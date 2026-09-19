@@ -146,6 +146,22 @@ export function cellLevelDiffBadge(
 }
 
 /**
+ * The badge a published cell carries as a whole. A plain "New" is admitted
+ * only while the cell has at most one pill: with two pills the cell-level
+ * marker sits over the first one, which is exactly the pill that may not be
+ * new (a second shift added beside a published one), so each pill carries its
+ * own marker instead and the badge follows the ring.
+ */
+export function publishCellLevelBadge(
+  summary: ShiftDiffDescriptorResult | null | undefined,
+  pillCount: number,
+): ShiftDiffBadgeDescriptor | null {
+  const cellBadge = cellLevelDiffBadge(summary);
+  if (cellBadge) return cellBadge;
+  return pillCount <= 1 && summary?.cellBadge?.kind === "new" ? summary.cellBadge : null;
+}
+
+/**
  * Tooltip for the request corner fold: what kind of request is on this shift
  * and whether anyone still has to act on it.
  */
@@ -173,7 +189,7 @@ export function formatRelativePublishTime(isoDate: string): string {
 }
 
 export function buildPublishTooltip(args: {
-  publishDiff: PublishChange & { publishedAt: string; publishedBy: string };
+  publishDiff: PublishChange & { publishedAt: string; publishedBy: string | null };
   resolvePublisherName?: (userId: string) => string | null;
   detail?: string;
   timeZone?: string | null;
@@ -198,9 +214,12 @@ export function formatPublishedMetadata(args: {
   timeZone?: string | null;
 }): string {
   const { publishedAt: publishedAtIso, publishedBy, resolvePublisherName, timeZone } = args;
-  const publisherName = publishedBy
-    ? (resolvePublisherName?.(publishedBy) ?? "Unknown author")
-    : null;
+  // No resolver means the viewer is not shown who published, not that the
+  // publisher is unknown; "Unknown author" is for a resolver that has no name.
+  const publisherName =
+    publishedBy && resolvePublisherName
+      ? (resolvePublisherName(publishedBy) ?? "Unknown author")
+      : null;
   const publishedAt = new Date(publishedAtIso);
   const publishedDateTime = Number.isNaN(publishedAt.getTime())
     ? "Published at an unknown time"
@@ -269,6 +288,16 @@ export function absenceTypeIdFromPublishState(
   state: ScheduleCellState | null | undefined,
 ): number | null {
   return state?.kind === "absence" ? state.absenceTypeId : null;
+}
+
+/** Per-segment mentored flags in pill order, so a published mentored toggle gets its badge. */
+export function mentoredFlagsFromPublishState(
+  state: ScheduleCellState | null | undefined,
+): boolean[] {
+  if (state?.kind !== "worked") return [];
+  return [...state.segments]
+    .sort((left, right) => left.position - right.position)
+    .map((segment) => segment.isMentored ?? false);
 }
 
 export function timeRangesFromPublishState(

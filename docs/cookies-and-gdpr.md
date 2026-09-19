@@ -264,7 +264,7 @@ The `custom_access_token_hook` (in `supabase/migrations/002_functions_triggers.s
 
 The hook also updates `profiles.last_sign_in_at` (debounced to 5-minute intervals) for GDPR account-cleanup tracking.
 
-### Middleware Processing
+### Request Proxy Processing
 
 `apps/web/src/proxy.ts` processes auth cookies on every request:
 
@@ -276,7 +276,7 @@ The hook also updates `profiles.last_sign_in_at` (debounced to 5-minute interval
 6. Sets verified role headers on the response (`x-dubgrid-role`, `x-dubgrid-org-id`, `x-dubgrid-org-slug`)
 7. The `setAll()` callback allows Supabase to refresh expired cookies automatically
 
-**Critical fallback:** If `jwtVerify` fails (can occur in production for various reasons), middleware falls back to `decodeJwt` (unverified) for non-gridmaster users. Gridmasters are blocked from unverified tokens. RLS is the real security boundary, not the middleware JWT check.
+**Critical fallback:** If `jwtVerify` fails (can occur in production for various reasons), the proxy falls back to `decodeJwt` (unverified) for non-gridmaster users. Gridmasters are blocked from unverified tokens. RLS is the real security boundary, not the proxy JWT check; Route Handlers re-verify every token locally against the JWKS and a Redis revocation marker.
 
 ---
 
@@ -341,7 +341,7 @@ Allows gridmasters to view the app as another user for support and debugging.
 }
 ```
 
-### Middleware Handling
+### Request Proxy Handling
 
 ```
 Request arrives
@@ -356,7 +356,7 @@ Request arrives
 
 - `setImpersonationCookie(data)` — sets the cookie (client-side)
 - `clearImpersonationCookie()` — clears the cookie (client-side)
-- `getImpersonationFromCookie(cookieString)` — parses from raw cookie string (Edge middleware and browser)
+- `getImpersonationFromCookie(cookieString)` — parses from raw cookie string (request proxy and browser)
 
 ---
 

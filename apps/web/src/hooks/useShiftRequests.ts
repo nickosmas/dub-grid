@@ -1,12 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getIsoDateInTimeZone, resolveActiveShiftRequests } from "@dubgrid/schedule-core";
-import { queueNotification } from "@/lib/notify";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
-import {
-  createBrowserRealtimeChannel,
-  removeBrowserRealtimeChannel,
-} from "@/features/account/client";
+import { queryKeys } from "@/lib/query-keys";
 import {
   cancelShiftRequest,
   claimShiftRequest,
@@ -39,7 +36,20 @@ function errMsg(err: unknown, fallback: string): string {
   return message;
 }
 
+export interface ShiftRequestsOptions {
+  /**
+   * Fetch every status in the window rather than only open and
+   * pending-approval ones. `requests` and the derived lists still hold only
+   * the active ones; `allRequests` holds everything fetched. The dashboard
+   * uses this so its activity feed and its pending-approvals count come from
+   * one request instead of two for the same period.
+   */
+  includeAllStatuses?: boolean;
+}
+
 export interface ShiftRequestsData {
+  /** Everything the last fetch returned, before any activity filtering. */
+  allRequests: ShiftRequest[];
   /** All requests for the org (filtered by active statuses by default). */
   requests: ShiftRequest[];
   /** Open pickup requests available for claiming. */
@@ -95,18 +105,14 @@ export function useShiftRequests(
   // mobile's period-scoped behavior instead of showing every open-ended
   // request in the org regardless of the period toggle.
   dateRange?: { startDate: string; endDate: string } | null,
+  options?: ShiftRequestsOptions,
 ): ShiftRequestsData {
-  const [requests, setRequests] = useState<ShiftRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [now, setNow] = useState(() => Date.now());
-  const orgIdRef = useRef(orgId);
-  orgIdRef.current = orgId;
-  const requestsRef = useRef(requests);
-  requestsRef.current = requests;
+  const includeAllStatuses = options?.includeAllStatuses === true;
 
-  // Stabilize the Map reference: serialize to a string key so useCallback
-  // doesn't get a new identity every render (Map is compared by reference).
+  // Stabilize the Map reference: serialize to a string key so the query key
+  // doesn't change identity every render (Map is compared by reference).
   const assignmentLabelMapKey = useMemo(
     () => JSON.stringify([...assignmentLabelMap.entries()].sort((a, b) => a[0] - b[0])),
     [assignmentLabelMap],
@@ -116,78 +122,47 @@ export function useShiftRequests(
   const dateRangeStart = dateRange?.startDate ?? null;
   const dateRangeEnd = dateRange?.endDate ?? null;
 
-  const fetchRequests = useCallback(async () => {
-    if (!orgId) {
-      setRequests([]);
-      setLoading(false);
-      return;
-    }
-    try {
-      setError(null);
-      const data = await fetchShiftRequests(orgId, assignmentLabelMapRef.current, {
-        status: ["open", "pending_approval"] as ShiftRequestStatus[],
+  // Lives in react-query under the org's shiftRequests prefix, which is what
+  // the shared org realtime channel (useOrgRealtimeInvalidation, mounted by
+  // useOrganizationData) invalidates on every shift_requests row change.
+  // This hook used to open its own raw channel per mount on top of that,
+  // reintroducing the per-hook-channel problem the shared helper exists to
+  // fix (build plan item 29).
+  const query = useQuery({
+    queryKey: [
+      ...queryKeys.shiftRequests.all(orgId ?? "none"),
+      dateRangeStart ?? "",
+      dateRangeEnd ?? "",
+      includeAllStatuses ? "all" : "active",
+      assignmentLabelMapKey,
+    ],
+    queryFn: () =>
+      fetchShiftRequests(orgId!, assignmentLabelMapRef.current, {
+        ...(includeAllStatuses
+          ? {}
+          : { status: ["open", "pending_approval"] as ShiftRequestStatus[] }),
         ...(dateRangeStart && dateRangeEnd
           ? { startDate: dateRangeStart, endDate: dateRangeEnd }
           : {}),
-      });
-      if (orgIdRef.current === orgId) {
-        setRequests(data);
-      }
-    } catch (err: unknown) {
-      const msg = errMsg(err, "We couldn't fetch shift requests. Try again.");
-      Sentry.captureException(err);
-      if (orgIdRef.current === orgId) {
-        setError(msg);
-      }
-    } finally {
-      setLoading(false);
-    }
-    // assignmentLabelMapKey is intentional: stabilization proxy for Map reference (read via assignmentLabelMapRef.current)
-  }, [orgId, assignmentLabelMapKey, dateRangeStart, dateRangeEnd]);
+      }),
+    enabled: Boolean(orgId),
+    staleTime: 15_000,
+  });
 
-  // Initial fetch
-  useEffect(() => {
-    fetchRequests();
-  }, [fetchRequests]);
-
-  // Realtime subscription — keyed on orgId only. Uses fetchRequestsRef
-  // so the channel callback always has the latest fetch function without
-  // causing channel teardown/recreate on every assignmentLabelMap change.
-  const fetchRequestsRef = useRef(fetchRequests);
-  fetchRequestsRef.current = fetchRequests;
+  const requests = useMemo(() => (orgId ? (query.data ?? []) : []), [orgId, query.data]);
+  const loading = Boolean(orgId) && query.isPending;
+  const error = query.error
+    ? errMsg(query.error, "We couldn't fetch shift requests. Try again.")
+    : null;
 
   useEffect(() => {
+    if (query.error) Sentry.captureException(query.error);
+  }, [query.error]);
+
+  const fetchRequests = useCallback(async () => {
     if (!orgId) return;
-
-    let hadError = false;
-
-    const channel = createBrowserRealtimeChannel(`shift_requests_${orgId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "shift_requests",
-          filter: `org_id=eq.${orgId}`,
-        },
-        () => {
-          fetchRequestsRef.current();
-        },
-      )
-      .subscribe((status: string, err?: Error) => {
-        if (status === "SUBSCRIBED" && hadError) {
-          hadError = false;
-          fetchRequestsRef.current();
-        } else if (status === "CHANNEL_ERROR") {
-          hadError = true;
-          Sentry.captureException(err ?? new Error("shift_requests channel error"));
-        }
-      });
-
-    return () => {
-      void removeBrowserRealtimeChannel(channel);
-    };
-  }, [orgId]);
+    await query.refetch();
+  }, [orgId, query]);
 
   useEffect(() => {
     const expiryTimes = requests
@@ -238,13 +213,17 @@ export function useShiftRequests(
     [requests, now, timeZone],
   );
 
+  // Invalidate the whole org prefix rather than refetch just this query, so
+  // a sibling instance (the dashboard's all-status window next to the
+  // schedule page's active list) refreshes from the same mutation.
   const refetchAfterMutation = useCallback(async () => {
+    if (!orgId) return;
     try {
-      await fetchRequestsRef.current();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.shiftRequests.all(orgId) });
     } catch (err) {
       Sentry.captureException(err);
     }
-  }, []);
+  }, [orgId, queryClient]);
 
   // Available pickups include public pickup offers plus targeted pickups for me.
   const openPickups = useMemo(
@@ -321,14 +300,9 @@ export function useShiftRequests(
                 : "Shift posted as available"
               : "Swap request sent",
         );
-        if (id) {
-          queueNotification({
-            action: "shift_request_created",
-            orgId,
-            requestId: id,
-            requestType: type,
-          });
-        }
+        // The server route already dispatches shift_request_created via
+        // dispatchNotificationEvent; queuing it again here double-sent every
+        // request's notification.
         await refetchAfterMutation();
         return id;
       } catch (err: unknown) {
@@ -345,12 +319,7 @@ export function useShiftRequests(
       try {
         await claimShiftRequest(requestId, claimerEmpId, orgId);
         toast.success("Shift claimed. Awaiting admin approval.");
-        queueNotification({
-          action: "shift_request_claimed",
-          orgId,
-          requestId,
-          requestType: "pickup",
-        });
+        // Server route already dispatches shift_request_claimed.
         await refetchAfterMutation();
         return true;
       } catch (err: unknown) {
@@ -372,14 +341,7 @@ export function useShiftRequests(
       try {
         const id = await volunteerForOpenShift(orgId, empId, shiftDate, input, focusAreaId);
         toast.success("Volunteered for shift. Awaiting admin approval.");
-        if (id) {
-          queueNotification({
-            action: "shift_request_created",
-            orgId,
-            requestId: id,
-            requestType: "pickup",
-          });
-        }
+        // Server route already dispatches shift_request_created.
         await refetchAfterMutation();
         return true;
       } catch (err: unknown) {
@@ -412,16 +374,7 @@ export function useShiftRequests(
       try {
         await resolveShiftRequest(requestId, approved, note, orgId);
         toast.success(approved ? "Request approved" : "Request rejected");
-        // Find the request to get its type for the notification
-        const request = requestsRef.current.find((r) => r.id === requestId);
-        queueNotification({
-          action: "shift_request_resolved",
-          orgId,
-          requestId,
-          requestType: request?.type ?? "pickup",
-          approved,
-          adminNote: note,
-        });
+        // Server route already dispatches shift_request_resolved.
         await refetchAfterMutation();
         return true;
       } catch (err: unknown) {
@@ -449,6 +402,7 @@ export function useShiftRequests(
   );
 
   return {
+    allRequests: requests,
     requests: activeRequests,
     openPickups,
     myRequests,

@@ -3,6 +3,7 @@
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { formatBillingStatusLabel } from "@/lib/client-facing";
 import type { GridmasterBillingOrgSummary } from "@/types";
+import { NumberField } from "@/components/ui/number-field";
 
 export type BillingConfirmAction =
   | { kind: "sync_billing"; org: GridmasterBillingOrgSummary }
@@ -102,13 +103,11 @@ export function ExtendTrialDialog({
       message={
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <span>Extend the trial for {org.orgName} by how many days?</span>
-          <input
-            className="dg-input"
-            inputMode="numeric"
+          <NumberField
+            nullable
             min={1}
-            type="number"
-            value={days}
-            onChange={(event) => onDaysChange(event.target.value)}
+            value={days === "" ? null : Number.parseInt(days, 10)}
+            onChange={(value) => onDaysChange(value === null ? "" : String(value))}
             aria-label="Trial extension days"
           />
         </div>

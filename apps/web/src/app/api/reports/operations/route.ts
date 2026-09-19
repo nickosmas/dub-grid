@@ -3,7 +3,10 @@ import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { isFeatureEnabled } from "@/lib/feature-flags";
-import { loadOperationsReport } from "@/features/reports/server/operations";
+import {
+  loadOperationsReport,
+  loadOperationsReportFilterOptions,
+} from "@/features/reports/server/operations";
 import { apiErrorResponse } from "@/lib/error-handling";
 import { operationsQuerySchema, parseOperationsFilters, parseOperationsRange } from "./params";
 
@@ -43,11 +46,20 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const payload = await loadOperationsReport(auth.serviceClient, {
-      orgId: parsed.data.orgId,
-      range,
-      filters,
-    });
+    // The page populates its filter dropdowns before any report is generated.
+    // Answering that with the full payload computed every report type for
+    // the whole range, then did it all again for the filtered generate.
+    const payload =
+      parsed.data.optionsOnly === "1"
+        ? await loadOperationsReportFilterOptions(auth.serviceClient, {
+            orgId: parsed.data.orgId,
+            range,
+          })
+        : await loadOperationsReport(auth.serviceClient, {
+            orgId: parsed.data.orgId,
+            range,
+            filters,
+          });
 
     return NextResponse.json(payload, {
       headers: {

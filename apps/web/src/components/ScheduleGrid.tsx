@@ -118,10 +118,10 @@ import {
   getDraftBorder,
   getPublishDiffRing,
   joinBoxShadows,
-  areGridCellIdsEqual,
   getGridCellKey,
   getBulkSelectionRingStyle,
   cellLevelDiffBadge,
+  publishCellLevelBadge,
   cellShowsDraftDiffBadge,
   formatActiveRequestLabel,
   buildPublishTooltip,
@@ -130,6 +130,7 @@ import {
   splitShiftLabelParts,
   assignmentIdsFromPublishState,
   absenceTypeIdFromPublishState,
+  mentoredFlagsFromPublishState,
   timeRangesFromPublishState,
   SINGLE_SHIFT_PILL_RADIUS,
   MULTI_SHIFT_PILL_RADIUS,
@@ -212,11 +213,11 @@ interface LegacyScheduleGridProps {
   publishDiffForKey?: (
     empId: string,
     date: Date,
-  ) => (PublishChange & { publishedAt: string; publishedBy: string }) | null;
+  ) => (PublishChange & { publishedAt: string; publishedBy: string | null }) | null;
   publishedMetadataForKey?: (
     empId: string,
     date: Date,
-  ) => { publishedAt: string; publishedBy: string; timeZone?: string | null } | null;
+  ) => { publishedAt: string; publishedBy: string | null; timeZone?: string | null } | null;
   /** Set of cell keys (empId_date) that were recently published since user's last view */
   /** Purely informational: who else currently has each cell open. Never blocks. */
   cellEditors?: Map<string, { userId: string; userName: string }>;
@@ -254,7 +255,6 @@ interface LegacyScheduleGridProps {
   /** Callback when a user clicks to claim an open shift */
   onClaimOpenShift?: (openShift: GridOpenShift) => void;
   onCellFocus?: (cellId: GridCellId) => void;
-  activeCellId?: GridCellId | null;
   bulkDeleteMode?: boolean;
   bulkSelectedCellKeys?: Set<string>;
   bulkSelectableCellKeys?: Set<string>;
@@ -321,11 +321,11 @@ interface SectionBlockProps {
   publishDiffForKey?: (
     empId: string,
     date: Date,
-  ) => (PublishChange & { publishedAt: string; publishedBy: string }) | null;
+  ) => (PublishChange & { publishedAt: string; publishedBy: string | null }) | null;
   publishedMetadataForKey?: (
     empId: string,
     date: Date,
-  ) => { publishedAt: string; publishedBy: string; timeZone?: string | null } | null;
+  ) => { publishedAt: string; publishedBy: string | null; timeZone?: string | null } | null;
   certifications: NamedItem[];
   orgRoles: NamedItem[];
   /** Purely informational: who else currently has each cell open. Never blocks. */
@@ -351,7 +351,6 @@ interface SectionBlockProps {
   resolvePublisherName?: (userId: string) => string | null;
   openShifts?: GridOpenShift[];
   onClaimOpenShift?: (openShift: GridOpenShift) => void;
-  activeCellId?: GridCellId | null;
   bulkDeleteMode?: boolean;
   bulkSelectedCellKeys?: Set<string>;
   bulkSelectableCellKeys?: Set<string>;
@@ -365,6 +364,111 @@ interface ActiveOutlineRect {
   height: number;
 }
 
+const ActiveCellContext = React.createContext<GridCellId | null>(null);
+
+/**
+ * The active-cell outline reads the active cell from context rather than
+ * SectionBlock props, so opening a panel or moving the active cell re-renders
+ * this overlay alone instead of every row in the section. It also marks the
+ * cell with `data-active` for the cell's own styling.
+ */
+function ActiveCellOutline({
+  sectionId,
+  gridRef,
+  remeasureKey,
+}: {
+  sectionId: number;
+  gridRef: React.RefObject<HTMLDivElement | null>;
+  remeasureKey: string;
+}) {
+  const activeCellId = React.useContext(ActiveCellContext);
+  const [rect, setRect] = useState<ActiveOutlineRect | null>(null);
+
+  useLayoutEffect(() => {
+    if (!activeCellId || activeCellId.sectionId !== sectionId) {
+      setRect(null);
+      return;
+    }
+
+    const selector =
+      `[data-slot="cell"]` +
+      `[data-emp-id="${activeCellId.empId}"]` +
+      `[data-date-key="${activeCellId.dateKey}"]` +
+      `[data-section-id="${activeCellId.sectionId}"]`;
+
+    let frame = 0;
+    let resizeObserver: ResizeObserver | null = null;
+    let markedEl: HTMLElement | null = null;
+
+    // Read the grid ref inside the frame callback: this component sits inside
+    // the grid element, so on a mount with an active cell already set the
+    // ancestor's ref is not attached yet when this layout effect runs.
+    const measure = () => {
+      const gridEl = gridRef.current;
+      if (!gridEl) {
+        setRect(null);
+        return;
+      }
+      const cellEl = gridEl.querySelector<HTMLElement>(selector);
+      if (!cellEl) {
+        setRect(null);
+        return;
+      }
+      if (markedEl !== cellEl) {
+        markedEl?.removeAttribute("data-active");
+        cellEl.setAttribute("data-active", "true");
+        markedEl = cellEl;
+      }
+
+      const gridRect = gridEl.getBoundingClientRect();
+      const cellRect = cellEl.getBoundingClientRect();
+      const nextRect = {
+        left: cellRect.left - gridRect.left,
+        top: cellRect.top - gridRect.top,
+        width: cellRect.width + 1,
+        height: cellRect.height + 1,
+      };
+
+      setRect((prev) => {
+        if (
+          prev &&
+          prev.left === nextRect.left &&
+          prev.top === nextRect.top &&
+          prev.width === nextRect.width &&
+          prev.height === nextRect.height
+        ) {
+          return prev;
+        }
+        return nextRect;
+      });
+
+      if (!resizeObserver) {
+        resizeObserver = new ResizeObserver(() => {
+          window.requestAnimationFrame(measure);
+        });
+        resizeObserver.observe(gridEl);
+        resizeObserver.observe(cellEl);
+      }
+    };
+
+    frame = window.requestAnimationFrame(measure);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      resizeObserver?.disconnect();
+      markedEl?.removeAttribute("data-active");
+    };
+  }, [activeCellId, sectionId, gridRef, remeasureKey]);
+
+  if (!rect) return null;
+  return (
+    <div
+      className="dg-grid-active-outline"
+      aria-hidden="true"
+      style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
+    />
+  );
+}
+
 type ShiftDetailEntry = {
   label: string;
   jobName: string | null;
@@ -373,6 +477,8 @@ type ShiftDetailEntry = {
   isCustomTime: boolean;
   isMentored: boolean;
 };
+
+const EMPTY_ID_SET = new Set<number>();
 
 function EmployeeDetailHoverCard({
   employeeName,
@@ -728,7 +834,6 @@ const SectionBlock = memo(function SectionBlock({
   resolvePublisherName,
   openShifts,
   onClaimOpenShift,
-  activeCellId = null,
   bulkDeleteMode = false,
   bulkSelectedCellKeys,
   bulkSelectableCellKeys,
@@ -748,7 +853,6 @@ const SectionBlock = memo(function SectionBlock({
   const cardBodyRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
-  const [activeOutlineRect, setActiveOutlineRect] = useState<ActiveOutlineRect | null>(null);
 
   const updateScrollButtons = useCallback(() => {
     const el = scrollContainerRef.current;
@@ -875,76 +979,6 @@ const SectionBlock = memo(function SectionBlock({
       delete group.dataset.stuck;
     };
   }, [employees.length, weekDates.length, fitToContainer]);
-
-  useLayoutEffect(() => {
-    const gridEl = gridRef.current;
-    if (!gridEl || !activeCellId || activeCellId.sectionId !== sectionId) {
-      setActiveOutlineRect(null);
-      return;
-    }
-
-    const selector =
-      `[data-slot="cell"]` +
-      `[data-emp-id="${activeCellId.empId}"]` +
-      `[data-date-key="${activeCellId.dateKey}"]` +
-      `[data-section-id="${activeCellId.sectionId}"]`;
-
-    let frame = 0;
-    let resizeObserver: ResizeObserver | null = null;
-
-    const measure = () => {
-      const cellEl = gridEl.querySelector<HTMLElement>(selector);
-      if (!cellEl) {
-        setActiveOutlineRect(null);
-        return;
-      }
-
-      const gridRect = gridEl.getBoundingClientRect();
-      const cellRect = cellEl.getBoundingClientRect();
-      const nextRect = {
-        left: cellRect.left - gridRect.left,
-        top: cellRect.top - gridRect.top,
-        width: cellRect.width + 1,
-        height: cellRect.height + 1,
-      };
-
-      setActiveOutlineRect((prev) => {
-        if (
-          prev &&
-          prev.left === nextRect.left &&
-          prev.top === nextRect.top &&
-          prev.width === nextRect.width &&
-          prev.height === nextRect.height
-        ) {
-          return prev;
-        }
-        return nextRect;
-      });
-
-      if (!resizeObserver) {
-        resizeObserver = new ResizeObserver(() => {
-          window.requestAnimationFrame(measure);
-        });
-        resizeObserver.observe(gridEl);
-        resizeObserver.observe(cellEl);
-      }
-    };
-
-    frame = window.requestAnimationFrame(measure);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      resizeObserver?.disconnect();
-    };
-  }, [
-    activeCellId,
-    sectionId,
-    fitToContainer,
-    colWidth,
-    nameColWidth,
-    shiftDisplayMode,
-    weekDates,
-    employees.length,
-  ]);
 
   const scrollDays = useCallback(
     (direction: "left" | "right") => {
@@ -1691,14 +1725,11 @@ const SectionBlock = memo(function SectionBlock({
                                 ) : null}
                               </span>
                               <NumericBadge
-                                aria-label={`${needed} needed`}
-                                value={needed}
+                                label={`${needed} needed`}
+                                count={needed}
                                 style={{
                                   background: scPill?.text ?? "var(--dg-color-warning)",
                                   color: scPill?.color ?? "var(--dg-color-text-inverse)",
-                                  fontSize: "var(--dg-type-badge-size)",
-                                  fontWeight: 600,
-                                  lineHeight: 1,
                                 }}
                               />
                             </Button>
@@ -2016,7 +2047,6 @@ const SectionBlock = memo(function SectionBlock({
                         bulkDeleteMode && !!bulkSelectableCellKeys?.has(bulkCellKey);
                       const isBulkSelected =
                         bulkDeleteMode && !!bulkSelectedCellKeys?.has(bulkCellKey);
-                      const isActiveCell = areGridCellIdsEqual(activeCellId, cellId);
                       const hasDraggableEntry =
                         canDragShifts &&
                         !bulkDeleteMode &&
@@ -2067,7 +2097,6 @@ const SectionBlock = memo(function SectionBlock({
                           data-week-split-start={isSplitDayDivider(index) ? "true" : undefined}
                           data-today={isToday ? "true" : undefined}
                           data-top-divider={topDivider}
-                          data-active={isActiveCell ? "true" : undefined}
                           data-bulk-mode={bulkDeleteMode ? "true" : undefined}
                           data-bulk-selectable={isBulkSelectable ? "true" : undefined}
                           data-bulk-selected={isBulkSelected ? "true" : undefined}
@@ -2211,20 +2240,6 @@ const SectionBlock = memo(function SectionBlock({
                                     publishDiff.isNewAddition !== false;
                                   const isPubDiff =
                                     showsPublishDiff && isMeaningfulPublishNew ? publishDiff : null;
-                                  const publishFrom =
-                                    publishDiff?.from ??
-                                    assignmentIdsFromPublishState(
-                                      publishDiff?.fromState,
-                                      publishedAssignmentIdByPair,
-                                    );
-                                  const publishTo =
-                                    publishDiff?.to ??
-                                    assignmentIdsFromPublishState(
-                                      publishDiff?.toState,
-                                      publishedAssignmentIdByPair,
-                                    );
-                                  const currentShiftLabels = splitShiftLabelParts(shiftLabel);
-                                  const publishedShiftLabels = splitShiftLabelParts(publishedLabel);
                                   // Persisted segment snapshots carry stable IDs, not presentation
                                   // labels. Treat an absent label as absent — passing `?` here masks
                                   // the current/published label fallback and produced `Added ?`.
@@ -2288,10 +2303,6 @@ const SectionBlock = memo(function SectionBlock({
                                       ? `${shiftName} · ${job.name}`
                                       : shiftName;
                                   };
-                                  const currentHistoryLabels =
-                                    cellCodeIds.map(resolveHistoryShiftLabel);
-                                  const publishedHistoryLabels =
-                                    publishFrom.map(resolveHistoryShiftLabel);
                                   const draftDiff = shouldComputeDraftDiff
                                     ? buildShiftDiffDescriptors({
                                         before: {
@@ -2316,58 +2327,78 @@ const SectionBlock = memo(function SectionBlock({
                                             count: cellCodeIds.length,
                                           }),
                                         },
-                                        beforeShiftLabels: publishedShiftLabels,
-                                        afterShiftLabels: currentShiftLabels,
+                                        beforeShiftLabels: splitShiftLabelParts(publishedLabel),
+                                        afterShiftLabels: splitShiftLabelParts(shiftLabel),
                                         resolveAssignmentDefinitionLabel: resolveGridShiftLabel,
                                         resolveAbsenceLabel: resolveGridAbsenceLabel,
                                       })
                                     : null;
+                                  // Only a cell with a published change to
+                                  // paint pays for resolving its before and
+                                  // after states; every other cell used to
+                                  // derive both id lists and both history
+                                  // label lists on every render for nothing.
                                   const publishDiffSummary = isPubDiff
-                                    ? buildShiftDiffDescriptors({
-                                        before: {
-                                          assignmentIds: publishFrom,
-                                          absenceTypeId:
-                                            publishDiff!.fromAbsenceTypeId ??
-                                            absenceTypeIdFromPublishState(publishDiff?.fromState),
-                                          timeRanges: timeRangesFromPublishState(
-                                            publishDiff?.fromState,
-                                            publishDiff?.fromCustomStart,
-                                            publishDiff?.fromCustomEnd,
-                                            publishFrom.length,
-                                          ),
-                                        },
-                                        after: {
-                                          assignmentIds: publishTo,
-                                          absenceTypeId:
-                                            publishDiff!.toAbsenceTypeId ??
-                                            absenceTypeIdFromPublishState(publishDiff?.toState),
-                                          timeRanges: timeRangesFromPublishState(
-                                            publishDiff?.toState,
-                                            publishDiff?.toCustomStart,
-                                            publishDiff?.toCustomEnd,
-                                            publishTo.length,
-                                          ),
-                                        },
-                                        beforeShiftLabels:
-                                          snapshotLabels(publishDiff?.fromSegments) ??
-                                          publishedHistoryLabels ??
-                                          publishedShiftLabels,
-                                        afterShiftLabels:
-                                          snapshotLabels(publishDiff?.toSegments) ??
-                                          currentHistoryLabels ??
-                                          currentShiftLabels,
-                                        resolveAssignmentDefinitionLabel: resolveHistoryShiftLabel,
-                                        resolveAbsenceLabel: (absenceTypeId) =>
-                                          absenceTypeMap?.get(absenceTypeId)?.name ?? "?",
-                                      })
+                                    ? (() => {
+                                        const publishFrom =
+                                          isPubDiff.from ??
+                                          assignmentIdsFromPublishState(
+                                            isPubDiff.fromState,
+                                            publishedAssignmentIdByPair,
+                                          );
+                                        const publishTo =
+                                          isPubDiff.to ??
+                                          assignmentIdsFromPublishState(
+                                            isPubDiff.toState,
+                                            publishedAssignmentIdByPair,
+                                          );
+                                        return buildShiftDiffDescriptors({
+                                          before: {
+                                            assignmentIds: publishFrom,
+                                            absenceTypeId:
+                                              isPubDiff.fromAbsenceTypeId ??
+                                              absenceTypeIdFromPublishState(isPubDiff.fromState),
+                                            timeRanges: timeRangesFromPublishState(
+                                              isPubDiff.fromState,
+                                              isPubDiff.fromCustomStart,
+                                              isPubDiff.fromCustomEnd,
+                                              publishFrom.length,
+                                            ),
+                                            isMentoredFlags: mentoredFlagsFromPublishState(
+                                              isPubDiff.fromState,
+                                            ),
+                                          },
+                                          after: {
+                                            assignmentIds: publishTo,
+                                            absenceTypeId:
+                                              isPubDiff.toAbsenceTypeId ??
+                                              absenceTypeIdFromPublishState(isPubDiff.toState),
+                                            timeRanges: timeRangesFromPublishState(
+                                              isPubDiff.toState,
+                                              isPubDiff.toCustomStart,
+                                              isPubDiff.toCustomEnd,
+                                              publishTo.length,
+                                            ),
+                                            isMentoredFlags: mentoredFlagsFromPublishState(
+                                              isPubDiff.toState,
+                                            ),
+                                          },
+                                          beforeShiftLabels:
+                                            snapshotLabels(isPubDiff.fromSegments) ??
+                                            publishFrom.map(resolveHistoryShiftLabel),
+                                          afterShiftLabels:
+                                            snapshotLabels(isPubDiff.toSegments) ??
+                                            cellCodeIds.map(resolveHistoryShiftLabel),
+                                          resolveAssignmentDefinitionLabel:
+                                            resolveHistoryShiftLabel,
+                                          resolveAbsenceLabel: (absenceTypeId) =>
+                                            absenceTypeMap?.get(absenceTypeId)?.name ?? "?",
+                                        });
+                                      })()
                                     : null;
 
                                   const publishCellBadge = isPubDiff
-                                    ? (cellLevelDiffBadge(publishDiffSummary) ??
-                                      (publishDiffSummary?.cellBadge?.kind === "new" &&
-                                      publishDiff?.isNewAddition !== false
-                                        ? publishDiffSummary.cellBadge
-                                        : null))
+                                    ? publishCellLevelBadge(publishDiffSummary, labels.length)
                                     : null;
                                   const publishBadge: GridDiffBadgeConfig | null = publishCellBadge
                                     ? {
@@ -2418,11 +2449,10 @@ const SectionBlock = memo(function SectionBlock({
                                     descriptor: ShiftDiffBadgeDescriptor | null | undefined;
                                   }): GridDiffBadgeConfig | null => {
                                     const { source, descriptor } = args;
+                                    // A draft "New" is already the dashed border.
                                     if (
                                       !descriptor ||
-                                      (descriptor.kind === "new" &&
-                                        (source === "draft" ||
-                                          publishDiff?.isNewAddition === false))
+                                      (descriptor.kind === "new" && source === "draft")
                                     ) {
                                       return null;
                                     }
@@ -3671,9 +3701,19 @@ const SectionBlock = memo(function SectionBlock({
                         letterSpacing: "0.04em",
                         display: "flex",
                         alignItems: "center",
-                        borderBottom: isLastRow
-                          ? undefined
-                          : "1px solid var(--dg-color-border-light)",
+                        // A real border-bottom on a position:sticky element
+                        // gets clipped by Chromium at fractional browser
+                        // zoom; drawn as a background image instead, same
+                        // as the header's Staff cell above.
+                        ...(isLastRow
+                          ? {}
+                          : {
+                              backgroundImage:
+                                "linear-gradient(var(--dg-color-border-light), var(--dg-color-border-light))",
+                              backgroundPosition: "0 100%",
+                              backgroundRepeat: "no-repeat",
+                              backgroundSize: "100% 1px",
+                            }),
                         boxShadow: joinBoxShadows(
                           "1px 0 0 0 var(--dg-color-border-light)",
                           "2px 0 4px rgba(0,0,0,0.02)",
@@ -3753,18 +3793,11 @@ const SectionBlock = memo(function SectionBlock({
                   </div>
                 );
               })}
-            {activeOutlineRect ? (
-              <div
-                className="dg-grid-active-outline"
-                aria-hidden="true"
-                style={{
-                  left: activeOutlineRect.left,
-                  top: activeOutlineRect.top,
-                  width: activeOutlineRect.width,
-                  height: activeOutlineRect.height,
-                }}
-              />
-            ) : null}
+            <ActiveCellOutline
+              sectionId={sectionId}
+              gridRef={gridRef}
+              remeasureKey={`${fitToContainer ? 1 : 0}|${colWidth}|${nameColWidth}|${shiftDisplayMode}|${weekDates.map((d) => d.getTime()).join(",")}|${employees.length}`}
+            />
           </div>
         </div>
       </div>
@@ -3826,7 +3859,6 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   resolvePublisherName,
   openShifts,
   onClaimOpenShift,
-  activeCellId = null,
   bulkDeleteMode = false,
   bulkSelectedCellKeys,
   bulkSelectableCellKeys,
@@ -3995,6 +4027,69 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
     [departmentSections, sectionHasVisibleContent],
   );
 
+  // Derived once per input change rather than inline in render, so a page
+  // re-render that leaves rows untouched (opening a panel, moving the active
+  // cell) hands every SectionBlock the same props and its memo holds.
+  const sectionRenderData = useMemo(() => {
+    const map = new Map<
+      number,
+      {
+        sectionId: number;
+        exclusiveCodeIds: Set<number>;
+        employees: Employee[];
+        openShifts: GridOpenShift[] | undefined;
+      }
+    >();
+    for (const { focusAreas: deptFAs } of renderedDepartmentSections) {
+      for (const fa of deptFAs) {
+        const sectionId = focusAreaIdByName[fa.name] ?? fa.id;
+        const exclusiveCodeIds = exclusiveCodeIdsPerSection[fa.name] ?? EMPTY_ID_SET;
+        const rawHomeEmps = filteredEmployees.filter(
+          (e) => sectionId != null && e.focusAreaIds.includes(sectionId),
+        );
+        const homeEmps = isCellInteractive
+          ? rawHomeEmps
+          : rawHomeEmps.filter((emp) =>
+              allDates.some((date) => {
+                const codeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
+                return codeIds.some(
+                  (id) =>
+                    exclusiveCodeIds.has(id) ||
+                    assignments.find((sc) => sc.id === id)?.focusAreaId === null,
+                );
+              }),
+            );
+        const guestEmps = allEmployees.filter(
+          (e) =>
+            e.focusAreaIds.length > 0 &&
+            (sectionId == null || !e.focusAreaIds.includes(sectionId)) &&
+            allDates.some((date) => {
+              const codeIds = assignmentIdsForKey?.(e.id, date) ?? [];
+              return codeIds.some((id) => exclusiveCodeIds.has(id));
+            }),
+        );
+        map.set(fa.id, {
+          sectionId,
+          exclusiveCodeIds,
+          employees: [...homeEmps, ...guestEmps],
+          openShifts: openShifts?.filter((os) => sectionId != null && os.focusAreaId === sectionId),
+        });
+      }
+    }
+    return map;
+  }, [
+    renderedDepartmentSections,
+    focusAreaIdByName,
+    exclusiveCodeIdsPerSection,
+    filteredEmployees,
+    allEmployees,
+    isCellInteractive,
+    allDates,
+    assignmentIdsForKey,
+    assignments,
+    openShifts,
+  ]);
+
   const hasOpenShifts = (openShifts?.length ?? 0) > 0;
   const gridLayout = getScheduleGridLayout({
     spanWeeks,
@@ -4066,35 +4161,15 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
           {renderedDepartmentSections.map(({ department: dept, focusAreas: deptFAs }) => (
             <div key={dept.id}>
               {deptFAs.map((fa) => {
+                const section = sectionRenderData.get(fa.id);
+                if (!section) return null;
+                const {
+                  sectionId,
+                  exclusiveCodeIds,
+                  employees: sectionEmps,
+                  openShifts: sectionOpenShifts,
+                } = section;
                 const sectionName = fa.name;
-                const sectionId = focusAreaIdByName[fa.name] ?? fa.id;
-                const exclusiveCodeIds = exclusiveCodeIdsPerSection[fa.name] ?? new Set<number>();
-
-                const rawHomeEmps = filteredEmployees.filter(
-                  (e) => sectionId != null && e.focusAreaIds.includes(sectionId),
-                );
-                const homeEmps = isCellInteractive
-                  ? rawHomeEmps
-                  : rawHomeEmps.filter((emp) =>
-                      allDates.some((date) => {
-                        const codeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
-                        return codeIds.some(
-                          (id) =>
-                            exclusiveCodeIds.has(id) ||
-                            assignments.find((sc) => sc.id === id)?.focusAreaId === null,
-                        );
-                      }),
-                    );
-                const guestEmps = allEmployees.filter(
-                  (e) =>
-                    e.focusAreaIds.length > 0 &&
-                    (sectionId == null || !e.focusAreaIds.includes(sectionId)) &&
-                    allDates.some((date) => {
-                      const codeIds = assignmentIdsForKey?.(e.id, date) ?? [];
-                      return codeIds.some((id) => exclusiveCodeIds.has(id));
-                    }),
-                );
-                const sectionEmps = [...homeEmps, ...guestEmps];
 
                 return (
                   <SectionBlock
@@ -4150,11 +4225,8 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                     useCompactRoleCertificationLabels={useCompactRoleCertificationLabels}
                     showShiftDetailHoverCards={showShiftDetailHoverCards}
                     resolvePublisherName={resolvePublisherName}
-                    openShifts={openShifts?.filter(
-                      (os) => sectionId != null && os.focusAreaId === sectionId,
-                    )}
+                    openShifts={sectionOpenShifts}
                     onClaimOpenShift={onClaimOpenShift}
-                    activeCellId={activeCellId}
                     bulkDeleteMode={bulkDeleteMode}
                     bulkSelectedCellKeys={bulkSelectedCellKeys}
                     bulkSelectableCellKeys={bulkSelectableCellKeys}
@@ -4321,66 +4393,67 @@ const ScheduleGrid = memo(function ScheduleGrid({
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <LegacyScheduleGrid
-        filteredEmployees={model.filteredEmployees}
-        allEmployees={model.allEmployees}
-        week1={model.week1}
-        week2={model.week2}
-        spanWeeks={model.spanWeeks}
-        shiftForKey={model.accessors.shiftForKey}
-        assignmentIdsForKey={model.accessors.assignmentIdsForKey}
-        segmentsForKey={model.accessors.segmentsForKey}
-        publishedSegmentsForKey={model.accessors.publishedSegmentsForKey}
-        getShiftStyle={model.accessors.getShiftStyle}
-        handleCellClick={handleLegacyCellClick}
-        todayKey={model.todayKey}
-        highlightEmpIds={model.options.highlightEmpIds}
-        highlightScrollKey={model.options.highlightScrollKey}
-        focusAreas={model.focusAreas}
-        departments={Array.from(model.departmentsById.values())}
-        assignments={model.assignments}
-        historicalAssignments={model.historicalAssignments}
-        shiftCategories={model.shiftCategories}
-        jobs={model.jobs}
-        indicatorTypes={model.indicatorTypes}
-        isCellInteractive={model.options.isCellInteractive}
-        canDragShifts={bulkDeleteMode ? false : model.options.canDragShifts}
-        noteMarksForKey={model.accessors.noteMarksForKey}
-        activeFocusArea={model.activeFocusArea}
-        certifications={model.certifications}
-        orgRoles={model.orgRoles}
-        useCompactRoleCertificationLabels={model.useCompactRoleCertificationLabels}
-        getCustomShiftTimes={model.accessors.getCustomShiftTimes}
-        getPublishedCustomShiftTimes={model.accessors.getPublishedCustomShiftTimes}
-        draftKindForKey={model.accessors.draftKindForKey}
-        fromRecurringForKey={model.accessors.fromRecurringForKey}
-        showPublishDiffOverlay={model.options.showPublishDiffOverlay}
-        publishedLabelForKey={model.accessors.publishedLabelForKey}
-        publishedAssignmentIdsForKey={model.accessors.publishedAssignmentIdsForKey}
-        publishedAbsenceTypeIdForKey={model.accessors.publishedAbsenceTypeIdForKey}
-        publishDiffForKey={model.accessors.publishDiffForKey}
-        publishedMetadataForKey={model.accessors.publishedMetadataForKey}
-        cellEditors={model.cellEditors}
-        showAudit={model.options.showAudit}
-        createdByNameForKey={model.accessors.createdByNameForKey}
-        onCellHover={handleCellHover}
-        onCellContextMenu={handleLegacyContextMenu}
-        onCellFocus={handleCellFocus}
-        coverageRequirements={model.coverageRequirements}
-        absenceTypeMap={model.absenceTypeMap}
-        absenceTypeIdForKey={model.accessors.absenceTypeIdForKey}
-        activeRequestForKey={model.accessors.activeRequestForKey}
-        shiftDisplayMode={model.options.shiftDisplayMode}
-        showShiftDetailHoverCards={model.options.showShiftDetailHoverCards}
-        resolvePublisherName={model.resolvePublisherName}
-        openShifts={model.openShifts}
-        onClaimOpenShift={handlers.onClaimOpenShift}
-        activeCellId={activeCellId}
-        bulkDeleteMode={bulkDeleteMode}
-        bulkSelectedCellKeys={interactionState.bulkSelectedCellKeys}
-        bulkSelectableCellKeys={interactionState.bulkSelectableCellKeys}
-        onToggleBulkDeleteCell={handlers.onToggleBulkDeleteCell}
-      />
+      <ActiveCellContext.Provider value={activeCellId}>
+        <LegacyScheduleGrid
+          filteredEmployees={model.filteredEmployees}
+          allEmployees={model.allEmployees}
+          week1={model.week1}
+          week2={model.week2}
+          spanWeeks={model.spanWeeks}
+          shiftForKey={model.accessors.shiftForKey}
+          assignmentIdsForKey={model.accessors.assignmentIdsForKey}
+          segmentsForKey={model.accessors.segmentsForKey}
+          publishedSegmentsForKey={model.accessors.publishedSegmentsForKey}
+          getShiftStyle={model.accessors.getShiftStyle}
+          handleCellClick={handleLegacyCellClick}
+          todayKey={model.todayKey}
+          highlightEmpIds={model.options.highlightEmpIds}
+          highlightScrollKey={model.options.highlightScrollKey}
+          focusAreas={model.focusAreas}
+          departments={model.departmentList}
+          assignments={model.assignments}
+          historicalAssignments={model.historicalAssignments}
+          shiftCategories={model.shiftCategories}
+          jobs={model.jobs}
+          indicatorTypes={model.indicatorTypes}
+          isCellInteractive={model.options.isCellInteractive}
+          canDragShifts={bulkDeleteMode ? false : model.options.canDragShifts}
+          noteMarksForKey={model.accessors.noteMarksForKey}
+          activeFocusArea={model.activeFocusArea}
+          certifications={model.certifications}
+          orgRoles={model.orgRoles}
+          useCompactRoleCertificationLabels={model.useCompactRoleCertificationLabels}
+          getCustomShiftTimes={model.accessors.getCustomShiftTimes}
+          getPublishedCustomShiftTimes={model.accessors.getPublishedCustomShiftTimes}
+          draftKindForKey={model.accessors.draftKindForKey}
+          fromRecurringForKey={model.accessors.fromRecurringForKey}
+          showPublishDiffOverlay={model.options.showPublishDiffOverlay}
+          publishedLabelForKey={model.accessors.publishedLabelForKey}
+          publishedAssignmentIdsForKey={model.accessors.publishedAssignmentIdsForKey}
+          publishedAbsenceTypeIdForKey={model.accessors.publishedAbsenceTypeIdForKey}
+          publishDiffForKey={model.accessors.publishDiffForKey}
+          publishedMetadataForKey={model.accessors.publishedMetadataForKey}
+          cellEditors={model.cellEditors}
+          showAudit={model.options.showAudit}
+          createdByNameForKey={model.accessors.createdByNameForKey}
+          onCellHover={handleCellHover}
+          onCellContextMenu={handleLegacyContextMenu}
+          onCellFocus={handleCellFocus}
+          coverageRequirements={model.coverageRequirements}
+          absenceTypeMap={model.absenceTypeMap}
+          absenceTypeIdForKey={model.accessors.absenceTypeIdForKey}
+          activeRequestForKey={model.accessors.activeRequestForKey}
+          shiftDisplayMode={model.options.shiftDisplayMode}
+          showShiftDetailHoverCards={model.options.showShiftDetailHoverCards}
+          resolvePublisherName={model.resolvePublisherName}
+          openShifts={model.openShifts}
+          onClaimOpenShift={handlers.onClaimOpenShift}
+          bulkDeleteMode={bulkDeleteMode}
+          bulkSelectedCellKeys={interactionState.bulkSelectedCellKeys}
+          bulkSelectableCellKeys={interactionState.bulkSelectableCellKeys}
+          onToggleBulkDeleteCell={handlers.onToggleBulkDeleteCell}
+        />
+      </ActiveCellContext.Provider>
       <DragOverlay dropAnimation={null}>
         {activeDrag && (
           <div

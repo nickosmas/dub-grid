@@ -25,6 +25,11 @@ import { useMediaQuery, MOBILE, TABLET } from "@/hooks";
 import CustomSelect from "@/components/CustomSelect";
 import ScrollableTabs from "@/components/ScrollableTabs";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { NumericBadge } from "@/components/ui/numeric-badge";
+
+// Sits on the corner of the icon button it counts for; the badge itself owns
+// the pill, the call site owns where it floats.
+const FLOATING_BADGE_STYLE = { position: "absolute", top: -6, right: -6 } as const;
 
 const SORT_OPTIONS = [
   { value: "seniority" as const, label: "Seniority" },
@@ -309,11 +314,7 @@ function ToolsMenu({
                 <path d="M21 13v2a4 4 0 0 1-4 4H3" />
               </svg>
               <span style={{ flex: 1 }}>Requests</span>
-              {(requestsBadgeCount ?? 0) > 0 && (
-                <span className="dg-notification-badge">
-                  {(requestsBadgeCount ?? 0) > 99 ? "99+" : requestsBadgeCount}
-                </span>
-              )}
+              <NumericBadge count={requestsBadgeCount ?? 0} tone="danger" />
             </MenuItem>
           </Hint>
         )}
@@ -676,11 +677,13 @@ export default function Toolbar({
                 <line x1="17" y1="16" x2="23" y2="16" />
               </svg>
               Tools
-              {requestsBadgeCount > 0 && (
-                <span className="dg-notification-badge dg-notification-badge--absolute">
-                  {requestsBadgeCount > 99 ? "99+" : requestsBadgeCount}
-                </span>
-              )}
+              <NumericBadge
+                count={requestsBadgeCount}
+                label={`${requestsBadgeCount} pending requests`}
+                size="sm"
+                tone="danger"
+                style={FLOATING_BADGE_STYLE}
+              />
             </Button>
           )}
           {hasData && toolsOpen && (
@@ -924,7 +927,17 @@ export default function Toolbar({
 
       {/* ── RIGHT ZONE: Presence + Coverage + Tools ── */}
       {hasData && (
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
+        <div
+          style={{
+            marginLeft: "auto",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            flexWrap: "wrap",
+            minWidth: 0,
+            maxWidth: "100%",
+          }}
+        >
           {presenceSlot}
 
           {/* Coverage button */}
@@ -958,11 +971,13 @@ export default function Toolbar({
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                 </svg>
                 Coverage
-                {coverageGapCount > 0 && (
-                  <span className="dg-notification-badge dg-notification-badge--absolute">
-                    {coverageGapCount > 99 ? "99+" : coverageGapCount}
-                  </span>
-                )}
+                <NumericBadge
+                  count={coverageGapCount}
+                  label={`${coverageGapCount} coverage gaps`}
+                  size="sm"
+                  tone="danger"
+                  style={FLOATING_BADGE_STYLE}
+                />
               </Button>
             </Hint>
           )}
@@ -1004,11 +1019,13 @@ export default function Toolbar({
                 <line x1="17" y1="16" x2="23" y2="16" />
               </svg>
               Tools
-              {requestsBadgeCount > 0 && (
-                <span className="dg-notification-badge dg-notification-badge--absolute">
-                  {requestsBadgeCount > 99 ? "99+" : requestsBadgeCount}
-                </span>
-              )}
+              <NumericBadge
+                count={requestsBadgeCount}
+                label={`${requestsBadgeCount} pending requests`}
+                size="sm"
+                tone="danger"
+                style={FLOATING_BADGE_STYLE}
+              />
             </Button>
           </Hint>
 

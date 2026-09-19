@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const fetchStatus = vi.fn();
@@ -34,7 +34,6 @@ beforeEach(() => {
     feedUrl: `${PRIVATE_URL}-new`,
   });
   revokeSubscription.mockResolvedValue({ active: false, issuedAt: null });
-  vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 
 describe("CalendarSubscriptionCard", () => {
@@ -65,7 +64,7 @@ describe("CalendarSubscriptionCard", () => {
     expect(screen.queryByRole("button", { name: "Copy link" })).not.toBeInTheDocument();
   });
 
-  it("warns before replacement and disable, then reflects revocation", async () => {
+  it("confirms replacement and disable in an in-app dialog, then reflects revocation", async () => {
     fetchStatus.mockResolvedValue({
       active: true,
       issuedAt: "2026-09-01T00:00:00.000Z",
@@ -73,12 +72,34 @@ describe("CalendarSubscriptionCard", () => {
     render(<CalendarSubscriptionCard />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Replace link" }));
-    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining("previous URL"));
+    const replaceDialog = screen.getByRole("dialog", { name: "Replace private link?" });
+    expect(within(replaceDialog).getByText(/previous URL stops working/i)).toBeInTheDocument();
+    expect(rotateSubscription).not.toHaveBeenCalled();
+    fireEvent.click(within(replaceDialog).getByRole("button", { name: "Replace link" }));
     expect(await screen.findByText(`${PRIVATE_URL}-new`)).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Disable subscription" }));
-    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining("stop receiving updates"));
+    const disableDialog = screen.getByRole("dialog", { name: "Disable calendar subscription?" });
+    expect(within(disableDialog).getByText(/stop receiving updates/i)).toBeInTheDocument();
+    fireEvent.click(within(disableDialog).getByRole("button", { name: "Disable subscription" }));
     await waitFor(() => expect(revokeSubscription).toHaveBeenCalled());
     expect(await screen.findByRole("button", { name: "Create private link" })).toBeInTheDocument();
+  });
+
+  it("cancelling the dialog leaves the subscription untouched", async () => {
+    fetchStatus.mockResolvedValue({
+      active: true,
+      issuedAt: "2026-09-01T00:00:00.000Z",
+    });
+    render(<CalendarSubscriptionCard />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Disable subscription" }));
+    const dialog = screen.getByRole("dialog", { name: "Disable calendar subscription?" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(revokeSubscription).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Disable subscription" })).toBeInTheDocument();
   });
 });

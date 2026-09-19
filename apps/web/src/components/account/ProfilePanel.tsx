@@ -67,6 +67,9 @@ interface ProfilePanelProps {
   /** Management department IDs from the caller's org membership — distinct
    *  from `employee.departmentIds`, which is scheduled departments. */
   managementDepartmentIds: number[];
+  /** False for a caller with no membership in `orgId`, such as a gridmaster
+   *  viewing an organization through impersonation. */
+  isOrgMember: boolean;
   orgId: string | null;
   canEditProfileDirectly: boolean;
   isGridmaster: boolean;
@@ -125,6 +128,7 @@ export function ProfilePanel({
   profile,
   employee,
   managementDepartmentIds,
+  isOrgMember,
   orgId,
   canEditProfileDirectly,
   isGridmaster,
@@ -375,7 +379,9 @@ export function ProfilePanel({
   useEffect(() => {
     // Both the name-change request UI and the account-deletion section need
     // to read change_requests. Fetch once for both.
-    const needsRequests = !canEditProfileDirectly || showDeletion;
+    // Change requests are org-scoped and the route refuses a non-member, so
+    // there is nothing to ask for without a membership.
+    const needsRequests = isOrgMember && (!canEditProfileDirectly || showDeletion);
     if (!orgId || !needsRequests) {
       setChangeRequests([]);
       return;
@@ -395,7 +401,7 @@ export function ProfilePanel({
     return () => {
       cancelled = true;
     };
-  }, [canEditProfileDirectly, orgId, showDeletion]);
+  }, [canEditProfileDirectly, isOrgMember, orgId, showDeletion]);
 
   const pendingRequests = changeRequests.filter((r) => r.status === "pending");
   const pendingNameRequest = pendingRequests.find((r) => r.type === "profile_update");

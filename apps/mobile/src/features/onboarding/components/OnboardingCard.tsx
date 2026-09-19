@@ -1,5 +1,6 @@
 import { useMemo, type ReactNode } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../../../shared/components/Text";
 import Animated, {
   Extrapolation,
   interpolate,
@@ -131,17 +132,13 @@ const createStyles = (mobileColors: MobileColors) =>
       width: "100%",
     },
     title: {
-      ...mobileText.heroMetric,
+      ...mobileText.display,
       color: mobileColors.textPrimary,
-      fontSize: 26,
-      lineHeight: 32,
       textAlign: "center",
     },
     body: {
       ...mobileText.body,
       color: mobileColors.textMuted,
-      fontSize: 15,
-      lineHeight: 22,
       textAlign: "center",
     },
   });

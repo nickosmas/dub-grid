@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -662,5 +663,57 @@ describe("AppShell setup lock header", () => {
     await waitFor(() => {
       expect(screen.queryByLabelText("App header")).not.toBeInTheDocument();
     });
+  });
+});
+
+describe("OnboardingGate subtree stability", () => {
+  it("does not remount the page subtree when permissions resolve", async () => {
+    let mounts = 0;
+    function MountProbe() {
+      useEffect(() => {
+        mounts += 1;
+      }, []);
+      return <div>Protected app</div>;
+    }
+
+    // Land on the plain "app" decision once permissions resolve.
+    mockOrganizationData.entryGate = {
+      onboardingCompleted: true,
+      adminOnboardingCompleted: true,
+      billingLocked: false,
+    };
+    mockOrganizationData.setupStatus = {
+      isComplete: true,
+      missing: {
+        focusAreas: false,
+        scheduleDefinitions: false,
+        certifications: false,
+        orgRoles: false,
+      },
+    };
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const tree = () => (
+      <QueryClientProvider client={queryClient}>
+        <OnboardingGate>
+          <MountProbe />
+        </OnboardingGate>
+      </QueryClientProvider>
+    );
+
+    mockPermissions.isLoading = true;
+    const result = render(tree());
+    await screen.findByText("Protected app");
+    expect(mounts).toBe(1);
+
+    // Permissions resolve: the gate goes from passing through to deciding.
+    // It used to swap `{children}` for a wrapper at that moment, which
+    // unmounted and remounted the whole page subtree — dropping the last
+    // observer of the org-bootstrap query, cancelling its in-flight request
+    // and refetching it (build plan item 26).
+    mockPermissions.isLoading = false;
+    result.rerender(tree());
+    await screen.findByText("Protected app");
+    expect(mounts).toBe(1);
   });
 });

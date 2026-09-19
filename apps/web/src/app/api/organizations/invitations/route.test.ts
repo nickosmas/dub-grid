@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const validateCsrfOrigin = vi.fn();
@@ -11,6 +11,7 @@ const dispatchNotificationEvent = vi.fn();
 const buildInvitationChanges = vi.fn();
 const invitationSelectMaybeSingle = vi.fn();
 const invitationUpdateMaybeSingle = vi.fn();
+const invitationListOrder = vi.fn();
 const invitationUpdateOperations: Array<{
   values: Record<string, unknown>;
   filters: Array<[string, unknown]>;
@@ -98,6 +99,8 @@ vi.mock("@/lib/supabase-service", () => ({
         select: () => chain,
         eq: () => chain,
         maybeSingle: () => invitationSelectMaybeSingle(),
+        // GET's list: select().eq().order()
+        order: () => invitationListOrder(),
         update: (values: Record<string, unknown>) => {
           const operation = { values, filters: [] as Array<[string, unknown]> };
           invitationUpdateOperations.push(operation);
@@ -452,5 +455,51 @@ describe("PATCH /api/organizations/invitations", () => {
     );
 
     expect(res.status).toBe(500);
+  });
+});
+
+describe("GET /api/organizations/invitations", () => {
+  // Runs the route's real predicate against a fixed permission context, so
+  // the test proves who the list is open to rather than stubbing the answer.
+  function allowFor(permissions: {
+    isGridmaster: boolean;
+    isSuperAdmin: boolean;
+    canManageEmployees: boolean;
+  }) {
+    requireOrgPermissions.mockImplementation(
+      async (_req: unknown, _orgId: unknown, isAllowed: (p: typeof permissions) => boolean) =>
+        isAllowed(permissions)
+          ? { ok: true }
+          : { response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) },
+    );
+  }
+
+  function makeGetRequest() {
+    return new NextRequest(`http://localhost/api/organizations/invitations?orgId=${ORG_ID}`);
+  }
+
+  it("lists invitations for an admin who can manage employees", async () => {
+    resolveEffectiveOrgId.mockResolvedValue(ORG_ID);
+    invitationListOrder.mockResolvedValue({ data: [CURRENT_INVITATION_ROW], error: null });
+    allowFor({ isGridmaster: false, isSuperAdmin: false, canManageEmployees: true });
+
+    const { GET } = await importRoute();
+    const res = await GET(makeGetRequest());
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.invitations).toHaveLength(1);
+    expect(body.invitations[0].id).toBe(INVITATION_ID);
+  });
+
+  it("refuses a management member who cannot manage employees", async () => {
+    resolveEffectiveOrgId.mockResolvedValue(ORG_ID);
+    invitationListOrder.mockResolvedValue({ data: [CURRENT_INVITATION_ROW], error: null });
+    allowFor({ isGridmaster: false, isSuperAdmin: false, canManageEmployees: false });
+
+    const { GET } = await importRoute();
+    const res = await GET(makeGetRequest());
+
+    expect(res.status).toBe(403);
   });
 });

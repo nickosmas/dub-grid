@@ -12,9 +12,10 @@ import { NumericBadge } from "@/components/ui/numeric-badge";
 import {
   fetchNotifications,
   fetchUnreadNotificationCount,
-  markNotificationRead,
   markAllNotificationsRead,
+  markNotificationRead,
 } from "@/features/notifications/client";
+import { resolveAlertDestination } from "@dubgrid/domain";
 import { useAuth } from "@/components/AuthProvider";
 import { usePermissions } from "@/hooks";
 import { useNotificationsRealtime } from "@/hooks/useNotificationsRealtime";
@@ -193,11 +194,17 @@ function NotificationIcon({ type }: { type: string }) {
  * @param onViewAll Optional override for the "View all" footer. When provided,
  *   it replaces the default `/alerts` link, e.g. so the gridmaster portal
  *   can route to its own in-portal feed view instead of ejecting to the app.
+ * @param onOpenItem Optional override for a row click. Without it a row links
+ *   to the alert's subject (the schedule, a person, the request board) and
+ *   marks it read on the way; the gridmaster portal passes it to open the
+ *   alert in its own inbox view.
  */
 export default function NotificationBell({
   onViewAll,
+  onOpenItem,
 }: {
   onViewAll?: () => void;
+  onOpenItem?: (id: string) => void;
 } = {}) {
   const { user } = useAuth();
   const userId = user?.id ?? null;
@@ -263,8 +270,6 @@ export default function NotificationBell({
     setOpen((prev) => !prev);
   }
 
-  const [optimisticallyRead, setOptimisticallyRead] = useState<Set<string>>(new Set());
-
   const invalidateAll = useCallback(() => {
     if (!userId) return;
     void queryClient.invalidateQueries({
@@ -272,22 +277,14 @@ export default function NotificationBell({
     });
   }, [queryClient, userId]);
 
-  // A row is a whole block of content, so it opts out of the button spinner.
-  // That left the unread tint as the only signal, and it waited on both the
-  // mutation and the refetch behind it. Clearing it here answers the click now
-  // and rolls back if the write fails.
+  // The reader is leaving for the alert's subject; the read mark must not
+  // hold the navigation, so it runs behind it and the badge follows.
   async function handleMarkRead(id: string) {
-    setOptimisticallyRead((prev) => new Set(prev).add(id));
     try {
       await markNotificationRead(id);
       invalidateAll();
-    } catch (err) {
-      setOptimisticallyRead((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
-      toast.error(formatClientErrorMessage(err, "Couldn't update notification"));
+    } catch {
+      // The alerts page and realtime will settle it; nothing to show here.
     }
   }
 
@@ -304,9 +301,6 @@ export default function NotificationBell({
       setConfirmingMarkAllRead(false);
     }
   }
-
-  const unreadCountLabel = unreadCount > 9 ? "9+" : String(unreadCount);
-  const unreadCountFontSize = unreadCount > 9 ? 8 : 9;
 
   return (
     <div ref={ref} style={{ position: "relative", display: "flex", alignItems: "center" }}>
@@ -355,24 +349,14 @@ export default function NotificationBell({
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
           <path d="M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
-        {unreadCount > 0 && (
-          <NumericBadge
-            aria-label={`${unreadCount} unread alerts`}
-            size="sm"
-            value={unreadCountLabel}
-            style={{
-              position: "absolute",
-              top: -1,
-              right: 1,
-              background: "var(--dg-color-danger)",
-              color: "var(--dg-color-text-inverse)",
-              fontSize: unreadCountFontSize,
-              fontWeight: 700,
-              lineHeight: 1,
-              zIndex: 1,
-            }}
-          />
-        )}
+        <NumericBadge
+          label={`${unreadCount} unread alerts`}
+          size="sm"
+          tone="danger"
+          count={unreadCount}
+          max={9}
+          style={{ position: "absolute", top: -1, right: 1, zIndex: 1 }}
+        />
       </Button>
 
       {open && (
@@ -467,91 +451,17 @@ export default function NotificationBell({
                 No alerts
               </div>
             ) : (
-              notifications.map((n) => {
-                const isUnread = !n.readAt && !optimisticallyRead.has(n.id);
-                return (
-                  <Button
-                    key={n.id}
-                    onClick={() => {
-                      if (isUnread) return handleMarkRead(n.id);
-                    }}
-                    spinner={false}
-                    aria-label={`${n.title}: ${n.message}${isUnread ? " (unread, click to mark as read)" : ""}`}
-                    style={{
-                      display: "flex",
-                      gap: 12,
-                      width: "100%",
-                      padding: "12px 16px",
-                      background: isUnread ? "var(--dg-color-info-bg)" : "transparent",
-                      border: "none",
-                      borderBottom: "1px solid var(--dg-color-border-light)",
-                      cursor: isUnread ? "pointer" : "default",
-                      fontFamily: "inherit",
-                      textAlign: "left",
-                      transition: "background 150ms ease",
-                    }}
-                  >
-                    <div
-                      style={{
-                        flexShrink: 0,
-                        width: 32,
-                        height: 32,
-                        borderRadius: "50%",
-                        background: "var(--dg-color-bg-secondary)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: isUnread ? "var(--dg-color-info)" : "var(--dg-color-text-muted)",
-                      }}
-                    >
-                      <NotificationIcon type={n.type} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <span
-                          style={{
-                            fontSize: "var(--dg-fs-caption)",
-                            fontWeight: isUnread ? 700 : 600,
-                            color: "var(--dg-color-text-primary)",
-                          }}
-                        >
-                          {n.title}
-                        </span>
-                        {isUnread && (
-                          <span
-                            style={{
-                              width: 6,
-                              height: 6,
-                              borderRadius: "50%",
-                              background: "var(--dg-color-info)",
-                              flexShrink: 0,
-                            }}
-                          />
-                        )}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "var(--dg-fs-footnote)",
-                          color: "var(--dg-color-text-muted)",
-                          marginTop: 2,
-                          lineHeight: 1.4,
-                        }}
-                      >
-                        {n.message}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "var(--dg-fs-footnote)",
-                          color: "var(--dg-color-text-subtle)",
-                          marginTop: 4,
-                        }}
-                      >
-                        {formatRelativeTime(n.createdAt)}
-                      </div>
-                    </div>
-                  </Button>
-                );
-              })
+              notifications.map((n) => (
+                <BellRow
+                  key={n.id}
+                  notification={n}
+                  onOpenItem={onOpenItem}
+                  onNavigate={() => {
+                    setOpen(false);
+                    if (!n.readAt) void handleMarkRead(n.id);
+                  }}
+                />
+              ))
             )}
           </div>
 
@@ -621,5 +531,133 @@ export default function NotificationBell({
         />
       )}
     </div>
+  );
+}
+
+const ROW_STYLE = {
+  display: "flex",
+  gap: 12,
+  width: "100%",
+  boxSizing: "border-box",
+  padding: "12px 16px",
+  border: "none",
+  borderBottom: "1px solid var(--dg-color-border-light)",
+  cursor: "pointer",
+  fontFamily: "inherit",
+  textAlign: "left",
+  textDecoration: "none",
+  color: "inherit",
+  transition: "background 150ms ease",
+} as const;
+
+function BellRow({
+  notification: n,
+  onOpenItem,
+  onNavigate,
+}: {
+  notification: Notification;
+  onOpenItem?: (id: string) => void;
+  onNavigate: () => void;
+}) {
+  const isUnread = !n.readAt;
+  const destination = resolveAlertDestination(n);
+  const label = `${n.title}: ${n.message}${isUnread ? " (unread)" : ""}${
+    destination ? `. ${destination.label}` : ""
+  }`;
+  const style = {
+    ...ROW_STYLE,
+    background: isUnread ? "var(--dg-color-info-bg)" : "transparent",
+  };
+  const content = (
+    <>
+      <div
+        style={{
+          flexShrink: 0,
+          width: 32,
+          height: 32,
+          borderRadius: "50%",
+          background: "var(--dg-color-bg-secondary)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: isUnread ? "var(--dg-color-info)" : "var(--dg-color-text-muted)",
+        }}
+      >
+        <NotificationIcon type={n.type} />
+      </div>
+      {/* The global button rule is nowrap; a row is prose, so it wraps here
+          and breaks a bare URL or email rather than widening the popover. */}
+      <div style={{ flex: 1, minWidth: 0, whiteSpace: "normal", overflowWrap: "anywhere" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span
+            style={{
+              fontSize: "var(--dg-fs-label)",
+              fontWeight: isUnread ? 700 : 600,
+              lineHeight: 1.35,
+              color: "var(--dg-color-text-primary)",
+            }}
+          >
+            {n.title}
+          </span>
+          {isUnread && (
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: "var(--dg-color-info)",
+                flexShrink: 0,
+              }}
+            />
+          )}
+        </div>
+        <div
+          style={{
+            fontSize: "var(--dg-fs-caption)",
+            color: "var(--dg-color-text-secondary)",
+            marginTop: 2,
+            lineHeight: 1.45,
+          }}
+        >
+          {n.message}
+        </div>
+        <div
+          style={{
+            fontSize: "var(--dg-fs-footnote)",
+            color: "var(--dg-color-text-subtle)",
+            marginTop: 4,
+          }}
+        >
+          {formatRelativeTime(n.createdAt)}
+        </div>
+      </div>
+    </>
+  );
+
+  if (onOpenItem) {
+    return (
+      <Button
+        spinner={false}
+        aria-label={label}
+        style={style}
+        onClick={() => {
+          onNavigate();
+          onOpenItem(n.id);
+        }}
+      >
+        {content}
+      </Button>
+    );
+  }
+  return (
+    <Link
+      href={destination?.href ?? "/alerts"}
+      prefetch={false}
+      aria-label={label}
+      style={style}
+      onClick={onNavigate}
+    >
+      {content}
+    </Link>
   );
 }

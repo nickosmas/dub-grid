@@ -1,4 +1,5 @@
 import { useId, type ReactNode } from "react";
+import { mobileSpace } from "../theme/tokens";
 import {
   InputAccessoryView,
   Keyboard,
@@ -89,7 +90,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "flex-end",
     backgroundColor: "transparent",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: mobileSpace.md,
+    paddingVertical: mobileSpace.sm,
   },
 });

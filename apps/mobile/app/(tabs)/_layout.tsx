@@ -5,7 +5,7 @@ import { useTabsGate } from "../../src/features/auth/hooks/useTabsGate";
 import { RouteErrorScreen } from "../../src/shared/components/RouteErrorScreen";
 import { NativeTabBarPresenceProvider } from "../../src/shared/navigation/NativeTabBarPresence";
 import { useMobileColors, useThemeMode } from "../../src/shared/providers/ThemeModeProvider";
-import { mobileTypography } from "../../src/shared/theme/tokens";
+import { mobileText, mobileTypography } from "../../src/shared/theme/tokens";
 
 /**
  * Keeps a crash inside the authed tab tree from unmounting the whole app —
@@ -123,12 +123,12 @@ export default function TabsLayout() {
           default: {
             color: mobileColors.textSubtle,
             fontFamily: mobileTypography.fontFamily.semibold,
-            fontSize: 11,
+            fontSize: mobileText.badge.fontSize,
           },
           selected: {
             color: mobileColors.brand,
             fontFamily: mobileTypography.fontFamily.bold,
-            fontSize: 11,
+            fontSize: mobileText.badge.fontSize,
           },
         }}
         minimizeBehavior="never"

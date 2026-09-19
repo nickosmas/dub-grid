@@ -275,6 +275,7 @@ interface RenderGridOptions {
     toSegments?: Array<{ label: string }>;
     fromState?: ScheduleCellState | null;
     toState?: ScheduleCellState | null;
+    isNewAddition?: boolean;
     publishedAt: string;
     publishedBy: string;
   } | null;
@@ -860,6 +861,115 @@ describe("ScheduleGrid", () => {
     for (const pill of pills) {
       expect(pill.style.boxShadow).toMatch(/^0 0 0 2px /);
     }
+  });
+
+  describe("published double shifts carry one badge per pill", () => {
+    const doubleShiftAssignments = [
+      { ...assignments[0], jobId: 101 },
+      {
+        id: 2,
+        orgId: "org-1",
+        label: "N",
+        name: "Night Shift",
+        color: "#E0F2FE",
+        border: "#0284C7",
+        text: "#0C4A6E",
+        categoryId: 1,
+        focusAreaId: 1,
+        jobId: 102,
+        sortOrder: 2,
+      },
+    ];
+    const segments = [
+      { shiftId: 1, jobId: 101, position: 0 },
+      { shiftId: 1, jobId: 102, position: 1 },
+    ];
+    const workedState = (cellSegments: typeof segments) => ({
+      kind: "worked" as const,
+      segments: cellSegments,
+      absenceTypeId: null,
+      customStartTime: null,
+      customEndTime: null,
+      seriesId: null,
+      fromRecurring: false,
+    });
+
+    type PublishDiff = NonNullable<ReturnType<NonNullable<RenderGridOptions["publishDiffForKey"]>>>;
+
+    function renderDoubleShift(
+      publishDiff: Omit<PublishDiff, "empId" | "date" | "publishedAt" | "publishedBy">,
+    ) {
+      renderGrid({
+        assignments: doubleShiftAssignments,
+        shiftForKey: () => "D/N",
+        assignmentIdsForKey: () => [1, 2],
+        showPublishDiffOverlay: true,
+        publishDiffForKey: () => ({
+          empId: "emp-1",
+          date: "2024-01-07",
+          publishedAt: "2024-01-07T12:00:00.000Z",
+          publishedBy: "user-1",
+          ...publishDiff,
+        }),
+      });
+      const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+      const pills = Array.from(
+        firstCell.querySelectorAll('[data-shift-pill="multi"]'),
+      ) as HTMLElement[];
+      expect(pills).toHaveLength(2);
+      return { firstCell, pills };
+    }
+
+    it("marks both pills New when the whole cell is new", () => {
+      const { firstCell, pills } = renderDoubleShift({
+        kind: "new",
+        fromState: null,
+        toState: workedState(segments),
+      });
+
+      expect(firstCell.querySelectorAll('[data-publish-badge="new"]')).toHaveLength(2);
+      for (const pill of pills) {
+        expect(pill.querySelector('[data-publish-badge="new"]')?.textContent).toBe("New");
+        expect(pill.style.boxShadow).toMatch(/^0 0 0 2px /);
+      }
+    });
+
+    it.each([undefined, false])(
+      "marks only the added second shift New (isNewAddition %s)",
+      (isNewAddition) => {
+        const { firstCell, pills } = renderDoubleShift({
+          kind: "modified",
+          isNewAddition,
+          fromState: workedState([segments[0]!]),
+          toState: workedState(segments),
+        });
+
+        expect(firstCell.querySelectorAll("[data-publish-badge]")).toHaveLength(1);
+        expect(pills[0]!.querySelector("[data-publish-badge]")).toBeNull();
+        expect(pills[0]!.style.boxShadow).toBe("none");
+        expect(pills[1]!.querySelector('[data-publish-badge="new"]')?.textContent).toBe("New");
+        expect(pills[1]!.style.boxShadow).toMatch(/^0 0 0 2px /);
+      },
+    );
+  });
+
+  it("keeps the cell-level New badge on a single published pill", () => {
+    renderGrid({
+      showPublishDiffOverlay: true,
+      publishDiffForKey: () => ({
+        empId: "emp-1",
+        date: "2024-01-07",
+        kind: "new",
+        isNewAddition: true,
+        from: [],
+        to: [1],
+        publishedAt: "2024-01-07T12:00:00.000Z",
+        publishedBy: "user-1",
+      }),
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    expect(firstCell.querySelectorAll('[data-publish-badge="new"]')).toHaveLength(1);
   });
 
   it("keeps the normal cell background when show changes is on", () => {
@@ -2323,6 +2433,54 @@ describe("ScheduleGrid", () => {
     expect(badge?.getAttribute("aria-label")).toContain("Was D · Supv.");
   });
 
+  it("badges a published mentored toggle instead of tinting a cell with no marker", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      showPublishDiffOverlay: true,
+      shiftForKey: () => "D",
+      assignmentIdsForKey: () => [1],
+      segmentsForKey: () => [{ shiftId: null, jobId: 101, position: 0, isMentored: true }],
+      publishDiffForKey: () => ({
+        empId: "emp-1",
+        date: "2024-01-07",
+        kind: "modified",
+        from: [1],
+        to: [1],
+        fromState: {
+          kind: "worked",
+          segments: [{ shiftId: null, jobId: 101, position: 0, isMentored: false }],
+          absenceTypeId: null,
+          customStartTime: null,
+          customEndTime: null,
+          seriesId: null,
+          fromRecurring: false,
+        },
+        toState: {
+          kind: "worked",
+          segments: [{ shiftId: null, jobId: 101, position: 0, isMentored: true }],
+          absenceTypeId: null,
+          customStartTime: null,
+          customEndTime: null,
+          seriesId: null,
+          fromRecurring: false,
+        },
+        publishedAt: "2024-01-07T12:00:00.000Z",
+        publishedBy: "user-1",
+      }),
+      resolvePublisherName: () => "Mina",
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const badge = firstCell.querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
+
+    // The compact grid marker reads "Edited" for every published edit; the
+    // tooltip is what names the mentored change. Before this, the overlay
+    // dropped the mentored flags and painted a tinted cell with no badge.
+    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.getAttribute("aria-label")).toContain("Marked mentored.");
+  });
+
   it("keeps draft new historical cross-focus cells on the white shift surface", () => {
     observedWidth = 1600;
 
@@ -2918,7 +3076,9 @@ describe("ScheduleGrid", () => {
     expect(secondCell.dataset.active).toBeUndefined();
   });
 
-  it("marks the externally active cell for the fill highlight", () => {
+  // The mark is applied by the active-cell outline's layout effect (on the
+  // next animation frame), not rendered as a prop, so wait for it.
+  it("marks the externally active cell for the fill highlight", async () => {
     renderGrid({
       activeCellId: {
         empId: "emp-1",
@@ -2927,11 +3087,12 @@ describe("ScheduleGrid", () => {
       },
     });
 
-    const activeCells = (screen.getAllByRole("gridcell") as HTMLElement[]).filter(
-      (cell) => cell.dataset.active === "true",
-    );
-
-    expect(activeCells).toHaveLength(1);
+    await waitFor(() => {
+      const activeCells = (screen.getAllByRole("gridcell") as HTMLElement[]).filter(
+        (cell) => cell.dataset.active === "true",
+      );
+      expect(activeCells).toHaveLength(1);
+    });
   });
 
   // Another editor's marker is informational. Blocking on it is exactly the
@@ -3116,6 +3277,18 @@ describe("ScheduleGrid", () => {
         timeZone: "UTC",
       }),
     ).toBe("Published Jan 7, 2024, 12:00 PM UTC by Mina.");
+  });
+
+  // A viewer who cannot open the publish history is not shown who published
+  // either; the time alone says whether the schedule is current.
+  it("leaves the publisher out of published metadata when no resolver is given", () => {
+    expect(
+      formatPublishedMetadata({
+        publishedAt: "2024-01-07T12:00:00.000Z",
+        publishedBy: "user-1",
+        timeZone: "UTC",
+      }),
+    ).toBe("Published Jan 7, 2024, 12:00 PM UTC.");
   });
 
   it("uses the change tooltip when shift detail hover cards are disabled", async () => {

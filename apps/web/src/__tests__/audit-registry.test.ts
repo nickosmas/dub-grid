@@ -8,7 +8,10 @@ import {
   getAuditCategoryLabel,
   getAuditCategoryOptions,
   getResourceTypeLabel,
+  isVisibleToAudience,
   ORG_ACTIVITY_CATEGORIES,
+  ORG_AUDIENCE_ACTIONS,
+  ORG_AUDIENCE_CATEGORIES,
   PERSON_ACTIVITY_CATEGORIES,
 } from "@/lib/audit/registry";
 import { AuditDetails } from "@/lib/audit/details";
@@ -66,7 +69,36 @@ function declaredAuditActions(): string[] {
   return [...contents.slice(start, end).matchAll(/"([a-z0-9_]+\.[a-z0-9_]+)"/g)].map((m) => m[1]);
 }
 
+/**
+ * Security events are written as `action: input.event`, so the source scanner
+ * above cannot see them; their names live in the `SecurityEventName` union.
+ */
+function declaredSecurityEvents(): string[] {
+  const source = readFileSync(path.join(SRC_ROOT, "lib/auth/security-audit.ts"), "utf8");
+  return [...source.matchAll(/"(security\.[a-z0-9_.]+)"/g)].map((match) => match[1]);
+}
+
+/** Rows a database trigger writes, so no TypeScript call site names them. */
+const TRIGGER_WRITTEN_ACTIONS = [
+  // supabase/migrations/010_invitation_auto_revoke_audit.sql
+  "invitation.auto_revoked",
+];
+
 describe("audit action registry coverage", () => {
+  it("has a spec for every security event the auth layer records", () => {
+    const events = declaredSecurityEvents();
+    expect(events.length).toBeGreaterThanOrEqual(4);
+    for (const event of events) {
+      expect(AUDIT_ACTIONS, `missing spec for ${event}`).toHaveProperty(event);
+    }
+  });
+
+  it("has a spec for every action a database trigger writes", () => {
+    for (const action of TRIGGER_WRITTEN_ACTIONS) {
+      expect(AUDIT_ACTIONS, `missing spec for ${action}`).toHaveProperty(action);
+    }
+  });
+
   it("has a spec for every action in the AuditAction union", () => {
     const missing = declaredAuditActions().filter((action) => !(action in AUDIT_ACTIONS));
     expect(missing).toEqual([]);
@@ -311,6 +343,157 @@ describe("access change rows", () => {
     });
 
     expect(rows).toEqual([{ label: "Admin Permissions", value: "No effective change" }]);
+  });
+});
+
+describe("audience", () => {
+  const PLATFORM_ONLY = [
+    "impersonation.started",
+    "impersonation.ended",
+    "feature_flags.updated",
+    "audit.exported",
+    "billing.portal_opened",
+    "billing.trial_extended",
+    "billing.seats_synced",
+    "billing.status_overridden",
+    "billing.synced",
+    "gridmaster_account.promoted",
+    "gridmaster_account.demoted",
+    "gridmaster_account.deactivated",
+    "gridmaster_account.reactivated",
+    "platform_feature_flags.created",
+    "platform_feature_flags.updated",
+    "security.auth.login",
+    "security.auth.recovery",
+    "security.auth.mfa",
+    "security.auth.session",
+  ];
+
+  it("keeps platform tooling out of the organization's own log", () => {
+    for (const action of PLATFORM_ONLY) {
+      expect(AUDIT_ACTIONS[action]?.audience, action).toBe("platform");
+      expect(isVisibleToAudience(action, "org"), action).toBe(false);
+      expect(isVisibleToAudience(action, "platform"), action).toBe(true);
+    }
+    expect(ORG_AUDIENCE_ACTIONS.some((action) => PLATFORM_ONLY.includes(action))).toBe(false);
+  });
+
+  it("keeps draft cell edits and publishes visible to an organization", () => {
+    for (const action of [
+      "shift.created",
+      "shift.updated",
+      "shift.deleted",
+      "shift.moved",
+      "schedule.published",
+      "schedule.drafts_discarded",
+      "invitation.auto_revoked",
+      "billing.payment_failed",
+    ]) {
+      expect(isVisibleToAudience(action, "org"), action).toBe(true);
+      expect(ORG_AUDIENCE_ACTIONS).toContain(action);
+    }
+  });
+
+  it("never shows an organization copy the registry did not write", () => {
+    expect(isVisibleToAudience("something.new", "org")).toBe(false);
+    expect(isVisibleToAudience("something.new", "platform")).toBe(true);
+  });
+
+  it("renders its own rows for every billing action an organization can read", () => {
+    for (const [action, spec] of Object.entries(AUDIT_ACTIONS)) {
+      if (!action.startsWith("billing.") || spec.audience === "platform") continue;
+      expect(spec.details, `${action} would flatten the raw Stripe payload`).toBeTypeOf("function");
+    }
+  });
+
+  it("backs every organization category with at least one org-visible action", () => {
+    for (const category of ORG_AUDIENCE_CATEGORIES) {
+      expect(
+        ORG_AUDIENCE_ACTIONS.some((action) => AUDIT_ACTIONS[action]?.category === category),
+        category,
+      ).toBe(true);
+    }
+    expect(ORG_AUDIENCE_CATEGORIES).not.toContain("platform");
+    expect(ORG_AUDIENCE_CATEGORIES).not.toContain("impersonation");
+    expect(ORG_AUDIENCE_CATEGORIES).not.toContain("security");
+  });
+
+  it("keeps hashes and raw cents out of the new copy", () => {
+    const hash = "a".repeat(64);
+    const login = describeAction({
+      action: "security.auth.login",
+      details: {
+        outcome: "rejected",
+        reason: "invalid_credentials",
+        surface: "web",
+        targetHash: hash,
+      },
+      resourceId: null,
+      resourceType: "user",
+      targetLabel: null,
+      targetEmail: null,
+      orgName: null,
+    });
+    expect(login).toBe("Sign-in rejected: wrong password");
+    const loginRows = formatDetails({
+      action: "security.auth.login",
+      details: { outcome: "succeeded", reason: "accepted", surface: "mobile", targetHash: hash },
+      resourceId: null,
+      resourceType: "user",
+      targetLabel: null,
+      targetEmail: null,
+      orgName: null,
+    });
+    expect(loginRows).toEqual([]);
+
+    const payment = {
+      action: "billing.payment_failed",
+      details: {
+        initiated_by: "stripe",
+        stripe_event_id: "evt_123",
+        stripe_event_type: "invoice.payment_failed",
+        invoice_id: "in_123",
+        customer_id: "cus_123",
+        amount_due: 4900,
+        currency: "usd",
+      },
+      resourceId: "in_123",
+      resourceType: "billing",
+      targetLabel: null,
+      targetEmail: null,
+      orgName: "Arden Wood",
+    };
+    expect(formatDetails(payment)).toEqual([{ label: "Amount", value: "$49.00" }]);
+    const text = JSON.stringify(formatDetails(payment));
+    expect(text).not.toContain("4900");
+    expect(text).not.toContain("evt_");
+    expect(text).not.toContain("Usd");
+
+    const subscription = formatDetails({
+      action: "billing.subscription_updated",
+      details: {
+        initiated_by: "stripe",
+        stripe_event_type: "customer.subscription.updated",
+        status: "active",
+        previous_status: "trialing",
+        quantity: 14,
+        previous_quantity: 12,
+        cancel_at: null,
+        current_period_end: "2026-10-18T00:00:00.000Z",
+      },
+      resourceId: "sub_123",
+      resourceType: "billing",
+      targetLabel: null,
+      targetEmail: null,
+      orgName: "Arden Wood",
+    });
+    expect(subscription.map((row) => row.label)).toEqual([
+      "Seats",
+      "Status",
+      "Current period ends",
+    ]);
+    expect(subscription[0]?.value).toBe("12 -> 14");
+    expect(subscription[1]?.value).toBe("Trial active -> Active");
   });
 });
 

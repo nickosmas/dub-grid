@@ -161,7 +161,7 @@ describe("MyScheduleCard", () => {
     expect(screen.getByText("Your schedule")).toBeInTheDocument();
   });
 
-  it("shows an expand button when onExpand is provided, and calls it on press", () => {
+  it("shows a See all link when onExpand is provided, and calls it on press", () => {
     useQuery.mockReturnValue({
       isLoading: false,
       data: { range: { startDate: "2026-05-11", endDate: "2026-05-11" }, entries: [] },
@@ -170,11 +170,13 @@ describe("MyScheduleCard", () => {
 
     render(<MyScheduleCard accessToken="token" onExpand={onExpand} />);
 
-    fireEvent.click(screen.getByLabelText("Expand your schedule"));
+    // The same header-right link every other dashboard card carries, not
+    // an expand glyph of its own.
+    fireEvent.click(screen.getByRole("button", { name: "See all: Your schedule" }));
     expect(onExpand).toHaveBeenCalledTimes(1);
   });
 
-  it("omits the expand button when onExpand isn't provided", () => {
+  it("omits the See all link when onExpand isn't provided", () => {
     useQuery.mockReturnValue({
       isLoading: false,
       data: { range: { startDate: "2026-05-11", endDate: "2026-05-11" }, entries: [] },
@@ -182,7 +184,9 @@ describe("MyScheduleCard", () => {
 
     render(<MyScheduleCard accessToken="token" />);
 
-    expect(screen.queryByLabelText("Expand your schedule")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "See all: Your schedule" }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows the job name under the shift name", () => {

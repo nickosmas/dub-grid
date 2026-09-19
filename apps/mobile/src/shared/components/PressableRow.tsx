@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from "react-nat
 import { hapticSelection } from "../lib/haptics";
 import { useAsyncAction } from "../hooks/useAsyncAction";
 import { useMobileColors } from "../providers/ThemeModeProvider";
-import type { MobileColors } from "../theme/tokens";
+import { mobileListRow, type MobileColors } from "../theme/tokens";
 
 /**
  * A pressable list row.
@@ -22,6 +22,7 @@ export function PressableRow({
   accessibilityLabel,
   accessibilityRole = "button",
   selected,
+  checked,
   disabled = false,
   haptic = true,
   style,
@@ -29,8 +30,10 @@ export function PressableRow({
 }: {
   children: ReactNode;
   accessibilityLabel?: string;
-  accessibilityRole?: "button" | "link";
+  accessibilityRole?: "button" | "link" | "checkbox" | "radio";
   selected?: boolean;
+  /** For a checkbox or radio row: whether it is on. */
+  checked?: boolean;
   disabled?: boolean;
   haptic?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -53,11 +56,12 @@ export function PressableRow({
     <Pressable
       accessibilityLabel={accessibilityLabel}
       accessibilityRole={accessibilityRole}
-      accessibilityState={{ disabled: isDisabled, busy: action.isRunning, selected }}
+      accessibilityState={{ disabled: isDisabled, busy: action.isRunning, selected, checked }}
       android_ripple={isDisabled ? undefined : { color: mobileColors.rippleNeutral }}
       disabled={isDisabled}
       onPress={action.run}
       style={({ pressed }) => [
+        styles.row,
         style,
         // Android draws its ripple over the row, so a highlight on top of it
         // would double up.
@@ -74,6 +78,11 @@ export function PressableRow({
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
+    // A row is a target in its own right, so it is never shorter than one.
+    // Callers add their own padding on top; this is only the floor.
+    row: {
+      minHeight: mobileListRow.minHeight,
+    },
     pressed: {
       backgroundColor: mobileColors.navActiveBg,
     },

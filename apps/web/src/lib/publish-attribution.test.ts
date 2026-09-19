@@ -104,6 +104,34 @@ describe("computeEditorDraftBreakdowns", () => {
     expect(rows.map((r) => r.editorId)).toEqual(["user-3", "user-2"]);
   });
 
+  it("attributes a shift added beside a published one as new, matching the headline", () => {
+    const doubleShift = {
+      ...shift("modified", "user-2"),
+      assignmentIds: [1, 2],
+      segments: [
+        { shiftId: 1, jobId: 10, label: "D" },
+        { shiftId: 2, jobId: 10, label: "E" },
+      ],
+      publishedAssignmentDefinitionIds: [1],
+      publishedSegments: [{ shiftId: 1, jobId: 10, label: "D" }],
+    } as unknown as ShiftMap[string];
+    const shifts: ShiftMap = { "emp-1_2026-03-02": doubleShift };
+
+    const rows = computeEditorDraftBreakdowns(shifts, {}, "user-1", WINDOW);
+    const overall = computeDraftBreakdown(shifts, {}, WINDOW);
+
+    expect(rows).toEqual([
+      expect.objectContaining({
+        editorId: "user-2",
+        newShifts: 1,
+        modifiedShifts: 0,
+        totalChanges: 1,
+      }),
+    ]);
+    expect(overall.newShifts).toBe(1);
+    expect(overall.modifiedShifts).toBe(0);
+  });
+
   it("ignores changes outside the publish window", () => {
     const shifts: ShiftMap = {
       "emp-1_2026-03-02": shift("new", "user-1"),

@@ -41,13 +41,30 @@ describe("Button", () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps labels to one line, scaling before truncating", () => {
+  it("keeps labels to one line and truncates rather than shrinking", () => {
     render(<Button label="Accept and continue" onPress={vi.fn()} />);
 
+    // Shrink-to-fit is gone on purpose: the new architecture fits against the
+    // button's default-size height with no floor, which is what left labels
+    // tiny beside large body copy.
     const label = screen.getByText("Accept and continue");
     expect(label).toHaveAttribute("data-number-of-lines", "1");
-    expect(label).toHaveAttribute("data-adjusts-font-size-to-fit", "true");
-    expect(label).toHaveAttribute("data-minimum-font-scale", "0.75");
+    expect(label).not.toHaveAttribute("data-adjusts-font-size-to-fit");
+    expect(label).not.toHaveAttribute("data-minimum-font-scale");
+    expect(label).toHaveAttribute("data-ellipsize-mode", "tail");
+  });
+
+  it("lets a link ellipsize instead of shrinking, with text padding", () => {
+    render(<Button label="Skip" onPress={vi.fn()} tone="link" />);
+
+    // A link is text: given a filled button's padding in a tight slot it
+    // starved its own label, and iOS shrank "Skip" to a fraction of its size.
+    const label = screen.getByText("Skip");
+    // Two lines, not one: at accessibility sizes a one-line link truncated
+    // its own question, and a link is a sentence rather than a control label.
+    expect(label).toHaveAttribute("data-number-of-lines", "2");
+    expect(label).not.toHaveAttribute("data-adjusts-font-size-to-fit");
+    expect(label).not.toHaveAttribute("data-minimum-font-scale");
     expect(label).toHaveAttribute("data-ellipsize-mode", "tail");
   });
 
@@ -163,7 +180,7 @@ describe("Button", () => {
     render(
       <Button
         accessibilityLabel="Archive notification"
-        icon="archive-outline"
+        icon="archive"
         iconOnly
         onPress={vi.fn()}
       />,

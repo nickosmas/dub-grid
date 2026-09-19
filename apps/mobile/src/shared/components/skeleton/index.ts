@@ -8,6 +8,7 @@ export {
   SkeletonLine,
   SkeletonPill,
   skeletonRows,
+  useSkeletonFillCount,
 } from "./primitives";
 export {
   getSkeletonWaveSubscriberCount,

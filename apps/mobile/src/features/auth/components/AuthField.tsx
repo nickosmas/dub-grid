@@ -4,9 +4,11 @@ import { AppText } from "../../../shared/components/AppText";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   MAX_FONT_SCALE,
+  mobileControl,
   mobileInputText,
   mobileRadii,
   mobileSpace,
+  mobileText,
   type MobileColors,
 } from "../../../shared/theme/tokens";
 
@@ -94,14 +96,16 @@ const createStyles = (mobileColors: MobileColors) =>
     row: {
       flexDirection: "row",
       alignItems: "center",
-      minHeight: 54,
+      minHeight: mobileControl.lg,
       borderRadius: mobileRadii.control,
       borderWidth: 1.5,
       borderColor: mobileColors.inputBorder,
       backgroundColor: mobileColors.surface,
     },
     rowCode: {
-      minHeight: 62,
+      // The code's 32pt line plus its padding already clears the floor; this
+      // only keeps an empty field on the same scale as the text variant.
+      minHeight: mobileControl.lg,
     },
     rowFocused: {
       borderColor: mobileColors.inputBorderFocused,
@@ -111,11 +115,11 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     input: {
       ...mobileInputText("regular"),
-      fontSize: 16,
-      lineHeight: 22,
+      fontSize: mobileText.input.fontSize,
+      lineHeight: mobileText.input.lineHeight,
       color: mobileColors.textPrimary,
       paddingHorizontal: mobileSpace.lg,
-      paddingVertical: 14,
+      paddingVertical: mobileSpace.md,
     },
     inputFlex: {
       flex: 1,
@@ -124,14 +128,14 @@ const createStyles = (mobileColors: MobileColors) =>
       ...mobileInputText("semibold"),
       flex: 1,
       textAlign: "center",
-      fontSize: 26,
-      lineHeight: 32,
+      fontSize: mobileText.display.fontSize,
+      lineHeight: mobileText.display.lineHeight,
       letterSpacing: 10,
     },
     suffix: {
       alignSelf: "stretch",
       justifyContent: "center",
-      paddingHorizontal: 14,
+      paddingHorizontal: mobileSpace.md,
       borderLeftWidth: 1,
       borderLeftColor: mobileColors.borderSubtle,
     },

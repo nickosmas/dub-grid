@@ -1,6 +1,7 @@
-import { StyleSheet, Text, type StyleProp, type TextProps, type TextStyle } from "react-native";
+import { StyleSheet, type StyleProp, type TextProps, type TextStyle } from "react-native";
+import { Text } from "./Text";
 import { useMobileColors } from "../providers/ThemeModeProvider";
-import { MAX_FONT_SCALE_FIXED, mobileBrandTypography } from "../theme/tokens";
+import { mobileBrandTypography } from "../theme/tokens";
 
 /**
  * The DubGrid brand wordmark for native.
@@ -33,7 +34,8 @@ export function DubGridWordmark({
   return (
     <Text
       {...rest}
-      maxFontSizeMultiplier={MAX_FONT_SCALE_FIXED}
+      // A logo is drawn, not read; it holds its size.
+      fit="fixed"
       style={[
         styles.wordmark,
         { fontSize, color: color ?? mobileColors.textPrimary, letterSpacing: fontSize * -0.02 },

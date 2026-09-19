@@ -1,41 +1,62 @@
 import { useMemo } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../../../shared/components/Text";
 import type { MobileShiftRequest } from "@dubgrid/contracts";
-import { Card } from "../../../shared/components/Screen";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { router } from "expo-router";
+import { PressableRow } from "../../../shared/components/PressableRow";
+import { DashboardCard } from "./DashboardCard";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileListRow,
+  mobileSpace,
+  mobileText,
+  mobileTextWeighted,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
 import { formatUsDate } from "../../../shared/lib/dates";
-import { CountBadge, type CountBadgeTone } from "./CountBadge";
-import { ExpandableList } from "./ExpandableList";
+import { REQUEST_TYPE_LABEL, REQUEST_TYPE_TONE } from "../../shift-requests/lib/request-type";
+import { createToneTextColors } from "../lib/tone-text";
+import {
+  DASHBOARD_CARD_PREVIEW_LIMIT,
+  DashboardRowList,
+  hasMoreDashboardRows,
+} from "./DashboardRowList";
 
-export const REQUEST_TYPE_LABEL: Record<MobileShiftRequest["type"], string> = {
-  pickup: "Pickup",
-  swap: "Swap",
-  calloff: "Time off",
-};
-
-export const REQUEST_TYPE_TONE: Record<MobileShiftRequest["type"], CountBadgeTone> = {
-  pickup: "brand",
-  swap: "success",
-  calloff: "warning",
-};
+export { REQUEST_TYPE_LABEL, REQUEST_TYPE_TONE };
 
 // Shared with the full-page expanded pending-approvals screen
-// (apps/mobile/app/(tabs)/home/pending-approvals.tsx).
+// (apps/mobile/app/(tabs)/home/pending-approvals.tsx). Owns its navigation so
+// the card preview and the full list land in the same place: the Requests
+// tab's Approval list, which is where the request is acted on.
 export function ActionQueueRow({ request }: { request: MobileShiftRequest }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const typeColor = useMemo(() => createToneTextColors(mobileColors), [mobileColors]);
   return (
-    <View style={styles.row}>
-      <CountBadge label={REQUEST_TYPE_LABEL[request.type]} tone={REQUEST_TYPE_TONE[request.type]} />
+    <PressableRow
+      accessibilityLabel={`${request.requesterName}, ${REQUEST_TYPE_LABEL[request.type]} request`}
+      onPress={() =>
+        router.push({
+          pathname: "/(tabs)/requests",
+          params: { tab: "approval", requestId: request.id },
+        })
+      }
+      style={styles.row}
+    >
       <View style={styles.copy}>
         <Text style={styles.label}>{request.requesterName}</Text>
         <Text style={styles.meta}>
+          <Text style={[styles.type, { color: typeColor[REQUEST_TYPE_TONE[request.type]] }]}>
+            {REQUEST_TYPE_LABEL[request.type]}
+          </Text>
+          {" · "}
           {request.requesterPresentation.label} shift · {formatUsDate(request.requesterShiftDate)}
         </Text>
       </View>
-    </View>
+      <Ionicons color={mobileColors.textMuted} name="chevron-forward" size={16} />
+    </PressableRow>
   );
 }
 
@@ -47,31 +68,25 @@ export function ActionQueueCard({
   onSeeAll?: () => void;
 }) {
   return (
-    <Card
+    <DashboardCard
       title="Pending approvals"
-      headerAccessory={
-        requests.length > 0 ? (
-          <CountBadge label={String(requests.length)} tone="brand" />
-        ) : undefined
-      }
-      detail={
-        requests.length > 0 ? (
-          <ExpandableList
-            title="Pending approvals"
-            items={requests}
-            keyExtractor={(request) => request.id}
-            onSeeAll={onSeeAll}
-            renderItem={(request) => <ActionQueueRow request={request} />}
-          />
-        ) : (
-          <EmptyStateCard
-            compact
-            iconName="checkmark-circle-outline"
-            title="No requests are waiting on you"
-          />
-        )
-      }
-    />
+      onOpen={hasMoreDashboardRows(requests.length) ? onSeeAll : undefined}
+    >
+      {requests.length > 0 ? (
+        <DashboardRowList
+          items={requests}
+          keyExtractor={(request) => request.id}
+          limit={DASHBOARD_CARD_PREVIEW_LIMIT}
+          renderItem={(request) => <ActionQueueRow request={request} />}
+        />
+      ) : (
+        <EmptyStateCard
+          compact
+          iconName="checkmark-circle"
+          title="No requests are waiting on you"
+        />
+      )}
+    </DashboardCard>
   );
 }
 
@@ -80,11 +95,12 @@ const createStyles = (mobileColors: MobileColors) =>
     row: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 8,
+      gap: mobileSpace.sm,
+      paddingVertical: mobileListRow.paddingVertical,
     },
     copy: {
-      flexShrink: 1,
-      gap: 2,
+      flex: 1,
+      gap: mobileListRow.titleGap,
     },
     label: {
       ...mobileText.body,
@@ -94,5 +110,10 @@ const createStyles = (mobileColors: MobileColors) =>
     meta: {
       ...mobileText.caption,
       color: mobileColors.textMuted,
+    },
+    // The request type as a word in the caption, coloured by its tone; a
+    // pill per row was the loudest thing on the card.
+    type: {
+      ...mobileTextWeighted("caption", "semibold"),
     },
   });

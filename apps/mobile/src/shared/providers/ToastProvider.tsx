@@ -11,12 +11,19 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { NETWORK_ERROR_MESSAGE, NETWORK_ERROR_TITLE } from "@dubgrid/client-errors";
 import { toastToneTokens } from "@dubgrid/design-tokens";
-import { StyleSheet, Text, View, type GestureResponderEvent } from "react-native";
+import { StyleSheet, View, type GestureResponderEvent } from "react-native";
+import { Text } from "../components/Text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNetworkStatus } from "./NetworkStateProvider";
 import { useNetworkRecovery } from "./NetworkRecoveryProvider";
 import { useMobileColors } from "./ThemeModeProvider";
-import { mobileRadii, mobileText, mobileTextWeighted, type MobileColors } from "../theme/tokens";
+import {
+  mobileRadii,
+  mobileText,
+  mobileTextWeighted,
+  type MobileColors,
+  mobileSpace,
+} from "../theme/tokens";
 
 export type ToastTone = "error" | "success" | "info" | "warning";
 
@@ -365,7 +372,7 @@ const createStyles = (mobileColors: MobileColors, insetLeft: number, insetRight:
       maxWidth: 520,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
-      paddingVertical: 14,
+      paddingVertical: mobileSpace.md,
       paddingLeft: 20,
       paddingRight: 20,
       flexDirection: "row",
@@ -381,7 +388,7 @@ const createStyles = (mobileColors: MobileColors, insetLeft: number, insetRight:
     },
     toastCopy: {
       flex: 1,
-      gap: 2,
+      gap: mobileSpace.xs,
     },
     toastTitle: {
       ...mobileText.bodyStrong,

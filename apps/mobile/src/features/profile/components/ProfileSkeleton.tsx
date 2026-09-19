@@ -14,6 +14,7 @@ import {
   mobileRadii,
   mobileSpacing,
   type MobileColors,
+  mobileSpace,
 } from "../../../shared/theme/tokens";
 import type { ProfileHeroAlign } from "./ProfilePrimitives";
 
@@ -25,13 +26,15 @@ const CENTERED_AVATAR_SIZE = 96;
 const ICON_BADGE_SIZE = 32;
 
 /** The row shapes the profile screens build their framed lists from. */
-type ProfileRowVariant =
+export type ProfileRowVariant =
   /** ProfileInfoRow: icon badge, small label above a value. */
   | "info"
   /** ProfileNavRow: icon badge, single label, trailing chevron. */
   | "nav"
   /** A settings toggle: title and caption with a switch on the right. */
-  | "toggle";
+  | "toggle"
+  /** A signed-in device: round platform badge, a title over three lines, a chevron. */
+  | "session";
 
 function ProfileRow({ variant }: { variant: ProfileRowVariant }) {
   const mobileColors = useMobileColors();
@@ -47,6 +50,21 @@ function ProfileRow({ variant }: { variant: ProfileRowVariant }) {
         </View>
         {/* The Switch primitive's track. */}
         <SkeletonPill height={31} width={51} />
+      </View>
+    );
+  }
+
+  if (variant === "session") {
+    return (
+      <View style={[styles.row, styles.sessionRow]}>
+        <SkeletonCircle size={36} />
+        <View style={styles.rowCopy}>
+          <SkeletonLine variant="rowTitle" width="48%" />
+          <SkeletonLine variant="caption" width="40%" />
+          <SkeletonLine variant="caption" width="34%" />
+          <SkeletonLine variant="caption" width="44%" />
+        </View>
+        <SkeletonLine variant="body" width={12} />
       </View>
     );
   }
@@ -94,17 +112,20 @@ function ProfileHeroSkeleton({
   return (
     <View style={[styles.hero, isCentered && styles.heroCentered]}>
       {isCentered ? (
+        // Fixed widths here: the centred column is content-sized, so a
+        // percentage line has nothing to be a percentage of and collapsed to
+        // a stub beside the avatar.
         <>
           <SkeletonCircle size={CENTERED_AVATAR_SIZE} />
-          <SkeletonLine variant="screenTitle" width="54%" />
-          {subtitle ? <SkeletonLine variant="body" width="46%" /> : null}
+          <SkeletonLine variant="screenTitle" width={168} />
+          {subtitle ? <SkeletonLine variant="body" width={208} /> : null}
         </>
       ) : (
         <View style={styles.heroTop}>
           <SkeletonCircle size={AVATAR_SIZE} />
           <View style={styles.heroCopy}>
             <View style={styles.heroTitleRow}>
-              <SkeletonLine variant="screenTitle" width="52%" />
+              <SkeletonLine variant="screenTitle" width="52%" style={styles.grow} />
               <SkeletonPill height={26} width={62} />
             </View>
             <SkeletonLine variant="body" width="64%" />
@@ -122,6 +143,8 @@ function ProfileHeroSkeleton({
           ))}
         </View>
       ) : null}
+      {/* The profile's "Joined" line under its badge. */}
+      {isCentered && subtitle ? <SkeletonLine variant="caption" width={128} /> : null}
       {metaItems > 0 ? (
         <View style={[styles.heroDetail, isCentered && styles.heroDetailCentered]}>
           {skeletonRows(metaItems, (index) => (
@@ -129,8 +152,8 @@ function ProfileHeroSkeleton({
               key={`profile-meta-${index}`}
               style={[styles.heroMetaItem, isCentered && styles.heroMetaItemCentered]}
             >
-              <SkeletonLine variant="caption" width="56%" />
-              <SkeletonLine variant="rowTitle" width="78%" />
+              <SkeletonLine variant="caption" width={isCentered ? 72 : "56%"} />
+              <SkeletonLine variant="rowTitle" width={isCentered ? 112 : "78%"} />
             </View>
           ))}
         </View>
@@ -138,6 +161,15 @@ function ProfileHeroSkeleton({
     </View>
   );
 }
+
+/** One framed list: how many rows it holds and what shape they take. */
+export type ProfileSectionSkeleton = {
+  rows: number;
+  rowVariant?: ProfileRowVariant;
+};
+
+/** Quick action pill widths, in the order the real row lays them out. */
+const QUICK_ACTION_WIDTHS = [112, 96, 88];
 
 /**
  * The placeholder every profile-shaped screen uses: the user's own profile,
@@ -148,6 +180,11 @@ function ProfileHeroSkeleton({
  * 16-radius lists of 66pt rows — because that is what actually replaces it. The
  * generic detail skeleton it supersedes drew none of the frames and sized the
  * avatar as a 56×64 rectangle.
+ *
+ * The screen decides the silhouette, and it must decide it per viewer: a
+ * teammate's page shows a manager three lists and three actions, and a
+ * colleague one list and no actions, so a skeleton drawn for the manager
+ * promised the colleague sections that never arrived.
  */
 export function ProfileSkeleton({
   sections = 3,
@@ -157,10 +194,11 @@ export function ProfileSkeleton({
   heroChips = 0,
   heroSubtitle = false,
   showHero = true,
-  showQuickActions = false,
+  quickActions = 0,
   rowVariant = "info",
 }: {
-  sections?: number;
+  /** A count of uniform lists, or one entry per list when their shapes differ. */
+  sections?: number | ProfileSectionSkeleton[];
   rowsPerSection?: number;
   metaItems?: number;
   /** Match the screen's own `ProfileHero`, or the silhouette shifts on load. */
@@ -170,12 +208,17 @@ export function ProfileSkeleton({
   /** On where the centered hero carries a subtitle under the name. */
   heroSubtitle?: boolean;
   showHero?: boolean;
-  showQuickActions?: boolean;
+  /** Pills in the action row under the hero; 0 leaves the row out. */
+  quickActions?: number;
   rowVariant?: ProfileRowVariant;
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
+  const sectionSpecs: ProfileSectionSkeleton[] =
+    typeof sections === "number"
+      ? Array.from({ length: sections }, () => ({ rows: rowsPerSection, rowVariant }))
+      : sections;
 
   return (
     <SkeletonGroup style={styles.page}>
@@ -187,25 +230,31 @@ export function ProfileSkeleton({
           subtitle={heroSubtitle}
         />
       ) : null}
-      {showQuickActions ? (
+      {quickActions > 0 ? (
         <View style={[styles.quickActions, heroAlign === "center" && styles.quickActionsCentered]}>
-          <SkeletonPill height={36} width={112} />
-          <SkeletonPill height={36} width={96} />
-          <SkeletonPill height={36} width={88} />
+          {skeletonRows(Math.min(quickActions, QUICK_ACTION_WIDTHS.length), (index) => (
+            <SkeletonPill
+              height={36}
+              key={`profile-action-${index}`}
+              width={QUICK_ACTION_WIDTHS[index]}
+            />
+          ))}
         </View>
       ) : null}
-      {skeletonRows(sections, (sectionIndex) => (
+      {sectionSpecs.map((section, sectionIndex) => (
         <View key={`profile-section-${sectionIndex}`} style={styles.section}>
-          <SkeletonLine variant="label" width="26%" />
+          <SkeletonLine style={styles.sectionTitle} variant="sectionTitle" width="30%" />
           <View style={styles.list}>
-            {skeletonRows(rowsPerSection, (rowIndex) => (
-              <View
-                key={`profile-row-${sectionIndex}-${rowIndex}`}
-                style={rowIndex < rowsPerSection - 1 ? styles.rowDivider : null}
-              >
-                <ProfileRow variant={rowVariant} />
-              </View>
-            ))}
+            <View style={styles.listClip}>
+              {skeletonRows(section.rows, (rowIndex) => (
+                <View
+                  key={`profile-row-${sectionIndex}-${rowIndex}`}
+                  style={rowIndex < section.rows - 1 ? styles.rowDivider : null}
+                >
+                  <ProfileRow variant={section.rowVariant ?? rowVariant} />
+                </View>
+              ))}
+            </View>
           </View>
         </View>
       ))}
@@ -215,11 +264,16 @@ export function ProfileSkeleton({
 
 const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
+    // A percentage-wide line inside a row has no width of its own to take a
+    // percentage of; growing the wrapper gives it the row's free space.
+    grow: {
+      flex: 1,
+    },
     page: {
       gap: mobileSpacing.sectionGap,
     },
     hero: {
-      gap: 14,
+      gap: mobileSpace.md,
       paddingTop: 4,
     },
     heroCentered: {
@@ -235,11 +289,11 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     heroTop: {
       alignItems: "center",
       flexDirection: "row",
-      gap: 14,
+      gap: mobileSpace.md,
     },
     heroCopy: {
       flex: 1,
-      gap: 3,
+      gap: mobileSpace.xs,
       minWidth: 0,
     },
     heroTitleRow: {
@@ -252,38 +306,56 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       alignSelf: "stretch",
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: 10,
+      gap: mobileSpace.md,
     },
     heroDetailCentered: {
       justifyContent: "center",
     },
     heroMetaItem: {
       flex: 1,
-      gap: 3,
+      gap: mobileSpace.xs,
       minWidth: 120,
     },
     heroMetaItemCentered: {
       alignItems: "center",
     },
+    // The real row's 112pt floor, so a device list stands in at full height.
+    sessionRow: {
+      minHeight: 112,
+      alignItems: "flex-start",
+    },
     quickActions: {
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: 10,
+      gap: mobileSpace.md,
       paddingBottom: 16,
     },
     quickActionsCentered: {
       justifyContent: "center",
     },
     section: {
-      gap: 10,
+      gap: mobileSpace.md,
     },
+    // Mirrors `ProfileSection`'s title: 16pt medium, inset from the card and
+    // with room above it. A margin, not padding: `SkeletonLine` fixes its
+    // height to the line, so padding would push the bar out of the box.
+    sectionTitle: {
+      paddingHorizontal: mobileSpace.lg,
+      marginTop: mobileSpace.sm,
+    },
+    // The clip sits on an inner view: iOS drops a view's own shadow when the
+    // same view clips its children, so the shadow-casting list stays unclipped
+    // and the rows are clipped to the corners one level down.
     list: {
       backgroundColor: mobileColors.surface,
       borderColor: mobileColors.cardBorder,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
-      overflow: "hidden",
       ...mobileElevation("card", isDark),
+    },
+    listClip: {
+      overflow: "hidden",
+      borderRadius: mobileRadii.card - 1,
     },
     row: {
       alignItems: "center",
@@ -309,7 +381,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     rowCopy: {
       flex: 1,
-      gap: 2,
+      gap: mobileSpace.xs,
       minWidth: 0,
     },
   });

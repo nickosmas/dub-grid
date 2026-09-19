@@ -1,8 +1,11 @@
 import { ActionButtons } from "../../../shared/components/ActionButtons";
+import { CountBadge } from "../../dashboard/components/CountBadge";
+import { REQUEST_TYPE_LABEL, REQUEST_TYPE_TONE } from "../lib/request-type";
 import { resolveJobChipTone } from "@dubgrid/design-tokens";
 import { useCallback, useMemo, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../../../shared/components/Text";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
 import type {
@@ -73,6 +76,7 @@ import {
   getSplitShiftSegmentsFromPresentation,
   hasShiftRequestStarted,
 } from "../../schedule/lib/schedule";
+import { ScheduleDateTile } from "../../schedule/components/ScheduleDateTile";
 import { createStyles } from "./requestsScreenStyles";
 
 const ACTIVE_REQUEST_STATUSES = new Set(["open", "pending_approval"]);
@@ -154,7 +158,9 @@ function MentoredPill() {
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors]);
   return (
     <View accessibilityLabel="Mentored assignment" style={styles.mentoredPill}>
-      <Text style={styles.mentoredPillText}>Mentored</Text>
+      <Text fit="compact" style={styles.mentoredPillText}>
+        Mentored
+      </Text>
     </View>
   );
 }
@@ -838,7 +844,7 @@ export default function RequestsScreen() {
 
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
-          <CardRowListSkeleton rows={4} />
+          <CardRowListSkeleton dateRail={activeTab === "available"} rows={4} />
         ) : null
       ) : contentState.kind === "error" ? (
         <StatusBanner
@@ -868,38 +874,50 @@ export default function RequestsScreen() {
               title="Nothing to pick up"
             />
           ) : (
-            availableOpenShiftFeed.groups.map((group) => (
-              <View key={group.date} style={styles.dateGroup}>
-                <Text style={styles.dateGroupLabel}>
-                  {formatScheduleDayLabel(group.date, now, timeZone)}
-                </Text>
-                <View style={styles.dateGroupItems}>
-                  {group.items.map((item) =>
-                    item.kind === "open_shift" ? (
-                      <OpenShiftCard
-                        key={item.key}
-                        linkedEmployeeId={linkedEmployeeId}
-                        pendingAction={pendingAction}
-                        onAction={(body) => runRequestAction(item.openShift.id, body)}
-                        openShift={item.openShift}
-                        showDate={false}
-                      />
-                    ) : (
-                      <RequestCard
-                        key={item.key}
-                        canApprove={false}
-                        linkedEmployeeId={linkedEmployeeId}
-                        pendingAction={pendingAction}
-                        onAction={(body) => runRequestAction(item.request.id, body)}
-                        highlighted={highlightedRequestId === item.request.id}
-                        request={item.request}
-                        showDate={false}
-                      />
-                    ),
-                  )}
+            <View style={styles.dateGroupList}>
+              {availableOpenShiftFeed.groups.map((group, groupIndex) => (
+                <View key={group.date} style={styles.dateGroup}>
+                  {/* The day fronts its cards from a rail: the same tile as
+                    Home's Your Week, joined to the next day by a line so the
+                    feed reads as one timeline rather than labelled piles. */}
+                  <View style={styles.dateRail}>
+                    <ScheduleDateTile
+                      accessibilityLabel={formatScheduleDayLabel(group.date, now, timeZone)}
+                      date={group.date}
+                      isToday={group.date === todayDate}
+                    />
+                    {groupIndex < availableOpenShiftFeed.groups.length - 1 ? (
+                      <View pointerEvents="none" style={styles.dateRailLine} />
+                    ) : null}
+                  </View>
+                  <View style={styles.dateGroupItems}>
+                    {group.items.map((item) =>
+                      item.kind === "open_shift" ? (
+                        <OpenShiftCard
+                          key={item.key}
+                          linkedEmployeeId={linkedEmployeeId}
+                          pendingAction={pendingAction}
+                          onAction={(body) => runRequestAction(item.openShift.id, body)}
+                          openShift={item.openShift}
+                          showDate={false}
+                        />
+                      ) : (
+                        <RequestCard
+                          key={item.key}
+                          canApprove={false}
+                          linkedEmployeeId={linkedEmployeeId}
+                          pendingAction={pendingAction}
+                          onAction={(body) => runRequestAction(item.request.id, body)}
+                          highlighted={highlightedRequestId === item.request.id}
+                          request={item.request}
+                          showDate={false}
+                        />
+                      ),
+                    )}
+                  </View>
                 </View>
-              </View>
-            ))
+              ))}
+            </View>
           )}
         </View>
       ) : activeTab === "all" ? (
@@ -954,7 +972,7 @@ export default function RequestsScreen() {
             <EmptyStateCard
               fillScreen
               body="Requests appear here when they need your approval."
-              iconName="checkmark-done-outline"
+              iconName="checkmark"
               title="Nothing to approve"
             />
           ) : (
@@ -1068,12 +1086,6 @@ function RequestCard({
     request.targetPresentation,
     request.targetState ?? null,
   );
-  const typeLabel =
-    request.type === "pickup"
-      ? "Pickup request"
-      : request.type === "swap"
-        ? "Swap request"
-        : "Calloff request";
   const statusTone = statusChipTones[request.status];
 
   const canCancel =
@@ -1100,13 +1112,16 @@ function RequestCard({
           <CardIcon muted={highlighted} name="swap-horizontal-outline" />
           <View style={styles.titleColumn}>
             <Text style={styles.requestTitle}>{request.requesterName}</Text>
-            <Text style={styles.metaText}>
-              {typeLabel}
-              {showDate ? ` • ${request.requesterShiftDate}` : ""}
-            </Text>
+            <View style={styles.requestTypeRow}>
+              <CountBadge
+                label={REQUEST_TYPE_LABEL[request.type]}
+                tone={REQUEST_TYPE_TONE[request.type]}
+              />
+              {showDate ? <Text style={styles.metaText}>{request.requesterShiftDate}</Text> : null}
+            </View>
             {requesterSplitSegments.length > 1 ? (
               <View style={styles.splitShiftPanel}>
-                <SplitShiftBadge count={requesterSplitSegments.length} compact />
+                <SplitShiftBadge count={requesterSplitSegments.length} />
                 <SplitShiftSegmentList
                   renderSegmentChip={(segment) => (
                     <JobPill
@@ -1135,7 +1150,7 @@ function RequestCard({
             {targetSplitSegments.length > 1 ? (
               <View style={styles.splitShiftPanel}>
                 <Text style={styles.splitShiftPanelLabel}>Target shift</Text>
-                <SplitShiftBadge count={targetSplitSegments.length} compact />
+                <SplitShiftBadge count={targetSplitSegments.length} />
                 <SplitShiftSegmentList
                   renderSegmentChip={(segment) => (
                     <JobPill
@@ -1160,7 +1175,7 @@ function RequestCard({
             { backgroundColor: statusTone.backgroundColor, borderColor: statusTone.borderColor },
           ]}
         >
-          <Text style={[styles.statusChipText, { color: statusTone.textColor }]}>
+          <Text fit="compact" style={[styles.statusChipText, { color: statusTone.textColor }]}>
             {formatRequestStatus(request.status)}
           </Text>
         </View>
@@ -1361,7 +1376,10 @@ function OpenShiftCard({
             },
           ]}
         >
-          <Text style={[styles.statusChipText, { color: openShiftChipTone.textColor }]}>
+          <Text
+            fit="compact"
+            style={[styles.statusChipText, { color: openShiftChipTone.textColor }]}
+          >
             Open shift
           </Text>
         </View>
@@ -1369,7 +1387,7 @@ function OpenShiftCard({
       {showDate ? <Text style={styles.metaText}>{openShift.date}</Text> : null}
       {splitSegments.length > 1 ? (
         <View style={styles.splitShiftPanel}>
-          <SplitShiftBadge count={splitSegments.length} compact />
+          <SplitShiftBadge count={splitSegments.length} />
           <SplitShiftSegmentList
             renderSegmentChip={(segment) => (
               <JobPill
@@ -1413,6 +1431,9 @@ function OpenShiftCard({
                 compact
                 disabled={Boolean(pendingAction) || openShift.canVolunteer === false}
                 label="Volunteer"
+                leadingAccessory={
+                  <Ionicons color={mobileColors.brand} name="add-circle-outline" size={18} />
+                }
                 loading={isLoading}
                 onPress={() => {
                   if (openShift.canVolunteer === false) {
@@ -1468,6 +1489,7 @@ function JobPill({
       {chip.eyebrowLabel ? (
         <View style={styles.jobPillTextStack}>
           <Text
+            fit="compact"
             style={[
               styles.jobPillEyebrowText,
               compact && styles.jobPillEyebrowTextCompact,
@@ -1477,6 +1499,7 @@ function JobPill({
             {chip.eyebrowLabel}
           </Text>
           <Text
+            fit="compact"
             style={[
               styles.jobPillValueText,
               compact && styles.jobPillValueTextCompact,
@@ -1495,6 +1518,7 @@ function JobPill({
       ) : (
         <View style={styles.jobPillInlineTextRow}>
           <Text
+            fit="compact"
             style={[
               styles.jobPillText,
               compact && styles.jobPillTextCompact,
@@ -1505,6 +1529,7 @@ function JobPill({
           </Text>
           {isMentored ? (
             <Text
+              fit="compact"
               style={[
                 styles.jobPillMentoredInlineText,
                 compact && styles.jobPillMentoredInlineTextCompact,
@@ -1535,7 +1560,9 @@ function ShiftPill({ colors, label }: { colors: ShiftPillColors; label: string }
         },
       ]}
     >
-      <Text style={[styles.shiftPillText, { color: colors.textColor }]}>{label}</Text>
+      <Text fit="compact" style={[styles.shiftPillText, { color: colors.textColor }]}>
+        {label}
+      </Text>
     </View>
   );
 }

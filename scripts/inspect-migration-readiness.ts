@@ -21,6 +21,11 @@ const CHECK_INTRODUCED_BY: Readonly<Record<string, string>> = {
   caller_org_id_validates_live_state: "016",
   scheduler_calloff_function: "019",
   scheduler_calloff_trigger: "019",
+  publish_schedule_split_times: "020",
+  // scheduler_calloff_json_null_safe is deliberately absent: it passes when
+  // 019's trigger is missing and fails only when the trigger is present in its
+  // original form, which is exactly the state that must never be deferred.
+  // Between 019 and 020 every publish that adds a cell fails at the database.
 };
 
 export const QUALIFICATION_SQL = `
@@ -97,6 +102,28 @@ WITH org_tables_without_rls AS (
   SELECT 'scheduler_calloff_trigger', count(*) = 1, count(*)::text
   FROM pg_trigger
   WHERE tgname = 'trigger_finalize_scheduler_staffed_calloffs' AND NOT tgisinternal
+  UNION ALL
+  -- 019 shipped this trigger reading a JSON-null from_state as SQL NULL's
+  -- opposite, which failed every publish that added a cell. 020 repairs it.
+  -- Absent is fine; present-and-unrepaired is the one state that is broken.
+  SELECT 'scheduler_calloff_json_null_safe',
+         CASE WHEN to_regprocedure('public.finalize_scheduler_staffed_calloffs()') IS NULL THEN true
+              ELSE pg_get_functiondef(to_regprocedure('public.finalize_scheduler_staffed_calloffs()'))
+                   LIKE '%jsonb_typeof(NEW.from_state)%' END,
+         CASE WHEN to_regprocedure('public.finalize_scheduler_staffed_calloffs()') IS NULL THEN 'absent'
+              WHEN pg_get_functiondef(to_regprocedure('public.finalize_scheduler_staffed_calloffs()'))
+                   LIKE '%jsonb_typeof(NEW.from_state)%' THEN 'repaired'
+              ELSE '019 without 020: publishing a new cell fails' END
+  UNION ALL
+  -- 020 also stops publish_schedule casting a pipe-delimited per-segment time
+  -- to TIME, which failed the publish of a double shift with both segments
+  -- timed.
+  SELECT 'publish_schedule_split_times',
+         pg_get_functiondef(to_regprocedure('public.publish_schedule(uuid,date,date,uuid)'))
+           LIKE '%split_part(COALESCE(c->>''toCustomStart''%',
+         CASE WHEN pg_get_functiondef(to_regprocedure('public.publish_schedule(uuid,date,date,uuid)'))
+                   LIKE '%split_part(COALESCE(c->>''toCustomStart''%'
+              THEN 'repaired' ELSE 'casts delimited times to TIME' END
 )
 SELECT check_name, passed, detail FROM checks ORDER BY check_name
 `;

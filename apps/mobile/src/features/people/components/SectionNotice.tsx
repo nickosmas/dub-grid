@@ -50,6 +50,6 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     messages: {
       flex: 1,
-      gap: 2,
+      gap: mobileSpace.xs,
     },
   });

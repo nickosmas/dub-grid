@@ -23,6 +23,7 @@
     "start": "npm --workspace @dubgrid/web run start",
     "hooks:install": "git config core.hooksPath .githooks && echo 'Git hooks enabled (.githooks)'",
     "lint": "eslint .",
+    "lint:rules": "node --test eslint-rules/",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "type-check": "turbo run type-check && npm run type-check:root",

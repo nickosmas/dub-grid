@@ -1,6 +1,7 @@
 import { ActionButtons } from "../../../shared/components/ActionButtons";
 import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "../../../shared/components/Text";
 import Animated from "react-native-reanimated";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
@@ -58,12 +59,13 @@ import {
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
   mobileAvatarText,
-  MAX_FONT_SCALE,
   mobileElevation,
   mobileMotion,
   mobileRadii,
   mobileText,
+  mobileTextWeighted,
   type MobileColors,
+  mobileSpace,
 } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
@@ -825,55 +827,60 @@ export default function PeopleScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>People requests</Text>
           <View style={styles.linkList}>
-            {profileRequests.map((request: MobileProfileChangeRequest, index: number) => (
-              <View
-                key={request.id}
-                style={[styles.requestRow, index < profileRequests.length - 1 && styles.rowDivider]}
-              >
-                <View style={styles.requestCopy}>
-                  <Text style={styles.personName}>{request.requesterName}</Text>
-                  <Text style={styles.personSubtitle}>
-                    {request.type === "account_deletion" ? "Account deletion" : "Profile update"}
-                  </Text>
-                </View>
-                <ActionButtons
-                  primaryAction={
+            <View style={styles.linkListClip}>
+              {profileRequests.map((request: MobileProfileChangeRequest, index: number) => (
+                <View
+                  key={request.id}
+                  style={[
+                    styles.requestRow,
+                    index < profileRequests.length - 1 && styles.rowDivider,
+                  ]}
+                >
+                  <View style={styles.requestCopy}>
+                    <Text style={styles.personName}>{request.requesterName}</Text>
+                    <Text style={styles.personSubtitle}>
+                      {request.type === "account_deletion" ? "Account deletion" : "Profile update"}
+                    </Text>
+                  </View>
+                  <ActionButtons
+                    primaryAction={
+                      <Button
+                        compact
+                        disabled={resolveRequestMutation.isPending}
+                        label="Approve"
+                        onPress={() => {
+                          setProfileRequestConfirmation({
+                            request,
+                            action: "approve",
+                          });
+                        }}
+                      />
+                    }
+                    style={styles.requestActions}
+                  >
                     <Button
                       compact
                       disabled={resolveRequestMutation.isPending}
-                      label="Approve"
+                      label="Reject"
                       onPress={() => {
                         setProfileRequestConfirmation({
                           request,
-                          action: "approve",
+                          action: "reject",
                         });
                       }}
+                      tone="neutral"
                     />
-                  }
-                  style={styles.requestActions}
-                >
-                  <Button
-                    compact
-                    disabled={resolveRequestMutation.isPending}
-                    label="Reject"
-                    onPress={() => {
-                      setProfileRequestConfirmation({
-                        request,
-                        action: "reject",
-                      });
-                    }}
-                    tone="neutral"
-                  />
-                </ActionButtons>
-              </View>
-            ))}
+                  </ActionButtons>
+                </View>
+              ))}
+            </View>
           </View>
         </View>
       ) : null}
 
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
-          <PersonListSkeleton rows={6} />
+          <PersonListSkeleton />
         ) : null
       ) : contentState.kind === "error" && contentState.reason === "unauthorized" ? (
         <StatusBanner
@@ -1182,12 +1189,7 @@ function PersonRow({
           },
         ]}
       >
-        <Text
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          maxFontSizeMultiplier={MAX_FONT_SCALE}
-          style={[styles.personAvatarText, { color: avatarTone.textColor }]}
-        >
+        <Text fit="fixed" style={[styles.personAvatarText, { color: avatarTone.textColor }]}>
           {initials}
         </Text>
       </View>
@@ -1203,7 +1205,9 @@ function PersonRow({
                 name={orgRoleBadge.icon === "crown" ? "crown" : "star"}
                 size={13}
               />
-              <Text style={orgRoleBadge.textStyle}>{orgRoleBadge.label}</Text>
+              <Text fit="compact" style={orgRoleBadge.textStyle}>
+                {orgRoleBadge.label}
+              </Text>
             </View>
           ) : null}
         </View>
@@ -1221,17 +1225,20 @@ function PersonRow({
 const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     section: {
-      gap: 10,
+      gap: mobileSpace.md,
     },
     sectionTitle: {
-      ...mobileText.label,
+      ...mobileTextWeighted("sectionTitle", "medium"),
       color: mobileColors.textSubtle,
-      textTransform: "uppercase",
+      paddingHorizontal: mobileSpace.lg,
+      // Air above a title that follows another section's card; the card's
+      // own gap below the title stays at the section's `gap`.
+      paddingTop: mobileSpace.sm,
     },
     searchBarRow: {
       alignItems: "center",
       flexDirection: "row",
-      gap: 10,
+      gap: mobileSpace.md,
     },
     rosterTabs: {
       // The control sizes to its own labels, so it needs a start-aligned row
@@ -1249,13 +1256,18 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       justifyContent: "center",
       width: 46,
     },
+    // The clip sits on an inner view: iOS drops a view's own shadow when the
+    // same view clips its children.
     linkList: {
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
       borderColor: mobileColors.cardBorder,
-      overflow: "hidden",
       ...mobileElevation("card", isDark),
+    },
+    linkListClip: {
+      overflow: "hidden",
+      borderRadius: mobileRadii.card - 1,
     },
     personRow: {
       alignItems: "center",
@@ -1275,10 +1287,10 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     requestRow: {
       gap: 12,
       paddingHorizontal: 16,
-      paddingVertical: 14,
+      paddingVertical: mobileSpace.md,
     },
     requestCopy: {
-      gap: 3,
+      gap: mobileSpace.xs,
     },
     requestActions: {
       flexDirection: "row",
@@ -1298,7 +1310,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     personCopy: {
       flex: 1,
-      gap: 3,
+      gap: mobileSpace.xs,
       minWidth: 0,
     },
     personNameRow: {

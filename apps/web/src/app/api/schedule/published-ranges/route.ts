@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { z } from "zod";
-import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { canSeeSchedulePublisher, requireOrgPermissions } from "@/app/api/shared/permissions";
 import { apiErrorResponse } from "@/lib/error-handling";
 
 const querySchema = z.object({
@@ -39,12 +39,13 @@ export async function GET(req: NextRequest) {
       throw error;
     }
 
+    const showPublisher = canSeeSchedulePublisher(auth.permissions);
     return NextResponse.json({
       ranges: (data ?? []).map((row: Record<string, unknown>) => ({
         startDate: row.start_date as string,
         endDate: row.end_date as string,
         publishedAt: row.published_at as string,
-        publishedBy: row.published_by as string,
+        publishedBy: showPublisher ? (row.published_by as string) : null,
       })),
     });
   } catch (error) {

@@ -38,6 +38,18 @@ describe("SuperAdminDashboard", () => {
     expect(screen.getByText("Open shifts")).toBeInTheDocument();
   });
 
+  it("stacks the card-row grids to one column at tablet widths", () => {
+    const { container } = render(<SuperAdminDashboard {...makeProps({ isTablet: true })} />);
+
+    const gridRows = Array.from(container.querySelectorAll<HTMLDivElement>("div")).filter(
+      (el) => el.style.display === "grid" && el.style.gap === "var(--dg-space-lg)",
+    );
+    expect(gridRows.length).toBeGreaterThan(0);
+    for (const row of gridRows) {
+      expect(row.style.gridTemplateColumns).toBe("1fr");
+    }
+  });
+
   it("omits the my-schedule row when the admin has no linked employee", () => {
     render(<SuperAdminDashboard {...makeProps({ currentEmpId: null })} />);
 

@@ -42,11 +42,29 @@ describe("BottomSheetModal close button", () => {
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
-  it("withholds it from a sheet that refuses dismissal", () => {
+  it("keeps it in place, disabled, while a task sheet is busy", () => {
     const onDismiss = vi.fn();
 
     render(
       <BottomSheetModal dismissDisabled visible onDismiss={onDismiss}>
+        <span>Body</span>
+      </BottomSheetModal>,
+    );
+
+    // A request in flight must not be interrupted, but a close button that
+    // vanishes mid-request reads as the sheet having lost its exit. It stays,
+    // says it is disabled, and does nothing until the request settles.
+    const close = screen.getByRole("button", { name: "Close" });
+    expect(close).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(close);
+    expect(onDismiss).not.toHaveBeenCalled();
+  });
+
+  it("withholds it from a gate", () => {
+    const onDismiss = vi.fn();
+
+    render(
+      <BottomSheetModal dismissDisabled presentationKind="gate" visible onDismiss={onDismiss}>
         <span>Body</span>
       </BottomSheetModal>,
     );

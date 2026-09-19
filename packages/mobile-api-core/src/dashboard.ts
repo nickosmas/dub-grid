@@ -6,6 +6,11 @@ import type {
   ScheduleCellState,
 } from "@dubgrid/contracts";
 import {
+  describeMemberSignupActivity,
+  describeShiftRequestActivity,
+  summarizePublishChanges,
+} from "@dubgrid/domain";
+import {
   buildShiftJobPairKey,
   computeShiftSegmentHours,
   formatLocalDateKey,
@@ -492,26 +497,13 @@ export function computeStaffHoursForPeriod(
   return results.sort((a, b) => b.overtimeHours - a.overtimeHours);
 }
 
-const SHIFT_CHANGE_DESCRIPTION: Record<DashboardPublishChange["kind"], string> = {
-  new: "Shift added",
-  modified: "Shift updated",
-  deleted: "Shift removed",
-};
-
-function getShiftRequestStatusLabel(status: string): string {
-  if (status === "open") return "Open";
-  if (status === "pending_approval") return "Pending";
-  return status;
-}
-
-// Same 4 event types as web's buildActivityFeed (apps/web/src/lib/
-// dashboard-stats.ts): publish, shift_change (per-shift diff from the same
-// schedule_publish_changes rows web reads), request (any shift
-// request, no status/type filter — matches web's unfiltered fetch), and
-// user_signup (any invitation with a non-null acceptedAt). Mobile's activity
-// item is pre-composed text (no separate highlight/href fields like web's),
-// so per-type detail that web puts in `highlight` is folded into
-// `description` here instead.
+// Same event types as web's buildActivityFeed (apps/web/src/lib/
+// dashboard-stats.ts): publish (one row per publish, its cell changes folded
+// into the description), request (any shift request, no status/type filter,
+// matching web's unfiltered fetch), and user_signup (any invitation with a
+// non-null acceptedAt). The copy comes from @dubgrid/domain so both feeds
+// read the same. `shift_change` stays in the contract for cached payloads
+// but is no longer emitted.
 export function buildActivityFeed(
   publishHistoryRows: DashboardPublishHistoryRow[],
   shiftRequests: MobileShiftRequest[],
@@ -525,34 +517,25 @@ export function buildActivityFeed(
     const publisherName = row.published_by
       ? (nameByProfileId.get(row.published_by) ?? "Someone")
       : "Someone";
+    const range = `${formatUsDateForActivity(row.start_date)} to ${formatUsDateForActivity(row.end_date)}`;
     items.push({
       id: `pub_${row.published_at}`,
       type: "publish",
-      description: `${publisherName} published the schedule for ${formatUsDateForActivity(row.start_date)} to ${formatUsDateForActivity(row.end_date)}`,
+      description: `${publisherName} published the schedule for ${range} · ${summarizePublishChanges(row.changes, row.change_count)}`,
       timestamp: row.published_at,
     });
-
-    for (const change of row.changes.slice(0, 12)) {
-      items.push({
-        id: `chg_${row.published_at}_${change.empId}_${change.date}_${change.kind}`,
-        type: "shift_change",
-        description: `${SHIFT_CHANGE_DESCRIPTION[change.kind]} · ${formatUsDateForActivity(change.date)}`,
-        timestamp: row.published_at,
-      });
-    }
   }
 
   for (const request of shiftRequests) {
-    const isPickup = request.type === "pickup";
-    const shiftName =
-      request.requesterPresentation.shiftName || request.requesterPresentation.label;
-    const statusLabel = getShiftRequestStatusLabel(request.status);
     items.push({
       id: `req_${request.id}`,
       type: "request",
-      description: isPickup
-        ? `Pickup request · ${shiftName} · ${statusLabel}`
-        : `Swap request · ${request.requesterName} · ${statusLabel}`,
+      description: describeShiftRequestActivity({
+        type: request.type,
+        shiftName: request.requesterPresentation.shiftName || request.requesterPresentation.label,
+        requesterName: request.requesterName,
+        status: request.status,
+      }),
       timestamp: request.createdAt,
     });
   }
@@ -561,7 +544,10 @@ export function buildActivityFeed(
     items.push({
       id: `signup_${invitation.accepted_at}_${invitation.email}`,
       type: "user_signup",
-      description: `User sign-up completed · ${invitation.email} (${invitation.role_to_assign})`,
+      description: describeMemberSignupActivity({
+        email: invitation.email,
+        role: invitation.role_to_assign,
+      }),
       timestamp: invitation.accepted_at,
     });
   }

@@ -2,11 +2,13 @@
 import { ChevronLeft, Clock } from "lucide-react";
 
 import { Fragment, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTheme } from "next-themes";
 import type { ReactNode } from "react";
 import type { ShiftRequest, ShiftRequestStatus, AbsenceType } from "@/types";
 import { Button } from "@/components/Button";
 import { useMediaQuery, MOBILE } from "@/hooks";
+import { useSlideoverClose } from "@/hooks/useSlideoverClose";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { EmptyState } from "@/components/EmptyState";
@@ -15,11 +17,15 @@ import ProgressBar from "@/components/ProgressBar";
 import ScrollableTabs from "@/components/ScrollableTabs";
 import { joinShiftJobSegmentNames } from "@/lib/shift-job-segments";
 import { joinAssignmentNames } from "@/lib/assignable-shifts";
-import { resolveShiftPillColors, SHIFT_REQUEST_STATUS_COLORS } from "@/lib/colors";
+import { resolveShiftPillColors } from "@/lib/colors";
+import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
+import { NumericBadge } from "@/components/ui/numeric-badge";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface ShiftRequestBoardProps {
+  /** The tab to open on; a deep link from an alert names it. */
+  initialTab?: Tab;
   openPickups: ShiftRequest[];
   myRequests: ShiftRequest[];
   pendingApproval: ShiftRequest[];
@@ -66,13 +72,19 @@ function timeRemainingLabel(expiresAt: string): string {
   return `${days}d left`;
 }
 
-// Lives in lib/colors.ts because the schedule grid's request fold tints itself
-// from the same table — two copies would drift the moment one is restyled.
-const STATUS_COLORS = SHIFT_REQUEST_STATUS_COLORS;
+const STATUS_TONES: Record<ShiftRequestStatus, StatusPillTone> = {
+  open: "info",
+  pending_approval: "warning",
+  approved: "success",
+  rejected: "danger",
+  cancelled: "neutral",
+  expired: "neutral",
+};
 
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function ShiftRequestBoard({
+  initialTab,
   openPickups,
   myRequests,
   pendingApproval,
@@ -90,9 +102,16 @@ export default function ShiftRequestBoard({
   assignmentNameMap,
 }: ShiftRequestBoardProps) {
   const isMobile = useMediaQuery(MOBILE);
+  const { closing, close } = useSlideoverClose(onClose);
   const { resolvedTheme } = useTheme();
   const isDarkTheme = resolvedTheme === "dark";
-  const [activeTab, setActiveTab] = useState<Tab>("available");
+  // A deep link may name the approval tab for someone who cannot see it;
+  // their own requests are the nearest tab that exists for them.
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    if (!initialTab) return "available";
+    if (initialTab === "approval" && !(canApprove || canViewAllRequests)) return "mine";
+    return initialTab;
+  });
   const [rejectNotes, setRejectNotes] = useState<Record<string, string>>({});
   const [showRejectInput, setShowRejectInput] = useState<Record<string, boolean>>({});
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
@@ -157,27 +176,12 @@ export default function ShiftRequestBoard({
   // ── Status badge ─────────────────────────────────────────────────────────
 
   function renderStatusBadge(status: ShiftRequestStatus) {
-    const colors = STATUS_COLORS[status];
     const label =
       status === "pending_approval" ? "Pending" : status.charAt(0).toUpperCase() + status.slice(1);
     return (
-      <span
-        style={{
-          display: "inline-block",
-          fontSize: "var(--dg-fs-footnote)",
-          fontWeight: 700,
-          textTransform: "uppercase",
-          letterSpacing: "0.04em",
-          padding: "2px 7px",
-          borderRadius: "var(--dg-radius-xs)",
-          background: colors.bg,
-          color: colors.text,
-          border: `1px solid ${colors.border}`,
-          lineHeight: 1.4,
-        }}
-      >
+      <StatusPill tone={STATUS_TONES[status]} className="uppercase tracking-wide">
         {label}
-      </span>
+      </StatusPill>
     );
   }
 
@@ -473,6 +477,8 @@ export default function ShiftRequestBoard({
                 borderRadius: "var(--dg-radius-md)",
                 fontSize: "var(--dg-fs-caption)",
                 fontFamily: "inherit",
+                color: "var(--dg-color-text-primary)",
+                background: "var(--dg-color-surface)",
                 resize: "vertical",
                 outline: "none",
                 boxSizing: "border-box",
@@ -621,7 +627,7 @@ export default function ShiftRequestBoard({
 
   const tabData = getTabData();
 
-  return (
+  return createPortal(
     <>
       <ProgressBar loading={loading} />
       {pendingConfirmation && (
@@ -640,17 +646,14 @@ export default function ShiftRequestBoard({
         />
       )}
       {/* Backdrop */}
-      <div className="dg-panel-overlay" onClick={onClose} />
+      <div className={`dg-panel-overlay${closing ? " closing" : ""}`} onClick={close} />
 
       {/* Panel */}
       <div
-        className="dg-panel"
+        className={`dg-panel${closing ? " closing" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-label="Shift requests"
-        onKeyDown={(e) => {
-          if (e.key === "Escape") onClose();
-        }}
       >
         {/* Header */}
         <div
@@ -666,7 +669,7 @@ export default function ShiftRequestBoard({
         >
           {isMobile && (
             <Button
-              onClick={onClose}
+              onClick={close}
               aria-label="Back"
               style={{
                 display: "flex",
@@ -705,7 +708,7 @@ export default function ShiftRequestBoard({
               Pickups, swaps, and approvals
             </div>
           </div>
-          {!isMobile && <CloseButton size="md" onClick={onClose} aria-label="Close panel" />}
+          {!isMobile && <CloseButton size="md" onClick={close} aria-label="Close panel" />}
         </div>
 
         {/* Tab bar */}
@@ -742,7 +745,11 @@ export default function ShiftRequestBoard({
                       className={`dg-span-tab${isActive ? " active" : ""}`}
                     >
                       {tab.label}
-                      {tab.count > 0 ? ` (${tab.count})` : ""}
+                      <NumericBadge
+                        count={tab.count}
+                        tone={isActive ? "onAccent" : "neutral"}
+                        style={{ marginLeft: 6 }}
+                      />
                     </Button>
                   </Fragment>
                 );
@@ -791,6 +798,7 @@ export default function ShiftRequestBoard({
         </div>
         <ScrollOverflowCue />
       </div>
-    </>
+    </>,
+    document.body,
   );
 }

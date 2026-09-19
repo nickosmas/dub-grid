@@ -15,7 +15,8 @@ Feature code in `apps/mobile/src`.
 - Typecheck: `npm --workspace @dubgrid/mobile run type-check`
 - iOS: `npm --workspace @dubgrid/mobile run ios`
 - Android: `npm --workspace @dubgrid/mobile run android`
-- Root mobile + contracts tests: `npm run test:mobile`
+- Root mobile + contracts + schedule-core tests: `npm run test:mobile`
+- App icons: `npm --workspace @dubgrid/mobile run icons` (stacked wordmark, both platforms' safe zones)
 
 First-run state is device-local storage, not DB state, so `npm run db:reset`
 never clears it: `hasSeenOnboarding` (`shared/lib/session.ts`) and the cookie
@@ -41,12 +42,14 @@ apps/mobile/
     (tabs)/
       _layout.tsx  _layout.android.tsx  _layout.web.tsx
       home/  people/  profile/  requests/  team/
-    alerts/
-    shift/
+    alerts/                         # index (mailbox list); [id] forwards to the alert's subject
+    person/[id]/                    # Person detail + schedule outside the tab stack
+    shift/[employeeId]/[date].tsx   # Shift detail with the request sheets
   src/
     features/
       auth/                         # Auth flow, MobileRealtimeProvider
       consent/                      # ConsentGate + TermsGate
+      dashboard/                    # Admin dashboard cards, hero, drill-in screens
       notifications/
       onboarding/                   # Onboarding screens/components
       people/
@@ -54,14 +57,15 @@ apps/mobile/
       schedule/
       shift-requests/
     shared/
-      components/                   # Shared primitives (ConfigurationScreen, etc.)
-      hooks/
-      lib/                          # env.ts, query-client, error helpers
+      components/                   # Shared primitives (AppText/Text, Button, sheets, skeleton/, ...)
+      hooks/                        # useAsyncAction, useUnsavedChangesGuard, useMobileContentState, ...
+      lib/                          # env.ts, api.ts, auth-reset, errors, in-app browser
       motion/                       # useMotionPreference, usePressAnimation,
                                     #   AnimatedListItem, Collapsible
       navigation/
       providers/                    # AuthSessionProvider
       theme/                        # tokens.ts adapter + useElevation
+    test/                           # Vitest shims (react-native emulation, reanimated stub, navigation)
 ```
 
 ## App Identifiers (High Risk)
@@ -135,6 +139,28 @@ Sign-out must revoke this device's push token **before** dropping the session
 (`disablePushForCurrentDevice` in `shared/lib/auth-reset.ts`), or the phone
 keeps receiving the previous user's notifications.
 
+## Text Scaling
+
+Every text in the app goes through `shared/components/Text` (and `AppText` on
+top of it); a lint rule refuses the raw `react-native` `Text` import. It caps the
+OS text-size setting at `MAX_FONT_SCALE` (1.5x) and bounds the rendered size at
+`MAX_TEXT_SIZE` (32pt) read from the style's `fontSize`, so a headline never
+outgrows its row. Two `fit` tiers keep controls in shape, always one line and
+truncating rather than wrapping:
+
+- `fit="fixed"` renders at the designed size whatever the OS setting: header
+  titles and the labels beside them, sheet titles, the tab bar, avatar initials,
+  date tiles, count dots, the wordmark. Chrome holds still while the page grows.
+- `fit="compact"` grows to `MAX_FONT_SCALE_COMPACT` (1.2x) and stops: button,
+  pill, chip, badge, segment, and tab labels.
+
+Reading text keeps the full multiplier. Padding and control geometry never
+derive from the font scale. Shrink-to-fit (`adjustsFontSizeToFit`) is banned:
+React Native's new architecture ignores `minimumFontScale` and fits against the
+container's height, which is what left button labels tiny beside large copy. At
+a raised scale, stack squeezed columns (a role pill under the name) rather than
+`flexWrap` a pill.
+
 ## Platform Rules
 
 - Do not use browser-only APIs (`window`, `document`, `localStorage`) in native
@@ -188,28 +214,51 @@ import path screens should use. **The package is shared with `apps/web`** — ad
 
 ### Reach for these before inventing anything
 
-| Need                        | Use                                                                                         |
-| --------------------------- | ------------------------------------------------------------------------------------------- |
-| Any text                    | `<AppText variant tone>` — carries a theme-correct color by default                         |
-| Any button                  | `<Button>` — solid fill, no border, squircle, sizes `sm`/`md`/`lg`, `iconOnly`              |
-| A pressable list row        | `<PressableRow>` — background highlight on iOS, ripple on Android                           |
-| A scrolling tab strip       | `<ScrollableTabStrip>` — pill tabs, optional count badges, scrolls the active tab into view |
-| A pressable that is neither | `usePressAnimation()`                                                                       |
-| Status/metadata/filter pill | `<Chip>`                                                                                    |
-| Segmented toggle            | `<SegmentedControl>` — sliding thumb, optional count badges (same pill as the strip's)      |
-| Shadow                      | `mobileElevation(level, isDark)` or `useElevation(level)`                                   |
-| Duration / spring / easing  | `useMotionPreference()` — never a raw number                                                |
-| Soft brand wash             | `<GradientBackdrop kind>`                                                                   |
-| List entrance               | `<AnimatedListItem index>`                                                                  |
-| Show/hide a block           | `<Collapsible open>`                                                                        |
-| A short task or selection   | `<BottomSheetModal>`; use a page for substantial or multi-step editing                      |
-| A sheet's title             | `<SheetHeader title subtitle>` in the `header` slot — never a title in the body             |
-| A consequential decision    | `<ConfirmationModal>`; cancel left, confirm right; always side by side                      |
-| Auth screen frame           | `<AuthShell>` + `<AuthField>`                                                               |
-| An empty state              | `<EmptyStateCard iconName>` — centred; `compact` inside a card adds its panel               |
-| Loading placeholder         | a `*Skeleton` colocated with the screen, built on `shared/components/skeleton`              |
-| Which state a screen is in  | `useMobileContentState({ hasData, isLoading, error, isEmpty })`                             |
-| Stopping a double-tap       | `useAsyncAction()` — already inside `<Button>`, `<PressableRow>`, `<ConfirmationModal>`     |
+| Need                        | Use                                                                                                                                |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Any text                    | `<AppText variant tone>` — carries a theme-correct color by default                                                                |
+| Any button                  | `<Button>` — solid fill, no border, squircle, sizes `sm`/`md`/`lg`, `iconOnly`                                                     |
+| A pressable list row        | `<PressableRow>` — background highlight on iOS, ripple on Android                                                                  |
+| A scrolling tab strip       | `<ScrollableTabStrip>` — pill tabs, optional count badges, scrolls the active tab into view                                        |
+| A pressable that is neither | `usePressAnimation()`                                                                                                              |
+| Status/metadata/filter pill | `<Chip>`                                                                                                                           |
+| Segmented toggle            | `<SegmentedControl>` — sliding thumb, optional count badges (same pill as the strip's)                                             |
+| Shadow                      | `mobileElevation(level, isDark)` or `useElevation(level)`                                                                          |
+| Duration / spring / easing  | `useMotionPreference()` — never a raw number                                                                                       |
+| Soft brand wash             | `<GradientBackdrop kind>`                                                                                                          |
+| List entrance               | `<AnimatedListItem index>`                                                                                                         |
+| Show/hide a block           | `<Collapsible open>`                                                                                                               |
+| A short task or selection   | `<BottomSheetModal>`; use `<FullPageSheet>` for a task that needs the whole page (the swap browser), a page for multi-step editing |
+| A sheet's title             | `<SheetHeader title subtitle>` in the `header` slot — never a title in the body                                                    |
+| A consequential decision    | `<ConfirmationModal>`; cancel left, confirm right; always side by side                                                             |
+| Auth screen frame           | `<AuthShell>` + `<AuthField>`                                                                                                      |
+| An empty state              | `<EmptyStateCard iconName>` — centred; `compact` inside a card adds its panel                                                      |
+| Loading placeholder         | a `*Skeleton` colocated with the screen, built on `shared/components/skeleton`                                                     |
+| Which state a screen is in  | `useMobileContentState({ hasData, isLoading, error, isEmpty })`                                                                    |
+| Stopping a double-tap       | `useAsyncAction()` — already inside `<Button>`, `<PressableRow>`, `<ConfirmationModal>`                                            |
+
+### The metric contract
+
+Every number on a mobile screen comes from a token, and the tokens are the
+whole vocabulary. `design/no-raw-mobile-metrics` fails lint on a raw
+`fontSize` or an off-ramp spacing literal; a 1pt optical nudge and a value
+computed from tokens (`mobileSpace["5xl"] + mobileSpace["2xl"]`) both pass.
+
+| Metric          | Rule                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Spacing         | `mobileSpace`: 4 / 8 / 12 / 16 / 20 / 24 / 32 / 40 / 48. The 2 / 6 / 10 / 14 sub-grid is banned; round, don't add                                                                                                                                                                                                                                                                                                                                             |
+| Type            | `mobileText` only: `display` 28 (one headline on a headerless screen), `screenTitle` 22, `title` 20 (card and section headings over their own surface), `sectionTitle` 16, `cardTitle` 16, `input` 16 (editable text, paired with `mobileInputText()` for the family), `rowTitle` 15, `body` 14, `meta` 13, `label`/`caption` 12, `badge` 11, `micro` 10 (non-interactive badges only). A different weight goes through `mobileTextWeighted(variant, weight)` |
+| Control height  | `mobileControl`: `sm` 36 (pads its target with `hitSlop`), `md` 44, `lg` 52. Buttons, fields, search, segmented and icon controls share it                                                                                                                                                                                                                                                                                                                    |
+| List row        | `mobileListRow`: min 44, 12 vertical padding, 4 between title and caption; `PressableRow` carries the floor                                                                                                                                                                                                                                                                                                                                                   |
+| Page gutter     | `getScreenGutter()`: 20 on iOS (the large-title inset), 16 on Android                                                                                                                                                                                                                                                                                                                                                                                         |
+| Section rhythm  | `mobileSpacing.sectionGap` 24 between sections; a card heading sits 8 above its surface                                                                                                                                                                                                                                                                                                                                                                       |
+| Card surface    | `getCardSurfaceStyle`: 16 padding, 12 internal gap, `card` radius; the shadow is the only edge in light mode                                                                                                                                                                                                                                                                                                                                                  |
+| Badge / chip    | Fill only, never a stroke; 8 × 4 padding; one badge per row, secondary facts go in `caption`                                                                                                                                                                                                                                                                                                                                                                  |
+| Edges           | One separator per surface: a stroke _or_ a shadow, never both (icon controls, badges, cards all follow this)                                                                                                                                                                                                                                                                                                                                                  |
+| Icons           | Ionicons: a glyph that names a thing (calendar, key, location, a tab) is the `-outline` variant; a glyph that states a status (`checkmark-circle`, `alert-circle`, `information-circle`, `close-circle`, `warning`, `shield-checkmark`) is filled. A checkmark is `checkmark`, never the double `checkmark-done`                                                                                                                                              |
+| Avatar initials | `mobileAvatarText(diameter)` sets the size from the circle; never add `adjustsFontSizeToFit` to initials, which shrank "CH" to a fraction of its circle on iOS                                                                                                                                                                                                                                                                                                |
+| Dashboard       | No pills: a status is a tone-coloured word, a count is a figure, a type is a coloured word in the caption; a card's affordance is the header-right "See all ›", shown only when the card holds rows back from its three-row preview                                                                                                                                                                                                                           |
+| Choosing        | A set of choices is a grouped list (`ProfileChoiceGroup`): a caption over a framed list of 44pt rows, a 22pt mark at the end that fills brand with a check. Pick-many rows wear a ring when idle; pick-one (`selection="single"`) rows show nothing until chosen. Never a wrapped cloud of chips (they ragged, truncated long names and hid which groups took one choice), and not a dropdown row with a picker sheet (tried, rejected on sight)              |
 
 ### Double-tap
 
@@ -242,10 +291,10 @@ return new Promise<void>((resolve) => {
 Because a synchronous handler returns `undefined`, the hook is a no-op for one:
 a plain toggle still fires on every tap. `loading` remains a prop for a pending
 flag that lives outside the control, and an explicit `loading` wins over the
-internal one. `loadingLabel` is still required on a `<Button>` that can spin
-(`design/require-busy-button`), in the progressive form of that button's own
-verb — see `request-action-feedback.ts`, where every variant carries its own
-(`Approve` → `Approving`, `Claim shift` → `Claiming shift`).
+internal one. A busy `<Button>` shows its spinner with the label unchanged:
+there is no `loadingLabel` prop (it was removed on purpose), so never write
+`pending ? "Approving" : "Approve"`. `request-action-feedback.ts` carries each
+request action's confirmation copy and success toast, not a busy label.
 
 ### Modals and sheets
 
@@ -254,6 +303,13 @@ Choose the surface by the user's task:
 - **ConfirmationModal:** a short consequence and an explicit action. Use for
   discarded edits, access changes, and significant side effects. Do not put
   editable forms or competing configuration choices inside a confirmation.
+  A request the other party still has to accept (a pickup offer, a swap) is
+  not one: its Submit is the commitment. A call-off is, since it takes the
+  requester off the roster.
+- **FullPageSheet:** the platform's card sheet (iOS `pageSheet`, Android
+  full-screen slide) with a header, Close, scrolling body and pinned footer,
+  for a task that needs the page but is still modal to the screen beneath it.
+  Same `onDismiss` funnel and one-task-sheet rule as `BottomSheetModal`.
 - **BottomSheetModal:** contextual choices, filters, short forms, and compact
   review tasks. Use a page for long or multi-step workflows.
 - **Ordinary saves:** save directly and show progress and success. Ask again
@@ -265,6 +321,16 @@ Choose the surface by the user's task:
 - **Confirmation behavior:** backdrop and Android back mean Cancel while idle.
   Pending work blocks every dismissal path. Keep request failures in the
   active surface via `error`, rather than a toast or an obscured parent.
+- **A sheet's close button stays mounted while the sheet is busy.** A
+  `dismissDisabled` task sheet shows it disabled at reduced opacity rather than
+  unmounting it; only a `presentationKind="gate"` sheet has no close button.
+  It renders as a sibling of the pan `GestureDetector`, never inside it, so a
+  slidy thumb tap cannot be swallowed as the start of a drag.
+- **Dirty means work the user cannot redo in one tap.** A single radio or list
+  choice does not arm the discard confirmation; typed text or a selection that
+  took browsing to reach (a swap target) does. The request sheet's guard splits
+  `onDiscard` (reset selections) from `onClose` (drop the mode) for the
+  sequencing reason `useModalHandoff` documents.
   Use specific sentence-case action labels and an action-specific `iconName`
   when helpful; danger does not imply a trash icon. Horizontal actions put
   Cancel left and Confirm right, always side by side. Long labels wrap inside
@@ -422,6 +488,14 @@ in that feature's `components/` folder. Three rules:
   and render on `showSkeleton` (or `useSkeletonGate` where there is no error or
   empty state to model). Its `hasData` means "the query resolved"; pass
   `isEmpty` separately on any screen whose query key carries a search or filter.
+- **A skeleton is drawn for this viewer.** Bootstrap is cached from app start,
+  so the permissions that shape a page are known before its data. Pass them in
+  (`showActions` and `showShiftmates` on `ShiftDetailSkeleton`; per-list
+  `sections` and a `quickActions` count on `ProfileSkeleton`) rather than
+  drawing the manager's page for everyone: a colleague's page promised three
+  lists and three actions and delivered one list. When the permission is
+  unknown, the smaller page is the guess. A surface the placeholder cannot
+  paint, the Home hero's gradient with white text on it, loads as one block.
 
 Animation is one app-wide clock (`useSkeletonWave`, a module-level
 `makeMutable`) driving a single band of light across the window, so every block
@@ -469,7 +543,13 @@ sweeps in phase. It is off entirely under reduce motion.
   left to collapse against, so it sits permanently expanded and pushes the page
   down, and pull-to-refresh needs a scroll gesture to hang off, so it disappears
   from exactly the screens most likely to want a retry. (`AdminHomeScreen`'s
-  empty state told the user to "pull to refresh" while doing this.)
+  empty state told the user to "pull to refresh" while doing this.) The lock
+  must never change what is mounted: `Screen` keeps its `RefreshControl` in
+  place and disarms it, because on iOS that control is the scroll view's first
+  child and dropping it remounted the whole page, tearing down any sheet
+  presented from it. A screen whose query re-keys while a sheet is up (Shift
+  Detail widening the team range for Swap) keeps the previous data with
+  `keepPreviousDataForMobileIdentity` rather than falling back to `loading`.
 - **A page-owning empty or error state sits above centre, not dead centre.**
   `fill-screen-anchor` owns the ratio for both `EmptyStateCard` and
   `StatusBanner`, as two flex spacers rather than a fixed offset so it lands at
@@ -550,6 +630,14 @@ withTiming(1, timing("emphasized", 200)) }))` throws `timing is not a function
 - Follow existing screen/component patterns in `src/features` and `src/shared`.
 - Preserve accessibility labels, touch targets (minimum 44pt), loading/error states,
   and offline/network handling.
+- Regular users see directory facts about colleagues, nothing more: the person
+  detail hides employment, account, and contact sections and the access pill for
+  a viewer without employee-details permission, and the API redacts the fields.
+  Who published a shift is withheld from a viewer who cannot open publish history.
+- `react-native-screens` is pinned to 4.17.x above Expo SDK 54's own pin for the
+  iOS 26 native back button (upstream #3294); it is excluded from `expo install
+--check` on purpose and needs a dev-client rebuild. Never draw a JS back button
+  on iOS: the glass capsule double-wraps it.
 - Use existing shared primitives before adding new components.
 - Avoid layout changes outside the requested screen or component.
 

@@ -373,7 +373,7 @@ describe("AdminHomeScreen", () => {
     expect(routerPush).toHaveBeenCalledWith("/(tabs)/home/my-schedule");
   });
 
-  it("renders the greeting header with the org name", () => {
+  it("renders the greeting header without the org name", () => {
     useBootstrap.mockReturnValue({
       isLoading: false,
       data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
@@ -387,7 +387,9 @@ describe("AdminHomeScreen", () => {
     render(<AdminHomeScreen />);
 
     expect(screen.getByText(/Jordan/)).toBeInTheDocument();
-    expect(screen.getByText(/Acme Care/)).toBeInTheDocument();
+    // The org name left the header (it is on Profile); the header is a
+    // two-word greeting and the period, nothing more.
+    expect(screen.queryByText(/Acme Care/)).not.toBeInTheDocument();
   });
 
   it("prefers the linked employee's name over auth user_metadata, which is often empty", () => {

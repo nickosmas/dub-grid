@@ -34,7 +34,7 @@ describe("mobile shared state components", () => {
         <EmptyStateCard
           actionLabel="Explore"
           body="Nothing has landed here yet."
-          iconName="cube-outline"
+          iconName="cube"
           onAction={onExplore}
           title="No items yet"
         />
@@ -52,7 +52,7 @@ describe("mobile shared state components", () => {
   });
 
   it("renders the compact empty-state variant without a body", () => {
-    render(<EmptyStateCard compact iconName="people-outline" title="No one in ICU yet" />);
+    render(<EmptyStateCard compact iconName="people" title="No one in ICU yet" />);
 
     expect(screen.getByText("No one in ICU yet")).toBeInTheDocument();
   });

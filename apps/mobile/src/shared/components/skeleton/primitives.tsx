@@ -1,8 +1,8 @@
 import { useMemo, useRef, useState, type PropsWithChildren, type ReactNode } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, View, useWindowDimensions } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import Animated, { FadeIn, FadeOut, interpolate, useAnimatedStyle } from "react-native-reanimated";
+import Animated, { FadeOut, interpolate, useAnimatedStyle } from "react-native-reanimated";
 import { useMotionPreference } from "../../motion/useMotionPreference";
 import { useIsDarkMode, useMobileColors } from "../../providers/ThemeModeProvider";
 import {
@@ -146,10 +146,13 @@ export function SkeletonLine({
   variant,
   width = "100%",
   style,
+  blockStyle,
 }: {
   variant: MobileTextVariant;
   width?: number | `${number}%`;
   style?: StyleProp<ViewStyle>;
+  /** Recolours the bar itself, for a line drawn on a fill the base tone would vanish into. */
+  blockStyle?: StyleProp<ViewStyle>;
 }) {
   const token = mobileText[variant];
   const fontSize = typeof token.fontSize === "number" ? token.fontSize : 14;
@@ -157,7 +160,7 @@ export function SkeletonLine({
 
   return (
     <View style={[{ height: lineHeight, justifyContent: "center" }, style]}>
-      <SkeletonBlock height={fontSize} radius={mobileRadius.sm} width={width} />
+      <SkeletonBlock height={fontSize} radius={mobileRadius.sm} style={blockStyle} width={width} />
     </View>
   );
 }
@@ -199,8 +202,15 @@ export function SkeletonCardSurface({
  * Root of every skeleton composition.
  *
  * Carries the one `testID` the whole app asserts on — tests should care that a
- * placeholder is showing, not which silhouette it is — and the cross-fade that
+ * placeholder is showing, not which silhouette it is — and the fade-out that
  * stops the swap to real content from being a hard cut.
+ *
+ * No fade-in. A Reanimated entering animation on a view mounted while the
+ * screen is still being pushed waits for the transition to end before it
+ * starts, and on device that left a pushed page blank for half a second or
+ * more (Open shifts, Your schedule) before its placeholder faded up. The gate
+ * in `useSkeletonGate` already holds the placeholder back for the first
+ * 150 ms; once it renders it should simply be there.
  */
 export function SkeletonGroup({
   children,
@@ -213,7 +223,6 @@ export function SkeletonGroup({
     <Animated.View
       accessibilityLabel="Loading"
       accessibilityRole="progressbar"
-      entering={FadeIn.duration(d(mobileMotion.duration.fast))}
       exiting={FadeOut.duration(d(mobileMotion.duration.instant))}
       style={style}
       testID={testID}
@@ -221,6 +230,18 @@ export function SkeletonGroup({
       {children}
     </Animated.View>
   );
+}
+
+/**
+ * How many rows of `rowHeight` fill the viewport below `reservedHeight` (the
+ * chrome above the list: header, search, tabs). A list placeholder that
+ * stopped halfway down the page read as a broken load; the real list runs to
+ * the bottom, so its stand-in does too. Rows past the fold cost nothing: a
+ * skeleton never scrolls.
+ */
+export function useSkeletonFillCount(rowHeight: number, reservedHeight = 0): number {
+  const { height } = useWindowDimensions();
+  return Math.max(1, Math.ceil((height - reservedHeight) / rowHeight));
 }
 
 /** Repeats a row builder `count` times with stable keys. */

@@ -11,8 +11,9 @@ in `apps/web/src/features/mobile/server`.
 ```
 packages/mobile-api-core/src/
   index.ts          # Package entry point
-  auth.ts           # Auth-related mobile API logic
-  organization.ts   # Org-selection and workspace logic
+  auth.ts           # Auth-related mobile API logic (rejects sandbox orgs, MFA-required challenge)
+  dashboard.ts      # Canonical dashboard payload (coverage, open shifts, drafts) over schedule-core
+  organization.ts   # Org-selection and organization-status logic
   people-status.ts  # Employee status helpers
   push.ts           # Push token registration/management
   read.ts           # Schedule/shift read operations
@@ -26,7 +27,7 @@ packages/mobile-api-core/src/
 - Keep this package framework-neutral. Do not import `next/server`, `NextRequest`,
   `NextResponse`, Next.js route handler types, or any UI code. The package must
   be callable from server code without coupling to Next.js.
-- Preserve contracts with `@dubgrid/contracts` (`./mobile` export). Validate
+- Preserve contracts with `@dubgrid/contracts` (mobile schemas come from its single `.` export). Validate
   input and output at the route boundary or shared API boundary.
 - Preserve organization, user, membership, and permission checks for every
   mobile API operation.

@@ -26,8 +26,14 @@ import Animated, {
 // sheets are full of Pressables and a ScrollView, and those win the JS
 // responder negotiation often enough to make a PanResponder drag misfire.
 
-/** Downward travel before the drag takes over from a tap or a scroll. */
-const DRAG_ACTIVATION_DISTANCE = 8;
+/**
+ * Vertical travel before the drag takes over from a tap or a scroll. A thumb
+ * tap on the header routinely slides a few points, and at 8 that slide was
+ * enough to start the pan and cancel the tap underneath it.
+ */
+const DRAG_ACTIVATION_DISTANCE = 12;
+/** Horizontal travel that hands the touch back: a sideways slop is not a drag. */
+const DRAG_FAIL_DISTANCE = 12;
 /** Drag past this, or flick faster than the velocity below (px/s), and it closes. */
 const DISMISS_DISTANCE = 96;
 const DISMISS_VELOCITY = 800;
@@ -161,6 +167,7 @@ export function useSheetDragToDismiss({
       // and which of the sheet and the list owns the motion is decided per frame
       // below, by whether the list has anywhere left to go.
       .activeOffsetY([-DRAG_ACTIVATION_DISTANCE, DRAG_ACTIVATION_DISTANCE])
+      .failOffsetX([-DRAG_FAIL_DISTANCE, DRAG_FAIL_DISTANCE])
       .onStart(() => {
         "worklet";
         // A finger on the sheet takes it back off the exit animation, so the

@@ -138,6 +138,26 @@ describe("buildPerms", () => {
     expect(perms.canApproveShiftRequests).toBe(false);
   });
 
+  it("ignores a stored JSONB on a user-role member", () => {
+    // The QA seed and a stale demotion both leave a "view everything" set on
+    // a user row; SQL's check_admin_permission never reads it for users, and
+    // neither does this resolver.
+    const stored = {
+      ...READ_ONLY_PERMS,
+      canViewEmployeeDetails: true,
+      canViewDashboardAnalytics: true,
+      canManageEmployees: true,
+      canEditShifts: true,
+    };
+    const perms = buildPerms("user", "org-1", false, stored);
+    expect(perms.canViewEmployeeDetails).toBe(false);
+    expect(perms.canViewDashboardAnalytics).toBe(false);
+    expect(perms.canManageEmployees).toBe(false);
+    expect(perms.canEditShifts).toBe(false);
+    expect(perms.canViewSchedule).toBe(true);
+    expect(perms.canViewStaff).toBe(true);
+  });
+
   it("keeps canViewStaff true for an admin, as it already was for a user", () => {
     const stored = { ...READ_ONLY_PERMS, canViewStaff: false };
     expect(buildPerms("admin", "org-1", false, stored).canViewStaff).toBe(true);

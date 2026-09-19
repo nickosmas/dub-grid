@@ -125,7 +125,21 @@ function RootLayoutContent({
                                 options={{ headerShown: false, animation: "fade" }}
                               />
                               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                              <Stack.Screen name="alerts" options={{ headerShown: false }} />
+                              {/* Registered here rather than behind a nested
+                                  stack of their own: as the root of that stack
+                                  the list drew no back control, so leaving it
+                                  relied on the edge swipe. In this stack it
+                                  gets the same native back as every drill-in. */}
+                              <Stack.Screen
+                                name="alerts/index"
+                                options={createDetailStackOptions(mobileColors, "Alerts", {
+                                  largeTitle: true,
+                                })}
+                              />
+                              <Stack.Screen
+                                name="alerts/[id]"
+                                options={createDetailStackOptions(mobileColors, "Alert")}
+                              />
                               <Stack.Screen
                                 name="shift/[employeeId]/[date]"
                                 options={createDetailStackOptions(mobileColors, "Shift Detail")}

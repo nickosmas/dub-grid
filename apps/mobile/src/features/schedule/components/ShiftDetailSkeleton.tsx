@@ -1,15 +1,20 @@
 import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import {
-  SkeletonBlock,
   SkeletonCircle,
   SkeletonGroup,
   SkeletonLine,
   SkeletonPill,
   skeletonRows,
+  useSkeletonFillCount,
 } from "../../../shared/components/skeleton";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileSpacing, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileControl,
+  mobileSpacing,
+  type MobileColors,
+  mobileSpace,
+} from "../../../shared/theme/tokens";
 import { createStyles as createShiftDetailStyles } from "../screens/shiftDetailScreenStyles";
 
 /**
@@ -21,11 +26,22 @@ import { createStyles as createShiftDetailStyles } from "../screens/shiftDetailS
  */
 export function ShiftDetailSkeleton({
   infoRows = 2,
-  shiftmates = 3,
+  shiftmates,
+  showActions = true,
+  showShiftmates = true,
 }: {
   infoRows?: number;
+  /** Defaults to enough rows to reach the bottom of the screen under the card. */
   shiftmates?: number;
+  /** Drop and Swap exist on the viewer's own shift only. */
+  showActions?: boolean;
+  /** "Working with" needs the team schedule permission. */
+  showShiftmates?: boolean;
 }) {
+  // A 42pt avatar row at its padding; reserved for the header, the card and
+  // the section title above the list.
+  const fillShiftmates = useSkeletonFillCount(42 + mobileSpace.md * 2, 470);
+  const shiftmateCount = shiftmates ?? fillShiftmates;
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const detailStyles = useMemo(
@@ -39,20 +55,27 @@ export function ShiftDetailSkeleton({
       <View style={detailStyles.shiftDetailCard}>
         <View style={detailStyles.detailSummaryRow}>
           <View style={detailStyles.detailSummaryContent}>
+            {/* The card as it renders: the shift name alone at heroMetric
+                (its subtitle is a teammate's name, shown only on their
+                shift), then each info row's label over its value beside a
+                16pt icon. */}
             <View style={detailStyles.detailHeroHeader}>
               <View style={detailStyles.detailHeroCopy}>
-                <SkeletonLine variant="heroMetric" width="72%" />
-                <SkeletonLine variant="body" width="52%" />
+                <SkeletonLine variant="heroMetric" width="56%" />
               </View>
             </View>
             <View style={detailStyles.detailInfoStack}>
               {skeletonRows(infoRows, (index) => (
                 <View key={`detail-info-${index}`} style={detailStyles.detailInfoRow}>
                   <View style={detailStyles.detailInfoIcon}>
-                    <SkeletonBlock height={16} radius={4} width={16} />
+                    <SkeletonCircle size={16} />
                   </View>
-                  <View style={styles.infoCopy}>
-                    <SkeletonLine variant={index === 0 ? "rowTitle" : "body"} width="58%" />
+                  <View style={detailStyles.detailInfoCopy}>
+                    <SkeletonLine variant="label" width={index === 0 ? 64 : 76} />
+                    <SkeletonLine
+                      variant={index === 0 ? "rowTitle" : "body"}
+                      width={index === 0 ? "62%" : "44%"}
+                    />
                   </View>
                 </View>
               ))}
@@ -63,10 +86,12 @@ export function ShiftDetailSkeleton({
             <SkeletonLine variant="heroMetric" width={24} />
           </View>
         </View>
-        <View style={detailStyles.detailActionsRow}>
-          <SkeletonPill height={48} style={styles.action} />
-          <SkeletonPill height={48} style={styles.action} />
-        </View>
+        {showActions ? (
+          <View style={detailStyles.detailActionsRow}>
+            <SkeletonPill height={mobileControl.md} style={styles.action} />
+            <SkeletonPill height={mobileControl.md} style={styles.action} />
+          </View>
+        ) : null}
         <View style={detailStyles.detailPublishedFooter}>
           <SkeletonCircle size={16} />
           <View style={styles.infoCopy}>
@@ -75,26 +100,27 @@ export function ShiftDetailSkeleton({
         </View>
       </View>
 
-      <View style={detailStyles.sectionBlock}>
-        <SkeletonLine variant="screenTitle" width="48%" />
-        <View style={detailStyles.shiftmatesList}>
-          {skeletonRows(shiftmates, (index) => (
-            <View
-              key={`shiftmate-skeleton-${index}`}
-              style={[
-                detailStyles.shiftmateRow,
-                index > 0 ? detailStyles.shiftmateRowBorder : null,
-              ]}
-            >
-              <SkeletonCircle size={42} />
-              <View style={detailStyles.shiftmateContent}>
-                <SkeletonLine variant="rowTitle" width="54%" />
-                <SkeletonLine variant="caption" width="36%" />
+      {showShiftmates ? (
+        <View style={detailStyles.sectionBlock}>
+          <SkeletonLine variant="screenTitle" width="48%" />
+          <View style={detailStyles.shiftmatesList}>
+            {skeletonRows(shiftmateCount, (index) => (
+              <View
+                key={`shiftmate-skeleton-${index}`}
+                style={[
+                  detailStyles.shiftmateRow,
+                  index > 0 ? detailStyles.shiftmateRowBorder : null,
+                ]}
+              >
+                <SkeletonCircle size={42} />
+                <View style={detailStyles.shiftmateContent}>
+                  <SkeletonLine variant="rowTitle" width={index % 2 === 0 ? "54%" : "42%"} />
+                </View>
               </View>
-            </View>
-          ))}
+            ))}
+          </View>
         </View>
-      </View>
+      ) : null}
     </SkeletonGroup>
   );
 }
@@ -106,7 +132,7 @@ const createStyles = (_mobileColors: MobileColors) =>
     },
     infoCopy: {
       flex: 1,
-      gap: 3,
+      gap: mobileSpace.xs,
       minWidth: 0,
     },
     action: {

@@ -39,10 +39,13 @@ vi.mock("@tanstack/react-query", () => ({
   useQueryClient,
 }));
 
+const useLocalSearchParams = vi.fn(() => ({}));
+
 vi.mock("expo-router", () => ({
   router: {
     push: routerPush,
   },
+  useLocalSearchParams: () => useLocalSearchParams(),
 }));
 
 vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));
@@ -225,6 +228,8 @@ describe("ScheduleScreen", () => {
   let openShifts: any[];
 
   beforeEach(() => {
+    useLocalSearchParams.mockReset();
+    useLocalSearchParams.mockReturnValue({});
     vi.setSystemTime(new Date("2026-04-16T12:00:00.000Z"));
 
     mutationSpy = vi.fn();
@@ -580,7 +585,7 @@ describe("ScheduleScreen", () => {
     expect(screen.queryByText(/Indicators:/)).not.toBeInTheDocument();
   });
 
-  it("keeps the no-schedule hero while showing every unscheduled week day", () => {
+  it("shows only the no-schedule state when nothing is scheduled this week", () => {
     meScheduleEntries = [];
 
     render(<HomeScheduleScreen />);
@@ -600,8 +605,37 @@ describe("ScheduleScreen", () => {
     expect(emptyState).not.toHaveTextContent(
       "Published jobs for this selected week will appear here.",
     );
-    expect(screen.getByText("Your Week")).toBeInTheDocument();
-    expect(screen.getAllByText("Unscheduled")).toHaveLength(7);
+    expect(screen.queryByText("Your Week")).not.toBeInTheDocument();
+    expect(screen.queryByText("Unscheduled")).not.toBeInTheDocument();
+  });
+
+  it("shows only the no-schedule state when the week holds nothing but a removed shift", () => {
+    meScheduleEntries = [
+      createScheduleEntry({
+        change: {
+          kind: "deleted",
+          previousPresentation: {
+            label: "D",
+            shiftName: "Day Shift",
+            focusAreaId: 2,
+            focusAreaName: "Skilled Nursing",
+            displayFocusAreaName: "Skilled Nursing",
+            startTime: "07:00:00",
+            endTime: "15:00:00",
+            segments: [],
+          },
+        },
+      }),
+    ];
+    openShifts = [];
+    shiftRequests = [];
+
+    render(<HomeScheduleScreen />);
+
+    expect(screen.getByTestId("me-empty-schedule-state")).toBeInTheDocument();
+    expect(screen.queryByText("Your Week")).not.toBeInTheDocument();
+    expect(screen.queryByText("Unscheduled")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Previous shift:/)).toBeNull();
   });
 
   it("shows a success toast after a schedule request action completes", async () => {
@@ -1129,7 +1163,76 @@ describe("ScheduleScreen", () => {
     personal.unmount();
     render(<TeamScheduleScreen />);
 
-    expect(screen.getAllByLabelText("Shift edited")).toHaveLength(1);
+    // The team row folds the change word into its split chip, as Home does,
+    // so the edited Evening row carries one chip and the Day row stays clean.
+    expect(screen.getByLabelText("Also Day Shift · Edited")).toBeInTheDocument();
+    expect(screen.getByLabelText("Also Evening Shift")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Shift edited")).toBeNull();
+  });
+
+  it("labels only the added second shift as New", () => {
+    const daySegment = {
+      shiftId: 1,
+      jobId: 10,
+      shiftName: "Day Shift",
+      jobName: "Mentor",
+      startTime: "07:00:00",
+      endTime: "15:00:00",
+      displayFocusAreaName: "Skilled Nursing",
+    };
+    const eveningSegment = {
+      shiftId: 2,
+      jobId: 20,
+      shiftName: "Evening Shift",
+      jobName: "Supervisor",
+      startTime: "15:00:00",
+      endTime: "23:00:00",
+      displayFocusAreaName: "Skilled Nursing",
+    };
+    const doubleShift = createScheduleEntry({
+      shiftIds: [1, 2],
+      jobIds: [10, 20],
+      shiftLabel: "D / E",
+      assignmentLabel: "D / E",
+      shiftName: "Day Shift / Evening Shift",
+      startTime: "07:00:00",
+      endTime: "23:00:00",
+      change: {
+        kind: "modified",
+        previousPresentation: {
+          label: "D",
+          shiftName: "Day Shift",
+          focusAreaId: 2,
+          focusAreaName: "Skilled Nursing",
+          displayFocusAreaName: "Skilled Nursing",
+          startTime: "07:00:00",
+          endTime: "15:00:00",
+          segments: [daySegment],
+        },
+      },
+      segments: [daySegment, eveningSegment],
+    });
+    meScheduleEntries = [doubleShift];
+    teamScheduleEntries = [{ ...doubleShift, employeeId: "emp-2", employeeName: "Bri Shaw" }];
+    openShifts = [];
+    shiftRequests = [];
+
+    const personal = render(<HomeScheduleScreen />);
+
+    const todayRow = within(screen.getByTestId("upcoming-today-row-2026-04-16"));
+    expect(todayRow.getByLabelText("Shift 1")).toBeInTheDocument();
+    expect(todayRow.getByLabelText("Shift 2 · New")).toBeInTheDocument();
+    expect(todayRow.queryByLabelText(/Edited/)).toBeNull();
+    expect(todayRow.queryByLabelText(/Previous shift:/)).toBeNull();
+
+    personal.unmount();
+    render(<TeamScheduleScreen />);
+
+    expect(screen.getByLabelText("Also Day Shift · New")).toBeInTheDocument();
+    expect(screen.getByLabelText("Also Evening Shift")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Shift new")).toBeNull();
+    expect(screen.queryByLabelText(/Edited/)).toBeNull();
+    expect(screen.queryByText(/^Was /)).toBeNull();
   });
 
   it("shows deleted general shifts in Your Week rows", () => {
@@ -1171,15 +1274,17 @@ describe("ScheduleScreen", () => {
           },
         ],
       }),
+      // A scheduled sibling day keeps Your Week on the page; a removed shift
+      // alone would show only the empty state.
+      createScheduleEntry({ date: "2026-04-18" }),
     ];
     openShifts = [];
     shiftRequests = [];
 
     render(<HomeScheduleScreen />);
 
-    expect(screen.queryByTestId("me-hero-card")).toBeNull();
-    expect(screen.getByTestId("me-empty-schedule-state")).toBeInTheDocument();
-    expect(screen.queryByText(/h this week/)).toBeNull();
+    expect(screen.getByTestId("me-hero-card")).toBeInTheDocument();
+    expect(screen.queryByTestId("me-empty-schedule-state")).toBeNull();
     const todayRow = screen.getByTestId("upcoming-today-row-2026-04-16");
     expect(within(todayRow).getByText("Unscheduled")).toBeInTheDocument();
     expect(within(todayRow).queryByLabelText("Shift deleted")).toBeNull();
@@ -1219,6 +1324,9 @@ describe("ScheduleScreen", () => {
         segments: [],
         change,
       }),
+      // A scheduled sibling day keeps Your Week on the page; a removed shift
+      // alone would show only the empty state.
+      createScheduleEntry({ date: "2026-04-18" }),
     ];
     openShifts = [];
     shiftRequests = [];
@@ -1311,6 +1419,9 @@ describe("ScheduleScreen", () => {
         segments: [],
         change,
       }),
+      // A scheduled sibling day keeps Your Week on the page; a removed shift
+      // alone would show only the empty state.
+      createScheduleEntry({ date: "2026-04-18" }),
     ];
     openShifts = [];
     shiftRequests = [];
@@ -1371,6 +1482,9 @@ describe("ScheduleScreen", () => {
         segments: [],
         change,
       }),
+      // A scheduled sibling day keeps Your Week on the page; a removed shift
+      // alone would show only the empty state.
+      createScheduleEntry({ date: "2026-04-18" }),
     ];
     openShifts = [];
     shiftRequests = [];
@@ -1746,7 +1860,7 @@ describe("ScheduleScreen", () => {
     expect(content.indexOf("Saturday Pickup Late")).toBeLessThan(content.indexOf("Sun, Apr 19"));
   });
 
-  it("expands a stacked Me open-shift day to show the full list", () => {
+  it("opens a stacked Me open-shift day in a sheet instead of growing the deck", () => {
     openShifts = [];
     shiftRequests = [
       createShiftRequest({
@@ -1836,13 +1950,63 @@ describe("ScheduleScreen", () => {
     expect(screen.getByLabelText("5 open shift cards")).toBeInTheDocument();
     expect(screen.queryByText("Saturday Pickup Extra")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByLabelText("Expand open shifts for Sat, Apr 18"));
+    fireEvent.click(screen.getByLabelText("Show all open shifts for Sat, Apr 18"));
 
+    // The day opens in a sheet; the carousel deck itself does not grow.
+    expect(screen.getByText("5 open shifts")).toBeInTheDocument();
     expect(screen.getByText("Saturday Pickup Extra")).toBeInTheDocument();
-    expect(screen.getByLabelText("Collapse open shifts for Sat, Apr 18")).toBeInTheDocument();
+    expect(screen.getByLabelText("Show all open shifts for Sat, Apr 18")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Collapse open shifts/)).toBeNull();
+
+    fireEvent.click(screen.getByLabelText("Dismiss open shifts"));
+
+    expect(screen.queryByText("Saturday Pickup Extra")).not.toBeInTheDocument();
   });
 
-  it("does not repeat absence and general-shift names in expanded bottom stacks", () => {
+  it("closes the day sheet before a claim taken inside it asks for confirmation", () => {
+    vi.useRealTimers();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-16T12:00:00.000Z"));
+    openShifts = [];
+    shiftRequests = ["Early", "Mid", "Late"].map((name, index) =>
+      createShiftRequest({
+        id: `request-saturday-${index + 1}`,
+        requesterName: "Mina Diaz",
+        requesterShiftDate: "2026-04-18",
+        requesterSegments: [
+          {
+            shiftId: 3 + index,
+            jobId: 21,
+            shiftName: `Saturday Pickup ${name}`,
+            jobName: "Nurse",
+            startTime: "07:00:00",
+            endTime: "15:00:00",
+            displayFocusAreaName: "Skilled Nursing",
+          },
+        ],
+      }),
+    );
+
+    render(<HomeScheduleScreen />);
+
+    fireEvent.click(screen.getByLabelText("Show all open shifts for Sat, Apr 18"));
+    expect(screen.getByText("Saturday Pickup Late")).toBeInTheDocument();
+
+    const claimButtons = screen.getAllByRole("button", { name: "Claim Shift" });
+    fireEvent.click(claimButtons[claimButtons.length - 1]!);
+
+    // The sheet leaves first; the confirmation is its own Modal and waits for it.
+    expect(screen.queryByText("Saturday Pickup Late")).not.toBeInTheDocument();
+    expect(screen.queryByText("Claim this shift?")).not.toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(screen.getByText("Claim this shift?")).toBeInTheDocument();
+  });
+
+  it("does not repeat absence and general-shift names in the day sheet", () => {
     meScheduleEntries = [createScheduleEntry()];
     teamScheduleEntries = [];
     openShifts = [];
@@ -1944,15 +2108,21 @@ describe("ScheduleScreen", () => {
 
     render(<HomeScheduleScreen />);
 
-    fireEvent.click(screen.getByLabelText("Expand open shifts for Sat, Apr 18"));
-    fireEvent.click(screen.getByLabelText("Expand open shifts for Sun, Apr 19"));
+    // The deck's lead card stays on the page while its day is open in the
+    // sheet, so each name gains exactly one more copy: the sheet's card, with
+    // the absence or general-shift name as the title and not again as a pill.
+    const paidTimeOffOnDeck = screen.queryAllByText("Paid Time Off").length;
+    fireEvent.click(screen.getByLabelText("Show all open shifts for Sat, Apr 18"));
 
-    expect(screen.getAllByText("Paid Time Off")).toHaveLength(1);
-    expect(screen.getAllByText("Admin")).toHaveLength(1);
+    expect(screen.getAllByText("Paid Time Off")).toHaveLength(paidTimeOffOnDeck + 1);
     expect(screen.getAllByText("Absence").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByLabelText("Dismiss open shifts"));
+    const adminOnDeck = screen.queryAllByText("Admin").length;
+    fireEvent.click(screen.getByLabelText("Show all open shifts for Sun, Apr 19"));
+
+    expect(screen.getAllByText("Admin")).toHaveLength(adminOnDeck + 1);
     expect(screen.getAllByText("General shift").length).toBeGreaterThan(0);
-    expect(screen.getByLabelText("Collapse open shifts for Sat, Apr 18")).toBeInTheDocument();
-    expect(screen.getByLabelText("Collapse open shifts for Sun, Apr 19")).toBeInTheDocument();
   });
 
   it("volunteers for a coverage-gap open shift from Home", () => {
@@ -2281,6 +2451,16 @@ describe("ScheduleScreen", () => {
       }),
     );
     springSpy.mockRestore();
+  });
+
+  it("opens on the focus area a dashboard coverage row asked for", () => {
+    // Emergency is not the linked employee's home focus area, so the default
+    // tab would be Skilled Nursing; the param has to win.
+    useLocalSearchParams.mockReturnValue({ focusAreaId: "1" });
+
+    render(<TeamScheduleScreen />);
+
+    expect(screen.getByRole("tab", { name: "Emergency" })).toHaveAttribute("aria-selected", "true");
   });
 
   it("keeps the Schedule tab pill flow working with focus-area filtering", () => {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { z } from "zod";
 import logger from "@/lib/logger";
+import { resolveAuditActionScope } from "@/lib/audit/audience";
 import { authorizeAuditLogRead } from "@/lib/audit/authorize";
 import { fetchFilteredAuditRows } from "@/lib/audit/server-query";
 import { enrichAuditRows } from "@/lib/audit/enrich";
@@ -59,13 +60,24 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: API_ERRORS.INVALID_REQUEST }, { status: 400 });
     }
 
-    const serviceClient = await authorizeAuditLogRead(req, parsed.data.orgId);
-    if ("response" in serviceClient) {
-      return serviceClient.response;
+    const reader = await authorizeAuditLogRead(req, parsed.data.orgId);
+    if ("response" in reader) {
+      return reader.response;
     }
 
-    const rows = await fetchFilteredAuditRows(serviceClient, parsed.data);
-    const entries = await enrichAuditRows(serviceClient, rows);
+    // An organization's own admins read through an allowlist of action names;
+    // the RPC applies each as a prefix, so full names work without a migration.
+    const scope = resolveAuditActionScope(reader.audience, parsed.data.actionPrefixes);
+    if (scope.kind === "allowlist" && scope.actions.length === 0) {
+      return NextResponse.json({ entries: [] });
+    }
+    const filters = {
+      ...parsed.data,
+      actionPrefixes: scope.kind === "open" ? scope.prefixes : scope.actions,
+    };
+
+    const rows = await fetchFilteredAuditRows(reader.serviceClient, filters);
+    const entries = await enrichAuditRows(reader.serviceClient, rows);
 
     return NextResponse.json({
       entries,

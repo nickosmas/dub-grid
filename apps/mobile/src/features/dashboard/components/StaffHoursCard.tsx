@@ -1,31 +1,53 @@
 import { useMemo } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../../../shared/components/Text";
 import type { MobileDashboardResponse } from "@dubgrid/contracts";
-import { Card } from "../../../shared/components/Screen";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { router } from "expo-router";
+import { PressableRow } from "../../../shared/components/PressableRow";
+import { DashboardCard } from "./DashboardCard";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
-import { CountBadge } from "./CountBadge";
-import { ExpandableList } from "./ExpandableList";
+import {
+  mobileListRow,
+  mobileSpace,
+  mobileTabularText,
+  mobileText,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
+import {
+  DASHBOARD_CARD_PREVIEW_LIMIT,
+  DashboardRowList,
+  hasMoreDashboardRows,
+} from "./DashboardRowList";
 
 export type StaffHoursEntry = MobileDashboardResponse["staffHours"][number];
 
 // Shared with the full-page expanded staff-hours screen
-// (apps/mobile/app/(tabs)/home/staff-hours.tsx).
+// (apps/mobile/app/(tabs)/home/staff-hours.tsx). Opens the person, whose
+// schedule is where an overtime week gets rebalanced.
 export function StaffHoursRow({ entry }: { entry: StaffHoursEntry }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
 
   return (
-    <View style={styles.row}>
+    <PressableRow
+      accessibilityLabel={`${entry.employeeName}, ${entry.overtimeHours} hours overtime`}
+      onPress={() => router.push({ pathname: "/person/[id]", params: { id: entry.employeeId } })}
+      style={styles.row}
+    >
       <View style={styles.copy}>
         <Text style={styles.label}>{entry.employeeName}</Text>
         <Text style={styles.value}>
           {entry.totalHours}h total{entry.focusAreaName ? ` · ${entry.focusAreaName}` : ""}
         </Text>
       </View>
-      <CountBadge label={`+${entry.overtimeHours}h OT`} tone="danger" />
-    </View>
+      <View style={styles.figure}>
+        <Text style={styles.overtime}>+{entry.overtimeHours}h</Text>
+        <Text style={styles.overtimeLabel}>overtime</Text>
+      </View>
+      <Ionicons color={mobileColors.textMuted} name="chevron-forward" size={16} />
+    </PressableRow>
   );
 }
 
@@ -39,29 +61,25 @@ export function StaffHoursCard({
   onSeeAll?: () => void;
 }) {
   return (
-    <Card
+    <DashboardCard
       title="Overtime watch"
-      headerAccessory={
-        entries.length > 0 ? <CountBadge label={String(entries.length)} tone="danger" /> : undefined
-      }
-      detail={
-        entries.length > 0 ? (
-          <ExpandableList
-            title="Overtime watch"
-            items={entries}
-            keyExtractor={(entry) => entry.employeeId}
-            onSeeAll={onSeeAll}
-            renderItem={(entry) => <StaffHoursRow entry={entry} />}
-          />
-        ) : (
-          <EmptyStateCard
-            compact
-            iconName="checkmark-circle-outline"
-            title={`No one is over ${thresholdHours}h this period`}
-          />
-        )
-      }
-    />
+      onOpen={hasMoreDashboardRows(entries.length) ? onSeeAll : undefined}
+    >
+      {entries.length > 0 ? (
+        <DashboardRowList
+          items={entries}
+          keyExtractor={(entry) => entry.employeeId}
+          limit={DASHBOARD_CARD_PREVIEW_LIMIT}
+          renderItem={(entry) => <StaffHoursRow entry={entry} />}
+        />
+      ) : (
+        <EmptyStateCard
+          compact
+          iconName="checkmark-circle"
+          title={`No one is over ${thresholdHours}h this period`}
+        />
+      )}
+    </DashboardCard>
   );
 }
 
@@ -69,12 +87,27 @@ const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     row: {
       flexDirection: "row",
-      justifyContent: "space-between",
       alignItems: "center",
-      gap: 8,
+      gap: mobileSpace.sm,
+      paddingVertical: mobileListRow.paddingVertical,
     },
     copy: {
-      gap: 2,
+      flex: 1,
+      gap: mobileListRow.titleGap,
+    },
+    // The overtime as a figure in the danger colour, no pill around it.
+    figure: {
+      alignItems: "flex-end",
+      flexShrink: 0,
+    },
+    overtime: {
+      ...mobileText.bodyStrong,
+      ...mobileTabularText,
+      color: mobileColors.dangerText,
+    },
+    overtimeLabel: {
+      ...mobileText.caption,
+      color: mobileColors.textMuted,
     },
     label: {
       ...mobileText.body,

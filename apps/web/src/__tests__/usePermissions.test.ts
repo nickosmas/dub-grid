@@ -609,36 +609,31 @@ describe("canAccessSettings", () => {
 // Part H: buildPerms — user role with direct + department permissions
 // ══════════════════════════════════════════════════════════════════════════════
 
-describe("buildPerms — user role per-user permissions", () => {
-  it("user with admin_permissions set", () => {
+describe("buildPerms — user role ignores a stored JSONB", () => {
+  // admin_permissions is an admin-tier column: SQL's check_admin_permission
+  // reads it for admins only ("users always fail") and the access route nulls
+  // it on demotion. A user row that still carries one, a stale demotion or the
+  // QA seed's view-everything set, must not widen what a regular member sees.
+  it("keeps a user on the read-only baseline whatever the row says", () => {
     const perms = {
       ...ALL_FALSE_PERMS,
       canViewDashboardAnalytics: true,
       canViewEmployeeDetails: true,
+      canEditShifts: true,
+      canEditNotes: true,
+      canViewFocusAreas: true,
+      canManageOrgSettings: true,
     };
     const result = buildPerms("user", "org-1", false, perms);
-    expect(result.canViewDashboardAnalytics).toBe(true);
-    expect(result.canViewEmployeeDetails).toBe(true);
+    expect(result.canViewDashboardAnalytics).toBe(false);
+    expect(result.canViewEmployeeDetails).toBe(false);
     expect(result.canEditShifts).toBe(false);
+    expect(result.canEditNotes).toBe(false);
+    expect(result.canAccessSettings).toBe(false);
+    expect(result.canManageOrg).toBe(false);
+    expect(result.canManageOrgSettings).toBe(false);
     expect(result.canViewSchedule).toBe(true);
     expect(result.canViewStaff).toBe(true);
-    expect(result.canManageOrgSettings).toBe(false);
-  });
-
-  it("user with edit perms configured per-user", () => {
-    const perms = { ...ALL_FALSE_PERMS, canEditShifts: true, canEditNotes: true };
-    const result = buildPerms("user", "org-1", false, perms);
-    expect(result.canEditShifts).toBe(true);
-    expect(result.canEditNotes).toBe(true);
-    expect(result.canViewSchedule).toBe(true);
-    expect(result.canViewStaff).toBe(true);
-    expect(result.canManageOrgSettings).toBe(false);
-  });
-
-  it("user with canManageOrgSettings true — forced false", () => {
-    const perms = { ...ALL_FALSE_PERMS, canManageOrgSettings: true };
-    const result = buildPerms("user", "org-1", false, perms);
-    expect(result.canManageOrgSettings).toBe(false);
   });
 
   it("user with no permissions gets READ_ONLY_PERMS", () => {
@@ -648,12 +643,5 @@ describe("buildPerms — user role per-user permissions", () => {
     expect(result.canEditShifts).toBe(false);
     expect(result.canViewDashboardAnalytics).toBe(false);
     expect(result.canAccessSettings).toBe(false);
-  });
-
-  it("user with view perms gets canAccessSettings", () => {
-    const perms = { ...ALL_FALSE_PERMS, canViewFocusAreas: true };
-    const result = buildPerms("user", "org-1", false, perms);
-    expect(result.canAccessSettings).toBe(true);
-    expect(result.canManageOrg).toBe(false);
   });
 });

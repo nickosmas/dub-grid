@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useMobileColors } from "../../../../shared/providers/ThemeModeProvider";
 import {
   mobileRadii,
@@ -9,7 +9,7 @@ import {
   mobileTextWeighted,
   type MobileColors,
 } from "../../../../shared/theme/tokens";
-import { IllustrationFrame, MockButton } from "./illustration-primitives";
+import { IllustrationFrame, MockButton, Text } from "./illustration-primitives";
 
 /**
  * The Requests tab: the tab strip

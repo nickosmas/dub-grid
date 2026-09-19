@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { useLatestRef } from "@/hooks/useLatestRef";
+import { useEffect, useRef, type ReactNode } from "react";
+import { useSlideoverClose } from "@/hooks/useSlideoverClose";
 import { useTheme } from "next-themes";
 import { createPortal } from "react-dom";
 import {
@@ -34,6 +34,12 @@ interface StaffReadOnlyDetailPanelProps {
   certificationLabel: string;
   departments?: NamedItem[];
   departmentLabel?: string;
+  /**
+   * Whether the viewer holds employee details. Employment is an HR fact the
+   * roster hides from regular users behind the same permission, so the panel
+   * hides it too instead of printing in the panel what the row withheld.
+   */
+  canViewEmployeeDetails?: boolean;
   onClose: () => void;
 }
 
@@ -66,29 +72,13 @@ export function StaffReadOnlyDetailPanel({
   certificationLabel,
   departments,
   departmentLabel,
+  canViewEmployeeDetails = false,
   onClose,
 }: StaffReadOnlyDetailPanelProps) {
   const { resolvedTheme } = useTheme();
   const avatarTone = getAvatarTone(resolveAvatarSeed(employee), resolvedTheme === "dark");
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [closing, setClosing] = useState(false);
-  const onCloseRef = useLatestRef(onClose);
-
-  const closePanel = useCallback(() => {
-    setClosing(true);
-    setTimeout(() => {
-      setClosing(false);
-      onCloseRef.current();
-    }, 200);
-  }, []);
-
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") closePanel();
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [closePanel]);
+  const { closing, close: closePanel } = useSlideoverClose(onClose);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -110,13 +100,22 @@ export function StaffReadOnlyDetailPanel({
     employee.certificationId != null ? (certMap.get(employee.certificationId) ?? "Unknown") : "—";
   const employmentLabel = employee.employmentType === "part_time" ? "Part-time" : "Full-time";
   const isOnSchedule = employee.focusAreaIds.length > 0;
+  const showEmployment = isOnSchedule && canViewEmployeeDetails;
+  // The employees API blanks a coworker's email and phone for viewers without
+  // employee details, so for them this section was two dashes under a heading.
+  const showContact = Boolean(employee.email || employee.phone);
   const displayName = getEmployeeDisplayName(employee);
   const initials = getInitials(displayName);
 
   return createPortal(
     <>
-      <div className={`staff-detail-overlay${closing ? " closing" : ""}`} onClick={closePanel} />
-      <div className={`staff-detail-pane${closing ? " closing" : ""}`}>
+      <div className={`dg-panel-overlay${closing ? " closing" : ""}`} onClick={closePanel} />
+      <div
+        className={`dg-panel dg-panel--x-wide${closing ? " closing" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Staff detail"
+      >
         {/* Header */}
         <div
           className="staff-detail-header"
@@ -177,7 +176,7 @@ export function StaffReadOnlyDetailPanel({
                   {displayName}
                 </span>
                 <AccessInsignia orgRole={orgRole} size="md" />
-                {isOnSchedule && (
+                {showEmployment && (
                   <span
                     style={{
                       display: "inline-flex",
@@ -231,11 +230,13 @@ export function StaffReadOnlyDetailPanel({
             />
             {isOnSchedule && (
               <>
-                <ReadOnlyRow
-                  icon={<Briefcase size={15} strokeWidth={1.8} />}
-                  label="Employment"
-                  value={employmentLabel}
-                />
+                {showEmployment && (
+                  <ReadOnlyRow
+                    icon={<Briefcase size={15} strokeWidth={1.8} />}
+                    label="Employment"
+                    value={employmentLabel}
+                  />
+                )}
                 <ReadOnlyRow
                   icon={<Tag size={15} strokeWidth={1.8} />}
                   label={roleLabel}
@@ -256,49 +257,51 @@ export function StaffReadOnlyDetailPanel({
             )}
           </ReadOnlySection>
 
-          <ReadOnlySection title="Contact">
-            <ReadOnlyRow
-              icon={<Mail size={15} strokeWidth={1.8} />}
-              label="Email"
-              value={
-                employee.email ? (
-                  <a
-                    href={`mailto:${employee.email}`}
-                    style={{
-                      color: "var(--dg-color-link)",
-                      textDecoration: "none",
-                      fontWeight: 500,
-                    }}
-                  >
-                    {employee.email}
-                  </a>
-                ) : (
-                  <span style={{ color: "var(--dg-color-text-faint)" }}>—</span>
-                )
-              }
-            />
-            <ReadOnlyRow
-              icon={<Phone size={15} strokeWidth={1.8} />}
-              label="Phone"
-              value={
-                employee.phone ? (
-                  <a
-                    href={`tel:${employee.phone}`}
-                    style={{
-                      color: "var(--dg-color-link)",
-                      textDecoration: "none",
-                      fontWeight: 500,
-                    }}
-                  >
-                    {employee.phone}
-                  </a>
-                ) : (
-                  <span style={{ color: "var(--dg-color-text-faint)" }}>—</span>
-                )
-              }
-              isLast
-            />
-          </ReadOnlySection>
+          {showContact && (
+            <ReadOnlySection title="Contact">
+              <ReadOnlyRow
+                icon={<Mail size={15} strokeWidth={1.8} />}
+                label="Email"
+                value={
+                  employee.email ? (
+                    <a
+                      href={`mailto:${employee.email}`}
+                      style={{
+                        color: "var(--dg-color-link)",
+                        textDecoration: "none",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {employee.email}
+                    </a>
+                  ) : (
+                    <span style={{ color: "var(--dg-color-text-faint)" }}>—</span>
+                  )
+                }
+              />
+              <ReadOnlyRow
+                icon={<Phone size={15} strokeWidth={1.8} />}
+                label="Phone"
+                value={
+                  employee.phone ? (
+                    <a
+                      href={`tel:${employee.phone}`}
+                      style={{
+                        color: "var(--dg-color-link)",
+                        textDecoration: "none",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {employee.phone}
+                    </a>
+                  ) : (
+                    <span style={{ color: "var(--dg-color-text-faint)" }}>—</span>
+                  )
+                }
+                isLast
+              />
+            </ReadOnlySection>
+          )}
 
           {departments && departments.length > 0 && departmentIds.length > 0 && (
             <ReadOnlySection title={departmentLabel ?? "Departments"}>

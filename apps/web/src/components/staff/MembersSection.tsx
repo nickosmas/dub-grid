@@ -59,7 +59,9 @@ import CustomSelect from "@/components/CustomSelect";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { MaybeHint } from "@/components/ui/hint";
 import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
+import { NumericBadge } from "@/components/ui/numeric-badge";
 import { EmptyState } from "@/components/EmptyState";
+import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { getAvatarInitials, getDirectoryPersonAvatarSeed } from "@/lib/utils";
 import {
   Table,
@@ -1136,7 +1138,9 @@ export function MembersSection({
               Directory
             </h1>
             <p className="mt-1 text-[14px] text-[var(--dg-color-text-muted)]">
-              View and manage your organization&apos;s staff roster.
+              {regularUserMode
+                ? "Your colleagues and where they work."
+                : "View and manage your organization's staff roster."}
             </p>
           </div>
 
@@ -1161,14 +1165,18 @@ export function MembersSection({
             </div>
           )}
 
-          <DirectorySummaryCards
-            onScheduleCount={employees.length}
-            fullTimeCount={employmentSummary.fullTime}
-            partTimeCount={employmentSummary.partTime}
-            showEmploymentCounts={!regularUserMode}
-          />
+          {/* Headcount and credential totals are management reading; a
+              regular user's directory is the list itself. */}
+          {!regularUserMode && (
+            <DirectorySummaryCards
+              onScheduleCount={employees.length}
+              fullTimeCount={employmentSummary.fullTime}
+              partTimeCount={employmentSummary.partTime}
+              showEmploymentCounts
+            />
+          )}
 
-          {!showManagement && (
+          {!showManagement && !regularUserMode && (
             <DirectoryCertificationCards
               counts={certificationCounts}
               certifications={certifications}
@@ -1430,14 +1438,13 @@ export function MembersSection({
                 {isMobile ? "" : "Filter"}
                 {/* Counts the half you're looking at, so it never reports
                     filters the visible list isn't being narrowed by. */}
-                {(showManagement ? managementActiveFilterCount : activeFilterCount) > 0 && (
-                  <span
-                    className="dg-notification-badge dg-notification-badge--absolute"
-                    style={{ background: "var(--dg-color-brand)" }}
-                  >
-                    {showManagement ? managementActiveFilterCount : activeFilterCount}
-                  </span>
-                )}
+                <NumericBadge
+                  count={showManagement ? managementActiveFilterCount : activeFilterCount}
+                  label={`${showManagement ? managementActiveFilterCount : activeFilterCount} active filters`}
+                  size="sm"
+                  tone="brand"
+                  style={{ position: "absolute", top: -6, right: -6 }}
+                />
               </Button>
 
               {canShowReorder && (
@@ -2023,25 +2030,13 @@ export function MembersSection({
                           : person.employeeStatus === "inactive"
                             ? "Inactive"
                             : "Active";
-                      const statusColors = isPending
-                        ? {
-                            background: "var(--dg-color-warning-bg)",
-                            color: "var(--dg-color-warning-text)",
-                          }
+                      const statusTone: StatusPillTone = isPending
+                        ? "warning"
                         : person.employeeStatus === "removed"
-                          ? {
-                              background: "var(--dg-color-danger-bg)",
-                              color: "var(--dg-color-danger-text)",
-                            }
+                          ? "danger"
                           : person.employeeStatus === "inactive"
-                            ? {
-                                background: "var(--dg-color-warning-bg)",
-                                color: "var(--dg-color-warning-text)",
-                              }
-                            : {
-                                background: "var(--dg-color-success-bg)",
-                                color: "var(--dg-color-success-text)",
-                              };
+                            ? "warning"
+                            : "success";
                       const displayName =
                         person.firstName || person.lastName
                           ? `${person.firstName} ${person.lastName}`.trim()
@@ -2196,12 +2191,7 @@ export function MembersSection({
                           </TableCell>
 
                           <TableCell className="py-4">
-                            <span
-                              className="inline-flex items-center rounded-full px-2 py-0.5 text-[length:var(--dg-type-badge-size)] font-medium"
-                              style={statusColors}
-                            >
-                              {statusLabel}
-                            </span>
+                            <StatusPill tone={statusTone}>{statusLabel}</StatusPill>
                           </TableCell>
 
                           <TableCell className="w-[40px] py-4 pr-6 text-right">
@@ -2306,6 +2296,7 @@ export function MembersSection({
 
       {selectedEmployee && !canManageEmployees && selectedEmployee.status === "active" && (
         <StaffReadOnlyDetailPanel
+          canViewEmployeeDetails={canViewEmployeeDetails}
           employee={selectedEmployee}
           orgRole={effectiveOrgRoleByEmployeeId.get(selectedEmployee.id) ?? null}
           focusAreas={focusAreas}

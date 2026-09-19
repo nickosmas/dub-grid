@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { mobileSpace } from "../../../shared/theme/tokens";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { StyleSheet, View } from "react-native";
 import { router } from "expo-router";
@@ -467,7 +468,14 @@ export default function ProfileWorkScreen() {
     >
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
-          <ProfileSkeleton rowsPerSection={3} sections={3} showHero={false} />
+          <ProfileSkeleton
+            // The staff record (status, department, focus area) only for a
+            // member the organization schedules; the account fields for all.
+            sections={
+              bootstrapQuery.data?.linkedEmployee ? [{ rows: 3 }, { rows: 4 }] : [{ rows: 4 }]
+            }
+            showHero={false}
+          />
         ) : null
       ) : contentState.kind === "error" ? (
         <StatusBanner
@@ -708,63 +716,61 @@ function EditPanel({
       {hasLinkedEmployee && canEditProfileDirectly ? (
         <>
           <ProfileSection title="Staffing">
-            <ProfilePanel>
-              <ProfileChoiceGroup
-                items={[
-                  { id: 0, name: "Full-time" },
-                  { id: 1, name: "Part-time" },
-                ]}
-                label="Employment"
-                selectedIds={[draft.employmentType === "part_time" ? 1 : 0]}
-                onToggle={(id) => setField("employmentType", id === 1 ? "part_time" : "full_time")}
-              />
-              <ProfileChoiceGroup
-                items={[
-                  { id: -1, name: "None" },
-                  ...certifications.map((item) => ({
-                    id: item.id,
-                    name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
-                  })),
-                ]}
-                label={certificationLabel}
-                selectedIds={draft.certificationId == null ? [-1] : [draft.certificationId]}
-                onToggle={(id) => setField("certificationId", id === -1 ? null : id)}
-              />
-            </ProfilePanel>
+            <ProfileChoiceGroup
+              items={[
+                { id: 0, name: "Full-time" },
+                { id: 1, name: "Part-time" },
+              ]}
+              label="Employment"
+              selection="single"
+              selectedIds={[draft.employmentType === "part_time" ? 1 : 0]}
+              onToggle={(id) => setField("employmentType", id === 1 ? "part_time" : "full_time")}
+            />
+            <ProfileChoiceGroup
+              items={[
+                { id: -1, name: "None" },
+                ...certifications.map((item) => ({
+                  id: item.id,
+                  name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
+                })),
+              ]}
+              label={certificationLabel}
+              selection="single"
+              selectedIds={draft.certificationId == null ? [-1] : [draft.certificationId]}
+              onToggle={(id) => setField("certificationId", id === -1 ? null : id)}
+            />
           </ProfileSection>
 
           <ProfileSection title="Assignments">
-            <ProfilePanel>
-              <ProfileChoiceGroup
-                error={fieldErrors.focusAreaIds}
-                items={focusAreas.map((item) => ({
+            <ProfileChoiceGroup
+              error={fieldErrors.focusAreaIds}
+              items={focusAreas.map((item) => ({
+                id: item.id,
+                name: item.name,
+              }))}
+              label={focusAreaLabel}
+              selectedIds={draft.focusAreaIds}
+              onToggle={(id) => toggle("focusAreaIds", id)}
+            />
+            <ProfileChoiceGroup
+              items={roles
+                .filter(
+                  (item) =>
+                    !isRoleCertificationBlocked({
+                      role: item,
+                      certificationId: draft.certificationId,
+                      selectedRoleIds: draft.roleIds,
+                      roleId: item.id,
+                    }),
+                )
+                .map((item) => ({
                   id: item.id,
-                  name: item.name,
+                  name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
                 }))}
-                label={focusAreaLabel}
-                selectedIds={draft.focusAreaIds}
-                onToggle={(id) => toggle("focusAreaIds", id)}
-              />
-              <ProfileChoiceGroup
-                items={roles
-                  .filter(
-                    (item) =>
-                      !isRoleCertificationBlocked({
-                        role: item,
-                        certificationId: draft.certificationId,
-                        selectedRoleIds: draft.roleIds,
-                        roleId: item.id,
-                      }),
-                  )
-                  .map((item) => ({
-                    id: item.id,
-                    name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
-                  }))}
-                label={roleLabel}
-                selectedIds={draft.roleIds}
-                onToggle={(id) => toggle("roleIds", id)}
-              />
-            </ProfilePanel>
+              label={roleLabel}
+              selectedIds={draft.roleIds}
+              onToggle={(id) => toggle("roleIds", id)}
+            />
           </ProfileSection>
 
           <ProfileSection title="Notes">
@@ -816,7 +822,7 @@ function EditPanel({
 const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: "row",
-    gap: 10,
+    gap: mobileSpace.md,
   },
   actionButton: {
     flex: 1,

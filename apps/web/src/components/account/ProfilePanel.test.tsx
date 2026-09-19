@@ -3,7 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { User } from "@supabase/supabase-js";
 
 import { ProfilePanel } from "@/components/account/ProfilePanel";
-import { requireCredentialAssurance, updateBrowserUserEmail } from "@/features/account/client";
+import {
+  fetchOwnProfileChangeRequests,
+  requireCredentialAssurance,
+  updateBrowserUserEmail,
+} from "@/features/account/client";
 import { EmployeeProfileConflictError, updateEmployee } from "@/features/employees/client";
 import type { Employee } from "@/types";
 
@@ -127,6 +131,7 @@ function renderPanel(overrides: Partial<React.ComponentProps<typeof ProfilePanel
     },
     employee,
     managementDepartmentIds: [],
+    isOrgMember: true,
     orgId: "org-1",
     canEditProfileDirectly: true,
     isGridmaster: false,
@@ -334,5 +339,22 @@ describe("ProfilePanel", () => {
 
       expect(screen.queryByText("Management departments")).not.toBeInTheDocument();
     });
+  });
+});
+
+describe("ProfilePanel change-request loading", () => {
+  it("skips the org-scoped change-requests fetch for a non-member", async () => {
+    // A gridmaster viewing an organization through impersonation has no
+    // membership there; the route answers 403, so the panel must not ask.
+    vi.mocked(fetchOwnProfileChangeRequests).mockClear();
+    renderPanel({ isOrgMember: false, canEditProfileDirectly: false });
+    await waitFor(() => expect(screen.getByText("Alice Smith")).toBeInTheDocument());
+    expect(fetchOwnProfileChangeRequests).not.toHaveBeenCalled();
+  });
+
+  it("still loads change requests for a member who cannot edit directly", async () => {
+    vi.mocked(fetchOwnProfileChangeRequests).mockClear();
+    renderPanel({ isOrgMember: true, canEditProfileDirectly: false });
+    await waitFor(() => expect(fetchOwnProfileChangeRequests).toHaveBeenCalledWith("org-1"));
   });
 });

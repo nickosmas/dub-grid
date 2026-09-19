@@ -4,10 +4,10 @@ import {
   ActivityIndicator,
   Pressable,
   StyleSheet,
-  Text,
   View,
   type GestureResponderEvent,
 } from "react-native";
+import { Text } from "./Text";
 import Animated from "react-native-reanimated";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useAsyncAction } from "../hooks/useAsyncAction";
@@ -18,6 +18,7 @@ import {
   mobileMotion,
   mobileRadius,
   mobileRadii,
+  mobileControl,
   mobileSpace,
   mobileText,
   type MobileColors,
@@ -51,10 +52,31 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 /** The platform minimum for anything tappable. */
 const MIN_TOUCH_TARGET = 44;
 
+// Heights come from the shared control scale so a button beside a field, the
+// search bar or a segmented control shares its baseline; each size's icon-only
+// square is that same height.
 const SIZE = {
-  sm: { minHeight: 36, paddingHorizontal: 14, gap: 6, icon: 16, iconOnly: 36 },
-  md: { minHeight: 48, paddingHorizontal: 20, gap: 8, icon: 18, iconOnly: 44 },
-  lg: { minHeight: 56, paddingHorizontal: 24, gap: 10, icon: 20, iconOnly: 52 },
+  sm: {
+    minHeight: mobileControl.sm,
+    paddingHorizontal: mobileSpace.md,
+    gap: mobileSpace.xs,
+    icon: 16,
+    iconOnly: mobileControl.sm,
+  },
+  md: {
+    minHeight: mobileControl.md,
+    paddingHorizontal: mobileSpace.xl,
+    gap: mobileSpace.sm,
+    icon: 18,
+    iconOnly: mobileControl.md,
+  },
+  lg: {
+    minHeight: mobileControl.lg,
+    paddingHorizontal: mobileSpace["2xl"],
+    gap: mobileSpace.sm,
+    icon: 20,
+    iconOnly: mobileControl.lg,
+  },
 } as const;
 
 const LABEL_VARIANT = {
@@ -137,6 +159,13 @@ export function Button({
 
   const resolvedSize: ButtonSize = size ?? (compact ? "sm" : "md");
   const metrics = SIZE[resolvedSize];
+  // A link is text, not a filled control. Given a filled button's padding it
+  // starved its own label in a tight slot (onboarding's 64pt "Skip" box left
+  // 24pt for the word), and iOS then shrank the text far past the floor the
+  // scale-then-truncate rule sets for filled buttons. A link keeps text
+  // padding and ellipsizes instead.
+  const isLink = tone === "link";
+  const paddingHorizontal = isLink ? mobileSpace.sm : metrics.paddingHorizontal;
   const isDisabled = disabled || isBusy;
   const stretches = fullWidth ?? !iconOnly;
 
@@ -177,7 +206,7 @@ export function Button({
         styles.button,
         {
           minHeight: metrics.minHeight,
-          paddingHorizontal: iconOnly ? 0 : metrics.paddingHorizontal,
+          paddingHorizontal: iconOnly ? 0 : paddingHorizontal,
         },
         // An icon-only button is a fixed square, so its own width/height define
         // the box. Leaving the base vertical padding on top of that squeezes the
@@ -202,11 +231,19 @@ export function Button({
         {!isBusy && (iconOnly || iconPosition === "leading") ? iconNode : null}
         {!iconOnly && content ? (
           <Text
-            adjustsFontSizeToFit
             ellipsizeMode="tail"
+            // A filled label is compact text: one line, scaling capped at the
+            // compact ceiling, truncation when the slot is too narrow. It
+            // used to shrink to fit first, but the new architecture fits
+            // against the button's default-size height as well as its width
+            // and has no floor, so a raised text size left "Cancel" at three
+            // quarters of the base beside a sentence at one and a half. A
+            // link is a sentence, not a control label: it keeps the full
+            // multiplier and two lines, since a one-line link ate its own
+            // question at accessibility sizes ("Need help with your subdom…").
+            fit={isLink ? undefined : "compact"}
             maxFontSizeMultiplier={MAX_FONT_SCALE}
-            minimumFontScale={0.75}
-            numberOfLines={1}
+            numberOfLines={2}
             style={[mobileText[LABEL_VARIANT[resolvedSize]], styles.label, { color: labelColor }]}
           >
             {content}

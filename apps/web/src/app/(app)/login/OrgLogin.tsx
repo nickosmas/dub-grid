@@ -38,6 +38,7 @@ import {
 } from "./shared";
 import { fetchWithTimeout, settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
 import { getWebAuthRecoveryMessage } from "@/lib/auth-recovery";
+import { ACTION_SIGN_IN } from "@/lib/action-copy";
 
 const GRIDMASTER_PORTAL_REQUIRED_CODE = "GRIDMASTER_PORTAL_REQUIRED";
 
@@ -528,7 +529,7 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
               setPassword={setPassword}
               loading={loading}
               onSubmit={handleSubmit}
-              submitLabel="Sign In"
+              submitLabel={ACTION_SIGN_IN}
               forgotPasswordHref="/forgot-password"
             />
 

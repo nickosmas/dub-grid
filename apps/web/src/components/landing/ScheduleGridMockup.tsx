@@ -383,15 +383,9 @@ function OpenShiftPill({ seg }: { seg: ShiftAssignment }) {
         )}
       </span>
       <NumericBadge
-        aria-label={`${needed} needed`}
-        value={needed}
-        style={{
-          background: WARNING_SOLID,
-          color: "var(--dg-color-text-inverse)",
-          fontSize: 10,
-          fontWeight: 700,
-          lineHeight: 1,
-        }}
+        label={`${needed} needed`}
+        count={needed}
+        style={{ background: WARNING_SOLID, color: "var(--dg-color-text-inverse)" }}
       />
     </span>
   );

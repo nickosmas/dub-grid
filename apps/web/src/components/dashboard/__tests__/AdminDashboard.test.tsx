@@ -147,6 +147,18 @@ describe("AdminDashboard", () => {
     expect(container.querySelector('a[href="/people/emp-1"]')).toBeNull();
   });
 
+  it("stacks the card-row grids to one column at tablet widths", () => {
+    const { container } = render(<AdminDashboard {...makeProps({ isTablet: true })} />);
+
+    const gridRows = Array.from(container.querySelectorAll<HTMLDivElement>("div")).filter(
+      (el) => el.style.display === "grid" && el.style.gap === "var(--dg-space-lg)",
+    );
+    expect(gridRows.length).toBeGreaterThan(0);
+    for (const row of gridRows) {
+      expect(row.style.gridTemplateColumns).toBe("1fr");
+    }
+  });
+
   it("links staff names to their profile for admins who manage employees", () => {
     const props = makeProps();
     const { container } = render(

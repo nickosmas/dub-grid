@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../../../src/shared/components/Text";
 import { Screen } from "../../../src/shared/components/Screen";
 import { StatusBanner } from "../../../src/shared/components/StatusBanner";
 import { EmptyStateCard } from "../../../src/shared/components/EmptyStateCard";
@@ -11,11 +12,12 @@ import {
 } from "../../../src/shared/components/FilterSheet";
 import { OpenShiftRow } from "../../../src/features/dashboard/components/OpenShiftsCard";
 import { DashboardListSkeleton } from "../../../src/features/dashboard/components/DashboardSkeleton";
+import { DashboardRowList } from "../../../src/features/dashboard/components/DashboardRowList";
 import { useExpandedDashboardQuery } from "../../../src/features/dashboard/hooks/useExpandedDashboardQuery";
 import { useManualRefresh } from "../../../src/shared/hooks/useManualRefresh";
 import { useMobileContentState } from "../../../src/shared/hooks/useMobileContentState";
 import { useMobileColors } from "../../../src/shared/providers/ThemeModeProvider";
-import { mobileText, type MobileColors } from "../../../src/shared/theme/tokens";
+import { mobileText, type MobileColors, mobileSpace } from "../../../src/shared/theme/tokens";
 
 const URGENCY_OPTIONS = ["all", "high", "medium", "low"] as const;
 type UrgencyFilter = (typeof URGENCY_OPTIONS)[number];
@@ -48,9 +50,7 @@ export default function OpenShiftsExpandedScreen() {
       // A skeleton stands in for content; it must not scroll, and there is
       // nothing to pull-to-refresh while the thing is still loading.
       <Screen bottomPaddingMode="tabbed" scrollEnabled={false}>
-        {contentState.showSkeleton ? (
-          <DashboardListSkeleton rows={4} variant="trailingBadges" />
-        ) : null}
+        {contentState.showSkeleton ? <DashboardListSkeleton variant="figure" /> : null}
       </Screen>
     );
   }
@@ -148,16 +148,13 @@ export default function OpenShiftsExpandedScreen() {
       </View>
 
       {filtered.length === 0 ? (
-        <EmptyStateCard
-          iconName="checkmark-circle-outline"
-          title="No open shifts match this filter"
-        />
+        <EmptyStateCard iconName="checkmark-circle" title="No open shifts match this filter" />
       ) : (
-        <View style={styles.list}>
-          {filtered.map((shift) => (
-            <OpenShiftRow key={shift.id} shift={shift} />
-          ))}
-        </View>
+        <DashboardRowList
+          items={filtered}
+          keyExtractor={(shift) => shift.id}
+          renderItem={(shift) => <OpenShiftRow shift={shift} />}
+        />
       )}
     </Screen>
   );
@@ -169,14 +166,11 @@ const createStyles = (mobileColors: MobileColors) =>
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      gap: 10,
+      gap: mobileSpace.md,
       paddingTop: 12,
       paddingBottom: 4,
     },
     count: {
       ...mobileText.label,
-    },
-    list: {
-      gap: 16,
     },
   });

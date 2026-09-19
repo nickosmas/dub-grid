@@ -1,10 +1,17 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMemo } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "./Text";
 import { Button } from "./Button";
 import { fillScreenAnchorStyles } from "./fill-screen-anchor";
 import { useMobileColors } from "../providers/ThemeModeProvider";
-import { MAX_FONT_SCALE, mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
+import {
+  MAX_FONT_SCALE,
+  mobileRadii,
+  mobileText,
+  type MobileColors,
+  mobileSpace,
+} from "../theme/tokens";
 
 type StatusBannerTone = "error" | "warning" | "info" | "success";
 type StatusBannerVariant = "inline" | "centered";
@@ -23,7 +30,7 @@ const createStatusBannerTone = (mobileColors: MobileColors) =>
       titleColor: mobileColors.textPrimary,
       bodyColor: mobileColors.textMuted,
       iconName: "alert-circle" as const,
-      centeredIconName: "alert-circle-outline" as const,
+      centeredIconName: "alert-circle" as const,
       inlineActionTone: "danger" as const,
     },
     warning: {
@@ -34,7 +41,7 @@ const createStatusBannerTone = (mobileColors: MobileColors) =>
       titleColor: mobileColors.textPrimary,
       bodyColor: mobileColors.textMuted,
       iconName: "warning" as const,
-      centeredIconName: "warning-outline" as const,
+      centeredIconName: "warning" as const,
       inlineActionTone: "secondary" as const,
     },
     info: {
@@ -45,7 +52,7 @@ const createStatusBannerTone = (mobileColors: MobileColors) =>
       titleColor: mobileColors.textPrimary,
       bodyColor: mobileColors.textMuted,
       iconName: "information-circle" as const,
-      centeredIconName: "information-circle-outline" as const,
+      centeredIconName: "information-circle" as const,
       inlineActionTone: "secondary" as const,
     },
     success: {
@@ -56,7 +63,7 @@ const createStatusBannerTone = (mobileColors: MobileColors) =>
       titleColor: mobileColors.textPrimary,
       bodyColor: mobileColors.textMuted,
       iconName: "checkmark-circle" as const,
-      centeredIconName: "checkmark-circle-outline" as const,
+      centeredIconName: "checkmark-circle" as const,
       inlineActionTone: "secondary" as const,
     },
   }) as const;
@@ -199,7 +206,7 @@ const createStyles = (mobileColors: MobileColors) =>
       borderRadius: mobileRadii.card,
       borderWidth: 1,
       padding: 16,
-      gap: 14,
+      gap: mobileSpace.md,
     },
     copyRow: {
       flexDirection: "row",
@@ -234,7 +241,7 @@ const createCenteredStyles = (mobileColors: MobileColors) =>
       alignItems: "center",
     },
     copy: {
-      gap: 6,
+      gap: mobileSpace.sm,
       alignItems: "center",
     },
     actionRow: {

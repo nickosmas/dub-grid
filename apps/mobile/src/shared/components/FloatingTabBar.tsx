@@ -2,14 +2,14 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { Tabs } from "expo-router";
 import { useMemo, type ComponentProps, type ReactNode } from "react";
-import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import { Text } from "./Text";
 import { Pressable } from "./Pressable";
 import Animated, { useAnimatedStyle, withTiming } from "react-native-reanimated";
 import { useMotionPreference } from "../motion/useMotionPreference";
 import { getScreenGutter } from "./screen-layout";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 import {
-  MAX_FONT_SCALE_FIXED,
   mobileElevation,
   mobileMotion,
   mobileRadii,
@@ -156,8 +156,7 @@ export function FloatingTabBar({ state, descriptors, navigation, insets }: Botto
               />
             </TabIconPill>
             <Text
-              maxFontSizeMultiplier={MAX_FONT_SCALE_FIXED}
-              numberOfLines={1}
+              fit="fixed"
               style={[styles.label, focused ? styles.labelActive : styles.labelInactive]}
             >
               {label}
@@ -243,7 +242,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flex: 1,
       alignItems: "center",
       justifyContent: "center",
-      paddingVertical: 6,
+      paddingVertical: mobileSpace.sm,
     },
     iconPill: {
       width: 64,
@@ -255,7 +254,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     label: {
       ...mobileText.micro,
-      marginTop: 2,
+      marginTop: mobileSpace.xs,
     },
     labelActive: {
       color: mobileColors.brand,

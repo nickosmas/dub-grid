@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import type { MobileProfileSession } from "@dubgrid/contracts";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../../../shared/components/Text";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
@@ -208,7 +209,7 @@ export default function ProfileSessionsScreen() {
     >
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
-          <ProfileSkeleton rowVariant="nav" rowsPerSection={3} sections={1} showHero={false} />
+          <ProfileSkeleton rowVariant="session" rowsPerSection={3} sections={1} showHero={false} />
         ) : null
       ) : contentState.kind === "error" ? (
         <StatusBanner
@@ -236,14 +237,16 @@ export default function ProfileSessionsScreen() {
               />
             ) : (
               <View style={styles.sessionList}>
-                {active.map((session, index) => (
-                  <SessionRow
-                    key={session.id}
-                    isLast={index === active.length - 1}
-                    session={session}
-                    onPress={() => setOpenSession(session)}
-                  />
-                ))}
+                <View style={styles.sessionListClip}>
+                  {active.map((session, index) => (
+                    <SessionRow
+                      key={session.id}
+                      isLast={index === active.length - 1}
+                      session={session}
+                      onPress={() => setOpenSession(session)}
+                    />
+                  ))}
+                </View>
               </View>
             )}
           </ProfileSection>
@@ -251,28 +254,30 @@ export default function ProfileSessionsScreen() {
           {stale.length > 0 ? (
             <ProfileSection>
               <View style={styles.sessionList}>
-                <PressableRow
-                  accessibilityLabel={`Inactive devices (${stale.length})`}
-                  style={[styles.disclosureRow, isStaleOpen && styles.sessionRowDivider]}
-                  onPress={() => setStaleOpen((open) => !open)}
-                >
-                  <Text style={styles.disclosureLabel}>Inactive devices ({stale.length})</Text>
-                  <Ionicons
-                    color={mobileColors.textSubtle}
-                    name={isStaleOpen ? "chevron-up" : "chevron-down"}
-                    size={20}
-                  />
-                </PressableRow>
-                <Collapsible open={isStaleOpen}>
-                  {stale.map((session, index) => (
-                    <SessionRow
-                      key={session.id}
-                      isLast={index === stale.length - 1}
-                      session={session}
-                      onPress={() => setOpenSession(session)}
+                <View style={styles.sessionListClip}>
+                  <PressableRow
+                    accessibilityLabel={`Inactive devices (${stale.length})`}
+                    style={[styles.disclosureRow, isStaleOpen && styles.sessionRowDivider]}
+                    onPress={() => setStaleOpen((open) => !open)}
+                  >
+                    <Text style={styles.disclosureLabel}>Inactive devices ({stale.length})</Text>
+                    <Ionicons
+                      color={mobileColors.textSubtle}
+                      name={isStaleOpen ? "chevron-up" : "chevron-down"}
+                      size={20}
                     />
-                  ))}
-                </Collapsible>
+                  </PressableRow>
+                  <Collapsible open={isStaleOpen}>
+                    {stale.map((session, index) => (
+                      <SessionRow
+                        key={session.id}
+                        isLast={index === stale.length - 1}
+                        session={session}
+                        onPress={() => setOpenSession(session)}
+                      />
+                    ))}
+                  </Collapsible>
+                </View>
               </View>
             </ProfileSection>
           ) : null}
@@ -348,7 +353,9 @@ function SessionRow({
           </Text>
           {session.isCurrent ? (
             <View style={styles.sessionCurrentBadge}>
-              <Text style={styles.sessionCurrentBadgeText}>This device</Text>
+              <Text fit="compact" style={styles.sessionCurrentBadgeText}>
+                This device
+              </Text>
             </View>
           ) : null}
         </View>
@@ -365,13 +372,19 @@ function SessionRow({
 
 const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
+    // The clip sits on an inner view: iOS drops a view's own shadow when the
+    // same view clips its children, so the shadow-casting list stays unclipped
+    // and the rows are clipped to the corners one level down.
     sessionList: {
       backgroundColor: mobileColors.surface,
       borderColor: mobileColors.cardBorder,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
-      overflow: "hidden",
       ...mobileElevation("card", isDark),
+    },
+    sessionListClip: {
+      overflow: "hidden",
+      borderRadius: mobileRadii.card - 1,
     },
     sessionRow: {
       alignItems: "center",
@@ -401,7 +414,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     sessionCopy: {
       flex: 1,
-      gap: 3,
+      gap: mobileSpace.xs,
       minWidth: 0,
     },
     sessionTitleRow: {
@@ -419,8 +432,8 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     sessionCurrentBadge: {
       backgroundColor: mobileColors.brand,
       borderRadius: 999,
-      paddingHorizontal: 7,
-      paddingVertical: 1,
+      paddingHorizontal: mobileSpace.sm,
+      paddingVertical: mobileSpace.xs,
     },
     sessionCurrentBadgeText: {
       ...mobileTextWeighted("micro", "bold"),

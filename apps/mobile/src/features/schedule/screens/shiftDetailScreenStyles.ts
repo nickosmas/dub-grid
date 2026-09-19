@@ -2,6 +2,7 @@ import { StyleSheet } from "react-native";
 import {
   mobileAvatarText,
   mobileElevation,
+  mobileElevationExtent,
   mobileRadii,
   mobileRadius,
   mobileSpace,
@@ -34,7 +35,9 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       // Borderless in light mode, hairline in dark: matches the shared Card.
       borderWidth: isDark ? 1 : 0,
       borderColor: mobileColors.cardBorder,
-      marginTop: 12,
+      // The card is the first thing in the scroll view, whose top edge clips;
+      // the token's upward reach is the room its shadow needs.
+      marginTop: mobileElevationExtent("card", isDark).top,
       marginBottom: 8,
       padding: mobileSpace.xl,
       gap: mobileSpace.lg,
@@ -43,7 +46,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     detailSummaryRow: {
       flexDirection: "row",
       alignItems: "stretch",
-      gap: 14,
+      gap: mobileSpace.md,
     },
     detailSummaryContent: {
       flex: 1,
@@ -55,48 +58,24 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       flexDirection: "row",
       alignItems: "flex-start",
       justifyContent: "space-between",
-      gap: 14,
+      gap: mobileSpace.md,
     },
     detailHeroCopy: {
       flex: 1,
       minWidth: 0,
-      gap: 7,
+      gap: mobileSpace.sm,
     },
     detailHeroTitleRow: {
       width: "100%",
       flexDirection: "row",
       alignItems: "center",
-      gap: 6,
+      gap: mobileSpace.sm,
     },
     detailHeroPillRow: {
       flexDirection: "row",
       alignItems: "center",
       flexWrap: "wrap",
-      gap: 10,
-    },
-    detailShiftChangeBadge: {
-      alignSelf: "flex-start",
-      borderRadius: mobileRadii.pill,
-      borderWidth: 1,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-    },
-    detailShiftChangeBadgeNew: {
-      backgroundColor: mobileColors.successSoft,
-      borderColor: mobileColors.successBorder,
-    },
-    detailShiftChangeBadgeModified: {
-      backgroundColor: mobileColors.brandSoft,
-      borderColor: mobileColors.brandBorder,
-    },
-    detailShiftChangeBadgeDeleted: {
-      backgroundColor: mobileColors.dangerSoft,
-      borderColor: mobileColors.dangerBorder,
-    },
-    detailShiftChangeBadgeText: {
-      ...mobileText.badge,
-      color: mobileColors.brand,
-      textTransform: "none",
+      gap: mobileSpace.md,
     },
     detailHeroTitle: {
       ...mobileText.heroMetric,
@@ -125,9 +104,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       flexShrink: 1,
     },
     detailHeaderJobPillEyebrow: {
-      ...mobileText.rowTitle,
-      fontSize: 17,
-      lineHeight: 22,
+      ...mobileText.cardTitle,
       color: mobileColors.textMuted,
     },
     detailInfoStack: {
@@ -140,7 +117,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     },
     detailActionsRow: {
       flexDirection: "row",
-      gap: 10,
+      gap: mobileSpace.md,
     },
     // Splits the row evenly between the two shared <Button fullWidth> actions.
     detailActionButtonWrap: {
@@ -192,7 +169,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     detailInfoRow: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 10,
+      gap: mobileSpace.md,
     },
     // A bare muted glyph, matching how the home card sets a time or a focus
     // area beside its copy. The tinted, bordered 32pt tile this replaced had no
@@ -205,7 +182,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     detailInfoCopy: {
       flex: 1,
       minWidth: 0,
-      gap: 2,
+      gap: mobileSpace.xs,
     },
     detailInfoLabel: {
       ...mobileText.label,
@@ -223,11 +200,26 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     previousShiftSheetDetails: {
       gap: mobileSpace.md,
     },
+    previousShiftChangeSummary: {
+      gap: mobileSpace.xs,
+      paddingBottom: mobileSpace.md,
+      marginBottom: mobileSpace.md,
+      borderBottomWidth: 1,
+      borderBottomColor: mobileColors.borderSubtle,
+    },
+    previousShiftChangeLabel: {
+      ...mobileText.label,
+      color: mobileColors.textMuted,
+    },
+    previousShiftChangeLine: {
+      ...mobileText.body,
+      color: mobileColors.textPrimary,
+    },
     previousShiftSegmentList: {
       gap: mobileSpace.sm,
     },
     previousShiftSegment: {
-      gap: 3,
+      gap: mobileSpace.xs,
     },
     previousShiftSegmentDivider: {
       borderTopWidth: 1,
@@ -243,7 +235,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       color: mobileColors.textSecondary,
     },
     detailGroup: {
-      gap: 10,
+      gap: mobileSpace.md,
       alignItems: "flex-start",
     },
     detailDateTile: {
@@ -257,7 +249,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       alignItems: "center",
       justifyContent: "center",
       gap: 4,
-      paddingHorizontal: 10,
+      paddingHorizontal: mobileSpace.md,
       paddingVertical: 8,
     },
     detailDateWeekday: {
@@ -280,7 +272,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     detailFocusAreaRow: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 7,
+      gap: mobileSpace.sm,
     },
     detailFocusAreaText: {
       ...mobileText.bodyStrong,
@@ -289,14 +281,14 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     detailFootnote: {
       ...mobileText.caption,
       color: mobileColors.textSubtle,
-      paddingTop: 2,
+      paddingTop: mobileSpace.xs,
     },
     detailJobChip: {
       alignSelf: "flex-start",
       borderRadius: mobileRadius.md,
       borderWidth: 1,
-      paddingHorizontal: 10,
-      paddingVertical: 5,
+      paddingHorizontal: mobileSpace.md,
+      paddingVertical: mobileSpace.xs,
     },
     detailJobPillRow: {
       flexDirection: "row",
@@ -305,7 +297,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       gap: 8,
     },
     detailJobChipTextStack: {
-      gap: 2,
+      gap: mobileSpace.xs,
     },
     detailJobChipInlineTextRow: {
       flexDirection: "row",
@@ -340,8 +332,8 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       backgroundColor: mobileColors.surfaceSecondary,
       minHeight: 28,
       justifyContent: "center",
-      paddingHorizontal: 10,
-      paddingVertical: 5,
+      paddingHorizontal: mobileSpace.md,
+      paddingVertical: mobileSpace.xs,
     },
     mentoredPillText: {
       ...mobileText.badge,
@@ -351,7 +343,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       gap: 12,
     },
     detailSegmentBlock: {
-      gap: 5,
+      gap: mobileSpace.xs,
     },
     detailSegmentDivider: {
       borderTopWidth: 1,
@@ -380,13 +372,13 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       gap: 24,
     },
     shiftmateSegmentGroup: {
-      gap: 6,
+      gap: mobileSpace.sm,
     },
     shiftmateSegmentHeader: {
-      paddingBottom: 2,
+      paddingBottom: mobileSpace.xs,
     },
     shiftmateSegmentHeaderCopy: {
-      gap: 2,
+      gap: mobileSpace.xs,
       minWidth: 0,
     },
     shiftmateSegmentTitleRow: {
@@ -419,7 +411,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       alignItems: "center",
       gap: 12,
       paddingHorizontal: 0,
-      paddingVertical: 13,
+      paddingVertical: mobileSpace.md,
     },
     shiftmateRowBorder: {
       borderTopWidth: 1,
@@ -438,14 +430,19 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     },
     shiftmateContent: {
       flex: 1,
-      gap: 5,
+      gap: mobileSpace.xs,
       minWidth: 0,
     },
     shiftmateHeader: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      gap: 10,
+      gap: mobileSpace.md,
+    },
+    shiftmateHeaderStacked: {
+      flexDirection: "column",
+      alignItems: "stretch",
+      gap: mobileSpace.xs,
     },
     shiftmateName: {
       ...mobileText.rowTitle,
@@ -458,6 +455,9 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       justifyContent: "flex-end",
       flexWrap: "wrap",
       gap: 8,
+    },
+    shiftmateChipRowStacked: {
+      justifyContent: "flex-start",
     },
     shiftmateMeta: {
       ...mobileTextWeighted("meta", "medium"),
@@ -487,10 +487,10 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       color: mobileColors.textPrimary,
     },
     modalContent: {
-      gap: 18,
+      gap: mobileSpace.lg,
     },
     subsection: {
-      gap: 14,
+      gap: mobileSpace.md,
     },
     subsectionLabel: {
       ...mobileText.sectionTitle,
@@ -509,7 +509,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       backgroundColor: mobileColors.surface,
     },
     actionSegmentPanel: {
-      gap: 10,
+      gap: mobileSpace.md,
       padding: ACTION_SEGMENT_PANEL_PADDING,
       borderRadius: ACTION_SEGMENT_PANEL_RADIUS,
       borderWidth: 1,
@@ -520,14 +520,14 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       gap: 8,
     },
     swapSummaryList: {
-      gap: 10,
+      gap: mobileSpace.md,
     },
     swapSummaryCard: {
       backgroundColor: mobileColors.surfaceSecondary,
       borderRadius: mobileRadii.card,
-      paddingHorizontal: 14,
+      paddingHorizontal: mobileSpace.md,
       paddingVertical: 12,
-      gap: 6,
+      gap: mobileSpace.sm,
       borderWidth: 1,
       borderColor: mobileColors.cardBorder,
     },
@@ -555,7 +555,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       color: mobileColors.textSecondary,
     },
     coverageOptionList: {
-      gap: 10,
+      gap: mobileSpace.md,
     },
     coverageOptionCard: {
       backgroundColor: mobileColors.surface,
@@ -585,7 +585,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       color: mobileColors.textPrimary,
     },
     coverageOptionTitleWithCheck: {
-      paddingRight: 28,
+      paddingRight: mobileSpace["3xl"],
     },
     coverageOptionTitleDanger: {
       color: mobileColors.dangerText,
@@ -620,8 +620,8 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     selectorChip: {
       borderRadius: mobileRadii.pill,
       minHeight: 44,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
+      paddingHorizontal: mobileSpace.md,
+      paddingVertical: mobileSpace.md,
       backgroundColor: mobileColors.surfaceSecondary,
     },
     selectorSegment: {
@@ -630,8 +630,8 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       backgroundColor: mobileColors.surfaceSecondary,
       borderWidth: 1,
       borderColor: mobileColors.brandBorder,
-      paddingHorizontal: 14,
-      paddingVertical: 13,
+      paddingHorizontal: mobileSpace.md,
+      paddingVertical: mobileSpace.md,
       justifyContent: "center",
     },
     selectorChipDisabled: {
@@ -721,19 +721,26 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     swapDateGrid: {
       flexDirection: "row",
       alignItems: "stretch",
-      gap: 6,
+      gap: mobileSpace.sm,
     },
-    swapDateChip: {
+    swapDateColumn: {
       flex: 1,
       minWidth: 0,
-      minHeight: 68,
+      alignItems: "stretch",
+      gap: mobileSpace.xs,
+    },
+    swapDateColumnDisabled: {
+      opacity: 0.5,
+    },
+    swapDateChip: {
+      minHeight: 56,
       borderRadius: mobileRadii.control,
       borderWidth: 1,
       borderColor: mobileColors.borderSubtle,
       backgroundColor: mobileColors.surface,
       alignItems: "center",
       justifyContent: "center",
-      gap: 2,
+      gap: mobileSpace.xs,
       paddingHorizontal: 4,
       paddingVertical: 8,
     },
@@ -741,45 +748,31 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       borderColor: mobileColors.brandBorder,
       backgroundColor: mobileColors.brandSoft,
     },
-    swapDateChipDisabled: {
-      opacity: 0.5,
-    },
     swapDateChipWeekday: {
       ...mobileText.micro,
       color: mobileColors.textSubtle,
       textTransform: "uppercase",
     },
     swapDateChipDay: {
+      ...mobileTextWeighted("title", "bold"),
       ...mobileTabularText,
-      // The bundled product scale stops at 700.
-      fontFamily: mobileTypography.fontFamily.bold,
-      fontSize: 20,
-      lineHeight: 24,
       color: mobileColors.textPrimary,
     },
     swapDateChipTextActive: {
       color: mobileColors.brand,
     },
-    swapDateChipCount: {
-      minWidth: 0,
-      minHeight: 18,
-      borderRadius: mobileRadius.md,
+    swapDateCount: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-      gap: 2,
-      paddingHorizontal: 5,
-      backgroundColor: mobileColors.surfaceSecondary,
+      gap: mobileSpace.xs,
     },
-    swapDateChipCountActive: {
-      backgroundColor: mobileColors.surface,
-    },
-    swapDateChipCountText: {
+    swapDateCountText: {
       ...mobileText.micro,
       ...mobileTabularText,
       color: mobileColors.textMuted,
     },
-    swapDateChipCountTextActive: {
+    swapDateCountTextActive: {
       color: mobileColors.brand,
     },
     swapOptions: {
@@ -790,7 +783,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       borderRadius: mobileRadii.card,
       borderWidth: 1,
       borderColor: mobileColors.cardBorder,
-      padding: 14,
+      padding: mobileSpace.md,
       gap: 8,
     },
     swapOptionCardActive: {
@@ -804,7 +797,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      gap: 10,
+      gap: mobileSpace.md,
     },
     swapOptionName: {
       ...mobileText.bodyStrong,

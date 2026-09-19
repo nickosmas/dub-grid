@@ -2,9 +2,9 @@ import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import {
   SkeletonBlock,
+  SkeletonCircle,
   SkeletonGroup,
   SkeletonLine,
-  SkeletonPill,
   skeletonRows,
 } from "../../../shared/components/skeleton";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
@@ -13,6 +13,8 @@ import {
   mobileRadii,
   mobileSpacing,
   type MobileColors,
+  mobileSpace,
+  mobileListRow,
 } from "../../../shared/theme/tokens";
 
 /** `ProfileTextInput`'s field height. */
@@ -43,7 +45,7 @@ export function PersonFormSkeleton({
     <SkeletonGroup style={styles.page}>
       {sections.map((fieldCount, sectionIndex) => (
         <View key={`form-section-${sectionIndex}`} style={styles.section}>
-          <SkeletonLine variant="label" width="30%" />
+          <SkeletonLine style={styles.sectionTitle} variant="sectionTitle" width="30%" />
           <View style={styles.panel}>
             {skeletonRows(fieldCount, (fieldIndex) => (
               <View key={`form-field-${sectionIndex}-${fieldIndex}`} style={styles.field}>
@@ -54,15 +56,27 @@ export function PersonFormSkeleton({
           </View>
         </View>
       ))}
+      {/* A choice group: its caption over a framed list of rows, each with
+          the 22pt mark at its end, as ProfileChoiceGroup draws it. */}
       {skeletonRows(chipGroups, (index) => (
-        <View key={`form-chip-group-${index}`} style={styles.section}>
-          <SkeletonLine variant="label" width="34%" />
-          <View style={styles.panel}>
+        <View key={`form-choice-group-${index}`} style={styles.section}>
+          <SkeletonLine style={styles.sectionTitle} variant="sectionTitle" width="34%" />
+          <View style={styles.field}>
             <SkeletonLine variant="caption" width="28%" />
-            <View style={styles.chipRow}>
-              <SkeletonPill height={36} width={96} />
-              <SkeletonPill height={36} width={124} />
-              <SkeletonPill height={36} width={82} />
+            <View style={styles.list}>
+              {skeletonRows(3, (row) => (
+                <View
+                  key={`form-choice-row-${index}-${row}`}
+                  style={[styles.choiceRow, row < 2 && styles.rowDivider]}
+                >
+                  <SkeletonLine
+                    variant="body"
+                    width={row === 1 ? "58%" : "40%"}
+                    style={styles.grow}
+                  />
+                  <SkeletonCircle size={22} />
+                </View>
+              ))}
             </View>
           </View>
         </View>
@@ -77,23 +91,47 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: mobileSpacing.sectionGap,
     },
     section: {
-      gap: 10,
+      gap: mobileSpace.md,
+    },
+    // Mirrors `ProfileSection`'s title: 16pt medium, inset from the card and
+    // with room above it. A margin, not padding: `SkeletonLine` fixes its
+    // height to the line, so padding would push the bar out of the box.
+    sectionTitle: {
+      paddingHorizontal: mobileSpace.lg,
+      marginTop: mobileSpace.sm,
     },
     panel: {
       backgroundColor: mobileColors.surface,
       borderColor: mobileColors.cardBorder,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
-      gap: 14,
+      gap: mobileSpace.md,
       padding: 16,
       ...mobileElevation("card", isDark),
     },
     field: {
-      gap: 7,
+      gap: mobileSpace.sm,
     },
-    chipRow: {
+    list: {
+      backgroundColor: mobileColors.surface,
+      borderColor: mobileColors.cardBorder,
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      overflow: "hidden",
+    },
+    choiceRow: {
+      alignItems: "center",
       flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 8,
+      gap: mobileSpace.md,
+      minHeight: mobileListRow.minHeight,
+      paddingHorizontal: 16,
+      paddingVertical: mobileListRow.paddingVertical,
+    },
+    rowDivider: {
+      borderBottomColor: mobileColors.borderSubtle,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    grow: {
+      flex: 1,
     },
   });

@@ -1,12 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../../../shared/components/Text";
 import { AppSwitch } from "../../../shared/components/AppSwitch";
 import { Screen } from "../../../shared/components/Screen";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { openInAppBrowser } from "../../../shared/lib/inAppBrowser";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileText, mobileTextWeighted, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileText,
+  mobileTextWeighted,
+  type MobileColors,
+  mobileSpace,
+} from "../../../shared/theme/tokens";
 import { getLegalUrls, getStoredConsent, setStoredConsent } from "../../consent/lib/consent";
 import {
   ProfileList,
@@ -116,7 +122,7 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     toggleCopy: {
       flex: 1,
-      gap: 3,
+      gap: mobileSpace.xs,
       minWidth: 0,
     },
     toggleLabel: {

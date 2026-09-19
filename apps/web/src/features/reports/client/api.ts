@@ -1,6 +1,7 @@
 "use client";
 
 import type {
+  OperationsReportFilterOptionsPayload,
   OperationsReportFilters,
   OperationsReportPayload,
   OperationsReportRange,
@@ -90,6 +91,20 @@ export async function fetchOperationsReport(input: {
     throw new Error(await parseReportError(response));
   }
   return (await response.json()) as OperationsReportPayload;
+}
+
+/** The dropdown lists for a range, without computing any report rows. */
+export async function fetchOperationsReportFilterOptions(input: {
+  orgId: string;
+  range: OperationsReportRange;
+}): Promise<OperationsReportFilterOptionsPayload> {
+  const params = buildReportParams(input);
+  params.set("optionsOnly", "1");
+  const response = await fetch(`/api/reports/operations?${params}`, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(await parseReportError(response));
+  }
+  return (await response.json()) as OperationsReportFilterOptionsPayload;
 }
 
 function getFilename(response: Response, fallback: string): string {

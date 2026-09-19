@@ -67,6 +67,10 @@ export const queryKeys = {
   reports: {
     operations: (orgId: string, startDate: string, endDate: string, filters = "") =>
       ["reports", "operations", orgId, startDate, endDate, filters] as const,
+    // Filter dropdown lists for a range; under the operations prefix so the
+    // realtime invalidation below still reaches it.
+    operationsOptions: (orgId: string, startDate: string, endDate: string) =>
+      ["reports", "operations", orgId, startDate, endDate, "options"] as const,
     // Bare prefix — matches every cached date-range/filter variant of the
     // operations report for the org, for realtime invalidation.
     operationsAll: (orgId: string) => ["reports", "operations", orgId] as const,

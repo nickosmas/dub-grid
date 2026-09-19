@@ -76,33 +76,41 @@ export default function OnboardingGate({ children }: { children: React.ReactNode
   const pathname = usePathname();
   const authTransitionPending = useAuthTransitionPending();
 
-  // Pass through for: loading, unauthenticated, public routes,
-  // gridmaster, no org, impersonating
-  if (authLoading || perms.isLoading) {
-    // During the post-login transition, hold the branded splash instead of
-    // flashing the app/blank while perms resolve and the onboarding decision is
-    // made (this route bypasses ProtectedRoute's splash). Normal in-app nav has
-    // perms cached, so this branch isn't hit and nothing changes there.
-    if (authTransitionPending && !isPublicRoute(pathname)) {
-      return <AuthTransitionScreen phase="signing-in" />;
-    }
-    return <>{children}</>;
-  }
-  if (!user) return <>{children}</>;
+  // Public routes never consult onboarding, and `isPublicRoute` is stable for
+  // a given pathname, so this branch cannot swap structure mid-render.
   if (isPublicRoute(pathname)) return <>{children}</>;
-  if (perms.isGridmaster) return <>{children}</>;
-  if (!perms.orgId) return <>{children}</>;
-  if (perms.isImpersonating) return <>{children}</>;
 
-  // User is authenticated with an org — check onboarding status. Resolving a
-  // search parameter must never cover an already signed-in refresh with an
-  // auth-transition screen; the app shell and each page own their normal
-  // loading states.
+  // During the post-login transition, hold the branded splash instead of
+  // flashing the app/blank while perms resolve and the onboarding decision is
+  // made (this route bypasses ProtectedRoute's splash). Normal in-app nav has
+  // perms cached, so this branch isn't hit and nothing changes there.
+  if ((authLoading || perms.isLoading) && authTransitionPending) {
+    return <AuthTransitionScreen phase="signing-in" />;
+  }
+
+  // The gate only *decides* for an authenticated member of an org; everyone
+  // else (still loading, signed out, gridmaster, no org, impersonating) passes
+  // straight through. They pass through the same tree position, though: this
+  // used to return a bare `{children}` while permissions loaded and then swap
+  // to the wrapper below, which made React unmount and remount the entire page
+  // subtree the moment perms resolved. That remount dropped the last observer
+  // of the org-bootstrap query, cancelling its in-flight request (the queryFn
+  // consumes the abort signal) and refetching it — one wasted round trip and a
+  // full re-render on every hard load (build plan item 26).
+  const gated =
+    !authLoading &&
+    !perms.isLoading &&
+    Boolean(user) &&
+    !perms.isGridmaster &&
+    Boolean(perms.orgId) &&
+    !perms.isImpersonating;
+
   return (
     <Suspense fallback={<>{children}</>}>
       <OnboardingCheckWithSection
-        userId={user.id}
-        orgId={perms.orgId}
+        gated={gated}
+        userId={user?.id ?? ""}
+        orgId={perms.orgId ?? ""}
         role={perms.role}
         canManageOrg={perms.canManageOrg}
         isInactive={perms.isInactive}
@@ -136,6 +144,7 @@ function BillingRedirect({ destination }: { destination: "recovery" | "organizat
 }
 
 function OnboardingCheck({
+  gated,
   userId,
   orgId,
   role,
@@ -145,6 +154,11 @@ function OnboardingCheck({
   section,
   children,
 }: {
+  /** False while the caller is not an authenticated org member (still loading,
+   *  signed out, gridmaster, no org, impersonating). The component still mounts
+   *  so the page subtree below it keeps a stable tree position, but it asks for
+   *  nothing and decides nothing. */
+  gated: boolean;
   userId: string;
   orgId: string;
   role: string;
@@ -165,6 +179,7 @@ function OnboardingCheck({
     entryGate,
   } = useOrganizationData({
     includeAssignmentDefinitionCompatibility: false,
+    enabled: gated,
   });
   const retryOrganizationBootstrap = useCallback(async () => {
     await queryClient.resetQueries({ queryKey: queryKeys.org.bootstrap() });
@@ -182,7 +197,7 @@ function OnboardingCheck({
   // is part of the latch: a previous org cannot suppress the next org's gate.
   const appShownForOrgRef = useRef<string | null>(null);
 
-  const decision = resolveOnboardingDecision({
+  const resolvedDecision = resolveOnboardingDecision({
     // A failed bootstrap has no organization for the wizard steps to render,
     // and an in-flight query would otherwise cover the page while the client
     // has no path to recover.
@@ -210,6 +225,11 @@ function OnboardingCheck({
     isInactive,
     frozenPhase: getOnboardingPhase(userId, orgId),
   });
+
+  // Not an authenticated org member: render the app untouched. The component
+  // still mounts (that is the point — the subtree below keeps its position),
+  // it just decides nothing and asks for nothing.
+  const decision = gated ? resolvedDecision : ({ kind: "app", settled: true } as const);
 
   const settledAppRender = decision.kind === "app" && decision.settled;
   useEffect(() => {

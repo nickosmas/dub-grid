@@ -572,6 +572,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                       <label style={fieldLabel}>Phone</label>
                       <input
                         className="dg-input"
+                        type="tel"
                         value={form.phone}
                         onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
                         onBlur={() => markTouched("phone")}

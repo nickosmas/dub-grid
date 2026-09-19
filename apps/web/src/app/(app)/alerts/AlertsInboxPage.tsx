@@ -10,9 +10,11 @@ import {
   type CSSProperties,
 } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
+import { NumericBadge } from "@/components/ui/numeric-badge";
 import {
   Archive,
   ArchiveRestore,
@@ -20,6 +22,8 @@ import {
   Building2,
   Calendar,
   CheckCheck,
+  ChevronDown,
+  ChevronRight,
   CreditCard,
   Inbox,
   Mail,
@@ -36,16 +40,21 @@ import { PageContainer } from "@/components/PageContainer";
 import { EmptyState } from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
-import Modal from "@/components/Modal";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { useAuth } from "@/components/AuthProvider";
 import { usePermissions, type Permissions } from "@/hooks";
 import { useNotificationsRealtime } from "@/hooks/useNotificationsRealtime";
 import { queryKeys } from "@/lib/query-keys";
 import { formatRelativeTime } from "@/lib/utils";
-import { extractNotificationAction, formatNotificationMetadata } from "@dubgrid/domain";
+import {
+  audienceForViewer,
+  formatNotificationMetadata,
+  resolveAlertDestination,
+  type Audience,
+} from "@dubgrid/domain";
 import {
   archiveNotifications,
+  fetchNotificationById,
   fetchNotificationFacets,
   markAllNotificationsRead,
   markNotificationsRead,
@@ -203,25 +212,6 @@ const DEFAULT_FILTERS: FilterState = {
   sort: "desc",
 };
 
-// The page heading mirrors the active Status filter so the user always sees
-// which section ("Inbox", "Archived"...) they're looking at. Read/unread is a
-// view toggle inside each section, not a section of its own.
-function activeViewMeta(filters: FilterState): {
-  title: string;
-  description: string;
-} {
-  if (filters.includeArchived) {
-    return {
-      title: "Archived",
-      description: "Alerts you've archived. Restore any to send it back to your inbox.",
-    };
-  }
-  return {
-    title: "Inbox",
-    description: "Search, filter, and review every alert you've received.",
-  };
-}
-
 function filtersToQuery(filters: FilterState): NotificationSearchParams {
   return {
     limit: PAGE_SIZE,
@@ -235,16 +225,43 @@ function filtersToQuery(filters: FilterState): NotificationSearchParams {
 }
 
 function AlertsInboxPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const openNotificationId = useSearchParams().get("open");
+  // Clearing the param once the alert is open means closing the modal does
+  // not leave a stale deep link, and re-opening the same alert from the bell
+  // is a fresh change of the prop.
+  const clearOpenParam = useCallback(
+    () => router.replace(pathname, { scroll: false }),
+    [router, pathname],
+  );
   return (
     <ProtectedRoute>
       <PageContainer maxWidth={1200}>
-        <InboxView />
+        <InboxView
+          openNotificationId={openNotificationId}
+          onOpenHandled={clearOpenParam}
+          navigate={(href) => router.push(href)}
+        />
       </PageContainer>
     </ProtectedRoute>
   );
 }
 
-export function InboxView() {
+interface InboxViewProps {
+  /** An alert to open on arrival, e.g. from the header bell. */
+  openNotificationId?: string | null;
+  /** Called once the requested alert is open (or reported missing). */
+  onOpenHandled?: () => void;
+  /** Goes to an alert's subject; the page and the portal supply the router. */
+  navigate?: (href: string) => void;
+}
+
+export function InboxView({
+  openNotificationId = null,
+  onOpenHandled,
+  navigate,
+}: InboxViewProps = {}) {
   const { user } = useAuth();
   const perms = usePermissions();
   const userId = user?.id ?? null;
@@ -482,180 +499,206 @@ export function InboxView() {
     }
   }, [refreshFacets]);
 
-  const [detailNotification, setDetailNotification] = useState<Notification | null>(null);
+  const audience = audienceForViewer(perms);
+  // A platform row (a gridmaster's) has nowhere to go; its details unfold in place.
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
-  const handleRowClick = useCallback(
+  const markReadInPlace = useCallback(
     async (n: Notification) => {
-      setDetailNotification(n);
-      if (!n.readAt) {
-        try {
-          await markNotificationsRead([n.id]);
-          applyOptimistic([n.id], { readAt: new Date().toISOString() });
-          refreshFacets();
-        } catch {
-          // best-effort; the detail panel still opens
+      if (n.readAt) return;
+      applyOptimistic([n.id], { readAt: new Date().toISOString() });
+      try {
+        await markNotificationsRead([n.id]);
+        refreshFacets();
+        // The header bell caches its own list and count; realtime would
+        // catch up, but the badge should drop as soon as the alert is read.
+        if (userId) {
+          void queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all(userId) });
         }
+      } catch {
+        applyOptimistic([n.id], { readAt: null });
       }
     },
-    [applyOptimistic, refreshFacets],
+    [applyOptimistic, refreshFacets, queryClient, userId],
   );
 
-  const activeView = activeViewMeta(filters);
+  const handleRowClick = useCallback(
+    (n: Notification) => {
+      void markReadInPlace(n);
+      const destination = resolveAlertDestination(n);
+      if (destination && navigate) {
+        navigate(destination.href);
+        return;
+      }
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(n.id)) next.delete(n.id);
+        else next.add(n.id);
+        return next;
+      });
+    },
+    [markReadInPlace, navigate],
+  );
+
+  // Open the alert a deep link or the bell asked for. The first page may not
+  // hold it (filters, pagination, archived), so fall back to a lookup by id.
+  // The collaborators live in a ref so a re-render mid-lookup (a realtime
+  // reload, the portal passing a fresh callback) cannot cancel or repeat it.
+  const openCollaboratorsRef = useRef({ notifications, handleRowClick, onOpenHandled });
+  useEffect(() => {
+    openCollaboratorsRef.current = { notifications, handleRowClick, onOpenHandled };
+  });
+  const handledOpenIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!openNotificationId) {
+      handledOpenIdRef.current = null;
+      return;
+    }
+    if (loadingPage || handledOpenIdRef.current === openNotificationId) return;
+    handledOpenIdRef.current = openNotificationId;
+    const {
+      notifications: loaded,
+      handleRowClick: open,
+      onOpenHandled: done,
+    } = openCollaboratorsRef.current;
+    const found = loaded.find((n) => n.id === openNotificationId);
+    (found ? Promise.resolve(found) : fetchNotificationById(openNotificationId))
+      .then((n) => {
+        if (n) open(n);
+        else toast.error("That alert is no longer available");
+      })
+      .catch(() => toast.error("That alert is no longer available"))
+      .finally(() => done?.());
+  }, [openNotificationId, loadingPage]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      <header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 16,
-          flexWrap: "wrap",
-        }}
-      >
-        <div>
-          <h1
-            style={{
-              margin: 0,
-              fontSize: "var(--dg-type-page-title-size)",
-              fontWeight: 700,
-              color: "var(--dg-color-text-primary)",
-            }}
-          >
-            {activeView.title}
-          </h1>
-          <p
-            style={{
-              margin: "4px 0 0",
-              color: "var(--dg-color-text-muted)",
-              fontSize: "var(--dg-fs-label)",
-            }}
-          >
-            {activeView.description}
-          </p>
-        </div>
-        <Button
-          type="button"
-          className="dg-btn dg-btn-secondary"
-          onClick={() => setConfirmingMarkAllRead(true)}
-          disabled={busy || (facets?.totalUnread ?? 0) === 0}
-          aria-label="Mark all alerts as read"
+      <header>
+        <h1
+          style={{
+            margin: 0,
+            fontSize: "var(--dg-type-page-title-size)",
+            fontWeight: 700,
+            color: "var(--dg-color-text-primary)",
+          }}
         >
-          <CheckCheck size={14} style={{ marginRight: 6 }} />
-          Mark all read
-        </Button>
+          Alerts
+        </h1>
+        <p
+          style={{
+            margin: "4px 0 0",
+            color: "var(--dg-color-text-muted)",
+            fontSize: "var(--dg-fs-label)",
+          }}
+        >
+          Everything that needs your attention, newest first. Open one to go to what it is about.
+        </p>
       </header>
 
-      <div className="dg-alerts-layout">
-        <FilterSidebar filters={filters} facets={facets} onChange={setFilters} />
-
-        <main style={{ flex: 1, minWidth: 0 }}>
-          <ReadFilterTabs
-            value={filters.read}
-            unreadCount={facets?.totalUnread ?? 0}
-            onChange={(value) => setFilters((prev) => ({ ...prev, read: value }))}
-          />
-          <Toolbar
-            search={filters.search}
-            sort={filters.sort}
-            isAllSelected={isAllSelected}
-            hasNotifications={notifications.length > 0}
-            totalSelected={totalSelected}
-            busy={busy}
-            includeArchived={filters.includeArchived}
-            category={filters.category}
-            priority={filters.priority}
-            categories={visibleCategories}
-            facets={facets}
-            onSearchChange={(value) => setFilters((prev) => ({ ...prev, search: value }))}
-            onClearSearch={() => setFilters((prev) => ({ ...prev, search: "" }))}
-            onSortToggle={() =>
-              setFilters((prev) => ({
-                ...prev,
-                sort: prev.sort === "desc" ? "asc" : "desc",
-              }))
-            }
-            onCategoryChange={(value) => setFilters((prev) => ({ ...prev, category: value }))}
-            onPriorityChange={(value) => setFilters((prev) => ({ ...prev, priority: value }))}
-            onToggleSelectAll={handleToggleSelectAll}
-            onBulk={handleBulk}
-            selectedIds={[...selectedIds]}
-          />
-
-          {loadingPage ? (
-            <ListPlaceholder />
-          ) : error ? (
-            <EmptyState
-              icon={<Bell size={28} />}
-              heading="Couldn't load alerts"
-              description={error}
-            />
-          ) : notifications.length === 0 ? (
-            <EmptyState
-              icon={<Inbox size={28} />}
-              heading="No alerts"
-              description={
-                debouncedSearch ||
-                filters.read !== "all" ||
-                filters.category !== "all" ||
-                filters.priority !== "all" ||
-                filters.includeArchived
-                  ? "Try clearing or loosening your filters."
-                  : "You're all caught up."
-              }
-            />
-          ) : (
-            <ul
-              role="list"
-              style={{
-                listStyle: "none",
-                margin: 0,
-                padding: 0,
-                background: "var(--dg-color-surface)",
-                border: "1px solid var(--dg-color-border)",
-                borderRadius: "var(--dg-radius-lg)",
-                overflow: "hidden",
-              }}
-            >
-              {notifications.map((n, idx) => (
-                <NotificationRow
-                  key={n.id}
-                  notification={n}
-                  isFirst={idx === 0}
-                  isLast={idx === notifications.length - 1}
-                  selected={selectedIds.has(n.id)}
-                  onToggleSelect={() => handleToggleSelect(n.id)}
-                  onClick={() => handleRowClick(n)}
-                  onArchive={() => handleBulk("archive", [n.id])}
-                  onMarkUnread={() => handleBulk("unread", [n.id])}
-                  onMarkRead={() => handleBulk("read", [n.id])}
-                  onUnarchive={() => handleBulk("unarchive", [n.id])}
-                />
-              ))}
-            </ul>
-          )}
-
-          {hasMore && notifications.length > 0 && (
-            <div style={{ display: "flex", justifyContent: "center", marginTop: 16 }}>
-              <Button
-                type="button"
-                className="dg-btn dg-btn-secondary"
-                onClick={handleLoadMore}
-                disabled={loadingMore}
-              >
-                <ButtonLoading loading={loadingMore}>Load more</ButtonLoading>
-              </Button>
-            </div>
-          )}
-        </main>
-      </div>
-
-      {detailNotification && (
-        <NotificationDetailModal
-          notification={detailNotification}
-          onClose={() => setDetailNotification(null)}
+      <main style={{ minWidth: 0 }}>
+        <Toolbar
+          search={filters.search}
+          sort={filters.sort}
+          read={filters.read}
+          isAllSelected={isAllSelected}
+          hasNotifications={notifications.length > 0}
+          totalSelected={totalSelected}
+          busy={busy}
+          includeArchived={filters.includeArchived}
+          category={filters.category}
+          priority={filters.priority}
+          categories={visibleCategories}
+          facets={facets}
+          // Switching sections never carries a read filter over from the last one.
+          onSectionChange={(includeArchived) =>
+            setFilters((prev) => ({ ...prev, read: "all", includeArchived }))
+          }
+          onReadChange={(value) => setFilters((prev) => ({ ...prev, read: value }))}
+          canMarkAllRead={!busy && (facets?.totalUnread ?? 0) > 0}
+          onMarkAllRead={() => setConfirmingMarkAllRead(true)}
+          onSearchChange={(value) => setFilters((prev) => ({ ...prev, search: value }))}
+          onClearSearch={() => setFilters((prev) => ({ ...prev, search: "" }))}
+          onSortToggle={() =>
+            setFilters((prev) => ({
+              ...prev,
+              sort: prev.sort === "desc" ? "asc" : "desc",
+            }))
+          }
+          onCategoryChange={(value) => setFilters((prev) => ({ ...prev, category: value }))}
+          onPriorityChange={(value) => setFilters((prev) => ({ ...prev, priority: value }))}
+          onToggleSelectAll={handleToggleSelectAll}
+          onBulk={handleBulk}
+          selectedIds={[...selectedIds]}
         />
-      )}
+
+        {loadingPage ? (
+          <ListPlaceholder />
+        ) : error ? (
+          <EmptyState
+            icon={<Bell size={28} />}
+            heading="Couldn't load alerts"
+            description={error}
+          />
+        ) : notifications.length === 0 ? (
+          <EmptyState
+            icon={<Inbox size={28} />}
+            heading="No alerts"
+            description={
+              debouncedSearch ||
+              filters.read !== "all" ||
+              filters.category !== "all" ||
+              filters.priority !== "all" ||
+              filters.includeArchived
+                ? "Try clearing or loosening your filters."
+                : "You're all caught up."
+            }
+          />
+        ) : (
+          <ul
+            role="list"
+            style={{
+              listStyle: "none",
+              margin: 0,
+              padding: 0,
+              background: "var(--dg-color-surface)",
+              border: "1px solid var(--dg-color-border)",
+              borderRadius: "var(--dg-radius-lg)",
+              overflow: "hidden",
+            }}
+          >
+            {notifications.map((n, idx) => (
+              <NotificationRow
+                key={n.id}
+                notification={n}
+                isFirst={idx === 0}
+                isLast={idx === notifications.length - 1}
+                selected={selectedIds.has(n.id)}
+                audience={audience}
+                expanded={expandedIds.has(n.id)}
+                onToggleSelect={() => handleToggleSelect(n.id)}
+                onClick={() => handleRowClick(n)}
+                onArchive={() => handleBulk("archive", [n.id])}
+                onMarkUnread={() => handleBulk("unread", [n.id])}
+                onMarkRead={() => handleBulk("read", [n.id])}
+                onUnarchive={() => handleBulk("unarchive", [n.id])}
+              />
+            ))}
+          </ul>
+        )}
+
+        {hasMore && notifications.length > 0 && (
+          <div style={{ display: "flex", justifyContent: "center", marginTop: 16 }}>
+            <Button
+              type="button"
+              className="dg-btn dg-btn-secondary"
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+            >
+              <ButtonLoading loading={loadingMore}>Load more</ButtonLoading>
+            </Button>
+          </div>
+        )}
+      </main>
 
       {confirmingMarkAllRead && (
         <ConfirmDialog
@@ -676,238 +719,40 @@ export function InboxView() {
   );
 }
 
-interface NotificationDetailModalProps {
-  notification: Notification;
-  onClose: () => void;
-}
-
-function formatFullTimestamp(value: string): string {
-  return new Date(value).toLocaleString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-function NotificationDetailModal({ notification, onClose }: NotificationDetailModalProps) {
-  const entries = useMemo(
-    () => formatNotificationMetadata(notification.metadata),
-    [notification.metadata],
-  );
-  const action = useMemo(
-    () => extractNotificationAction(notification.metadata),
-    [notification.metadata],
-  );
-
-  return (
-    <Modal title={notification.title} onClose={onClose} headerSafe>
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <span
-          style={{
-            fontSize: "var(--dg-fs-footnote)",
-            color: "var(--dg-color-text-muted)",
-          }}
-        >
-          {formatFullTimestamp(notification.createdAt)}
-          {notification.channel === "email" ? " • Sent via email" : ""}
-        </span>
-        <p
-          style={{
-            margin: 0,
-            color: "var(--dg-color-text-primary)",
-            fontSize: "var(--dg-fs-body)",
-            lineHeight: 1.5,
-          }}
-        >
-          {notification.message}
-        </p>
-
-        {entries.length > 0 && (
-          <div
-            style={{
-              border: "1px solid var(--dg-color-border-light)",
-              borderRadius: "var(--dg-radius-md)",
-              padding: 12,
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-              background: "var(--dg-color-bg-secondary)",
-            }}
-          >
-            <span className="dg-type-content-group-heading">Details</span>
-            {entries.map((entry) => (
-              <div
-                key={entry.label}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.4fr)",
-                  gap: 12,
-                  alignItems: "baseline",
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: "var(--dg-fs-label)",
-                    color: "var(--dg-color-text-muted)",
-                  }}
-                >
-                  {entry.label}
-                </span>
-                <span
-                  style={{
-                    fontSize: "var(--dg-fs-label)",
-                    color: "var(--dg-color-text-primary)",
-                    wordBreak: "break-word",
-                  }}
-                >
-                  {entry.value}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {action && (
-          <Link
-            href={action.href}
-            className="dg-btn dg-btn-primary"
-            onClick={onClose}
-            style={{ alignSelf: "flex-start" }}
-          >
-            {action.label}
-          </Link>
-        )}
-      </div>
-    </Modal>
-  );
-}
-
-interface FilterSidebarProps {
-  filters: FilterState;
-  facets: NotificationFacets | null;
-  onChange: (next: FilterState) => void;
-}
-
-function FilterSidebar({ filters, facets, onChange }: FilterSidebarProps) {
-  // Setting includeArchived must also reset `read` to "all" in a single
-  // update — switching sections should never carry over a read filter that
-  // the user set inside the previous section.
-  const setSection = (includeArchived: boolean) =>
-    onChange({ ...filters, read: "all", includeArchived });
-
-  const totalArchived = facets?.totalArchived ?? 0;
-
-  return (
-    <aside className="dg-alerts-sidebar">
-      <FilterChip
-        active={!filters.includeArchived}
-        onClick={() => setSection(false)}
-        icon={<Inbox size={14} />}
-        label="Inbox"
-      />
-      <FilterChip
-        active={filters.includeArchived}
-        onClick={() => setSection(true)}
-        icon={<Archive size={14} />}
-        label="Archived"
-        count={totalArchived || undefined}
-      />
-    </aside>
-  );
-}
-
-function FilterChip({
-  active,
-  onClick,
-  icon,
-  label,
-  count,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon?: React.ReactNode;
+interface Segment<T extends string> {
+  value: T;
   label: string;
   count?: number;
-}) {
-  return (
-    <Button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      data-active={active ? "true" : undefined}
-      className={
-        active
-          ? "bg-[var(--dg-color-nav-active-bg)] text-[var(--dg-color-text-primary)]"
-          : "hover:bg-[var(--dg-color-bg-secondary)]"
-      }
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        height: 36,
-        padding: "0 12px",
-        border: "none",
-        borderRadius: "var(--dg-radius-md)",
-        cursor: "pointer",
-        fontSize: "var(--dg-fs-label)",
-        color: active ? undefined : "var(--dg-color-text-primary)",
-        background: active ? undefined : "transparent",
-        fontWeight: active ? 600 : 500,
-        fontFamily: "inherit",
-        textAlign: "left",
-        width: "100%",
-        transition: "background 120ms ease, color 120ms ease",
-      }}
-    >
-      {icon && <span style={{ display: "inline-flex" }}>{icon}</span>}
-      <span style={{ flex: 1 }}>{label}</span>
-      {count !== undefined && count > 0 && (
-        <span
-          style={{
-            fontSize: "var(--dg-fs-footnote)",
-            color: "var(--dg-color-text-muted)",
-            fontVariantNumeric: "tabular-nums",
-          }}
-        >
-          {count}
-        </span>
-      )}
-    </Button>
-  );
+  icon?: React.ReactNode;
 }
 
-function ReadFilterTabs({
+/** A row of exclusive choices in the toolbar, in the shared tab-shell look. */
+function Segments<T extends string>({
+  label,
   value,
-  unreadCount,
+  segments,
   onChange,
 }: {
-  value: ReadFilter;
-  unreadCount: number;
-  onChange: (value: ReadFilter) => void;
+  label: string;
+  value: T;
+  segments: Segment<T>[];
+  onChange: (value: T) => void;
 }) {
-  const tabs: { value: ReadFilter; label: string; count?: number }[] = [
-    { value: "all", label: "All" },
-    { value: "unread", label: "Unread", count: unreadCount || undefined },
-    { value: "read", label: "Read" },
-  ];
   return (
     <div
-      role="tablist"
-      aria-label="Filter by read state"
+      role="group"
+      aria-label={label}
       className="dg-span-tabs dg-span-tabs--light"
       // `.dg-span-tabs` is unlayered and sets `display: flex`, so this has to
       // be inline to shrink-wrap the control. Same override as PrintOptionsModal.
-      style={{ display: "inline-flex", marginBottom: 12 }}
+      style={{ display: "inline-flex", flexShrink: 0 }}
     >
-      {tabs.map((tab, index) => {
-        const active = value === tab.value;
-        const prevActive = index > 0 && value === tabs[index - 1].value;
+      {segments.map((segment, index) => {
+        const active = value === segment.value;
+        const prevActive = index > 0 && value === segments[index - 1].value;
         const showDivider = index > 0 && !active && !prevActive;
         return (
-          <Fragment key={tab.value}>
+          <Fragment key={segment.value}>
             {index > 0 && (
               <div
                 style={{
@@ -921,33 +766,19 @@ function ReadFilterTabs({
             )}
             <Button
               type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => onChange(tab.value)}
+              aria-pressed={active}
+              onClick={() => onChange(segment.value)}
               className={`dg-span-tab${active ? " active" : ""}`}
             >
-              {tab.label}
-              {tab.count !== undefined && tab.count > 0 && (
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    minWidth: 18,
-                    height: 18,
-                    borderRadius: "50%",
-                    padding: "0 4px",
-                    fontSize: "var(--dg-fs-micro)",
-                    fontWeight: 700,
-                    lineHeight: 1,
-                    background: active ? "rgba(255,255,255,0.25)" : "var(--dg-color-border-light)",
-                    color: active ? "inherit" : "var(--dg-color-text-muted)",
-                    marginLeft: 3,
-                  }}
-                >
-                  {tab.count}
-                </span>
+              {segment.icon && (
+                <span style={{ display: "inline-flex", marginRight: 6 }}>{segment.icon}</span>
               )}
+              {segment.label}
+              <NumericBadge
+                count={segment.count ?? 0}
+                tone={active ? "onAccent" : "neutral"}
+                style={{ marginLeft: 6 }}
+              />
             </Button>
           </Fragment>
         );
@@ -959,6 +790,7 @@ function ReadFilterTabs({
 interface ToolbarProps {
   search: string;
   sort: "asc" | "desc";
+  read: ReadFilter;
   isAllSelected: boolean;
   hasNotifications: boolean;
   totalSelected: number;
@@ -969,6 +801,10 @@ interface ToolbarProps {
   priority: NotificationPriority | "all";
   categories: CategoryFilter[];
   facets: NotificationFacets | null;
+  onSectionChange: (includeArchived: boolean) => void;
+  onReadChange: (value: ReadFilter) => void;
+  canMarkAllRead: boolean;
+  onMarkAllRead: () => void;
   onSearchChange: (value: string) => void;
   onClearSearch: () => void;
   onSortToggle: () => void;
@@ -981,6 +817,7 @@ interface ToolbarProps {
 function Toolbar({
   search,
   sort,
+  read,
   isAllSelected,
   hasNotifications,
   totalSelected,
@@ -991,6 +828,10 @@ function Toolbar({
   priority,
   categories,
   facets,
+  onSectionChange,
+  onReadChange,
+  canMarkAllRead,
+  onMarkAllRead,
   onSearchChange,
   onClearSearch,
   onSortToggle,
@@ -1028,8 +869,13 @@ function Toolbar({
     [facets],
   );
 
+  const totalArchived = facets?.totalArchived ?? 0;
+  const totalUnread = facets?.totalUnread ?? 0;
+
   return (
     <div
+      role="toolbar"
+      aria-label="Alerts"
       className="dg-toolbar-type"
       style={{
         display: "flex",
@@ -1039,32 +885,37 @@ function Toolbar({
         flexWrap: "wrap",
       }}
     >
-      <label
-        htmlFor="alerts-select-all"
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "0 6px",
-          color: "var(--dg-color-text-muted)",
-          cursor: hasNotifications ? "pointer" : "default",
-        }}
-      >
-        <input
-          id="alerts-select-all"
-          type="checkbox"
-          checked={isAllSelected}
-          onChange={onToggleSelectAll}
-          disabled={!hasNotifications}
-        />
-        {totalSelected > 0 ? `${totalSelected} selected` : "Select"}
-      </label>
+      <Segments
+        label="Section"
+        value={includeArchived ? "archived" : "inbox"}
+        onChange={(value) => onSectionChange(value === "archived")}
+        segments={[
+          { value: "inbox", label: "Inbox", icon: <Inbox size={14} /> },
+          {
+            value: "archived",
+            label: "Archived",
+            icon: <Archive size={14} />,
+            count: totalArchived || undefined,
+          },
+        ]}
+      />
+
+      <Segments
+        label="Read state"
+        value={read}
+        onChange={onReadChange}
+        segments={[
+          { value: "all", label: "All" },
+          { value: "unread", label: "Unread", count: totalUnread || undefined },
+          { value: "read", label: "Read" },
+        ]}
+      />
 
       <div
         style={{
           position: "relative",
-          flex: 1,
-          minWidth: 220,
+          flex: "1 1 220px",
+          minWidth: 0,
         }}
       >
         <Search
@@ -1102,7 +953,7 @@ function Toolbar({
         value={category}
         options={categoryOptions}
         onChange={onCategoryChange}
-        style={{ minWidth: 160 }}
+        style={{ flex: "0 1 160px", minWidth: 0 }}
         fontSize="var(--dg-fs-navigation-item)"
         fontWeight="var(--dg-type-control-weight)"
         activeFontWeight="var(--dg-type-control-weight)"
@@ -1114,7 +965,7 @@ function Toolbar({
         value={priority}
         options={priorityOptions}
         onChange={onPriorityChange}
-        style={{ minWidth: 140 }}
+        style={{ flex: "0 1 140px", minWidth: 0 }}
         fontSize="var(--dg-fs-navigation-item)"
         fontWeight="var(--dg-type-control-weight)"
         activeFontWeight="var(--dg-type-control-weight)"
@@ -1130,6 +981,27 @@ function Toolbar({
         {sort === "desc" ? "Newest first" : "Oldest first"}
       </Button>
 
+      <label
+        htmlFor="alerts-select-all"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "0 6px",
+          color: "var(--dg-color-text-muted)",
+          cursor: hasNotifications ? "pointer" : "default",
+        }}
+      >
+        <input
+          id="alerts-select-all"
+          type="checkbox"
+          checked={isAllSelected}
+          onChange={onToggleSelectAll}
+          disabled={!hasNotifications}
+        />
+        {totalSelected > 0 ? `${totalSelected} selected` : "Select"}
+      </label>
+
       {totalSelected > 0 && (
         <BulkActions
           selectedIds={selectedIds}
@@ -1138,6 +1010,18 @@ function Toolbar({
           onBulk={onBulk}
         />
       )}
+
+      <Button
+        type="button"
+        className="dg-btn dg-btn-secondary"
+        onClick={onMarkAllRead}
+        disabled={!canMarkAllRead}
+        aria-label="Mark all alerts as read"
+        style={{ marginLeft: "auto" }}
+      >
+        <CheckCheck size={14} style={{ marginRight: 6 }} />
+        Mark all read
+      </Button>
     </div>
   );
 }
@@ -1210,6 +1094,8 @@ interface NotificationRowProps {
   isFirst: boolean;
   isLast: boolean;
   selected: boolean;
+  audience: Audience;
+  expanded: boolean;
   onToggleSelect: () => void;
   onClick: () => void;
   onArchive: () => void;
@@ -1222,6 +1108,8 @@ function NotificationRow({
   notification,
   isLast,
   selected,
+  audience,
+  expanded,
   onToggleSelect,
   onClick,
   onArchive,
@@ -1231,6 +1119,11 @@ function NotificationRow({
 }: NotificationRowProps) {
   const isUnread = !notification.readAt;
   const isArchived = !!notification.archivedAt;
+  const destination = resolveAlertDestination(notification);
+  const details = formatNotificationMetadata(notification.metadata, { audience });
+  // An organization's own notes read inline; platform rows unfold on demand.
+  const inlineDetails = audience === "org" ? details : [];
+  const disclosure = audience === "platform" && !destination ? details : [];
 
   const rowStyle: CSSProperties = {
     display: "grid",
@@ -1275,7 +1168,10 @@ function NotificationRow({
       <Button
         type="button"
         onClick={onClick}
-        aria-label={`${notification.title}: ${notification.message}${isUnread ? " (unread)" : ""}`}
+        aria-label={`${notification.title}: ${notification.message}${isUnread ? " (unread)" : ""}. ${
+          destination ? destination.label : expanded ? "Hide details" : "Show details"
+        }`}
+        aria-expanded={destination ? undefined : expanded}
         style={{
           textAlign: "left",
           background: "none",
@@ -1286,8 +1182,9 @@ function NotificationRow({
           color: "inherit",
           display: "flex",
           flexDirection: "column",
-          gap: 2,
+          gap: 4,
           minWidth: 0,
+          whiteSpace: "normal",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1307,8 +1204,9 @@ function NotificationRow({
           )}
           <span
             style={{
-              fontSize: "var(--dg-fs-label)",
+              fontSize: "var(--dg-fs-body-sm)",
               fontWeight: isUnread ? 700 : 600,
+              lineHeight: 1.35,
               color: "var(--dg-color-text-primary)",
             }}
           >
@@ -1351,22 +1249,76 @@ function NotificationRow({
         </div>
         <span
           style={{
-            fontSize: "var(--dg-fs-footnote)",
-            color: "var(--dg-color-text-muted)",
+            fontSize: "var(--dg-fs-label)",
+            color: "var(--dg-color-text-secondary)",
             lineHeight: 1.5,
           }}
         >
           {notification.message}
         </span>
+        {inlineDetails.map((entry) => (
+          <span
+            key={entry.label}
+            style={{
+              fontSize: "var(--dg-fs-label)",
+              color: "var(--dg-color-text-secondary)",
+              lineHeight: 1.5,
+            }}
+          >
+            <span style={{ color: "var(--dg-color-text-muted)" }}>{entry.label}: </span>
+            {entry.value}
+          </span>
+        ))}
         <span
           style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
             fontSize: "var(--dg-fs-footnote)",
             color: "var(--dg-color-text-subtle)",
           }}
         >
           {formatRelativeTime(notification.createdAt)}
           {notification.channel === "email" ? " • Sent via email" : ""}
+          {disclosure.length > 0 && (
+            <>
+              <span aria-hidden> • </span>
+              {expanded ? (
+                <ChevronDown size={12} aria-hidden />
+              ) : (
+                <ChevronRight size={12} aria-hidden />
+              )}
+              Details
+            </>
+          )}
         </span>
+        {expanded && disclosure.length > 0 && (
+          <span
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, auto) minmax(0, 1fr)",
+              gap: "4px 12px",
+              marginTop: 4,
+              padding: 10,
+              border: "1px solid var(--dg-color-border-light)",
+              borderRadius: "var(--dg-radius-md)",
+              background: "var(--dg-color-bg-secondary)",
+              fontSize: "var(--dg-fs-label)",
+            }}
+          >
+            <span className="dg-type-content-group-heading" style={{ gridColumn: "1 / -1" }}>
+              Details
+            </span>
+            {disclosure.map((entry) => (
+              <Fragment key={entry.label}>
+                <span style={{ color: "var(--dg-color-text-muted)" }}>{entry.label}</span>
+                <span style={{ color: "var(--dg-color-text-primary)", wordBreak: "break-word" }}>
+                  {entry.value}
+                </span>
+              </Fragment>
+            ))}
+          </span>
+        )}
       </Button>
       <div
         style={{
@@ -1376,27 +1328,6 @@ function NotificationRow({
           flexShrink: 0,
         }}
       >
-        {(() => {
-          const actionUrl =
-            typeof notification.metadata?.actionUrl === "string"
-              ? (notification.metadata.actionUrl as string)
-              : null;
-          const actionLabel =
-            typeof notification.metadata?.actionLabel === "string"
-              ? (notification.metadata.actionLabel as string)
-              : null;
-          if (!actionUrl || !actionLabel) return null;
-          return (
-            <Link
-              href={actionUrl}
-              className="dg-btn dg-btn-secondary"
-              onClick={onClick}
-              style={{ whiteSpace: "nowrap" }}
-            >
-              {actionLabel}
-            </Link>
-          );
-        })()}
         <Button
           type="button"
           aria-label={isUnread ? "Mark as read" : "Mark as unread"}

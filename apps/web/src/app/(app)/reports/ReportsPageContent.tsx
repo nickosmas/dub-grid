@@ -31,6 +31,7 @@ import {
   exportOperationsReportCsv,
   exportOperationsReportPdf,
   fetchOperationsReport,
+  fetchOperationsReportFilterOptions,
 } from "@/features/reports/client/api";
 import {
   type OperationsReportFilters,
@@ -689,7 +690,6 @@ function ReportsContent() {
     ],
   );
   const filtersKey = useMemo(() => serializeFilters(reportFilters), [reportFilters]);
-  const emptyFiltersKey = useMemo(() => serializeFilters(EMPTY_REPORT_FILTERS), []);
   const reportOptions = REPORT_OPTIONS as SelectOption<OperationsReportType>[];
   const quickRangeOptions = useMemo(
     () => buildQuickRangeOptions(range, org?.payPeriodStartDate, customRangeSelected),
@@ -763,11 +763,14 @@ function ReportsContent() {
     resetAppliedReport();
   };
 
+  // Dropdown lists only. This used to request the whole unfiltered report to
+  // read five option arrays off it, then request the whole report again for
+  // every filtered generate of the same range (build plan item 30).
   const targetOptionsQuery = useQuery({
     queryKey: orgId
-      ? queryKeys.reports.operations(orgId, range.startDate, range.endDate, emptyFiltersKey)
-      : ["reports", "operations", "none"],
-    queryFn: () => fetchOperationsReport({ orgId: orgId!, range, filters: EMPTY_REPORT_FILTERS }),
+      ? queryKeys.reports.operationsOptions(orgId, range.startDate, range.endDate)
+      : ["reports", "operations", "options", "none"],
+    queryFn: () => fetchOperationsReportFilterOptions({ orgId: orgId!, range }),
     enabled: Boolean(orgId) && canAccessReports && reportMetadata.targetControls.length > 0,
     staleTime: 30_000,
   });
@@ -1272,7 +1275,7 @@ function ReportsContent() {
           </section>
         ) : null}
 
-        {appliedRequest ? (
+        {appliedRequest && !reportsQuery.error ? (
           <section style={hasVisibleRows ? tableShellStyle : undefined}>
             {hasVisibleRows ? (
               <div style={{ overflowX: "auto" }}>

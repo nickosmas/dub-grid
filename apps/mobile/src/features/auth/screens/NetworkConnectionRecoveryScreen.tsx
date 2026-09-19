@@ -2,11 +2,17 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { NETWORK_ERROR_MESSAGE, NETWORK_ERROR_TITLE } from "@dubgrid/client-errors";
 import { useEffect, useMemo } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../../../shared/components/Text";
 import { Button } from "../../../shared/components/Button";
 import { useNetworkRecovery } from "../../../shared/providers/NetworkRecoveryProvider";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileRadii,
+  mobileText,
+  type MobileColors,
+  mobileSpace,
+} from "../../../shared/theme/tokens";
 
 /**
  * Recovery surface for a signed-in session whose required bootstrap data could
@@ -70,5 +76,5 @@ const createStyles = (colors: MobileColors) =>
       marginTop: 12,
       textAlign: "center",
     },
-    actions: { gap: 12, marginTop: 28, width: "100%" },
+    actions: { gap: 12, marginTop: mobileSpace["3xl"], width: "100%" },
   });

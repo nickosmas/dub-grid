@@ -25,6 +25,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { NumberField } from "@/components/ui/number-field";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { useMediaQuery, MOBILE } from "@/hooks";
 
@@ -462,6 +463,7 @@ function CoverageOptionRow({
           {draft.everyDay ? (
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <label
+                htmlFor={`${panelId}-min-staff`}
                 style={{
                   fontSize: "var(--dg-type-field-title-size)",
                   fontWeight: "var(--dg-type-field-title-weight)",
@@ -472,24 +474,14 @@ function CoverageOptionRow({
               >
                 Minimum Staff
               </label>
-              <input
-                type="number"
+              <NumberField
+                id={`${panelId}-min-staff`}
                 min={0}
                 max={999}
+                emptyValue={0}
                 value={draft.values[0] ?? 0}
-                onChange={(event) =>
-                  onDraftChange({
-                    everyDay: true,
-                    values: [Math.max(0, Math.min(999, Number(event.target.value) || 0))],
-                  })
-                }
-                style={{
-                  width: 72,
-                  padding: "6px 8px",
-                  borderRadius: "var(--dg-radius-md)",
-                  border: "1px solid var(--dg-color-border)",
-                  textAlign: "center",
-                }}
+                onChange={(value) => onDraftChange({ everyDay: true, values: [value] })}
+                style={{ width: 120 }}
                 disabled={!canEdit}
               />
             </div>
@@ -519,25 +511,15 @@ function CoverageOptionRow({
                   >
                     {day}
                   </span>
-                  <input
-                    type="number"
+                  <NumberField
                     min={0}
                     max={999}
+                    emptyValue={0}
                     value={draft.values[index] ?? 0}
-                    onChange={(event) => {
+                    onChange={(value) => {
                       const nextValues = [...draft.values];
-                      nextValues[index] = Math.max(
-                        0,
-                        Math.min(999, Number(event.target.value) || 0),
-                      );
+                      nextValues[index] = value;
                       onDraftChange({ everyDay: false, values: nextValues });
-                    }}
-                    style={{
-                      width: "100%",
-                      padding: "6px 8px",
-                      borderRadius: "var(--dg-radius-md)",
-                      border: "1px solid var(--dg-color-border)",
-                      textAlign: "center",
                     }}
                     disabled={!canEdit}
                   />

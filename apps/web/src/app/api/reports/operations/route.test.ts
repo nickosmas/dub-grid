@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requireOrgPermissions = vi.fn();
 const loadOperationsReport = vi.fn();
+const loadOperationsReportFilterOptions = vi.fn();
 const buildOperationsReportCsv = vi.fn();
 const buildOperationsReportPdf = vi.fn();
 const auditInsert = vi.fn();
@@ -30,6 +31,8 @@ vi.mock("@/features/reports/server/operations", async () => {
   return {
     ...actual,
     loadOperationsReport: (...args: unknown[]) => loadOperationsReport(...args),
+    loadOperationsReportFilterOptions: (...args: unknown[]) =>
+      loadOperationsReportFilterOptions(...args),
     buildOperationsReportCsv: (...args: unknown[]) => buildOperationsReportCsv(...args),
     buildOperationsReportPdf: (...args: unknown[]) => buildOperationsReportPdf(...args),
   };
@@ -187,6 +190,41 @@ describe("reports operations API", () => {
         shiftCategoryIds: [],
       },
     });
+  });
+
+  it("answers optionsOnly with the dropdown lists and no report load", async () => {
+    loadOperationsReportFilterOptions.mockResolvedValue({
+      filterOptions: {
+        employees: [],
+        focusAreas: [],
+        shiftCategories: [],
+        jobs: [],
+        indicators: [],
+        dates: [],
+      },
+    });
+
+    const response = await GET_REPORT(
+      makeReportRequest(`orgId=${ORG_ID}&startDate=2026-05-03&endDate=2026-05-09&optionsOnly=1`),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    await expect(response.json()).resolves.toEqual({
+      filterOptions: {
+        employees: [],
+        focusAreas: [],
+        shiftCategories: [],
+        jobs: [],
+        indicators: [],
+        dates: [],
+      },
+    });
+    expect(loadOperationsReportFilterOptions).toHaveBeenCalledWith(expect.any(Object), {
+      orgId: ORG_ID,
+      range: { startDate: "2026-05-03", endDate: "2026-05-09" },
+    });
+    expect(loadOperationsReport).not.toHaveBeenCalled();
   });
 
   it("passes validated target filters into report loading", async () => {

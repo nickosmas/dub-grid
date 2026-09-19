@@ -166,7 +166,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div key={effectiveOrgKey} className="contents">
         {children}
       </div>
-      {!isGridmaster && <TrialWelcomeModal />}
+      {/* Authenticated app routes only. The modal reads organization data, and
+          useOrganizationData's org-context lookup is not covered by its own
+          `enabled` flag, so mounting this on the sign-in page put a 401 in the
+          console on every visit. */}
+      {isAppRoute(pathname) && Boolean(user) && !isGridmaster && <TrialWelcomeModal />}
       <InactivityGuard />
     </div>
   );

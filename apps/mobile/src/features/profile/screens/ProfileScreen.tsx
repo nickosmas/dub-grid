@@ -6,11 +6,11 @@ import { getOrgRoleLabel } from "@dubgrid/domain";
 import {
   ActivityIndicator,
   StyleSheet,
-  Text,
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
+import { Text } from "../../../shared/components/Text";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { AppText } from "../../../shared/components/AppText";
 import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";
@@ -407,8 +407,9 @@ export default function ProfileScreen() {
             heroChips={1}
             heroSubtitle
             metaItems={0}
-            rowsPerSection={3}
-            sections={3}
+            // Organization (name, subdomain), Departments, then the Settings
+            // list of navigation rows; the sign-out row has no frame to draw.
+            sections={[{ rows: 2 }, { rows: 1 }, { rows: 5, rowVariant: "nav" }]}
           />
         ) : null
       ) : contentState.kind === "error" ? (
@@ -826,7 +827,7 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     orgOptionCopy: {
       flex: 1,
-      gap: 3,
+      gap: mobileSpace.xs,
       minWidth: 0,
     },
     orgOptionName: {

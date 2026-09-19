@@ -4,6 +4,7 @@ import {
   mobilePillOverflow,
   mobileAvatarText,
   mobileElevation,
+  mobileElevationExtent,
   mobileMotion,
   mobileRadii,
   mobileRadius,
@@ -11,17 +12,38 @@ import {
   mobileTabularText,
   mobileText,
   mobileTextWeighted,
-  mobileTypography,
   type MobileColors,
+  mobileSpace,
 } from "../../../shared/theme/tokens";
+import { HERO_INVERSE_CHIP_BORDER, HERO_INVERSE_CHIP_FILL } from "../lib/heroCardTheme";
+import { SCHEDULE_DATE_TILE_MIN_WIDTH } from "../components/ScheduleDateTile";
 
 /**
  * Fixed pixel geometry shared by the screen and its stylesheet.
  */
 export const MAX_VISIBLE_OPEN_SHIFT_STACK_CARDS = 4;
 export const OPEN_SHIFT_CARD_MIN_HEIGHT = 180;
-export const OPEN_SHIFT_CARD_SHADOW_ALLOWANCE = 18;
-export const ME_HERO_AVATAR_FRAME_OVERLAP = -10;
+/**
+ * How far the open-shift carousel bleeds into the page gutter so a card's side
+ * shadow is not cut at the strip's edge, and how much room the section keeps
+ * below its cards. The vertical room the shadow actually needs comes from the
+ * elevation token, and the strip's bottom margin takes back whatever exceeds
+ * this so the rhythm to the next section does not move with the token.
+ */
+export const OPEN_SHIFT_CARD_SIDE_BLEED = 18;
+export const OPEN_SHIFT_CARD_FOOTROOM = 36;
+/**
+ * The hero's collaborator stack: each avatar sits in a frame painted the
+ * block's own navy, and the frame is exactly the avatar plus the ring, so
+ * where frames overlap the ring reads as a clean cut-out of the neighbour.
+ * The old 42pt frame held a 38pt avatar behind 4pt of padding, which left
+ * 34pt of room: every avatar spilled out of its own ring off-centre and the
+ * cut-outs became uneven crescents.
+ */
+export const ME_HERO_AVATAR_SIZE = 38;
+export const ME_HERO_AVATAR_RING = 3;
+export const ME_HERO_AVATAR_FRAME_SIZE = ME_HERO_AVATAR_SIZE + ME_HERO_AVATAR_RING * 2;
+export const ME_HERO_AVATAR_FRAME_OVERLAP = -12;
 /**
  * Height of every control in the header row — the week chevrons, Today and the
  * alerts bell. One constant because they sit side by side and read as one set:
@@ -42,13 +64,16 @@ export const MONTH_EXPAND_SECTION_GAP = 14;
  * The stylesheet for the schedule screen's screen. Split out of the screen file
  * purely for size; this is a move, not a rewrite.
  */
+const TIMELINE_RAIL_WIDTH = 2;
+const TIMELINE_DOT_SIZE = 12;
+
 export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     stickyControlsSection: {
       gap: 16,
     },
     mePage: {
-      gap: 22,
+      gap: mobileSpace["2xl"],
       paddingTop: 8,
     },
     mePageEmpty: {
@@ -56,7 +81,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingTop: 0,
     },
     meTopStack: {
-      gap: 18,
+      gap: mobileSpace.lg,
     },
     meWelcomeRow: {
       flexDirection: "row",
@@ -74,16 +99,14 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textSubtle,
     },
     meWelcomeTitle: {
-      ...mobileText.sectionTitle,
-      fontSize: 20,
-      lineHeight: 25,
+      ...mobileTextWeighted("title", "bold"),
       color: mobileColors.textPrimary,
     },
     meWeekNavigator: {
       flexDirection: "row",
       alignItems: "flex-start",
       justifyContent: "space-between",
-      gap: 14,
+      gap: mobileSpace.md,
     },
     meWeekNavigatorCopy: {
       flex: 1,
@@ -91,9 +114,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: 4,
     },
     meWeekNavigatorTitle: {
-      ...mobileTextWeighted("sectionTitle", "bold"),
-      fontSize: 26,
-      lineHeight: 32,
+      ...mobileText.screenTitle,
       color: mobileColors.textPrimary,
     },
     meWeekNavigatorRangeLabel: {
@@ -104,7 +125,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     meWeekNavigatorActions: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 10,
+      gap: mobileSpace.md,
       flexShrink: 0,
     },
     meWeekRangeControlGroup: {
@@ -113,38 +134,12 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexShrink: 0,
       gap: 8,
     },
-    // Matches the shared Button's `secondary` tone at size sm: solid tint, no
-    // border, pill. The JSX still hand-rolls the Pressable; it converts to
-    // <Button> when this screen's animation rework opens the file.
-    meTodayButton: {
-      height: HEADER_CONTROL_HEIGHT,
-      borderRadius: mobileRadii.pill,
-      // Same outlined chrome as `iconControlButton`, which it sits beside — the
-      // two are one row of header controls and have to read as one set.
-      borderWidth: 1,
-      borderColor: mobileColors.border,
-      backgroundColor: mobileColors.surface,
-      justifyContent: "center",
-      paddingHorizontal: 14,
-      ...mobileElevation("raised", isDark),
-    },
-    meTodayButtonPressed: {
-      transform: [{ scale: mobileMotion.press.scale }],
-    },
-    meTodayButtonText: {
-      ...mobileText.bodyStrong,
-      // Stays `controlSecondaryFg` even though the fill is now white, because
-      // it is the one blue that clears AA in *both* themes here: 6.70:1 on
-      // white and 8.52:1 on the dark bar. Plain `brand` passes in light (5.17:1)
-      // and lands at 4.499:1 in dark, which is under the line.
-      color: mobileColors.controlSecondaryFg,
-    },
+    // The shadow lives on this view and the clip on the one inside: iOS clips
+    // a view's own shadow when it also clips its children, which is why the
+    // hero's blue glow never rendered there.
     meHeroCard: {
       position: "relative",
-      overflow: "hidden",
       borderRadius: mobileRadii.card,
-      paddingHorizontal: 18,
-      paddingVertical: 18,
       shadowOffset: {
         width: 0,
         height: 14,
@@ -152,6 +147,12 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       shadowOpacity: 1,
       shadowRadius: 28,
       elevation: 5,
+    },
+    meHeroCardClip: {
+      overflow: "hidden",
+      borderRadius: mobileRadii.card,
+      paddingHorizontal: mobileSpace.lg,
+      paddingVertical: mobileSpace.lg,
     },
     meHeroCardMuted: {
       backgroundColor: "#E2E8F0",
@@ -193,7 +194,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     meHeroHeaderCopy: {
       flex: 1,
       minWidth: 0,
-      gap: 6,
+      gap: mobileSpace.sm,
     },
     meHeroBadge: {
       alignSelf: "flex-start",
@@ -241,7 +242,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       alignItems: "center",
       justifyContent: "center",
       gap: 4,
-      paddingHorizontal: 10,
+      paddingHorizontal: mobileSpace.md,
       paddingVertical: 8,
     },
     meHeroDateWeekday: {
@@ -268,13 +269,13 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       // Hangs a split-shift or change pill from the hero title's baseline.
       // `flex-end` alone lands on the line box, a descender below the text.
       alignSelf: "flex-end",
-      marginBottom: 6,
+      marginBottom: mobileSpace.sm,
     },
     meHeroTitleRow: {
       flexDirection: "row",
       alignItems: "center",
       flexWrap: "wrap",
-      gap: 6,
+      gap: mobileSpace.sm,
     },
     meHeroHeading: {
       ...mobileText.rowTitle,
@@ -314,65 +315,10 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     meHeroContextGroup: {
       gap: 8,
     },
-    shiftChangeBadge: {
-      alignSelf: "flex-start",
-      alignItems: "center",
-      justifyContent: "center",
-      borderRadius: 999,
-      borderWidth: 1,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-    },
-    shiftChangeBadgeNew: {
-      backgroundColor: mobileColors.successSoft,
-      borderColor: mobileColors.successBorder,
-    },
-    shiftChangeBadgeModified: {
-      backgroundColor: mobileColors.brandSoft,
-      borderColor: mobileColors.brandBorder,
-    },
-    shiftChangeBadgeDeleted: {
-      backgroundColor: mobileColors.dangerSoft,
-      borderColor: mobileColors.dangerBorder,
-    },
-    shiftChangeBadgeCompactSegment: {
-      paddingVertical: 4,
-    },
-    // The hero's lone change chip stands in for the `Shift N · Edited` pill a
-    // split shift shows in the same slot, so it copies `SplitShiftBadge`.
-    shiftChangeBadgeInverse: {
-      alignSelf: "flex-start",
-      alignItems: "center",
-      backgroundColor: "rgba(255, 255, 255, 0.16)",
-      borderColor: "rgba(255, 255, 255, 0.28)",
-      borderRadius: mobileRadii.pill,
-      borderWidth: 1,
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-    },
-    shiftChangeBadgeText: {
-      ...mobileTextWeighted("micro", "bold"),
-      color: mobileColors.textSecondary,
-      textTransform: "uppercase",
-      // Android's font padding pushes uppercase glyphs high inside a pill this
-      // tight, leaving the label visibly off-center in its own chip.
-      includeFontPadding: false,
-      textAlignVertical: "center",
-    },
-    shiftChangeBadgeTextInverse: {
-      ...mobileText.badge,
-      color: mobileColors.textInverse,
-      textTransform: "none",
-    },
-    shiftChangeBadgeTextCompactSegment: {
-      ...mobileText.badge,
-      color: mobileColors.brand,
-      textTransform: "none",
-    },
     previousShiftRow: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 6,
+      gap: mobileSpace.sm,
       minWidth: 0,
     },
     previousShiftText: {
@@ -387,7 +333,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     meHeroRoleRow: {
       flexDirection: "row",
       alignItems: "flex-start",
-      gap: 10,
+      gap: mobileSpace.md,
     },
     meTypePillStack: {
       alignSelf: "flex-start",
@@ -397,13 +343,14 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileText.rowTitle,
       color: mobileColors.textMuted,
     },
+    // Size steps only: the family stays the base label's.
     meTypePillLabelRow: {
-      fontSize: 17,
-      lineHeight: 22,
+      fontSize: mobileText.cardTitle.fontSize,
+      lineHeight: mobileText.cardTitle.lineHeight,
     },
     meTypePillLabelHero: {
-      fontSize: 24,
-      lineHeight: 30,
+      fontSize: mobileText.heroMetric.fontSize,
+      lineHeight: mobileText.heroMetric.lineHeight,
     },
     meTypePillLabelInverse: {
       color: "rgba(255, 255, 255, 0.82)",
@@ -413,13 +360,13 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       alignItems: "center",
       justifyContent: "space-between",
       flexWrap: "wrap",
-      gap: 10,
+      gap: mobileSpace.md,
     },
     meHeroTimeRow: {
       flexDirection: "row",
       alignItems: "center",
       flex: 1,
-      gap: 9,
+      gap: mobileSpace.sm,
       minWidth: 0,
     },
     meHeroTimeText: {
@@ -431,12 +378,12 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     meHeroTimePill: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 10,
+      gap: mobileSpace.md,
       alignSelf: "flex-start",
       backgroundColor: "rgba(29, 78, 216, 0.22)",
       borderRadius: mobileRadii.control,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
+      paddingHorizontal: mobileSpace.md,
+      paddingVertical: mobileSpace.md,
     },
     meHeroTimePillMuted: {
       backgroundColor: "rgba(255, 255, 255, 0.58)",
@@ -465,7 +412,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: "rgba(255, 255, 255, 0.84)",
     },
     meHeroEmptyBlock: {
-      gap: 10,
+      gap: mobileSpace.md,
     },
     meHeroEmptyTextMuted: {
       color: mobileColors.textSecondary,
@@ -474,16 +421,14 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: 8,
     },
     meHeroDetailText: {
+      ...mobileText.bodyStrong,
       color: "rgba(255, 255, 255, 0.88)",
-      fontFamily: mobileTypography.fontFamily.semibold,
-      fontSize: 14,
-      lineHeight: 20,
     },
     meHeroDetailTextMuted: {
       color: mobileColors.textSecondary,
     },
     meHeroProgressBlock: {
-      gap: 10,
+      gap: mobileSpace.md,
       marginTop: 4,
     },
     meHeroProgressRow: {
@@ -515,18 +460,18 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      gap: 10,
-      paddingHorizontal: 14,
-      paddingVertical: 9,
-      marginTop: 6,
-      marginBottom: 6,
+      gap: mobileSpace.md,
+      paddingHorizontal: mobileSpace.md,
+      paddingVertical: mobileSpace.sm,
+      marginTop: mobileSpace.sm,
+      marginBottom: mobileSpace.sm,
     },
     meHeroCollaboratorLabelRow: {
       flex: 1,
       minWidth: 0,
       flexDirection: "row",
       alignItems: "center",
-      gap: 9,
+      gap: mobileSpace.sm,
     },
     meHeroCollaboratorLabel: {
       ...mobileText.rowTitle,
@@ -539,68 +484,71 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexShrink: 0,
     },
     meHeroCollaboratorAvatarFrame: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
-      padding: 2,
+      width: ME_HERO_AVATAR_FRAME_SIZE,
+      height: ME_HERO_AVATAR_FRAME_SIZE,
+      borderRadius: ME_HERO_AVATAR_FRAME_SIZE / 2,
+      padding: ME_HERO_AVATAR_RING,
     },
     meHeroCollaboratorAvatarFrameOverlap: {
       marginLeft: ME_HERO_AVATAR_FRAME_OVERLAP,
     },
     meHeroCollaboratorAvatar: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
+      width: ME_HERO_AVATAR_SIZE,
+      height: ME_HERO_AVATAR_SIZE,
+      borderRadius: ME_HERO_AVATAR_SIZE / 2,
       borderWidth: 1,
       alignItems: "center",
       justifyContent: "center",
     },
     meHeroCollaboratorAvatarText: {
-      ...mobileAvatarText(38),
+      ...mobileAvatarText(ME_HERO_AVATAR_SIZE),
     },
+    // A pale disc reads on the light navy block, but the same grey vanished
+    // against the dark theme's deeper navy, so dark mode lightens the block
+    // like the hero's other chips instead.
     meHeroCollaboratorOverflow: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
+      width: ME_HERO_AVATAR_SIZE,
+      height: ME_HERO_AVATAR_SIZE,
+      borderRadius: ME_HERO_AVATAR_SIZE / 2,
       borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      backgroundColor: mobileColors.surfaceSecondary,
+      borderColor: isDark ? HERO_INVERSE_CHIP_BORDER : mobileColors.borderSubtle,
+      backgroundColor: isDark ? HERO_INVERSE_CHIP_FILL : mobileColors.surfaceSecondary,
       alignItems: "center",
       justifyContent: "center",
     },
     meHeroCollaboratorOverflowText: {
       ...mobileText.bodyStrong,
-      color: mobileColors.textMuted,
+      color: isDark ? mobileColors.textInverse : mobileColors.textMuted,
     },
     meSectionBlock: {
       gap: 12,
     },
     upcomingSectionBlock: {
-      gap: 18,
+      gap: mobileSpace.lg,
     },
     upcomingSectionHeader: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      gap: 14,
+      gap: mobileSpace.md,
     },
     upcomingSectionTitle: {
-      ...mobileText.sectionTitle,
-      fontSize: 18,
-      lineHeight: 24,
+      ...mobileTextWeighted("title", "bold"),
       flex: 1,
       color: mobileColors.textPrimary,
     },
+    // The secondary control pair rather than the soft brand fill: on the
+    // aurora-washed page `brandSoft` is the same tint as the ground.
     upcomingHoursBadge: {
       borderRadius: mobileRadii.control,
-      backgroundColor: mobileColors.brandSoft,
-      paddingHorizontal: 14,
-      paddingVertical: 9,
+      backgroundColor: mobileColors.controlSecondaryBg,
+      paddingHorizontal: mobileSpace.md,
+      paddingVertical: mobileSpace.sm,
     },
     upcomingHoursBadgeText: {
       ...mobileText.bodyStrong,
       ...mobileTabularText,
-      color: mobileColors.brand,
+      color: mobileColors.controlSecondaryFg,
     },
     upcomingShiftsCard: {
       backgroundColor: mobileColors.surface,
@@ -613,7 +561,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     upcomingDateGroup: {
       flexDirection: "row",
       alignItems: "stretch",
-      gap: 18,
+      gap: mobileSpace.lg,
       marginHorizontal: -20,
       paddingHorizontal: 20,
     },
@@ -621,10 +569,10 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       // minWidth, not width: at a raised OS text size the weekday and day
       // labels grow, and a hard width clips them instead of letting the column
       // take the room.
-      minWidth: 60,
+      minWidth: SCHEDULE_DATE_TILE_MIN_WIDTH,
       alignItems: "center",
       justifyContent: "center",
-      paddingVertical: 18,
+      paddingVertical: mobileSpace.lg,
     },
     upcomingDateShiftStack: {
       flex: 1,
@@ -634,21 +582,20 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       minHeight: 132,
       flexDirection: "row",
       alignItems: "center",
-      gap: 18,
-      paddingVertical: 18,
+      gap: mobileSpace.lg,
+      paddingVertical: mobileSpace.lg,
     },
     upcomingUnscheduledRow: {
       minHeight: 132,
       justifyContent: "center",
       gap: 4,
-      paddingVertical: 18,
+      paddingVertical: mobileSpace.lg,
     },
     upcomingDeletedHistoryRow: {
-      paddingVertical: 14,
+      paddingVertical: mobileSpace.md,
     },
     upcomingUnscheduledTitle: {
-      ...mobileText.sectionTitle,
-      fontSize: 17,
+      ...mobileTextWeighted("cardTitle", "bold"),
       color: mobileColors.textSecondary,
     },
     upcomingUnscheduledBody: {
@@ -681,41 +628,10 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderBottomLeftRadius: mobileRadii.card,
       borderBottomRightRadius: mobileRadii.card,
     },
-    upcomingDateTile: {
-      minWidth: 60,
-      minHeight: 68,
-      borderRadius: mobileRadii.control,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      backgroundColor: mobileColors.surfaceMuted,
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 6,
-    },
-    upcomingDateWeekday: {
-      ...mobileText.micro,
-      color: mobileColors.textSubtle,
-      fontSize: 11,
-      lineHeight: 14,
-    },
-    upcomingDateDay: {
-      ...mobileText.sectionTitle,
-      ...mobileTabularText,
-      fontSize: 20,
-      lineHeight: 24,
-      color: mobileColors.textSecondary,
-    },
-    upcomingDateTodayDot: {
-      width: 5,
-      height: 5,
-      borderRadius: 999,
-      backgroundColor: mobileColors.danger,
-      marginTop: 1,
-    },
     upcomingShiftCopy: {
       flex: 1,
       minWidth: 0,
-      gap: 9,
+      gap: mobileSpace.sm,
     },
     // Title over time, not beside it. Tighter than `upcomingShiftCopy`'s gap so
     // the two read as one heading block, with the focus area and type pill
@@ -733,8 +649,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     upcomingShiftTitle: {
       flexShrink: 1,
       minWidth: 0,
-      ...mobileText.sectionTitle,
-      fontSize: 17,
+      ...mobileTextWeighted("cardTitle", "bold"),
       color: mobileColors.textPrimary,
     },
     upcomingShiftArea: {
@@ -750,10 +665,8 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // Smaller and lighter than upcomingShiftTitle (17px) — the time is
     // secondary to the shift name, not competing with it for attention.
     upcomingShiftTimeText: {
-      ...mobileText.caption,
+      ...mobileText.meta,
       ...mobileTabularText,
-      fontSize: 13,
-      lineHeight: 18,
       color: mobileColors.textSubtle,
     },
     meSectionHeader: {
@@ -767,9 +680,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: 4,
     },
     meSectionTitle: {
-      ...mobileText.sectionTitle,
-      fontSize: 18,
-      lineHeight: 24,
+      ...mobileTextWeighted("title", "bold"),
       color: mobileColors.textPrimary,
     },
     meSectionLink: {
@@ -781,7 +692,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderRadius: mobileRadii.card,
       borderWidth: 1,
       borderColor: mobileColors.borderSubtle,
-      padding: 18,
+      padding: mobileSpace.lg,
       shadowColor: mobileColors.shadow,
       shadowOffset: {
         width: 0,
@@ -815,8 +726,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textMuted,
     },
     scheduleRowTitle: {
-      ...mobileText.sectionTitle,
-      fontSize: 17,
+      ...mobileTextWeighted("cardTitle", "bold"),
       color: mobileColors.textPrimary,
     },
     scheduleRowTitleWithBadge: {
@@ -858,50 +768,53 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderColor: mobileColors.borderSubtle,
       backgroundColor: mobileColors.surfaceSecondary,
     },
+    // A horizontal ScrollView clips to its bounds, so the card shadow needs
+    // the token's own reach below the last card or it ends in a hard line.
     openShiftCarousel: {
-      marginHorizontal: -OPEN_SHIFT_CARD_SHADOW_ALLOWANCE,
+      marginHorizontal: -OPEN_SHIFT_CARD_SIDE_BLEED,
+      marginBottom: Math.min(
+        0,
+        OPEN_SHIFT_CARD_FOOTROOM - mobileElevationExtent("card", isDark).bottom,
+      ),
     },
     openShiftCarouselContent: {
-      gap: 14,
-      paddingHorizontal: OPEN_SHIFT_CARD_SHADOW_ALLOWANCE,
+      gap: mobileSpace.md,
+      paddingHorizontal: OPEN_SHIFT_CARD_SIDE_BLEED,
       paddingTop: 4,
-      paddingBottom: OPEN_SHIFT_CARD_SHADOW_ALLOWANCE,
-      paddingRight: OPEN_SHIFT_CARD_SHADOW_ALLOWANCE + 4,
+      paddingBottom: mobileElevationExtent("card", isDark).bottom,
+      paddingRight: OPEN_SHIFT_CARD_SIDE_BLEED + 4,
     },
     openShiftDateCard: {
       width: 320,
       gap: 12,
     },
+    // Inset from the card below it the way a grouped list's section title
+    // is, so the date sits over the card's content rather than on its edge.
     openShiftDateHeader: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
       gap: 12,
+      paddingHorizontal: mobileSpace.lg,
     },
     openShiftDateCardItems: {
-      gap: 14,
-      paddingBottom: OPEN_SHIFT_CARD_SHADOW_ALLOWANCE,
+      gap: mobileSpace.md,
+    },
+    // The day sheet's scroll view clips at both edges, so the list keeps the
+    // cards' shadow reach above the first and below the last one.
+    openShiftSheetList: {
+      gap: mobileSpace.md,
+      paddingTop: mobileElevationExtent("raised", isDark).top,
+      paddingBottom: mobileElevationExtent("raised", isDark).bottom,
+    },
+    // On the sheet's own surface a full card lift reads as too much depth.
+    openShiftSheetCard: {
+      ...mobileElevation("raised", isDark),
     },
     openShiftDateCardItemsStacked: {
       gap: 0,
       minHeight: OPEN_SHIFT_CARD_MIN_HEIGHT,
       position: "relative",
-    },
-    openShiftCountBadge: {
-      minWidth: 28,
-      paddingHorizontal: 9,
-      paddingVertical: 5,
-      borderRadius: mobileRadii.pill,
-      borderWidth: 1,
-      borderColor: mobileColors.brandBorder,
-      backgroundColor: mobileColors.brandSoft,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    openShiftCountBadgeText: {
-      ...mobileText.badge,
-      ...mobileTabularText,
-      color: mobileColors.brand,
     },
     openShiftCard: {
       minHeight: OPEN_SHIFT_CARD_MIN_HEIGHT,
@@ -910,32 +823,35 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderRadius: mobileRadii.card,
       borderWidth: 1,
       borderColor: mobileColors.cardBorder,
-      padding: 18,
+      padding: mobileSpace.lg,
       ...mobileElevation("card", isDark),
     },
     openShiftCardSurface: {
       gap: 12,
     },
     openShiftSplitPanel: {
-      gap: 10,
+      gap: mobileSpace.md,
     },
     openShiftCardLead: {
       zIndex: MAX_VISIBLE_OPEN_SHIFT_STACK_CARDS + 1,
     },
+    // The peeking ghosts sit under the lead card, so they take the quieter
+    // level on both platforms; overriding one iOS property left the full
+    // `boxShadow` cast in place.
     openShiftCardStacked: {
       position: "absolute",
-      shadowRadius: 14,
+      ...mobileElevation("raised", isDark),
     },
     requestList: {
-      gap: 14,
+      gap: mobileSpace.md,
     },
     requestCard: {
-      gap: 14,
+      gap: mobileSpace.md,
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
       borderColor: mobileColors.cardBorder,
-      padding: 18,
+      padding: mobileSpace.lg,
       ...mobileElevation("card", isDark),
     },
     requestHeaderRow: {
@@ -967,7 +883,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     requestHeaderTextStack: {
       flex: 1,
-      gap: 2,
+      gap: mobileSpace.xs,
     },
     requestHeaderSubtext: {
       ...mobileTextWeighted("meta", "semibold"),
@@ -987,17 +903,17 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       alignSelf: "flex-start",
       borderRadius: mobileRadius.md,
       borderWidth: 1,
-      paddingHorizontal: 10,
-      paddingVertical: 7,
+      paddingHorizontal: mobileSpace.md,
+      paddingVertical: mobileSpace.sm,
     },
     jobPillCompact: {
       borderRadius: mobileRadius.md,
-      paddingHorizontal: 9,
-      paddingVertical: 5,
+      paddingHorizontal: mobileSpace.sm,
+      paddingVertical: mobileSpace.xs,
     },
     jobPillTextStack: {
       minWidth: 0,
-      gap: 2,
+      gap: mobileSpace.xs,
     },
     jobPillInlineTextRow: {
       flexDirection: "row",
@@ -1009,8 +925,9 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     jobPillEyebrowText: {
       ...mobileText.micro,
     },
+    // The ramp floors at `micro`; a compact eyebrow keeps that size.
     jobPillEyebrowTextCompact: {
-      fontSize: 9,
+      fontSize: mobileText.micro.fontSize,
     },
     jobPillText: {
       ...mobileText.badge,
@@ -1028,19 +945,19 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       textTransform: "none",
     },
     jobPillMentoredInlineTextCompact: {
-      fontSize: 12,
-      lineHeight: 16,
+      fontSize: mobileText.label.fontSize,
+      lineHeight: mobileText.label.lineHeight,
     },
     jobPillTextCompact: {
-      fontSize: 12,
-      lineHeight: 16,
+      fontSize: mobileText.label.fontSize,
+      lineHeight: mobileText.label.lineHeight,
     },
     jobPillValueText: {
       ...mobileTextWeighted("meta", "semibold"),
       ...mobilePillOverflow.displayText,
     },
     jobPillValueTextCompact: {
-      fontSize: 12,
+      fontSize: mobileText.label.fontSize,
     },
     mentoredPill: {
       ...mobilePillOverflow.displayContainer,
@@ -1051,8 +968,8 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       backgroundColor: mobileColors.surfaceSecondary,
       minHeight: 28,
       justifyContent: "center",
-      paddingHorizontal: 10,
-      paddingVertical: 5,
+      paddingHorizontal: mobileSpace.md,
+      paddingVertical: mobileSpace.xs,
     },
     mentoredPillText: {
       ...mobileText.badge,
@@ -1081,24 +998,27 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textPrimary,
     },
     timelineList: {
-      gap: 18,
+      gap: mobileSpace.lg,
     },
     timelineSection: {
       gap: 12,
-      paddingLeft: 18,
+      paddingLeft: mobileSpace.lg,
       marginLeft: 4,
-      borderLeftWidth: 2,
+      borderLeftWidth: TIMELINE_RAIL_WIDTH,
       borderLeftColor: mobileColors.borderSubtle,
     },
     timelineSectionHeader: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 10,
-      marginLeft: -25,
+      gap: mobileSpace.md,
+      // Pulls the dot back over the section's rail: the section's own inset
+      // and border, half the dot, and one point so the dot centres on a 2pt
+      // line rather than sitting beside it.
+      marginLeft: -(mobileSpace.lg + TIMELINE_RAIL_WIDTH + TIMELINE_DOT_SIZE / 2 + 1),
     },
     timelineDot: {
-      width: 12,
-      height: 12,
+      width: TIMELINE_DOT_SIZE,
+      height: TIMELINE_DOT_SIZE,
       borderRadius: 6,
       borderWidth: 3,
       borderColor: mobileColors.background,
@@ -1109,7 +1029,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textPrimary,
     },
     timelineSectionEntries: {
-      gap: 10,
+      gap: mobileSpace.md,
     },
     timelineEntryCard: {
       backgroundColor: mobileColors.surface,
@@ -1138,18 +1058,18 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     meHeaderActions: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 10,
+      gap: mobileSpace.md,
     },
     teamHeaderUtilityRow: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 14,
+      gap: mobileSpace.md,
       justifyContent: "space-between",
     },
     teamHeaderActions: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 10,
+      gap: mobileSpace.md,
       marginLeft: "auto",
       flexShrink: 0,
       overflow: "visible",
@@ -1159,18 +1079,17 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       minWidth: 0,
     },
     meSelectedDateTitle: {
-      ...mobileTextWeighted("sectionTitle", "bold"),
+      ...mobileText.screenTitle,
       ...mobileTabularText,
-      fontSize: 26,
-      lineHeight: 32,
       flex: 1,
       color: mobileColors.textPrimary,
       textAlign: "left",
     },
+    // `screenTitle`, not `display`: this title shares its row with the Today
+    // button and the alerts bell, and at 28pt "Tomorrow, Sep 18" truncated to
+    // "Tomorrow, Se…" the moment the Today button appeared.
     teamHeaderTitle: {
-      ...mobileTextWeighted("sectionTitle", "bold"),
-      fontSize: 26,
-      lineHeight: 32,
+      ...mobileText.screenTitle,
       color: mobileColors.textPrimary,
       textAlign: "left",
       flexShrink: 1,
@@ -1182,6 +1101,10 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     iconControlButtonPressed: {
       transform: [{ scale: mobileMotion.press.iconOnlyScale }],
     },
+    // Ionicons draws its circular arrow clockwise; flipped, it points back.
+    iconControlMirrored: {
+      transform: [{ scaleX: -1 }],
+    },
     calendarBlock: {
       gap: MONTH_EXPAND_SECTION_GAP,
     },
@@ -1191,7 +1114,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     calendarDragHandleRow: {
       alignItems: "center",
       justifyContent: "center",
-      paddingVertical: 2,
+      paddingVertical: mobileSpace.xs,
     },
     calendarDragHandleBar: {
       width: 36,
@@ -1207,13 +1130,12 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     monthCalendarWeekdays: {
       flexDirection: "row",
-      gap: 6,
+      gap: mobileSpace.sm,
     },
     monthCalendarWeekdayLabel: {
+      ...mobileTextWeighted("label", "bold"),
       flex: 1,
       color: mobileColors.textSubtle,
-      fontFamily: mobileTypography.fontFamily.bold,
-      fontSize: 12,
       textAlign: "center",
     },
     monthCalendarWeeks: {
@@ -1230,7 +1152,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     monthCalendarWeek: {
       flexDirection: "row",
-      gap: 6,
+      gap: mobileSpace.sm,
     },
     monthCalendarDaySlot: {
       flex: 1,
@@ -1264,10 +1186,9 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       opacity: 0.4,
     },
     dateHighlightText: {
+      ...mobileTextWeighted("rowTitle", "bold"),
       ...mobileTabularText,
       color: mobileColors.textPrimary,
-      fontFamily: mobileTypography.fontFamily.bold,
-      fontSize: 15,
     },
     dateHighlightTextSelected: {
       color: mobileColors.textInverse,
@@ -1285,23 +1206,12 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       // -2 on both axes) rather than tucking it inside the circle.
       top: -2,
       right: -2,
-      minWidth: 16,
-      minHeight: 16,
-      borderRadius: 999,
-      paddingHorizontal: 4,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: mobileColors.danger,
-    },
-    alertBadgeText: {
-      ...mobileText.micro,
-      color: mobileColors.textInverse,
     },
     groupsList: {
       gap: mobileSpacing.sectionGap,
     },
     shiftGroupsList: {
-      gap: 28,
+      gap: mobileSpace["3xl"],
       paddingTop: 24,
     },
     shiftGroupBlock: {
@@ -1321,9 +1231,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     shiftGroupTitle: {
       flex: 1,
       minWidth: 0,
-      ...mobileText.sectionTitle,
-      fontSize: 18,
-      lineHeight: 23,
+      ...mobileTextWeighted("title", "bold"),
       color: mobileColors.textPrimary,
     },
     shiftGroupTime: {
@@ -1333,6 +1241,14 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textSubtle,
       textAlign: "right",
     },
+    shiftGroupHeaderStacked: {
+      flexDirection: "column",
+      alignItems: "stretch",
+      gap: mobileSpace.xs,
+    },
+    shiftGroupTimeStacked: {
+      textAlign: "left",
+    },
     weekDaySection: {
       gap: 12,
     },
@@ -1340,9 +1256,8 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: 4,
     },
     weekDayTitle: {
-      ...mobileText.sectionTitle,
+      ...mobileTextWeighted("cardTitle", "bold"),
       ...mobileTabularText,
-      fontSize: 17,
       color: mobileColors.textPrimary,
     },
     weekDayEmptyState: {
@@ -1351,14 +1266,14 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderWidth: 1,
       borderColor: mobileColors.cardBorder,
       paddingHorizontal: 16,
-      paddingVertical: 14,
+      paddingVertical: mobileSpace.md,
     },
     weekDayEmptyText: {
       ...mobileTextWeighted("body", "semibold"),
       color: mobileColors.textMuted,
     },
     groupEntries: {
-      gap: 10,
+      gap: mobileSpace.md,
     },
     teamGroupCard: {
       backgroundColor: mobileColors.surface,
@@ -1366,7 +1281,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderWidth: 1,
       borderColor: mobileColors.cardBorder,
       paddingHorizontal: 20,
-      paddingVertical: 10,
+      paddingVertical: mobileSpace.md,
       ...mobileElevation("card", isDark),
     },
     teamGroupMembers: {
@@ -1397,19 +1312,19 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileAvatarText(48),
       color: mobileColors.brand,
     },
-    teamMemberMain: {
+    teamMemberCopy: {
       flex: 1,
       minWidth: 0,
+      gap: mobileSpace.xs,
+    },
+    teamMemberHeaderRow: {
       flexDirection: "row",
       alignItems: "center",
       gap: 12,
     },
-    teamMemberCopy: {
+    teamMemberNameRow: {
       flex: 1,
       minWidth: 0,
-      gap: 5,
-    },
-    teamMemberNameRow: {
       alignItems: "center",
       flexDirection: "row",
       flexWrap: "wrap",
@@ -1428,20 +1343,27 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       alignItems: "flex-start",
     },
     teamMemberRoleRow: {
+      flexShrink: 0,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "flex-end",
       flexWrap: "wrap",
       gap: 8,
     },
+    // Under the name at a raised text size, where a trailing pill squeezed
+    // the name column until "Richard Bennett" broke and the split-shift
+    // badge truncated beside it.
+    teamMemberRoleRowStacked: {
+      justifyContent: "flex-start",
+    },
     teamMemberRoleChip: {
       borderWidth: 1,
       borderRadius: mobileRadius.md,
-      paddingHorizontal: 10,
-      paddingVertical: 7,
+      paddingHorizontal: mobileSpace.md,
+      paddingVertical: mobileSpace.sm,
     },
     teamMemberRoleChipTextStack: {
-      gap: 2,
+      gap: mobileSpace.xs,
     },
     teamMemberRoleChipEyebrowText: {
       ...mobileText.micro,
@@ -1457,7 +1379,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: 8,
     },
     compactSegmentBlock: {
-      gap: 3,
+      gap: mobileSpace.xs,
     },
     compactSegmentDivider: {
       borderTopWidth: 1,
@@ -1465,20 +1387,18 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingTop: 8,
     },
     compactSegmentTitle: {
+      ...mobileTextWeighted("meta", "bold"),
       color: mobileColors.textSecondary,
-      fontFamily: mobileTypography.fontFamily.bold,
-      fontSize: 13,
     },
     compactSegmentMeta: {
+      ...mobileTextWeighted("meta", "semibold"),
       color: mobileColors.textMuted,
-      fontFamily: mobileTypography.fontFamily.semibold,
-      fontSize: 13,
     },
     heroSegmentList: {
       gap: 12,
     },
     heroSegmentBlock: {
-      gap: 6,
+      gap: mobileSpace.sm,
     },
     heroSegmentDivider: {
       borderTopWidth: 1,
@@ -1524,7 +1444,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: 12,
     },
     entrySegmentBlock: {
-      gap: 6,
+      gap: mobileSpace.sm,
     },
     entrySegmentDivider: {
       borderTopWidth: 1,

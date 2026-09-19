@@ -11,7 +11,6 @@ import {
 import {
   Pressable,
   StyleSheet,
-  Text,
   TextInput,
   View,
   type StyleProp,
@@ -19,13 +18,14 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
+import { Text } from "../../../shared/components/Text";
 import { AccessInsignia } from "../../../shared/components/AccessInsignia";
-import { Chip } from "../../../shared/components/Chip";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { useIsInsideSheet } from "../../../shared/components/BottomSheetModal";
 import { useKeyboardDoneAccessory } from "../../../shared/components/KeyboardDoneAccessory";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
+  mobileListRow,
   mobileAvatarText,
   MAX_FONT_SCALE,
   mobileElevation,
@@ -35,6 +35,7 @@ import {
   mobileText,
   mobileTextWeighted,
   type MobileColors,
+  mobileSpace,
 } from "../../../shared/theme/tokens";
 
 type IconName = ComponentProps<typeof Ionicons>["name"];
@@ -168,14 +169,16 @@ export function ProfileHero({
         onPress={onBadgePress}
         style={({ pressed }) => [...badgeStyle, pressed && styles.heroBadgePressed]}
       >
-        <Text ellipsizeMode="tail" numberOfLines={1} style={badgeTextStyle}>
+        <Text fit="compact" style={badgeTextStyle}>
           {badge}
         </Text>
         <Ionicons color={badgeChevronColor} name="chevron-down" size={13} />
       </Pressable>
     ) : (
       <View style={badgeStyle}>
-        <Text style={badgeTextStyle}>{badge}</Text>
+        <Text fit="compact" style={badgeTextStyle}>
+          {badge}
+        </Text>
       </View>
     )
   ) : null;
@@ -188,9 +191,7 @@ export function ProfileHero({
             {initials ? (
               <View style={[styles.avatar, isCentered && styles.avatarLarge, avatarStyle]}>
                 <Text
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  maxFontSizeMultiplier={MAX_FONT_SCALE}
+                  fit="fixed"
                   style={[styles.avatarText, isCentered && styles.avatarTextLarge, avatarTextStyle]}
                 >
                   {initials}
@@ -312,7 +313,7 @@ export function ProfileList({
         insideSheet ? styles.flatInSheet : null,
       ]}
     >
-      {children}
+      <View style={variant === "plain" ? null : styles.listClip}>{children}</View>
     </View>
   );
 }
@@ -458,10 +459,18 @@ export function ProfileTextInput({
   );
 }
 
+/**
+ * A group of choices as a framed list, the Settings idiom: a caption over
+ * full-width rows, a trailing mark that fills when a row is chosen. Rows
+ * wrap long names where a chip cloud ragged and truncated them, and the
+ * idle mark says which kind of group this is: a ring on every row for
+ * pick-many, nothing until the chosen row for pick-one.
+ */
 export function ProfileChoiceGroup<TId extends string | number>({
   label,
   items,
   selectedIds,
+  selection = "multiple",
   error,
   onToggle,
 }: {
@@ -474,6 +483,8 @@ export function ProfileChoiceGroup<TId extends string | number>({
     disabledReason?: string;
   }>;
   selectedIds: TId[];
+  /** `"single"` for a group where choosing one row replaces the last. */
+  selection?: "single" | "multiple";
   error?: string | null;
   onToggle: (id: TId) => void;
 }) {
@@ -482,21 +493,45 @@ export function ProfileChoiceGroup<TId extends string | number>({
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
-    <View style={styles.chipGroup}>
+    <View style={styles.choiceGroup}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <View style={styles.chipRow}>
-        {items.map((item) => (
-          <Chip
-            accessibilityLabel={
-              item.disabledReason ? `${item.name}. ${item.disabledReason}` : item.name
-            }
-            disabled={item.disabled}
-            key={item.id}
-            label={item.name}
-            onPress={() => onToggle(item.id)}
-            selected={selectedIds.includes(item.id)}
-          />
-        ))}
+      <View style={styles.list}>
+        <View style={styles.listClip}>
+          {items.map((item, index) => {
+            const selected = selectedIds.includes(item.id);
+            return (
+              <PressableRow
+                accessibilityLabel={
+                  item.disabledReason ? `${item.name}. ${item.disabledReason}` : item.name
+                }
+                accessibilityRole={selection === "single" ? "radio" : "checkbox"}
+                checked={selected}
+                disabled={item.disabled}
+                key={item.id}
+                onPress={() => onToggle(item.id)}
+                style={[styles.choiceRow, index < items.length - 1 && styles.rowDivider]}
+              >
+                <Text
+                  maxFontSizeMultiplier={MAX_FONT_SCALE}
+                  style={[styles.choiceLabel, selected && styles.choiceLabelSelected]}
+                >
+                  {item.name}
+                </Text>
+                <View
+                  style={[
+                    styles.choiceMark,
+                    selection === "multiple" && !selected && styles.choiceMarkRing,
+                    selected && styles.choiceMarkSelected,
+                  ]}
+                >
+                  {selected ? (
+                    <Ionicons color={mobileColors.onBrandText} name="checkmark" size={14} />
+                  ) : null}
+                </View>
+              </PressableRow>
+            );
+          })}
+        </View>
       </View>
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
@@ -576,17 +611,17 @@ const personLayoutStyles = StyleSheet.create({
   quickActions: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: mobileSpace.md,
     justifyContent: "center",
     paddingBottom: 16,
   },
   actionStack: {
-    gap: 10,
+    gap: mobileSpace.md,
     paddingTop: 12,
   },
   actionRow: {
     flexDirection: "row",
-    gap: 10,
+    gap: mobileSpace.md,
   },
   actionRowItem: {
     flex: 1,
@@ -635,7 +670,7 @@ export function ProfileActionRow({ children }: { children: ReactNode }) {
 const createProfilePrimitiveStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     actionsStack: {
-      gap: 10,
+      gap: mobileSpace.md,
     },
     supportingText: {
       ...mobileText.body,
@@ -656,17 +691,17 @@ export function useProfilePrimitiveStyles() {
 const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     hero: {
-      gap: 14,
+      gap: mobileSpace.md,
       paddingTop: 4,
     },
     heroTop: {
       alignItems: "center",
       flexDirection: "row",
-      gap: 14,
+      gap: mobileSpace.md,
     },
     heroTopCentered: {
       flexDirection: "column",
-      gap: 14,
+      gap: mobileSpace.md,
       paddingTop: 8,
     },
     avatar: {
@@ -691,7 +726,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     heroCopy: {
       flex: 1,
-      gap: 3,
+      gap: mobileSpace.xs,
       minWidth: 0,
     },
     // Stretched rather than flexed: in a column `flex: 1` would stretch the
@@ -701,7 +736,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       alignSelf: "stretch",
       flexBasis: "auto",
       flexGrow: 0,
-      gap: 6,
+      gap: mobileSpace.sm,
     },
     heroTitleRow: {
       alignItems: "center",
@@ -719,8 +754,8 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       minWidth: 0,
     },
     heroTitleCentered: {
-      fontSize: 26,
-      lineHeight: 32,
+      fontSize: mobileText.display.fontSize,
+      lineHeight: mobileText.display.lineHeight,
       textAlign: "center",
     },
     heroSubtitle: {
@@ -738,9 +773,9 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderRadius: mobileRadii.pill,
       borderWidth: 1,
       flexDirection: "row",
-      gap: 6,
-      paddingHorizontal: 10,
-      paddingVertical: 5,
+      gap: mobileSpace.sm,
+      paddingHorizontal: mobileSpace.md,
+      paddingVertical: mobileSpace.xs,
     },
     heroBadgeCentered: {
       alignSelf: "center",
@@ -769,7 +804,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     heroDetail: {
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: 10,
+      gap: mobileSpace.md,
     },
     heroDetailCentered: {
       alignItems: "center",
@@ -777,7 +812,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     heroMetaItem: {
       flex: 1,
-      gap: 3,
+      gap: mobileSpace.xs,
       minWidth: 120,
     },
     heroMetaItemCentered: {
@@ -799,17 +834,24 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textPrimary,
     },
     section: {
-      gap: 10,
+      gap: mobileSpace.md,
     },
+    // Sentence case, like every other heading in the app; the small caps
+    // read as a different voice above a card of sentence-case rows. Inset
+    // from the card's edge the way a grouped list's header is, so the title
+    // sits over the rows' content rather than flush with the card corner.
     sectionTitle: {
-      ...mobileTextWeighted("label", "medium"),
+      ...mobileTextWeighted("sectionTitle", "medium"),
       color: mobileColors.textSubtle,
-      letterSpacing: 0.4,
-      textTransform: "uppercase",
+      paddingHorizontal: mobileSpace.lg,
+      // Air above a title that follows another section's card; the card's
+      // own gap below the title stays at the section's `gap`.
+      paddingTop: mobileSpace.sm,
     },
     sectionDescription: {
       ...mobileText.body,
       color: mobileColors.textMuted,
+      paddingHorizontal: mobileSpace.lg,
       marginTop: -4,
     },
     // Cancels the card shadow when this is rendered inside a sheet, and hands
@@ -829,17 +871,23 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderColor: mobileColors.cardBorder,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
-      gap: 14,
+      gap: mobileSpace.md,
       padding: 16,
       ...mobileElevation("card", isDark),
     },
+    // The clip sits on an inner view: iOS drops a view's own shadow when the
+    // same view clips its children, so the shadow-casting list stays unclipped
+    // and the rows are clipped to the corners one level down.
     list: {
       backgroundColor: mobileColors.surface,
       borderColor: mobileColors.cardBorder,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
-      overflow: "hidden",
       ...mobileElevation("card", isDark),
+    },
+    listClip: {
+      overflow: "hidden",
+      borderRadius: mobileRadii.card - 1,
     },
     listPlain: {
       gap: 0,
@@ -861,7 +909,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     rowCopy: {
       flex: 1,
-      gap: 2,
+      gap: mobileSpace.xs,
       minWidth: 0,
     },
     rowLabel: {
@@ -881,7 +929,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textPrimary,
     },
     field: {
-      gap: 7,
+      gap: mobileSpace.sm,
     },
     fieldLabel: {
       ...mobileTextWeighted("caption", "medium"),
@@ -889,15 +937,15 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     input: {
       ...mobileInputText("regular"),
-      fontSize: 16,
-      lineHeight: 22,
+      fontSize: mobileText.input.fontSize,
+      lineHeight: mobileText.input.lineHeight,
       backgroundColor: mobileColors.surfaceSecondary,
       borderColor: mobileColors.borderSubtle,
       borderRadius: mobileRadii.control,
       borderWidth: 1,
       color: mobileColors.textPrimary,
       minHeight: 48,
-      paddingHorizontal: 14,
+      paddingHorizontal: mobileSpace.md,
       paddingVertical: 12,
     },
     inputShell: {
@@ -919,7 +967,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     inputAccessory: {
       alignItems: "center",
       justifyContent: "center",
-      paddingRight: 6,
+      paddingRight: mobileSpace.sm,
     },
     inputMultiline: {
       minHeight: 96,
@@ -936,13 +984,40 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileText.caption,
       color: mobileColors.dangerText,
     },
-    chipGroup: {
-      gap: 8,
+    choiceGroup: {
+      gap: mobileSpace.sm,
     },
-    chipRow: {
+    choiceRow: {
+      alignItems: "center",
       flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 8,
+      gap: mobileSpace.md,
+      paddingHorizontal: 16,
+      paddingVertical: mobileListRow.paddingVertical,
+    },
+    choiceLabel: {
+      ...mobileText.body,
+      color: mobileColors.textPrimary,
+      flex: 1,
+      minWidth: 0,
+    },
+    choiceLabelSelected: {
+      ...mobileTextWeighted("body", "medium"),
+    },
+    // The 22pt mark at the row's end. A ring is the pick-many group's idle
+    // state; the fill is the chosen row in either kind of group.
+    choiceMark: {
+      alignItems: "center",
+      borderRadius: 11,
+      height: 22,
+      justifyContent: "center",
+      width: 22,
+    },
+    choiceMarkRing: {
+      borderColor: mobileColors.border,
+      borderWidth: 1.5,
+    },
+    choiceMarkSelected: {
+      backgroundColor: mobileColors.brand,
     },
     iconBadge: {
       alignItems: "center",

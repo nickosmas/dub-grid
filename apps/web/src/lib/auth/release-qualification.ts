@@ -2,6 +2,7 @@ export const AUTH_RELEASE_ROLES = [
   "public",
   "regular",
   "management",
+  "admin",
   "super_admin",
   "gridmaster",
 ] as const;
@@ -101,6 +102,18 @@ export const AUTH_RELEASE_MATRIX: readonly AuthReleaseMatrixRow[] = [
     browserEngines: AUTH_RELEASE_BROWSER_ENGINES,
   },
   {
+    // qa-admin (org_role admin, full admin permissions), added for 25d2.
+    id: "admin-active",
+    role: "admin",
+    state: "active",
+    surface: "web",
+    organization: "calmhaven",
+    expectedAdmission: "allowed",
+    evidenceOwner: "e2e/role-fixtures.spec.ts",
+    evidenceStatus: "automated",
+    browserEngines: AUTH_RELEASE_BROWSER_ENGINES,
+  },
+  {
     id: "super-admin-active",
     role: "super_admin",
     state: "active",
@@ -129,7 +142,9 @@ export const AUTH_RELEASE_MATRIX: readonly AuthReleaseMatrixRow[] = [
     surface: "web",
     organization: "platform",
     expectedAdmission: "limited",
-    evidenceOwner: "apps/web/src/app/api/auth/login/route.test.ts",
+    // The route test proves the org-host refusal; the browser spec signs
+    // qa-gridmaster (added for 25d2) into the portal host live.
+    evidenceOwner: "e2e/role-fixtures.spec.ts; apps/web/src/app/api/auth/login/route.test.ts",
     evidenceStatus: "automated",
     browserEngines: AUTH_RELEASE_BROWSER_ENGINES,
   },

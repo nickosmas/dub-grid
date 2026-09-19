@@ -494,6 +494,8 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
             fontFamily: "monospace",
             letterSpacing: "0.2em",
             textAlign: "center",
+            color: "var(--dg-color-text-primary)",
+            background: "var(--dg-color-surface)",
             outline: "none",
             boxSizing: "border-box",
           }}

@@ -723,7 +723,7 @@ describe("settings dirty save controls", () => {
 
     await user.click(discardButton);
 
-    expect(screen.getByRole("spinbutton")).toHaveValue(2);
+    expect(screen.getByRole("spinbutton")).toHaveValue("2");
     expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
   });
 
@@ -788,7 +788,7 @@ describe("settings dirty save controls", () => {
     expect(screen.getByLabelText("Same every day")).toBeChecked();
 
     const staffInput = await screen.findByRole("spinbutton");
-    expect(staffInput).toHaveValue(0);
+    expect(staffInput).toHaveValue("0");
 
     await user.clear(staffInput);
     await user.type(staffInput, "2");

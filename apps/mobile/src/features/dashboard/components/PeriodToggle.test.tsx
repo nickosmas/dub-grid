@@ -27,12 +27,14 @@ describe("PeriodToggle", () => {
     expect(onChange).toHaveBeenCalledWith("2weeks");
   });
 
-  it("disables presses while loading", () => {
+  it("stays pressable while a period is still loading", () => {
+    // A locked toggle read as a hang; the cards dim instead, and a second tap
+    // just moves the query on.
     const onChange = vi.fn();
-    render(<PeriodToggle mode="week" onChange={onChange} loading />);
+    render(<PeriodToggle mode="week" onChange={onChange} />);
 
-    fireEvent.click(screen.getByText("2 Weeks"));
+    fireEvent.click(screen.getByText("Day"));
 
-    expect(onChange).not.toHaveBeenCalled();
+    expect(onChange).toHaveBeenCalledWith("day");
   });
 });

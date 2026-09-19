@@ -2988,6 +2988,30 @@ async function main() {
       employee_status: "inactive",
     },
     {
+      email: "qa-admin@dubgrid.test",
+      platform_role: "none",
+      org_role: "admin",
+      label: "qa_admin (release qualification)",
+      first_name: "QA",
+      last_name: "Admin",
+      preferred_org: "calmhaven",
+      management_access: true,
+      employee_status: "active",
+    },
+    {
+      // Platform-level QA identity so automated runs never sign in as the
+      // personal gridmaster account above.
+      email: "qa-gridmaster@dubgrid.test",
+      platform_role: "gridmaster",
+      org_role: "user",
+      label: "qa_gridmaster (release qualification)",
+      first_name: "QA",
+      last_name: "Gridmaster",
+      preferred_org: "calmhaven",
+      management_access: false,
+      employee_status: "active",
+    },
+    {
       email: "qa-mfa-chromium@dubgrid.test",
       platform_role: "none",
       org_role: "super_admin",
@@ -3051,7 +3075,10 @@ async function main() {
     canViewDashboardAnalytics: true,
   };
 
-  // View-only permissions for user-role members (no edit access, can see everything)
+  // The Tech management department's template (nothing reads it any more;
+  // departments do not grant permissions). Never written to a `user`-role
+  // membership: `admin_permissions` is an admin-tier column and the resolver
+  // ignores it for users, so a seeded regular user is a real regular user.
   const userViewPermsObj = {
     canViewSchedule: true,
     canEditShifts: false,
@@ -3151,12 +3178,8 @@ async function main() {
 
   // Ensure a "Tech" management department exists in every org, then assign the
   // seeded logins to it below. Members surface as management users in the People
-  // directory. For `user`-role members the department's permission template
-  // drives their effective permissions (it replaces admin_permissions; see
-  // resolveManagementDepartmentPermissions), so Tech carries the same view-only
-  // set the `user` account already had. Nobody's access changes: the `user`
-  // account stays read-only, and super_admin is unaffected because its access is
-  // role-based, not template-driven.
+  // directory. The department carries a permissions template only because the
+  // column exists; no resolution path reads it, so nobody's access depends on it.
   const techDeptPermissions = JSON.stringify(userViewPermsObj);
   await db.query(`
     INSERT INTO public.departments (org_id, name, abbr, type, sort_order, permissions)
@@ -3181,12 +3204,7 @@ async function main() {
     management_access: boolean;
   }> = [];
   for (const user of memberUsers) {
-    const adminPermissions =
-      user.org_role === "admin"
-        ? allAdminPermsObj
-        : user.org_role === "user"
-          ? userViewPermsObj
-          : null;
+    const adminPermissions = user.org_role === "admin" ? allAdminPermsObj : null;
     for (const org of allOrgs) {
       membershipSeeds.push({
         email: user.email,

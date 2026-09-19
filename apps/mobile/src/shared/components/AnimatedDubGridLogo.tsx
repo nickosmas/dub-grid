@@ -78,6 +78,7 @@ export function AnimatedDubGridLogo({
             <PulseCell
               key={`${row}-${col}`}
               style={style}
+              initialOpacity={staticOpacity(row, col)}
               durationMs={duration * 1000}
               delayMs={delay * 1000}
             />
@@ -96,14 +97,19 @@ function staticOpacity(row: number, col: number) {
 
 function PulseCell({
   style,
+  initialOpacity,
   durationMs,
   delayMs,
 }: {
   style: object;
+  initialOpacity: number;
   durationMs: number;
   delayMs: number;
 }) {
-  const opacity = useSharedValue(ANIMATED_LOGO_OPACITY_MIN);
+  // Starts at the static mark's value, not the pulse floor: the native launch
+  // image shows the static pattern, so the first animated frame must match it
+  // or the handoff reads as every cell dimming at once.
+  const opacity = useSharedValue(initialOpacity);
 
   useEffect(() => {
     const half = durationMs / 2;

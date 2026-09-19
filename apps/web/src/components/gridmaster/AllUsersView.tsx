@@ -1,7 +1,8 @@
 "use client";
 import { Search } from "lucide-react";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useTheme } from "next-themes";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -24,7 +25,24 @@ import {
 } from "@/features/gridmaster/client";
 import { queryKeys } from "@/lib/query-keys";
 import { useStepUpAction } from "@/hooks/useStepUpAction";
+import { useSlideoverClose } from "@/hooks/useSlideoverClose";
 import { requireCredentialAssurance } from "@/features/account/client";
+
+/**
+ * Owns the slide-over's animation, scroll lock, and Escape handling for
+ * exactly as long as a user is selected. The panel body itself stays inline
+ * in the view because it reads the view's handlers and memoized data.
+ */
+function UserDetailSlideover({
+  onClose,
+  children,
+}: {
+  onClose: () => void;
+  children: (close: () => void, closing: boolean) => ReactNode;
+}) {
+  const { closing, close } = useSlideoverClose(onClose);
+  return <>{children(close, closing)}</>;
+}
 
 function RoleBadge({ role }: { role: string }) {
   const { resolvedTheme } = useTheme();
@@ -112,7 +130,6 @@ export default function AllUsersView({
   const [forceLogoutConfirm, setForceLogoutConfirm] = useState<PlatformUser | null>(null);
   const [resetConfirm, setResetConfirm] = useState<PlatformUser | null>(null);
   const [selectedUser, setSelectedUser] = useState<PlatformUser | null>(null);
-  const [closing, setClosing] = useState(false);
   const usersQuery = useQuery({
     queryKey: queryKeys.gridmaster.allUsers(),
     queryFn: fetchGridmasterUsers,
@@ -139,22 +156,7 @@ export default function AllUsersView({
   const memberships = membershipsQuery.data ?? [];
   const membershipsLoading = membershipsQuery.isLoading;
 
-  const handleClosePanel = useCallback(() => {
-    setClosing(true);
-    setTimeout(() => {
-      setClosing(false);
-      setSelectedUser(null);
-    }, 200);
-  }, []);
-
-  useEffect(() => {
-    if (!selectedUser) return;
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") handleClosePanel();
-    }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [selectedUser, handleClosePanel]);
+  const closeUserDetail = useCallback(() => setSelectedUser(null), []);
 
   function reload() {
     queryClient.invalidateQueries({ queryKey: queryKeys.gridmaster.allUsers() });
@@ -631,148 +633,105 @@ export default function AllUsersView({
       )}
 
       {/* User detail side panel */}
-      {selectedUser &&
-        (() => {
-          const u = selectedUser;
-          const isDeactivated = !!u.deactivatedAt;
-          const isGM = u.platformRole === "gridmaster";
-          const emailName = u.email?.split("@")[0] ?? "";
-          const initials = emailName.slice(0, 2).toUpperCase();
-          const badgeColor = isGM
-            ? "var(--dg-color-brand)"
-            : (ROLE_BADGE_COLORS[u.orgRole ?? "user"]?.bg ?? "var(--dg-color-bg-secondary)");
-          return (
-            <>
-              <div
-                className={`staff-detail-overlay${closing ? " closing" : ""}`}
-                onClick={handleClosePanel}
-              />
-              <div className={`staff-detail-pane${closing ? " closing" : ""}`}>
-                {/* Header */}
-                <div className="staff-detail-header">
-                  <CloseButton
-                    size="md"
-                    className="self-end"
-                    onClick={handleClosePanel}
-                    aria-label="Close detail panel"
-                  />
-                  <div
-                    style={{
-                      width: 56,
-                      height: 56,
-                      borderRadius: "50%",
-                      background: badgeColor,
-                      color: "var(--dg-color-text-inverse)",
-                      display: "grid",
-                      placeItems: "center",
-                      fontSize: "var(--dg-fs-body)",
-                      fontWeight: 700,
-                      letterSpacing: "0.02em",
-                      marginBottom: 10,
-                    }}
-                  >
-                    {initials}
-                  </div>
-                  <h3
-                    style={{
-                      margin: "0 0 6px",
-                      fontSize: "var(--dg-fs-body-sm)",
-                      fontWeight: 700,
-                      color: "var(--dg-color-text-primary)",
-                      textAlign: "center",
-                      wordBreak: "break-all",
-                    }}
-                  >
-                    {u.email ?? "Unknown"}
-                  </h3>
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 6,
-                      alignItems: "center",
-                      flexWrap: "wrap",
-                      justifyContent: "center",
-                    }}
-                  >
-                    {isGM && <RoleBadge role={u.platformRole} />}
-                    {!isGM && u.orgRole && <RoleBadge role={u.orgRole} />}
-                    {isDeactivated && <StatusBadge deactivatedAt={u.deactivatedAt as string} />}
-                  </div>
-                </div>
-
-                {/* Content */}
+      {selectedUser && (
+        <UserDetailSlideover onClose={closeUserDetail}>
+          {(handleClosePanel, closing) => {
+            const u = selectedUser;
+            const isDeactivated = !!u.deactivatedAt;
+            const isGM = u.platformRole === "gridmaster";
+            const emailName = u.email?.split("@")[0] ?? "";
+            const initials = emailName.slice(0, 2).toUpperCase();
+            const badgeColor = isGM
+              ? "var(--dg-color-brand)"
+              : (ROLE_BADGE_COLORS[u.orgRole ?? "user"]?.bg ?? "var(--dg-color-bg-secondary)");
+            return createPortal(
+              <>
                 <div
-                  style={{
-                    flex: 1,
-                    minHeight: 0,
-                    overflowY: "auto",
-                    padding: 20,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 20,
-                  }}
+                  className={`dg-panel-overlay${closing ? " closing" : ""}`}
+                  onClick={handleClosePanel}
+                />
+                <div
+                  className={`dg-panel dg-panel--x-wide${closing ? " closing" : ""}`}
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="User detail"
                 >
-                  {/* Info grid */}
+                  {/* Header */}
+                  <div className="staff-detail-header">
+                    <CloseButton
+                      size="md"
+                      className="self-end"
+                      onClick={handleClosePanel}
+                      aria-label="Close detail panel"
+                    />
+                    <div
+                      style={{
+                        width: 56,
+                        height: 56,
+                        borderRadius: "50%",
+                        background: badgeColor,
+                        color: "var(--dg-color-text-inverse)",
+                        display: "grid",
+                        placeItems: "center",
+                        fontSize: "var(--dg-fs-body)",
+                        fontWeight: 700,
+                        letterSpacing: "0.02em",
+                        marginBottom: 10,
+                      }}
+                    >
+                      {initials}
+                    </div>
+                    <h3
+                      style={{
+                        margin: "0 0 6px",
+                        fontSize: "var(--dg-fs-body-sm)",
+                        fontWeight: 700,
+                        color: "var(--dg-color-text-primary)",
+                        textAlign: "center",
+                        wordBreak: "break-all",
+                      }}
+                    >
+                      {u.email ?? "Unknown"}
+                    </h3>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 6,
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        justifyContent: "center",
+                      }}
+                    >
+                      {isGM && <RoleBadge role={u.platformRole} />}
+                      {!isGM && u.orgRole && <RoleBadge role={u.orgRole} />}
+                      {isDeactivated && <StatusBadge deactivatedAt={u.deactivatedAt as string} />}
+                    </div>
+                  </div>
+
+                  {/* Content */}
                   <div
                     style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: "14px 24px",
-                      fontSize: "var(--dg-fs-label)",
-                      padding: 16,
-                      background: "var(--dg-color-bg)",
-                      borderRadius: "var(--dg-radius-md)",
+                      flex: 1,
+                      minHeight: 0,
+                      overflowY: "auto",
+                      padding: 20,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 20,
                     }}
                   >
-                    <div>
-                      <span
-                        style={{
-                          color: "var(--dg-type-field-title-color)",
-                          fontSize: "var(--dg-type-field-title-size)",
-                          fontWeight: "var(--dg-type-field-title-weight)",
-                          textTransform: "none",
-                          letterSpacing: "var(--dg-type-field-title-letter-spacing)",
-                        }}
-                      >
-                        Last Login
-                      </span>
-                      <div
-                        style={{
-                          color: "var(--dg-color-text-primary)",
-                          marginTop: 2,
-                          fontWeight: 500,
-                        }}
-                      >
-                        {formatRelativeDate(u.lastSignInAt)}
-                      </div>
-                    </div>
-                    <div>
-                      <span
-                        style={{
-                          color: "var(--dg-type-field-title-color)",
-                          fontSize: "var(--dg-type-field-title-size)",
-                          fontWeight: "var(--dg-type-field-title-weight)",
-                          textTransform: "none",
-                          letterSpacing: "var(--dg-type-field-title-letter-spacing)",
-                        }}
-                      >
-                        Date Joined
-                      </span>
-                      <div
-                        style={{
-                          color: "var(--dg-color-text-primary)",
-                          marginTop: 2,
-                          fontWeight: 500,
-                        }}
-                      >
-                        {new Date(u.createdAt).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
-                      </div>
-                    </div>
-                    {u.orgName && (
+                    {/* Info grid */}
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: "14px 24px",
+                        fontSize: "var(--dg-fs-label)",
+                        padding: 16,
+                        background: "var(--dg-color-bg)",
+                        borderRadius: "var(--dg-radius-md)",
+                      }}
+                    >
                       <div>
                         <span
                           style={{
@@ -783,309 +742,364 @@ export default function AllUsersView({
                             letterSpacing: "var(--dg-type-field-title-letter-spacing)",
                           }}
                         >
-                          Current Org
+                          Last Login
                         </span>
-                        <div style={{ marginTop: 2 }}>
-                          <Button
-                            onClick={() => {
-                              handleClosePanel();
-                              setTimeout(() => u.orgId && onNavigateToOrg(u.orgId), 220);
-                            }}
-                            style={{
-                              background: "none",
-                              border: "none",
-                              color: "var(--dg-color-info)",
-                              cursor: "pointer",
-                              fontSize: "var(--dg-fs-label)",
-                              fontWeight: 500,
-                              fontFamily: "inherit",
-                              padding: 0,
-                              textDecoration: "underline",
-                            }}
-                          >
-                            {u.orgName}
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                    <div>
-                      <span
-                        style={{
-                          color: "var(--dg-type-field-title-color)",
-                          fontSize: "var(--dg-type-field-title-size)",
-                          fontWeight: "var(--dg-type-field-title-weight)",
-                          textTransform: "none",
-                          letterSpacing: "var(--dg-type-field-title-letter-spacing)",
-                        }}
-                      >
-                        User ID
-                      </span>
-                      <div
-                        style={{
-                          color: "var(--dg-color-text-muted)",
-                          marginTop: 2,
-                          fontSize: "var(--dg-fs-footnote)",
-                          fontFamily: "var(--font-dm-mono), monospace",
-                        }}
-                      >
-                        {u.id.slice(0, 8)}…
-                      </div>
-                    </div>
-                    <div>
-                      <span
-                        style={{
-                          color: "var(--dg-type-field-title-color)",
-                          fontSize: "var(--dg-type-field-title-size)",
-                          fontWeight: "var(--dg-type-field-title-weight)",
-                          textTransform: "none",
-                          letterSpacing: "var(--dg-type-field-title-letter-spacing)",
-                        }}
-                      >
-                        Active Sessions
-                      </span>
-                      <div
-                        style={{
-                          color: "var(--dg-color-text-primary)",
-                          marginTop: 2,
-                          fontWeight: 500,
-                        }}
-                      >
-                        {u.activeSessionCount ?? 0}
-                      </div>
-                    </div>
-                    <div>
-                      <span
-                        style={{
-                          color: "var(--dg-type-field-title-color)",
-                          fontSize: "var(--dg-type-field-title-size)",
-                          fontWeight: "var(--dg-type-field-title-weight)",
-                          textTransform: "none",
-                          letterSpacing: "var(--dg-type-field-title-letter-spacing)",
-                        }}
-                      >
-                        Mobile Devices
-                      </span>
-                      <div
-                        style={{
-                          color: "var(--dg-color-text-primary)",
-                          marginTop: 2,
-                          fontWeight: 500,
-                        }}
-                      >
-                        {u.mobileDeviceCount ?? 0}
-                      </div>
-                    </div>
-                    <div>
-                      <span
-                        style={{
-                          color: "var(--dg-type-field-title-color)",
-                          fontSize: "var(--dg-type-field-title-size)",
-                          fontWeight: "var(--dg-type-field-title-weight)",
-                          textTransform: "none",
-                          letterSpacing: "var(--dg-type-field-title-letter-spacing)",
-                        }}
-                      >
-                        Last Force Logout
-                      </span>
-                      <div
-                        style={{
-                          color: "var(--dg-color-text-primary)",
-                          marginTop: 2,
-                          fontWeight: 500,
-                        }}
-                      >
-                        {formatRelativeDate(u.lastForceLogoutAt)}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Memberships */}
-                  {(membershipsLoading || memberships.length > 0) && (
-                    <div>
-                      <h4
-                        style={{
-                          margin: "0 0 8px",
-                          fontSize: "var(--dg-fs-caption)",
-                          fontWeight: 700,
-                          color: "var(--dg-color-text-primary)",
-                        }}
-                      >
-                        Organization Memberships
-                      </h4>
-                      {membershipsLoading ? (
-                        <table style={{ width: "100%", borderCollapse: "collapse" }} aria-hidden>
-                          <thead>
-                            <tr>
-                              <th style={thStyle}>Organization</th>
-                              <th style={thStyle}>Role</th>
-                              <th style={thStyle}>Date joined</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {Array.from({ length: 3 }).map((_, i) => (
-                              <tr key={i}>
-                                <td style={tdStyle}>
-                                  <div
-                                    className="dg-skeleton"
-                                    style={{
-                                      width: "70%",
-                                      height: 12,
-                                      borderRadius: "var(--dg-radius-xs)",
-                                    }}
-                                  />
-                                </td>
-                                <td style={tdStyle}>
-                                  <div
-                                    className="dg-skeleton"
-                                    style={{ width: 64, height: 18, borderRadius: 999 }}
-                                  />
-                                </td>
-                                <td style={tdStyle}>
-                                  <div
-                                    className="dg-skeleton"
-                                    style={{
-                                      width: 96,
-                                      height: 12,
-                                      borderRadius: "var(--dg-radius-xs)",
-                                    }}
-                                  />
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      ) : membershipsQuery.error instanceof Error ? (
                         <div
                           style={{
-                            padding: 16,
-                            color: "var(--dg-color-danger)",
-                            fontSize: "var(--dg-fs-label)",
+                            color: "var(--dg-color-text-primary)",
+                            marginTop: 2,
+                            fontWeight: 500,
                           }}
                         >
-                          {formatClientErrorMessage(
-                            membershipsQuery.error,
-                            "We couldn't load memberships. Refresh and try again.",
-                          )}
+                          {formatRelativeDate(u.lastSignInAt)}
                         </div>
-                      ) : (
-                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                          <thead>
-                            <tr>
-                              <th style={thStyle}>Organization</th>
-                              <th style={thStyle}>Role</th>
-                              <th style={thStyle}>Date joined</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {memberships.map((m) => (
-                              <tr key={m.org_id}>
-                                <td style={{ ...tdStyle, fontWeight: 600 }}>
-                                  <Button
-                                    onClick={() => {
-                                      handleClosePanel();
-                                      setTimeout(() => onNavigateToOrg(m.org_id), 220);
-                                    }}
+                      </div>
+                      <div>
+                        <span
+                          style={{
+                            color: "var(--dg-type-field-title-color)",
+                            fontSize: "var(--dg-type-field-title-size)",
+                            fontWeight: "var(--dg-type-field-title-weight)",
+                            textTransform: "none",
+                            letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+                          }}
+                        >
+                          Date Joined
+                        </span>
+                        <div
+                          style={{
+                            color: "var(--dg-color-text-primary)",
+                            marginTop: 2,
+                            fontWeight: 500,
+                          }}
+                        >
+                          {new Date(u.createdAt).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </div>
+                      </div>
+                      {u.orgName && (
+                        <div>
+                          <span
+                            style={{
+                              color: "var(--dg-type-field-title-color)",
+                              fontSize: "var(--dg-type-field-title-size)",
+                              fontWeight: "var(--dg-type-field-title-weight)",
+                              textTransform: "none",
+                              letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+                            }}
+                          >
+                            Current Org
+                          </span>
+                          <div style={{ marginTop: 2 }}>
+                            <Button
+                              onClick={() => {
+                                handleClosePanel();
+                                setTimeout(() => u.orgId && onNavigateToOrg(u.orgId), 220);
+                              }}
+                              style={{
+                                background: "none",
+                                border: "none",
+                                color: "var(--dg-color-info)",
+                                cursor: "pointer",
+                                fontSize: "var(--dg-fs-label)",
+                                fontWeight: 500,
+                                fontFamily: "inherit",
+                                padding: 0,
+                                textDecoration: "underline",
+                              }}
+                            >
+                              {u.orgName}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                      <div>
+                        <span
+                          style={{
+                            color: "var(--dg-type-field-title-color)",
+                            fontSize: "var(--dg-type-field-title-size)",
+                            fontWeight: "var(--dg-type-field-title-weight)",
+                            textTransform: "none",
+                            letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+                          }}
+                        >
+                          User ID
+                        </span>
+                        <div
+                          style={{
+                            color: "var(--dg-color-text-muted)",
+                            marginTop: 2,
+                            fontSize: "var(--dg-fs-footnote)",
+                            fontFamily: "var(--font-dm-mono), monospace",
+                          }}
+                        >
+                          {u.id.slice(0, 8)}…
+                        </div>
+                      </div>
+                      <div>
+                        <span
+                          style={{
+                            color: "var(--dg-type-field-title-color)",
+                            fontSize: "var(--dg-type-field-title-size)",
+                            fontWeight: "var(--dg-type-field-title-weight)",
+                            textTransform: "none",
+                            letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+                          }}
+                        >
+                          Active Sessions
+                        </span>
+                        <div
+                          style={{
+                            color: "var(--dg-color-text-primary)",
+                            marginTop: 2,
+                            fontWeight: 500,
+                          }}
+                        >
+                          {u.activeSessionCount ?? 0}
+                        </div>
+                      </div>
+                      <div>
+                        <span
+                          style={{
+                            color: "var(--dg-type-field-title-color)",
+                            fontSize: "var(--dg-type-field-title-size)",
+                            fontWeight: "var(--dg-type-field-title-weight)",
+                            textTransform: "none",
+                            letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+                          }}
+                        >
+                          Mobile Devices
+                        </span>
+                        <div
+                          style={{
+                            color: "var(--dg-color-text-primary)",
+                            marginTop: 2,
+                            fontWeight: 500,
+                          }}
+                        >
+                          {u.mobileDeviceCount ?? 0}
+                        </div>
+                      </div>
+                      <div>
+                        <span
+                          style={{
+                            color: "var(--dg-type-field-title-color)",
+                            fontSize: "var(--dg-type-field-title-size)",
+                            fontWeight: "var(--dg-type-field-title-weight)",
+                            textTransform: "none",
+                            letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+                          }}
+                        >
+                          Last Force Logout
+                        </span>
+                        <div
+                          style={{
+                            color: "var(--dg-color-text-primary)",
+                            marginTop: 2,
+                            fontWeight: 500,
+                          }}
+                        >
+                          {formatRelativeDate(u.lastForceLogoutAt)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Memberships */}
+                    {(membershipsLoading || memberships.length > 0) && (
+                      <div>
+                        <h4
+                          style={{
+                            margin: "0 0 8px",
+                            fontSize: "var(--dg-fs-caption)",
+                            fontWeight: 700,
+                            color: "var(--dg-color-text-primary)",
+                          }}
+                        >
+                          Organization Memberships
+                        </h4>
+                        {membershipsLoading ? (
+                          <table style={{ width: "100%", borderCollapse: "collapse" }} aria-hidden>
+                            <thead>
+                              <tr>
+                                <th style={thStyle}>Organization</th>
+                                <th style={thStyle}>Role</th>
+                                <th style={thStyle}>Date joined</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {Array.from({ length: 3 }).map((_, i) => (
+                                <tr key={i}>
+                                  <td style={tdStyle}>
+                                    <div
+                                      className="dg-skeleton"
+                                      style={{
+                                        width: "70%",
+                                        height: 12,
+                                        borderRadius: "var(--dg-radius-xs)",
+                                      }}
+                                    />
+                                  </td>
+                                  <td style={tdStyle}>
+                                    <div
+                                      className="dg-skeleton"
+                                      style={{ width: 64, height: 18, borderRadius: 999 }}
+                                    />
+                                  </td>
+                                  <td style={tdStyle}>
+                                    <div
+                                      className="dg-skeleton"
+                                      style={{
+                                        width: 96,
+                                        height: 12,
+                                        borderRadius: "var(--dg-radius-xs)",
+                                      }}
+                                    />
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        ) : membershipsQuery.error instanceof Error ? (
+                          <div
+                            style={{
+                              padding: 16,
+                              color: "var(--dg-color-danger)",
+                              fontSize: "var(--dg-fs-label)",
+                            }}
+                          >
+                            {formatClientErrorMessage(
+                              membershipsQuery.error,
+                              "We couldn't load memberships. Refresh and try again.",
+                            )}
+                          </div>
+                        ) : (
+                          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                            <thead>
+                              <tr>
+                                <th style={thStyle}>Organization</th>
+                                <th style={thStyle}>Role</th>
+                                <th style={thStyle}>Date joined</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {memberships.map((m) => (
+                                <tr key={m.org_id}>
+                                  <td style={{ ...tdStyle, fontWeight: 600 }}>
+                                    <Button
+                                      onClick={() => {
+                                        handleClosePanel();
+                                        setTimeout(() => onNavigateToOrg(m.org_id), 220);
+                                      }}
+                                      style={{
+                                        background: "none",
+                                        border: "none",
+                                        color: "var(--dg-color-info)",
+                                        cursor: "pointer",
+                                        fontSize: "var(--dg-fs-label)",
+                                        fontWeight: 600,
+                                        fontFamily: "inherit",
+                                        padding: 0,
+                                        textDecoration: "underline",
+                                      }}
+                                    >
+                                      {m.org_name}
+                                    </Button>
+                                  </td>
+                                  <td style={tdStyle}>
+                                    <RoleBadge role={m.org_role} />
+                                  </td>
+                                  <td
                                     style={{
-                                      background: "none",
-                                      border: "none",
-                                      color: "var(--dg-color-info)",
-                                      cursor: "pointer",
-                                      fontSize: "var(--dg-fs-label)",
-                                      fontWeight: 600,
-                                      fontFamily: "inherit",
-                                      padding: 0,
-                                      textDecoration: "underline",
+                                      ...tdStyle,
+                                      fontSize: "var(--dg-fs-caption)",
+                                      color: "var(--dg-color-text-muted)",
                                     }}
                                   >
-                                    {m.org_name}
-                                  </Button>
-                                </td>
-                                <td style={tdStyle}>
-                                  <RoleBadge role={m.org_role} />
-                                </td>
-                                <td
-                                  style={{
-                                    ...tdStyle,
-                                    fontSize: "var(--dg-fs-caption)",
-                                    color: "var(--dg-color-text-muted)",
-                                  }}
-                                >
-                                  {new Date(m.joined_at).toLocaleDateString("en-US", {
-                                    month: "short",
-                                    day: "numeric",
-                                    year: "numeric",
-                                  })}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )}
-                    </div>
-                  )}
+                                    {new Date(m.joined_at).toLocaleDateString("en-US", {
+                                      month: "short",
+                                      day: "numeric",
+                                      year: "numeric",
+                                    })}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
+                    )}
 
-                  {/* Actions */}
-                  {!isGM && (
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: 8,
-                        flexWrap: "wrap",
-                        paddingTop: 16,
-                        borderTop: "1px solid var(--dg-color-border-light)",
-                      }}
-                    >
-                      <Button
-                        className="dg-btn dg-btn-secondary"
-                        style={{ fontSize: "var(--dg-fs-label)" }}
-                        onClick={() => {
-                          handleClosePanel();
-                          setTimeout(() => onImpersonate(u.id, u.orgId ?? undefined), 220);
+                    {/* Actions */}
+                    {!isGM && (
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 8,
+                          flexWrap: "wrap",
+                          paddingTop: 16,
+                          borderTop: "1px solid var(--dg-color-border-light)",
                         }}
                       >
-                        Impersonate
-                      </Button>
-                      {u.orgId && (
-                        <Button
-                          className="dg-btn dg-btn-secondary"
-                          style={{
-                            fontSize: "var(--dg-fs-label)",
-                            color: isDeactivated
-                              ? "var(--dg-color-success, green)"
-                              : "var(--dg-color-warning, orange)",
-                          }}
-                          onClick={() => setDeactivateConfirm(u)}
-                          disabled={actionLoading === u.id}
-                        >
-                          {isDeactivated ? "Reactivate" : "Deactivate"}
-                        </Button>
-                      )}
-                      <Button
-                        className="dg-btn dg-btn-secondary"
-                        style={{ fontSize: "var(--dg-fs-label)", color: "var(--dg-color-danger)" }}
-                        onClick={() => setForceLogoutConfirm(u)}
-                        disabled={actionLoading === u.id}
-                      >
-                        Force Logout
-                      </Button>
-                      {u.email && (
                         <Button
                           className="dg-btn dg-btn-secondary"
                           style={{ fontSize: "var(--dg-fs-label)" }}
-                          onClick={() => setResetConfirm(u)}
+                          onClick={() => {
+                            handleClosePanel();
+                            setTimeout(() => onImpersonate(u.id, u.orgId ?? undefined), 220);
+                          }}
+                        >
+                          Impersonate
+                        </Button>
+                        {u.orgId && (
+                          <Button
+                            className="dg-btn dg-btn-secondary"
+                            style={{
+                              fontSize: "var(--dg-fs-label)",
+                              color: isDeactivated
+                                ? "var(--dg-color-success, green)"
+                                : "var(--dg-color-warning, orange)",
+                            }}
+                            onClick={() => setDeactivateConfirm(u)}
+                            disabled={actionLoading === u.id}
+                          >
+                            {isDeactivated ? "Reactivate" : "Deactivate"}
+                          </Button>
+                        )}
+                        <Button
+                          className="dg-btn dg-btn-secondary"
+                          style={{
+                            fontSize: "var(--dg-fs-label)",
+                            color: "var(--dg-color-danger)",
+                          }}
+                          onClick={() => setForceLogoutConfirm(u)}
                           disabled={actionLoading === u.id}
                         >
-                          Reset Password
+                          Force Logout
                         </Button>
-                      )}
-                    </div>
-                  )}
+                        {u.email && (
+                          <Button
+                            className="dg-btn dg-btn-secondary"
+                            style={{ fontSize: "var(--dg-fs-label)" }}
+                            onClick={() => setResetConfirm(u)}
+                            disabled={actionLoading === u.id}
+                          >
+                            Reset Password
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <ScrollOverflowCue />
                 </div>
-                <ScrollOverflowCue />
-              </div>
-            </>
-          );
-        })()}
+              </>,
+              document.body,
+            );
+          }}
+        </UserDetailSlideover>
+      )}
     </>
   );
 }

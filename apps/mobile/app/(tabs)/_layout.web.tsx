@@ -1,7 +1,7 @@
 import { Tabs } from "expo-router";
 import { useTabsGate } from "../../src/features/auth/hooks/useTabsGate";
 import { useMobileColors } from "../../src/shared/providers/ThemeModeProvider";
-import { mobileTypography } from "../../src/shared/theme/tokens";
+import { mobileText, mobileTypography } from "../../src/shared/theme/tokens";
 
 /**
  * Web build of the tab bar. The gating rules (auth, org-locked, per-role tab
@@ -31,7 +31,7 @@ export default function TabsLayoutWeb() {
         },
         tabBarLabelStyle: {
           fontFamily: mobileTypography.fontFamily.bold,
-          fontSize: 12,
+          fontSize: mobileText.label.fontSize,
         },
       }}
     >

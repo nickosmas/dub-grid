@@ -1,51 +1,55 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule } from "../../../test/native";
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
+vi.mock("@expo/vector-icons/Ionicons", () => ({ default: () => null }));
+vi.mock("expo-router", () => ({ router: { push: vi.fn() } }));
+vi.mock("../../../shared/lib/haptics", () => ({ hapticSelection: vi.fn() }));
 
 let DashboardHeroCard: (typeof import("./DashboardHeroCard"))["DashboardHeroCard"];
 
 beforeAll(async () => {
-  DashboardHeroCard = (await import("./DashboardHeroCard")).DashboardHeroCard;
+  const module = await import("./DashboardHeroCard");
+  DashboardHeroCard = module.DashboardHeroCard;
 });
 
 describe("DashboardHeroCard", () => {
-  it("renders the headline and status pill", () => {
+  it("shows the coverage percentage with its meter when configured", () => {
     render(
       <DashboardHeroCard
-        summary={{
-          statusLabel: "Attention",
-          title: "2 coverage gaps",
-          description: "Resolve staffing gaps.",
-        }}
-        metrics={{ coveragePct: 86, openGapCount: 2, pendingApprovalsCount: 0, draftSummary: null }}
-      />,
-    );
-
-    expect(screen.getByText("Attention")).toBeInTheDocument();
-    expect(screen.getByText("2 coverage gaps")).toBeInTheDocument();
-  });
-
-  it("shows the coverage percentage when configured", () => {
-    render(
-      <DashboardHeroCard
-        summary={{ statusLabel: "Healthy", title: "Schedule health looks good", description: "" }}
         metrics={{ coveragePct: 86, openGapCount: 0, pendingApprovalsCount: 0, draftSummary: null }}
       />,
     );
 
     expect(screen.getByText("86%")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar")).toBeInTheDocument();
+    expect(screen.getByText("Coverage")).toBeInTheDocument();
   });
 
-  it("shows a dash and 'Not configured' when coveragePct is null", () => {
+  it("routes the gap and approval stats only when there is something to open", () => {
+    const onOpenGaps = vi.fn();
+    const onOpenApprovals = vi.fn();
     render(
       <DashboardHeroCard
-        summary={{
-          statusLabel: "Setup",
-          title: "Coverage requirements not configured",
-          description: "",
-        }}
+        metrics={{ coveragePct: 86, openGapCount: 2, pendingApprovalsCount: 0, draftSummary: null }}
+        onOpenApprovals={onOpenApprovals}
+        onOpenGaps={onOpenGaps}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "2 open gaps" }));
+    expect(onOpenGaps).toHaveBeenCalledTimes(1);
+
+    const approvals = screen.getByRole("button", { name: "0 pending approvals" });
+    expect(approvals).toBeDisabled();
+    fireEvent.click(approvals);
+    expect(onOpenApprovals).not.toHaveBeenCalled();
+  });
+
+  it("omits the coverage figure and meter when coveragePct is null", () => {
+    render(
+      <DashboardHeroCard
         metrics={{
           coveragePct: null,
           openGapCount: 0,
@@ -55,7 +59,80 @@ describe("DashboardHeroCard", () => {
       />,
     );
 
-    expect(screen.getByText("—")).toBeInTheDocument();
-    expect(screen.getByText("Not configured")).toBeInTheDocument();
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(screen.getByText("open gaps")).toBeInTheDocument();
+  });
+
+  it("previews the first three focus areas above the stats", () => {
+    const section = (id: number, name: string) =>
+      ({
+        focusAreaId: id,
+        focusAreaName: name,
+        filledTotal: 6,
+        requiredTotal: 8,
+        openSlots: 2,
+        pct: 75,
+      }) as never;
+    render(
+      <DashboardHeroCard
+        metrics={{ coveragePct: 75, openGapCount: 2, pendingApprovalsCount: 0, draftSummary: null }}
+        sections={[
+          section(1, "East Wing"),
+          section(2, "West Wing"),
+          section(3, "Memory Care"),
+          section(4, "Rehab"),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("East Wing")).toBeInTheDocument();
+    expect(screen.getByText("Memory Care")).toBeInTheDocument();
+    expect(screen.queryByText("Rehab")).not.toBeInTheDocument();
+    // The breakdown sits between the figure and the stats; the stats close the card.
+    const memoryCare = screen.getByText("Memory Care");
+    const openGaps = screen.getByText("open gaps");
+    expect(memoryCare.compareDocumentPosition(openGaps) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    // One card, one title: the breakdown no longer has a heading of its own.
+    expect(screen.queryByText(/Coverage by/)).not.toBeInTheDocument();
+  });
+
+  it("opens the coverage screen from the card title only when it previews a subset", () => {
+    const section = (id: number, name: string) =>
+      ({
+        focusAreaId: id,
+        focusAreaName: name,
+        filledTotal: 6,
+        requiredTotal: 8,
+        openSlots: 2,
+        pct: 75,
+      }) as never;
+    const onOpenCoverage = vi.fn();
+    const metrics = {
+      coveragePct: 92,
+      openGapCount: 0,
+      pendingApprovalsCount: 0,
+      draftSummary: null,
+    };
+    const three = [section(1, "East Wing"), section(2, "West Wing"), section(3, "Memory Care")];
+
+    // Three focus areas fit the preview, so the card is already the whole list.
+    const fits = render(
+      <DashboardHeroCard metrics={metrics} onOpenCoverage={onOpenCoverage} sections={three} />,
+    );
+    expect(screen.queryByRole("button", { name: "See all: Coverage" })).not.toBeInTheDocument();
+    fits.unmount();
+
+    render(
+      <DashboardHeroCard
+        metrics={metrics}
+        onOpenCoverage={onOpenCoverage}
+        sections={[...three, section(4, "Rehab")]}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "See all: Coverage" }));
+    expect(onOpenCoverage).toHaveBeenCalledTimes(1);
   });
 });

@@ -1736,6 +1736,7 @@ export default function OrganizationSetupWizard({
                 />
                 <input
                   className="dg-input"
+                  type="tel"
                   value={row.phone}
                   onChange={(e) => updateEmployeeRow(idx, { phone: e.target.value })}
                   placeholder="(555) 123-4567"

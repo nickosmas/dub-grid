@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash 25304129495ef215832d359e5ac6d37218827c9e01fe607de39eeb29b159fca8 -->
+<!-- blueprint:source-hash 60849baa54b454a5e7b19f42eba055711294dd536310facdd0d2cda6e01a1d8c -->
 
 > Multi-tenant employee scheduling platform for care facilities, replacing
 > spreadsheet scheduling with a connected Next.js web app and Expo mobile app.
@@ -20,7 +20,7 @@ facilities.
   call-off), see alerts and notifications, on web and mobile.
 - **Managers / Admins** - build and publish schedules, manage people and
   focus areas, review and approve requests, run reports, configure org
-  settings. Admin capability is a configurable, per-person set of 25
+  settings. Admin capability is a configurable, per-person set of 26
   permissions, not a role template.
 - **Super Admins** - full control within one organization, including
   managing Admin-tier permissions and billing.
@@ -31,7 +31,8 @@ facilities.
 
 ## Features
 
-Everything below is already shipped except the unchecked work in items 25-26.
+Everything below is already shipped except item 28, the final production
+migration gate.
 
 1. **Multi-tenant organizations** - subdomain-isolated tenants with their
    own settings and terminology overrides.
@@ -39,8 +40,10 @@ Everything below is already shipped except the unchecked work in items 25-26.
    per-person configurable admin permissions.
 3. **Schedule grid** - drag-drop week / 2-week / month views, draft/publish
    workflow, recurring shifts. Headline feature - the core product.
-4. **Real-time schedule collaboration** - Supabase Realtime cell locks and
-   presence so concurrent edits don't collide.
+4. **Real-time schedule collaboration** - Supabase Realtime presence with a
+   non-blocking "being edited" marker per cell, and an optimistic version check
+   so concurrent edits don't collide (advisory cell locks were tried and
+   removed).
 5. **Staff / people management** - lifecycle, focus areas, certifications.
 6. **Shift requests** - pickup, swap, call-off with approval workflow and
    auditable request events/snapshots.
@@ -154,9 +157,17 @@ Everything below is already shipped except the unchecked work in items 25-26.
     draft/publish workflow, while regular staff keep the existing volunteer flow.
 
 23. **App-wide pill overflow resilience** - keep pill, chip, tag, badge, and
-    segmented-choice text within its visual bounds on web and mobile. Display
-    values may wrap and grow; interactive controls remain one line and truncate
-    safely while retaining the full accessible value.
+    segmented-choice text within its visual bounds on web and mobile. On web,
+    display values may wrap and grow; interactive controls remain one line and
+    truncate safely while retaining the full accessible value. On mobile no
+    pill wraps: chrome (headers, tab bar, avatars, date tiles, count dots)
+    holds its size whatever the OS text setting, and button, pill and badge
+    labels grow to a hard 1.2x ceiling, so a raised text size never breaks
+    the shape.
+    - **23a. Numeric badge shape consistency** - equivalent number counts use
+      one pill-shaped contract across web and mobile, including one- and
+      two-digit values, notification/tab/open-shift/staffing counts, with
+      shared sizing, padding, typography, overflow, and accessible labeling.
 
 24. **Inter product typography** - use Inter for all product UI and ordinary
     copy across web and mobile, with Inter Variable optical sizing on web and
@@ -183,7 +194,33 @@ Everything below is already shipped except the unchecked work in items 25-26.
     references guide review and do not authorize a new dependency or wholesale
     visual rewrite.
 
-26. **Production migration safety** - the final release gate after all product
+26. **Mobile UI consistency and interaction resilience** - bring the Expo app
+    to one spacing, typography, control-scale, and interaction contract: a
+    `display`/`title` type ramp and a 36/44/52 control scale, fill-only badges,
+    a redesigned admin dashboard with pressable drill-in rows and purposeful
+    motion, request flows that exit on one tap (swap target selection on a
+    full-page modal, confirmation for call-off only), a mechanical token
+    migration of the schedule and requests screens, and a screenshot-qualified
+    role, theme, text-scale, and device matrix. No new dependency; preserve the
+    `mobile*` tokens and reduced-motion behavior.
+
+27. **Alerts go to their subject** - an alert is one sentence about something
+    else, so tapping it anywhere (web bell popup, web `/alerts` rows, mobile
+    alerts list) marks it read and navigates to what it is about through one
+    shared destination resolver in `@dubgrid/domain`: requests to the request
+    board, schedule changes to that date, people changes to the person,
+    invitations to People > Invitations, billing to Settings > Subscription,
+    role and permission changes to the person's own profile, profile-change
+    requests to their existing action, and web-only destinations shown as such
+    on mobile. The web detail modal and the mobile detail screen go away for
+    organization users; gridmasters keep a Details disclosure for platform
+    rows. The web alerts page loses its sidebar: Inbox / Archived, the read
+    filter, search, category, priority, sort, select-all with bulk actions,
+    and Mark all read live in one toolbar above the list. Mobile rows stop
+    truncating and show a human note inline, and every alert row on web and
+    mobile gets a clear title-versus-content text hierarchy.
+
+28. **Production migration safety** - the final release gate after all product
     work and hardening: inventory linked production, reconcile migration
     history, rehearse on a production-shaped Supabase branch, apply only
     reviewed forward migrations, and verify health, schema, tenant isolation,
@@ -208,7 +245,7 @@ Everything below is already shipped except the unchecked work in items 25-26.
 ### Organization Membership
 
 - `org_id`, `user_id`, `org_role` (Super Admin / Admin / User),
-  `admin_permissions` (25-key JSONB, per-person, not department-templated),
+  `admin_permissions` (26-key JSONB, per-person, not department-templated),
   `onboarding_completed_at`, onboarding-tour state
 - relationship: belongs to one Organization and one Profile
 
@@ -315,6 +352,11 @@ native Inter 400/500/600/700 faces. The existing semantic size hierarchy stays
 in place, and schedules, dates, times, durations, and totals use tabular
 numerals.
 
+Alerts are one sentence about something else: tapping one marks it read and
+goes to its subject rather than opening a detail view that repeats the
+sentence. The web alerts page is a list under one toolbar, and every alert
+row keeps a clear title-versus-content hierarchy.
+
 For future web UI consistency work, `better-ui` is a reference for surfaces,
 radii, optical alignment, icon state, explicit transitions, and theme-switch
 behavior. `emil-design-eng` is a reference for motion purpose, interruptibility,
@@ -332,28 +374,31 @@ Main route groups (web, App Router):
 
 ## Deployment
 
-- **Host:** Vercel (web). No committed `render.yaml` or `vercel.json` -
-  project configuration lives in the Vercel dashboard.
+- **Host:** Vercel (web). `apps/web/vercel.json` pins the region and schedules
+  two crons (`/api/cron/trial-expiry`, `/api/cron/sandbox-cleanup`); the rest of
+  the project configuration lives in the Vercel dashboard.
 - **App type:** Next.js 16 App Router, standard Vercel build
   (`npm run build`) and start (`npm run start`).
-- **Database:** Supabase-hosted Postgres, migrations in
-  `supabase/migrations/`. Feature flags specifically have no incremental
-  production migration path - they're created through the Gridmaster UI,
-  not a migration.
-- **Background jobs:** `cron-expire-requests.yml` (GitHub Action) expires
-  stale shift requests on a schedule.
+- **Database:** Supabase-hosted Postgres with an immutable ordered migration
+  stream in `supabase/migrations/` (`001`-`004` frozen, forward migrations
+  through `020`, checksum-locked, applied by ledger). Feature flags are seeded
+  in `001` and toggled through the Gridmaster UI; a new switch is one INSERT in
+  a forward migration plus a call site.
+- **Background jobs:** `cron-expire-requests.yml` (GitHub Action, hourly)
+  expires stale shift requests and invitations; the two Vercel crons above
+  handle trial-expiry notices and sandbox cleanup. All three need `CRON_SECRET`.
 - **Final migration gate:** after all product work and authentication release
   qualification, inventory and reconcile linked production, rehearse against a
   production-shaped Supabase branch, then apply only reviewed forward
   migrations and verify health, schema, tenant isolation, and ledger state.
   The tracked plan grants no authority to mutate production.
 
-> TODO: env vars by name, health check path, and domain notes. Run
-> `/release vercel` for a real readiness pass instead of guessing here.
+> Env vars by name and rotation procedure are in `docs/secrets-rotation.md`;
+> the health check is `GET /api/health`. Run `/release vercel` for a real
+> readiness pass on domain notes.
 
 ## Open questions
 
-- The project plan says there are 10 shared packages but names 11; the
-  repository currently contains 11.
 - Exact per-seat billing price points / tier breaks are unconfirmed.
-- Deployment env vars, health check path, and domain notes are unconfirmed.
+- Deployment domain notes are unconfirmed (env vars are listed in
+  `docs/secrets-rotation.md`; the health check is `GET /api/health`).

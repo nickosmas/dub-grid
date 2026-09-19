@@ -350,7 +350,8 @@ export interface NotePublishChange {
 
 export interface PublishHistoryEntry {
   id: string;
-  publishedBy: string;
+  /** Null for a viewer who cannot open the publish history; see `canSeeSchedulePublisher`. */
+  publishedBy: string | null;
   startDate: string;
   endDate: string;
   changeCount: number;

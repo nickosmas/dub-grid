@@ -11,7 +11,7 @@ import { CloseButton } from "@/components/ui/CloseButton";
 import { Pagination } from "@/components/ui/pagination";
 import { queryKeys } from "@/lib/query-keys";
 import { countActors, groupByDay, summarizeCategories } from "@/lib/activity-log-utils";
-import { getAuditCategoryOptions, ORG_ACTIVITY_CATEGORIES } from "@/lib/audit/registry";
+import { getAuditCategoryOptions, ORG_AUDIENCE_CATEGORIES } from "@/lib/audit/registry";
 import { formatActivityPeriodPhrase, shiftActivityPeriod } from "@/lib/activity-period";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { ActivityDetailsDialog } from "@/components/activity/ActivityLogParts";
@@ -40,7 +40,7 @@ export default function ActivityLog({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEntry, setSelectedEntry] = useState<FullAuditLogEntry | null>(null);
 
-  const categoryOptions = useMemo(() => getAuditCategoryOptions(ORG_ACTIVITY_CATEGORIES), []);
+  const categoryOptions = useMemo(() => getAuditCategoryOptions(ORG_AUDIENCE_CATEGORIES), []);
   const categoryPrefixes = useMemo(
     () => categoryOptions.find((category) => category.value === categoryFilter)?.prefixes ?? [],
     [categoryOptions, categoryFilter],

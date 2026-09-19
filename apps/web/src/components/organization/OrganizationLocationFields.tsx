@@ -474,6 +474,7 @@ export default function OrganizationLocationFields({
         <input
           id={`${idBase}-phone`}
           className="dg-input"
+          type="tel"
           value={value.phone}
           onChange={(event) => onChange({ phone: event.target.value })}
           placeholder="(415) 555-0100"

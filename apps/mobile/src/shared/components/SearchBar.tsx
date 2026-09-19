@@ -6,9 +6,12 @@ import { usePressAnimation } from "../motion/usePressAnimation";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import {
   MAX_FONT_SCALE,
+  mobileControl,
   mobileInputText,
   mobileMotion,
   mobileRadii,
+  mobileSpace,
+  mobileText,
   type MobileColors,
 } from "../theme/tokens";
 import { useAsyncAction } from "../hooks/useAsyncAction";
@@ -127,7 +130,7 @@ function ClearButton({ onPress }: { onPress: () => unknown }) {
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     field: {
-      minHeight: 46,
+      minHeight: mobileControl.md,
       alignItems: "center",
       // White, like every other enterable surface. `surfaceSecondary` made the
       // field a *recessed* gray, which is the older iOS search idiom and reads
@@ -146,7 +149,7 @@ const createStyles = (mobileColors: MobileColors) =>
       borderWidth: 1,
       flexDirection: "row",
       flex: 1,
-      gap: 9,
+      gap: mobileSpace.sm,
       // A pill needs more room at the ends than a 12pt-radius box before its
       // contents stop looking crowded by the curve.
       paddingLeft: 16,
@@ -154,8 +157,8 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     input: {
       ...mobileInputText("regular"),
-      fontSize: 16,
-      lineHeight: 22,
+      fontSize: mobileText.input.fontSize,
+      lineHeight: mobileText.input.lineHeight,
       // Explicit rather than left to the platform default, so this field
       // can't inherit stray tracking from a native fallback font.
       letterSpacing: 0,

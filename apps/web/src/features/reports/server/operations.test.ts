@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   buildOperationsReportCsv,
+  buildOperationsReportFilterOptions,
   buildOperationsReportPdf,
   buildOperationsReportPayload,
   buildOperationsReportTable,
+  getDatesInReportRange,
   resolveCurrentPayPeriodRange,
   type OperationsReportType,
   type OperationsReportSourceData,
@@ -1380,5 +1382,28 @@ describe("operations reports", () => {
       { label: "Staff tagged", value: "2" },
       { label: "Indicators used", value: "2" },
     ]);
+  });
+});
+
+describe("buildOperationsReportFilterOptions", () => {
+  // The options-only loader (build plan item 30) builds the dropdown lists
+  // from this function alone, so it must be exactly what the full payload
+  // carries: same rows in, same options out.
+  it("matches the filter options the full payload carries", () => {
+    const source = buildSource();
+    const range = { startDate: "2026-06-01", endDate: "2026-06-07" };
+
+    const full = buildOperationsReportPayload(source, range, {
+      employeeIds: [source.employees[0]!.id],
+      jobIds: [source.jobs[0]!.id],
+    });
+    const optionsOnly = buildOperationsReportFilterOptions(source, getDatesInReportRange(range));
+
+    expect(optionsOnly).toEqual(full.filterOptions);
+    // Range-scoped, never filter-scoped: the applied employee/job filters
+    // above did not shrink what is offered for the next report.
+    expect(optionsOnly.employees.length).toBe(source.employees.length);
+    expect(optionsOnly.jobs.length).toBe(source.jobs.length);
+    expect(optionsOnly.dates).toHaveLength(7);
   });
 });

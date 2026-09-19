@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule, createScreenModule } from "../../../test/native";
 
@@ -461,6 +461,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -623,6 +624,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -645,6 +647,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -673,7 +676,7 @@ describe("ShiftDetailScreen", () => {
   });
 
   it("opens the complete publication information from the compact footer", () => {
-    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn() });
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn(), reset: vi.fn() });
     render(<ShiftDetailScreen />);
 
     expect(screen.queryByText("Publication details")).not.toBeInTheDocument();
@@ -828,6 +831,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -1000,6 +1004,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -1118,6 +1123,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -1129,6 +1135,89 @@ describe("ShiftDetailScreen", () => {
     expect(detailCard.getByLabelText("Job Lead")).toBeInTheDocument();
     expect(detailCard.getByText("ICU")).toBeInTheDocument();
     expect(detailCard.getByText("Emergency")).toBeInTheDocument();
+  });
+
+  it("labels only the added second shift as New and says what changed", () => {
+    const daySegment = {
+      shiftId: 1,
+      jobId: 10,
+      shiftName: "Day Shift",
+      jobName: "Nurse",
+      startTime: "07:30:00",
+      endTime: "15:30:00",
+      displayFocusAreaName: "ICU",
+    };
+    const eveningSegment = {
+      shiftId: 2,
+      jobId: 20,
+      shiftName: "Evening Shift",
+      jobName: "Lead",
+      startTime: "15:30:00",
+      endTime: "23:30:00",
+      displayFocusAreaName: "ICU",
+    };
+    const selectedEntry = {
+      employeeId: "emp-1",
+      employeeName: "Alex Kim",
+      date: "2026-04-16",
+      assignmentIds: [1, 2],
+      shiftLabel: "D/E",
+      assignmentLabel: "D/E",
+      shiftName: "Day Shift / Evening Shift",
+      absenceTypeId: null,
+      focusAreaId: 2,
+      focusAreaName: "ICU",
+      displayFocusAreaName: "ICU",
+      startTime: "07:30:00",
+      endTime: "23:30:00",
+      segments: [daySegment, eveningSegment],
+      change: {
+        kind: "modified",
+        previousPresentation: {
+          label: "D",
+          shiftName: "Day Shift",
+          focusAreaId: 2,
+          focusAreaName: "ICU",
+          displayFocusAreaName: "ICU",
+          startTime: "07:30:00",
+          endTime: "15:30:00",
+          segments: [daySegment],
+        },
+      },
+      publishedAt: "2026-04-15T18:30:00.000Z",
+      publishedByName: "Mina Diaz",
+    };
+
+    useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => ({
+      data:
+        queryKey[1] === "requests"
+          ? { requests: [], openShifts: [] }
+          : { entries: [selectedEntry] },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    }));
+    useMutation.mockReturnValue({
+      error: null,
+      isPending: false,
+      mutate: vi.fn(),
+      reset: vi.fn(),
+    });
+
+    render(<ShiftDetailScreen />);
+
+    const detailCard = within(screen.getByTestId("shift-detail-card"));
+    expect(detailCard.queryAllByLabelText("New")).toHaveLength(1);
+    expect(detailCard.queryByLabelText("Edited")).toBeNull();
+    expect(detailCard.queryByLabelText("Shift edited")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "View previous shift" }));
+
+    expect(screen.getByLabelText("What changed: Added Evening Shift")).toHaveTextContent(
+      "Added Evening Shift",
+    );
+    expect(screen.getByText("Previous shift")).toBeInTheDocument();
   });
 
   it("does not show drop and swap split-shift guidance for another employee", () => {
@@ -1216,6 +1305,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -1267,6 +1357,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -1359,6 +1450,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -1378,6 +1470,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -1404,6 +1497,11 @@ describe("ShiftDetailScreen", () => {
     expect(
       screen.getByLabelText("Show eligible teammates for Friday, April 17, 2026"),
     ).toHaveAttribute("aria-selected", "true");
+    // The count reads as the tile's value, so a screen reader hears it with
+    // the date rather than as a stray figure.
+    expect(
+      screen.getByLabelText("Show eligible teammates for Friday, April 17, 2026"),
+    ).toHaveAttribute("aria-valuetext", "1 eligible teammate");
 
     expect(screen.getByText("Chris Hall")).toBeInTheDocument();
     expect(screen.getByText("Evening Shift")).toBeInTheDocument();
@@ -1420,6 +1518,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -1453,6 +1552,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -1518,6 +1618,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -1569,7 +1670,7 @@ describe("ShiftDetailScreen", () => {
       isLoading: false,
       refetch: vi.fn(),
     }));
-    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn() });
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn(), reset: vi.fn() });
 
     render(<ShiftDetailScreen />);
 
@@ -1668,6 +1769,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -1767,6 +1869,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -1800,6 +1903,20 @@ describe("ShiftDetailScreen", () => {
                 endTime: "23:00:00",
                 customStartTime: null,
                 customEndTime: null,
+                // A teammate's own published edit is noise in a swap list.
+                change: {
+                  kind: "modified",
+                  previousPresentation: {
+                    label: "D",
+                    shiftName: "Day Shift",
+                    focusAreaId: 1,
+                    focusAreaName: "Emergency",
+                    displayFocusAreaName: "Emergency",
+                    startTime: "07:00:00",
+                    endTime: "15:00:00",
+                    segments: [],
+                  },
+                },
                 publishedAt: "2026-04-15T18:30:00.000Z",
                 publishedByName: "Mina Diaz",
               },
@@ -1906,6 +2023,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -1919,6 +2037,8 @@ describe("ShiftDetailScreen", () => {
     expect(screen.queryByText("Chris Hall")).not.toBeInTheDocument();
     expect(screen.queryByText("Dana Moss")).not.toBeInTheDocument();
     expect(screen.queryByText("Evan Cole")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Edited/)).toBeNull();
+    expect(screen.queryByText(/Edited/)).toBeNull();
 
     fireEvent.click(screen.getByLabelText("Show eligible teammates for Friday, April 17, 2026"));
 
@@ -2038,6 +2158,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -2060,6 +2181,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -2183,6 +2305,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -2205,6 +2328,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate,
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -2213,12 +2337,9 @@ describe("ShiftDetailScreen", () => {
     fireEvent.click(screen.getByText("Offer for pickup"));
     fireEvent.click(screen.getByText("Offer to everyone"));
 
-    expect(mutate).not.toHaveBeenCalled();
-    expect(screen.getByText("Offer this shift for pickup?")).toBeInTheDocument();
-    expect(screen.getByText(/will be offered/)).toBeInTheDocument();
-
-    confirmDialog("Offer Shift");
-
+    // Offering is a request teammates still have to accept, so the offer
+    // itself is the commitment: no second popup.
+    expect(screen.queryByText("Offer this shift for pickup?")).not.toBeInTheDocument();
     expect(mutate).toHaveBeenCalledWith({
       type: "pickup",
       requesterEmpId: "emp-1",
@@ -2242,6 +2363,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate,
+      reset: vi.fn(),
     });
     useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
       if (queryKey[1] === "requests") {
@@ -2315,7 +2437,6 @@ describe("ShiftDetailScreen", () => {
     ).toBeDisabled();
     fireEvent.click(screen.getByText("Offer for pickup"));
     fireEvent.click(screen.getByText("Offer to everyone"));
-    confirmDialog("Offer Shift");
 
     expect(mutate).toHaveBeenCalledWith({
       type: "pickup",
@@ -2496,6 +2617,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate,
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -2527,12 +2649,7 @@ describe("ShiftDetailScreen", () => {
 
     fireEvent.click(screen.getByText("Submit"));
 
-    expect(mutate).not.toHaveBeenCalled();
-    expect(screen.getByText("Send a pickup request?")).toBeInTheDocument();
-    expect(screen.getByText(/Jordan Lee will be asked to pick up your/)).toBeInTheDocument();
-
-    confirmDialog("Send Request");
-
+    expect(screen.queryByText("Send a pickup request?")).not.toBeInTheDocument();
     expect(mutate).toHaveBeenCalledWith({
       type: "pickup",
       requesterEmpId: "emp-1",
@@ -2549,6 +2666,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate,
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -2629,6 +2747,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate,
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -2642,12 +2761,13 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByText(/A Paid time off absence will be submitted/)).toBeInTheDocument();
   });
 
-  it("confirms before submitting a swap request", () => {
+  it("submits a swap request from the full-page sheet without a second popup", () => {
     const mutate = vi.fn();
     useMutation.mockReturnValue({
       error: null,
       isPending: false,
       mutate,
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -2657,12 +2777,7 @@ describe("ShiftDetailScreen", () => {
     fireEvent.click(screen.getByText("Chris Hall"));
     fireEvent.click(screen.getByText("Submit"));
 
-    expect(mutate).not.toHaveBeenCalled();
-    expect(screen.getByText("Send this swap request?")).toBeInTheDocument();
-    expect(screen.getByText(/You.ll swap your/)).toBeInTheDocument();
-
-    confirmDialog("Send Swap");
-
+    expect(screen.queryByText("Send this swap request?")).not.toBeInTheDocument();
     expect(mutate).toHaveBeenCalledWith({
       type: "swap",
       requesterEmpId: "emp-1",
@@ -2673,26 +2788,101 @@ describe("ShiftDetailScreen", () => {
   });
 
   it("closes the request sheet outright when nothing has been chosen yet", () => {
-    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn() });
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn(), reset: vi.fn() });
 
     render(<ShiftDetailScreen />);
 
     fireEvent.click(screen.getByText("Swap"));
-    fireEvent.click(screen.getByLabelText("Dismiss"));
+    fireEvent.click(screen.getByLabelText("Close"));
 
     expect(screen.queryByText("Discard this request?")).not.toBeInTheDocument();
     expect(screen.queryByText("Back to eligible teammates")).not.toBeInTheDocument();
   });
 
+  it("shows a failed request inside the sheet instead of a toast behind it", () => {
+    useMutation.mockReturnValue({
+      error: new Error("Shift already has a pending request"),
+      isPending: false,
+      mutate: vi.fn(),
+      reset: vi.fn(),
+    });
+
+    render(<ShiftDetailScreen />);
+
+    fireEvent.click(screen.getByText("Drop shift"));
+
+    // The sheet is its own native window; a toast would render behind it.
+    expect(screen.getByText("Shift already has a pending request")).toBeInTheDocument();
+    expect(pushToast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Could not create request" }),
+    );
+    // The close button stays: a failure must never strand the user.
+    expect(screen.getByLabelText("Close")).toBeInTheDocument();
+  });
+
+  it("closes the request sheet on one tap before a request is ready to send", () => {
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn(), reset: vi.fn() });
+
+    render(<ShiftDetailScreen />);
+
+    // Drop, then Call off: each one tap to redo and nothing yet to send, so
+    // neither is worth a discard question.
+    fireEvent.click(screen.getByText("Drop shift"));
+    fireEvent.click(screen.getByText("Call off"));
+    fireEvent.click(screen.getByLabelText("Close"));
+
+    expect(screen.queryByText("Discard this request?")).not.toBeInTheDocument();
+    expect(screen.queryByText("Call off")).not.toBeInTheDocument();
+  });
+
+  it("confirms before discarding a call-off that is ready to send", () => {
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn(), reset: vi.fn() });
+
+    render(<ShiftDetailScreen />);
+
+    fireEvent.click(screen.getByText("Drop shift"));
+    fireEvent.click(screen.getByText("Call off"));
+    fireEvent.click(screen.getByText("Sick"));
+    // The absence reason put Submit in the footer: the same moment the swap
+    // sheet starts asking, so the drop sheet asks too.
+    expect(screen.getByText("Submit")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText("Close"));
+
+    expect(screen.getByText("Discard this request?")).toBeInTheDocument();
+    expect(screen.getByText("Sick")).toBeInTheDocument();
+
+    confirmDialog("Keep Editing");
+
+    expect(screen.queryByText("Discard this request?")).not.toBeInTheDocument();
+    expect(screen.getByText("Sick")).toBeInTheDocument();
+    expect(screen.getByText("Submit")).toBeInTheDocument();
+  });
+
+  it("forgets single-tap choices once the sheet has closed", () => {
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn(), reset: vi.fn() });
+
+    render(<ShiftDetailScreen />);
+
+    fireEvent.click(screen.getByText("Drop shift"));
+    fireEvent.click(screen.getByText("Call off"));
+    fireEvent.click(screen.getByLabelText("Close"));
+    fireEvent.click(screen.getByText("Drop shift"));
+
+    // Reopened at the choice step, not on the absence list it was closed from.
+    expect(screen.getByText("Call off")).toBeInTheDocument();
+    expect(screen.queryByText("Sick")).not.toBeInTheDocument();
+  });
+
   it("confirms before discarding a request sheet with selections in it", () => {
-    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn() });
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn(), reset: vi.fn() });
 
     render(<ShiftDetailScreen />);
 
     fireEvent.click(screen.getByText("Swap"));
     selectFridaySwapDate();
     fireEvent.click(screen.getByText("Chris Hall"));
-    fireEvent.click(screen.getByLabelText("Dismiss"));
+    fireEvent.click(screen.getByLabelText("Close"));
 
     // The sheet is still open behind the confirmation — the swap the user
     // picked is right there to go back to.
@@ -2701,18 +2891,29 @@ describe("ShiftDetailScreen", () => {
 
     confirmDialog("Discard");
 
+    // The confirmation leaves first, the selections reset at once, and the
+    // sheet (its "Swap" title alongside the page's Swap button) follows only
+    // once that transition is done; closing both in one commit strands it.
+    expect(screen.queryByText("Discard this request?")).not.toBeInTheDocument();
     expect(screen.queryByText("You give")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Swap")).toHaveLength(2);
+
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(screen.getAllByText("Swap")).toHaveLength(1);
   });
 
   it("keeps the request sheet and its selections when the discard is cancelled", () => {
-    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn() });
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn(), reset: vi.fn() });
 
     render(<ShiftDetailScreen />);
 
     fireEvent.click(screen.getByText("Swap"));
     selectFridaySwapDate();
     fireEvent.click(screen.getByText("Chris Hall"));
-    fireEvent.click(screen.getByLabelText("Dismiss"));
+    fireEvent.click(screen.getByLabelText("Close"));
     // Not "Cancel": the sheet's own dismiss button is Cancel, so the
     // confirmation would be asking the user to cancel their cancel.
     confirmDialog("Keep Editing");

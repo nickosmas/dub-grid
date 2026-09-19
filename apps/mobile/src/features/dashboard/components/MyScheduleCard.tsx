@@ -1,23 +1,28 @@
 import { useMemo } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Text } from "../../../shared/components/Text";
 import { addDaysToIsoDate, getDaysBetweenIsoDates } from "@dubgrid/schedule-core";
 import type { MobileScheduleEntry, ResolvedSchedulePresentationSegment } from "@dubgrid/contracts";
 import { resolveShiftPillColors, type ShiftPillColors } from "@dubgrid/design-tokens";
-import { Card } from "../../../shared/components/Screen";
+import { DashboardCard } from "./DashboardCard";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { getClientFriendlyErrorMessage } from "../../../shared/lib/errors";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
+  MAX_FONT_SCALE,
+  mobileBorderColorFromText,
+  mobileElevation,
   mobileRadius,
   mobileText,
   mobileTabularText,
   mobileTextWeighted,
   type MobileColors,
+  mobileSpace,
 } from "../../../shared/theme/tokens";
 import { formatUsTime } from "../../../shared/lib/dates";
+import { getScreenGutter } from "../../../shared/components/screen-layout";
 import { useMyScheduleQuery } from "../hooks/useMyScheduleQuery";
-import { ExpandButton } from "./ExpandButton";
 
 // Kept as narrow as possible while still fitting a full time range like
 // "10:00 PM–6:00 AM" on one line at the pill's 11px font — a double shift
@@ -30,6 +35,16 @@ const DAY_CARD_GAP = 10;
 // radius the strip reads at rather than a nested corner inside a bigger one.
 // The chip step of the shared ramp (card 20 / panel 12 / chip 8).
 const PILL_RADIUS = mobileRadius.md;
+// The coloured cards' edge, as an alpha of their text colour.
+const PILL_EDGE_ALPHA = 0.12;
+// Room for the pills' shadow inside the strip. A ScrollView clips at its
+// bounds, so without it the cast ends in a hard line under each pill; the
+// same room is taken back as a negative margin so the section's rhythm is
+// unchanged. The room is asymmetric on purpose: the strip's frame grows by
+// the same amount, and a frame reaching up over the "See all" row swallowed
+// its taps. Above, only the header gap; below, short of the next section.
+const SHADOW_ROOM_TOP = mobileSpace.sm;
+const SHADOW_ROOM_BOTTOM = mobileSpace.xl;
 // Explicit min-height, shared by the worked-shift pill and the empty-day
 // placeholder, sized for 3 stacked lines (name/job/time) so every pill is
 // the same height regardless of whether a given shift has a job name or a
@@ -138,10 +153,12 @@ function buildDaySegmentPills(
   });
 }
 
-// One card per day in the period, matching web's MyScheduleRow.tsx DayBox
-// strip (apps/web/src/components/dashboard/MyScheduleRow.tsx) — spelled-out
-// shift names, swipeable, empty days shown as their own placeholder card
-// rather than dropped entirely.
+// One column per day in the period, matching web's MyScheduleRow.tsx DayBox
+// strip (apps/web/src/components/dashboard/MyScheduleRow.tsx): spelled-out
+// shift names, swipeable, empty days shown as their own placeholder rather
+// than dropped entirely. The strip sits straight on the page under its
+// title; the pills are the only boxes, so a card around them boxed them
+// twice.
 export function MyScheduleCard({
   accessToken,
   onExpand,
@@ -151,9 +168,14 @@ export function MyScheduleCard({
 }) {
   const mobileColors = useMobileColors();
   const isDarkTheme = useIsDarkMode();
+  // The pill's width follows its text: at the larger accessibility sizes a
+  // fixed 124pt cut "Day Shift" to "Day..." and the time to its hour. The
+  // text itself is capped at MAX_FONT_SCALE, so the width caps there too.
+  const { fontScale } = useWindowDimensions();
+  const pillWidth = Math.round(PILL_WIDTH * Math.min(Math.max(fontScale, 1), MAX_FONT_SCALE));
   const styles = useMemo(
-    () => createStyles(mobileColors, isDarkTheme),
-    [mobileColors, isDarkTheme],
+    () => createStyles(mobileColors, isDarkTheme, pillWidth),
+    [mobileColors, isDarkTheme, pillWidth],
   );
   // The screens that render this card fold the same query into their content
   // state, so by the time the card mounts the data is there. No local loading
@@ -169,143 +191,149 @@ export function MyScheduleCard({
   const dates = range ? buildDateList(range.startDate, range.endDate) : [];
 
   return (
-    <Card
-      title="Your schedule"
-      headerAccessory={
-        onExpand ? (
-          <ExpandButton accessibilityLabel="Expand your schedule" onPress={onExpand} />
-        ) : undefined
-      }
-      detail={
-        dates.length > 0 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            decelerationRate="fast"
-            style={styles.scrollView}
-            contentContainerStyle={styles.scrollContent}
-          >
-            {dates.map((dateIso) => {
-              const entry = entryByDate.get(dateIso);
-              const { weekday, dayNumber } = formatDayHeader(dateIso);
-              const segmentPills = buildDaySegmentPills(entry, mobileColors, isDarkTheme);
+    <DashboardCard surface={false} title="Your schedule" onOpen={onExpand}>
+      {dates.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          decelerationRate="fast"
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+        >
+          {dates.map((dateIso) => {
+            const entry = entryByDate.get(dateIso);
+            const { weekday, dayNumber } = formatDayHeader(dateIso);
+            const segmentPills = buildDaySegmentPills(entry, mobileColors, isDarkTheme);
 
-              return (
-                <View key={dateIso} style={styles.dayCard}>
-                  <Text style={styles.dayHeader}>
-                    {weekday} {dayNumber}
-                  </Text>
-                  {segmentPills.length > 0 ? (
-                    <View style={styles.shiftRow}>
-                      {segmentPills.map((segment) => (
-                        <View
-                          key={segment.key}
+            return (
+              <View key={dateIso} style={styles.dayCard}>
+                <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.dayHeader}>
+                  {weekday} {dayNumber}
+                </Text>
+                {segmentPills.length > 0 ? (
+                  <View style={styles.shiftRow}>
+                    {segmentPills.map((segment) => (
+                      <View
+                        key={segment.key}
+                        style={[
+                          styles.shiftPill,
+                          // A tint of the pill's own text, fainter than the
+                          // edge other pills wear: `borderSubtle` below is
+                          // tuned against white and vanishes on a fill, and
+                          // the standard 0.35 read as a drawn outline here.
+                          segment.pill
+                            ? {
+                                backgroundColor: segment.pill.color,
+                                borderColor: mobileBorderColorFromText(
+                                  segment.pill.text,
+                                  PILL_EDGE_ALPHA,
+                                ),
+                              }
+                            : null,
+                        ]}
+                      >
+                        <Text
+                          maxFontSizeMultiplier={MAX_FONT_SCALE}
+                          numberOfLines={1}
                           style={[
-                            styles.shiftPill,
-                            segment.pill
-                              ? {
-                                  backgroundColor: segment.pill.color,
-                                  borderColor: segment.pill.border,
-                                }
-                              : null,
+                            styles.shiftName,
+                            segment.pill ? { color: segment.pill.text } : null,
                           ]}
                         >
-                          <Text
-                            numberOfLines={1}
-                            style={[
-                              styles.shiftName,
-                              segment.pill ? { color: segment.pill.text } : null,
-                            ]}
-                          >
-                            {segment.label}
-                          </Text>
-                          {/* Job name and time lines are always rendered (even
-                              when absent) so every pill has the same
-                              three-line height. */}
-                          <Text
-                            numberOfLines={1}
-                            style={[
-                              styles.shiftJobName,
-                              segment.pill ? { color: segment.pill.text } : null,
-                            ]}
-                          >
-                            {segment.jobName ?? " "}
-                          </Text>
-                          <Text
-                            numberOfLines={1}
-                            style={[
-                              styles.shiftTime,
-                              segment.pill ? { color: segment.pill.text } : null,
-                            ]}
-                          >
-                            {segment.timeRangeLabel ?? " "}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  ) : (
-                    // Nothing scheduled at all. Absences no longer land here —
-                    // they render as their own coloured pill above.
-                    <View style={styles.emptyPill}>
-                      <Text style={styles.emptyText}>—</Text>
-                    </View>
-                  )}
-                </View>
-              );
-            })}
-          </ScrollView>
-        ) : query.error ? (
-          // A failed fetch is not an empty week. This card owns its own query,
-          // and the dashboard's content state deliberately excludes its error,
-          // so without this branch a dropped request told the user they had no
-          // shifts — a wrong answer rather than a missing one, in a scheduling
-          // app where that is the whole question.
-          <StatusBanner
-            actionLabel="Try again"
-            body={getClientFriendlyErrorMessage(
-              query.error,
-              "We couldn't load your schedule right now.",
-            )}
-            title="Could not load your schedule"
-            onAction={() => {
-              void query.refetch();
-            }}
-          />
-        ) : (
-          <EmptyStateCard
-            actionLabel={onExpand ? "View full schedule" : undefined}
-            actionVariant="link"
-            compact
-            iconName="calendar-clear-outline"
-            onAction={onExpand}
-            title="You're not scheduled this week"
-          />
-        )
-      }
-    />
+                          {segment.label}
+                        </Text>
+                        {/* Job name and time lines are always rendered (even
+                            when absent) so every pill has the same
+                            three-line height. */}
+                        <Text
+                          maxFontSizeMultiplier={MAX_FONT_SCALE}
+                          numberOfLines={1}
+                          style={[
+                            styles.shiftJobName,
+                            segment.pill ? { color: segment.pill.text } : null,
+                          ]}
+                        >
+                          {segment.jobName ?? " "}
+                        </Text>
+                        <Text
+                          maxFontSizeMultiplier={MAX_FONT_SCALE}
+                          numberOfLines={1}
+                          style={[
+                            styles.shiftTime,
+                            segment.pill ? { color: segment.pill.text } : null,
+                          ]}
+                        >
+                          {segment.timeRangeLabel ?? " "}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  // Nothing scheduled at all. Absences no longer land here —
+                  // they render as their own coloured pill above.
+                  <View style={styles.emptyPill}>
+                    <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.emptyText}>
+                      —
+                    </Text>
+                  </View>
+                )}
+              </View>
+            );
+          })}
+        </ScrollView>
+      ) : query.error ? (
+        // A failed fetch is not an empty week. This card owns its own query,
+        // and the dashboard's content state deliberately excludes its error,
+        // so without this branch a dropped request told the user they had no
+        // shifts — a wrong answer rather than a missing one, in a scheduling
+        // app where that is the whole question.
+        <StatusBanner
+          actionLabel="Try again"
+          body={getClientFriendlyErrorMessage(
+            query.error,
+            "We couldn't load your schedule right now.",
+          )}
+          title="Could not load your schedule"
+          onAction={() => {
+            void query.refetch();
+          }}
+        />
+      ) : (
+        <EmptyStateCard
+          actionLabel={onExpand ? "View full schedule" : undefined}
+          actionVariant="link"
+          compact
+          iconName="calendar-clear-outline"
+          onAction={onExpand}
+          title="You're not scheduled this week"
+        />
+      )}
+    </DashboardCard>
   );
 }
 
-const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
+const createStyles = (mobileColors: MobileColors, isDark: boolean, pillWidth: number) =>
   StyleSheet.create({
-    // Cancels Card's own 18px horizontal padding (Screen.tsx's `card` style)
-    // so the scroll track itself bleeds edge-to-edge instead of sitting inset —
-    // everything else in the card (title, icon) keeps the normal padding. The
-    // same 18px comes back as contentContainerStyle padding below, so the
-    // first/last day cards still sit inset at rest; only the track between
-    // them (visible while actively scrolling) is truly edge-to-edge.
+    // Cancels the screen gutter so the strip runs to the screen edges; the
+    // same gutter comes back as content padding, so the first and last day
+    // sit in line with the title at rest and only the track between them
+    // (visible while scrolling) is truly edge-to-edge.
     scrollView: {
-      marginHorizontal: -18,
+      marginHorizontal: -getScreenGutter(),
+      marginTop: -SHADOW_ROOM_TOP,
+      marginBottom: -SHADOW_ROOM_BOTTOM,
     },
     scrollContent: {
       gap: DAY_CARD_GAP,
-      paddingHorizontal: 18,
+      paddingHorizontal: getScreenGutter(),
+      paddingTop: SHADOW_ROOM_TOP,
+      paddingBottom: SHADOW_ROOM_BOTTOM,
     },
     // No box. The shift pill below already carries its own fill and edge, so a
     // hairline around the day only drew a second container inside the card:
     // the day header and the gap between days do that job on their own.
     dayCard: {
-      minWidth: PILL_WIDTH,
+      minWidth: pillWidth,
       gap: 8,
     },
     dayHeader: {
@@ -319,26 +347,28 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexDirection: "row",
       gap: PILL_GAP,
     },
+    // The pill's own colour is the shape; the quiet `raised` lift and a
+    // subtle edge keep it legible when a shift colour lands close to the
+    // page behind it.
     shiftPill: {
-      width: PILL_WIDTH,
-      gap: 2,
+      width: pillWidth,
+      gap: mobileSpace.xs,
       minHeight: SHIFT_PILL_MIN_HEIGHT,
       justifyContent: "center",
       borderRadius: PILL_RADIUS,
       borderWidth: 1,
-      borderColor: mobileColors.border,
+      borderColor: mobileColors.borderSubtle,
       backgroundColor: mobileColors.surface,
-      paddingHorizontal: 6,
-      paddingVertical: 6,
+      ...mobileElevation("raised", isDark),
+      paddingHorizontal: mobileSpace.sm,
+      paddingVertical: mobileSpace.sm,
     },
     shiftName: {
       ...mobileText.bodyStrong,
       color: mobileColors.textPrimary,
     },
     shiftJobName: {
-      ...mobileTextWeighted("caption", "medium"),
-      fontSize: 11,
-      lineHeight: 14,
+      ...mobileTextWeighted("badge", "medium"),
       color: mobileColors.textMuted,
       opacity: 0.85,
     },
@@ -346,14 +376,12 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // range like "10:00 PM–6:00 AM" fits in the pill's width without
     // ellipsizing.
     shiftTime: {
-      ...mobileText.caption,
+      ...mobileTextWeighted("badge", "regular"),
       ...mobileTabularText,
-      fontSize: 11,
-      lineHeight: 14,
       color: mobileColors.textMuted,
     },
     emptyPill: {
-      width: PILL_WIDTH,
+      width: pillWidth,
       minHeight: SHIFT_PILL_MIN_HEIGHT,
       justifyContent: "center",
     },

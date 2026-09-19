@@ -36,41 +36,50 @@ DubGrid implements defense-in-depth across every layer:
 
 ### CSRF Protection
 
-- Server Actions have built-in CSRF protection from Next.js
-- All state-changing Route Handlers call `validateCsrfOrigin` (`apps/web/src/lib/csrf.ts`), which validates the `Origin` header against the site root domain (supports multi-tenant subdomains)
+- The app uses no Server Actions; every mutation is a Route Handler
+- All state-changing browser-facing Route Handlers call `validateCsrfOrigin` (`apps/web/src/lib/csrf.ts`), which validates the `Origin` header against the site root domain (supports multi-tenant subdomains)
 - Supabase auth cookies use `SameSite=Lax` as a secondary CSRF control
 
 ### Rate Limiting (`apps/web/src/lib/rate-limit.ts`)
 
 All limiters are Upstash Redis sliding-window, fail-closed in production. Defined limiters:
 
-| Limiter                 | Limit | Window | Key               | Used by                                                |
-| ----------------------- | ----- | ------ | ----------------- | ------------------------------------------------------ |
-| `loginLimiter`          | 15    | 15 min | email hash        | `/api/auth/login`, mobile login                        |
-| `passwordResetLimiter`  | 5     | 15 min | email hash        | `/api/gridmaster/password-reset`                       |
-| `inviteLimiter`         | 100   | 1 hour | user ID           | `/api/send-invite-email`                               |
-| `emailTargetLimiter`    | 5     | 1 hour | target email hash | invite + password-reset (per-recipient flooding guard) |
-| `demoLimiter`           | 3     | 1 hour | IP                | `/api/request-demo`                                    |
-| `apiLimiter`            | 10    | 10 sec | IP                | most mutating API routes                               |
-| `scheduleReviewLimiter` | 60    | 10 sec | user ID           | schedule review/publish                                |
+| Limiter                 | Limit | Window | Key               | Used by                                                         |
+| ----------------------- | ----- | ------ | ----------------- | --------------------------------------------------------------- |
+| `loginLimiter`          | 15    | 15 min | email hash        | `/api/auth/login`, mobile login                                 |
+| `loginIpLimiter`        | 120   | 1 min  | source IP         | `/api/auth/login`, mobile login                                 |
+| `loginSurgeLimiter`     | 500   | 10 sec | global            | `/api/auth/login`, mobile login (load shedding)                 |
+| `passwordResetLimiter`  | 5     | 15 min | target email hash | `/api/auth/recovery-request`, mobile recovery, gridmaster reset |
+| `recoverySurgeLimiter`  | 100   | 10 sec | global            | recovery requests                                               |
+| `inviteLimiter`         | 100   | 1 hour | user ID           | `/api/send-invite-email`                                        |
+| `emailTargetLimiter`    | 5     | 1 hour | target email hash | invite + password-reset (per-recipient flooding guard)          |
+| `demoLimiter`           | 3     | 1 hour | IP                | `/api/request-demo`                                             |
+| `apiLimiter`            | 10    | 10 sec | user ID or IP     | most mutating API routes, MFA lifecycle                         |
+| `scheduleReviewLimiter` | 60    | 10 sec | user ID           | schedule review/publish                                         |
+
+The three login limits are env-tunable (`LOGIN_EMAIL_LIMIT_PER_15_MIN`, `LOGIN_IP_LIMIT_PER_MINUTE`, `LOGIN_GLOBAL_LIMIT_PER_10_SECONDS`). Public identity-facing failures return generic responses so account, invitation, and factor existence are never revealed.
 
 ### Authentication and Authorization
 
 - Custom JWT hook (`custom_access_token_hook`) runs on every token issue/refresh, baking `platform_role`, `org_role`, `org_id`, and `org_slug` as top-level claims
 - Hook strips org claims for archived/suspended orgs and deactivated users; honors `jwt_refresh_locks`
-- All Server Actions and Route Handlers re-check auth/authorization independently; middleware is a first filter, not the sole gate
+- All Route Handlers re-check auth/authorization independently (`lib/api-auth.ts`: local ES256 verification against the JWKS plus a Redis revocation check; a live Supabase Auth check is reserved for sensitive actions and the mobile MFA-factor lookup); the request proxy is a first filter, not the sole gate
+- Live authorization: every tenant request is checked against the caller's current membership in exactly one live organization; stale org claims, archived memberships, and revoked sessions fail closed (migrations `005`, `016`, `017`)
+- Sensitive actions (MFA changes, credential updates, other-session revocation, data export, account and organization deletion) require a human authentication step within the last five minutes: fresh AAL2 proof when a verified TOTP factor exists, otherwise a fresh password proof (`@dubgrid/authz` `assurance.ts`, `requireSensitiveActionAuth`)
+- Invitation and recovery credentials expire, bind to the intended identity, and are single-use (`accept_invitation`, migration `018`); post-auth redirects are pinned to an allowlist (`lib/auth/integrity-contract.ts`)
+- Security outcomes (recovery requests, throttles, step-up results) are written as audit events without secrets (`lib/auth/security-audit.ts`)
 - Per-session org isolation: `user_sessions.active_org_id` drives JWT claims per device; `switch_org` affects only the calling device
 
 ### Row-Level Security (RLS)
 
-- All 36 tables have RLS enabled; tenant isolation is enforced at the DB via `caller_org_id()`
+- All 42 tables have RLS enabled; tenant isolation is enforced at the DB via `caller_org_id()`
 - `caller_org_id()` prefers the JWT-baked per-session claim, preventing sibling-device leakage
 
 ### Role-Change Hardening
 
 - `change_user_role` RPC: caller-identity check, self-action guard, admin-tier guard (admins cannot touch admin/super_admin/gridmaster), last-super_admin guard, advisory lock, idempotency key dedup, immutable audit log, 5s JWT refresh lock
 - Gridmaster demotion/deactivation: 5-minute refresh lock + immediate session wipe
-- 25 per-person admin permissions stored in `organization_memberships.admin_permissions`
+- 26 per-person admin permissions stored in `organization_memberships.admin_permissions`; a `user`-role member never inherits a stored set
 - Direct `org_role` UPDATEs blocked by the `guard_org_role_change` trigger
 
 ### Security Headers (`apps/web/next.config.ts`)
@@ -87,11 +96,9 @@ Applied to every response:
 ### Dependency Security
 
 - Env vars validated at startup via Zod (`apps/web/src/lib/env.ts`); strict validation in production
-- `protobufjs` pinned to `7.5.9` and `fast-uri` to `^3.1.2` via scoped npm overrides in root `package.json`
-- `react` and `react-dom` pinned to `19.2.3` in root `overrides` to enforce a single copy
-- `npm audit`: 0 critical, 0 unreviewed high (8 high in the Metro/`image-size`
-  build chain are allowlisted with an expiry — see below), 3 moderate in `hono`
-  via the `@modelcontextprotocol/sdk` dev CLI only
+- `protobufjs` pinned to `7.5.9` and `fast-uri` to `^3.1.6` via scoped npm overrides in root `package.json`, alongside pins for `next`, `axios`, `dompurify`, `postcss`, `hono`, `undici`, `tar`, `sharp`, and others
+- `react` and `react-dom` pinned to `19.2.3` in the root `devDependencies` to enforce a single copy; `zod` is pinned to one exact version across every workspace so a schema built in one package is an `instanceof` match in another
+- `npm audit` runs in CI through `scripts/audit-check.mjs`; the only suppressed advisories are the dated allowlist entries described below
 
 ### Supply-Chain Controls
 
@@ -125,8 +132,11 @@ controls assume a dependency will eventually be malicious.
   list cannot rot into a permanent waiver. Everything else fails the build as
   before. Lowering `--audit-level` to get green is the thing this exists to
   prevent. Currently allowlisted: `image-size` (GHSA-w3rx-r6r6-pgpr,
-  GHSA-5p2g-fcmc-qvqq) and the Metro/Expo chain that depends on it — build-time
-  only, no patched release exists at any version, review by 2026-11-01.
+  GHSA-5p2g-fcmc-qvqq) in the Metro/Expo build chain, review by 2026-11-01;
+  `@faker-js/faker` (GHSA-qxc2-j82w-r537), a transitive dev dependency of the
+  seed tooling whose vulnerable function is never called, review by 2026-12-01;
+  and the two `fast-uri` copies nested under `@sentry/nextjs` and `react-email`
+  that npm's override cannot reach, review by 2026-12-01.
 - **Actions are pinned to commit SHAs**, and every workflow declares
   `permissions: contents: read`, so a dependency executing in CI cannot inherit
   a token that writes to the repo.
@@ -141,7 +151,7 @@ so a planted `.claude/setup.mjs` would never surface in `git status`.
 ### Sandbox Cookie (`dubgrid-sandbox`)
 
 - `HttpOnly: true`, `SameSite=Lax`, `Secure` — set and read server-side only
-- Middleware re-verifies ownership against the DB before honoring it; a forged cookie cannot escalate privilege
+- The request proxy re-verifies ownership against the DB before honoring it, and `POST /api/test-sandbox` is gated server-side to admins and super admins by their real role in the source org (never the cookie-widened claim); a forged cookie cannot escalate privilege
 
 ### Error Handling
 
@@ -151,7 +161,7 @@ so a planted `.claude/setup.mjs` would never surface in `git status`.
 
 ### Input Validation
 
-- All Server Actions and Route Handlers use Zod schema validation
+- All Route Handlers use Zod schema validation (the app uses no Server Actions)
 - No string-interpolated SQL; all DB access uses the parameterized Supabase query builder
 - Zero `dangerouslySetInnerHTML`, zero `eval`/`new Function` in `apps/` and `packages/`
 

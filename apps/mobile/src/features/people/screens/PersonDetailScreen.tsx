@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Linking,
   StyleSheet,
-  Text,
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
+import { Text } from "../../../shared/components/Text";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -82,6 +82,7 @@ import {
   mobileTextWeighted,
   mobileTypography,
   type MobileColors,
+  mobileSpace,
 } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
@@ -101,7 +102,7 @@ import { isRoleCertificationBlocked } from "../../profile/lib/role-certification
 import { ProfileSkeleton } from "../../profile/components/ProfileSkeleton";
 import { EMAIL_CONFLICT_MESSAGES, PHONE_CONFLICT_MESSAGE } from "../lib/contactConflicts";
 import { hasManagementAccess } from "../lib/managementAccess";
-import { getMobileOrgRoleHeroBadge } from "../lib/orgRoleBadges";
+import { getHighlightedOrgRole, getMobileOrgRoleHeroBadge } from "../lib/orgRoleBadges";
 import { SectionNotice } from "../components/SectionNotice";
 import { ManagementAccessSheet } from "../components/ManagementAccessSheet";
 import {
@@ -233,7 +234,13 @@ export default function PersonDetailScreen() {
   const canManageEmployees = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
   // Employee numbers are an employee-details fact, not a directory one: web
   // keeps its ID column and staff detail page behind the same permission.
-  const canViewEmployeeDetails = Boolean(bootstrapQuery.data?.permissions.canViewEmployeeDetails);
+  // Managing employees implies viewing their details (authz applies that
+  // implication server-side); restated here so a bootstrap that carries only
+  // the manage flag still reads as a staff manager.
+  const canViewEmployeeDetails = Boolean(
+    bootstrapQuery.data?.permissions.canViewEmployeeDetails ||
+    bootstrapQuery.data?.permissions.canManageEmployees,
+  );
   // A person's own employee record belongs to the Profile tab. Resolve that
   // from bootstrap before enabling this query so a pasted /person/[id] URL
   // cannot briefly fetch and render the duplicate teammate-profile surface.
@@ -683,14 +690,29 @@ export default function PersonDetailScreen() {
       >
         {/* Nothing at all for a blip: a skeleton that appears and vanishes
             inside a few frames reads as a glitch, not as loading. */}
+        {/* Drawn for this viewer, not for a manager: the page a colleague gets
+            has no contact actions, no Contact list and a Staffing list only
+            when a certification exists, so a manager's silhouette promised
+            sections that never arrived. Bootstrap is cached from app start,
+            so the permissions are known before the person loads; when they
+            are not, the smaller page is the safer guess. */}
         {contentState.showSkeleton ? (
           <ProfileSkeleton
             heroAlign="center"
-            heroChips={2}
+            // One pill at most, the access tier. A colleague sees it only on
+            // an admin, so it is left out of their guess.
+            heroChips={canViewEmployeeDetails ? 1 : 0}
             metaItems={0}
-            rowsPerSection={4}
-            sections={3}
-            showQuickActions
+            // Call, Email and Edit for a manager; Call and Email with employee
+            // details alone; nothing when contact details are redacted.
+            quickActions={canManageEmployees ? 3 : canViewEmployeeDetails ? 2 : 0}
+            sections={
+              canViewEmployeeDetails
+                ? // Contact, Staffing, Assignments at their usual row counts.
+                  [{ rows: 2 }, { rows: 3 }, { rows: 2 }]
+                : // Assignments alone: the department and the focus area.
+                  [{ rows: 2 }]
+            }
           />
         ) : null}
       </Screen>
@@ -780,22 +802,38 @@ export default function PersonDetailScreen() {
     (person.userId ? person.membershipUpdatedAt != null : person.pendingInvitation != null);
   // Only the two states someone might act on get a banner. A person who
   // already has an account needs no announcement that they do, and the body
-  // line naming the next move is for the managers who can make it.
-  const invitationBanner = person.userId
+  // line naming the next move is for the managers who can make it. A viewer
+  // without employee details never sees one: the API redacts `userId` and
+  // the invitation for them, so every colleague would read "No app access".
+  const invitationBanner = !canViewEmployeeDetails
     ? null
-    : person.pendingInvitation
-      ? {
-          title: "Invitation pending",
-          body: person.pendingInvitation.email
-            ? `Sent to ${person.pendingInvitation.email}.`
-            : undefined,
-          tone: "warning" as const,
-        }
-      : {
-          title: "No app access",
-          body: canManageEmployees ? "Send an invitation to give app access." : undefined,
-          tone: "info" as const,
-        };
+    : person.userId
+      ? null
+      : person.pendingInvitation
+        ? {
+            title: "Invitation pending",
+            body: person.pendingInvitation.email
+              ? `Sent to ${person.pendingInvitation.email}.`
+              : undefined,
+            tone: "warning" as const,
+          }
+        : {
+            title: "No app access",
+            body: canManageEmployees ? "Send an invitation to give app access." : undefined,
+            tone: "info" as const,
+          };
+  // The access tier is management information. A regular viewer sees it only
+  // when it says something about the colleague, an Admin or Super admin
+  // insignia; a plain "User" pill on every colleague told them nothing.
+  const showOrgRoleBadge =
+    canViewEmployeeDetails || getHighlightedOrgRole(getPersonOrgRole(person)) != null;
+  const showContact = Boolean(person.phone || person.email);
+  // A manager reads "None" as a gap to fill; a colleague reads it as noise.
+  // The rows that can be empty drop out for viewers without details, and the
+  // Staffing section with them when nothing is left in it.
+  const showCertificationRow = canViewEmployeeDetails || person.certificationId != null;
+  const showRolesRow = canViewEmployeeDetails || person.roleIds.length > 0;
+  const showStaffingSection = canViewEmployeeDetails || showCertificationRow;
   const avatarTone = getAvatarTone(resolveAvatarSeed(person), isDark);
 
   // The Deactivate sheet carries both outcomes, so what the confirm actually
@@ -968,7 +1006,7 @@ export default function PersonDetailScreen() {
           Deactivate button and the "Status updated" row below. */}
       <ProfileHero
         align="center"
-        badge={orgRoleBadge.label}
+        badge={showOrgRoleBadge ? orgRoleBadge.label : undefined}
         badgeAccessibilityLabel={`App access: ${orgRoleBadge.label}`}
         badgeTone={orgRoleBadge.tone}
         onBadgePress={
@@ -990,32 +1028,36 @@ export default function PersonDetailScreen() {
         title={fullName}
       />
 
-      {!editing ? (
+      {/* Only actions that do something. A viewer the API redacts contact
+          details for used to get two disabled buttons and nothing to press. */}
+      {!editing && (showContact || canEdit) ? (
         <ProfileQuickActions>
-          <Button
-            compact
-            disabled={!person.phone}
-            label="Call"
-            leadingAccessory={
-              <Ionicons color={mobileIconToneColor("green", isDark)} name="call" size={18} />
-            }
-            onPress={() => {
-              if (person.phone) void Linking.openURL(`tel:${person.phone}`);
-            }}
-            tone="plain"
-          />
-          <Button
-            compact
-            disabled={!person.email}
-            label="Email"
-            leadingAccessory={
-              <Ionicons color={mobileIconToneColor("blue", isDark)} name="mail" size={18} />
-            }
-            onPress={() => {
-              if (person.email) void Linking.openURL(`mailto:${person.email}`);
-            }}
-            tone="plain"
-          />
+          {person.phone ? (
+            <Button
+              compact
+              label="Call"
+              leadingAccessory={
+                <Ionicons color={mobileIconToneColor("green", isDark)} name="call" size={18} />
+              }
+              onPress={() => {
+                void Linking.openURL(`tel:${person.phone}`);
+              }}
+              tone="plain"
+            />
+          ) : null}
+          {person.email ? (
+            <Button
+              compact
+              label="Email"
+              leadingAccessory={
+                <Ionicons color={mobileIconToneColor("blue", isDark)} name="mail" size={18} />
+              }
+              onPress={() => {
+                void Linking.openURL(`mailto:${person.email}`);
+              }}
+              tone="plain"
+            />
+          ) : null}
           {canEdit ? (
             <Button
               compact
@@ -1073,68 +1115,82 @@ export default function PersonDetailScreen() {
         />
       ) : (
         <>
-          <ProfileSection title="Contact">
-            <ProfileList>
-              <ProfileInfoRow
-                iconName="mail-outline"
-                label="Email"
-                value={person.email || "No email on file"}
-              />
-              <ProfileInfoRow
-                iconName="call-outline"
-                isLast
-                label="Phone"
-                value={person.phone || "No phone on file"}
-              />
-            </ProfileList>
-          </ProfileSection>
+          {/* Contact details are a manager's view; the API blanks them for
+              everyone else, and "No email on file" would state a blank as a
+              fact. Managers still see the placeholder for a genuinely empty
+              field. */}
+          {canViewEmployeeDetails ? (
+            <ProfileSection title="Contact">
+              <ProfileList>
+                <ProfileInfoRow
+                  iconName="mail-outline"
+                  label="Email"
+                  value={person.email || "No email on file"}
+                />
+                <ProfileInfoRow
+                  iconName="call-outline"
+                  isLast
+                  label="Phone"
+                  value={person.phone || "No phone on file"}
+                />
+              </ProfileList>
+            </ProfileSection>
+          ) : null}
 
           {/* Split the way the edit panel below splits the same fields: what
               the person is hired as here, where they are placed under
               Assignments. The name row is gone with it, since the native header
               already carries it. */}
-          <ProfileSection title="Staffing">
-            <ProfileList>
-              {/* Web prints this beside the name in its staff header, and it is
+          {showStaffingSection ? (
+            <ProfileSection title="Staffing">
+              <ProfileList>
+                {/* Web prints this beside the name in its staff header, and it is
                   how people are identified in payroll conversations. Regular
                   users have no business with a colleague's payroll identifier,
                   so it rides on the same permission web gates it behind. */}
-              {canViewEmployeeDetails ? (
-                <ProfileInfoRow
-                  iconName="card-outline"
-                  label="Employee ID"
-                  value={`#${person.employeeNumber}`}
-                />
-              ) : null}
-              <ProfileInfoRow
-                iconName="briefcase-outline"
-                label="Employment"
-                value={employmentLabel}
-              />
-              <ProfileInfoRow
-                iconName="ribbon-outline"
-                isLast={!canManageEmployees || (!person.statusChangedAt && !person.statusNote)}
-                label={certificationLabel}
-                value={certificationName}
-              />
-              {canManageEmployees && person.statusChangedAt ? (
-                <ProfileInfoRow
-                  iconName="calendar-outline"
-                  isLast={!person.statusNote}
-                  label="Status updated"
-                  value={formatDate(person.statusChangedAt)}
-                />
-              ) : null}
-              {canManageEmployees && person.statusNote ? (
-                <ProfileInfoRow
-                  iconName="document-text-outline"
-                  isLast
-                  label="Status note"
-                  value={person.statusNote}
-                />
-              ) : null}
-            </ProfileList>
-          </ProfileSection>
+                {canViewEmployeeDetails ? (
+                  <ProfileInfoRow
+                    iconName="card-outline"
+                    label="Employee ID"
+                    value={`#${person.employeeNumber}`}
+                  />
+                ) : null}
+                {/* Full-time or part-time is an HR fact; the web roster hides
+                  the column from regular users and so does this row. */}
+                {canViewEmployeeDetails ? (
+                  <ProfileInfoRow
+                    iconName="briefcase-outline"
+                    label="Employment"
+                    value={employmentLabel}
+                  />
+                ) : null}
+                {showCertificationRow ? (
+                  <ProfileInfoRow
+                    iconName="ribbon-outline"
+                    isLast={!canManageEmployees || (!person.statusChangedAt && !person.statusNote)}
+                    label={certificationLabel}
+                    value={certificationName}
+                  />
+                ) : null}
+                {canManageEmployees && person.statusChangedAt ? (
+                  <ProfileInfoRow
+                    iconName="calendar-outline"
+                    isLast={!person.statusNote}
+                    label="Status updated"
+                    value={formatDate(person.statusChangedAt)}
+                  />
+                ) : null}
+                {canManageEmployees && person.statusNote ? (
+                  <ProfileInfoRow
+                    iconName="document-text-outline"
+                    isLast
+                    label="Status note"
+                    value={person.statusNote}
+                  />
+                ) : null}
+              </ProfileList>
+            </ProfileSection>
+          ) : null}
 
           <ProfileSection title="Assignments">
             <ProfileList>
@@ -1161,15 +1217,18 @@ export default function PersonDetailScreen() {
               ) : null}
               <ProfileInfoRow
                 iconName="albums-outline"
+                isLast={!showRolesRow}
                 label={focusAreaLabel}
                 value={focusAreaNames}
               />
-              <ProfileInfoRow
-                iconName="people-circle-outline"
-                isLast
-                label={roleLabel}
-                value={roleNames}
-              />
+              {showRolesRow ? (
+                <ProfileInfoRow
+                  iconName="people-circle-outline"
+                  isLast
+                  label={roleLabel}
+                  value={roleNames}
+                />
+              ) : null}
             </ProfileList>
           </ProfileSection>
 
@@ -1668,29 +1727,29 @@ function EditPanel({
       </ProfileSection>
 
       <ProfileSection title="Staffing">
-        <ProfilePanel>
-          <ProfileChoiceGroup
-            items={[
-              { id: 0, name: "Full-time" },
-              { id: 1, name: "Part-time" },
-            ]}
-            label="Employment"
-            selectedIds={[draft.employmentType === "part_time" ? 1 : 0]}
-            onToggle={(id) => setField("employmentType", id === 1 ? "part_time" : "full_time")}
-          />
-          <ProfileChoiceGroup
-            items={[
-              { id: -1, name: "None" },
-              ...certifications.map((item) => ({
-                id: item.id,
-                name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
-              })),
-            ]}
-            label={certificationLabel}
-            selectedIds={draft.certificationId == null ? [-1] : [draft.certificationId]}
-            onToggle={(id) => setField("certificationId", id === -1 ? null : id)}
-          />
-        </ProfilePanel>
+        <ProfileChoiceGroup
+          items={[
+            { id: 0, name: "Full-time" },
+            { id: 1, name: "Part-time" },
+          ]}
+          label="Employment"
+          selection="single"
+          selectedIds={[draft.employmentType === "part_time" ? 1 : 0]}
+          onToggle={(id) => setField("employmentType", id === 1 ? "part_time" : "full_time")}
+        />
+        <ProfileChoiceGroup
+          items={[
+            { id: -1, name: "None" },
+            ...certifications.map((item) => ({
+              id: item.id,
+              name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
+            })),
+          ]}
+          label={certificationLabel}
+          selection="single"
+          selectedIds={draft.certificationId == null ? [-1] : [draft.certificationId]}
+          onToggle={(id) => setField("certificationId", id === -1 ? null : id)}
+        />
       </ProfileSection>
 
       <ProfileSection title="Assignments">
@@ -1699,37 +1758,35 @@ function EditPanel({
             all - for anyone else an empty set is the group's own validation
             error, which stays where it is. */}
         <SectionNotice messages={assignmentNotices} />
-        <ProfilePanel>
-          <ProfileChoiceGroup
-            error={fieldErrors.focusAreaIds}
-            items={focusAreas.map((item) => ({
+        <ProfileChoiceGroup
+          error={fieldErrors.focusAreaIds}
+          items={focusAreas.map((item) => ({
+            id: item.id,
+            name: item.name,
+          }))}
+          label={focusAreaLabel}
+          selectedIds={draft.focusAreaIds}
+          onToggle={(id) => toggle("focusAreaIds", id)}
+        />
+        <ProfileChoiceGroup
+          items={roles
+            .filter(
+              (item) =>
+                !isRoleCertificationBlocked({
+                  role: item,
+                  certificationId: draft.certificationId,
+                  selectedRoleIds: draft.roleIds,
+                  roleId: item.id,
+                }),
+            )
+            .map((item) => ({
               id: item.id,
-              name: item.name,
+              name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
             }))}
-            label={focusAreaLabel}
-            selectedIds={draft.focusAreaIds}
-            onToggle={(id) => toggle("focusAreaIds", id)}
-          />
-          <ProfileChoiceGroup
-            items={roles
-              .filter(
-                (item) =>
-                  !isRoleCertificationBlocked({
-                    role: item,
-                    certificationId: draft.certificationId,
-                    selectedRoleIds: draft.roleIds,
-                    roleId: item.id,
-                  }),
-              )
-              .map((item) => ({
-                id: item.id,
-                name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
-              }))}
-            label={roleLabel}
-            selectedIds={draft.roleIds}
-            onToggle={(id) => toggle("roleIds", id)}
-          />
-        </ProfilePanel>
+          label={roleLabel}
+          selectedIds={draft.roleIds}
+          onToggle={(id) => toggle("roleIds", id)}
+        />
       </ProfileSection>
 
       <ProfileSection title="Notes">
@@ -1757,7 +1814,7 @@ const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     actionsRow: {
       flexDirection: "row",
-      gap: 10,
+      gap: mobileSpace.md,
     },
     actionButton: {
       flex: 1,
@@ -1788,7 +1845,7 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textSecondary,
     },
     modalActionStack: {
-      gap: 10,
+      gap: mobileSpace.md,
       paddingTop: 4,
     },
   });

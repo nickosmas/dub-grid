@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AnimatedDubGridLogo } from "@/components/AnimatedDubGridLogo";
 import { Button } from "@/components/Button";
-import ButtonSpinner from "@/components/ButtonSpinner";
 import { useLogout } from "@/hooks/useLogout";
 import { getAuthTransitionStartedAt } from "@/lib/auth-transition";
 
@@ -81,7 +81,7 @@ export default function AuthTransitionScreen({
     >
       <div style={{ width: "100%", maxWidth: 440, textAlign: "center" }}>
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
-          <ButtonSpinner size={32} color="var(--dg-color-brand)" />
+          <AnimatedDubGridLogo />
         </div>
         <h1
           style={{

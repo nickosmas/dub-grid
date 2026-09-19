@@ -10,6 +10,15 @@
   overflow-wrap: anywhere;
 }
 
+/* Inside a horizontally scrollable table the pill keeps its full width, so
+   the column's minimum grows and the table scrolls. Otherwise auto layout
+   treats a wrappable pill as one character wide and squeezes the column
+   until values break mid-word. */
+.overflow-x-auto :is(table, .dg-staff-directory-table) .dg-pill-display {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
 .dg-pill-action {
   max-inline-size: 100%;
   min-inline-size: 0;
@@ -263,7 +272,7 @@
   --dg-tab-inner-radius: calc(var(--dg-tab-shell-radius) - var(--dg-tab-shell-pad));
   --tooltip-font-size: var(--dg-fs-label);
   --tooltip-border-radius: var(--dg-radius-sm);
-  --dg-overlay: rgba(10, 20, 40, 0.45);
+  --dg-overlay: rgba(0, 0, 0, 0.6);
   --dg-overlay-blur: 0px;
   --dg-focus-ring: rgba(59, 130, 246, 0.15);
   --dg-danger-ring: rgba(239, 68, 68, 0.12);
@@ -1361,6 +1370,108 @@ button {
   box-shadow: 0 0 0 3px var(--dg-danger-ring);
 }
 
+/* Integer entry (NumberField): a minus, the value, a plus, in one bordered
+   box with the same corner as every other input. The box is the input's
+   chrome (border, radius, focus ring), the value is centred between the two
+   buttons, and the wheel never steps it. Width is the caller's, set on the
+   box; the minimum leaves room for three digits. */
+.dg-number-field {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 112px;
+  height: var(--dg-toolbar-h);
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--dg-color-border);
+  border-radius: var(--dg-btn-radius);
+  background: var(--dg-color-surface);
+  vertical-align: middle;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.dg-number-field:focus-within {
+  border-color: var(--dg-color-border-focus);
+  box-shadow: 0 0 0 3px var(--dg-focus-ring);
+}
+
+.dg-number-field-disabled,
+.dg-number-field-readonly {
+  background: var(--dg-color-bg);
+}
+
+.dg-number-field-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 4px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  text-align: center;
+  font-size: var(--dg-type-control-size);
+  font-weight: var(--dg-type-control-weight);
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  color: var(--dg-type-control-color);
+}
+
+.dg-number-field-input:disabled {
+  color: var(--dg-color-text-subtle);
+  cursor: not-allowed;
+}
+
+/* Inset from the box: a button that ran to the edge read as part of the
+   border. The rounded square inside the field is the target. */
+.dg-number-field-step {
+  flex: 0 0 auto;
+  align-self: stretch;
+  width: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 0;
+  border-radius: calc(var(--dg-btn-radius) - 2px);
+  background: transparent;
+  color: var(--dg-color-text-muted);
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.dg-number-field-step:hover:not(:disabled) {
+  background: var(--dg-color-bg-secondary);
+  color: var(--dg-color-text-primary);
+}
+
+.dg-number-field-step:active:not(:disabled) {
+  background: var(--dg-color-border-light);
+}
+
+.dg-number-field-step:disabled {
+  color: var(--dg-color-text-faint);
+  cursor: default;
+}
+
+.dg-number-field-sm {
+  min-width: 92px;
+  height: 30px;
+  padding: 2px;
+}
+
+.dg-number-field-sm .dg-number-field-step {
+  width: 24px;
+}
+
+.dg-number-field-sm .dg-number-field-input {
+  font-size: var(--dg-fs-caption);
+}
+
 /* ── Label System ──────────────────────────────────────── */
 .dg-label {
   font-size: var(--dg-type-field-title-size);
@@ -1734,6 +1845,19 @@ button {
   -webkit-backdrop-filter: blur(var(--dg-overlay-blur));
   z-index: 10000;
   animation: fade-in var(--dg-duration-standard) ease;
+}
+
+/* Wider variants for panels with richer content. Scoped to the same
+   breakpoint as .dg-panel's own mobile full-screen override below, so
+   neither fights over width. */
+@media (min-width: 768px) {
+  .dg-panel--wide {
+    width: min(560px, calc(100vw - 24px));
+  }
+
+  .dg-panel--x-wide {
+    width: min(640px, calc(100vw - 24px));
+  }
 }
 
 @keyframes panel-in {
@@ -2340,7 +2464,7 @@ button {
   background: var(--dg-overlay);
   backdrop-filter: blur(var(--dg-overlay-blur));
   -webkit-backdrop-filter: blur(var(--dg-overlay-blur));
-  /* Above .staff-detail-pane/.dg-panel (z-index 10001): a Modal or
+  /* Above .dg-panel (z-index 10001): a Modal or
      ConfirmDialog opened from a slide-over (e.g. Edit Management Access from
      the staff detail panel) must stack over the panel that spawned it, not
      behind it. */
@@ -3438,57 +3562,6 @@ table tbody > tr:last-child > th {
   border-bottom: 0 !important;
 }
 
-.staff-detail-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--dg-overlay);
-  backdrop-filter: blur(var(--dg-overlay-blur));
-  -webkit-backdrop-filter: blur(var(--dg-overlay-blur));
-  z-index: 10000;
-  animation: fade-in var(--dg-duration-standard) ease;
-}
-
-.staff-detail-pane {
-  position: fixed;
-  top: 12px;
-  right: 12px;
-  bottom: 12px;
-  width: min(640px, calc(100vw - 24px));
-  background: var(--dg-color-surface);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border-radius: var(--dg-radius-lg);
-  border: 1px solid var(--dg-color-border);
-  box-shadow: var(--shadow-panel);
-  z-index: 10001;
-  animation: staff-detail-in var(--dg-duration-standard) cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes staff-detail-in {
-  from {
-    transform: translateX(24px) scale(0.98);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0) scale(1);
-    opacity: 1;
-  }
-}
-
-.staff-detail-pane.closing {
-  animation: staff-detail-out var(--dg-duration-standard) ease forwards;
-}
-.staff-detail-overlay.closing {
-  animation: fade-out var(--dg-duration-fast) ease forwards;
-}
-@keyframes staff-detail-out {
-  to {
-    transform: translateX(24px) scale(0.98);
-    opacity: 0;
-  }
-}
-
 .staff-detail-header {
   display: flex;
   flex-direction: column;
@@ -3521,17 +3594,6 @@ table tbody > tr:last-child > th {
 /* Mobile: full-screen panel */
 
 @media (max-width: 767px) {
-  .staff-detail-pane {
-    top: 0;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    width: 100vw;
-    border-radius: 0;
-    border: none;
-    box-shadow: none;
-  }
-
   .staff-panel-action-footer {
     padding: 12px 16px;
   }
@@ -3859,28 +3921,6 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     inset 0 0 0 1px var(--dg-color-border-focus),
     1px 0 0 0 var(--dg-color-border-focus),
     0 1px 0 0 var(--dg-color-border-focus);
-}
-
-/* ── Notification Badge ────────────────────────────────── */
-.dg-notification-badge {
-  background: var(--dg-color-danger);
-  color: var(--dg-color-text-inverse);
-  font-size: var(--dg-fs-badge);
-  font-weight: 700;
-  border-radius: 9999px;
-  min-width: 18px;
-  height: 18px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 5px;
-  line-height: 1;
-}
-
-.dg-notification-badge--absolute {
-  position: absolute;
-  top: -6px;
-  right: -6px;
 }
 
 /* ── Open Shift Button ────────────────────────────────── */
@@ -4264,6 +4304,10 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 
 .dg-panel.closing {
   animation: panel-out var(--dg-duration-standard) ease forwards;
+}
+
+.dg-panel-overlay.closing {
+  animation: fade-out var(--dg-duration-standard) ease forwards;
 }
 
 @keyframes panel-out {
@@ -4926,44 +4970,6 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 
 .dg-auth-footer-link:hover {
   text-decoration: underline;
-}
-
-.dg-alerts-layout {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 16px;
-}
-
-.dg-alerts-sidebar {
-  display: flex;
-  width: 100%;
-  flex-shrink: 0;
-  gap: 8px;
-}
-
-.dg-alerts-sidebar > * {
-  flex: 1 1 0;
-}
-
-@media (min-width: 768px) {
-  .dg-alerts-layout {
-    flex-direction: row;
-    align-items: flex-start;
-    gap: 24px;
-  }
-
-  .dg-alerts-sidebar {
-    position: sticky;
-    top: calc(var(--dg-app-shell-header-height) + 16px);
-    width: 200px;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .dg-alerts-sidebar > * {
-    flex: none;
-  }
 }
 
 /* ── Auth card (responsive padding) ────────────────────── */

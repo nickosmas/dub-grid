@@ -6,9 +6,10 @@ import {
   SkeletonGroup,
   SkeletonLine,
   skeletonRows,
+  useSkeletonFillCount,
 } from "../../../shared/components/skeleton";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { type MobileColors } from "../../../shared/theme/tokens";
+import { type MobileColors, mobileSpace } from "../../../shared/theme/tokens";
 
 /** `personAvatar` in PeopleScreen. */
 const AVATAR_SIZE = 44;
@@ -17,27 +18,30 @@ const AVATAR_SIZE = 44;
  * The people directory list.
  *
  * Rows sit on the page background rather than in a card, lead with a 44pt
- * avatar and carry three stacked lines — name, subtitle, access — at the same
- * 76pt minimum height the real row uses, so nothing shifts on arrival.
+ * avatar and carry the name over its focus areas, with a chevron at the end,
+ * at the same 76pt minimum height the real row uses so nothing shifts on
+ * arrival.
  */
-export function PersonListSkeleton({ rows = 6 }: { rows?: number }) {
+export function PersonListSkeleton({ rows }: { rows?: number }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  // The row's 76pt minimum; reserved for the large title and search row.
+  const fillRows = useSkeletonFillCount(76, 220);
+  const rowCount = rows ?? fillRows;
 
   return (
     <SkeletonGroup style={styles.list}>
-      {skeletonRows(rows, (index) => (
+      {skeletonRows(rowCount, (index) => (
         <View
           key={`person-skeleton-${index}`}
-          style={[styles.row, index < rows - 1 ? styles.rowDivider : null]}
+          style={[styles.row, index < rowCount - 1 ? styles.rowDivider : null]}
         >
           <SkeletonCircle size={AVATAR_SIZE} />
           <View style={styles.copy}>
-            <SkeletonLine variant="cardTitle" width="56%" />
-            <SkeletonLine variant="body" width="72%" />
-            <SkeletonLine variant="caption" width="38%" />
+            <SkeletonLine variant="cardTitle" width={index % 2 === 0 ? "52%" : "60%"} />
+            <SkeletonLine variant="body" width={index % 2 === 0 ? "44%" : "70%"} />
           </View>
-          <SkeletonBlock height={22} radius={4} width={12} />
+          <SkeletonBlock height={16} radius={2} width={8} />
         </View>
       ))}
     </SkeletonGroup>
@@ -52,7 +56,7 @@ const createStyles = (mobileColors: MobileColors) =>
     row: {
       alignItems: "center",
       flexDirection: "row",
-      gap: 12,
+      gap: mobileSpace.sm,
       minHeight: 76,
       paddingVertical: 12,
     },
@@ -62,7 +66,7 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     copy: {
       flex: 1,
-      gap: 3,
+      gap: mobileSpace.xs,
       minWidth: 0,
     },
   });

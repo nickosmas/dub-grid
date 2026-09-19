@@ -24,9 +24,11 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
+          "imageWidth": 96,
           "backgroundColor": "#FFFFFF",
           "resizeMode": "contain",
           "dark": {
+            "image": "./assets/images/splash-icon-dark.png",
             "backgroundColor": "#02070F"
           }
         }
@@ -51,7 +53,7 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "monochromeImage": "./assets/images/adaptive-icon-monochrome.png",
-        "backgroundColor": "#FFFFFF"
+        "backgroundColor": "#2563EB"
       },
       "predictiveBackGestureEnabled": true
     },

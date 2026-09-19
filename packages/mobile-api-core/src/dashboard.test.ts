@@ -340,7 +340,9 @@ describe("buildActivityFeed", () => {
     const result = buildActivityFeed(rows, [], [], nameByProfileId);
 
     expect(result[0]?.type).toBe("publish");
-    expect(result[0]?.description).toBe("Jordan Lee published the schedule for May 11 to May 17");
+    expect(result[0]?.description).toBe(
+      "Jordan Lee published the schedule for May 11 to May 17 · No shift changes",
+    );
     expect(result[0]?.timestamp).toBe("2026-05-10T12:00:00.000Z");
   });
 
@@ -350,7 +352,7 @@ describe("buildActivityFeed", () => {
     expect(result[0]?.description).toContain("Someone published");
   });
 
-  it("expands each publish entry's changes into shift_change items, capped at 12 per entry", () => {
+  it("folds a publish's changes into its description and emits no shift_change items", () => {
     const changes = Array.from({ length: 14 }, (_, i) => ({
       empId: `emp-${i}`,
       date: "2026-05-12",
@@ -360,10 +362,17 @@ describe("buildActivityFeed", () => {
 
     const result = buildActivityFeed(rows, [], [], new Map(), 100);
 
-    const shiftChangeItems = result.filter((item) => item.type === "shift_change");
-    expect(shiftChangeItems).toHaveLength(12);
-    expect(shiftChangeItems[0]?.description).toBe("Shift added · May 12");
-    expect(shiftChangeItems[1]?.description).toBe("Shift removed · May 12");
+    expect(result).toHaveLength(1);
+    expect(result.filter((item) => item.type === "shift_change")).toHaveLength(0);
+    expect(result[0]?.description).toBe(
+      "Someone published the schedule for May 11 to May 17 · 7 shifts added, 7 removed",
+    );
+  });
+
+  it("uses the recorded count when the publish carries no per-cell detail", () => {
+    const result = buildActivityFeed([makeRow({ change_count: 12 })], [], [], new Map());
+
+    expect(result[0]?.description).toContain("· 12 changes");
   });
 
   it("turns every shift request into a request item, regardless of status", () => {
@@ -388,6 +397,24 @@ describe("buildActivityFeed", () => {
     });
   });
 
+  it("reads a resolved request's status as copy, never the raw token", () => {
+    const requests = [
+      {
+        id: "req-2",
+        type: "swap",
+        status: "approved",
+        requesterName: "Alex Rivera",
+        requesterShiftDate: "2026-05-12",
+        requesterPresentation: { label: "D", shiftName: "Day Shift", segments: [] },
+        createdAt: "2026-05-10T09:00:00.000Z",
+      } as unknown as MobileShiftRequest,
+    ];
+
+    const result = buildActivityFeed([], requests, [], new Map());
+
+    expect(result[0]?.description).toBe("Swap request · Alex Rivera · Approved");
+  });
+
   it("turns accepted invitations into user_signup items", () => {
     const result = buildActivityFeed(
       [],
@@ -395,7 +422,7 @@ describe("buildActivityFeed", () => {
       [
         {
           email: "jane@example.com",
-          role_to_assign: "Nurse",
+          role_to_assign: "admin",
           accepted_at: "2026-05-10T09:00:00.000Z",
         },
       ],
@@ -404,7 +431,7 @@ describe("buildActivityFeed", () => {
 
     expect(result[0]).toMatchObject({
       type: "user_signup",
-      description: "User sign-up completed · jane@example.com (Nurse)",
+      description: "New member · jane@example.com · Admin",
       timestamp: "2026-05-10T09:00:00.000Z",
     });
   });
@@ -425,7 +452,7 @@ describe("buildActivityFeed", () => {
     const invitations = [
       {
         email: "jane@example.com",
-        role_to_assign: "Nurse",
+        role_to_assign: "user",
         accepted_at: "2026-05-10T06:00:00.000Z",
       },
     ];

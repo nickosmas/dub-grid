@@ -498,7 +498,7 @@ describe("StaffView", () => {
       });
     });
 
-    it("excludes the signed-in employee and hides employment summaries for regular users", () => {
+    it("excludes the signed-in employee and hides the roster summaries for regular users", () => {
       mockCurrentUser = { id: "user-alice" };
 
       renderWithProviders(
@@ -513,11 +513,14 @@ describe("StaffView", () => {
       expect(screen.queryByText("Alice Alpha")).not.toBeInTheDocument();
       expect(screen.getByText("Bob Beta")).toBeInTheDocument();
       expect(screen.getByText("Casey Clark")).toBeInTheDocument();
-      expect(
-        within(screen.getByLabelText("On schedule staff count")).getByText("2"),
-      ).toBeInTheDocument();
+      // Headcount and credential totals are management reading; a regular
+      // user's directory is the list itself.
+      expect(screen.queryByLabelText("On schedule staff count")).not.toBeInTheDocument();
       expect(screen.queryByLabelText("Full-time staff count")).not.toBeInTheDocument();
       expect(screen.queryByLabelText("Part-time staff count")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /^Certified staff count/ }),
+      ).not.toBeInTheDocument();
     });
 
     it("shows regular users only qualification filters", async () => {

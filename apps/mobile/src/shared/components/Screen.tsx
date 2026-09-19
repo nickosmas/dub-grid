@@ -14,12 +14,14 @@ import {
   ScrollView,
   StyleSheet,
   Platform,
-  Text,
   View,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
+import { Text } from "./Text";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
+import { Pressable } from "./Pressable";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNativeTabBarPresence } from "../navigation/NativeTabBarPresence";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
@@ -54,7 +56,10 @@ export function getCardSurfaceStyle(mobileColors: MobileColors, isDark: boolean)
   return {
     backgroundColor: mobileColors.surface,
     borderRadius: mobileRadii.card,
-    padding: mobileSpace.xl,
+    // 16, not the 20 the page gutter uses: text inside a card already sits a
+    // gutter in from the screen edge, and 40pt of combined inset on the iOS
+    // gutter pushed every row's text past where a grouped list would start.
+    padding: mobileSpace.lg,
     gap: mobileSpace.md,
     // Light mode carries depth with the shadow alone; a border on top of it
     // reads as an outline sticker. Dark mode keeps the hairline, because a
@@ -84,6 +89,8 @@ export function Screen({
   stickyHeader,
   stickyHeaderShellStyle,
   stickyHeaderTopPadding,
+  stickyHeaderBackground,
+  pageBackground,
   renderOverlay,
   footer,
   scrollViewRef,
@@ -104,6 +111,20 @@ export function Screen({
   stickyHeader?: ReactNode;
   stickyHeaderShellStyle?: StyleProp<ViewStyle>;
   stickyHeaderTopPadding?: number;
+  /**
+   * Painted inside the sticky header's clipped shell, behind its content.
+   * Pair it with `pageBackground`: the shell goes transparent so the page's
+   * wash shows through the header region, and this node is what keeps
+   * content from showing through as it scrolls under. Render the same wash
+   * at the same height and the header paints exactly the slice behind it.
+   */
+  stickyHeaderBackground?: ReactNode;
+  /**
+   * A layer fixed behind everything, status bar to bottom edge: the scroll
+   * view and the sticky header shell both go transparent over it. For a page
+   * whose ground carries meaning (the dashboard's status wash).
+   */
+  pageBackground?: ReactNode;
   renderOverlay?: (options: { stickyHeaderHeight: number }) => ReactNode;
   /**
    * A non-scrolling region pinned below the content, in normal flow rather
@@ -130,23 +151,29 @@ export function Screen({
    *
    * A placeholder standing in for content should not scroll, and there is
    * nothing to pull-to-refresh while the thing is still loading. Full-page
-   * error and empty states deliberately do *not* use this: they keep the
-   * scroll view, because `contentContainerStyle`'s `flexGrow: 1` already gives
-   * a `fillScreen` child real space to claim, and leaving scroll mode costs an
-   * iOS `headerLargeTitle` the ability to collapse (it sits permanently
-   * expanded, pushing the page down) as well as pull-to-refresh itself.
+   * error and empty states deliberately do *not* use this: `contentContainerStyle`'s
+   * `flexGrow: 1` already gives a `fillScreen` child real space to claim.
    *
-   * Swaps the `ScrollView` for a plain `flex: 1` `View`. `stickyHeader` still
-   * renders, in normal flow rather than floating. `onRefresh`, `onScroll` and
-   * `scrollViewRef` all do nothing here, and content taller than the viewport
-   * is clipped rather than reachable — which is the intended trade for a
-   * skeleton and the wrong one for anything else.
+   * The `ScrollView` and everything inside it stay mounted either way. It
+   * used to be swapped for a plain `View`, and on iOS that cost every screen
+   * whose data arrived after it appeared its large title: UIKit binds the
+   * title's collapse to the scroll view present when the screen appears, and
+   * one mounted later is never tracked, so the title sat expanded for the
+   * life of the screen (Alerts, every time). The pull-to-refresh control used
+   * to come and go with this flag, which remounted the page's children each
+   * time loading toggled (see `refreshControl` below). Now only scrolling,
+   * bouncing and the pull switch off; the sticky header floats exactly as it
+   * does once loaded, so nothing shifts when the content resolves.
    */
   scrollEnabled?: boolean;
 }>) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
+  const hasPageBackground = pageBackground != null;
+  const styles = useMemo(
+    () => createStyles(mobileColors, isDark, hasPageBackground),
+    [mobileColors, isDark, hasPageBackground],
+  );
   const insets = useSafeAreaInsets();
   const nativeTabBarVisible = useNativeTabBarPresence();
   const resolvedBottomPadding = getScreenBottomPadding(bottomPaddingMode, insets.bottom);
@@ -171,14 +198,14 @@ export function Screen({
   // container already does — so it renders as a sibling of the scroll view
   // instead, keeping the scroll view shallow and the title collapsing.
   const shouldRenderFooterAsSibling = !stickyHeader && !renderOverlay && Boolean(footer);
-  // The floating shell is `position: absolute; top: 0`, so it spans the status
-  // bar and has to pad itself clear of it. The non-scrolling shell sits in
-  // normal flow, already below the system bars, where that same inset is pure
-  // dead space — a band above the sticky header the size of the notch. It only
-  // became visible once skeletons moved into the non-scrolling branch, which is
-  // where the schedule's calendar strip started floating away from its title.
-  const resolvedStickyHeaderTopPadding =
-    stickyHeaderTopPadding ?? (scrollEnabled ? Math.max(insets.top, 8) : mobileSpace.sm);
+  // A sticky header only exists on a route that hides the native header (the
+  // dashboard and the schedule), so nothing above it clears the status bar on
+  // its behalf: the shell pads itself by the safe-area inset whether it floats
+  // over the scroll view or sits in normal flow above a skeleton. The two
+  // branches used to disagree, with the non-scrolling one padding by 8pt on the
+  // assumption that it was "already below the system bars", and every skeleton
+  // drew under the Dynamic Island and then jumped down when its content landed.
+  const resolvedStickyHeaderTopPadding = stickyHeaderTopPadding ?? Math.max(insets.top, 8);
   // Android's RefreshControl has progressViewOffset to push the pull-to-
   // refresh spinner below the floating sticky header; iOS has no such prop.
   // A JS-level paddingTop doesn't move the ScrollView's own frame origin
@@ -270,6 +297,8 @@ export function Screen({
       contentInset={iosContentInset}
       contentOffset={iosContentOffset}
       contentInsetAdjustmentBehavior={useNativeContentInsets ? "automatic" : "never"}
+      scrollEnabled={scrollEnabled}
+      bounces={scrollEnabled}
       // UIKit will otherwise let a mostly-vertical drag briefly rubber-band on
       // the horizontal axis. That exposes the navigation controller behind the
       // page as a white corner at the top-right of a light screen.
@@ -278,9 +307,19 @@ export function Screen({
       keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
       keyboardShouldPersistTaps="handled"
       onScroll={onScroll}
+      // Mounted for the life of the screen once it can refresh, never only
+      // while `scrollEnabled`. On iOS the control is the scroll view's first
+      // child, so adding or removing it moves the content container to a
+      // different child slot and React remounts the whole page under it: a
+      // sheet presented from that page was torn down and presented again
+      // (UIKit refused the second present when the first was still leaving,
+      // which read as a dead button). The lock on the scroll view already
+      // stops the pull on iOS; Android's swipe layout owns the gesture and
+      // needs `enabled` to stand down.
       refreshControl={
         onRefresh ? (
           <RefreshControl
+            enabled={scrollEnabled}
             refreshing={refreshing}
             onRefresh={onRefresh}
             progressViewOffset={stickyHeader ? stickyHeaderHeight : 0}
@@ -316,45 +355,6 @@ export function Screen({
     <View style={[styles.footer, { paddingBottom: resolvedFooterBottomPadding }]}>{footer}</View>
   ) : null;
 
-  if (!scrollEnabled) {
-    return (
-      <View style={styles.root}>
-        {stickyHeader ? (
-          // Nothing scrolls under it here, so it needs none of the floating
-          // shell's `position: absolute` and scroll-under chrome — just the
-          // same fill, padding and hairline, in normal flow above the content.
-          <View
-            style={[
-              styles.stickyHeaderShell,
-              styles.nonScrollStickyHeaderShell,
-              stickyHeaderShellStyle,
-              { paddingTop: resolvedStickyHeaderTopPadding },
-            ]}
-          >
-            {stickyHeader}
-          </View>
-        ) : null}
-        <View
-          style={[
-            styles.content,
-            // Same rule as the scrolling branch: content under a sticky header
-            // is held off it by one section gap. Hardcoding `contentDefault`
-            // here gave a skeleton no top padding at all, so it sat flush
-            // against the header where the real content it stands in for is
-            // inset — the placeholder has to occupy the same space, or the page
-            // visibly shifts the moment it resolves.
-            stickyHeader ? styles.contentWithStickyHeader : styles.contentDefault,
-            styles.nonScrollContent,
-            { paddingBottom: footer ? mobileSpace.lg : resolvedBottomPadding },
-          ]}
-        >
-          {children}
-        </View>
-        {footerBar}
-      </View>
-    );
-  }
-
   if (shouldExposeNativeScrollRoot) {
     return scrollView;
   }
@@ -370,6 +370,7 @@ export function Screen({
 
   return (
     <View style={styles.root}>
+      {pageBackground}
       {stickyHeader ? (
         // The shadow lives on this outer wrapper, not the clipped shell
         // below: `overflow: "hidden"` on the same view as a shadow clips the
@@ -407,6 +408,7 @@ export function Screen({
               { paddingTop: resolvedStickyHeaderTopPadding },
             ]}
           >
+            {stickyHeaderBackground}
             {stickyHeader}
           </View>
         </View>
@@ -423,15 +425,24 @@ export function Card({
   body,
   detail,
   headerAccessory,
+  onSeeAll,
+  seeAllLabel = "See all",
 }: {
   title: string;
   body?: string;
   detail?: ReactNode;
   headerAccessory?: ReactNode;
+  /**
+   * Opens the full version of what the card previews. Renders as a link in
+   * the header's trailing slot, where a reader looks for it, rather than as a
+   * button under the list, where it used to sit below three rows of content.
+   */
+  onSeeAll?: () => void;
+  seeAllLabel?: string;
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
+  const styles = useMemo(() => createStyles(mobileColors, isDark, false), [mobileColors, isDark]);
 
   return (
     <View style={styles.cardGroup}>
@@ -444,6 +455,23 @@ export function Card({
           </Text>
         </View>
         {headerAccessory ? <View style={styles.cardHeaderAccessory}>{headerAccessory}</View> : null}
+        {onSeeAll ? (
+          // A plain pressable rather than a link `Button`: the header is one
+          // line of hierarchy and a 36pt control beside the title competed with
+          // it. The slop keeps the target at the platform minimum.
+          <Pressable
+            accessibilityLabel={`${seeAllLabel}: ${title}`}
+            accessibilityRole="button"
+            hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+            onPress={onSeeAll}
+            style={({ pressed }) => [styles.cardSeeAll, pressed && styles.cardSeeAllPressed]}
+          >
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.cardSeeAllLabel}>
+              {seeAllLabel}
+            </Text>
+            <Ionicons color={mobileColors.brand} name="chevron-forward" size={14} />
+          </Pressable>
+        ) : null}
       </View>
       <View style={styles.card}>
         {body ? (
@@ -457,15 +485,17 @@ export function Card({
   );
 }
 
-const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
+const createStyles = (mobileColors: MobileColors, isDark: boolean, hasPageBackground: boolean) =>
   StyleSheet.create({
     root: {
       flex: 1,
       backgroundColor: mobileColors.background,
     },
+    // Transparent over a page background, so the wash behind shows through;
+    // the root above still carries the theme's ground under it.
     scrollView: {
       flex: 1,
-      backgroundColor: mobileColors.background,
+      backgroundColor: hasPageBackground ? "transparent" : mobileColors.background,
     },
     content: {
       paddingHorizontal: getScreenGutter(),
@@ -477,9 +507,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     contentWithStickyHeader: {
       paddingTop: mobileSpacing.sectionGap,
     },
-    nonScrollContent: {
-      flex: 1,
-    },
     footer: {
       borderTopWidth: 1,
       borderTopColor: mobileColors.borderSubtle,
@@ -490,13 +517,15 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // Carries only the shadow, positioning, and stacking — see the JSX for
     // why this can't share a view with `stickyHeaderShell`'s `overflow:
     // "hidden"` on iOS.
+    // No shadow over a page background: the wash runs through the header,
+    // and a shadow band under the shell read as a hard seam in it.
     stickyHeaderShadow: {
       position: "absolute",
       top: 0,
       left: 0,
       right: 0,
       zIndex: 10,
-      ...mobileElevation("header", isDark),
+      ...(hasPageBackground ? null : mobileElevation("header", isDark)),
     },
     stickyHeaderShell: {
       // The fill has to stay opaque: content scrolls under this shell and must
@@ -506,6 +535,9 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       // Match native-stack headers and the page ground. This shell is visible
       // behind an interactive back swipe from a child route; using `surface`
       // here made that strip flash white while the destination was revealed.
+      // Over a page background the shell keeps this ground and paints
+      // `stickyHeaderBackground` on top of it, so the header shows the same
+      // ground-plus-wash the page shows behind it while staying opaque.
       backgroundColor: mobileColors.background,
       paddingHorizontal: getScreenGutter(),
       paddingTop: mobileSpace.sm,
@@ -520,21 +552,13 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       // shadow from the `stickyHeaderShadow` wrapper instead; putting it here
       // too would just be clipped by this view's own `overflow: "hidden"`.
     },
-    nonScrollStickyHeaderShell: {
-      // Nothing scrolls under this variant, so it sits in normal flow
-      // instead of floating and carries its own (harmless, since nothing
-      // passes beneath it) shadow directly rather than needing the floating
-      // case's separate unclipped wrapper.
-      position: "relative",
-      ...mobileElevation("header", isDark),
-    },
     overlayLayer: {
       ...StyleSheet.absoluteFillObject,
       zIndex: 20,
       elevation: 20,
     },
     cardGroup: {
-      gap: mobileSpace.md,
+      gap: mobileSpace.sm,
     },
     card: getCardSurfaceStyle(mobileColors, isDark),
     cardHeader: {
@@ -550,8 +574,23 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     cardHeaderAccessory: {
       justifyContent: "center",
     },
+    cardSeeAll: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: mobileSpace.xs,
+      paddingVertical: mobileSpace.xs,
+    },
+    cardSeeAllPressed: {
+      opacity: 0.6,
+    },
+    cardSeeAllLabel: {
+      ...mobileText.label,
+      color: mobileColors.brand,
+    },
+    // `title`, one step under the screen's own heading: at `screenTitle` a
+    // dashboard of six cards read as six page titles down one scroll.
     cardTitle: {
-      ...mobileText.screenTitle,
+      ...mobileText.title,
       color: mobileColors.textPrimary,
     },
     cardBody: {

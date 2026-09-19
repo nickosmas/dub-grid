@@ -133,6 +133,17 @@ function renderSheetDrag(
 }
 
 describe("useSheetDragToDismiss", () => {
+  it("waits for a real vertical drag and lets a sideways slop through", () => {
+    renderSheetDrag();
+    const gesture = capturedPanGestures.at(-1);
+
+    // A thumb tap on the header slides a few points; anything under this
+    // stays a tap. Sideways movement fails the pan outright so the touch
+    // underneath (the close button, a row) keeps it.
+    expect(gesture?.__config.activeOffsetY).toEqual([[-12, 12]]);
+    expect(gesture?.__config.failOffsetX).toEqual([[-12, 12]]);
+  });
+
   it("closes the sheet after a long drag", () => {
     const { drag, onDismiss } = renderSheetDrag();
 
@@ -223,7 +234,7 @@ describe("useSheetDragToDismiss", () => {
     // Nothing fails the gesture by direction any more: which of the sheet and
     // the list moves is decided per frame from how much scrolling is left.
     for (const view of [renderSheetDrag(), renderSheetDrag({ scrollable: true })]) {
-      expect(view.gesture?.__config.activeOffsetY).toEqual([[-8, 8]]);
+      expect(view.gesture?.__config.activeOffsetY).toEqual([[-12, 12]]);
       expect(view.gesture?.__config.failOffsetY).toBeUndefined();
     }
   });

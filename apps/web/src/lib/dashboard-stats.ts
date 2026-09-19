@@ -26,7 +26,12 @@ import {
   hasShiftStartedAtTimeRanges,
   type CoverageTotals,
 } from "@dubgrid/schedule-core";
-import type { CoverageRuleConfig } from "@dubgrid/domain";
+import {
+  describeMemberSignupActivity,
+  describeShiftRequestActivity,
+  summarizePublishChanges,
+  type CoverageRuleConfig,
+} from "@dubgrid/domain";
 import { formatDateKey, getWeekStart, addDays } from "@/lib/utils";
 
 // ─── Exported Types ─────────────────────────────────────
@@ -695,52 +700,36 @@ export function buildActivityFeed(
   const items: ActivityItem[] = [];
 
   for (const historyEntry of publishHistory) {
+    const summary = summarizePublishChanges(historyEntry.changes, historyEntry.changeCount);
+    const publisher =
+      "publishedByName" in historyEntry && historyEntry.publishedByName
+        ? `${historyEntry.publishedByName} published the schedule`
+        : "Schedule published";
     items.push({
       id: `pub_${historyEntry.id}`,
       type: "publish",
       iconVariant: "success",
-      description: "Schedule published",
-      highlight: `${historyEntry.changeCount} changes`,
+      description: `${publisher} · ${summary}`,
+      highlight: summary,
       timestamp: historyEntry.publishedAt,
       relativeTime: relativeTimeString(new Date(historyEntry.publishedAt)),
       href: "/schedule",
     });
-
-    for (const change of historyEntry.changes.slice(0, 12)) {
-      items.push({
-        id: `chg_${historyEntry.id}_${change.empId}_${change.date}_${change.kind}`,
-        type: "shift_change",
-        iconVariant:
-          change.kind === "new" ? "success" : change.kind === "deleted" ? "danger" : "warning",
-        description:
-          change.kind === "new"
-            ? `Shift added · ${change.date}`
-            : change.kind === "deleted"
-              ? `Shift removed · ${change.date}`
-              : `Shift updated · ${change.date}`,
-        highlight: `Employee ${change.empId}`,
-        timestamp: historyEntry.publishedAt,
-        relativeTime: relativeTimeString(new Date(historyEntry.publishedAt)),
-        href: "/schedule",
-      });
-    }
   }
 
   for (const req of shiftRequests) {
-    const isPickup = req.type === "pickup";
-    const shiftName = getShiftRequestDisplayShiftName(req);
-    const statusLabel =
-      req.status === "open" ? "Open" : req.status === "pending_approval" ? "Pending" : req.status;
-
     items.push({
       id: `req_${req.id}`,
       type: "request",
       iconVariant:
         req.status === "open" ? "warning" : req.status === "approved" ? "success" : "neutral",
-      description: isPickup
-        ? `Pickup request · ${shiftName}`
-        : `Swap request · ${req.requesterName}`,
-      highlight: `${req.requesterShiftDate} · ${statusLabel}`,
+      description: describeShiftRequestActivity({
+        type: req.type,
+        shiftName: getShiftRequestDisplayShiftName(req),
+        requesterName: req.requesterName,
+        status: req.status,
+      }),
+      highlight: req.requesterShiftDate,
       timestamp: req.createdAt,
       relativeTime: relativeTimeString(new Date(req.createdAt)),
       href: "/schedule",
@@ -753,8 +742,11 @@ export function buildActivityFeed(
       id: `signup_${invitation.id}`,
       type: "user_signup",
       iconVariant: "success",
-      description: `User sign-up completed · ${invitation.email}`,
-      highlight: invitation.roleToAssign,
+      description: describeMemberSignupActivity({
+        email: invitation.email,
+        role: invitation.roleToAssign,
+      }),
+      highlight: "",
       timestamp: invitation.acceptedAt,
       relativeTime: relativeTimeString(new Date(invitation.acceptedAt)),
       href: "/people",

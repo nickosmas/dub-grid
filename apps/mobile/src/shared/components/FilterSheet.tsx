@@ -7,15 +7,17 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "./Text";
 import { BottomSheetModal, SheetHeader } from "./BottomSheetModal";
 import { Button } from "./Button";
+import { NumericBadge } from "./NumericBadge";
 import { PressableRow } from "./PressableRow";
 import { SelectionCheck } from "./SelectionCheck";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import {
-  MAX_FONT_SCALE,
   mobileRadii,
+  mobileSpace,
   mobileText,
   mobileTextWeighted,
   type MobileColors,
@@ -168,9 +170,6 @@ export function FilterButton({
   accessibilityLabel: string;
   onPress: () => void;
 }) {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-
   return (
     <Button
       // Recreate the native button when its tone changes: Android can retain
@@ -185,15 +184,7 @@ export function FilterButton({
       fullWidth
       icon="options-outline"
       label="Filter"
-      trailingAccessory={
-        activeCount > 0 ? (
-          <View style={styles.filterCountBadge}>
-            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.filterCountText}>
-              {activeCount}
-            </Text>
-          </View>
-        ) : null
-      }
+      trailingAccessory={<NumericBadge count={activeCount} tone="onAccent" />}
       onPress={onPress}
       size="sm"
       // Promotes to a solid brand fill once any filter is on, so an active
@@ -205,28 +196,16 @@ export function FilterButton({
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
-    filterCountBadge: {
-      width: 22,
-      height: 22,
-      borderRadius: 11,
-      flexShrink: 0,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: "rgba(255, 255, 255, 0.22)",
-    },
-    filterCountText: {
-      ...mobileText.badge,
-      color: mobileColors.onBrandText,
-      textAlign: "center",
-      includeFontPadding: false,
-    },
     section: {
-      gap: 10,
+      gap: mobileSpace.md,
     },
     sectionTitle: {
-      ...mobileText.label,
+      ...mobileTextWeighted("sectionTitle", "medium"),
       color: mobileColors.textSubtle,
-      textTransform: "uppercase",
+      paddingHorizontal: mobileSpace.lg,
+      // Air above a title that follows another section's card; the card's
+      // own gap below the title stays at the section's `gap`.
+      paddingTop: mobileSpace.sm,
     },
     selectionList: {
       backgroundColor: mobileColors.surface,
@@ -257,13 +236,13 @@ const createStyles = (mobileColors: MobileColors) =>
       alignItems: "center",
       borderRadius: mobileRadii.control,
       flexDirection: "row",
-      gap: 12,
+      gap: mobileSpace.md,
       margin: SELECTION_ROW_INSET,
       overflow: "hidden",
       // The inset taken back out of the padding, so the label sits on the same
       // vertical line it did when the rows were flush.
-      paddingHorizontal: 16 - SELECTION_ROW_INSET,
-      paddingVertical: 12,
+      paddingHorizontal: mobileSpace.lg - SELECTION_ROW_INSET,
+      paddingVertical: mobileSpace.md,
     },
     selectionRowSelected: {
       // The same control fill the organization picker uses for its current row,
@@ -272,7 +251,7 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     selectionRowCopy: {
       flex: 1,
-      gap: 2,
+      gap: mobileSpace.xs,
     },
     selectionRowTitle: {
       ...mobileText.body,

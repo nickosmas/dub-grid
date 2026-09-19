@@ -2,34 +2,36 @@ import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import {
   SkeletonCardSurface,
-  SkeletonCircle,
   SkeletonGroup,
   SkeletonLine,
   SkeletonPill,
   skeletonRows,
+  useSkeletonFillCount,
 } from "../../../shared/components/skeleton";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
-  mobileElevation,
+  mobileListRow,
   mobileRadii,
   mobileRadius,
   mobileSpace,
   mobileSpacing,
   type MobileColors,
+  mobileText,
 } from "../../../shared/theme/tokens";
 
 /**
  * Row shapes the dashboard cards actually use. Each card renders one of these
- * repeatedly through `ExpandableList` at its 10pt gap.
+ * through `DashboardRowList`, a hairline between rows, and the full-page
+ * screen behind the card renders the same rows.
  */
 type DashboardRowVariant =
-  /** ActionQueueCard: leading count badge, two stacked lines. */
-  | "badgeLead"
-  /** CoverageBySectionCard: label row above a 6pt progress track. */
+  /** ActionQueueCard: two stacked lines, a chevron. */
+  | "text"
+  /** CoverageSectionRow: label row above a 6pt progress track. */
   | "meter"
-  /** OpenShiftsCard and StaffHoursCard: copy left, badges right. */
-  | "trailingBadges"
-  /** ActivityFeedCard: badge + timestamp header, then a body line. */
+  /** OpenShiftsCard and StaffHoursCard: two lines, a figure with its label, a chevron. */
+  | "figure"
+  /** ActivityFeedCard: a typed line over a description, nothing at the end. */
   | "feed";
 
 function DashboardRow({ variant }: { variant: DashboardRowVariant }) {
@@ -41,7 +43,7 @@ function DashboardRow({ variant }: { variant: DashboardRowVariant }) {
     return (
       <View style={styles.meterRow}>
         <View style={styles.meterHeader}>
-          <SkeletonLine variant="body" width="46%" />
+          <SkeletonLine variant="body" width="46%" style={styles.grow} />
           <SkeletonLine variant="caption" width={52} />
         </View>
         <View style={styles.meterTrack} />
@@ -52,44 +54,39 @@ function DashboardRow({ variant }: { variant: DashboardRowVariant }) {
   if (variant === "feed") {
     return (
       <View style={styles.feedRow}>
-        <View style={styles.feedHeader}>
-          <SkeletonPill height={20} width={72} />
-          <SkeletonLine variant="caption" width={64} />
-        </View>
-        <SkeletonLine variant="body" width="88%" />
+        <SkeletonLine variant="body" width="82%" />
+        <SkeletonLine variant="meta" width="64%" />
       </View>
     );
   }
 
-  if (variant === "badgeLead") {
+  if (variant === "text") {
     return (
-      <View style={styles.badgeLeadRow}>
-        <SkeletonPill height={22} width={34} />
+      <View style={styles.textRow}>
         <View style={styles.rowCopy}>
-          <SkeletonLine variant="body" width="70%" />
-          <SkeletonLine variant="caption" width="45%" />
+          <SkeletonLine variant="body" width="58%" />
+          <SkeletonLine variant="caption" width="46%" />
         </View>
+        <View style={styles.chevron} />
       </View>
     );
   }
 
   return (
-    <View style={styles.trailingBadgesRow}>
+    <View style={styles.textRow}>
       <View style={styles.rowCopy}>
-        <SkeletonLine variant="body" width="76%" />
-        <SkeletonLine variant="caption" width="52%" />
+        <SkeletonLine variant="body" width="52%" />
+        <SkeletonLine variant="caption" width="66%" />
       </View>
-      <SkeletonPill height={22} width={44} />
+      <View style={styles.figure}>
+        <SkeletonLine variant="title" width={24} />
+        <SkeletonLine variant="caption" width={48} />
+      </View>
+      <View style={styles.chevron} />
     </View>
   );
 }
 
-/**
- * One dashboard card: the title above the surface, then N rows inside it.
- *
- * Mirrors the shared `Card`, whose header now sits above the white surface
- * rather than inside it.
- */
 function DashboardCardSkeleton({
   rows,
   variant,
@@ -103,53 +100,69 @@ function DashboardCardSkeleton({
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
+  // The heading over its surface with See all beside it, as `DashboardCard`
+  // draws it.
   return (
     <View style={styles.cardGroup}>
-      <View style={styles.cardHeader}>
-        <View style={styles.cardHeaderCopy}>
-          <SkeletonLine variant="screenTitle" width={titleWidth} />
-        </View>
+      <View style={styles.cardTitleRow}>
+        <SkeletonLine variant="title" width={titleWidth} style={styles.grow} />
+        <SkeletonLine variant="label" width={52} />
       </View>
       <SkeletonCardSurface>
-        <View style={styles.cardList}>
-          {skeletonRows(rows, (index) => (
-            <DashboardRow key={`dashboard-row-${index}`} variant={variant} />
-          ))}
-        </View>
+        {skeletonRows(rows, (index) => (
+          <View key={`dashboard-row-${index}`}>
+            {index > 0 ? <View style={styles.rowDivider} /> : null}
+            <DashboardRow variant={variant} />
+          </View>
+        ))}
       </SkeletonCardSurface>
     </View>
   );
 }
 
-/** The hero card: period toggle, headline, and the three metric tiles. */
+/** The Coverage card: the figure over its meter, three focus-area meters, two stats. */
 function DashboardHeroSkeleton() {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
-    <View style={styles.heroCard}>
-      <View style={styles.heroCopy}>
-        <SkeletonPill height={22} width={92} />
-        <SkeletonLine variant="sectionTitle" width={180} />
+    <View style={styles.cardGroup}>
+      <View style={styles.cardTitleRow}>
+        <SkeletonLine variant="title" width={88} />
       </View>
-      <View style={styles.tileRow}>
-        {skeletonRows(3, (index) => (
-          <View key={`hero-tile-${index}`} style={styles.tile}>
-            <View style={styles.tileHeader}>
-              <SkeletonLine variant="caption" width="64%" />
-              <SkeletonCircle size={26} style={styles.tileIcon} />
-            </View>
-            <SkeletonLine variant="heroMetric" width="52%" />
-            <SkeletonLine variant="caption" width="80%" />
+      <SkeletonCardSurface>
+        <View style={styles.heroCoverage}>
+          <View style={styles.heroFigureRow}>
+            <SkeletonLine variant="display" width={84} />
+            <SkeletonLine variant="meta" width={56} />
           </View>
-        ))}
-      </View>
+          <View style={styles.heroTrack} />
+        </View>
+        <View style={styles.heroBreakdown}>
+          {skeletonRows(3, (index) => (
+            <View key={`hero-section-${index}`}>
+              {index > 0 ? <View style={styles.rowDivider} /> : null}
+              <DashboardRow variant="meter" />
+            </View>
+          ))}
+        </View>
+        <View style={styles.heroStatRow}>
+          <View style={styles.heroStat}>
+            <SkeletonLine variant="title" width={28} />
+            <SkeletonLine variant="caption" width={72} />
+          </View>
+          <View style={styles.heroStat}>
+            <SkeletonLine variant="title" width={28} />
+            <SkeletonLine variant="caption" width={110} />
+          </View>
+        </View>
+      </SkeletonCardSurface>
     </View>
   );
 }
 
-/** The horizontally scrolling day strip inside "Your schedule". */
+/** The day strip under "Your schedule": pills straight on the page, no card. */
 function MyScheduleSkeleton() {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
@@ -157,23 +170,18 @@ function MyScheduleSkeleton() {
 
   return (
     <View style={styles.cardGroup}>
-      <View style={styles.cardHeader}>
-        <View style={styles.cardHeaderCopy}>
-          <SkeletonLine variant="screenTitle" width="42%" />
-        </View>
-        {/* ExpandButton: iconOnly Button at size="sm" — 36pt circle. */}
-        <SkeletonCircle size={36} />
+      <View style={styles.cardTitleRow}>
+        <SkeletonLine variant="title" width="42%" style={styles.grow} />
+        <SkeletonLine variant="label" width={52} />
       </View>
-      <SkeletonCardSurface>
-        <View style={styles.dayStrip}>
-          {skeletonRows(3, (index) => (
-            <View key={`schedule-day-${index}`} style={styles.dayCard}>
-              <SkeletonLine variant="label" width="70%" />
-              <View style={styles.shiftPill} />
-            </View>
-          ))}
-        </View>
-      </SkeletonCardSurface>
+      <View style={styles.dayStrip}>
+        {skeletonRows(3, (index) => (
+          <View key={`schedule-day-${index}`} style={styles.dayCard}>
+            <SkeletonLine variant="label" width="70%" />
+            <View style={styles.shiftPill} />
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
@@ -200,28 +208,13 @@ export function DashboardSkeleton({
     <SkeletonGroup style={styles.page}>
       {/* PeriodToggle is a SegmentedControl at size="sm" — 36pt, pill. */}
       <SkeletonPill height={36} width={180} />
-      <DashboardHeroSkeleton />
-      {showActionQueue ? <DashboardCardSkeleton rows={2} variant="badgeLead" /> : null}
       {showMySchedule ? <MyScheduleSkeleton /> : null}
-      <DashboardCardSkeleton rows={3} variant="meter" />
-      <DashboardCardSkeleton rows={2} variant="trailingBadges" />
-      <DashboardCardSkeleton rows={3} variant="trailingBadges" />
+      <DashboardHeroSkeleton />
+      {showActionQueue ? <DashboardCardSkeleton rows={3} variant="text" /> : null}
+      <DashboardCardSkeleton rows={3} variant="figure" />
+      <DashboardCardSkeleton rows={3} variant="figure" />
       <DashboardCardSkeleton rows={3} variant="feed" />
     </SkeletonGroup>
-  );
-}
-
-/** The greeting block that sits in the screen's sticky header slot. */
-export function DashboardHeaderSkeleton() {
-  const mobileColors = useMobileColors();
-  const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-
-  return (
-    <View style={styles.header}>
-      <SkeletonLine variant="screenTitle" width="58%" />
-      <SkeletonLine variant="body" width="74%" />
-    </View>
   );
 }
 
@@ -230,10 +223,11 @@ export function DashboardHeaderSkeleton() {
  * borderless list at the real 16pt gap.
  */
 export function DashboardListSkeleton({
-  rows = 4,
+  rows,
   showFilterHeader = true,
-  variant = "trailingBadges",
+  variant = "figure",
 }: {
+  /** Defaults to enough rows to reach the bottom of the screen. */
   rows?: number;
   showFilterHeader?: boolean;
   variant?: DashboardRowVariant;
@@ -241,6 +235,16 @@ export function DashboardListSkeleton({
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
+  // Two lines at the list row's padding, plus the 16pt list gap; the
+  // reserved height is the native header and the filter row above the list.
+  const fillRows = useSkeletonFillCount(
+    mobileListRow.paddingVertical * 2 +
+      mobileText.body.lineHeight +
+      mobileText.caption.lineHeight +
+      16,
+    160,
+  );
+  const rowCount = rows ?? fillRows;
 
   return (
     <SkeletonGroup style={styles.expandedPage}>
@@ -251,7 +255,7 @@ export function DashboardListSkeleton({
         </View>
       ) : null}
       <View style={styles.expandedList}>
-        {skeletonRows(rows, (index) => (
+        {skeletonRows(rowCount, (index) => (
           <DashboardRow key={`expanded-row-${index}`} variant={variant} />
         ))}
       </View>
@@ -261,107 +265,102 @@ export function DashboardListSkeleton({
 
 const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
+    // A percentage-wide line inside a row has no width of its own to take a
+    // percentage of; growing the wrapper gives it the row's free space.
+    grow: {
+      flex: 1,
+    },
     page: {
       gap: mobileSpacing.sectionGap,
     },
-    header: {
-      gap: 4,
-    },
-    heroCard: {
-      backgroundColor: isDark ? mobileColors.surfaceSecondary : mobileColors.surface,
-      borderColor: mobileColors.cardBorder,
-      borderRadius: mobileRadii.card,
-      borderWidth: 1,
-      gap: mobileSpace.lg,
-      padding: mobileSpace.xl,
-      ...mobileElevation("card", isDark),
-    },
-    heroCopy: {
-      gap: 6,
-    },
-    tileRow: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 10,
-    },
-    // Boxed, matching DashboardHeroCard's tiles.
-    tile: {
-      flexBasis: "30%",
-      flexGrow: 1,
-      gap: 6,
-      minWidth: 0,
-      overflow: "hidden",
-      padding: 12,
-      borderRadius: mobileRadii.control,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-    },
-    tileHeader: {
-      alignItems: "flex-start",
-      flexDirection: "row",
-      gap: 6,
-      justifyContent: "space-between",
-    },
-    tileIcon: {
-      marginRight: -4,
-      marginTop: -4,
-    },
     cardGroup: {
+      gap: mobileSpace.sm,
+    },
+    cardTitleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
       gap: mobileSpace.md,
     },
-    cardHeader: {
-      alignItems: "center",
+    heroCoverage: {
+      gap: mobileSpace.sm,
+    },
+    heroFigureRow: {
+      alignItems: "flex-end",
       flexDirection: "row",
       gap: mobileSpace.md,
     },
-    cardHeaderCopy: {
-      flex: 1,
-      justifyContent: "center",
+    heroTrack: {
+      height: 8,
+      borderRadius: mobileRadii.pill,
+      backgroundColor: mobileColors.skeletonBase,
     },
-    cardList: {
-      gap: 10,
+    heroStatRow: {
+      flexDirection: "row",
+      gap: mobileSpace.lg,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: mobileColors.borderSubtle,
+      paddingTop: mobileSpace.lg,
+    },
+    heroStat: {
+      flex: 1,
+      alignItems: "center",
+      gap: mobileSpace.xs,
+    },
+    heroBreakdown: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: mobileColors.borderSubtle,
+      paddingTop: mobileSpace.xs,
+      marginBottom: -mobileSpace.sm,
+    },
+    rowDivider: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: mobileColors.borderSubtle,
     },
     rowCopy: {
       flex: 1,
-      gap: 2,
+      gap: mobileListRow.titleGap,
     },
-    badgeLeadRow: {
+    // Every row variant sits at the real rows' vertical padding, so the
+    // placeholder list is as tall as the list it stands in for.
+    textRow: {
       alignItems: "center",
       flexDirection: "row",
-      gap: 8,
+      gap: mobileSpace.sm,
+      paddingVertical: mobileListRow.paddingVertical,
     },
-    trailingBadgesRow: {
-      alignItems: "center",
-      flexDirection: "row",
-      gap: 8,
-      justifyContent: "space-between",
+    figure: {
+      alignItems: "flex-end",
+      gap: mobileSpace.xs,
+    },
+    chevron: {
+      backgroundColor: mobileColors.skeletonBase,
+      borderRadius: 2,
+      height: 16,
+      width: 8,
     },
     meterRow: {
-      gap: 6,
+      gap: mobileSpace.sm,
+      paddingVertical: mobileListRow.paddingVertical,
     },
     meterHeader: {
       alignItems: "center",
       flexDirection: "row",
-      gap: 8,
+      gap: mobileSpace.sm,
       justifyContent: "space-between",
     },
     meterTrack: {
       backgroundColor: mobileColors.skeletonBase,
-      borderRadius: 3,
+      borderRadius: mobileRadii.pill,
       height: 6,
     },
     feedRow: {
-      gap: 4,
-    },
-    feedHeader: {
-      alignItems: "center",
-      flexDirection: "row",
-      gap: 8,
-      justifyContent: "space-between",
+      gap: mobileListRow.titleGap,
+      paddingVertical: mobileListRow.paddingVertical,
     },
     dayStrip: {
       flexDirection: "row",
-      gap: 10,
+      gap: mobileSpace.md,
       overflow: "hidden",
     },
     // Borderless, matching MyScheduleCard's day cards.
@@ -376,12 +375,12 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       width: 124,
     },
     expandedPage: {
-      gap: 14,
+      gap: mobileSpace.md,
     },
     filterHeader: {
       alignItems: "center",
       flexDirection: "row",
-      gap: 10,
+      gap: mobileSpace.md,
       justifyContent: "space-between",
       paddingBottom: 4,
       paddingTop: 12,

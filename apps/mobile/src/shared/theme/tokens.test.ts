@@ -30,9 +30,9 @@ describe("mobileAvatarText", () => {
 });
 
 describe("mobilePillOverflow", () => {
-  it("lets display pills wrap while bounding both pill modes", () => {
+  it("bounds both pill modes and keeps neither wrapping", () => {
     expect(mobilePillOverflow.displayContainer).toMatchObject({ maxWidth: "100%", minWidth: 0 });
-    expect(mobilePillOverflow.displayText).toMatchObject({ flexShrink: 1, flexWrap: "wrap" });
+    expect(mobilePillOverflow.displayText).toEqual({ flexShrink: 1 });
     expect(mobilePillOverflow.interactiveContainer).toMatchObject({
       maxWidth: "100%",
       minWidth: 0,

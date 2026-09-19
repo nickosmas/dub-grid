@@ -671,6 +671,48 @@ function requestStateMatchesShiftCategories(
   );
 }
 
+/** The slice of the source the filter dropdowns are built from. */
+export type OperationsReportFilterOptionSource = Pick<
+  OperationsReportSourceData,
+  "employees" | "focusAreas" | "shiftCategories" | "jobs" | "indicatorTypes"
+>;
+
+export type OperationsReportFilterOptionsPayload = Pick<OperationsReportPayload, "filterOptions">;
+
+/**
+ * Filter-option lists for the report page's dropdowns. Range-scoped, never
+ * filter-scoped: an applied employee or job filter must not shrink the
+ * choices offered for the next report. Shared by the full payload and the
+ * options-only loader so the two can never drift.
+ */
+export function buildOperationsReportFilterOptions(
+  source: OperationsReportFilterOptionSource,
+  rangeDates: string[],
+): OperationsReportPayload["filterOptions"] {
+  return {
+    employees: source.employees.map((employee) => ({
+      id: employee.id,
+      label: formatName(employee),
+      status: employee.status ?? "unknown",
+      focusAreaIds: employee.focus_area_ids ?? [],
+    })),
+    focusAreas: source.focusAreas.map((focusArea) => ({
+      id: String(focusArea.id),
+      label: getNamedValue(focusArea),
+    })),
+    shiftCategories: source.shiftCategories.map((shift) => ({
+      id: String(shift.id),
+      label: shift.name,
+    })),
+    jobs: source.jobs.map((job) => ({ id: String(job.id), label: getNamedValue(job) })),
+    indicators: source.indicatorTypes.map((indicator) => ({
+      id: String(indicator.id),
+      label: indicator.name,
+    })),
+    dates: rangeDates,
+  };
+}
+
 export function buildOperationsReportPayload(
   source: OperationsReportSourceData,
   range: OperationsReportRange,
@@ -758,28 +800,7 @@ export function buildOperationsReportPayload(
       .filter((row) => row.employee_id)
       .map((row) => [row.employee_id!, row.email ?? "Pending"]),
   );
-  const filterOptions = {
-    employees: source.employees.map((employee) => ({
-      id: employee.id,
-      label: formatName(employee),
-      status: employee.status ?? "unknown",
-      focusAreaIds: employee.focus_area_ids ?? [],
-    })),
-    focusAreas: source.focusAreas.map((focusArea) => ({
-      id: String(focusArea.id),
-      label: getNamedValue(focusArea),
-    })),
-    shiftCategories: source.shiftCategories.map((shift) => ({
-      id: String(shift.id),
-      label: shift.name,
-    })),
-    jobs: source.jobs.map((job) => ({ id: String(job.id), label: getNamedValue(job) })),
-    indicators: source.indicatorTypes.map((indicator) => ({
-      id: String(indicator.id),
-      label: indicator.name,
-    })),
-    dates: rangeDates,
-  };
+  const filterOptions = buildOperationsReportFilterOptions(source, rangeDates);
 
   const reportNotes = source.scheduleNotes.filter((note) => {
     // Unpublished additions never belong in a published view, whatever the
@@ -2094,6 +2115,78 @@ async function fetchTableRows<T>(
   return (data ?? []) as T[];
 }
 
+const EMPLOYEE_REPORT_COLUMNS =
+  "id, employee_number, first_name, last_name, employment_type, email, phone, status, seniority, focus_area_ids, certification_id, role_ids, department_ids, user_id";
+
+/**
+ * The five lookups the filter dropdowns need. One definition, used by both
+ * the full report load and the options-only load, so the dropdowns can never
+ * be built from a different query than the report itself.
+ */
+function fetchFilterOptionSource(serviceClient: SupabaseClient, orgId: string) {
+  return {
+    employees: fetchTableRows<EmployeeReportRow>(
+      serviceClient
+        .from("employees")
+        .select(EMPLOYEE_REPORT_COLUMNS)
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .order("seniority", { ascending: true }),
+    ),
+    focusAreas: fetchTableRows<FocusAreaRow>(
+      serviceClient
+        .from("focus_areas")
+        .select("id, name, department_id")
+        .eq("org_id", orgId)
+        .is("archived_at", null),
+    ),
+    shiftCategories: fetchTableRows<ShiftCategoryRow>(
+      serviceClient
+        .from("shift_categories")
+        .select("id, name, focus_area_id")
+        .eq("org_id", orgId)
+        .is("archived_at", null),
+    ),
+    jobs: fetchTableRows<NamedRow>(
+      serviceClient.from("jobs").select("id, name").eq("org_id", orgId).is("archived_at", null),
+    ),
+    indicatorTypes: fetchTableRows<IndicatorTypeRow>(
+      serviceClient
+        .from("indicator_types")
+        .select("id, name")
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .order("sort_order", { ascending: true }),
+    ),
+  };
+}
+
+/**
+ * Just the dropdown lists for a range. The report page asked for the whole
+ * report (every row of every report type) to populate five dropdowns, and did
+ * so again for each filtered generate; this answers that request with five
+ * small lookups and no report computation (build plan item 30).
+ */
+export async function loadOperationsReportFilterOptions(
+  serviceClient: SupabaseClient,
+  input: { orgId: string; range: OperationsReportRange },
+): Promise<OperationsReportFilterOptionsPayload> {
+  const queries = fetchFilterOptionSource(serviceClient, input.orgId);
+  const [employees, focusAreas, shiftCategories, jobs, indicatorTypes] = await Promise.all([
+    queries.employees,
+    queries.focusAreas,
+    queries.shiftCategories,
+    queries.jobs,
+    queries.indicatorTypes,
+  ]);
+  return {
+    filterOptions: buildOperationsReportFilterOptions(
+      { employees, focusAreas, shiftCategories, jobs, indicatorTypes },
+      getDatesInReportRange(input.range),
+    ),
+  };
+}
+
 export async function loadOperationsReport(
   serviceClient: SupabaseClient,
   input: {
@@ -2103,6 +2196,7 @@ export async function loadOperationsReport(
   },
 ): Promise<OperationsReportPayload> {
   const now = new Date().toISOString();
+  const optionSource = fetchFilterOptionSource(serviceClient, input.orgId);
   const [
     orgRows,
     employees,
@@ -2128,33 +2222,16 @@ export async function loadOperationsReport(
         .eq("id", input.orgId)
         .limit(1),
     ),
+    optionSource.employees,
     fetchTableRows<EmployeeReportRow>(
       serviceClient
         .from("employees")
-        .select(
-          "id, employee_number, first_name, last_name, employment_type, email, phone, status, seniority, focus_area_ids, certification_id, role_ids, department_ids, user_id",
-        )
-        .eq("org_id", input.orgId)
-        .is("archived_at", null)
-        .order("seniority", { ascending: true }),
-    ),
-    fetchTableRows<EmployeeReportRow>(
-      serviceClient
-        .from("employees")
-        .select(
-          "id, employee_number, first_name, last_name, employment_type, email, phone, status, seniority, focus_area_ids, certification_id, role_ids, department_ids, user_id",
-        )
+        .select(EMPLOYEE_REPORT_COLUMNS)
         .eq("org_id", input.orgId)
         .not("archived_at", "is", null)
         .order("seniority", { ascending: true }),
     ),
-    fetchTableRows<FocusAreaRow>(
-      serviceClient
-        .from("focus_areas")
-        .select("id, name, department_id")
-        .eq("org_id", input.orgId)
-        .is("archived_at", null),
-    ),
+    optionSource.focusAreas,
     fetchTableRows<NamedRow>(
       serviceClient
         .from("organization_roles")
@@ -2189,20 +2266,8 @@ export async function loadOperationsReport(
         .select("id, focus_area_id, job_id, preferred_shift_id, day_of_week, min_staff")
         .eq("org_id", input.orgId),
     ),
-    fetchTableRows<ShiftCategoryRow>(
-      serviceClient
-        .from("shift_categories")
-        .select("id, name, focus_area_id")
-        .eq("org_id", input.orgId)
-        .is("archived_at", null),
-    ),
-    fetchTableRows<NamedRow>(
-      serviceClient
-        .from("jobs")
-        .select("id, name")
-        .eq("org_id", input.orgId)
-        .is("archived_at", null),
-    ),
+    optionSource.shiftCategories,
+    optionSource.jobs,
     fetchTableRows<ShiftRequestRow>(
       serviceClient
         .from("shift_requests")
@@ -2233,14 +2298,7 @@ export async function loadOperationsReport(
       endDate: input.range.endDate,
       orderAscending: true,
     }) as Promise<PublishedShiftReportRow[]>,
-    fetchTableRows<IndicatorTypeRow>(
-      serviceClient
-        .from("indicator_types")
-        .select("id, name")
-        .eq("org_id", input.orgId)
-        .is("archived_at", null)
-        .order("sort_order", { ascending: true }),
-    ),
+    optionSource.indicatorTypes,
     // draft_deleted notes are still published until the next publish runs, so
     // they belong in a published view of the schedule; plain drafts do not.
     fetchTableRows<ScheduleNoteRow>(

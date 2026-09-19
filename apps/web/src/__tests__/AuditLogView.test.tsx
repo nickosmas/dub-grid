@@ -71,8 +71,10 @@ describe("AuditLogView", () => {
     await user.click(await screen.findByText("Canceled the subscription"));
 
     const dialog = await screen.findByRole("dialog", { name: "Activity details" });
-    expect(within(dialog).getByText("Stripe Event Type")).toBeInTheDocument();
-    expect(within(dialog).getByText("Customer Subscription Deleted")).toBeInTheDocument();
+    // The Stripe payload is never flattened raw; a cancellation has no rows to add.
+    expect(within(dialog).queryByText("Stripe Event Type")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("Customer Subscription Deleted")).not.toBeInTheDocument();
+    expect(within(dialog).getByText("No additional details were recorded.")).toBeInTheDocument();
     expect(within(dialog).getByText("Item type")).toBeInTheDocument();
     expect(within(dialog).getByText("Organization")).toBeInTheDocument();
     expect(within(dialog).getByText("Acme Health")).toBeInTheDocument();

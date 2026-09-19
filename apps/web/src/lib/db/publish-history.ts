@@ -29,10 +29,50 @@ export function isNotePublishChangeRow(
   return isNotePublishChangeState(row.to_state) || isNotePublishChangeState(row.from_state);
 }
 
+function segmentIdentityKey(segment: {
+  shiftId: number | null;
+  jobId: number;
+  position: number;
+  isMentored?: boolean;
+}): string {
+  return `${segment.shiftId ?? "null"}:${segment.jobId}:${segment.isMentored ? 1 : 0}`;
+}
+
+function stateIdentityKey(state: PublishChange["fromState"]): string {
+  if (!state || state.kind === "deleted") return "deleted";
+  if (state.kind === "absence") return `absence:${state.absenceTypeId}`;
+  const segments = [...state.segments]
+    .sort((left, right) => left.position - right.position)
+    .map(segmentIdentityKey)
+    .join("|");
+  return `worked:${segments}:${state.customStartTime ?? ""}:${state.customEndTime ?? ""}`;
+}
+
+/**
+ * True for a "modified" row whose before and after states are the same
+ * schedule: an edit undone before it was published. `publish_schedule` stopped
+ * recording these (migration 020), but rows written before that are still in
+ * the ledger and would count as an edit and tint a cell nothing changed in.
+ */
+export function isNoOpPublishChange(
+  change: Pick<PublishChange, "kind" | "fromState" | "toState">,
+): boolean {
+  if (change.kind !== "modified" || !change.fromState || !change.toState) return false;
+  return stateIdentityKey(change.fromState) === stateIdentityKey(change.toState);
+}
+
 /** Maps schedule_publish_changes rows (from an embedded select on publish_history) to the PublishChange[] shape every consumer already expects. */
 export function toPublishChanges(rows: ScheduleChangeRow[] | null | undefined): PublishChange[] {
   return (rows ?? [])
     .filter((row) => !isNotePublishChangeRow(row))
+    .filter(
+      (row) =>
+        !isNoOpPublishChange({
+          kind: row.kind as PublishChange["kind"],
+          fromState: row.from_state as PublishChange["fromState"],
+          toState: row.to_state as PublishChange["toState"],
+        }),
+    )
     .map((row) => {
       const fromState = row.from_state as PublishChange["fromState"];
       const toState = row.to_state as PublishChange["toState"];

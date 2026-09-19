@@ -27,6 +27,7 @@ import { useMediaQuery, MOBILE } from "@/hooks";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
+import { NumberField } from "@/components/ui/number-field";
 import { Switch } from "@/components/ui/switch";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -1523,23 +1524,21 @@ function JobRow({
                         <div
                           style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}
                         >
-                          <input
-                            type="number"
+                          <NumberField
+                            nullable
+                            aria-label="Default duration hours"
                             min={0}
                             max={23}
-                            value={normalizedShiftlessTiming.defaultDurationHours ?? ""}
-                            onChange={(event) =>
+                            value={normalizedShiftlessTiming.defaultDurationHours}
+                            onChange={(value) =>
                               setForm((prev) => ({
                                 ...prev,
                                 defaultStartTime: null,
                                 defaultEndTime: null,
-                                defaultDurationHours:
-                                  event.target.value === ""
-                                    ? null
-                                    : Math.max(0, Math.min(23, Number(event.target.value))),
+                                defaultDurationHours: value,
                               }))
                             }
-                            style={{ ...inputStyle, width: 72, textAlign: "center" }}
+                            style={{ width: 112 }}
                             disabled={!canManageScheduleDefinitions}
                           />
                           <span
@@ -1550,23 +1549,21 @@ function JobRow({
                           >
                             h
                           </span>
-                          <input
-                            type="number"
+                          <NumberField
+                            nullable
+                            aria-label="Default duration minutes"
                             min={0}
                             max={59}
-                            value={normalizedShiftlessTiming.defaultDurationMinutes ?? ""}
-                            onChange={(event) =>
+                            value={normalizedShiftlessTiming.defaultDurationMinutes}
+                            onChange={(value) =>
                               setForm((prev) => ({
                                 ...prev,
                                 defaultStartTime: null,
                                 defaultEndTime: null,
-                                defaultDurationMinutes:
-                                  event.target.value === ""
-                                    ? null
-                                    : Math.max(0, Math.min(59, Number(event.target.value))),
+                                defaultDurationMinutes: value,
                               }))
                             }
-                            style={{ ...inputStyle, width: 72, textAlign: "center" }}
+                            style={{ width: 112 }}
                             disabled={!canManageScheduleDefinitions}
                           />
                           <span

@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
-import { LayoutChangeEvent, StyleSheet, Text, View } from "react-native";
+import { LayoutChangeEvent, StyleSheet, View } from "react-native";
+import { Text } from "./Text";
+import { NumericBadge } from "./NumericBadge";
 import { Pressable } from "./Pressable";
 import Animated, { useAnimatedStyle, withSpring, withTiming } from "react-native-reanimated";
 import { hapticSelection } from "../lib/haptics";
@@ -9,6 +11,7 @@ import {
   mobileElevation,
   mobileMotion,
   mobilePillOverflow,
+  mobileControl,
   mobileRadii,
   mobileSpace,
   mobileText,
@@ -30,8 +33,8 @@ export type SegmentedOption<Value extends string> = {
 };
 
 const SIZE = {
-  sm: { height: 36, paddingHorizontal: 12, labelVariant: "body" },
-  md: { height: 44, paddingHorizontal: 16, labelVariant: "bodyStrong" },
+  sm: { height: mobileControl.sm, paddingHorizontal: mobileSpace.md, labelVariant: "body" },
+  md: { height: mobileControl.md, paddingHorizontal: mobileSpace.lg, labelVariant: "bodyStrong" },
 } as const satisfies Record<
   SegmentedControlSize,
   { height: number; paddingHorizontal: number; labelVariant: keyof typeof mobileText }
@@ -57,6 +60,8 @@ export function SegmentedControl<Value extends string>({
   onChange,
   size = "md",
   disabled = false,
+  track = "neutral",
+  stretch = false,
   accessibilityLabel,
 }: {
   options: ReadonlyArray<SegmentedOption<Value>>;
@@ -64,6 +69,19 @@ export function SegmentedControl<Value extends string>({
   onChange: (value: Value) => void;
   size?: SegmentedControlSize;
   disabled?: boolean;
+  /**
+   * `"background"` fills the track with the theme's ground (white in light,
+   * black in dark) instead of the neutral grey, for a control sitting on a
+   * coloured wash where a grey box reads as a patch. The thumb is unchanged.
+   */
+  track?: "neutral" | "background";
+  /**
+   * Spreads the track across its row and gives every segment an equal
+   * share, for a label set that no longer fits a content-sized pill (the
+   * larger accessibility text sizes). The thumb still follows the measured
+   * segment, so nothing else changes.
+   */
+  stretch?: boolean;
   accessibilityLabel?: string;
 }) {
   const mobileColors = useMobileColors();
@@ -118,7 +136,13 @@ export function SegmentedControl<Value extends string>({
     <View
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="tablist"
-      style={[styles.track, { minHeight: metrics.height }, disabled && styles.trackDisabled]}
+      style={[
+        styles.track,
+        { minHeight: metrics.height },
+        track === "background" && styles.trackBackground,
+        stretch && styles.trackStretch,
+        disabled && styles.trackDisabled,
+      ]}
     >
       {/* Hidden via opacity until the selected segment has been measured, so it
           never flashes at zero width on first layout. */}
@@ -133,6 +157,9 @@ export function SegmentedControl<Value extends string>({
             accessibilityRole="button"
             accessibilityLabel={option.label}
             accessibilityState={{ selected, disabled }}
+            // The badge is a sibling the explicit label hides from assistive
+            // tech; the value slot reads the count right after the name.
+            accessibilityValue={option.count ? { text: String(option.count) } : undefined}
             disabled={disabled}
             hitSlop={4}
             onPress={() => {
@@ -141,11 +168,14 @@ export function SegmentedControl<Value extends string>({
               onChange(option.value);
             }}
             onLayout={(event) => handleSegmentLayout(option.value, event)}
-            style={[styles.segment, { paddingHorizontal: metrics.paddingHorizontal }]}
+            style={[
+              styles.segment,
+              stretch && styles.segmentStretch,
+              { paddingHorizontal: metrics.paddingHorizontal },
+            ]}
           >
             <Text
-              ellipsizeMode="tail"
-              numberOfLines={1}
+              fit="compact"
               style={[
                 mobileText[metrics.labelVariant],
                 mobilePillOverflow.interactiveText,
@@ -154,13 +184,7 @@ export function SegmentedControl<Value extends string>({
             >
               {option.label}
             </Text>
-            {option.count !== undefined && option.count > 0 ? (
-              <View style={[styles.badge, selected && styles.badgeSelected]}>
-                <Text style={[styles.badgeText, selected && styles.badgeTextSelected]}>
-                  {option.count}
-                </Text>
-              </View>
-            ) : null}
+            <NumericBadge count={option.count ?? 0} tone={selected ? "onAccent" : "neutral"} />
           </Pressable>
         );
       })}
@@ -185,6 +209,17 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderWidth: 1,
       borderColor: mobileColors.controlNeutralBorder,
       padding: TRACK_PADDING,
+    },
+    trackBackground: {
+      backgroundColor: mobileColors.background,
+    },
+    trackStretch: {
+      alignSelf: "stretch",
+    },
+    // Only under `trackStretch`: the row then has a width of its own, so
+    // `flex: 1` shares it out instead of collapsing to zero.
+    segmentStretch: {
+      flex: 1,
     },
     trackDisabled: {
       opacity: 0.4,
@@ -216,26 +251,5 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     labelSelected: {
       color: mobileColors.onBrandText,
-    },
-    badge: {
-      minWidth: 20,
-      paddingHorizontal: 6,
-      paddingVertical: 3,
-      borderRadius: mobileRadii.pill,
-      backgroundColor: mobileColors.surface,
-    },
-    // Sits on the blue thumb, so it needs a translucent-on-color treatment
-    // rather than the idle badge's opaque surface fill.
-    badgeSelected: {
-      backgroundColor: "rgba(255, 255, 255, 0.22)",
-    },
-    badgeText: {
-      ...mobileText.badge,
-      color: mobileColors.textMuted,
-      textAlign: "center",
-      includeFontPadding: false,
-    },
-    badgeTextSelected: {
-      color: mobileColors.textInverse,
     },
   });

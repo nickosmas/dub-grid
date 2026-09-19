@@ -43,19 +43,8 @@ export function formatShiftRequestTypeLabel(type: string | null | undefined): st
   return SHIFT_REQUEST_TYPE_LABELS[type] ?? formatClientLabel(type);
 }
 
-const SHIFT_REQUEST_STATUS_LABELS: Record<string, string> = {
-  approved: "Approved",
-  cancelled: "Cancelled",
-  canceled: "Canceled",
-  open: "Open",
-  pending_approval: "Awaiting approval",
-  rejected: "Rejected",
-};
-
-export function formatShiftRequestStatusLabel(status: string | null | undefined): string {
-  if (!status) return "Unknown";
-  return SHIFT_REQUEST_STATUS_LABELS[status] ?? formatClientLabel(status);
-}
+// The label set moved to @dubgrid/domain so the mobile dashboard reads the same copy.
+export { formatShiftRequestStatusLabel } from "@dubgrid/domain";
 
 const BILLING_STATUS_LABELS: Record<string, string> = {
   active: "Active",

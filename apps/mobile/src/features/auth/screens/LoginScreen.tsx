@@ -5,7 +5,8 @@ import { isRetryableAuthRecoveryError } from "@dubgrid/client-errors";
 import type { MobileAuthLoginResponse } from "@dubgrid/contracts";
 import { ACCOUNT_DISABLED_CODE, ACCOUNT_DISABLED_MESSAGE } from "@dubgrid/domain";
 import { Redirect, router } from "expo-router";
-import { Platform, StyleSheet, Text, TextInput, View } from "react-native";
+import { Platform, StyleSheet, TextInput, View } from "react-native";
+import { Text } from "../../../shared/components/Text";
 import { Button } from "../../../shared/components/Button";
 import { AuthField } from "../components/AuthField";
 import { InlineError } from "../../../shared/components/InlineError";
@@ -658,13 +659,11 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: 24,
     },
     header: {
-      gap: 6,
+      gap: mobileSpace.sm,
     },
     title: {
-      ...mobileText.heroMetric,
+      ...mobileText.display,
       color: mobileColors.textPrimary,
-      fontSize: 30,
-      lineHeight: 36,
     },
     subtitle: {
       ...mobileText.body,

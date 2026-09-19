@@ -52,6 +52,7 @@ function pickDomProps(input: Record<string, any>) {
       key === "transparent" ||
       key === "visible" ||
       key === "onRequestClose" ||
+      key === "allowSwipeDismissal" ||
       key === "horizontal" ||
       key === "showsHorizontalScrollIndicator" ||
       key === "showsVerticalScrollIndicator" ||
@@ -88,10 +89,14 @@ function pickDomProps(input: Record<string, any>) {
       }
       const state = value as {
         busy?: boolean;
+        checked?: boolean;
         disabled?: boolean;
         expanded?: boolean;
         selected?: boolean;
       };
+      if (state.checked !== undefined) {
+        output["aria-checked"] = String(state.checked);
+      }
       if (state.busy !== undefined) {
         output["aria-busy"] = String(state.busy);
       }
@@ -103,6 +108,31 @@ function pickDomProps(input: Record<string, any>) {
       }
       if (state.selected !== undefined) {
         output["aria-selected"] = String(state.selected);
+      }
+      continue;
+    }
+
+    if (key === "accessibilityValue") {
+      if (value == null) {
+        continue;
+      }
+      const accessibilityValue = value as {
+        min?: number;
+        max?: number;
+        now?: number;
+        text?: string;
+      };
+      if (accessibilityValue.min !== undefined) {
+        output["aria-valuemin"] = accessibilityValue.min;
+      }
+      if (accessibilityValue.max !== undefined) {
+        output["aria-valuemax"] = accessibilityValue.max;
+      }
+      if (accessibilityValue.now !== undefined) {
+        output["aria-valuenow"] = accessibilityValue.now;
+      }
+      if (accessibilityValue.text !== undefined) {
+        output["aria-valuetext"] = accessibilityValue.text;
       }
       continue;
     }
@@ -124,6 +154,11 @@ function pickDomProps(input: Record<string, any>) {
 
     if (key === "minimumFontScale") {
       output["data-minimum-font-scale"] = String(value);
+      continue;
+    }
+
+    if (key === "allowFontScaling") {
+      output["data-allow-font-scaling"] = String(value);
       continue;
     }
 
@@ -425,6 +460,11 @@ export function createReactNativeModule(
       openURL: () => Promise.resolve(),
     },
     Modal,
+    PixelRatio: {
+      get: () => 2,
+      getFontScale: () => 1,
+      roundToNearestPixel: (value: number) => Math.round(value * 2) / 2,
+    },
     Platform: {
       OS: platformOS,
       select: (value: Record<string, any>) => value[platformOS] ?? value.default ?? null,

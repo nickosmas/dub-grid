@@ -1,229 +1,245 @@
 import { useMemo } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../../../shared/components/Text";
 import type { MobileDashboardResponse } from "@dubgrid/contracts";
-import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { Pressable } from "../../../shared/components/Pressable";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
-  mobileElevation,
-  mobilePillOverflow,
+  MAX_FONT_SCALE,
   mobileRadii,
   mobileSpace,
   mobileTabularText,
   mobileText,
   type MobileColors,
 } from "../../../shared/theme/tokens";
-import type { CardIconTone } from "../../../shared/components/Screen";
+import { coverageColor } from "../lib/coverage";
+import { createToneTextColors } from "../lib/tone-text";
+import { CoverageSectionRow } from "./CoverageSectionRow";
+import { DashboardCard } from "./DashboardCard";
+import {
+  DASHBOARD_CARD_PREVIEW_LIMIT,
+  DashboardRowList,
+  hasMoreDashboardRows,
+} from "./DashboardRowList";
 
-function createToneStyles(
-  mobileColors: MobileColors,
-): Record<CardIconTone, { backgroundColor: string; borderColor: string; iconColor: string }> {
-  return {
-    brand: {
-      backgroundColor: mobileColors.brandSoft,
-      borderColor: mobileColors.brandBorder,
-      iconColor: mobileColors.brand,
-    },
-    warning: {
-      backgroundColor: mobileColors.warningSoft,
-      borderColor: mobileColors.warningBorder,
-      iconColor: mobileColors.warningText,
-    },
-    danger: {
-      backgroundColor: mobileColors.dangerSoft,
-      borderColor: mobileColors.dangerBorder,
-      iconColor: mobileColors.dangerText,
-    },
-    success: {
-      backgroundColor: mobileColors.successSoft,
-      borderColor: mobileColors.successBorder,
-      iconColor: mobileColors.successText,
-    },
-  };
-}
-
-function MetricTile({
+/**
+ * A secondary figure under the coverage meter: the number in its tone's
+ * colour, the label beneath, a chevron when it opens something.
+ */
+function MetricStat({
   label,
   value,
-  detail,
-  icon,
   tone,
+  onPress,
 }: {
   label: string;
-  value: string;
-  detail: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  tone: CardIconTone;
+  value: number;
+  /** Colours the figure only when it is non-zero; a zero is plain, not green. */
+  tone: "warning" | "danger";
+  onPress?: () => void;
 }) {
   const mobileColors = useMobileColors();
-  const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-  const toneStyle = useMemo(() => createToneStyles(mobileColors), [mobileColors])[tone];
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const toneColors = useMemo(() => createToneTextColors(mobileColors), [mobileColors]);
+  const color = value > 0 ? toneColors[tone] : mobileColors.textPrimary;
 
   return (
-    <View style={styles.tile}>
-      <View style={styles.tileHeader}>
-        <Text style={styles.tileLabel}>{label}</Text>
-        <View
-          style={[
-            styles.tileIconFrame,
-            { backgroundColor: toneStyle.backgroundColor, borderColor: toneStyle.borderColor },
-          ]}
-        >
-          <Ionicons name={icon} size={16} color={toneStyle.iconColor} />
-        </View>
+    <Pressable
+      accessibilityLabel={`${value} ${label}`}
+      accessibilityRole={onPress ? "button" : undefined}
+      android_ripple={onPress ? { color: mobileColors.rippleNeutral } : undefined}
+      disabled={!onPress}
+      onPress={onPress}
+      style={({ pressed }) => [styles.stat, pressed && onPress && styles.statPressed]}
+    >
+      <View style={styles.statFigureRow}>
+        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={[styles.statValue, { color }]}>
+          {value}
+        </Text>
+        {onPress ? (
+          <Ionicons color={mobileColors.textMuted} name="chevron-forward" size={14} />
+        ) : null}
       </View>
-      <Text style={styles.tileValue}>{value}</Text>
-      <Text style={styles.tileDetail}>{detail}</Text>
-    </View>
+      <Text maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1} style={styles.statLabel}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
-const STATUS_TONE: Record<string, CardIconTone> = {
-  Attention: "danger",
-  Approval: "warning",
-  Setup: "warning",
-  Healthy: "success",
-};
-
+/**
+ * The coverage card: the period's one big figure over its meter, the same
+ * figure broken down by focus area, and at the foot the two counts that
+ * need a hand. One card for all of it; a second "Coverage by wings" card
+ * said the same thing twice, and "See all" opens the full breakdown, but
+ * only while there are more focus areas than the card previews.
+ */
 export function DashboardHeroCard({
-  summary,
   metrics,
+  sections = [],
+  onOpenCoverage,
+  onOpenGaps,
+  onOpenApprovals,
 }: {
-  summary: MobileDashboardResponse["heroSummary"];
   metrics: MobileDashboardResponse["metrics"];
+  /** Per-focus-area coverage; the card previews the first three. */
+  sections?: MobileDashboardResponse["coverageBySection"];
+  onOpenCoverage?: () => void;
+  onOpenGaps?: () => void;
+  onOpenApprovals?: () => void;
 }) {
   const mobileColors = useMobileColors();
-  const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-  const tone = STATUS_TONE[summary.statusLabel] ?? "brand";
-  const toneStyle = useMemo(() => createToneStyles(mobileColors), [mobileColors])[tone];
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const coverage = metrics.coveragePct;
+  const meterColor =
+    coverage == null ? mobileColors.textMuted : coverageColor(mobileColors, coverage);
 
   return (
-    <View style={styles.card}>
-      <View style={styles.headerCopy}>
-        <View
-          style={[
-            styles.statusPill,
-            { backgroundColor: toneStyle.backgroundColor, borderColor: toneStyle.borderColor },
-          ]}
-        >
-          <Text style={[styles.statusPillLabel, { color: toneStyle.iconColor }]}>
-            {summary.statusLabel}
-          </Text>
+    <DashboardCard
+      title="Coverage"
+      onOpen={hasMoreDashboardRows(sections.length) ? onOpenCoverage : undefined}
+    >
+      {coverage != null ? (
+        <View style={styles.coverage}>
+          <View style={styles.coverageFigureRow}>
+            <Text
+              accessibilityLabel={`Coverage ${coverage} percent`}
+              maxFontSizeMultiplier={MAX_FONT_SCALE}
+              style={styles.coverageFigure}
+            >
+              {coverage}%
+            </Text>
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.coverageLabel}>
+              covered
+            </Text>
+          </View>
+          <View
+            accessibilityRole="progressbar"
+            accessibilityValue={{ min: 0, max: 100, now: coverage }}
+            style={styles.track}
+          >
+            <View
+              style={[
+                styles.fill,
+                { backgroundColor: meterColor, width: `${Math.min(100, Math.max(0, coverage))}%` },
+              ]}
+            />
+          </View>
         </View>
-        <Text style={styles.title}>{summary.title}</Text>
+      ) : null}
+      {sections.length > 0 ? (
+        <View style={[styles.breakdown, coverage != null ? styles.breakdownDivided : null]}>
+          <DashboardRowList
+            items={sections}
+            keyExtractor={(section) => String(section.focusAreaId)}
+            limit={DASHBOARD_CARD_PREVIEW_LIMIT}
+            renderItem={(section) => <CoverageSectionRow section={section} />}
+          />
+        </View>
+      ) : null}
+      <View
+        style={[
+          styles.statRow,
+          coverage != null || sections.length > 0 ? styles.statRowDivided : null,
+        ]}
+      >
+        <MetricStat
+          label={metrics.openGapCount === 1 ? "open gap" : "open gaps"}
+          onPress={metrics.openGapCount > 0 ? onOpenGaps : undefined}
+          tone="danger"
+          value={metrics.openGapCount}
+        />
+        <View style={styles.statDivider} />
+        <MetricStat
+          label={metrics.pendingApprovalsCount === 1 ? "pending approval" : "pending approvals"}
+          onPress={metrics.pendingApprovalsCount > 0 ? onOpenApprovals : undefined}
+          tone="warning"
+          value={metrics.pendingApprovalsCount}
+        />
       </View>
-      <View style={styles.tileRow}>
-        <MetricTile
-          label="Coverage"
-          value={metrics.coveragePct != null ? `${metrics.coveragePct}%` : "—"}
-          detail={metrics.coveragePct != null ? "Current staffing coverage" : "Not configured"}
-          icon="shield-checkmark-outline"
-          tone="brand"
-        />
-        <MetricTile
-          label="Open gaps"
-          value={String(metrics.openGapCount)}
-          detail="Staffing gaps this period"
-          icon="alert-circle-outline"
-          tone={metrics.openGapCount > 0 ? "danger" : "success"}
-        />
-        <MetricTile
-          label="Pending approvals"
-          value={String(metrics.pendingApprovalsCount)}
-          detail="Requests waiting for review"
-          icon="checkmark-done-outline"
-          tone={metrics.pendingApprovalsCount > 0 ? "warning" : "success"}
-        />
-      </View>
-    </View>
+    </DashboardCard>
   );
 }
 
-const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
+const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
-    card: {
-      backgroundColor: mobileColors.surface,
-      borderRadius: mobileRadii.card,
-      // Borderless in light mode, hairline in dark: matches the shared Card.
-      borderWidth: isDark ? 1 : 0,
-      borderColor: mobileColors.cardBorder,
-      padding: mobileSpace.xl,
-      gap: mobileSpace.lg,
-      ...mobileElevation("card", isDark),
+    coverage: {
+      gap: mobileSpace.sm,
     },
-    headerCopy: {
-      gap: 6,
-    },
-    statusPill: {
-      ...mobilePillOverflow.displayContainer,
-      alignSelf: "flex-start",
-      borderRadius: 999,
-      borderWidth: 1,
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-    },
-    statusPillLabel: {
-      ...mobileText.badge,
-      ...mobilePillOverflow.displayText,
-    },
-    title: {
-      ...mobileText.sectionTitle,
-      color: mobileColors.textPrimary,
-    },
-    tileRow: {
+    coverageFigureRow: {
       flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 10,
+      alignItems: "baseline",
+      gap: mobileSpace.sm,
     },
-    // Kept boxed, unlike the empty-state panel. These three tiles are nothing
-    // but text, so a soft hairline is the only thing grouping each label with
-    // its number. Borderless, the columns ran together and the values stopped
-    // reading as a row. `control` radius nests inside the card's.
-    tile: {
-      flexGrow: 1,
-      flexBasis: "30%",
-      minWidth: 0,
-      padding: 12,
-      gap: 6,
-      borderRadius: mobileRadii.control,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-    },
-    tileHeader: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      justifyContent: "space-between",
-      gap: 6,
-    },
-    tileLabel: {
-      ...mobileText.caption,
-      color: mobileColors.textMuted,
-      flex: 1,
-      flexShrink: 1,
-      flexWrap: "wrap",
-    },
-    tileIconFrame: {
-      width: 26,
-      height: 26,
-      borderRadius: 13,
-      borderWidth: 1,
-      alignItems: "center",
-      justifyContent: "center",
-      flexShrink: 0,
-      // Nudge into the tile's top-right corner, matching the shared Card
-      // component's icon treatment. Kept smaller than the tile's own padding
-      // (12) so it stays inside the tile's bounds.
-      marginTop: -4,
-      marginRight: -4,
-    },
-    tileValue: {
-      ...mobileText.heroMetric,
+    coverageFigure: {
+      ...mobileText.display,
       ...mobileTabularText,
       color: mobileColors.textPrimary,
     },
-    tileDetail: {
+    coverageLabel: {
+      ...mobileText.meta,
+      color: mobileColors.textMuted,
+    },
+    track: {
+      height: 8,
+      borderRadius: mobileRadii.pill,
+      backgroundColor: mobileColors.borderSubtle,
+      overflow: "hidden",
+    },
+    fill: {
+      height: "100%",
+      borderRadius: mobileRadii.pill,
+    },
+    statRow: {
+      flexDirection: "row",
+      alignItems: "stretch",
+      gap: mobileSpace.lg,
+    },
+    // A hairline above the stats when anything sits above them, so they
+    // read as the card's closing section rather than another line of it.
+    statRowDivided: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: mobileColors.borderSubtle,
+      paddingTop: mobileSpace.lg,
+    },
+    stat: {
+      flex: 1,
+      alignItems: "center",
+      gap: mobileSpace.xs,
+      borderRadius: mobileRadii.control,
+    },
+    statPressed: {
+      opacity: 0.6,
+    },
+    statFigureRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: mobileSpace.xs,
+    },
+    statValue: {
+      ...mobileText.title,
+      ...mobileTabularText,
+    },
+    statLabel: {
       ...mobileText.caption,
       color: mobileColors.textMuted,
+      textAlign: "center",
+    },
+    statDivider: {
+      width: StyleSheet.hairlineWidth,
+      backgroundColor: mobileColors.borderSubtle,
+    },
+    // The rows carry their own vertical padding, so the section only pads
+    // the first row off the hairline and gives back part of the last row's
+    // padding, leaving the stats' hairline 16pt below the last row's text.
+    breakdown: {
+      paddingTop: mobileSpace.xs,
+      marginBottom: -mobileSpace.sm,
+    },
+    breakdownDivided: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: mobileColors.borderSubtle,
     },
   });

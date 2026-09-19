@@ -250,7 +250,7 @@ describe("NotificationsScreen", () => {
     });
   });
 
-  it("opens the detail screen when an alert is tapped and marks it read first", async () => {
+  it("goes to the alert's subject when it is tapped and marks it read first", async () => {
     const queryResult = buildInfiniteQueryResult({
       notifications: [SAMPLE_NOTIFICATION],
       unreadCount: 1,
@@ -275,10 +275,8 @@ describe("NotificationsScreen", () => {
     await waitFor(() => {
       expect(markNotificationRead).toHaveBeenCalledWith("token-123", SAMPLE_NOTIFICATION.id);
     });
-    expect(push).toHaveBeenCalledWith({
-      pathname: "/alerts/[id]",
-      params: { id: SAMPLE_NOTIFICATION.id },
-    });
+    // The alert is about a request, so the tap lands on the Requests tab.
+    expect(push).toHaveBeenCalledWith("/(tabs)/requests");
     expect(setQueryData).toHaveBeenCalled();
     // Sidebar/chip badge bug: row-press must refetch both list + facets so
     // filter chip counts stay accurate. handleArchive/handleMarkAllRead already
@@ -287,6 +285,36 @@ describe("NotificationsScreen", () => {
       expect(queryResult.refetch).toHaveBeenCalled();
       expect(facetsRefetch).toHaveBeenCalled();
     });
+  });
+
+  it("stays put with a hint when the subject only exists on the web", async () => {
+    const billing = {
+      ...SAMPLE_NOTIFICATION,
+      id: "00000000-0000-4000-8000-000000000002",
+      type: "billing_payment_failed",
+      category: "billing",
+      title: "Payment failed",
+      message: "A payment for Calm Haven failed.",
+      metadata: {} as Record<string, unknown>,
+      actionUrl: null as unknown as string,
+      actionLabel: null as unknown as string,
+      readAt: "2026-04-24T13:00:00.000Z" as unknown as null,
+    };
+    useInfiniteQuery.mockReturnValue(
+      buildInfiniteQueryResult({ notifications: [billing], unreadCount: 0 }),
+    );
+
+    render(<NotificationsScreen />);
+
+    fireEvent.click(screen.getByText("Payment failed"));
+
+    await waitFor(() => {
+      expect(pushToast).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "Open this on the web to see more." }),
+      );
+    });
+    expect(push).not.toHaveBeenCalled();
+    expect(markNotificationRead).not.toHaveBeenCalled();
   });
 
   it("marks all unread alerts as read", async () => {
@@ -309,6 +337,36 @@ describe("NotificationsScreen", () => {
 
     await waitFor(() => {
       expect(markAllNotificationsRead).toHaveBeenCalledWith("token-123");
+    });
+    expect(queryResult.refetch).toHaveBeenCalled();
+  });
+
+  it("archives and toggles read state from the row's swipe actions", async () => {
+    const queryResult = buildInfiniteQueryResult({
+      notifications: [SAMPLE_NOTIFICATION],
+      unreadCount: 1,
+    });
+    useInfiniteQuery.mockReturnValue(queryResult);
+    bulkUpdateNotifications.mockResolvedValue({ success: true, unreadCount: 0 });
+
+    render(<NotificationsScreen />);
+
+    // The row carries no buttons of its own; the actions sit behind a left
+    // swipe, which the test stub renders inline.
+    fireEvent.click(screen.getByRole("button", { name: "Mark as read" }));
+    await waitFor(() => {
+      expect(bulkUpdateNotifications).toHaveBeenCalledWith("token-123", {
+        ids: [SAMPLE_NOTIFICATION.id],
+        action: "read",
+      });
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+    await waitFor(() => {
+      expect(bulkUpdateNotifications).toHaveBeenCalledWith("token-123", {
+        ids: [SAMPLE_NOTIFICATION.id],
+        action: "archive",
+      });
     });
     expect(queryResult.refetch).toHaveBeenCalled();
   });

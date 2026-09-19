@@ -408,7 +408,7 @@ describe("RequestsScreen", () => {
 
     render(<RequestsScreen />);
 
-    expect(screen.getByText("Sun, Apr 19")).toBeInTheDocument();
+    expect(screen.getByLabelText("Sun, Apr 19")).toBeInTheDocument();
     expect(screen.getByText("Day Shift")).toBeInTheDocument();
     const mentoredJobPill = screen.getByLabelText("Job Nurse mentored assignment");
     expect(mentoredJobPill).toHaveTextContent("Nurse");
@@ -580,12 +580,14 @@ describe("RequestsScreen", () => {
 
     fireEvent.click(screen.getByText("Available"));
 
-    expect(screen.getByText("Sat, Apr 18")).toBeInTheDocument();
-    expect(screen.getByText("Sun, Apr 19")).toBeInTheDocument();
-
-    const content = document.body.textContent ?? "";
-    expect(content.indexOf("Sat, Apr 18")).toBeLessThan(content.indexOf("Mina Diaz"));
-    expect(content.indexOf("Ivy Stone")).toBeLessThan(content.indexOf("Sun, Apr 19"));
+    // Each day fronts its cards from a date tile on the rail; the full day
+    // label is the tile's accessible name.
+    const saturday = screen.getByLabelText("Sat, Apr 18");
+    const sunday = screen.getByLabelText("Sun, Apr 19");
+    const follows = (first: Element, second: Element) =>
+      Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(follows(saturday, screen.getByText("Mina Diaz"))).toBe(true);
+    expect(follows(screen.getByText("Ivy Stone"), sunday)).toBe(true);
   });
 
   it("shows split-shift segments on open shifts and request cards", () => {
@@ -733,6 +735,10 @@ describe("RequestsScreen", () => {
     expect(screen.getByText("Target Evening")).toBeInTheDocument();
     expect(screen.getAllByText("Shift 1").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Shift 2").length).toBeGreaterThan(0);
+    // The type reads as the same badge Home's approval queue uses. The page
+    // also has a Swap tab, so the badge is one of several "Swap" texts.
+    expect(screen.getAllByText("Swap").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Swap request")).not.toBeInTheDocument();
   });
 
   it("uses the org timezone for available day labels", () => {
@@ -796,7 +802,7 @@ describe("RequestsScreen", () => {
 
     render(<RequestsScreen />);
 
-    expect(screen.getByText("Tomorrow, Apr 16")).toBeInTheDocument();
+    expect(screen.getByLabelText("Tomorrow, Apr 16")).toBeInTheDocument();
   });
 
   it("does not render an inline error card when mutation state carries an error", () => {

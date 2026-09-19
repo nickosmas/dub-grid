@@ -10,6 +10,12 @@ export {
 } from "./animated-logo";
 
 export { getAvatarTone, resolveAvatarSeed, type AvatarTone } from "./avatar-tone";
+export {
+  NUMERIC_BADGE_MAX,
+  formatBadgeCount,
+  numericBadgeSize,
+  type NumericBadgeSize,
+} from "./numeric-badge";
 export { getAvatarTypography } from "./avatar-typography";
 export {
   EDITOR_ACTION_LABELS,
@@ -47,8 +53,10 @@ export {
 export {
   darkMobileElevationTokens,
   getMobileElevation,
+  getMobileElevationExtent,
   mobileElevationTokens,
   type MobileElevation,
+  type MobileElevationExtent,
   type MobileElevationLevel,
 } from "./elevation";
 
@@ -202,8 +210,12 @@ export const colorTokens = lightColorTokens;
  */
 export const spacingTokens = {
   screenX: 16,
-  /** Vertical rhythm between cards/sections on a mobile screen. */
-  sectionGap: 32,
+  /**
+   * Vertical rhythm between cards/sections on a mobile screen. Was 32: with a
+   * card's own heading above its surface each section cost 92pt of chrome
+   * before its first row, a quarter of the viewport on a 17 Pro.
+   */
+  sectionGap: 24,
   /**
    * @deprecated Disagrees with the real card gap. `Screen.tsx`'s Card uses
    * `mobileSpacingTokens.md` (12); this 8 is only still read by
@@ -230,6 +242,33 @@ export const mobileSpacingTokens = {
   "3xl": 32,
   "4xl": 40,
   "5xl": 48,
+} as const;
+
+/**
+ * Heights for every tappable control on mobile: buttons, fields, the search
+ * bar, segmented controls and icon controls. `md` is the platform's 44pt
+ * minimum touch target; `sm` is for a control drawn small on purpose (it pads
+ * its target out with `hitSlop`); `lg` is the auth and primary-CTA size.
+ *
+ * Before this ramp the controls sat at 36, 44, 46, 48, 52, 54, 56 and 62, so a
+ * button beside a segmented control or a search field missed its baseline by
+ * a few points on every screen that put two of them in a row.
+ */
+export const mobileControlTokens = {
+  sm: 36,
+  md: 44,
+  lg: 52,
+} as const;
+
+/**
+ * A pressable list row: tall enough to be a target on its own, with room
+ * between a title and its caption. Dashboard rows used to be bare views 10pt
+ * apart with 2pt inside, which read as a block of text rather than a list.
+ */
+export const mobileListRowTokens = {
+  minHeight: 44,
+  paddingVertical: 12,
+  titleGap: 4,
 } as const;
 
 /**
@@ -349,10 +388,30 @@ export const mobileTypographyTokens = {
    * `mobileTextWeighted(variant, weight)`.
    */
   text: {
+    /**
+     * The one headline on a screen that has no native large title: the
+     * dashboard greeting. A step above `screenTitle` so card headings at
+     * `title` read as a level below it rather than as its peers.
+     */
+    display: {
+      fontFamily: "Inter_700Bold",
+      fontSize: 28,
+      lineHeight: 34,
+    },
     screenTitle: {
       fontFamily: "Inter_700Bold",
       fontSize: 22,
       lineHeight: 28,
+    },
+    /**
+     * A card or section heading over its own surface. Sits between
+     * `screenTitle` and `sectionTitle`; every dashboard card used to take
+     * `screenTitle`, which put six page-sized headings down one scroll.
+     */
+    title: {
+      fontFamily: "Inter_600SemiBold",
+      fontSize: 20,
+      lineHeight: 26,
     },
     heroMetric: {
       fontFamily: "Inter_700Bold",
@@ -378,6 +437,17 @@ export const mobileTypographyTokens = {
       fontFamily: "Inter_400Regular",
       fontSize: 14,
       lineHeight: 21,
+    },
+    /**
+     * Editable text. A step above `body` so a field reads as something you
+     * type into rather than something you read; the family here is the
+     * requested one, and `mobileInputText()` decides at runtime whether a
+     * native field may name it.
+     */
+    input: {
+      fontFamily: "Inter_400Regular",
+      fontSize: 16,
+      lineHeight: 22,
     },
     bodyStrong: {
       fontFamily: "Inter_600SemiBold",

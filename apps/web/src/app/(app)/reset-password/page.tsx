@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
 import { getWebAuthRecoveryMessage } from "@/lib/auth-recovery";
+import { ACTION_SIGN_IN } from "@/lib/action-copy";
 import { isRetryableAuthRecoveryError } from "@dubgrid/client-errors";
 import {
   exchangeBrowserCodeForSession,
@@ -223,7 +224,7 @@ function ResetPasswordContent() {
             icon="check"
             heading="Password updated"
             message="Your password has been successfully reset. You can now sign in with your new password."
-            primaryCta={{ label: "Sign In", href: "/login" }}
+            primaryCta={{ label: ACTION_SIGN_IN, href: "/login" }}
           />
         ) : (
           <>

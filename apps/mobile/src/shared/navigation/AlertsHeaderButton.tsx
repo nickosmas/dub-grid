@@ -1,21 +1,15 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useMemo } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useAccessToken } from "../../features/auth/hooks/useAccessToken";
 import { useBootstrap } from "../../features/auth/hooks/useBootstrap";
 import { useAsyncAction } from "../hooks/useAsyncAction";
 import { usePressAnimation } from "../motion/usePressAnimation";
+import { NumericBadge } from "../components/NumericBadge";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
-import {
-  mobileElevation,
-  mobileMotion,
-  mobileRadii,
-  mobileSpace,
-  mobileText,
-  type MobileColors,
-} from "../theme/tokens";
+import { mobileElevation, mobileMotion, mobileRadii, type MobileColors } from "../theme/tokens";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -53,11 +47,15 @@ export function AlertsHeaderButton() {
       >
         <Ionicons color={mobileColors.textPrimary} name="notifications-outline" size={20} />
       </AnimatedPressable>
-      {unreadCount > 0 ? (
-        <View pointerEvents="none" style={styles.badge}>
-          <Text style={styles.badgeText}>{unreadCount > 9 ? "9+" : unreadCount}</Text>
-        </View>
-      ) : null}
+      <View pointerEvents="none" style={styles.badge}>
+        <NumericBadge
+          count={unreadCount}
+          label={`${unreadCount} unread alerts`}
+          max={9}
+          size="sm"
+          tone="danger"
+        />
+      </View>
     </View>
   );
 }
@@ -87,16 +85,5 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       // -2 on both axes) rather than tucking it inside the circle.
       top: -2,
       right: -2,
-      minWidth: 16,
-      minHeight: 16,
-      borderRadius: mobileRadii.pill,
-      paddingHorizontal: mobileSpace.xs,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: mobileColors.danger,
-    },
-    badgeText: {
-      ...mobileText.micro,
-      color: mobileColors.textInverse,
     },
   });

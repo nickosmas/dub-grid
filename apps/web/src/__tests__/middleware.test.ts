@@ -387,6 +387,8 @@ describe("middleware: Content-Security-Policy", () => {
     const scriptSrc = scriptSrcOf(res);
     expect(scriptSrc).toContain("'unsafe-inline'");
     expect(scriptSrc).not.toContain("'nonce-");
+    // Google Places loader (OrganizationLocationFields) under the static policy.
+    expect(scriptSrc).toContain("https://maps.googleapis.com");
   });
 
   it("uses a per-request nonce + strict-dynamic and drops 'unsafe-inline' for the authenticated app", async () => {
@@ -406,6 +408,16 @@ describe("middleware: Content-Security-Policy", () => {
     expect(scriptSrc).toMatch(/'nonce-[^']+'/);
     expect(scriptSrc).toContain("'strict-dynamic'");
     expect(scriptSrc).not.toContain("'unsafe-inline'");
+    // Explicit rather than relying on strict-dynamic to trust the
+    // bundle-created loader tag, so both policies behave the same.
+    expect(scriptSrc).toContain("https://maps.googleapis.com");
+    expect(scriptSrc).toContain("https://maps.gstatic.com");
+    const csp = (res as { headers: Headers }).headers.get("Content-Security-Policy") ?? "";
+    const connectSrc = csp
+      .split(";")
+      .map((d) => d.trim())
+      .find((d) => d.startsWith("connect-src"));
+    expect(connectSrc).toContain("https://maps.googleapis.com");
   });
 });
 

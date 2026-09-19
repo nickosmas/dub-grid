@@ -1,12 +1,23 @@
 import { useMemo } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../../../shared/components/Text";
 import type { MobileDashboardResponse } from "@dubgrid/contracts";
-import { Card } from "../../../shared/components/Screen";
+import { DashboardCard } from "./DashboardCard";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
-import { CountBadge, type CountBadgeTone } from "./CountBadge";
-import { ExpandableList } from "./ExpandableList";
+import {
+  mobileListRow,
+  mobileText,
+  mobileTextWeighted,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
+import type { CountBadgeTone } from "./CountBadge";
+import { createToneTextColors } from "../lib/tone-text";
+import {
+  DASHBOARD_CARD_PREVIEW_LIMIT,
+  DashboardRowList,
+  hasMoreDashboardRows,
+} from "./DashboardRowList";
 
 export type ActivityItem = MobileDashboardResponse["activity"][number];
 export type ActivityType = ActivityItem["type"];
@@ -44,12 +55,16 @@ export function formatRelativeTime(isoTimestamp: string): string {
 export function ActivityRow({ item }: { item: ActivityItem }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const toneColor = useMemo(() => createToneTextColors(mobileColors), [mobileColors]);
   return (
     <View style={styles.row}>
-      <View style={styles.rowHeader}>
-        <CountBadge label={ACTIVITY_TYPE_LABEL[item.type]} tone={ACTIVITY_TYPE_TONE[item.type]} />
-        <Text style={styles.value}>{formatRelativeTime(item.timestamp)}</Text>
-      </View>
+      <Text style={styles.value}>
+        <Text style={[styles.type, { color: toneColor[ACTIVITY_TYPE_TONE[item.type]] }]}>
+          {ACTIVITY_TYPE_LABEL[item.type]}
+        </Text>
+        {" · "}
+        {formatRelativeTime(item.timestamp)}
+      </Text>
       <Text style={styles.label}>{item.description}</Text>
     </View>
   );
@@ -62,43 +77,35 @@ export function ActivityFeedCard({
   items: MobileDashboardResponse["activity"];
   onSeeAll?: () => void;
 }) {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
-    <Card
+    <DashboardCard
       title="Recent activity"
-      detail={
-        items.length > 0 ? (
-          <ExpandableList
-            title="Recent activity"
-            items={items}
-            keyExtractor={(item) => item.id}
-            onSeeAll={onSeeAll}
-            renderDivider={() => <View style={styles.divider} />}
-            renderItem={(item) => <ActivityRow item={item} />}
-          />
-        ) : (
-          <EmptyStateCard compact iconName="time-outline" title="No recent activity" />
-        )
-      }
-    />
+      onOpen={hasMoreDashboardRows(items.length) ? onSeeAll : undefined}
+    >
+      {items.length > 0 ? (
+        <DashboardRowList
+          items={items}
+          keyExtractor={(item) => item.id}
+          limit={DASHBOARD_CARD_PREVIEW_LIMIT}
+          renderItem={(item) => <ActivityRow item={item} />}
+        />
+      ) : (
+        <EmptyStateCard compact iconName="time-outline" title="No recent activity" />
+      )}
+    </DashboardCard>
   );
 }
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
-    divider: {
-      height: 1,
-      backgroundColor: mobileColors.borderSubtle,
-    },
+    // Static, unlike the other dashboard rows: the feed carries only a
+    // description, so there is nothing to open. Same rhythm as the rows that do.
     row: {
-      gap: 4,
+      gap: mobileListRow.titleGap,
+      paddingVertical: mobileListRow.paddingVertical,
     },
-    rowHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 8,
+    type: {
+      ...mobileTextWeighted("caption", "semibold"),
     },
     label: {
       ...mobileText.body,

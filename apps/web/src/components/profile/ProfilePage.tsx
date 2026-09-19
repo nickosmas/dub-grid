@@ -54,6 +54,7 @@ export function ProfilePage() {
   const {
     user,
     profile,
+    isOrgMember,
     employee,
     managementDepartmentIds,
     shifts,
@@ -115,6 +116,7 @@ export function ProfilePage() {
           profile={profile}
           employee={employee}
           managementDepartmentIds={managementDepartmentIds}
+          isOrgMember={isOrgMember}
           orgId={orgId}
           canEditProfileDirectly={canEditProfileDirectly}
           isGridmaster={Boolean(isGridmaster)}

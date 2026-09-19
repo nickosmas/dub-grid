@@ -20,7 +20,13 @@ import { registerModalPresentation } from "../lib/modal-presentation";
 import { hapticImpact } from "../lib/haptics";
 import { useAsyncAction } from "../hooks/useAsyncAction";
 import { useMotionPreference } from "../motion/useMotionPreference";
-import { mobileElevation, mobileRadii, mobileSpace, type MobileColors } from "../theme/tokens";
+import {
+  mobileControl,
+  mobileElevation,
+  mobileRadii,
+  mobileSpace,
+  type MobileColors,
+} from "../theme/tokens";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 
 type ConfirmationTone = Extract<
@@ -38,38 +44,35 @@ const CARD_ENTRANCE_SCALE = 0.98;
  * small accent beside text - the same role this badge plays here.
  */
 const CONFIRMATION_ICON_NAME: Record<ConfirmationTone, keyof typeof Ionicons.glyphMap> = {
-  primary: "checkmark-circle-outline",
-  secondary: "checkmark-circle-outline",
-  neutral: "information-circle-outline",
-  danger: "warning-outline",
-  warning: "warning-outline",
+  primary: "checkmark-circle",
+  secondary: "checkmark-circle",
+  neutral: "information-circle",
+  danger: "warning",
+  warning: "warning",
 };
 
 /**
- * Background/border/icon colour for the tone badge, mirroring
- * `StatusBanner`'s tone-to-colour mapping (`dangerSoft`/`dangerBorder`/
- * `dangerText`, etc.) rather than inventing a second one. `neutral` has no
- * matching semantic-soft token in the palette, so it composes the same
- * control-surface tokens `Button`'s own neutral tone already uses.
+ * Background/icon colour for the tone badge, mirroring `StatusBanner`'s
+ * tone-to-colour mapping (`dangerSoft`/`dangerText`, etc.) rather than
+ * inventing a second one. `neutral` has no matching semantic-soft token in the
+ * palette, so it composes the same control-surface tokens `Button`'s own
+ * neutral tone already uses. Fill only: the badge carries no stroke.
  */
 function getConfirmationIconColors(tone: ConfirmationTone, mobileColors: MobileColors) {
   switch (tone) {
     case "danger":
       return {
         background: mobileColors.dangerSoft,
-        border: mobileColors.dangerBorder,
         icon: mobileColors.dangerText,
       };
     case "warning":
       return {
         background: mobileColors.warningSoft,
-        border: mobileColors.warningBorder,
         icon: mobileColors.warningText,
       };
     case "neutral":
       return {
         background: mobileColors.controlNeutralBg,
-        border: mobileColors.borderSubtle,
         icon: mobileColors.textSecondary,
       };
     case "primary":
@@ -77,7 +80,6 @@ function getConfirmationIconColors(tone: ConfirmationTone, mobileColors: MobileC
     default:
       return {
         background: mobileColors.brandSoft,
-        border: mobileColors.brandBorder,
         icon: mobileColors.brand,
       };
   }
@@ -97,6 +99,7 @@ export function ConfirmationModal({
   loading,
   onCancel,
   onConfirm,
+  presentation = "modal",
 }: {
   visible: boolean;
   title: string;
@@ -123,6 +126,13 @@ export function ConfirmationModal({
   loading?: boolean;
   onCancel: () => void;
   onConfirm: () => void | Promise<unknown>;
+  /**
+   * `"inline"` draws the same backdrop and card as an absolute overlay in
+   * the parent instead of its own Modal, for a confirmation raised inside
+   * an iOS page sheet: UIKit refuses a second presentation while the sheet
+   * is up, so a nested Modal never appears.
+   */
+  presentation?: "modal" | "inline";
 }) {
   const isDestructive = confirmTone === "danger";
   const mobileColors = useMobileColors();
@@ -186,6 +196,84 @@ export function ConfirmationModal({
     onCancel();
   };
 
+  const surface = (
+    <InsideSheetContext.Provider value>
+      <View style={styles.root}>
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.backdrop]} />
+        {/* Tapping outside dismisses, so there is nothing to tap when the
+              confirmation is busy. */}
+        {isBusy ? null : (
+          <Pressable
+            accessibilityLabel="Dismiss"
+            accessibilityRole="button"
+            style={StyleSheet.absoluteFill}
+            onPress={handleDismiss}
+          />
+        )}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          pointerEvents="box-none"
+          style={styles.avoider}
+        >
+          <Animated.View accessibilityRole="alert" style={[styles.card, cardAnimatedStyle]}>
+            <View style={styles.header}>
+              <View style={[styles.iconBadge, { backgroundColor: iconColors.background }]}>
+                <Ionicons
+                  color={iconColors.icon}
+                  name={iconName ?? CONFIRMATION_ICON_NAME[confirmTone]}
+                  size={24}
+                />
+              </View>
+              <AppText align="center" variant="sectionTitle">
+                {title}
+              </AppText>
+            </View>
+            <ScrollView
+              bounces={false}
+              contentContainerStyle={styles.body}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              style={styles.scrollArea}
+            >
+              {body ? (
+                <AppText align="center" tone="secondary" variant="body">
+                  {body}
+                </AppText>
+              ) : null}
+              {children}
+              {error ? <InlineError message={error} /> : null}
+            </ScrollView>
+            {/* Keep actions visible while the body scrolls. */}
+            <View style={styles.footer}>
+              <ActionButtons
+                primaryAction={
+                  <Button
+                    label={confirmLabel}
+                    loading={isBusy}
+                    onPress={confirm.run}
+                    tone={confirmTone}
+                  />
+                }
+              >
+                <Button
+                  disabled={isBusy}
+                  label={cancelLabel}
+                  onPress={handleDismiss}
+                  tone="plain"
+                />
+              </ActionButtons>
+            </View>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </View>
+    </InsideSheetContext.Provider>
+  );
+
+  if (presentation === "inline") {
+    if (!visible) return null;
+    return <View style={StyleSheet.absoluteFill}>{surface}</View>;
+  }
+
   return (
     <Modal
       animationType="fade"
@@ -196,81 +284,7 @@ export function ConfirmationModal({
       transparent
       visible={visible}
     >
-      <InsideSheetContext.Provider value>
-        <View style={styles.root}>
-          <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.backdrop]} />
-          {/* Tapping outside dismisses, so there is nothing to tap when the
-              confirmation is busy. */}
-          {isBusy ? null : (
-            <Pressable
-              accessibilityLabel="Dismiss"
-              accessibilityRole="button"
-              style={StyleSheet.absoluteFill}
-              onPress={handleDismiss}
-            />
-          )}
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
-            pointerEvents="box-none"
-            style={styles.avoider}
-          >
-            <Animated.View accessibilityRole="alert" style={[styles.card, cardAnimatedStyle]}>
-              <View style={styles.header}>
-                <View
-                  style={[
-                    styles.iconBadge,
-                    { backgroundColor: iconColors.background, borderColor: iconColors.border },
-                  ]}
-                >
-                  <Ionicons
-                    color={iconColors.icon}
-                    name={iconName ?? CONFIRMATION_ICON_NAME[confirmTone]}
-                    size={24}
-                  />
-                </View>
-                <AppText align="center" variant="sectionTitle">
-                  {title}
-                </AppText>
-              </View>
-              <ScrollView
-                bounces={false}
-                contentContainerStyle={styles.body}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-                style={styles.scrollArea}
-              >
-                {body ? (
-                  <AppText align="center" tone="secondary" variant="body">
-                    {body}
-                  </AppText>
-                ) : null}
-                {children}
-                {error ? <InlineError message={error} /> : null}
-              </ScrollView>
-              {/* Keep actions visible while the body scrolls. */}
-              <View style={styles.footer}>
-                <ActionButtons
-                  primaryAction={
-                    <Button
-                      label={confirmLabel}
-                      loading={isBusy}
-                      onPress={confirm.run}
-                      tone={confirmTone}
-                    />
-                  }
-                >
-                  <Button
-                    disabled={isBusy}
-                    label={cancelLabel}
-                    onPress={handleDismiss}
-                    tone="plain"
-                  />
-                </ActionButtons>
-              </View>
-            </Animated.View>
-          </KeyboardAvoidingView>
-        </View>
-      </InsideSheetContext.Provider>
+      {surface}
     </Modal>
   );
 }
@@ -316,11 +330,12 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, windowHeight:
       paddingTop: mobileSpace["2xl"],
       paddingBottom: mobileSpace.sm,
     },
+    // Fill only, like every badge: a stroke around a soft fill read as an
+    // outline sticker on the card.
     iconBadge: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      borderWidth: 1,
+      width: mobileControl.md,
+      height: mobileControl.md,
+      borderRadius: mobileRadii.pill,
       alignItems: "center",
       justifyContent: "center",
       marginBottom: mobileSpace.md,
@@ -336,9 +351,11 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, windowHeight:
     // No top divider: unlike a sheet, this card has no scrollable body long
     // enough to need a permanent "more below" cue, and the mockup this
     // redesign matches separates the actions with space alone.
+    // The body ends 16 above and the footer adds 8: 24 above the actions, so
+    // 24 below them too, per the popup-footer symmetry rule.
     footer: {
       paddingHorizontal: mobileSpace.xl,
       paddingTop: mobileSpace.sm,
-      paddingBottom: mobileSpace.xl,
+      paddingBottom: mobileSpace["2xl"],
     },
   });

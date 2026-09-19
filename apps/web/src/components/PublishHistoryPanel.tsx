@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { Button } from "@/components/Button";
@@ -10,6 +11,7 @@ import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import { fetchPublishHistory } from "@/features/schedule/client";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useSlideoverClose } from "@/hooks/useSlideoverClose";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { formatRelativeTime } from "@/lib/utils";
 import type {
@@ -513,6 +515,7 @@ export default function PublishHistoryPanel({
 }: PublishHistoryPanelProps) {
   const isMobile = useMediaQuery(MOBILE);
   const queryClient = useQueryClient();
+  const { closing, close } = useSlideoverClose(onClose);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // Build empId → "First Last" lookup from employees prop
@@ -594,17 +597,14 @@ export default function PublishHistoryPanel({
     `${entries.length} publish${entries.length !== 1 ? "es" : ""}`
   );
 
-  return (
+  return createPortal(
     <>
-      <div className="dg-panel-overlay" onClick={onClose} />
+      <div className={`dg-panel-overlay${closing ? " closing" : ""}`} onClick={close} />
       <div
-        className="dg-panel"
+        className={`dg-panel${closing ? " closing" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-label="Publish history"
-        onKeyDown={(e) => {
-          if (e.key === "Escape") onClose();
-        }}
       >
         {/* Header */}
         <div
@@ -620,7 +620,7 @@ export default function PublishHistoryPanel({
         >
           {isMobile && (
             <Button
-              onClick={onClose}
+              onClick={close}
               aria-label="Back"
               style={{
                 display: "flex",
@@ -659,7 +659,7 @@ export default function PublishHistoryPanel({
               {subtitle}
             </div>
           </div>
-          {!isMobile && <CloseButton size="md" onClick={onClose} aria-label="Close" />}
+          {!isMobile && <CloseButton size="md" onClick={close} aria-label="Close" />}
         </div>
 
         <ProgressBar loading={loading} />
@@ -833,6 +833,7 @@ export default function PublishHistoryPanel({
         </div>
         <ScrollOverflowCue />
       </div>
-    </>
+    </>,
+    document.body,
   );
 }

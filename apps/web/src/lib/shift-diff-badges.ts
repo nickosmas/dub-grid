@@ -1,3 +1,5 @@
+import { alignSegmentsToBefore, unclaimedBeforeIndices } from "@dubgrid/schedule-core";
+
 export type ShiftDiffBorderKind = "new" | "modified" | null;
 
 export type ShiftDiffBadgeKind = "new" | "modified" | "time";
@@ -209,46 +211,9 @@ function buildMentoredBadge(args: {
       };
 }
 
-/**
- * Which before-pill each after-pill came from.
- *
- * Pills used to be compared by position alone, which misreads any edit that
- * removes something other than the last one: dropping the D from D/N left the
- * surviving N pill labelled "Was D" and the summary claiming N was removed,
- * when D was. Same-position matches are taken first (so a straight
- * replacement still reads as one), then equal assignments elsewhere in the
- * cell, and only then whatever before-pill is left over positionally.
- * A `null` entry means the pill is genuinely new; a before index nothing
- * claims was removed.
- */
+/** Pills are keyed by assignment-definition id; the shared aligner does the rest. */
 function alignPillsToBefore(before: number[], after: number[]): Array<number | null> {
-  const alignment: Array<number | null> = after.map(() => null);
-  const claimed = new Set<number>();
-
-  const claim = (afterIndex: number, beforeIndex: number) => {
-    alignment[afterIndex] = beforeIndex;
-    claimed.add(beforeIndex);
-  };
-
-  after.forEach((assignmentId, afterIndex) => {
-    if (before[afterIndex] === assignmentId) claim(afterIndex, afterIndex);
-  });
-
-  after.forEach((assignmentId, afterIndex) => {
-    if (alignment[afterIndex] != null) return;
-    const match = before.findIndex(
-      (beforeId, beforeIndex) => beforeId === assignmentId && !claimed.has(beforeIndex),
-    );
-    if (match !== -1) claim(afterIndex, match);
-  });
-
-  after.forEach((_, afterIndex) => {
-    if (alignment[afterIndex] != null) return;
-    const leftover = before.findIndex((_beforeId, beforeIndex) => !claimed.has(beforeIndex));
-    if (leftover !== -1) claim(afterIndex, leftover);
-  });
-
-  return alignment;
+  return alignSegmentsToBefore(before, after, (assignmentId) => assignmentId);
 }
 
 function buildNewShiftBadge(label: string): ShiftDiffBadgeDescriptor {
@@ -477,11 +442,10 @@ export function buildShiftDiffDescriptors(
     beforeAbsenceTypeId == null &&
     beforeAssignmentDefinitionIds.length > afterAssignmentDefinitionIds.length
   ) {
-    const survivingBeforeIndices = new Set(
-      pillAlignment.filter((beforeIndex): beforeIndex is number => beforeIndex != null),
-    );
-    for (let index = 0; index < beforeAssignmentDefinitionIds.length; index += 1) {
-      if (survivingBeforeIndices.has(index)) continue;
+    for (const index of unclaimedBeforeIndices(
+      pillAlignment,
+      beforeAssignmentDefinitionIds.length,
+    )) {
       const removedLabel =
         resolveShiftLabelAtIndex({
           assignmentIds: beforeAssignmentDefinitionIds,

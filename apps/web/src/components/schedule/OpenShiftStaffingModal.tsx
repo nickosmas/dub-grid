@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Search, UserRound } from "lucide-react";
 import Modal from "@/components/Modal";
 import CustomSelect from "@/components/CustomSelect";
+import { SectionNotice } from "@/components/ui/SectionNotice";
 import { Button } from "@/components/Button";
 import { fmt12h } from "@/components/shiftEditTime";
 import { getEmployeeDisplayName } from "@/lib/utils";
@@ -147,6 +148,18 @@ export function OpenShiftStaffingModal({
         <span>{dateLabel}</span>
         <span>{needed === 1 ? "1 person needed" : `${needed} people needed`}</span>
       </div>
+
+      {/* The adjacent-day overlap check reads the loaded shift window; when a
+          neighbouring day is outside it the check cannot run for anyone, so
+          say so rather than present the list as fully vetted. */}
+      {candidates.some((candidate) => candidate.adjacentCheckUnverified) && (
+        <SectionNotice
+          tone="warning"
+          messages={[
+            "Shifts on the day before or after this date are not loaded, so overnight overlaps with them could not be checked.",
+          ]}
+        />
+      )}
 
       {candidates.length > 0 ? (
         <label className="dg-open-shift-staffing-search">

@@ -3,6 +3,10 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { NativeTabBarPresenceProvider } from "../navigation/NativeTabBarPresence";
 
 const nativeScrollTo = vi.fn();
+// Mutable so a test can stand the screen under a real notch. The default 8 is
+// deliberately small: it is also the floor the sticky header pads by, so a test
+// that wants to see the inset applied has to raise it first.
+const safeAreaInsets = vi.hoisted(() => ({ top: 8, right: 0, bottom: 14, left: 0 }));
 
 function pickDomProps(input: Record<string, any>) {
   const output: Record<string, any> = {};
@@ -94,7 +98,10 @@ vi.mock("react-native", async () => {
     React.createElement("span", pickDomProps(props), children as React.ReactNode);
 
   const ScrollView = React.forwardRef<{ scrollTo: () => void }, Record<string, any>>(
-    ({ children, contentContainerStyle, contentInset, contentOffset, ...props }, ref) => {
+    (
+      { children, contentContainerStyle, contentInset, contentOffset, refreshControl, ...props },
+      ref,
+    ) => {
       React.useImperativeHandle(
         ref,
         () => ({
@@ -103,6 +110,8 @@ vi.mock("react-native", async () => {
         [],
       );
 
+      // iOS mounts the refresh control as the scroll view's first child,
+      // ahead of the content container; the tests below rely on that shape.
       return React.createElement(
         "div",
         {
@@ -121,15 +130,37 @@ vi.mock("react-native", async () => {
           "data-keyboard-dismiss-mode": props.keyboardDismissMode,
           "data-testid": "screen-scroll-view",
         },
+        refreshControl as React.ReactNode,
         children as React.ReactNode,
       );
     },
   );
+  const Pressable = ({ children, onPress, disabled, style, ...props }: Record<string, any>) =>
+    React.createElement(
+      "button",
+      {
+        type: "button",
+        disabled,
+        onClick: onPress as (() => void) | undefined,
+        ...pickDomProps(props),
+        "data-style": JSON.stringify(
+          typeof style === "function" ? style({ pressed: false }) : (style ?? null),
+        ),
+      },
+      children as React.ReactNode,
+    );
+
   return {
     Platform: {
       OS: "ios",
     },
-    RefreshControl: () => null,
+    Pressable,
+    RefreshControl: ({ enabled, refreshing }: Record<string, any>) =>
+      React.createElement("div", {
+        "data-testid": "refresh-control",
+        "data-enabled": String(enabled ?? true),
+        "data-refreshing": String(refreshing),
+      }),
     ScrollView,
     StyleSheet: {
       absoluteFillObject: {
@@ -146,18 +177,17 @@ vi.mock("react-native", async () => {
   };
 });
 
+vi.mock("@expo/vector-icons/Ionicons", () => ({
+  default: () => null,
+}));
+
 vi.mock("react-native-safe-area-context", async () => {
   const React = await import("react");
 
   return {
     SafeAreaProvider: ({ children }: { children: React.ReactNode }) =>
       React.createElement("div", {}, children),
-    useSafeAreaInsets: () => ({
-      top: 8,
-      right: 0,
-      bottom: 14,
-      left: 0,
-    }),
+    useSafeAreaInsets: () => ({ ...safeAreaInsets }),
   };
 });
 
@@ -170,9 +200,21 @@ beforeAll(async () => {
   Card = screenModule.Card;
 });
 
+/** The sticky-header shell is the View wrapping whatever `stickyHeader` renders. */
+function getStickyHeaderShellPaddingTop(): number | undefined {
+  const shell = screen.getByText("Header").parentElement;
+  const style = JSON.parse(shell?.getAttribute("data-style") ?? "null") as unknown;
+  const layers = Array.isArray(style) ? style : [style];
+  return layers.reduce<number | undefined>((found, layer) => {
+    const value = (layer as { paddingTop?: number } | null)?.paddingTop;
+    return typeof value === "number" ? value : found;
+  }, undefined);
+}
+
 describe("Screen", () => {
   beforeEach(() => {
     nativeScrollTo.mockClear();
+    safeAreaInsets.top = 8;
   });
 
   it("exposes the scroll view as the top-level element for native header scroll tracking", () => {
@@ -297,6 +339,28 @@ describe("Screen", () => {
     expect(handleScroll).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps the page mounted when scrolling is locked for a skeleton", () => {
+    const { rerender } = render(
+      <Screen onRefresh={vi.fn()} scrollEnabled>
+        <div>Body</div>
+      </Screen>,
+    );
+    const body = screen.getByText("Body");
+    expect(screen.getByTestId("refresh-control")).toHaveAttribute("data-enabled", "true");
+
+    rerender(
+      <Screen onRefresh={vi.fn()} scrollEnabled={false}>
+        <div>Body</div>
+      </Screen>,
+    );
+
+    // The refresh control is the scroll view's first child on iOS. Dropping it
+    // for the skeleton moved the content to that slot and React remounted
+    // everything in it, a presented sheet included. It stays, disarmed.
+    expect(screen.getByTestId("refresh-control")).toHaveAttribute("data-enabled", "false");
+    expect(screen.getByText("Body")).toBe(body);
+  });
+
   it("keeps a stable root shell when a custom overlay is requested", () => {
     const { container } = render(
       <Screen renderOverlay={() => null}>
@@ -308,6 +372,58 @@ describe("Screen", () => {
 
     expect(container.firstElementChild).not.toBe(scrollView);
     expect(container.firstElementChild?.contains(scrollView)).toBe(true);
+  });
+
+  it("renders a page background behind everything and lets the sticky header paint its own slice", () => {
+    render(
+      <Screen
+        pageBackground={<span>Page wash</span>}
+        stickyHeader={<span>Header</span>}
+        stickyHeaderBackground={<span>Header wash</span>}
+      >
+        <div>Body</div>
+      </Screen>,
+    );
+
+    expect(screen.getByText("Page wash")).toBeInTheDocument();
+    // The header's wash lives inside the header's shell, next to its content,
+    // so content scrolling under the header never shows through.
+    expect(screen.getByText("Header wash").parentElement).toBe(
+      screen.getByText("Header").parentElement,
+    );
+  });
+
+  it("pads a non-scrolling sticky header by the top safe-area inset, the same as the floating one", () => {
+    safeAreaInsets.top = 59;
+
+    const { unmount } = render(
+      <Screen scrollEnabled={false} stickyHeader={<span>Header</span>}>
+        <div>Skeleton</div>
+      </Screen>,
+    );
+    const nonScrollingPadding = getStickyHeaderShellPaddingTop();
+    unmount();
+
+    render(
+      <Screen stickyHeader={<span>Header</span>}>
+        <div>Body</div>
+      </Screen>,
+    );
+
+    expect(nonScrollingPadding).toBe(59);
+    expect(getStickyHeaderShellPaddingTop()).toBe(nonScrollingPadding);
+  });
+
+  it("keeps the sticky header off the top edge on a device with no inset", () => {
+    safeAreaInsets.top = 0;
+
+    render(
+      <Screen scrollEnabled={false} stickyHeader={<span>Header</span>}>
+        <div>Skeleton</div>
+      </Screen>,
+    );
+
+    expect(getStickyHeaderShellPaddingTop()).toBe(8);
   });
 
   it("renders overlays with the measured sticky header height", () => {
@@ -393,6 +509,15 @@ describe("Screen", () => {
 });
 
 describe("Card", () => {
+  it("renders a header-right See all control that calls back", () => {
+    const onSeeAll = vi.fn();
+    render(<Card title="Open shifts" onSeeAll={onSeeAll} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "See all: Open shifts" }));
+
+    expect(onSeeAll).toHaveBeenCalledTimes(1);
+  });
+
   it("renders the title and body", () => {
     render(<Card title="Plain card" body="Some body text" />);
 

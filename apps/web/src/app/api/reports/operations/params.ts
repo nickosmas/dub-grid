@@ -18,6 +18,8 @@ export const operationsQuerySchema = z.object({
   jobIds: z.string().optional(),
   indicatorTypeIds: z.string().optional(),
   dates: z.string().optional(),
+  /** "1" asks for the filter dropdown lists only, with no report rows. */
+  optionsOnly: z.literal("1").optional(),
 });
 
 type OperationsQueryInput = z.infer<typeof operationsQuerySchema>;

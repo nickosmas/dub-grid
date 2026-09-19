@@ -1,4 +1,91 @@
 import type { ShiftMap } from "@/types";
+import { expandDelimitedTimeRanges } from "@/lib/shift-diff-badges";
+
+/** One side of a published-cell comparison, in the shape both the draft map and publish history can supply. */
+export interface CellChangeSide {
+  segments: ReadonlyArray<{ shiftId: number | null; jobId: number; isMentored?: boolean }>;
+  absenceTypeId: number | null;
+  customStartTime: string | null;
+  customEndTime: string | null;
+}
+
+/**
+ * How many shifts a change to an already-published cell added without
+ * touching what was there. Adding a second shift beside a published one makes
+ * a double shift, and the grid already rings that pill green as "new"; the
+ * cell-level `draftKind` still says "modified", so the banner used to count it
+ * as an edit. Returns 0 when anything published changed (replaced, removed,
+ * reordered, retimed, or an absence swapped), so those stay edits.
+ */
+export function countShiftsAddedToPublishedCell(
+  before: CellChangeSide,
+  after: CellChangeSide,
+): number {
+  if (before.segments.length === 0 || after.segments.length <= before.segments.length) return 0;
+  if ((before.absenceTypeId ?? null) !== (after.absenceTypeId ?? null)) return 0;
+
+  const beforeTimes = expandDelimitedTimeRanges(
+    before.customStartTime,
+    before.customEndTime,
+    before.segments.length,
+  );
+  const afterTimes = expandDelimitedTimeRanges(
+    after.customStartTime,
+    after.customEndTime,
+    after.segments.length,
+  );
+
+  const preserved = before.segments.every((segment, index) => {
+    const other = after.segments[index];
+    return (
+      !!other &&
+      (segment.shiftId ?? null) === (other.shiftId ?? null) &&
+      segment.jobId === other.jobId &&
+      (segment.isMentored ?? false) === (other.isMentored ?? false) &&
+      beforeTimes[index]?.start === afterTimes[index]?.start &&
+      beforeTimes[index]?.end === afterTimes[index]?.end
+    );
+  });
+
+  return preserved ? after.segments.length - before.segments.length : 0;
+}
+
+/**
+ * How many changes one draft cell contributes to a total: the added shifts
+ * when that is all that changed, otherwise the cell itself. Keeps the headline
+ * count, the per-editor rows, the out-of-window groups, and the server audit
+ * summary agreeing with the chips.
+ */
+export function countDraftEntryChanges(entry: ShiftMap[string]): number {
+  if (entry.draftKind == null) return 0;
+  if (entry.draftKind !== "modified") return 1;
+  return Math.max(1, countShiftsAddedToPublishedEntry(entry));
+}
+
+/** Splits a `modified` draft cell into the added-shift count the banner should report as new. */
+export function countShiftsAddedToPublishedEntry(entry: ShiftMap[string]): number {
+  const toSegments = (
+    segments: ShiftMap[string]["segments"],
+    assignmentIds: number[] | undefined,
+  ) =>
+    segments && segments.length > 0
+      ? segments
+      : (assignmentIds ?? []).map((id) => ({ shiftId: id, jobId: -1 }));
+  return countShiftsAddedToPublishedCell(
+    {
+      segments: toSegments(entry.publishedSegments, entry.publishedAssignmentDefinitionIds),
+      absenceTypeId: entry.publishedAbsenceTypeId ?? null,
+      customStartTime: entry.publishedCustomStartTime ?? null,
+      customEndTime: entry.publishedCustomEndTime ?? null,
+    },
+    {
+      segments: toSegments(entry.segments, entry.assignmentIds),
+      absenceTypeId: entry.absenceTypeId ?? null,
+      customStartTime: entry.customStartTime ?? null,
+      customEndTime: entry.customEndTime ?? null,
+    },
+  );
+}
 
 export interface DraftBreakdown {
   newShifts: number;
@@ -58,9 +145,12 @@ export function computeDraftBreakdown(
       case "new":
         newShifts++;
         break;
-      case "modified":
-        modifiedShifts++;
+      case "modified": {
+        const added = countShiftsAddedToPublishedEntry(entry);
+        if (added > 0) newShifts += added;
+        else modifiedShifts++;
         break;
+      }
       case "deleted":
         deletedShifts++;
         break;
@@ -116,16 +206,16 @@ export function computeOutOfWindowDraftGroups(
 ): OutOfWindowDraftGroup[] {
   const counts = new Map<string, number>();
 
-  const tally = (dateKey: string | null) => {
+  const tally = (dateKey: string | null, count: number) => {
     if (!dateKey) return;
     if (isInRange(dateKey, window)) return;
     const periodKey = getPeriodKey(dateKey);
-    counts.set(periodKey, (counts.get(periodKey) ?? 0) + 1);
+    counts.set(periodKey, (counts.get(periodKey) ?? 0) + count);
   };
 
   for (const [key, entry] of Object.entries(shifts)) {
     if (entry.draftKind == null) continue;
-    tally(extractDateKeyFromCellKey(key));
+    tally(extractDateKeyFromCellKey(key), countDraftEntryChanges(entry));
   }
 
   for (const [key, noteList] of Object.entries(notes)) {

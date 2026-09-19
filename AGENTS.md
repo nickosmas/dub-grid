@@ -290,6 +290,7 @@ Current DubGrid commands (root, npm workspaces + Turborepo):
 - Build: `npm run build`
 - Production server: `npm run start`
 - Lint: `npm run lint`
+- Lint rule tests: `npm run lint:rules` (the custom rules under `eslint-rules/`)
 - Type check: `npm run type-check`
 - Test (unit/integration, all workspaces): `npm run test`
 - Test (web only): `npm run test:web`

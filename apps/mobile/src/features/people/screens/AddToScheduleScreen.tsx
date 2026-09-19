@@ -204,54 +204,53 @@ export default function AddToScheduleScreen() {
         />
       ) : (
         <>
-          <ProfileSection title="Assignments">
-            <ProfilePanel>
-              <AppText tone="secondary" variant="meta">
-                They keep their management access either way. This is what puts them on the grid.
-              </AppText>
-              <ProfileChoiceGroup
-                error={focusAreaError}
-                items={focusAreas.map((item) => ({ id: item.id, name: item.name }))}
-                label={focusAreaLabel}
-                selectedIds={draft.focusAreaIds}
-                onToggle={(id) => toggle("focusAreaIds", id)}
-              />
-              <ProfileChoiceGroup
-                items={[
-                  { id: -1, name: "None" },
-                  ...certifications.map((item) => ({
-                    id: item.id,
-                    name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
-                  })),
-                ]}
-                label={certificationLabel}
-                selectedIds={draft.certificationId == null ? [-1] : [draft.certificationId]}
-                onToggle={(id) =>
-                  setDraft((current) =>
-                    current ? { ...current, certificationId: id === -1 ? null : id } : current,
-                  )
-                }
-              />
-              <ProfileChoiceGroup
-                items={roles
-                  .filter(
-                    (item) =>
-                      !isRoleCertificationBlocked({
-                        role: item,
-                        certificationId: draft.certificationId,
-                        selectedRoleIds: draft.roleIds,
-                        roleId: item.id,
-                      }),
-                  )
-                  .map((item) => ({
-                    id: item.id,
-                    name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
-                  }))}
-                label={roleLabel}
-                selectedIds={draft.roleIds}
-                onToggle={(id) => toggle("roleIds", id)}
-              />
-            </ProfilePanel>
+          <ProfileSection
+            description="They keep their management access either way. This is what puts them on the grid."
+            title="Assignments"
+          >
+            <ProfileChoiceGroup
+              error={focusAreaError}
+              items={focusAreas.map((item) => ({ id: item.id, name: item.name }))}
+              label={focusAreaLabel}
+              selectedIds={draft.focusAreaIds}
+              onToggle={(id) => toggle("focusAreaIds", id)}
+            />
+            <ProfileChoiceGroup
+              items={[
+                { id: -1, name: "None" },
+                ...certifications.map((item) => ({
+                  id: item.id,
+                  name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
+                })),
+              ]}
+              label={certificationLabel}
+              selection="single"
+              selectedIds={draft.certificationId == null ? [-1] : [draft.certificationId]}
+              onToggle={(id) =>
+                setDraft((current) =>
+                  current ? { ...current, certificationId: id === -1 ? null : id } : current,
+                )
+              }
+            />
+            <ProfileChoiceGroup
+              items={roles
+                .filter(
+                  (item) =>
+                    !isRoleCertificationBlocked({
+                      role: item,
+                      certificationId: draft.certificationId,
+                      selectedRoleIds: draft.roleIds,
+                      roleId: item.id,
+                    }),
+                )
+                .map((item) => ({
+                  id: item.id,
+                  name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
+                }))}
+              label={roleLabel}
+              selectedIds={draft.roleIds}
+              onToggle={(id) => toggle("roleIds", id)}
+            />
           </ProfileSection>
 
           {error ? <InlineError message={error} /> : null}

@@ -1,3 +1,4 @@
+import { useWindowDimensions } from "react-native";
 import { SegmentedControl } from "../../../shared/components/SegmentedControl";
 import type { DashboardPeriodMode } from "../../../shared/lib/dates";
 
@@ -15,19 +16,26 @@ const OPTIONS = [
 export function PeriodToggle({
   mode,
   onChange,
-  loading = false,
 }: {
   mode: DashboardPeriodMode;
   onChange: (mode: DashboardPeriodMode) => void;
-  loading?: boolean;
 }) {
+  // A compact pill at the default size; once text is scaled up the three
+  // labels no longer fit it and truncated to their first letter, so the
+  // control takes the row instead.
+  const { fontScale } = useWindowDimensions();
+  // Never disabled while a period loads: the cards dim to say so, and a
+  // second tap simply moves the query on. Locking the control read as a hang.
   return (
     <SegmentedControl
       accessibilityLabel="Dashboard period"
-      disabled={loading}
       onChange={onChange}
       options={OPTIONS}
       size="sm"
+      stretch={fontScale > 1}
+      // On the coverage wash a grey track read as a patch; the theme's own
+      // ground (white or black) sits cleanly on it.
+      track="background"
       value={mode}
     />
   );

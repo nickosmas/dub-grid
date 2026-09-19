@@ -16,7 +16,7 @@ sequenceDiagram
     participant JWTHook as custom_access_token_hook
     participant DB as PostgreSQL
     participant TrialAPI as POST /api/auth/start-trial
-    participant Middleware as Edge Middleware
+    participant Middleware as Request Proxy
 
     Note over User,Middleware: === ORG LOGIN (e.g., calmhaven.dubgrid.com/login) ===
 
@@ -349,7 +349,7 @@ flowchart TB
     SA -->|configures permissions for| AD
     AD -.->|elevated from| US
 
-    subgraph PermMatrix["Admin Permission Matrix - 25 permissions (JSONB in organization_memberships)"]
+    subgraph PermMatrix["Admin Permission Matrix - 26 permissions (JSONB in organization_memberships)"]
         direction LR
         subgraph Schedule["Schedule (4)"]
             P1["canViewSchedule always-true\ncanEditShifts\ncanPublishSchedule\ncanApplyRecurringSchedule"]
@@ -369,14 +369,14 @@ flowchart TB
         subgraph Coverage["Coverage + Requests (3)"]
             P6["canViewCoverageRequirements\ncanManageCoverageRequirements\ncanApproveShiftRequests"]
         end
-        subgraph Dashboard["Dashboard (1)"]
-            P7["canViewDashboardAnalytics"]
+        subgraph Dashboard["Dashboard + Reports (2)"]
+            P7["canViewDashboardAnalytics\ncanViewReports"]
         end
     end
 
     AD -->|permissions stored per-person, NOT per-department| PermMatrix
 
-    NOTE1["25 total perms. canManage* implies canView*.\nPermissions are PER-PERSON (admin_permissions field on organization_memberships).\nDepartments do NOT grant permissions.\nSuper-admin-only (non-delegable): canManageUsers, canConfigureAdminPermissions, canManageOrgSettings."]
+    NOTE1["26 total perms. canManage* implies canView*.\nPermissions are PER-PERSON (admin_permissions field on organization_memberships).\nDepartments do NOT grant permissions. A user-role member never inherits a stored set.\nBaselines: users start all-false, admins start from ADMIN_DEFAULT_PERMS (schedule editing, publishing, notes, recurring, reports).\nSuper-admin-only (non-delegable): canManageUsers, canConfigureAdminPermissions, canManageOrgSettings."]
     PermMatrix -.-> NOTE1
 
     style GM fill:#dc2626,color:#fff
@@ -524,11 +524,11 @@ erDiagram
         text subscription_status "billing state"
         timestamptz trial_started_at "set by start_trial_for_org on first super_admin login"
         timestamptz trial_ends_at "NULL = trial_pending state"
-        text workspace_kind "production or sandbox"
+        text workspace_kind "real or sandbox"
         uuid sandbox_source_org_id FK "organizations (nullable)"
-        uuid sandbox_owner_user_id FK "auth.users (nullable)"
-        timestamptz sandbox_expires_at "30-day TTL"
-        text sandbox_template_version
+        uuid sandbox_owner_user_id FK "auth.users (nullable, one active sandbox per user)"
+        timestamptz trial_welcome_email_sent_at "claimed once"
+        integer data_retention_days
     }
 
     profiles {
@@ -537,8 +537,11 @@ erDiagram
         platform_role platform_role "gridmaster or none"
         bigint version "optimistic lock"
         boolean role_locked
+        boolean mfa_enabled
+        text terms_version
         timestamptz last_sign_in_at
         timestamptz deactivated_at
+        timestamptz scheduled_deletion_at
     }
 
     organization_memberships {
@@ -546,10 +549,12 @@ erDiagram
         uuid user_id FK "auth.users"
         uuid org_id FK "organizations"
         org_role org_role "super_admin or admin or user"
-        jsonb admin_permissions "fine-grained perms - 25 total, per-person"
+        jsonb admin_permissions "fine-grained perms - 26 total, per-person"
         bigint_arr department_ids "departments[]"
-        timestamptz landing_card_dismissed_at
-        jsonb onboarding_step_telemetry "default {}"
+        bigint_arr dept_admin_ids "subset of department_ids"
+        timestamptz onboarding_completed_at "durable per member and org"
+        jsonb tooltip_tours_completed "default {}"
+        timestamptz schedule_last_viewed_at
         timestamptz archived_at "soft removal"
     }
 
@@ -772,7 +777,7 @@ erDiagram
 
     schedule_draft_sessions {
         uuid id PK
-        uuid org_id FK_UK "organizations (one per org)"
+        uuid org_id FK_UK "organizations (one per org) - draft recovery, not a lock"
         uuid saved_by FK "auth.users"
         date start_date
         date end_date
@@ -780,9 +785,18 @@ erDiagram
 
     recurring_shifts_draft_sessions {
         uuid id PK
-        uuid org_id FK_UK "organizations (one per org)"
+        uuid org_id FK_UK "organizations (one per org) - draft recovery, not a lock"
         uuid saved_by FK "auth.users"
         jsonb draft_data
+    }
+
+    schedule_editor_session_terminations {
+        uuid id PK
+        uuid org_id FK "organizations"
+        uuid user_id FK "auth.users (owner-only)"
+        uuid editor_session_id
+        uuid ended_by_editor_session_id
+        timestamptz ended_at
     }
 
     publish_history {
@@ -793,6 +807,134 @@ erDiagram
         date end_date
         integer change_count
         jsonb changes
+    }
+
+    schedule_publish_changes {
+        bigint id PK
+        uuid publish_history_id FK "publish_history"
+        uuid org_id FK "organizations"
+        uuid emp_id FK "employees"
+        date date
+        text kind
+        jsonb from_state "finalize_scheduler_staffed_calloffs trigger (019/020)"
+        jsonb to_state
+        uuid updated_by FK "auth.users"
+    }
+
+    job_shift_overrides {
+        bigint id PK
+        uuid org_id FK "organizations"
+        bigint job_id FK "jobs"
+        bigint shift_id FK "shift_categories"
+        time start_time
+        time end_time
+        text color
+    }
+
+    calendar_feed_tokens {
+        uuid id PK
+        uuid user_id FK "auth.users"
+        uuid org_id FK "organizations"
+        uuid employee_id FK "employees"
+        text token_hash "private .ics feed (migration 011)"
+        timestamptz issued_at
+        timestamptz revoked_at
+    }
+
+    notifications {
+        uuid id PK
+        uuid user_id FK "auth.users"
+        uuid org_id FK "organizations"
+        text type
+        text channel
+        text category
+        text priority "low/normal/high/critical"
+        text title
+        text message
+        jsonb metadata "destination facts for the alert resolver"
+        timestamptz read_at
+        timestamptz archived_at
+    }
+
+    notification_preferences {
+        bigint id PK
+        uuid user_id FK "auth.users"
+        jsonb prefs
+    }
+
+    profile_change_requests {
+        uuid id PK
+        uuid org_id FK "organizations"
+        uuid requester_user_id FK "auth.users"
+        uuid requester_employee_id FK "employees"
+        profile_change_request_type request_type
+        profile_change_request_status status
+        jsonb requested_changes
+        jsonb current_values
+        uuid resolver_user_id FK "auth.users"
+        timestamptz resolved_at
+        integer version "optimistic lock"
+    }
+
+    subscriptions {
+        bigint id PK
+        uuid org_id FK "organizations"
+        text stripe_subscription_id
+        text stripe_customer_id
+        text status
+        text price_id
+        integer quantity "seats"
+        timestamptz current_period_end
+        timestamptz trial_end
+    }
+
+    stripe_processed_events {
+        text event_id PK "webhook replay idempotency"
+        timestamptz processed_at
+    }
+
+    platform_feature_flags {
+        text key PK "stripe, resend_email, mobile_api, csv_import, csv_export, sentry, posthog, cron_*"
+        boolean enabled "false = kill-switched"
+        text description
+        uuid updated_by FK "auth.users (gridmaster)"
+    }
+
+    audit_log {
+        bigint id PK
+        uuid org_id FK "organizations (nullable for platform rows)"
+        uuid actor_id FK "auth.users"
+        text actor_email
+        text action
+        text resource_type
+        text resource_id
+        jsonb details
+        uuid impersonation_session_id FK "impersonation_sessions"
+    }
+
+    terms_acceptances {
+        bigint id PK
+        uuid user_id FK "auth.users"
+        text terms_version
+        timestamptz accepted_at
+    }
+
+    cookie_consents {
+        bigint id PK
+        uuid user_id FK "auth.users (nullable)"
+        text ip_hash
+        jsonb consent
+        text consent_version
+    }
+
+    mobile_device_tokens {
+        uuid id PK
+        uuid user_id FK "auth.users"
+        uuid org_id FK "organizations"
+        text platform
+        text expo_push_token
+        timestamptz last_seen_at
+        timestamptz disabled_at
     }
 
     %% === RELATIONSHIPS ===
@@ -817,7 +959,18 @@ erDiagram
     organizations ||--o{ shift_requests : "has requests"
     organizations ||--o| schedule_draft_sessions : "has draft"
     organizations ||--o| recurring_shifts_draft_sessions : "has recurring draft"
+    organizations ||--o{ schedule_editor_session_terminations : "ended editor sessions"
     organizations ||--o{ publish_history : "has publishes"
+    publish_history ||--o{ schedule_publish_changes : "per-cell diffs"
+    organizations ||--o{ job_shift_overrides : "job shift overrides"
+    organizations ||--o{ notifications : "alerts"
+    organizations ||--o{ profile_change_requests : "change requests"
+    organizations ||--o| subscriptions : "billing"
+    organizations ||--o{ audit_log : "activity"
+    auth_users ||--o| notification_preferences : "delivery prefs"
+    auth_users ||--o{ terms_acceptances : "accepted terms"
+    auth_users ||--o{ mobile_device_tokens : "push devices"
+    employees ||--o{ calendar_feed_tokens : "private calendar feeds"
     organizations ||--o| impersonation_sessions : "target org"
 
     profiles }o--o| organizations : "default org for new sessions"
@@ -991,7 +1144,7 @@ flowchart TD
     subgraph Revoke["Access Revocation - Multiple Layers"]
         direction TB
         HOOK["custom_access_token_hook:\nLEFT JOIN organizations WHERE archived_at IS NULL\nArchived org strips org claims from next JWT"]
-        MIDDLEWARE["Edge Middleware:\ncacheThrough checks archived_at on every request\narchived_at IS NOT NULL → redirect to /login?deleted=true"]
+        MIDDLEWARE["Request proxy:\ncacheThrough checks archived_at on every request\narchived_at IS NOT NULL → redirect to /login?deleted=true"]
         GETMYORGS["get_my_organizations RPC:\nJOIN organizations WHERE archived_at IS NULL\nArchived org never appears in org switcher"]
         SWITCHORG["switch_org RPC:\nblocks switching into archived org for non-gridmasters"]
     end
@@ -1023,22 +1176,23 @@ flowchart TD
 flowchart LR
     subgraph Enter["Entering Sandbox Mode"]
         SA["Super Admin clicks 'Enter Sandbox'"]
-        CREATE["POST /api/test-sandbox\nCreate or retrieve sandbox org\n(workspace_kind = sandbox,\nsandbox_owner_user_id = caller,\nsandbox_source_org_id = real org)"]
-        SETCOOKIE["Set dubgrid-sandbox cookie:\n{ sandboxOrgId, userId }\nUser stays on SAME subdomain\nNo JWT refresh, no navigation"]
+        CREATE["POST /api/test-sandbox { action: enter }\nadmin+ by real source-org role, CSRF + rate-limited\nCreate or reuse sandbox org\n(workspace_kind = sandbox,\nsandbox_owner_user_id = caller,\nsandbox_source_org_id = real org)"]
+        SETCOOKIE["Set dubgrid-sandbox cookie (HttpOnly, 7 days):\n{ sandboxOrgId, userId }\nUser stays on SAME subdomain\nNo JWT refresh, no navigation"]
     end
 
     subgraph Active["Active Sandbox State"]
         COOKIE["Browser carries dubgrid-sandbox cookie"]
-        MW["Middleware reads cookie:\ngetSandboxFromCookie()\nVerifies: workspace_kind=sandbox,\nsandbox_owner_user_id = session.user.id,\narchived_at IS NULL via service client"]
+        MW["Request proxy reads cookie:\ngetSandboxFromCookie()\nVerifies: workspace_kind=sandbox,\nsandbox_owner_user_id = session.user.id,\narchived_at IS NULL via service client"]
         OVERRIDE["Override claims.org_id to sandboxOrgId\nclaims.org_slug intentionally KEPT as real org\n(user stays on real-org subdomain)"]
         HEADER["Inject x-dubgrid-sandbox: true header"]
         APIGATE["requireOrgPermissions (api-auth.ts):\nsandbox org_id replaces real org_id\nfor all reads and writes\nMutation-only endpoints blocked with 403"]
     end
 
     subgraph Exit["Exiting Sandbox"]
-        EXITBTN["User clicks 'Exit Sandbox'"]
-        CLEARCOOKIE["DELETE /api/test-sandbox\nClear dubgrid-sandbox cookie"]
-        RESTORE["Next request: no sandbox cookie\nMiddleware uses real org_id from JWT"]
+        EXITBTN["User clicks 'Exit Sandbox'\n(or 'Reset' to wipe and re-clone)"]
+        CLEARCOOKIE["POST /api/test-sandbox { action: exit }\nDelete the caller's sandboxes,\nclear dubgrid-sandbox cookie"]
+        RESTORE["Next request: no sandbox cookie\nRequest proxy uses real org_id from JWT"]
+        REAP["Daily /api/cron/sandbox-cleanup\ndeletes sandboxes older than 14 days"]
     end
 
     subgraph Isolation["Isolation Guarantees"]
@@ -1052,7 +1206,7 @@ flowchart LR
     SETCOOKIE --> COOKIE
     COOKIE --> MW --> OVERRIDE --> HEADER --> APIGATE
     EXITBTN --> CLEARCOOKIE --> RESTORE
-    ISOLATION -.-> Isolation
+    COOKIE -.->|abandoned| REAP
 
     style Enter fill:#dbeafe,stroke:#2563eb
     style Active fill:#fef3c7,stroke:#d97706
@@ -1109,7 +1263,7 @@ flowchart TD
         S_INVITE["InviteTeamStep: points to /people"]
     end
 
-    DASHBOARD["/dashboard - fully operational\nPersonaLandingCard shows next steps\n(dismiss persists to organization_memberships.landing_card_dismissed_at)"]
+    DASHBOARD["/dashboard - fully operational\nDashboardChecklist shows remaining setup steps\nwhile the organization is still being configured"]
 
     INVITE --> EMAIL --> ACCEPT --> VALIDATE
     VALIDATE -->|No| REJECT["Error: Invalid or expired invite"]
@@ -1151,8 +1305,8 @@ flowchart TD
 
 ## 14. Monorepo Layout and Package Graph
 
-> npm workspaces (`apps/*`, `packages/*`) orchestrated by Turborepo. Node 22.13,
-> npm 10.9.2. Two apps, nine private `0.1.0` ESM packages (built via `tsc` to `dist/`).
+> npm workspaces (`apps/*`, `packages/*`) orchestrated by Turborepo. Node 22.x,
+> npm 10.9.2. Two apps, eleven private `0.1.0` ESM packages (built via `tsc` to `dist/`).
 
 ```mermaid
 flowchart TD
@@ -1163,10 +1317,12 @@ flowchart TD
 
     subgraph Packages["packages/"]
         DOMAIN["@dubgrid/domain\nPlatform-neutral types/enums\n+ pure logic, self-guard, billing eval"]
-        CONTRACTS["@dubgrid/contracts\nZod schemas + inferred types\n(./mobile subpath)"]
+        CONTRACTS["@dubgrid/contracts\nZod schemas + inferred types\n(schedule, mobile, staff, mfa)"]
         DBTYPES["@dubgrid/db-types\nDB-row TS types"]
-        AUTHZ["@dubgrid/authz\nPermission logic\nROLE_LEVEL, unionPermissions,\nbuildPerms, extractJwtClaims"]
-        SCHEDCORE["@dubgrid/schedule-core\nSchedule transform/calc"]
+        AUTHZ["@dubgrid/authz\nPermission logic + assurance\nROLE_LEVEL, VIEW_IMPLICATIONS,\nbuildPerms, extractJwtClaims"]
+        SCHEDCORE["@dubgrid/schedule-core\nCoverage, hours, pay periods,\nopen shifts, request assembly"]
+        CLIENTERR["@dubgrid/client-errors\nError translation +\nauth-recovery retry policy"]
+        REALTIME["@dubgrid/realtime-core\nOrg-scoped channels,\nref-counted subscriptions"]
         DATAACCESS["@dubgrid/data-access\nSupabase query + mapping\n(shared mobile data layer)"]
         MOBAPICORE["@dubgrid/mobile-api-core\nFramework-neutral mobile\nbackend orchestration"]
         APICLIENT["@dubgrid/api-client\nPlatform-neutral HTTP\nclient primitives"]
@@ -1174,16 +1330,22 @@ flowchart TD
     end
 
     WEB --> AUTHZ
+    WEB --> CLIENTERR
     WEB --> CONTRACTS
     WEB --> DATAACCESS
     WEB --> DBTYPES
     WEB --> TOKENS
     WEB --> DOMAIN
     WEB --> MOBAPICORE
+    WEB --> REALTIME
+    WEB --> SCHEDCORE
 
     MOBILE --> APICLIENT
+    MOBILE --> CLIENTERR
     MOBILE --> CONTRACTS
     MOBILE --> TOKENS
+    MOBILE --> DOMAIN
+    MOBILE --> REALTIME
     MOBILE --> SCHEDCORE
 
     CONTRACTS --> ZOD["zod"]
@@ -1191,6 +1353,7 @@ flowchart TD
     DBTYPES --> DOMAIN
     AUTHZ --> DOMAIN
     SCHEDCORE --> CONTRACTS
+    SCHEDCORE --> DOMAIN
     DATAACCESS --> CONTRACTS
     DATAACCESS --> DBTYPES
     DATAACCESS --> DOMAIN
@@ -1216,18 +1379,18 @@ flowchart TD
 ```mermaid
 flowchart LR
     subgraph Mobile["apps/mobile (Expo / React Native)"]
-        SCREEN["Feature screen\n(auth, schedule, people,\nprofile, shift-requests, notifications)"]
-        APILIB["src/shared/lib/api.ts\nbearer auth, 15s timeout,\nonAuthFailure hook"]
+        SCREEN["Feature screen\n(auth, dashboard, schedule, people,\nprofile, shift-requests, notifications)"]
+        APILIB["src/shared/lib/api.ts\nbearer auth, 15s timeout, bounded retry,\nonAuthFailure hook"]
         CLIENT["@dubgrid/api-client\ncreateHeaders, appendQueryParams,\ncreateJsonApiRequest, ApiResponseError"]
-        ZODPARSE["Zod response parsing\nvia @dubgrid/contracts (./mobile)"]
+        ZODPARSE["Zod response parsing\nvia @dubgrid/contracts"]
     end
 
     subgraph Web["apps/web - Route Handlers"]
-        ROUTE["/api/mobile/v1/*\n(bootstrap, auth/login, auth/organization,\nme/schedule, org/schedule, people,\nshift-requests, notifications,\nprofile, push-tokens, session-presence)"]
+        ROUTE["/api/mobile/v1/*\n(bootstrap, auth/*, org-status, dashboard,\nme/schedule, org/schedule, people/*,\nmanagement-users/*, shift-requests/*,\nnotifications/*, profile/*, push-tokens,\nsession-presence)"]
     end
 
     subgraph Core["@dubgrid/mobile-api-core"]
-        MODULES["Modules: auth, organization, people-status,\npush, read, setup, shift-requests, write\n(rejects sandbox orgs for mobile login)"]
+        MODULES["Modules: auth, dashboard, organization,\npeople-status, push, read, setup,\nshift-requests, write\n(rejects sandbox orgs for mobile login;\nmobile_api kill switch)"]
     end
 
     SUPA[("Supabase\n(auth + Postgres + RLS)")]

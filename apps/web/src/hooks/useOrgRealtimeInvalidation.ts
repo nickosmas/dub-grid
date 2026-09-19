@@ -224,6 +224,12 @@ function acquireOrgSubscription(orgId: string, queryClient: QueryClient): () => 
         void queryClient.invalidateQueries({
           queryKey: queryKeys.org.bootstrap(),
         });
+        // Requests can change hands while the socket is down; useShiftRequests
+        // relies on this channel now instead of one of its own, and used to
+        // refetch on its own reconnect.
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.shiftRequests.all(orgId),
+        });
       },
       onError: (error) => {
         Sentry.captureException(error);

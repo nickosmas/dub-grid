@@ -1,61 +1,87 @@
 import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { useIsDarkMode, useMobileColors } from "../../providers/ThemeModeProvider";
-import { mobileElevation, mobileRadii, mobileSpace, type MobileColors } from "../../theme/tokens";
 import {
-  SkeletonCircle,
+  mobileControl,
+  mobileElevation,
+  mobileRadii,
+  mobileSpace,
+  type MobileColors,
+} from "../../theme/tokens";
+import {
+  SkeletonBlock,
   SkeletonGroup,
   SkeletonLine,
   SkeletonPill,
   skeletonRows,
 } from "./primitives";
-
-/** Alert and request cards both lead with the same 32pt round icon. */
-const ICON_SIZE = 32;
-/** Their action strips both inset past that icon plus its 10pt gap. */
-const ACTION_STRIP_INSET = ICON_SIZE + 10;
+import {
+  SCHEDULE_DATE_TILE_MIN_HEIGHT,
+  SCHEDULE_DATE_TILE_MIN_WIDTH,
+} from "../../../features/schedule/components/ScheduleDateTile";
 
 /**
- * The card-with-leading-icon list, shared by Alerts and Requests.
- *
- * Those two screens render structurally identical rows — a 16-radius card with
- * a 32pt icon, a title, message lines and a hairline-topped action strip inset
- * past the icon — so they get one placeholder rather than two that drift.
+ * The request card list, as the Requests tabs and a shift's own request list
+ * draw it: a 16-radius card whose header carries the title with a status
+ * chip at the far end, two lines of detail, then a hairline and one control
+ * (Volunteer, Approve). One placeholder for every tab so none drifts.
+ * `dateRail` fronts the cards with the Available feed's date tiles and the
+ * line that joins them, two cards on the first day and one on each after.
  */
 export function CardRowListSkeleton({
   rows = 4,
   showActions = true,
-  showUnreadDot = true,
+  dateRail = false,
 }: {
   rows?: number;
   showActions?: boolean;
-  showUnreadDot?: boolean;
+  dateRail?: boolean;
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
+  const cards = skeletonRows(rows, (index) => (
+    <View key={`card-row-skeleton-${index}`} style={styles.card}>
+      <View style={styles.header}>
+        <SkeletonLine
+          variant="cardTitle"
+          width={index % 2 === 0 ? "44%" : "56%"}
+          style={styles.grow}
+        />
+        <SkeletonPill height={24} width={88} />
+      </View>
+      <SkeletonLine variant="body" width="46%" />
+      <SkeletonLine variant="meta" width="64%" />
+      {showActions ? (
+        <View style={styles.actions}>
+          <SkeletonPill height={mobileControl.md} width={128} />
+        </View>
+      ) : null}
+    </View>
+  ));
+
+  if (!dateRail) {
+    return <SkeletonGroup style={styles.list}>{cards}</SkeletonGroup>;
+  }
+
+  const groups = [cards.slice(0, 2), ...cards.slice(2).map((card) => [card])].filter(
+    (group) => group.length > 0,
+  );
+
   return (
-    <SkeletonGroup style={styles.list}>
-      {skeletonRows(rows, (index) => (
-        <View key={`card-row-skeleton-${index}`} style={styles.card}>
-          <View style={styles.header}>
-            <View style={styles.titleRow}>
-              <SkeletonCircle size={ICON_SIZE} />
-              <View style={styles.titleColumn}>
-                <SkeletonLine variant="cardTitle" width="72%" />
-                <SkeletonLine variant="body" width="94%" />
-                <SkeletonLine variant="body" width="58%" />
-              </View>
-            </View>
-            {showUnreadDot ? <View style={styles.unreadDot} /> : null}
+    <SkeletonGroup>
+      {groups.map((group, index) => (
+        <View key={`card-rail-skeleton-${index}`} style={styles.railGroup}>
+          <View style={styles.rail}>
+            <SkeletonBlock
+              height={SCHEDULE_DATE_TILE_MIN_HEIGHT}
+              radius={mobileRadii.control}
+              width={SCHEDULE_DATE_TILE_MIN_WIDTH}
+            />
+            {index < groups.length - 1 ? <View style={styles.railLine} /> : null}
           </View>
-          {showActions ? (
-            <View style={styles.actions}>
-              <SkeletonPill height={36} width={104} />
-              <SkeletonPill height={36} width={88} />
-            </View>
-          ) : null}
+          <View style={styles.list}>{group}</View>
         </View>
       ))}
     </SkeletonGroup>
@@ -64,51 +90,52 @@ export function CardRowListSkeleton({
 
 const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
-    list: {
-      gap: mobileSpace.sm,
+    // A percentage-wide line inside a row has no width of its own to take a
+    // percentage of; growing the wrapper gives it the row's free space.
+    grow: {
+      flex: 1,
     },
-    // Not `getCardSurfaceStyle`: these two lists use a flatter card than the
-    // dashboard's — same radius, but 16pt padding, a hairline in both themes,
-    // and no shadow.
+    list: {
+      flex: 1,
+      minWidth: 0,
+      gap: mobileSpace.md,
+    },
+    // Mirrors the Requests feed's `dateGroup`, `dateRail` and `dateRailLine`.
+    railGroup: {
+      flexDirection: "row",
+      alignItems: "stretch",
+      gap: mobileSpace.md,
+      paddingBottom: mobileSpace.lg,
+    },
+    rail: {
+      alignItems: "center",
+      gap: mobileSpace.xs,
+    },
+    railLine: {
+      flex: 1,
+      width: 2,
+      borderRadius: 999,
+      backgroundColor: mobileColors.borderSubtle,
+      marginBottom: -mobileSpace.lg + mobileSpace.xs,
+    },
     card: {
       backgroundColor: mobileColors.surface,
       borderColor: mobileColors.cardBorder,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
-      gap: mobileSpace.sm,
+      gap: mobileSpace.md,
       padding: mobileSpace.lg,
       ...mobileElevation("card", isDark),
     },
     header: {
-      alignItems: "flex-start",
+      alignItems: "center",
       flexDirection: "row",
       gap: mobileSpace.md,
       justifyContent: "space-between",
     },
-    titleRow: {
-      alignItems: "flex-start",
-      flex: 1,
-      flexDirection: "row",
-      gap: mobileSpace.sm,
-    },
-    titleColumn: {
-      flex: 1,
-      gap: 4,
-    },
-    unreadDot: {
-      backgroundColor: mobileColors.skeletonBase,
-      borderRadius: 999,
-      height: 10,
-      marginTop: 6,
-      width: 10,
-    },
     actions: {
-      alignItems: "center",
       borderTopColor: mobileColors.borderSubtle,
       borderTopWidth: StyleSheet.hairlineWidth,
-      flexDirection: "row",
-      gap: mobileSpace.sm,
-      marginLeft: ACTION_STRIP_INSET,
-      paddingTop: mobileSpace.sm,
+      paddingTop: mobileSpace.md,
     },
   });

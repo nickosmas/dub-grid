@@ -1,18 +1,30 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
+import {
+  ScrollView,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+  type LayoutChangeEvent,
+} from "react-native";
+import { Text } from "./Text";
+import { NumericBadge } from "./NumericBadge";
 import { Pressable } from "./Pressable";
 import { hapticSelection } from "../lib/haptics";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import { getScreenGutter } from "./screen-layout";
 import { SkeletonBlock } from "./skeleton";
 import {
-  mobileRadii,
+  MAX_FONT_SCALE_COMPACT,
+  mobileControl,
   mobilePillOverflow,
+  mobileRadii,
   mobileSpace,
   mobileSpacing,
   mobileText,
   type MobileColors,
 } from "../theme/tokens";
+
+const TAB_MAX_WIDTH = 180;
 
 export type ScrollableTab = {
   key: string;
@@ -80,6 +92,11 @@ export function ScrollableTabStrip({
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  // The cap grows with the label it holds, up to the compact ceiling, so a
+  // raised text size widens "Skilled Nursing" instead of cutting it to
+  // "Skilled Nu…" beside a wider badge.
+  const tabMaxWidth =
+    TAB_MAX_WIDTH * Math.min(useWindowDimensions().fontScale, MAX_FONT_SCALE_COMPACT);
 
   const scrollRef = useRef<ScrollView>(null);
   const [viewportWidth, setViewportWidth] = useState(0);
@@ -149,6 +166,9 @@ export function ScrollableTabStrip({
             key={tab.key}
             accessibilityLabel={tab.label}
             accessibilityRole="tab"
+            // The badge is a sibling the explicit label hides from assistive
+            // tech; the value slot reads the count right after the name.
+            accessibilityValue={tab.count ? { text: String(tab.count) } : undefined}
             accessibilityState={{ selected: isActive }}
             android_ripple={{ color: mobileColors.rippleNeutral }}
             // The pill is 36pt tall by design; pad the touch area out to the
@@ -160,22 +180,15 @@ export function ScrollableTabStrip({
               hapticSelection();
               onSelect(tab.key);
             }}
-            style={[styles.tab, isActive && styles.tabActive]}
+            style={[styles.tab, { maxWidth: tabMaxWidth }, isActive && styles.tabActive]}
           >
             <Text
-              ellipsizeMode="tail"
-              numberOfLines={1}
+              fit="compact"
               style={[styles.label, isActive ? styles.labelActive : styles.labelIdle]}
             >
               {tab.label}
             </Text>
-            {tab.count !== undefined && tab.count > 0 ? (
-              <View style={[styles.badge, isActive && styles.badgeActive]}>
-                <Text style={[styles.badgeText, isActive && styles.badgeTextActive]}>
-                  {tab.count}
-                </Text>
-              </View>
-            ) : null}
+            <NumericBadge count={tab.count ?? 0} tone={isActive ? "onAccent" : "neutral"} />
           </Pressable>
         );
       })}
@@ -224,7 +237,7 @@ export function ScrollableTabStripSkeleton({
 }
 
 /** The pill's `minHeight`, which is also its resting height at one line. */
-const SKELETON_TAB_HEIGHT = 36;
+const SKELETON_TAB_HEIGHT = mobileControl.sm;
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
@@ -238,16 +251,15 @@ const createStyles = (mobileColors: MobileColors) =>
       alignItems: "center",
       gap: mobileSpace.sm,
       paddingHorizontal: getScreenGutter(),
-      paddingVertical: 2,
+      paddingVertical: mobileSpace.xs,
     },
     tab: {
       ...mobilePillOverflow.interactiveContainer,
       flexDirection: "row",
       alignItems: "center",
       gap: mobileSpace.sm,
-      minHeight: 36,
-      maxWidth: 180,
-      paddingHorizontal: 14,
+      minHeight: mobileControl.sm,
+      paddingHorizontal: mobileSpace.md,
       paddingVertical: mobileSpace.sm,
       borderRadius: mobileRadii.pill,
       // Same hairline the shared SegmentedControl carries: the neutral fill
@@ -272,24 +284,5 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     labelActive: {
       color: mobileColors.onBrandText,
-    },
-    badge: {
-      minWidth: 20,
-      paddingHorizontal: 6,
-      paddingVertical: 3,
-      borderRadius: mobileRadii.pill,
-      backgroundColor: mobileColors.surface,
-    },
-    badgeActive: {
-      backgroundColor: "rgba(255, 255, 255, 0.22)",
-    },
-    badgeText: {
-      ...mobileText.badge,
-      color: mobileColors.textMuted,
-      textAlign: "center",
-      includeFontPadding: false,
-    },
-    badgeTextActive: {
-      color: mobileColors.textInverse,
     },
   });

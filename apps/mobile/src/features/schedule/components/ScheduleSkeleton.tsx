@@ -7,21 +7,40 @@ import {
   SkeletonLine,
   SkeletonPill,
   skeletonRows,
+  useSkeletonFillCount,
 } from "../../../shared/components/skeleton";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileRadii, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileControl,
+  mobileRadii,
+  type MobileColors,
+  mobileSpace,
+} from "../../../shared/theme/tokens";
 import { createStyles as createScheduleStyles } from "../screens/scheduleScreenStyles";
+import { SCHEDULE_DATE_TILE_MIN_HEIGHT, SCHEDULE_DATE_TILE_MIN_WIDTH } from "./ScheduleDateTile";
 
 /**
- * The personal schedule: the rounded hero, then the upcoming-shifts card.
+ * The staff home: the rounded hero, then the week's card of 132pt rows. No
+ * open-shifts strip: it appears only when there are shifts to offer, and a
+ * placeholder strip that then vanished dropped the week's card by a whole
+ * section on load.
  *
- * Both surfaces are the screen's own styles, borrowed from
- * `scheduleScreenStyles`. The hero is a gradient card and the upcoming list a
- * card with 132pt rows, neither of which the old flat-bar skeleton resembled.
+ * Every surface is the screen's own style, borrowed from
+ * `scheduleScreenStyles`, so the placeholder cannot drift from the page.
  */
-export function ScheduleMeSkeleton({ rows = 3 }: { rows?: number }) {
+/**
+ * The hero with a status word, a title and a type pill beside its date tile.
+ * A shift that also lists its focus area and time runs taller; the rectangle
+ * promises the least and the card grows into place.
+ */
+const ME_HERO_SKELETON_HEIGHT = 116;
+
+export function ScheduleMeSkeleton({ rows }: { rows?: number }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
+  // The week's 132pt rows; reserved for the sticky header and the hero.
+  const fillRows = useSkeletonFillCount(132, 420);
+  const rowCount = rows ?? fillRows;
   const scheduleStyles = useMemo(
     () => createScheduleStyles(mobileColors, isDark),
     [mobileColors, isDark],
@@ -30,33 +49,19 @@ export function ScheduleMeSkeleton({ rows = 3 }: { rows?: number }) {
 
   return (
     <SkeletonGroup style={scheduleStyles.mePage}>
-      <View style={[scheduleStyles.meHeroCard, styles.heroFill]}>
-        <View style={scheduleStyles.meHeroContent}>
-          <View style={scheduleStyles.meHeroHeader}>
-            <View style={scheduleStyles.meHeroHeaderCopy}>
-              <SkeletonPill height={24} width={124} />
-              <SkeletonLine variant="heroMetric" width="72%" />
-              <SkeletonLine variant="body" width="54%" />
-            </View>
-            <View style={styles.heroDateTile} />
-          </View>
-          <View style={scheduleStyles.meHeroProgressBlock}>
-            <View style={scheduleStyles.meHeroProgressRow}>
-              <SkeletonLine variant="rowTitle" width={96} />
-              <SkeletonLine variant="rowTitle" width={48} />
-            </View>
-            <View style={styles.heroProgressTrack} />
-          </View>
-        </View>
-      </View>
+      {/* The hero is one rectangle. The real card is a brand gradient with
+          white text on it, and a placeholder cannot paint either: drawn as
+          lines on the grey fill it read as a broken card in light mode. The
+          block takes the hero's radius and its usual height. */}
+      <SkeletonBlock height={ME_HERO_SKELETON_HEIGHT} radius={mobileRadii.card} />
 
       <View style={scheduleStyles.upcomingSectionBlock}>
         <View style={scheduleStyles.upcomingSectionHeader}>
-          <SkeletonLine variant="sectionTitle" width="46%" />
-          <SkeletonBlock height={38} radius={12} width={92} />
+          <SkeletonLine variant="sectionTitle" width="46%" style={styles.grow} />
+          <SkeletonPill height={mobileControl.sm} width={132} />
         </View>
         <View style={scheduleStyles.upcomingShiftsCard}>
-          {skeletonRows(rows, (index) => (
+          {skeletonRows(rowCount, (index) => (
             <View
               key={`upcoming-skeleton-${index}`}
               style={[
@@ -79,11 +84,11 @@ export function ScheduleMeSkeleton({ rows = 3 }: { rows?: number }) {
 }
 
 /**
- * The team schedule: shift groups, each a 28-radius card of 72pt member rows
- * with the 48pt round arrow on the right.
+ * The team schedule: shift groups, each a card of 72pt member rows with a
+ * 48pt avatar, the name, and on some a status badge at the end.
  */
 export function ScheduleTeamSkeleton({
-  groups = 2,
+  groups = 3,
   rowsPerGroup = 3,
 }: {
   groups?: number;
@@ -102,7 +107,7 @@ export function ScheduleTeamSkeleton({
       {skeletonRows(groups, (groupIndex) => (
         <View key={`shift-group-skeleton-${groupIndex}`} style={scheduleStyles.shiftGroupBlock}>
           <View style={scheduleStyles.shiftGroupHeader}>
-            <SkeletonLine variant="sectionTitle" width="44%" />
+            <SkeletonLine variant="sectionTitle" width="44%" style={styles.grow} />
             <SkeletonLine variant="bodyStrong" width={84} />
           </View>
           <View style={scheduleStyles.teamGroupCard}>
@@ -114,12 +119,11 @@ export function ScheduleTeamSkeleton({
                   rowIndex > 0 ? scheduleStyles.teamMemberRowBorder : null,
                 ]}
               >
-                <SkeletonCircle size={44} />
+                <SkeletonCircle size={48} />
                 <View style={styles.teamMemberCopy}>
-                  <SkeletonLine variant="rowTitle" width="58%" />
-                  <SkeletonLine variant="caption" width="40%" />
+                  <SkeletonLine variant="rowTitle" width={rowIndex === 1 ? "44%" : "58%"} />
                 </View>
-                <View style={styles.rowArrow} />
+                {rowIndex === 0 ? <SkeletonPill height={22} width={92} /> : null}
               </View>
             ))}
           </View>
@@ -131,40 +135,20 @@ export function ScheduleTeamSkeleton({
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
-    // The real hero paints a brand gradient; a placeholder for it has to be
-    // neutral, so it takes the skeleton fill and drops the coloured shadow.
-    heroFill: {
-      backgroundColor: mobileColors.skeletonBase,
-      shadowColor: mobileColors.shadow,
-    },
-    heroDateTile: {
-      backgroundColor: mobileColors.surface,
-      borderRadius: mobileRadii.control,
-      height: 64,
-      minWidth: 58,
-      opacity: 0.4,
-    },
-    heroProgressTrack: {
-      backgroundColor: mobileColors.surface,
-      borderRadius: 999,
-      height: 7,
-      opacity: 0.4,
+    // A percentage-wide line inside a row has no width of its own to take a
+    // percentage of; growing the wrapper gives it the row's free space.
+    grow: {
+      flex: 1,
     },
     upcomingDateTile: {
       backgroundColor: mobileColors.skeletonBase,
       borderRadius: mobileRadii.control,
-      height: 68,
-      width: 60,
+      height: SCHEDULE_DATE_TILE_MIN_HEIGHT,
+      width: SCHEDULE_DATE_TILE_MIN_WIDTH,
     },
     teamMemberCopy: {
       flex: 1,
-      gap: 6,
+      gap: mobileSpace.sm,
       minWidth: 0,
-    },
-    rowArrow: {
-      backgroundColor: mobileColors.skeletonBase,
-      borderRadius: 24,
-      height: 48,
-      width: 48,
     },
   });

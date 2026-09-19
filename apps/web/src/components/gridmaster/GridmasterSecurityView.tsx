@@ -2,6 +2,8 @@
 import { User } from "lucide-react";
 
 import { Fragment, useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { useSlideoverClose } from "@/hooks/useSlideoverClose";
 import { useQuery } from "@tanstack/react-query";
 import CustomSelect from "@/components/CustomSelect";
 import { Pagination } from "@/components/ui/pagination";
@@ -11,6 +13,7 @@ import { formatClientErrorMessage, formatOrganizationRoleLabel } from "@/lib/cli
 import { CloseButton } from "@/components/ui/CloseButton";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { EmptyState } from "@/components/EmptyState";
+import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { queryKeys } from "@/lib/query-keys";
 import { sectionStyle, tdStyle, thStyle } from "@/lib/styles";
 import type { GridmasterUserSession, Organization } from "@/types";
@@ -57,25 +60,10 @@ const SESSION_STATUS_LABELS: Record<GridmasterUserSession["status"], string> = {
   stale: "Stale",
 };
 
-const SESSION_STATUS_STYLES: Record<
-  GridmasterUserSession["status"],
-  { bg: string; text: string; border: string }
-> = {
-  active: {
-    bg: "var(--dg-color-success-bg)",
-    text: "var(--dg-color-success)",
-    border: "var(--dg-color-success-border)",
-  },
-  recent: {
-    bg: "var(--dg-color-warning-bg)",
-    text: "var(--dg-color-warning)",
-    border: "var(--dg-color-warning-border)",
-  },
-  stale: {
-    bg: "var(--dg-color-bg-secondary)",
-    text: "var(--dg-color-text-muted)",
-    border: "var(--dg-color-border)",
-  },
+const SESSION_STATUS_TONES: Record<GridmasterUserSession["status"], StatusPillTone> = {
+  active: "success",
+  recent: "warning",
+  stale: "neutral",
 };
 
 function formatDateTime(value: string | null | undefined): string {
@@ -131,22 +119,8 @@ function groupSessionsByDate(
 }
 
 function statusBadge(status: GridmasterUserSession["status"]) {
-  const colors = SESSION_STATUS_STYLES[status];
   return (
-    <span
-      style={{
-        display: "inline-block",
-        fontSize: "var(--dg-fs-footnote)",
-        fontWeight: 700,
-        padding: "2px 8px",
-        borderRadius: "var(--dg-radius-xs)",
-        background: colors.bg,
-        color: colors.text,
-        border: `1px solid ${colors.border}`,
-      }}
-    >
-      {SESSION_STATUS_LABELS[status]}
-    </span>
+    <StatusPill tone={SESSION_STATUS_TONES[status]}>{SESSION_STATUS_LABELS[status]}</StatusPill>
   );
 }
 
@@ -218,14 +192,16 @@ function SessionDetailPanel({
   session: GridmasterUserSession;
   onClose: () => void;
 }) {
-  return (
+  const { closing, close } = useSlideoverClose(onClose);
+
+  return createPortal(
     <>
-      <div className="staff-detail-overlay" onClick={onClose} />
+      <div className={`dg-panel-overlay${closing ? " closing" : ""}`} onClick={close} />
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Session details"
-        className="staff-detail-pane"
+        className={`dg-panel${closing ? " closing" : ""}`}
       >
         <div
           style={{
@@ -256,7 +232,7 @@ function SessionDetailPanel({
               {session.userName ?? session.userEmail ?? "Unknown user"} / {sessionOrgLabel(session)}
             </div>
           </div>
-          <CloseButton size="md" onClick={onClose} aria-label="Close session details" />
+          <CloseButton size="md" onClick={close} aria-label="Close session details" />
         </div>
         <div style={{ flex: 1, minHeight: 0, padding: "8px 20px 24px", overflowY: "auto" }}>
           <DetailRow label="Status" value={statusBadge(session.status)} />
@@ -281,7 +257,8 @@ function SessionDetailPanel({
         </div>
         <ScrollOverflowCue />
       </div>
-    </>
+    </>,
+    document.body,
   );
 }
 

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { z } from "zod";
-import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { canSeeSchedulePublisher, requireOrgPermissions } from "@/app/api/shared/permissions";
 import {
   toNotePublishChanges,
   toPublishChanges,
@@ -21,33 +22,104 @@ const querySchema = z
 
 const MAX_RECENT_HISTORY_ROWS = 200;
 
-function addNewAdditionFlags<
-  TEntry extends {
-    startDate: string;
-    endDate: string;
-    changes: ReturnType<typeof toPublishChanges>;
-    noteChanges: ReturnType<typeof toNotePublishChanges>;
-  },
->(entries: TEntry[]) {
-  const isAddition = (entryIndex: number, kind: string, date: string) =>
-    kind === "new" &&
-    entries
-      .slice(entryIndex + 1)
-      .some((olderEntry) => olderEntry.startDate <= date && olderEntry.endDate >= date);
+interface PublishedPeriod {
+  startDate: string;
+  endDate: string;
+  publishedAt: string;
+}
 
-  return entries.map((entry, entryIndex) => ({
+interface RecentHistoryEntry {
+  startDate: string;
+  endDate: string;
+  publishedAt: string;
+  changes: ReturnType<typeof toPublishChanges>;
+  noteChanges: ReturnType<typeof toNotePublishChanges>;
+}
+
+function coversDate(period: PublishedPeriod, date: string): boolean {
+  return period.startDate <= date && period.endDate >= date;
+}
+
+/**
+ * A `new` change is an addition only when an earlier publication already
+ * covered its date; otherwise it is part of that period's first publication,
+ * which the grid treats as the baseline rather than ringing every cell.
+ *
+ * The baseline has to come from the whole ledger, not from the rows this
+ * request happened to return: the `since` form only returns publications
+ * after the caller's last visit, so a week first published before that visit
+ * had no older row in the result and every later addition to it read as
+ * baseline, which the grid then refused to highlight. `priorPeriods` carries
+ * the publications older than the result for the dates in question.
+ */
+function addNewAdditionFlags<TEntry extends RecentHistoryEntry>(
+  entries: TEntry[],
+  priorPeriods: PublishedPeriod[],
+) {
+  const isAddition = (entry: RecentHistoryEntry, kind: string, date: string) =>
+    kind === "new" &&
+    (entries.some((other) => other.publishedAt < entry.publishedAt && coversDate(other, date)) ||
+      priorPeriods.some(
+        (period) => period.publishedAt < entry.publishedAt && coversDate(period, date),
+      ));
+
+  return entries.map((entry) => ({
     ...entry,
     changes: entry.changes.map((change) => ({
       ...change,
-      isNewAddition: isAddition(entryIndex, change.kind, change.date),
+      isNewAddition: isAddition(entry, change.kind, change.date),
     })),
     // Notes take the same baseline rule as cells: a period's first publication
     // is not a set of additions, so its notes must not be marked either while
     // every shift beside them stays clean.
     noteChanges: entry.noteChanges.map((change) => ({
       ...change,
-      isNewAddition: isAddition(entryIndex, change.kind, change.date),
+      isNewAddition: isAddition(entry, change.kind, change.date),
     })),
+  }));
+}
+
+/** Dates of `new` changes that no older row in the result already covers. */
+function unresolvedNewChangeDates(entries: RecentHistoryEntry[]): string[] {
+  const dates = new Set<string>();
+  for (const entry of entries) {
+    const candidates = [...entry.changes, ...entry.noteChanges];
+    for (const change of candidates) {
+      if (change.kind !== "new") continue;
+      const covered = entries.some(
+        (other) => other.publishedAt < entry.publishedAt && coversDate(other, change.date),
+      );
+      if (!covered) dates.add(change.date);
+    }
+  }
+  return [...dates].sort();
+}
+
+async function fetchPriorPublishedPeriods(
+  serviceClient: SupabaseClient,
+  orgId: string,
+  entries: RecentHistoryEntry[],
+): Promise<PublishedPeriod[]> {
+  const dates = unresolvedNewChangeDates(entries);
+  if (dates.length === 0) return [];
+  const newestPublishedAt = entries.reduce(
+    (latest, entry) => (entry.publishedAt > latest ? entry.publishedAt : latest),
+    entries[0]!.publishedAt,
+  );
+  const { data, error } = await serviceClient
+    .from("publish_history")
+    .select("start_date, end_date, published_at")
+    .eq("org_id", orgId)
+    .lte("start_date", dates[dates.length - 1]!)
+    .gte("end_date", dates[0]!)
+    .lt("published_at", newestPublishedAt)
+    .order("published_at", { ascending: false })
+    .limit(MAX_RECENT_HISTORY_ROWS);
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    startDate: row.start_date as string,
+    endDate: row.end_date as string,
+    publishedAt: row.published_at as string,
   }));
 }
 
@@ -95,23 +167,27 @@ export async function GET(req: NextRequest) {
       throw error;
     }
 
-    return NextResponse.json({
-      entries: addNewAdditionFlags(
-        (data ?? []).map((row: Record<string, unknown>) => ({
-          id: row.id as string,
-          publishedBy: row.published_by as string,
-          startDate: row.start_date as string,
-          endDate: row.end_date as string,
-          changeCount: row.change_count as number,
-          changes: toPublishChanges(row.schedule_publish_changes as ScheduleChangeRow[]),
-          // Kept beside the cell changes rather than mixed in: a note carries no
-          // cell state, and nothing downstream should have to guess which of the
-          // two a change row describes.
-          noteChanges: toNotePublishChanges(row.schedule_publish_changes as ScheduleChangeRow[]),
-          publishedAt: row.published_at as string,
-        })),
-      ),
-    });
+    const showPublisher = canSeeSchedulePublisher(auth.permissions);
+    const entries = (data ?? []).map((row: Record<string, unknown>) => ({
+      id: row.id as string,
+      publishedBy: showPublisher ? (row.published_by as string) : null,
+      startDate: row.start_date as string,
+      endDate: row.end_date as string,
+      changeCount: row.change_count as number,
+      changes: toPublishChanges(row.schedule_publish_changes as ScheduleChangeRow[]),
+      // Kept beside the cell changes rather than mixed in: a note carries no
+      // cell state, and nothing downstream should have to guess which of the
+      // two a change row describes.
+      noteChanges: toNotePublishChanges(row.schedule_publish_changes as ScheduleChangeRow[]),
+      publishedAt: row.published_at as string,
+    }));
+    const priorPeriods = await fetchPriorPublishedPeriods(
+      auth.serviceClient,
+      parsed.data.orgId,
+      entries,
+    );
+
+    return NextResponse.json({ entries: addNewAdditionFlags(entries, priorPeriods) });
   } catch (error) {
     logger.error(
       { err: error, route: "schedule/publish-history/recent" },

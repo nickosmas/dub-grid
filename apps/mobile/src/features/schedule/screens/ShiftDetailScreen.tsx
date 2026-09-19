@@ -1,6 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View, useWindowDimensions } from "react-native";
+import { Text } from "../../../shared/components/Text";
 import { Pressable } from "../../../shared/components/Pressable";
 import { useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -20,7 +21,9 @@ import {
 import { Button } from "../../../shared/components/Button";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
+import { FullPageSheet } from "../../../shared/components/FullPageSheet";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
+import { InlineError } from "../../../shared/components/InlineError";
 import { Card, Screen } from "../../../shared/components/Screen";
 import { SkeletonCardSurface, SkeletonLine } from "../../../shared/components/skeleton";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
@@ -36,9 +39,15 @@ import {
   getShiftRequests,
   getShiftSwapOptions,
 } from "../../../shared/lib/api";
-import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
+import {
+  getClientFriendlyErrorMessage,
+  pushClientFriendlyErrorToast,
+} from "../../../shared/lib/errors";
 import { getQueryErrorMessage } from "../../../shared/lib/query-state";
-import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
+import {
+  keepPreviousDataForMobileIdentity,
+  mobileQueryKeys,
+} from "../../../shared/lib/mobile-query-keys";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
 import {
@@ -55,6 +64,7 @@ import {
   mobileText,
   mobileVisiblePillBorder,
   type MobileColors,
+  mobileSpace,
 } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
@@ -81,7 +91,11 @@ import {
   getScheduleEntryTitle,
   sortScheduleEntries,
 } from "../lib/schedule";
-import { getScheduleEntrySegmentChange } from "../lib/scheduleScreenChips";
+import {
+  describeScheduleEntryChanges,
+  getScheduleEntrySegmentChange,
+} from "../lib/scheduleScreenChips";
+import { ShiftChangeBadge, getShiftChangeLabel } from "../components/ShiftChangeBadge";
 import {
   addDaysIso,
   buildShiftmateSegmentGroups,
@@ -210,7 +224,9 @@ function MentoredPill() {
 
   return (
     <View accessibilityLabel="Mentored assignment" style={styles.mentoredPill}>
-      <Text style={styles.mentoredPillText}>Mentored</Text>
+      <Text fit="compact" style={styles.mentoredPillText}>
+        Mentored
+      </Text>
     </View>
   );
 }
@@ -299,10 +315,17 @@ export default function ShiftDetailScreen() {
     Boolean(teamScheduleRange.startDate) &&
     Boolean(teamScheduleRange.endDate) &&
     (canViewTeamSchedule || needsTeamScheduleForShift);
+  // Opening Swap widens the range, which re-keys this query. Without the
+  // previous data the page dropped to `loading` behind the sheet it had just
+  // presented: its content blanked, scrolling locked, and the whole tree
+  // remounted once the wider range landed. The narrow range is a prefix of
+  // the wide one, so the shift and its shiftmates read the same from either.
   const teamScheduleQuery = useQuery({
     queryKey: mobileQueryKeys.schedule(accessToken, "team", teamScheduleRange),
     queryFn: ({ signal }) => getOrgSchedule(accessToken!, teamScheduleRange, signal),
     enabled: canLoadTeamSchedule,
+    placeholderData: (previousData, previousQuery) =>
+      keepPreviousDataForMobileIdentity(accessToken, previousData, previousQuery),
   });
   useEffect(() => {
     if (teamScheduleQuery.error) {
@@ -364,13 +387,9 @@ export default function ShiftDetailScreen() {
       targetSegmentIndex?: number;
       absenceTypeId?: number;
     }) => createShiftRequest(accessToken!, input),
-    onError: (error) => {
-      pushClientFriendlyErrorToast(pushToast, {
-        error,
-        title: "Could not create request",
-        fallbackMessage: "We couldn't create that request.",
-      });
-    },
+    // No `onError` toast: the request is sent from inside the sheet, which is
+    // its own native window, and a toast lands in the root window behind it
+    // where nobody sees it. The error renders in the sheet's footer instead.
     onSuccess: async (_, variables) => {
       pushToast({
         tone: "success",
@@ -783,12 +802,23 @@ export default function ShiftDetailScreen() {
     ]),
   );
 
-  function resetRequestMode(nextMode: RequestMode) {
-    setRequestMode(nextMode);
+  // Selections only, never the mode: the unsaved-changes guard runs this on
+  // every exit, and closing the sheet from inside it would tear the sheet and
+  // the discard confirmation down in one commit. UIKit drops the second of two
+  // simultaneous modal dismissals and the sheet stays on screen.
+  function resetRequestSelections() {
     setCoverageRequestType(null);
     setSelectedTargetShift(null);
     setSelectedRequesterSegmentIndex(firstRequestableRequesterSegmentIndex);
     setSelectedSwapDate(null);
+    setSelectedTargetedPickupEmployeeId(null);
+    setSelectedCalloffAbsenceTypeId(null);
+  }
+
+  function resetRequestMode(nextMode: RequestMode) {
+    setRequestMode(nextMode);
+    resetRequestSelections();
+    createRequestMutation.reset();
     setSwapWeekStartDate(
       nextMode === "swap"
         ? range.startDate
@@ -798,34 +828,35 @@ export default function ShiftDetailScreen() {
             : null
         : null,
     );
-    setSelectedTargetedPickupEmployeeId(null);
-    setSelectedCalloffAbsenceTypeId(null);
   }
 
-  /**
-   * Anything the user has chosen inside the request sheet that a dismissal
-   * would throw away. The segment index counts: on a split shift, picking the
-   * other half is a real decision, not a default.
-   */
-  const hasUnsavedRequestInput =
-    requestMode != null &&
-    (coverageRequestType != null ||
-      selectedTargetShift != null ||
-      selectedTargetedPickupEmployeeId != null ||
-      selectedCalloffAbsenceTypeId != null ||
-      selectedRequesterSegmentIndex !== firstRequestableRequesterSegmentIndex);
+  // A request that is one tap from being sent is the thing worth a discard
+  // question, and it is the same moment the footer offers Submit: a swap
+  // target, an absence reason, or the teammate a pickup names. The steps
+  // before it (drop or pick up, which segment) are one tap to redo, and asking
+  // "Discard this request?" after those read as the close button being broken.
+  const hasSubmittableRequest =
+    (requestMode === "swap" && !!selectedTargetEntry && !!shiftEntry) ||
+    (requestMode === "coverage" &&
+      !!shiftEntry &&
+      ((coverageRequestType === "pickup" && !!selectedTargetedPickupEntry) ||
+        (coverageRequestType === "calloff" && !!selectedCalloffAbsenceType)));
 
   // Leaving the sheet open is what makes this a guard: a dragged sheet settles
-  // back into place while the confirmation sits on top of it. Resetting the
-  // mode is also what closes the sheet, so it is the discard and the close at
-  // once.
+  // back into place while the confirmation sits on top of it. `onClose` is
+  // what closes the sheet, kept apart from `onDiscard` so the guard can
+  // sequence the confirmation's dismissal before the sheet's.
   const requestGuard = useUnsavedChangesGuard({
-    isDirty: hasUnsavedRequestInput,
+    isDirty: hasSubmittableRequest,
     disabled: createRequestMutation.isPending,
     title: "Discard this request?",
     body: "Your selections won't be saved.",
-    onDiscard: () => resetRequestMode(null),
+    onDiscard: resetRequestSelections,
+    onClose: () => resetRequestMode(null),
   });
+  const createRequestError = createRequestMutation.error
+    ? getClientFriendlyErrorMessage(createRequestMutation.error, "We couldn't create that request.")
+    : null;
 
   function submitSwapRequest() {
     if (!linkedEmployeeId || !shiftEntry || requestMode !== "swap") {
@@ -874,6 +905,9 @@ export default function ShiftDetailScreen() {
     });
   }
 
+  // Only a call-off asks twice: it takes the requester off the roster, and
+  // the absence is what a manager sees. A pickup offer or a swap is a request
+  // the other party still has to accept, so its Submit is the commitment.
   function confirmCoverageRequest(
     type: "pickup" | "calloff",
     options?: { absenceTypeId?: number; absenceTypeLabel?: string },
@@ -882,19 +916,22 @@ export default function ShiftDetailScreen() {
       return;
     }
 
+    if (type === "pickup") {
+      submitCoverageRequest("pickup", { absenceTypeId: options?.absenceTypeId });
+      return;
+    }
+
     const shiftLabel = selectedRequesterShiftLabel;
     const shiftDateLabel = formatShiftDate(shiftEntry.date);
+    const absenceTypeLabel = options?.absenceTypeLabel ?? "selected";
 
     setPendingConfirmation({
-      title: type === "pickup" ? "Offer this shift for pickup?" : "Submit this call-off?",
-      body:
-        type === "pickup"
-          ? `Your ${shiftLabel} shift on ${shiftDateLabel} will be offered to teammates for pickup.`
-          : `${indefiniteArticle(options?.absenceTypeLabel ?? "selected") === "an" ? "An" : "A"} ${options?.absenceTypeLabel ?? "selected"} absence will be submitted for your ${shiftLabel} shift on ${shiftDateLabel}.`,
-      confirmLabel: type === "pickup" ? "Offer Shift" : "Submit Call-off",
-      confirmTone: type === "calloff" ? "danger" : "primary",
+      title: "Submit this call-off?",
+      body: `${indefiniteArticle(absenceTypeLabel) === "an" ? "An" : "A"} ${absenceTypeLabel} absence will be submitted for your ${shiftLabel} shift on ${shiftDateLabel}.`,
+      confirmLabel: "Submit Call-off",
+      confirmTone: "danger",
       onConfirm: () =>
-        submitCoverageRequest(type, {
+        submitCoverageRequest("calloff", {
           absenceTypeId: options?.absenceTypeId,
         }),
     });
@@ -905,25 +942,16 @@ export default function ShiftDetailScreen() {
       return;
     }
 
-    const shiftLabel = selectedRequesterShiftLabel;
-    const shiftDateLabel = formatShiftDate(shiftEntry.date);
     const absenceTypeId = getScheduleEntryAbsenceTypeId(entry);
-    const absenceTypeLabel = getAbsenceTypeLabelForEntry(activeAbsenceTypes, entry);
 
     if (absenceTypeId == null) {
       return;
     }
 
-    setPendingConfirmation({
-      title: "Send a pickup request?",
-      body: `${entry.employeeName} will be asked to pick up your ${shiftLabel} shift on ${shiftDateLabel} so you can use ${absenceTypeLabel}.`,
-      confirmLabel: "Send Request",
-      onConfirm: () =>
-        submitCoverageRequest("pickup", {
-          targetEmpId: entry.employeeId,
-          targetShiftDate: shiftEntry.date,
-          absenceTypeId,
-        }),
+    submitCoverageRequest("pickup", {
+      targetEmpId: entry.employeeId,
+      targetShiftDate: shiftEntry.date,
+      absenceTypeId,
     });
   }
 
@@ -932,18 +960,7 @@ export default function ShiftDetailScreen() {
       return;
     }
 
-    const requesterLabel = selectedRequesterShiftLabel;
-    const targetLabel = getActionSegmentLabel(
-      selectedTargetEntry,
-      selectedTargetShift.segmentIndex ?? 0,
-    );
-
-    setPendingConfirmation({
-      title: "Send this swap request?",
-      body: `You'll swap your ${requesterLabel} shift on ${formatShiftDate(shiftEntry.date)} for ${selectedTargetEntry.employeeName}'s ${targetLabel} shift on ${formatShiftDate(selectedTargetEntry.date)}.`,
-      confirmLabel: "Send Swap",
-      onConfirm: submitSwapRequest,
-    });
+    submitSwapRequest();
   }
 
   function handleSwapWeek(delta: 1 | -1) {
@@ -961,6 +978,431 @@ export default function ShiftDetailScreen() {
     setSelectedTargetShift(null);
   }
 
+  // The sheets draw a footer shell (hairline, padding) whenever a footer is
+  // passed, so an always-truthy fragment left an empty band under the body
+  // until a choice was made. Only hand the footer over when it has content.
+  const hasRequestSheetFooter = !!createRequestError || hasSubmittableRequest;
+  // Both confirmations a request sheet can raise: the descriptor one from
+  // its Submit (call-off), the guard one from Close with a choice made. As
+  // an overlay inside the sheet's own Modal, because UIKit refuses to
+  // present a second controller while the sheet is up ("already
+  // presenting"), so a root-level Modal never appeared and the button did
+  // nothing.
+  const requestConfirmations = (presentation: "modal" | "inline") => (
+    <>
+      <ConfirmationModal
+        body={pendingConfirmation?.body}
+        confirmLabel={pendingConfirmation?.confirmLabel ?? "Confirm"}
+        confirmTone={pendingConfirmation?.confirmTone ?? "primary"}
+        loading={createRequestMutation.isPending}
+        onCancel={() => setPendingConfirmation(null)}
+        onConfirm={() => {
+          const action = pendingConfirmation?.onConfirm;
+          setPendingConfirmation(null);
+          action?.();
+        }}
+        presentation={presentation}
+        title={pendingConfirmation?.title ?? "Confirm action?"}
+        visible={pendingConfirmation != null}
+      />
+      <ConfirmationModal presentation={presentation} {...requestGuard.confirmationProps} />
+    </>
+  );
+  const requestSheetOverlay = requestConfirmations("inline");
+
+  const requestSheetFooter = hasRequestSheetFooter ? (
+    <>
+      {createRequestError ? <InlineError message={createRequestError} /> : null}
+      {requestMode === "swap" && selectedTargetEntry && shiftEntry ? (
+        <SheetActions
+          primaryAction={
+            <Button
+              disabled={!canSubmitRequest || createRequestMutation.isPending}
+              label="Submit"
+              loading={createRequestMutation.isPending}
+              onPress={handleSubmitRequest}
+            />
+          }
+        >
+          <Button
+            disabled={createRequestMutation.isPending}
+            label="Back"
+            onPress={() => {
+              setSelectedSwapDate(selectedTargetEntry.date);
+              setSelectedTargetShift(null);
+            }}
+            tone="neutral"
+          />
+        </SheetActions>
+      ) : null}
+
+      {requestMode === "coverage" &&
+      coverageRequestType === "pickup" &&
+      selectedTargetedPickupEntry &&
+      shiftEntry ? (
+        <SheetActions
+          primaryAction={
+            <Button
+              label="Submit"
+              loading={createRequestMutation.isPending}
+              onPress={() => confirmTargetedPickupRequest(selectedTargetedPickupEntry)}
+            />
+          }
+        >
+          <Button
+            disabled={createRequestMutation.isPending}
+            label="Back"
+            onPress={() => setSelectedTargetedPickupEmployeeId(null)}
+            tone="neutral"
+          />
+        </SheetActions>
+      ) : null}
+
+      {requestMode === "coverage" &&
+      coverageRequestType === "calloff" &&
+      selectedCalloffAbsenceType &&
+      shiftEntry ? (
+        <SheetActions
+          primaryAction={
+            <Button
+              label="Submit"
+              loading={createRequestMutation.isPending}
+              onPress={() =>
+                confirmCoverageRequest("calloff", {
+                  absenceTypeId: selectedCalloffAbsenceType.id,
+                  absenceTypeLabel: getAbsenceTypeOptionLabel(selectedCalloffAbsenceType),
+                })
+              }
+            />
+          }
+        >
+          <Button
+            disabled={createRequestMutation.isPending}
+            label="Back"
+            onPress={() => setSelectedCalloffAbsenceTypeId(null)}
+            tone="neutral"
+          />
+        </SheetActions>
+      ) : null}
+    </>
+  ) : undefined;
+  const requestSheetBody = (
+    <View style={styles.modalContent}>
+      {actionSegmentOptions.length > 1 && shiftEntry ? (
+        <ActionSegmentSelector
+          disabled={createRequestMutation.isPending}
+          entry={shiftEntry}
+          isOptionDisabled={(segmentIndex) =>
+            hasScheduleEntrySegmentStarted(shiftEntry, timeZone, segmentIndex)
+          }
+          options={actionSegmentOptions}
+          selectedIndex={selectedRequesterSegmentIndex}
+          onSelect={setSelectedRequesterSegmentIndex}
+        />
+      ) : null}
+      {requestMode === "coverage" ? (
+        <View style={styles.subsection}>
+          <Text style={styles.subsectionBody}>Choose how you want to drop this shift.</Text>
+          <View style={styles.coverageOptionList}>
+            <CoverageOptionCard
+              active={coverageRequestType === "pickup"}
+              body="Post the shift for teammates to claim. It stays yours unless someone claims it and approval completes."
+              disabled={createRequestMutation.isPending}
+              onPress={() => {
+                setCoverageRequestType("pickup");
+                setSelectedCalloffAbsenceTypeId(null);
+              }}
+              title="Offer for pickup"
+              tone="neutral"
+            />
+            <CoverageOptionCard
+              active={coverageRequestType === "calloff"}
+              body="Use this when you cannot work the shift yourself. Approval records the absence and opens coverage automatically."
+              disabled={createRequestMutation.isPending || activeAbsenceTypes.length === 0}
+              onPress={() => {
+                setCoverageRequestType("calloff");
+                setSelectedTargetedPickupEmployeeId(null);
+              }}
+              title="Call off"
+              tone="danger"
+            />
+          </View>
+          {activeAbsenceTypes.length === 0 ? (
+            <Text style={styles.coverageNotice}>
+              Call off is unavailable until at least one active absence type is set up.
+            </Text>
+          ) : null}
+          {coverageRequestType === "pickup" ? (
+            <View style={styles.modalInlinePanel}>
+              <Text style={styles.subsectionLabel}>Offer for pickup</Text>
+              {selectedTargetedPickupEntry ? null : (
+                <Button
+                  disabled={createRequestMutation.isPending}
+                  label="Offer to everyone"
+                  onPress={() => confirmCoverageRequest("pickup")}
+                />
+              )}
+              <Text style={styles.subsectionLabel}>Request specific person</Text>
+              <Text style={styles.subsectionBody}>
+                {selectedTargetedPickupEntry
+                  ? "Review your request below, then submit."
+                  : "Only teammates with an absence on this date are shown."}
+              </Text>
+              <View style={styles.swapDateFilteredList}>
+                {targetedPickupOptions.length === 0 ? (
+                  <EmptyStateCard
+                    compact
+                    iconName="person-remove-outline"
+                    title="No absent teammates on this date"
+                  />
+                ) : (
+                  <View style={styles.swapOptions}>
+                    {(selectedTargetedPickupEntry
+                      ? [selectedTargetedPickupEntry]
+                      : targetedPickupOptions
+                    ).map((entry) => (
+                      <SwapOptionCard
+                        key={`${entry.employeeId}-${entry.date}`}
+                        active={selectedTargetedPickupEmployeeId === entry.employeeId}
+                        disabled={createRequestMutation.isPending}
+                        detailLabel={getPickupTargetDetailLabel(activeAbsenceTypes, entry)}
+                        entry={entry}
+                        showSegments={false}
+                        onPress={() => {
+                          setSelectedTargetedPickupEmployeeId(
+                            selectedTargetedPickupEmployeeId === entry.employeeId
+                              ? null
+                              : entry.employeeId,
+                          );
+                        }}
+                      />
+                    ))}
+                  </View>
+                )}
+              </View>
+            </View>
+          ) : null}
+          {coverageRequestType === "calloff" ? (
+            <View style={styles.modalInlinePanel}>
+              <Text style={styles.subsectionLabel}>
+                {selectedCalloffAbsenceType ? "Absence reason" : "Select absence reason"}
+              </Text>
+              {selectedCalloffAbsenceType ? (
+                <Text style={styles.subsectionBody}>Review your call-off below, then submit.</Text>
+              ) : null}
+              <View style={styles.selectorWrap}>
+                {(selectedCalloffAbsenceType
+                  ? [selectedCalloffAbsenceType]
+                  : activeAbsenceTypes
+                ).map((absenceType) => (
+                  <SelectorChip
+                    key={absenceType.id}
+                    active={selectedCalloffAbsenceTypeId === absenceType.id}
+                    disabled={createRequestMutation.isPending}
+                    label={getAbsenceTypeOptionLabel(absenceType)}
+                    onPress={() =>
+                      setSelectedCalloffAbsenceTypeId(
+                        selectedCalloffAbsenceTypeId === absenceType.id ? null : absenceType.id,
+                      )
+                    }
+                  />
+                ))}
+              </View>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
+      {requestMode === "swap" ? (
+        <View style={styles.subsection}>
+          <Text style={styles.subsectionBody}>
+            {selectedTargetEntry
+              ? "Review the trade below, then submit your swap request."
+              : "Choose a teammate's published shift to trade dates or shift types. Same-code swaps are allowed when the date changes."}
+          </Text>
+          {shiftEntry ? (
+            <>
+              <View style={styles.swapSummaryList}>
+                <SwapSummaryCard
+                  entry={shiftEntry}
+                  label={selectedTargetEntry ? "You give" : "Your shift"}
+                  segmentIndex={selectedRequesterSegmentIndex}
+                />
+                {selectedTargetEntry ? (
+                  <SwapSummaryCard
+                    entry={selectedTargetEntry}
+                    label="You get"
+                    segmentIndex={selectedTargetShift?.segmentIndex ?? 0}
+                    summaryNote={`From ${selectedTargetEntry.employeeName}`}
+                  />
+                ) : null}
+              </View>
+              <View style={styles.modalInlinePanel}>
+                <Text style={styles.subsectionLabel}>Eligible teammates</Text>
+                {/* The app's only text-based loading state and only
+                    icon-less, retry-less error lived here. Both now read
+                    like every other surface. */}
+                {swapOptionsQuery.isLoading ? (
+                  <CardRowListSkeleton rows={2} />
+                ) : swapOptionsQuery.error ? (
+                  <StatusBanner
+                    actionLabel="Try again"
+                    body={getQueryErrorMessage(
+                      swapOptionsQuery.error,
+                      "We couldn't load teammate shifts.",
+                    )}
+                    title="Could not load teammate shifts"
+                    onAction={() => {
+                      void swapOptionsQuery.refetch();
+                    }}
+                  />
+                ) : swapTargetOptions.length === 0 ? (
+                  <EmptyStateCard
+                    compact
+                    iconName="swap-horizontal-outline"
+                    title="No eligible shifts"
+                    body="Eligible teammate shifts will appear here once published."
+                  />
+                ) : selectedTargetEntry ? (
+                  <View style={styles.swapSelectedPanel}>
+                    <Text style={styles.subsectionBody}>
+                      {selectedTargetEntry.employeeName} is selected for{" "}
+                      {formatShiftDate(selectedTargetEntry.date)}.
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.swapDateFilteredList}>
+                    <View style={styles.swapWeekNav}>
+                      <Pressable
+                        accessibilityLabel="Go to previous week"
+                        accessibilityRole="button"
+                        accessibilityState={{
+                          disabled: previousEligibleSwapWeekStart == null,
+                        }}
+                        android_ripple={
+                          previousEligibleSwapWeekStart == null
+                            ? undefined
+                            : { color: mobileColors.rippleNeutral }
+                        }
+                        disabled={previousEligibleSwapWeekStart == null}
+                        onPress={() => handleSwapWeek(-1)}
+                        style={({ pressed }) => [
+                          styles.swapWeekNavButton,
+                          pressed &&
+                            previousEligibleSwapWeekStart != null &&
+                            styles.swapWeekNavButtonPressed,
+                          previousEligibleSwapWeekStart == null && styles.swapWeekNavButtonDisabled,
+                        ]}
+                      >
+                        <Ionicons
+                          color={mobileColors.textSecondary}
+                          name="chevron-back"
+                          size={20}
+                        />
+                      </Pressable>
+                      <Text style={styles.swapWeekRangeLabel}>
+                        {activeSwapWeekStart ? formatWeekRangeLabel(activeSwapWeekStart) : ""}
+                      </Text>
+                      <Pressable
+                        accessibilityLabel="Go to next week"
+                        accessibilityRole="button"
+                        accessibilityState={{
+                          disabled: nextEligibleSwapWeekStart == null,
+                        }}
+                        android_ripple={
+                          nextEligibleSwapWeekStart == null
+                            ? undefined
+                            : { color: mobileColors.rippleNeutral }
+                        }
+                        disabled={nextEligibleSwapWeekStart == null}
+                        onPress={() => handleSwapWeek(1)}
+                        style={({ pressed }) => [
+                          styles.swapWeekNavButton,
+                          pressed &&
+                            nextEligibleSwapWeekStart != null &&
+                            styles.swapWeekNavButtonPressed,
+                          nextEligibleSwapWeekStart == null && styles.swapWeekNavButtonDisabled,
+                        ]}
+                      >
+                        <Ionicons
+                          color={mobileColors.textSecondary}
+                          name="chevron-forward"
+                          size={20}
+                        />
+                      </Pressable>
+                    </View>
+                    <View accessibilityLabel="Eligible swap dates" style={styles.swapDateGrid}>
+                      {swapWeekDates.map((date) => (
+                        <SwapDateChip
+                          key={date}
+                          active={date === activeSwapDate}
+                          count={swapSectionsByDate.get(date)?.entries.length ?? 0}
+                          date={date}
+                          onPress={() => {
+                            setSelectedSwapDate(date);
+                            setSelectedTargetShift(null);
+                          }}
+                        />
+                      ))}
+                    </View>
+                    {activeSwapSection ? (
+                      <View style={styles.swapOptions}>
+                        {visibleSwapTargetOptions.flatMap((entry) => {
+                          const options = getActionSegmentOptions(entry);
+                          const targetOptions =
+                            options.length > 1
+                              ? options.filter(
+                                  (option) =>
+                                    !hasScheduleEntrySegmentStarted(
+                                      entry,
+                                      timeZone,
+                                      option.segmentIndex,
+                                    ),
+                                )
+                              : options[0]
+                                ? hasScheduleEntrySegmentStarted(
+                                    entry,
+                                    timeZone,
+                                    options[0].segmentIndex,
+                                  )
+                                  ? []
+                                  : [options[0]]
+                                : [];
+
+                          return targetOptions.map((option) => (
+                            <SwapOptionCard
+                              key={`${entry.employeeId}-${entry.date}-${option.segmentIndex}`}
+                              active={
+                                selectedTargetShift?.employeeId === entry.employeeId &&
+                                selectedTargetShift?.date === entry.date &&
+                                (selectedTargetShift.segmentIndex ?? 0) === option.segmentIndex
+                              }
+                              entry={entry}
+                              segmentIndex={options.length > 1 ? option.segmentIndex : undefined}
+                              onPress={() =>
+                                setSelectedTargetShift({
+                                  employeeId: entry.employeeId,
+                                  date: entry.date,
+                                  segmentIndex:
+                                    options.length > 1 ? option.segmentIndex : undefined,
+                                })
+                              }
+                            />
+                          ));
+                        })}
+                      </View>
+                    ) : null}
+                  </View>
+                )}
+              </View>
+            </>
+          ) : (
+            <Text style={styles.subsectionBody}>Refreshing shift details.</Text>
+          )}
+        </View>
+      ) : null}
+    </View>
+  );
   return (
     <Screen
       bottomPaddingMode="stack"
@@ -974,7 +1416,14 @@ export default function ShiftDetailScreen() {
     >
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
-          <ShiftDetailSkeleton />
+          // Drop and Swap belong to the viewer's own shift, and "Working
+          // with" to a viewer who may see the team schedule; both are known
+          // from bootstrap before the shift arrives. Unknown reads as absent,
+          // the smaller page being the safer guess.
+          <ShiftDetailSkeleton
+            showActions={Boolean(linkedEmployeeId) && employeeId === linkedEmployeeId}
+            showShiftmates={canViewTeamSchedule}
+          />
         ) : null
       ) : contentState.kind === "error" ? (
         <StatusBanner
@@ -1014,7 +1463,7 @@ export default function ShiftDetailScreen() {
                         >
                           {detailCardTitle}
                         </Text>
-                        <DetailShiftChangeBadge change={hasSplitShift ? null : shiftEntry.change} />
+                        <ShiftChangeBadge change={hasSplitShift ? null : shiftEntry.change} />
                       </View>
                     ) : null}
                     {!hasSplitShift && (shouldRenderTitlePills || shiftEntry.change) ? (
@@ -1026,9 +1475,7 @@ export default function ShiftDetailScreen() {
                           />
                         ) : null}
                         {!shouldShowDetailTitle ? (
-                          <DetailShiftChangeBadge
-                            change={hasSplitShift ? null : shiftEntry.change}
-                          />
+                          <ShiftChangeBadge change={hasSplitShift ? null : shiftEntry.change} />
                         ) : null}
                       </View>
                     ) : null}
@@ -1105,7 +1552,7 @@ export default function ShiftDetailScreen() {
               </View>
             ) : null}
 
-            <PreviousShiftFooter change={shiftEntry.change} />
+            <PreviousShiftFooter entry={shiftEntry} />
 
             {publishedSummary ? (
               <DetailPublishedFooter
@@ -1143,7 +1590,11 @@ export default function ShiftDetailScreen() {
 
           {isCheckingExistingRequests ? (
             <SkeletonCardSurface>
-              <SkeletonLine style={{ marginBottom: 6 }} variant="screenTitle" width="60%" />
+              <SkeletonLine
+                style={{ marginBottom: mobileSpace.sm }}
+                variant="screenTitle"
+                width="60%"
+              />
               <SkeletonLine variant="body" width="90%" />
             </SkeletonCardSurface>
           ) : null}
@@ -1162,429 +1613,39 @@ export default function ShiftDetailScreen() {
           ) : null}
         </>
       )}
+      {/* Drop and pickup are a short choice and stay in the bottom sheet.
+          Swap browses weeks of teammates' shifts, which is a page's worth of
+          task, so it takes the full-page sheet. Both read the same body and
+          footer and exit through the same guard. */}
+      <FullPageSheet
+        dismissDisabled={createRequestMutation.isPending}
+        footer={requestSheetFooter}
+        hasUnsavedChanges={requestGuard.isDirty}
+        title={getRequestModeTitle("swap")}
+        visible={requestMode === "swap"}
+        onDismiss={requestGuard.requestClose}
+        overlay={requestSheetOverlay}
+      >
+        {requestSheetBody}
+      </FullPageSheet>
       <BottomSheetModal
         // A request in flight can't be dragged, tapped or backed away from —
         // the same rule the old close button enforced on its own.
         dismissDisabled={createRequestMutation.isPending}
-        footer={
-          <>
-            {requestMode === "swap" && selectedTargetEntry && shiftEntry ? (
-              <SheetActions
-                primaryAction={
-                  <Button
-                    disabled={!canSubmitRequest || createRequestMutation.isPending}
-                    label="Submit"
-                    loading={createRequestMutation.isPending}
-                    onPress={handleSubmitRequest}
-                  />
-                }
-              >
-                <Button
-                  disabled={createRequestMutation.isPending}
-                  label="Back"
-                  onPress={() => {
-                    setSelectedSwapDate(selectedTargetEntry.date);
-                    setSelectedTargetShift(null);
-                  }}
-                  tone="neutral"
-                />
-              </SheetActions>
-            ) : null}
-
-            {requestMode === "coverage" &&
-            coverageRequestType === "pickup" &&
-            selectedTargetedPickupEntry &&
-            shiftEntry ? (
-              <SheetActions
-                primaryAction={
-                  <Button
-                    label="Submit"
-                    loading={createRequestMutation.isPending}
-                    onPress={() => confirmTargetedPickupRequest(selectedTargetedPickupEntry)}
-                  />
-                }
-              >
-                <Button
-                  disabled={createRequestMutation.isPending}
-                  label="Back"
-                  onPress={() => setSelectedTargetedPickupEmployeeId(null)}
-                  tone="neutral"
-                />
-              </SheetActions>
-            ) : null}
-
-            {requestMode === "coverage" &&
-            coverageRequestType === "calloff" &&
-            selectedCalloffAbsenceType &&
-            shiftEntry ? (
-              <SheetActions
-                primaryAction={
-                  <Button
-                    label="Submit"
-                    loading={createRequestMutation.isPending}
-                    onPress={() =>
-                      confirmCoverageRequest("calloff", {
-                        absenceTypeId: selectedCalloffAbsenceType.id,
-                        absenceTypeLabel: getAbsenceTypeOptionLabel(selectedCalloffAbsenceType),
-                      })
-                    }
-                  />
-                }
-              >
-                <Button
-                  disabled={createRequestMutation.isPending}
-                  label="Back"
-                  onPress={() => setSelectedCalloffAbsenceTypeId(null)}
-                  tone="neutral"
-                />
-              </SheetActions>
-            ) : null}
-          </>
-        }
+        footer={requestSheetFooter}
         header={<SheetHeader title={getRequestModeTitle(requestMode)} />}
+        overlay={requestSheetOverlay}
         scrollable
-        visible={requestMode != null}
+        visible={requestMode === "coverage"}
         onDismiss={requestGuard.requestClose}
       >
-        <View style={styles.modalContent}>
-          {actionSegmentOptions.length > 1 && shiftEntry ? (
-            <ActionSegmentSelector
-              disabled={createRequestMutation.isPending}
-              entry={shiftEntry}
-              isOptionDisabled={(segmentIndex) =>
-                hasScheduleEntrySegmentStarted(shiftEntry, timeZone, segmentIndex)
-              }
-              options={actionSegmentOptions}
-              selectedIndex={selectedRequesterSegmentIndex}
-              onSelect={setSelectedRequesterSegmentIndex}
-            />
-          ) : null}
-          {requestMode === "coverage" ? (
-            <View style={styles.subsection}>
-              <Text style={styles.subsectionBody}>Choose how you want to drop this shift.</Text>
-              <View style={styles.coverageOptionList}>
-                <CoverageOptionCard
-                  active={coverageRequestType === "pickup"}
-                  body="Post the shift for teammates to claim. It stays yours unless someone claims it and approval completes."
-                  disabled={createRequestMutation.isPending}
-                  onPress={() => {
-                    setCoverageRequestType("pickup");
-                    setSelectedCalloffAbsenceTypeId(null);
-                  }}
-                  title="Offer for pickup"
-                  tone="neutral"
-                />
-                <CoverageOptionCard
-                  active={coverageRequestType === "calloff"}
-                  body="Use this when you cannot work the shift yourself. Approval records the absence and opens coverage automatically."
-                  disabled={createRequestMutation.isPending || activeAbsenceTypes.length === 0}
-                  onPress={() => {
-                    setCoverageRequestType("calloff");
-                    setSelectedTargetedPickupEmployeeId(null);
-                  }}
-                  title="Call off"
-                  tone="danger"
-                />
-              </View>
-              {activeAbsenceTypes.length === 0 ? (
-                <Text style={styles.coverageNotice}>
-                  Call off is unavailable until at least one active absence type is set up.
-                </Text>
-              ) : null}
-              {coverageRequestType === "pickup" ? (
-                <View style={styles.modalInlinePanel}>
-                  <Text style={styles.subsectionLabel}>Offer for pickup</Text>
-                  {selectedTargetedPickupEntry ? null : (
-                    <Button
-                      disabled={createRequestMutation.isPending}
-                      label="Offer to everyone"
-                      onPress={() => confirmCoverageRequest("pickup")}
-                    />
-                  )}
-                  <Text style={styles.subsectionLabel}>Request specific person</Text>
-                  <Text style={styles.subsectionBody}>
-                    {selectedTargetedPickupEntry
-                      ? "Review your request below, then submit."
-                      : "Only teammates with an absence on this date are shown."}
-                  </Text>
-                  <View style={styles.swapDateFilteredList}>
-                    {targetedPickupOptions.length === 0 ? (
-                      <EmptyStateCard
-                        compact
-                        iconName="person-remove-outline"
-                        title="No absent teammates on this date"
-                      />
-                    ) : (
-                      <View style={styles.swapOptions}>
-                        {(selectedTargetedPickupEntry
-                          ? [selectedTargetedPickupEntry]
-                          : targetedPickupOptions
-                        ).map((entry) => (
-                          <SwapOptionCard
-                            key={`${entry.employeeId}-${entry.date}`}
-                            active={selectedTargetedPickupEmployeeId === entry.employeeId}
-                            disabled={createRequestMutation.isPending}
-                            detailLabel={getPickupTargetDetailLabel(activeAbsenceTypes, entry)}
-                            entry={entry}
-                            showSegments={false}
-                            onPress={() => {
-                              setSelectedTargetedPickupEmployeeId(
-                                selectedTargetedPickupEmployeeId === entry.employeeId
-                                  ? null
-                                  : entry.employeeId,
-                              );
-                            }}
-                          />
-                        ))}
-                      </View>
-                    )}
-                  </View>
-                </View>
-              ) : null}
-              {coverageRequestType === "calloff" ? (
-                <View style={styles.modalInlinePanel}>
-                  <Text style={styles.subsectionLabel}>
-                    {selectedCalloffAbsenceType ? "Absence reason" : "Select absence reason"}
-                  </Text>
-                  {selectedCalloffAbsenceType ? (
-                    <Text style={styles.subsectionBody}>
-                      Review your call-off below, then submit.
-                    </Text>
-                  ) : null}
-                  <View style={styles.selectorWrap}>
-                    {(selectedCalloffAbsenceType
-                      ? [selectedCalloffAbsenceType]
-                      : activeAbsenceTypes
-                    ).map((absenceType) => (
-                      <SelectorChip
-                        key={absenceType.id}
-                        active={selectedCalloffAbsenceTypeId === absenceType.id}
-                        disabled={createRequestMutation.isPending}
-                        label={getAbsenceTypeOptionLabel(absenceType)}
-                        onPress={() =>
-                          setSelectedCalloffAbsenceTypeId(
-                            selectedCalloffAbsenceTypeId === absenceType.id ? null : absenceType.id,
-                          )
-                        }
-                      />
-                    ))}
-                  </View>
-                </View>
-              ) : null}
-            </View>
-          ) : null}
-
-          {requestMode === "swap" ? (
-            <View style={styles.subsection}>
-              <Text style={styles.subsectionBody}>
-                {selectedTargetEntry
-                  ? "Review the trade below, then submit your swap request."
-                  : "Choose a teammate's published shift to trade dates or shift types. Same-code swaps are allowed when the date changes."}
-              </Text>
-              {shiftEntry ? (
-                <>
-                  <View style={styles.swapSummaryList}>
-                    <SwapSummaryCard
-                      entry={shiftEntry}
-                      label={selectedTargetEntry ? "You give" : "Your shift"}
-                      segmentIndex={selectedRequesterSegmentIndex}
-                    />
-                    {selectedTargetEntry ? (
-                      <SwapSummaryCard
-                        entry={selectedTargetEntry}
-                        label="You get"
-                        segmentIndex={selectedTargetShift?.segmentIndex ?? 0}
-                        summaryNote={`From ${selectedTargetEntry.employeeName}`}
-                      />
-                    ) : null}
-                  </View>
-                  <View style={styles.modalInlinePanel}>
-                    <Text style={styles.subsectionLabel}>Eligible teammates</Text>
-                    {/* The app's only text-based loading state and only
-                        icon-less, retry-less error lived here. Both now read
-                        like every other surface. */}
-                    {swapOptionsQuery.isLoading ? (
-                      <CardRowListSkeleton rows={2} />
-                    ) : swapOptionsQuery.error ? (
-                      <StatusBanner
-                        actionLabel="Try again"
-                        body={getQueryErrorMessage(
-                          swapOptionsQuery.error,
-                          "We couldn't load teammate shifts.",
-                        )}
-                        title="Could not load teammate shifts"
-                        onAction={() => {
-                          void swapOptionsQuery.refetch();
-                        }}
-                      />
-                    ) : swapTargetOptions.length === 0 ? (
-                      <EmptyStateCard
-                        compact
-                        iconName="swap-horizontal-outline"
-                        title="No eligible shifts"
-                        body="Eligible teammate shifts will appear here once published."
-                      />
-                    ) : selectedTargetEntry ? (
-                      <View style={styles.swapSelectedPanel}>
-                        <Text style={styles.subsectionBody}>
-                          {selectedTargetEntry.employeeName} is selected for{" "}
-                          {formatShiftDate(selectedTargetEntry.date)}.
-                        </Text>
-                      </View>
-                    ) : (
-                      <View style={styles.swapDateFilteredList}>
-                        <View style={styles.swapWeekNav}>
-                          <Pressable
-                            accessibilityLabel="Go to previous week"
-                            accessibilityRole="button"
-                            accessibilityState={{
-                              disabled: previousEligibleSwapWeekStart == null,
-                            }}
-                            android_ripple={
-                              previousEligibleSwapWeekStart == null
-                                ? undefined
-                                : { color: mobileColors.rippleNeutral }
-                            }
-                            disabled={previousEligibleSwapWeekStart == null}
-                            onPress={() => handleSwapWeek(-1)}
-                            style={({ pressed }) => [
-                              styles.swapWeekNavButton,
-                              pressed &&
-                                previousEligibleSwapWeekStart != null &&
-                                styles.swapWeekNavButtonPressed,
-                              previousEligibleSwapWeekStart == null &&
-                                styles.swapWeekNavButtonDisabled,
-                            ]}
-                          >
-                            <Ionicons
-                              color={mobileColors.textSecondary}
-                              name="chevron-back"
-                              size={20}
-                            />
-                          </Pressable>
-                          <Text style={styles.swapWeekRangeLabel}>
-                            {activeSwapWeekStart ? formatWeekRangeLabel(activeSwapWeekStart) : ""}
-                          </Text>
-                          <Pressable
-                            accessibilityLabel="Go to next week"
-                            accessibilityRole="button"
-                            accessibilityState={{
-                              disabled: nextEligibleSwapWeekStart == null,
-                            }}
-                            android_ripple={
-                              nextEligibleSwapWeekStart == null
-                                ? undefined
-                                : { color: mobileColors.rippleNeutral }
-                            }
-                            disabled={nextEligibleSwapWeekStart == null}
-                            onPress={() => handleSwapWeek(1)}
-                            style={({ pressed }) => [
-                              styles.swapWeekNavButton,
-                              pressed &&
-                                nextEligibleSwapWeekStart != null &&
-                                styles.swapWeekNavButtonPressed,
-                              nextEligibleSwapWeekStart == null && styles.swapWeekNavButtonDisabled,
-                            ]}
-                          >
-                            <Ionicons
-                              color={mobileColors.textSecondary}
-                              name="chevron-forward"
-                              size={20}
-                            />
-                          </Pressable>
-                        </View>
-                        <View accessibilityLabel="Eligible swap dates" style={styles.swapDateGrid}>
-                          {swapWeekDates.map((date) => (
-                            <SwapDateChip
-                              key={date}
-                              active={date === activeSwapDate}
-                              count={swapSectionsByDate.get(date)?.entries.length ?? 0}
-                              date={date}
-                              onPress={() => {
-                                setSelectedSwapDate(date);
-                                setSelectedTargetShift(null);
-                              }}
-                            />
-                          ))}
-                        </View>
-                        {activeSwapSection ? (
-                          <View style={styles.swapOptions}>
-                            {visibleSwapTargetOptions.flatMap((entry) => {
-                              const options = getActionSegmentOptions(entry);
-                              const targetOptions =
-                                options.length > 1
-                                  ? options.filter(
-                                      (option) =>
-                                        !hasScheduleEntrySegmentStarted(
-                                          entry,
-                                          timeZone,
-                                          option.segmentIndex,
-                                        ),
-                                    )
-                                  : options[0]
-                                    ? hasScheduleEntrySegmentStarted(
-                                        entry,
-                                        timeZone,
-                                        options[0].segmentIndex,
-                                      )
-                                      ? []
-                                      : [options[0]]
-                                    : [];
-
-                              return targetOptions.map((option) => (
-                                <SwapOptionCard
-                                  key={`${entry.employeeId}-${entry.date}-${option.segmentIndex}`}
-                                  active={
-                                    selectedTargetShift?.employeeId === entry.employeeId &&
-                                    selectedTargetShift?.date === entry.date &&
-                                    (selectedTargetShift.segmentIndex ?? 0) === option.segmentIndex
-                                  }
-                                  entry={entry}
-                                  segmentIndex={
-                                    options.length > 1 ? option.segmentIndex : undefined
-                                  }
-                                  onPress={() =>
-                                    setSelectedTargetShift({
-                                      employeeId: entry.employeeId,
-                                      date: entry.date,
-                                      segmentIndex:
-                                        options.length > 1 ? option.segmentIndex : undefined,
-                                    })
-                                  }
-                                />
-                              ));
-                            })}
-                          </View>
-                        ) : null}
-                      </View>
-                    )}
-                  </View>
-                </>
-              ) : (
-                <Text style={styles.subsectionBody}>Refreshing shift details.</Text>
-              )}
-            </View>
-          ) : null}
-        </View>
+        {requestSheetBody}
       </BottomSheetModal>
-      <ConfirmationModal
-        body={pendingConfirmation?.body}
-        confirmLabel={pendingConfirmation?.confirmLabel ?? "Confirm"}
-        confirmTone={pendingConfirmation?.confirmTone ?? "primary"}
-        loading={createRequestMutation.isPending}
-        onCancel={() => setPendingConfirmation(null)}
-        onConfirm={() => {
-          const action = pendingConfirmation?.onConfirm;
-          setPendingConfirmation(null);
-          action?.();
-        }}
-        title={pendingConfirmation?.title ?? "Confirm action?"}
-        visible={pendingConfirmation != null}
-      />
-      {/* Separate from the descriptor modal above, which routes the request
-          sheet's own buttons. The two are never visible together: this one is
-          only ever raised by a dismissal, which the buttons don't perform. */}
-      <ConfirmationModal {...requestGuard.confirmationProps} />
+      {/* With no sheet up, the two confirmations are ordinary modals: the
+          descriptor one routes the request list's own buttons, the guard one
+          is only ever raised by a dismissal. While a sheet is up they ride
+          inside it as overlays (see `requestSheetOverlay`). */}
+      {requestMode == null ? requestConfirmations("modal") : null}
     </Screen>
   );
 }
@@ -1604,10 +1665,10 @@ function DetailDateTile({ date }: { date: string }) {
 
   return (
     <View accessibilityLabel={dateLabel} style={styles.detailDateTile}>
-      <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.detailDateWeekday}>
+      <Text fit="fixed" style={styles.detailDateWeekday}>
         {dateParts.weekdayLabel}
       </Text>
-      <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.detailDateDay}>
+      <Text fit="fixed" style={styles.detailDateDay}>
         {dateParts.dayLabel}
       </Text>
     </View>
@@ -1693,36 +1754,6 @@ function getPreviousPresentationTitle(
   return presentation?.shiftName?.trim() || presentation?.label?.trim() || "Shift";
 }
 
-const DETAIL_SHIFT_CHANGE_LABELS = {
-  deleted: "Deleted",
-  modified: "Edited",
-  new: "New",
-} as const;
-
-function DetailShiftChangeBadge({ change }: { change: MobileScheduleEntry["change"] }) {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-
-  if (!change || (change.kind === "new" && !change.isNewAddition)) {
-    return null;
-  }
-
-  return (
-    <View
-      accessibilityLabel={`Shift ${DETAIL_SHIFT_CHANGE_LABELS[change.kind].toLowerCase()}`}
-      style={[
-        styles.detailShiftChangeBadge,
-        change.kind === "modified" && styles.detailShiftChangeBadgeModified,
-        change.kind === "deleted" && styles.detailShiftChangeBadgeDeleted,
-      ]}
-    >
-      <Text style={styles.detailShiftChangeBadgeText}>
-        {DETAIL_SHIFT_CHANGE_LABELS[change.kind]}
-      </Text>
-    </View>
-  );
-}
-
 function getPreviousSegmentTitle(segment: MobileScheduleEntrySegment): string {
   return segment.shiftName?.trim() || segment.label?.trim() || "Shift";
 }
@@ -1745,11 +1776,12 @@ function getPreviousPresentationFocusAreaName(
   return presentation.displayFocusAreaName?.trim() || null;
 }
 
-function PreviousShiftFooter({ change }: { change: MobileScheduleEntry["change"] }) {
+function PreviousShiftFooter({ entry }: { entry: MobileScheduleEntry }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const [showPreviousShift, setShowPreviousShift] = useState(false);
-  const previous = change?.previousPresentation ?? null;
+  const previous = entry.change?.previousPresentation ?? null;
+  const changeLines = useMemo(() => describeScheduleEntryChanges(entry), [entry]);
 
   if (!previous) {
     return null;
@@ -1782,6 +1814,25 @@ function PreviousShiftFooter({ change }: { change: MobileScheduleEntry["change"]
         visible={showPreviousShift}
         onDismiss={() => setShowPreviousShift(false)}
       >
+        {changeLines.length > 0 ? (
+          <View
+            accessibilityLabel={`What changed: ${changeLines.join("; ")}`}
+            style={styles.previousShiftChangeSummary}
+          >
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.previousShiftChangeLabel}>
+              What changed
+            </Text>
+            {changeLines.map((line) => (
+              <Text
+                key={line}
+                maxFontSizeMultiplier={MAX_FONT_SCALE}
+                style={styles.previousShiftChangeLine}
+              >
+                {line}
+              </Text>
+            ))}
+          </View>
+        ) : null}
         {hasMultiplePreviousSegments ? (
           <View style={styles.previousShiftSegmentList}>
             {previousSegments.map((segment, index) => {
@@ -1861,10 +1912,11 @@ function DetailPublishedFooter({
         onPress={() => setShowPublication(true)}
         style={styles.detailPublishedFooter}
       >
-        <Ionicons color={mobileColors.textSubtle} name="information-circle-outline" size={16} />
+        <Ionicons color={mobileColors.textSubtle} name="information-circle" size={16} />
+        {/* Two lines: one cut "Published Sep 18, 2026 at 3:3…" at a raised
+            text size, and the time is the part worth reading. */}
         <Text
-          numberOfLines={1}
-          ellipsizeMode="tail"
+          numberOfLines={2}
           maxFontSizeMultiplier={MAX_FONT_SCALE}
           style={styles.detailPublishedText}
         >
@@ -1974,7 +2026,7 @@ function DetailJobPill({
       {shouldRenderSingleLinePill ? (
         <View style={styles.detailJobChipInlineTextRow}>
           <Text
-            maxFontSizeMultiplier={MAX_FONT_SCALE}
+            fit="compact"
             style={[
               styles.detailJobChipText,
               prominent && styles.detailHeroTitle,
@@ -1985,7 +2037,10 @@ function DetailJobPill({
             {chip.label}
           </Text>
           {isMentored ? (
-            <Text style={[styles.detailJobChipMentoredInlineText, { color: chip.textColor }]}>
+            <Text
+              fit="compact"
+              style={[styles.detailJobChipMentoredInlineText, { color: chip.textColor }]}
+            >
               (Mentored)
             </Text>
           ) : null}
@@ -1993,11 +2048,14 @@ function DetailJobPill({
       ) : (
         <View style={styles.detailJobChipTextStack}>
           {shouldRenderEyebrowInsidePill ? (
-            <Text style={[styles.detailJobChipEyebrowText, { color: chip.textColor }]}>
+            <Text
+              fit="compact"
+              style={[styles.detailJobChipEyebrowText, { color: chip.textColor }]}
+            >
               {chip.eyebrowLabel}
             </Text>
           ) : null}
-          <Text style={[styles.detailJobChipValueText, { color: chip.textColor }]}>
+          <Text fit="compact" style={[styles.detailJobChipValueText, { color: chip.textColor }]}>
             {chip.label}
             {isMentored ? (
               <Text style={[styles.detailJobChipMentoredText, { color: chip.textColor }]}>
@@ -2031,7 +2089,7 @@ function ShiftmateSegmentGroups({
               <View style={styles.shiftmateSegmentTitleRow}>
                 <View style={styles.shiftmateSegmentTitleMeta}>
                   <Text style={styles.shiftmateSegmentTitle}>{group.title}</Text>
-                  <SplitShiftBadge compact count={groups.length} label={group.label} />
+                  <SplitShiftBadge count={groups.length} label={group.label} />
                 </View>
                 {group.timeRange ? (
                   <Text style={styles.shiftmateSegmentTime}>{group.timeRange}</Text>
@@ -2084,6 +2142,7 @@ function ShiftmateRow({
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { resolvedTheme } = useThemeMode();
+  const stackJobPill = useWindowDimensions().fontScale > 1;
   const avatarTone = getAvatarTone(entry.employeeId, resolvedTheme === "dark");
   const displayName = entry.employeeId === linkedEmployeeId ? "You" : entry.employeeName;
   const jobChip = matchedSegment
@@ -2116,26 +2175,23 @@ function ShiftmateRow({
           },
         ]}
       >
-        <Text
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          maxFontSizeMultiplier={MAX_FONT_SCALE}
-          style={[styles.shiftmateAvatarText, { color: avatarTone.textColor }]}
-        >
+        <Text fit="fixed" style={[styles.shiftmateAvatarText, { color: avatarTone.textColor }]}>
           {getInitials(entry.employeeName)}
         </Text>
       </View>
       <View style={styles.shiftmateContent}>
-        <View style={styles.shiftmateHeader}>
+        {/* At a raised text size the pill moves under the name, the same
+            way the Schedule tab's team rows do, so neither squeezes the other. */}
+        <View style={[styles.shiftmateHeader, stackJobPill && styles.shiftmateHeaderStacked]}>
           <Text style={styles.shiftmateName}>{displayName}</Text>
           {jobChip || isMentored ? (
-            <View style={styles.shiftmateChipRow}>
+            <View style={[styles.shiftmateChipRow, stackJobPill && styles.shiftmateChipRowStacked]}>
               <DetailJobPill chip={jobChip} eyebrowDisplay="outside" isMentored={isMentored} />
             </View>
           ) : null}
         </View>
         {shouldShowSegments ? (
-          <ShiftEntrySegmentList entry={entry} variant="supporting" />
+          <ShiftEntrySegmentList entry={entry} showChangeLabels={false} variant="supporting" />
         ) : metaItems.length > 0 ? (
           <Text style={styles.shiftmateMeta}>{metaItems.join(" · ")}</Text>
         ) : null}
@@ -2328,32 +2384,37 @@ function SwapDateChip({
   const dateParts = getCompactScheduleDateParts(date);
   const countColor = active ? mobileColors.brand : mobileColors.textMuted;
 
+  // The count sits under the tile rather than inside it: seven tiles share
+  // the row, and a pill squeezed into one of them cut "12" to "1..". Under
+  // the tile the figure has the column's full width.
   return (
     <Pressable
       accessibilityLabel={`Show eligible teammates for ${formatShiftDate(date)}`}
       accessibilityRole="button"
       accessibilityState={{ disabled, selected: active }}
+      accessibilityValue={{ text: `${count} eligible teammate${count === 1 ? "" : "s"}` }}
       android_ripple={disabled ? undefined : { color: mobileColors.rippleNeutral }}
       disabled={disabled}
       onPress={onPress}
-      style={[
-        styles.swapDateChip,
-        active && styles.swapDateChipActive,
-        disabled && styles.swapDateChipDisabled,
-      ]}
+      style={[styles.swapDateColumn, disabled && styles.swapDateColumnDisabled]}
     >
-      <Text style={[styles.swapDateChipWeekday, active && styles.swapDateChipTextActive]}>
-        {dateParts.weekdayLabel}
-      </Text>
-      <Text style={[styles.swapDateChipDay, active && styles.swapDateChipTextActive]}>
-        {dateParts.dayLabel}
-      </Text>
-      <View
-        accessibilityLabel={`${count} eligible teammate${count === 1 ? "" : "s"}`}
-        style={[styles.swapDateChipCount, active && styles.swapDateChipCountActive]}
-      >
+      <View style={[styles.swapDateChip, active && styles.swapDateChipActive]}>
+        <Text
+          fit="fixed"
+          style={[styles.swapDateChipWeekday, active && styles.swapDateChipTextActive]}
+        >
+          {dateParts.weekdayLabel}
+        </Text>
+        <Text fit="fixed" style={[styles.swapDateChipDay, active && styles.swapDateChipTextActive]}>
+          {dateParts.dayLabel}
+        </Text>
+      </View>
+      <View style={styles.swapDateCount}>
         <Ionicons color={countColor} name="person-outline" size={11} />
-        <Text style={[styles.swapDateChipCountText, active && styles.swapDateChipCountTextActive]}>
+        <Text
+          fit="fixed"
+          style={[styles.swapDateCountText, active && styles.swapDateCountTextActive]}
+        >
           {count}
         </Text>
       </View>
@@ -2403,7 +2464,12 @@ function SwapOptionCard({
       ) : null}
       {detailLabel ? <Text style={styles.swapOptionDetail}>{detailLabel}</Text> : null}
       {showSegments && segmentIndex == null ? (
-        <ShiftEntrySegmentList entry={entry} showSegmentLabels={false} variant="supporting" />
+        <ShiftEntrySegmentList
+          entry={entry}
+          showChangeLabels={false}
+          showSegmentLabels={false}
+          variant="supporting"
+        />
       ) : null}
     </Pressable>
   );
@@ -2411,11 +2477,17 @@ function SwapOptionCard({
 
 function ShiftEntrySegmentList({
   entry,
+  /**
+   * Off for someone else's shifts listed as context (a swap candidate, a
+   * shiftmate): what matters there is what they work, not what changed.
+   */
+  showChangeLabels = true,
   showSegmentLabels = true,
   suppressCountAccessibilityLabel = false,
   variant,
 }: {
   entry: MobileScheduleEntry;
+  showChangeLabels?: boolean;
   showSegmentLabels?: boolean;
   suppressCountAccessibilityLabel?: boolean;
   variant: "detail" | "supporting";
@@ -2426,10 +2498,11 @@ function ShiftEntrySegmentList({
 
   return (
     <SplitShiftSegmentList
-      getSegmentStatusLabel={(segment) => {
-        const change = getScheduleEntrySegmentChange(entry, segment);
-        return change ? DETAIL_SHIFT_CHANGE_LABELS[change.kind] : null;
-      }}
+      getSegmentStatusLabel={
+        showChangeLabels
+          ? (segment) => getShiftChangeLabel(getScheduleEntrySegmentChange(entry, segment))
+          : undefined
+      }
       includeSegmentLabelInStatus={variant === "supporting"}
       renderSegmentChip={(segment) => (
         <DetailJobPill

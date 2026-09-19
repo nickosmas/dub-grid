@@ -4,6 +4,7 @@ import * as Sentry from "@/lib/sentry";
 import { Button } from "@/components/Button";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { useState, useMemo, useCallback, useRef, useEffect, useLayoutEffect } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
   LazyOverlayFallback,
@@ -58,10 +59,6 @@ import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { hint } from "@/components/ui/hint.types";
 import { X } from "lucide-react";
 
-const ShiftEditPanel = dynamic(() => import("@/components/ShiftEditPanel"), {
-  ssr: false,
-  loading: LazyOverlayFallback,
-});
 const PrintOptionsModal = dynamic(() => import("@/components/PrintOptionsModal"), {
   ssr: false,
   loading: LazyOverlayFallback,
@@ -79,6 +76,7 @@ const CoveragePanel = dynamic(() => import("@/components/CoveragePanel"), {
   loading: LazyProgressFallback,
 });
 
+import ShiftEditPanel from "@/components/schedule/ShiftEditPanelLazy";
 import { ScheduleLoadingScreen } from "./ScheduleLoadingScreen";
 import {
   addDays,
@@ -150,7 +148,11 @@ import {
   type EchoedCells,
   type DeleteShiftBatchItem,
 } from "@/features/schedule/client";
-import { computeDraftBreakdown, computeOutOfWindowDraftGroups } from "@/lib/draft-utils";
+import {
+  computeDraftBreakdown,
+  computeOutOfWindowDraftGroups,
+  countShiftsAddedToPublishedCell,
+} from "@/lib/draft-utils";
 import { exportScheduleCSV } from "@/lib/export-csv";
 import { queueNotification } from "@/lib/notify";
 import { buildRealtimeDraftDiff } from "@/lib/realtime-draft-utils";
@@ -327,7 +329,29 @@ function newEditorSessionId(): string {
     : `editor-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function SchedulerContent() {
+/** The board tab a `?requests=` deep link may ask for. */
+type RequestsParam = "mine" | "approval";
+
+function parseRequestsParam(value: string | null): RequestsParam | null {
+  return value === "mine" || value === "approval" ? value : null;
+}
+
+function parseDateParam(value: string | null): string | null {
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}
+
+function SchedulerContent({
+  initialDate,
+  openRequests,
+  onDeepLinkHandled,
+}: {
+  /** A `YYYY-MM-DD` the page should open on, from an alert or a link. */
+  initialDate: string | null;
+  /** Open the request board on this tab on arrival. */
+  openRequests: RequestsParam | null;
+  /** Called once the parameters were applied, so the caller can clear them. */
+  onDeepLinkHandled: () => void;
+}) {
   const isMobile = useMediaQuery(MOBILE);
   const shouldAutoUseOneWeek = useMediaQuery(AUTO_ONE_WEEK);
   const { user: authUser } = useAuth();
@@ -477,7 +501,9 @@ function SchedulerContent() {
   const shiftFetchStart = loadedShiftWindow.start;
   const shiftFetchEnd = loadedShiftWindow.end;
 
-  const [weekStart, setWeekStart] = useState<Date>(() => getWeekStart(todayAnchor));
+  const [weekStart, setWeekStart] = useState<Date>(() =>
+    getWeekStart(initialDate ? parseLocalDateKey(initialDate) : todayAnchor),
+  );
   const [activeFocusArea, setActiveFocusArea] = useState<number | null>(null);
   const [shifts, setShifts] = useState<ShiftMap>({});
   // Ref always points to the latest shifts — used in setShift to read fresh version
@@ -555,7 +581,28 @@ function SchedulerContent() {
   const [showCoveragePanel, setShowCoveragePanel] = useState(false);
 
   // ── Shift Requests (pickup & swap) ────────────────────────────────────────
-  const [showRequestBoard, setShowRequestBoard] = useState(false);
+  const [showRequestBoard, setShowRequestBoard] = useState(openRequests !== null);
+  const [requestBoardTab, setRequestBoardTab] = useState<RequestsParam | null>(openRequests);
+  // A deep link that arrives while the page is already mounted (a bell click
+  // from the schedule itself) moves the grid and opens the board the same way
+  // a fresh load does; the caller then clears the parameters from the URL.
+  const deepLinkKey = `${initialDate ?? ""}|${openRequests ?? ""}`;
+  const handledDeepLinkRef = useRef(deepLinkKey);
+  useEffect(() => {
+    if (deepLinkKey === "|") {
+      handledDeepLinkRef.current = deepLinkKey;
+      return;
+    }
+    if (handledDeepLinkRef.current !== deepLinkKey) {
+      handledDeepLinkRef.current = deepLinkKey;
+      if (initialDate) setWeekStart(getWeekStart(parseLocalDateKey(initialDate)));
+      if (openRequests) {
+        setRequestBoardTab(openRequests);
+        setShowRequestBoard(true);
+      }
+    }
+    onDeepLinkHandled();
+  }, [deepLinkKey, initialDate, openRequests, onDeepLinkHandled]);
 
   const currentEmpId = useMemo(
     () => (authUser ? (employees.find((e) => e.userId === authUser.id)?.id ?? null) : null),
@@ -1062,6 +1109,10 @@ function SchedulerContent() {
   // Load schedule-specific data (shifts, notes, recurring, publish history) once org data is ready.
   const scheduleLoadStarted = useRef(false);
   const draftCheckStarted = useRef(false);
+  // The org + window the published ranges have already been fetched for, so the
+  // window-change effect below doesn't re-request what the initial load just
+  // fetched inside its own Promise.all (build plan item 28).
+  const publishedRangesWindowRef = useRef<string | null>(null);
   const initialLoadUsedEditPerms = useRef(false);
   const prevOrgIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -1070,6 +1121,7 @@ function SchedulerContent() {
       prevOrgIdRef.current = org.id;
       scheduleLoadStarted.current = false;
       draftCheckStarted.current = false;
+      publishedRangesWindowRef.current = null;
       setLoadedShiftWindow({ start: defaultShiftFetchStart, end: defaultShiftFetchEnd });
       setPublicationRangeState(beginPublicationRangeLoad());
     }
@@ -1077,6 +1129,10 @@ function SchedulerContent() {
     scheduleLoadStarted.current = true;
     initialLoadUsedEditPerms.current = canEditShifts;
     const orgId = org.id;
+    // Claim this window before the fetch below runs, so the window-change
+    // effect treats the initial load as the fetch for it rather than issuing
+    // a second, identical request on every mount.
+    publishedRangesWindowRef.current = `${orgId}|${defaultShiftFetchStart}|${defaultShiftFetchEnd}`;
 
     // Paint the previous visit's grid immediately while the fetch below
     // refreshes it. Coming back to /schedule otherwise blocked on refetching
@@ -1541,7 +1597,10 @@ function SchedulerContent() {
   // Iterate oldest→newest so the most recent publish wins per cell key.
   const publishChangesMap = useMemo(() => {
     if (inWindowPublishHistory.length === 0) return null;
-    const map = new Map<string, PublishChange & { publishedAt: string; publishedBy: string }>();
+    const map = new Map<
+      string,
+      PublishChange & { publishedAt: string; publishedBy: string | null }
+    >();
     // inWindowPublishHistory is newest-first, so iterate in reverse (oldest first) to let newer entries overwrite
     for (let i = inWindowPublishHistory.length - 1; i >= 0; i--) {
       const entry = inWindowPublishHistory[i];
@@ -1593,13 +1652,50 @@ function SchedulerContent() {
     for (const change of publishChangesMap.values()) {
       // A period's first publication has no prior published schedule for the
       // viewer to compare against. Only later additions are meaningful "New"
-      // changes; the API marks initial-publication entries explicitly.
-      if (change.kind === "new" && change.isNewAddition !== false) counts.newShifts += 1;
-      else if (change.kind === "deleted") counts.deletedShifts += 1;
+      // changes; the API marks initial-publication entries explicitly, and the
+      // grid paints nothing for them, so they must not be counted either (they
+      // used to fall through and read as "edited").
+      if (change.kind === "new") {
+        if (change.isNewAddition !== false) counts.newShifts += 1;
+        continue;
+      }
+      if (change.kind === "deleted") {
+        counts.deletedShifts += 1;
+        continue;
+      }
+      // A shift added beside a published one is a double shift, which the
+      // overlay rings green as new; count it the way the grid shows it.
+      const added =
+        change.fromState && change.toState
+          ? countShiftsAddedToPublishedCell(change.fromState, change.toState)
+          : 0;
+      if (added > 0) counts.newShifts += added;
       else counts.modifiedShifts += 1;
     }
     return counts;
   }, [publishChangesMap, publishNoteChangesMap]);
+
+  // Whether "Highlight Changes" can actually put anything on screen. Two ways
+  // it cannot, and both used to render the control anyway — it flipped state
+  // and nothing changed, which reads as a dead button (build plan items 27
+  // and 31):
+  //  - only the desktop week/2-week grid renders the overlay. MonthView and
+  //    MobileDayView take no publish-diff props at all.
+  //  - a publish whose recorded changes are all outside the window (or which
+  //    recorded none) has nothing to paint.
+  const publishDiffRenderable = spanWeeks !== "month" && !isMobile;
+  const publishChangeTotal =
+    publishChangeCounts.newShifts +
+    publishChangeCounts.modifiedShifts +
+    publishChangeCounts.deletedShifts +
+    publishChangeCounts.notes;
+  const canHighlightPublishChanges = publishDiffRenderable && publishChangeTotal > 0;
+
+  // Switching to a view that cannot paint the overlay would otherwise strand it
+  // on, with its only off switch hidden along with the control.
+  useEffect(() => {
+    if (!publishDiffRenderable) setShowPublishDiff(false);
+  }, [publishDiffRenderable]);
 
   // Dismissals persist for the tab session via useDismissibleBanner — no
   // auto-reset on data change. The X means "hide this for the rest of the
@@ -2362,9 +2458,20 @@ function SchedulerContent() {
   }, [org, shiftFetchEnd, shiftFetchStart]);
   refetchPublishedRangesRef.current = refetchPublishedRanges;
 
+  // Refetch the published ranges when the window (or org) genuinely changes.
+  // This used to run unconditionally on mount as well, duplicating the fetch
+  // the initial load had already issued for the same window.
   useEffect(() => {
+    if (!org) {
+      publishedRangesWindowRef.current = null;
+      void refetchPublishedRanges();
+      return;
+    }
+    const windowKey = `${org.id}|${shiftFetchStart}|${shiftFetchEnd}`;
+    if (publishedRangesWindowRef.current === windowKey) return;
+    publishedRangesWindowRef.current = windowKey;
     void refetchPublishedRanges();
-  }, [refetchPublishedRanges]);
+  }, [org, shiftFetchStart, shiftFetchEnd, refetchPublishedRanges]);
 
   // Register focus areas as sub-nav items for the mobile bottom sheet
   const focusAreaSubNav: SubNavItem[] = useMemo(
@@ -3237,7 +3344,7 @@ function SchedulerContent() {
     (
       empId: string,
       date: Date,
-    ): (PublishChange & { publishedAt: string; publishedBy: string }) | null => {
+    ): (PublishChange & { publishedAt: string; publishedBy: string | null }) | null => {
       if (!showPublishDiff || !publishChangesMap) return null;
       const change = publishChangesMap.get(`${empId}_${formatDateKey(date)}`) ?? null;
       // Initial publication is the baseline, not an addition. Keep its audit
@@ -5667,11 +5774,19 @@ function SchedulerContent() {
         next: staffingStateFor(employee.id, nextDateKey),
       });
     }
+    // `shifts` only holds the loaded window, so a neighbouring day outside it
+    // reads as "no shift" above. The window carries a 90-day buffer past the
+    // visible range, so this is not expected to trip for any open shift the
+    // scheduler can click; when it does, the builder flags every candidate
+    // rather than letting the adjacent-day check pass silently.
+    const isLoaded = (key: string) =>
+      key >= loadedShiftWindow.start && key <= loadedShiftWindow.end;
     return buildOpenShiftStaffingCandidates({
       openShift: staffingOpenShift,
       employees,
       scheduleByEmployeeId,
       adjacentScheduleByEmployeeId,
+      adjacentDaysLoaded: { previous: isLoaded(previousDateKey), next: isLoaded(nextDateKey) },
       assignments,
       shiftCategories,
       jobs,
@@ -5683,6 +5798,7 @@ function SchedulerContent() {
     canEditShifts,
     employees,
     jobs,
+    loadedShiftWindow,
     orgRoles,
     scheduleSortBy,
     shiftCategories,
@@ -5889,7 +6005,12 @@ function SchedulerContent() {
         coverageRequirements,
         absenceTypeMap: absenceTypeObjectMap,
         cellEditors: editingCells,
-        resolvePublisherName: (userId: string) => auditNames.get(userId) ?? null,
+        // Who published is process detail for the people who publish, the same
+        // viewers who can open the publish history; everyone else reads the
+        // time alone, as on mobile.
+        resolvePublisherName: canNavigatePublishHistory
+          ? (userId: string) => auditNames.get(userId) ?? null
+          : undefined,
         openShifts,
         activeFocusArea,
         highlightEmpIds: searchMatchedEmployeeIds,
@@ -6708,13 +6829,15 @@ function SchedulerContent() {
                     )}
                     <div className="dg-draft-banner-actions">
                       {!canNavigatePublishHistory ? (
-                        <Button
-                          onClick={() => setShowPublishDiff((visible) => !visible)}
-                          className={`dg-btn ${showPublishDiff ? "dg-btn-info" : "dg-btn-secondary"}`}
-                          style={{ fontSize: "var(--dg-fs-caption)", padding: "5px 12px" }}
-                        >
-                          {showPublishDiff ? "Hide changes" : "Show changes"}
-                        </Button>
+                        canHighlightPublishChanges && (
+                          <Button
+                            onClick={() => setShowPublishDiff((visible) => !visible)}
+                            className={`dg-btn ${showPublishDiff ? "dg-btn-info" : "dg-btn-secondary"}`}
+                            style={{ fontSize: "var(--dg-fs-caption)", padding: "5px 12px" }}
+                          >
+                            {showPublishDiff ? "Hide changes" : "Show changes"}
+                          </Button>
+                        )
                       ) : isMobile ? (
                         // Publish History's "Show on Grid" reaches the overlay
                         // on a phone too, so the way back out has to live here
@@ -6742,21 +6865,36 @@ function SchedulerContent() {
                         )
                       ) : (
                         <>
-                          <Hint
-                            content={hint("Highlight this publish's changes on the grid")}
-                            side="bottom"
-                          >
-                            <Button
-                              onClick={() => setShowPublishDiff((v) => !v)}
-                              className={`dg-btn ${showPublishDiff ? "dg-btn-info" : "dg-btn-secondary"}`}
+                          {canHighlightPublishChanges && (
+                            <Hint
+                              content={hint("Highlight this publish's changes on the grid")}
+                              side="bottom"
+                            >
+                              <Button
+                                onClick={() => setShowPublishDiff((v) => !v)}
+                                className={`dg-btn ${showPublishDiff ? "dg-btn-info" : "dg-btn-secondary"}`}
+                                style={{
+                                  fontSize: "var(--dg-fs-caption)",
+                                  padding: "5px 12px",
+                                }}
+                              >
+                                {showPublishDiff ? "Hide Changes" : "Highlight Changes"}
+                              </Button>
+                            </Hint>
+                          )}
+                          {/* The changes exist, this view just cannot paint
+                              them. Say so instead of offering a control that
+                              would do nothing. */}
+                          {!publishDiffRenderable && publishChangeTotal > 0 && (
+                            <span
                               style={{
-                                fontSize: "var(--dg-fs-caption)",
-                                padding: "5px 12px",
+                                fontSize: "var(--dg-fs-footnote)",
+                                fontStyle: "italic",
                               }}
                             >
-                              {showPublishDiff ? "Hide Changes" : "Highlight Changes"}
-                            </Button>
-                          </Hint>
+                              Switch to week view to highlight changes
+                            </span>
+                          )}
                           <Button
                             onClick={() => setShowPublishHistory(true)}
                             className="dg-btn dg-btn-secondary"
@@ -7584,6 +7722,7 @@ function SchedulerContent() {
               onClose={() => setShowRequestBoard(false)}
               absenceTypeMap={absenceTypeObjectMap}
               assignmentNameMap={assignmentNameMap}
+              initialTab={requestBoardTab ?? undefined}
             />
           )}
 
@@ -7847,11 +7986,26 @@ export default function SchedulerPageClient({
   initialState: SchedulePageInitialState;
 }) {
   void initialState;
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const initialDate = parseDateParam(searchParams.get("date"));
+  const openRequests = parseRequestsParam(searchParams.get("requests"));
+  const hasDeepLink = initialDate !== null || openRequests !== null;
+  // Once applied, the parameters leave the URL so a later navigation or a
+  // refresh does not replay them.
+  const clearDeepLink = useCallback(() => {
+    if (hasDeepLink) router.replace(pathname, { scroll: false });
+  }, [hasDeepLink, router, pathname]);
 
   return (
     <ProtectedRoute>
       <SetupGuard>
-        <SchedulerContent />
+        <SchedulerContent
+          initialDate={initialDate}
+          openRequests={openRequests}
+          onDeepLinkHandled={clearDeepLink}
+        />
       </SetupGuard>
     </ProtectedRoute>
   );

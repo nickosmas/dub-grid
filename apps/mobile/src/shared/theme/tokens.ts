@@ -5,11 +5,14 @@ import {
   getAvatarTypography,
   getMobileEasingCurve,
   getMobileElevation,
+  getMobileElevationExtent,
   getMobileIconToneColor,
   getSoftGradientStops,
   mobileMotionTokens,
   mobileNavigationTheme,
   mobileBrandTypographyTokens,
+  mobileControlTokens,
+  mobileListRowTokens,
   mobileRadiusTokens,
   mobileSpacingTokens,
   mobileTypographyTokens,
@@ -21,6 +24,7 @@ import {
   type MobileEasingCurve,
   type MobileEasingName,
   type MobileElevation,
+  type MobileElevationExtent,
   type MobileElevationLevel,
   type MobileIconToneName,
   type MobileSpringConfig,
@@ -263,6 +267,10 @@ export type MobileColors = Record<keyof typeof mobileColors, string>;
 export const mobileSpacing = spacingTokens;
 /** The 4/8/12/16/20/24/32/40/48 ramp — reach for this for ad-hoc spacing. */
 export const mobileSpace = mobileSpacingTokens;
+/** Control heights, 36/44/52: every button, field, search and segmented control. */
+export const mobileControl = mobileControlTokens;
+/** A pressable list row's minimum height, vertical padding and title-to-caption gap. */
+export const mobileListRow = mobileListRowTokens;
 /** Named radii for the three surface roles (card, control, pill). */
 export const mobileRadii = radiusTokens;
 /** Small-surface radius ramp for chips, inputs and inline badges. */
@@ -270,7 +278,11 @@ export const mobileRadius = mobileRadiusTokens;
 export const mobileTypography = mobileTypographyTokens;
 export const mobileBrandTypography = mobileBrandTypographyTokens;
 
-/** Avatar initials use the actual Inter medium face on both native platforms. */
+/**
+ * Avatar initials use the actual Inter medium face on both native platforms.
+ * Render them with `fit="fixed"`: the disc is fixed, and scaled initials
+ * truncated to "M.." inside it.
+ */
 export function mobileAvatarText(diameter: number): TextStyle {
   const { fontSize } = getAvatarTypography(diameter);
   return {
@@ -341,6 +353,18 @@ export function mobileElevation(
 }
 
 /**
+ * The room a clipping parent must leave around a view at `level`, or the
+ * shadow is cut flat at the parent's bounds (a ScrollView's edge, an
+ * `overflow: hidden` wrapper).
+ */
+export function mobileElevationExtent(
+  level: MobileElevationLevel,
+  isDark: boolean,
+): MobileElevationExtent {
+  return getMobileElevationExtent(level, isDark);
+}
+
+/**
  * `jobs.border_color` and `absence_types.border_color` both default to
  * `'transparent'` in the schema and the color picker never writes anything
  * else, so a stored border is almost always that sentinel. Rendering it (or
@@ -391,9 +415,9 @@ export function mobileDarkenTone(tone: MobilePillTone, isDark: boolean): MobileP
  * ceilings are high: iOS Larger Text reaches 310% and Android 200%. Uncapped, a
  * 17px row title renders at 53px, which no card layout survives.
  *
- * 1.5 is the ceiling this app holds. It gives someone who has raised their text
- * size most of what they asked for while leaving the fixed-size furniture (date
- * tiles, shift pills, count badges) able to hold its content.
+ * 1.5 is the ceiling for reading text. It gives someone who has raised their
+ * text size most of what they asked for while leaving the page's furniture
+ * able to hold its content.
  *
  * A cap is the second line of defence, not the first. The first is a layout
  * that grows: rows stack rather than sit in two columns, containers use
@@ -403,11 +427,27 @@ export function mobileDarkenTone(tone: MobilePillTone, isDark: boolean): MobileP
  * shrink, so a raised text size squeezed the name into a column narrow enough
  * to break "Visiting Nursing" mid-word.
  *
- * `MAX_FONT_SCALE_FIXED` is the tighter ceiling for the few surfaces whose
- * height genuinely cannot move, such as the floating tab bar.
+ * Text inside a control is `fit` text (see `Text`), in two tiers. Chrome
+ * holds its size whatever the setting: header titles beside their buttons,
+ * the tab bar, avatar initials, date tiles, count dots. Labels the reader
+ * acts on grow a little, to `MAX_FONT_SCALE_COMPACT` and no further: button,
+ * pill, chip, segment and tab labels. 1.2 keeps a pill a pill and a pair of
+ * side-by-side buttons on one line while still answering the setting.
  */
 export const MAX_FONT_SCALE = 1.5;
-export const MAX_FONT_SCALE_FIXED = 1.3;
+export const MAX_FONT_SCALE_COMPACT = 1.2;
+
+/**
+ * The second limit, in points rather than as a multiplier: no text renders
+ * larger than this, whatever the OS setting. Headlines are already large, so
+ * they need the least help from text scaling and break a layout soonest: at
+ * 1.5x a 28pt `display` became 42pt and a hero title broke mid-word beside
+ * its date tile. Under this ceiling `display` scales to about 1.14x,
+ * `heroMetric` 1.33x, `screenTitle` 1.45x, and everything from `title` down
+ * keeps the full `MAX_FONT_SCALE`. `Text` applies it from the style's
+ * `fontSize`; a style without one gets the multiplier alone.
+ */
+export const MAX_TEXT_SIZE = 32;
 
 export const mobileText = mobileTypographyTokens.text satisfies Record<string, TextStyle>;
 
@@ -420,9 +460,12 @@ export const mobilePillOverflow = {
     maxWidth: "100%",
     minWidth: 0,
   } satisfies ViewStyle,
+  // One line like the interactive text: a pill that wraps stops being a pill,
+  // and at a raised text size "Also Day Shift" became a three-line lozenge.
+  // A display pill grows to its content and truncates only when the row
+  // cannot hold it; render its text with `fit="compact"`.
   displayText: {
     flexShrink: 1,
-    flexWrap: "wrap",
   } satisfies TextStyle,
   interactiveContainer: {
     maxWidth: "100%",

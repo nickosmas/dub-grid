@@ -8,6 +8,7 @@ import { noDecorativeAiIcons } from "./eslint-rules/no-decorative-ai-icons.mjs";
 import { requireBusyButton } from "./eslint-rules/require-busy-button.mjs";
 import { noFloatingAsyncHandler } from "./eslint-rules/no-floating-async-handler.mjs";
 import { noMisplacedUseClient } from "./eslint-rules/no-misplaced-use-client.mjs";
+import { noRawMobileMetrics } from "./eslint-rules/no-raw-mobile-metrics.mjs";
 import { noRawErrorInToast, noTechnicalUserCopy } from "./eslint-rules/no-technical-user-copy.mjs";
 
 const tooltipPlugin = {
@@ -23,6 +24,7 @@ const designPlugin = {
     "require-busy-button": requireBusyButton,
     "no-floating-async-handler": noFloatingAsyncHandler,
     "no-misplaced-use-client": noMisplacedUseClient,
+    "no-raw-mobile-metrics": noRawMobileMetrics,
   },
 };
 
@@ -183,6 +185,22 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    // Mobile styles draw from the token ramps; the 38d migration cleared the
+    // last raw literal, so this is now enforced. The illustration files are
+    // drawings, not layout, and the token module is the ramp itself.
+    files: ["apps/mobile/src/**/*.{ts,tsx}", "apps/mobile/app/**/*.{ts,tsx}"],
+    ignores: [
+      "apps/mobile/src/**/*.test.{ts,tsx}",
+      "apps/mobile/src/test/**",
+      "apps/mobile/src/shared/theme/tokens.ts",
+      "apps/mobile/src/features/onboarding/components/illustrations/**",
+    ],
+    plugins: { design: designPlugin },
+    rules: {
+      "design/no-raw-mobile-metrics": "error",
+    },
+  },
+  {
     // Keep implementation detail out of the words a customer reads, and keep a
     // caught error from reaching a toast unfiltered. Tests are excluded: their
     // string literals are fixtures standing in for server responses, not copy.
@@ -196,6 +214,33 @@ const eslintConfig = defineConfig([
     rules: {
       "copy/no-technical-user-copy": "error",
       "copy/no-raw-error-in-toast": "error",
+    },
+  },
+  {
+    // Every mobile text goes through `shared/components/Text`, which applies
+    // the app's text-size ceiling by default. The raw import scales to the OS
+    // maximum, which is how a hero's time wrapped one character per line at
+    // an accessibility size while the capped button beside it stayed small.
+    files: ["apps/mobile/src/**/*.{ts,tsx}", "apps/mobile/app/**/*.{ts,tsx}"],
+    ignores: [
+      "apps/mobile/src/**/*.test.{ts,tsx}",
+      "apps/mobile/src/test/**",
+      "apps/mobile/src/shared/components/Text.tsx",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "react-native",
+              importNames: ["Text"],
+              message:
+                "Import Text from shared/components/Text; it applies MAX_FONT_SCALE so OS text scaling has a ceiling.",
+            },
+          ],
+        },
+      ],
     },
   },
   {
@@ -266,6 +311,33 @@ const eslintConfig = defineConfig([
           message:
             'Import validated env vars instead of reading process.env directly: clientEnv from "@/lib/env", or serverEnv from "@/lib/env.server" (server-only — importing it from a client component ships the server schema to the browser).',
         },
+      ],
+    },
+  },
+  {
+    files: ["apps/web/src/**/*.{ts,tsx}"],
+    ignores: [
+      "apps/web/src/**/*.test.ts",
+      "apps/web/src/**/*.test.tsx",
+      "apps/web/src/**/__tests__/**",
+    ],
+    rules: {
+      // Native browser dialogs are unstyled, block the thread, and cannot be
+      // themed or tested; every confirmation goes through the in-app dialog.
+      "no-restricted-globals": [
+        "error",
+        ...["alert", "confirm", "prompt"].map((name) => ({
+          name,
+          message: `Use ConfirmDialog from "@/components/ConfirmDialog" instead of window.${name}().`,
+        })),
+      ],
+      "no-restricted-properties": [
+        "error",
+        ...["alert", "confirm", "prompt"].map((property) => ({
+          object: "window",
+          property,
+          message: `Use ConfirmDialog from "@/components/ConfirmDialog" instead of window.${property}().`,
+        })),
       ],
     },
   },

@@ -40,26 +40,24 @@ describe("DashboardHeader", () => {
     vi.restoreAllMocks();
   });
 
-  it("shows a morning greeting with the viewer's first name on one line", () => {
+  it("greets in two words with the viewer's first name", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-11T08:00:00"));
     vi.spyOn(Math, "random").mockReturnValue(0);
 
-    render(
-      <DashboardHeader firstName="Jordan" orgName="Acme Care" timezone="America/Los_Angeles" />,
-    );
+    render(<DashboardHeader firstName="Jordan" />);
 
-    expect(screen.getByText("Good morning, Jordan!")).toBeInTheDocument();
+    expect(screen.getByText("Morning, Jordan!")).toBeInTheDocument();
   });
 
-  it("picks a different variant from the morning pool for a different random draw", () => {
+  it("picks the other two-word variant for a different random draw", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-11T08:00:00"));
     vi.spyOn(Math, "random").mockReturnValue(0.99);
 
-    render(<DashboardHeader firstName="Jordan" orgName="Acme Care" timezone={null} />);
+    render(<DashboardHeader firstName="Jordan" />);
 
-    expect(screen.getByText("Let's get the day going, Jordan!")).toBeInTheDocument();
+    expect(screen.getByText("Hi, Jordan!")).toBeInTheDocument();
   });
 
   it("shows an afternoon greeting", () => {
@@ -67,9 +65,9 @@ describe("DashboardHeader", () => {
     vi.setSystemTime(new Date("2026-05-11T14:00:00"));
     vi.spyOn(Math, "random").mockReturnValue(0);
 
-    render(<DashboardHeader firstName="Jordan" orgName="Acme Care" timezone={null} />);
+    render(<DashboardHeader firstName="Jordan" />);
 
-    expect(screen.getByText("Good afternoon, Jordan!")).toBeInTheDocument();
+    expect(screen.getByText("Afternoon, Jordan!")).toBeInTheDocument();
   });
 
   it("shows an evening greeting", () => {
@@ -77,62 +75,38 @@ describe("DashboardHeader", () => {
     vi.setSystemTime(new Date("2026-05-11T20:00:00"));
     vi.spyOn(Math, "random").mockReturnValue(0);
 
-    render(<DashboardHeader firstName="Jordan" orgName="Acme Care" timezone={null} />);
+    render(<DashboardHeader firstName="Jordan" />);
 
-    expect(screen.getByText("Good evening, Jordan!")).toBeInTheDocument();
+    expect(screen.getByText("Evening, Jordan!")).toBeInTheDocument();
   });
 
-  it("falls back to a name-less greeting", () => {
+  it("falls back to a name-less two-word greeting", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-11T08:00:00"));
     vi.spyOn(Math, "random").mockReturnValue(0);
 
-    render(<DashboardHeader firstName={null} orgName="Acme Care" timezone={null} />);
+    render(<DashboardHeader firstName={null} />);
 
     expect(screen.getByText("Good morning!")).toBeInTheDocument();
   });
 
-  it("renders the org name alongside the local time", () => {
+  it("shows only the period beneath the greeting", () => {
     vi.spyOn(Math, "random").mockReturnValue(0);
 
-    render(
-      <DashboardHeader firstName="Jordan" orgName="Acme Care" timezone="America/Los_Angeles" />,
-    );
+    render(<DashboardHeader firstName="Jordan" periodLabel="Jul 5–11, 2026" />);
 
-    expect(screen.getByText(/Acme Care/)).toBeInTheDocument();
-  });
-
-  it("shows the period date range separated from the org name by a |", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
-
-    render(
-      <DashboardHeader
-        firstName="Jordan"
-        orgName="Acme Care"
-        timezone="America/Los_Angeles"
-        periodLabel="Jul 5–11, 2026"
-      />,
-    );
-
-    expect(screen.getByText(/Acme Care \| Jul 5–11, 2026/)).toBeInTheDocument();
-  });
-
-  it("omits the | separator entirely when no period label is given", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
-
-    render(
-      <DashboardHeader firstName="Jordan" orgName="Acme Care" timezone="America/Los_Angeles" />,
-    );
-
+    // The organization name and the facility clock left the header: the org
+    // is on Profile and the clock on Schedule, and the header was the busiest
+    // thing on the page.
+    expect(screen.getByText("Jul 5–11, 2026")).toBeInTheDocument();
+    expect(screen.queryByText(/Facility time/)).not.toBeInTheDocument();
     expect(screen.queryByText(/\|/)).not.toBeInTheDocument();
   });
 
   it("shows the alerts bell button", () => {
     vi.spyOn(Math, "random").mockReturnValue(0);
 
-    render(
-      <DashboardHeader firstName="Jordan" orgName="Acme Care" timezone="America/Los_Angeles" />,
-    );
+    render(<DashboardHeader firstName="Jordan" />);
 
     expect(screen.getByRole("button", { name: "Open alerts" })).toBeInTheDocument();
   });

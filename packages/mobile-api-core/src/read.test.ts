@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { loadMobileBootstrapPayload, loadMobilePeoplePayload } from "./read";
+import {
+  loadMobileBootstrapPayload,
+  loadMobileMeSchedulePayload,
+  loadMobileOrgSchedulePayload,
+  loadMobilePeoplePayload,
+} from "./read";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
 const USER_ID = "22222222-2222-4222-8222-222222222222";
@@ -165,5 +170,82 @@ describe("loadMobilePeoplePayload", () => {
       email: coworker.email,
       phone: coworker.phone,
     });
+  });
+});
+
+describe("schedule payloads and the publisher's name", () => {
+  const entry = (publishedByName: string | null) =>
+    ({
+      employeeId: "employee-1",
+      employeeName: "Mina Diaz",
+      date: "2026-09-21",
+      state: null,
+      presentation: null,
+      change: null,
+      publishedAt: "2026-09-18T03:31:00Z",
+      publishedByName,
+    }) as never;
+  const range = { startDate: "2026-09-20", endDate: "2026-09-26" };
+  const fetchMobileScheduleEntries = vi.fn(async () => [entry("Nic Kosmas"), entry(null)]);
+  const fetchLinkedEmployeeForUser = vi.fn(async () => ({
+    id: "employee-9",
+    firstName: "Alex",
+    lastName: "Reed",
+    status: "active",
+    focusAreaIds: [],
+    departmentIds: [],
+  }));
+
+  it("withholds who published from a viewer who cannot publish, keeping the time", async () => {
+    const payload = await loadMobileMeSchedulePayload(
+      {
+        currentOrg: { id: ORG_ID },
+        serviceClient: {},
+        user: { id: USER_ID },
+        permissions: { canPublishSchedule: false, level: 0 },
+      } as never,
+      range,
+      { fetchLinkedEmployeeForUser, fetchMobileScheduleEntries } as never,
+    );
+    expect(payload.entries.map((item) => item.publishedByName)).toEqual([null, null]);
+    expect(payload.entries[0]!.publishedAt).toBe("2026-09-18T03:31:00Z");
+  });
+
+  it("keeps the publisher for a publisher and for a super admin", async () => {
+    const publisher = await loadMobileOrgSchedulePayload(
+      {
+        currentOrg: { id: ORG_ID },
+        serviceClient: {},
+        permissions: {
+          canViewSchedule: true,
+          canEditShifts: true,
+          canApproveShiftRequests: false,
+          canManageEmployees: false,
+          canPublishSchedule: true,
+          level: 2,
+        },
+      } as never,
+      range,
+      { fetchMobileScheduleEntries } as never,
+    );
+    expect(publisher.entries[0]!.publishedByName).toBe("Nic Kosmas");
+
+    const superAdmin = await loadMobileOrgSchedulePayload(
+      {
+        currentOrg: { id: ORG_ID },
+        serviceClient: {},
+        permissions: {
+          canViewSchedule: true,
+          canEditShifts: true,
+          canApproveShiftRequests: true,
+          canManageEmployees: true,
+          canPublishSchedule: false,
+          level: 3,
+        },
+      } as never,
+      range,
+      { fetchMobileScheduleEntries } as never,
+    );
+    expect(superAdmin.entries[0]!.publishedByName).toBe("Nic Kosmas");
   });
 });

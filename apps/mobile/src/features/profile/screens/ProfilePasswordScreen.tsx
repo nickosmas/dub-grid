@@ -10,7 +10,8 @@ import {
 } from "@dubgrid/domain";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useQuery } from "@tanstack/react-query";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../../../shared/components/Text";
 import { Pressable } from "../../../shared/components/Pressable";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
@@ -391,7 +392,7 @@ const createStyles = (mobileColors: MobileColors) =>
     passwordStrengthHeader: {
       alignItems: "center",
       flexDirection: "row",
-      gap: 10,
+      gap: mobileSpace.md,
       justifyContent: "space-between",
     },
     passwordStrengthTitle: {
@@ -411,7 +412,7 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.successText,
     },
     passwordHintList: {
-      gap: 6,
+      gap: mobileSpace.sm,
     },
     passwordHintRow: {
       alignItems: "center",

@@ -9,7 +9,12 @@ import {
   skeletonRows,
 } from "../../../shared/components/skeleton";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileElevation, mobileRadii, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileElevation,
+  mobileRadii,
+  type MobileColors,
+  mobileSpace,
+} from "../../../shared/theme/tokens";
 
 /**
  * A single alert.
@@ -19,8 +24,10 @@ import { mobileElevation, mobileRadii, type MobileColors } from "../../../shared
  * its action pills.
  */
 export function NotificationDetailSkeleton({
-  messageLines = 4,
-  metadataRows = 3,
+  messageLines = 2,
+  // Most alerts carry no metadata, so the Details card is off by default;
+  // a placeholder card that then vanished read as a load failure.
+  metadataRows = 0,
 }: {
   messageLines?: number;
   metadataRows?: number;
@@ -47,14 +54,16 @@ export function NotificationDetailSkeleton({
           />
         ))}
       </View>
-      <View style={styles.metadataCard}>
-        {skeletonRows(metadataRows, (index) => (
-          <View key={`alert-metadata-${index}`} style={styles.metadataRow}>
-            <SkeletonLine variant="caption" width="32%" />
-            <SkeletonLine variant="caption" width="42%" />
-          </View>
-        ))}
-      </View>
+      {metadataRows > 0 ? (
+        <View style={styles.metadataCard}>
+          {skeletonRows(metadataRows, (index) => (
+            <View key={`alert-metadata-${index}`} style={styles.metadataRow}>
+              <SkeletonLine variant="caption" width="32%" style={styles.grow} />
+              <SkeletonLine variant="caption" width="42%" style={styles.grow} />
+            </View>
+          ))}
+        </View>
+      ) : null}
       <View style={styles.actionsRow}>
         <SkeletonBlock height={40} radius={mobileRadii.control} width={128} />
         <SkeletonBlock height={40} radius={mobileRadii.control} width={104} />
@@ -65,8 +74,13 @@ export function NotificationDetailSkeleton({
 
 const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
+    // A percentage-wide line inside a row has no width of its own to take a
+    // percentage of; growing the wrapper gives it the row's free space.
+    grow: {
+      flex: 1,
+    },
     container: {
-      gap: 14,
+      gap: mobileSpace.md,
       paddingBottom: 24,
     },
     header: {
@@ -85,7 +99,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderRadius: mobileRadii.card,
       borderWidth: 1,
       gap: 8,
-      padding: 14,
+      padding: mobileSpace.md,
       ...mobileElevation("card", isDark),
     },
     metadataRow: {

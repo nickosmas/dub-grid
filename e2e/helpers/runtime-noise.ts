@@ -17,6 +17,15 @@ const KNOWN_BENIGN_CONSOLE_PATTERNS: readonly RegExp[] = [
   // deliberately generic — a genuinely unexpected 404 is still caught by a
   // spec's own response listener, which has the path to check.
   /Failed to load resource: the server responded with a status of 404/,
+  // Same script, WebKit: va.vercel-scripts.com answers its debug build with a
+  // 403 there, and the console echo again carries no URL. The response-path
+  // list below already excludes it; a real 403 is still caught by a spec's
+  // response listener, which sees the path.
+  /Failed to load resource: the server responded with a status of 403/,
+  // Firefox reports the Supabase realtime websocket being closed by a
+  // navigation as a console error; a spec walking several routes tears
+  // that socket down on every hop by design.
+  /The connection to ws:\/\/.*\/realtime\/v1\/websocket.* was interrupted while the page was loading/,
   // Next.js's own resilience: a client-side RSC prefetch that hits a
   // transient network blip falls back to a full browser navigation rather
   // than failing the interaction. The fallback is the point of the message.

@@ -30,6 +30,7 @@ vi.mock("@/lib/audit/server-query", () => ({
 }));
 
 import { GET } from "./route";
+import { ORG_AUDIENCE_ACTIONS } from "@/lib/audit/registry";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
 const ACTOR_ID = "22222222-2222-4222-8222-222222222222";
@@ -189,7 +190,61 @@ describe("GET /api/gridmaster/audit-log/full", () => {
     expect(requireGridmasterSession).not.toHaveBeenCalled();
     expect(fetchFilteredAuditRows).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ orgId: ORG_ID, actionPrefix: "employee." }),
+      expect.objectContaining({
+        orgId: ORG_ID,
+        actionPrefix: "employee.",
+        // An organization's own admin reads through the org allowlist.
+        actionPrefixes: [...ORG_AUDIENCE_ACTIONS],
+      }),
+    );
+  });
+
+  it("narrows an org admin's category filter to org-visible actions", async () => {
+    await GET(
+      makeRequest(
+        `http://localhost/api/gridmaster/audit-log/full?orgId=${ORG_ID}&actionPrefixes=billing.`,
+      ),
+    );
+
+    const [, filters] = fetchFilteredAuditRows.mock.calls[0] as [
+      unknown,
+      { actionPrefixes: string[] },
+    ];
+    expect(filters.actionPrefixes).toContain("billing.payment_failed");
+    expect(filters.actionPrefixes).not.toContain("billing.portal_opened");
+    expect(filters.actionPrefixes).not.toContain("billing.seats_synced");
+    expect(filters.actionPrefixes.every((action) => action.startsWith("billing."))).toBe(true);
+  });
+
+  it("returns nothing to an org admin asking for a platform-only category", async () => {
+    const response = await GET(
+      makeRequest(
+        `http://localhost/api/gridmaster/audit-log/full?orgId=${ORG_ID}&actionPrefixes=impersonation.`,
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ entries: [] });
+    expect(fetchFilteredAuditRows).not.toHaveBeenCalled();
+  });
+
+  it("passes a gridmaster's org-scoped prefixes through untouched", async () => {
+    requireOrgPermissions.mockImplementationOnce(async () => ({
+      actor: { id: "gridmaster-user" },
+      permissions: { isGridmaster: true, isSuperAdmin: false, canManageEmployees: false },
+      serviceClient: { from: orgFrom },
+      userClient: {},
+    }));
+
+    await GET(
+      makeRequest(
+        `http://localhost/api/gridmaster/audit-log/full?orgId=${ORG_ID}&actionPrefixes=impersonation.,security.`,
+      ),
+    );
+
+    expect(fetchFilteredAuditRows).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ actionPrefixes: ["impersonation.", "security."] }),
     );
   });
 

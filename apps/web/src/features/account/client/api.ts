@@ -29,6 +29,8 @@ export interface SelfProfileRecord {
 
 export interface AccountSelfProfileData {
   profile: SelfProfileRecord | null;
+  /** False when the caller has no active membership in the requested org. */
+  isOrgMember: boolean;
   employee: Employee | null;
   /** Management department IDs from the caller's org membership — distinct
    *  from `employee.departmentIds`, which is scheduled departments. */

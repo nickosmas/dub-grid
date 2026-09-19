@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { useMemo } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text as ScalingText, type TextProps } from "../../../../shared/components/Text";
 import { useMobileColors } from "../../../../shared/providers/ThemeModeProvider";
 import {
   mobileRadii,
@@ -42,6 +43,15 @@ import {
  * look like it fills the phone, not like a postcard floating inside the slide.
  */
 const SCREEN_BLEED = mobileSpace["2xl"] - mobileSpacing.screenX;
+
+/**
+ * A still of a screen is a picture, so its text stays the size it was drawn
+ * at: the frame has fixed geometry, and the copy beside the illustration is
+ * what scales with the reader's setting.
+ */
+export function Text(props: TextProps) {
+  return <ScalingText allowFontScaling={false} {...props} />;
+}
 
 export function IllustrationFrame({ children, gap = 10 }: { children: ReactNode; gap?: number }) {
   return (
