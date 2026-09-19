@@ -230,53 +230,53 @@ Commands: `npx vitest run --config apps/web/vitest.config.mts apps/web/src/__tes
 **Suggested fix:** Keep a loading affordance mounted while the bootstrap query is retrying (the shared progress bar above `SetupGuard`, or `AuthTransitionScreen` with its workspace phase), so a transient failure never reads as a hung page.
 **Resolution:**
 
-### F-69 [P3] open - Impersonation end accepts any reason, then answers a constraint violation with a 500
+### F-69 [P3] fixed - Impersonation end accepts any reason, then answers a constraint violation with a 500
 
 **File:** apps/web/src/app/api/gridmaster/impersonation/route.ts:23-28,153-165; supabase/migrations/002_functions_triggers.sql (end_impersonation)
 **Found:** 2026-09-17 by feature 25d2c Step 4 (role variance, impersonation)
 **Why it matters:** `endSchema` validates `reason` as any non-empty string, but `impersonation_sessions.end_reason` is constrained to `manual | expired | navigation`. Any other value reaches the RPC, fails the check constraint, and the catch-all turns it into a generic 500 "We couldn't update that viewing session. Try again." The caller cannot tell it sent an invalid value. Reproduced by calling `end_impersonation(<own session>, 'probe')` as `qa-gridmaster` in a rolled-back transaction: `violates check constraint "impersonation_sessions_end_reason_check"`.
 **Suggested fix:** `reason: z.enum(["manual", "expired", "navigation"]).optional()` in `endSchema`, so an unknown value is a 400 `INVALID_INPUT` before the RPC.
-**Resolution:**
+**Resolution:** Fixed 2026-09-20. `endSchema.reason` is `z.enum(["manual", "expired", "navigation"])`, so an unknown value is a 400 before the RPC; route test covers `probe` (400, no RPC) and `navigation` (200). Requires `/audit` re-review before closing.
 
-### F-70 [P3] open - Starting an impersonation while one is active loses the RPC's message behind a 500
+### F-70 [P3] fixed - Starting an impersonation while one is active loses the RPC's message behind a 500
 
 **File:** apps/web/src/app/api/gridmaster/impersonation/route.ts:114-131,184-193; apps/web/src/components/gridmaster/EnhancedImpersonation.tsx:119-165
 **Found:** 2026-09-17 by feature 25d2c Step 4 (role variance, impersonation)
 **Why it matters:** `start_impersonation` raises "Cannot start a new impersonation while another session is active. End the current session first." The route's catch-all maps that to the same generic 500 as any unexpected failure, and the Start confirmation dialog stays open with only a transient toast, so a gridmaster with a stale session (for example after closing the tab without "End Session") sees an apparent outage instead of the instruction to end the previous session. Observed on Firefox/WebKit in the e2e run when Chromium's session was still open: POST answered 500 in 0.1s.
 **Suggested fix:** Recognise the known RPC errors (active session, self-impersonation, membership mismatch) and return 409/400 with the RPC message; let the dialog show it. Consider offering "End previous session" inline.
-**Resolution:**
+**Resolution:** Fixed 2026-09-20. The start branch recognises the RPC's caller-mistake messages (active session, self-impersonation, org mismatch, unknown target, justification length) and answers 409/400 with the RPC message, which the portal toast already shows via `formatClientErrorMessage`. Route test asserts the active-session case is 409 with the message and no audit row. Requires `/audit` re-review before closing.
 
-### F-71 [P3] open - Impersonation banner names the target while the shell greets the gridmaster
+### F-71 [P3] fixed - Impersonation banner names the target while the shell greets the gridmaster
 
 **File:** apps/web/src/components/ImpersonationBanner.tsx:114; apps/web/src/components/dashboard/UserDashboard.tsx (greeting and "No linked staff profile" state); docs/authentication.md:416
 **Found:** 2026-09-17 by feature 25d2c Step 5 (role variance, impersonation)
 **Why it matters:** Impersonation is role-scoped by design: the proxy verifies the target's membership, organization and role, while the gridmaster's own JWT keeps acting. The banner says "Impersonating qa-regular@dubgrid.test", but the dashboard beneath it says "Glad you're here, qa-gridmaster!" and "No linked staff profile", the schedule has no own row, and the profile has no Overview. A support engineer reading the banner expects to see what the target sees and instead sees the target's permission set around their own identity, with no copy explaining the difference.
 **Suggested fix:** Say what it is: "Viewing Calm Haven as user (qa-regular@dubgrid.test)" in the banner, and suppress or reword the personal greeting and no-linked-profile state while impersonating. Widening impersonation to act as the target would be a security design change, not a copy fix.
-**Resolution:**
+**Resolution:** Fixed 2026-09-20. Banner reads "Viewing <org> as <role> (<email>)"; the dashboard greeting drops the personal name while `permissions.isImpersonating`, and UserDashboard's unlinked card explains that impersonation applies the member's access to the gridmaster's own account instead of "No linked staff profile". e2e spec updated to the new copy. Requires `/audit` re-review before closing.
 
-### F-72 [P3] open - The /gridmaster safety escape clears the cookie but leaves the impersonation row active
+### F-72 [P3] fixed - The /gridmaster safety escape clears the cookie but leaves the impersonation row active
 
 **File:** apps/web/src/proxy.ts:441-446; supabase/migrations/002_functions_triggers.sql (start_impersonation active-session check)
 **Found:** 2026-09-17 by feature 25d2c Step 5 (role variance, impersonation)
 **Why it matters:** Navigating to /gridmaster while impersonating clears `dubgrid-impersonation` server-side, so the portal renders and the banner is gone, but no `end_impersonation` call is made. The `impersonation_sessions` row stays active until its 30-minute expiry, the Security view keeps counting it, and `start_impersonation` refuses a new session for that gridmaster until then (surfaced as the generic 500 in [[F-70]]). The e2e spec ends the row through the API after taking the escape for that reason.
 **Suggested fix:** Have the escape end the session too: either the proxy calls `end_impersonation` with reason `navigation` (the constraint already allows it), or the portal ends any open session for the signed-in gridmaster on mount.
-**Resolution:**
+**Resolution:** Fixed 2026-09-20. The proxy escape now calls `end_impersonation(sessionId, 'navigation')` as the gridmaster (new `endImpersonationOnEscape`, unit-tested) alongside clearing the cookie. The e2e escape test asserts the row is ended with reason `navigation` (Chromium pass). Requires `/audit` re-review before closing.
 
-### F-73 [P2] open - Ending impersonation sometimes bounces the gridmaster to /login on Firefox
+### F-73 [P2] fixed - Ending impersonation sometimes bounces the gridmaster to /login on Firefox
 
 **File:** apps/web/src/components/ImpersonationBanner.tsx:65-92; apps/web/src/components/AuthProvider.tsx:117-123; apps/web/src/components/RouteGuards.tsx:47-59
 **Found:** 2026-09-17 by feature 25d2c Step 5 (role variance, impersonation)
 **Why it matters:** After "End Session" the banner ends the DB session (POST answers 200), clears the cookie, clears the query cache and replaces the location with /dashboard. In roughly 1 of 7 cycles on Firefox (never yet on Chromium or WebKit) the page instead issues a direct document GET of /login with the Supabase auth cookie still present, and the portal login renders empty for a still-signed-in gridmaster. A probe captured the sequence twice: End POST 200, one console error with an object argument, then `DOC 200 GET /login` with no /dashboard document and no 3xx, so the navigation is client-initiated. The best-supported reading is that an auth event without an access token reaches AuthProvider (line 120 commits a null user) and ProtectedRoute's sign-out branch replaces the location with /login before the banner's own navigation wins; the emitter was not confirmed because the run that serialized the error's arguments did not reproduce it.
 **Suggested fix:** Reproduce with the auth listener instrumented (log every event and whether `nextSession.access_token` is set) around handleEnd; likely mitigations are navigating before `queryClient.clear()`, or having ProtectedRoute ignore a transient null session while an impersonation end is in flight. `e2e/role-variance-impersonation.spec.ts` currently accepts the bounce (annotated) so the suite stays deterministic; make the portal landing strict again once fixed.
-**Resolution:**
+**Resolution:** Fixed 2026-09-20 on the finding's best-supported reading: the banner (End Session and expiry) and the portal start flow now mark the auth transition and navigate without calling `queryClient.clear()` first, so a transient null session cannot reach ProtectedRoute's sign-out bounce mid-teardown. The e2e End Session test asserts the `/dashboard` landing strictly again; four Firefox runs on the worktree server landed on the portal every time (their later failures were dev-server 500 timeouts, not the bounce). Requires `/audit` re-review before closing.
 
-### F-74 [P3] open - The Gridmaster route's not-found boundary is unreachable
+### F-74 [P3] fixed - The Gridmaster route's not-found boundary is unreachable
 
 **File:** apps/web/src/app/(app)/gridmaster/not-found.tsx; apps/web/src/app/(app)/gridmaster/page.tsx
 **Found:** 2026-09-17 by feature 25d3 Step 5 (Gridmaster portal states)
 **Why it matters:** The route ships a tailored boundary ("The Gridmaster page you're looking for doesn't exist.", "Back to Gridmaster"), but nothing under `/gridmaster` calls `notFound()` and the segment has no dynamic child, so an unknown path such as `/gridmaster/does-not-exist` never enters it. Next answers with the app root's 404 ("This page could not be found.", "Go Home"), which sends a gridmaster to the org apex instead of back to the portal. The file is dead code with copy nobody sees. Same shape as the resolved `/settings` claim in 25d1c2.
 **Suggested fix:** Either give the portal a catch-all child that calls `notFound()` so the route-local boundary answers unknown portal paths, or delete the file and let the manifest stop claiming a route-local not-found state.
-**Resolution:**
+**Resolution:** Fixed 2026-09-20 by deleting `(app)/gridmaster/not-found.tsx`: nothing under the segment calls `notFound()` and the standards forbid a catch-all child, so the boundary could never render. Requires `/audit` re-review before closing.
 
 ### F-77 [P2] fixed - A request sheet opened during another sheet's dismissal is dropped by UIKit and stays "open" in JS
 

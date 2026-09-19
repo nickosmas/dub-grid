@@ -66,6 +66,10 @@ async function endOpenImpersonationSessions(page: Page) {
   }
 }
 
+// The banner says whose view this is (F-71): the organization, the role in
+// force, and the member it was borrowed from.
+const BANNER_TEXT = `Viewing Calm Haven as user (${QA_REGULAR_EMAIL})`;
+
 /** Signs in on the portal and starts impersonating qa-regular in Calm Haven. */
 async function startImpersonation(page: Page) {
   await loginAsQaGridmaster(page);
@@ -92,9 +96,7 @@ async function startImpersonation(page: Page) {
     .click();
 
   await expect(page).toHaveURL(`${QA_GRIDMASTER_ORIGIN}/schedule`, { timeout: 20_000 });
-  await expect(page.getByText(`Impersonating ${QA_REGULAR_EMAIL}`)).toBeVisible({
-    timeout: 20_000,
-  });
+  await expect(page.getByText(BANNER_TEXT)).toBeVisible({ timeout: 20_000 });
 }
 
 test.describe("role variance: gridmaster impersonation", () => {
@@ -133,14 +135,14 @@ test.describe("role variance: gridmaster impersonation", () => {
     // read-only People) around the gridmaster's identity, which is why the
     // dashboard shows the no-linked-profile state instead of qa-regular's
     // cards and there is no own row on the schedule.
-    const banner = (p: Page) => p.getByText(`Impersonating ${QA_REGULAR_EMAIL}`);
+    const banner = (p: Page) => p.getByText(BANNER_TEXT);
     await walkRoutes(
       page,
       [
         {
           path: "/dashboard",
           finalUrl: /\/dashboard$/,
-          marker: (p) => p.getByText("No linked staff profile"),
+          marker: (p) => p.getByText("Viewing with this member's permissions"),
         },
         { path: "/schedule", finalUrl: /\/schedule$/, marker: (p) => p.getByRole("grid") },
         {
@@ -181,15 +183,14 @@ test.describe("role variance: gridmaster impersonation", () => {
 
     // The banner ends the session directly (no confirmation; the "End
     // Impersonation" dialog belongs to the portal's Impersonation view) and
-    // replaces the location with the portal. On Firefox it sometimes lands
-    // on /login instead (F-73); the contract asserted here is that the
-    // session is over, so that bounce is annotated rather than failed.
+    // replaces the location with the portal. Landing on /login here was
+    // F-73; the portal landing is asserted strictly now.
     const activeCookie = await impersonationCookie(page);
     const { sessionId } = JSON.parse(decodeURIComponent(activeCookie!.value)) as {
       sessionId: string;
     };
     await page.getByRole("button", { name: "End Session" }).click();
-    await expect(page).toHaveURL(/\/(dashboard|login)$/, { timeout: 20_000 });
+    await expect(page).toHaveURL(/\/dashboard$/, { timeout: 20_000 });
     await expect(banner(page)).toHaveCount(0);
     expect(await impersonationCookie(page), "cookie after End Session").toBeNull();
     const history = await page.request.get(`${QA_GRIDMASTER_ORIGIN}/api/gridmaster/impersonation`, {
@@ -199,20 +200,9 @@ test.describe("role variance: gridmaster impersonation", () => {
       (await history.json()) as { entries: { sessionId: string; endedAt: string | null }[] }
     ).entries.find((entry) => entry.sessionId === sessionId);
     expect(ended?.endedAt, "session ended in the database").toBeTruthy();
-    if (/\/login$/.test(page.url())) {
-      test.info().annotations.push({
-        type: "known-defect",
-        description: "F-73: End Session bounced to /login instead of the portal",
-      });
-      // The bounce logs one error object (an auth event without a token,
-      // per the F-73 evidence); it is part of the same defect.
-      const bounceNoise = failures.filter((failure) => failure === "console:JSHandle@object");
-      for (const entry of bounceNoise) failures.splice(failures.indexOf(entry), 1);
-    } else {
-      await expect(page.getByRole("button", { name: "All Users" })).toBeVisible({
-        timeout: 20_000,
-      });
-    }
+    await expect(page.getByRole("button", { name: "All Users" })).toBeVisible({
+      timeout: 20_000,
+    });
 
     expect(failures).toEqual([]);
     await endOpenImpersonationSessions(page);
@@ -226,10 +216,26 @@ test.describe("role variance: gridmaster impersonation", () => {
 
     // proxy.ts clears the cookie on any /gridmaster request instead of
     // serving the portal as the impersonated user.
+    const escapedCookie = await impersonationCookie(page);
+    const { sessionId: escapedSessionId } = JSON.parse(
+      decodeURIComponent(escapedCookie!.value),
+    ) as { sessionId: string };
     await page.goto(`${QA_GRIDMASTER_ORIGIN}/gridmaster`);
     await expect(page.getByRole("button", { name: "All Users" })).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText(`Impersonating ${QA_REGULAR_EMAIL}`)).toHaveCount(0);
+    await expect(page.getByText(BANNER_TEXT)).toHaveCount(0);
     expect(await impersonationCookie(page), "cookie after the escape").toBeNull();
+    // The escape ends the row too (F-72), so the next start is not refused.
+    const escapeHistory = await page.request.get(
+      `${QA_GRIDMASTER_ORIGIN}/api/gridmaster/impersonation`,
+      { params: { limit: 50 } },
+    );
+    const escaped = (
+      (await escapeHistory.json()) as {
+        entries: { sessionId: string; endedAt: string | null; endReason: string | null }[];
+      }
+    ).entries.find((entry) => entry.sessionId === escapedSessionId);
+    expect(escaped?.endedAt, "escape ended the session row").toBeTruthy();
+    expect(escaped?.endReason).toBe("navigation");
 
     expect(failures).toEqual([]);
     await endOpenImpersonationSessions(page);

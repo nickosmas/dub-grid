@@ -14,7 +14,7 @@ vi.mock("@/lib/api-auth", () => ({
   createRequestSupabaseClient: (req: NextRequest) => createRequestSupabaseClient(req),
 }));
 
-vi.mock("../route", () => ({
+vi.mock("@/features/notifications/server/map-row", () => ({
   // Echo the row back unchanged so the test can read the query path,
   // not the mapping.
   mapNotificationRow: (row: unknown) => row,

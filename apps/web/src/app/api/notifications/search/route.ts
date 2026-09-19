@@ -4,7 +4,7 @@ import { createRequestSupabaseClient, requireAuthenticatedUserWithClaims } from 
 import { validateCsrfOrigin } from "@/lib/csrf";
 import logger from "@/lib/logger";
 import type { NotificationFacets } from "@/types";
-import { mapNotificationRow } from "../route";
+import { mapNotificationRow } from "@/features/notifications/server/map-row";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
 const cursorSchema = z.object({

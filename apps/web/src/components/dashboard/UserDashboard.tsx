@@ -165,6 +165,7 @@ export default function UserDashboard(props: DashboardContentProps) {
     currentHours,
     currentPeriodShifts,
     recentPublishedChanges = new Map(),
+    permissions,
     employees,
     focusAreas,
     isMobile,
@@ -359,13 +360,21 @@ export default function UserDashboard(props: DashboardContentProps) {
   );
 
   if (!currentEmpId || !currentEmployee) {
+    // Impersonation applies the target's permissions to the gridmaster's own
+    // account, so there is no staff row to show here. Say that, rather than
+    // telling a support engineer their account needs linking.
+    const impersonating = permissions.isImpersonating;
     return (
       <section className="dg-card" data-testid="user-dashboard-unlinked">
         <div className="dg-card-header">
           <div>
-            <div className="dg-card-title">No linked staff profile</div>
+            <div className="dg-card-title">
+              {impersonating ? "Viewing with this member's permissions" : "No linked staff profile"}
+            </div>
             <div className="dg-card-subtitle">
-              Your account is not connected to an employee record.
+              {impersonating
+                ? "Impersonation applies their access to your own account. Their personal schedule and profile are not shown."
+                : "Your account is not connected to an employee record."}
             </div>
           </div>
         </div>
@@ -373,8 +382,12 @@ export default function UserDashboard(props: DashboardContentProps) {
           <EmptyState
             size="inline"
             icon={<UserRound size={22} />}
-            title="Schedule unavailable"
-            description="Ask an administrator to link this account to a staff profile."
+            title={impersonating ? "No personal schedule in this view" : "Schedule unavailable"}
+            description={
+              impersonating
+                ? "Open the Schedule page to see what this member can see."
+                : "Ask an administrator to link this account to a staff profile."
+            }
           />
         </div>
       </section>

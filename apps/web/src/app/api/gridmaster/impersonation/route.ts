@@ -23,9 +23,28 @@ const startSchema = z.object({
 const endSchema = z.object({
   action: z.literal("end"),
   sessionId: z.string().uuid(),
-  reason: z.string().trim().min(1).optional(),
+  // Mirrors impersonation_sessions.end_reason's check constraint, so an
+  // unknown value is a 400 here rather than a constraint violation in the RPC.
+  reason: z.enum(["manual", "expired", "navigation"]).optional(),
   targetOrgId: z.string().uuid().nullable().optional(),
 });
+
+// start_impersonation raises these for caller mistakes, not outages. Answer
+// them with their own message so the portal can say what to do next.
+const START_CONFLICTS: ReadonlyArray<{ match: string; status: 400 | 409 }> = [
+  { match: "while another session is active", status: 409 },
+  { match: "Cannot impersonate yourself", status: 400 },
+  { match: "does not belong to the specified organization", status: 400 },
+  { match: "not found or has no organization", status: 400 },
+  { match: "Justification must be", status: 400 },
+];
+
+function startConflictResponse(error: { message?: string }): NextResponse | null {
+  const message = error.message ?? "";
+  const conflict = START_CONFLICTS.find((entry) => message.includes(entry.match));
+  if (!conflict) return null;
+  return NextResponse.json({ error: message }, { status: conflict.status });
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -126,6 +145,8 @@ export async function POST(req: NextRequest) {
         p_target_org_id: parsed.data.targetOrgId ?? null,
       });
       if (error) {
+        const conflict = startConflictResponse(error);
+        if (conflict) return conflict;
         throw error;
       }
 

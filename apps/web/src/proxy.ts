@@ -4,7 +4,7 @@ import { jwtVerify, decodeJwt } from "jose";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { getSandboxFromCookie } from "@/lib/sandbox-cookie";
-import { verifyImpersonationSession } from "@/lib/impersonation-server";
+import { endImpersonationOnEscape, verifyImpersonationSession } from "@/lib/impersonation-server";
 import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
 import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
 import { cacheSet, cacheThrough, CacheKey, TTL } from "@/lib/cache";
@@ -447,11 +447,18 @@ export async function proxy(req: NextRequest) {
             maxAge: 0,
           });
         } else if (pathname.startsWith("/gridmaster")) {
-          // Safety escape: navigating to /gridmaster auto-ends impersonation
+          // Safety escape: navigating to /gridmaster auto-ends impersonation.
+          // End the row as well as the cookie, or the session keeps counting
+          // as active and blocks the next start until it expires (F-72).
           res.cookies.set("dubgrid-impersonation", "", {
             path: "/",
             maxAge: 0,
           });
+          if (typeof impData.sessionId === "string") {
+            await timer.time("mw_impersonation_escape", () =>
+              endImpersonationOnEscape(supabase, impData.sessionId),
+            );
+          }
         } else {
           // The cookie is client-writable and populated mostly from
           // client-held state, not start_impersonation's return value — cross

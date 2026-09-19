@@ -2,7 +2,6 @@
 import { User } from "lucide-react";
 
 import { useState, useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   getImpersonationFromCookie,
@@ -10,6 +9,8 @@ import {
   type ImpersonationData,
 } from "@/lib/impersonation";
 import { endGridmasterImpersonation } from "@/features/gridmaster/client";
+import { formatOrganizationRoleLabel } from "@/lib/client-facing";
+import { markAuthTransition } from "@/lib/auth-transition";
 import { Button } from "@/components/Button";
 import { MaybeHint } from "@/components/ui/hint";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -17,7 +18,6 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 const BANNER_HEIGHT = 40;
 
 export default function ImpersonationBanner() {
-  const queryClient = useQueryClient();
   const [imp, setImp] = useState<ImpersonationData | null>(null);
   const [countdown, setCountdown] = useState<string | null>(null);
   const [ending, setEnding] = useState(false);
@@ -48,8 +48,8 @@ export default function ImpersonationBanner() {
       if (diff <= 0) {
         setCountdown(null);
         clearImpersonationCookie();
-        queryClient.clear();
         setImp(null);
+        markAuthTransition();
         window.location.replace("/dashboard");
         return;
       }
@@ -60,7 +60,7 @@ export default function ImpersonationBanner() {
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [imp?.expiresAt, queryClient]);
+  }, [imp?.expiresAt]);
 
   async function handleEnd() {
     if (!imp || ending) return;
@@ -86,8 +86,13 @@ export default function ImpersonationBanner() {
       // Best-effort — cookie clear + redirect is what matters
     }
     clearImpersonationCookie();
-    queryClient.clear();
     toast.success("Impersonation ended");
+    // Navigate without clearing the query cache first. The full document
+    // load discards it anyway, and clearing it while queries are in flight
+    // surfaced a transient null session that ProtectedRoute answered with a
+    // bounce to /login on Firefox (F-73). The transition mark holds that
+    // guard until the portal document has taken over.
+    markAuthTransition();
     window.location.replace("/dashboard");
   }
 
@@ -111,8 +116,8 @@ export default function ImpersonationBanner() {
     >
       <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <User size={16} strokeWidth={2.5} />
-        Impersonating <strong>{imp.targetEmail}</strong>
-        {imp.targetOrgName && <span>({imp.targetOrgName})</span>}
+        Viewing <strong>{imp.targetOrgName || "organization"}</strong> as{" "}
+        {formatOrganizationRoleLabel(imp.targetOrgRole).toLowerCase()} ({imp.targetEmail})
         {imp.justification && (
           <MaybeHint content={imp.justification} side="bottom">
             <span

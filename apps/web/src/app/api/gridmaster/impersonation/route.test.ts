@@ -233,4 +233,46 @@ describe("POST /api/gridmaster/impersonation", () => {
       }),
     );
   });
+
+  it("answers an already-active session with 409 and the RPC's own message", async () => {
+    const message =
+      "Cannot start a new impersonation while another session is active. End the current session first.";
+    requestRpc.mockResolvedValue({ data: null, error: { message } });
+
+    const response = await POST(
+      makePostRequest({
+        action: "start",
+        targetUserId: TARGET_USER_ID,
+        justification: "Need support investigation",
+        targetOrgId: ORG_ID,
+      }),
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: message });
+    expect(auditInsert).not.toHaveBeenCalled();
+  });
+
+  it("rejects an end reason outside the constraint before calling the RPC", async () => {
+    const response = await POST(
+      makePostRequest({ action: "end", sessionId: SESSION_ID, reason: "probe" }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(requestRpc).not.toHaveBeenCalled();
+  });
+
+  it("ends a session with a constraint-listed reason", async () => {
+    requestRpc.mockResolvedValue({ data: null, error: null });
+
+    const response = await POST(
+      makePostRequest({ action: "end", sessionId: SESSION_ID, reason: "navigation" }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(requestRpc).toHaveBeenCalledWith("end_impersonation", {
+      p_session_id: SESSION_ID,
+      p_reason: "navigation",
+    });
+  });
 });
