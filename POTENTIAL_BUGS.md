@@ -1,6 +1,6 @@
 # Bug and Edge-Case Hunt — DubGrid
 
-**Date:** 2026-05-23 (last reconciled 2026-05-25)
+**Date:** 2026-05-23 (last reconciled 2026-09-19)
 
 Proactive sweep across rendering/config, middleware, API/data, auth/session/React,
 and build/tooling. Findings are verified against actual code. Critical and High
@@ -99,9 +99,9 @@ and a fix.
 
 ## LOW
 
-- **L-1 — `usePermissions` cross-instance setState storm:** `features/permissions/usePermissions.ts` calls `setUserViewActive(false)` without an "already-false" guard, triggering synchronous re-renders across all `usePermissions` consumers. Guard against unchanged value or migrate to `useSyncExternalStore`. **Status: OPEN**
-- **L-2 — `departments` realtime over-invalidation:** `usePermissions.ts` re-resolves permissions on every `departments` UPDATE, but departments do not grant permissions (the column is vestigial). Dropping that subscription removes an org-wide invalidation storm. **Status: OPEN**
-- **L-3 — Gridmaster oversight queries have no `.limit()` on aggregate tables:** `apps/web/src/app/api/gridmaster/_lib/oversight.ts` — `selectRows` is a bare `.select()` with no limit for `organizations`, `organization_memberships`, `employees`, `invitations`, `shift_requests`, `user_sessions`, `mobile_device_tokens`, and several other tables (verified in code). `audit_log` and `impersonation_sessions` were fixed (`.limit(1000)` and `.limit(250)` respectively); `schedule_cells` now uses a 30-day date filter. The remaining unbounded queries are a data-growth risk (PostgREST silent max-rows truncation gives under-reported platform counts). **Status: PARTIALLY FIXED — schedule_cells and audit_log/impersonation_sessions are bounded; the aggregate-table selectRows calls remain unbounded.**
+- **L-1 — `usePermissions` cross-instance setState storm:** `features/permissions/usePermissions.ts` called `setUserViewActive(false)` without an "already-false" guard, triggering synchronous re-renders across all `usePermissions` consumers. **Status: ✅ Fixed** — the view-as-user flag is now read through `useSyncExternalStore` and the setter no-ops when unchanged (confirmed in `AUTH_EDGE_CASES.md` and re-verified 2026-09-19).
+- **L-2 — `departments` realtime over-invalidation:** `usePermissions.ts` re-resolved permissions on every `departments` UPDATE, but departments do not grant permissions (the column is vestigial). **Status: ✅ Fixed** — `usePermissions.ts` no longer subscribes to `departments` (the comment in the hook cites this item); org-wide `departments` invalidation lives only in the reference-counted `useOrgRealtimeInvalidation`.
+- **L-3 — Gridmaster oversight queries have no `.limit()` on aggregate tables:** `apps/web/src/app/api/gridmaster/_lib/oversight.ts` — `selectRows` is a bare `.select()` with no limit for `organizations`, `organization_memberships`, `employees`, `invitations`, `shift_requests`, `user_sessions`, `mobile_device_tokens`, and several other tables (verified in code). `audit_log` and `impersonation_sessions` were fixed (`.limit(1000)` and `.limit(250)` respectively); `schedule_cells` now uses a 30-day date filter. The remaining unbounded queries are a data-growth risk (PostgREST silent max-rows truncation gives under-reported platform counts). **Status: PARTIALLY FIXED — schedule_cells and audit_log/impersonation_sessions are bounded; the aggregate-table `selectRows` calls remain unbounded (re-verified 2026-09-19: `selectRows` is still a bare `.select()`).**
 - **L-4 — `useOnboardingState.ts` persisted the unclamped step index:** **Status: ✅ Fixed** — `useOnboardingState.ts` now persists `safeStepIndex` (lines 64-69), not the raw `currentStepIndex`. Comments in the file explicitly reference this fix.
 - **L-5 — `ProtectedRoute` 6s fallback timer resets on auth churn:** **Status: ✅ Fixed** — `RouteGuards.tsx` uses a `bounceDeadlineRef` (`useRef<number | null>`) to store the wall-clock deadline (lines 28-47). The deadline is set once (`bounceDeadlineRef.current === null` guard) and not reset on subsequent re-renders from auth state changes.
 - **L-6 — Orphan boundary files:** `apps/web/src/app/setup/` no longer exists (directory not found). **Status: ✅ Fixed**
@@ -114,9 +114,9 @@ and a fix.
 ## Verified clean (checked, not bugs)
 
 - `packages/*` platform-neutrality (no next/expo/RN/DOM/node imports); `dist/` rebuilt via web `predev`/`prebuild` hooks + turbo `^build`.
-- Exactly 4 migration files; `custom_access_token_hook` tables all granted to `supabase_auth_admin`.
+- Migration layout as it stood in May 2026 (four consolidated files); `custom_access_token_hook` tables all granted to `supabase_auth_admin`. Since 2026-09-04 the schema is an ordered stream of numbered forward migrations (`001`-`020`, checksum-locked); see `supabase/AGENTS.md`.
 - All current npm `overrides` applied in the lockfile (requires clean reinstall when overrides change — the `install-strategy=nested` footgun).
-- `CONSENT_VERSION` is `"1.1"` in `apps/web/src/components/CookieConsent.tsx`. Impersonation and sandbox cookies are essential (no consent gate needed).
+- `CONSENT_VERSION` was `"1.1"` in `apps/web/src/components/CookieConsent.tsx` at the time of the sweep (now `"1.2"`, bumped when the `dg-theme` cookie was added; mirrored in the mobile consent lib). Impersonation and sandbox cookies are essential (no consent gate needed).
 - Error sanitization (`packages/client-errors`) blocks raw DB/JWT leaks; `apiErrorResponse` logs server-side only.
 - `error.tsx`/`not-found.tsx` delegate to shared `RouteBoundary`; no catch-all routes; no raw `<img>`; no `dangerouslySetInnerHTML`/`eval`/`<script>`.
 - AppShell/header React Query keys include `orgId` (no cross-org cache bleed).
@@ -125,7 +125,7 @@ and a fix.
 
 ## Recommended order for remaining open items
 
-1. **C-1** — Confirm on a fresh clone / CI run that `npm ci` exits 0. If not, run a clean reinstall and commit the updated lockfile.
-2. **L-3** — Add `.limit()` caps to the unbounded `selectRows` calls in `oversight.ts` (affects platform-level data accuracy).
-3. **L-1, L-2** — Small, low-risk refactors to the permissions cache.
-4. **L-9** — Drop quotes from `.env.local.bak` (cosmetic).
+1. **L-3** - Add `.limit()` caps to the unbounded `selectRows` calls in `oversight.ts` (affects platform-level data accuracy). The only item still open as of 2026-09-19.
+2. **L-9** - Drop quotes from `.env.local.bak` (cosmetic; the file is local and gitignored, so it cannot be re-verified from the repo).
+
+C-1 was closed 2026-07-08 (CI runs `npm ci --ignore-scripts` on every push), and L-1 / L-2 were closed in the permissions cache work recorded above. The later, broader passes (`SECURITY_AUDIT.md` 2026-07-25 and the 2026-09 authentication hardening epic) did not reopen anything in this file.

@@ -41,7 +41,7 @@ npm run db:migrations:check
 git diff --exit-code
 ```
 
-Save the commit, the 19 filename/checksum lines, the linked-project
+Save the commit, the 20 filename/checksum lines, the linked-project
 classification, and the time of the run in the release ticket. Do not save
 connection strings, keys, tokens, or tenant data.
 
@@ -118,8 +118,10 @@ to that branch. Verify:
 - Schedule read, draft, publish, open-shift assignment, People, alerts, and
   settings smoke paths work.
 - Auth token refresh still contains the expected top-level organization claims.
-- The read-only inspector passes and the branch ledger ends at 019 with no
-  unknown rows.
+- The read-only inspector passes and the branch ledger ends at 020 with no
+  unknown rows. An environment holding 019 without 020 is broken (every publish
+  that adds a cell fails); the inspector's `scheduler_calloff_json_null_safe`
+  check reports exactly that state and is never deferred.
 
 Capture pass/fail facts, not personal or tenant data. Fix rehearsal failures
 with a new forward migration; never edit an applied file.
@@ -148,7 +150,7 @@ npx supabase db push --linked --dry-run
 ```
 
 The final dry run must report no pending migrations. The ledger must match local
-versions 001-019 and every schema, RLS, grant, hook, historical-patch, and
+versions 001-020 and every schema, RLS, grant, hook, historical-patch, and
 scheduler-calloff invariant must pass.
 
 ## Recovery

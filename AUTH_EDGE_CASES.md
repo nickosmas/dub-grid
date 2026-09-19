@@ -19,6 +19,14 @@ re-confirmed against current source on 2026-05-25.
 > Companion to `SECURITY_AUDIT.md` (2026-05-21, F-1..F-7) and `POTENTIAL_BUGS.md`
 > (2026-05-23, C/H/M/L). This doc does not restate their findings; it covers the
 > auth-specific gaps found after them and records which were already fixed.
+>
+> **Superseded for current state (2026-09-19).** The authentication hardening
+> epic (build-plan items 19a-19e, completed 2026-09-14) rebuilt most of the
+> surface this log examined: server-mediated recovery requests, the five-minute
+> sensitive-action window, live tenant authorization, single-use invitation and
+> recovery credentials, and a release qualification matrix. `docs/authentication.md`
+> §5a and §8 and the `SECURITY_AUDIT.md` 2026-09-14 section describe the
+> steady state; the rows below remain accurate as a record of May 2026.
 
 ---
 

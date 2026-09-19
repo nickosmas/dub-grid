@@ -5,7 +5,7 @@
 **Race-Condition-Free Architecture**
 Next.js · React · React Native (Expo) · Supabase · Vercel · Turborepo
 
-Version 2.2 | Updated 2026-05-25 | Confidential
+Version 2.3 | Updated 2026-09-19 | Confidential
 
 > **Monorepo note:** DubGrid is an npm-workspaces + Turborepo monorepo. Two apps —
 > `@dubgrid/web` (Next.js 16 App Router, `apps/web`) and `@dubgrid/mobile`
@@ -16,11 +16,16 @@ Version 2.2 | Updated 2026-05-25 | Confidential
 > `buildPermissionContext` / `buildPerms`, `extractJwtClaims`,
 > `getPermissionsFromSession`), with domain types/enums and the self-action
 > guard (`assertNotSelf` / `isSelfAction` / `SelfActionForbiddenError` in
-> `packages/domain/src/self-guard.ts`) in **`@dubgrid/domain`**. The web app
+> `packages/domain/src/self-guard.ts`) in **`@dubgrid/domain`**. The five-minute
+> sensitive-action assurance policy (`packages/authz/src/assurance.ts`) sits beside
+> the permission logic so web and mobile make the same step-up decision. The web app
 > consumes these via `apps/web/src/features/permissions/` (`usePermissions.ts`,
 > `core`, `client`, `shared`, `index`); the mobile backend orchestration in
 > `@dubgrid/mobile-api-core` consumes `@dubgrid/authz` directly. Paths in this
 > document reflect the monorepo layout (`apps/web/...`, `apps/web/src/proxy.ts`).
+> Route Handlers verify tokens locally (`lib/auth/verify-token.ts`, JWKS/ES256) with a
+> Redis revocation check; a live `auth.getUser()` is reserved for sensitive actions and
+> the mobile MFA-factor lookup. See `docs/authentication.md` §5a for that contract.
 
 ---
 
@@ -45,7 +50,7 @@ Security is enforced at three independent layers. Compromising one layer does no
 
 | Layer        | Technology             | Responsibility                                                  | Race Condition Risk                                              |
 | ------------ | ---------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------- |
-| A — Entryway | Vercel Edge Middleware | Subdomain routing, JWT role verification, request blocking      | JWT expiry window — mitigated by short TTL + refresh lock        |
+| A — Entryway | Next.js request proxy  | Subdomain routing, JWT role verification, request blocking      | JWT expiry window — mitigated by short TTL + refresh lock        |
 | B — Identity | Supabase Custom Claims | Role & org_id baked into JWT, instant permission decisions      | Stale JWT after role change — mitigated by forced refresh flow   |
 | C — Vault    | Supabase RLS Policies  | Row-level org isolation, gridmaster bypass policy, write guards | Concurrent writes — mitigated by atomic SQL + optimistic locking |
 
@@ -178,10 +183,9 @@ CREATE TABLE public.organizations (
   -- Test-sandbox support (migration 001_schema.sql)
   workspace_kind          public.workspace_kind NOT NULL DEFAULT 'real',
                             -- enum workspace_kind = ('real', 'sandbox'); NOT 'production'
+  sandbox_owner_user_id   UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   sandbox_source_org_id   UUID REFERENCES organizations(id) ON DELETE SET NULL,
-  sandbox_owner_user_id   UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-  sandbox_expires_at      TIMESTAMPTZ,            -- 30-day TTL for sandbox orgs
-  sandbox_template_version TEXT,
+                            -- partial UNIQUE index: one active sandbox per owner
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -189,11 +193,12 @@ CREATE TABLE public.organizations (
 
 > **Test sandbox.** A `workspace_kind = 'sandbox'` organization is an isolated
 > clone of a production org's config, created via `features/test-sandbox/` +
-> `app/api/test-sandbox/` (a `force-dynamic` POST route with CSRF + rate
-> limiting via `testSandboxLimiter`; actions `create` / `reset` / `archive`).
-> Sandboxes carry a 30-day TTL (`sandbox_expires_at`), are owned by the
-> creating user (`sandbox_owner_user_id`), and are **rejected for mobile
-> login** by `@dubgrid/mobile-api-core`. The `workspace_kind` enum is
+> `app/api/test-sandbox/` (a `force-dynamic` POST route with CSRF, `apiLimiter`,
+> and a server-side admin+ gate on the caller's real source-org role; actions
+> `enter` / `reset` / `exit`). Sandboxes are owned by the creating user
+> (`sandbox_owner_user_id`, one active sandbox each), entered through a 7-day
+> HttpOnly cookie, reaped by the daily `sandbox-cleanup` cron after 14 days, and
+> are **rejected for mobile login** by `@dubgrid/mobile-api-core`. The `workspace_kind` enum is
 > `('real', 'sandbox')` (default `'real'`) — production orgs are `'real'`, not
 > `'production'`.
 
@@ -307,11 +312,11 @@ This section enumerates every race condition that can occur in an RBAC system of
 
 ### 3.1 Race Condition: Stale JWT After Role Change
 
-| Property   | Detail                                                                                                                                                          |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Scenario   | Super admin demotes an Admin at 10:00 AM. The Admin's JWT does not expire until 10:15 AM. For 15 minutes the user retains Admin permissions in Edge Middleware. |
-| Severity   | HIGH — active over-privilege window                                                                                                                             |
-| Mitigation | Forced JWT invalidation via Supabase custom claims + refresh lock table                                                                                         |
+| Property   | Detail                                                                                                                                                            |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scenario   | Super admin demotes an Admin at 10:00 AM. The Admin's JWT does not expire until 10:15 AM. For 15 minutes the user retains Admin permissions in the request proxy. |
+| Severity   | HIGH — active over-privilege window                                                                                                                               |
+| Mitigation | Forced JWT invalidation via Supabase custom claims + refresh lock table                                                                                           |
 
 #### Implementation: Atomic Role Change + Forced Refresh
 
@@ -674,7 +679,7 @@ CREATE POLICY "audit_select" ON role_change_log FOR SELECT
 
 ## 5. Supabase Custom JWT Claims
 
-Custom claims eliminate per-request database round trips for role checks. The role and org_id live directly inside the signed JWT, so Vercel Edge Middleware and the React client can make permission decisions in zero additional queries.
+Custom claims eliminate per-request database round trips for role checks. The role and org_id live directly inside the signed JWT, so the request proxy, the Route Handlers, and the React client can make permission decisions in zero additional queries.
 
 ### 5.1 Auth Hook: Inject Claims on Sign-In
 
@@ -796,9 +801,9 @@ $$;
 
 ---
 
-## 6. Vercel Edge Middleware
+## 6. Request Proxy
 
-The Next.js request proxy (`apps/web/src/proxy.ts`) runs at the CDN edge — geographically closest to the user — before any backend compute is invoked. Beyond JWT verification and subdomain-based role routing it also:
+The Next.js request proxy (`apps/web/src/proxy.ts`) runs on every page request before the route renders. Beyond JWT verification and subdomain-based role routing it also:
 
 - **Org access check (archived + suspended + billing)** — looks up `suspended_at`,
   `archived_at`, `subscription_status`, and `trial_ends_at` for the caller's org,
@@ -1299,7 +1304,7 @@ Self-signup is completely disabled. Every user account must be created through a
 
 ### 11.1 Disable Public Sign-Up
 
-In Supabase Dashboard → Authentication → Providers → Email: set "Enable email signup" to OFF. This makes `supabase.auth.signUp()` return an error for any call not initiated through the invite flow.
+In Supabase Dashboard → Authentication → Providers → Email: set "Enable email signup" to OFF. The only account-creation path is `/api/invitations/register`, which runs with the service role and creates the invitee pre-confirmed; the browser never calls `supabase.auth.signUp()`.
 
 ### 11.2 invitations Table
 
@@ -1370,7 +1375,7 @@ The following features have been implemented since the initial RBAC design:
 
 Self-service password reset is fully implemented with security best practices:
 
-1. **Forgot Password** (`/forgot-password`) — User enters email, Supabase sends reset link via `resetPasswordForEmail()`. Includes email enumeration protection: always shows "Check your email" regardless of whether the email exists in the system.
+1. **Forgot Password** (`/forgot-password`) — the page posts to `POST /api/auth/recovery-request`, which rate-limits by source IP, target email hash, and a global surge limit, writes a security audit event, and then calls Supabase `resetPasswordForEmail()`. Always shows "Check your email" regardless of whether the email exists. Mobile uses the same handler and completes the reset in-app with the emailed 6-digit code.
 2. **Reset Password** (`/reset-password`) — Token-validated form with:
    - Password strength meter (4 levels: too short → weak → fair → strong)
    - Minimum 10-character requirement
@@ -1381,7 +1386,7 @@ Self-service password reset is fully implemented with security best practices:
 
 ### 12.2 Email Verification
 
-New accounts created via invitation acceptance go through email verification:
+Invited accounts are created **pre-confirmed** by `/api/invitations/register` (service role, `email_confirm: true`), so the invitation link itself proves the address and no second email is sent. `/verify-email` remains only for accounts that are genuinely unconfirmed:
 
 - **Verify Email** (`/verify-email`) — Displays verification status with optional `?email=` param
 - Resend button with 60-second cooldown to prevent abuse
@@ -1392,47 +1397,61 @@ New accounts created via invitation acceptance go through email verification:
 
 All public-facing API routes are rate-limited via Upstash Redis (`apps/web/src/lib/rate-limit.ts`):
 
-| Limiter                 | Window   | Key                 | Applied To                                                                                   |
-| ----------------------- | -------- | ------------------- | -------------------------------------------------------------------------------------------- |
-| `apiLimiter`            | 10 / 10s | user id (or IP)     | general protected mutations (org settings/access/role-change, etc.)                          |
-| `inviteLimiter`         | 100 / 1h | user id (per-actor) | `/api/send-invite-email`                                                                     |
-| `emailTargetLimiter`    | 5 / 1h   | `hashEmail(target)` | layered onto invite + gridmaster password-reset so one actor can't email-bomb a single inbox |
-| `demoLimiter`           | 3 / 1h   | IP                  | `/api/request-demo`                                                                          |
-| `passwordResetLimiter`  | 5 / 15m  | `hashEmail(email)`  | forgot/reset password                                                                        |
-| `loginLimiter`          | 15 / 15m | `hashEmail(email)`  | login (app-level brute-force protection)                                                     |
-| `scheduleReviewLimiter` | 60 / 10s | user id             | publish/discard review dialogs (higher headroom)                                             |
+| Limiter                 | Window    | Key                 | Applied To                                                                                   |
+| ----------------------- | --------- | ------------------- | -------------------------------------------------------------------------------------------- |
+| `apiLimiter`            | 10 / 10s  | user id (or IP)     | general protected mutations (org settings/access/role-change, etc.)                          |
+| `inviteLimiter`         | 100 / 1h  | user id (per-actor) | `/api/send-invite-email`                                                                     |
+| `emailTargetLimiter`    | 5 / 1h    | `hashEmail(target)` | layered onto invite + gridmaster password-reset so one actor can't email-bomb a single inbox |
+| `demoLimiter`           | 3 / 1h    | IP                  | `/api/request-demo`                                                                          |
+| `passwordResetLimiter`  | 5 / 15m   | `hashEmail(email)`  | recovery requests (web + mobile) and gridmaster password reset, per target address           |
+| `loginLimiter`          | 15 / 15m  | `hashEmail(email)`  | login (app-level brute-force protection; `LOGIN_EMAIL_LIMIT_PER_15_MIN`)                     |
+| `loginIpLimiter`        | 120 / 1m  | source IP           | login burst ceiling for shared-office users (`LOGIN_IP_LIMIT_PER_MINUTE`)                    |
+| `loginSurgeLimiter`     | 500 / 10s | global              | login load shedding during sign-in spikes (`LOGIN_GLOBAL_LIMIT_PER_10_SECONDS`)              |
+| `recoverySurgeLimiter`  | 100 / 10s | global              | recovery-request abuse and provider protection                                               |
+| `scheduleReviewLimiter` | 60 / 10s  | user id             | publish/discard review dialogs (higher headroom)                                             |
 
 `checkRateLimit` **fails closed** in production (returns a 503-signalling `misconfigured`
 flag) when Upstash Redis is unconfigured or unreachable; in development it allows through.
 
 ### 12.4 Branded Email Templates
 
-Shared email template system in `apps/web/src/lib/email.ts`:
-
-- `sanitizeHeaderValue()` — Prevents email header injection (strips CRLF, null bytes)
-- `escapeHtml()` — Prevents XSS in email content
-- `emailWrapper()` — Branded HTML template with DubGrid header, card layout, responsive design
-- Used by invitation emails and demo request notifications
+Every email is a react-email component under `apps/web/src/emails/` (transactional emails plus, under `emails/auth/`, the ten Supabase auth templates including the MFA enrolled/unenrolled and password/email-changed security notices). `npm --workspace @dubgrid/web run email:build` compiles the auth set to `supabase/templates/*.html` and `npm run auth:templates:push` syncs them to the linked remote project. `apps/web/src/lib/email.ts` keeps only the header-safety helpers (`sanitizeHeaderValue`, `emailBaseUrl`).
 
 ### 12.5 CSRF Protection
 
 Mutating Route Handlers call `validateCsrfOrigin(req)` (`apps/web/src/lib/csrf.ts`), which
 checks the request `Origin` header's root domain against the request host's root domain
-(so any `*.dubgrid.com` subdomain is accepted, but a foreign origin is rejected). Server
-Actions also include Next.js's built-in CSRF protection.
+(so any `*.dubgrid.com` subdomain is accepted, but a foreign origin is rejected) and fails
+closed in production when the header is absent. The app uses no Server Actions; every
+mutating route is inventoried by `apps/web/src/__tests__/auth-integrity-entry-points.test.ts`,
+which fails if a browser-facing mutation lacks the check or a non-browser exception
+(mobile bearer, webhook, cron) is unclassified.
 
-### 12.6 MFA Status Endpoint (Partial)
+### 12.6 MFA and Sensitive-Action Reauthentication
 
-Multi-factor authentication enrollment is fully built on both platforms:
-web (`MFASetup.tsx`, QR + manual secret) and mobile
-(`ProfileSecurityScreen.tsx`, manual secret entry), both backed by
-Supabase's native `auth.mfa.enroll`/`challengeAndVerify`/`unenroll`. The
-`/api/account/mfa-status` Route Handler reports whether the current user has
-MFA enrolled (backed by `profiles.mfa_enabled` and Supabase's MFA factors).
-What's still advisory-only rather than enforced: gridmaster/super_admin/admin
-accounts without a verified TOTP factor get a dismissible in-app nag, not a
-hard block (see §13.1) — a deliberate choice to avoid locking out existing
-admins.
+Multi-factor authentication is fully built on both platforms: web (`MFASetup.tsx`,
+QR + manual secret) and mobile (`ProfileSecurityScreen`), both driving one shared
+lifecycle handler (`POST /api/account/mfa-lifecycle`, `POST /api/mobile/v1/profile/mfa-lifecycle`)
+with `enroll`, `remove`, `reauthenticate`, and `cleanup` actions over user-scoped
+Supabase factor calls (never Auth Admin factor mutations). `/api/account/mfa-status`
+persists the enrolled flag after a verified enrollment.
+
+Enforcement is **account-based**: once a verified TOTP factor exists, sign-in requires
+the challenge on web and mobile, the mobile API rejects AAL1 tokens for that account,
+and sensitive actions require fresh AAL2 proof. Accounts without a factor present a
+fresh password proof for the same actions. The five-minute window is derived from the
+signed JWT `amr` timestamps in `packages/authz/src/assurance.ts` and enforced by
+`requireSensitiveActionAuth` (web) / `requireMobileSensitiveActionAuth` (mobile) on
+factor and credential changes, other-session revocation, data export, account and
+organization deletion, and approving another person's account deletion; the web
+`StepUpDialog` and the mobile step-up flow satisfy it. `docs/mfa-provider-boundary.md`
+records the hosted-provider qualification and the accepted limit that direct calls to
+Supabase's own factor-removal endpoint follow the provider's AAL2 rule, not DubGrid's
+five-minute window.
+
+What remains advisory: gridmaster/super_admin/admin accounts without a verified factor
+get a dismissible in-app nag (`MfaNagBanner`), not a hard block (see §13.1), a
+deliberate choice to avoid locking out existing admins.
 
 ---
 
@@ -1442,21 +1461,22 @@ The following features are recommended before a production launch.
 
 ### 13.1 Priority 1 — Security (Implement Before Launch)
 
-#### Multi-Factor Authentication (MFA) — Enrollment Done, Enforcement Advisory
+#### Multi-Factor Authentication (MFA): Done, Enforcement Account-Based
 
-| Property         | Detail                                                                                                                                                                                       |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Status           | Enrollment is fully built on web and mobile (see §12.6). Role-based enforcement is a dismissible nag banner for gridmaster/super_admin/admin without a verified factor, not a hard block.    |
-| Gap              | An unenrolled admin can dismiss the nag indefinitely; a compromised password alone still grants full access until they choose to enroll.                                                     |
-| Recommendation   | If a hard requirement is wanted later, gate `/settings` and `/gridmaster` in `proxy.ts` behind AAL2 for privileged roles — deliberately not done now to avoid locking out existing accounts. |
-| Supabase support | Built-in via `supabase.auth.mfa.enroll()` / `challengeAndVerify()` / `unenroll()`                                                                                                            |
+| Property         | Detail                                                                                                                                                                                                                      |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status           | Enrollment, challenge, unenrollment, and the five-minute sensitive-action step-up are built on web and mobile (see §12.6). An enrolled account cannot sign in or act sensitively without its factor.                        |
+| Gap              | Role-based enforcement is a dismissible nag for gridmaster/super_admin/admin accounts without a verified factor, not a hard block; a compromised password alone still grants such an account full access until they enroll. |
+| Recommendation   | If a hard requirement is wanted later, gate `/settings` and `/gridmaster` in `proxy.ts` behind AAL2 for privileged roles — deliberately not done now to avoid locking out existing accounts.                                |
+| Supabase support | Built-in via `supabase.auth.mfa.enroll()` / `challengeAndVerify()` / `unenroll()`; provider-boundary limits in `docs/mfa-provider-boundary.md`                                                                              |
 
-#### Failed Login Attempt Tracking & Account Lockout
+#### Failed Login Attempt Tracking & Account Lockout: Rate-Limit Based
 
-| Property       | Detail                                                                                                        |
-| -------------- | ------------------------------------------------------------------------------------------------------------- |
-| Gap            | No rate limit or lockout on the authentication endpoint. Brute-force attacks can try unlimited passwords.     |
-| Recommendation | Add failed attempt tracking. After 5 failures within 15 minutes, lock account and require email-based unlock. |
+| Property       | Detail                                                                                                                                                                                        |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status         | Login is bounded per email (15/15m), per source IP (120/min), and globally (500/10s), failing closed in production; failures return a generic 401 and throttles are security-audited (§12.3). |
+| Gap            | No persistent per-account lockout with an email-based unlock; the sliding windows expire on their own.                                                                                        |
+| Recommendation | Only if abuse evidence warrants it: add failed-attempt tracking with a lockout and email unlock on top of the existing limits.                                                                |
 
 #### IP Allowlisting for Gridmaster
 
@@ -1474,19 +1494,18 @@ here.
 
 ### 13.3 Priority 3 — Operational
 
-#### Refresh Token Rotation & Reuse Detection
+#### Refresh Token Rotation & Reuse Detection: Configured Locally, Plus App-Side Revocation
 
-| Property       | Detail                                                                                                                   |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Gap            | If a refresh token is stolen, the attacker can obtain new access tokens indefinitely.                                    |
-| Recommendation | Enable Supabase's built-in refresh token rotation. Reuse detection revokes the entire session family on theft detection. |
+| Property       | Detail                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status         | `supabase/config.toml` enables refresh token rotation with a 10-second reuse interval locally; the hosted project's setting lives in the Supabase dashboard. Independently, Route Handlers consult Redis revocation markers on every request, `POST /api/auth/sign-out` with `global` scope revokes every session, and a forced logout or gridmaster demotion wipes the tracked session rows (migration `016` cuts direct queries off with them). |
+| Recommendation | Confirm rotation is enabled on the hosted project during the production migration gate.                                                                                                                                                                                                                                                                                                                                                           |
 
-#### Role Change Notifications
+#### Role Change Notifications: Done
 
-| Property       | Detail                                                              |
-| -------------- | ------------------------------------------------------------------- |
-| Gap            | When a user is promoted or demoted, they receive no communication.  |
-| Recommendation | Trigger an email and in-app notification from the role change flow. |
+| Property | Detail                                                                                                                                                                                                |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status   | The access routes dispatch a `role_changed` notification (`features/notifications/server/events.ts`) to the affected member; permission-only changes list the flags that flipped in the Activity Log. |
 
 #### GDPR / Data Export Compliance — Implemented
 
@@ -1497,18 +1516,18 @@ here.
 
 ### 13.4 Feature Priority Summary
 
-| Priority | Feature                                  | Status      | Risk if Skipped                                                                                                                                    |
-| -------- | ---------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P1       | MFA for Gridmaster & Super Admin         | **Partial** | Enrollment done (web + mobile); enforcement is a dismissible nag, not a hard block → account takeover still possible for admins who ignore the nag |
-| P1       | Failed login tracking & lockout          | Not done    | Brute-force attacks succeed silently                                                                                                               |
-| P1       | IP allowlisting for Gridmaster           | Not done    | Stolen credentials = full platform access                                                                                                          |
-| ~~P1~~   | ~~Password reset flow~~                  | ✅ Done     | ~~Users locked out permanently if password lost~~                                                                                                  |
-| ~~P2~~   | ~~Email verification~~                   | ✅ Done     | ~~Unverified accounts receive org roles~~                                                                                                          |
-| ~~P2~~   | ~~Rate limiting on API routes~~          | ✅ Done     | ~~Abuse of public endpoints~~                                                                                                                      |
-| ~~P2~~   | ~~Soft delete (users & orgs)~~           | ✅ Done     | ~~Accidental permanent data loss~~ — see §10a and `profiles.deactivated_at`                                                                        |
-| P3       | Refresh token rotation + reuse detection | Not done    | Stolen tokens usable indefinitely                                                                                                                  |
-| P3       | Role change notifications                | Not done    | Silent UX — confused users after demotion                                                                                                          |
-| ~~P3~~   | ~~GDPR data export~~                     | ✅ Done     | ~~Legal compliance gap in EU/UK markets~~                                                                                                          |
+| Priority | Feature                                  | Status                            | Risk if Skipped                                                                                                                                                    |
+| -------- | ---------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| P1       | MFA for Gridmaster & Super Admin         | **Done, account-based**           | Enrollment, challenge, and five-minute step-up done (web + mobile); role enforcement is a dismissible nag → takeover still possible for an admin who never enrolls |
+| P1       | Failed login tracking & lockout          | **Done as rate limits**           | Per-email, per-IP, and global login limits fail closed; no persistent per-account lockout                                                                          |
+| P1       | IP allowlisting for Gridmaster           | Not done                          | Stolen credentials = full platform access                                                                                                                          |
+| ~~P1~~   | ~~Password reset flow~~                  | ✅ Done                           | ~~Users locked out permanently if password lost~~                                                                                                                  |
+| ~~P2~~   | ~~Email verification~~                   | ✅ Done                           | ~~Unverified accounts receive org roles~~                                                                                                                          |
+| ~~P2~~   | ~~Rate limiting on API routes~~          | ✅ Done                           | ~~Abuse of public endpoints~~                                                                                                                                      |
+| ~~P2~~   | ~~Soft delete (users & orgs)~~           | ✅ Done                           | ~~Accidental permanent data loss~~ — see §10a and `profiles.deactivated_at`                                                                                        |
+| P3       | Refresh token rotation + reuse detection | Local config + revocation markers | Confirm the hosted setting at the migration gate                                                                                                                   |
+| ~~P3~~   | ~~Role change notifications~~            | ✅ Done                           | ~~Silent UX — confused users after demotion~~                                                                                                                      |
+| ~~P3~~   | ~~GDPR data export~~                     | ✅ Done                           | ~~Legal compliance gap in EU/UK markets~~                                                                                                                          |
 
 ---
 

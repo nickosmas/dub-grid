@@ -9,9 +9,9 @@
 |                     |                                                                                     |
 | ------------------- | ----------------------------------------------------------------------------------- |
 | **Document Status** | Living Document — Reflects Current Implementation                                   |
-| **Version**         | 4.0                                                                                 |
+| **Version**         | 4.1                                                                                 |
 | **Prepared For**    | Development Team                                                                    |
-| **Date**            | May 2026                                                                            |
+| **Date**            | September 2026 (v4.0 May 2026)                                                      |
 | **Scope**           | DubGrid — multi-tenant staff scheduling platform (web + mobile) for care facilities |
 
 ---
@@ -30,51 +30,56 @@ DubGrid ships as a **monorepo** with two product surfaces — a Next.js web appl
 
 ### 2.1 Monorepo
 
-DubGrid is an **npm workspaces** monorepo orchestrated by **Turborepo** (Node 22.13, npm 10.9.2):
+DubGrid is an **npm workspaces** monorepo orchestrated by **Turborepo** (Node 22.x, npm 10.9.2):
 
-| Workspace                  | Package                    | Description                                                                                        |
-| -------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------- |
-| `apps/web`                 | `@dubgrid/web`             | Next.js 16 App Router web application                                                              |
-| `apps/mobile`              | `@dubgrid/mobile`          | Expo SDK 54 / React Native mobile application (Expo Router)                                        |
-| `packages/domain`          | `@dubgrid/domain`          | Platform-neutral domain types, enums, and pure logic (RBAC, billing, requests, self-action guards) |
-| `packages/contracts`       | `@dubgrid/contracts`       | Zod schemas + inferred types for cross-app API contracts                                           |
-| `packages/db-types`        | `@dubgrid/db-types`        | Database-row TypeScript types                                                                      |
-| `packages/authz`           | `@dubgrid/authz`           | Permission logic — role levels, view implications, JWT claim extraction                            |
-| `packages/schedule-core`   | `@dubgrid/schedule-core`   | Schedule transformation and calculation logic                                                      |
-| `packages/data-access`     | `@dubgrid/data-access`     | Supabase query + data mapping; shared mobile data layer                                            |
-| `packages/mobile-api-core` | `@dubgrid/mobile-api-core` | Framework-neutral mobile backend orchestration consumed by web's `/api/mobile/v1` routes           |
-| `packages/api-client`      | `@dubgrid/api-client`      | Platform-neutral HTTP client primitives                                                            |
-| `packages/client-errors`   | `@dubgrid/client-errors`   | Shared client-facing error translation (friendly copy + fallbacks) for web and mobile              |
-| `packages/design-tokens`   | `@dubgrid/design-tokens`   | Shared design values                                                                               |
+| Workspace                  | Package                    | Description                                                                                           |
+| -------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `apps/web`                 | `@dubgrid/web`             | Next.js 16 App Router web application                                                                 |
+| `apps/mobile`              | `@dubgrid/mobile`          | Expo SDK 54 / React Native mobile application (Expo Router)                                           |
+| `packages/domain`          | `@dubgrid/domain`          | Platform-neutral domain types, enums, and pure logic (RBAC, billing, requests, self-action guards)    |
+| `packages/contracts`       | `@dubgrid/contracts`       | Zod schemas + inferred types for cross-app API contracts                                              |
+| `packages/db-types`        | `@dubgrid/db-types`        | Database-row TypeScript types                                                                         |
+| `packages/authz`           | `@dubgrid/authz`           | Permission logic — role levels, view implications, JWT claim extraction                               |
+| `packages/schedule-core`   | `@dubgrid/schedule-core`   | Schedule transformation and calculation logic                                                         |
+| `packages/data-access`     | `@dubgrid/data-access`     | Supabase query + data mapping; shared mobile data layer                                               |
+| `packages/mobile-api-core` | `@dubgrid/mobile-api-core` | Framework-neutral mobile backend orchestration consumed by web's `/api/mobile/v1` routes              |
+| `packages/api-client`      | `@dubgrid/api-client`      | Platform-neutral HTTP client primitives                                                               |
+| `packages/client-errors`   | `@dubgrid/client-errors`   | Shared client-facing error translation (friendly copy + fallbacks) and the auth-recovery retry policy |
+| `packages/design-tokens`   | `@dubgrid/design-tokens`   | Shared design values, including the `mobile*` spacing, type, and control ramps                        |
+| `packages/realtime-core`   | `@dubgrid/realtime-core`   | Shared Supabase Realtime channel, subscription, and invalidation primitives                           |
 
-All ten packages are private `0.1.0`, ESM, and build via `tsc` to `dist/`. `apps/web` consumes authz, client-errors, contracts, data-access, db-types, design-tokens, domain, and mobile-api-core. `apps/mobile` consumes api-client, client-errors, contracts, design-tokens, and schedule-core.
+All eleven packages are private `0.1.0`, ESM, and build via `tsc` to `dist/`. `apps/web` consumes authz, client-errors, contracts, data-access, db-types, design-tokens, domain, mobile-api-core, realtime-core, and schedule-core. `apps/mobile` consumes api-client, client-errors, contracts, design-tokens, domain, realtime-core, and schedule-core.
 
 ### 2.2 Web Application (`apps/web`)
 
-| Layer         | Technology                                        |
-| ------------- | ------------------------------------------------- |
-| Framework     | Next.js 16, React 19, TypeScript                  |
-| Styling       | Tailwind CSS v4                                   |
-| Database      | Supabase (PostgreSQL + Auth + Realtime + RLS)     |
-| Auth          | Supabase Auth with custom JWT claims              |
-| SSR           | @supabase/ssr v0.9 for cookie-based SSR sessions  |
-| State/Cache   | TanStack React Query v5                           |
-| Drag & Drop   | @dnd-kit/core for schedule grid interactions      |
-| JWT           | jose v6 for JWT verification in middleware        |
-| Validation    | Zod for schema validation                         |
-| Notifications | Sonner v2 (toast notifications)                   |
-| Testing       | Vitest + Testing Library (unit), Playwright (E2E) |
-| Deployment    | Vercel                                            |
+| Layer         | Technology                                                 |
+| ------------- | ---------------------------------------------------------- |
+| Framework     | Next.js 16, React 19, TypeScript                           |
+| Styling       | Tailwind CSS v4                                            |
+| Database      | Supabase (PostgreSQL + Auth + Realtime + RLS)              |
+| Auth          | Supabase Auth with custom JWT claims                       |
+| SSR           | @supabase/ssr v0.9 for cookie-based SSR sessions           |
+| State/Cache   | TanStack React Query v5                                    |
+| Drag & Drop   | @dnd-kit/core for schedule grid interactions               |
+| JWT           | jose for local ES256 verification (proxy + Route Handlers) |
+| Validation    | Zod for schema validation                                  |
+| Notifications | Sonner v2 (toast notifications)                            |
+| Typography    | Inter (product UI), DM Sans (wordmark + landing)           |
+| Testing       | Vitest + Testing Library (unit), Playwright (E2E)          |
+| Deployment    | Vercel                                                     |
 
 ### 2.3 Mobile Application (`apps/mobile`)
 
-| Layer     | Technology                                                                        |
-| --------- | --------------------------------------------------------------------------------- |
-| Framework | Expo SDK 54, React Native                                                         |
-| Routing   | Expo Router                                                                       |
-| Backend   | Talks only to `apps/web` `/api/mobile/v1/*` (base URL `EXPO_PUBLIC_API_BASE_URL`) |
-| HTTP      | `@dubgrid/api-client` primitives — 15s timeout, bearer auth, Zod response parsing |
-| Push      | Expo push notifications                                                           |
+| Layer     | Technology                                                                             |
+| --------- | -------------------------------------------------------------------------------------- |
+| Framework | Expo SDK 54, React Native                                                              |
+| Routing   | Expo Router                                                                            |
+| Backend   | Talks only to `apps/web` `/api/mobile/v1/*` (base URL `EXPO_PUBLIC_API_BASE_URL`)      |
+| HTTP      | `@dubgrid/api-client` primitives — 15s timeout, bearer auth, Zod response parsing      |
+| Auth      | Supabase Auth directly (sign-in, session restore, TOTP, in-app OTP password reset)     |
+| Realtime  | Supabase Realtime via `@dubgrid/realtime-core` (shared org channels)                   |
+| Design    | `mobile*` design tokens, `AppText`/`Text`, `Button`, `PressableRow`, sheets, skeletons |
+| Push      | Expo push notifications                                                                |
 
 ### 2.4 Third-Party Integrations
 
@@ -135,7 +140,7 @@ Organizations can customize the following labels in their settings:
 
 ### 4.1 Role Hierarchy
 
-DubGrid implements a four-tier RBAC system with JWT-based claims enforced at both the edge middleware and database (RLS) levels.
+DubGrid implements a four-tier RBAC system with JWT-based claims enforced at the request proxy, in every Route Handler, and at the database (RLS).
 
 | Tier | Role        | Scope    | Who                     | Capabilities                                                                                |
 | ---- | ----------- | -------- | ----------------------- | ------------------------------------------------------------------------------------------- |
@@ -185,11 +190,12 @@ Permissions are **per-person**, set on the People page, not granted by departmen
 
 - Email/password authentication via Supabase Auth
 - Custom JWT access token hook writes claims at top level of JWT payload: `platform_role`, `org_role`, `org_id`, `org_slug`
-- Edge middleware verifies JWT, calculates effective role, and enforces route-level access
+- The request proxy verifies the JWT, calculates the effective role, and enforces route-level access; Route Handlers re-verify locally (JWKS + Redis revocation) and check live membership
 - Subdomain routing ensures users stay within their org context
 - Invitation-only registration with 72-hour expiry tokens
-- Self-service password reset via email (forgot password → reset password flow)
-- Email verification for new accounts with resend capability (60s cooldown)
+- Self-service password reset: web posts to a rate-limited, audited recovery endpoint and follows the emailed link; mobile completes the reset in-app with a 6-digit code
+- Invited accounts are created pre-confirmed; `/verify-email` (resend with 60s cooldown) only serves accounts that are genuinely unconfirmed
+- TOTP multi-factor authentication on web and mobile; once enrolled, sign-in requires the challenge and sensitive actions require fresh (five-minute) AAL2 proof; accounts without a factor use a fresh password proof for sensitive actions
 - Password strength meter (4 levels: too short, weak, fair, strong; minimum 10 characters)
 - Post-login soft navigation: `router.replace` + an `<AuthSplash>` bridge while the session settles, so route guards do not bounce a freshly-authenticated user back to login. Logout is fast and always redirects to `/login`.
 - 14-day trial starts on the **first super admin login** via the idempotent `start_trial_for_org` RPC. Until then the org sits in a `trial_pending` billing state that gates non-super-admins. A one-time welcome modal and "trial started" email (`/api/trial-welcome`, react-email `TrialWelcomeEmail`) fire once for the super admin.
@@ -296,25 +302,25 @@ Status: ✅ = Implemented, 🔨 = Partially Implemented, ❌ = Not Yet Implement
 
 ### 7.5 Real-Time Collaboration
 
-| ID    | Feature          | Priority | Status | Description                                                                                   |
-| ----- | ---------------- | -------- | ------ | --------------------------------------------------------------------------------------------- |
-| FR-27 | Real-Time Sync   | Should   | ✅     | Schedule changes sync across tabs and users in real-time via Supabase Realtime subscriptions. |
-| FR-28 | Tab Coordination | Should   | ✅     | Cross-tab communication for session state consistency.                                        |
-| FR-29 | Cell Locks       | Should   | ✅     | Real-time cell lock/occupancy tracking. Shows which user is currently editing a cell.         |
-| FR-30 | Presence Avatars | Should   | ✅     | Active user presence indicators showing who is currently viewing the schedule.                |
+| ID    | Feature          | Priority | Status | Description                                                                                                                                   |
+| ----- | ---------------- | -------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| FR-27 | Real-Time Sync   | Should   | ✅     | Schedule changes sync across tabs and users in real-time via Supabase Realtime subscriptions.                                                 |
+| FR-28 | Tab Coordination | Should   | ✅     | Cross-tab communication for session state consistency.                                                                                        |
+| FR-29 | Editor Presence  | Should   | ✅     | Non-blocking "being edited" marker per cell via Realtime presence; advisory cell locks were removed in favor of the optimistic version check. |
+| FR-30 | Presence Avatars | Should   | ✅     | Active user presence indicators showing who is currently viewing the schedule.                                                                |
 
 ### 7.6 Authentication & Account Management
 
-| ID    | Feature                 | Priority | Status | Description                                                                                                                                                                                                                                                                                                                                                                                                       |
-| ----- | ----------------------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| FR-60 | Forgot Password         | Must     | ✅     | Email-based password reset request with enumeration protection (always shows success). Rate limited.                                                                                                                                                                                                                                                                                                              |
-| FR-61 | Reset Password          | Must     | ✅     | Token-validated reset form via email link. Password strength meter (4 levels). Minimum 10 characters. Signs out after.                                                                                                                                                                                                                                                                                            |
-| FR-62 | Email Verification      | Must     | ✅     | Verification page for new accounts with resend button (60s cooldown). Auto-redirects on confirmation.                                                                                                                                                                                                                                                                                                             |
-| FR-63 | Onboarding Wizard       | Must     | ✅     | Role-aware composite onboarding wizard rendered **inline** via `OnboardingGate` (the standalone `/setup` route and the old 8-step wizard were deleted). Step list varies by role and org configuration state — see §7.6.1.                                                                                                                                                                                        |
-| FR-64 | Invited-User Onboarding | Must     | ✅     | Polling page for newly invited users awaiting org assignment. Non-admins on an unconfigured org see a `SetupPendingScreen`.                                                                                                                                                                                                                                                                                       |
-| FR-65 | Demo Request Form       | Should   | ✅     | Landing page contact form with Zod validation, CSRF protection, and branded email notification via Resend.                                                                                                                                                                                                                                                                                                        |
-| FR-66 | MFA Status              | Should   | 🔨     | `/api/account/mfa-status` reports per-account MFA enrollment state and surfaces it in the profile/security UI. Full TOTP enrollment + enforcement for elevated roles not yet complete.                                                                                                                                                                                                                            |
-| FR-67 | Test Sandbox            | Could    | ✅     | Clone a super admin's org config into an isolated `workspace_kind='sandbox'` org (30-day TTL) and enter it via an HttpOnly cookie (`dubgrid-sandbox`), not a JWT/subdomain hop. `/api/test-sandbox` (force-dynamic POST, CSRF-guarded) supports `enter` (reuse-or-clone), `reset` (wipe + re-clone), and `exit` (delete + clear cookie). Sandboxes are owned by the creating user and excluded from mobile login. |
+| ID    | Feature                 | Priority | Status | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ----- | ----------------------- | -------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| FR-60 | Forgot Password         | Must     | ✅     | Email-based password reset request with enumeration protection (always shows success). Rate limited.                                                                                                                                                                                                                                                                                                                                                                                          |
+| FR-61 | Reset Password          | Must     | ✅     | Token-validated reset form via email link. Password strength meter (4 levels). Minimum 10 characters. Signs out after.                                                                                                                                                                                                                                                                                                                                                                        |
+| FR-62 | Email Verification      | Must     | ✅     | Verification page for new accounts with resend button (60s cooldown). Auto-redirects on confirmation.                                                                                                                                                                                                                                                                                                                                                                                         |
+| FR-63 | Onboarding Wizard       | Must     | ✅     | Role-aware composite onboarding wizard rendered **inline** via `OnboardingGate` (the standalone `/setup` route and the old 8-step wizard were deleted). Step list varies by role and org configuration state — see §7.6.1.                                                                                                                                                                                                                                                                    |
+| FR-64 | Invited-User Onboarding | Must     | ✅     | Polling page for newly invited users awaiting org assignment. Non-admins on an unconfigured org see a `SetupPendingScreen`.                                                                                                                                                                                                                                                                                                                                                                   |
+| FR-65 | Demo Request Form       | Should   | ✅     | Landing page contact form with Zod validation, CSRF protection, and branded email notification via Resend.                                                                                                                                                                                                                                                                                                                                                                                    |
+| FR-66 | MFA                     | Should   | ✅     | TOTP enrollment, verification, and removal on web and mobile through one lifecycle handler (`/api/account/mfa-lifecycle`, `/api/mobile/v1/profile/mfa-lifecycle`); enrolled accounts must pass the challenge at sign-in and present fresh AAL2 proof for sensitive actions. Enforcement is account-based: unenrolled management accounts see a dismissible nag, not a hard block.                                                                                                             |
+| FR-67 | Test Sandbox            | Could    | ✅     | Clone a super admin's org config into an isolated `workspace_kind='sandbox'` org and enter it via an HttpOnly cookie (`dubgrid-sandbox`, 7 days), not a JWT/subdomain hop. `/api/test-sandbox` (force-dynamic POST, CSRF-guarded, admin+ by real source-org role) supports `enter` (reuse-or-clone), `reset` (wipe + re-clone), and `exit` (delete + clear cookie). Sandboxes are owned by the creating user, excluded from mobile login, and reaped by the daily cleanup cron after 14 days. |
 
 #### 7.6.1 Onboarding Wizard Step Lists
 
@@ -327,13 +333,13 @@ The wizard is rendered by `components/onboarding/OnboardingWizard.tsx` inside a 
 | admin                          | ORIENTATION | `welcome → orientation → completion`                                   |
 | user                           | MINIMAL     | `welcome → completion`                                                 |
 
-SETUP steps group legacy settings panels onto single wizard screens via `steps/CompositeSection.tsx`: **Identity** (OrganizationGeneral + OrganizationLabels), **Structure** (Departments + roles + certifications, requires ≥1 department), **Schedule** (display mode + ShiftCategories + Jobs, requires ≥1 category and ≥1 job), **Invite Team** (points to `/people`). After completion, a dismissable `PersonaLandingCard` "Next steps" card is shown on the dashboard (dismissal persists to `organization_memberships.landing_card_dismissed_at` via the `dismiss_landing_card` RPC). Telemetry events (`onboarding_started`, `step_completed`, `step_skipped`, `completed`, `abandoned`, `persona_landing_dismissed`) flow to PostHog via `lib/onboarding-telemetry.ts`.
+SETUP steps group legacy settings panels onto single wizard screens via `steps/CompositeSection.tsx`: **Identity** (OrganizationGeneral + OrganizationLabels), **Structure** (Departments + roles + certifications, requires ≥1 department), **Schedule** (display mode + ShiftCategories + Jobs, requires ≥1 category and ≥1 job), **Invite Team** (points to `/people`). Completion is durable per member and organization (`organization_memberships.onboarding_completed_at`), and the gate waits for bootstrap data from the effective organization before deciding, so a completed member is never returned to onboarding by a refresh, token rotation, realtime org change, or role change. While the organization is still being configured the dashboard shows a `DashboardChecklist` of the remaining setup steps. The trial welcome modal is held until onboarding completes.
 
 ### 7.7 Staff Schedule View
 
-| ID    | Feature             | Priority | Status | Description                                                                                                    |
-| ----- | ------------------- | -------- | ------ | -------------------------------------------------------------------------------------------------------------- |
-| FR-18 | Staff Schedule View | Should   | 🔨     | Users with `user` role can view the schedule in read-only mode. Full per-wing scoped view not yet implemented. |
+| ID    | Feature             | Priority | Status | Description                                                                                                                                                                                                                                 |
+| ----- | ------------------- | -------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| FR-18 | Staff Schedule View | Should   | 🔨     | Users with `user` role can view the schedule in read-only mode and see only directory facts about colleagues (no employment, account, or access details; who published a shift is withheld). Full per-wing scoped view not yet implemented. |
 
 ### 7.8 Dashboard & Analytics
 
@@ -342,7 +348,7 @@ SETUP steps group legacy settings panels onto single wizard screens via `steps/C
 | FR-31 | Dashboard Overview  | Should   | ✅     | Main dashboard with KPI stat cards (total hours, active employees, open shifts, coverage rate). |
 | FR-32 | Coverage by Section | Should   | ✅     | Donut chart showing coverage status breakdown per focus area.                                   |
 | FR-33 | Open Shifts Card    | Should   | ✅     | Card listing uncovered/open shifts that need attention.                                         |
-| FR-34 | Staff Hours Card    | Should   | ✅     | Total hours and trends visualization across the schedule period.                                |
+| FR-34 | Staff Hours Card    | Should   | ✅     | Total hours across the schedule period (period-history trends were tried and removed).          |
 | FR-35 | Shift Breakdown     | Should   | ✅     | Shift code distribution chart showing how shifts are allocated.                                 |
 | FR-36 | Activity Feed       | Should   | ✅     | Recent activity feed showing schedule changes, publishes, and user actions.                     |
 | FR-37 | Expanded Views      | Could    | ✅     | Each dashboard card expands to a detailed full-page view for deeper analysis.                   |
@@ -374,28 +380,30 @@ SETUP steps group legacy settings panels onto single wizard screens via `steps/C
 
 ### 7.12 Gridmaster Portal
 
-| ID    | Feature                  | Priority | Status | Description                                                                                       |
-| ----- | ------------------------ | -------- | ------ | ------------------------------------------------------------------------------------------------- |
-| FR-50 | Gridmaster Dashboard     | Must     | ✅     | Platform-wide overview with organization stats, health metrics, and recent activity.              |
-| FR-51 | Organization Management  | Must     | ✅     | Create, view, and manage organizations. Organization detail view with member counts and settings. |
-| FR-52 | All Users View           | Must     | ✅     | Platform-wide user table across all organizations with search and filtering.                      |
-| FR-53 | Audit Log                | Must     | ✅     | Global audit trail of all role changes with immutable history.                                    |
-| FR-54 | Admin Permissions Editor | Must     | ✅     | Configure granular per-admin permissions via checkbox UI. Used by super_admin and gridmaster.     |
-| FR-55 | User Impersonation       | Should   | ✅     | Gridmaster can impersonate org users with 30-minute session expiry. Full audit trail.             |
+| ID    | Feature                  | Priority | Status | Description                                                                                                                                                                                        |
+| ----- | ------------------------ | -------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| FR-50 | Gridmaster Dashboard     | Must     | ✅     | Platform-wide overview with organization stats, health metrics, and recent activity.                                                                                                               |
+| FR-51 | Organization Management  | Must     | ✅     | Create, view, and manage organizations. Organization detail view with member counts and settings.                                                                                                  |
+| FR-52 | All Users View           | Must     | ✅     | Platform-wide user table across all organizations with search and filtering.                                                                                                                       |
+| FR-53 | Audit Log                | Must     | ✅     | Global audit trail of all role changes with immutable history.                                                                                                                                     |
+| FR-54 | Admin Permissions Editor | Must     | ✅     | `PermissionsEditor`: per-admin switches with implied views shown as "Included", a change review step, and no super_admin-only keys. Used by super_admin (People page) and gridmaster (org detail). |
+| FR-55 | User Impersonation       | Should   | ✅     | Gridmaster can impersonate org users with 30-minute session expiry. Full audit trail.                                                                                                              |
 
 ### 7.13 Mobile Application
 
-The Expo / React Native mobile app (`apps/mobile`) is a first-class product surface for staff and admins on the go. It communicates exclusively with the web app's `/api/mobile/v1/*` API (bearer auth, Zod-validated responses) and never touches Supabase data tables directly. Sandbox workspaces are rejected for mobile login.
+The Expo / React Native mobile app (`apps/mobile`) is a first-class product surface for staff and admins on the go. It communicates exclusively with the web app's `/api/mobile/v1/*` API (bearer auth, Zod-validated responses) for data and never touches Supabase data tables directly; Supabase Auth and Realtime are used directly. Sandbox organizations are rejected for mobile login. Reports, billing, the Gridmaster portal, the permissions editor, org settings, and schedule editing/publishing are deliberately web-only.
 
-| ID    | Feature                     | Priority | Status | Description                                                                                                                                  |
-| ----- | --------------------------- | -------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| FR-70 | Mobile Auth & Org Selection | Must     | ✅     | Email/password login and organization selection against `/api/mobile/v1/auth/*` and `/bootstrap`. `onAuthFailure` hook handles token expiry. |
-| FR-71 | Mobile Schedule             | Must     | ✅     | "My schedule" and org schedule views (`me/`, `team/` tab stacks); per-shift detail screen at `shift/[employeeId]/[date]`.                    |
-| FR-72 | Mobile People               | Should   | ✅     | People roster and person-detail screens with status and invitation actions (`people/` tab stack).                                            |
-| FR-73 | Mobile Shift Requests       | Should   | ✅     | View, create, and act on shift pickup/swap requests, including swap-option lookup (`requests/` tab stack).                                   |
-| FR-74 | Mobile Profile              | Should   | ✅     | Profile, work, account, and security screens; phone update, session list, change-requests, notification preferences.                         |
-| FR-75 | Mobile Notifications        | Should   | ✅     | In-app notification list with read / read-all; Expo push token registration and session-presence reporting.                                  |
-| FR-76 | Mobile Onboarding Intro     | Could    | ✅     | 3-slide first-launch intro carousel (`apps/mobile/src/features/onboarding`) — distinct from the web onboarding wizard.                       |
+| ID    | Feature                     | Priority | Status | Description                                                                                                                                                                                                                                                   |
+| ----- | --------------------------- | -------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| FR-70 | Mobile Auth & Org Selection | Must     | ✅     | Email/password login and organization selection against `/api/mobile/v1/auth/*` and `/bootstrap`. `onAuthFailure` hook handles token expiry.                                                                                                                  |
+| FR-71 | Mobile Schedule             | Must     | ✅     | Personal schedule and org schedule views (`home/`, `team/` tab stacks); per-shift detail screen at `shift/[employeeId]/[date]` with drop, pickup, and swap request sheets; open shifts and unpublished changes shown with previous values.                    |
+| FR-72 | Mobile People               | Should   | ✅     | People roster, add person, and person-detail screens with status, org-role, invitation, and management-access actions (`people/` tab stack, `person/[id]`); role certification eligibility enforced before save; fields redacted by the viewer's permissions. |
+| FR-73 | Mobile Shift Requests       | Should   | ✅     | View, create, and act on pickup, swap, and call-off requests, including swap-option lookup and request history (`requests/` tab stack); one shared realtime channel per organization.                                                                         |
+| FR-74 | Mobile Profile              | Should   | ✅     | Profile, work, account, security, password, two-factor, sessions, notifications, and privacy screens; phone update, change requests, terms acceptance, app lock.                                                                                              |
+| FR-75 | Mobile Alerts               | Should   | ✅     | Mailbox-style alerts list with swipe actions; tapping an alert marks it read and goes to its subject; Expo push token registration and session-presence reporting.                                                                                            |
+| FR-76 | Mobile Onboarding Intro     | Could    | ✅     | 3-slide first-launch intro carousel (`apps/mobile/src/features/onboarding`) — distinct from the web onboarding wizard.                                                                                                                                        |
+| FR-77 | Mobile Dashboard            | Should   | ✅     | Canonical admin dashboard (`home/`) fed by `/api/mobile/v1/dashboard`: coverage hero, open shifts, pending approvals, staff hours, activity, unpublished-draft summary, with read-only drill-in screens.                                                      |
+| FR-78 | Mobile Auth Hardening       | Must     | ✅     | Consent and terms gates, in-app OTP password reset, TOTP challenge, bounded session restoration and degraded-network recovery, one splash gate above the router.                                                                                              |
 
 ---
 
@@ -403,31 +411,40 @@ The Expo / React Native mobile app (`apps/mobile`) is a first-class product surf
 
 ### 8.1 Core Tables
 
-| Entity                            | Key Fields                                                                                                                                                                                                                                                                                                                                                                 |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `organizations`                   | id, name, slug, address, phone, timezone, employee_count, focus_area_label, certification_label, role_label, suspended_at, feature_overrides (JSONB), stripe fields, `workspace_kind` ('production'\|'sandbox', default 'production', CHECK), `sandbox_source_org_id` (FK orgs), `sandbox_owner_user_id` (FK auth.users), `sandbox_expires_at`, `sandbox_template_version` |
-| `profiles`                        | id (FK auth.users), org_id, platform_role (enum), version, role_locked                                                                                                                                                                                                                                                                                                     |
-| `organization_memberships`        | user_id, org_id, org_role (enum), admin_permissions (JSONB), department_ids[], archived_at, joined_at, `landing_card_dismissed_at`, `onboarding_step_telemetry` (JSONB, default `{}`)                                                                                                                                                                                      |
-| `departments`                     | id, org_id, name, abbr, `type` (`scheduled` \| `management`), permissions (JSONB — management depts only); two-type model, focus areas are children of departments                                                                                                                                                                                                         |
-| `employees`                       | id, org_id, first_name, last_name, status (active/benched/terminated), certification_id (FK), role_ids[], focus_area_ids[], department_ids[], phone, email, seniority, user_id (FK auth.users, nullable)                                                                                                                                                                   |
-| `schedule_cells`                  | id, emp_id, date, org_id, version (optimistic lock), series_id, from_recurring, focus_area_id                                                                                                                                                                                                                                                                              |
-| `schedule_cell_snapshots`         | id, cell_id, snapshot_kind (draft/published), state_kind (worked/absence/deleted), absence_type_id, custom_start_time, custom_end_time                                                                                                                                                                                                                                     |
-| `schedule_cell_segments`          | id, snapshot_id, position, shift_id, job_id                                                                                                                                                                                                                                                                                                                                |
-| `focus_areas`                     | id, org_id, department_id (FK), name, color_bg, color_text, sort_order, break_minutes                                                                                                                                                                                                                                                                                      |
-| `assignments (derived)`           | label, name, colors, default timing, shift/category linkage, focus area linkage, required_certification_ids[]                                                                                                                                                                                                                                                              |
-| `shift_categories`                | id, org_id, name, color, start_time, end_time, sort_order, focus_area_id, break_minutes                                                                                                                                                                                                                                                                                    |
-| `schedule_notes`                  | id, org_id, emp_id, date, indicator_type_id, status (published/draft/draft_deleted), focus_area_id                                                                                                                                                                                                                                                                         |
-| `indicator_types`                 | id, org_id, name, color, sort_order                                                                                                                                                                                                                                                                                                                                        |
-| `certifications`                  | id, org_id, name, abbr, sort_order                                                                                                                                                                                                                                                                                                                                         |
-| `organization_roles`              | id, org_id, name, abbr, sort_order                                                                                                                                                                                                                                                                                                                                         |
-| `recurring_shifts`                | id, org_id, emp_id, state (JSONB), day_of_week (0-6), effective_from, effective_until                                                                                                                                                                                                                                                                                      |
-| `shift_series`                    | id, org_id, emp_id, state (JSONB), frequency (daily/weekly/biweekly), days_of_week[], start_date, end_date, max_occurrences                                                                                                                                                                                                                                                |
-| `coverage_requirements`           | id, org_id, focus_area_id, preferred_shift_id, preferred_job_id, day_of_week, min_staff                                                                                                                                                                                                                                                                                    |
-| `absence_types`                   | id, org_id, label (X/V/S), name, color, border_color, text_color, sort_order                                                                                                                                                                                                                                                                                               |
-| `shift_requests`                  | id, org_id, type (pickup/swap/calloff), status (open/pending_approval/approved/rejected/cancelled/expired), requester_emp_id, target_emp_id, target_shift_date, absence_type_id (required for calloff + targeted pickup), admin_user_id, expires_at                                                                                                                        |
-| `recurring_shifts_draft_sessions` | id, org_id, saved_by, ... — concurrent-edit cell locks for the recurring-shifts editor                                                                                                                                                                                                                                                                                     |
-| `schedule_draft_sessions`         | id, org_id, saved_by, start_date, end_date, saved_at — concurrent-edit cell locks for the schedule grid                                                                                                                                                                                                                                                                    |
-| `publish_history`                 | id, org_id, published_by, start_date, end_date, change_count, changes (JSONB), published_at                                                                                                                                                                                                                                                                                |
+| Entity                                                                      | Key Fields                                                                                                                                                                                                                                                                                                                                                                                                              |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `organizations`                                                             | id, name, slug, address fields, phone, timezone, employee_count, focus_area_label, certification_label, role_label, department_label, shift_display_mode, pay_period_start_date, data_retention_days, suspended_at, archived_at, stripe and trial fields, `workspace_kind` ('real'\|'sandbox', default 'real'), `sandbox_source_org_id` (FK orgs), `sandbox_owner_user_id` (FK auth.users; one active sandbox per user) |
+| `profiles`                                                                  | id (FK auth.users), org_id, platform_role (enum), version, role_locked, mfa_enabled, terms_accepted_at, terms_version, first_name, last_name, last_sign_in_at, deactivated_at, scheduled_deletion_at                                                                                                                                                                                                                    |
+| `organization_memberships`                                                  | user_id, org_id, org_role (enum), admin_permissions (JSONB, 26 keys), department_ids[], dept_admin_ids[], phone, archived_at, joined_at, `onboarding_completed_at`, `tooltip_tours_completed`, `schedule_last_viewed_at`                                                                                                                                                                                                |
+| `departments`                                                               | id, org_id, name, abbr, `type` (`scheduled` \| `management`), permissions (JSONB — management depts only); two-type model, focus areas are children of departments                                                                                                                                                                                                                                                      |
+| `employees`                                                                 | id, org_id, first_name, last_name, status (active/benched/terminated), certification_id (FK), role_ids[], focus_area_ids[], department_ids[], phone, email, seniority, user_id (FK auth.users, nullable)                                                                                                                                                                                                                |
+| `schedule_cells`                                                            | id, emp_id, date, org_id, version (optimistic lock), series_id, from_recurring, focus_area_id                                                                                                                                                                                                                                                                                                                           |
+| `schedule_cell_snapshots`                                                   | id, cell_id, snapshot_kind (draft/published), state_kind (worked/absence/deleted), absence_type_id, custom_start_time, custom_end_time                                                                                                                                                                                                                                                                                  |
+| `schedule_cell_segments`                                                    | id, snapshot_id, position, shift_id, job_id                                                                                                                                                                                                                                                                                                                                                                             |
+| `focus_areas`                                                               | id, org_id, department_id (FK), name, color_bg, color_text, sort_order, break_minutes                                                                                                                                                                                                                                                                                                                                   |
+| `assignments (derived)`                                                     | label, name, colors, default timing, shift/category linkage, focus area linkage, required_certification_ids[]                                                                                                                                                                                                                                                                                                           |
+| `shift_categories`                                                          | id, org_id, name, color, start_time, end_time, sort_order, focus_area_id, break_minutes                                                                                                                                                                                                                                                                                                                                 |
+| `schedule_notes`                                                            | id, org_id, emp_id, date, indicator_type_id, status (published/draft/draft_deleted), focus_area_id                                                                                                                                                                                                                                                                                                                      |
+| `indicator_types`                                                           | id, org_id, name, color, sort_order                                                                                                                                                                                                                                                                                                                                                                                     |
+| `certifications`                                                            | id, org_id, name, abbr, sort_order                                                                                                                                                                                                                                                                                                                                                                                      |
+| `organization_roles`                                                        | id, org_id, name, abbr, sort_order                                                                                                                                                                                                                                                                                                                                                                                      |
+| `recurring_shifts`                                                          | id, org_id, emp_id, state (JSONB), day_of_week (0-6), effective_from, effective_until                                                                                                                                                                                                                                                                                                                                   |
+| `shift_series`                                                              | id, org_id, emp_id, state (JSONB), frequency (daily/weekly/biweekly), days_of_week[], start_date, end_date, max_occurrences                                                                                                                                                                                                                                                                                             |
+| `coverage_requirements`                                                     | id, org_id, focus_area_id, preferred_shift_id, preferred_job_id, day_of_week, min_staff                                                                                                                                                                                                                                                                                                                                 |
+| `absence_types`                                                             | id, org_id, label (X/V/S), name, color, border_color, text_color, sort_order                                                                                                                                                                                                                                                                                                                                            |
+| `shift_requests`                                                            | id, org_id, type (pickup/swap/calloff), status (open/pending_approval/approved/rejected/cancelled/expired), requester_emp_id, target_emp_id, target_shift_date, absence_type_id (required for calloff + targeted pickup), admin_user_id, expires_at                                                                                                                                                                     |
+| `recurring_shifts_draft_sessions`                                           | id, org_id, saved_by, ... — persisted draft window for the recurring-shifts editor (draft recovery, not a lock)                                                                                                                                                                                                                                                                                                         |
+| `schedule_draft_sessions`                                                   | id, org_id, saved_by, start_date, end_date, saved_at — persisted draft window for the schedule grid (draft recovery, not a lock)                                                                                                                                                                                                                                                                                        |
+| `schedule_editor_session_terminations`                                      | org_id, user_id, editor_session_id, ended_by_editor_session_id, ended_at: owner-only tombstones for explicitly ended editor sessions (migration 013)                                                                                                                                                                                                                                                                    |
+| `publish_history`                                                           | id, org_id, published_by, start_date, end_date, change_count, changes (JSONB), published_at                                                                                                                                                                                                                                                                                                                             |
+| `schedule_publish_changes`                                                  | per-cell from/to state for each publish; the `finalize_scheduler_staffed_calloffs` trigger (migrations 019/020) resolves a call-off-backed pickup when a scheduler's matching draft is published                                                                                                                                                                                                                        |
+| `job_shift_overrides`                                                       | per-job overrides of a shift's defaults                                                                                                                                                                                                                                                                                                                                                                                 |
+| `calendar_feed_tokens`                                                      | per-employee private `.ics` subscription tokens (migration 011)                                                                                                                                                                                                                                                                                                                                                         |
+| `notifications`, `notification_preferences`                                 | in-app/email/push alerts with priority, archived_at, and JSONB metadata; per-user delivery preferences                                                                                                                                                                                                                                                                                                                  |
+| `profile_change_requests`                                                   | manager-approved profile and account-deletion requests                                                                                                                                                                                                                                                                                                                                                                  |
+| `subscriptions`, `stripe_processed_events`                                  | Stripe subscription state and webhook replay idempotency                                                                                                                                                                                                                                                                                                                                                                |
+| `platform_feature_flags`                                                    | gridmaster kill switches (`stripe`, `resend_email`, `mobile_api`, `csv_import`, `csv_export`, `sentry`, `posthog`, the crons)                                                                                                                                                                                                                                                                                           |
+| `terms_acceptances`, `cookie_consents`, `audit_log`, `mobile_device_tokens` | legal and consent audit trail, org/platform activity log, Expo push tokens                                                                                                                                                                                                                                                                                                                                              |
 
 `recurring_shifts.state` and `shift_series.state` are canonical `ScheduleCellState`
 payloads. Those tables do not store `shift_id`, `job_id`, or `absence_type_id`
@@ -436,23 +453,24 @@ convenience columns. Dated schedule identity is normalized through
 
 ### 8.2 RBAC & Security Tables
 
-| Entity                   | Key Fields                                                                                       |
-| ------------------------ | ------------------------------------------------------------------------------------------------ |
-| `role_change_log`        | id, changed_by, target_user_id, old_role, new_role, org_id, idempotency_key (UNIQUE), created_at |
-| `jwt_refresh_locks`      | user_id, locked_until (blocks JWT refresh for 5s after role change)                              |
-| `invitations`            | id, org_id, email, employee_id (FK), invited_by, token, expires_at (72h), accepted_at            |
-| `impersonation_sessions` | id, gridmaster_id, target_user_id, org_id, started_at, expires_at (30min)                        |
-| `user_sessions`          | id, user_id, device_label, ip_address, last_active_at, refresh_token_hash                        |
+| Entity                   | Key Fields                                                                                                                                                                   |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `role_change_log`        | id, changed_by, target_user_id, old_role, new_role, org_id, idempotency_key (UNIQUE), created_at                                                                             |
+| `jwt_refresh_locks`      | user_id, locked_until (blocks JWT refresh for 5s after role change)                                                                                                          |
+| `invitations`            | id, org_id, email, employee_id (FK), invited_by, token, expires_at (72h), accepted_at                                                                                        |
+| `impersonation_sessions` | id, gridmaster_id, target_user_id, org_id, started_at, expires_at (30min)                                                                                                    |
+| `user_sessions`          | id, user_id, org_id, active_org_id (drives per-session JWT claims), supabase_session_id, platform, app_version, device_label, ip_address, last_active_at, refresh_token_hash |
 
 ### 8.3 Database Security
 
-- **Row-Level Security (RLS):** All tables have RLS policies enforcing org-scoped data access. `schedule_notes` write policies gate on `check_admin_permission('canEditScheduleIndicators')`.
+- **Row-Level Security (RLS):** All 42 tables have RLS enabled, enforcing org-scoped data access. `schedule_notes` write policies gate on `check_admin_permission('canEditScheduleIndicators')`, and a note cannot exist without a shift on its cell (migration 015).
 - **Custom JWT claims:** `platform_role`, `org_role`, `org_id`, `org_slug` written at JWT top level by access token hook
 - **Optimistic locking:** `schedule_cells` uses a `version` column to prevent concurrent overwrites
 - **Idempotency:** Role changes and schedule operations use idempotency keys to prevent duplicate writes
 - **Self-action guards:** `change_user_role` hard-blocks self-role-change at the DB layer (P0001); `@dubgrid/domain` exposes `assertNotSelf` / `isSelfAction` for the app layer
-- **Sandbox isolation:** `workspace_kind='sandbox'` orgs are owned by a single user, carry a 30-day TTL, and are excluded from mobile login
-- **4-file migration strategy:** All schema in 001_schema.sql, 002_functions_triggers.sql, 003_rls_policies.sql, 004_grants.sql
+- **Sandbox isolation:** `workspace_kind='sandbox'` orgs are owned by a single user, entered through a 7-day HttpOnly cookie, reaped after 14 days, and excluded from mobile login
+- **Live authorization:** a tenant claim is only honored while the membership is live (migration 005); direct user-scoped queries are cut off when the tracked session row is removed (016); effective-tenant state is bound to the auth session (017)
+- **Migrations:** an immutable ordered stream. `001`-`004` are the frozen baseline; every later change is a new, checksum-locked forward migration (currently through `020`), applied by ledger and never by resetting production
 
 ---
 
@@ -468,39 +486,44 @@ Organizations are routed via subdomains:
 
 The Next.js request proxy (`apps/web/src/proxy.ts`) enforces:
 
-- JWT verification and role calculation
-- Subdomain-to-org matching
+- JWT verification (JWKS/ES256 with an unverified-decode fallback for non-gridmaster users) and role calculation
+- Subdomain-to-org matching, org archived/suspended checks, billing and trial gates, sandbox and impersonation context
 - Route-level access control (`/settings` → admin+, `/gridmaster` → gridmaster only)
-- Header injection (`x-dubgrid-role`, `x-dubgrid-org-id`, `x-dubgrid-org-slug`)
+- Header injection (`x-dubgrid-role`, `x-dubgrid-org-id`, `x-dubgrid-org-slug`, plus `x-dubgrid-impersonating` / `x-dubgrid-sandbox` when active) and the per-request nonce CSP
 
 ### 9.2 Application Routes
 
 All routes are simple (non-catch-all) to preserve static prerendering on Vercel.
 
-| Route                    | Access Level  | Purpose                                                             |
-| ------------------------ | ------------- | ------------------------------------------------------------------- |
-| `/`                      | Public        | Landing page with feature showcase                                  |
-| `/login`                 | Public        | Organization / gridmaster login                                     |
-| `/forgot-password`       | Public        | Password reset request (email-based)                                |
-| `/reset-password`        | Public        | Password reset form (via email link token)                          |
-| `/verify-email`          | Public        | Email verification for new accounts                                 |
-| `/auth/verify`           | Public        | Auth callback / token verification handler                          |
-| `/accept-invite`         | Public        | Invitation acceptance flow                                          |
-| `/request-demo`          | Public        | Demo request / contact form                                         |
-| `/onboarding`            | Authenticated | Invited-user org assignment polling                                 |
-| `/dashboard`             | Authenticated | Organization dashboard with analytics                               |
-| `/schedule`              | Authenticated | Main schedule grid                                                  |
-| `/people`                | Authenticated | People roster management                                            |
-| `/people/[id]`           | Authenticated | Individual staff member detail (tabs: Overview, Schedule, Activity) |
-| `/reports`               | Authenticated | Operations reports                                                  |
-| `/settings`              | Admin+        | Organization configuration                                          |
-| `/settings/staff-config` | Admin+        | Staff config — focus areas, certifications, absence types, roles    |
-| `/profile`               | Authenticated | User profile settings                                               |
-| `/billing-required`      | Authenticated | Billing lock screen for orgs without an active subscription         |
-| `/gridmaster`            | Gridmaster    | Platform command center                                             |
-| `/privacy`               | Public        | Privacy policy                                                      |
-| `/terms`                 | Public        | Terms of service                                                    |
-| `/cookie-policy`         | Public        | Cookie policy                                                       |
+| Route                             | Access Level  | Purpose                                                                                    |
+| --------------------------------- | ------------- | ------------------------------------------------------------------------------------------ |
+| `/`                               | Public        | Landing page with feature showcase                                                         |
+| `/login`                          | Public        | Organization / gridmaster login                                                            |
+| `/forgot-password`                | Public        | Password reset request (email-based)                                                       |
+| `/reset-password`                 | Public        | Password reset form (via email link token)                                                 |
+| `/verify-email`                   | Public        | Email verification for new accounts                                                        |
+| `/auth/verify`                    | Public        | Auth callback / token verification handler                                                 |
+| `/accept-invite`                  | Public        | Invitation acceptance flow                                                                 |
+| `/request-demo`                   | Public        | Demo request / contact form                                                                |
+| `/auth/callback`, `/auth/confirm` | Public        | Supabase auth redirect handlers                                                            |
+| `/accept-terms`                   | Authenticated | Accept the current terms version before entering the app                                   |
+| `/goodbye`                        | Public        | Post-deletion farewell page                                                                |
+| `/onboarding`                     | Authenticated | Invited-user org assignment polling                                                        |
+| `/dashboard`                      | Authenticated | Organization dashboard with analytics                                                      |
+| `/schedule`                       | Authenticated | Main schedule grid                                                                         |
+| `/people`                         | Authenticated | People roster management                                                                   |
+| `/people/[id]`                    | Authenticated | Individual staff member detail (tabs: Overview, Schedule, Activity)                        |
+| `/alerts`                         | Authenticated | Alerts inbox (one toolbar: search, filters, sort, bulk actions)                            |
+| `/reports`                        | Authenticated | Operations reports (`canViewReports`)                                                      |
+| `/settings`                       | Admin+        | Organization configuration                                                                 |
+| `/settings/staff-config`          | Admin+        | Legacy path; redirects to `/settings?section=staff-certifications`                         |
+| `/profile`                        | Authenticated | User profile settings                                                                      |
+| `/account`                        | Authenticated | Account panels: profile, security (MFA, sessions), appearance, notifications, data privacy |
+| `/billing-required`               | Authenticated | Billing lock screen for orgs without an active subscription                                |
+| `/gridmaster`                     | Gridmaster    | Platform command center                                                                    |
+| `/privacy`                        | Public        | Privacy policy                                                                             |
+| `/terms`                          | Public        | Terms of service                                                                           |
+| `/cookie-policy`                  | Public        | Cookie policy                                                                              |
 
 The onboarding wizard is no longer a route — it renders inline via `OnboardingGate` (the former `/setup` route was deleted).
 
@@ -508,137 +531,131 @@ The onboarding wizard is no longer a route — it renders inline via `Onboarding
 
 Everything for the web app lives under `apps/web/`. UI features are organized into `apps/web/src/features/<feature>/` folders with up to `client/`, `server/`, and `shared/` subfolders. A feature's `client/api.ts` exposes typed functions that `fetch()` the app's own `/api/...` Route Handlers — the browser never touches Supabase data tables directly for these domains. Server-only logic in `server/` is invoked by those Route Handlers. The request flow is: browser → `features/*/client/api.ts` → Route Handler → `lib/db/*` (or `mobile-api-core` / `@dubgrid/data-access` for mobile).
 
-| File / Directory                                          | Purpose                                                                                                                                                                                                                                                        |
-| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/web/src/proxy.ts`                                   | Next.js request proxy for RBAC + subdomain routing                                                                                                                                                                                                             |
-| `apps/web/next.config.ts`                                 | Next.js configuration + security headers                                                                                                                                                                                                                       |
-| `apps/web/src/app/schedule/page.tsx`                      | Main scheduler UI — grid, toolbar, DND                                                                                                                                                                                                                         |
-| `apps/web/src/app/dashboard/page.tsx`                     | Organization dashboard with analytics                                                                                                                                                                                                                          |
-| `apps/web/src/app/people/page.tsx`                        | People roster management                                                                                                                                                                                                                                       |
-| `apps/web/src/app/people/[id]/page.tsx`                   | Person detail page with tabbed views                                                                                                                                                                                                                           |
-| `apps/web/src/app/settings/page.tsx`                      | Organization settings                                                                                                                                                                                                                                          |
-| `apps/web/src/app/gridmaster/page.tsx`                    | Gridmaster command center                                                                                                                                                                                                                                      |
-| `apps/web/src/app/api/`                                   | Route Handlers — ~110 endpoints incl. `/api/mobile/v1/*`                                                                                                                                                                                                       |
-| `apps/web/src/lib/db/`                                    | Server-side data-access layer — barrel (`index.ts`) over domain modules: `shared, types, mappers, organizations, config, employees, shifts, schedule, invitations, requests, notifications, sessions, admin, access`. Replaces the old single `src/lib/db.ts`. |
-| `apps/web/src/features/permissions/`                      | Wraps `@dubgrid/authz` (`core`, `client`, `shared`, `usePermissions.ts`)                                                                                                                                                                                       |
-| `apps/web/src/components/onboarding/`                     | Inline role-aware onboarding wizard (`OnboardingGate`, `OnboardingWizard`, `WizardShell`, steps, `PersonaLandingCard`)                                                                                                                                         |
-| `apps/web/src/features/test-sandbox/`                     | Test-sandbox feature (org config cloning into a sandbox workspace)                                                                                                                                                                                             |
-| `apps/web/src/components/forms/`                          | Shared form primitives: `CountrySelect`, `UsStateSelect`, `EmailInput`, `PhoneInput`, `PostalCodeInput`                                                                                                                                                        |
-| `apps/web/src/lib/supabase.ts`                            | Lazy browser Supabase client via Proxy pattern                                                                                                                                                                                                                 |
-| `apps/web/src/emails/`                                    | react-email components for transactional + Supabase auth emails (incl. `TrialWelcomeEmail`); `email:build` regenerates `supabase/templates/*.html`                                                                                                             |
-| `apps/web/src/lib/email.ts`                               | Small email helpers (`sanitizeHeaderValue`, `emailBaseUrl`)                                                                                                                                                                                                    |
-| `apps/web/src/lib/rate-limit.ts`                          | Upstash Redis rate limiters (API, schedule review, invite, demo, password reset, login, per-recipient email)                                                                                                                                                   |
-| `apps/web/src/lib/onboarding-telemetry.ts`                | PostHog onboarding telemetry wrappers                                                                                                                                                                                                                          |
-| `apps/web/src/lib/timezone-from-coords.ts`                | Offline timezone lookup from coordinates (`tz-lookup`)                                                                                                                                                                                                         |
-| `apps/web/src/lib/us-states.ts` / `us-state-timezones.ts` | US state list + default-timezone map                                                                                                                                                                                                                           |
-| `packages/domain/src/`                                    | Domain types + `permissions.ts` (`AdminPermissions`, 26 perms), role enums, billing types, `self-guard.ts`                                                                                                                                                     |
-| `packages/authz/src/`                                     | Permission logic — `ROLE_LEVEL`, view implications, JWT claim extraction                                                                                                                                                                                       |
-| `packages/contracts/src/`                                 | Zod API contract schemas (`schedule`, `mobile`, `staff`)                                                                                                                                                                                                       |
-| `packages/mobile-api-core/src/`                           | Mobile backend orchestration (`auth`, `people-status`, `push`, `read`, `shift-requests`, `setup`, `organization`, `write`)                                                                                                                                     |
-| `apps/mobile/app/`                                        | Expo Router routes (`index.tsx`, `(auth)/*`, `(tabs)/*`, `shift/[employeeId]/[date].tsx`)                                                                                                                                                                      |
-| `apps/mobile/src/features/`                               | Mobile features — `auth`, `schedule`, `people`, `profile`, `shift-requests`, `notifications`, `onboarding`                                                                                                                                                     |
-| `apps/mobile/src/shared/lib/api.ts`                       | Mobile API client built on `@dubgrid/api-client`                                                                                                                                                                                                               |
+| File / Directory                                          | Purpose                                                                                                                                                                                                                                                          |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/proxy.ts`                                   | Next.js request proxy for RBAC + subdomain routing                                                                                                                                                                                                               |
+| `apps/web/next.config.ts`                                 | Next.js configuration + security headers                                                                                                                                                                                                                         |
+| `apps/web/src/app/(app)/schedule/page.tsx`                | Main scheduler UI: grid, toolbar, DND (helpers in `_components`, `_hooks`, `_lib`)                                                                                                                                                                               |
+| `apps/web/src/app/(app)/dashboard/page.tsx`               | Organization dashboard with analytics                                                                                                                                                                                                                            |
+| `apps/web/src/app/(app)/people/page.tsx`                  | People roster management                                                                                                                                                                                                                                         |
+| `apps/web/src/app/(app)/people/[id]/page.tsx`             | Person detail page with tabbed views                                                                                                                                                                                                                             |
+| `apps/web/src/app/(app)/alerts/page.tsx`                  | Alerts inbox (`AlertsInboxPage.tsx`)                                                                                                                                                                                                                             |
+| `apps/web/src/app/(app)/settings/page.tsx`                | Organization settings                                                                                                                                                                                                                                            |
+| `apps/web/src/app/(app)/gridmaster/page.tsx`              | Gridmaster command center                                                                                                                                                                                                                                        |
+| `apps/web/src/app/api/`                                   | Route Handlers — 154 route files incl. 40 under `/api/mobile/v1/*`                                                                                                                                                                                               |
+| `apps/web/src/lib/db/`                                    | Server-side data-access layer — barrel (`index.ts`) over domain modules: `shared, types, mappers, organizations, config, employees, shifts, schedule, publish-history, invitations, requests, sessions, admin, access`. Replaces the old single `src/lib/db.ts`. |
+| `apps/web/src/features/permissions/`                      | Wraps `@dubgrid/authz` (`core`, `client`, `shared`, `usePermissions.ts`)                                                                                                                                                                                         |
+| `apps/web/src/components/onboarding/`                     | Inline role-aware onboarding wizard (`OnboardingGate`, `OnboardingWizard`, `WizardShell`, `steps/`, `SetupPendingScreen`, `OrganizationBootstrapRecovery`)                                                                                                       |
+| `apps/web/src/features/test-sandbox/`                     | Test-sandbox feature (org config cloning into a sandbox organization)                                                                                                                                                                                            |
+| `apps/web/src/components/organization/`                   | Shared organization form primitives: `OrganizationLocationFields`, `TimezoneSelect`, Google Maps address lookup, change review                                                                                                                                   |
+| `apps/web/src/lib/auth/`, `lib/api-auth.ts`               | Local JWT verification (`verify-token.ts`), Redis revocation, sensitive-action assurance, security audit events, redirect/CSRF integrity contracts                                                                                                               |
+| `apps/web/src/lib/audit/`                                 | Audit registry, audience scoping, enrichment, and day counts behind the Activity Log and Gridmaster audit views                                                                                                                                                  |
+| `apps/web/src/lib/feature-flags.ts`                       | Platform kill switches (Redis + Next data cache) read by the Stripe, email, import/export, mobile API, and cron routes                                                                                                                                           |
+| `apps/web/src/lib/supabase.ts`                            | Lazy browser Supabase client via Proxy pattern                                                                                                                                                                                                                   |
+| `apps/web/src/emails/`                                    | react-email components for transactional + Supabase auth emails (incl. `TrialWelcomeEmail`); `email:build` regenerates `supabase/templates/*.html`                                                                                                               |
+| `apps/web/src/lib/email.ts`                               | Small email helpers (`sanitizeHeaderValue`, `emailBaseUrl`)                                                                                                                                                                                                      |
+| `apps/web/src/lib/rate-limit.ts`                          | Upstash Redis rate limiters (API, schedule review, invite, demo, password reset, login by email/IP/global, recovery surge, per-recipient email)                                                                                                                  |
+| `apps/web/src/lib/timezone-from-coords.ts`                | Offline timezone lookup from coordinates (`tz-lookup`)                                                                                                                                                                                                           |
+| `apps/web/src/lib/us-states.ts` / `us-state-timezones.ts` | US state list + default-timezone map                                                                                                                                                                                                                             |
+| `packages/domain/src/`                                    | Domain types + `permissions.ts` (`AdminPermissions`, 26 perms), role enums, billing types, `self-guard.ts`                                                                                                                                                       |
+| `packages/authz/src/`                                     | Permission logic — `ROLE_LEVEL`, role baselines, view implications, JWT claim extraction, sensitive-action assurance (`assurance.ts`)                                                                                                                            |
+| `packages/contracts/src/`                                 | Zod API contract schemas (`schedule`, `mobile`, `staff`, `mfa`)                                                                                                                                                                                                  |
+| `packages/mobile-api-core/src/`                           | Mobile backend orchestration (`auth`, `dashboard`, `organization`, `people-status`, `push`, `read`, `setup`, `shift-requests`, `write`)                                                                                                                          |
+| `packages/realtime-core/src/`                             | Org-scoped channel names, reference-counted subscriptions, Postgres-changes helpers, debounced invalidation                                                                                                                                                      |
+| `packages/schedule-core/src/`                             | Coverage and hours engines, pay periods, open-shift derivation, request assembly, segment alignment                                                                                                                                                              |
+| `apps/mobile/app/`                                        | Expo Router routes (`index.tsx`, `+not-found.tsx`, `(auth)/*`, `(tabs)/*`, `alerts/*`, `person/[id]/*`, `shift/[employeeId]/[date].tsx`)                                                                                                                         |
+| `apps/mobile/src/features/`                               | Mobile features — `auth`, `consent`, `dashboard`, `notifications`, `onboarding`, `people`, `profile`, `schedule`, `shift-requests`                                                                                                                               |
+| `apps/mobile/src/shared/lib/api.ts`                       | Mobile API client built on `@dubgrid/api-client`                                                                                                                                                                                                                 |
 
 > `docs/architecture/folder-structure.md` describes the full feature/data-access layout. The remaining `apps/web/src/lib/*` modules (besides `lib/db/`) are compatibility shims.
 
 ### 9.4 Component Architecture (`apps/web`)
 
+Route files stay thin; the components below live under `apps/web/src/components/` unless noted.
+
 ```
-AppShell.tsx (root layout — sidebar, header, navigation)
-├── Header.tsx (top navigation bar)
-├── MobileNavSheet.tsx (mobile navigation drawer)
-├── MobileSubNavContext.tsx (mobile sub-navigation context)
-├── OnboardingGate.tsx (billing lock → onboarding → org setup gate)
-│   └── OnboardingWizard.tsx → WizardShell.tsx → steps/* (role-aware inline wizard)
-├── ImpersonationBanner.tsx (gridmaster impersonation indicator)
-├── PageTransition.tsx (fade-in page animations)
+(app)/layout.tsx (NavigationGuardProvider → AppShell)
+├── AppShell.tsx (sidebar, header, navigation; hides trial chrome during setup)
+│   ├── Header.tsx / MobileNavSheet.tsx / MobileSubNavContext.tsx
+│   ├── NotificationBell.tsx (bell popup; rows go to their subject)
+│   ├── ImpersonationBanner.tsx / UserViewBanner.tsx / InactiveAccountBanner.tsx / MfaNagBanner.tsx
+│   ├── TrialWelcomeModal.tsx (held until onboarding completes)
+│   └── InactivityGuard.tsx, AuthenticatedCacheBoundary.tsx
+├── onboarding/OnboardingGate.tsx (bootstrap wait → billing lock → onboarding → org setup)
+│   ├── OnboardingWizard.tsx → WizardShell.tsx → steps/* (Welcome, Identity, Structure, Schedule,
+│   │   InviteTeam, SuperAdminOrientation, AdminOrientation, Completion; CompositeSection groups panels)
+│   ├── SetupPendingScreen.tsx (non-admins on an unconfigured org)
+│   └── OrganizationBootstrapRecovery.tsx (slow or failed bootstrap)
+├── RouteGuards.tsx / SetupGuard.tsx / AuthSplash.tsx / AuthTransitionScreen.tsx
 │
-├── Auth components (apps/web/src/components/auth/)
-│   ├── AuthCard.tsx (PageShell + Card layout for auth pages)
-│   ├── PasswordInput.tsx (password field with show/hide toggle)
-│   └── PasswordStrength.tsx (4-level visual strength meter)
+├── Auth (components/auth/)
+│   ├── AuthCard.tsx, EmailPasswordForm.tsx, SubdomainField.tsx, OrganizationBadge.tsx
+│   ├── PasswordInput.tsx, PasswordStrength.tsx, AuthStateCard.tsx, AuthLoading.tsx
+│   ├── StepUpDialog.tsx / StepUpForm.tsx (five-minute sensitive-action reauthentication)
+│   └── TermsAcceptanceCard.tsx
 │
-├── DashboardView.tsx (organization dashboard)
-│   ├── DashboardHeader.tsx (title + controls)
-│   ├── AlertBanner.tsx (critical issue alerts)
-│   ├── StatCardsRow.tsx → StatCard.tsx (KPI cards)
-│   ├── CoverageBySectionCard.tsx (coverage donut chart)
-│   ├── OpenShiftsCard.tsx
-│   ├── StaffHoursCard.tsx
-│   ├── ShiftBreakdownCard.tsx
-│   ├── ActivityFeed.tsx
-│   ├── DonutChart.tsx (reusable chart)
-│   └── expanded/ (full-page detail views)
-│       ├── ExpandedStats.tsx
-│       ├── ExpandedActivity.tsx
-│       ├── ExpandedOpenShifts.tsx
-│       ├── ExpandedStaffHours.tsx
-│       ├── ExpandedCoverage.tsx
-│       └── ExpandedBreakdown.tsx
+├── Dashboard (components/dashboard/)
+│   ├── DashboardView.tsx → SuperAdminDashboard / AdminDashboard / UserDashboard
+│   ├── DashboardHeader.tsx, DashboardHero.tsx, DashboardGreeting.tsx, DashboardChecklist.tsx
+│   ├── CoverageBySectionCard.tsx (DonutChart.tsx), OpenShiftsCard.tsx, StaffHoursCard.tsx,
+│   │   ActionQueueCard.tsx, ActivityFeed.tsx, MyScheduleRow.tsx
+│   └── expanded/ (ExpandedActivity, ExpandedOpenShifts, ExpandedStaffHours, ExpandedCoverage, ExpandedBreakdown)
 │
-├── ScheduleGrid.tsx (employee × date grid with DND)
+├── Schedule
+│   ├── ScheduleGrid.tsx (employee × date grid with DND; schedule-grid/ helpers, badges, publish diff pills)
 │   ├── DraggableShift.tsx / DroppableCell.tsx
-│   ├── ShiftEditPanel.tsx (canonical assignment picker, notes)
-│   ├── ShiftPicker.tsx (shift/job selector)
-│   ├── ShiftContextMenu.tsx (right-click actions)
-│   ├── RepeatForm.tsx (shift series creation)
-│   ├── DraftBanner.tsx (draft change count + publish/cancel)
-│   ├── CoveragePanel.tsx (coverage intelligence sidebar)
-│   └── PresenceAvatars.tsx (active users)
+│   ├── ShiftEditPanel.tsx (+ schedule/ShiftEditPanelLazy.tsx): assignment picker, notes, indicator removal
+│   ├── ShiftPicker.tsx, ShiftContextMenu.tsx, RepeatForm.tsx, PillTimeEditor.tsx
+│   ├── schedule/OpenShiftStaffingModal.tsx (scheduler staffs an open shift from the qualified roster)
+│   ├── DraftBanner.tsx, DraftReviewSummary.tsx, ChangeCountChips.tsx, PublishHistoryPanel.tsx
+│   ├── CoveragePanel.tsx, PresenceAvatars.tsx (editor presence)
+│   ├── MonthView.tsx, MobileDayView.tsx, Toolbar.tsx, TimeZoneClocks.tsx
+│   ├── ScheduleOperationModal.tsx, useScheduleImport (app/(app)/schedule/_hooks)
+│   └── PrintOptionsModal.tsx + PrintScheduleView.tsx + PrintLegend.tsx
 │
-├── MonthView.tsx (calendar month view)
-├── MobileDayView.tsx (mobile-web day-by-day view)
+├── People (components/staff/, staff-detail/)
+│   ├── StaffView.tsx (roster; DirectorySummaryCards and credential cards for management only)
+│   ├── StaffTableRow.tsx, StaffFilterPopover.tsx, StaffContextBar.tsx, StaffPagination.tsx, StaffEmptyState.tsx
+│   ├── StaffDetailPanel.tsx / StaffReadOnlyDetailPanel.tsx (slide-over; management access opens in a popup)
+│   ├── AddEmployeeModal.tsx, EditEmployeePanel.tsx, InviteEmployeeModal.tsx, BulkImportModal.tsx, ImportResultsModal.tsx
+│   ├── MembersSection.tsx, MemberAccessControls.tsx, InlineRoleSelect.tsx, EmployeeManagementAccessModal.tsx
+│   ├── ManagementStaffPanel.tsx, ManagementFilterPopover.tsx, PendingInvitationBanner.tsx, ProfileChangeRequestQueue.tsx
+│   └── staff-detail/StaffDetailPage.tsx → StaffDetailHeader, EmployeeStatusActions, RecurringScheduleCard,
+│       tabs/OverviewTab.tsx, tabs/ActivityTab.tsx
 │
-├── People roster (features/people/)
-│   ├── PeopleView.tsx (employee roster management)
-│   ├── PeopleToolbar.tsx (search, filter, sort, export)
-│   ├── PeopleFilterPopover.tsx (advanced filtering)
-│   ├── PersonTableRow.tsx
-│   ├── PeopleContextBar.tsx (quick actions)
-│   ├── PeoplePagination.tsx / PeopleEmptyState.tsx
-│   ├── AddEmployeeModal.tsx / EditEmployeePanel.tsx
-│   ├── InviteEmployeeModal.tsx
-│   └── PersonDetailPanel.tsx (side panel)
+├── PermissionsEditor.tsx (per-admin switches, implied views, change review)
+├── activity/ (ActivityTable, PeriodNavigator, ActivityPeriodStats, ActivityEmptyPeriod; shared by org, person, and Gridmaster logs)
+├── settings/SettingsPage.tsx → SettingsShell.tsx + one panel per section (see §10.8)
+├── account/ (ProfilePanel, SecurityPanel, AppearancePanel, NotificationsPanel, DataPrivacyPanel)
+├── profile/ (ProfilePage, SelfWorkProfile, MFASetup, MFAVerify, SessionList, NotificationPreferences, CalendarSubscriptionCard)
+├── ShiftRequestBoard.tsx
+├── test-sandbox/ (CreateSandboxDialog, SandboxBanner)
+├── landing/ (ScheduleGridMockup, StaffViewMockup, SettingsMockup, RecurringShiftsMockup, DashboardMockup,
+│   MobileAppMockup, LandingScreenshot, ThemeToggleButton)
 │
-├── PersonDetailPage.tsx (individual person at /people/[id])
-│   ├── PersonDetailHeader.tsx (avatar, name, status, actions)
-│   ├── tabs/OverviewTab.tsx (profile, certs, focus areas)
-│   ├── tabs/ScheduleTab.tsx (historical schedule)
-│   ├── tabs/ActivityTab.tsx (timeline)
-│
-├── SettingsPage.tsx (org configuration — see §10.8)
-│
-├── ShiftRequestBoard.tsx / ShiftSwapModal.tsx
-│
-├── Landing page mockups (apps/web/src/components/landing/)
-│   ├── ScheduleGridMockup.tsx
-│   ├── StaffViewMockup.tsx
-│   ├── SettingsMockup.tsx
-│   ├── PermissionsMockup.tsx
-│   └── RecurringShiftsMockup.tsx
-│
-├── PrintOptionsModal.tsx + PrintScheduleView.tsx + PrintLegend.tsx
-│
-├── Shared UI
-│   ├── Modal.tsx / ConfirmDialog.tsx
-│   ├── CustomSelect.tsx (searchable dropdown)
-│   ├── ScrollableTabs.tsx / NotificationBell.tsx
-│   ├── ButtonSpinner.tsx / ProgressBar.tsx
-│   └── Logo.tsx (wordmark + icon)
-│
-└── Toolbar.tsx (date nav, view toggle, filters, search, print)
+└── Shared UI
+    ├── Modal.tsx / ConfirmDialog.tsx / UnsavedChangesDialog.tsx / NavigationGuardProvider.tsx
+    ├── PageContainer.tsx, EmptyState.tsx, CustomSelect.tsx, ScrollableTabs.tsx, StepperBar.tsx
+    ├── Button.tsx / ButtonSpinner.tsx (ButtonLoading: spinner replaces the icon, label unchanged), ProgressBar.tsx
+    ├── ui/ (switch, sheet, number-field, numeric-badge, status-pill, selectable-tag, editor-action-row,
+    │   table, pagination, popover, tooltip, menu, calendar-date-picker, skeleton, ...)
+    ├── Logo.tsx / AnimatedDubGridLogo.tsx (the animated 16-cell mark), ThemeProvider.tsx
+    └── CookieConsent.tsx, ConsentGatedAnalytics.tsx, PostHogProvider.tsx, WebVitals.tsx, RouteBoundary.tsx
 ```
 
 ### 9.5 Gridmaster Command Center
 
 ```
-gridmaster/page.tsx
+(app)/gridmaster/page.tsx → components/gridmaster/GridmasterPortal.tsx
 ├── GridmasterDashboard.tsx (platform stats, recent activity)
 ├── AllUsersView.tsx (platform-wide user table)
-├── AuditLogView.tsx (role change audit trail)
-├── OrganizationDetail.tsx (org management)
-│   └── AdminPermissionsEditor.tsx (per-admin permission config)
-├── organization-setup/ (guided setup for new orgs — incl. parseEmployeePaste.ts)
+├── AuditLogView.tsx (date-navigated audit trail; shares components/activity/)
+├── OrganizationDetail.tsx
+│   ├── organization-detail/ (OverviewTab, UsersTab, EmployeesTab, InvitationsTab, ConfigTab, BillingTab)
+│   └── PermissionsEditor (per-admin permission config, shared with the People page)
+├── OrganizationSetupWizard.tsx + organization-setup/ (WizardStepper, ActionBar, parseEmployeePaste.ts, persistence)
+├── GridmasterAccountsView.tsx, GridmasterBillingView.tsx (BillingActionDialogs), GridmasterComplianceView.tsx,
+│   GridmasterSecurityView.tsx, PlatformFeatureFlagsView.tsx, ReadOnlyScheduleView.tsx
 ├── EnhancedImpersonation.tsx (impersonate org users)
 └── ImpersonationHistory.tsx (impersonation session log)
 ```
@@ -647,24 +664,30 @@ gridmaster/page.tsx
 
 ```
 apps/mobile/app/ (Expo Router)
-├── _layout.tsx / index.tsx / alerts.tsx
-├── shift/[employeeId]/[date].tsx (shift detail)
-├── (auth)/login.tsx / (auth)/onboarding.tsx
-└── (tabs)/_layout.tsx
-    ├── me/      (my schedule)
-    ├── people/  (roster + person detail)
-    ├── team/    (org schedule)
-    ├── requests/(shift pickup/swap)
-    └── profile/ (index, work, account, security)
+├── _layout.tsx (fonts, providers, consent + terms gates, ErrorBoundary) / index.tsx / +not-found.tsx
+├── (auth)/login.tsx / forgot-password.tsx / reset-password.tsx / onboarding.tsx
+├── (tabs)/_layout.tsx (+ .android, .web)
+│   ├── home/     (admin dashboard or personal schedule; my-schedule, open-shifts,
+│   │              pending-approvals, coverage, staff-hours, activity drill-ins)
+│   ├── team/     (org schedule)
+│   ├── people/   (roster, add, [id] detail)
+│   ├── requests/ (pickup, swap, call-off; history)
+│   └── profile/  (index, work, account, security, password, two-factor, sessions, notifications, privacy)
+├── alerts/index.tsx, alerts/[id].tsx (forwards to the alert's subject)
+├── person/[id]/index.tsx, person/[id]/schedule.tsx
+└── shift/[employeeId]/[date].tsx (shift detail with request sheets)
 
 apps/mobile/src/
-├── features/ — auth, schedule, people, profile, shift-requests,
-│               notifications, onboarding (3-slide intro carousel)
-└── shared/   — providers, navigation, components, theme, hooks, lib
-                (lib/api.ts → @dubgrid/api-client, bearer auth, Zod parsing)
+├── features/ — auth, consent, dashboard, notifications, onboarding (3-slide intro),
+│               people, profile, schedule, shift-requests
+└── shared/   — providers (AuthSessionProvider, NetworkStateProvider, AppLockProvider, ThemeModeProvider, ToastProvider),
+                navigation, components (AppText/Text, Button, PressableRow, Chip, BottomSheetModal,
+                FullPageSheet, ConfirmationModal, EmptyStateCard, skeleton/), theme (mobile* tokens),
+                motion, hooks (useAsyncAction, useUnsavedChangesGuard, useMobileContentState), lib
+                (api.ts → @dubgrid/api-client, bearer auth, Zod parsing, bounded retry)
 ```
 
-The mobile app talks only to `apps/web` `/api/mobile/v1/*`.
+The mobile app talks only to `apps/web` `/api/mobile/v1/*` for data, and to Supabase Auth and Realtime directly.
 
 ---
 
@@ -680,7 +703,7 @@ The mobile app talks only to `apps/web` `/api/mobile/v1/*`.
 - Draft shifts are visually distinct from published shifts
 - Staff search/highlight within the active focus area filter
 - Today's date column is highlighted
-- Real-time presence avatars and cell locks
+- Real-time presence avatars and a non-blocking "being edited" marker per cell
 
 ### 10.2 Staff Name Column
 
@@ -698,14 +721,14 @@ The mobile app talks only to `apps/web` `/api/mobile/v1/*`.
 
 ### 10.4 Dashboard
 
-- Stat cards row: total hours, active employees, open shifts, coverage rate
+- Role-specific dashboards: super admin and admin views with KPI hero, coverage, open shifts, action queue, staff hours, and activity; a `UserDashboard` for regular users showing their own schedule and the open shifts they can volunteer for (each named by shift and job)
 - Coverage by section donut chart
 - Open shifts card with details
-- Staff hours trend visualization
-- Shift breakdown by code distribution
+- Staff hours across the period
 - Activity feed with recent changes
 - Each card expands to a detailed full-page view
-- Alert banner for critical issues
+- A setup checklist while the organization is still being configured
+- Tablet layouts get their own column step; the first paint matches the real viewport (no wide-desktop flash)
 
 ### 10.5 Staff Detail
 
@@ -736,26 +759,27 @@ The mobile app talks only to `apps/web` `/api/mobile/v1/*`.
 
 ### 10.8 Settings
 
-The `/settings` route hosts the organization configuration panels:
+The `/settings` route hosts the organization configuration panels, grouped by `?section=`:
 
-- **Organization** — Name, address, phone, employee count, timezone, custom terminology labels
-- **Departments** — Two-type department model (scheduled + management); focus areas are children
-- **Shift Categories** — Create/edit/delete shift categories with time windows
-- **Shifts & Jobs** — Schedule definitions with colors, times, and qualification rules
-- **Coverage** — Minimum staffing requirements per focus area, shift/job assignment, and day
-- **Indicators** — Note/indicator type definitions with colors
-- **Users** — User management, role assignment, admin permission configuration (super_admin only)
+- **General** - Organization Details (name, address, phone, employee count, timezone) and Labels (custom terminology)
+- **Staff designations** - Departments (two-type model, focus areas as children), Roles, Certifications
+- **Scheduling** - Shift Display Mode (preview kept fully visible and selectable at supported widths and zoom levels), Schedule Rules (conflict prevention, default shift), Shifts, Jobs, Absence Types, Coverage (minimum staffing per focus area, shift/job, and day), Indicators
+- **Billing** - Subscription (Stripe, seats)
+- **Audit** - Activity Log (date-navigated, per-period stats)
+- **Danger Zone** - Delete Organization (behind fresh sensitive-action auth)
 
-`/settings/staff-config` is a dedicated sub-route covering focus areas, certifications, absence types, and organization roles. Gridmaster impersonation controls live in the gridmaster portal, not in org settings.
+User management, role assignment, and admin permission configuration live on the People page (super_admin only), not in Settings. `/settings/staff-config` only redirects to `/settings?section=staff-certifications`. Every Settings data table starts from the Departments width and grows for edit or dense modes. Gridmaster impersonation controls live in the gridmaster portal, not in org settings.
 
 ### 10.9 Authentication Pages
 
-- **Login** — Email/password login with org subdomain validation and domain selector
-- **Forgot Password** — Email input with enumeration protection (always shows success)
-- **Reset Password** — Token-validated form with password strength meter and min 10 char requirement
-- **Email Verification** — Verification status with resend button (60s cooldown) and auto-redirect
-- **Accept Invite** — Invitation token validation, account creation, employee linking
-- All auth pages use consistent `AuthCard` layout with branded styling
+- **Login** - Email/password login with org subdomain validation and domain selector; TOTP challenge for enrolled accounts; bounded recovery states for slow, offline, or throttled requests
+- **Forgot Password** - Email input with enumeration protection (always shows success); the request goes through the rate-limited server endpoint
+- **Reset Password** - Token-validated form with password strength meter (rules shared from `@dubgrid/domain`)
+- **Email Verification** - Verification status with resend button (60s cooldown) and auto-redirect, for the rare unconfirmed account
+- **Accept Invite** - Invitation token validation, pre-confirmed account creation, employee linking
+- **Accept Terms** - Blocks entry until the current terms version is accepted
+- **Step-up** - A `StepUpDialog` asks for a fresh password or TOTP code before a sensitive action when the last proof is older than five minutes
+- All auth pages use consistent `AuthCard` layout with branded styling; the animated 16-cell mark bridges the post-login transition
 
 ### 10.10 Landing Page
 
@@ -771,8 +795,10 @@ The `/settings` route hosts the organization configuration panels:
 - **Compatibility:** Must work in current versions of Chrome, Safari, and Edge
 - **Real-Time:** Supabase Realtime subscriptions keep schedule data in sync across concurrent users
 - **Persistence:** All data persisted in Supabase (PostgreSQL). No local storage dependency.
-- **Security:** RLS policies enforce org-scoped access at the database level. JWT claims verified in edge middleware.
+- **Security:** RLS policies enforce org-scoped access at the database level. JWT claims are verified in the request proxy and again in every Route Handler.
 - **Deployment:** `apps/web` deploys on Vercel with a Supabase backend; `apps/mobile` ships via Expo
+- **Typography:** Inter for product UI (Inter Variable with optical sizing on web, native Inter faces on mobile), DM Sans for the wordmark and landing headings, tabular numerals on scheduling figures; mobile caps OS text scaling so chrome holds its size
+- **Accessibility:** keyboard and focus contracts on web dialogs, 44pt touch targets on mobile, badge counts exposed through accessibility values, reduced-motion honored app-wide
 - **Print:** Print output faithful to on-screen layout with configurable options
 - **Mobile:** Native Expo / React Native app (`apps/mobile`) plus a responsive web layout with a mobile navigation drawer and day view
 - **Integrations:** The platform depends on Stripe, Resend, PostHog, Sentry, Upstash Redis, Vercel Analytics, and Expo push (see §2.4)
@@ -781,25 +807,27 @@ The `/settings` route hosts the organization configuration panels:
 
 ## 12. API Surface
 
-The web app exposes roughly **110 Route Handlers** under `apps/web/src/app/api/`. The browser reaches them through each feature's `client/api.ts`; the mobile app reaches the `/api/mobile/v1/*` subset. The table below summarizes the surface by area — the exhaustive endpoint list lives in **`docs/api-reference.md`**.
+The web app exposes **154 Route Handler files** under `apps/web/src/app/api/` (114 web routes and 40 mobile routes). The browser reaches them through each feature's `client/api.ts`; the mobile app reaches the `/api/mobile/v1/*` subset. The table below summarizes the surface by area — the exhaustive endpoint list lives in **`docs/api-reference.md`**.
 
-| Area                           | Representative Endpoints                                                                                                                                                                                                                                                                                | Auth                                  |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| Public / unauth                | `/api/health`, `/api/validate-domain`, `/api/request-demo`, `/api/consent`, `/api/invitations/lookup`, `/api/invitations/accept`, `/api/notify-impersonation`                                                                                                                                           | Public                                |
-| Auth & account                 | `/api/auth/login`, `/api/auth/organizations`, `/api/auth/data-export`, `/api/auth/delete-account`, `/api/auth/gdpr-erase`, `/api/account/identity`, `/api/account/profile`, `/api/account/sessions`, `/api/account/mfa-status`, `/api/account/notification-preferences`, `/api/account/change-requests` | Authenticated                         |
-| Organization & onboarding      | `/api/onboarding`, `/api/organization/bootstrap`, `/api/organization/directory`, `/api/organizations/settings`, `/api/organizations/users`, `/api/organizations/role-change`, `/api/organizations/invitations`                                                                                          | Authenticated                         |
-| Schedule & shifts              | `/api/schedule/manage`, `/api/schedule/recurring`, `/api/schedule/requests`, `/api/schedule/publish-history`, `/api/shifts/draft-summary`, `/api/shifts/publish`, `/api/shifts/discard`                                                                                                                 | Authenticated                         |
-| Employees & people             | `/api/employees/manage`, `/api/employees/status`, `/api/employees/link-user`, `/api/import/employees`, `/api/people/change-requests`                                                                                                                                                                    | Authenticated                         |
-| Settings / reports / dashboard | `/api/settings/config`, `/api/reports/operations`, `/api/reports/operations/export`, `/api/dashboard/analytics`, `/api/notifications`, `/api/calendar`, `/api/export`, `/api/test-sandbox`, `/api/billing`                                                                                              | Authenticated                         |
-| Stripe billing                 | `/api/stripe/create-checkout`, `/api/stripe/checkout-complete`, `/api/stripe/billing-portal`, `/api/stripe/webhook`                                                                                                                                                                                     | Mixed (webhook is signature-verified) |
-| Gridmaster                     | `/api/gridmaster/dashboard`, `/api/gridmaster/accounts`, `/api/gridmaster/users`, `/api/gridmaster/organizations/manage`, `/api/gridmaster/audit-log`, `/api/gridmaster/impersonation`, `/api/gridmaster/billing`, `/api/gridmaster/security`                                                           | Gridmaster                            |
-| Mobile API (`/api/mobile/v1`)  | `/bootstrap`, `/auth/login`, `/auth/organization`, `/me/schedule`, `/org/schedule`, `/people`, `/people/[id]/status`, `/profile`, `/notifications`, `/shift-requests`, `/shift-requests/swap-options`, `/push-tokens`, `/session-presence`                                                              | Bearer token                          |
+| Area                           | Representative Endpoints                                                                                                                                                                                                                                                                                                                                                                                    | Auth                                  |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| Public / unauth                | `/api/health`, `/api/validate-domain`, `/api/request-demo`, `/api/consent`, `/api/auth/recovery-request`, `/api/invitations/lookup`, `/api/invitations/register`, `/api/users/check-email`                                                                                                                                                                                                                  | Public                                |
+| Scheduled jobs                 | `/api/cron/expire-requests`, `/api/cron/trial-expiry`, `/api/cron/sandbox-cleanup`                                                                                                                                                                                                                                                                                                                          | `CRON_SECRET` bearer                  |
+| Auth & account                 | `/api/auth/login`, `/api/auth/organizations`, `/api/auth/sign-out`, `/api/auth/data-export`, `/api/auth/delete-account`, `/api/auth/gdpr-erase`, `/api/account/identity`, `/api/account/profile`, `/api/account/sessions`, `/api/account/mfa-lifecycle`, `/api/account/credential-assurance`, `/api/account/calendar-subscription`, `/api/account/notification-preferences`, `/api/account/change-requests` | Authenticated                         |
+| Organization & onboarding      | `/api/onboarding`, `/api/organization/bootstrap`, `/api/organization/directory`, `/api/organizations/settings`, `/api/organizations/users`, `/api/organizations/role-change`, `/api/organizations/invitations`                                                                                                                                                                                              | Authenticated                         |
+| Schedule & shifts              | `/api/schedule/manage`, `/api/schedule/recurring`, `/api/schedule/requests`, `/api/schedule/publish-history`, `/api/schedule/editor-sessions`, `/api/schedule/presence-profiles`, `/api/shifts/publish`, `/api/shifts/discard`, `/api/shifts/repeat-overwrites`                                                                                                                                             | Authenticated                         |
+| Employees & people             | `/api/employees/manage`, `/api/employees/status`, `/api/employees/identity`, `/api/employees/check-email`, `/api/employees/check-phone`, `/api/import/employees`, `/api/people/change-requests`                                                                                                                                                                                                             | Authenticated                         |
+| Settings / reports / dashboard | `/api/settings/config`, `/api/reports/operations`, `/api/reports/operations/export`, `/api/dashboard/analytics`, `/api/notifications`, `/api/calendar`, `/api/calendar/feed/[token]`, `/api/export`, `/api/test-sandbox`, `/api/billing`, `/api/feature-flags`                                                                                                                                              | Authenticated (feed: token)           |
+| Stripe billing                 | `/api/stripe/create-checkout`, `/api/stripe/checkout-complete`, `/api/stripe/billing-portal`, `/api/stripe/webhook`                                                                                                                                                                                                                                                                                         | Mixed (webhook is signature-verified) |
+| Gridmaster                     | `/api/gridmaster/dashboard`, `/api/gridmaster/accounts`, `/api/gridmaster/users`, `/api/gridmaster/organizations/manage`, `/api/gridmaster/audit-log` (+ `day-counts`), `/api/gridmaster/impersonation`, `/api/gridmaster/billing`, `/api/gridmaster/security`, `/api/gridmaster/platform-flags`                                                                                                            | Gridmaster                            |
+| Mobile API (`/api/mobile/v1`)  | `/bootstrap`, `/auth/login`, `/auth/recovery-request`, `/org-status`, `/dashboard`, `/me/schedule`, `/org/schedule`, `/people`, `/people/[id]/*`, `/management-users`, `/profile/*` (incl. `mfa-lifecycle`, `credential-assurance`, `terms`), `/notifications`, `/shift-requests`, `/shift-requests/history`, `/push-tokens`, `/session-presence`                                                           | Bearer token                          |
 
 All API routes include:
 
 - **Input validation** via Zod schemas (cross-app contracts in `@dubgrid/contracts`)
 - **Rate limiting** via Upstash Redis (`apps/web/src/lib/rate-limit.ts`), including a per-recipient email limiter (`emailTargetLimiter`) on email-sending routes
-- **CSRF protection** via Origin header validation (where applicable; e.g. demo, test-sandbox, trial-welcome)
+- **CSRF protection** via Origin header validation on every browser-facing mutation (exceptions for mobile bearer, webhook, and cron entry points are classified and tested)
+- **Live authorization** on every authenticated request (verified, non-revoked session plus current membership), and a **five-minute sensitive-action window** on factor, credential, session, export, and deletion routes
 - **Email-header safety** via `sanitizeHeaderValue()` from `apps/web/src/lib/email.ts`; email bodies are rendered from react-email components (`apps/web/src/emails/`)
 
 Server-side data access flows through the `apps/web/src/lib/db/*` barrel; mobile orchestration flows through `@dubgrid/mobile-api-core`. The browser does not query Supabase data tables directly for these domains.
@@ -810,19 +838,20 @@ Server-side data access flows through the `apps/web/src/lib/db/*` barrel; mobile
 
 ### 13.1 Not Yet Implemented
 
-| Feature                      | Priority | Notes                                                                                                                       |
-| ---------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Wing-Scoped User View        | Could    | Staff-role users see only their assigned focus area's schedule                                                              |
-| E2E Test Suite               | Should   | Playwright config exists but tests not yet written                                                                          |
-| MFA Enrollment & Enforcement | Should   | `/api/account/mfa-status` reports enrollment state; full TOTP enrollment + enforcement for elevated roles still outstanding |
-| Failed Login Tracking        | Should   | Account lockout after repeated failed login attempts                                                                        |
-| IP Allowlisting              | Could    | Restrict gridmaster access to trusted IPs                                                                                   |
+| Feature                     | Priority | Notes                                                                                                                                                                                                                                           |
+| --------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Production migration safety | Must     | The final release gate (build-plan item 37): inventory and reconcile the linked production ledger, rehearse on a production-shaped branch, apply only reviewed forward migrations. Runbook in `docs/operations/production-migration-safety.md`. |
+| Wing-Scoped User View       | Could    | Staff-role users see only their assigned focus area's schedule                                                                                                                                                                                  |
+| Role-mandated MFA           | Could    | Enforcement is account-based today; a hard AAL2 gate on `/settings` and `/gridmaster` for privileged roles is a deliberate future decision                                                                                                      |
+| Persistent account lockout  | Could    | Login is rate-limited per email, IP, and globally; there is no lockout with an email-based unlock                                                                                                                                               |
+| IP Allowlisting             | Could    | Restrict gridmaster access to trusted IPs                                                                                                                                                                                                       |
 
-Schedule PDF/CSV export, iCalendar (`.ics`) export, and operations-report export are **implemented** (see FR-17) — they are no longer outstanding work.
+The Playwright E2E suite (24 specs under `e2e/`: route-state coverage, role variance, auth qualification, typography, layout), MFA enrollment and challenge, and schedule/report exports are **implemented** and no longer outstanding.
 
 ### 13.2 Known Issues
 
-- Some pre-existing test failures (AuthProvider, login page, PublicRoute, and role-level property tests)
+- The Gridmaster oversight aggregates (`api/gridmaster/_lib/oversight.ts`) still read several tables without a `.limit()`, so platform counts can under-report once a table passes PostgREST's max rows (`POTENTIAL_BUGS.md` L-3).
+- The full Vitest suite is sensitive to machine load when several agent sessions run at once; a timed-out file is re-run in isolation before it is treated as a regression.
 
 ---
 
@@ -833,7 +862,7 @@ These items were open questions in previous PRD versions and have been resolved 
 | Question                   | Resolution                                                                                                                                                                         |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Data persistence strategy? | Supabase (PostgreSQL) with RLS. No local storage dependency.                                                                                                                       |
-| Multi-user editing?        | Real-time sync via Supabase Realtime. Optimistic locking on `schedule_cells` (version column).                                                                                     |
+| Multi-user editing?        | Real-time sync via Supabase Realtime, editor presence markers, and optimistic locking on `schedule_cells` (version column). Advisory cell locks were tried and removed.            |
 | Historical schedules?      | Past schedule periods are persisted and viewable by navigating date ranges.                                                                                                        |
 | FTE-weighted counts?       | Not yet implemented. Design decision pending.                                                                                                                                      |
 | Cross-staff counting?      | Employees belong to multiple focus areas. Shift entries are per-employee per-date.                                                                                                 |
@@ -843,13 +872,14 @@ These items were open questions in previous PRD versions and have been resolved 
 | Shift requests?            | Pickup, swap, and call-off requests implemented with admin approval workflow.                                                                                                      |
 | Coverage tracking?         | Coverage requirements and status visualization implemented.                                                                                                                        |
 | Password reset flow?       | Implemented. Forgot password → email link → reset form with strength meter → sign out.                                                                                             |
-| Email verification?        | Implemented. Verification page with resend button (60s cooldown), auto-redirect on confirm.                                                                                        |
+| Email verification?        | Invited accounts are created pre-confirmed; the verification page (resend, auto-redirect) remains for stragglers.                                                                  |
 | Org setup/onboarding?      | Implemented. Role-aware composite onboarding wizard rendered inline via `OnboardingGate` (the old 8-step wizard and `/setup` route were removed) + invited-user polling page.      |
-| Rate limiting?             | Implemented via Upstash Redis on all public API routes.                                                                                                                            |
+| Rate limiting?             | Implemented via Upstash Redis on all public API routes, with per-email, per-IP, and global login limits and per-target recovery limits.                                            |
+| MFA?                       | Implemented on web and mobile (TOTP), with a five-minute fresh-auth window for sensitive actions.                                                                                  |
 | Branded emails?            | Authored as react-email components in `apps/web/src/emails/`; `email:build` regenerates the Supabase auth templates. `apps/web/src/lib/email.ts` keeps only header-safety helpers. |
-| Mobile app?                | Native Expo / React Native app (`apps/mobile`) covering schedule, people, requests, profile, and notifications, talking to `/api/mobile/v1/*`.                                     |
+| Mobile app?                | Native Expo / React Native app (`apps/mobile`) covering dashboard, schedule, people, requests, profile, and alerts, talking to `/api/mobile/v1/*`.                                 |
 | Schedule export?           | Implemented. PDF/CSV export, iCalendar (`.ics`) feed, and operations-report export.                                                                                                |
-| Monorepo structure?        | npm workspaces + Turborepo. `apps/web`, `apps/mobile`, and ten shared `packages/*`.                                                                                                |
+| Monorepo structure?        | npm workspaces + Turborepo. `apps/web`, `apps/mobile`, and eleven shared `packages/*`.                                                                                             |
 | Third-party integrations?  | Stripe, Resend, PostHog, Sentry, Upstash Redis, Vercel Analytics, and Expo push.                                                                                                   |
 
 ---

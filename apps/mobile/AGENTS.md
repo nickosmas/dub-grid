@@ -15,7 +15,8 @@ Feature code in `apps/mobile/src`.
 - Typecheck: `npm --workspace @dubgrid/mobile run type-check`
 - iOS: `npm --workspace @dubgrid/mobile run ios`
 - Android: `npm --workspace @dubgrid/mobile run android`
-- Root mobile + contracts tests: `npm run test:mobile`
+- Root mobile + contracts + schedule-core tests: `npm run test:mobile`
+- App icons: `npm --workspace @dubgrid/mobile run icons` (stacked wordmark, both platforms' safe zones)
 
 First-run state is device-local storage, not DB state, so `npm run db:reset`
 never clears it: `hasSeenOnboarding` (`shared/lib/session.ts`) and the cookie
@@ -41,12 +42,14 @@ apps/mobile/
     (tabs)/
       _layout.tsx  _layout.android.tsx  _layout.web.tsx
       home/  people/  profile/  requests/  team/
-    alerts/
-    shift/
+    alerts/                         # index (mailbox list); [id] forwards to the alert's subject
+    person/[id]/                    # Person detail + schedule outside the tab stack
+    shift/[employeeId]/[date].tsx   # Shift detail with the request sheets
   src/
     features/
       auth/                         # Auth flow, MobileRealtimeProvider
       consent/                      # ConsentGate + TermsGate
+      dashboard/                    # Admin dashboard cards, hero, drill-in screens
       notifications/
       onboarding/                   # Onboarding screens/components
       people/
@@ -54,14 +57,15 @@ apps/mobile/
       schedule/
       shift-requests/
     shared/
-      components/                   # Shared primitives (ConfigurationScreen, etc.)
-      hooks/
-      lib/                          # env.ts, query-client, error helpers
+      components/                   # Shared primitives (AppText/Text, Button, sheets, skeleton/, ...)
+      hooks/                        # useAsyncAction, useUnsavedChangesGuard, useMobileContentState, ...
+      lib/                          # env.ts, api.ts, auth-reset, errors, in-app browser
       motion/                       # useMotionPreference, usePressAnimation,
                                     #   AnimatedListItem, Collapsible
       navigation/
       providers/                    # AuthSessionProvider
       theme/                        # tokens.ts adapter + useElevation
+    test/                           # Vitest shims (react-native emulation, reanimated stub, navigation)
 ```
 
 ## App Identifiers (High Risk)
@@ -134,6 +138,28 @@ a second copy silently drifted once.
 Sign-out must revoke this device's push token **before** dropping the session
 (`disablePushForCurrentDevice` in `shared/lib/auth-reset.ts`), or the phone
 keeps receiving the previous user's notifications.
+
+## Text Scaling
+
+Every text in the app goes through `shared/components/Text` (and `AppText` on
+top of it); a lint rule refuses the raw `react-native` `Text` import. It caps the
+OS text-size setting at `MAX_FONT_SCALE` (1.5x) and bounds the rendered size at
+`MAX_TEXT_SIZE` (32pt) read from the style's `fontSize`, so a headline never
+outgrows its row. Two `fit` tiers keep controls in shape, always one line and
+truncating rather than wrapping:
+
+- `fit="fixed"` renders at the designed size whatever the OS setting: header
+  titles and the labels beside them, sheet titles, the tab bar, avatar initials,
+  date tiles, count dots, the wordmark. Chrome holds still while the page grows.
+- `fit="compact"` grows to `MAX_FONT_SCALE_COMPACT` (1.2x) and stops: button,
+  pill, chip, badge, segment, and tab labels.
+
+Reading text keeps the full multiplier. Padding and control geometry never
+derive from the font scale. Shrink-to-fit (`adjustsFontSizeToFit`) is banned:
+React Native's new architecture ignores `minimumFontScale` and fits against the
+container's height, which is what left button labels tiny beside large copy. At
+a raised scale, stack squeezed columns (a role pill under the name) rather than
+`flexWrap` a pill.
 
 ## Platform Rules
 
@@ -265,10 +291,10 @@ return new Promise<void>((resolve) => {
 Because a synchronous handler returns `undefined`, the hook is a no-op for one:
 a plain toggle still fires on every tap. `loading` remains a prop for a pending
 flag that lives outside the control, and an explicit `loading` wins over the
-internal one. `loadingLabel` is still required on a `<Button>` that can spin
-(`design/require-busy-button`), in the progressive form of that button's own
-verb — see `request-action-feedback.ts`, where every variant carries its own
-(`Approve` → `Approving`, `Claim shift` → `Claiming shift`).
+internal one. A busy `<Button>` shows its spinner with the label unchanged:
+there is no `loadingLabel` prop (it was removed on purpose), so never write
+`pending ? "Approving" : "Approve"`. `request-action-feedback.ts` carries each
+request action's confirmation copy and success toast, not a busy label.
 
 ### Modals and sheets
 
@@ -590,6 +616,14 @@ withTiming(1, timing("emphasized", 200)) }))` throws `timing is not a function
 - Follow existing screen/component patterns in `src/features` and `src/shared`.
 - Preserve accessibility labels, touch targets (minimum 44pt), loading/error states,
   and offline/network handling.
+- Regular users see directory facts about colleagues, nothing more: the person
+  detail hides employment, account, and contact sections and the access pill for
+  a viewer without employee-details permission, and the API redacts the fields.
+  Who published a shift is withheld from a viewer who cannot open publish history.
+- `react-native-screens` is pinned to 4.17.x above Expo SDK 54's own pin for the
+  iOS 26 native back button (upstream #3294); it is excluded from `expo install
+--check` on purpose and needs a dev-client rebuild. Never draw a JS back button
+  on iOS: the glass capsule double-wraps it.
 - Use existing shared primitives before adding new components.
 - Avoid layout changes outside the requested screen or component.
 

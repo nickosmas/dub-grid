@@ -13,6 +13,7 @@ and database behavior.
 packages/data-access/src/
   index.ts        # Re-exports everything from ./mobile
   mobile.ts       # Mobile-specific data query helpers
+  mobile.test.ts  # Query-shape tests
 ```
 
 ## Rules

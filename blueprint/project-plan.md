@@ -21,7 +21,7 @@ concurrently.
   call-off), see facility alerts and notifications, on web and mobile.
 - **Managers / Admins** - build and publish schedules, manage people and
   focus areas, review and approve requests, run reports, configure org
-  settings. A configurable set of 25 admin permissions controls what an
+  settings. A configurable set of 26 admin permissions controls what an
   Admin can do within their organization.
 - **Super Admins** - full control within one organization, including
   managing Admin-tier permissions and billing.
@@ -41,7 +41,8 @@ Shipped capabilities and active roadmap (see `build-plan.md` for status):
   configurable admin permissions (not department templates)
 - Schedule grid: drag-drop, week / 2-week / month views, draft/publish
   workflow, recurring shifts
-- Real-time collaboration via Supabase Realtime (cell locks, presence)
+- Real-time collaboration via Supabase Realtime (editor presence and an
+  optimistic version check; advisory cell locks were tried and removed)
 - Staff / people management: lifecycle, focus areas, certifications
   (certifications are clinical credentials for nursing staff only; support
   staff carry no certification)
@@ -152,7 +153,7 @@ security, and release qualification. Item 28 must remain last.
 - Organizations (tenants), subdomains, org settings/terminology overrides
 - Users / profiles, with `platform_role` and per-org `org_role`
   (Gridmaster/Super Admin/Admin/User) plus per-user `admin_permissions`
-  (25-key JSONB)
+  (26-key JSONB)
 - Organization memberships (per-tenant role assignment)
 - Per-membership onboarding completion and onboarding-tour state
 - Employees / staff records, focus areas, certifications, employment
@@ -169,7 +170,7 @@ security, and release qualification. Item 28 must remain last.
 
 ## 5. Tech - What stack are we using?
 
-- **Monorepo:** npm workspaces + Turborepo (`apps/web`, `apps/mobile`, 10
+- **Monorepo:** npm workspaces + Turborepo (`apps/web`, `apps/mobile`, 11
   shared `packages/*`: `authz`, `domain`, `schedule-core`, `contracts`,
   `db-types`, `data-access`, `api-client`, `mobile-api-core`,
   `client-errors`, `realtime-core`, `design-tokens`)
@@ -191,8 +192,8 @@ security, and release qualification. Item 28 must remain last.
   (E2E) - both already configured and wired into root scripts
 - **CI:** GitHub Actions already present - `ci.yml`, `e2e.yml`,
   `dependency-audit.yml`, `cron-expire-requests.yml`
-- **Deployment target:** Vercel (per README; no committed `vercel.json` -
-  configured via the Vercel dashboard)
+- **Deployment target:** Vercel (`apps/web/vercel.json` holds the region and
+  cron schedules; everything else is configured via the Vercel dashboard)
 
 Confirmed during adoption: this stack and monorepo structure is fully
 intentional, not legacy.
@@ -239,18 +240,22 @@ before conversion is required.
 
 ## 8. Deployment - Where and how will this ship?
 
-- **Host:** Vercel (web). No committed `render.yaml` or `vercel.json`;
-  project settings live in the Vercel dashboard.
+- **Host:** Vercel (web). `apps/web/vercel.json` pins the region and schedules
+  the trial-expiry and sandbox-cleanup crons; other project settings live in
+  the Vercel dashboard.
 - **App type:** Next.js 16 App Router, standard Vercel build
   (`npm run build`) and start.
-- **Database:** Supabase (hosted Postgres + Auth + Realtime), migrations
-  under `supabase/migrations/`. No incremental production migration path
-  for feature flags specifically - those are created via the Gridmaster
-  UI (PUT), not a migration.
-- **Background jobs:** `cron-expire-requests.yml` GitHub Action handles
-  scheduled expiry of stale shift requests.
-- **Env vars, health checks, domain notes:** not captured during
-  adoption.
+- **Database:** Supabase (hosted Postgres + Auth + Realtime), an immutable
+  ordered migration stream under `supabase/migrations/` (`001`-`004` frozen,
+  forward migrations through `020`, checksum-locked). Feature flags are
+  created via the Gridmaster UI; a new switch is one INSERT in a forward
+  migration plus a call site.
+- **Background jobs:** `cron-expire-requests.yml` GitHub Action (hourly)
+  expires stale shift requests and invitations; Vercel crons run
+  trial-expiry notices and sandbox cleanup daily. All need `CRON_SECRET`.
+- **Env vars and health check:** `docs/secrets-rotation.md` lists every
+  variable with its rotation procedure; `GET /api/health` is the health check.
+- **Domain notes:** not captured during adoption.
 
-> TODO (confirm): full deployment/env details. Run `/release vercel` when
-> you want a real readiness pass instead of guessing here.
+> TODO (confirm): domain notes. Run `/release vercel` when you want a real
+> readiness pass instead of guessing here.

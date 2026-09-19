@@ -22,7 +22,7 @@
 
 ## Monorepo structure
 
-- npm workspaces + Turborepo: `apps/web`, `apps/mobile`, and 10 shared
+- npm workspaces + Turborepo: `apps/web`, `apps/mobile`, and 11 shared
   `packages/*` (`authz`, `domain`, `schedule-core`, `contracts`,
   `db-types`, `data-access`, `api-client`, `mobile-api-core`,
   `client-errors`, `realtime-core`, `design-tokens`)
@@ -110,9 +110,11 @@
 
 - Supabase only - Postgres, Auth, Realtime, Row Level Security. No ORM;
   use `@supabase/supabase-js` / `@supabase/ssr` clients directly
-- Schema changes go through `supabase/migrations/`; there is no
-  incremental production migration path for feature flags specifically -
-  those are created through the Gridmaster UI, not a migration
+- Schema changes are new numbered forward migrations under
+  `supabase/migrations/` (never edit an applied file; lock the hash in
+  `checksums.sha256` and run `npm run db:migrations:check`). Feature flags are
+  seeded in `001` and created through the Gridmaster UI; a new switch is one
+  INSERT in a forward migration plus a call site
 - RLS is the real security boundary; JWT verification failures for
   non-Gridmaster users must fall back to unverified decode rather than
   block login (RLS still protects the data either way)
@@ -128,7 +130,8 @@
 ## Auth and tenant safety
 
 - Validate auth in every Route Handler; don't rely on middleware/proxy
-  alone
+  alone. Sensitive actions (factor or credential changes, other-session
+  revocation, export, deletion) call `requireSensitiveActionAuth`
 - CSRF check on mutating requests
 - Always use the effective (sandbox-redirected) `orgId` for API
   mutations, never a raw client-supplied org id

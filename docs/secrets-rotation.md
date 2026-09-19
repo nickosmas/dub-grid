@@ -4,39 +4,56 @@ Quarterly rotation schedule. Each secret has a specific rotation procedure.
 
 ## Environment Variables Reference
 
-All required and optional env vars are validated at startup by
-`apps/web/src/lib/env.ts` (Zod schema). The schema enforces the following at
-runtime:
+All required and optional env vars are validated at startup by two Zod schemas:
+`apps/web/src/lib/env.ts` for the `NEXT_PUBLIC_*` variables (reachable from the
+browser bundle) and `apps/web/src/lib/env.server.ts` for server-only variables
+(importing it also validates the public set). Together they enforce the following
+at runtime:
 
 **Always required (all environments):**
 
-- `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — Supabase public anon key (baked into client bundle)
-- `SUPABASE_SECRET_KEY` — Server-only service role key (never `NEXT_PUBLIC_`)
+- `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` - Supabase public anon key (baked into client bundle)
+- `SUPABASE_SECRET_KEY` - Server-only service role key (never `NEXT_PUBLIC_`)
 
 **Required in production (`NODE_ENV=production` + `VERCEL_ENV=production` or `STRICT_PROD_ENV_VALIDATION=1`):**
 
-- `UPSTASH_REDIS_REST_URL` — Rate limiter; fail-closed if absent (503)
-- `UPSTASH_REDIS_REST_TOKEN` — Rate limiter token
+- `UPSTASH_REDIS_REST_URL` - Rate limiter; fail-closed if absent (503)
+- `UPSTASH_REDIS_REST_TOKEN` - Rate limiter token
 
 **Optional (warn in dev, degrade gracefully):**
 
-- `CRON_SECRET` — Bearer token for the `vercel.json` scheduled jobs. Optional in
-  the schema because local dev never runs them, but **required on the Vercel
-  production project**: without it Vercel sends no `Authorization` header, every
-  cron route answers 503, and each run is reported as a failed cron job.
-- `RESEND_API_KEY` — Transactional email (invites, password resets)
-- `EXPO_ACCESS_TOKEN` — Expo push notifications
-- `STRIPE_SECRET_KEY` — Stripe billing
-- `STRIPE_WEBHOOK_SECRET` — Stripe webhook signature verification
-- `STRIPE_PRICE_ID_MONTHLY` — Monthly subscription price ID
-- `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` — Error monitoring
-- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` — Stripe client-side
-- `NEXT_PUBLIC_POSTHOG_KEY` / `NEXT_PUBLIC_POSTHOG_HOST` — Analytics
-- `NEXT_PUBLIC_SITE_URL` — Used by CSRF origin validation and absolute URL generation
-- `NEXT_PUBLIC_BASE_DOMAIN` — Multi-tenant subdomain routing
-- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` — Maps
-- `NEXT_PUBLIC_VERCEL_URL` — Fallback for CSRF origin in Vercel Preview deployments
+- `CRON_SECRET` - Bearer token for the scheduled jobs: the two `apps/web/vercel.json`
+  crons (`trial-expiry`, `sandbox-cleanup`) and the `cron-expire-requests.yml` GitHub
+  Action, which reads it from the repo secret of the same name. Optional in the
+  schema because local dev never runs them, but **required on the Vercel production
+  project and in GitHub Actions secrets**: without it Vercel sends no `Authorization`
+  header, every cron route answers 503, and each run is reported as a failed job.
+- `LOGIN_EMAIL_LIMIT_PER_15_MIN` / `LOGIN_IP_LIMIT_PER_MINUTE` /
+  `LOGIN_GLOBAL_LIMIT_PER_10_SECONDS` - Optional overrides for the three login
+  limiters (defaults 15, 120, 500)
+- `RATE_LIMIT_IN_DEV` - Set to `1` to exercise the rate limiters locally
+- `LOG_LEVEL`, `PERF_TIMING` / `NEXT_PUBLIC_PERF_TIMING` - Logging verbosity and the
+  Server-Timing instrumentation used by `npm run measure:auth:web`
+- `RESEND_FROM_EMAIL` / `DEMO_RECIPIENT_EMAIL` - Sender address and demo-request inbox
+- `RESEND_API_KEY` - Transactional email (invites, password resets)
+- `EXPO_ACCESS_TOKEN` - Expo push notifications
+- `STRIPE_SECRET_KEY` - Stripe billing
+- `STRIPE_WEBHOOK_SECRET` - Stripe webhook signature verification
+- `STRIPE_PRICE_ID_MONTHLY` - Monthly subscription price ID
+- `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` - Error monitoring
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` - Stripe client-side
+- `NEXT_PUBLIC_POSTHOG_KEY` / `NEXT_PUBLIC_POSTHOG_HOST` - Analytics
+- `NEXT_PUBLIC_SITE_URL` - Used by CSRF origin validation and absolute URL generation
+- `NEXT_PUBLIC_BASE_DOMAIN` - Multi-tenant subdomain routing
+- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` - Maps
+- `NEXT_PUBLIC_VERCEL_URL` - Fallback for CSRF origin in Vercel Preview deployments
+- `VERCEL_API_TOKEN` / `VERCEL_PROJECT_ID` / `VERCEL_TEAM_ID` - Declared in the server schema as optional; nothing in the app reads them today
+
+**Scripts only (never read by the app):**
+
+- `DATABASE_URL` / `SUPABASE_DB_PASSWORD` - direct Postgres access for `seed.ts`, `db:reset:remote`, `db:reset:staging`, `db:seed:branch`, and the migration inspectors (`scripts/lib/db-client.ts`); `SUPABASE_ACCESS_TOKEN` enables the Management API fallback transport
+- `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` / `EXPO_PUBLIC_API_BASE_URL` - the mobile app's bundled (public) configuration in `apps/mobile/.env.local`
 
 > Note: `SUPABASE_JWT_SECRET` is **not** used. JWT verification uses the JWKS
 > endpoint (ES256 asymmetric keys from `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`).
@@ -47,8 +64,8 @@ runtime:
 
 ### SUPABASE_SECRET_KEY
 
-1. Go to Supabase Dashboard > Settings > API
-2. Regenerate the service_role key
+1. Go to Supabase Dashboard > Settings > API Keys
+2. Create a new secret (`sb_secret_...`) key and revoke the old one; the publishable/secret keys are individually revocable, unlike the legacy `anon`/`service_role` JWTs
 3. Update in Vercel env vars (Production + Preview)
 4. Run `vercel env pull` to update `.env.local` locally
 5. Restart the deployment
@@ -56,7 +73,7 @@ runtime:
 
 ### NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 
-1. Same location as above — regenerate the anon key
+1. Same location as above: rotate the publishable (`sb_publishable_...`) key
 2. Update in Vercel env vars (all environments)
 3. Run `vercel env pull` to update `.env.local` locally
 4. Rebuild and deploy (the anon key is baked into the client bundle)
@@ -88,12 +105,13 @@ runtime:
 2. Update `CRON_SECRET` in the Vercel project env vars (Production scope)
 3. Redeploy — Vercel reads the variable when it invokes a cron, so the next
    scheduled run picks up the new value
-4. Verify: Vercel Dashboard > Cron Jobs, confirm the next `/api/cron/expire-requests`
-   run returns 200 (it runs hourly, so this is quick to confirm)
+4. Update the `CRON_SECRET` repo secret under GitHub Settings → Secrets and variables → Actions, which the hourly `cron-expire-requests.yml` workflow sends
+5. Verify: run the workflow with `workflow_dispatch` and confirm it logs HTTP 200; Vercel Dashboard > Cron Jobs shows the next `trial-expiry` / `sandbox-cleanup` run
 
 > Important: this secret is generated by us, not by a third party, so there is
-> nothing to revoke upstream. If it is missing entirely, all four crons in
-> `apps/web/vercel.json` return 503 and Vercel reports every run as a failure.
+> nothing to revoke upstream. If it is missing entirely, the two crons in
+> `apps/web/vercel.json` and the GitHub Action all get 503 and every run is reported
+> as a failure.
 
 ### STRIPE_SECRET_KEY
 
@@ -171,8 +189,9 @@ If a secret is compromised:
 
 ## Security Notes
 
-- Server-only secrets must never have the `NEXT_PUBLIC_` prefix. The env schema
-  (`apps/web/src/lib/env.ts`) enforces this by keeping them in the `serverSchema`.
+- Server-only secrets must never have the `NEXT_PUBLIC_` prefix. The server schema
+  (`apps/web/src/lib/env.server.ts`) is a separate module from the public one so the
+  names of server variables are never bundled into client chunks.
 - In strict production mode the schema throws at startup for missing required vars,
   preventing a misconfigured deployment from silently failing open.
 - Rotate secrets immediately if they are ever committed to version control. Use

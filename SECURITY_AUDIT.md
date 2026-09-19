@@ -1,9 +1,9 @@
 # Security Audit — DubGrid
 
-**Date:** 2026-05-21 (last updated 2026-05-25)
+**Date:** 2026-05-21 (last updated 2026-09-19; see the dated sections appended below)
 **Scope:** Entire monorepo — `apps/web` (Next.js 16), `apps/mobile` (Expo),
-`packages/*`, Supabase migrations (RLS / RPCs / grants / JWT hook), edge
-middleware, dependencies.
+`packages/*`, Supabase migrations (RLS / RPCs / grants / JWT hook), the request
+proxy, dependencies.
 **Method:** Static review of the actual source at each location, tracing
 request → handler → RPC → RLS for the highest-risk paths, plus `npm audit` with
 per-advisory reachability triage. Every reported item was confirmed in code.
@@ -526,3 +526,38 @@ All nine findings (F-8 through F-16) are fixed as of this update. F-16 was
 caught by a follow-up security-review pass over this same set of changes
 rather than the original three-agent audit — see the note at the top of
 this section.
+
+---
+
+## 2026-09-14: Authentication security hardening (build-plan item 19)
+
+**Scope:** the complete web and mobile authentication and onboarding lifecycle,
+delivered as build-plan features 19a-19e between 2026-09-08 and 2026-09-14. This
+was a build-and-verify epic rather than an audit, so it is recorded here as a
+pointer: each sub-feature's archive under `blueprint/history/features/19*.md`
+carries its own inventory, evidence, and disclosed limits.
+
+| Pass | What it locked down                                                                                                                                                                                                                                                                                                                                   | Evidence                                                                                                                      |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 19d1 | One authorization contract for web cookies, web bearer, and mobile bearer: signature-verified, non-revoked session plus current live membership in exactly one organization. Stale org claims, archived memberships, revoked sessions, and cross-tenant ids fail closed; service-role paths carry explicit tenant checks. Migrations `016` and `017`. | `__tests__/api-authorization-boundaries.test.ts`, `sensitive-action-authorization-boundaries.test.ts`, feature archive        |
+| 19d2 | Five-minute sensitive-action window from signed `amr` timestamps (`@dubgrid/authz` `assurance.ts`); AAL2 required when a verified TOTP factor exists, fresh password proof otherwise; one shared MFA lifecycle handler with pending-factor cleanup and no Auth Admin factor mutations.                                                                | `docs/mfa-provider-boundary.md` (hosted-provider qualification, accepted limits), `mfa-lifecycle.test.ts`                     |
+| 19d3 | Invitation and recovery credentials expire, bind to the intended identity, and are single-use (`accept_invitation`, migration `018`); post-auth redirects pinned to an allowlist; one fail-closed CSRF origin policy with every non-browser exception classified.                                                                                     | `lib/auth/integrity-contract.ts`, `__tests__/auth-integrity-entry-points.test.ts`, `invitation-integrity.integration.test.ts` |
+| 19d4 | Generic public identity-facing failures; distributed per-source, per-target, and global limits on login and recovery that fail closed in production; credentials kept out of URLs and telemetry; security-event audit coverage without secrets.                                                                                                       | `lib/auth/abuse-boundary-contract.ts`, `lib/auth/security-audit.ts`, `lib/auth/security-redaction.ts`                         |
+| 19e  | Machine-checked role, account-state, surface, and browser qualification matrix (`e2e/auth-release-qualification.spec.ts`, `lib/auth/release-qualification.ts`), with unavailable evidence disclosed rather than inferred.                                                                                                                             | `blueprint/history/features/19e-authentication-release-qualification.md`                                                      |
+
+Related earlier work in the same window: the sandbox POST gained a server-side
+admin+ role gate (F-8), `useSchedulePresence` replaced the advisory cell locks
+whose trigger-driven broadcasts had become unreliable (2026-09-04), publish
+history became a management-only read (2026-09-05), and the mobile API stopped
+serving management-only data to regular staff (2026-09-05).
+
+Counts quoted above (36 tables, four migration files) describe the schema as it
+stood in May 2026; as of 2026-09-19 there are 42 tables, all with RLS, across
+20 numbered migrations.
+
+**Open, by decision:** MFA enforcement stays account-based (a dismissible nag for
+management accounts without a factor rather than a hard AAL2 gate on `/settings`
+and `/gridmaster`), and there is no gridmaster IP allowlist. Direct calls to
+Supabase's own factor-removal and credential endpoints remain subject to the
+provider's policy rather than DubGrid's five-minute window; see
+`docs/mfa-provider-boundary.md` for the approved scope.

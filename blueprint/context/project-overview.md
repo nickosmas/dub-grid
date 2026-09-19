@@ -20,7 +20,7 @@ facilities.
   call-off), see alerts and notifications, on web and mobile.
 - **Managers / Admins** - build and publish schedules, manage people and
   focus areas, review and approve requests, run reports, configure org
-  settings. Admin capability is a configurable, per-person set of 25
+  settings. Admin capability is a configurable, per-person set of 26
   permissions, not a role template.
 - **Super Admins** - full control within one organization, including
   managing Admin-tier permissions and billing.
@@ -31,7 +31,8 @@ facilities.
 
 ## Features
 
-Everything below is already shipped except item 27 and item 28.
+Everything below is already shipped except item 28, the final production
+migration gate.
 
 1. **Multi-tenant organizations** - subdomain-isolated tenants with their
    own settings and terminology overrides.
@@ -39,8 +40,10 @@ Everything below is already shipped except item 27 and item 28.
    per-person configurable admin permissions.
 3. **Schedule grid** - drag-drop week / 2-week / month views, draft/publish
    workflow, recurring shifts. Headline feature - the core product.
-4. **Real-time schedule collaboration** - Supabase Realtime cell locks and
-   presence so concurrent edits don't collide.
+4. **Real-time schedule collaboration** - Supabase Realtime presence with a
+   non-blocking "being edited" marker per cell, and an optimistic version check
+   so concurrent edits don't collide (advisory cell locks were tried and
+   removed).
 5. **Staff / people management** - lifecycle, focus areas, certifications.
 6. **Shift requests** - pickup, swap, call-off with approval workflow and
    auditable request events/snapshots.
@@ -242,7 +245,7 @@ Everything below is already shipped except item 27 and item 28.
 ### Organization Membership
 
 - `org_id`, `user_id`, `org_role` (Super Admin / Admin / User),
-  `admin_permissions` (25-key JSONB, per-person, not department-templated),
+  `admin_permissions` (26-key JSONB, per-person, not department-templated),
   `onboarding_completed_at`, onboarding-tour state
 - relationship: belongs to one Organization and one Profile
 
@@ -371,28 +374,31 @@ Main route groups (web, App Router):
 
 ## Deployment
 
-- **Host:** Vercel (web). No committed `render.yaml` or `vercel.json` -
-  project configuration lives in the Vercel dashboard.
+- **Host:** Vercel (web). `apps/web/vercel.json` pins the region and schedules
+  two crons (`/api/cron/trial-expiry`, `/api/cron/sandbox-cleanup`); the rest of
+  the project configuration lives in the Vercel dashboard.
 - **App type:** Next.js 16 App Router, standard Vercel build
   (`npm run build`) and start (`npm run start`).
-- **Database:** Supabase-hosted Postgres, migrations in
-  `supabase/migrations/`. Feature flags specifically have no incremental
-  production migration path - they're created through the Gridmaster UI,
-  not a migration.
-- **Background jobs:** `cron-expire-requests.yml` (GitHub Action) expires
-  stale shift requests on a schedule.
+- **Database:** Supabase-hosted Postgres with an immutable ordered migration
+  stream in `supabase/migrations/` (`001`-`004` frozen, forward migrations
+  through `020`, checksum-locked, applied by ledger). Feature flags are seeded
+  in `001` and toggled through the Gridmaster UI; a new switch is one INSERT in
+  a forward migration plus a call site.
+- **Background jobs:** `cron-expire-requests.yml` (GitHub Action, hourly)
+  expires stale shift requests and invitations; the two Vercel crons above
+  handle trial-expiry notices and sandbox cleanup. All three need `CRON_SECRET`.
 - **Final migration gate:** after all product work and authentication release
   qualification, inventory and reconcile linked production, rehearse against a
   production-shaped Supabase branch, then apply only reviewed forward
   migrations and verify health, schema, tenant isolation, and ledger state.
   The tracked plan grants no authority to mutate production.
 
-> TODO: env vars by name, health check path, and domain notes. Run
-> `/release vercel` for a real readiness pass instead of guessing here.
+> Env vars by name and rotation procedure are in `docs/secrets-rotation.md`;
+> the health check is `GET /api/health`. Run `/release vercel` for a real
+> readiness pass on domain notes.
 
 ## Open questions
 
-- The project plan says there are 10 shared packages but names 11; the
-  repository currently contains 11.
 - Exact per-seat billing price points / tier breaks are unconfirmed.
-- Deployment env vars, health check path, and domain notes are unconfirmed.
+- Deployment domain notes are unconfirmed (env vars are listed in
+  `docs/secrets-rotation.md`; the health check is `GET /api/health`).

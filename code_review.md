@@ -31,8 +31,8 @@ Before approving any change, verify:
 
 - **Package boundary**: shared `packages/*` must stay platform-neutral. No Next.js, Expo, React Native, DOM, or Node.js-only imports. Any such import in a package will break the other app.
 - **Both apps**: a change to any `packages/*` workspace potentially affects both `apps/web` and `apps/mobile`. Confirm both still build and their tests pass.
-- **Migration rule**: schema lives in exactly 4 files (`001_schema.sql` through `004_grants.sql`). If a PR creates a `005_...sql` or later file, reject it. New columns, functions, policies, and grants go in the appropriate existing file.
-- **Route rule**: all web routes must be simple page files (e.g., `apps/web/src/app/people/page.tsx`). Catch-all routes (`[...slug]`) break static prerendering on Vercel and must not be introduced.
+- **Migration rule**: `001`-`004` are a frozen baseline. Every schema change is a new, idempotent `NNN_name.sql` at the next number, locked in `supabase/migrations/checksums.sha256`. Reject a PR that edits an applied migration, skips the checksum, or reapplies `supabase/patches/`.
+- **Route rule**: all web routes must be simple page files (e.g., `apps/web/src/app/(app)/people/page.tsx`). Catch-all routes (`[...slug]`) break static prerendering on Vercel and must not be introduced.
 - **Mobile API isolation**: `apps/mobile` must not import from `apps/web` or touch Supabase data tables directly. All data access goes through `/api/mobile/v1/*`.
 
 ---
@@ -40,7 +40,7 @@ Before approving any change, verify:
 ## Security Checklist
 
 - [ ] All mutation endpoints call `validateCsrfOrigin` before processing the body.
-- [ ] All Route Handlers and Server Actions validate input with Zod before using it.
+- [ ] All Route Handlers validate input with Zod before using it (the app uses no Server Actions; a new one would need the same review).
 - [ ] Authenticated endpoints call `requireAuthenticatedUser` or `requireOrgPermissions` before touching data. Session checks are inside the handler, not only in the request proxy.
 - [ ] `requireOrgPermissions` returns the effective (sandbox-redirected) `orgId`. Mutations use that value, never a raw client-supplied `orgId`.
 - [ ] Destructive org mutations call `forbidIfSandboxCookie` to block sandbox-to-production escalation.
@@ -50,18 +50,25 @@ Before approving any change, verify:
 - [ ] No secrets, stack traces, or internal error details are returned to clients.
 - [ ] Rate limiters are applied to public-facing and email-sending endpoints.
 - [ ] New email-sending routes apply `emailTargetLimiter` per recipient address.
+- [ ] A new sensitive action (factor or credential change, session revocation, export, deletion, irreversible org change) calls `requireSensitiveActionAuth` (web) or `requireMobileSensitiveActionAuth` (mobile) and the UI drives the step-up flow.
+- [ ] Public identity-facing failures stay generic (no account, invitation, or factor existence leaks); security outcomes go through `lib/auth/security-audit.ts` without secrets.
+- [ ] A new mutating route is classified in `__tests__/auth-integrity-entry-points.test.ts` (browser CSRF, native bearer, or signed/webhook boundary).
 
 ---
 
 ## Design System and Copy Checklist
 
 - [ ] Authenticated app UI uses `dg-btn-*`, `dg-input`, `dg-label`, `dg-form-error` (not `dg-auth-*`).
-- [ ] Auth-flow UI uses `dg-auth-submit`, `dg-auth-input`, `dg-auth-link`, `dg-auth-heading` (not `dg-btn-*`).
+- [ ] Buttons use `dg-btn-*` everywhere; auth-flow inputs and links use `dg-auth-input`, `dg-auth-link`, `dg-auth-heading` (never the retired `dg-auth-submit` pill as a button style).
+- [ ] Async action buttons latch with `useAsyncAction` and show a spinner with the label unchanged (no `loadingLabel`, no relabel).
+- [ ] Integer fields use `<NumberField>`, never `type="number"`; selects use `<CustomSelect>`, never a native `<select>`.
 - [ ] Empty states use `<EmptyState size="...">` (not hand-rolled divs or the removed `DashboardEmptyState`).
-- [ ] Shared layout primitives are used where applicable: `<PageContainer>`, `<Switch>`, `<EditorActionRow>`, `<SectionCard>`, `<ConfirmDialog>`.
+- [ ] Shared layout primitives are used where applicable: `<PageContainer>`, `<Switch>`, `<EditorActionRow>`, `<SectionCard>`, `<ConfirmDialog>`, `<Modal>`, `<NumericBadge>`, `<StatusPill>`.
+- [ ] Mobile: numbers come from the `mobile*` token ramps (`design/no-raw-mobile-metrics`), text goes through `shared/components/Text` with the right `fit` tier, and choices render as grouped lists (`ProfileChoiceGroup`), not chip clouds or dropdowns.
+- [ ] Typography: Inter for product UI, DM Sans only for the wordmark and landing headings, `dg-tabular-nums` / `mobileTabularText` on operational figures only.
 - [ ] Error and not-found segments delegate to `<ErrorBoundary>` and `<NotFoundBoundary>` from `components/RouteBoundary.tsx`.
 - [ ] User-facing copy follows the tone guide: no em-dashes (replace with commas, parentheses, or colons), no "workspace" for the tenant (use "Organization"), no "admin portal" for the gridmaster portal, "subdomain" for the URL identifier.
-- [ ] Cookie consent: if cookies are added/removed or an analytics provider changes, `CONSENT_VERSION` in `apps/web/src/components/CookieConsent.tsx` is bumped.
+- [ ] Cookie consent: if cookies are added/removed or an analytics provider changes, `CONSENT_VERSION` is bumped in both `apps/web/src/components/CookieConsent.tsx` and `apps/mobile/src/features/consent/lib/consent.ts`.
 
 ---
 
