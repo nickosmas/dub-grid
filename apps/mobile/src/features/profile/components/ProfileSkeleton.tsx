@@ -219,7 +219,7 @@ export function ProfileSkeleton({
       ) : null}
       {skeletonRows(sections, (sectionIndex) => (
         <View key={`profile-section-${sectionIndex}`} style={styles.section}>
-          <SkeletonLine variant="label" width="26%" />
+          <SkeletonLine style={styles.sectionTitle} variant="sectionTitle" width="30%" />
           <View style={styles.list}>
             <View style={styles.listClip}>
               {skeletonRows(rowsPerSection, (rowIndex) => (
@@ -311,6 +311,13 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     section: {
       gap: mobileSpace.md,
+    },
+    // Mirrors `ProfileSection`'s title: 16pt medium, inset from the card and
+    // with room above it. A margin, not padding: `SkeletonLine` fixes its
+    // height to the line, so padding would push the bar out of the box.
+    sectionTitle: {
+      paddingHorizontal: mobileSpace.lg,
+      marginTop: mobileSpace.sm,
     },
     // The clip sits on an inner view: iOS drops a view's own shadow when the
     // same view clips its children, so the shadow-casting list stays unclipped

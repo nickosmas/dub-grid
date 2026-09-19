@@ -45,7 +45,7 @@ export function PersonFormSkeleton({
     <SkeletonGroup style={styles.page}>
       {sections.map((fieldCount, sectionIndex) => (
         <View key={`form-section-${sectionIndex}`} style={styles.section}>
-          <SkeletonLine variant="label" width="30%" />
+          <SkeletonLine style={styles.sectionTitle} variant="sectionTitle" width="30%" />
           <View style={styles.panel}>
             {skeletonRows(fieldCount, (fieldIndex) => (
               <View key={`form-field-${sectionIndex}-${fieldIndex}`} style={styles.field}>
@@ -60,7 +60,7 @@ export function PersonFormSkeleton({
           the 22pt mark at its end, as ProfileChoiceGroup draws it. */}
       {skeletonRows(chipGroups, (index) => (
         <View key={`form-choice-group-${index}`} style={styles.section}>
-          <SkeletonLine variant="label" width="34%" />
+          <SkeletonLine style={styles.sectionTitle} variant="sectionTitle" width="34%" />
           <View style={styles.field}>
             <SkeletonLine variant="caption" width="28%" />
             <View style={styles.list}>
@@ -92,6 +92,13 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     section: {
       gap: mobileSpace.md,
+    },
+    // Mirrors `ProfileSection`'s title: 16pt medium, inset from the card and
+    // with room above it. A margin, not padding: `SkeletonLine` fixes its
+    // height to the line, so padding would push the bar out of the box.
+    sectionTitle: {
+      paddingHorizontal: mobileSpace.lg,
+      marginTop: mobileSpace.sm,
     },
     panel: {
       backgroundColor: mobileColors.surface,
