@@ -44,7 +44,9 @@ export function CountBadge({ label, tone = "brand" }: { label: string; tone?: Co
 
   return (
     <View style={[styles.badge, { backgroundColor: toneStyle.backgroundColor }]}>
-      <Text style={[styles.label, { color: toneStyle.color }]}>{label}</Text>
+      <Text fit="compact" style={[styles.label, { color: toneStyle.color }]}>
+        {label}
+      </Text>
     </View>
   );
 }

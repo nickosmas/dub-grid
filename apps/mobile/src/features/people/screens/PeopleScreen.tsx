@@ -59,7 +59,6 @@ import {
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
   mobileAvatarText,
-  MAX_FONT_SCALE,
   mobileElevation,
   mobileMotion,
   mobileRadii,
@@ -1189,11 +1188,7 @@ function PersonRow({
           },
         ]}
       >
-        <Text
-          numberOfLines={1}
-          maxFontSizeMultiplier={MAX_FONT_SCALE}
-          style={[styles.personAvatarText, { color: avatarTone.textColor }]}
-        >
+        <Text fit="shrink" style={[styles.personAvatarText, { color: avatarTone.textColor }]}>
           {initials}
         </Text>
       </View>
@@ -1209,7 +1204,9 @@ function PersonRow({
                 name={orgRoleBadge.icon === "crown" ? "crown" : "star"}
                 size={13}
               />
-              <Text style={orgRoleBadge.textStyle}>{orgRoleBadge.label}</Text>
+              <Text fit="compact" style={orgRoleBadge.textStyle}>
+                {orgRoleBadge.label}
+              </Text>
             </View>
           ) : null}
         </View>

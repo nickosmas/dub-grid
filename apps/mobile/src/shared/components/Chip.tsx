@@ -6,7 +6,6 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { usePressAnimation } from "../motion/usePressAnimation";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import {
-  MAX_FONT_SCALE,
   mobilePillOverflow,
   mobileRadii,
   mobileSpace,
@@ -70,8 +69,7 @@ export function Chip({
         />
       ) : null}
       <Text
-        maxFontSizeMultiplier={MAX_FONT_SCALE}
-        {...(onPress ? { ellipsizeMode: "tail" as const, numberOfLines: 1 } : {})}
+        fit="compact"
         style={[
           mobileText.label,
           onPress ? mobilePillOverflow.interactiveText : mobilePillOverflow.displayText,

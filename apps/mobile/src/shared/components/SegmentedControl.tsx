@@ -8,7 +8,6 @@ import { hapticSelection } from "../lib/haptics";
 import { useMotionPreference } from "../motion/useMotionPreference";
 import { useMobileColors, useThemeMode } from "../providers/ThemeModeProvider";
 import {
-  MAX_FONT_SCALE,
   mobileElevation,
   mobileMotion,
   mobilePillOverflow,
@@ -176,9 +175,7 @@ export function SegmentedControl<Value extends string>({
             ]}
           >
             <Text
-              ellipsizeMode="tail"
-              maxFontSizeMultiplier={MAX_FONT_SCALE}
-              numberOfLines={1}
+              fit="compact"
               style={[
                 mobileText[metrics.labelVariant],
                 mobilePillOverflow.interactiveText,

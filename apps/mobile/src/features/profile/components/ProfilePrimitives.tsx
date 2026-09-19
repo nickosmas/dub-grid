@@ -169,14 +169,16 @@ export function ProfileHero({
         onPress={onBadgePress}
         style={({ pressed }) => [...badgeStyle, pressed && styles.heroBadgePressed]}
       >
-        <Text ellipsizeMode="tail" numberOfLines={1} style={badgeTextStyle}>
+        <Text fit="compact" style={badgeTextStyle}>
           {badge}
         </Text>
         <Ionicons color={badgeChevronColor} name="chevron-down" size={13} />
       </Pressable>
     ) : (
       <View style={badgeStyle}>
-        <Text style={badgeTextStyle}>{badge}</Text>
+        <Text fit="compact" style={badgeTextStyle}>
+          {badge}
+        </Text>
       </View>
     )
   ) : null;
@@ -189,8 +191,7 @@ export function ProfileHero({
             {initials ? (
               <View style={[styles.avatar, isCentered && styles.avatarLarge, avatarStyle]}>
                 <Text
-                  numberOfLines={1}
-                  maxFontSizeMultiplier={MAX_FONT_SCALE}
+                  fit="shrink"
                   style={[styles.avatarText, isCentered && styles.avatarTextLarge, avatarTextStyle]}
                 >
                   {initials}

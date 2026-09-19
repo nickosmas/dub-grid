@@ -1,10 +1,9 @@
 import { useMemo } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, View } from "react-native";
-import { Text } from "../../../../shared/components/Text";
 import { useMobileColors } from "../../../../shared/providers/ThemeModeProvider";
 import { mobileRadii, mobileText, type MobileColors } from "../../../../shared/theme/tokens";
-import { IllustrationFrame, MockButton, MockIconButton } from "./illustration-primitives";
+import { IllustrationFrame, MockButton, MockIconButton, Text } from "./illustration-primitives";
 
 /**
  * The Alerts list, mirroring `NotificationCard` in

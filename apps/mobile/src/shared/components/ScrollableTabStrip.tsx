@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ScrollView, StyleSheet, View, type LayoutChangeEvent } from "react-native";
+import {
+  ScrollView,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+  type LayoutChangeEvent,
+} from "react-native";
 import { Text } from "./Text";
 import { NumericBadge } from "./NumericBadge";
 import { Pressable } from "./Pressable";
@@ -8,6 +14,7 @@ import { useMobileColors } from "../providers/ThemeModeProvider";
 import { getScreenGutter } from "./screen-layout";
 import { SkeletonBlock } from "./skeleton";
 import {
+  MAX_FONT_SCALE_FIXED,
   mobileControl,
   mobilePillOverflow,
   mobileRadii,
@@ -16,6 +23,8 @@ import {
   mobileText,
   type MobileColors,
 } from "../theme/tokens";
+
+const TAB_MAX_WIDTH = 180;
 
 export type ScrollableTab = {
   key: string;
@@ -83,6 +92,11 @@ export function ScrollableTabStrip({
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  // The cap grows with the label it holds, up to the compact ceiling, so a
+  // raised text size widens "Skilled Nursing" instead of cutting it to
+  // "Skilled Nu…" beside a wider badge.
+  const tabMaxWidth =
+    TAB_MAX_WIDTH * Math.min(useWindowDimensions().fontScale, MAX_FONT_SCALE_FIXED);
 
   const scrollRef = useRef<ScrollView>(null);
   const [viewportWidth, setViewportWidth] = useState(0);
@@ -166,11 +180,10 @@ export function ScrollableTabStrip({
               hapticSelection();
               onSelect(tab.key);
             }}
-            style={[styles.tab, isActive && styles.tabActive]}
+            style={[styles.tab, { maxWidth: tabMaxWidth }, isActive && styles.tabActive]}
           >
             <Text
-              ellipsizeMode="tail"
-              numberOfLines={1}
+              fit="compact"
               style={[styles.label, isActive ? styles.labelActive : styles.labelIdle]}
             >
               {tab.label}
@@ -246,7 +259,6 @@ const createStyles = (mobileColors: MobileColors) =>
       alignItems: "center",
       gap: mobileSpace.sm,
       minHeight: mobileControl.sm,
-      maxWidth: 180,
       paddingHorizontal: mobileSpace.md,
       paddingVertical: mobileSpace.sm,
       borderRadius: mobileRadii.pill,

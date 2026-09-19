@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, View } from "react-native";
-import { Text } from "../../../../shared/components/Text";
 import { LinearGradient } from "expo-linear-gradient";
 import { getAvatarTone } from "@dubgrid/design-tokens";
 import { useIsDarkMode, useMobileColors } from "../../../../shared/providers/ThemeModeProvider";
@@ -11,7 +10,7 @@ import {
   mobileTextWeighted,
   type MobileColors,
 } from "../../../../shared/theme/tokens";
-import { IllustrationFrame } from "./illustration-primitives";
+import { IllustrationFrame, Text } from "./illustration-primitives";
 
 /**
  * The shift hero card that opens the Home tab, mirroring `MeHeroCard` in

@@ -353,7 +353,9 @@ function SessionRow({
           </Text>
           {session.isCurrent ? (
             <View style={styles.sessionCurrentBadge}>
-              <Text style={styles.sessionCurrentBadgeText}>This device</Text>
+              <Text fit="compact" style={styles.sessionCurrentBadgeText}>
+                This device
+              </Text>
             </View>
           ) : null}
         </View>

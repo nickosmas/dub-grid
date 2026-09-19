@@ -221,7 +221,9 @@ function MentoredPill() {
 
   return (
     <View accessibilityLabel="Mentored assignment" style={styles.mentoredPill}>
-      <Text style={styles.mentoredPillText}>Mentored</Text>
+      <Text fit="compact" style={styles.mentoredPillText}>
+        Mentored
+      </Text>
     </View>
   );
 }
@@ -1649,10 +1651,10 @@ function DetailDateTile({ date }: { date: string }) {
 
   return (
     <View accessibilityLabel={dateLabel} style={styles.detailDateTile}>
-      <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.detailDateWeekday}>
+      <Text fit="compact" style={styles.detailDateWeekday}>
         {dateParts.weekdayLabel}
       </Text>
-      <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.detailDateDay}>
+      <Text fit="compact" style={styles.detailDateDay}>
         {dateParts.dayLabel}
       </Text>
     </View>
@@ -2009,7 +2011,7 @@ function DetailJobPill({
       {shouldRenderSingleLinePill ? (
         <View style={styles.detailJobChipInlineTextRow}>
           <Text
-            maxFontSizeMultiplier={MAX_FONT_SCALE}
+            fit="compact"
             style={[
               styles.detailJobChipText,
               prominent && styles.detailHeroTitle,
@@ -2020,7 +2022,10 @@ function DetailJobPill({
             {chip.label}
           </Text>
           {isMentored ? (
-            <Text style={[styles.detailJobChipMentoredInlineText, { color: chip.textColor }]}>
+            <Text
+              fit="compact"
+              style={[styles.detailJobChipMentoredInlineText, { color: chip.textColor }]}
+            >
               (Mentored)
             </Text>
           ) : null}
@@ -2028,11 +2033,14 @@ function DetailJobPill({
       ) : (
         <View style={styles.detailJobChipTextStack}>
           {shouldRenderEyebrowInsidePill ? (
-            <Text style={[styles.detailJobChipEyebrowText, { color: chip.textColor }]}>
+            <Text
+              fit="compact"
+              style={[styles.detailJobChipEyebrowText, { color: chip.textColor }]}
+            >
               {chip.eyebrowLabel}
             </Text>
           ) : null}
-          <Text style={[styles.detailJobChipValueText, { color: chip.textColor }]}>
+          <Text fit="compact" style={[styles.detailJobChipValueText, { color: chip.textColor }]}>
             {chip.label}
             {isMentored ? (
               <Text style={[styles.detailJobChipMentoredText, { color: chip.textColor }]}>
@@ -2151,11 +2159,7 @@ function ShiftmateRow({
           },
         ]}
       >
-        <Text
-          numberOfLines={1}
-          maxFontSizeMultiplier={MAX_FONT_SCALE}
-          style={[styles.shiftmateAvatarText, { color: avatarTone.textColor }]}
-        >
+        <Text fit="shrink" style={[styles.shiftmateAvatarText, { color: avatarTone.textColor }]}>
           {getInitials(entry.employeeName)}
         </Text>
       </View>
@@ -2376,10 +2380,13 @@ function SwapDateChip({
         disabled && styles.swapDateChipDisabled,
       ]}
     >
-      <Text style={[styles.swapDateChipWeekday, active && styles.swapDateChipTextActive]}>
+      <Text
+        fit="compact"
+        style={[styles.swapDateChipWeekday, active && styles.swapDateChipTextActive]}
+      >
         {dateParts.weekdayLabel}
       </Text>
-      <Text style={[styles.swapDateChipDay, active && styles.swapDateChipTextActive]}>
+      <Text fit="compact" style={[styles.swapDateChipDay, active && styles.swapDateChipTextActive]}>
         {dateParts.dayLabel}
       </Text>
       <View
@@ -2387,7 +2394,10 @@ function SwapDateChip({
         style={[styles.swapDateChipCount, active && styles.swapDateChipCountActive]}
       >
         <Ionicons color={countColor} name="person-outline" size={11} />
-        <Text style={[styles.swapDateChipCountText, active && styles.swapDateChipCountTextActive]}>
+        <Text
+          fit="compact"
+          style={[styles.swapDateChipCountText, active && styles.swapDateChipCountTextActive]}
+        >
           {count}
         </Text>
       </View>

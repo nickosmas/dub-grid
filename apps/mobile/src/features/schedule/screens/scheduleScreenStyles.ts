@@ -1349,15 +1349,23 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileAvatarText(48),
       color: mobileColors.brand,
     },
+    // The name column and the role pill share a line while both fit and the
+    // pill drops under the name when they do not, instead of the pill holding
+    // its width and squeezing the name into a column that broke it mid-name
+    // at a raised text size. `flexBasis: "auto"` is what lets Yoga judge the
+    // fit from the name's own width; `flex: 1` would zero it out.
     teamMemberMain: {
       flex: 1,
       minWidth: 0,
       flexDirection: "row",
+      flexWrap: "wrap",
       alignItems: "center",
       gap: 12,
     },
     teamMemberCopy: {
-      flex: 1,
+      flexGrow: 1,
+      flexShrink: 1,
+      flexBasis: "auto",
       minWidth: 0,
       gap: mobileSpace.xs,
     },

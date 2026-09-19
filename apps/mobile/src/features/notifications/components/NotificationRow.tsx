@@ -21,7 +21,6 @@ import { PressableRow } from "../../../shared/components/PressableRow";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   MAX_FONT_SCALE,
-  MAX_FONT_SCALE_FIXED,
   mobileControl,
   mobileListRow,
   mobileRadii,
@@ -236,7 +235,7 @@ function SwipeActions({
             size={22}
           />
         </Animated.View>
-        <Text maxFontSizeMultiplier={MAX_FONT_SCALE_FIXED} style={styles.actionLabel}>
+        <Text fit="compact" style={styles.actionLabel}>
           {isUnread ? "Read" : "Unread"}
         </Text>
       </Pressable>
@@ -253,7 +252,7 @@ function SwipeActions({
             size={22}
           />
         </Animated.View>
-        <Text maxFontSizeMultiplier={MAX_FONT_SCALE_FIXED} style={styles.actionLabel}>
+        <Text fit="compact" style={styles.actionLabel}>
           {isArchived ? "Restore" : "Archive"}
         </Text>
       </Pressable>

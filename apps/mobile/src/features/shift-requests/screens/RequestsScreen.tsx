@@ -157,7 +157,9 @@ function MentoredPill() {
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors]);
   return (
     <View accessibilityLabel="Mentored assignment" style={styles.mentoredPill}>
-      <Text style={styles.mentoredPillText}>Mentored</Text>
+      <Text fit="compact" style={styles.mentoredPillText}>
+        Mentored
+      </Text>
     </View>
   );
 }
@@ -1160,7 +1162,7 @@ function RequestCard({
             { backgroundColor: statusTone.backgroundColor, borderColor: statusTone.borderColor },
           ]}
         >
-          <Text style={[styles.statusChipText, { color: statusTone.textColor }]}>
+          <Text fit="compact" style={[styles.statusChipText, { color: statusTone.textColor }]}>
             {formatRequestStatus(request.status)}
           </Text>
         </View>
@@ -1361,7 +1363,10 @@ function OpenShiftCard({
             },
           ]}
         >
-          <Text style={[styles.statusChipText, { color: openShiftChipTone.textColor }]}>
+          <Text
+            fit="compact"
+            style={[styles.statusChipText, { color: openShiftChipTone.textColor }]}
+          >
             Open shift
           </Text>
         </View>
@@ -1471,6 +1476,7 @@ function JobPill({
       {chip.eyebrowLabel ? (
         <View style={styles.jobPillTextStack}>
           <Text
+            fit="compact"
             style={[
               styles.jobPillEyebrowText,
               compact && styles.jobPillEyebrowTextCompact,
@@ -1480,6 +1486,7 @@ function JobPill({
             {chip.eyebrowLabel}
           </Text>
           <Text
+            fit="compact"
             style={[
               styles.jobPillValueText,
               compact && styles.jobPillValueTextCompact,
@@ -1498,6 +1505,7 @@ function JobPill({
       ) : (
         <View style={styles.jobPillInlineTextRow}>
           <Text
+            fit="compact"
             style={[
               styles.jobPillText,
               compact && styles.jobPillTextCompact,
@@ -1508,6 +1516,7 @@ function JobPill({
           </Text>
           {isMentored ? (
             <Text
+              fit="compact"
               style={[
                 styles.jobPillMentoredInlineText,
                 compact && styles.jobPillMentoredInlineTextCompact,
@@ -1538,7 +1547,9 @@ function ShiftPill({ colors, label }: { colors: ShiftPillColors; label: string }
         },
       ]}
     >
-      <Text style={[styles.shiftPillText, { color: colors.textColor }]}>{label}</Text>
+      <Text fit="compact" style={[styles.shiftPillText, { color: colors.textColor }]}>
+        {label}
+      </Text>
     </View>
   );
 }

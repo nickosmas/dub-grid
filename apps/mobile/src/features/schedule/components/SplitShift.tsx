@@ -48,6 +48,7 @@ export function SplitShiftBadge({
     >
       <Ionicons color={contentColor} name="layers-outline" size={compact ? 13 : 15} />
       <Text
+        fit="compact"
         style={[
           styles.badgeText,
           compact && styles.badgeTextCompact,

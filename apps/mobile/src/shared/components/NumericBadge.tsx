@@ -3,14 +3,7 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { Text } from "./Text";
 import { formatBadgeCount, numericBadgeSize, type NumericBadgeSize } from "@dubgrid/design-tokens";
 import { useMobileColors } from "../providers/ThemeModeProvider";
-import {
-  MAX_FONT_SCALE,
-  MAX_FONT_SCALE_FIXED,
-  mobileRadii,
-  mobileTabularText,
-  mobileText,
-  type MobileColors,
-} from "../theme/tokens";
+import { mobileRadii, mobileTabularText, mobileText, type MobileColors } from "../theme/tokens";
 
 export type NumericBadgeTone = "danger" | "brand" | "neutral" | "onAccent";
 
@@ -78,9 +71,7 @@ export function NumericBadge({
       ]}
     >
       <Text
-        // A floating dot that outgrows its icon ring stops pointing at
-        // anything, so it scales less than an inline count.
-        maxFontSizeMultiplier={size === "sm" ? MAX_FONT_SCALE_FIXED : MAX_FONT_SCALE}
+        fit="compact"
         style={[size === "sm" ? styles.textSm : styles.textMd, { color: toneStyle.color }]}
       >
         {text}

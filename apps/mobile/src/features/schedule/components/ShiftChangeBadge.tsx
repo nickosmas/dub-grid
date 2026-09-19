@@ -55,7 +55,10 @@ export function ShiftChangeBadge({
       accessibilityLabel={`Shift ${label.toLowerCase()}`}
       style={[styles.badge, inverse ? styles.badgeInverse : styles[change.kind]]}
     >
-      <Text style={[styles.text, inverse ? styles.textInverse : styles[`${change.kind}Text`]]}>
+      <Text
+        fit="compact"
+        style={[styles.text, inverse ? styles.textInverse : styles[`${change.kind}Text`]]}
+      >
         {label}
       </Text>
     </View>

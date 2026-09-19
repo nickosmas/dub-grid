@@ -5,7 +5,6 @@ import {
   Pressable,
   StyleSheet,
   View,
-  useWindowDimensions,
   type GestureResponderEvent,
 } from "react-native";
 import { Text } from "./Text";
@@ -79,19 +78,6 @@ const SIZE = {
     iconOnly: mobileControl.lg,
   },
 } as const;
-
-/**
- * Filled and outlined labels scale down to a legible floor before they
- * truncate, so equal-width peers in an action grid keep whole words. Links
- * skip this: a link is text, and shrinking text reads as a rendering fault.
- *
- * Only at the default text size. Once the reader has raised it, both
- * platforms fit the label against the unscaled size, so "Cancel" landed at
- * three quarters of the base while the sentence above it sat at one and a
- * half: a tiny label next to large text. Large text keeps its size and takes
- * a second line instead.
- */
-const SCALE_THEN_TRUNCATE = { adjustsFontSizeToFit: true, minimumFontScale: 0.75 } as const;
 
 const LABEL_VARIANT = {
   sm: "bodyStrong",
@@ -173,7 +159,6 @@ export function Button({
 
   const resolvedSize: ButtonSize = size ?? (compact ? "sm" : "md");
   const metrics = SIZE[resolvedSize];
-  const isLargeText = useWindowDimensions().fontScale > 1;
   // A link is text, not a filled control. Given a filled button's padding it
   // starved its own label in a tight slot (onboarding's 64pt "Skip" box left
   // 24pt for the word), and iOS then shrank the text far past the floor the
@@ -246,14 +231,19 @@ export function Button({
         {!isBusy && (iconOnly || iconPosition === "leading") ? iconNode : null}
         {!iconOnly && content ? (
           <Text
-            {...(isLink || isLargeText ? undefined : SCALE_THEN_TRUNCATE)}
             ellipsizeMode="tail"
+            // A filled label is compact text: one line, capped scaling,
+            // truncation when the slot is too narrow. It used to shrink to
+            // fit first, but the new architecture fits against the button's
+            // default-size height as well as its width and has no floor, so
+            // a raised text size left "Cancel" at three quarters of the base
+            // beside a sentence at one and a half. A link is a sentence, not
+            // a control label: it keeps the full multiplier and two lines,
+            // since a one-line link ate its own question at accessibility
+            // sizes ("Need help with your subdom…").
+            fit={isLink ? undefined : "compact"}
             maxFontSizeMultiplier={MAX_FONT_SCALE}
-            // A link is a sentence, and at accessibility sizes a one-line
-            // link ate its own question ("Need help with your subdom…").
-            // Filled buttons stay on one line by the app-wide rule at the
-            // default size; large text wraps rather than shrinks.
-            numberOfLines={isLink || isLargeText ? 2 : 1}
+            numberOfLines={2}
             style={[mobileText[LABEL_VARIANT[resolvedSize]], styles.label, { color: labelColor }]}
           >
             {content}

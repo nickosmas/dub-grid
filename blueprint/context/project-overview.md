@@ -154,9 +154,12 @@ Everything below is already shipped except item 27 and item 28.
     draft/publish workflow, while regular staff keep the existing volunteer flow.
 
 23. **App-wide pill overflow resilience** - keep pill, chip, tag, badge, and
-    segmented-choice text within its visual bounds on web and mobile. Display
-    values may wrap and grow; interactive controls remain one line and truncate
-    safely while retaining the full accessible value.
+    segmented-choice text within its visual bounds on web and mobile. On web,
+    display values may wrap and grow; interactive controls remain one line and
+    truncate safely while retaining the full accessible value. On mobile no
+    pill wraps: every pill, badge, button label and avatar is one-line text
+    with a tighter text-scaling cap, so a raised OS text size never breaks the
+    shape.
     - **23a. Numeric badge shape consistency** - equivalent number counts use
       one pill-shaped contract across web and mobile, including one- and
       two-digit values, notification/tab/open-shift/staffing counts, with

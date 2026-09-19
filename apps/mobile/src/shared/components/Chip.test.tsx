@@ -18,11 +18,14 @@ beforeAll(async () => {
 });
 
 describe("Chip overflow", () => {
-  it("lets a display-only label wrap inside a bounded pill", () => {
+  it("keeps a display-only label to one line so the pill keeps its shape", () => {
     render(<Chip label="Journal Listed Christian Science Nurse" />);
 
+    // A wrapped pill is a lozenge, not a pill: the label grows the pill and
+    // truncates only when the row cannot hold it.
     const label = screen.getByText("Journal Listed Christian Science Nurse");
-    expect(label).not.toHaveAttribute("data-number-of-lines");
+    expect(label).toHaveAttribute("data-number-of-lines", "1");
+    expect(label).toHaveAttribute("data-ellipsize-mode", "tail");
   });
 
   it("keeps an interactive label to one line without changing its accessible name", () => {

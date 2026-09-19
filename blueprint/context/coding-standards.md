@@ -92,9 +92,17 @@
   the final action spans both columns (three is two above, one full-width below;
   five continues with two equal rows, then one full-width below). Do not let
   labels or variants make a peer larger within a row.
-- Button labels never wrap on either platform. Keep them to one line, scale
-  mobile labels down to a legible floor when space is tight, then truncate
-  rather than creating a second line.
+- Button labels never wrap on either platform. Keep them to one line and
+  truncate rather than creating a second line. Mobile does not shrink a label
+  to fit: React Native's new architecture fits against the button's
+  default-size height with no floor, which is what left labels tiny beside
+  large text.
+- On mobile, text inside a shaped control is `fit` text: pill, badge, chip and
+  button labels, avatar initials, segment and tab labels, and a header title
+  beside its buttons render through `Text fit="compact"` (one line, truncate)
+  or `fit="shrink"` (one line, shrink to fit; bounded text only, such as a
+  date or two initials). Both cap OS text scaling at `MAX_FONT_SCALE_FIXED`,
+  so a raised text size never breaks the shape.
 
 ## Database and data access
 

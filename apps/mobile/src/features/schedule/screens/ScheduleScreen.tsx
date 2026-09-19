@@ -69,7 +69,6 @@ import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeM
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
   MAX_FONT_SCALE,
-  MAX_FONT_SCALE_FIXED,
   mobileBorderColorFromText,
   mobileMotion,
   mobileRadii,
@@ -1497,12 +1496,12 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const meStickyHeader = !isTeamScope ? (
     <View style={styles.meWeekNavigator}>
       <View style={styles.meWeekNavigatorCopy}>
-        {/* Two lines, not one: beside three 44pt controls a raised text size
-            left "Today, Sep 18" as "Toda…". The date drops under "Today,". */}
-        <Text numberOfLines={2} style={styles.meWeekNavigatorTitle}>
+        {/* Both shrink rather than wrap or truncate: a header is one row,
+            and a date is bounded text that fits at the default size. */}
+        <Text fit="shrink" style={styles.meWeekNavigatorTitle}>
           {selectedDateLabel}
         </Text>
-        <Text numberOfLines={2} style={styles.meWeekNavigatorRangeLabel}>
+        <Text fit="shrink" style={styles.meWeekNavigatorRangeLabel}>
           {weekRangeLabel}
         </Text>
       </View>
@@ -1526,7 +1525,9 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
             onPress={handleGoToToday}
             style={({ pressed }) => [styles.meTodayButton, pressed && styles.meTodayButtonPressed]}
           >
-            <Text style={styles.meTodayButtonText}>Today</Text>
+            <Text fit="compact" style={styles.meTodayButtonText}>
+              Today
+            </Text>
           </Pressable>
         ) : null}
         <AlertsChromeButton unreadCount={unreadNotificationCount} />
@@ -1613,7 +1614,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     <View style={styles.stickyControlsSection}>
       <View style={styles.teamHeaderUtilityRow}>
         <View style={styles.teamHeaderTitleArea}>
-          <Text numberOfLines={1} style={styles.teamHeaderTitle}>
+          <Text fit="shrink" style={styles.teamHeaderTitle}>
             {teamHeaderDateLabel}
           </Text>
         </View>
@@ -1628,7 +1629,9 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
                 pressed && styles.meTodayButtonPressed,
               ]}
             >
-              <Text style={styles.meTodayButtonText}>Today</Text>
+              <Text fit="compact" style={styles.meTodayButtonText}>
+                Today
+              </Text>
             </Pressable>
           ) : null}
           <AlertsChromeButton unreadCount={unreadNotificationCount} />
@@ -1639,7 +1642,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         {/* Weekday labels: always visible, fixed in place — never move. */}
         <View style={styles.monthCalendarWeekdays}>
           {MONTH_WEEKDAY_LABELS.map((label) => (
-            <Text key={label} style={styles.monthCalendarWeekdayLabel}>
+            <Text key={label} fit="compact" style={styles.monthCalendarWeekdayLabel}>
               {label}
             </Text>
           ))}
@@ -1967,7 +1970,7 @@ function MonthDayCell({
         ]}
       >
         <Text
-          maxFontSizeMultiplier={MAX_FONT_SCALE_FIXED}
+          fit="compact"
           style={[
             styles.dateHighlightText,
             day.isSelected && !day.isToday && styles.dateHighlightTextSelected,
@@ -2094,7 +2097,9 @@ function MentoredPill() {
 
   return (
     <View accessibilityLabel="Mentored assignment" style={styles.mentoredPill}>
-      <Text style={styles.mentoredPillText}>Mentored</Text>
+      <Text fit="compact" style={styles.mentoredPillText}>
+        Mentored
+      </Text>
     </View>
   );
 }
@@ -2169,6 +2174,7 @@ function JobPill({
       {shouldRenderSingleLinePill ? (
         <View style={styles.jobPillInlineTextRow}>
           <Text
+            fit="compact"
             style={[
               styles.jobPillText,
               compact && styles.jobPillTextCompact,
@@ -2179,6 +2185,7 @@ function JobPill({
           </Text>
           {isMentored ? (
             <Text
+              fit="compact"
               style={[
                 styles.jobPillMentoredInlineText,
                 compact && styles.jobPillMentoredInlineTextCompact,
@@ -2193,6 +2200,7 @@ function JobPill({
         <View style={styles.jobPillTextStack}>
           {shouldRenderEyebrowInsidePill ? (
             <Text
+              fit="compact"
               style={[
                 styles.jobPillEyebrowText,
                 compact && styles.jobPillEyebrowTextCompact,
@@ -2203,6 +2211,7 @@ function JobPill({
             </Text>
           ) : null}
           <Text
+            fit="compact"
             style={[
               styles.jobPillValueText,
               compact && styles.jobPillValueTextCompact,
@@ -2251,6 +2260,7 @@ function MeTypePill({
   return (
     <View style={styles.meTypePillStack}>
       <Text
+        fit="compact"
         style={[
           styles.meTypePillLabel,
           titleScale === "hero" ? styles.meTypePillLabelHero : styles.meTypePillLabelRow,
@@ -2382,7 +2392,7 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
                 ]}
               >
                 <Text
-                  numberOfLines={1}
+                  fit="shrink"
                   style={[styles.meHeroCollaboratorAvatarText, { color: avatarTone.textColor }]}
                 >
                   {getInitials(entry.employeeName)}
@@ -2400,10 +2410,7 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
             ]}
           >
             <View style={styles.meHeroCollaboratorOverflow}>
-              <Text
-                maxFontSizeMultiplier={MAX_FONT_SCALE}
-                style={styles.meHeroCollaboratorOverflowText}
-              >
+              <Text fit="compact" style={styles.meHeroCollaboratorOverflowText}>
                 +{overflowCount}
               </Text>
             </View>
@@ -2492,7 +2499,9 @@ function MeHeroCard({
               <View style={styles.meHeroBadgeRow}>
                 <View style={styles.meHeroBadge}>
                   <View style={[styles.meHeroBadgeDot, badgeDotStyle]} />
-                  <Text style={styles.meHeroBadgeText}>{badgeLabel}</Text>
+                  <Text fit="compact" style={styles.meHeroBadgeText}>
+                    {badgeLabel}
+                  </Text>
                 </View>
               </View>
             ) : null}
@@ -2535,8 +2544,12 @@ function MeHeroCard({
           </View>
           {heroDateParts ? (
             <View accessibilityLabel={heroDateLabel ?? undefined} style={styles.meHeroDateTile}>
-              <Text style={styles.meHeroDateWeekday}>{heroDateParts.weekdayLabel}</Text>
-              <Text style={styles.meHeroDateDay}>{heroDateParts.dayLabel}</Text>
+              <Text fit="compact" style={styles.meHeroDateWeekday}>
+                {heroDateParts.weekdayLabel}
+              </Text>
+              <Text fit="compact" style={styles.meHeroDateDay}>
+                {heroDateParts.dayLabel}
+              </Text>
             </View>
           ) : null}
         </View>
@@ -2546,7 +2559,9 @@ function MeHeroCard({
           {focusAreaName ? (
             <View style={styles.meHeroAreaRow}>
               <Ionicons color="rgba(255, 255, 255, 0.82)" name="location-outline" size={18} />
-              <Text style={styles.meHeroAreaLabel}>{focusAreaName}</Text>
+              <Text fit="compact" style={styles.meHeroAreaLabel}>
+                {focusAreaName}
+              </Text>
             </View>
           ) : null}
           {timeRange ? (
@@ -2707,7 +2722,9 @@ function UpcomingShiftsSection({
         <Text style={styles.upcomingSectionTitle}>Your Week</Text>
         {hoursLabel ? (
           <View style={styles.upcomingHoursBadge}>
-            <Text style={styles.upcomingHoursBadgeText}>{hoursLabel}</Text>
+            <Text fit="compact" style={styles.upcomingHoursBadgeText}>
+              {hoursLabel}
+            </Text>
           </View>
         ) : null}
       </View>
@@ -2732,10 +2749,10 @@ function UpcomingShiftsSection({
             >
               <View style={styles.upcomingDateColumn}>
                 <View style={styles.upcomingDateTile}>
-                  <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.upcomingDateWeekday}>
+                  <Text fit="compact" style={styles.upcomingDateWeekday}>
                     {dateParts.weekdayLabel}
                   </Text>
-                  <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.upcomingDateDay}>
+                  <Text fit="compact" style={styles.upcomingDateDay}>
                     {dateParts.dayLabel}
                   </Text>
                   {isToday ? (
@@ -3397,8 +3414,7 @@ function ShiftCoverRequestsSection({
                     ]}
                   >
                     <Text
-                      numberOfLines={1}
-                      maxFontSizeMultiplier={MAX_FONT_SCALE}
+                      fit="shrink"
                       style={[styles.requestAvatarText, { color: avatarTone.textColor }]}
                     >
                       {getInitials(request.requesterName)}
@@ -3499,11 +3515,7 @@ function TeamShiftMemberRow({
           },
         ]}
       >
-        <Text
-          numberOfLines={1}
-          maxFontSizeMultiplier={MAX_FONT_SCALE}
-          style={[styles.teamMemberAvatarText, { color: avatarTone.textColor }]}
-        >
+        <Text fit="shrink" style={[styles.teamMemberAvatarText, { color: avatarTone.textColor }]}>
           {getInitials(entry.employeeName)}
         </Text>
       </View>

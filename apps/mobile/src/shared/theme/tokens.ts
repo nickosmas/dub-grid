@@ -278,7 +278,11 @@ export const mobileRadius = mobileRadiusTokens;
 export const mobileTypography = mobileTypographyTokens;
 export const mobileBrandTypography = mobileBrandTypographyTokens;
 
-/** Avatar initials use the actual Inter medium face on both native platforms. */
+/**
+ * Avatar initials use the actual Inter medium face on both native platforms.
+ * Render them with `fit="shrink"`: the disc is fixed, so the initials give
+ * back their scaling before they would truncate to "M..".
+ */
 export function mobileAvatarText(diameter: number): TextStyle {
   const { fontSize } = getAvatarTypography(diameter);
   return {
@@ -423,8 +427,11 @@ export function mobileDarkenTone(tone: MobilePillTone, isDark: boolean): MobileP
  * shrink, so a raised text size squeezed the name into a column narrow enough
  * to break "Visiting Nursing" mid-word.
  *
- * `MAX_FONT_SCALE_FIXED` is the tighter ceiling for the few surfaces whose
- * height genuinely cannot move, such as the floating tab bar.
+ * `MAX_FONT_SCALE_FIXED` is the tighter ceiling for text whose container is
+ * the thing being read: a pill, badge, chip or button label, an avatar's
+ * initials, a segment or tab, and the fixed-height furniture such as the
+ * floating tab bar. `Text fit` applies it, along with the one-line rule that
+ * keeps those shapes intact.
  */
 export const MAX_FONT_SCALE = 1.5;
 export const MAX_FONT_SCALE_FIXED = 1.3;
@@ -452,9 +459,12 @@ export const mobilePillOverflow = {
     maxWidth: "100%",
     minWidth: 0,
   } satisfies ViewStyle,
+  // One line like the interactive text: a pill that wraps stops being a pill,
+  // and at a raised text size "Also Day Shift" became a three-line lozenge.
+  // A display pill grows to its content and truncates only when the row
+  // cannot hold it; render its text with `fit="compact"`.
   displayText: {
     flexShrink: 1,
-    flexWrap: "wrap",
   } satisfies TextStyle,
   interactiveContainer: {
     maxWidth: "100%",
