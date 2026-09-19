@@ -9,12 +9,22 @@ import {
   type KeyboardEvent,
   type MouseEvent,
 } from "react";
+import { Minus, Plus } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
 type NativeProps = Omit<
   ComponentProps<"input">,
-  "type" | "value" | "defaultValue" | "onChange" | "min" | "max" | "step" | "inputMode" | "pattern"
+  | "type"
+  | "value"
+  | "defaultValue"
+  | "onChange"
+  | "min"
+  | "max"
+  | "step"
+  | "inputMode"
+  | "pattern"
+  | "size"
 >;
 
 type SharedProps = NativeProps & {
@@ -24,6 +34,8 @@ type SharedProps = NativeProps & {
   step?: number;
   /** Select the whole value on focus so typing replaces it. Default true. */
   selectOnFocus?: boolean;
+  /** `sm` is the inline size for a field inside a sentence. */
+  size?: "md" | "sm";
 };
 
 type RequiredProps = SharedProps & {
@@ -69,6 +81,16 @@ function format(value: number | null) {
  * holding its own draft so the value can be cleared and retyped freely. The
  * parent is updated on every keystroke that parses, and the draft is
  * normalized (clamped, leading zeros dropped) when the field is left.
+ *
+ * Stepping is deliberate: the arrow keys, and a minus and a plus at either
+ * end of the field with the value centred between them. The mouse wheel never
+ * changes the value, because a wheel over a number input while scrolling a
+ * form is how settings change by accident; as a text input the browser gives
+ * the wheel nothing to do here.
+ *
+ * The bordered box is the wrapper, which takes `className` and `style`
+ * (callers set a width) and shows the focus ring for the input inside it;
+ * everything else lands on the input, where the label's `id` has to be.
  */
 export function NumberField(props: NumberFieldProps) {
   const {
@@ -88,6 +110,8 @@ export function NumberField(props: NumberFieldProps) {
     onMouseUp,
     disabled,
     readOnly,
+    style,
+    size = "md",
     ...rest
   } = props;
 
@@ -153,6 +177,15 @@ export function NumberField(props: NumberFieldProps) {
     setDraft(format(next));
   };
 
+  const current = parse(draft) ?? emitted.current;
+  const canStep = !disabled && !readOnly;
+  const canStepUp = canStep && (max === undefined || current === null || current < max);
+  const canStepDown = canStep && (min === undefined || current === null || current > min);
+  // The buttons are pointer targets only: they take no focus, so a click
+  // leaves the caret where it was and the keyboard still owns the arrows.
+  const keepFocusInInput = (event: MouseEvent<HTMLButtonElement>) => event.preventDefault();
+  const iconSize = size === "sm" ? 12 : 14;
+
   const handleMouseDown = (event: MouseEvent<HTMLInputElement>) => {
     focusedByPointer.current = document.activeElement !== event.currentTarget;
     onMouseDown?.(event);
@@ -198,30 +231,63 @@ export function NumberField(props: NumberFieldProps) {
   };
 
   return (
-    <input
-      {...rest}
-      type="text"
-      inputMode="numeric"
-      pattern="[0-9]*"
-      autoComplete="off"
-      role="spinbutton"
-      aria-valuemin={min}
-      aria-valuemax={max}
-      aria-valuenow={value ?? undefined}
-      className={cn("dg-input dg-input-number", className)}
-      value={draft}
-      disabled={disabled}
-      readOnly={readOnly}
-      onChange={(event) => {
-        const digits = event.target.value.replace(/\D/g, "");
-        setDraft(digits);
-        emit(parse(digits));
-      }}
-      onFocus={handleFocus}
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
-      onBlur={handleBlur}
-      onKeyDown={handleKeyDown}
-    />
+    <span
+      className={cn(
+        "dg-number-field",
+        size === "sm" && "dg-number-field-sm",
+        disabled && "dg-number-field-disabled",
+        readOnly && "dg-number-field-readonly",
+        className,
+      )}
+      style={style}
+    >
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label="Decrease"
+        className="dg-number-field-step"
+        disabled={!canStepDown}
+        onMouseDown={keepFocusInInput}
+        onClick={() => stepBy(-1)}
+      >
+        <Minus size={iconSize} strokeWidth={2.25} aria-hidden />
+      </button>
+      <input
+        {...rest}
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        autoComplete="off"
+        role="spinbutton"
+        aria-valuemin={min}
+        aria-valuemax={max}
+        aria-valuenow={value ?? undefined}
+        className="dg-number-field-input"
+        value={draft}
+        disabled={disabled}
+        readOnly={readOnly}
+        onChange={(event) => {
+          const digits = event.target.value.replace(/\D/g, "");
+          setDraft(digits);
+          emit(parse(digits));
+        }}
+        onFocus={handleFocus}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
+      />
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label="Increase"
+        className="dg-number-field-step"
+        disabled={!canStepUp}
+        onMouseDown={keepFocusInInput}
+        onClick={() => stepBy(1)}
+      >
+        <Plus size={iconSize} strokeWidth={2.25} aria-hidden />
+      </button>
+    </span>
   );
 }

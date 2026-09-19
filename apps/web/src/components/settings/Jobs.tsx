@@ -1538,7 +1538,7 @@ function JobRow({
                                 defaultDurationHours: value,
                               }))
                             }
-                            style={{ width: 72 }}
+                            style={{ width: 112 }}
                             disabled={!canManageScheduleDefinitions}
                           />
                           <span
@@ -1563,7 +1563,7 @@ function JobRow({
                                 defaultDurationMinutes: value,
                               }))
                             }
-                            style={{ width: 72 }}
+                            style={{ width: 112 }}
                             disabled={!canManageScheduleDefinitions}
                           />
                           <span

@@ -650,7 +650,8 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
                   max={MAX_SERIES_OCCURRENCES}
                   value={afterN}
                   onChange={setAfterN}
-                  style={{ fontSize: "var(--dg-fs-caption)", padding: "4px 8px", width: 70 }}
+                  size="sm"
+                  style={{ width: 96 }}
                 />
               )}
             </label>

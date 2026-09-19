@@ -481,7 +481,7 @@ function CoverageOptionRow({
                 emptyValue={0}
                 value={draft.values[0] ?? 0}
                 onChange={(value) => onDraftChange({ everyDay: true, values: [value] })}
-                style={{ width: 80 }}
+                style={{ width: 120 }}
                 disabled={!canEdit}
               />
             </div>

@@ -667,7 +667,7 @@ function ShiftCategoriesSettings({
               value={cat.breakMinutes ?? null}
               onChange={(value) => handleChange(cat.id, "breakMinutes", value)}
               placeholder="None"
-              style={{ width: 100 }}
+              style={{ width: 120 }}
               disabled={!canManageScheduleDefinitions}
             />
           </div>

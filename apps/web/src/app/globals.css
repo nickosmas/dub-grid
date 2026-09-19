@@ -1370,10 +1370,106 @@ button {
   box-shadow: 0 0 0 3px var(--dg-danger-ring);
 }
 
-/* Integer entry (NumberField). Centred tabular digits; width is the caller's. */
-.dg-input-number {
+/* Integer entry (NumberField): a minus, the value, a plus, in one bordered
+   box with the same corner as every other input. The box is the input's
+   chrome (border, radius, focus ring), the value is centred between the two
+   buttons, and the wheel never steps it. Width is the caller's, set on the
+   box; the minimum leaves room for three digits. */
+.dg-number-field {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 112px;
+  height: var(--dg-toolbar-h);
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--dg-color-border);
+  border-radius: var(--dg-btn-radius);
+  background: var(--dg-color-surface);
+  vertical-align: middle;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.dg-number-field:focus-within {
+  border-color: var(--dg-color-border-focus);
+  box-shadow: 0 0 0 3px var(--dg-focus-ring);
+}
+
+.dg-number-field-disabled,
+.dg-number-field-readonly {
+  background: var(--dg-color-bg);
+}
+
+.dg-number-field-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 4px;
+  border: 0;
+  outline: none;
+  background: transparent;
   text-align: center;
+  font-size: var(--dg-type-control-size);
+  font-weight: var(--dg-type-control-weight);
+  font-family: inherit;
   font-variant-numeric: tabular-nums;
+  color: var(--dg-type-control-color);
+}
+
+.dg-number-field-input:disabled {
+  color: var(--dg-color-text-subtle);
+  cursor: not-allowed;
+}
+
+/* Inset from the box: a button that ran to the edge read as part of the
+   border. The rounded square inside the field is the target. */
+.dg-number-field-step {
+  flex: 0 0 auto;
+  align-self: stretch;
+  width: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 0;
+  border-radius: calc(var(--dg-btn-radius) - 2px);
+  background: transparent;
+  color: var(--dg-color-text-muted);
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.dg-number-field-step:hover:not(:disabled) {
+  background: var(--dg-color-bg-secondary);
+  color: var(--dg-color-text-primary);
+}
+
+.dg-number-field-step:active:not(:disabled) {
+  background: var(--dg-color-border-light);
+}
+
+.dg-number-field-step:disabled {
+  color: var(--dg-color-text-faint);
+  cursor: default;
+}
+
+.dg-number-field-sm {
+  min-width: 92px;
+  height: 30px;
+  padding: 2px;
+}
+
+.dg-number-field-sm .dg-number-field-step {
+  width: 24px;
+}
+
+.dg-number-field-sm .dg-number-field-input {
+  font-size: var(--dg-fs-caption);
 }
 
 /* ── Label System ──────────────────────────────────────── */

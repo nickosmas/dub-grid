@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -181,6 +181,40 @@ describe("NumberField", () => {
     await user.click(field);
     await user.keyboard("4");
     expect(field).toHaveValue("4");
+  });
+
+  it("steps with the chevrons, which stop at the range and leave focus in the field", async () => {
+    const user = userEvent.setup();
+    render(<RequiredHarness initial={1} min={0} max={2} />);
+    const field = screen.getByRole("spinbutton", { name: "Minimum staff" });
+    const up = screen.getByRole("button", { name: "Increase" });
+    const down = screen.getByRole("button", { name: "Decrease" });
+
+    await user.click(field);
+    await user.click(up);
+    expect(field).toHaveValue("2");
+    expect(screen.getByTestId("value")).toHaveTextContent("2");
+    expect(up).toBeDisabled();
+    expect(field).toHaveFocus();
+
+    await user.click(down);
+    await user.click(down);
+    expect(field).toHaveValue("0");
+    expect(down).toBeDisabled();
+    // The chevrons are pointer targets only; Tab order stays on the input.
+    expect(up).toHaveAttribute("tabindex", "-1");
+  });
+
+  it("ignores the mouse wheel", () => {
+    const onChange = vi.fn();
+    render(<RequiredHarness initial={3} min={0} max={9} onChange={onChange} />);
+    const field = screen.getByRole("spinbutton", { name: "Minimum staff" });
+
+    field.focus();
+    fireEvent.wheel(field, { deltaY: -120 });
+    fireEvent.wheel(field, { deltaY: 120 });
+    expect(field).toHaveValue("3");
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it("exposes the range and value to assistive technology", () => {
