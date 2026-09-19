@@ -200,9 +200,12 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: mobileSpace.md,
     },
     sectionTitle: {
-      ...mobileTextWeighted("meta", "medium"),
+      ...mobileTextWeighted("sectionTitle", "medium"),
       color: mobileColors.textSubtle,
       paddingHorizontal: mobileSpace.lg,
+      // Air above a title that follows another section's card; the card's
+      // own gap below the title stays at the section's `gap`.
+      paddingTop: mobileSpace.sm,
     },
     selectionList: {
       backgroundColor: mobileColors.surface,

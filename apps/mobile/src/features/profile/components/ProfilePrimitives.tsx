@@ -841,13 +841,17 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // from the card's edge the way a grouped list's header is, so the title
     // sits over the rows' content rather than flush with the card corner.
     sectionTitle: {
-      ...mobileTextWeighted("meta", "medium"),
+      ...mobileTextWeighted("sectionTitle", "medium"),
       color: mobileColors.textSubtle,
       paddingHorizontal: mobileSpace.lg,
+      // Air above a title that follows another section's card; the card's
+      // own gap below the title stays at the section's `gap`.
+      paddingTop: mobileSpace.sm,
     },
     sectionDescription: {
       ...mobileText.body,
       color: mobileColors.textMuted,
+      paddingHorizontal: mobileSpace.lg,
       marginTop: -4,
     },
     // Cancels the card shadow when this is rendered inside a sheet, and hands
