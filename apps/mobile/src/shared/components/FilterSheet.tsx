@@ -202,6 +202,7 @@ const createStyles = (mobileColors: MobileColors) =>
     sectionTitle: {
       ...mobileTextWeighted("meta", "medium"),
       color: mobileColors.textSubtle,
+      paddingHorizontal: mobileSpace.lg,
     },
     selectionList: {
       backgroundColor: mobileColors.surface,

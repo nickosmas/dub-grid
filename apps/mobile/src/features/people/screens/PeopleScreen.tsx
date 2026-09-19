@@ -1230,6 +1230,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     sectionTitle: {
       ...mobileTextWeighted("meta", "medium"),
       color: mobileColors.textSubtle,
+      paddingHorizontal: mobileSpace.lg,
     },
     searchBarRow: {
       alignItems: "center",

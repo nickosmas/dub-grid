@@ -837,10 +837,13 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: mobileSpace.md,
     },
     // Sentence case, like every other heading in the app; the small caps
-    // read as a different voice above a card of sentence-case rows.
+    // read as a different voice above a card of sentence-case rows. Inset
+    // from the card's edge the way a grouped list's header is, so the title
+    // sits over the rows' content rather than flush with the card corner.
     sectionTitle: {
       ...mobileTextWeighted("meta", "medium"),
       color: mobileColors.textSubtle,
+      paddingHorizontal: mobileSpace.lg,
     },
     sectionDescription: {
       ...mobileText.body,
