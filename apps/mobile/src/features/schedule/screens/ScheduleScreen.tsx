@@ -212,8 +212,11 @@ import {
  * so a single failure raises a single toast rather than one from each.
  */
 const SCHEDULE_REQUESTS_ERROR_TOAST_KEY = "schedule-requests-error";
-const OPEN_SHIFT_STACK_PEEK_HEIGHT = 10;
-const OPEN_SHIFT_STACK_SIDE_INSET = 6;
+// How far each card behind the lead peeks out below it and steps in at the
+// sides. Tight on purpose: at 10pt a four-card deck trailed 30pt of ledges
+// under the lead card and read as a stack of trays rather than a fanned deck.
+const OPEN_SHIFT_STACK_PEEK_HEIGHT = 6;
+const OPEN_SHIFT_STACK_SIDE_INSET = 4;
 const UPCOMING_SHIFT_DIVIDER_DASHES = Array.from({ length: 18 });
 const MONTH_WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTH_EXPAND_TIMING = {
