@@ -28,6 +28,13 @@ import { SCHEDULE_DATE_TILE_MIN_HEIGHT, SCHEDULE_DATE_TILE_MIN_WIDTH } from "./S
  * Every surface is the screen's own style, borrowed from
  * `scheduleScreenStyles`, so the placeholder cannot drift from the page.
  */
+/**
+ * The hero with a status word, a title and a type pill beside its date tile.
+ * A shift that also lists its focus area and time runs taller; the rectangle
+ * promises the least and the card grows into place.
+ */
+const ME_HERO_SKELETON_HEIGHT = 116;
+
 export function ScheduleMeSkeleton({ rows }: { rows?: number }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
@@ -38,43 +45,15 @@ export function ScheduleMeSkeleton({ rows }: { rows?: number }) {
     () => createScheduleStyles(mobileColors, isDark),
     [mobileColors, isDark],
   );
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
 
   return (
     <SkeletonGroup style={scheduleStyles.mePage}>
-      {/* The hero as it renders: a status dot with its word, the shift name
-          at heroMetric, the type pill under it, the date tile at the right
-          edge, then the focus-area and time rows the card closes on. Each
-          placeholder sits in the real style so the frame lands where the
-          content will. */}
-      <View style={[scheduleStyles.meHeroCard, styles.heroFill]}>
-        <View style={scheduleStyles.meHeroContent}>
-          <View style={scheduleStyles.meHeroHeader}>
-            <View style={scheduleStyles.meHeroHeaderCopy}>
-              <View style={scheduleStyles.meHeroBadge}>
-                <View style={[scheduleStyles.meHeroBadgeDot, styles.heroInk]} />
-                <SkeletonLine blockStyle={styles.heroInk} variant="label" width={72} />
-              </View>
-              <SkeletonLine blockStyle={styles.heroInk} variant="heroMetric" width="64%" />
-              <SkeletonPill height={26} style={styles.heroInk} width={96} />
-            </View>
-            <View style={[scheduleStyles.meHeroDateTile, styles.heroDateTile]}>
-              <SkeletonLine blockStyle={styles.heroInk} variant="label" width={28} />
-              <SkeletonLine blockStyle={styles.heroInk} variant="heroMetric" width={30} />
-            </View>
-          </View>
-          <View style={scheduleStyles.meHeroContextGroup}>
-            <View style={scheduleStyles.meHeroAreaRow}>
-              <SkeletonCircle size={18} style={styles.heroInk} />
-              <SkeletonLine blockStyle={styles.heroInk} variant="rowTitle" width={128} />
-            </View>
-            <View style={scheduleStyles.meHeroTimeRow}>
-              <SkeletonCircle size={24} style={styles.heroInk} />
-              <SkeletonLine blockStyle={styles.heroInk} variant="sectionTitle" width={156} />
-            </View>
-          </View>
-        </View>
-      </View>
+      {/* The hero is one rectangle. The real card is a brand gradient with
+          white text on it, and a placeholder cannot paint either: drawn as
+          lines on the grey fill it read as a broken card in light mode. The
+          block takes the hero's radius and its usual height. */}
+      <SkeletonBlock height={ME_HERO_SKELETON_HEIGHT} radius={mobileRadii.card} />
 
       <View style={scheduleStyles.upcomingSectionBlock}>
         <View style={scheduleStyles.upcomingSectionHeader}>
@@ -121,7 +100,7 @@ export function ScheduleTeamSkeleton({
     () => createScheduleStyles(mobileColors, isDark),
     [mobileColors, isDark],
   );
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
 
   return (
     <SkeletonGroup style={scheduleStyles.shiftGroupsList}>
@@ -154,28 +133,12 @@ export function ScheduleTeamSkeleton({
   );
 }
 
-const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
+const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     // A percentage-wide line inside a row has no width of its own to take a
     // percentage of; growing the wrapper gives it the row's free space.
     grow: {
       flex: 1,
-    },
-    // The real hero paints a brand gradient; a placeholder for it has to be
-    // neutral, so it takes the skeleton fill and drops the coloured shadow.
-    heroFill: {
-      backgroundColor: mobileColors.skeletonBase,
-      shadowColor: mobileColors.shadow,
-    },
-    // Placeholders on the hero's fill are the same tone as the fill, so they
-    // take the white the real hero's text and tile carry, faint enough to
-    // read as lines rather than labels.
-    heroInk: {
-      backgroundColor: isDark ? "rgba(255, 255, 255, 0.10)" : "rgba(255, 255, 255, 0.72)",
-    },
-    heroDateTile: {
-      backgroundColor: "transparent",
-      borderColor: isDark ? "rgba(255, 255, 255, 0.10)" : "rgba(255, 255, 255, 0.72)",
     },
     upcomingDateTile: {
       backgroundColor: mobileColors.skeletonBase,
