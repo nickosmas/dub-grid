@@ -764,6 +764,71 @@ describe("UserDashboard", () => {
     expect(screen.getByText("3 upcoming items")).toBeInTheDocument();
   });
 
+  // Coverage is required per shift and job, so two gaps on one shift arrive
+  // as two open shifts. Named by shift alone they were indistinguishable;
+  // each now carries its job, and volunteering asks for that job's slot.
+  it("names each open shift by its shift and job", async () => {
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    const nurseAssignment: AssignmentDefinition = {
+      ...assignment,
+      id: 303,
+      jobId: 8,
+      label: "N",
+      name: "Day shift Nurse",
+    };
+    const baseOpenShift = makeProps().openShifts[0]!;
+    const props = makeProps({
+      assignmentById: new Map([
+        [assignment.id, assignment],
+        [nurseAssignment.id, nurseAssignment],
+      ]),
+      assignments: [assignment, nurseAssignment],
+      jobs: [
+        { id: 7, orgId: "org-1", name: "Care", abbr: "C", showOnGrid: true } as never,
+        { id: 8, orgId: "org-1", name: "Nurse", abbr: "N", showOnGrid: true } as never,
+      ],
+      openShifts: [
+        { ...baseOpenShift, date: tomorrow, dayOfMonth: tomorrow.getDate(), id: "gap-care" },
+        {
+          ...baseOpenShift,
+          date: tomorrow,
+          dayOfMonth: tomorrow.getDate(),
+          eligibleAssignmentDefinitionIds: [nurseAssignment.id],
+          id: "gap-nurse",
+          needed: 2,
+          preferredOpenAssignmentDefinitionId: nurseAssignment.id,
+          requirementAssignmentDefinitionId: nurseAssignment.id,
+        },
+      ],
+      periodDates: [today, tomorrow],
+      periodEnd: tomorrow,
+      periodStart: today,
+    });
+
+    render(<UserDashboard {...props} />);
+
+    const rail = screen.getByTestId("user-dashboard-action-rail");
+    expect(within(rail).getByText("Day shift · Care")).toBeInTheDocument();
+    expect(within(rail).getByText("Day shift · Nurse")).toBeInTheDocument();
+    expect(within(rail).getByText(/2 teammates needed/)).toBeInTheDocument();
+
+    const volunteerButtons = within(rail).getAllByRole("button", { name: "Volunteer" });
+    expect(volunteerButtons).toHaveLength(2);
+    fireEvent.click(volunteerButtons[1]!);
+    await waitFor(() => {
+      expect(props.shiftRequests.volunteer).toHaveBeenCalledWith(
+        "emp-1",
+        expect.any(String),
+        expect.objectContaining({
+          segments: [expect.objectContaining({ jobId: 8, shiftId: 10 })],
+        }),
+        1,
+      );
+    });
+  });
+
   it("hides available open shifts and pickups after their start time today", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-08T18:00:00.000Z"));

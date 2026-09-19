@@ -1473,7 +1473,7 @@ function buildAvailableShiftItems(input: {
                 .filter(Boolean)
                 .join(" · "),
               timeRange: openShift.timeRange || formatAssignmentTimeRange(assignment),
-              title: formatOpenShiftTitle(openShift, assignment, input.shiftById),
+              title: formatOpenShiftTitle(openShift, assignment, input.shiftById, input.jobs),
             };
           });
 
@@ -3237,9 +3237,20 @@ function formatOpenShiftTitle(
   openShift: DashboardContentProps["openShifts"][number],
   assignment: AssignmentDefinition | null,
   shiftById: Map<number, { abbr?: string | null; name: string }>,
+  jobs: JobDefinition[] = [],
 ): string {
   const shiftId = assignment?.shiftId ?? assignment?.categoryId ?? null;
   const shift = shiftId != null ? (shiftById.get(shiftId) ?? null) : null;
+
+  // Coverage is required per shift and job, so each open shift is one slot:
+  // name the job asked for beside the shift when the org shows that job,
+  // otherwise a Supervisor gap and the shift's default gap both read "Day
+  // Shift" and someone deciding whether to volunteer cannot tell them apart.
+  const job = assignment?.jobId != null ? jobs.find((item) => item.id === assignment.jobId) : null;
+  if (shift && job && shouldShowJobOnGrid(job)) {
+    return labelsEqual(job.name, shift.name) ? shift.name : `${shift.name} \u00b7 ${job.name}`;
+  }
+
   const assignmentJobName = getAssignmentJobName(assignment, shift?.name ?? null);
 
   return expandShiftDisplayLabel({
