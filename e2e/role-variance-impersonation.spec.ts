@@ -149,9 +149,12 @@ test.describe("role variance: gridmaster impersonation", () => {
           marker: (p) => p.getByText("Directory"),
         },
         {
+          // The impersonated user-role shell has no employee details
+          // permission: the page bounces to the Directory, as it does for
+          // qa-regular signed in directly.
           path: employeeHref,
-          finalUrl: new RegExp(`${employeeHref.replace(/\//g, "\\/")}$`),
-          marker: (p) => p.getByText("Profile"),
+          finalUrl: /\/people$/,
+          marker: (p) => p.getByText("Directory"),
         },
         { path: "/profile", finalUrl: /\/profile/ },
         { path: "/reports", finalUrl: /\/dashboard$/ },

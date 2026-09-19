@@ -488,6 +488,14 @@ in that feature's `components/` folder. Three rules:
   and render on `showSkeleton` (or `useSkeletonGate` where there is no error or
   empty state to model). Its `hasData` means "the query resolved"; pass
   `isEmpty` separately on any screen whose query key carries a search or filter.
+- **A skeleton is drawn for this viewer.** Bootstrap is cached from app start,
+  so the permissions that shape a page are known before its data. Pass them in
+  (`showActions` and `showShiftmates` on `ShiftDetailSkeleton`; per-list
+  `sections` and a `quickActions` count on `ProfileSkeleton`) rather than
+  drawing the manager's page for everyone: a colleague's page promised three
+  lists and three actions and delivered one list. When the permission is
+  unknown, the smaller page is the guess. A surface the placeholder cannot
+  paint, the Home hero's gradient with white text on it, loads as one block.
 
 Animation is one app-wide clock (`useSkeletonWave`, a module-level
 `makeMutable`) driving a single band of light across the window, so every block

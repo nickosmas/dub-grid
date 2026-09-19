@@ -34,10 +34,12 @@ test.describe("role variance: route entry contract", () => {
       { path: "/schedule", finalUrl: /\/schedule$/, marker: (p) => p.getByRole("grid") },
       { path: "/people", finalUrl: /\/people$/, marker: (p) => p.getByText("Directory") },
       {
-        // userViewPermsObj.canViewEmployeeDetails is true: the page renders.
+        // A user-role member resolves to the read-only baseline whatever the
+        // seed stored, so canViewEmployeeDetails is false: StaffDetailPage
+        // sends them back to the Directory with a toast.
         path: employeeHref,
-        finalUrl: new RegExp(`${employeeHref.replace(/\//g, "\\/")}$`),
-        marker: (p) => p.getByText("Profile"),
+        finalUrl: /\/people$/,
+        marker: (p) => p.getByText("Directory"),
       },
       {
         // On schedule, so the work Overview section is offered.
@@ -83,9 +85,11 @@ test.describe("role variance: route entry contract", () => {
         marker: (p) => p.getByRole("button", { name: /^On Schedule \(\d+\)$/ }),
       },
       {
+        // Management access is a department, not a permission: the same
+        // read-only baseline, the same bounce back to the Directory.
         path: employeeHref,
-        finalUrl: new RegExp(`${employeeHref.replace(/\//g, "\\/")}$`),
-        marker: (p) => p.getByText("Profile"),
+        finalUrl: /\/people$/,
+        marker: (p) => p.getByText("Directory"),
       },
       {
         path: "/profile",
@@ -210,11 +214,13 @@ test.describe("role variance: interaction contract", () => {
     // The cell's hover tooltip is also role="dialog"; only a slide-over is modal.
     await expect(page.locator('[role="dialog"][aria-modal="true"]')).toHaveCount(0);
 
-    // /people/<id>: StaffDetailPage renders ProfileField rows instead of
-    // EditEmployeePanel when canEditDetails is false.
+    // /people/<id>: the full page is a management surface. Without
+    // canViewEmployeeDetails, StaffDetailPage bounces to the Directory and
+    // says so; the read-only slide-over above is the colleague view.
+    // `.first()`: Sonner announces the toast in a live region as well.
     await page.goto(`${QA_CALM_HAVEN_ORIGIN}${employeeHref}`);
-    await expect(page.getByText("Profile").first()).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText("Employment", { exact: true }).first()).toBeVisible({
+    await expect(page).toHaveURL(/\/people$/, { timeout: 20_000 });
+    await expect(page.getByText("You don't have access to employee details.").first()).toBeVisible({
       timeout: 15_000,
     });
     await expectNoManageControls(page, page);
@@ -280,8 +286,8 @@ test.describe("role variance: interaction contract", () => {
     await expect(page.locator('[role="dialog"][aria-modal="true"]')).toHaveCount(0);
 
     await page.goto(`${QA_CALM_HAVEN_ORIGIN}${employeeHref}`);
-    await expect(page.getByText("Profile").first()).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText("Employment", { exact: true }).first()).toBeVisible({
+    await expect(page).toHaveURL(/\/people$/, { timeout: 20_000 });
+    await expect(page.getByText("You don't have access to employee details.").first()).toBeVisible({
       timeout: 15_000,
     });
     await expectNoManageControls(page, page);
