@@ -844,7 +844,7 @@ export default function RequestsScreen() {
 
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
-          <CardRowListSkeleton rows={4} />
+          <CardRowListSkeleton dateRail={activeTab === "available"} rows={4} />
         ) : null
       ) : contentState.kind === "error" ? (
         <StatusBanner
