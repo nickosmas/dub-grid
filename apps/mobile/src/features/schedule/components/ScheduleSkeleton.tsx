@@ -17,6 +17,7 @@ import {
   mobileSpace,
 } from "../../../shared/theme/tokens";
 import { createStyles as createScheduleStyles } from "../screens/scheduleScreenStyles";
+import { SCHEDULE_DATE_TILE_MIN_HEIGHT, SCHEDULE_DATE_TILE_MIN_WIDTH } from "./ScheduleDateTile";
 
 /**
  * The staff home: the rounded hero, then the week's card of 132pt rows. No
@@ -179,8 +180,8 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     upcomingDateTile: {
       backgroundColor: mobileColors.skeletonBase,
       borderRadius: mobileRadii.control,
-      height: 68,
-      width: 60,
+      height: SCHEDULE_DATE_TILE_MIN_HEIGHT,
+      width: SCHEDULE_DATE_TILE_MIN_WIDTH,
     },
     teamMemberCopy: {
       flex: 1,

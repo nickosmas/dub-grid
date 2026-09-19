@@ -60,11 +60,11 @@ export interface ScheduleGridAccessors {
   publishDiffForKey?: (
     empId: string,
     date: Date,
-  ) => (PublishChange & { publishedAt: string; publishedBy: string }) | null;
+  ) => (PublishChange & { publishedAt: string; publishedBy: string | null }) | null;
   publishedMetadataForKey?: (
     empId: string,
     date: Date,
-  ) => { publishedAt: string; publishedBy: string; timeZone?: string | null } | null;
+  ) => { publishedAt: string; publishedBy: string | null; timeZone?: string | null } | null;
   createdByNameForKey?: (empId: string, date: Date) => string | null;
   absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   activeRequestForKey?: (empId: string, date: Date) => ActiveShiftRequestSummary | null;

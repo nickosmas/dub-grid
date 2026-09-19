@@ -68,10 +68,13 @@ Admins (Tier 2) receive a configurable set of permissions stored as JSONB in `or
 Permissions are **per-person**, not per-department. Departments do not grant any
 permission. `departments.permissions` exists on the schema (a JSONB column whose comment
 still describes a management-department template), but no permission-resolution path
-reads it. A member's effective permissions =
-role baseline + their own `admin_permissions` JSONB, with view-implications applied.
+reads it. An **admin's** effective permissions =
+`ADMIN_DEFAULT_PERMS` + their own `admin_permissions` JSONB, with view-implications applied.
+A **user** is `READ_ONLY_PERMS` and nothing else: the JSONB is an admin-tier column
+(`check_admin_permission` in SQL reads it for admins only, and the access route nulls it on
+demotion), so a user row that still carries one never widens what that member sees.
 
-`canViewSchedule` and `canViewStaff` are **always true** for any authenticated user (including Tier 0 `user`). Every other key defaults per role baseline: a `user` resolves against `READ_ONLY_PERMS` (all `false`), and an `admin` resolves against `ADMIN_DEFAULT_PERMS`, the core scheduling set (`canEditShifts`, `canPublishSchedule`, `canEditNotes`, `canEditScheduleIndicators`, the four recurring-shift keys, and `canViewReports`) with nothing in people management or administration. A stored JSONB overrides the baseline key by key in both directions, so an unconfigured admin (or one whose row predates a key) can edit and publish the schedule and see Reports, but cannot manage people until a super admin switches that on. The order below matches the interface definition.
+`canViewSchedule` and `canViewStaff` are **always true** for any authenticated user (including Tier 0 `user`). Every other key defaults per role baseline: a `user` resolves against `READ_ONLY_PERMS` (all `false`) and stays there whatever the row stores, and an `admin` resolves against `ADMIN_DEFAULT_PERMS`, the core scheduling set (`canEditShifts`, `canPublishSchedule`, `canEditNotes`, `canEditScheduleIndicators`, the four recurring-shift keys, and `canViewReports`) with nothing in people management or administration. For an admin, a stored JSONB overrides the baseline key by key in both directions, so an unconfigured admin (or one whose row predates a key) can edit and publish the schedule and see Reports, but cannot manage people until a super admin switches that on. The order below matches the interface definition.
 
 | #   | Category  | Permission                      | Delegatable | Description                                                                      |
 | --- | --------- | ------------------------------- | ----------- | -------------------------------------------------------------------------------- |

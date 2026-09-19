@@ -189,7 +189,7 @@ export function formatRelativePublishTime(isoDate: string): string {
 }
 
 export function buildPublishTooltip(args: {
-  publishDiff: PublishChange & { publishedAt: string; publishedBy: string };
+  publishDiff: PublishChange & { publishedAt: string; publishedBy: string | null };
   resolvePublisherName?: (userId: string) => string | null;
   detail?: string;
   timeZone?: string | null;

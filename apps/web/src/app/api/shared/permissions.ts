@@ -29,6 +29,19 @@ export async function isCallerInactive(
 
 type PermissionContext = ReturnType<typeof buildPermissionContext>;
 
+/**
+ * Who published a schedule is process detail for the people who publish it.
+ * The publish history page and its panel already sit behind this gate; the
+ * reads every schedule viewer can make (recent changes, published ranges)
+ * withhold the publisher's id under the same rule, so the grid cannot name a
+ * publisher to a viewer who could never open the history.
+ */
+export function canSeeSchedulePublisher(
+  permissions: Pick<PermissionContext, "canPublishSchedule" | "isSuperAdmin" | "isGridmaster">,
+): boolean {
+  return permissions.canPublishSchedule || permissions.isSuperAdmin || permissions.isGridmaster;
+}
+
 interface OrgPermissionOptions {
   allowLockedOrganization?: boolean;
   allowDuringSetup?: boolean;

@@ -213,11 +213,11 @@ interface LegacyScheduleGridProps {
   publishDiffForKey?: (
     empId: string,
     date: Date,
-  ) => (PublishChange & { publishedAt: string; publishedBy: string }) | null;
+  ) => (PublishChange & { publishedAt: string; publishedBy: string | null }) | null;
   publishedMetadataForKey?: (
     empId: string,
     date: Date,
-  ) => { publishedAt: string; publishedBy: string; timeZone?: string | null } | null;
+  ) => { publishedAt: string; publishedBy: string | null; timeZone?: string | null } | null;
   /** Set of cell keys (empId_date) that were recently published since user's last view */
   /** Purely informational: who else currently has each cell open. Never blocks. */
   cellEditors?: Map<string, { userId: string; userName: string }>;
@@ -321,11 +321,11 @@ interface SectionBlockProps {
   publishDiffForKey?: (
     empId: string,
     date: Date,
-  ) => (PublishChange & { publishedAt: string; publishedBy: string }) | null;
+  ) => (PublishChange & { publishedAt: string; publishedBy: string | null }) | null;
   publishedMetadataForKey?: (
     empId: string,
     date: Date,
-  ) => { publishedAt: string; publishedBy: string; timeZone?: string | null } | null;
+  ) => { publishedAt: string; publishedBy: string | null; timeZone?: string | null } | null;
   certifications: NamedItem[];
   orgRoles: NamedItem[];
   /** Purely informational: who else currently has each cell open. Never blocks. */

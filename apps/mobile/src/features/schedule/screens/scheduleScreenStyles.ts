@@ -16,6 +16,7 @@ import {
   mobileSpace,
 } from "../../../shared/theme/tokens";
 import { HERO_INVERSE_CHIP_BORDER, HERO_INVERSE_CHIP_FILL } from "../lib/heroCardTheme";
+import { SCHEDULE_DATE_TILE_MIN_WIDTH } from "../components/ScheduleDateTile";
 
 /**
  * Fixed pixel geometry shared by the screen and its stylesheet.
@@ -594,7 +595,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       // minWidth, not width: at a raised OS text size the weekday and day
       // labels grow, and a hard width clips them instead of letting the column
       // take the room.
-      minWidth: 60,
+      minWidth: SCHEDULE_DATE_TILE_MIN_WIDTH,
       alignItems: "center",
       justifyContent: "center",
       paddingVertical: mobileSpace.lg,

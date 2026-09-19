@@ -1597,7 +1597,10 @@ function SchedulerContent({
   // Iterate oldest→newest so the most recent publish wins per cell key.
   const publishChangesMap = useMemo(() => {
     if (inWindowPublishHistory.length === 0) return null;
-    const map = new Map<string, PublishChange & { publishedAt: string; publishedBy: string }>();
+    const map = new Map<
+      string,
+      PublishChange & { publishedAt: string; publishedBy: string | null }
+    >();
     // inWindowPublishHistory is newest-first, so iterate in reverse (oldest first) to let newer entries overwrite
     for (let i = inWindowPublishHistory.length - 1; i >= 0; i--) {
       const entry = inWindowPublishHistory[i];
@@ -3341,7 +3344,7 @@ function SchedulerContent({
     (
       empId: string,
       date: Date,
-    ): (PublishChange & { publishedAt: string; publishedBy: string }) | null => {
+    ): (PublishChange & { publishedAt: string; publishedBy: string | null }) | null => {
       if (!showPublishDiff || !publishChangesMap) return null;
       const change = publishChangesMap.get(`${empId}_${formatDateKey(date)}`) ?? null;
       // Initial publication is the baseline, not an addition. Keep its audit

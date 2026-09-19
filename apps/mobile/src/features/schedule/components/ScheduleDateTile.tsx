@@ -11,8 +11,12 @@ import {
 } from "../../../shared/theme/tokens";
 import { getCompactScheduleDateParts } from "../lib/schedule";
 
-/** The tile's width, which a rail beside a list of cards reserves for it. */
+/**
+ * The tile's box, shared with the columns that reserve room for it and the
+ * skeletons that stand in for it, so none of them drifts from the tile.
+ */
 export const SCHEDULE_DATE_TILE_MIN_WIDTH = 60;
+export const SCHEDULE_DATE_TILE_MIN_HEIGHT = 68;
 
 /**
  * The calendar tile that fronts a day: weekday over day number in a framed
@@ -55,7 +59,7 @@ const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     tile: {
       minWidth: SCHEDULE_DATE_TILE_MIN_WIDTH,
-      minHeight: 68,
+      minHeight: SCHEDULE_DATE_TILE_MIN_HEIGHT,
       borderRadius: mobileRadii.control,
       borderWidth: 1,
       borderColor: mobileColors.borderSubtle,

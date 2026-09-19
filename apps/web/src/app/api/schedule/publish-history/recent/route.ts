@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { z } from "zod";
-import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { canSeeSchedulePublisher, requireOrgPermissions } from "@/app/api/shared/permissions";
 import {
   toNotePublishChanges,
   toPublishChanges,
@@ -167,9 +167,10 @@ export async function GET(req: NextRequest) {
       throw error;
     }
 
+    const showPublisher = canSeeSchedulePublisher(auth.permissions);
     const entries = (data ?? []).map((row: Record<string, unknown>) => ({
       id: row.id as string,
-      publishedBy: row.published_by as string,
+      publishedBy: showPublisher ? (row.published_by as string) : null,
       startDate: row.start_date as string,
       endDate: row.end_date as string,
       changeCount: row.change_count as number,

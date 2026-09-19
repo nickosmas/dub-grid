@@ -15,10 +15,10 @@ import {
   SkeletonPill,
   skeletonRows,
 } from "./primitives";
-
-// The Requests feed's date tile, as `ScheduleDateTile` draws it.
-const DATE_TILE_WIDTH = 60;
-const DATE_TILE_HEIGHT = 68;
+import {
+  SCHEDULE_DATE_TILE_MIN_HEIGHT,
+  SCHEDULE_DATE_TILE_MIN_WIDTH,
+} from "../../../features/schedule/components/ScheduleDateTile";
 
 /**
  * The request card list, as the Requests tabs and a shift's own request list
@@ -75,9 +75,9 @@ export function CardRowListSkeleton({
         <View key={`card-rail-skeleton-${index}`} style={styles.railGroup}>
           <View style={styles.rail}>
             <SkeletonBlock
-              height={DATE_TILE_HEIGHT}
+              height={SCHEDULE_DATE_TILE_MIN_HEIGHT}
               radius={mobileRadii.control}
-              width={DATE_TILE_WIDTH}
+              width={SCHEDULE_DATE_TILE_MIN_WIDTH}
             />
             {index < groups.length - 1 ? <View style={styles.railLine} /> : null}
           </View>

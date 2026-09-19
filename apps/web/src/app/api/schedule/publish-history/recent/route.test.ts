@@ -9,7 +9,8 @@ const publishHistoryLimit = vi.fn();
 /** The second, baseline query: publications older than the result for the dates in question. */
 const priorPeriodsLimit = vi.fn();
 
-vi.mock("@/app/api/shared/permissions", () => ({
+vi.mock("@/app/api/shared/permissions", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/app/api/shared/permissions")>()),
   requireOrgPermissions: (...args: unknown[]) => requireOrgPermissions(...args),
 }));
 
@@ -142,7 +143,9 @@ describe("GET /api/schedule/publish-history/recent", () => {
     expect(body.entries).toEqual([
       {
         id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        publishedBy: "22222222-2222-4222-8222-222222222222",
+        // A viewer who cannot open the publish history is not told who
+        // published; the time and the changes are what the grid needs.
+        publishedBy: null,
         startDate: "2026-05-04",
         endDate: "2026-05-10",
         changeCount: 1,
@@ -167,6 +170,23 @@ describe("GET /api/schedule/publish-history/recent", () => {
         publishedAt: "2026-05-06T17:00:00.000Z",
       },
     ]);
+  });
+
+  it("names the publisher for a caller who can publish", async () => {
+    const serviceClient = createServiceClient();
+    requireOrgPermissions.mockResolvedValue({
+      serviceClient,
+      orgId: ORG_ID,
+      actor: { id: "user-1" },
+      permissions: { canViewSchedule: true, canPublishSchedule: true },
+      userClient: {},
+    });
+
+    const response = await GET(makeRequest({ orgId: ORG_ID, since: "2026-05-05T00:00:00.000Z" }));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.entries[0].publishedBy).toBe("22222222-2222-4222-8222-222222222222");
   });
 
   it("returns published note changes separately from cell changes", async () => {
