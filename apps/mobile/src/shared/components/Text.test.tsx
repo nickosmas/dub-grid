@@ -18,9 +18,10 @@ vi.mock("react-native", async () => {
 
 let Text: (typeof import("./Text"))["Text"];
 let resolveTextMultiplier: (typeof import("./Text"))["resolveTextMultiplier"];
+let androidLineHeight: (typeof import("./Text"))["androidLineHeight"];
 
 beforeAll(async () => {
-  ({ Text, resolveTextMultiplier } = await import("./Text"));
+  ({ Text, resolveTextMultiplier, androidLineHeight } = await import("./Text"));
 });
 
 beforeEach(() => {
@@ -53,6 +54,21 @@ describe("Text", () => {
     expect(resolveTextMultiplier(40, undefined)).toBe(1);
     expect(resolveTextMultiplier(undefined, undefined)).toBe(MAX_FONT_SCALE);
     expect(resolveTextMultiplier(10, MAX_FONT_SCALE_COMPACT)).toBe(MAX_FONT_SCALE_COMPACT);
+  });
+
+  describe("androidLineHeight", () => {
+    // Android multiplies lineHeight by the uncapped OS setting, so the value
+    // handed over is pre-divided to land on the capped size.
+    it("pre-divides the line height once the setting passes the cap", () => {
+      expect(androidLineHeight(14, MAX_FONT_SCALE_COMPACT, 2)).toBeCloseTo((14 * 1.2) / 2);
+      expect(androidLineHeight(21, MAX_FONT_SCALE, 2)).toBeCloseTo((21 * 1.5) / 2);
+    });
+
+    it("leaves the style alone while the setting is within the cap, or has no line height", () => {
+      expect(androidLineHeight(14, MAX_FONT_SCALE_COMPACT, 1.1)).toBeUndefined();
+      expect(androidLineHeight(14, MAX_FONT_SCALE, 1)).toBeUndefined();
+      expect(androidLineHeight(undefined, MAX_FONT_SCALE, 2)).toBeUndefined();
+    });
   });
 
   describe("fit", () => {

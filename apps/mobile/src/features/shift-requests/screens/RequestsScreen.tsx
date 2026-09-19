@@ -1108,7 +1108,7 @@ function RequestCard({
             </View>
             {requesterSplitSegments.length > 1 ? (
               <View style={styles.splitShiftPanel}>
-                <SplitShiftBadge count={requesterSplitSegments.length} compact />
+                <SplitShiftBadge count={requesterSplitSegments.length} />
                 <SplitShiftSegmentList
                   renderSegmentChip={(segment) => (
                     <JobPill
@@ -1137,7 +1137,7 @@ function RequestCard({
             {targetSplitSegments.length > 1 ? (
               <View style={styles.splitShiftPanel}>
                 <Text style={styles.splitShiftPanelLabel}>Target shift</Text>
-                <SplitShiftBadge count={targetSplitSegments.length} compact />
+                <SplitShiftBadge count={targetSplitSegments.length} />
                 <SplitShiftSegmentList
                   renderSegmentChip={(segment) => (
                     <JobPill
@@ -1374,7 +1374,7 @@ function OpenShiftCard({
       {showDate ? <Text style={styles.metaText}>{openShift.date}</Text> : null}
       {splitSegments.length > 1 ? (
         <View style={styles.splitShiftPanel}>
-          <SplitShiftBadge count={splitSegments.length} compact />
+          <SplitShiftBadge count={splitSegments.length} />
           <SplitShiftSegmentList
             renderSegmentChip={(segment) => (
               <JobPill

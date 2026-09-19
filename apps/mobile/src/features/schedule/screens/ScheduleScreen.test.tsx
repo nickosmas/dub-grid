@@ -1163,7 +1163,11 @@ describe("ScheduleScreen", () => {
     personal.unmount();
     render(<TeamScheduleScreen />);
 
-    expect(screen.getAllByLabelText("Shift edited")).toHaveLength(1);
+    // The team row folds the change word into its split chip, as Home does,
+    // so the edited Evening row carries one chip and the Day row stays clean.
+    expect(screen.getByLabelText("Also Day Shift · Edited")).toBeInTheDocument();
+    expect(screen.getByLabelText("Also Evening Shift")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Shift edited")).toBeNull();
   });
 
   it("labels only the added second shift as New", () => {
@@ -1224,8 +1228,10 @@ describe("ScheduleScreen", () => {
     personal.unmount();
     render(<TeamScheduleScreen />);
 
-    expect(screen.getAllByLabelText("Shift new")).toHaveLength(1);
-    expect(screen.queryByLabelText("Shift edited")).toBeNull();
+    expect(screen.getByLabelText("Also Day Shift · New")).toBeInTheDocument();
+    expect(screen.getByLabelText("Also Evening Shift")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Shift new")).toBeNull();
+    expect(screen.queryByLabelText(/Edited/)).toBeNull();
     expect(screen.queryByText(/^Was /)).toBeNull();
   });
 

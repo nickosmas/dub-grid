@@ -435,6 +435,11 @@ export function createReactNativeModule(
       openURL: () => Promise.resolve(),
     },
     Modal,
+    PixelRatio: {
+      get: () => 2,
+      getFontScale: () => 1,
+      roundToNearestPixel: (value: number) => Math.round(value * 2) / 2,
+    },
     Platform: {
       OS: platformOS,
       select: (value: Record<string, any>) => value[platformOS] ?? value.default ?? null,

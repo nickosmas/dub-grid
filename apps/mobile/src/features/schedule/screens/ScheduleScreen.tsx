@@ -2843,7 +2843,6 @@ function UpcomingShiftsSection({
                                       {splitSegments.length > 1 ? (
                                         <SplitShiftBadge
                                           count={splitSegments.length}
-                                          compact
                                           label={
                                             splitChangeLabel
                                               ? `${splitShiftLabel ?? "Shift"} · ${splitChangeLabel}`
@@ -3066,7 +3065,7 @@ function OpenShiftsSection({
               {shouldShowShiftName ? (
                 <Text style={styles.scheduleRowTitle}>{shiftName}</Text>
               ) : null}
-              {hasSplitSegments ? <SplitShiftBadge count={splitSegments.length} compact /> : null}
+              {hasSplitSegments ? <SplitShiftBadge count={splitSegments.length} /> : null}
             </View>
           ) : null}
           {hasSplitSegments ? (
@@ -3268,7 +3267,7 @@ function OpenShiftsSection({
                 <NumericBadge
                   count={group.itemCount}
                   label={formatOpenShiftCardCountLabel(group.itemCount)}
-                  tone="brand"
+                  tone="secondary"
                 />
               </View>
               <View
@@ -3511,6 +3510,14 @@ function TeamShiftMemberRow({
   const alternateShiftLabel = formatAlternateShiftTitles(row.alternateShiftTitles);
   const roleChip = getTeamMemberRoleChip(mobileColors, isDark, entry, segment);
   const change = segment ? getScheduleEntrySegmentChange(entry, segment) : entry.change;
+  // One chip, not two: as on Home's Your Week rows, a split shift folds the
+  // change word into its own label ("Also Day Shift · New") instead of
+  // stacking a second chip under the name.
+  const changeLabel = getShiftChangeLabel(change);
+  const splitChipLabel =
+    alternateShiftLabel && changeLabel
+      ? `${alternateShiftLabel} · ${changeLabel}`
+      : alternateShiftLabel;
   const isMentored = segment
     ? segment.isMentored === true
     : hasMentoredSegments(getScheduleEntrySegments(entry));
@@ -3547,17 +3554,13 @@ function TeamShiftMemberRow({
         <View style={styles.teamMemberCopy}>
           <View style={styles.teamMemberNameRow}>
             <Text style={styles.teamMemberName}>{memberName}</Text>
-            <ShiftChangeBadge change={change} />
+            <ShiftChangeBadge change={splitChipLabel ? null : change} />
           </View>
           {memberTimeRange ? <Text style={styles.teamMemberTime}>{memberTimeRange}</Text> : null}
           <PreviousShiftRow change={change} />
-          {alternateShiftLabel ? (
+          {splitChipLabel ? (
             <View style={styles.teamMemberSplitBadgeRow}>
-              <SplitShiftBadge
-                count={row.alternateShiftTitles.length + 1}
-                compact
-                label={alternateShiftLabel}
-              />
+              <SplitShiftBadge count={row.alternateShiftTitles.length + 1} label={splitChipLabel} />
             </View>
           ) : null}
           {stackRolePill ? rolePill : null}

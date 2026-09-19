@@ -2,6 +2,7 @@ import { Fragment, useMemo, type ReactNode } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
+import { Chip } from "../../../shared/components/Chip";
 import type { MobileScheduleEntrySegment } from "@dubgrid/contracts";
 import {
   getScheduleEntrySegmentTimeRange,
@@ -21,13 +22,16 @@ import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 type SplitShiftVariant = "compact" | "hero" | "detail" | "supporting";
 const SPLIT_SHIFT_DIVIDER_DASHES = Array.from({ length: 18 });
 
+/**
+ * The "also on another shift" tag. Off the hero it is the shared `Chip`, so it
+ * sits beside a change chip or a role pill as one family rather than a third
+ * bordered box; `inverse` keeps the hero gradient's translucent version.
+ */
 export function SplitShiftBadge({
-  compact = false,
   count,
   inverse = false,
   label: customLabel,
 }: {
-  compact?: boolean;
   count: number;
   inverse?: boolean;
   label?: string | null;
@@ -39,22 +43,20 @@ export function SplitShiftBadge({
     return null;
   }
 
-  const contentColor = inverse ? mobileColors.textInverse : mobileColors.brand;
+  const accessibilityLabel = customLabel ? label : `Multiple Shifts, ${label}`;
+
+  if (!inverse) {
+    return (
+      <Chip accessibilityLabel={accessibilityLabel} icon="layers-outline" tone="brand">
+        {label}
+      </Chip>
+    );
+  }
 
   return (
-    <View
-      accessibilityLabel={customLabel ? label : `Multiple Shifts, ${label}`}
-      style={[styles.badge, compact && styles.badgeCompact, inverse && styles.badgeInverse]}
-    >
-      <Ionicons color={contentColor} name="layers-outline" size={compact ? 13 : 15} />
-      <Text
-        fit="compact"
-        style={[
-          styles.badgeText,
-          compact && styles.badgeTextCompact,
-          inverse && styles.badgeTextInverse,
-        ]}
-      >
+    <View accessibilityLabel={accessibilityLabel} style={[styles.badge, styles.badgeInverse]}>
+      <Ionicons color={mobileColors.textInverse} name="layers-outline" size={15} />
+      <Text fit="compact" style={[styles.badgeText, styles.badgeTextInverse]}>
         {label}
       </Text>
     </View>
@@ -263,11 +265,7 @@ export function SplitShiftSegmentList({
                         {title}
                       </Text>
                       {statusLabel ? (
-                        <SplitShiftBadge
-                          compact
-                          count={labelTotalCount}
-                          label={combinedSegmentLabel}
-                        />
+                        <SplitShiftBadge count={labelTotalCount} label={combinedSegmentLabel} />
                       ) : null}
                     </View>
                     {chip ? <View style={styles.segmentChipRow}>{chip}</View> : null}
@@ -354,18 +352,12 @@ const createStyles = (mobileColors: MobileColors) =>
     badge: {
       alignSelf: "flex-start",
       alignItems: "center",
-      backgroundColor: mobileColors.brandSoft,
-      borderColor: mobileColors.brandBorder,
       borderRadius: mobileRadii.pill,
       borderWidth: 1,
       flexDirection: "row",
       gap: mobileSpace.xs,
       paddingHorizontal: mobileSpace.md,
       paddingVertical: mobileSpace.sm,
-    },
-    badgeCompact: {
-      paddingHorizontal: 8,
-      paddingVertical: 4,
     },
     badgeInverse: {
       backgroundColor: HERO_INVERSE_CHIP_FILL,
@@ -375,9 +367,6 @@ const createStyles = (mobileColors: MobileColors) =>
       ...mobileText.badge,
       color: mobileColors.brand,
       textTransform: "none",
-    },
-    badgeTextCompact: {
-      fontSize: mobileText.badge.fontSize,
     },
     badgeTextInverse: {
       color: mobileColors.textInverse,

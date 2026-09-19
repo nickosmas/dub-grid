@@ -237,20 +237,26 @@ describe("solid button tone contrast", () => {
 /**
  * The staff Home is washed with the aurora gradient, and the hero card is a
  * solid brand gradient. A soft brand fill (`brandSoft`) is the same tint as
- * either ground, which is how the open-shift count pill disappeared, so the
- * chips placed on those grounds use a solid fill or the hero's inverse chip.
+ * either ground, which is how the open-shift count pill disappeared. The
+ * count pill now takes the secondary control fill, the same as the hours pill
+ * beside it, which is a step deeper than the wash; the hero's chips use its
+ * inverse chip.
  */
 describe("brand-tinted ground contrast", () => {
-  const NON_TEXT_UI = 3;
-
   for (const [theme, colors, isDark] of [
     ["light", mobileColors, false],
     ["dark", darkMobileColors, true],
   ] as const) {
-    it(`keeps a solid brand count pill and its number readable on the ${theme} aurora`, () => {
-      const auroraTop = composite(getSoftGradientStops("aurora", isDark)[0]!, colors.background);
-      const pill = createNumericBadgeToneStyles(colors).brand;
-      expect(contrastRatio(pill.backgroundColor, auroraTop)).toBeGreaterThanOrEqual(NON_TEXT_UI);
+    // The open-shift count sits under the hero, around the wash's middle
+    // stop (location 0.45), where the aurora has already given up most of
+    // its colour; the hours pill it matches sits lower still.
+    it(`keeps the secondary count pill visible and its number readable on the ${theme} aurora`, () => {
+      const auroraMid = composite(getSoftGradientStops("aurora", isDark)[1]!, colors.background);
+      const pill = createNumericBadgeToneStyles(colors).secondary;
+      expect(pill.backgroundColor).toBe(colors.controlSecondaryBg);
+      expect(contrastRatio(pill.backgroundColor, auroraMid)).toBeGreaterThanOrEqual(
+        PERCEIVABLE_FILL,
+      );
       expect(contrastRatio(pill.color, pill.backgroundColor)).toBeGreaterThanOrEqual(AA_TEXT);
     });
 

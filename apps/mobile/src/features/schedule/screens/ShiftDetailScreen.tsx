@@ -2075,7 +2075,7 @@ function ShiftmateSegmentGroups({
               <View style={styles.shiftmateSegmentTitleRow}>
                 <View style={styles.shiftmateSegmentTitleMeta}>
                   <Text style={styles.shiftmateSegmentTitle}>{group.title}</Text>
-                  <SplitShiftBadge compact count={groups.length} label={group.label} />
+                  <SplitShiftBadge count={groups.length} label={group.label} />
                 </View>
                 {group.timeRange ? (
                   <Text style={styles.shiftmateSegmentTime}>{group.timeRange}</Text>

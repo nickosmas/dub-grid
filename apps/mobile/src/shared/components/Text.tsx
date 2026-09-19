@@ -1,5 +1,10 @@
 import { forwardRef, type ElementRef } from "react";
-import { Text as NativeText, type TextProps as NativeTextProps } from "react-native";
+import {
+  PixelRatio,
+  Platform,
+  Text as NativeText,
+  type TextProps as NativeTextProps,
+} from "react-native";
 import { MAX_FONT_SCALE, MAX_FONT_SCALE_COMPACT, MAX_TEXT_SIZE } from "../theme/tokens";
 
 /**
@@ -54,18 +59,44 @@ export function resolveTextMultiplier(
   return Math.max(1, Math.min(multiplier, MAX_TEXT_SIZE / fontSize));
 }
 
-/** The `fontSize` a nested style array resolves to, last one wins, like the renderer. */
-export function readFontSize(style: unknown): number | undefined {
+/** The numeric `key` a nested style array resolves to, last one wins, like the renderer. */
+function readStyleNumber(style: unknown, key: "fontSize" | "lineHeight"): number | undefined {
   if (!style) return undefined;
   if (Array.isArray(style)) {
     return style.reduce<number | undefined>(
-      (size, entry: unknown) => readFontSize(entry) ?? size,
+      (size, entry: unknown) => readStyleNumber(entry, key) ?? size,
       undefined,
     );
   }
   if (typeof style !== "object") return undefined;
-  const { fontSize } = style as { fontSize?: number | null };
-  return typeof fontSize === "number" ? fontSize : undefined;
+  const value = (style as Record<string, unknown>)[key];
+  return typeof value === "number" ? value : undefined;
+}
+
+export function readFontSize(style: unknown): number | undefined {
+  return readStyleNumber(style, "fontSize");
+}
+
+/**
+ * The `lineHeight` to hand Android so the rendered line comes out at
+ * `lineHeight * multiplier`, or undefined when the style's own value is right.
+ *
+ * Android scales `fontSize` by the OS setting capped at
+ * `maxFontSizeMultiplier`, but scales `lineHeight` by the uncapped setting
+ * (`TextAttributeProps.setLineHeight` calls `toPixelFromSP` without the
+ * cap; `setFontSize` passes it). At a 2.0 setting with a 1.2 cap, a badge's
+ * 11pt digits sat in a 28pt line: the count dot stretched into an oval and
+ * every capped label carried air above and below that read as padding.
+ * iOS applies the cap to both. Pre-dividing by the setting lets Android's
+ * multiplication land on the capped value.
+ */
+export function androidLineHeight(
+  lineHeight: number | undefined,
+  multiplier: number,
+  fontScale: number,
+): number | undefined {
+  if (lineHeight == null || fontScale <= multiplier) return undefined;
+  return (lineHeight * multiplier) / fontScale;
 }
 
 // A fitted text sits in a row beside an icon or a count, and has to be the
@@ -83,13 +114,23 @@ export const Text = forwardRef<ElementRef<typeof NativeText>, TextProps>(functio
         ...(fit === "fixed" ? { allowFontScaling: false } : null),
       }
     : {};
+  const scales = fit !== "fixed" && props.allowFontScaling !== false;
+  const multiplier = resolveTextMultiplier(readFontSize(style), maxFontSizeMultiplier, fit);
+  const lineHeight =
+    Platform.OS === "android" && scales
+      ? androidLineHeight(
+          readStyleNumber(style, "lineHeight"),
+          multiplier,
+          PixelRatio.getFontScale(),
+        )
+      : undefined;
   return (
     <NativeText
       ref={ref}
       {...props}
       {...fitProps}
-      maxFontSizeMultiplier={resolveTextMultiplier(readFontSize(style), maxFontSizeMultiplier, fit)}
-      style={fit ? [FIT_STYLE, style] : style}
+      maxFontSizeMultiplier={multiplier}
+      style={[fit ? FIT_STYLE : null, style, lineHeight != null ? { lineHeight } : null]}
     />
   );
 });

@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
+import { Chip, type ChipTone } from "../../../shared/components/Chip";
 import type { MobileScheduleEntry } from "@dubgrid/contracts";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
@@ -19,6 +20,12 @@ export const SHIFT_CHANGE_LABELS: Record<ShiftChange["kind"], string> = {
   new: "New",
 };
 
+const SHIFT_CHANGE_TONES: Record<ShiftChange["kind"], ChipTone> = {
+  deleted: "danger",
+  modified: "brand",
+  new: "success",
+};
+
 /**
  * The status word for a published change, or null when there is nothing to
  * say: a raw `new` from a period's first publication is the baseline, not an
@@ -32,8 +39,11 @@ export function getShiftChangeLabel(change: MobileScheduleEntry["change"]): stri
 
 /**
  * The one change chip: Home's Your Week rows, the team tab's member rows and
- * the shift detail hero all draw it the same way. `inverse` is the hero
- * gradient's version, where a soft fill of its own would not read.
+ * the shift detail hero all draw it the same way. It is the shared `Chip`,
+ * so it carries the same fill-only shape as every other tag on the page; a
+ * bordered pill of its own beside a bordered split badge and a bordered role
+ * pill was three boxes in three colours around one name. `inverse` is the
+ * hero gradient's version, where a soft fill of its own would not read.
  */
 export function ShiftChangeBadge({
   change,
@@ -50,15 +60,19 @@ export function ShiftChangeBadge({
     return null;
   }
 
+  const accessibilityLabel = `Shift ${label.toLowerCase()}`;
+
+  if (!inverse) {
+    return (
+      <Chip accessibilityLabel={accessibilityLabel} tone={SHIFT_CHANGE_TONES[change.kind]}>
+        {label}
+      </Chip>
+    );
+  }
+
   return (
-    <View
-      accessibilityLabel={`Shift ${label.toLowerCase()}`}
-      style={[styles.badge, inverse ? styles.badgeInverse : styles[change.kind]]}
-    >
-      <Text
-        fit="compact"
-        style={[styles.text, inverse ? styles.textInverse : styles[`${change.kind}Text`]]}
-      >
+    <View accessibilityLabel={accessibilityLabel} style={styles.badgeInverse}>
+      <Text fit="compact" style={styles.textInverse}>
         {label}
       </Text>
     </View>
@@ -67,50 +81,23 @@ export function ShiftChangeBadge({
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
-    badge: {
+    // Matches `SplitShiftBadge` in the hero, which shares the same title slot.
+    badgeInverse: {
       alignSelf: "flex-start",
       alignItems: "center",
       justifyContent: "center",
       borderRadius: mobileRadii.pill,
       borderWidth: 1,
-      paddingHorizontal: mobileSpace.sm,
-      paddingVertical: mobileSpace.xs,
-    },
-    new: {
-      backgroundColor: mobileColors.successSoft,
-      borderColor: mobileColors.successBorder,
-    },
-    modified: {
-      backgroundColor: mobileColors.brandSoft,
-      borderColor: mobileColors.brandBorder,
-    },
-    deleted: {
-      backgroundColor: mobileColors.dangerSoft,
-      borderColor: mobileColors.dangerBorder,
-    },
-    // Matches `SplitShiftBadge` in the hero, which shares the same title slot.
-    badgeInverse: {
       backgroundColor: HERO_INVERSE_CHIP_FILL,
       borderColor: HERO_INVERSE_CHIP_BORDER,
       paddingHorizontal: mobileSpace.md,
       paddingVertical: mobileSpace.sm,
     },
-    text: {
+    textInverse: {
       ...mobileText.badge,
       textTransform: "none",
       includeFontPadding: false,
       textAlignVertical: "center",
-    },
-    newText: {
-      color: mobileColors.successText,
-    },
-    modifiedText: {
-      color: mobileColors.brand,
-    },
-    deletedText: {
-      color: mobileColors.dangerText,
-    },
-    textInverse: {
       color: mobileColors.textInverse,
     },
   });

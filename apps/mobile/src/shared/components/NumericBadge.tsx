@@ -5,7 +5,7 @@ import { formatBadgeCount, numericBadgeSize, type NumericBadgeSize } from "@dubg
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import { mobileRadii, mobileTabularText, mobileText, type MobileColors } from "../theme/tokens";
 
-export type NumericBadgeTone = "danger" | "brand" | "neutral" | "onAccent";
+export type NumericBadgeTone = "danger" | "brand" | "secondary" | "neutral" | "onAccent";
 
 /**
  * The solid tones take the button fills rather than the shared semantic
@@ -19,6 +19,12 @@ export function createNumericBadgeToneStyles(
   return {
     danger: { backgroundColor: mobileColors.buttonDangerBg, color: mobileColors.textInverse },
     brand: { backgroundColor: mobileColors.buttonPrimaryBg, color: mobileColors.textInverse },
+    // The secondary button's pair, so a count beside a secondary-toned pill
+    // (the "44.5h this week" hours pill) reads as the same family.
+    secondary: {
+      backgroundColor: mobileColors.controlSecondaryBg,
+      color: mobileColors.controlSecondaryFg,
+    },
     neutral: { backgroundColor: mobileColors.surface, color: mobileColors.textMuted },
     // Sits on a filled control (a selected segment, the brand filter button),
     // so it lightens that fill instead of picking a surface of its own.
