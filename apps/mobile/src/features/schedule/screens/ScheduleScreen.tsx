@@ -655,7 +655,10 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const accessToken = useAccessToken();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
-  const { height: viewportHeight } = useWindowDimensions();
+  const { height: viewportHeight, fontScale } = useWindowDimensions();
+  // A group's title and time share a row until the reader raises the text
+  // size, then the time drops under the title rather than breaking it.
+  const stackGroupTime = fontScale > 1;
   const { pushToast } = useToast();
   const bootstrapQuery = useBootstrap(accessToken);
   const now = useRealtimeNow();
@@ -1876,10 +1879,22 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
               return (
                 <View key={group.key} style={styles.shiftGroupBlock}>
                   {index > 0 ? <View style={styles.shiftGroupDivider} /> : null}
-                  <View style={styles.shiftGroupHeader}>
+                  <View
+                    style={[
+                      styles.shiftGroupHeader,
+                      stackGroupTime && styles.shiftGroupHeaderStacked,
+                    ]}
+                  >
                     <Text style={styles.shiftGroupTitle}>{group.title}</Text>
                     {groupTimeRange ? (
-                      <Text style={styles.shiftGroupTime}>{groupTimeRange}</Text>
+                      <Text
+                        style={[
+                          styles.shiftGroupTime,
+                          stackGroupTime && styles.shiftGroupTimeStacked,
+                        ]}
+                      >
+                        {groupTimeRange}
+                      </Text>
                     ) : null}
                   </View>
                   <View style={styles.teamGroupCard}>

@@ -1286,6 +1286,14 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textSubtle,
       textAlign: "right",
     },
+    shiftGroupHeaderStacked: {
+      flexDirection: "column",
+      alignItems: "stretch",
+      gap: mobileSpace.xs,
+    },
+    shiftGroupTimeStacked: {
+      textAlign: "left",
+    },
     weekDaySection: {
       gap: 12,
     },
