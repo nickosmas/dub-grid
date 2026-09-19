@@ -836,11 +836,11 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     section: {
       gap: mobileSpace.md,
     },
+    // Sentence case, like every other heading in the app; the small caps
+    // read as a different voice above a card of sentence-case rows.
     sectionTitle: {
-      ...mobileTextWeighted("label", "medium"),
+      ...mobileTextWeighted("meta", "medium"),
       color: mobileColors.textSubtle,
-      letterSpacing: 0.4,
-      textTransform: "uppercase",
     },
     sectionDescription: {
       ...mobileText.body,

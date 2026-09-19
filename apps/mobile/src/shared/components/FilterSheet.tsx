@@ -200,9 +200,8 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: mobileSpace.md,
     },
     sectionTitle: {
-      ...mobileText.label,
+      ...mobileTextWeighted("meta", "medium"),
       color: mobileColors.textSubtle,
-      textTransform: "uppercase",
     },
     selectionList: {
       backgroundColor: mobileColors.surface,

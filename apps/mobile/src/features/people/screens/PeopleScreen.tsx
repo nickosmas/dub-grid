@@ -63,6 +63,7 @@ import {
   mobileMotion,
   mobileRadii,
   mobileText,
+  mobileTextWeighted,
   type MobileColors,
   mobileSpace,
 } from "../../../shared/theme/tokens";
@@ -1227,9 +1228,8 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: mobileSpace.md,
     },
     sectionTitle: {
-      ...mobileText.label,
+      ...mobileTextWeighted("meta", "medium"),
       color: mobileColors.textSubtle,
-      textTransform: "uppercase",
     },
     searchBarRow: {
       alignItems: "center",
