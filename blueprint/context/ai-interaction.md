@@ -92,7 +92,9 @@ something done.
 12. **Release PR** - Keep `main` untouched during development. When explicitly
     asked to prepare a release, create or update a PR from `dev` to `main` only
     after auditing the diff and included commits. Do not merge, rewrite, or push
-    `main` without separate explicit authorization.
+    `main` without separate explicit authorization, and never merge until every
+    GitHub check on the PR is green (`gh pr checks <n> --watch`); a failure
+    withdraws the authorization until it is fixed and the checks rerun.
 13. **Release prep (optional)** - run `/release render` or `/release vercel`
     after a completed feature or milestone when you want local provider config,
     env var review, build/start checks, and a smoke-test path. `/release` must
