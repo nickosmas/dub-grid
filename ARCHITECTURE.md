@@ -226,7 +226,7 @@ A new organization's 14-day trial clock starts on the **first super admin login*
 
 ### Migration Strategy
 
-Database history is an immutable, ordered migration stream under `supabase/migrations/`. Migrations `001`-`004` are the frozen baseline; every later schema change is a new, retry-safe `NNN_snake_case.sql` at the next number (currently through `020`), and `checksums.sha256` locks every reviewed file (`npm run db:migrations:check`). Never edit an applied migration and never mirror a change back into the baseline.
+Database history is an immutable, ordered migration stream under `supabase/migrations/`. Migrations `001`-`004` are the frozen baseline; every later schema change is a new, retry-safe `NNN_snake_case.sql` at the next number (currently through `022`), and `checksums.sha256` locks every reviewed file (`npm run db:migrations:check`). Never edit an applied migration and never mirror a change back into the baseline.
 
 | File                         | Contents                                                                                                                                                                                                                                                                                                                                                 |
 | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

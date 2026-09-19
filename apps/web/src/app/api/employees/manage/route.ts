@@ -6,13 +6,23 @@ import { API_ERRORS } from "@dubgrid/client-errors";
 import { scheduleCellStateSchema } from "@dubgrid/contracts";
 import type { Employee } from "@/types";
 import { requireOrgPermissions, resolveEffectiveOrgId } from "@/app/api/shared/permissions";
-import { requireAuthenticatedUser } from "@/lib/api-auth";
+import {
+  forbidIfSandboxCookie,
+  requireAuthenticatedUser,
+  requireSensitiveActionAuth,
+} from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { fetchAssignmentIdByPairMap } from "@/app/api/shared/schedule";
 import { mapNormalizedScheduleCellRowToScheduleEntry } from "@/lib/schedule-cells";
 import { employeeToRow, rowToEmployee, rowToInvitation } from "@/lib/db/mappers";
 import { EMPLOYEE_COLS, fetchAllRows } from "@/lib/db/shared";
 import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
+import {
+  getLoginEmailChange,
+  LINKED_EMAIL_REQUIRED_MESSAGE,
+  LoginEmailConflictError,
+  syncLinkedLoginEmail,
+} from "@/features/employees/server/login-email";
 import { apiErrorResponse } from "@/lib/error-handling";
 import logger from "@/lib/logger";
 import {
@@ -693,6 +703,36 @@ export async function POST(req: NextRequest) {
         const changedProfileFields = previousRow
           ? diffEmployeeProfileFields(previousRow, nextEmployee)
           : [];
+
+        // The staff email is the login email. Changing it for a linked
+        // account is a sensitive action: step-up first, never from a sandbox
+        // (its clone keeps the owner's own user_id), and never to nothing.
+        const linkedUserId = previousRow?.userId ?? null;
+        if (linkedUserId && !nextEmployee.email?.trim()) {
+          return buildStaffValidationErrorResponse({ email: LINKED_EMAIL_REQUIRED_MESSAGE });
+        }
+        const loginEmailChange = getLoginEmailChange({
+          userId: linkedUserId,
+          previousEmail: previousRow?.email,
+          nextEmail: nextEmployee.email,
+        });
+        if (loginEmailChange && linkedUserId) {
+          const sandboxResponse = forbidIfSandboxCookie(req);
+          if (sandboxResponse) return sandboxResponse;
+          const assurance = await requireSensitiveActionAuth(req);
+          if ("response" in assurance) return assurance.response;
+          try {
+            await syncLinkedLoginEmail(auth.serviceClient, {
+              userId: linkedUserId,
+              email: loginEmailChange,
+            });
+          } catch (error) {
+            if (error instanceof LoginEmailConflictError) {
+              return NextResponse.json(error.conflict, { status: 409 });
+            }
+            throw error;
+          }
+        }
         const referenceAuditValues =
           previousRow && changedProfileFields.length > 0
             ? employeeAuditReferenceValues(
@@ -786,6 +826,7 @@ export async function POST(req: NextRequest) {
             if (changedFields.includes("email")) {
               from.email = previousRow.email;
               to.email = nextEmployee.email;
+              if (loginEmailChange) to.loginEmail = loginEmailChange;
             }
             if (changedFields.includes("phone")) {
               from.phone = previousRow.phone;

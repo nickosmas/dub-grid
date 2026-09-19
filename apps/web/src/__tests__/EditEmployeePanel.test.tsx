@@ -15,6 +15,21 @@ vi.mock("@/features/employees/client", () => ({
   checkEmployeeEmailConflict: vi.fn(),
 }));
 
+const requireCredentialAssurance = vi.fn(async (_accessToken: string) => ({
+  success: true as const,
+}));
+vi.mock("@/features/account/client", () => ({
+  requireCredentialAssurance: (accessToken: string) => requireCredentialAssurance(accessToken),
+}));
+
+const stepUpRun = vi.fn(async (action: (token: string) => Promise<unknown>) => {
+  await action("access-token");
+  return true;
+});
+vi.mock("@/hooks/useStepUpAction", () => ({
+  useStepUpAction: () => ({ run: stepUpRun, dialog: null }),
+}));
+
 const checkEmployeeEmailConflictMock = vi.mocked(checkEmployeeEmailConflict);
 const DESIGNATIONS: NamedItem[] = [
   { id: 1, orgId: "org-1", name: "JLCSN", abbr: "JLCSN", sortOrder: 0 },
@@ -631,6 +646,56 @@ describe("EditEmployeePanel", () => {
         pendingInvitation,
       );
       expect(onSave).not.toHaveBeenCalled();
+    });
+
+    beforeEach(() => {
+      stepUpRun.mockClear();
+      requireCredentialAssurance.mockClear();
+    });
+
+    it("confirms the manager's identity before changing a linked account's email", async () => {
+      const user = userEvent.setup();
+      const onSave = vi.fn();
+      renderPanel({ onSave, employee: { ...employee, userId: "user-42" } });
+
+      await changeEmail(user);
+      expect(
+        screen.getByText("This also changes the email they sign in with."),
+      ).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      await waitFor(() => expect(onSave).toHaveBeenCalledOnce());
+      expect(stepUpRun).toHaveBeenCalledOnce();
+      expect(requireCredentialAssurance).toHaveBeenCalledWith("access-token");
+      expect(requireCredentialAssurance.mock.invocationCallOrder[0]).toBeLessThan(
+        onSave.mock.invocationCallOrder[0]!,
+      );
+    });
+
+    it("does not ask for identity when a person without an account changes email", async () => {
+      const user = userEvent.setup();
+      const onSave = vi.fn();
+      renderPanel({ onSave });
+
+      await changeEmail(user);
+      expect(screen.queryByText(/sign in with/)).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(onSave).toHaveBeenCalledOnce();
+      expect(stepUpRun).not.toHaveBeenCalled();
+    });
+
+    it("blocks clearing the email of a linked account", async () => {
+      const user = userEvent.setup();
+      const onSave = vi.fn();
+      renderPanel({ onSave, employee: { ...employee, userId: "user-42" } });
+
+      const emailInput = screen.getByDisplayValue("alice@example.com");
+      await user.clear(emailInput);
+      fireEvent.blur(emailInput);
+
+      expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+      expect(screen.getByText("An account needs an email to sign in with.")).toBeInTheDocument();
     });
 
     it("does not gate the save when there is no pending invitation", async () => {

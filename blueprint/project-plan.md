@@ -247,7 +247,7 @@ before conversion is required.
   (`npm run build`) and start.
 - **Database:** Supabase (hosted Postgres + Auth + Realtime), an immutable
   ordered migration stream under `supabase/migrations/` (`001`-`004` frozen,
-  forward migrations through `020`, checksum-locked). Feature flags are
+  forward migrations through `022`, checksum-locked). Feature flags are
   created via the Gridmaster UI; a new switch is one INSERT in a forward
   migration plus a call site.
 - **Background jobs:** `cron-expire-requests.yml` GitHub Action (hourly)

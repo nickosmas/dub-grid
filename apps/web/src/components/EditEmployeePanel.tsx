@@ -5,6 +5,9 @@ import { Employee, FocusArea, NamedItem, Invitation } from "@/types";
 import { Button } from "@/components/Button";
 import CustomSelect from "@/components/CustomSelect";
 import { useMediaQuery, MOBILE, useIsInSandbox } from "@/hooks";
+import { useStepUpAction } from "@/hooks/useStepUpAction";
+import { useLatestRef } from "@/hooks/useLatestRef";
+import { requireCredentialAssurance } from "@/features/account/client";
 import {
   validateEmail,
   validateNotes,
@@ -152,6 +155,8 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
   ) {
     const isMobile = useMediaQuery(MOBILE);
     const isInSandbox = useIsInSandbox();
+    const stepUp = useStepUpAction();
+    const stepUpRef = useLatestRef(stepUp);
     // Set while the "changing this email will revoke the pending invitation"
     // confirm dialog is open — holds the already-validated employee payload
     // handleSave built, so onConfirm/onCancel don't need to redo validation.
@@ -212,6 +217,15 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       onEmailConflictChange?.(emailConflict);
     }, [emailConflict, onEmailConflictChange]);
 
+    // The email is the login email, so a linked account cannot be left without one.
+    const validateStaffEmail = useCallback(
+      (value: string) =>
+        employee.userId && !value.trim()
+          ? "An account needs an email to sign in with."
+          : validateEmail(value),
+      [employee.userId],
+    );
+
     const fieldErrors = useMemo(
       () => ({
         firstName: touched.firstName ? validateRequired(form.firstName, "First name") : null,
@@ -220,11 +234,11 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
           touched.focusAreaIds && form.focusAreaIds.length === 0 && !isManagementUser
             ? `At least one ${focusAreaLabel.toLowerCase()} is required`
             : null,
-        email: touched.email ? validateEmail(form.email) : null,
+        email: touched.email ? validateStaffEmail(form.email) : null,
         phone: touched.phone ? validatePhone(form.phone) : null,
         contactNotes: touched.contactNotes ? validateNotes(form.contactNotes) : null,
       }),
-      [form, touched, focusAreaLabel, isManagementUser],
+      [form, touched, focusAreaLabel, isManagementUser, validateStaffEmail],
     );
 
     const markTouched = useCallback((field: string) => {
@@ -266,12 +280,12 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
           (form.focusAreaIds.length === 0 && !isManagementUser) ||
           validateRequired(form.firstName, "First name") ||
           validateRequired(form.lastName, "Last name") ||
-          validateEmail(form.email) ||
+          validateStaffEmail(form.email) ||
           validatePhone(form.phone) ||
           validateNotes(form.contactNotes) ||
           emailConflict,
         ),
-      [form, isManagementUser, emailConflict],
+      [form, isManagementUser, emailConflict, validateStaffEmail],
     );
 
     useEffect(() => {
@@ -296,7 +310,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       if (
         validateRequired(form.firstName, "First name") ||
         validateRequired(form.lastName, "Last name") ||
-        validateEmail(form.email) ||
+        validateStaffEmail(form.email) ||
         validatePhone(form.phone) ||
         validateNotes(form.contactNotes) ||
         emailConflict
@@ -335,6 +349,16 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
         return false;
       }
 
+      // The email is the login email: changing it for a linked account is a
+      // sensitive action, so confirm the manager's identity the way the
+      // profile's own email change does before the save goes out.
+      if (emailChanged && employee.userId) {
+        return stepUpRef.current.run(async (accessToken) => {
+          await requireCredentialAssurance(accessToken);
+          await onSave(nextEmployee);
+        });
+      }
+
       await onSave(nextEmployee);
       return true;
     }, [
@@ -343,6 +367,8 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       onSave,
       onSaveWithReinvite,
       pendingInvitation,
+      stepUpRef,
+      validateStaffEmail,
       isManagementUser,
       emailConflict,
     ]);
@@ -404,7 +430,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
     const detailsNotices = useMemo(() => {
       const notices: string[] = [];
       if (employee.userId && form.email !== employee.email && !emailConflict) {
-        notices.push("Changing the contact email does not change their login email.");
+        notices.push("This also changes the email they sign in with.");
       }
       return notices;
     }, [employee.userId, employee.email, form.email, emailConflict]);
@@ -883,6 +909,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
             </div>
           )}
         </div>
+        {stepUp.dialog}
         {pendingReinviteSave && pendingInvitation && onSaveWithReinvite && (
           <ConfirmDialog
             title="Send a new invitation?"

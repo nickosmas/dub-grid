@@ -25,7 +25,7 @@ describe("SectionNotice", () => {
   it("uses the warning surface for something that will not happen", () => {
     render(
       <SectionNotice
-        messages={["Changing the contact email does not change their login email."]}
+        messages={["This also changes the email they sign in with."]}
         tone="warning"
       />,
     );

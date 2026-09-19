@@ -259,6 +259,26 @@ belongs to no organization is an abandoned signup, so the register route confirm
 sets the password just chosen. A **confirmed** account's password is never touched — that
 person signs in with the one they already have.
 
+### 4.1 One email per person
+
+A linked staff record's email **is** the login email; there is no separate contact
+address. The two stores are kept equal in both directions:
+
+- **Manager changes it** (web `EditEmployeePanel`, mobile person editor): the
+  `/api/employees/manage` update branch and the mobile person `PATCH` treat a changed
+  email on a linked, active row as a sensitive action (`requireSensitiveActionAuth` /
+  `requireMobileSensitiveActionAuth`, step-up in the client), refuse it from a test
+  sandbox, and call `auth.admin.updateUserById(userId, { email, email_confirm: true })`
+  **before** writing the row (`features/employees/server/login-email.ts`). GoTrue
+  rejects an address another account holds, which surfaces as the usual email conflict.
+  A linked row cannot be saved with a blank email. The change applies to that account in
+  every organization it belongs to.
+- **The person changes it** (web profile, mobile profile): after Supabase confirms the
+  new address, the `on_auth_user_email_changed` trigger (migration `022`) rewrites
+  `employees.email` on every linked, active row. A row in an organization where an
+  unlinked staff record already holds that address is left alone with a warning rather
+  than failing the confirmation.
+
 ---
 
 ## 4a. Post-Login Soft Nav, Auth Splash, and Onboarding Gate

@@ -15,6 +15,7 @@ import Modal from "@/components/Modal";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { AddManagementUserToScheduleModal } from "@/components/staff/AddManagementUserToScheduleModal";
 import { useDirectory, useOrganizationData, usePermissions } from "@/hooks";
+import { useLatestRef } from "@/hooks/useLatestRef";
 import {
   isSelfAction,
   SELF_ACTION_FORBIDDEN_MESSAGE,
@@ -37,6 +38,7 @@ import {
 } from "@/features/employees/client";
 import { queryKeys } from "@/lib/query-keys";
 import { mergeEmployeeIntoDirectoryPerson, upsertEmployeeInList } from "@/lib/staff-directory";
+import { isCurrentUsersEmployee } from "@/lib/profile-links";
 import { computeEmployeeWeeklyHours } from "@/lib/dashboard-stats";
 import {
   getProfileOverviewCurrentWeekDateKeys,
@@ -127,6 +129,12 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   );
   const { directory } = useDirectory(orgId);
   const queryClient = useQueryClient();
+  // Label maps are rebuilt whenever the org bootstrap refetches in the
+  // background. Read them through refs so that never restarts this page's
+  // load, which used to blank an already-rendered profile a second time.
+  const assignmentLabelMapRef = useLatestRef(assignmentLabelMap);
+  const absenceTypeMapRef = useLatestRef(absenceTypeMap);
+  const currentUserIdRef = useLatestRef(currentUser?.id ?? null);
 
   // Employee-scoped invitation list. Key is a sub-prefix of
   // `queryKeys.org.invitations(orgId)` so realtime invalidation of the
@@ -199,6 +207,12 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           setLoading(false);
           return;
         }
+        // Your own record lives at /profile. In-app links already go there;
+        // this covers a typed URL without a separate lookup in front of the page.
+        if (isCurrentUsersEmployee(emp.userId, currentUserIdRef.current)) {
+          router.replace("/profile");
+          return;
+        }
         setEmployee(emp);
 
         // Fetch the rest in parallel
@@ -206,13 +220,19 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           fetchEmployeeShifts(
             employeeId,
             orgId,
-            assignmentLabelMap,
-            absenceTypeMap,
+            assignmentLabelMapRef.current,
+            absenceTypeMapRef.current,
             overviewRange.startDate,
             overviewRange.endDate,
           ),
           perms.canViewRecurringShifts
-            ? fetchRecurringShifts(orgId, employeeId, assignmentLabelMap, false, absenceTypeMap)
+            ? fetchRecurringShifts(
+                orgId,
+                employeeId,
+                assignmentLabelMapRef.current,
+                false,
+                absenceTypeMapRef.current,
+              )
             : Promise.resolve([]),
         ]);
 
@@ -242,8 +262,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     employeeId,
     orgId,
     orgLoading,
-    assignmentLabelMap,
-    absenceTypeMap,
+    absenceTypeMapRef,
+    assignmentLabelMapRef,
+    currentUserIdRef,
     perms.canViewEmployeeDetails,
     perms.canViewRecurringShifts,
     perms.isGridmaster,
@@ -254,6 +275,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   ]);
 
   useEffect(() => {
+    setEmployee(null);
     setIsEditingManagementAccess(false);
     setShowInviteModal(false);
     setShowAddToScheduleModal(false);
@@ -721,7 +743,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     <>
       <ProgressBar loading={isLoading} />
 
-      {!isLoading && employee && org && (
+      {/* A re-run of the load (permissions settling, a bootstrap refetch) keeps
+          the rendered profile in place; only a first load shows nothing. */}
+      {employee && org && (
         <SettingsShell<StaffProfileSection>
           basePath={`/people/${employeeId}`}
           navGroups={profileNavGroups}

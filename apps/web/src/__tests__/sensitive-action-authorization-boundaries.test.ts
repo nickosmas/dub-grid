@@ -132,6 +132,12 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
     policy: "sensitive",
     assertions: [/\brequireOrgPermissions\s*\(/, /\brequireSensitiveActionAuth\s*\(/],
   },
+  "apps/web/src/app/api/employees/manage/route.ts": {
+    policy: "conditional-sensitive",
+    assertions: [
+      /if \(loginEmailChange && linkedUserId\) \{[\s\S]*?\bforbidIfSandboxCookie\s*\([\s\S]*?\brequireSensitiveActionAuth\s*\([\s\S]*?\bsyncLinkedLoginEmail\s*\(/,
+    ],
+  },
   "apps/web/src/app/api/people/change-requests/[id]/route.ts": {
     policy: "conditional-sensitive",
     assertions: [
@@ -141,6 +147,9 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
 };
 
 const MOBILE_DELEGATES: Record<string, RegExp[]> = {
+  "apps/web/src/features/mobile/server/routes/person.ts": [
+    /if \(loginEmailChange && currentPerson\.userId\) \{[\s\S]*?\brequireMobileSensitiveActionAuth\s*\([\s\S]*?\bsyncLinkedLoginEmail\s*\(/,
+  ],
   "apps/web/src/features/mobile/server/routes/credential-assurance.ts": [
     /\brequireMobileSensitiveActionAuth\s*\(/,
   ],

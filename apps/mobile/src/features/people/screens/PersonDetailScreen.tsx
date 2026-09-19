@@ -52,6 +52,7 @@ import {
   parseMobileStaffFieldErrors,
   resendMobilePersonInvitation,
   revokeMobilePersonInvitation,
+  requireMobileCredentialAssurance,
   updateMobilePerson,
   updateMobilePersonStatus,
   type MobileAccountLinkChallenge,
@@ -98,6 +99,7 @@ import {
   ProfileSection,
   ProfileTextInput,
 } from "../../profile/components/ProfilePrimitives";
+import { useMobileStepUpAction } from "../../profile/hooks/useMobileStepUpAction";
 import { isRoleCertificationBlocked } from "../../profile/lib/role-certification";
 import { ProfileSkeleton } from "../../profile/components/ProfileSkeleton";
 import { EMAIL_CONFLICT_MESSAGES, PHONE_CONFLICT_MESSAGE } from "../lib/contactConflicts";
@@ -124,6 +126,7 @@ type DeactivateOutcome = "inactive" | "remove";
 
 /** Draft fields the server can reject on its own, so a rejection can be retired. */
 const SERVER_CHECKED_FIELDS = ["firstName", "lastName", "email", "phone"] as const;
+const LINKED_EMAIL_REQUIRED_MESSAGE = "An account needs an email to sign in with.";
 
 type EditDraft = {
   firstName: string;
@@ -204,17 +207,25 @@ function personDraftHasChanges(draft: EditDraft, person: MobilePerson): boolean 
  * malformed address was never checked for uniqueness, and saying it is taken
  * would be describing something that wasn't asked.
  */
+// The staff email is the login email, so a linked account cannot be left without one.
+function getStaffEmailError(value: string, hasAccount: boolean) {
+  return hasAccount && !value.trim()
+    ? LINKED_EMAIL_REQUIRED_MESSAGE
+    : getOptionalStaffEmailError(value);
+}
+
 function getPersonEditFieldErrors(
   draft: EditDraft,
   serverFieldErrors: Partial<Record<MobileStaffField, string>>,
   hasManagementAccess: boolean,
   focusAreaLabel: string,
+  hasAccount = false,
 ) {
   return {
     firstName: getStaffNameError(draft.firstName, "First name") ?? serverFieldErrors.firstName,
     lastName: getStaffNameError(draft.lastName, "Last name") ?? serverFieldErrors.lastName,
     phone: getOptionalUsPhoneError(draft.phone) ?? serverFieldErrors.phone,
-    email: getOptionalStaffEmailError(draft.email) ?? serverFieldErrors.email,
+    email: getStaffEmailError(draft.email, hasAccount) ?? serverFieldErrors.email,
     contactNotes: getStaffNotesError(draft.contactNotes),
     focusAreaIds:
       draft.focusAreaIds.length === 0 && !hasManagementAccess
@@ -410,9 +421,13 @@ export default function PersonDetailScreen() {
     );
   }
 
+  const stepUp = useMobileStepUpAction();
   const updateMutation = useMutation({
-    mutationFn: async (body: MobilePersonUpdateBody) =>
-      updateMobilePerson(accessToken!, personId!, body),
+    mutationFn: async ({
+      actionAccessToken,
+      ...body
+    }: MobilePersonUpdateBody & { actionAccessToken?: string }) =>
+      updateMobilePerson(actionAccessToken ?? accessToken!, personId!, body),
     onMutate: () => setConfirmationError(null),
     onError: (error) => {
       // A rejection the server pinned to a field belongs on that field, not in
@@ -605,7 +620,7 @@ export default function PersonDetailScreen() {
     if (!person || !draft) return;
     const firstNameError = getStaffNameError(draft.firstName, "First name");
     const lastNameError = getStaffNameError(draft.lastName, "Last name");
-    const emailError = getOptionalStaffEmailError(draft.email);
+    const emailError = getStaffEmailError(draft.email, Boolean(person.userId));
     const phoneError = getOptionalUsPhoneError(draft.phone);
     const notesError = getStaffNotesError(draft.contactNotes);
     // Someone with management access doesn't need at least one focus area to
@@ -649,22 +664,42 @@ export default function PersonDetailScreen() {
     return confirmSave();
   }
 
-  function confirmSave() {
+  async function confirmSave() {
     if (!person || !draft) return;
 
-    return updateMutation.mutateAsync({
-      expectedVersion: person.version,
-      firstName: normalizeStaffName(draft.firstName),
-      lastName: normalizeStaffName(draft.lastName),
-      employmentType: draft.employmentType,
-      phone: normalizeOptionalUsPhone(draft.phone),
-      email: normalizeOptionalStaffEmail(draft.email),
-      contactNotes: normalizeStaffNotes(draft.contactNotes),
-      certificationId: draft.certificationId,
-      focusAreaIds: draft.focusAreaIds,
-      roleIds: draft.roleIds,
-      departmentIds: draft.departmentIds,
-    });
+    // The staff email is the login email. Changing it for a linked account is
+    // a sensitive action, so the manager confirms their identity first, the
+    // way their own email change does.
+    const changesLoginEmail =
+      Boolean(person.userId) && normalizeOptionalStaffEmail(draft.email) !== person.email;
+    if (changesLoginEmail) {
+      try {
+        await stepUp.run(async (actionAccessToken) => {
+          await requireMobileCredentialAssurance(actionAccessToken);
+          await updateMutation.mutateAsync({ ...buildUpdateBody(), actionAccessToken });
+        });
+      } catch {
+        // The mutation owns its user-facing error.
+      }
+      return;
+    }
+    return updateMutation.mutateAsync(buildUpdateBody());
+  }
+
+  function buildUpdateBody(): MobilePersonUpdateBody {
+    return {
+      expectedVersion: person!.version,
+      firstName: normalizeStaffName(draft!.firstName),
+      lastName: normalizeStaffName(draft!.lastName),
+      employmentType: draft!.employmentType,
+      phone: normalizeOptionalUsPhone(draft!.phone),
+      email: normalizeOptionalStaffEmail(draft!.email),
+      contactNotes: normalizeStaffNotes(draft!.contactNotes),
+      certificationId: draft!.certificationId,
+      focusAreaIds: draft!.focusAreaIds,
+      roleIds: draft!.roleIds,
+      departmentIds: draft!.departmentIds,
+    };
   }
 
   function handlePersonScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
@@ -1096,6 +1131,7 @@ export default function PersonDetailScreen() {
           focusAreaLabel={focusAreaLabel}
           focusAreas={bootstrapQuery.data?.focusAreas ?? []}
           hasManagementAccess={person.managementDepartmentIds.length > 0}
+          hasAccount={Boolean(person.userId)}
           serverFieldErrors={serverFieldErrors}
           onChange={(next) => {
             // A server verdict only holds for the value it was given. Editing
@@ -1355,7 +1391,9 @@ export default function PersonDetailScreen() {
       <ConfirmationModal
         body={
           draft
-            ? `The staff email will change to ${draft.email.trim() || "no email address"}. Check the address before saving.`
+            ? person?.userId
+              ? `They will sign in with ${draft.email.trim()} from now on. Check the address before saving.`
+              : `The staff email will change to ${draft.email.trim() || "no email address"}. Check the address before saving.`
             : ""
         }
         confirmLabel="Save"
@@ -1366,9 +1404,10 @@ export default function PersonDetailScreen() {
           setShowSaveConfirmation(false);
         }}
         onConfirm={confirmSave}
-        title="Change the staff email?"
-        visible={showSaveConfirmation}
+        title={person?.userId ? "Change their sign-in email?" : "Change the staff email?"}
+        visible={showSaveConfirmation && !stepUp.active}
       />
+      {stepUp.sheet}
       <ConfirmationModal {...guard.confirmationProps} />
       <ConfirmationModal
         body={statusConfirmationBody}
@@ -1613,6 +1652,7 @@ function EditPanel({
   roles,
   useCompactRoleCertificationLabels,
   hasManagementAccess,
+  hasAccount,
   serverFieldErrors,
   onChange,
 }: {
@@ -1624,6 +1664,7 @@ function EditPanel({
   certifications: MobileNamedItem[];
   roleLabel: string;
   hasManagementAccess: boolean;
+  hasAccount: boolean;
   roles: MobileBootstrapRole[];
   useCompactRoleCertificationLabels: boolean;
   serverFieldErrors: Partial<Record<MobileStaffField, string>>;
@@ -1637,6 +1678,7 @@ function EditPanel({
     serverFieldErrors,
     hasManagementAccess,
     focusAreaLabel,
+    hasAccount,
   );
   const setField = <K extends keyof EditDraft>(key: K, value: EditDraft[K]) => {
     onChange({ ...draft, [key]: value });
@@ -1686,7 +1728,10 @@ function EditPanel({
         </ProfilePanel>
       </ProfileSection>
 
-      <ProfileSection title="Contact">
+      <ProfileSection
+        title="Contact"
+        description={hasAccount ? "The email is also the one they sign in with." : undefined}
+      >
         <ProfilePanel>
           <ProfileTextInput
             accessibilityLabel="Phone"
