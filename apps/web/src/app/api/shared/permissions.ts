@@ -1,7 +1,11 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { buildPermissionContext } from "@dubgrid/authz";
-import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
+import {
+  ACCOUNT_DISABLED_CODE,
+  ACCOUNT_DISABLED_MESSAGE,
+  evaluateOrganizationBillingAccess,
+} from "@dubgrid/domain";
 import type { AdminPermissions, OrganizationRole } from "@/types";
 import { createRequestSupabaseClient, requireAuthenticatedUser } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
@@ -442,7 +446,11 @@ export async function requireOrgPermissions(
         .eq("org_id", orgId)
         .is("archived_at", null)
         .maybeSingle(),
-      serviceClient.from("profiles").select("platform_role").eq("id", auth.user.id).maybeSingle(),
+      serviceClient
+        .from("profiles")
+        .select("platform_role, deactivated_at, terminated_at")
+        .eq("id", auth.user.id)
+        .maybeSingle(),
       serviceClient
         .from("organizations")
         .select("archived_at, suspended_at, subscription_status, trial_ends_at")
@@ -450,6 +458,18 @@ export async function requireOrgPermissions(
         .maybeSingle(),
       isCallerInactive(serviceClient, auth.user.id, orgId),
     ]);
+
+  // The JWT hook refuses these accounts at the next token issue; this covers
+  // the token they already hold. Without it a deactivated user kept every
+  // organization API for as long as they never signed out.
+  if (profile?.deactivated_at != null || profile?.terminated_at != null) {
+    return {
+      response: NextResponse.json(
+        { error: ACCOUNT_DISABLED_MESSAGE, code: ACCOUNT_DISABLED_CODE },
+        { status: 403 },
+      ),
+    };
+  }
 
   const isGridmaster = profile?.platform_role === "gridmaster";
   if (!isGridmaster && !membership) {

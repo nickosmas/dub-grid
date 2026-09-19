@@ -66,6 +66,11 @@ function renderView() {
   return { ...view, onSelectOrg };
 }
 
+async function openRowAction(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(screen.getByRole("button", { name: "Billing actions for Acme Health" }));
+  await user.click(await screen.findByRole("menuitem", { name }));
+}
+
 describe("GridmasterBillingView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -80,7 +85,7 @@ describe("GridmasterBillingView", () => {
     renderView();
 
     await screen.findByText("Acme Health");
-    await user.click(screen.getByRole("button", { name: "Sync" }));
+    await openRowAction(user, "Sync Stripe");
     await user.click(screen.getByRole("button", { name: "Sync Stripe" }));
 
     await waitFor(() => {
@@ -120,7 +125,7 @@ describe("GridmasterBillingView", () => {
     renderView();
 
     await screen.findByText("Acme Health");
-    await user.click(screen.getByRole("button", { name: "Extend trial" }));
+    await openRowAction(user, "Extend trial");
     await user.clear(await screen.findByLabelText("Trial extension days"));
     await user.type(screen.getByLabelText("Trial extension days"), "21");
     // The row trigger and the dialog confirm are both "Extend trial", so scope
@@ -143,7 +148,7 @@ describe("GridmasterBillingView", () => {
     renderView();
 
     await screen.findByText("Acme Health");
-    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await openRowAction(user, "Cancel subscription");
     await user.click(screen.getByRole("button", { name: "Cancel Billing" }));
 
     await waitFor(() => {
@@ -160,7 +165,7 @@ describe("GridmasterBillingView", () => {
     renderView();
 
     await screen.findByText("Acme Health");
-    await user.click(screen.getByRole("button", { name: "End period" }));
+    await openRowAction(user, "End at period end");
     await user.click(screen.getByRole("button", { name: "End Period" }));
 
     await waitFor(() => {
@@ -177,7 +182,7 @@ describe("GridmasterBillingView", () => {
     renderView();
 
     await screen.findByText("Acme Health");
-    await user.click(screen.getByRole("button", { name: "True up seats" }));
+    await openRowAction(user, "True up seats");
     await user.click(screen.getByRole("button", { name: "True Up Seats" }));
 
     await waitFor(() => {
@@ -194,9 +199,7 @@ describe("GridmasterBillingView", () => {
     renderView();
 
     await screen.findByText("Acme Health");
-    await user.click(screen.getByRole("button", { name: "Billing status for Acme Health" }));
-    await user.click(await screen.findByRole("option", { name: "Active" }));
-    await user.click(screen.getByRole("button", { name: "Override" }));
+    await openRowAction(user, "Active");
     await user.click(screen.getByRole("button", { name: "Override Status" }));
 
     await waitFor(() => {

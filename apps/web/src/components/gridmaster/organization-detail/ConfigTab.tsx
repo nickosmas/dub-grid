@@ -1,5 +1,5 @@
 import { resolveShiftPillColors, toDarkPillColors } from "@/lib/colors";
-import { sectionBodyStyle, sectionHeaderStyle, sectionStyle, thStyle } from "@/lib/styles";
+import { sectionBodyStyle, sectionHeaderStyle, sectionStyle } from "@/lib/styles";
 import {
   type AbsenceType,
   type FocusArea,
@@ -10,6 +10,7 @@ import {
   type ShiftCategory,
 } from "@/types";
 import { useTheme } from "next-themes";
+import { gmHeaderStyle, gmTableStyle } from "@/components/gridmaster/table-styles";
 
 // Configuration tab for the gridmaster OrganizationDetail view.
 
@@ -121,14 +122,14 @@ export function ConfigTab({
               None configured
             </span>
           ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <table style={gmTableStyle}>
               <thead>
                 <tr>
                   {["Shift", "Short code", "Times", "Focus area"].map((h) => (
                     <th
                       key={h}
                       style={{
-                        ...thStyle,
+                        ...gmHeaderStyle(h),
                         padding: "8px 14px",
                         borderBottom: "1px solid var(--dg-color-border-light)",
                       }}
@@ -242,14 +243,14 @@ export function ConfigTab({
               None configured
             </span>
           ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <table style={gmTableStyle}>
               <thead>
                 <tr>
                   {["Job", "Short code", "Assignment", "Grid display"].map((h) => (
                     <th
                       key={h}
                       style={{
-                        ...thStyle,
+                        ...gmHeaderStyle(h),
                         padding: "8px 14px",
                         borderBottom: "1px solid var(--dg-color-border-light)",
                       }}
@@ -344,14 +345,14 @@ export function ConfigTab({
               None configured
             </span>
           ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <table style={gmTableStyle}>
               <thead>
                 <tr>
                   {["Label", "Name", "Color"].map((h) => (
                     <th
                       key={h}
                       style={{
-                        ...thStyle,
+                        ...gmHeaderStyle(h),
                         padding: "8px 14px",
                         borderBottom: "1px solid var(--dg-color-border-light)",
                       }}

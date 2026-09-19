@@ -46,6 +46,8 @@ const BROWSER_MUTATION_ROUTES = [
   "apps/web/src/app/api/gridmaster/stripe-sync/route.ts",
   "apps/web/src/app/api/gridmaster/subscription/route.ts",
   "apps/web/src/app/api/gridmaster/users/[userId]/force-logout/route.ts",
+  "apps/web/src/app/api/gridmaster/users/[userId]/reinstate/route.ts",
+  "apps/web/src/app/api/gridmaster/users/[userId]/terminate/route.ts",
   "apps/web/src/app/api/gridmaster/users/route.ts",
   "apps/web/src/app/api/import/employees/route.ts",
   "apps/web/src/app/api/invitations/accept/route.ts",

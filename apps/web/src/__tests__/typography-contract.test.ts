@@ -35,7 +35,6 @@ const typographyEnforcementSourceFiles = allProductionSourceFiles.filter((filePa
   // Only fixed visual artifacts are excluded. Real route, auth, onboarding,
   // and landing controls stay in scope even when they sit beside a mockup.
   const artifactExceptions = [
-    "components/account/AppearancePreview.tsx",
     "components/landing/DashboardMockup.tsx",
     "components/landing/MobileAppMockup.tsx",
     "components/landing/RecurringShiftsMockup.tsx",

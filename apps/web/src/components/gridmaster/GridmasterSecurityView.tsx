@@ -15,8 +15,14 @@ import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { EmptyState } from "@/components/EmptyState";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { queryKeys } from "@/lib/query-keys";
-import { sectionStyle, tdStyle, thStyle } from "@/lib/styles";
+import { sectionStyle } from "@/lib/styles";
 import type { GridmasterUserSession, Organization } from "@/types";
+import {
+  gmHeaderStyle,
+  gmTableStyle,
+  gmTdStyle,
+  gmThStyle,
+} from "@/components/gridmaster/table-styles";
 
 function SecurityCard({ label, value, detail }: { label: string; value: number; detail: string }) {
   return (
@@ -301,16 +307,16 @@ function SessionsTable({
   }
   return (
     <div style={{ overflowX: "auto" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <table style={gmTableStyle}>
         <thead>
           <tr>
-            <th style={thStyle}>Status</th>
-            <th style={thStyle}>User</th>
-            <th style={thStyle}>Organization</th>
-            <th style={thStyle}>Device</th>
-            <th style={thStyle}>IP</th>
-            <th style={thStyle}>Last active</th>
-            <th style={thStyle}>Created</th>
+            <th style={gmHeaderStyle("Status")}>Status</th>
+            <th style={gmHeaderStyle("User")}>User</th>
+            <th style={gmHeaderStyle("Organization")}>Organization</th>
+            <th style={gmHeaderStyle("Device")}>Device</th>
+            <th style={gmHeaderStyle("IP")}>IP</th>
+            <th style={gmHeaderStyle("Last active")}>Last active</th>
+            <th style={gmHeaderStyle("Created")}>Created</th>
           </tr>
         </thead>
         <tbody>
@@ -318,7 +324,7 @@ function SessionsTable({
             <tr>
               <td
                 colSpan={7}
-                style={{ ...tdStyle, textAlign: "center", color: "var(--dg-color-text-muted)" }}
+                style={{ ...gmTdStyle, textAlign: "center", color: "var(--dg-color-text-muted)" }}
               >
                 Loading
               </td>
@@ -360,8 +366,8 @@ function SessionsTable({
                     }}
                     style={{ cursor: "pointer" }}
                   >
-                    <td style={tdStyle}>{statusBadge(session.status)}</td>
-                    <td style={{ ...tdStyle, minWidth: 220 }}>
+                    <td style={gmTdStyle}>{statusBadge(session.status)}</td>
+                    <td style={{ ...gmTdStyle, minWidth: 220 }}>
                       <div style={{ fontWeight: 700, color: "var(--dg-color-text-primary)" }}>
                         {session.userName ?? "Unknown user"}
                       </div>
@@ -374,7 +380,7 @@ function SessionsTable({
                         {session.userEmail ?? "Unknown email"}
                       </div>
                     </td>
-                    <td style={{ ...tdStyle, minWidth: 180 }}>
+                    <td style={{ ...gmTdStyle, minWidth: 180 }}>
                       <div
                         style={{
                           color:
@@ -386,7 +392,7 @@ function SessionsTable({
                         {sessionOrgLabel(session)}
                       </div>
                     </td>
-                    <td style={{ ...tdStyle, minWidth: 190 }}>
+                    <td style={{ ...gmTdStyle, minWidth: 190 }}>
                       <div style={{ fontWeight: 700, color: "var(--dg-color-text-primary)" }}>
                         {session.deviceLabel ?? "Unknown device"}
                       </div>
@@ -400,9 +406,9 @@ function SessionsTable({
                         {session.appVersion ? ` / ${session.appVersion}` : ""}
                       </div>
                     </td>
-                    <td style={tdStyle}>{session.ipAddress ?? "—"}</td>
-                    <td style={tdStyle}>{formatRelative(session.lastActiveAt)}</td>
-                    <td style={tdStyle}>{formatDateTime(session.createdAt)}</td>
+                    <td style={gmTdStyle}>{session.ipAddress ?? "—"}</td>
+                    <td style={gmTdStyle}>{formatRelative(session.lastActiveAt)}</td>
+                    <td style={gmTdStyle}>{formatDateTime(session.createdAt)}</td>
                   </tr>
                 ))}
               </Fragment>
@@ -773,14 +779,14 @@ export default function GridmasterSecurityView({
               </div>
             ) : (
               <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <table style={gmTableStyle}>
                   <thead>
                     <tr>
-                      <th style={thStyle}>Status</th>
-                      <th style={thStyle}>Target</th>
-                      <th style={thStyle}>Justification</th>
-                      <th style={thStyle}>Started</th>
-                      <th style={thStyle}>Ended</th>
+                      <th style={gmHeaderStyle("Status")}>Status</th>
+                      <th style={gmHeaderStyle("Target")}>Target</th>
+                      <th style={gmHeaderStyle("Justification")}>Justification</th>
+                      <th style={gmHeaderStyle("Started")}>Started</th>
+                      <th style={gmHeaderStyle("Ended")}>Ended</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -791,7 +797,7 @@ export default function GridmasterSecurityView({
                         <tr key={entry.sessionId}>
                           <td
                             style={{
-                              ...tdStyle,
+                              ...gmTdStyle,
                               fontWeight: 700,
                               color: active
                                 ? "var(--dg-color-warning)"
@@ -800,20 +806,14 @@ export default function GridmasterSecurityView({
                           >
                             {active ? "Active" : entry.endedAt ? "Ended" : "Expired"}
                           </td>
-                          <td style={tdStyle}>{entry.targetUserId.slice(0, 8)}...</td>
                           <td
-                            style={{
-                              ...tdStyle,
-                              maxWidth: 360,
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}
+                            style={{ ...gmTdStyle, fontFamily: "var(--font-dm-mono), monospace" }}
                           >
-                            {entry.justification || "—"}
+                            {entry.targetUserId}
                           </td>
-                          <td style={tdStyle}>{new Date(entry.createdAt).toLocaleString()}</td>
-                          <td style={tdStyle}>
+                          <td style={gmTdStyle}>{entry.justification || "—"}</td>
+                          <td style={gmTdStyle}>{new Date(entry.createdAt).toLocaleString()}</td>
+                          <td style={gmTdStyle}>
                             {entry.endedAt ? new Date(entry.endedAt).toLocaleString() : "—"}
                           </td>
                         </tr>

@@ -57,7 +57,11 @@ export default function IdentityStep({ onNext, onBack }: IdentityStepProps) {
       <Provider>
         <CompositeSection
           title="Organization details"
-          description="Facility name, location, and timezone."
+          description={
+            org.timezone === "UTC"
+              ? "Facility name, location, and time zone. The time zone is currently UTC, so pick your facility's zone here for schedule times to read correctly."
+              : "Facility name, location, and time zone."
+          }
         >
           <OrganizationGeneral organization={org} onSave={setOrg} />
         </CompositeSection>

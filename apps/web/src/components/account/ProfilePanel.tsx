@@ -815,10 +815,14 @@ export function ProfilePanel({
               Access
             </div>
             <div className="mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
-              Your organization role and the permissions it carries.
+              {isGridmaster
+                ? "Your platform role. Gridmasters administer every organization and hold no organization role of their own."
+                : "Your organization role and the permissions it carries."}
             </div>
           </div>
-          {canManageManagementAccess && selfOrgRole ? (
+          {isGridmaster ? (
+            <Field label="Platform role" value="Gridmaster" />
+          ) : canManageManagementAccess && selfOrgRole ? (
             <MemberAccessControls
               orgRole={selfOrgRole}
               adminPermissions={selfMembership?.adminPermissions}
@@ -837,7 +841,7 @@ export function ProfilePanel({
        *  self-viewer with neither existing departments nor the permission to
        *  start (canManageManagementAccess) never sees this card at all - the
        *  same "not part of management" story the People panels tell. */}
-      {(canManageManagementAccess || showManagementAccess) && (
+      {!isGridmaster && (canManageManagementAccess || showManagementAccess) && (
         <SectionCard>
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div className="flex items-start justify-between gap-3">

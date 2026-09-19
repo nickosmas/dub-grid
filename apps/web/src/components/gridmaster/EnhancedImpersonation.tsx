@@ -198,7 +198,7 @@ export default function EnhancedImpersonation({
   }
 
   return (
-    <div style={{ maxWidth: 640 }}>
+    <div>
       <h2
         style={{
           margin: "0 0 4px",

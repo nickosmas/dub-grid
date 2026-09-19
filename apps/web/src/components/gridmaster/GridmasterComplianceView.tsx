@@ -10,10 +10,16 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import ProgressBar from "@/components/ProgressBar";
 import { queryKeys } from "@/lib/query-keys";
-import { sectionStyle, tdStyle, thStyle } from "@/lib/styles";
+import { sectionStyle } from "@/lib/styles";
 import { describeAuditEvent } from "@/lib/activity-log-utils";
 import { formatClientErrorMessage, formatDateTimeLabel } from "@/lib/client-facing";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import {
+  gmHeaderStyle,
+  gmTableStyle,
+  gmTdStyle,
+  gmThStyle,
+} from "@/components/gridmaster/table-styles";
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
@@ -244,11 +250,11 @@ export default function GridmasterComplianceView({
                 </div>
               ) : (
                 <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <table style={gmTableStyle}>
                     <thead>
                       <tr>
-                        <th style={thStyle}>Organization</th>
-                        <th style={thStyle}>Retention days</th>
+                        <th style={gmHeaderStyle("Organization")}>Organization</th>
+                        <th style={gmHeaderStyle("Retention days")}>Retention days</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -264,8 +270,8 @@ export default function GridmasterComplianceView({
                                 : undefined,
                           }}
                         >
-                          <td style={{ ...tdStyle, fontWeight: 700 }}>{org.orgName}</td>
-                          <td style={tdStyle}>{org.dataRetentionDays}</td>
+                          <td style={{ ...gmTdStyle, fontWeight: 700 }}>{org.orgName}</td>
+                          <td style={gmTdStyle}>{org.dataRetentionDays}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -311,23 +317,23 @@ export default function GridmasterComplianceView({
                 </div>
               ) : (
                 <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <table style={gmTableStyle}>
                     <thead>
                       <tr>
-                        <th style={thStyle}>Action</th>
-                        <th style={thStyle}>Actor</th>
-                        <th style={thStyle}>Created</th>
+                        <th style={gmHeaderStyle("Action")}>Action</th>
+                        <th style={gmHeaderStyle("Actor")}>Actor</th>
+                        <th style={gmHeaderStyle("Created")}>Created</th>
                       </tr>
                     </thead>
                     <tbody>
                       {[...compliance.gdprEvents, ...compliance.accountDeletionEvents].map(
                         (event) => (
                           <tr key={`${event.action}-${event.id}`}>
-                            <td style={{ ...tdStyle, fontWeight: 700 }}>
+                            <td style={{ ...gmTdStyle, fontWeight: 700 }}>
                               {describeAuditEvent(event.action, event.details)}
                             </td>
-                            <td style={tdStyle}>{event.actorEmail ?? "Unknown"}</td>
-                            <td style={tdStyle}>{formatDateTimeLabel(event.createdAt)}</td>
+                            <td style={gmTdStyle}>{event.actorEmail ?? "Unknown"}</td>
+                            <td style={gmTdStyle}>{formatDateTimeLabel(event.createdAt)}</td>
                           </tr>
                         ),
                       )}

@@ -285,6 +285,10 @@ export default function Header({ orgName }: HeaderProps) {
             : "";
 
   const visibleNavItems = NAV_ITEMS.filter((item) => {
+    // A gridmaster has no organization of their own: on /profile the org tabs
+    // would lead nowhere. They get the portal button instead. Impersonation
+    // keeps the tabs, since that is the org view being inspected.
+    if (isGridmaster && !isImpersonating) return false;
     if (item.id === "dashboard") return !isManagementOnlyUser;
     if (item.id === "schedule") return true;
     if (item.id === "people") return canViewStaff;

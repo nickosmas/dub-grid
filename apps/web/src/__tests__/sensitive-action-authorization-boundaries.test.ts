@@ -69,6 +69,32 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
       /force_logout_user/,
     ],
   },
+  "apps/web/src/app/api/gridmaster/users/[userId]/terminate/route.ts": {
+    policy: "sensitive",
+    assertions: [
+      /\brequireGridmasterSession\s*\(/,
+      /\brequireSensitiveActionAuth\s*\(/,
+      /terminate_user_account/,
+      /revokeAllUserSessions\(userId\)/,
+    ],
+  },
+  "apps/web/src/app/api/gridmaster/users/[userId]/reinstate/route.ts": {
+    policy: "sensitive",
+    assertions: [
+      /\brequireGridmasterSession\s*\(/,
+      /\brequireSensitiveActionAuth\s*\(/,
+      /reinstate_user_account/,
+    ],
+  },
+  "apps/web/src/app/api/gridmaster/users/route.ts": {
+    // Deactivation is reversible and already gated on a live gridmaster
+    // profile; it revokes the target's issued tokens the moment it lands.
+    policy: "authorized-target-revocation",
+    assertions: [
+      /\brequireGridmasterSession\s*\(/,
+      /if \(deactivate\) \{[\s\S]*?revokeAllUserSessions\(userId\)/,
+    ],
+  },
   "apps/web/src/app/api/invitations/register/route.ts": {
     policy: "independent-credential",
     assertions: [

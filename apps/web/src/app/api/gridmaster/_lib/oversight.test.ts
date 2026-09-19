@@ -64,6 +64,10 @@ class MockQuery {
     return this;
   }
 
+  eq(_column?: string, _value?: string) {
+    return this;
+  }
+
   gte() {
     return this;
   }
@@ -142,6 +146,26 @@ function organizationRow() {
 }
 
 describe("gridmaster organization health facts", () => {
+  it("asks only for real organizations, never Test Sandbox clones", async () => {
+    const filters: Array<[string, string]> = [];
+    const client = {
+      from(table: string) {
+        const query = new MockQuery(table === "organizations" ? [organizationRow()] : []);
+        if (table === "organizations") {
+          query.eq = (column: string, value: string) => {
+            filters.push([column, value]);
+            return query;
+          };
+        }
+        return query;
+      },
+    };
+
+    await loadGridmasterOrgHealth(client);
+
+    expect(filters).toEqual([["workspace_kind", "real"]]);
+  });
+
   it("excludes archived memberships from user and active-session counts", async () => {
     const activeUserId = "22222222-2222-4222-8222-222222222222";
     const archivedUserId = "33333333-3333-4333-8333-333333333333";

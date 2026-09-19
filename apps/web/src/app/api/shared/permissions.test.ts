@@ -19,7 +19,11 @@ type MockAccessRow = {
     org_role: string | null;
     admin_permissions: Record<string, boolean> | null;
   } | null;
-  profile?: { platform_role: string | null } | null;
+  profile?: {
+    platform_role: string | null;
+    deactivated_at?: string | null;
+    terminated_at?: string | null;
+  } | null;
   organization?: {
     archived_at?: string | null;
     suspended_at: string | null;
@@ -332,6 +336,45 @@ describe("requireOrgPermissions", () => {
       }
     });
   });
+
+  it.each([
+    ["deactivated", { platform_role: "none", deactivated_at: "2026-09-19T10:00:00.000Z" }],
+    ["terminated", { platform_role: "none", terminated_at: "2026-09-19T10:00:00.000Z" }],
+  ])(
+    "refuses a %s caller even with a live membership and a valid token",
+    async (_label, profile) => {
+      // The JWT hook refuses these accounts at the next token issue; this is the
+      // guard for the token they already hold.
+      getServiceClient.mockReturnValue(
+        createServiceClientMock({
+          membership: { org_role: "super_admin", admin_permissions: null },
+          profile,
+          organization: {
+            suspended_at: null,
+            subscription_status: "active",
+            trial_ends_at: null,
+          },
+          employee: { status: "active" },
+        }),
+      );
+
+      const { requireOrgPermissions } = await import("./permissions");
+      const result = await requireOrgPermissions(
+        makeRequest(),
+        "11111111-1111-4111-8111-111111111111",
+        () => true,
+        { allowLockedOrganization: true, allowDuringSetup: true },
+      );
+
+      expect("response" in result).toBe(true);
+      if ("response" in result) {
+        expect(result.response.status).toBe(403);
+        await expect(result.response.json()).resolves.toEqual(
+          expect.objectContaining({ code: "ACCOUNT_DISABLED" }),
+        );
+      }
+    },
+  );
 
   it("blocks regular users from org-scoped APIs when billing is locked", async () => {
     getServiceClient.mockReturnValue(

@@ -21,6 +21,7 @@ import { DubGridLogo } from "@/components/Logo";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { getAvatarInitials } from "@/lib/utils";
 import { useAvatarTone } from "@/hooks/useAvatarTone";
+import { useTheme } from "next-themes";
 import {
   SidebarProvider,
   Sidebar,
@@ -106,6 +107,7 @@ const ImpersonationHistory = dynamic(() => import("@/components/gridmaster/Imper
 
 import NotificationBell from "@/components/NotificationBell";
 import ProgressBar from "@/components/ProgressBar";
+import { EmptyState } from "@/components/EmptyState";
 import { InboxView as AlertsInboxView } from "@/app/(app)/alerts/AlertsInboxPage";
 import {
   fetchGridmasterDashboardData,
@@ -413,6 +415,7 @@ export default function GridmasterPortal() {
   }, [signOut]);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { theme, setTheme } = useTheme();
   const [selectedOrgInitialTab, setSelectedOrgInitialTab] = useState<
     OrganizationDetailTab | undefined
   >();
@@ -725,7 +728,13 @@ export default function GridmasterPortal() {
   return (
     <div
       style={{
-        minHeight: "100vh",
+        // The shell above publishes the height of whatever it is showing
+        // (MFA nag, impersonation, inactive-account banners). Fitting the
+        // portal under it makes `main` the only scroller, so the header and
+        // sidebar never slide behind a banner the way they did when the
+        // document itself could scroll by the banner's height.
+        height: "calc(100dvh - var(--dg-app-shell-header-height, 0px))",
+        overflow: "hidden",
         background: "var(--dg-color-bg)",
         display: "flex",
         flexDirection: "column",
@@ -901,6 +910,36 @@ export default function GridmasterPortal() {
                   Profile
                 </Button>
                 <div className="dg-menu-divider" />
+                {/* Same theme control as the organization header's avatar
+                    menu: appearance lives here, not in a settings section. */}
+                <div style={{ padding: "6px 10px 4px" }}>
+                  <div
+                    style={{
+                      fontSize: "var(--dg-type-field-title-size)",
+                      fontWeight: "var(--dg-type-field-title-weight)",
+                      color: "var(--dg-type-field-title-color)",
+                      textTransform: "none",
+                      letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+                      marginBottom: 6,
+                    }}
+                  >
+                    Theme
+                  </div>
+                  <div className="dg-segment" style={{ display: "flex" }}>
+                    {(["light", "dark", "system"] as const).map((option) => (
+                      <Button
+                        key={option}
+                        type="button"
+                        className={`dg-segment-btn${theme === option ? " active" : ""}`}
+                        style={{ flex: 1 }}
+                        onClick={() => setTheme(option)}
+                      >
+                        {option === "light" ? "Light" : option === "dark" ? "Dark" : "System"}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                <div className="dg-menu-divider" />
                 <Button
                   className="dg-menu-item dg-menu-item--danger"
                   onClick={() => {
@@ -968,13 +1007,20 @@ export default function GridmasterPortal() {
       )}
 
       {/* Body: sidebar + content */}
-      <SidebarProvider defaultOpen={true} style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+      <SidebarProvider
+        defaultOpen={true}
+        className="min-h-0"
+        style={{ display: "flex", flex: 1, overflow: "hidden" }}
+      >
         {/* Sidebar (desktop only) */}
         {!isMobile && (
           <Sidebar
             collapsible="icon"
             className="border-r border-[var(--dg-color-border)] bg-[var(--dg-color-surface)]"
-            style={{ top: 56, height: "calc(100dvh - 56px)" }}
+            style={{
+              top: "calc(var(--dg-app-shell-header-height, 0px) + 56px)",
+              height: "calc(100dvh - var(--dg-app-shell-header-height, 0px) - 56px)",
+            }}
           >
             <SidebarContent className="pt-2 overscroll-contain">
               {primaryNavGroups.map((group) => (
@@ -1056,123 +1102,151 @@ export default function GridmasterPortal() {
             padding: `${isMobile ? 16 : 24}px var(--dg-page-gutter)`,
           }}
         >
-          {error && (
-            <div
-              style={{
-                padding: "12px 16px",
-                background: "var(--dg-color-danger-bg)",
-                color: "var(--dg-color-danger)",
-                borderRadius: "var(--dg-radius-lg)",
-                fontSize: "var(--dg-fs-label)",
-                fontWeight: 600,
-                marginBottom: 20,
-              }}
-            >
-              {error}
-            </div>
-          )}
-
-          {view === "dashboard" && (
-            <GridmasterDashboard
-              organizations={organizations}
-              stats={stats}
-              totalUsers={totalUsers}
-              totalEmployees={totalEmployees}
-              onSelectOrg={selectOrg}
-              onCreateOrg={() => {
-                setView("create-organization");
-                setSelectedId(null);
-              }}
-            />
-          )}
-
-          {view === "all-users" && (
-            <AllUsersView
-              organizations={organizations}
-              onNavigateToOrg={selectOrg}
-              onImpersonate={handleImpersonate}
-            />
-          )}
-
-          {view === "billing" && <GridmasterBillingView onSelectOrg={selectOrg} />}
-
-          {view === "compliance" && <GridmasterComplianceView onSelectOrg={selectOrg} />}
-
-          {view === "security" && (
-            <GridmasterSecurityView organizations={organizations} currentUserId={authUser?.id} />
-          )}
-
-          {view === "platform-flags" && <PlatformFeatureFlagsView />}
-
-          {view === "gridmaster-accounts" && (
-            <GridmasterAccountsView organizations={organizations} currentUserId={authUser?.id} />
-          )}
-
-          {view === "audit-log" && <AuditLogView />}
-
-          {view === "create-organization" && (
-            <OrganizationSetupWizard
-              onCreated={handleOrgCreated}
-              onCancel={() => setView("dashboard")}
-            />
-          )}
-
-          {view === "organization" && selectedOrg && (
-            <>
-              <Button
-                onClick={() => {
-                  setView("dashboard");
-                  setSelectedId(null);
-                }}
+          {/* Same envelope as the client dashboard: a centred column with a
+              ceiling, so views stop hugging the left edge on wide displays. */}
+          <div style={{ width: "100%", maxWidth: 1560, margin: "0 auto" }}>
+            {error && (
+              <div
                 style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  fontFamily: "inherit",
+                  padding: "12px 16px",
+                  background: "var(--dg-color-danger-bg)",
+                  color: "var(--dg-color-danger)",
+                  borderRadius: "var(--dg-radius-lg)",
                   fontSize: "var(--dg-fs-label)",
-                  color: "var(--dg-color-text-muted)",
-                  padding: "0 0 12px",
-                  transition: "color 150ms ease",
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.color = "var(--dg-color-text-primary)";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.color = "var(--dg-color-text-muted)";
+                  fontWeight: 600,
+                  marginBottom: 20,
                 }}
               >
-                <ChevronLeft size={14} />
-                All Organizations
-              </Button>
-              <OrganizationDetail
-                organization={selectedOrg}
-                stats={stats.get(selectedOrg.id)}
-                initialTab={selectedOrgInitialTab}
-                onOrgUpdated={handleOrgUpdated}
+                {error}
+              </div>
+            )}
+
+            {view === "dashboard" && (
+              <GridmasterDashboard
+                organizations={organizations}
+                stats={stats}
+                totalUsers={totalUsers}
+                totalEmployees={totalEmployees}
+                onSelectOrg={selectOrg}
+                onCreateOrg={() => {
+                  setView("create-organization");
+                  setSelectedId(null);
+                }}
+              />
+            )}
+
+            {view === "all-users" && (
+              <AllUsersView
+                organizations={organizations}
+                onNavigateToOrg={selectOrg}
                 onImpersonate={handleImpersonate}
               />
-            </>
-          )}
+            )}
 
-          {view === "impersonation" && (
-            <EnhancedImpersonation
-              organizations={organizations}
-              initialOrgId={impersonateOrgId}
-              initialTargetId={impersonateTargetId}
-            />
-          )}
+            {view === "billing" && <GridmasterBillingView onSelectOrg={selectOrg} />}
 
-          {view === "impersonation-history" && <ImpersonationHistory />}
+            {view === "compliance" && <GridmasterComplianceView onSelectOrg={selectOrg} />}
 
-          {view === "notifications" && (
-            <AlertsInboxView
-              openNotificationId={openAlertId}
-              onOpenHandled={() => setOpenAlertId(null)}
-            />
-          )}
+            {view === "security" && (
+              <GridmasterSecurityView organizations={organizations} currentUserId={authUser?.id} />
+            )}
+
+            {view === "platform-flags" && <PlatformFeatureFlagsView />}
+
+            {view === "gridmaster-accounts" && (
+              <GridmasterAccountsView organizations={organizations} currentUserId={authUser?.id} />
+            )}
+
+            {view === "audit-log" && <AuditLogView />}
+
+            {view === "create-organization" && (
+              <OrganizationSetupWizard
+                onCreated={handleOrgCreated}
+                onCancel={() => setView("dashboard")}
+              />
+            )}
+
+            {view === "organization" && !selectedOrg && (
+              <div style={{ paddingTop: 24 }}>
+                {dashboardQuery.isLoading ? (
+                  <ProgressBar loading />
+                ) : (
+                  <EmptyState
+                    title="This organization is no longer available"
+                    description="It was deleted, or it is a Test Sandbox that only its owner can open. Its activity stays in the audit log."
+                    action={
+                      <Button
+                        className="dg-btn dg-btn-secondary"
+                        onClick={() => {
+                          setView("dashboard");
+                          setSelectedId(null);
+                        }}
+                      >
+                        Back to dashboard
+                      </Button>
+                    }
+                  />
+                )}
+              </div>
+            )}
+
+            {view === "organization" && selectedOrg && (
+              <>
+                <Button
+                  onClick={() => {
+                    setView("dashboard");
+                    setSelectedId(null);
+                  }}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    fontSize: "var(--dg-fs-label)",
+                    color: "var(--dg-color-text-muted)",
+                    padding: "0 0 12px",
+                    transition: "color 150ms ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLElement).style.color = "var(--dg-color-text-primary)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.color = "var(--dg-color-text-muted)";
+                  }}
+                >
+                  <ChevronLeft size={14} />
+                  All Organizations
+                </Button>
+                <OrganizationDetail
+                  organization={selectedOrg}
+                  stats={stats.get(selectedOrg.id)}
+                  initialTab={selectedOrgInitialTab}
+                  onOrgUpdated={handleOrgUpdated}
+                  onImpersonate={handleImpersonate}
+                />
+              </>
+            )}
+
+            {view === "impersonation" && (
+              <EnhancedImpersonation
+                organizations={organizations}
+                initialOrgId={impersonateOrgId}
+                initialTargetId={impersonateTargetId}
+              />
+            )}
+
+            {view === "impersonation-history" && <ImpersonationHistory />}
+
+            {view === "notifications" && (
+              <AlertsInboxView
+                openNotificationId={openAlertId}
+                onOpenHandled={() => setOpenAlertId(null)}
+              />
+            )}
+          </div>
         </main>
       </SidebarProvider>
     </div>

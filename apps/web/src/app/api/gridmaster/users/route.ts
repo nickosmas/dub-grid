@@ -6,6 +6,7 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
+import { revokeAllUserSessions } from "@/lib/auth/revocation";
 import type { PlatformRole, OrganizationRole } from "@dubgrid/domain";
 import type { PlatformUser } from "@/types";
 
@@ -50,7 +51,13 @@ export async function GET(req: NextRequest) {
       .map((row: Record<string, unknown>) => mapPlatformUser(row));
     const userIds = users.map((user) => user.id);
     const serviceClient = getServiceClient();
-    const [sessionsResult, mobileTokensResult, membershipsResult, forceLogoutResult] =
+    const [
+      sessionsResult,
+      mobileTokensResult,
+      membershipsResult,
+      forceLogoutResult,
+      terminationsResult,
+    ] =
       userIds.length > 0
         ? await Promise.all([
             serviceClient
@@ -71,8 +78,14 @@ export async function GET(req: NextRequest) {
               .eq("action", "user.force_logout")
               .in("resource_id", userIds)
               .order("created_at", { ascending: false }),
+            serviceClient
+              .from("profiles")
+              .select("id, terminated_at, terminated_reason")
+              .in("id", userIds)
+              .not("terminated_at", "is", null),
           ])
         : [
+            { data: [], error: null },
             { data: [], error: null },
             { data: [], error: null },
             { data: [], error: null },
@@ -83,6 +96,7 @@ export async function GET(req: NextRequest) {
       mobileTokensResult,
       membershipsResult,
       forceLogoutResult,
+      terminationsResult,
     ]) {
       if (extraResult.error) throw extraResult.error;
     }
@@ -105,6 +119,15 @@ export async function GET(req: NextRequest) {
       ) as Record<string, unknown>[],
       "user_id",
     );
+    const terminationByUser = new Map<string, { at: string; reason: string | null }>();
+    for (const row of (terminationsResult.data ?? []) as Record<string, unknown>[]) {
+      if (typeof row.id === "string" && typeof row.terminated_at === "string") {
+        terminationByUser.set(row.id, {
+          at: row.terminated_at,
+          reason: typeof row.terminated_reason === "string" ? row.terminated_reason : null,
+        });
+      }
+    }
     const lastForceLogoutByUser = new Map<string, string>();
     for (const row of (forceLogoutResult.data ?? []) as Record<string, unknown>[]) {
       const userId = typeof row.resource_id === "string" ? row.resource_id : null;
@@ -120,6 +143,8 @@ export async function GET(req: NextRequest) {
         activeSessionCount: activeSessionsByUser.get(user.id) ?? 0,
         mobileDeviceCount: mobileDevicesByUser.get(user.id) ?? 0,
         lastForceLogoutAt: lastForceLogoutByUser.get(user.id) ?? null,
+        terminatedAt: terminationByUser.get(user.id)?.at ?? null,
+        terminatedReason: terminationByUser.get(user.id)?.reason ?? null,
       })),
     });
   } catch (error) {
@@ -176,6 +201,12 @@ export async function PATCH(req: NextRequest) {
 
     if (error) {
       throw error;
+    }
+
+    // The hook now refuses a deactivated account at the next token issue;
+    // the watermark makes the tokens already in hand fail app APIs at once.
+    if (deactivate) {
+      await revokeAllUserSessions(userId);
     }
 
     await writeGridmasterAuditLog({

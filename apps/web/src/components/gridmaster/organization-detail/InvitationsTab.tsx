@@ -5,10 +5,16 @@ import {
 } from "@/features/organization/client";
 import { formatClientErrorMessage, formatOrganizationRoleLabel } from "@/lib/client-facing";
 import { Button } from "@/components/Button";
-import { sectionStyle, tdStyle, thStyle } from "@/lib/styles";
+import { sectionStyle } from "@/lib/styles";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import {
+  gmHeaderStyle,
+  gmTableStyle,
+  gmTdStyle,
+  gmThStyle,
+} from "@/components/gridmaster/table-styles";
 
 // Invitations tab for the gridmaster OrganizationDetail view.
 
@@ -100,15 +106,15 @@ export function InvitationsTab({
 
       <div style={sectionStyle}>
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <table style={gmTableStyle}>
             <thead>
               <tr>
-                <th style={thStyle}>Email</th>
-                <th style={thStyle}>Role</th>
-                <th style={thStyle}>Status</th>
-                <th style={thStyle}>Sent</th>
-                <th style={thStyle}>Expires</th>
-                <th style={thStyle}>Actions</th>
+                <th style={gmHeaderStyle("Email")}>Email</th>
+                <th style={gmHeaderStyle("Role")}>Role</th>
+                <th style={gmHeaderStyle("Status")}>Status</th>
+                <th style={gmHeaderStyle("Sent")}>Sent</th>
+                <th style={gmHeaderStyle("Expires")}>Expires</th>
+                <th style={gmHeaderStyle("Actions")}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -117,7 +123,7 @@ export function InvitationsTab({
                   <td
                     colSpan={6}
                     style={{
-                      ...tdStyle,
+                      ...gmTdStyle,
                       textAlign: "center",
                       color: "var(--dg-color-text-muted)",
                       padding: 32,
@@ -132,9 +138,9 @@ export function InvitationsTab({
                   const isPending = status.label === "Pending";
                   return (
                     <tr key={inv.id}>
-                      <td style={{ ...tdStyle, fontWeight: 600 }}>{inv.email}</td>
-                      <td style={tdStyle}>{formatOrganizationRoleLabel(inv.role_to_assign)}</td>
-                      <td style={tdStyle}>
+                      <td style={{ ...gmTdStyle, fontWeight: 600 }}>{inv.email}</td>
+                      <td style={gmTdStyle}>{formatOrganizationRoleLabel(inv.role_to_assign)}</td>
+                      <td style={gmTdStyle}>
                         <span
                           style={{
                             display: "inline-block",
@@ -151,7 +157,7 @@ export function InvitationsTab({
                       </td>
                       <td
                         style={{
-                          ...tdStyle,
+                          ...gmTdStyle,
                           fontSize: "var(--dg-fs-caption)",
                           color: "var(--dg-color-text-muted)",
                         }}
@@ -160,14 +166,14 @@ export function InvitationsTab({
                       </td>
                       <td
                         style={{
-                          ...tdStyle,
+                          ...gmTdStyle,
                           fontSize: "var(--dg-fs-caption)",
                           color: "var(--dg-color-text-muted)",
                         }}
                       >
                         {new Date(inv.expires_at).toLocaleDateString()}
                       </td>
-                      <td style={tdStyle}>
+                      <td style={gmTdStyle}>
                         {isPending && (
                           <Button
                             className="dg-btn dg-btn-ghost"

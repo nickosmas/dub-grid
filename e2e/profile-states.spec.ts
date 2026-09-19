@@ -61,7 +61,6 @@ test.describe("profile states", () => {
     profile: "First name",
     security: "Password",
     notifications: "System Notifications",
-    appearance: "Theme",
     "data-privacy": "Cookie preferences",
   };
 

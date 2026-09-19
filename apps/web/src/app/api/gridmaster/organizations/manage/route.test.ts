@@ -286,6 +286,33 @@ describe("POST /api/gridmaster/organizations/manage", () => {
     expect(organizationInsert.mock.calls[0][0]).not.toHaveProperty("trial_ends_at");
   });
 
+  it("leaves the time zone to the database default when the gridmaster skips it", async () => {
+    const response = await POST(
+      makeRequest({
+        action: "createOrganizationSetup",
+        input: {
+          name: "Acme Health",
+          addressLine1: "",
+          addressLine2: "",
+          addressCity: "",
+          addressState: "",
+          addressPostalCode: "",
+          addressCountry: "",
+          phone: "",
+          timezone: "",
+          focusAreaLabel: "",
+          certificationLabel: "",
+          roleLabel: "",
+          shiftDisplayMode: "code",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    // organizations.timezone is NOT NULL DEFAULT 'UTC': sending null was a 500.
+    expect(organizationInsert.mock.calls[0][0]).not.toHaveProperty("timezone");
+  });
+
   it("retries with a numeric suffix when the generated slug already exists", async () => {
     organizationInsert.mockReturnValueOnce({
       select: vi.fn(() => ({

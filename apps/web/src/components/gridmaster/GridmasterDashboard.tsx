@@ -14,7 +14,8 @@ import {
   formatOrganizationRoleLabel,
 } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
-import { sectionStyle, thStyle } from "@/lib/styles";
+import { sectionStyle } from "@/lib/styles";
+import { gmHeaderStyle, gmTableStyle, gmThStyle } from "@/components/gridmaster/table-styles";
 
 // ── Stat card ────────────────────────────────────────────────────────────────
 
@@ -299,9 +300,7 @@ export default function GridmasterDashboard({
               </h3>
               <div style={sectionStyle}>
                 <div style={{ overflowX: "auto" }}>
-                  <table
-                    style={{ width: "100%", borderCollapse: "collapse", whiteSpace: "nowrap" }}
-                  >
+                  <table style={gmTableStyle}>
                     <thead>
                       <tr>
                         {["Org", "Score", "Risk", "Active users", "Open requests", "Billing"].map(
@@ -309,7 +308,7 @@ export default function GridmasterDashboard({
                             <th
                               key={h}
                               style={{
-                                ...thStyle,
+                                ...gmHeaderStyle(h),
                                 borderBottom: "1px solid var(--dg-color-border-light)",
                               }}
                             >
@@ -520,9 +519,10 @@ export default function GridmasterDashboard({
                     fontSize: "var(--dg-fs-footnote)",
                     color: "var(--dg-color-text-muted)",
                     textTransform: "capitalize",
+                    overflowWrap: "anywhere",
                   }}
                 >
-                  {category.category}
+                  {category.category.replace(/_/g, " ")}
                 </div>
               </div>
             ))}
@@ -530,14 +530,16 @@ export default function GridmasterDashboard({
           {overview.activitySummary.busiestOrganizations.length > 0 && (
             <div style={sectionStyle}>
               <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", whiteSpace: "nowrap" }}>
+                <table style={gmTableStyle}>
                   <thead>
                     <tr>
                       {["Org", "Activity", "Type", "Status"].map((h) => (
                         <th
                           key={h}
                           style={{
-                            ...thStyle,
+                            // Status here is a sentence, not a badge: let it
+                            // share the width with the organization name.
+                            ...(h === "Status" ? gmThStyle : gmHeaderStyle(h)),
                             borderBottom: "1px solid var(--dg-color-border-light)",
                           }}
                         >
@@ -646,7 +648,7 @@ export default function GridmasterDashboard({
       </h3>
       <div style={sectionStyle}>
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", whiteSpace: "nowrap" }}>
+          <table style={gmTableStyle}>
             <thead>
               <tr>
                 {[
@@ -663,7 +665,7 @@ export default function GridmasterDashboard({
                   <th
                     key={h}
                     style={{
-                      ...thStyle,
+                      ...gmHeaderStyle(h),
                       borderBottom: "1px solid var(--dg-color-border-light)",
                     }}
                   >
