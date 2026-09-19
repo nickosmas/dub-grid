@@ -338,9 +338,10 @@ describe("PersonDetailScreen", () => {
     expect(screen.queryByText("Employee ID")).not.toBeInTheDocument();
     expect(screen.queryByText("#12")).not.toBeInTheDocument();
     // Employment is HR information too; the web roster hides that column
-    // from regular users. The rest of the Staffing section still renders.
+    // from regular users. A held certification is a scheduling fact and stays.
     expect(screen.queryByText("Employment")).not.toBeInTheDocument();
-    expect(screen.getByText("Certification")).toBeInTheDocument();
+    expect(screen.queryByText("Certification")).not.toBeInTheDocument();
+    expect(screen.getByText("Assignments")).toBeInTheDocument();
   });
 
   // The API redacts a colleague's userId, invitation and contact details for a

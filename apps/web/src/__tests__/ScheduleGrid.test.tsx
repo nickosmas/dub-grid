@@ -3279,6 +3279,18 @@ describe("ScheduleGrid", () => {
     ).toBe("Published Jan 7, 2024, 12:00 PM UTC by Mina.");
   });
 
+  // A viewer who cannot open the publish history is not shown who published
+  // either; the time alone says whether the schedule is current.
+  it("leaves the publisher out of published metadata when no resolver is given", () => {
+    expect(
+      formatPublishedMetadata({
+        publishedAt: "2024-01-07T12:00:00.000Z",
+        publishedBy: "user-1",
+        timeZone: "UTC",
+      }),
+    ).toBe("Published Jan 7, 2024, 12:00 PM UTC.");
+  });
+
   it("uses the change tooltip when shift detail hover cards are disabled", async () => {
     renderGrid({
       assignments: twoPillAssignmentDefinitions,

@@ -1138,7 +1138,9 @@ export function MembersSection({
               Directory
             </h1>
             <p className="mt-1 text-[14px] text-[var(--dg-color-text-muted)]">
-              View and manage your organization&apos;s staff roster.
+              {regularUserMode
+                ? "Your colleagues and where they work."
+                : "View and manage your organization's staff roster."}
             </p>
           </div>
 
@@ -1163,14 +1165,18 @@ export function MembersSection({
             </div>
           )}
 
-          <DirectorySummaryCards
-            onScheduleCount={employees.length}
-            fullTimeCount={employmentSummary.fullTime}
-            partTimeCount={employmentSummary.partTime}
-            showEmploymentCounts={!regularUserMode}
-          />
+          {/* Headcount and credential totals are management reading; a
+              regular user's directory is the list itself. */}
+          {!regularUserMode && (
+            <DirectorySummaryCards
+              onScheduleCount={employees.length}
+              fullTimeCount={employmentSummary.fullTime}
+              partTimeCount={employmentSummary.partTime}
+              showEmploymentCounts
+            />
+          )}
 
-          {!showManagement && (
+          {!showManagement && !regularUserMode && (
             <DirectoryCertificationCards
               counts={certificationCounts}
               certifications={certifications}

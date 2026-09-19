@@ -214,9 +214,12 @@ export function formatPublishedMetadata(args: {
   timeZone?: string | null;
 }): string {
   const { publishedAt: publishedAtIso, publishedBy, resolvePublisherName, timeZone } = args;
-  const publisherName = publishedBy
-    ? (resolvePublisherName?.(publishedBy) ?? "Unknown author")
-    : null;
+  // No resolver means the viewer is not shown who published, not that the
+  // publisher is unknown; "Unknown author" is for a resolver that has no name.
+  const publisherName =
+    publishedBy && resolvePublisherName
+      ? (resolvePublisherName(publishedBy) ?? "Unknown author")
+      : null;
   const publishedAt = new Date(publishedAtIso);
   const publishedDateTime = Number.isNaN(publishedAt.getTime())
     ? "Published at an unknown time"

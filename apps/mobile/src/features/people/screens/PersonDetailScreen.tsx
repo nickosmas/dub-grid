@@ -813,6 +813,12 @@ export default function PersonDetailScreen() {
   const showOrgRoleBadge =
     canViewEmployeeDetails || getHighlightedOrgRole(getPersonOrgRole(person)) != null;
   const showContact = Boolean(person.phone || person.email);
+  // A manager reads "None" as a gap to fill; a colleague reads it as noise.
+  // The rows that can be empty drop out for viewers without details, and the
+  // Staffing section with them when nothing is left in it.
+  const showCertificationRow = canViewEmployeeDetails || person.certificationId != null;
+  const showRolesRow = canViewEmployeeDetails || person.roleIds.length > 0;
+  const showStaffingSection = canViewEmployeeDetails || showCertificationRow;
   const avatarTone = getAvatarTone(resolveAvatarSeed(person), isDark);
 
   // The Deactivate sheet carries both outcomes, so what the confirm actually
@@ -1120,52 +1126,56 @@ export default function PersonDetailScreen() {
               the person is hired as here, where they are placed under
               Assignments. The name row is gone with it, since the native header
               already carries it. */}
-          <ProfileSection title="Staffing">
-            <ProfileList>
-              {/* Web prints this beside the name in its staff header, and it is
+          {showStaffingSection ? (
+            <ProfileSection title="Staffing">
+              <ProfileList>
+                {/* Web prints this beside the name in its staff header, and it is
                   how people are identified in payroll conversations. Regular
                   users have no business with a colleague's payroll identifier,
                   so it rides on the same permission web gates it behind. */}
-              {canViewEmployeeDetails ? (
-                <ProfileInfoRow
-                  iconName="card-outline"
-                  label="Employee ID"
-                  value={`#${person.employeeNumber}`}
-                />
-              ) : null}
-              {/* Full-time or part-time is an HR fact; the web roster hides
+                {canViewEmployeeDetails ? (
+                  <ProfileInfoRow
+                    iconName="card-outline"
+                    label="Employee ID"
+                    value={`#${person.employeeNumber}`}
+                  />
+                ) : null}
+                {/* Full-time or part-time is an HR fact; the web roster hides
                   the column from regular users and so does this row. */}
-              {canViewEmployeeDetails ? (
-                <ProfileInfoRow
-                  iconName="briefcase-outline"
-                  label="Employment"
-                  value={employmentLabel}
-                />
-              ) : null}
-              <ProfileInfoRow
-                iconName="ribbon-outline"
-                isLast={!canManageEmployees || (!person.statusChangedAt && !person.statusNote)}
-                label={certificationLabel}
-                value={certificationName}
-              />
-              {canManageEmployees && person.statusChangedAt ? (
-                <ProfileInfoRow
-                  iconName="calendar-outline"
-                  isLast={!person.statusNote}
-                  label="Status updated"
-                  value={formatDate(person.statusChangedAt)}
-                />
-              ) : null}
-              {canManageEmployees && person.statusNote ? (
-                <ProfileInfoRow
-                  iconName="document-text-outline"
-                  isLast
-                  label="Status note"
-                  value={person.statusNote}
-                />
-              ) : null}
-            </ProfileList>
-          </ProfileSection>
+                {canViewEmployeeDetails ? (
+                  <ProfileInfoRow
+                    iconName="briefcase-outline"
+                    label="Employment"
+                    value={employmentLabel}
+                  />
+                ) : null}
+                {showCertificationRow ? (
+                  <ProfileInfoRow
+                    iconName="ribbon-outline"
+                    isLast={!canManageEmployees || (!person.statusChangedAt && !person.statusNote)}
+                    label={certificationLabel}
+                    value={certificationName}
+                  />
+                ) : null}
+                {canManageEmployees && person.statusChangedAt ? (
+                  <ProfileInfoRow
+                    iconName="calendar-outline"
+                    isLast={!person.statusNote}
+                    label="Status updated"
+                    value={formatDate(person.statusChangedAt)}
+                  />
+                ) : null}
+                {canManageEmployees && person.statusNote ? (
+                  <ProfileInfoRow
+                    iconName="document-text-outline"
+                    isLast
+                    label="Status note"
+                    value={person.statusNote}
+                  />
+                ) : null}
+              </ProfileList>
+            </ProfileSection>
+          ) : null}
 
           <ProfileSection title="Assignments">
             <ProfileList>
@@ -1192,15 +1202,18 @@ export default function PersonDetailScreen() {
               ) : null}
               <ProfileInfoRow
                 iconName="albums-outline"
+                isLast={!showRolesRow}
                 label={focusAreaLabel}
                 value={focusAreaNames}
               />
-              <ProfileInfoRow
-                iconName="people-circle-outline"
-                isLast
-                label={roleLabel}
-                value={roleNames}
-              />
+              {showRolesRow ? (
+                <ProfileInfoRow
+                  iconName="people-circle-outline"
+                  isLast
+                  label={roleLabel}
+                  value={roleNames}
+                />
+              ) : null}
             </ProfileList>
           </ProfileSection>
 

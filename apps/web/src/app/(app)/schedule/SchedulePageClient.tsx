@@ -6002,7 +6002,12 @@ function SchedulerContent({
         coverageRequirements,
         absenceTypeMap: absenceTypeObjectMap,
         cellEditors: editingCells,
-        resolvePublisherName: (userId: string) => auditNames.get(userId) ?? null,
+        // Who published is process detail for the people who publish, the same
+        // viewers who can open the publish history; everyone else reads the
+        // time alone, as on mobile.
+        resolvePublisherName: canNavigatePublishHistory
+          ? (userId: string) => auditNames.get(userId) ?? null
+          : undefined,
         openShifts,
         activeFocusArea,
         highlightEmpIds: searchMatchedEmployeeIds,

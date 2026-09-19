@@ -92,6 +92,7 @@ describe("mobile me-schedule route", () => {
       currentOrg: {
         id: "org-1",
       },
+      permissions: { canPublishSchedule: false, level: 0 },
       serviceClient: {},
       user: {
         id: "user-1",
