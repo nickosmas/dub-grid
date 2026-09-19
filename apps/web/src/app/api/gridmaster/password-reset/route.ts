@@ -7,7 +7,7 @@ import {
   checkRateLimit,
   hashEmail,
 } from "@/lib/rate-limit";
-import { requireGridmasterSession } from "@/lib/api-auth";
+import { createAnonClient, requireGridmasterSession } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
@@ -83,18 +83,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ── Generate password reset link via Supabase Admin API ─────────────
+  // ── Send the recovery email ─────────────────────────────────────────
+  // `auth.admin.generateLink` only mints a link and never delivers it, which
+  // is how this route reported success while the inbox stayed empty (F-84).
+  // `resetPasswordForEmail` is what the user-facing recovery route sends
+  // with, so the same Supabase template and redirect apply here.
   try {
-    const supabaseAdmin = getServiceClient();
-    const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-      type: "recovery",
-      email,
+    const origin = new URL(req.url).origin;
+    const { error } = await createAnonClient().auth.resetPasswordForEmail(email, {
+      redirectTo: `${origin}/reset-password`,
     });
 
     if (error) {
       logger.error(
         { err: error, path: "/api/gridmaster/password-reset" },
-        "Supabase Admin generateLink failed",
+        "Supabase resetPasswordForEmail failed",
       );
       return NextResponse.json(
         { success: false, error: "We couldn't send that password reset email. Try again." },
@@ -106,11 +109,11 @@ export async function POST(req: NextRequest) {
     // Best-effort audit via service client (server-side, not browser supabase)
     try {
       await writeGridmasterAuditLog({
-        serviceClient: supabaseAdmin,
+        serviceClient: getServiceClient(),
         actor: user,
         action: "user.password_reset_sent",
         resourceType: "user",
-        resourceId: data.user?.id ?? null,
+        resourceId: null,
         details: { target_email: email },
         request: req,
       });

@@ -302,21 +302,21 @@ Commands: `npx vitest run --config apps/web/vitest.config.mts apps/web/src/__tes
 **Suggested fix:** Require a time zone in the Details step (block Next with a field message) and make the route schema `timezone: z.string().trim().min(1)` so a missing value is a 400 with a field error, or omit the column so the `'UTC'` default applies. Add a route test for the empty-timezone body.
 **Resolution:** Fixed 2026-09-19 in the same session, the other way round: the time zone is now deliberately optional for the gridmaster (hand-off mode) and the insert omits the column when blank so the `'UTC'` default applies; the super admin's Identity step points out the UTC default and collects the real zone. Route test "leaves the time zone to the database default when the gridmaster skips it" added; browser run created an org with only a name and the super admin, `timezone = UTC` in the row, no 500, and the super admin saved `America/Los_Angeles` from onboarding. Requires `/audit` re-review before closing.
 
-### F-84 [P1] open - The gridmaster "Send password reset" never sends an email, then reports success and audits it as sent
+### F-84 [P1] fixed - The gridmaster "Send password reset" never sends an email, then reports success and audits it as sent
 
 **File:** apps/web/src/app/api/gridmaster/password-reset/route.ts:89-124; apps/web/src/components/gridmaster/AllUsersView.tsx:229-240; apps/web/src/components/gridmaster/GridmasterAccountsView.tsx:210-221
 **Found:** 2026-09-19 by /audit (scope: gridmaster functions; lens: quality, security)
 **Why it matters:** The route calls `auth.admin.generateLink({ type: "recovery" })`, which only generates a link and never delivers it; the returned `action_link` is discarded. Confirmed against local Mailpit: the route answered `{"success":true}` and wrote a `user.password_reset_sent` audit row while the mailbox stayed empty, whereas the user-facing `recovery-request` route (which uses `resetPasswordForEmail`) delivered "Reset your password" to the same address. Both views toast "Password reset email sent", so a gridmaster believes the user was helped and the audit trail records a delivery that never happened.
 **Suggested fix:** Send the way `features/account/server/recovery-request.ts` does (`createAnonClient().auth.resetPasswordForEmail(email, { redirectTo })`), or deliver `data.properties.action_link` through Resend; write the audit row only after the send succeeds, and add a route test that asserts the sender is called.
-**Resolution:**
+**Resolution:** Fixed 2026-09-20. The route now sends with `createAnonClient().auth.resetPasswordForEmail(email, { redirectTo: <origin>/reset-password })`, the same call the user-facing recovery route makes, and writes the `user.password_reset_sent` audit row only after that call returns without error. `generateLink` is gone. New `password-reset/route.test.ts` asserts the sender is called with the address, that a send error yields 500 with no audit row, and that the per-target cap still holds. Requires `/audit` re-review before closing.
 
-### F-85 [P1] open - The org.created audit row persists the raw super-admin invitation token
+### F-85 [P1] fixed - The org.created audit row persists the raw super-admin invitation token
 
 **File:** apps/web/src/app/api/gridmaster/organizations/manage/route.ts:388-397,411-423
 **Found:** 2026-09-19 by /audit (scope: org lifecycle; lens: security)
 **Why it matters:** When the super admin has no account yet, `superAdmin.pendingInvite.token` is placed in the response (needed for "Send Email") and then the whole `superAdmin` object is spread into `writeGridmasterAuditLog({ details })`. Confirmed in the local DB after creating an organization: `audit_log.details.super_admin.pendingInvite.token` holds the live token. That token is the credential `/api/invitations/register` accepts to create the pre-confirmed account and set its password, so a durable copy now sits in a table that gridmasters browse and export to CSV (`audit-log/export`). Feature 19d4's contract is that raw credentials never reach audit metadata.
 **Suggested fix:** Log `{ kind, email, displayName }` only; never spread `pendingInvite` into `details`. Add a route test asserting the audit payload has no `token` key, and consider a one-off cleanup of existing rows.
-**Resolution:**
+**Resolution:** Fixed 2026-09-20. `org.created` now logs `super_admin: { kind, displayName, email }` and never the `pendingInvite` object; the token still travels in the response for "Send Email". Route test drives the pending-invite branch and asserts the audit payload has no token. Migration 024 scrubs `details.super_admin.pendingInvite` from existing rows (dry run against local: 3 rows cleaned, invitations untouched). Requires `/audit` re-review before closing.
 
 ### F-86 [P1] fixed - Deactivating a user from the portal leaves their issued tokens valid
 

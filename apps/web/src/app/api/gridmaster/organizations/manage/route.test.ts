@@ -286,6 +286,55 @@ describe("POST /api/gridmaster/organizations/manage", () => {
     expect(organizationInsert.mock.calls[0][0]).not.toHaveProperty("trial_ends_at");
   });
 
+  it("keeps the super admin's invitation token out of the org.created audit row", async () => {
+    requestRpc.mockImplementation(async (fn: string) => {
+      if (fn === "assign_org_role_by_email") {
+        return { error: { code: "P0002", message: "no account" } };
+      }
+      if (fn === "send_invitation") {
+        return { data: { token: "raw-invite-token" }, error: null };
+      }
+      return { error: null };
+    });
+
+    const response = await POST(
+      makeRequest({
+        action: "createOrganizationSetup",
+        input: {
+          name: "Acme Health",
+          addressLine1: "",
+          addressLine2: "",
+          addressCity: "",
+          addressState: "",
+          addressPostalCode: "",
+          addressCountry: "",
+          phone: "",
+          timezone: "America/Los_Angeles",
+          focusAreaLabel: "",
+          certificationLabel: "",
+          roleLabel: "",
+          shiftDisplayMode: "code",
+          superAdminFirstName: "Ada",
+          superAdminLastName: "Lovelace",
+          superAdminEmail: "ada@example.com",
+          superAdminPhone: "",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.superAdmin.pendingInvite.token).toBe("raw-invite-token");
+
+    const auditRow = auditInsert.mock.calls.find(([row]) => row.action === "org.created")?.[0];
+    expect(auditRow.details.super_admin).toEqual({
+      kind: "pending-invite",
+      displayName: "Ada Lovelace",
+      email: "ada@example.com",
+    });
+    expect(JSON.stringify(auditRow)).not.toContain("raw-invite-token");
+  });
+
   it("leaves the time zone to the database default when the gridmaster skips it", async () => {
     const response = await POST(
       makeRequest({

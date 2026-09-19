@@ -420,7 +420,14 @@ export async function POST(req: NextRequest) {
           orgId: org.id,
           details: {
             name: org.name,
-            super_admin: superAdmin,
+            // The pending-invite token is a credential (it is what
+            // /api/invitations/register accepts), so it goes to the response
+            // for "Send Email" only and never into the audit row.
+            super_admin: {
+              kind: superAdmin.kind,
+              displayName: superAdmin.displayName ?? null,
+              email: email || null,
+            },
           },
           request: req,
         });
