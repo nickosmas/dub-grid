@@ -18,7 +18,11 @@ import {
 import { formatUsDate } from "../../../shared/lib/dates";
 import { REQUEST_TYPE_LABEL, REQUEST_TYPE_TONE } from "../../shift-requests/lib/request-type";
 import { createToneTextColors } from "../lib/tone-text";
-import { DashboardRowList } from "./DashboardRowList";
+import {
+  DASHBOARD_CARD_PREVIEW_LIMIT,
+  DashboardRowList,
+  hasMoreDashboardRows,
+} from "./DashboardRowList";
 
 export { REQUEST_TYPE_LABEL, REQUEST_TYPE_TONE };
 
@@ -64,12 +68,15 @@ export function ActionQueueCard({
   onSeeAll?: () => void;
 }) {
   return (
-    <DashboardCard title="Pending approvals" onOpen={onSeeAll}>
+    <DashboardCard
+      title="Pending approvals"
+      onOpen={hasMoreDashboardRows(requests.length) ? onSeeAll : undefined}
+    >
       {requests.length > 0 ? (
         <DashboardRowList
           items={requests}
           keyExtractor={(request) => request.id}
-          limit={3}
+          limit={DASHBOARD_CARD_PREVIEW_LIMIT}
           renderItem={(request) => <ActionQueueRow request={request} />}
         />
       ) : (

@@ -99,15 +99,39 @@ describe("DashboardHeroCard", () => {
     expect(screen.queryByText(/Coverage by/)).not.toBeInTheDocument();
   });
 
-  it("opens the coverage screen from the card title", () => {
+  it("opens the coverage screen from the card title only when it previews a subset", () => {
+    const section = (id: number, name: string) =>
+      ({
+        focusAreaId: id,
+        focusAreaName: name,
+        filledTotal: 6,
+        requiredTotal: 8,
+        openSlots: 2,
+        pct: 75,
+      }) as never;
     const onOpenCoverage = vi.fn();
+    const metrics = {
+      coveragePct: 92,
+      openGapCount: 0,
+      pendingApprovalsCount: 0,
+      draftSummary: null,
+    };
+    const three = [section(1, "East Wing"), section(2, "West Wing"), section(3, "Memory Care")];
+
+    // Three focus areas fit the preview, so the card is already the whole list.
+    const fits = render(
+      <DashboardHeroCard metrics={metrics} onOpenCoverage={onOpenCoverage} sections={three} />,
+    );
+    expect(screen.queryByRole("button", { name: "See all: Coverage" })).not.toBeInTheDocument();
+    fits.unmount();
+
     render(
       <DashboardHeroCard
-        metrics={{ coveragePct: 92, openGapCount: 0, pendingApprovalsCount: 0, draftSummary: null }}
+        metrics={metrics}
         onOpenCoverage={onOpenCoverage}
+        sections={[...three, section(4, "Rehab")]}
       />,
     );
-
     fireEvent.click(screen.getByRole("button", { name: "See all: Coverage" }));
     expect(onOpenCoverage).toHaveBeenCalledTimes(1);
   });

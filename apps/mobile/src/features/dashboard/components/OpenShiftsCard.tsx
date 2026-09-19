@@ -18,7 +18,11 @@ import {
 import { formatUsDate, formatUsTime } from "../../../shared/lib/dates";
 import type { CountBadgeTone } from "./CountBadge";
 import { createToneTextColors } from "../lib/tone-text";
-import { DashboardRowList } from "./DashboardRowList";
+import {
+  DASHBOARD_CARD_PREVIEW_LIMIT,
+  DashboardRowList,
+  hasMoreDashboardRows,
+} from "./DashboardRowList";
 
 export type OpenShiftUrgency = NonNullable<
   MobileDashboardResponse["openShifts"][number]["urgency"]
@@ -78,12 +82,15 @@ export function OpenShiftsCard({
   onSeeAll?: () => void;
 }) {
   return (
-    <DashboardCard title="Open shifts" onOpen={onSeeAll}>
+    <DashboardCard
+      title="Open shifts"
+      onOpen={hasMoreDashboardRows(openShifts.length) ? onSeeAll : undefined}
+    >
       {openShifts.length > 0 ? (
         <DashboardRowList
           items={openShifts}
           keyExtractor={(shift) => shift.id}
-          limit={3}
+          limit={DASHBOARD_CARD_PREVIEW_LIMIT}
           renderItem={(shift) => <OpenShiftRow shift={shift} />}
         />
       ) : (

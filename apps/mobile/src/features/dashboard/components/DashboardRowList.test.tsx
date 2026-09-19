@@ -5,9 +5,12 @@ import { createReactNativeModule } from "../../../test/native";
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 let DashboardRowList: (typeof import("./DashboardRowList"))["DashboardRowList"];
+let DASHBOARD_CARD_PREVIEW_LIMIT: (typeof import("./DashboardRowList"))["DASHBOARD_CARD_PREVIEW_LIMIT"];
+let hasMoreDashboardRows: (typeof import("./DashboardRowList"))["hasMoreDashboardRows"];
 
 beforeAll(async () => {
-  DashboardRowList = (await import("./DashboardRowList")).DashboardRowList;
+  ({ DashboardRowList, DASHBOARD_CARD_PREVIEW_LIMIT, hasMoreDashboardRows } =
+    await import("./DashboardRowList"));
 });
 
 type Item = { id: string; label: string };
@@ -45,5 +48,13 @@ describe("DashboardRowList", () => {
     );
 
     expect(screen.getByText("Item 6")).toBeInTheDocument();
+  });
+});
+
+describe("hasMoreDashboardRows", () => {
+  it("is true only when a card holds rows back from its preview", () => {
+    expect(hasMoreDashboardRows(0)).toBe(false);
+    expect(hasMoreDashboardRows(DASHBOARD_CARD_PREVIEW_LIMIT)).toBe(false);
+    expect(hasMoreDashboardRows(DASHBOARD_CARD_PREVIEW_LIMIT + 1)).toBe(true);
   });
 });

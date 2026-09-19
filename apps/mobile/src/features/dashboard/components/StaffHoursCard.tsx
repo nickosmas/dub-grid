@@ -15,7 +15,11 @@ import {
   mobileText,
   type MobileColors,
 } from "../../../shared/theme/tokens";
-import { DashboardRowList } from "./DashboardRowList";
+import {
+  DASHBOARD_CARD_PREVIEW_LIMIT,
+  DashboardRowList,
+  hasMoreDashboardRows,
+} from "./DashboardRowList";
 
 export type StaffHoursEntry = MobileDashboardResponse["staffHours"][number];
 
@@ -57,12 +61,15 @@ export function StaffHoursCard({
   onSeeAll?: () => void;
 }) {
   return (
-    <DashboardCard title="Overtime watch" onOpen={onSeeAll}>
+    <DashboardCard
+      title="Overtime watch"
+      onOpen={hasMoreDashboardRows(entries.length) ? onSeeAll : undefined}
+    >
       {entries.length > 0 ? (
         <DashboardRowList
           items={entries}
           keyExtractor={(entry) => entry.employeeId}
-          limit={3}
+          limit={DASHBOARD_CARD_PREVIEW_LIMIT}
           renderItem={(entry) => <StaffHoursRow entry={entry} />}
         />
       ) : (

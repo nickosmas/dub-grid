@@ -13,7 +13,11 @@ import {
 } from "../../../shared/theme/tokens";
 import type { CountBadgeTone } from "./CountBadge";
 import { createToneTextColors } from "../lib/tone-text";
-import { DashboardRowList } from "./DashboardRowList";
+import {
+  DASHBOARD_CARD_PREVIEW_LIMIT,
+  DashboardRowList,
+  hasMoreDashboardRows,
+} from "./DashboardRowList";
 
 export type ActivityItem = MobileDashboardResponse["activity"][number];
 export type ActivityType = ActivityItem["type"];
@@ -74,12 +78,15 @@ export function ActivityFeedCard({
   onSeeAll?: () => void;
 }) {
   return (
-    <DashboardCard title="Recent activity" onOpen={onSeeAll}>
+    <DashboardCard
+      title="Recent activity"
+      onOpen={hasMoreDashboardRows(items.length) ? onSeeAll : undefined}
+    >
       {items.length > 0 ? (
         <DashboardRowList
           items={items}
           keyExtractor={(item) => item.id}
-          limit={3}
+          limit={DASHBOARD_CARD_PREVIEW_LIMIT}
           renderItem={(item) => <ActivityRow item={item} />}
         />
       ) : (

@@ -4,6 +4,21 @@ import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import type { MobileColors } from "../../../shared/theme/tokens";
 
 /**
+ * How many rows a card previews: enough to show what kind of thing is
+ * inside, few enough that the next card is still on screen.
+ */
+export const DASHBOARD_CARD_PREVIEW_LIMIT = 3;
+
+/**
+ * Whether a card is holding rows back, which is the only time its "See all"
+ * has anything to show. A card whose list fits in the preview is already the
+ * whole list; a link beside it opened the same rows again.
+ */
+export function hasMoreDashboardRows(count: number, limit = DASHBOARD_CARD_PREVIEW_LIMIT) {
+  return count > limit;
+}
+
+/**
  * The rows of a dashboard card, and of the full-page screen behind it.
  *
  * One component for both so a card's preview and its "See all" screen never

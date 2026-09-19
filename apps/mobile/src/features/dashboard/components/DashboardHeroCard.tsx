@@ -17,7 +17,11 @@ import { coverageColor } from "../lib/coverage";
 import { createToneTextColors } from "../lib/tone-text";
 import { CoverageSectionRow } from "./CoverageSectionRow";
 import { DashboardCard } from "./DashboardCard";
-import { DashboardRowList } from "./DashboardRowList";
+import {
+  DASHBOARD_CARD_PREVIEW_LIMIT,
+  DashboardRowList,
+  hasMoreDashboardRows,
+} from "./DashboardRowList";
 
 /**
  * A secondary figure under the coverage meter: the number in its tone's
@@ -68,7 +72,8 @@ function MetricStat({
  * The coverage card: the period's one big figure over its meter, the same
  * figure broken down by focus area, and at the foot the two counts that
  * need a hand. One card for all of it; a second "Coverage by wings" card
- * said the same thing twice, and "See all" opens the full breakdown.
+ * said the same thing twice, and "See all" opens the full breakdown, but
+ * only while there are more focus areas than the card previews.
  */
 export function DashboardHeroCard({
   metrics,
@@ -91,7 +96,10 @@ export function DashboardHeroCard({
     coverage == null ? mobileColors.textMuted : coverageColor(mobileColors, coverage);
 
   return (
-    <DashboardCard title="Coverage" onOpen={onOpenCoverage}>
+    <DashboardCard
+      title="Coverage"
+      onOpen={hasMoreDashboardRows(sections.length) ? onOpenCoverage : undefined}
+    >
       {coverage != null ? (
         <View style={styles.coverage}>
           <View style={styles.coverageFigureRow}>
@@ -125,7 +133,7 @@ export function DashboardHeroCard({
           <DashboardRowList
             items={sections}
             keyExtractor={(section) => String(section.focusAreaId)}
-            limit={3}
+            limit={DASHBOARD_CARD_PREVIEW_LIMIT}
             renderItem={(section) => <CoverageSectionRow section={section} />}
           />
         </View>
