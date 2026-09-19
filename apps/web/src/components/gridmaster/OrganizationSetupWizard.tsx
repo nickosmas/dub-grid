@@ -452,6 +452,16 @@ export default function OrganizationSetupWizard({
         <div style={{ ...sectionStyle, marginBottom: 20 }}>
           <div style={sectionHeaderStyle}>Organization Details</div>
           <div style={sectionBodyStyle}>
+            <p
+              style={{
+                margin: "0 0 16px",
+                fontSize: "var(--dg-fs-label)",
+                color: "var(--dg-color-text-muted)",
+              }}
+            >
+              Only the name is required. Address, phone, and time zone can be left for the super
+              admin to fill in during their own setup.
+            </p>
             <div
               style={{
                 display: "grid",
@@ -509,7 +519,8 @@ export default function OrganizationSetupWizard({
                 color: "var(--dg-color-text-muted)",
               }}
             >
-              Customize terminology used throughout the app for this organization.
+              Optional. Customize the terminology used throughout the app, or leave it for the super
+              admin to decide.
             </p>
             <div
               style={{
@@ -785,6 +796,7 @@ export default function OrganizationSetupWizard({
   }
 
   function renderDecision() {
+    const handoffName = superAdminFirstName.trim() || "the super admin";
     return (
       <div style={{ maxWidth: 560, margin: "0 auto", padding: "40px 0" }}>
         <div style={{ textAlign: "center" }}>
@@ -867,7 +879,7 @@ export default function OrganizationSetupWizard({
                     color: "var(--dg-color-text-muted)",
                   }}
                 >
-                  They will join as admin. You can promote them to super admin after they accept.
+                  They will join as the super admin of this organization as soon as they accept.
                 </div>
               </div>
               <Button
@@ -891,26 +903,36 @@ export default function OrganizationSetupWizard({
               color: "var(--dg-color-text-muted)",
             }}
           >
-            Would you like to continue setting up configuration, employees, and invitations?
+            Hand the rest off to {handoffName}, or set it up now? If you hand off, {handoffName}{" "}
+            will be walked through organization details, departments and focus areas, shifts and
+            jobs, and team invitations the first time they sign in.
           </p>
-          <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 12,
+              maxWidth: 440,
+              margin: "0 auto",
+            }}
+          >
             <Button
               type="button"
-              className="dg-btn dg-btn-secondary"
+              className="dg-btn dg-btn-primary"
               style={{ padding: "12px 24px" }}
               onClick={() => {
                 if (createdOrg) onCreated(createdOrg);
               }}
             >
-              Finish — Go to Organization
+              Hand off to {handoffName}
             </Button>
             <Button
               type="button"
-              className="dg-btn dg-btn-primary"
+              className="dg-btn dg-btn-secondary"
               style={{ padding: "12px 24px" }}
               onClick={() => setCurrentStep("config")}
             >
-              Continue Setup
+              Set up now
             </Button>
           </div>
         </div>
@@ -2023,7 +2045,7 @@ export default function OrganizationSetupWizard({
             : null;
 
   return (
-    <div style={{ maxWidth: currentStep === "config" ? 960 : 720 }}>
+    <div style={{ maxWidth: currentStep === "config" ? 960 : 720, margin: "0 auto" }}>
       <div
         style={{
           display: "flex",

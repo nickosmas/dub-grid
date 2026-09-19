@@ -636,6 +636,16 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     severity: "create",
     headline: (d, ctx) => `Reactivated ${who(d, ctx, "an account")}`,
   },
+  "user.terminated": {
+    category: "access",
+    severity: "delete",
+    headline: (d, ctx) => `Terminated ${who(d, ctx, "an account")} platform-wide`,
+  },
+  "user.reinstated": {
+    category: "access",
+    severity: "create",
+    headline: (d, ctx) => `Reinstated ${who(d, ctx, "an account")}`,
+  },
   "user.force_logout": {
     category: "access",
     severity: "warning",

@@ -24,10 +24,7 @@ describe("SectionNotice", () => {
 
   it("uses the warning surface for something that will not happen", () => {
     render(
-      <SectionNotice
-        messages={["Changing the contact email does not change their login email."]}
-        tone="warning"
-      />,
+      <SectionNotice messages={["Saving now removes them from the schedule."]} tone="warning" />,
     );
 
     expect(screen.getByRole("note")).toHaveClass(

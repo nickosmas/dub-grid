@@ -242,6 +242,7 @@ import {
   getLoadedPublishedWindowState,
   type PublicationRangeLoadState,
 } from "./_lib/publication-range-state";
+import { markOwnPublicationAsAdditions } from "./_lib/own-publication";
 import { readScheduleWindow, writeScheduleWindow } from "./_lib/schedule-cache";
 import { useScheduleImport } from "./_hooks/useScheduleImport";
 import {
@@ -5578,8 +5579,15 @@ function SchedulerContent({
       try {
         await refetchScheduleData();
         await refetchPublishedRanges();
-        const recentPublishes = await fetchRecentPublishHistory(org.id, lastViewedRef.current);
-        setPublishHistory(recentPublishes);
+        // Ask for the published window itself, not only "since last viewed":
+        // a first visit has no baseline and the API would answer with nothing.
+        const recentPublishes = await fetchRecentPublishHistory(
+          org.id,
+          lastViewedRef.current,
+          true,
+          { startDate: formatDateKey(startDate), endDate: formatDateKey(endDate) },
+        );
+        setPublishHistory(markOwnPublicationAsAdditions(recentPublishes));
       } catch (err: unknown) {
         Sentry.captureException(err);
         toast.error("Published, but the view couldn't refresh. Reload to see the latest.");

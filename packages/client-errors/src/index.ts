@@ -131,6 +131,13 @@ export const CLIENT_FRIENDLY_ERROR_PATTERNS: ReadonlyArray<{
     message: "You can't perform this action on your own account. Ask another admin.",
   },
   {
+    // Raised by the database guards in migration 021 whenever an organization
+    // tries to invite, reactivate, or re-add a platform-terminated account.
+    pattern: /ACCOUNT_TERMINATED/,
+    message:
+      "This account was terminated by the DubGrid platform team. Only a gridmaster can reinstate it.",
+  },
+  {
     pattern: /unauthorized|forbidden|not authorized|permission denied/i,
     message: "You don't have permission to do that.",
   },

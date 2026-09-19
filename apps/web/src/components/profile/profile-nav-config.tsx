@@ -6,18 +6,16 @@ import {
   NotificationsIcon,
   DataPrivacyIcon,
   DashboardIcon,
-  DisplayIcon,
 } from "@/components/icons/NavIcons";
 import type { ShellNavGroup, ShellNavItem } from "@/components/settings/SettingsShell";
 
 export type ProfileSectionId =
-  "profile" | "security" | "notifications" | "appearance" | "data-privacy" | "overview";
+  "profile" | "security" | "notifications" | "data-privacy" | "overview";
 
 export const VALID_PROFILE_SECTIONS: ProfileSectionId[] = [
   "profile",
   "security",
   "notifications",
-  "appearance",
   "data-privacy",
   "overview",
 ];
@@ -58,12 +56,6 @@ export function buildProfileNavGroups(ctx: ProfileNavContext): ShellNavGroup<Pro
       label: "Alerts",
       Icon: NotificationsIcon,
       description: "Choose how and when DubGrid contacts you.",
-    },
-    {
-      id: "appearance",
-      label: "Appearance",
-      Icon: DisplayIcon,
-      description: "Follow your device's appearance, or choose light or dark.",
     },
   ];
 

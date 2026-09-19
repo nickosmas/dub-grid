@@ -286,7 +286,10 @@ export async function POST(req: NextRequest) {
               role_label: input.roleLabel || "Roles",
               department_label: "Scheduled Departments",
               shift_display_mode: input.shiftDisplayMode,
-              timezone: input.timezone || null,
+              // The column is NOT NULL and defaults to 'UTC'. A gridmaster may
+              // leave the time zone to the super admin's own onboarding, so an
+              // empty value omits the column rather than sending NULL.
+              ...(input.timezone ? { timezone: input.timezone } : {}),
               pay_period_start_date: null,
               subscription_status: "trialing",
               // trial_ends_at intentionally left NULL: the trial is "pending" until
@@ -430,6 +433,15 @@ export async function POST(req: NextRequest) {
       }
     }
   } catch (error) {
+    // The database refuses to let a terminated account back into an
+    // organization; that is a conflict with the account's state, not a fault.
+    const message =
+      error instanceof Error
+        ? error.message
+        : String((error as { message?: unknown })?.message ?? "");
+    if (message.includes("ACCOUNT_TERMINATED")) {
+      return apiErrorResponse(error, "Gridmaster organization request failed", 409);
+    }
     return apiErrorResponse(error, "Gridmaster organization request failed");
   }
 }

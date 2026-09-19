@@ -6,7 +6,13 @@ import {
   type MobilePerson,
 } from "@dubgrid/contracts";
 import { updateMobileEmployeeDetailsRow } from "@dubgrid/data-access";
-import { requireMobileAuth } from "@/features/mobile/server";
+import { requireMobileAuth, requireMobileSensitiveActionAuth } from "@/features/mobile/server";
+import {
+  getLoginEmailChange,
+  LINKED_EMAIL_REQUIRED_MESSAGE,
+  LoginEmailConflictError,
+  syncLinkedLoginEmail,
+} from "@/features/employees/server/login-email";
 import { loadMobilePersonWithAccess } from "@/features/mobile/server/person-access";
 import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
 import {
@@ -266,6 +272,33 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     departmentIds: parsed.data.departmentIds,
   };
   const auditDetails = employeeUpdateAuditDetails(currentPerson, update);
+
+  // The staff email is the login email. Changing it for a linked account is a
+  // sensitive action, and an account cannot be left without one.
+  if (currentPerson.userId && !update.email) {
+    return buildStaffValidationErrorResponse({ email: LINKED_EMAIL_REQUIRED_MESSAGE });
+  }
+  const loginEmailChange = getLoginEmailChange({
+    userId: currentPerson.userId,
+    previousEmail: currentPerson.email,
+    nextEmail: update.email,
+  });
+  if (loginEmailChange && currentPerson.userId) {
+    const assurance = await requireMobileSensitiveActionAuth(req);
+    if ("response" in assurance) return assurance.response;
+    try {
+      await syncLinkedLoginEmail(auth.serviceClient, {
+        userId: currentPerson.userId,
+        email: loginEmailChange,
+      });
+    } catch (error) {
+      if (error instanceof LoginEmailConflictError) {
+        return NextResponse.json(error.conflict, { status: 409 });
+      }
+      throw error;
+    }
+    auditDetails.to.loginEmail = loginEmailChange;
+  }
 
   let updatedRow;
   try {

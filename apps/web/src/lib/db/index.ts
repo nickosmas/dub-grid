@@ -17,5 +17,4 @@ export * from "./schedule";
 export * from "./invitations";
 export * from "./requests";
 export * from "./sessions";
-export * from "./admin";
 export * from "./access";

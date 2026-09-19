@@ -58,6 +58,19 @@ describe("getErrorMessage", () => {
 // ── formatClientErrorMessage ─────────────────────────────────────────────────
 
 describe("formatClientErrorMessage", () => {
+  it("rewrites the database's termination guard into the platform-team message", () => {
+    expect(
+      formatClientErrorMessage(
+        new Error(
+          "ACCOUNT_TERMINATED: this account was terminated by the platform team and cannot rejoin an organization until a gridmaster reinstates it",
+        ),
+        "fallback",
+      ),
+    ).toBe(
+      "This account was terminated by the DubGrid platform team. Only a gridmaster can reinstate it.",
+    );
+  });
+
   it("passes through a plain, non-technical raw message", () => {
     expect(formatClientErrorMessage(new Error("boom"), "fallback")).toBe("boom");
   });

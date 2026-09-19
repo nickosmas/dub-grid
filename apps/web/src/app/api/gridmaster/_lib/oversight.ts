@@ -28,6 +28,7 @@ const HIGH_RISK_ACTIONS = new Set([
   "org.suspended",
   "user.deactivated",
   "user.force_logout",
+  "user.terminated",
   "user.password_reset_sent",
 ]);
 const NORMAL_OPERATION_ACTION_PREFIXES = [
@@ -180,9 +181,7 @@ async function loadOversightFacts(serviceClient: QueryClient) {
     termsCount,
     consentCount,
   ] = await Promise.all([
-    selectRows(serviceClient, "organizations", ORGANIZATION_WITH_BILLING_COLS).then((rows) =>
-      rows.map((row) => rowToOrganization(row as unknown as DbOrganization)),
-    ),
+    selectRealOrganizations(serviceClient),
     selectRows(
       serviceClient,
       "organization_memberships",
@@ -339,7 +338,9 @@ function buildOrgActivitySignal(
 
   return {
     orgId,
-    orgName: organizationNames.get(orgId) ?? orgId.slice(0, 8),
+    // A row whose organization no longer exists keeps its full id so the
+    // gridmaster can still find it in the audit log.
+    orgName: organizationNames.get(orgId) ?? `Deleted organization ${orgId}`,
     actionCount: rows.length,
     operationalActionCount,
     highRiskActionCount,
@@ -616,6 +617,16 @@ function buildComplianceSummary(
         365,
     })),
   };
+}
+
+// Test Sandbox clones are not tenants: the dashboard list excludes them and
+// the manage route refuses them, so oversight must not count them either.
+async function selectRealOrganizations(client: QueryClient): Promise<Organization[]> {
+  const result = await client
+    .from("organizations")
+    .select(ORGANIZATION_WITH_BILLING_COLS)
+    .eq("workspace_kind", "real");
+  return toRows(result).map((row) => rowToOrganization(row as unknown as DbOrganization));
 }
 
 async function selectRows(client: QueryClient, table: string, columns: string): Promise<Row[]> {

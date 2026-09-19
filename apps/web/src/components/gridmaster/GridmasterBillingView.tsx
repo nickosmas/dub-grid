@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -13,14 +13,15 @@ import {
   ExtendTrialDialog,
   type BillingConfirmAction,
 } from "@/components/gridmaster/BillingActionDialogs";
-import CustomSelect from "@/components/CustomSelect";
 import { Button } from "@/components/Button";
+import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
 import { EmptyState } from "@/components/EmptyState";
 import ProgressBar from "@/components/ProgressBar";
 import { queryKeys } from "@/lib/query-keys";
 import { formatBillingStatusLabel, formatClientErrorMessage } from "@/lib/client-facing";
-import { sectionStyle, tdStyle, thStyle } from "@/lib/styles";
+import { sectionStyle } from "@/lib/styles";
 import type { GridmasterBillingOrgSummary } from "@/types";
+import { gmTableStyle, gmTdStyle, gmThStyle } from "@/components/gridmaster/table-styles";
 
 const BILLING_STATUSES = [
   "trialing",
@@ -31,6 +32,27 @@ const BILLING_STATUSES = [
   "incomplete",
   "incomplete_expired",
 ] as const;
+
+// Eleven columns have to fit a 1440px display without a horizontal scroll,
+// so the short columns take tighter tracks than the portal default and the
+// organization name keeps whatever is left.
+const BILLING_COLUMN_WIDTHS: Record<string, number> = {
+  Status: 118,
+  "Trial Started": 98,
+  "Trial Ends": 98,
+  "Period End": 98,
+  "Cancel At": 98,
+  Seats: 64,
+  "App Users": 88,
+  Delta: 64,
+  Stripe: 108,
+  Actions: 96,
+};
+
+function billingHeaderStyle(heading: string) {
+  const width = BILLING_COLUMN_WIDTHS[heading];
+  return width ? { ...gmThStyle, width } : gmThStyle;
+}
 
 function MiniCard({
   label,
@@ -183,82 +205,98 @@ function BillingRowActions({
   onCancelAtPeriodEnd: (org: GridmasterBillingOrgSummary) => void;
   onOverrideStatus: (org: GridmasterBillingOrgSummary, status: string) => void;
 }) {
-  const [status, setStatus] = useState(
-    BILLING_STATUSES.includes(org.status as (typeof BILLING_STATUSES)[number])
-      ? (org.status ?? "active")
-      : "active",
-  );
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  // One overflow menu per row, the control the schedule toolbar uses: seven
+  // inline buttons and a status select made the Actions column wider than the
+  // table and stacked them five deep on wide displays. The menu is portalled,
+  // so the table's horizontal scroll container cannot clip it.
+  const items: Array<{ label: string; disabled: boolean; danger?: boolean; run: () => void }> = [
+    { label: "Sync Stripe", disabled: busy || !org.stripeCustomerId, run: () => onSync(org) },
+    {
+      label: "True up seats",
+      disabled: busy || !org.stripeSubscriptionId || org.seats === org.appUsers,
+      run: () => onSyncSeats(org),
+    },
+    // Only a trialing org has a trial to extend; for active/canceled/past_due
+    // there is no trial clock, so the action would be a no-op.
+    {
+      label: "Extend trial",
+      disabled: busy || org.status !== "trialing",
+      run: () => onExtendTrial(org),
+    },
+    {
+      label: "End at period end",
+      disabled: busy || !org.stripeSubscriptionId || org.status === "canceled" || !!org.cancelAt,
+      run: () => onCancelAtPeriodEnd(org),
+    },
+    // No Stripe subscription = nothing to cancel; use a status override to
+    // change a local-only org's status instead.
+    {
+      label: "Cancel subscription",
+      disabled: busy || org.status === "canceled" || !org.stripeSubscriptionId,
+      danger: true,
+      run: () => onCancel(org),
+    },
+  ];
+  const overrides = BILLING_STATUSES.filter((status) => status !== org.status);
 
   return (
-    <div
-      onClick={(event) => event.stopPropagation()}
-      style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
-    >
+    <div onClick={(event) => event.stopPropagation()}>
       <Button
+        ref={triggerRef}
         type="button"
         className="dg-btn dg-btn-secondary dg-btn-xs"
-        disabled={busy || !org.stripeCustomerId}
-        onClick={() => onSync(org)}
-      >
-        Sync
-      </Button>
-      <Button
-        type="button"
-        className="dg-btn dg-btn-secondary dg-btn-xs"
-        disabled={busy || !org.stripeSubscriptionId || org.seats === org.appUsers}
-        onClick={() => onSyncSeats(org)}
-      >
-        True up seats
-      </Button>
-      <Button
-        type="button"
-        className="dg-btn dg-btn-secondary dg-btn-xs"
-        // Only a trialing org has a trial to extend; for active/canceled/past_due
-        // there is no trial clock, so the action would be a no-op.
-        disabled={busy || org.status !== "trialing"}
-        onClick={() => onExtendTrial(org)}
-      >
-        Extend trial
-      </Button>
-      <Button
-        type="button"
-        className="dg-btn dg-btn-secondary dg-btn-xs"
-        disabled={busy || !org.stripeSubscriptionId || org.status === "canceled" || !!org.cancelAt}
-        onClick={() => onCancelAtPeriodEnd(org)}
-      >
-        End period
-      </Button>
-      <Button
-        type="button"
-        className="dg-btn dg-btn-danger dg-btn-xs"
-        // No Stripe subscription = nothing to cancel; use Override to change a
-        // local-only org's status instead.
-        disabled={busy || org.status === "canceled" || !org.stripeSubscriptionId}
-        onClick={() => onCancel(org)}
-      >
-        Cancel
-      </Button>
-      <CustomSelect
-        ariaLabel={`Billing status for ${org.orgName}`}
-        value={status}
+        aria-label={`Billing actions for ${org.orgName}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
         disabled={busy}
-        onChange={setStatus}
-        options={BILLING_STATUSES.map((nextStatus) => ({
-          value: nextStatus,
-          label: formatBillingStatusLabel(nextStatus),
-        }))}
-        style={{ width: 150 }}
-        height={28}
-        fontSize="var(--dg-fs-caption)"
-      />
-      <Button
-        type="button"
-        className="dg-btn dg-btn-primary dg-btn-xs"
-        disabled={busy || status === org.status}
-        onClick={() => onOverrideStatus(org, status)}
+        onClick={() => setOpen((value) => !value)}
       >
-        Override
+        Actions
       </Button>
+      {open && (
+        <Menu open onOpenChange={(nextOpen) => setOpen(nextOpen)}>
+          <MenuContent
+            anchor={triggerRef}
+            side="bottom"
+            align="end"
+            sideOffset={4}
+            positionMethod="fixed"
+            collisionPadding={8}
+            finalFocus={triggerRef}
+            style={{ minWidth: 200 }}
+          >
+            {items.map((item) => (
+              <MenuItem
+                key={item.label}
+                disabled={item.disabled}
+                className={item.danger ? "dg-menu-item--danger" : undefined}
+                onClick={item.run}
+              >
+                {item.label}
+              </MenuItem>
+            ))}
+            <div className="dg-menu-divider" />
+            <div
+              style={{
+                padding: "4px 10px",
+                fontSize: "var(--dg-type-field-title-size)",
+                fontWeight: "var(--dg-type-field-title-weight)",
+                color: "var(--dg-type-field-title-color)",
+              }}
+            >
+              Override status
+            </div>
+            {overrides.map((status) => (
+              <MenuItem key={status} disabled={busy} onClick={() => onOverrideStatus(org, status)}>
+                {formatBillingStatusLabel(status)}
+              </MenuItem>
+            ))}
+          </MenuContent>
+        </Menu>
+      )}
     </div>
   );
 }
@@ -521,7 +559,7 @@ export default function GridmasterBillingView({
               </div>
             ) : (
               <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", whiteSpace: "nowrap" }}>
+                <table style={{ ...gmTableStyle, minWidth: 1080 }}>
                   <thead>
                     <tr>
                       {[
@@ -535,10 +573,9 @@ export default function GridmasterBillingView({
                         "App Users",
                         "Delta",
                         "Stripe",
-                        "Updated",
                         "Actions",
                       ].map((heading) => (
-                        <th key={heading} style={thStyle}>
+                        <th key={heading} style={billingHeaderStyle(heading)}>
                           {heading}
                         </th>
                       ))}
@@ -560,22 +597,22 @@ export default function GridmasterBillingView({
                             background: risky ? "var(--dg-color-danger-bg)" : undefined,
                           }}
                         >
-                          <td style={{ ...tdStyle, fontWeight: 700 }}>{org.orgName}</td>
-                          <td style={{ ...tdStyle, color: statusToneFor(org), fontWeight: 600 }}>
+                          <td style={{ ...gmTdStyle, fontWeight: 700 }}>{org.orgName}</td>
+                          <td style={{ ...gmTdStyle, color: statusToneFor(org), fontWeight: 600 }}>
                             {statusLabelFor(org)}
                           </td>
-                          <td style={tdStyle}>
+                          <td style={gmTdStyle}>
                             {org.trialStartedAt
                               ? new Date(org.trialStartedAt).toLocaleDateString()
                               : isTrialPending(org)
                                 ? "Not started"
                                 : "—"}
                           </td>
-                          <td style={tdStyle}>{formatTrialEnds(org)}</td>
-                          <td style={tdStyle}>{formatDate(org.currentPeriodEnd)}</td>
+                          <td style={gmTdStyle}>{formatTrialEnds(org)}</td>
+                          <td style={gmTdStyle}>{formatDate(org.currentPeriodEnd)}</td>
                           <td
                             style={{
-                              ...tdStyle,
+                              ...gmTdStyle,
                               color: org.cancelAt
                                 ? "var(--dg-color-warning)"
                                 : "var(--dg-color-text-muted)",
@@ -584,11 +621,11 @@ export default function GridmasterBillingView({
                           >
                             {formatDate(org.cancelAt)}
                           </td>
-                          <td style={tdStyle}>{org.seats ?? "—"}</td>
-                          <td style={tdStyle}>{org.appUsers}</td>
+                          <td style={gmTdStyle}>{org.seats ?? "—"}</td>
+                          <td style={gmTdStyle}>{org.appUsers}</td>
                           <td
                             style={{
-                              ...tdStyle,
+                              ...gmTdStyle,
                               color:
                                 org.seatDelta != null && org.seatDelta < 0
                                   ? "var(--dg-color-danger)"
@@ -598,7 +635,7 @@ export default function GridmasterBillingView({
                           >
                             {org.seatDelta ?? "—"}
                           </td>
-                          <td style={tdStyle}>
+                          <td style={gmTdStyle}>
                             {org.stripeCustomerId ? (
                               <a
                                 href={`https://dashboard.stripe.com/customers/${org.stripeCustomerId}`}
@@ -613,8 +650,7 @@ export default function GridmasterBillingView({
                               "Missing"
                             )}
                           </td>
-                          <td style={tdStyle}>{formatDate(org.updatedAt)}</td>
-                          <td style={tdStyle}>
+                          <td style={gmTdStyle}>
                             <BillingRowActions
                               org={org}
                               busy={busyOrgId === org.orgId}

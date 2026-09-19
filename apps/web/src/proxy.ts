@@ -85,6 +85,10 @@ async function readOrgAccess(
   const value = refresh
     ? await load()
     : await cacheThrough(CacheKey.mwOrgAccess(orgId), TTL.MIDDLEWARE, load);
+  // The read is RLS-scoped but the key is per organization: an empty result is
+  // one caller's lost membership, not the organization's state, so it must
+  // never be memoized for the next caller. (Redis stores it as a miss already.)
+  if (value === null) return value;
   mwOrgAccessMemo.set(orgId, { value, expiresAt: now + MW_ORG_ACCESS_MEMO_MS });
   if (refresh) void cacheSet(CacheKey.mwOrgAccess(orgId), value, TTL.MIDDLEWARE);
   return value;
@@ -603,16 +607,27 @@ export async function proxy(req: NextRequest) {
         readOrgAccess(
           claims.org_id!,
           async () => {
-            const { data } = await supabase
+            const { data, error } = await supabase
               .from("organizations")
               .select("suspended_at, archived_at, subscription_status, trial_ends_at")
               .eq("id", claims.org_id!)
               .maybeSingle();
+            // A lookup failure is an outage, handled below as best-effort; an
+            // empty result is a verdict, so the two must not look the same.
+            if (error) throw error;
             return (data as MwOrgAccess) ?? null;
           },
           pathname === "/billing-required",
         ),
       );
+
+      // The read runs as the caller under RLS, so no row means the organization
+      // is no longer visible to them: the membership was archived (removal,
+      // termination) after this token was issued. Without this, the null row
+      // read as a pending trial and sent the person to the billing gate.
+      if (orgAccess === null) {
+        return NextResponse.redirect(new URL("/login", req.url));
+      }
 
       // A deleted (archived) org revokes access just like a suspended one. A
       // user with a pre-deletion JWT can still hit the app until it clears, so

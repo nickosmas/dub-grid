@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { resolveShiftPillColors } from "@/lib/colors";
 import { Button } from "@/components/Button";
 import { MaybeHint } from "@/components/ui/hint";
-import { sectionStyle, thStyle, tdStyle } from "@/lib/styles";
+import { sectionStyle } from "@/lib/styles";
 import { EmptyState } from "@/components/EmptyState";
 import { addDays, formatDateKey } from "@/lib/utils";
 import { getScheduleStartForSpan } from "@/lib/schedule-view";
@@ -20,6 +20,12 @@ import {
   fetchGridmasterReadOnlySchedule,
   type GridmasterReadOnlyShiftRow as ShiftRow,
 } from "@/features/gridmaster/client";
+import {
+  gmHeaderStyle,
+  gmTableStyle,
+  gmTdStyle,
+  gmThStyle,
+} from "@/components/gridmaster/table-styles";
 
 function formatDate(d: string) {
   return new Date(d + "T00:00:00").toLocaleDateString("en-US", {
@@ -189,20 +195,20 @@ export default function ReadOnlyScheduleView({
               {formatDate(date)}
             </div>
             <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <table style={gmTableStyle}>
                 <thead>
                   <tr>
-                    <th style={thStyle}>Employee</th>
-                    <th style={thStyle}>Shift</th>
-                    <th style={thStyle}>Focus area</th>
-                    <th style={thStyle}>Status</th>
+                    <th style={gmHeaderStyle("Employee")}>Employee</th>
+                    <th style={gmHeaderStyle("Shift")}>Shift</th>
+                    <th style={gmHeaderStyle("Focus area")}>Focus area</th>
+                    <th style={gmHeaderStyle("Status")}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((r, i) => (
                     <tr key={`${r.empId}-${i}`}>
-                      <td style={{ ...tdStyle, fontWeight: 600 }}>{r.empName}</td>
-                      <td style={tdStyle}>
+                      <td style={{ ...gmTdStyle, fontWeight: 600 }}>{r.empName}</td>
+                      <td style={gmTdStyle}>
                         {r.assignmentDetails.length > 0 ? (
                           <span style={{ display: "inline-flex", gap: 4, flexWrap: "wrap" }}>
                             {r.assignmentDetails.map((assignment) => (
@@ -253,7 +259,7 @@ export default function ReadOnlyScheduleView({
                       </td>
                       <td
                         style={{
-                          ...tdStyle,
+                          ...gmTdStyle,
                           fontSize: "var(--dg-fs-caption)",
                           color: "var(--dg-color-text-muted)",
                         }}
@@ -263,7 +269,7 @@ export default function ReadOnlyScheduleView({
                             ?.focusAreaName ??
                           "—"}
                       </td>
-                      <td style={tdStyle}>
+                      <td style={gmTdStyle}>
                         <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                           {r.isDraft ? (
                             <span

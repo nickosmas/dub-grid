@@ -221,33 +221,35 @@ All four are behind the `stripe` platform kill switch (503 when disabled).
 
 All gridmaster routes require `platform_role = 'gridmaster'` in the JWT. They are served by `apps/web/src/features/gridmaster/`.
 
-| Method         | Path                                          | Purpose                                                                                      |
-| -------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| GET            | `/api/gridmaster/overview`                    | High-level platform overview                                                                 |
-| GET            | `/api/gridmaster/dashboard`                   | Gridmaster dashboard data                                                                    |
-| GET, POST      | `/api/gridmaster/accounts`                    | List and manage gridmaster accounts                                                          |
-| GET            | `/api/gridmaster/users`                       | Search all users across orgs                                                                 |
-| PATCH          | `/api/gridmaster/users`                       | Update a user's platform state                                                               |
-| GET            | `/api/gridmaster/users/[userId]/memberships`  | All org memberships for a user                                                               |
-| POST           | `/api/gridmaster/users/[userId]/force-logout` | Terminate all sessions for a user (fresh sensitive-action auth)                              |
-| POST           | `/api/gridmaster/organizations/manage`        | Manage org lifecycle (suspend, restore, archive)                                             |
-| GET            | `/api/gridmaster/invitations`                 | List invitations across all orgs                                                             |
-| GET            | `/api/gridmaster/audit-log`                   | Paginated audit log for a period                                                             |
-| GET            | `/api/gridmaster/audit-log/day-counts`        | Per-day event counts for the period navigator                                                |
-| GET            | `/api/gridmaster/audit-log/full`              | Full unfiltered audit log                                                                    |
-| POST           | `/api/gridmaster/audit-log/export`            | Export audit log to CSV                                                                      |
-| GET            | `/api/gridmaster/billing`                     | Billing overview across all orgs                                                             |
-| POST           | `/api/gridmaster/subscription`                | Manage an org's subscription tier                                                            |
-| POST           | `/api/gridmaster/stripe-sync`                 | Force-sync Stripe data for an org                                                            |
-| GET            | `/api/gridmaster/org-health`                  | Org health metrics                                                                           |
-| GET            | `/api/gridmaster/compliance`                  | Compliance report                                                                            |
-| GET            | `/api/gridmaster/security`                    | Security overview                                                                            |
-| GET            | `/api/gridmaster/security/sessions`           | Active sessions across orgs                                                                  |
-| POST           | `/api/gridmaster/password-reset`              | Force a password reset for any user                                                          |
-| GET            | `/api/gridmaster/impersonation`               | Impersonation history                                                                        |
-| POST           | `/api/gridmaster/impersonation`               | Start an impersonation session                                                               |
-| GET            | `/api/gridmaster/schedule`                    | Schedule data across orgs                                                                    |
-| GET, POST, PUT | `/api/gridmaster/platform-flags`              | Read, create, or flip the platform kill switches (invalidates Redis and the Next data cache) |
+| Method         | Path                                          | Purpose                                                                                                                                                     |
+| -------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET            | `/api/gridmaster/overview`                    | High-level platform overview                                                                                                                                |
+| GET            | `/api/gridmaster/dashboard`                   | Gridmaster dashboard data                                                                                                                                   |
+| GET, POST      | `/api/gridmaster/accounts`                    | List and manage gridmaster accounts                                                                                                                         |
+| GET            | `/api/gridmaster/users`                       | Search all users across orgs                                                                                                                                |
+| PATCH          | `/api/gridmaster/users`                       | Update a user's platform state                                                                                                                              |
+| GET            | `/api/gridmaster/users/[userId]/memberships`  | All org memberships for a user                                                                                                                              |
+| POST           | `/api/gridmaster/users/[userId]/force-logout` | Terminate all sessions for a user (fresh sensitive-action auth)                                                                                             |
+| POST           | `/api/gridmaster/users/[userId]/terminate`    | Terminate an account platform-wide: memberships archived, employee rows removed, sessions cut, org-side reinstatement blocked (fresh sensitive-action auth) |
+| POST           | `/api/gridmaster/users/[userId]/reinstate`    | Lift a platform termination; access is granted again explicitly by a gridmaster (fresh sensitive-action auth)                                               |
+| POST           | `/api/gridmaster/organizations/manage`        | Manage org lifecycle (suspend, restore, archive)                                                                                                            |
+| GET            | `/api/gridmaster/invitations`                 | List invitations across all orgs                                                                                                                            |
+| GET            | `/api/gridmaster/audit-log`                   | Paginated audit log for a period                                                                                                                            |
+| GET            | `/api/gridmaster/audit-log/day-counts`        | Per-day event counts for the period navigator                                                                                                               |
+| GET            | `/api/gridmaster/audit-log/full`              | Full unfiltered audit log                                                                                                                                   |
+| POST           | `/api/gridmaster/audit-log/export`            | Export audit log to CSV                                                                                                                                     |
+| GET            | `/api/gridmaster/billing`                     | Billing overview across all orgs                                                                                                                            |
+| POST           | `/api/gridmaster/subscription`                | Manage an org's subscription tier                                                                                                                           |
+| POST           | `/api/gridmaster/stripe-sync`                 | Force-sync Stripe data for an org                                                                                                                           |
+| GET            | `/api/gridmaster/org-health`                  | Org health metrics                                                                                                                                          |
+| GET            | `/api/gridmaster/compliance`                  | Compliance report                                                                                                                                           |
+| GET            | `/api/gridmaster/security`                    | Security overview                                                                                                                                           |
+| GET            | `/api/gridmaster/security/sessions`           | Active sessions across orgs                                                                                                                                 |
+| POST           | `/api/gridmaster/password-reset`              | Force a password reset for any user                                                                                                                         |
+| GET            | `/api/gridmaster/impersonation`               | Impersonation history                                                                                                                                       |
+| POST           | `/api/gridmaster/impersonation`               | Start an impersonation session                                                                                                                              |
+| GET            | `/api/gridmaster/schedule`                    | Schedule data across orgs                                                                                                                                   |
+| GET, POST, PUT | `/api/gridmaster/platform-flags`              | Read, create, or flip the platform kill switches (invalidates Redis and the Next data cache)                                                                |
 
 The org-scoped Activity Log and per-person Activity pages read the same audit registry through `/api/gridmaster/audit-log` and `/audit-log/day-counts` with an organization-scoped audience; the route authorizes by audience, not only by platform role.
 

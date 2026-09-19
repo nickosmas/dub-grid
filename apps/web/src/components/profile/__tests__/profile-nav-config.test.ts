@@ -15,8 +15,8 @@ describe("profile nav config", () => {
       const primary = groups.find((group) => group.id === "primary");
       expect(primary?.items.map((item) => item.id)).toEqual(
         isOnSchedule
-          ? ["profile", "security", "notifications", "appearance", "overview"]
-          : ["profile", "security", "notifications", "appearance"],
+          ? ["profile", "security", "notifications", "overview"]
+          : ["profile", "security", "notifications"],
       );
     }
   });

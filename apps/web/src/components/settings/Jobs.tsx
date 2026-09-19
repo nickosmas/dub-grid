@@ -2755,14 +2755,8 @@ export default function JobsSettings({
   );
 
   const handleAddScheduledJob = useCallback(() => {
-    const defaultDepartmentId =
-      activeScheduledDepartments.find((department) =>
-        focusAreas.some(
-          (focusArea) =>
-            focusArea.departmentId === department.id &&
-            activeShiftCategories.some((shift) => shift.focusAreaId === focusArea.id),
-        ),
-      )?.id ?? null;
+    // Placement starts empty so the scheduler chooses where the job applies;
+    // pre-selecting the first department and all its shifts was saved as-is.
     const nextJob: JobDefinition & { isNew: true } = {
       id: nextTmpId.current--,
       orgId,
@@ -2772,27 +2766,9 @@ export default function JobsSettings({
       assignmentMode: "with_shift",
       eligibilityMode: "and",
       focusAreaId: null,
-      focusAreaIds:
-        defaultDepartmentId == null
-          ? []
-          : focusAreas
-              .filter((focusArea) => focusArea.departmentId === defaultDepartmentId)
-              .map((focusArea) => focusArea.id),
-      departmentIds: defaultDepartmentId != null ? [defaultDepartmentId] : [],
-      applicableShiftIds:
-        defaultDepartmentId == null
-          ? []
-          : activeShiftCategories
-              .filter(
-                (shift) =>
-                  shift.focusAreaId != null &&
-                  focusAreas.some(
-                    (focusArea) =>
-                      focusArea.id === shift.focusAreaId &&
-                      focusArea.departmentId === defaultDepartmentId,
-                  ),
-              )
-              .map((shift) => shift.id),
+      focusAreaIds: [],
+      departmentIds: [],
+      applicableShiftIds: [],
       eligibleRoleIds: [],
       requiredCertificationIds: [],
       color: EMPTY_SCHEDULED_JOB_STYLE.color,
@@ -2810,7 +2786,7 @@ export default function JobsSettings({
       isNew: true,
     };
     setLocal((previous) => [...previous, nextJob]);
-  }, [activeScheduledDepartments, activeShiftCategories, focusAreas, local.length, orgId]);
+  }, [local.length, orgId]);
 
   const handleAddShiftlessJob = useCallback(() => {
     const defaultPreset = PREDEFINED_COLORS[0]!;

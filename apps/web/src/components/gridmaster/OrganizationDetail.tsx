@@ -83,14 +83,7 @@ import { buildMembershipAccessChanges } from "@/lib/access-management";
 /** Raw invitation row from supabase (snake_case columns). */
 import ConfirmDialog from "@/components/ConfirmDialog";
 import PermissionsEditor from "@/components/PermissionsEditor";
-import {
-  sectionStyle,
-  sectionHeaderStyle,
-  sectionBodyStyle,
-  thStyle,
-  tdStyle,
-  labelStyle,
-} from "@/lib/styles";
+import { sectionStyle, sectionHeaderStyle, sectionBodyStyle, labelStyle } from "@/lib/styles";
 import {
   formatBillingStatusLabel,
   formatClientLabel,
@@ -111,6 +104,7 @@ import {
   unsuspendGridmasterOrganization,
   updateGridmasterSubscription,
 } from "@/features/gridmaster/client";
+import { gmTdStyle } from "@/components/gridmaster/table-styles";
 
 export type OrganizationDetailTab =
   | "overview"

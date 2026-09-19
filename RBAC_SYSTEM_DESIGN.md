@@ -699,6 +699,15 @@ injecting claims, all reflected below:
    archived orgs (`o.archived_at`), suspended orgs (`o.suspended_at`), and deactivated
    users (`p.deactivated_at`); a missing membership yields no org claims at all (org
    context is stripped). It also writes `org_name` alongside the other claims.
+4. **Platform-disabled accounts are refused outright** (migration `021`). A profile with
+   `deactivated_at` or `terminated_at` set gets the same 403 "account disabled" envelope
+   as a removed employee, before the refresh-lock check, so neither a sign-in nor a
+   silent refresh mints a token. Stripping claims alone was not enough: the web proxy's
+   profile fallback resolved them again and an open session kept working. A termination
+   (`terminate_user_account`, gridmaster only) also archives every membership, marks
+   linked employee rows removed, cuts sessions, and arms table guards so no
+   organization-side path (invitation, role change, employee reactivation) can let the
+   person back in until `reinstate_user_account` clears the flag.
 
 ```sql
 -- Supabase Auth Hook — runs on every token mint (sign-in AND refresh).

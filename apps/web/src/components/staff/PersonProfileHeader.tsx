@@ -74,10 +74,12 @@ export function PersonProfileHeader({
           <BioField label="Email" value={email || "—"} />
           <BioField label="Phone" value={phone || "—"} />
           {employmentType !== undefined && <BioField label="Employment" value={employmentLabel} />}
-          <BioField
-            label="Employee ID"
-            value={employeeNumber != null ? `#${employeeNumber}` : "—"}
-          />
+          {employeeNumber !== undefined && (
+            <BioField
+              label="Employee ID"
+              value={employeeNumber != null ? `#${employeeNumber}` : "—"}
+            />
+          )}
         </div>
       </div>
     </header>

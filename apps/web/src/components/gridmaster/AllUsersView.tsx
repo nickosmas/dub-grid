@@ -11,7 +11,7 @@ import { Button } from "@/components/Button";
 import CustomSelect from "@/components/CustomSelect";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
-import { sectionStyle, thStyle, tdStyle, ROLE_BADGE_COLORS } from "@/lib/styles";
+import { sectionStyle, ROLE_BADGE_COLORS } from "@/lib/styles";
 import { toDarkPillColors } from "@/lib/colors";
 import { formatClientErrorMessage, formatOrganizationRoleLabel } from "@/lib/client-facing";
 import { CloseButton } from "@/components/ui/CloseButton";
@@ -21,12 +21,20 @@ import {
   fetchGridmasterUserMemberships,
   fetchGridmasterUsers,
   forceLogoutGridmasterUser,
+  reinstateGridmasterUser,
+  terminateGridmasterUser,
   updateGridmasterUserActivation,
 } from "@/features/gridmaster/client";
 import { queryKeys } from "@/lib/query-keys";
 import { useStepUpAction } from "@/hooks/useStepUpAction";
 import { useSlideoverClose } from "@/hooks/useSlideoverClose";
 import { requireCredentialAssurance } from "@/features/account/client";
+import {
+  gmHeaderStyle,
+  gmTableStyle,
+  gmTdStyle,
+  gmThStyle,
+} from "@/components/gridmaster/table-styles";
 
 /**
  * Owns the slide-over's animation, scroll lock, and Escape handling for
@@ -74,8 +82,14 @@ function RoleBadge({ role }: { role: string }) {
   );
 }
 
-function StatusBadge({ deactivatedAt }: { deactivatedAt: string | null | undefined }) {
-  if (!deactivatedAt) return null;
+function StatusBadge({
+  deactivatedAt,
+  terminatedAt,
+}: {
+  deactivatedAt: string | null | undefined;
+  terminatedAt?: string | null;
+}) {
+  if (!deactivatedAt && !terminatedAt) return null;
   return (
     <span
       style={{
@@ -90,7 +104,7 @@ function StatusBadge({ deactivatedAt }: { deactivatedAt: string | null | undefin
         marginLeft: 4,
       }}
     >
-      Deactivated
+      {terminatedAt ? "Terminated" : "Deactivated"}
     </span>
   );
 }
@@ -128,6 +142,9 @@ export default function AllUsersView({
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [deactivateConfirm, setDeactivateConfirm] = useState<PlatformUser | null>(null);
   const [forceLogoutConfirm, setForceLogoutConfirm] = useState<PlatformUser | null>(null);
+  const [terminateConfirm, setTerminateConfirm] = useState<PlatformUser | null>(null);
+  const [terminateReason, setTerminateReason] = useState("");
+  const [reinstateConfirm, setReinstateConfirm] = useState<PlatformUser | null>(null);
   const [resetConfirm, setResetConfirm] = useState<PlatformUser | null>(null);
   const [selectedUser, setSelectedUser] = useState<PlatformUser | null>(null);
   const usersQuery = useQuery({
@@ -171,8 +188,9 @@ export default function AllUsersView({
         if (u.orgRole !== roleFilter) return false;
       }
       if (orgFilter !== "all" && u.orgId !== orgFilter) return false;
-      if (statusFilter === "active" && u.deactivatedAt) return false;
+      if (statusFilter === "active" && (u.deactivatedAt || u.terminatedAt)) return false;
       if (statusFilter === "deactivated" && !u.deactivatedAt) return false;
+      if (statusFilter === "terminated" && !u.terminatedAt) return false;
       if (statusFilter === "inactive" && u.lastSignInAt) return false;
       return true;
     });
@@ -217,6 +235,48 @@ export default function AllUsersView({
       setForceLogoutConfirm(null);
     } catch (err: unknown) {
       toast.error(formatClientErrorMessage(err, "We couldn't force logout. Try again."));
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleTerminate(user: PlatformUser) {
+    const reason = terminateReason.trim();
+    if (!reason) {
+      toast.error("Give a reason for the termination.");
+      return;
+    }
+    setActionLoading(user.id);
+    try {
+      const completed = await stepUp.run(async (accessToken) => {
+        await requireCredentialAssurance(accessToken);
+        await terminateGridmasterUser(user.id, reason, accessToken);
+      });
+      if (!completed) return;
+      toast.success("Account terminated");
+      setTerminateConfirm(null);
+      setTerminateReason("");
+      reload();
+    } catch (err: unknown) {
+      toast.error(formatClientErrorMessage(err, "We couldn't terminate that account. Try again."));
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleReinstate(user: PlatformUser) {
+    setActionLoading(user.id);
+    try {
+      const completed = await stepUp.run(async (accessToken) => {
+        await requireCredentialAssurance(accessToken);
+        await reinstateGridmasterUser(user.id, accessToken);
+      });
+      if (!completed) return;
+      toast.success("Account reinstated. Grant organization access again to let them back in.");
+      setReinstateConfirm(null);
+      reload();
+    } catch (err: unknown) {
+      toast.error(formatClientErrorMessage(err, "We couldn't reinstate that account. Try again."));
     } finally {
       setActionLoading(null);
     }
@@ -353,6 +413,7 @@ export default function AllUsersView({
               { value: "all", label: "All Statuses" },
               { value: "active", label: "Active" },
               { value: "deactivated", label: "Deactivated" },
+              { value: "terminated", label: "Terminated" },
               { value: "inactive", label: "Never Logged In" },
             ]}
             onChange={setStatusFilter}
@@ -441,18 +502,18 @@ export default function AllUsersView({
       {filtered.length > 0 ? (
         <div style={sectionStyle}>
           <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <table style={gmTableStyle}>
               <thead>
                 <tr>
-                  <th style={thStyle}>Email</th>
-                  <th style={thStyle}>Platform role</th>
-                  <th style={thStyle}>Organization role</th>
-                  <th style={thStyle}>Organization</th>
-                  <th style={thStyle}>Sessions</th>
-                  <th style={thStyle}>Mobile</th>
-                  <th style={thStyle}>Memberships</th>
-                  <th style={thStyle}>Last login</th>
-                  <th style={thStyle}>Date joined</th>
+                  <th style={gmHeaderStyle("Email")}>Email</th>
+                  <th style={gmHeaderStyle("Platform role")}>Platform role</th>
+                  <th style={gmHeaderStyle("Organization role")}>Organization role</th>
+                  <th style={gmHeaderStyle("Organization")}>Organization</th>
+                  <th style={gmHeaderStyle("Sessions")}>Sessions</th>
+                  <th style={gmHeaderStyle("Mobile")}>Mobile</th>
+                  <th style={gmHeaderStyle("Memberships")}>Memberships</th>
+                  <th style={gmHeaderStyle("Last login")}>Last login</th>
+                  <th style={gmHeaderStyle("Date joined")}>Date joined</th>
                 </tr>
               </thead>
               <tbody>
@@ -464,15 +525,20 @@ export default function AllUsersView({
                       style={{ opacity: isDeactivated ? 0.6 : 1, cursor: "pointer" }}
                       onClick={() => handleSelectUser(u)}
                     >
-                      <td style={{ ...tdStyle, fontWeight: 600, fontSize: "var(--dg-fs-caption)" }}>
+                      <td
+                        style={{ ...gmTdStyle, fontWeight: 600, fontSize: "var(--dg-fs-caption)" }}
+                      >
                         {u.email ?? "—"}
-                        <StatusBadge deactivatedAt={u.deactivatedAt as string | null} />
+                        <StatusBadge
+                          deactivatedAt={u.deactivatedAt as string | null}
+                          terminatedAt={u.terminatedAt}
+                        />
                       </td>
-                      <td style={tdStyle}>
+                      <td style={gmTdStyle}>
                         {u.platformRole !== "none" && <RoleBadge role={u.platformRole} />}
                       </td>
-                      <td style={tdStyle}>{u.orgRole && <RoleBadge role={u.orgRole} />}</td>
-                      <td style={tdStyle}>
+                      <td style={gmTdStyle}>{u.orgRole && <RoleBadge role={u.orgRole} />}</td>
+                      <td style={gmTdStyle}>
                         {u.orgName ? (
                           <Button
                             onClick={(e) => {
@@ -489,6 +555,8 @@ export default function AllUsersView({
                               fontFamily: "inherit",
                               padding: 0,
                               textDecoration: "underline",
+                              whiteSpace: "normal",
+                              textAlign: "left",
                             }}
                           >
                             {u.orgName}
@@ -499,7 +567,7 @@ export default function AllUsersView({
                       </td>
                       <td
                         style={{
-                          ...tdStyle,
+                          ...gmTdStyle,
                           fontSize: "var(--dg-fs-caption)",
                           fontFamily: "var(--font-dm-mono), monospace",
                         }}
@@ -508,7 +576,7 @@ export default function AllUsersView({
                       </td>
                       <td
                         style={{
-                          ...tdStyle,
+                          ...gmTdStyle,
                           fontSize: "var(--dg-fs-caption)",
                           fontFamily: "var(--font-dm-mono), monospace",
                         }}
@@ -517,7 +585,7 @@ export default function AllUsersView({
                       </td>
                       <td
                         style={{
-                          ...tdStyle,
+                          ...gmTdStyle,
                           fontSize: "var(--dg-fs-caption)",
                           fontFamily: "var(--font-dm-mono), monospace",
                         }}
@@ -526,7 +594,7 @@ export default function AllUsersView({
                       </td>
                       <td
                         style={{
-                          ...tdStyle,
+                          ...gmTdStyle,
                           fontSize: "var(--dg-fs-caption)",
                           color: "var(--dg-color-text-muted)",
                           whiteSpace: "nowrap",
@@ -544,7 +612,7 @@ export default function AllUsersView({
                       </td>
                       <td
                         style={{
-                          ...tdStyle,
+                          ...gmTdStyle,
                           fontSize: "var(--dg-fs-caption)",
                           color: "var(--dg-color-text-muted)",
                           whiteSpace: "nowrap",
@@ -605,6 +673,52 @@ export default function AllUsersView({
         />
       )}
 
+      {/* Terminate confirm: the reason is recorded on the account and in the audit log. */}
+      {terminateConfirm && !stepUp.dialog && (
+        <ConfirmDialog
+          title="Terminate account"
+          message={
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <span>
+                Terminate &quot;{terminateConfirm.email}&quot;? They lose every organization
+                membership and every session now, and no organization admin can invite, reactivate,
+                or re-add them. Only a gridmaster can reinstate the account.
+              </span>
+              <textarea
+                className="dg-input"
+                aria-label="Termination reason"
+                placeholder="Reason (required, recorded in the audit log)"
+                value={terminateReason}
+                onChange={(event) => setTerminateReason(event.target.value)}
+                rows={3}
+                style={{ resize: "vertical" }}
+              />
+            </div>
+          }
+          confirmLabel="Terminate account"
+          variant="danger"
+          isLoading={actionLoading === terminateConfirm.id}
+          onConfirm={() => handleTerminate(terminateConfirm)}
+          onCancel={() => {
+            setTerminateConfirm(null);
+            setTerminateReason("");
+          }}
+        />
+      )}
+
+      {/* Reinstate confirm */}
+      {reinstateConfirm && !stepUp.dialog && (
+        <ConfirmDialog
+          title="Reinstate account"
+          message={`Reinstate "${reinstateConfirm.email}"? This lifts the platform block only. Their memberships stay archived until you grant organization access again.`}
+          confirmLabel="Reinstate"
+          variant="info"
+          isLoading={actionLoading === reinstateConfirm.id}
+          onConfirm={() => handleReinstate(reinstateConfirm)}
+          onCancel={() => setReinstateConfirm(null)}
+        />
+      )}
+
       {/* Force logout confirm */}
       {forceLogoutConfirm && !stepUp.dialog && (
         <ConfirmDialog
@@ -636,7 +750,9 @@ export default function AllUsersView({
       {selectedUser && (
         <UserDetailSlideover onClose={closeUserDetail}>
           {(handleClosePanel, closing) => {
-            const u = selectedUser;
+            // Read the live row so the panel reflects an action (terminate,
+            // deactivate) as soon as the list reloads, not the snapshot it opened with.
+            const u = users.find((candidate) => candidate.id === selectedUser.id) ?? selectedUser;
             const isDeactivated = !!u.deactivatedAt;
             const isGM = u.platformRole === "gridmaster";
             const emailName = u.email?.split("@")[0] ?? "";
@@ -704,7 +820,12 @@ export default function AllUsersView({
                     >
                       {isGM && <RoleBadge role={u.platformRole} />}
                       {!isGM && u.orgRole && <RoleBadge role={u.orgRole} />}
-                      {isDeactivated && <StatusBadge deactivatedAt={u.deactivatedAt as string} />}
+                      {(isDeactivated || u.terminatedAt) && (
+                        <StatusBadge
+                          deactivatedAt={u.deactivatedAt as string | null}
+                          terminatedAt={u.terminatedAt}
+                        />
+                      )}
                     </div>
                   </div>
 
@@ -836,7 +957,7 @@ export default function AllUsersView({
                             fontFamily: "var(--font-dm-mono), monospace",
                           }}
                         >
-                          {u.id.slice(0, 8)}…
+                          {u.id}
                         </div>
                       </div>
                       <div>
@@ -921,18 +1042,18 @@ export default function AllUsersView({
                           Organization Memberships
                         </h4>
                         {membershipsLoading ? (
-                          <table style={{ width: "100%", borderCollapse: "collapse" }} aria-hidden>
+                          <table style={gmTableStyle} aria-hidden>
                             <thead>
                               <tr>
-                                <th style={thStyle}>Organization</th>
-                                <th style={thStyle}>Role</th>
-                                <th style={thStyle}>Date joined</th>
+                                <th style={gmHeaderStyle("Organization")}>Organization</th>
+                                <th style={gmHeaderStyle("Role")}>Role</th>
+                                <th style={gmHeaderStyle("Date joined")}>Date joined</th>
                               </tr>
                             </thead>
                             <tbody>
                               {Array.from({ length: 3 }).map((_, i) => (
                                 <tr key={i}>
-                                  <td style={tdStyle}>
+                                  <td style={gmTdStyle}>
                                     <div
                                       className="dg-skeleton"
                                       style={{
@@ -942,13 +1063,13 @@ export default function AllUsersView({
                                       }}
                                     />
                                   </td>
-                                  <td style={tdStyle}>
+                                  <td style={gmTdStyle}>
                                     <div
                                       className="dg-skeleton"
                                       style={{ width: 64, height: 18, borderRadius: 999 }}
                                     />
                                   </td>
-                                  <td style={tdStyle}>
+                                  <td style={gmTdStyle}>
                                     <div
                                       className="dg-skeleton"
                                       style={{
@@ -976,18 +1097,18 @@ export default function AllUsersView({
                             )}
                           </div>
                         ) : (
-                          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                          <table style={gmTableStyle}>
                             <thead>
                               <tr>
-                                <th style={thStyle}>Organization</th>
-                                <th style={thStyle}>Role</th>
-                                <th style={thStyle}>Date joined</th>
+                                <th style={gmHeaderStyle("Organization")}>Organization</th>
+                                <th style={gmHeaderStyle("Role")}>Role</th>
+                                <th style={gmHeaderStyle("Date joined")}>Date joined</th>
                               </tr>
                             </thead>
                             <tbody>
                               {memberships.map((m) => (
                                 <tr key={m.org_id}>
-                                  <td style={{ ...tdStyle, fontWeight: 600 }}>
+                                  <td style={{ ...gmTdStyle, fontWeight: 600 }}>
                                     <Button
                                       onClick={() => {
                                         handleClosePanel();
@@ -1008,12 +1129,12 @@ export default function AllUsersView({
                                       {m.org_name}
                                     </Button>
                                   </td>
-                                  <td style={tdStyle}>
+                                  <td style={gmTdStyle}>
                                     <RoleBadge role={m.org_role} />
                                   </td>
                                   <td
                                     style={{
-                                      ...tdStyle,
+                                      ...gmTdStyle,
                                       fontSize: "var(--dg-fs-caption)",
                                       color: "var(--dg-color-text-muted)",
                                     }}
@@ -1032,6 +1153,24 @@ export default function AllUsersView({
                       </div>
                     )}
 
+                    {u.terminatedAt && (
+                      <div
+                        role="note"
+                        style={{
+                          padding: "12px 16px",
+                          borderRadius: "var(--dg-radius-lg)",
+                          background: "var(--dg-color-danger-bg)",
+                          color: "var(--dg-color-danger)",
+                          fontSize: "var(--dg-fs-label)",
+                          fontWeight: 600,
+                        }}
+                      >
+                        Terminated {formatRelativeDate(u.terminatedAt)}
+                        {u.terminatedReason ? `: ${u.terminatedReason}` : ""}. Organization admins
+                        cannot invite, reactivate, or re-add this account.
+                      </div>
+                    )}
+
                     {/* Actions */}
                     {!isGM && (
                       <div
@@ -1043,17 +1182,31 @@ export default function AllUsersView({
                           borderTop: "1px solid var(--dg-color-border-light)",
                         }}
                       >
-                        <Button
-                          className="dg-btn dg-btn-secondary"
-                          style={{ fontSize: "var(--dg-fs-label)" }}
-                          onClick={() => {
-                            handleClosePanel();
-                            setTimeout(() => onImpersonate(u.id, u.orgId ?? undefined), 220);
-                          }}
-                        >
-                          Impersonate
-                        </Button>
-                        {u.orgId && (
+                        {u.terminatedAt ? (
+                          <Button
+                            className="dg-btn dg-btn-secondary"
+                            style={{
+                              fontSize: "var(--dg-fs-label)",
+                              color: "var(--dg-color-success, green)",
+                            }}
+                            onClick={() => setReinstateConfirm(u)}
+                            disabled={actionLoading === u.id}
+                          >
+                            Reinstate
+                          </Button>
+                        ) : (
+                          <Button
+                            className="dg-btn dg-btn-secondary"
+                            style={{ fontSize: "var(--dg-fs-label)" }}
+                            onClick={() => {
+                              handleClosePanel();
+                              setTimeout(() => onImpersonate(u.id, u.orgId ?? undefined), 220);
+                            }}
+                          >
+                            Impersonate
+                          </Button>
+                        )}
+                        {u.orgId && !u.terminatedAt && (
                           <Button
                             className="dg-btn dg-btn-secondary"
                             style={{
@@ -1079,7 +1232,7 @@ export default function AllUsersView({
                         >
                           Force Logout
                         </Button>
-                        {u.email && (
+                        {u.email && !u.terminatedAt && (
                           <Button
                             className="dg-btn dg-btn-secondary"
                             style={{ fontSize: "var(--dg-fs-label)" }}
@@ -1087,6 +1240,16 @@ export default function AllUsersView({
                             disabled={actionLoading === u.id}
                           >
                             Reset Password
+                          </Button>
+                        )}
+                        {!u.terminatedAt && (
+                          <Button
+                            className="dg-btn dg-btn-danger"
+                            style={{ fontSize: "var(--dg-fs-label)", marginLeft: "auto" }}
+                            onClick={() => setTerminateConfirm(u)}
+                            disabled={actionLoading === u.id}
+                          >
+                            Terminate account
                           </Button>
                         )}
                       </div>

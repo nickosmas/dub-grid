@@ -9,6 +9,9 @@ const requireAuthenticatedUser = vi.fn();
 const fetchMobileManagementMembershipRowsByUserIds = vi.fn();
 const fetchMobilePendingInvitationRowByEmployeeId = vi.fn();
 const rowToEmployee = vi.fn();
+const forbidIfSandboxCookie = vi.fn();
+const requireSensitiveActionAuth = vi.fn();
+const updateUserById = vi.fn();
 const employeeUpdatePayloads: unknown[] = [];
 
 vi.mock("@/lib/csrf", () => ({
@@ -22,6 +25,8 @@ vi.mock("@/app/api/shared/permissions", () => ({
 
 vi.mock("@/lib/api-auth", () => ({
   requireAuthenticatedUser: (...args: unknown[]) => requireAuthenticatedUser(...args),
+  forbidIfSandboxCookie: (...args: unknown[]) => forbidIfSandboxCookie(...args),
+  requireSensitiveActionAuth: (...args: unknown[]) => requireSensitiveActionAuth(...args),
 }));
 
 vi.mock("@/app/api/shared/schedule", () => ({
@@ -60,7 +65,7 @@ function makeServiceClient() {
   chain.maybeSingle = vi.fn(() =>
     Promise.resolve({ data: { id: EMPLOYEE_ID, user_id: PERSON_USER_ID }, error: null }),
   );
-  return { from: vi.fn(() => chain) };
+  return { from: vi.fn(() => chain), auth: { admin: { updateUserById } } };
 }
 
 function makeEmployee(overrides: Record<string, unknown> = {}) {
@@ -152,6 +157,9 @@ describe("POST /api/employees/manage", () => {
     rowToEmployee.mockReturnValue(makeEmployee());
     fetchMobileManagementMembershipRowsByUserIds.mockResolvedValue([]);
     fetchMobilePendingInvitationRowByEmployeeId.mockResolvedValue(null);
+    forbidIfSandboxCookie.mockReturnValue(null);
+    requireSensitiveActionAuth.mockResolvedValue({ user: { id: VIEWER_USER_ID } });
+    updateUserById.mockResolvedValue({ error: null });
   });
 
   it("rejects CSRF failures before parsing or auth", async () => {
@@ -288,6 +296,110 @@ describe("POST /api/employees/manage", () => {
 
       expect(response.status).toBe(200);
       expect(employeeUpdatePayloads).toContainEqual(expect.objectContaining({ version: 1 }));
+    });
+
+    describe("login email", () => {
+      function linkedManagementUser() {
+        mockAuth({ canManageEmployees: true });
+        fetchMobileManagementMembershipRowsByUserIds.mockResolvedValue([
+          { user_id: PERSON_USER_ID, department_ids: [4], dept_admin_ids: [] },
+        ]);
+      }
+
+      it("leaves the account alone when the email is unchanged", async () => {
+        linkedManagementUser();
+
+        const response = await POST(updateEmployeeRequest({ email: "MINA@dubgrid.com" }));
+
+        expect(response.status).toBe(200);
+        expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
+        expect(updateUserById).not.toHaveBeenCalled();
+      });
+
+      it("leaves the account alone for a person without one", async () => {
+        linkedManagementUser();
+        rowToEmployee.mockReturnValue(makeEmployee({ userId: null }));
+
+        const response = await POST(updateEmployeeRequest({ email: "new@dubgrid.com" }));
+
+        expect(response.status).toBe(200);
+        expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
+        expect(updateUserById).not.toHaveBeenCalled();
+      });
+
+      it("changes the login email behind step-up, before the row", async () => {
+        linkedManagementUser();
+        let rowsWrittenWhenAccountChanged = -1;
+        updateUserById.mockImplementation(async () => {
+          rowsWrittenWhenAccountChanged = employeeUpdatePayloads.length;
+          return { error: null };
+        });
+
+        const response = await POST(updateEmployeeRequest({ email: "new@dubgrid.com" }));
+
+        expect(response.status).toBe(200);
+        expect(requireSensitiveActionAuth).toHaveBeenCalledTimes(1);
+        expect(updateUserById).toHaveBeenCalledWith(PERSON_USER_ID, {
+          email: "new@dubgrid.com",
+          email_confirm: true,
+        });
+        expect(rowsWrittenWhenAccountChanged).toBe(0);
+        expect(employeeUpdatePayloads).toContainEqual(expect.objectContaining({ version: 1 }));
+      });
+
+      it("returns the step-up challenge without touching the account", async () => {
+        linkedManagementUser();
+        requireSensitiveActionAuth.mockResolvedValue({
+          response: NextResponse.json({ error: "step up" }, { status: 403 }),
+        });
+
+        const response = await POST(updateEmployeeRequest({ email: "new@dubgrid.com" }));
+
+        expect(response.status).toBe(403);
+        expect(updateUserById).not.toHaveBeenCalled();
+        expect(employeeUpdatePayloads).toHaveLength(0);
+      });
+
+      it("refuses from a sandbox", async () => {
+        linkedManagementUser();
+        forbidIfSandboxCookie.mockReturnValue(
+          NextResponse.json({ error: "sandbox" }, { status: 403 }),
+        );
+
+        const response = await POST(updateEmployeeRequest({ email: "new@dubgrid.com" }));
+
+        expect(response.status).toBe(403);
+        expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
+        expect(updateUserById).not.toHaveBeenCalled();
+      });
+
+      it("reports a taken address as an email conflict", async () => {
+        linkedManagementUser();
+        updateUserById.mockResolvedValue({
+          error: { status: 422, code: "email_exists", message: "already registered" },
+        });
+
+        const response = await POST(updateEmployeeRequest({ email: "taken@dubgrid.com" }));
+
+        expect(response.status).toBe(409);
+        expect(await response.json()).toMatchObject({
+          code: "EMPLOYEE_CONTACT_CONFLICT",
+          field: "email",
+        });
+        expect(employeeUpdatePayloads).toHaveLength(0);
+      });
+
+      it("rejects clearing the email of a linked account", async () => {
+        linkedManagementUser();
+
+        const response = await POST(updateEmployeeRequest({ email: "" }));
+
+        expect(response.status).toBe(400);
+        expect((await response.json()).fieldErrors.email).toBe(
+          "An account needs an email to sign in with.",
+        );
+        expect(updateUserById).not.toHaveBeenCalled();
+      });
     });
   });
 

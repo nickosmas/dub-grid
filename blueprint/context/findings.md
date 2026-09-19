@@ -293,3 +293,179 @@ Commands: `npx vitest run --config apps/web/vitest.config.mts apps/web/src/__tes
 **Why it matters:** The authenticated app's policy is `'nonce-…' 'strict-dynamic'` in production because its pages are force-dynamic and Next stamps the nonce into them. An unknown path under that scope (`/gridmaster/does-not-exist`, or any mistyped app URL) is answered by the prerendered root `not-found` page, which carries no nonce, so the browser blocks all sixteen chunk scripts, `dg-theme-seed.js` and the inline bootstrap: the 404 shows as unhydrated HTML in the wrong theme. The test that pins this boundary was added on 2026-09-17 and has never been green in CI; locally it passes because dev mode keeps `'unsafe-inline'`.
 **Suggested fix:** Give the not-found response a policy it can satisfy: either render the root `not-found` dynamically so the nonce is stamped, or have the proxy fall back to the static-page policy for responses it can tell are 404s. Verify with the CI e2e run, which is the only place the production policy is exercised.
 **Resolution:** Fixed 2026-09-19: the root `not-found.tsx` awaits `connection()` so Next renders it per request and stamps the nonce it reads from the request CSP header; `next build` now lists `/_not-found` as dynamic. Verified on a production build (`next build` + `next start`) with the gridmaster not-found spec reporting no unexpected console failures; the CI e2e run on the release PR is the second proof.
+
+### F-83 [P1] fixed - Gridmaster organization creation answers 500 unless a time zone was picked
+
+**File:** apps/web/src/app/api/gridmaster/organizations/manage/route.ts:289; apps/web/src/components/gridmaster/OrganizationSetupWizard.tsx:134-142
+**Found:** 2026-09-19 by /audit (scope: gridmaster functions, org lifecycle, super admin setup; lenses: all)
+**Why it matters:** The Details step validates only the name, the API schema accepts an empty `timezone`, and the insert sends `timezone: input.timezone || null` into a `NOT NULL DEFAULT 'UTC'` column. Reproduced in the browser: with every other field filled and no time zone chosen, "Create Organization" answers `500 {"error":"Gridmaster organization request failed"}` (server log: `23502 null value in column "timezone"`) and the wizard shows only a generic red toast. The gridmaster has no hint which field is wrong.
+**Suggested fix:** Require a time zone in the Details step (block Next with a field message) and make the route schema `timezone: z.string().trim().min(1)` so a missing value is a 400 with a field error, or omit the column so the `'UTC'` default applies. Add a route test for the empty-timezone body.
+**Resolution:** Fixed 2026-09-19 in the same session, the other way round: the time zone is now deliberately optional for the gridmaster (hand-off mode) and the insert omits the column when blank so the `'UTC'` default applies; the super admin's Identity step points out the UTC default and collects the real zone. Route test "leaves the time zone to the database default when the gridmaster skips it" added; browser run created an org with only a name and the super admin, `timezone = UTC` in the row, no 500, and the super admin saved `America/Los_Angeles` from onboarding. Requires `/audit` re-review before closing.
+
+### F-84 [P1] open - The gridmaster "Send password reset" never sends an email, then reports success and audits it as sent
+
+**File:** apps/web/src/app/api/gridmaster/password-reset/route.ts:89-124; apps/web/src/components/gridmaster/AllUsersView.tsx:229-240; apps/web/src/components/gridmaster/GridmasterAccountsView.tsx:210-221
+**Found:** 2026-09-19 by /audit (scope: gridmaster functions; lens: quality, security)
+**Why it matters:** The route calls `auth.admin.generateLink({ type: "recovery" })`, which only generates a link and never delivers it; the returned `action_link` is discarded. Confirmed against local Mailpit: the route answered `{"success":true}` and wrote a `user.password_reset_sent` audit row while the mailbox stayed empty, whereas the user-facing `recovery-request` route (which uses `resetPasswordForEmail`) delivered "Reset your password" to the same address. Both views toast "Password reset email sent", so a gridmaster believes the user was helped and the audit trail records a delivery that never happened.
+**Suggested fix:** Send the way `features/account/server/recovery-request.ts` does (`createAnonClient().auth.resetPasswordForEmail(email, { redirectTo })`), or deliver `data.properties.action_link` through Resend; write the audit row only after the send succeeds, and add a route test that asserts the sender is called.
+**Resolution:**
+
+### F-85 [P1] open - The org.created audit row persists the raw super-admin invitation token
+
+**File:** apps/web/src/app/api/gridmaster/organizations/manage/route.ts:388-397,411-423
+**Found:** 2026-09-19 by /audit (scope: org lifecycle; lens: security)
+**Why it matters:** When the super admin has no account yet, `superAdmin.pendingInvite.token` is placed in the response (needed for "Send Email") and then the whole `superAdmin` object is spread into `writeGridmasterAuditLog({ details })`. Confirmed in the local DB after creating an organization: `audit_log.details.super_admin.pendingInvite.token` holds the live token. That token is the credential `/api/invitations/register` accepts to create the pre-confirmed account and set its password, so a durable copy now sits in a table that gridmasters browse and export to CSV (`audit-log/export`). Feature 19d4's contract is that raw credentials never reach audit metadata.
+**Suggested fix:** Log `{ kind, email, displayName }` only; never spread `pendingInvite` into `details`. Add a route test asserting the audit payload has no `token` key, and consider a one-off cleanup of existing rows.
+**Resolution:**
+
+### F-86 [P1] fixed - Deactivating a user from the portal leaves their issued tokens valid
+
+**File:** apps/web/src/app/api/gridmaster/users/route.ts:167-179; apps/web/src/lib/auth/revocation.ts:20-35; apps/web/src/proxy.ts:340-420
+**Found:** 2026-09-19 by /audit (scope: gridmaster functions; lens: security)
+**Why it matters:** PATCH only writes `profiles.deactivated_at`. Nothing calls `revokeAllUserSessions`, the proxy never reads `deactivated_at`, and `authenticateRequest` checks only the signature and the revocation markers, so every access token the user already holds keeps working on web and mobile APIs until it expires (up to the 1h `jwt_expiry`); only a refresh through the hook drops them. `revocation.ts` names "account disabled" as exactly the case the per-user watermark exists for, and `force-logout`, `employees/status` and `organizations/access` all write it. The confirmation copy promises they "will be blocked from logging in across all orgs", which is true only for new sign-ins.
+**Suggested fix:** Call `revokeAllUserSessions(userId)` (and `force_logout_user` for tracked sessions, as force-logout does) when `deactivate` is true; add a route test asserting the revocation write. Consider `requireSensitiveActionAuth` here for parity with force-logout.
+**Resolution:** Fixed 2026-09-19 with migration 021 and the gridmaster users route: the JWT hook now refuses deactivated (and terminated) accounts at token issue, `requireOrgPermissions` refuses them for the token they already hold, and PATCH deactivate writes the revocation watermark. Runtime probe before the fix showed a deactivated user keeping every org API open; after it the account gets the disabled modal on sign-in and 403 ACCOUNT_DISABLED on API calls. Requires `/audit` re-review before closing.
+
+### F-87 [P2] open - Members of a suspended or deleted organization are never told why they are locked out
+
+**File:** apps/web/src/proxy.ts:617-630; apps/web/src/app/(app)/login/OrgLogin.tsx:292-324; apps/web/src/app/api/auth/login/route.ts:96-118
+**Found:** 2026-09-19 by /audit (scope: org lifecycle; lens: quality)
+**Why it matters:** The proxy redirects to `/login?suspended=true` or `/login?deleted=true`, but `OrgLogin` never reads either flag, so the page renders as an ordinary sign-in. A sign-in attempt then fails through `switch_org`'s refusal, which the login route maps to a 403 `ORG_ACCESS_DENIED` and `OrgLogin` maps to the transient toast "We couldn't sign you in. Try again." (reproduced for both suspend and archive; screenshots `35b`/`42b`). A live session shows the normal dashboard for the cached org-access window and, after an archive, "Loading your workspace" with Try again / Sign out. The DB trigger does mail an in-app alert to super admins, which they cannot open. Nobody in the organization learns that the platform suspended or deleted it.
+**Suggested fix:** Have the login route return a distinct code for a suspended/archived host org (it already knows from `lookupOrgBySlug`/`switch_org`), render a "This organization is suspended, contact support" / "This organization was deleted" state in `OrgLogin` for that code and for the `suspended`/`deleted` params, and let the bootstrap recovery screen say the same instead of "Loading your workspace".
+**Resolution:**
+
+### F-88 [P2] fixed - Gridmaster oversight counts sandbox clones as tenants
+
+**File:** apps/web/src/app/api/gridmaster/_lib/oversight.ts:170-176; apps/web/src/app/api/gridmaster/dashboard/route.ts:19-23
+**Found:** 2026-09-19 by /audit (scope: gridmaster functions; lens: quality)
+**Why it matters:** The dashboard route filters `workspace_kind = 'real'` and the manage route refuses sandbox ids, but `loadOversightFacts` selects every organization. Overview, Billing Oversight, Compliance, Security and Org Health therefore include each user's Test Sandbox clone: `archivedCount` (the cleanup cron archives sandboxes), `missingStripeCount`, `trialsNotStartedCount`, `pendingSetupCount`, `riskiestOrganizations`, `orgRetention` and the billing table all inflate with organizations that are not customers, and a clicked row leads to an org the manage route then rejects.
+**Suggested fix:** Filter `workspace_kind = 'real'` in the organizations select of `loadOversightFacts` and drop rows from the other fact tables whose `org_id` is not in that set; add an oversight test with one sandbox row.
+**Resolution:** Fixed 2026-09-19: `loadOversightFacts` selects `workspace_kind = real` through `selectRealOrganizations`, with a test asserting the filter. Requires `/audit` re-review before closing.
+
+### F-89 [P2] open - Oversight fact loading reads whole tables and is silently capped at 1000 rows each
+
+**File:** apps/web/src/app/api/gridmaster/_lib/oversight.ts:180-262,621-623; supabase/config.toml:18
+**Found:** 2026-09-19 by /audit (scope: gridmaster functions; lens: performance)
+**Why it matters:** `selectRows` issues unbounded selects over memberships, employees, invitations, shift_requests, user_sessions, mobile_device_tokens, subscriptions, departments, focus areas, shifts, jobs, certifications, roles and profile change requests, and PostgREST truncates each at `max_rows = 1000` without an error (the L-3 comment already acknowledges this for schedule_cells). Past that size the per-org counts, "pending invitations", "open shift requests", session summaries and setup completeness are wrong with no signal. Every one of the five oversight routes reloads all twenty queries, so opening the portal costs ~100 full-table reads. Data-size dependent; the local seed stays under the cap.
+**Suggested fix:** Aggregate in SQL (one RPC or grouped counts per org) or page through with `.range()`, and load the facts once per request (share between routes or cache briefly). Add a test that the loader does not depend on row-count defaults.
+**Resolution:**
+
+### F-90 [P2] open - The gridmaster invitations list ships every invitation's raw token to the browser
+
+**File:** apps/web/src/app/api/gridmaster/invitations/route.ts:29-31; apps/web/src/components/gridmaster/organization-detail/InvitationsTab.tsx:21; apps/web/src/app/api/organizations/invitations/route.ts:107-140
+**Found:** 2026-09-19 by /audit (scope: gridmaster functions; lens: security)
+**Why it matters:** The select includes `token` for all invitations of an organization and the tab never reads it (confirmed: the response for the new org carried `hasToken: true`). The org-level route deliberately splits `fetchInvitation` (no token) from `fetchInvitationWithToken` (resend only). Each token is an account-creation credential for `/api/invitations/register`, so a list view now exposes them to browser devtools, extensions, and any response logging.
+**Suggested fix:** Drop `token` from the select (the tab needs id, email, role, dates, employee_id). If a gridmaster resend is ever wanted, add a dedicated action that fetches one token server-side.
+**Resolution:**
+
+### F-91 [P2] open - Gridmaster archive cancels Stripe from the browser, unmentioned and unmatched by the API
+
+**File:** apps/web/src/components/gridmaster/organization-detail/OverviewTab.tsx:216-246; apps/web/src/app/api/gridmaster/organizations/manage/route.ts:137-157; apps/web/src/app/api/organizations/delete/route.ts:127-143
+**Found:** 2026-09-19 by /audit (scope: org lifecycle; lens: quality)
+**Why it matters:** The Archive dialog says data is preserved, then `handleArchive` fires `POST /api/gridmaster/subscription {action:"cancel"}` without reading the response and archives regardless. The archive API itself does nothing about billing, so an archive through the API (or the client cancel failing) leaves a paid subscription running, while an archive through the UI irreversibly cancels it with no mention and no restore path (Restore leaves `subscription_status = canceled`, so the restored org is billing-locked). The super-admin delete route does this server-side and records `stripeCanceled` in its audit row; the gridmaster path records nothing.
+**Suggested fix:** Move the cancellation into the `archiveOrganization` branch server-side (mirroring `organizations/delete`), record the outcome in the audit details, and state it in the confirmation copy. Decide explicitly what Restore does with billing.
+**Resolution:**
+
+### F-92 [P2] open - A scheduled department with no focus area is a dead end in the Structure editor
+
+**File:** apps/web/src/components/settings/DepartmentsSettings.tsx:933-934,1083-1113; apps/web/src/components/onboarding/steps/StructureStep.tsx:56-70; apps/web/src/components/onboarding/WizardModeContext.tsx:90
+**Found:** 2026-09-19 by /audit (scope: super admin setup; lens: quality)
+**Why it matters:** The row renders "Split into Focus Areas" only when the department has exactly one focus area and the focus-area rows plus "+ Add Focus Area" only when it has more than one; with zero it offers nothing but Delete. The wizard's Continue saves departments and focus areas as two separate `POST /api/settings/config` calls, so an interruption between them leaves exactly that state (reproduced by closing the tab mid-save: `departments = 1`, `focus_areas = 0`). The Schedule step then reads "No focus areas yet. Create focus areas first", the Structure step offers no way to do so, and the setup checklist never completes until the admin guesses to delete and recreate the department. Screenshot `16b`.
+**Suggested fix:** Render the focus-area rows and "+ Add Focus Area" for `childFAs.length !== 1` (zero included), or auto-seed the single focus area for a scheduled department that has none. Ideally save departments and focus areas in one request.
+**Resolution:**
+
+### F-93 [P2] open - send-invite-email mails any address a branded invitation with caller-supplied token and copy
+
+**File:** apps/web/src/app/api/send-invite-email/route.ts:17-22,54-62,123-141
+**Found:** 2026-09-19 by /audit (scope: org create, super admin setup; lens: security)
+**Why it matters:** The route trusts `token`, `email`, `orgName` and `inviterName` from the body. It never checks that the token is a live invitation, that it belongs to that email, or that the caller (any super_admin of any organization, or a gridmaster) may act for that organization. A super admin can send "You're invited to join {any name} on DubGrid" from DubGrid's sender to arbitrary addresses with an arbitrary link token, bounded only by 5/hour per target and the per-actor limiter.
+**Suggested fix:** Look the invitation up by token server-side (org, email, pending state), require the caller to be a super_admin of that org or a gridmaster, and derive `orgName` from the row. Reject on mismatch with the generic failure.
+**Resolution:**
+
+### F-94 [P3] open - Structure step buttons read "+ Add add a role..." and "+ Add add a certification..."
+
+**File:** apps/web/src/components/settings/StringListSettings.tsx:1090; apps/web/src/components/onboarding/steps/StructureStep.tsx:140,166
+**Found:** 2026-09-19 by /audit (scope: super admin setup; lens: quality)
+**Why it matters:** `StringListSettings` renders `+ Add {placeholder.toLowerCase()}` and the wizard passes placeholders that already begin with "Add a". Screenshot `16`.
+**Suggested fix:** Pass the noun (`roleNoun`, `certNoun`) as an explicit `addLabel` prop, or derive the button label from `label` as the departments editor does.
+**Resolution:**
+
+### F-95 [P3] open - Gridmaster archive, restore, suspend and unsuspend never invalidate the org caches
+
+**File:** apps/web/src/app/api/gridmaster/organizations/manage/route.ts:137-224; apps/web/src/lib/cache.ts:20-27; apps/web/src/app/api/gridmaster/organizations/manage/route.test.ts:205-207
+**Found:** 2026-09-19 by /audit (scope: org lifecycle; lens: quality)
+**Why it matters:** The subscription route drops `mwOrgAccess` after every billing change and the super-admin delete route drops `orgBySlug`, and the `PUBLIC_LOOKUP` TTL comment says archive does too, but the gridmaster route does neither: members keep passing the proxy for the cache window (observed: a full page load rendered the dashboard normally after suspension), and the 24h slug cache can keep an archived organization's login page resolving. The route test asserts `cacheDel` is not called, so the gap is codified.
+**Suggested fix:** Call `cacheDel(CacheKey.mwOrgAccess(orgId), CacheKey.organization(orgId))` on all four state changes and `cacheDel(CacheKey.orgBySlug(slug))` on archive/restore; flip the test expectation.
+**Resolution:**
+
+### F-96 [P3] fixed - The "Organization Created" screen misstates the invited role and uses an em dash
+
+**File:** apps/web/src/components/gridmaster/OrganizationSetupWizard.tsx:870,905; apps/web/src/app/api/gridmaster/organizations/manage/route.ts:376-379
+**Found:** 2026-09-19 by /audit (scope: org lifecycle; lens: quality)
+**Why it matters:** The pending-invite card says "They will join as admin. You can promote them to super admin after they accept." while the route sends the invitation with `p_role: "super_admin"` (confirmed: `role_to_assign = super_admin`). The Finish button reads "Finish — Go to Organization" with U+2014. Screenshot `07`.
+**Suggested fix:** "They will join as super admin." and "Finish: go to organization" (or two buttons).
+**Resolution:** Fixed 2026-09-19 in the same session: the card now reads "They will join as the super admin of this organization as soon as they accept." and the button "Finish and go to organization". Re-ran the browser flow: the Invitations tab lists the invite as Super Admin, Pending (screenshots `07`, `09`). Requires `/audit` re-review before closing.
+
+### F-97 [P3] fixed - Platform kill-switch changes never classify as high-risk in Security oversight
+
+**File:** apps/web/src/app/api/gridmaster/_lib/oversight.ts:26,416; apps/web/src/app/api/gridmaster/platform-flags/route.ts:155,246; supabase/migrations/007_filtered_audit_log.sql:53
+**Found:** 2026-09-19 by /audit (scope: gridmaster functions; lens: quality)
+**Why it matters:** `HIGH_RISK_ACTIONS` lists `feature_flags.updated` (the per-organization override written by `organizations/settings`), but the kill-switch route writes `platform_feature_flags.updated` and `platform_feature_flags.created`. Flipping a platform switch, the highest-impact toggle the portal has, is invisible to the high-risk feed, the `recentHighRiskEvents` tile and the filtered audit query.
+**Suggested fix:** Add the `platform_feature_flags.` prefix to `HIGH_RISK_ACTION_PREFIXES` and to the filtered audit-log allow-list.
+**Resolution:** Fixed 2026-09-19: `platform_feature_flags.` added to the oversight high-risk prefixes and to the `get_filtered_audit_log` allow-list in migration 021. Requires `/audit` re-review before closing.
+
+### F-98 [P3] fixed - lib/db/admin.ts is a dead gridmaster data layer
+
+**File:** apps/web/src/lib/db/admin.ts; apps/web/src/lib/db/index.ts:20
+**Found:** 2026-09-19 by /audit (scope: gridmaster functions; lens: quality)
+**Why it matters:** 429 lines and 18 exports (`createOrganization`, `archiveOrganization`, `suspendOrganization`, `deactivateUser`, `fetchAuditLog`, `revokeInvitationAsGridmaster`, ...) built on the browser Supabase client; no file imports any of them, since every operation moved to the `/api/gridmaster/*` routes. The barrel keeps it alive and its `logAudit`/cache calls describe behaviour the real routes no longer share.
+**Suggested fix:** Delete the module and its barrel export; keep any type that is still referenced.
+**Resolution:** Fixed 2026-09-19: `lib/db/admin.ts` deleted and its barrel export removed; type-check clean. Requires `/audit` re-review before closing.
+
+### F-99 [P3] fixed - assign_org_role_by_email matches the email case-sensitively
+
+**File:** supabase/migrations/002_functions_triggers.sql:862; apps/web/src/app/api/gridmaster/organizations/manage/route.ts:78,321-368
+**Found:** 2026-09-19 by /audit (scope: org lifecycle; lens: quality)
+**Why it matters:** The RPC looks up `auth.users WHERE email = p_email`, while `promote_gridmaster_by_email`, `send_invitation` and `accept_invitation` all compare `lower(...)`. A gridmaster typing `Jane@Example.com` in "Assign role by email" gets "User with email ... not found", and in the creation wizard an existing account silently takes the invitation path instead of being assigned.
+**Suggested fix:** `WHERE lower(email::TEXT) = lower(p_email)` in a forward migration, and lowercase the email in the route schema.
+**Resolution:** Fixed 2026-09-19 in migration 021: `assign_org_role_by_email` matches `lower(email)` and also revives an archived membership on conflict, which is what lets a reinstated or previously removed person back in. Requires `/audit` re-review before closing.
+
+### F-100 [P3] open - Wizard job-editor copy clips and the display-mode sample overflows the column
+
+**File:** apps/web/src/components/settings/Jobs.tsx:1811; apps/web/src/components/onboarding/steps/ScheduleStep.tsx:96-173
+**Found:** 2026-09-19 by /audit (scope: super admin setup; lens: quality)
+**Why it matters:** At 1440x900 the Placement and Per-shift Settings descriptions end mid-sentence at the card edge ("...the shifts where this job", "...only where this job needs t") and the "Full Names" display-mode sample runs past the 720px wizard column. Screenshots `19b`, `18`.
+**Suggested fix:** Let the description elements wrap (`white-space: normal`, `min-width: 0`) and give the two samples a two-column grid that shrinks.
+**Resolution:**
+
+### F-101 [P3] open - Create Organization wizard fields have no label association
+
+**File:** apps/web/src/components/gridmaster/OrganizationSetupWizard.tsx:464-469,522-546,605-645
+**Found:** 2026-09-19 by /audit (scope: org lifecycle; lens: quality)
+**Why it matters:** The name, custom-label and super-admin inputs sit under styled `<label>` elements with no `htmlFor`/`id`, so assistive technology announces them unlabeled and the browser audit had to target placeholders. The location fields on the same step do it right (`useId`).
+**Suggested fix:** Give each input an id and point its label at it, as `OrganizationLocationFields` does.
+**Resolution:**
+
+### F-102 [P0] fixed - Gridmaster deactivation did not stop an open web session
+
+**File:** supabase/migrations/002_functions_triggers.sql:243-273 (hook, superseded by 021); apps/web/src/proxy.ts:340-420; apps/web/src/app/api/shared/permissions.ts:440-470
+**Found:** 2026-09-19 by /audit (scope: gridmaster functions; lens: security) during the terminate-account work
+**Why it matters:** Deactivating an account only stripped the org claims from its next token. The proxy's profile fallback then resolved the same membership again, and no API route read `profiles.deactivated_at`, so a deactivated user who never signed out kept every organization API indefinitely. Reproduced with a throwaway member of Calm Haven: after PATCH deactivate, a full navigation to `/schedule` rendered normally with every `/api/*` call answering 200. Only a fresh sign-in was refused, and with the wrong copy ("We couldn't finish switching organizations").
+**Suggested fix:** Refuse the account at the hook (403 "account disabled" envelope, before the refresh-lock check), refuse it in `requireOrgPermissions`, and revoke issued tokens on deactivate.
+**Resolution:** Fixed 2026-09-19 exactly that way (migration 021, `permissions.ts`, `users/route.ts`), with a middleware test, a permissions test for both deactivated and terminated callers, and a users-route test for the revocation. Requires `/audit` re-review before closing.
+
+### F-103 [P2] fixed - An organization id the portal cannot resolve rendered a blank pane
+
+**File:** apps/web/src/components/gridmaster/GridmasterPortal.tsx:1133
+**Found:** 2026-09-19 by /audit (scope: gridmaster functions; lens: quality), reported by the user as "clicking archived orgs leads to a blank page"
+**Why it matters:** `view === "organization" && selectedOrg && (...)` rendered nothing when the id was not in the dashboard list: hard-deleted organizations still named in "busiest organizations" (their audit rows survive), sandbox clones, or any row clicked before the dashboard query resolved. Archived organizations themselves opened fine. Reproduced by clicking a deleted-org row: `main` was empty.
+**Suggested fix:** Render a progress bar while the dashboard loads and an explicit "no longer available" state with a way back otherwise; name deleted organizations by their full id in the activity table.
+**Resolution:** Fixed 2026-09-19: the portal shows the loading bar or the empty state, and oversight labels missing organizations "Deleted organization <id>" instead of an 8-character prefix. Requires `/audit` re-review before closing.
+
+### F-104 [P2] fixed - A member whose organization row is no longer visible was sent to the billing gate
+
+**File:** apps/web/src/proxy.ts:600-640
+**Found:** 2026-09-19 by /audit (scope: org lifecycle; lens: quality) while probing termination
+**Why it matters:** The org-access read runs as the caller under RLS. Once a membership is archived (removal, termination), the read returns no row, `evaluateOrganizationBillingAccess` saw `null` status and `null` trial end, classified it as `trial_pending`, and the person landed on `/billing-required` ("your admin is setting up") instead of being signed out. The same read was memoized under the organization's key, so caching that empty answer would have bounced every member of the org.
+**Suggested fix:** Treat an empty (not errored) read as lost access and redirect to `/login`; never memoize an empty read under the shared key.
+**Resolution:** Fixed 2026-09-19 with a middleware test covering both the redirect and the memo. Requires `/audit` re-review before closing.

@@ -12,7 +12,7 @@ import {
 } from "@/features/organization/client";
 import { buildMembershipAccessChanges } from "@/lib/access-management";
 import { formatClientErrorMessage, formatOrganizationRoleLabel } from "@/lib/client-facing";
-import { labelStyle, sectionStyle, tdStyle, thStyle } from "@/lib/styles";
+import { labelStyle, sectionStyle } from "@/lib/styles";
 import {
   type AdminPermissions,
   type Organization,
@@ -22,6 +22,12 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import {
+  gmHeaderStyle,
+  gmTableStyle,
+  gmTdStyle,
+  gmThStyle,
+} from "@/components/gridmaster/table-styles";
 
 // Users tab for the gridmaster OrganizationDetail view.
 
@@ -246,13 +252,13 @@ export function UsersTab({
       {/* Users table */}
       <div style={{ ...sectionStyle, overflow: "visible" }}>
         <div>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <table style={gmTableStyle}>
             <thead>
               <tr>
-                <th style={thStyle}>Email</th>
-                <th style={thStyle}>Organization role</th>
-                <th style={thStyle}>Permissions</th>
-                <th style={thStyle}>Actions</th>
+                <th style={gmHeaderStyle("Email")}>Email</th>
+                <th style={gmHeaderStyle("Organization role")}>Organization role</th>
+                <th style={gmHeaderStyle("Permissions")}>Permissions</th>
+                <th style={gmHeaderStyle("Actions")}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -261,7 +267,7 @@ export function UsersTab({
                   <td
                     colSpan={4}
                     style={{
-                      ...tdStyle,
+                      ...gmTdStyle,
                       textAlign: "center",
                       color: "var(--dg-color-text-muted)",
                       padding: 32,
@@ -273,8 +279,8 @@ export function UsersTab({
               ) : (
                 users.map((u) => (
                   <tr key={u.id}>
-                    <td style={{ ...tdStyle, fontWeight: 600 }}>{u.email ?? "—"}</td>
-                    <td style={tdStyle}>
+                    <td style={{ ...gmTdStyle, fontWeight: 600 }}>{u.email ?? "—"}</td>
+                    <td style={gmTdStyle}>
                       <CustomSelect
                         value={u.orgRole}
                         options={[
@@ -290,7 +296,7 @@ export function UsersTab({
                     </td>
                     <td
                       style={{
-                        ...tdStyle,
+                        ...gmTdStyle,
                         fontSize: "var(--dg-fs-footnote)",
                         color: "var(--dg-color-text-muted)",
                       }}
@@ -309,7 +315,7 @@ export function UsersTab({
                         "—"
                       )}
                     </td>
-                    <td style={tdStyle}>
+                    <td style={gmTdStyle}>
                       {(onImpersonate && u.platformRole !== "gridmaster") ||
                       u.orgRole !== "super_admin" ? (
                         <div

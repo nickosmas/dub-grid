@@ -19,12 +19,11 @@ import { SelfWorkOverview } from "./SelfWorkProfile";
 import { ProfilePanel } from "@/components/account/ProfilePanel";
 import { SecurityPanel } from "@/components/account/SecurityPanel";
 import { NotificationsPanel } from "@/components/account/NotificationsPanel";
-import { AppearancePanel } from "@/components/account/AppearancePanel";
 import { DataPrivacyPanel } from "@/components/account/DataPrivacyPanel";
 
 /**
  * /profile — the user's home for everything about them:
- *   - Profile, security, notifications, appearance, and data & privacy
+ *   - Profile, security, notifications, and data & privacy
  *   - Work overview for on-schedule employees
  *
  * Shares the SettingsShell chrome with /settings so the navigation feels
@@ -147,8 +146,6 @@ export function ProfilePage() {
           isSuperAdmin={Boolean(isSuperAdmin)}
         />
       )}
-
-      {activeSection === "appearance" && <AppearancePanel />}
 
       {activeSection === "data-privacy" && <DataPrivacyPanel />}
 

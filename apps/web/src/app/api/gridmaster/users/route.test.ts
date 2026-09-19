@@ -13,6 +13,8 @@ const userSessionsIn = vi.fn();
 const mobileTokensIn = vi.fn();
 const membershipsIn = vi.fn();
 const forceLogoutOrder = vi.fn();
+const terminationsNot = vi.fn();
+const revokeAllUserSessions = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
   createRequestSupabaseClient: () => ({
@@ -30,6 +32,10 @@ vi.mock("@/lib/supabase-service", () => ({
     from: serviceFrom,
     rpc: serviceRpc,
   }),
+}));
+
+vi.mock("@/lib/auth/revocation", () => ({
+  revokeAllUserSessions: (userId: string) => revokeAllUserSessions(userId),
 }));
 
 vi.mock("@/lib/logger", () => ({
@@ -102,7 +108,16 @@ describe("GET /api/gridmaster/users", () => {
       data: [{ resource_id: USER_ID, created_at: "2026-05-01T17:00:00.000Z" }],
       error: null,
     });
+    terminationsNot.mockResolvedValue({
+      data: [
+        { id: USER_ID, terminated_at: "2026-05-02T09:00:00.000Z", terminated_reason: "abuse" },
+      ],
+      error: null,
+    });
     serviceFrom.mockImplementation((table: string) => {
+      if (table === "profiles") {
+        return { select: () => ({ in: () => ({ not: terminationsNot }) }) };
+      }
       if (table === "user_sessions") {
         return { select: () => ({ in: userSessionsIn }) };
       }
@@ -162,6 +177,8 @@ describe("GET /api/gridmaster/users", () => {
           activeSessionCount: 1,
           mobileDeviceCount: 1,
           lastForceLogoutAt: "2026-05-01T17:00:00.000Z",
+          terminatedAt: "2026-05-02T09:00:00.000Z",
+          terminatedReason: "abuse",
         },
       ],
     });
@@ -242,7 +259,7 @@ describe("PATCH /api/gridmaster/users", () => {
     expect(auditInsert).not.toHaveBeenCalled();
   });
 
-  it("updates activation state and writes a platform audit event", async () => {
+  it("updates activation state, revokes issued tokens, and writes a platform audit event", async () => {
     const response = await PATCH(
       makePatchRequest({ userId: USER_ID, orgId: ORG_ID, deactivate: true }),
     );
@@ -253,6 +270,9 @@ describe("PATCH /api/gridmaster/users", () => {
       deactivated_at: expect.any(String),
       deactivated_by: "gridmaster-user",
     });
+    // The account is refused at the next token issue; the watermark makes the
+    // tokens already in hand fail immediately instead of at expiry.
+    expect(revokeAllUserSessions).toHaveBeenCalledWith(USER_ID);
     expect(profileEq).toHaveBeenCalledWith("id", USER_ID);
     expect(auditInsert).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requireMobileAuth = vi.fn();
+const requireMobileSensitiveActionAuth = vi.fn();
+const updateUserById = vi.fn();
 const fetchMobileEmployeeRowById = vi.fn();
 const fetchMobileManagementMembershipRowsByUserIds = vi.fn();
 const fetchMobilePendingInvitationRowByEmployeeId = vi.fn();
@@ -10,6 +12,7 @@ const validateStaffOrgReferences = vi.fn();
 
 vi.mock("@/features/mobile/server", () => ({
   requireMobileAuth,
+  requireMobileSensitiveActionAuth,
 }));
 
 vi.mock("@dubgrid/data-access", () => ({
@@ -44,7 +47,7 @@ function makeAuth(overrides?: { canManageEmployees?: boolean; canViewStaff?: boo
       canManageEmployees: overrides?.canManageEmployees ?? true,
       canViewStaff: overrides?.canViewStaff ?? true,
     },
-    serviceClient: {},
+    serviceClient: { auth: { admin: { updateUserById } } },
   };
 }
 
@@ -95,6 +98,8 @@ describe("mobile person route", () => {
     mockManagementMemberships([{ user_id: PERSON_USER_ID, department_ids: [8] }]);
     fetchMobilePendingInvitationRowByEmployeeId.mockResolvedValue(null);
     validateStaffOrgReferences.mockResolvedValue({});
+    requireMobileSensitiveActionAuth.mockResolvedValue(makeAuth());
+    updateUserById.mockResolvedValue({ error: null });
   });
 
   it("rejects users without staff visibility", async () => {
@@ -379,6 +384,90 @@ describe("mobile person route", () => {
       };
       expect(input.audit.actorId).toBe(VIEWER_USER_ID);
       expect(input.audit).not.toHaveProperty("details");
+    });
+
+    describe("login email", () => {
+      const params = { params: Promise.resolve({ id: "d660d308-4e0d-4daf-84fd-6753405e6740" }) };
+
+      it("changes the login email behind step-up before writing the row", async () => {
+        requireMobileAuth.mockResolvedValue(makeAuth());
+        updateMobileEmployeeDetailsRow.mockResolvedValue({ id: "row-1" });
+
+        const { PATCH } = await import("./person");
+        const response = await PATCH(patchRequest({ email: "new@dubgrid.com" }), params);
+
+        expect(response.status).toBe(200);
+        expect(requireMobileSensitiveActionAuth).toHaveBeenCalledTimes(1);
+        expect(updateUserById).toHaveBeenCalledWith(PERSON_USER_ID, {
+          email: "new@dubgrid.com",
+          email_confirm: true,
+        });
+        expect(updateUserById.mock.invocationCallOrder[0]).toBeLessThan(
+          updateMobileEmployeeDetailsRow.mock.invocationCallOrder[0]!,
+        );
+        const input = updateMobileEmployeeDetailsRow.mock.calls[0]?.[1] as {
+          audit: { details?: { to: Record<string, unknown> } };
+        };
+        expect(input.audit.details?.to.loginEmail).toBe("new@dubgrid.com");
+      });
+
+      it("returns the step-up challenge without touching the account", async () => {
+        requireMobileAuth.mockResolvedValue(makeAuth());
+        requireMobileSensitiveActionAuth.mockResolvedValue({
+          response: Response.json({ error: "step up" }, { status: 403 }),
+        });
+
+        const { PATCH } = await import("./person");
+        const response = await PATCH(patchRequest({ email: "new@dubgrid.com" }), params);
+
+        expect(response.status).toBe(403);
+        expect(updateUserById).not.toHaveBeenCalled();
+        expect(updateMobileEmployeeDetailsRow).not.toHaveBeenCalled();
+      });
+
+      it("skips step-up for a person without an account", async () => {
+        requireMobileAuth.mockResolvedValue(makeAuth());
+        rowToEmployee.mockReturnValue(makeEmployee({ userId: null }));
+        mockManagementMemberships([]);
+        updateMobileEmployeeDetailsRow.mockResolvedValue({ id: "row-1" });
+
+        const { PATCH } = await import("./person");
+        const response = await PATCH(
+          patchRequest({ email: "new@dubgrid.com", focusAreaIds: [2] }),
+          params,
+        );
+
+        expect(response.status).toBe(200);
+        expect(requireMobileSensitiveActionAuth).not.toHaveBeenCalled();
+        expect(updateUserById).not.toHaveBeenCalled();
+      });
+
+      it("reports a taken address as an email conflict", async () => {
+        requireMobileAuth.mockResolvedValue(makeAuth());
+        updateUserById.mockResolvedValue({
+          error: { status: 422, code: "email_exists", message: "already registered" },
+        });
+
+        const { PATCH } = await import("./person");
+        const response = await PATCH(patchRequest({ email: "taken@dubgrid.com" }), params);
+
+        expect(response.status).toBe(409);
+        expect(await response.json()).toMatchObject({ field: "email" });
+        expect(updateMobileEmployeeDetailsRow).not.toHaveBeenCalled();
+      });
+
+      it("rejects clearing the email of a linked account", async () => {
+        requireMobileAuth.mockResolvedValue(makeAuth());
+
+        const { PATCH } = await import("./person");
+        const response = await PATCH(patchRequest({ email: "" }), params);
+
+        expect(response.status).toBe(400);
+        expect((await response.json()).fieldErrors.email).toBe(
+          "An account needs an email to sign in with.",
+        );
+        expect(updateUserById).not.toHaveBeenCalled();
+      });
     });
   });
 });

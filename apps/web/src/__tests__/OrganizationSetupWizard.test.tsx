@@ -126,9 +126,9 @@ describe("OrganizationSetupWizard", () => {
         within(screen.getByRole("dialog")).getByRole("button", { name: /^create organization$/i }),
       );
 
-      expect(await screen.findByRole("button", { name: /continue setup/i })).toBeInTheDocument();
+      expect(await screen.findByRole("button", { name: /set up now/i })).toBeInTheDocument();
 
-      await user.click(screen.getByRole("button", { name: /continue setup/i }));
+      await user.click(screen.getByRole("button", { name: /set up now/i }));
       expect(screen.getAllByText(/select scheduled department/i).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/select focus area/i).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/select shift/i).length).toBeGreaterThan(0);

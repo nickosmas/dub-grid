@@ -901,6 +901,9 @@ export interface PlatformUser {
   activeSessionCount?: number;
   mobileDeviceCount?: number;
   lastForceLogoutAt?: string | null;
+  /** Set by a gridmaster termination; only a gridmaster can clear it. */
+  terminatedAt?: string | null;
+  terminatedReason?: string | null;
 }
 
 /** A platform-only gridmaster account view. */

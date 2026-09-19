@@ -485,6 +485,52 @@ describe("middleware: route guards", () => {
     expect((res as { _type: string })._type).toBe("next");
   });
 
+  it("sends a caller whose organization row is no longer visible to /login without poisoning the memo", async () => {
+    mockSessionWithClaims({
+      platform_role: "none",
+      org_role: "user",
+      org_id: "org-1",
+      org_slug: "acme",
+      sub: "user-1",
+    });
+    // First caller: membership archived after the token was issued, so the
+    // RLS-scoped read returns no row.
+    mockSupabaseFrom.mockImplementation((table: string) => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        })),
+      })),
+    }));
+
+    const req = makeNextRequest("http://acme.localhost:3000/schedule", {
+      host: "acme.localhost:3000",
+    });
+    const res = await runMiddleware(req);
+
+    expect((res as { _type: string })._type).toBe("redirect");
+    expect((res as { _redirectUrl: string })._redirectUrl).toBe("http://acme.localhost:3000/login");
+
+    // Second caller in the same isolate still sees the organization.
+    mockSupabaseFrom.mockImplementation((table: string) => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          maybeSingle: vi.fn().mockResolvedValue({
+            data:
+              table === "organizations"
+                ? { suspended_at: null, subscription_status: "active", trial_ends_at: null }
+                : null,
+            error: null,
+          }),
+        })),
+      })),
+    }));
+    const res2 = await runMiddleware(
+      makeNextRequest("http://acme.localhost:3000/schedule", { host: "acme.localhost:3000" }),
+    );
+    expect((res2 as { _type: string })._type).not.toBe("redirect");
+  });
+
   it("redirects regular users to a neutral unavailable page after trial grace", async () => {
     mockSessionWithClaims({
       platform_role: "none",

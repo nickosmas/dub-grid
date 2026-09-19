@@ -69,6 +69,32 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
       /force_logout_user/,
     ],
   },
+  "apps/web/src/app/api/gridmaster/users/[userId]/terminate/route.ts": {
+    policy: "sensitive",
+    assertions: [
+      /\brequireGridmasterSession\s*\(/,
+      /\brequireSensitiveActionAuth\s*\(/,
+      /terminate_user_account/,
+      /revokeAllUserSessions\(userId\)/,
+    ],
+  },
+  "apps/web/src/app/api/gridmaster/users/[userId]/reinstate/route.ts": {
+    policy: "sensitive",
+    assertions: [
+      /\brequireGridmasterSession\s*\(/,
+      /\brequireSensitiveActionAuth\s*\(/,
+      /reinstate_user_account/,
+    ],
+  },
+  "apps/web/src/app/api/gridmaster/users/route.ts": {
+    // Deactivation is reversible and already gated on a live gridmaster
+    // profile; it revokes the target's issued tokens the moment it lands.
+    policy: "authorized-target-revocation",
+    assertions: [
+      /\brequireGridmasterSession\s*\(/,
+      /if \(deactivate\) \{[\s\S]*?revokeAllUserSessions\(userId\)/,
+    ],
+  },
   "apps/web/src/app/api/invitations/register/route.ts": {
     policy: "independent-credential",
     assertions: [
@@ -106,6 +132,12 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
     policy: "sensitive",
     assertions: [/\brequireOrgPermissions\s*\(/, /\brequireSensitiveActionAuth\s*\(/],
   },
+  "apps/web/src/app/api/employees/manage/route.ts": {
+    policy: "conditional-sensitive",
+    assertions: [
+      /if \(loginEmailChange && linkedUserId\) \{[\s\S]*?\bforbidIfSandboxCookie\s*\([\s\S]*?\brequireSensitiveActionAuth\s*\([\s\S]*?\bsyncLinkedLoginEmail\s*\(/,
+    ],
+  },
   "apps/web/src/app/api/people/change-requests/[id]/route.ts": {
     policy: "conditional-sensitive",
     assertions: [
@@ -115,6 +147,9 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
 };
 
 const MOBILE_DELEGATES: Record<string, RegExp[]> = {
+  "apps/web/src/features/mobile/server/routes/person.ts": [
+    /if \(loginEmailChange && currentPerson\.userId\) \{[\s\S]*?\brequireMobileSensitiveActionAuth\s*\([\s\S]*?\bsyncLinkedLoginEmail\s*\(/,
+  ],
   "apps/web/src/features/mobile/server/routes/credential-assurance.ts": [
     /\brequireMobileSensitiveActionAuth\s*\(/,
   ],

@@ -6,11 +6,17 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchGridmasterImpersonationHistory } from "@/features/gridmaster/client";
 import { Pagination } from "@/components/ui/pagination";
 import type { ImpersonationHistoryEntry } from "@/types";
-import { sectionStyle, thStyle, tdStyle } from "@/lib/styles";
+import { sectionStyle } from "@/lib/styles";
 import { EmptyState } from "@/components/EmptyState";
 import { MaybeHint } from "@/components/ui/hint";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
+import {
+  gmHeaderStyle,
+  gmTableStyle,
+  gmTdStyle,
+  gmThStyle,
+} from "@/components/gridmaster/table-styles";
 
 function useNow(intervalMs = 60_000) {
   const [now, setNow] = useState(() => Date.now());
@@ -186,19 +192,19 @@ export default function ImpersonationHistory() {
           {entries.length > 0 ? (
             <div style={sectionStyle}>
               <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <table style={gmTableStyle}>
                   <thead>
                     <tr>
-                      <th style={thStyle}>Status</th>
-                      <th style={thStyle}>Target user</th>
-                      <th style={thStyle}>Organization</th>
-                      <th style={thStyle}>Gridmaster</th>
-                      <th style={thStyle}>Justification</th>
-                      <th style={thStyle}>Started</th>
-                      <th style={thStyle}>Ended</th>
-                      <th style={thStyle}>Duration</th>
-                      <th style={thStyle}>End reason</th>
-                      <th style={thStyle}>IP address</th>
+                      <th style={gmHeaderStyle("Status")}>Status</th>
+                      <th style={gmHeaderStyle("Target user")}>Target user</th>
+                      <th style={gmHeaderStyle("Organization")}>Organization</th>
+                      <th style={gmHeaderStyle("Gridmaster")}>Gridmaster</th>
+                      <th style={gmHeaderStyle("Justification")}>Justification</th>
+                      <th style={gmHeaderStyle("Started")}>Started</th>
+                      <th style={gmHeaderStyle("Ended")}>Ended</th>
+                      <th style={gmHeaderStyle("Duration")}>Duration</th>
+                      <th style={gmHeaderStyle("End reason")}>End reason</th>
+                      <th style={gmHeaderStyle("IP address")}>IP address</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -207,12 +213,12 @@ export default function ImpersonationHistory() {
                       const endDate = e.endedAt ? new Date(e.endedAt) : null;
                       return (
                         <tr key={e.sessionId}>
-                          <td style={tdStyle}>
+                          <td style={gmTdStyle}>
                             <StatusBadge entry={e} now={now} />
                           </td>
                           <td
                             style={{
-                              ...tdStyle,
+                              ...gmTdStyle,
                               fontWeight: 600,
                               fontSize: "var(--dg-fs-caption)",
                             }}
@@ -221,7 +227,7 @@ export default function ImpersonationHistory() {
                           </td>
                           <td
                             style={{
-                              ...tdStyle,
+                              ...gmTdStyle,
                               fontSize: "var(--dg-fs-caption)",
                               color: "var(--dg-color-text-muted)",
                             }}
@@ -230,7 +236,7 @@ export default function ImpersonationHistory() {
                           </td>
                           <td
                             style={{
-                              ...tdStyle,
+                              ...gmTdStyle,
                               fontSize: "var(--dg-fs-caption)",
                               color: "var(--dg-color-text-muted)",
                             }}
@@ -239,28 +245,18 @@ export default function ImpersonationHistory() {
                           </td>
                           <td
                             style={{
-                              ...tdStyle,
+                              ...gmTdStyle,
                               fontSize: "var(--dg-fs-caption)",
                               color: "var(--dg-color-text-primary)",
-                              maxWidth: 200,
                             }}
                           >
                             <MaybeHint content={e.justification} side="bottom">
-                              <span
-                                style={{
-                                  display: "block",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                {e.justification || "—"}
-                              </span>
+                              <span style={{ display: "block" }}>{e.justification || "—"}</span>
                             </MaybeHint>
                           </td>
                           <td
                             style={{
-                              ...tdStyle,
+                              ...gmTdStyle,
                               fontSize: "var(--dg-fs-caption)",
                               color: "var(--dg-color-text-muted)",
                               whiteSpace: "nowrap",
@@ -279,7 +275,7 @@ export default function ImpersonationHistory() {
                           </td>
                           <td
                             style={{
-                              ...tdStyle,
+                              ...gmTdStyle,
                               fontSize: "var(--dg-fs-caption)",
                               color: "var(--dg-color-text-muted)",
                               whiteSpace: "nowrap",
@@ -304,7 +300,7 @@ export default function ImpersonationHistory() {
                           </td>
                           <td
                             style={{
-                              ...tdStyle,
+                              ...gmTdStyle,
                               fontSize: "var(--dg-fs-caption)",
                               color: "var(--dg-color-text-muted)",
                               fontFamily: "var(--font-dm-mono, monospace)",
@@ -314,7 +310,7 @@ export default function ImpersonationHistory() {
                           </td>
                           <td
                             style={{
-                              ...tdStyle,
+                              ...gmTdStyle,
                               fontSize: "var(--dg-fs-caption)",
                               color: "var(--dg-color-text-muted)",
                             }}
@@ -323,7 +319,7 @@ export default function ImpersonationHistory() {
                           </td>
                           <td
                             style={{
-                              ...tdStyle,
+                              ...gmTdStyle,
                               fontSize: "var(--dg-fs-caption)",
                               color: "var(--dg-color-text-muted)",
                               fontFamily: "var(--font-dm-mono, monospace)",

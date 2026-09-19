@@ -2271,7 +2271,18 @@ describe("settings dirty save controls", () => {
     ).toBeTruthy();
   });
 
-  it("defaults scheduled jobs to all shifts in their focus area and only requires picks when narrowed to specific shifts", async () => {
+  // A new scheduled job starts with no placement; the scheduler picks the
+  // department, its focus areas and the shifts in that order.
+  async function pickPlacement(
+    user: ReturnType<typeof userEvent.setup>,
+    labels: { departments: RegExp[]; focusAreas: RegExp[]; shifts: RegExp[] },
+  ) {
+    for (const label of labels.departments) await user.click(screen.getByLabelText(label));
+    for (const label of labels.focusAreas) await user.click(screen.getByLabelText(label));
+    for (const label of labels.shifts) await user.click(screen.getByLabelText(label));
+  }
+
+  it("starts a new scheduled job with nothing placed and only requires picks when narrowed to specific shifts", async () => {
     const user = userEvent.setup();
     const department = makeDepartment({
       id: 1,
@@ -2314,6 +2325,15 @@ describe("settings dirty save controls", () => {
 
     const saveButton = screen.getByRole("button", { name: /^save$/i });
     expect(saveButton).toBeDisabled();
+    expect(screen.getByLabelText(/^Nursing$/i)).not.toBeChecked();
+    expect(screen.queryByLabelText(/^North$/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Day Shift$/i)).not.toBeInTheDocument();
+
+    await pickPlacement(user, {
+      departments: [/^Nursing$/i],
+      focusAreas: [/^North$/i],
+      shifts: [/^Day Shift$/i],
+    });
     expect(screen.getByLabelText(/^Nursing$/i)).toBeChecked();
     expect(screen.getByLabelText(/^North$/i)).toBeChecked();
     expect(screen.getByLabelText(/^Day Shift$/i)).toBeChecked();
@@ -2412,6 +2432,11 @@ describe("settings dirty save controls", () => {
     await user.click(screen.getByRole("button", { name: /add scheduled job/i }));
     await user.type(screen.getByPlaceholderText("e.g. Supervisor"), "Supervisor");
     await user.type(screen.getByPlaceholderText("e.g. SUP"), "SUP");
+    await pickPlacement(user, {
+      departments: [/^Nursing$/i],
+      focusAreas: [/^North$/i, /^South$/i],
+      shifts: [/^Day Shift$/i, /^Night Shift$/i],
+    });
 
     const saveButton = screen.getByRole("button", { name: /^save$/i });
     expect(saveButton).toBeEnabled();
@@ -2517,6 +2542,11 @@ describe("settings dirty save controls", () => {
     await user.click(screen.getByRole("button", { name: /add scheduled job/i }));
     await user.type(screen.getByPlaceholderText("e.g. Supervisor"), "Supervisor");
     await user.type(screen.getByPlaceholderText("e.g. SUP"), "SUP");
+    await pickPlacement(user, {
+      departments: [/^Nursing$/i],
+      focusAreas: [/^North$/i, /^South$/i],
+      shifts: [/^Day Shift$/i, /^Night Shift$/i],
+    });
 
     const [departmentSelectAll, focusAreaSelectAll, shiftSelectAll] =
       screen.getAllByLabelText(/^select all$/i);
@@ -2579,6 +2609,11 @@ describe("settings dirty save controls", () => {
     await user.click(screen.getByRole("button", { name: /add scheduled job/i }));
     await user.type(screen.getByPlaceholderText("e.g. Supervisor"), "Supervisor");
     await user.type(screen.getByPlaceholderText("e.g. SUP"), "SUP");
+    await pickPlacement(user, {
+      departments: [/^Nursing$/i],
+      focusAreas: [/^North$/i],
+      shifts: [/^Day Shift/i],
+    });
 
     expect(screen.getByText(/using 07:00-15:00 from the shift/i)).toBeInTheDocument();
 
@@ -2834,6 +2869,11 @@ describe("settings dirty save controls", () => {
     await user.click(screen.getByRole("button", { name: /add scheduled job/i }));
     await user.type(screen.getByPlaceholderText("e.g. Supervisor"), "Supervisor");
     await user.type(screen.getByPlaceholderText("e.g. SUP"), "SUP");
+    await pickPlacement(user, {
+      departments: [/^Nursing$/i],
+      focusAreas: [/^North$/i],
+      shifts: [/^Day Shift/i, /^Night Shift/i],
+    });
 
     await user.click(screen.getAllByLabelText(/override time/i)[1]!);
     await user.click(screen.getAllByRole("button", { name: /color preset:/i })[1]!);

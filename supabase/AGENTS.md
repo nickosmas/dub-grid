@@ -15,7 +15,7 @@ supabase/
     002_functions_triggers.sql    # Functions, triggers, RPCs, JWT hook implementation
     003_rls_policies.sql          # RLS ENABLE + all row-level security policies
     004_grants.sql                # Grants + default privileges + supabase_auth_admin grants
-    005_*.sql ... 020_*.sql       # Ordered, idempotent forward migrations
+    005_*.sql ... 021_*.sql       # Ordered, idempotent forward migrations
     checksums.sha256              # Locks every reviewed migration (db:migrations:check)
   patches/                        # Historical one-time production patches (evidence only, never replayed)
   seed_arden_wood.sql             # Local seed: Arden Wood org
@@ -35,8 +35,12 @@ tokens, `012` replace pending invitation access, `013` schedule editor session
 terminations, `014` nullable role-change target, `015` schedule notes require a
 shift, `016` authorization hardening, `017` effective tenants bound to auth
 sessions, `018` hardened invitation acceptance, `019` scheduler-staffed call-off
-finalization, `020` publish repairs. An environment holding `019` without `020`
-cannot publish a new cell; `npm run db:migrations:inspect` reports that state.
+finalization, `020` publish repairs, `021` platform account termination (the
+`terminated_*` profile columns, the JWT hook refusing deactivated and terminated
+accounts, the membership/employee/invitation guards, the terminate and reinstate
+RPCs, and the revived `assign_org_role_by_email`). An environment holding `019`
+without `020` cannot publish a new cell; `npm run db:migrations:inspect` reports
+that state.
 
 ## Migration Rules (CRITICAL)
 

@@ -217,6 +217,31 @@ export function forceLogoutGridmasterUser(
   });
 }
 
+export function terminateGridmasterUser(
+  userId: string,
+  reason: string,
+  accessToken?: string,
+): Promise<{ success: true }> {
+  return requestGridmasterJson(`/api/gridmaster/users/${encodeURIComponent(userId)}/terminate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export function reinstateGridmasterUser(
+  userId: string,
+  accessToken?: string,
+): Promise<{ success: true }> {
+  return requestGridmasterJson(`/api/gridmaster/users/${encodeURIComponent(userId)}/reinstate`, {
+    method: "POST",
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+  });
+}
+
 export function fetchGridmasterInvitations(
   orgId: string,
 ): Promise<{ invitations: GridmasterInvitationRecord[] }> {

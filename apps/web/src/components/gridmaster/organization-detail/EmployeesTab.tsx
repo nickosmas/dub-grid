@@ -1,9 +1,15 @@
 import { StatusDot } from "@/components/gridmaster/organization-detail/shared";
-import { sectionStyle, tdStyle, thStyle } from "@/lib/styles";
+import { sectionStyle } from "@/lib/styles";
 import { Button } from "@/components/Button";
 import { getEmployeeDisplayName } from "@/lib/utils";
 import { type Employee } from "@/types";
 import { useState } from "react";
+import {
+  gmHeaderStyle,
+  gmTableStyle,
+  gmTdStyle,
+  gmThStyle,
+} from "@/components/gridmaster/table-styles";
 
 // Employees tab for the gridmaster OrganizationDetail view.
 
@@ -88,14 +94,14 @@ export function EmployeesTab({
 
       <div style={sectionStyle}>
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <table style={gmTableStyle}>
             <thead>
               <tr>
-                <th style={thStyle}>Name</th>
-                <th style={thStyle}>Status</th>
-                <th style={thStyle}>Employee ID</th>
-                <th style={thStyle}>Phone</th>
-                <th style={thStyle}>Email</th>
+                <th style={gmHeaderStyle("Name")}>Name</th>
+                <th style={gmHeaderStyle("Status")}>Status</th>
+                <th style={gmHeaderStyle("Employee ID")}>Employee ID</th>
+                <th style={gmHeaderStyle("Phone")}>Phone</th>
+                <th style={gmHeaderStyle("Email")}>Email</th>
               </tr>
             </thead>
             <tbody>
@@ -104,7 +110,7 @@ export function EmployeesTab({
                   <td
                     colSpan={5}
                     style={{
-                      ...tdStyle,
+                      ...gmTdStyle,
                       textAlign: "center",
                       color: "var(--dg-color-text-muted)",
                       padding: 32,
@@ -116,14 +122,14 @@ export function EmployeesTab({
               ) : (
                 list.map((emp) => (
                   <tr key={emp.id}>
-                    <td style={{ ...tdStyle, fontWeight: 600 }}>{getEmployeeDisplayName(emp)}</td>
-                    <td style={tdStyle}>
+                    <td style={{ ...gmTdStyle, fontWeight: 600 }}>{getEmployeeDisplayName(emp)}</td>
+                    <td style={gmTdStyle}>
                       <StatusDot status={emp.status} />
                     </td>
-                    <td style={{ ...tdStyle, textAlign: "center" }}>#{emp.employeeNumber}</td>
+                    <td style={{ ...gmTdStyle, textAlign: "center" }}>#{emp.employeeNumber}</td>
                     <td
                       style={{
-                        ...tdStyle,
+                        ...gmTdStyle,
                         fontSize: "var(--dg-fs-caption)",
                         color: "var(--dg-color-text-muted)",
                       }}
@@ -132,7 +138,7 @@ export function EmployeesTab({
                     </td>
                     <td
                       style={{
-                        ...tdStyle,
+                        ...gmTdStyle,
                         fontSize: "var(--dg-fs-caption)",
                         color: "var(--dg-color-text-muted)",
                       }}

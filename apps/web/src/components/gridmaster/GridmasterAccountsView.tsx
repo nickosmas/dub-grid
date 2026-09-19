@@ -20,11 +20,17 @@ import {
 } from "@/features/gridmaster/client";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
-import { sectionStyle, tdStyle, thStyle } from "@/lib/styles";
+import { sectionStyle } from "@/lib/styles";
 import type { AssignableOrganizationRole, GridmasterAccount, Organization } from "@/types";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { useStepUpAction } from "@/hooks/useStepUpAction";
 import { requireCredentialAssurance } from "@/features/account/client";
+import {
+  gmHeaderStyle,
+  gmTableStyle,
+  gmTdStyle,
+  gmThStyle,
+} from "@/components/gridmaster/table-styles";
 
 function StatusBadge({ deactivatedAt }: { deactivatedAt: string | null | undefined }) {
   if (!deactivatedAt) return null;
@@ -343,14 +349,14 @@ export default function GridmasterAccountsView({
       {filtered.length > 0 ? (
         <div style={sectionStyle}>
           <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <table style={gmTableStyle}>
               <thead>
                 <tr>
-                  <th style={thStyle}>Email</th>
-                  <th style={thStyle}>Role</th>
-                  <th style={thStyle}>Last login</th>
-                  <th style={thStyle}>Date joined</th>
-                  <th style={thStyle}>Actions</th>
+                  <th style={gmHeaderStyle("Email")}>Email</th>
+                  <th style={gmHeaderStyle("Role")}>Role</th>
+                  <th style={gmHeaderStyle("Last login")}>Last login</th>
+                  <th style={gmHeaderStyle("Date joined")}>Date joined</th>
+                  <th style={gmHeaderStyle("Actions")}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -359,7 +365,9 @@ export default function GridmasterAccountsView({
                   const isLoading = actionLoading === account.id;
                   return (
                     <tr key={account.id} style={{ opacity: account.deactivatedAt ? 0.6 : 1 }}>
-                      <td style={{ ...tdStyle, fontWeight: 600, fontSize: "var(--dg-fs-caption)" }}>
+                      <td
+                        style={{ ...gmTdStyle, fontWeight: 600, fontSize: "var(--dg-fs-caption)" }}
+                      >
                         <div
                           style={{
                             display: "flex",
@@ -382,12 +390,12 @@ export default function GridmasterAccountsView({
                           )}
                         </div>
                       </td>
-                      <td style={tdStyle}>
+                      <td style={gmTdStyle}>
                         <GridmasterBadge />
                       </td>
                       <td
                         style={{
-                          ...tdStyle,
+                          ...gmTdStyle,
                           fontSize: "var(--dg-fs-caption)",
                           color: "var(--dg-color-text-muted)",
                           whiteSpace: "nowrap",
@@ -407,7 +415,7 @@ export default function GridmasterAccountsView({
                       </td>
                       <td
                         style={{
-                          ...tdStyle,
+                          ...gmTdStyle,
                           fontSize: "var(--dg-fs-caption)",
                           color: "var(--dg-color-text-muted)",
                           whiteSpace: "nowrap",
@@ -420,7 +428,7 @@ export default function GridmasterAccountsView({
                           year: "numeric",
                         })}
                       </td>
-                      <td style={tdStyle}>
+                      <td style={gmTdStyle}>
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                           <Button
                             className="dg-btn dg-btn-secondary"
