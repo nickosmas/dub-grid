@@ -1099,7 +1099,11 @@ export default function DashboardView({
           </div>
         </div>
         <div style={contentStyle}>
-          <DashboardLoading />
+          <DashboardLoading
+            isMobile={isMobile}
+            isTablet={isTablet}
+            variant={isUserDashboardMode ? "user" : "admin"}
+          />
         </div>
       </div>
     );

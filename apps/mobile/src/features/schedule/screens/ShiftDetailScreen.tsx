@@ -1416,7 +1416,14 @@ export default function ShiftDetailScreen() {
     >
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
-          <ShiftDetailSkeleton />
+          // Drop and Swap belong to the viewer's own shift, and "Working
+          // with" to a viewer who may see the team schedule; both are known
+          // from bootstrap before the shift arrives. Unknown reads as absent,
+          // the smaller page being the safer guess.
+          <ShiftDetailSkeleton
+            showActions={Boolean(linkedEmployeeId) && employeeId === linkedEmployeeId}
+            showShiftmates={canViewTeamSchedule}
+          />
         ) : null
       ) : contentState.kind === "error" ? (
         <StatusBanner

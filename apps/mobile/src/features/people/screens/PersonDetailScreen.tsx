@@ -690,14 +690,29 @@ export default function PersonDetailScreen() {
       >
         {/* Nothing at all for a blip: a skeleton that appears and vanishes
             inside a few frames reads as a glitch, not as loading. */}
+        {/* Drawn for this viewer, not for a manager: the page a colleague gets
+            has no contact actions, no Contact list and a Staffing list only
+            when a certification exists, so a manager's silhouette promised
+            sections that never arrived. Bootstrap is cached from app start,
+            so the permissions are known before the person loads; when they
+            are not, the smaller page is the safer guess. */}
         {contentState.showSkeleton ? (
           <ProfileSkeleton
             heroAlign="center"
-            heroChips={2}
+            // One pill at most, the access tier. A colleague sees it only on
+            // an admin, so it is left out of their guess.
+            heroChips={canViewEmployeeDetails ? 1 : 0}
             metaItems={0}
-            rowsPerSection={4}
-            sections={3}
-            showQuickActions
+            // Call, Email and Edit for a manager; Call and Email with employee
+            // details alone; nothing when contact details are redacted.
+            quickActions={canManageEmployees ? 3 : canViewEmployeeDetails ? 2 : 0}
+            sections={
+              canViewEmployeeDetails
+                ? // Contact, Staffing, Assignments at their usual row counts.
+                  [{ rows: 2 }, { rows: 3 }, { rows: 2 }]
+                : // Assignments alone: the department and the focus area.
+                  [{ rows: 2 }]
+            }
           />
         ) : null}
       </Screen>

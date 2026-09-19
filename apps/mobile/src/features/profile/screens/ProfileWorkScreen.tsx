@@ -468,7 +468,14 @@ export default function ProfileWorkScreen() {
     >
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
-          <ProfileSkeleton rowsPerSection={3} sections={3} showHero={false} />
+          <ProfileSkeleton
+            // The staff record (status, department, focus area) only for a
+            // member the organization schedules; the account fields for all.
+            sections={
+              bootstrapQuery.data?.linkedEmployee ? [{ rows: 3 }, { rows: 4 }] : [{ rows: 4 }]
+            }
+            showHero={false}
+          />
         ) : null
       ) : contentState.kind === "error" ? (
         <StatusBanner

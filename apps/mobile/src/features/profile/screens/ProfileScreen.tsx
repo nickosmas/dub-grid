@@ -407,8 +407,9 @@ export default function ProfileScreen() {
             heroChips={1}
             heroSubtitle
             metaItems={0}
-            rowsPerSection={3}
-            sections={3}
+            // Organization (name, subdomain), Departments, then the Settings
+            // list of navigation rows; the sign-out row has no frame to draw.
+            sections={[{ rows: 2 }, { rows: 1 }, { rows: 5, rowVariant: "nav" }]}
           />
         ) : null
       ) : contentState.kind === "error" ? (

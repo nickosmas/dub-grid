@@ -27,10 +27,16 @@ import { createStyles as createShiftDetailStyles } from "../screens/shiftDetailS
 export function ShiftDetailSkeleton({
   infoRows = 2,
   shiftmates,
+  showActions = true,
+  showShiftmates = true,
 }: {
   infoRows?: number;
   /** Defaults to enough rows to reach the bottom of the screen under the card. */
   shiftmates?: number;
+  /** Drop and Swap exist on the viewer's own shift only. */
+  showActions?: boolean;
+  /** "Working with" needs the team schedule permission. */
+  showShiftmates?: boolean;
 }) {
   // A 42pt avatar row at its padding; reserved for the header, the card and
   // the section title above the list.
@@ -80,10 +86,12 @@ export function ShiftDetailSkeleton({
             <SkeletonLine variant="heroMetric" width={24} />
           </View>
         </View>
-        <View style={detailStyles.detailActionsRow}>
-          <SkeletonPill height={mobileControl.md} style={styles.action} />
-          <SkeletonPill height={mobileControl.md} style={styles.action} />
-        </View>
+        {showActions ? (
+          <View style={detailStyles.detailActionsRow}>
+            <SkeletonPill height={mobileControl.md} style={styles.action} />
+            <SkeletonPill height={mobileControl.md} style={styles.action} />
+          </View>
+        ) : null}
         <View style={detailStyles.detailPublishedFooter}>
           <SkeletonCircle size={16} />
           <View style={styles.infoCopy}>
@@ -92,25 +100,27 @@ export function ShiftDetailSkeleton({
         </View>
       </View>
 
-      <View style={detailStyles.sectionBlock}>
-        <SkeletonLine variant="screenTitle" width="48%" />
-        <View style={detailStyles.shiftmatesList}>
-          {skeletonRows(shiftmateCount, (index) => (
-            <View
-              key={`shiftmate-skeleton-${index}`}
-              style={[
-                detailStyles.shiftmateRow,
-                index > 0 ? detailStyles.shiftmateRowBorder : null,
-              ]}
-            >
-              <SkeletonCircle size={42} />
-              <View style={detailStyles.shiftmateContent}>
-                <SkeletonLine variant="rowTitle" width={index % 2 === 0 ? "54%" : "42%"} />
+      {showShiftmates ? (
+        <View style={detailStyles.sectionBlock}>
+          <SkeletonLine variant="screenTitle" width="48%" />
+          <View style={detailStyles.shiftmatesList}>
+            {skeletonRows(shiftmateCount, (index) => (
+              <View
+                key={`shiftmate-skeleton-${index}`}
+                style={[
+                  detailStyles.shiftmateRow,
+                  index > 0 ? detailStyles.shiftmateRowBorder : null,
+                ]}
+              >
+                <SkeletonCircle size={42} />
+                <View style={detailStyles.shiftmateContent}>
+                  <SkeletonLine variant="rowTitle" width={index % 2 === 0 ? "54%" : "42%"} />
+                </View>
               </View>
-            </View>
-          ))}
+            ))}
+          </View>
         </View>
-      </View>
+      ) : null}
     </SkeletonGroup>
   );
 }
