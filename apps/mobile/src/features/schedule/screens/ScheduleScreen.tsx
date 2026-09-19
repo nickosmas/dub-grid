@@ -3550,22 +3550,25 @@ function TeamShiftMemberRow({
           {getInitials(entry.employeeName)}
         </Text>
       </View>
-      <View style={styles.teamMemberMain}>
-        <View style={styles.teamMemberCopy}>
+      <View style={styles.teamMemberCopy}>
+        {/* The role pill shares the name's line and the tags take the full
+            width beneath, so a split chip is never squeezed into the column
+            beside the pill and cut to "Also Day Shift ·…". */}
+        <View style={styles.teamMemberHeaderRow}>
           <View style={styles.teamMemberNameRow}>
             <Text style={styles.teamMemberName}>{memberName}</Text>
             <ShiftChangeBadge change={splitChipLabel ? null : change} />
           </View>
-          {memberTimeRange ? <Text style={styles.teamMemberTime}>{memberTimeRange}</Text> : null}
-          <PreviousShiftRow change={change} />
-          {splitChipLabel ? (
-            <View style={styles.teamMemberSplitBadgeRow}>
-              <SplitShiftBadge count={row.alternateShiftTitles.length + 1} label={splitChipLabel} />
-            </View>
-          ) : null}
-          {stackRolePill ? rolePill : null}
+          {stackRolePill ? null : rolePill}
         </View>
-        {stackRolePill ? null : rolePill}
+        {memberTimeRange ? <Text style={styles.teamMemberTime}>{memberTimeRange}</Text> : null}
+        <PreviousShiftRow change={change} />
+        {splitChipLabel ? (
+          <View style={styles.teamMemberSplitBadgeRow}>
+            <SplitShiftBadge count={row.alternateShiftTitles.length + 1} label={splitChipLabel} />
+          </View>
+        ) : null}
+        {stackRolePill ? rolePill : null}
       </View>
     </Pressable>
   );

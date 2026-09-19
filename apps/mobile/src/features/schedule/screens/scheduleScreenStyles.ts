@@ -1357,19 +1357,19 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileAvatarText(48),
       color: mobileColors.brand,
     },
-    teamMemberMain: {
-      flex: 1,
-      minWidth: 0,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 12,
-    },
     teamMemberCopy: {
       flex: 1,
       minWidth: 0,
       gap: mobileSpace.xs,
     },
+    teamMemberHeaderRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
     teamMemberNameRow: {
+      flex: 1,
+      minWidth: 0,
       alignItems: "center",
       flexDirection: "row",
       flexWrap: "wrap",
@@ -1388,6 +1388,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       alignItems: "flex-start",
     },
     teamMemberRoleRow: {
+      flexShrink: 0,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "flex-end",
