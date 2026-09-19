@@ -1525,17 +1525,15 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
             onPress={handleNextWeek}
           />
         </View>
+        {/* Icon-only, like the chevrons beside it: with the word "Today" this
+            row held five controls and the date title was cut to "Sat, Sep…"
+            on any week but the current one. */}
         {!isSelectedToday ? (
-          <Pressable
-            accessibilityRole="button"
-            android_ripple={{ color: "rgba(37, 99, 235, 0.12)" }}
+          <IconControlButton
+            accessibilityLabel="Today"
+            iconName="calendar-number-outline"
             onPress={handleGoToToday}
-            style={({ pressed }) => [styles.meTodayButton, pressed && styles.meTodayButtonPressed]}
-          >
-            <Text fit="fixed" style={styles.meTodayButtonText}>
-              Today
-            </Text>
-          </Pressable>
+          />
         ) : null}
         <AlertsChromeButton unreadCount={unreadNotificationCount} />
       </View>
