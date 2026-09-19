@@ -35,6 +35,7 @@ export default function StringListSettings({
   items,
   onSave,
   placeholder,
+  addLabel,
   canEdit = true,
   hideAbbr = false,
   departments,
@@ -57,6 +58,11 @@ export default function StringListSettings({
    */
   onSave: (items: NamedItem[], hardDeleteIds: number[]) => Promise<void>;
   placeholder: string;
+  /**
+   * Noun for the dashed add button ("+ Add role"). Defaults to the singular
+   * of `label`; the placeholder is input hint copy and reads wrong there.
+   */
+  addLabel?: string;
   canEdit?: boolean;
   hideAbbr?: boolean;
   departments?: Department[];
@@ -1087,7 +1093,7 @@ export default function StringListSettings({
           {isEditing && (
             <div style={{ padding: "8px 16px 12px" }}>
               <Button onClick={addRow} className={addBtnClass} style={{ width: "100%" }}>
-                + Add {placeholder.toLowerCase()}
+                + Add {addLabel ?? label.replace(/s$/, "")}
               </Button>
             </div>
           )}

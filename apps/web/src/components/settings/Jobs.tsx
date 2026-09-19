@@ -428,13 +428,22 @@ function SectionBlock({
             fontSize: "var(--dg-fs-caption)",
             color: "var(--dg-color-text-muted)",
             lineHeight: 1.5,
+            // The collapsible header is a <button>, and buttons never wrap
+            // their labels; this is prose, so let it (F-100).
+            whiteSpace: "normal",
           }}
         >
           {description}
         </div>
       ) : null}
       {summary ? (
-        <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-faint)" }}>
+        <div
+          style={{
+            fontSize: "var(--dg-fs-caption)",
+            color: "var(--dg-color-text-faint)",
+            whiteSpace: "normal",
+          }}
+        >
           {summary}
         </div>
       ) : null}

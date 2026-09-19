@@ -366,13 +366,13 @@ Commands: `npx vitest run --config apps/web/vitest.config.mts apps/web/src/__tes
 **Suggested fix:** Move the cancellation into the `archiveOrganization` branch server-side (mirroring `organizations/delete`), record the outcome in the audit details, and state it in the confirmation copy. Decide explicitly what Restore does with billing.
 **Resolution:** Fixed 2026-09-20. Stripe cancellation moved into the `archiveOrganization` branch server-side (mirrors `organizations/delete`: cancel, mark the subscription and org `canceled`, log failures, never block the archive); the outcome is returned and recorded as `stripeCanceled` in the audit row; the browser no longer fires its own cancel; the Archive dialog says members lose access, billing is canceled, and restoring does not reactivate it. Route tests cover the cancel and the no-subscription paths. Requires `/audit` re-review before closing.
 
-### F-92 [P2] open - A scheduled department with no focus area is a dead end in the Structure editor
+### F-92 [P2] fixed - A scheduled department with no focus area is a dead end in the Structure editor
 
 **File:** apps/web/src/components/settings/DepartmentsSettings.tsx:933-934,1083-1113; apps/web/src/components/onboarding/steps/StructureStep.tsx:56-70; apps/web/src/components/onboarding/WizardModeContext.tsx:90
 **Found:** 2026-09-19 by /audit (scope: super admin setup; lens: quality)
 **Why it matters:** The row renders "Split into Focus Areas" only when the department has exactly one focus area and the focus-area rows plus "+ Add Focus Area" only when it has more than one; with zero it offers nothing but Delete. The wizard's Continue saves departments and focus areas as two separate `POST /api/settings/config` calls, so an interruption between them leaves exactly that state (reproduced by closing the tab mid-save: `departments = 1`, `focus_areas = 0`). The Schedule step then reads "No focus areas yet. Create focus areas first", the Structure step offers no way to do so, and the setup checklist never completes until the admin guesses to delete and recreate the department. Screenshot `16b`.
 **Suggested fix:** Render the focus-area rows and "+ Add Focus Area" for `childFAs.length !== 1` (zero included), or auto-seed the single focus area for a scheduled department that has none. Ideally save departments and focus areas in one request.
-**Resolution:**
+**Resolution:** Fixed 2026-09-20. The scheduled-department row renders its focus-area rows and "+ Add <focus area>" for any count other than one, with a hint when there are none; test "offers to add a focus area to a scheduled department that has none". The two-request wizard save is unchanged. Requires `/audit` re-review before closing.
 
 ### F-93 [P2] fixed - send-invite-email mails any address a branded invitation with caller-supplied token and copy
 
@@ -382,13 +382,13 @@ Commands: `npx vitest run --config apps/web/vitest.config.mts apps/web/src/__tes
 **Suggested fix:** Look the invitation up by token server-side (org, email, pending state), require the caller to be a super_admin of that org or a gridmaster, and derive `orgName` from the row. Reject on mismatch with the generic failure.
 **Resolution:** Fixed 2026-09-20. The route looks the token up as a live, unaccepted, unrevoked, unexpired invitation in an unarchived organization, requires the address to match and the caller to be a gridmaster or a super admin of that organization, and takes the organization name from the row; anything else is a generic 404. Four route tests. Requires `/audit` re-review before closing.
 
-### F-94 [P3] open - Structure step buttons read "+ Add add a role..." and "+ Add add a certification..."
+### F-94 [P3] fixed - Structure step buttons read "+ Add add a role..." and "+ Add add a certification..."
 
 **File:** apps/web/src/components/settings/StringListSettings.tsx:1090; apps/web/src/components/onboarding/steps/StructureStep.tsx:140,166
 **Found:** 2026-09-19 by /audit (scope: super admin setup; lens: quality)
 **Why it matters:** `StringListSettings` renders `+ Add {placeholder.toLowerCase()}` and the wizard passes placeholders that already begin with "Add a". Screenshot `16`.
 **Suggested fix:** Pass the noun (`roleNoun`, `certNoun`) as an explicit `addLabel` prop, or derive the button label from `label` as the departments editor does.
-**Resolution:**
+**Resolution:** Fixed 2026-09-20. `StringListSettings` derives the add button from `label` (singular) with an explicit `addLabel` override, so it reads "+ Add Role" / "+ Add Certification"; the placeholder stays input hint copy. Requires `/audit` re-review before closing.
 
 ### F-95 [P3] fixed - Gridmaster archive, restore, suspend and unsuspend never invalidate the org caches
 
@@ -430,21 +430,21 @@ Commands: `npx vitest run --config apps/web/vitest.config.mts apps/web/src/__tes
 **Suggested fix:** `WHERE lower(email::TEXT) = lower(p_email)` in a forward migration, and lowercase the email in the route schema.
 **Resolution:** Fixed 2026-09-19 in migration 021: `assign_org_role_by_email` matches `lower(email)` and also revives an archived membership on conflict, which is what lets a reinstated or previously removed person back in. Requires `/audit` re-review before closing.
 
-### F-100 [P3] open - Wizard job-editor copy clips and the display-mode sample overflows the column
+### F-100 [P3] fixed - Wizard job-editor copy clips and the display-mode sample overflows the column
 
 **File:** apps/web/src/components/settings/Jobs.tsx:1811; apps/web/src/components/onboarding/steps/ScheduleStep.tsx:96-173
 **Found:** 2026-09-19 by /audit (scope: super admin setup; lens: quality)
 **Why it matters:** At 1440x900 the Placement and Per-shift Settings descriptions end mid-sentence at the card edge ("...the shifts where this job", "...only where this job needs t") and the "Full Names" display-mode sample runs past the 720px wizard column. Screenshots `19b`, `18`.
 **Suggested fix:** Let the description elements wrap (`white-space: normal`, `min-width: 0`) and give the two samples a two-column grid that shrinks.
-**Resolution:**
+**Resolution:** Fixed 2026-09-20. Cause was the global `button { white-space: nowrap }` rule: the collapsible SectionBlock header and the display-mode cards are buttons. Descriptions in both now wrap (`white-space: normal`), the display-mode grid uses `minmax(0, 1fr)` columns and the card has `min-width: 0` so the sample shrinks with the column. Verified by rule, not screenshot. Requires `/audit` re-review before closing.
 
-### F-101 [P3] open - Create Organization wizard fields have no label association
+### F-101 [P3] fixed - Create Organization wizard fields have no label association
 
 **File:** apps/web/src/components/gridmaster/OrganizationSetupWizard.tsx:464-469,522-546,605-645
 **Found:** 2026-09-19 by /audit (scope: org lifecycle; lens: quality)
 **Why it matters:** The name, custom-label and super-admin inputs sit under styled `<label>` elements with no `htmlFor`/`id`, so assistive technology announces them unlabeled and the browser audit had to target placeholders. The location fields on the same step do it right (`useId`).
 **Suggested fix:** Give each input an id and point its label at it, as `OrganizationLocationFields` does.
-**Resolution:**
+**Resolution:** Fixed 2026-09-20. Name, the three label inputs, and the super admin first name, last name, email and phone inputs carry `useId` ids with `htmlFor` labels; test asserts each via `getByLabelText`. Requires `/audit` re-review before closing.
 
 ### F-102 [P0] fixed - Gridmaster deactivation did not stop an open web session
 

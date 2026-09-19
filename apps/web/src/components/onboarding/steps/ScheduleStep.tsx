@@ -94,7 +94,7 @@ export default function ScheduleStep({ onNext, onBack }: ScheduleStepProps) {
       wide
     >
       <CompositeSection title="Display mode" description="How shifts appear on the schedule grid.">
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 16 }}>
           {DISPLAY_MODES.map((mode) => {
             const isActive = selectedMode === mode.id;
             return (
@@ -117,6 +117,10 @@ export default function ScheduleStep({ onNext, onBack }: ScheduleStepProps) {
                   cursor: "pointer",
                   textAlign: "left",
                   transition: "border-color 150ms ease, background 150ms ease",
+                  // A <button> never wraps, but this one holds a paragraph
+                  // and a grid sample that must shrink with the column (F-100).
+                  whiteSpace: "normal",
+                  minWidth: 0,
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
