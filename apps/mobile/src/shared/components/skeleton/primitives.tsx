@@ -146,10 +146,13 @@ export function SkeletonLine({
   variant,
   width = "100%",
   style,
+  blockStyle,
 }: {
   variant: MobileTextVariant;
   width?: number | `${number}%`;
   style?: StyleProp<ViewStyle>;
+  /** Recolours the bar itself, for a line drawn on a fill the base tone would vanish into. */
+  blockStyle?: StyleProp<ViewStyle>;
 }) {
   const token = mobileText[variant];
   const fontSize = typeof token.fontSize === "number" ? token.fontSize : 14;
@@ -157,7 +160,7 @@ export function SkeletonLine({
 
   return (
     <View style={[{ height: lineHeight, justifyContent: "center" }, style]}>
-      <SkeletonBlock height={fontSize} radius={mobileRadius.sm} width={width} />
+      <SkeletonBlock height={fontSize} radius={mobileRadius.sm} style={blockStyle} width={width} />
     </View>
   );
 }

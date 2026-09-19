@@ -37,26 +37,40 @@ export function ScheduleMeSkeleton({ rows }: { rows?: number }) {
     () => createScheduleStyles(mobileColors, isDark),
     [mobileColors, isDark],
   );
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <SkeletonGroup style={scheduleStyles.mePage}>
+      {/* The hero as it renders: a status dot with its word, the shift name
+          at heroMetric, the type pill under it, the date tile at the right
+          edge, then the focus-area and time rows the card closes on. Each
+          placeholder sits in the real style so the frame lands where the
+          content will. */}
       <View style={[scheduleStyles.meHeroCard, styles.heroFill]}>
         <View style={scheduleStyles.meHeroContent}>
           <View style={scheduleStyles.meHeroHeader}>
             <View style={scheduleStyles.meHeroHeaderCopy}>
-              <SkeletonPill height={24} width={124} />
-              <SkeletonLine variant="heroMetric" width="72%" />
-              <SkeletonLine variant="body" width="54%" />
+              <View style={scheduleStyles.meHeroBadge}>
+                <View style={[scheduleStyles.meHeroBadgeDot, styles.heroInk]} />
+                <SkeletonLine blockStyle={styles.heroInk} variant="label" width={72} />
+              </View>
+              <SkeletonLine blockStyle={styles.heroInk} variant="heroMetric" width="64%" />
+              <SkeletonPill height={26} style={styles.heroInk} width={96} />
             </View>
-            <View style={styles.heroDateTile} />
+            <View style={[scheduleStyles.meHeroDateTile, styles.heroDateTile]}>
+              <SkeletonLine blockStyle={styles.heroInk} variant="label" width={28} />
+              <SkeletonLine blockStyle={styles.heroInk} variant="heroMetric" width={30} />
+            </View>
           </View>
-          <View style={scheduleStyles.meHeroProgressBlock}>
-            <View style={scheduleStyles.meHeroProgressRow}>
-              <SkeletonLine variant="rowTitle" width={96} />
-              <SkeletonLine variant="rowTitle" width={48} />
+          <View style={scheduleStyles.meHeroContextGroup}>
+            <View style={scheduleStyles.meHeroAreaRow}>
+              <SkeletonCircle size={18} style={styles.heroInk} />
+              <SkeletonLine blockStyle={styles.heroInk} variant="rowTitle" width={128} />
             </View>
-            <View style={styles.heroProgressTrack} />
+            <View style={scheduleStyles.meHeroTimeRow}>
+              <SkeletonCircle size={24} style={styles.heroInk} />
+              <SkeletonLine blockStyle={styles.heroInk} variant="sectionTitle" width={156} />
+            </View>
           </View>
         </View>
       </View>
@@ -106,7 +120,7 @@ export function ScheduleTeamSkeleton({
     () => createScheduleStyles(mobileColors, isDark),
     [mobileColors, isDark],
   );
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <SkeletonGroup style={scheduleStyles.shiftGroupsList}>
@@ -139,7 +153,7 @@ export function ScheduleTeamSkeleton({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) =>
+const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     // A percentage-wide line inside a row has no width of its own to take a
     // percentage of; growing the wrapper gives it the row's free space.
@@ -152,18 +166,15 @@ const createStyles = (mobileColors: MobileColors) =>
       backgroundColor: mobileColors.skeletonBase,
       shadowColor: mobileColors.shadow,
     },
-    heroDateTile: {
-      backgroundColor: mobileColors.surface,
-      borderRadius: mobileRadii.control,
-      height: 64,
-      minWidth: 58,
-      opacity: 0.4,
+    // Placeholders on the hero's fill are the same tone as the fill, so they
+    // take the white the real hero's text and tile carry, faint enough to
+    // read as lines rather than labels.
+    heroInk: {
+      backgroundColor: isDark ? "rgba(255, 255, 255, 0.10)" : "rgba(255, 255, 255, 0.72)",
     },
-    heroProgressTrack: {
-      backgroundColor: mobileColors.surface,
-      borderRadius: 999,
-      height: 7,
-      opacity: 0.4,
+    heroDateTile: {
+      backgroundColor: "transparent",
+      borderColor: isDark ? "rgba(255, 255, 255, 0.10)" : "rgba(255, 255, 255, 0.72)",
     },
     upcomingDateTile: {
       backgroundColor: mobileColors.skeletonBase,

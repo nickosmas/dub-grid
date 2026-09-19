@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import {
-  SkeletonBlock,
   SkeletonCircle,
   SkeletonGroup,
   SkeletonLine,
@@ -50,20 +49,27 @@ export function ShiftDetailSkeleton({
       <View style={detailStyles.shiftDetailCard}>
         <View style={detailStyles.detailSummaryRow}>
           <View style={detailStyles.detailSummaryContent}>
+            {/* The card as it renders: the shift name alone at heroMetric
+                (its subtitle is a teammate's name, shown only on their
+                shift), then each info row's label over its value beside a
+                16pt icon. */}
             <View style={detailStyles.detailHeroHeader}>
               <View style={detailStyles.detailHeroCopy}>
-                <SkeletonLine variant="heroMetric" width="72%" />
-                <SkeletonLine variant="body" width="52%" />
+                <SkeletonLine variant="heroMetric" width="56%" />
               </View>
             </View>
             <View style={detailStyles.detailInfoStack}>
               {skeletonRows(infoRows, (index) => (
                 <View key={`detail-info-${index}`} style={detailStyles.detailInfoRow}>
                   <View style={detailStyles.detailInfoIcon}>
-                    <SkeletonBlock height={16} radius={4} width={16} />
+                    <SkeletonCircle size={16} />
                   </View>
-                  <View style={styles.infoCopy}>
-                    <SkeletonLine variant={index === 0 ? "rowTitle" : "body"} width="58%" />
+                  <View style={detailStyles.detailInfoCopy}>
+                    <SkeletonLine variant="label" width={index === 0 ? 64 : 76} />
+                    <SkeletonLine
+                      variant={index === 0 ? "rowTitle" : "body"}
+                      width={index === 0 ? "62%" : "44%"}
+                    />
                   </View>
                 </View>
               ))}

@@ -813,11 +813,14 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       width: 320,
       gap: 12,
     },
+    // Inset from the card below it the way a grouped list's section title
+    // is, so the date sits over the card's content rather than on its edge.
     openShiftDateHeader: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
       gap: 12,
+      paddingHorizontal: mobileSpace.lg,
     },
     openShiftDateCardItems: {
       gap: mobileSpace.md,
