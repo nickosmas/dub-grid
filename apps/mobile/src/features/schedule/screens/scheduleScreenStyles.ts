@@ -1127,6 +1127,10 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     iconControlButtonPressed: {
       transform: [{ scale: mobileMotion.press.iconOnlyScale }],
     },
+    // Ionicons draws its circular arrow clockwise; flipped, it points back.
+    iconControlMirrored: {
+      transform: [{ scaleX: -1 }],
+    },
     calendarBlock: {
       gap: MONTH_EXPAND_SECTION_GAP,
     },

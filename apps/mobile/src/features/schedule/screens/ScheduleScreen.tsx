@@ -18,6 +18,8 @@ import {
   useWindowDimensions,
   type AppStateStatus,
   type GestureResponderEvent,
+  type StyleProp,
+  type TextStyle,
 } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import { Pressable } from "../../../shared/components/Pressable";
@@ -1527,11 +1529,15 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         </View>
         {/* Icon-only, like the chevrons beside it: with the word "Today" this
             row held five controls and the date title was cut to "Sat, Sep…"
-            on any week but the current one. */}
+            on any week but the current one. The glyph is a circular arrow
+            turned to point back, "return to today"; Ionicons only draws the
+            clockwise one, so it is mirrored. A calendar glyph read as a date
+            picker. */}
         {!isSelectedToday ? (
           <IconControlButton
             accessibilityLabel="Today"
-            iconName="calendar-number-outline"
+            iconName="refresh-outline"
+            iconStyle={styles.iconControlMirrored}
             onPress={handleGoToToday}
           />
         ) : null}
@@ -2006,11 +2012,13 @@ function IconControlButton({
   accessibilityLabel,
   iconName,
   iconSize = 20,
+  iconStyle,
   onPress,
 }: {
   accessibilityLabel: string;
   iconName: React.ComponentProps<typeof Ionicons>["name"];
   iconSize?: number;
+  iconStyle?: StyleProp<TextStyle>;
   onPress: () => void;
 }) {
   const mobileColors = useMobileColors();
@@ -2029,7 +2037,12 @@ function IconControlButton({
         pressed && styles.iconControlButtonPressed,
       ]}
     >
-      <Ionicons color={mobileColors.textPrimary} name={iconName} size={iconSize} />
+      <Ionicons
+        color={mobileColors.textPrimary}
+        name={iconName}
+        size={iconSize}
+        style={iconStyle}
+      />
     </Pressable>
   );
 }
