@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
     case "found":
       return NextResponse.json({ valid: true, name: result.org.name }, { headers: cacheHeaders });
     case "not-found":
+    case "archived":
       return NextResponse.json({ valid: false, name: null }, { headers: cacheHeaders });
     case "unconfigured":
       // Local dev without a service key: fail-open so the login flow isn't

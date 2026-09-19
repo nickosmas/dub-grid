@@ -221,18 +221,6 @@ export function OverviewTab({
         toast.success("Organization restored");
         onOrgUpdated?.({ ...organization, archivedAt: null });
       } else {
-        // Cancel Stripe subscription before archiving (best-effort)
-        if (organization.stripeCustomerId) {
-          try {
-            await fetch("/api/gridmaster/subscription", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ orgId: organization.id, action: "cancel" }),
-            });
-          } catch {
-            // Best-effort — proceed with archive even if Stripe cancel fails
-          }
-        }
         await archiveGridmasterOrganization(organization.id);
         toast.success("Organization archived");
         onOrgUpdated?.({ ...organization, archivedAt: new Date().toISOString() });
@@ -586,7 +574,7 @@ export function OverviewTab({
           message={
             organization.archivedAt
               ? `Are you sure you want to restore "${organization.name}"?`
-              : `Are you sure you want to archive "${organization.name}"? The organization will be hidden from active listings but all data will be preserved.`
+              : `Archive "${organization.name}"? Members lose access, the Stripe subscription is canceled, and the data is preserved. Restoring later does not reactivate billing.`
           }
           confirmLabel={organization.archivedAt ? "Restore" : "Archive"}
           variant={organization.archivedAt ? "info" : "danger"}

@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { buildPlatformActivitySummary, loadGridmasterOrgHealth } from "./oversight";
+import { beforeEach, describe, expect, it } from "vitest";
+import {
+  OVERSIGHT_PAGE_SIZE,
+  buildPlatformActivitySummary,
+  loadGridmasterOrgHealth,
+  resetOversightFactsMemoForTests,
+} from "./oversight";
 
 const orgId = "11111111-1111-4111-8111-111111111111";
 const now = new Date("2026-05-03T12:00:00.000Z");
@@ -80,6 +85,10 @@ class MockQuery {
     return this;
   }
 
+  range(from: number, to: number) {
+    return new MockQuery(this.rows.slice(from, to + 1));
+  }
+
   then<
     TResult1 = { data: Record<string, unknown>[]; count: number; error: null },
     TResult2 = never,
@@ -102,12 +111,19 @@ class MockQuery {
 }
 
 function mockServiceClient(tables: Record<string, Record<string, unknown>[]>) {
+  const reads: string[] = [];
   return {
+    reads,
     from(table: string) {
+      reads.push(table);
       return new MockQuery(tables[table] ?? []);
     },
   };
 }
+
+beforeEach(() => {
+  resetOversightFactsMemoForTests();
+});
 
 function organizationRow() {
   return {
@@ -218,5 +234,36 @@ describe("gridmaster organization health facts", () => {
     expect(summaries[0].supportSnapshot.userCount).toBe(1);
     expect(summaries[0].supportSnapshot.activeUsers30d).toBe(1);
     expect(summaries[0].supportSnapshot.activeSessions).toBe(1);
+  });
+
+  it("pages past PostgREST's row cap so a large tenant is counted in full", async () => {
+    const total = OVERSIGHT_PAGE_SIZE * 2 + 7;
+    const memberships = Array.from({ length: total }, (_, index) => ({
+      org_id: orgId,
+      user_id: `user-${index}`,
+      org_role: "user",
+      joined_at: now.toISOString(),
+      updated_at: now.toISOString(),
+      archived_at: null,
+    }));
+    const client = mockServiceClient({
+      organizations: [organizationRow()],
+      organization_memberships: memberships,
+    });
+
+    const summaries = await loadGridmasterOrgHealth(client);
+
+    expect(summaries[0].supportSnapshot.userCount).toBe(total);
+    expect(client.reads.filter((table) => table === "organization_memberships")).toHaveLength(3);
+  });
+
+  it("shares one facts load across the portal's burst of requests", async () => {
+    const client = mockServiceClient({ organizations: [organizationRow()] });
+
+    await loadGridmasterOrgHealth(client);
+    const readsAfterFirst = client.reads.length;
+    await loadGridmasterOrgHealth(client);
+
+    expect(client.reads.length).toBe(readsAfterFirst);
   });
 });

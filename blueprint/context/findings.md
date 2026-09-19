@@ -268,7 +268,7 @@ Commands: `npx vitest run --config apps/web/vitest.config.mts apps/web/src/__tes
 **Found:** 2026-09-17 by feature 25d2c Step 5 (role variance, impersonation)
 **Why it matters:** After "End Session" the banner ends the DB session (POST answers 200), clears the cookie, clears the query cache and replaces the location with /dashboard. In roughly 1 of 7 cycles on Firefox (never yet on Chromium or WebKit) the page instead issues a direct document GET of /login with the Supabase auth cookie still present, and the portal login renders empty for a still-signed-in gridmaster. A probe captured the sequence twice: End POST 200, one console error with an object argument, then `DOC 200 GET /login` with no /dashboard document and no 3xx, so the navigation is client-initiated. The best-supported reading is that an auth event without an access token reaches AuthProvider (line 120 commits a null user) and ProtectedRoute's sign-out branch replaces the location with /login before the banner's own navigation wins; the emitter was not confirmed because the run that serialized the error's arguments did not reproduce it.
 **Suggested fix:** Reproduce with the auth listener instrumented (log every event and whether `nextSession.access_token` is set) around handleEnd; likely mitigations are navigating before `queryClient.clear()`, or having ProtectedRoute ignore a transient null session while an impersonation end is in flight. `e2e/role-variance-impersonation.spec.ts` currently accepts the bounce (annotated) so the suite stays deterministic; make the portal landing strict again once fixed.
-**Resolution:** Fixed 2026-09-20 on the finding's best-supported reading: the banner (End Session and expiry) and the portal start flow now mark the auth transition and navigate without calling `queryClient.clear()` first, so a transient null session cannot reach ProtectedRoute's sign-out bounce mid-teardown. The e2e End Session test asserts the `/dashboard` landing strictly again; four Firefox runs on the worktree server landed on the portal every time (their later failures were dev-server 500 timeouts, not the bounce). Requires `/audit` re-review before closing.
+**Resolution:** Fixed 2026-09-20 on the finding's best-supported reading: the banner (End Session and expiry) and the portal start flow now mark the auth transition and navigate without calling `queryClient.clear()` first, so a transient null session cannot reach ProtectedRoute's sign-out bounce mid-teardown. The e2e End Session test asserts the `/dashboard` landing strictly again; nine Firefox End Session cycles on the main checkout's Turbopack server (3 in the full spec, 6 repeats) plus 3 WebKit and 3 Chromium landed on the portal every time. Requires `/audit` re-review before closing.
 
 ### F-74 [P3] fixed - The Gridmaster route's not-found boundary is unreachable
 
@@ -326,13 +326,13 @@ Commands: `npx vitest run --config apps/web/vitest.config.mts apps/web/src/__tes
 **Suggested fix:** Call `revokeAllUserSessions(userId)` (and `force_logout_user` for tracked sessions, as force-logout does) when `deactivate` is true; add a route test asserting the revocation write. Consider `requireSensitiveActionAuth` here for parity with force-logout.
 **Resolution:** Fixed 2026-09-19 with migration 021 and the gridmaster users route: the JWT hook now refuses deactivated (and terminated) accounts at token issue, `requireOrgPermissions` refuses them for the token they already hold, and PATCH deactivate writes the revocation watermark. Runtime probe before the fix showed a deactivated user keeping every org API open; after it the account gets the disabled modal on sign-in and 403 ACCOUNT_DISABLED on API calls. Requires `/audit` re-review before closing.
 
-### F-87 [P2] open - Members of a suspended or deleted organization are never told why they are locked out
+### F-87 [P2] fixed - Members of a suspended or deleted organization are never told why they are locked out
 
 **File:** apps/web/src/proxy.ts:617-630; apps/web/src/app/(app)/login/OrgLogin.tsx:292-324; apps/web/src/app/api/auth/login/route.ts:96-118
 **Found:** 2026-09-19 by /audit (scope: org lifecycle; lens: quality)
 **Why it matters:** The proxy redirects to `/login?suspended=true` or `/login?deleted=true`, but `OrgLogin` never reads either flag, so the page renders as an ordinary sign-in. A sign-in attempt then fails through `switch_org`'s refusal, which the login route maps to a 403 `ORG_ACCESS_DENIED` and `OrgLogin` maps to the transient toast "We couldn't sign you in. Try again." (reproduced for both suspend and archive; screenshots `35b`/`42b`). A live session shows the normal dashboard for the cached org-access window and, after an archive, "Loading your workspace" with Try again / Sign out. The DB trigger does mail an in-app alert to super admins, which they cannot open. Nobody in the organization learns that the platform suspended or deleted it.
 **Suggested fix:** Have the login route return a distinct code for a suspended/archived host org (it already knows from `lookupOrgBySlug`/`switch_org`), render a "This organization is suspended, contact support" / "This organization was deleted" state in `OrgLogin` for that code and for the `suspended`/`deleted` params, and let the bootstrap recovery screen say the same instead of "Loading your workspace".
-**Resolution:**
+**Resolution:** Fixed 2026-09-20. `lookupOrgBySlug` now caches archived/suspended state and answers `archived` distinctly; the login route returns `ORG_SUSPENDED` / `ORG_DELETED` (403) before `switch_org`; the login page passes the proxy's `?suspended` / `?deleted` flags through; and `OrgLogin` renders a lockout card ("This organization is suspended" / "has been deleted", contact support) instead of the form for the seed, the flags, and those codes. Route and component tests added. The proxy redirect now takes effect immediately because the lifecycle route drops the access and slug caches (F-95). Not changed: a live SPA session that never reloads still sees the bootstrap recovery screen until its next document load. Requires `/audit` re-review before closing.
 
 ### F-88 [P2] fixed - Gridmaster oversight counts sandbox clones as tenants
 
@@ -342,29 +342,29 @@ Commands: `npx vitest run --config apps/web/vitest.config.mts apps/web/src/__tes
 **Suggested fix:** Filter `workspace_kind = 'real'` in the organizations select of `loadOversightFacts` and drop rows from the other fact tables whose `org_id` is not in that set; add an oversight test with one sandbox row.
 **Resolution:** Fixed 2026-09-19: `loadOversightFacts` selects `workspace_kind = real` through `selectRealOrganizations`, with a test asserting the filter. Requires `/audit` re-review before closing.
 
-### F-89 [P2] open - Oversight fact loading reads whole tables and is silently capped at 1000 rows each
+### F-89 [P2] fixed - Oversight fact loading reads whole tables and is silently capped at 1000 rows each
 
 **File:** apps/web/src/app/api/gridmaster/_lib/oversight.ts:180-262,621-623; supabase/config.toml:18
 **Found:** 2026-09-19 by /audit (scope: gridmaster functions; lens: performance)
 **Why it matters:** `selectRows` issues unbounded selects over memberships, employees, invitations, shift_requests, user_sessions, mobile_device_tokens, subscriptions, departments, focus areas, shifts, jobs, certifications, roles and profile change requests, and PostgREST truncates each at `max_rows = 1000` without an error (the L-3 comment already acknowledges this for schedule_cells). Past that size the per-org counts, "pending invitations", "open shift requests", session summaries and setup completeness are wrong with no signal. Every one of the five oversight routes reloads all twenty queries, so opening the portal costs ~100 full-table reads. Data-size dependent; the local seed stays under the cap.
 **Suggested fix:** Aggregate in SQL (one RPC or grouped counts per org) or page through with `.range()`, and load the facts once per request (share between routes or cache briefly). Add a test that the loader does not depend on row-count defaults.
-**Resolution:**
+**Resolution:** Fixed 2026-09-20. Every unbounded oversight select now pages through `.range()` in 1000-row chunks until a short page, and the twenty-read facts load is memoised for 10 s per service client so the portal's five parallel views share one load (a failed load is not memoised). Tests: a 2007-row membership table is counted in full across three page reads; a second load within the window issues no reads. Requires `/audit` re-review before closing.
 
-### F-90 [P2] open - The gridmaster invitations list ships every invitation's raw token to the browser
+### F-90 [P2] fixed - The gridmaster invitations list ships every invitation's raw token to the browser
 
 **File:** apps/web/src/app/api/gridmaster/invitations/route.ts:29-31; apps/web/src/components/gridmaster/organization-detail/InvitationsTab.tsx:21; apps/web/src/app/api/organizations/invitations/route.ts:107-140
 **Found:** 2026-09-19 by /audit (scope: gridmaster functions; lens: security)
 **Why it matters:** The select includes `token` for all invitations of an organization and the tab never reads it (confirmed: the response for the new org carried `hasToken: true`). The org-level route deliberately splits `fetchInvitation` (no token) from `fetchInvitationWithToken` (resend only). Each token is an account-creation credential for `/api/invitations/register`, so a list view now exposes them to browser devtools, extensions, and any response logging.
 **Suggested fix:** Drop `token` from the select (the tab needs id, email, role, dates, employee_id). If a gridmaster resend is ever wanted, add a dedicated action that fetches one token server-side.
-**Resolution:**
+**Resolution:** Fixed 2026-09-20. `token` dropped from the gridmaster invitations select and from the client types; new route test asserts the column list excludes it. Requires `/audit` re-review before closing.
 
-### F-91 [P2] open - Gridmaster archive cancels Stripe from the browser, unmentioned and unmatched by the API
+### F-91 [P2] fixed - Gridmaster archive cancels Stripe from the browser, unmentioned and unmatched by the API
 
 **File:** apps/web/src/components/gridmaster/organization-detail/OverviewTab.tsx:216-246; apps/web/src/app/api/gridmaster/organizations/manage/route.ts:137-157; apps/web/src/app/api/organizations/delete/route.ts:127-143
 **Found:** 2026-09-19 by /audit (scope: org lifecycle; lens: quality)
 **Why it matters:** The Archive dialog says data is preserved, then `handleArchive` fires `POST /api/gridmaster/subscription {action:"cancel"}` without reading the response and archives regardless. The archive API itself does nothing about billing, so an archive through the API (or the client cancel failing) leaves a paid subscription running, while an archive through the UI irreversibly cancels it with no mention and no restore path (Restore leaves `subscription_status = canceled`, so the restored org is billing-locked). The super-admin delete route does this server-side and records `stripeCanceled` in its audit row; the gridmaster path records nothing.
 **Suggested fix:** Move the cancellation into the `archiveOrganization` branch server-side (mirroring `organizations/delete`), record the outcome in the audit details, and state it in the confirmation copy. Decide explicitly what Restore does with billing.
-**Resolution:**
+**Resolution:** Fixed 2026-09-20. Stripe cancellation moved into the `archiveOrganization` branch server-side (mirrors `organizations/delete`: cancel, mark the subscription and org `canceled`, log failures, never block the archive); the outcome is returned and recorded as `stripeCanceled` in the audit row; the browser no longer fires its own cancel; the Archive dialog says members lose access, billing is canceled, and restoring does not reactivate it. Route tests cover the cancel and the no-subscription paths. Requires `/audit` re-review before closing.
 
 ### F-92 [P2] open - A scheduled department with no focus area is a dead end in the Structure editor
 
@@ -374,13 +374,13 @@ Commands: `npx vitest run --config apps/web/vitest.config.mts apps/web/src/__tes
 **Suggested fix:** Render the focus-area rows and "+ Add Focus Area" for `childFAs.length !== 1` (zero included), or auto-seed the single focus area for a scheduled department that has none. Ideally save departments and focus areas in one request.
 **Resolution:**
 
-### F-93 [P2] open - send-invite-email mails any address a branded invitation with caller-supplied token and copy
+### F-93 [P2] fixed - send-invite-email mails any address a branded invitation with caller-supplied token and copy
 
 **File:** apps/web/src/app/api/send-invite-email/route.ts:17-22,54-62,123-141
 **Found:** 2026-09-19 by /audit (scope: org create, super admin setup; lens: security)
 **Why it matters:** The route trusts `token`, `email`, `orgName` and `inviterName` from the body. It never checks that the token is a live invitation, that it belongs to that email, or that the caller (any super_admin of any organization, or a gridmaster) may act for that organization. A super admin can send "You're invited to join {any name} on DubGrid" from DubGrid's sender to arbitrary addresses with an arbitrary link token, bounded only by 5/hour per target and the per-actor limiter.
 **Suggested fix:** Look the invitation up by token server-side (org, email, pending state), require the caller to be a super_admin of that org or a gridmaster, and derive `orgName` from the row. Reject on mismatch with the generic failure.
-**Resolution:**
+**Resolution:** Fixed 2026-09-20. The route looks the token up as a live, unaccepted, unrevoked, unexpired invitation in an unarchived organization, requires the address to match and the caller to be a gridmaster or a super admin of that organization, and takes the organization name from the row; anything else is a generic 404. Four route tests. Requires `/audit` re-review before closing.
 
 ### F-94 [P3] open - Structure step buttons read "+ Add add a role..." and "+ Add add a certification..."
 
@@ -390,13 +390,13 @@ Commands: `npx vitest run --config apps/web/vitest.config.mts apps/web/src/__tes
 **Suggested fix:** Pass the noun (`roleNoun`, `certNoun`) as an explicit `addLabel` prop, or derive the button label from `label` as the departments editor does.
 **Resolution:**
 
-### F-95 [P3] open - Gridmaster archive, restore, suspend and unsuspend never invalidate the org caches
+### F-95 [P3] fixed - Gridmaster archive, restore, suspend and unsuspend never invalidate the org caches
 
 **File:** apps/web/src/app/api/gridmaster/organizations/manage/route.ts:137-224; apps/web/src/lib/cache.ts:20-27; apps/web/src/app/api/gridmaster/organizations/manage/route.test.ts:205-207
 **Found:** 2026-09-19 by /audit (scope: org lifecycle; lens: quality)
 **Why it matters:** The subscription route drops `mwOrgAccess` after every billing change and the super-admin delete route drops `orgBySlug`, and the `PUBLIC_LOOKUP` TTL comment says archive does too, but the gridmaster route does neither: members keep passing the proxy for the cache window (observed: a full page load rendered the dashboard normally after suspension), and the 24h slug cache can keep an archived organization's login page resolving. The route test asserts `cacheDel` is not called, so the gap is codified.
 **Suggested fix:** Call `cacheDel(CacheKey.mwOrgAccess(orgId), CacheKey.organization(orgId))` on all four state changes and `cacheDel(CacheKey.orgBySlug(slug))` on archive/restore; flip the test expectation.
-**Resolution:**
+**Resolution:** Fixed 2026-09-20. Archive, restore, suspend and unsuspend all drop `mwOrgAccess`, `organization` and `orgBySlug`; the route test that codified the gap now asserts the keys. Requires `/audit` re-review before closing.
 
 ### F-96 [P3] fixed - The "Organization Created" screen misstates the invited role and uses an em dash
 

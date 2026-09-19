@@ -53,8 +53,19 @@ vi.mock("@/lib/logger", () => ({
 const cacheDel = vi.fn();
 vi.mock("@/lib/cache", () => ({
   cacheDel: (...args: unknown[]) => cacheDel(...args),
-  CacheKey: { orgBySlug: (slug: string) => `dg:org:slug:${slug}` },
+  CacheKey: {
+    orgBySlug: (slug: string) => `dg:org:slug:${slug}`,
+    mwOrgAccess: (orgId: string) => `dg:mw:orgAccess:${orgId}`,
+    organization: (orgId: string) => `dg:org:${orgId}:organization`,
+  },
 }));
+
+const cancelSubscription = vi.fn();
+vi.mock("@/lib/stripe", () => ({
+  cancelSubscription: (...args: unknown[]) => cancelSubscription(...args),
+}));
+const subscriptionMaybeSingle = vi.fn();
+const subscriptionUpdate = vi.fn();
 
 import { POST } from "./route";
 
@@ -133,6 +144,12 @@ describe("POST /api/gridmaster/organizations/manage", () => {
       if (table === "audit_log") {
         return { insert: auditInsert };
       }
+      if (table === "subscriptions") {
+        return {
+          select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: subscriptionMaybeSingle })) })),
+          update: subscriptionUpdate,
+        };
+      }
       throw new Error(`Unexpected table: ${table}`);
     });
   });
@@ -184,11 +201,19 @@ describe("POST /api/gridmaster/organizations/manage", () => {
     expect(organizationUpdate).not.toHaveBeenCalled();
   });
 
-  it("archives an organization and writes an audit event", async () => {
+  it("archives an organization, cancels its billing, drops its caches, and writes an audit event", async () => {
+    subscriptionMaybeSingle.mockResolvedValue({
+      data: { stripe_subscription_id: "sub_123" },
+      error: null,
+    });
+    subscriptionUpdate.mockReturnValue({ eq: vi.fn(async () => ({ error: null })) });
+    cancelSubscription.mockResolvedValue({});
+
     const response = await POST(makeRequest({ action: "archiveOrganization", orgId: ORG_ID }));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ success: true });
+    await expect(response.json()).resolves.toEqual({ success: true, stripeCanceled: true });
+    expect(cancelSubscription).toHaveBeenCalledWith("sub_123");
     expect(organizationUpdate).toHaveBeenCalledWith({
       archived_at: expect.any(String),
     });
@@ -200,11 +225,38 @@ describe("POST /api/gridmaster/organizations/manage", () => {
         action: "org.archived",
         resource_type: "organization",
         resource_id: ORG_ID,
+        details: expect.objectContaining({ stripeCanceled: true }),
       }),
     );
-    // Archiving no longer touches host-routing caches: organizations are
-    // selected by authenticated session context, never by a subdomain.
-    expect(cacheDel).not.toHaveBeenCalled();
+    // Members keep passing the proxy for the cached access window and the
+    // slug lookup keeps resolving for a day unless both are dropped (F-95).
+    expect(cacheDel).toHaveBeenCalledWith(
+      `dg:mw:orgAccess:${ORG_ID}`,
+      `dg:org:${ORG_ID}:organization`,
+      "dg:org:slug:acme",
+    );
+  });
+
+  it("archives without billing when the organization has no Stripe subscription", async () => {
+    subscriptionMaybeSingle.mockResolvedValue({ data: null, error: null });
+
+    const response = await POST(makeRequest({ action: "archiveOrganization", orgId: ORG_ID }));
+
+    await expect(response.json()).resolves.toEqual({ success: true, stripeCanceled: false });
+    expect(cancelSubscription).not.toHaveBeenCalled();
+  });
+
+  it("suspending drops the org access and slug caches", async () => {
+    const response = await POST(
+      makeRequest({ action: "suspendOrganization", orgId: ORG_ID, reason: "Unpaid invoices" }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(cacheDel).toHaveBeenCalledWith(
+      `dg:mw:orgAccess:${ORG_ID}`,
+      `dg:org:${ORG_ID}:organization`,
+      "dg:org:slug:acme",
+    );
   });
 
   it("assigns an org role by email and writes an audit event", async () => {

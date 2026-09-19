@@ -24,8 +24,7 @@
 - Unit: impersonation route (8), impersonation-server (7), middleware,
   dashboard suites, notifications routes all pass; web type-check and lint
   clean.
-- e2e `role-variance-impersonation.spec.ts`: 3/3 on Chromium against the
-  worktree server. Firefox on that webpack server was unreliable in warm-up
-  (NS_BINDING_ABORTED on the post-login goto, unrelated to this change);
-  the End Session landing was strict-asserted and passed in every Firefox run
-  that got that far.
+- e2e `role-variance-impersonation.spec.ts`: 3/3 on Chromium, Firefox and
+  WebKit against the main checkout's Turbopack server after the
+  fast-forward, plus 6 Firefox repeats of the End Session case with the
+  strict `/dashboard` landing: 0 bounces (was about 1 in 7).

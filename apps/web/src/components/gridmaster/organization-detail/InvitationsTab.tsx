@@ -24,7 +24,6 @@ export interface InvitationRow {
   email: string;
   role_to_assign: string;
   invited_by?: string | null;
-  token?: string | null;
   created_at: string;
   expires_at: string;
   accepted_at: string | null;

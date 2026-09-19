@@ -27,7 +27,9 @@ export async function GET(req: NextRequest) {
     const { data, error } = await getServiceClient()
       .from("invitations")
       .select(
-        "id, org_id, email, role_to_assign, invited_by, token, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id",
+        // No token: it is the credential /api/invitations/register accepts,
+        // and the list only shows who was invited (F-90).
+        "id, org_id, email, role_to_assign, invited_by, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id",
       )
       .eq("org_id", parsed.data.orgId)
       .order("created_at", { ascending: false });
