@@ -134,32 +134,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexShrink: 0,
       gap: 8,
     },
-    // Matches the shared Button's `secondary` tone at size sm: solid tint, no
-    // border, pill. The JSX still hand-rolls the Pressable; it converts to
-    // <Button> when this screen's animation rework opens the file.
-    meTodayButton: {
-      height: HEADER_CONTROL_HEIGHT,
-      borderRadius: mobileRadii.pill,
-      // Same outlined chrome as `iconControlButton`, which it sits beside — the
-      // two are one row of header controls and have to read as one set.
-      borderWidth: 1,
-      borderColor: mobileColors.border,
-      backgroundColor: mobileColors.surface,
-      justifyContent: "center",
-      paddingHorizontal: mobileSpace.md,
-      ...mobileElevation("raised", isDark),
-    },
-    meTodayButtonPressed: {
-      transform: [{ scale: mobileMotion.press.scale }],
-    },
-    meTodayButtonText: {
-      ...mobileText.bodyStrong,
-      // Stays `controlSecondaryFg` even though the fill is now white, because
-      // it is the one blue that clears AA in *both* themes here: 6.70:1 on
-      // white and 8.52:1 on the dark bar. Plain `brand` passes in light (5.17:1)
-      // and lands at 4.499:1 in dark, which is under the line.
-      color: mobileColors.controlSecondaryFg,
-    },
     // The shadow lives on this view and the clip on the one inside: iOS clips
     // a view's own shadow when it also clips its children, which is why the
     // hero's blue glow never rendered there.

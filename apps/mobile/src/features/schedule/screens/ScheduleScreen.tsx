@@ -862,6 +862,10 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const selectedDateLabel = formatScheduleDayLabel(selectedDate, now, timeZone);
   const teamHeaderDateLabel = formatTeamScheduleHeaderDateLabel(selectedDate, now, timeZone);
   const isSelectedToday = selectedDate === todayDate;
+  // The Today control's arrow points the way today lies: back from a future
+  // week, forward from a past one. Ionicons only draws the clockwise arrow,
+  // which reads as forward, so the backward one is that glyph mirrored.
+  const todayIconStyle = selectedDate > todayDate ? styles.iconControlMirrored : undefined;
   const weekRangeLabel = formatScheduleRange(range, timeZone);
   const currentTimeValue = getCurrentTimeValue(now, timeZone);
   const visibleCalendarMonth = calendarMonthAnchor ?? getScheduleMonthStartDate(selectedDate);
@@ -1529,15 +1533,13 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         </View>
         {/* Icon-only, like the chevrons beside it: with the word "Today" this
             row held five controls and the date title was cut to "Sat, Sep…"
-            on any week but the current one. The glyph is a circular arrow
-            turned to point back, "return to today"; Ionicons only draws the
-            clockwise one, so it is mirrored. A calendar glyph read as a date
-            picker. */}
+            on any week but the current one. A circular arrow, "return to
+            today"; a calendar glyph read as a date picker. */}
         {!isSelectedToday ? (
           <IconControlButton
             accessibilityLabel="Today"
             iconName="refresh-outline"
-            iconStyle={styles.iconControlMirrored}
+            iconStyle={todayIconStyle}
             onPress={handleGoToToday}
           />
         ) : null}
@@ -1630,20 +1632,14 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           </Text>
         </View>
         <View style={styles.teamHeaderActions}>
+          {/* The same control as Home's, so the two headers read as one set. */}
           {!isSelectedToday ? (
-            <Pressable
-              accessibilityRole="button"
-              android_ripple={{ color: "rgba(37, 99, 235, 0.12)" }}
+            <IconControlButton
+              accessibilityLabel="Today"
+              iconName="refresh-outline"
+              iconStyle={todayIconStyle}
               onPress={handleGoToToday}
-              style={({ pressed }) => [
-                styles.meTodayButton,
-                pressed && styles.meTodayButtonPressed,
-              ]}
-            >
-              <Text fit="fixed" style={styles.meTodayButtonText}>
-                Today
-              </Text>
-            </Pressable>
+            />
           ) : null}
           <AlertsChromeButton unreadCount={unreadNotificationCount} />
         </View>
