@@ -98,7 +98,10 @@ vi.mock("react-native", async () => {
     React.createElement("span", pickDomProps(props), children as React.ReactNode);
 
   const ScrollView = React.forwardRef<{ scrollTo: () => void }, Record<string, any>>(
-    ({ children, contentContainerStyle, contentInset, contentOffset, ...props }, ref) => {
+    (
+      { children, contentContainerStyle, contentInset, contentOffset, refreshControl, ...props },
+      ref,
+    ) => {
       React.useImperativeHandle(
         ref,
         () => ({
@@ -107,6 +110,8 @@ vi.mock("react-native", async () => {
         [],
       );
 
+      // iOS mounts the refresh control as the scroll view's first child,
+      // ahead of the content container; the tests below rely on that shape.
       return React.createElement(
         "div",
         {
@@ -125,6 +130,7 @@ vi.mock("react-native", async () => {
           "data-keyboard-dismiss-mode": props.keyboardDismissMode,
           "data-testid": "screen-scroll-view",
         },
+        refreshControl as React.ReactNode,
         children as React.ReactNode,
       );
     },
@@ -149,7 +155,12 @@ vi.mock("react-native", async () => {
       OS: "ios",
     },
     Pressable,
-    RefreshControl: () => null,
+    RefreshControl: ({ enabled, refreshing }: Record<string, any>) =>
+      React.createElement("div", {
+        "data-testid": "refresh-control",
+        "data-enabled": String(enabled ?? true),
+        "data-refreshing": String(refreshing),
+      }),
     ScrollView,
     StyleSheet: {
       absoluteFillObject: {
@@ -326,6 +337,28 @@ describe("Screen", () => {
     fireEvent.scroll(screen.getByTestId("screen-scroll-view"));
 
     expect(handleScroll).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the page mounted when scrolling is locked for a skeleton", () => {
+    const { rerender } = render(
+      <Screen onRefresh={vi.fn()} scrollEnabled>
+        <div>Body</div>
+      </Screen>,
+    );
+    const body = screen.getByText("Body");
+    expect(screen.getByTestId("refresh-control")).toHaveAttribute("data-enabled", "true");
+
+    rerender(
+      <Screen onRefresh={vi.fn()} scrollEnabled={false}>
+        <div>Body</div>
+      </Screen>,
+    );
+
+    // The refresh control is the scroll view's first child on iOS. Dropping it
+    // for the skeleton moved the content to that slot and React remounted
+    // everything in it, a presented sheet included. It stays, disarmed.
+    expect(screen.getByTestId("refresh-control")).toHaveAttribute("data-enabled", "false");
+    expect(screen.getByText("Body")).toBe(body);
   });
 
   it("keeps a stable root shell when a custom overlay is requested", () => {

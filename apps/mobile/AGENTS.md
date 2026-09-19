@@ -535,7 +535,13 @@ sweeps in phase. It is off entirely under reduce motion.
   left to collapse against, so it sits permanently expanded and pushes the page
   down, and pull-to-refresh needs a scroll gesture to hang off, so it disappears
   from exactly the screens most likely to want a retry. (`AdminHomeScreen`'s
-  empty state told the user to "pull to refresh" while doing this.)
+  empty state told the user to "pull to refresh" while doing this.) The lock
+  must never change what is mounted: `Screen` keeps its `RefreshControl` in
+  place and disarms it, because on iOS that control is the scroll view's first
+  child and dropping it remounted the whole page, tearing down any sheet
+  presented from it. A screen whose query re-keys while a sheet is up (Shift
+  Detail widening the team range for Swap) keeps the previous data with
+  `keepPreviousDataForMobileIdentity` rather than falling back to `loading`.
 - **A page-owning empty or error state sits above centre, not dead centre.**
   `fill-screen-anchor` owns the ratio for both `EmptyStateCard` and
   `StatusBanner`, as two flex spacers rather than a fixed offset so it lands at

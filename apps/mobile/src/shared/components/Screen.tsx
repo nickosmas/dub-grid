@@ -154,14 +154,16 @@ export function Screen({
    * error and empty states deliberately do *not* use this: `contentContainerStyle`'s
    * `flexGrow: 1` already gives a `fillScreen` child real space to claim.
    *
-   * The `ScrollView` stays mounted either way. It used to be swapped for a
-   * plain `View`, and on iOS that cost every screen whose data arrived after
-   * it appeared its large title: UIKit binds the title's collapse to the
-   * scroll view present when the screen appears, and one mounted later is
-   * never tracked, so the title sat expanded for the life of the screen
-   * (Alerts, every time). Now only scrolling, bouncing and pull-to-refresh
-   * switch off; the sticky header floats exactly as it does once loaded, so
-   * nothing shifts when the content resolves.
+   * The `ScrollView` and everything inside it stay mounted either way. It
+   * used to be swapped for a plain `View`, and on iOS that cost every screen
+   * whose data arrived after it appeared its large title: UIKit binds the
+   * title's collapse to the scroll view present when the screen appears, and
+   * one mounted later is never tracked, so the title sat expanded for the
+   * life of the screen (Alerts, every time). The pull-to-refresh control used
+   * to come and go with this flag, which remounted the page's children each
+   * time loading toggled (see `refreshControl` below). Now only scrolling,
+   * bouncing and the pull switch off; the sticky header floats exactly as it
+   * does once loaded, so nothing shifts when the content resolves.
    */
   scrollEnabled?: boolean;
 }>) {
@@ -305,9 +307,19 @@ export function Screen({
       keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
       keyboardShouldPersistTaps="handled"
       onScroll={onScroll}
+      // Mounted for the life of the screen once it can refresh, never only
+      // while `scrollEnabled`. On iOS the control is the scroll view's first
+      // child, so adding or removing it moves the content container to a
+      // different child slot and React remounts the whole page under it: a
+      // sheet presented from that page was torn down and presented again
+      // (UIKit refused the second present when the first was still leaving,
+      // which read as a dead button). The lock on the scroll view already
+      // stops the pull on iOS; Android's swipe layout owns the gesture and
+      // needs `enabled` to stand down.
       refreshControl={
-        onRefresh && scrollEnabled ? (
+        onRefresh ? (
           <RefreshControl
+            enabled={scrollEnabled}
             refreshing={refreshing}
             onRefresh={onRefresh}
             progressViewOffset={stickyHeader ? stickyHeaderHeight : 0}

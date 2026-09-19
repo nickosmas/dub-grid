@@ -723,10 +723,17 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       alignItems: "stretch",
       gap: mobileSpace.sm,
     },
-    swapDateChip: {
+    swapDateColumn: {
       flex: 1,
       minWidth: 0,
-      minHeight: 68,
+      alignItems: "stretch",
+      gap: mobileSpace.xs,
+    },
+    swapDateColumnDisabled: {
+      opacity: 0.5,
+    },
+    swapDateChip: {
+      minHeight: 56,
       borderRadius: mobileRadii.control,
       borderWidth: 1,
       borderColor: mobileColors.borderSubtle,
@@ -741,9 +748,6 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       borderColor: mobileColors.brandBorder,
       backgroundColor: mobileColors.brandSoft,
     },
-    swapDateChipDisabled: {
-      opacity: 0.5,
-    },
     swapDateChipWeekday: {
       ...mobileText.micro,
       color: mobileColors.textSubtle,
@@ -757,26 +761,18 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     swapDateChipTextActive: {
       color: mobileColors.brand,
     },
-    swapDateChipCount: {
-      minWidth: 0,
-      minHeight: 18,
-      borderRadius: mobileRadius.md,
+    swapDateCount: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
       gap: mobileSpace.xs,
-      paddingHorizontal: mobileSpace.xs,
-      backgroundColor: mobileColors.surfaceSecondary,
     },
-    swapDateChipCountActive: {
-      backgroundColor: mobileColors.surface,
-    },
-    swapDateChipCountText: {
+    swapDateCountText: {
       ...mobileText.micro,
       ...mobileTabularText,
       color: mobileColors.textMuted,
     },
-    swapDateChipCountTextActive: {
+    swapDateCountTextActive: {
       color: mobileColors.brand,
     },
     swapOptions: {

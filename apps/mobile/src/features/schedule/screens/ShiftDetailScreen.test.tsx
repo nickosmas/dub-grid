@@ -1497,6 +1497,11 @@ describe("ShiftDetailScreen", () => {
     expect(
       screen.getByLabelText("Show eligible teammates for Friday, April 17, 2026"),
     ).toHaveAttribute("aria-selected", "true");
+    // The count reads as the tile's value, so a screen reader hears it with
+    // the date rather than as a stray figure.
+    expect(
+      screen.getByLabelText("Show eligible teammates for Friday, April 17, 2026"),
+    ).toHaveAttribute("aria-valuetext", "1 eligible teammate");
 
     expect(screen.getByText("Chris Hall")).toBeInTheDocument();
     expect(screen.getByText("Evening Shift")).toBeInTheDocument();
@@ -2815,20 +2820,43 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByLabelText("Close")).toBeInTheDocument();
   });
 
-  it("closes the request sheet on one tap after single-tap choices", () => {
+  it("closes the request sheet on one tap before a request is ready to send", () => {
     useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn(), reset: vi.fn() });
 
     render(<ShiftDetailScreen />);
 
-    // Drop, then Call off, then an absence type: three choices, each one tap
-    // to redo, so none of them is worth a discard question.
+    // Drop, then Call off: each one tap to redo and nothing yet to send, so
+    // neither is worth a discard question.
     fireEvent.click(screen.getByText("Drop shift"));
     fireEvent.click(screen.getByText("Call off"));
-    fireEvent.click(screen.getByText("Sick"));
     fireEvent.click(screen.getByLabelText("Close"));
 
     expect(screen.queryByText("Discard this request?")).not.toBeInTheDocument();
     expect(screen.queryByText("Call off")).not.toBeInTheDocument();
+  });
+
+  it("confirms before discarding a call-off that is ready to send", () => {
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn(), reset: vi.fn() });
+
+    render(<ShiftDetailScreen />);
+
+    fireEvent.click(screen.getByText("Drop shift"));
+    fireEvent.click(screen.getByText("Call off"));
+    fireEvent.click(screen.getByText("Sick"));
+    // The absence reason put Submit in the footer: the same moment the swap
+    // sheet starts asking, so the drop sheet asks too.
+    expect(screen.getByText("Submit")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText("Close"));
+
+    expect(screen.getByText("Discard this request?")).toBeInTheDocument();
+    expect(screen.getByText("Sick")).toBeInTheDocument();
+
+    confirmDialog("Keep Editing");
+
+    expect(screen.queryByText("Discard this request?")).not.toBeInTheDocument();
+    expect(screen.getByText("Sick")).toBeInTheDocument();
+    expect(screen.getByText("Submit")).toBeInTheDocument();
   });
 
   it("forgets single-tap choices once the sheet has closed", () => {

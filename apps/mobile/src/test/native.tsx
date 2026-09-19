@@ -112,6 +112,31 @@ function pickDomProps(input: Record<string, any>) {
       continue;
     }
 
+    if (key === "accessibilityValue") {
+      if (value == null) {
+        continue;
+      }
+      const accessibilityValue = value as {
+        min?: number;
+        max?: number;
+        now?: number;
+        text?: string;
+      };
+      if (accessibilityValue.min !== undefined) {
+        output["aria-valuemin"] = accessibilityValue.min;
+      }
+      if (accessibilityValue.max !== undefined) {
+        output["aria-valuemax"] = accessibilityValue.max;
+      }
+      if (accessibilityValue.now !== undefined) {
+        output["aria-valuenow"] = accessibilityValue.now;
+      }
+      if (accessibilityValue.text !== undefined) {
+        output["aria-valuetext"] = accessibilityValue.text;
+      }
+      continue;
+    }
+
     if (key === "testID") {
       output["data-testid"] = value;
       continue;

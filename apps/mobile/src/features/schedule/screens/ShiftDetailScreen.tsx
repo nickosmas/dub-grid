@@ -44,7 +44,10 @@ import {
   pushClientFriendlyErrorToast,
 } from "../../../shared/lib/errors";
 import { getQueryErrorMessage } from "../../../shared/lib/query-state";
-import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
+import {
+  keepPreviousDataForMobileIdentity,
+  mobileQueryKeys,
+} from "../../../shared/lib/mobile-query-keys";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
 import {
@@ -312,10 +315,17 @@ export default function ShiftDetailScreen() {
     Boolean(teamScheduleRange.startDate) &&
     Boolean(teamScheduleRange.endDate) &&
     (canViewTeamSchedule || needsTeamScheduleForShift);
+  // Opening Swap widens the range, which re-keys this query. Without the
+  // previous data the page dropped to `loading` behind the sheet it had just
+  // presented: its content blanked, scrolling locked, and the whole tree
+  // remounted once the wider range landed. The narrow range is a prefix of
+  // the wide one, so the shift and its shiftmates read the same from either.
   const teamScheduleQuery = useQuery({
     queryKey: mobileQueryKeys.schedule(accessToken, "team", teamScheduleRange),
     queryFn: ({ signal }) => getOrgSchedule(accessToken!, teamScheduleRange, signal),
     enabled: canLoadTeamSchedule,
+    placeholderData: (previousData, previousQuery) =>
+      keepPreviousDataForMobileIdentity(accessToken, previousData, previousQuery),
   });
   useEffect(() => {
     if (teamScheduleQuery.error) {
@@ -820,21 +830,24 @@ export default function ShiftDetailScreen() {
     );
   }
 
-  /**
-   * Work the user cannot redo in one tap, which is the only thing worth a
-   * discard question. A swap target is found by browsing weeks and teammates;
-   * every other choice in the sheet (drop or pick up, an absence type, a
-   * segment, a targeted teammate) is a single tap, and asking "Discard this
-   * request?" after one tap read as the close button being broken.
-   */
-  const hasUnsavedRequestInput = requestMode != null && selectedTargetShift != null;
+  // A request that is one tap from being sent is the thing worth a discard
+  // question, and it is the same moment the footer offers Submit: a swap
+  // target, an absence reason, or the teammate a pickup names. The steps
+  // before it (drop or pick up, which segment) are one tap to redo, and asking
+  // "Discard this request?" after those read as the close button being broken.
+  const hasSubmittableRequest =
+    (requestMode === "swap" && !!selectedTargetEntry && !!shiftEntry) ||
+    (requestMode === "coverage" &&
+      !!shiftEntry &&
+      ((coverageRequestType === "pickup" && !!selectedTargetedPickupEntry) ||
+        (coverageRequestType === "calloff" && !!selectedCalloffAbsenceType)));
 
   // Leaving the sheet open is what makes this a guard: a dragged sheet settles
   // back into place while the confirmation sits on top of it. `onClose` is
   // what closes the sheet, kept apart from `onDiscard` so the guard can
   // sequence the confirmation's dismissal before the sheet's.
   const requestGuard = useUnsavedChangesGuard({
-    isDirty: hasUnsavedRequestInput,
+    isDirty: hasSubmittableRequest,
     disabled: createRequestMutation.isPending,
     title: "Discard this request?",
     body: "Your selections won't be saved.",
@@ -968,13 +981,7 @@ export default function ShiftDetailScreen() {
   // The sheets draw a footer shell (hairline, padding) whenever a footer is
   // passed, so an always-truthy fragment left an empty band under the body
   // until a choice was made. Only hand the footer over when it has content.
-  const hasRequestSheetFooter =
-    !!createRequestError ||
-    (requestMode === "swap" && !!selectedTargetEntry && !!shiftEntry) ||
-    (requestMode === "coverage" &&
-      !!shiftEntry &&
-      ((coverageRequestType === "pickup" && !!selectedTargetedPickupEntry) ||
-        (coverageRequestType === "calloff" && !!selectedCalloffAbsenceType)));
+  const hasRequestSheetFooter = !!createRequestError || hasSubmittableRequest;
   // Both confirmations a request sheet can raise: the descriptor one from
   // its Submit (call-off), the guard one from Close with a choice made. As
   // an overlay inside the sheet's own Modal, because UIKit refuses to
@@ -2370,37 +2377,36 @@ function SwapDateChip({
   const dateParts = getCompactScheduleDateParts(date);
   const countColor = active ? mobileColors.brand : mobileColors.textMuted;
 
+  // The count sits under the tile rather than inside it: seven tiles share
+  // the row, and a pill squeezed into one of them cut "12" to "1..". Under
+  // the tile the figure has the column's full width.
   return (
     <Pressable
       accessibilityLabel={`Show eligible teammates for ${formatShiftDate(date)}`}
       accessibilityRole="button"
       accessibilityState={{ disabled, selected: active }}
+      accessibilityValue={{ text: `${count} eligible teammate${count === 1 ? "" : "s"}` }}
       android_ripple={disabled ? undefined : { color: mobileColors.rippleNeutral }}
       disabled={disabled}
       onPress={onPress}
-      style={[
-        styles.swapDateChip,
-        active && styles.swapDateChipActive,
-        disabled && styles.swapDateChipDisabled,
-      ]}
+      style={[styles.swapDateColumn, disabled && styles.swapDateColumnDisabled]}
     >
-      <Text
-        fit="fixed"
-        style={[styles.swapDateChipWeekday, active && styles.swapDateChipTextActive]}
-      >
-        {dateParts.weekdayLabel}
-      </Text>
-      <Text fit="fixed" style={[styles.swapDateChipDay, active && styles.swapDateChipTextActive]}>
-        {dateParts.dayLabel}
-      </Text>
-      <View
-        accessibilityLabel={`${count} eligible teammate${count === 1 ? "" : "s"}`}
-        style={[styles.swapDateChipCount, active && styles.swapDateChipCountActive]}
-      >
+      <View style={[styles.swapDateChip, active && styles.swapDateChipActive]}>
+        <Text
+          fit="fixed"
+          style={[styles.swapDateChipWeekday, active && styles.swapDateChipTextActive]}
+        >
+          {dateParts.weekdayLabel}
+        </Text>
+        <Text fit="fixed" style={[styles.swapDateChipDay, active && styles.swapDateChipTextActive]}>
+          {dateParts.dayLabel}
+        </Text>
+      </View>
+      <View style={styles.swapDateCount}>
         <Ionicons color={countColor} name="person-outline" size={11} />
         <Text
           fit="fixed"
-          style={[styles.swapDateChipCountText, active && styles.swapDateChipCountTextActive]}
+          style={[styles.swapDateCountText, active && styles.swapDateCountTextActive]}
         >
           {count}
         </Text>
