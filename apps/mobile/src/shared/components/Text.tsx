@@ -1,24 +1,26 @@
 import { forwardRef, type ElementRef } from "react";
 import { Text as NativeText, type TextProps as NativeTextProps } from "react-native";
-import { MAX_FONT_SCALE, MAX_FONT_SCALE_FIXED, MAX_TEXT_SIZE } from "../theme/tokens";
+import { MAX_FONT_SCALE, MAX_FONT_SCALE_COMPACT, MAX_TEXT_SIZE } from "../theme/tokens";
 
 /**
- * Text that lives inside a shaped control: a pill's label, a button's label,
- * a badge's count, an avatar's initials, a header title beside its buttons.
- * The shape is what the reader recognises, so the text stays on one line and
- * scales to `MAX_FONT_SCALE_FIXED` at most, whatever the OS setting.
+ * Text that is part of a control's shape rather than something to read at
+ * length. Both tiers keep it on one line and truncate when the row cannot
+ * take it, so the pill, button, tile or bar around it keeps its shape.
  *
- * - `"compact"` grows to that cap and truncates with an ellipsis when its
- *   row cannot take it. Pills, badges, chips, buttons, segments, tabs.
- * - `"shrink"` gives its scaling back instead of truncating: it shrinks until
- *   it fits. Only for text that fits at the default size and cannot be long,
- *   such as a header date or two initials. React Native's new architecture
- *   parses `minimumFontScale` but never applies it, so the shrink has no
- *   floor above 4pt, and it fits against the container's height as well as
- *   its width, so a fixed-height box shrinks a scaled label back below its
- *   base size. A button label is the worked example of what not to shrink.
+ * - `"fixed"` renders at its designed size whatever the OS text setting:
+ *   a header title beside its buttons, the tab bar, avatar initials, date
+ *   tiles, count dots. Chrome holds still while the page grows, the way a
+ *   navigation bar does.
+ * - `"compact"` grows with the setting to `MAX_FONT_SCALE_COMPACT` and no
+ *   further: button, pill, chip, badge, segment and tab labels, which the
+ *   reader acts on and so should answer the setting a little.
+ *
+ * Shrinking to fit was tried instead and rejected: React Native's new
+ * architecture parses `minimumFontScale` but never applies it, and fits
+ * against the container's height as well as its width, so a button label at
+ * a raised text size shrank to a fraction of its base size.
  */
-export type TextFit = "compact" | "shrink";
+export type TextFit = "fixed" | "compact";
 
 export type TextProps = NativeTextProps & { fit?: TextFit };
 
@@ -36,15 +38,15 @@ export type TextProps = NativeTextProps & { fit?: TextFit };
  * On top of the multiplier, `MAX_TEXT_SIZE` bounds the rendered size in
  * points, read from the style's `fontSize`, so a headline never outgrows the
  * row it sits in. A call site that needs a tighter multiplier passes its own,
- * or marks the text `fit`, which caps it at `MAX_FONT_SCALE_FIXED`; the size
- * ceiling still applies to both.
+ * or marks the text `fit="compact"`, which caps it at `MAX_FONT_SCALE_COMPACT`;
+ * the size ceiling still applies to both.
  */
 export function resolveTextMultiplier(
   fontSize: number | undefined,
   requested: number | null | undefined,
   fit?: TextFit,
 ): number {
-  const ceiling = fit ? MAX_FONT_SCALE_FIXED : MAX_FONT_SCALE;
+  const ceiling = fit === "compact" ? MAX_FONT_SCALE_COMPACT : MAX_FONT_SCALE;
   const multiplier = Math.min(requested ?? ceiling, ceiling);
   if (!fontSize || fontSize <= 0) return multiplier;
   // React Native treats a value below 1 as no scaling at all, so the size
@@ -74,12 +76,11 @@ export const Text = forwardRef<ElementRef<typeof NativeText>, TextProps>(functio
   { fit, maxFontSizeMultiplier, style, ...props },
   ref,
 ) {
-  const fontSize = readFontSize(style);
   const fitProps: NativeTextProps = fit
     ? {
         ellipsizeMode: props.ellipsizeMode ?? "tail",
         numberOfLines: 1,
-        ...(fit === "shrink" ? { adjustsFontSizeToFit: true } : null),
+        ...(fit === "fixed" ? { allowFontScaling: false } : null),
       }
     : {};
   return (
@@ -87,7 +88,7 @@ export const Text = forwardRef<ElementRef<typeof NativeText>, TextProps>(functio
       ref={ref}
       {...props}
       {...fitProps}
-      maxFontSizeMultiplier={resolveTextMultiplier(fontSize, maxFontSizeMultiplier, fit)}
+      maxFontSizeMultiplier={resolveTextMultiplier(readFontSize(style), maxFontSizeMultiplier, fit)}
       style={fit ? [FIT_STYLE, style] : style}
     />
   );

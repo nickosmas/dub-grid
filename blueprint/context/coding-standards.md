@@ -97,12 +97,14 @@
   to fit: React Native's new architecture fits against the button's
   default-size height with no floor, which is what left labels tiny beside
   large text.
-- On mobile, text inside a shaped control is `fit` text: pill, badge, chip and
-  button labels, avatar initials, segment and tab labels, and a header title
-  beside its buttons render through `Text fit="compact"` (one line, truncate)
-  or `fit="shrink"` (one line, shrink to fit; bounded text only, such as a
-  date or two initials). Both cap OS text scaling at `MAX_FONT_SCALE_FIXED`,
-  so a raised text size never breaks the shape.
+- On mobile, text inside a control is `fit` text, always one line, truncating
+  rather than wrapping. Chrome is `fit="fixed"` and never scales with the OS
+  text setting: header titles and the labels beside them, sheet titles, the
+  tab bar, avatar initials, date tiles, count dots, the wordmark. Labels the
+  reader acts on are `fit="compact"` and grow to `MAX_FONT_SCALE_COMPACT`
+  (1.2x) and no further: button, pill, chip, badge, segment and tab labels.
+  Reading text keeps `MAX_FONT_SCALE`. Padding and control geometry never
+  derive from the font scale.
 
 ## Database and data access
 

@@ -1651,10 +1651,10 @@ function DetailDateTile({ date }: { date: string }) {
 
   return (
     <View accessibilityLabel={dateLabel} style={styles.detailDateTile}>
-      <Text fit="compact" style={styles.detailDateWeekday}>
+      <Text fit="fixed" style={styles.detailDateWeekday}>
         {dateParts.weekdayLabel}
       </Text>
-      <Text fit="compact" style={styles.detailDateDay}>
+      <Text fit="fixed" style={styles.detailDateDay}>
         {dateParts.dayLabel}
       </Text>
     </View>
@@ -1899,9 +1899,10 @@ function DetailPublishedFooter({
         style={styles.detailPublishedFooter}
       >
         <Ionicons color={mobileColors.textSubtle} name="information-circle" size={16} />
+        {/* Two lines: one cut "Published Sep 18, 2026 at 3:3…" at a raised
+            text size, and the time is the part worth reading. */}
         <Text
-          numberOfLines={1}
-          ellipsizeMode="tail"
+          numberOfLines={2}
           maxFontSizeMultiplier={MAX_FONT_SCALE}
           style={styles.detailPublishedText}
         >
@@ -2160,7 +2161,7 @@ function ShiftmateRow({
           },
         ]}
       >
-        <Text fit="shrink" style={[styles.shiftmateAvatarText, { color: avatarTone.textColor }]}>
+        <Text fit="fixed" style={[styles.shiftmateAvatarText, { color: avatarTone.textColor }]}>
           {getInitials(entry.employeeName)}
         </Text>
       </View>
@@ -2384,12 +2385,12 @@ function SwapDateChip({
       ]}
     >
       <Text
-        fit="compact"
+        fit="fixed"
         style={[styles.swapDateChipWeekday, active && styles.swapDateChipTextActive]}
       >
         {dateParts.weekdayLabel}
       </Text>
-      <Text fit="compact" style={[styles.swapDateChipDay, active && styles.swapDateChipTextActive]}>
+      <Text fit="fixed" style={[styles.swapDateChipDay, active && styles.swapDateChipTextActive]}>
         {dateParts.dayLabel}
       </Text>
       <View
@@ -2398,7 +2399,7 @@ function SwapDateChip({
       >
         <Ionicons color={countColor} name="person-outline" size={11} />
         <Text
-          fit="compact"
+          fit="fixed"
           style={[styles.swapDateChipCountText, active && styles.swapDateChipCountTextActive]}
         >
           {count}

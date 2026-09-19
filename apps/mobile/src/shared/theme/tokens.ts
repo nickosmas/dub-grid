@@ -280,8 +280,8 @@ export const mobileBrandTypography = mobileBrandTypographyTokens;
 
 /**
  * Avatar initials use the actual Inter medium face on both native platforms.
- * Render them with `fit="shrink"`: the disc is fixed, so the initials give
- * back their scaling before they would truncate to "M..".
+ * Render them with `fit="fixed"`: the disc is fixed, and scaled initials
+ * truncated to "M.." inside it.
  */
 export function mobileAvatarText(diameter: number): TextStyle {
   const { fontSize } = getAvatarTypography(diameter);
@@ -415,9 +415,9 @@ export function mobileDarkenTone(tone: MobilePillTone, isDark: boolean): MobileP
  * ceilings are high: iOS Larger Text reaches 310% and Android 200%. Uncapped, a
  * 17px row title renders at 53px, which no card layout survives.
  *
- * 1.5 is the ceiling this app holds. It gives someone who has raised their text
- * size most of what they asked for while leaving the fixed-size furniture (date
- * tiles, shift pills, count badges) able to hold its content.
+ * 1.5 is the ceiling for reading text. It gives someone who has raised their
+ * text size most of what they asked for while leaving the page's furniture
+ * able to hold its content.
  *
  * A cap is the second line of defence, not the first. The first is a layout
  * that grows: rows stack rather than sit in two columns, containers use
@@ -427,14 +427,15 @@ export function mobileDarkenTone(tone: MobilePillTone, isDark: boolean): MobileP
  * shrink, so a raised text size squeezed the name into a column narrow enough
  * to break "Visiting Nursing" mid-word.
  *
- * `MAX_FONT_SCALE_FIXED` is the tighter ceiling for text whose container is
- * the thing being read: a pill, badge, chip or button label, an avatar's
- * initials, a segment or tab, and the fixed-height furniture such as the
- * floating tab bar. `Text fit` applies it, along with the one-line rule that
- * keeps those shapes intact.
+ * Text inside a control is `fit` text (see `Text`), in two tiers. Chrome
+ * holds its size whatever the setting: header titles beside their buttons,
+ * the tab bar, avatar initials, date tiles, count dots. Labels the reader
+ * acts on grow a little, to `MAX_FONT_SCALE_COMPACT` and no further: button,
+ * pill, chip, segment and tab labels. 1.2 keeps a pill a pill and a pair of
+ * side-by-side buttons on one line while still answering the setting.
  */
 export const MAX_FONT_SCALE = 1.5;
-export const MAX_FONT_SCALE_FIXED = 1.3;
+export const MAX_FONT_SCALE_COMPACT = 1.2;
 
 /**
  * The second limit, in points rather than as a multiplier: no text renders

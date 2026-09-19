@@ -71,7 +71,9 @@ export function NumericBadge({
       ]}
     >
       <Text
-        fit="compact"
+        // A floating dot sits on a fixed icon ring, so it holds its size; an
+        // inline count grows a little with the label beside it.
+        fit={size === "sm" ? "fixed" : "compact"}
         style={[size === "sm" ? styles.textSm : styles.textMd, { color: toneStyle.color }]}
       >
         {text}

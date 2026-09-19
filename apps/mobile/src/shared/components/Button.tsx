@@ -232,15 +232,15 @@ export function Button({
         {!iconOnly && content ? (
           <Text
             ellipsizeMode="tail"
-            // A filled label is compact text: one line, capped scaling,
-            // truncation when the slot is too narrow. It used to shrink to
-            // fit first, but the new architecture fits against the button's
-            // default-size height as well as its width and has no floor, so
-            // a raised text size left "Cancel" at three quarters of the base
-            // beside a sentence at one and a half. A link is a sentence, not
-            // a control label: it keeps the full multiplier and two lines,
-            // since a one-line link ate its own question at accessibility
-            // sizes ("Need help with your subdom…").
+            // A filled label is compact text: one line, scaling capped at the
+            // compact ceiling, truncation when the slot is too narrow. It
+            // used to shrink to fit first, but the new architecture fits
+            // against the button's default-size height as well as its width
+            // and has no floor, so a raised text size left "Cancel" at three
+            // quarters of the base beside a sentence at one and a half. A
+            // link is a sentence, not a control label: it keeps the full
+            // multiplier and two lines, since a one-line link ate its own
+            // question at accessibility sizes ("Need help with your subdom…").
             fit={isLink ? undefined : "compact"}
             maxFontSizeMultiplier={MAX_FONT_SCALE}
             numberOfLines={2}

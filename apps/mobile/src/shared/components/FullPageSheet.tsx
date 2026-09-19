@@ -4,7 +4,7 @@ import { Modal, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { registerModalPresentation } from "../lib/modal-presentation";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
-import { MAX_FONT_SCALE, mobileSpace, type MobileColors } from "../theme/tokens";
+import { mobileSpace, type MobileColors } from "../theme/tokens";
 import { AppText } from "./AppText";
 import { InsideSheetContext } from "./BottomSheetModal";
 import { createIconControlStyle } from "./icon-control-style";
@@ -100,7 +100,7 @@ export function FullPageSheet({
         <View style={styles.root}>
           <View style={styles.header}>
             <View style={styles.headerCopy}>
-              <AppText maxFontSizeMultiplier={MAX_FONT_SCALE} variant="screenTitle">
+              <AppText fit="fixed" variant="screenTitle">
                 {title}
               </AppText>
               {subtitle ? (

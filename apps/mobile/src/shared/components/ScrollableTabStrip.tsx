@@ -14,7 +14,7 @@ import { useMobileColors } from "../providers/ThemeModeProvider";
 import { getScreenGutter } from "./screen-layout";
 import { SkeletonBlock } from "./skeleton";
 import {
-  MAX_FONT_SCALE_FIXED,
+  MAX_FONT_SCALE_COMPACT,
   mobileControl,
   mobilePillOverflow,
   mobileRadii,
@@ -96,7 +96,7 @@ export function ScrollableTabStrip({
   // raised text size widens "Skilled Nursing" instead of cutting it to
   // "Skilled Nu…" beside a wider badge.
   const tabMaxWidth =
-    TAB_MAX_WIDTH * Math.min(useWindowDimensions().fontScale, MAX_FONT_SCALE_FIXED);
+    TAB_MAX_WIDTH * Math.min(useWindowDimensions().fontScale, MAX_FONT_SCALE_COMPACT);
 
   const scrollRef = useRef<ScrollView>(null);
   const [viewportWidth, setViewportWidth] = useState(0);

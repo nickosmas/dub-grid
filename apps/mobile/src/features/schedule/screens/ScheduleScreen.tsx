@@ -1498,10 +1498,10 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       <View style={styles.meWeekNavigatorCopy}>
         {/* Both shrink rather than wrap or truncate: a header is one row,
             and a date is bounded text that fits at the default size. */}
-        <Text fit="shrink" style={styles.meWeekNavigatorTitle}>
+        <Text fit="fixed" style={styles.meWeekNavigatorTitle}>
           {selectedDateLabel}
         </Text>
-        <Text fit="shrink" style={styles.meWeekNavigatorRangeLabel}>
+        <Text fit="fixed" style={styles.meWeekNavigatorRangeLabel}>
           {weekRangeLabel}
         </Text>
       </View>
@@ -1525,7 +1525,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
             onPress={handleGoToToday}
             style={({ pressed }) => [styles.meTodayButton, pressed && styles.meTodayButtonPressed]}
           >
-            <Text fit="compact" style={styles.meTodayButtonText}>
+            <Text fit="fixed" style={styles.meTodayButtonText}>
               Today
             </Text>
           </Pressable>
@@ -1614,7 +1614,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     <View style={styles.stickyControlsSection}>
       <View style={styles.teamHeaderUtilityRow}>
         <View style={styles.teamHeaderTitleArea}>
-          <Text fit="shrink" style={styles.teamHeaderTitle}>
+          <Text fit="fixed" style={styles.teamHeaderTitle}>
             {teamHeaderDateLabel}
           </Text>
         </View>
@@ -1629,7 +1629,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
                 pressed && styles.meTodayButtonPressed,
               ]}
             >
-              <Text fit="compact" style={styles.meTodayButtonText}>
+              <Text fit="fixed" style={styles.meTodayButtonText}>
                 Today
               </Text>
             </Pressable>
@@ -1642,7 +1642,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         {/* Weekday labels: always visible, fixed in place — never move. */}
         <View style={styles.monthCalendarWeekdays}>
           {MONTH_WEEKDAY_LABELS.map((label) => (
-            <Text key={label} fit="compact" style={styles.monthCalendarWeekdayLabel}>
+            <Text key={label} fit="fixed" style={styles.monthCalendarWeekdayLabel}>
               {label}
             </Text>
           ))}
@@ -1970,7 +1970,7 @@ function MonthDayCell({
         ]}
       >
         <Text
-          fit="compact"
+          fit="fixed"
           style={[
             styles.dateHighlightText,
             day.isSelected && !day.isToday && styles.dateHighlightTextSelected,
@@ -2392,7 +2392,7 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
                 ]}
               >
                 <Text
-                  fit="shrink"
+                  fit="fixed"
                   style={[styles.meHeroCollaboratorAvatarText, { color: avatarTone.textColor }]}
                 >
                   {getInitials(entry.employeeName)}
@@ -2410,7 +2410,7 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
             ]}
           >
             <View style={styles.meHeroCollaboratorOverflow}>
-              <Text fit="compact" style={styles.meHeroCollaboratorOverflowText}>
+              <Text fit="fixed" style={styles.meHeroCollaboratorOverflowText}>
                 +{overflowCount}
               </Text>
             </View>
@@ -2544,10 +2544,10 @@ function MeHeroCard({
           </View>
           {heroDateParts ? (
             <View accessibilityLabel={heroDateLabel ?? undefined} style={styles.meHeroDateTile}>
-              <Text fit="compact" style={styles.meHeroDateWeekday}>
+              <Text fit="fixed" style={styles.meHeroDateWeekday}>
                 {heroDateParts.weekdayLabel}
               </Text>
-              <Text fit="compact" style={styles.meHeroDateDay}>
+              <Text fit="fixed" style={styles.meHeroDateDay}>
                 {heroDateParts.dayLabel}
               </Text>
             </View>
@@ -2749,10 +2749,10 @@ function UpcomingShiftsSection({
             >
               <View style={styles.upcomingDateColumn}>
                 <View style={styles.upcomingDateTile}>
-                  <Text fit="compact" style={styles.upcomingDateWeekday}>
+                  <Text fit="fixed" style={styles.upcomingDateWeekday}>
                     {dateParts.weekdayLabel}
                   </Text>
-                  <Text fit="compact" style={styles.upcomingDateDay}>
+                  <Text fit="fixed" style={styles.upcomingDateDay}>
                     {dateParts.dayLabel}
                   </Text>
                   {isToday ? (
@@ -3414,7 +3414,7 @@ function ShiftCoverRequestsSection({
                     ]}
                   >
                     <Text
-                      fit="shrink"
+                      fit="fixed"
                       style={[styles.requestAvatarText, { color: avatarTone.textColor }]}
                     >
                       {getInitials(request.requesterName)}
@@ -3524,7 +3524,7 @@ function TeamShiftMemberRow({
           },
         ]}
       >
-        <Text fit="shrink" style={[styles.teamMemberAvatarText, { color: avatarTone.textColor }]}>
+        <Text fit="fixed" style={[styles.teamMemberAvatarText, { color: avatarTone.textColor }]}>
           {getInitials(entry.employeeName)}
         </Text>
       </View>

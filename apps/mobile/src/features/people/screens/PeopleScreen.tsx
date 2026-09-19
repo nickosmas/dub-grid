@@ -1188,7 +1188,7 @@ function PersonRow({
           },
         ]}
       >
-        <Text fit="shrink" style={[styles.personAvatarText, { color: avatarTone.textColor }]}>
+        <Text fit="fixed" style={[styles.personAvatarText, { color: avatarTone.textColor }]}>
           {initials}
         </Text>
       </View>

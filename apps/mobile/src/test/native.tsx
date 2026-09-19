@@ -132,6 +132,11 @@ function pickDomProps(input: Record<string, any>) {
       continue;
     }
 
+    if (key === "allowFontScaling") {
+      output["data-allow-font-scaling"] = String(value);
+      continue;
+    }
+
     if (key === "ellipsizeMode") {
       output["data-ellipsize-mode"] = String(value);
       continue;

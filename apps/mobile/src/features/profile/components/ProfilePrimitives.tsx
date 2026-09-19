@@ -191,7 +191,7 @@ export function ProfileHero({
             {initials ? (
               <View style={[styles.avatar, isCentered && styles.avatarLarge, avatarStyle]}>
                 <Text
-                  fit="shrink"
+                  fit="fixed"
                   style={[styles.avatarText, isCentered && styles.avatarTextLarge, avatarTextStyle]}
                 >
                   {initials}

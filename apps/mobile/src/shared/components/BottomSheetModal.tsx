@@ -515,7 +515,9 @@ export function SheetHeader({
   return (
     <View style={sheetHeaderStyles.root}>
       {icon ? <Ionicons color={mobileColors.brand} name={icon} size={28} /> : null}
-      <AppText variant="screenTitle">{title}</AppText>
+      <AppText fit="fixed" variant="screenTitle">
+        {title}
+      </AppText>
       {subtitle ? (
         <AppText tone="secondary" variant="body">
           {subtitle}

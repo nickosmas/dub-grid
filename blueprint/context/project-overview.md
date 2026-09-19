@@ -157,9 +157,10 @@ Everything below is already shipped except item 27 and item 28.
     segmented-choice text within its visual bounds on web and mobile. On web,
     display values may wrap and grow; interactive controls remain one line and
     truncate safely while retaining the full accessible value. On mobile no
-    pill wraps: every pill, badge, button label and avatar is one-line text
-    with a tighter text-scaling cap, so a raised OS text size never breaks the
-    shape.
+    pill wraps: chrome (headers, tab bar, avatars, date tiles, count dots)
+    holds its size whatever the OS text setting, and button, pill and badge
+    labels grow to a hard 1.2x ceiling, so a raised text size never breaks
+    the shape.
     - **23a. Numeric badge shape consistency** - equivalent number counts use
       one pill-shaped contract across web and mobile, including one- and
       two-digit values, notification/tab/open-shift/staffing counts, with

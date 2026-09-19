@@ -235,7 +235,7 @@ function SwipeActions({
             size={22}
           />
         </Animated.View>
-        <Text fit="compact" style={styles.actionLabel}>
+        <Text fit="fixed" style={styles.actionLabel}>
           {isUnread ? "Read" : "Unread"}
         </Text>
       </Pressable>
@@ -252,7 +252,7 @@ function SwipeActions({
             size={22}
           />
         </Animated.View>
-        <Text fit="compact" style={styles.actionLabel}>
+        <Text fit="fixed" style={styles.actionLabel}>
           {isArchived ? "Restore" : "Archive"}
         </Text>
       </Pressable>

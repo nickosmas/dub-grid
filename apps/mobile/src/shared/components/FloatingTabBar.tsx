@@ -156,7 +156,7 @@ export function FloatingTabBar({ state, descriptors, navigation, insets }: Botto
               />
             </TabIconPill>
             <Text
-              fit="compact"
+              fit="fixed"
               style={[styles.label, focused ? styles.labelActive : styles.labelInactive]}
             >
               {label}
