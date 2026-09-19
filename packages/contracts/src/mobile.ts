@@ -415,6 +415,24 @@ export const mobileProfileSessionRevokeResponseSchema = z.object({
   success: z.literal(true),
 });
 
+export const mobileCalendarSubscriptionStatusSchema = z.object({
+  active: z.boolean(),
+  issuedAt: z.string().nullable(),
+});
+
+export const mobileCalendarSubscriptionIssuedSchema = z.object({
+  active: z.literal(true),
+  issuedAt: z.string().nullable(),
+  feedUrl: z.string().url(),
+});
+
+export type MobileCalendarSubscriptionStatus = z.infer<
+  typeof mobileCalendarSubscriptionStatusSchema
+>;
+export type MobileCalendarSubscriptionIssued = z.infer<
+  typeof mobileCalendarSubscriptionIssuedSchema
+>;
+
 export const MAX_MOBILE_SCHEDULE_RANGE_DAYS = 31;
 const MS_PER_DAY = 86_400_000;
 

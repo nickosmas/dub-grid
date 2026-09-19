@@ -49,6 +49,12 @@ export default function ProfileLayout() {
         options={createDetailStackOptions(mobileColors, "Devices", { largeTitle: true })}
       />
       <Stack.Screen
+        name="calendar"
+        options={createDetailStackOptions(mobileColors, "Calendar subscription", {
+          largeTitle: true,
+        })}
+      />
+      <Stack.Screen
         name="notifications"
         options={createDetailStackOptions(mobileColors, "Notifications", { largeTitle: true })}
       />

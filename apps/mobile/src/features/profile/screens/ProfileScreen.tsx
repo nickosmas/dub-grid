@@ -577,6 +577,11 @@ export default function ProfileScreen() {
                 onPress={() => router.push("/(tabs)/profile/notifications")}
               />
               <ProfileNavRow
+                iconName="calendar-outline"
+                label="Calendar subscription"
+                onPress={() => router.push("/(tabs)/profile/calendar")}
+              />
+              <ProfileNavRow
                 iconName="shield-outline"
                 label="Privacy & data"
                 onPress={() => router.push("/(tabs)/profile/privacy")}

@@ -14,6 +14,8 @@ import {
   mobileProfilePhoneUpdateResponseSchema,
   mobileProfileResponseSchema,
   mobileProfileSessionRevokeResponseSchema,
+  mobileCalendarSubscriptionIssuedSchema,
+  mobileCalendarSubscriptionStatusSchema,
   mobileProfileSessionsResponseSchema,
   mobileNotificationBulkResponseSchema,
   mobileNotificationFacetsSchema,
@@ -596,6 +598,35 @@ export function revokeProfileSession(accessToken: string, refreshTokenHash: stri
       body: JSON.stringify({ refreshTokenHash }),
     },
     (value) => mobileProfileSessionRevokeResponseSchema.parse(value),
+  );
+}
+
+const CALENDAR_SUBSCRIPTION_PATH = "/api/mobile/v1/profile/calendar-subscription";
+
+export function getCalendarSubscription(accessToken: string, signal?: AbortSignal) {
+  return mobileApiRequest(
+    CALENDAR_SUBSCRIPTION_PATH,
+    accessToken,
+    { method: "GET", signal },
+    (value) => mobileCalendarSubscriptionStatusSchema.parse(value),
+  );
+}
+
+export function createCalendarSubscription(accessToken: string) {
+  return mobileApiRequest(CALENDAR_SUBSCRIPTION_PATH, accessToken, { method: "POST" }, (value) =>
+    mobileCalendarSubscriptionIssuedSchema.parse(value),
+  );
+}
+
+export function rotateCalendarSubscription(accessToken: string) {
+  return mobileApiRequest(CALENDAR_SUBSCRIPTION_PATH, accessToken, { method: "PUT" }, (value) =>
+    mobileCalendarSubscriptionIssuedSchema.parse(value),
+  );
+}
+
+export function revokeCalendarSubscription(accessToken: string) {
+  return mobileApiRequest(CALENDAR_SUBSCRIPTION_PATH, accessToken, { method: "DELETE" }, (value) =>
+    mobileCalendarSubscriptionStatusSchema.parse(value),
   );
 }
 

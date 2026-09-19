@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Calendar, Copy } from "lucide-react";
 import { toast } from "sonner";
 
+import { buildCalendarSubscribeLinks } from "@dubgrid/domain";
+
 import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import {
@@ -98,7 +100,8 @@ export function CalendarSubscriptionCard() {
         <div>
           <div className="dg-card-title">Calendar subscription</div>
           <div className="dg-card-subtitle">
-            Subscribe to your shift schedule in your preferred calendar app.
+            Add your shifts to Apple Calendar, Google Calendar, or Outlook in one click, or copy the
+            link for any other app.
           </div>
         </div>
       </div>
@@ -117,8 +120,9 @@ export function CalendarSubscriptionCard() {
         ) : !status?.active ? (
           <div className="flex flex-col items-start gap-3">
             <p className="m-0 text-[14px] text-[var(--dg-color-text-muted)]">
-              Create a private link that Google Calendar, Apple Calendar, or Outlook can poll
-              without requiring a DubGrid login.
+              Create a private link, then add it to Apple Calendar, Google Calendar, or Outlook in
+              one click, or copy it for any other app. Calendar apps poll the link without a DubGrid
+              login.
             </p>
             <Button
               type="button"
@@ -132,26 +136,29 @@ export function CalendarSubscriptionCard() {
         ) : (
           <div className="flex flex-col gap-3">
             {feedUrl ? (
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <div className="flex flex-1 items-center gap-2 rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border)] bg-[var(--dg-color-bg)] px-3 py-2">
-                  <Calendar className="size-4 shrink-0 text-[var(--dg-color-text-muted)]" />
-                  <code className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-[var(--dg-color-text-secondary)]">
-                    {feedUrl}
-                  </code>
+              <div className="flex flex-col gap-2">
+                <CalendarSubscribeLinks feedUrl={feedUrl} />
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <div className="flex flex-1 items-center gap-2 rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border)] bg-[var(--dg-color-bg)] px-3 py-2">
+                    <Calendar className="size-4 shrink-0 text-[var(--dg-color-text-muted)]" />
+                    <code className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-[var(--dg-color-text-secondary)]">
+                      {feedUrl}
+                    </code>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={() =>
+                      navigator.clipboard.writeText(feedUrl).then(
+                        () => toast.success("Calendar URL copied to clipboard"),
+                        () => toast.error("We couldn't copy that link. Copy it manually instead."),
+                      )
+                    }
+                    className="dg-btn dg-btn-secondary"
+                  >
+                    <Copy className="mr-1 size-4" />
+                    Copy link
+                  </Button>
                 </div>
-                <Button
-                  type="button"
-                  onClick={() =>
-                    navigator.clipboard.writeText(feedUrl).then(
-                      () => toast.success("Calendar URL copied to clipboard"),
-                      () => toast.error("We couldn't copy that link. Copy it manually instead."),
-                    )
-                  }
-                  className="dg-btn dg-btn-secondary"
-                >
-                  <Copy className="mr-1 size-4" />
-                  Copy link
-                </Button>
               </div>
             ) : (
               <p className="m-0 text-[14px] text-[var(--dg-color-text-muted)]">
@@ -203,6 +210,36 @@ export function CalendarSubscriptionCard() {
           onCancel={() => setPendingAction(null)}
         />
       )}
+    </div>
+  );
+}
+
+function CalendarSubscribeLinks({ feedUrl }: { feedUrl: string }) {
+  const links = buildCalendarSubscribeLinks(feedUrl);
+  return (
+    <div
+      data-slot="calendar-subscribe-links"
+      className="grid grid-cols-2 items-stretch gap-2 [&>:last-child:nth-child(odd)]:col-span-2"
+    >
+      <a href={links.apple} className="dg-btn dg-btn-secondary w-full">
+        Apple Calendar
+      </a>
+      <a
+        href={links.google}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="dg-btn dg-btn-secondary w-full"
+      >
+        Google Calendar
+      </a>
+      <a
+        href={links.outlook}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="dg-btn dg-btn-secondary w-full"
+      >
+        Outlook
+      </a>
     </div>
   );
 }
