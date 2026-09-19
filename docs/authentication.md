@@ -278,6 +278,10 @@ address. The two stores are kept equal in both directions:
   `employees.email` on every linked, active row. A row in an organization where an
   unlinked staff record already holds that address is left alone with a warning rather
   than failing the confirmation.
+- **Linking** (migration `023`): a staff row linked to an account without an email takes
+  the account's email at link time, and rows that were already in that state were
+  backfilled once. There is no separate "contact" address to explain in the editors; a
+  linked row simply cannot be saved with a blank email.
 
 ---
 

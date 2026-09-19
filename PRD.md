@@ -470,7 +470,7 @@ convenience columns. Dated schedule identity is normalized through
 - **Self-action guards:** `change_user_role` hard-blocks self-role-change at the DB layer (P0001); `@dubgrid/domain` exposes `assertNotSelf` / `isSelfAction` for the app layer
 - **Sandbox isolation:** `workspace_kind='sandbox'` orgs are owned by a single user, entered through a 7-day HttpOnly cookie, reaped after 14 days, and excluded from mobile login
 - **Live authorization:** a tenant claim is only honored while the membership is live (migration 005); direct user-scoped queries are cut off when the tracked session row is removed (016); effective-tenant state is bound to the auth session (017)
-- **Migrations:** an immutable ordered stream. `001`-`004` are the frozen baseline; every later change is a new, checksum-locked forward migration (currently through `022`), applied by ledger and never by resetting production
+- **Migrations:** an immutable ordered stream. `001`-`004` are the frozen baseline; every later change is a new, checksum-locked forward migration (currently through `023`), applied by ledger and never by resetting production
 
 ---
 

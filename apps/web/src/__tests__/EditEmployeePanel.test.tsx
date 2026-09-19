@@ -659,9 +659,6 @@ describe("EditEmployeePanel", () => {
       renderPanel({ onSave, employee: { ...employee, userId: "user-42" } });
 
       await changeEmail(user);
-      expect(
-        screen.getByText("This also changes the email they sign in with."),
-      ).toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Save" }));
 
       await waitFor(() => expect(onSave).toHaveBeenCalledOnce());
@@ -678,7 +675,6 @@ describe("EditEmployeePanel", () => {
       renderPanel({ onSave });
 
       await changeEmail(user);
-      expect(screen.queryByText(/sign in with/)).not.toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Save" }));
 
       expect(onSave).toHaveBeenCalledOnce();

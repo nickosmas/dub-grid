@@ -1573,11 +1573,10 @@ describe("PersonDetailScreen", () => {
       const mutationCalls = renderForSchedule({ userId: "user-2", email: "old@dubgrid.test" });
 
       fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-      expect(screen.getByText("The email is also the one they sign in with.")).toBeInTheDocument();
       fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@dubgrid.test" } });
       fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
-      expect(screen.getByText("Change their sign-in email?")).toBeInTheDocument();
+      expect(screen.getByText("Change the staff email?")).toBeInTheDocument();
       confirmDialog("Save");
 
       await waitFor(() => expect(stepUpRun).toHaveBeenCalledTimes(1));
@@ -1594,9 +1593,6 @@ describe("PersonDetailScreen", () => {
       const mutationCalls = renderForSchedule({ userId: null, email: "old@dubgrid.test" });
 
       fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-      expect(
-        screen.queryByText("The email is also the one they sign in with."),
-      ).not.toBeInTheDocument();
       fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@dubgrid.test" } });
       fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
       confirmDialog("Save");

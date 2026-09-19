@@ -424,17 +424,6 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       [],
     );
 
-    // What saving would do, gathered per section. Field-level validation is not
-    // in here: it stays as the coloured hint under its own input, and a filled
-    // box only ever means a consequence of the save.
-    const detailsNotices = useMemo(() => {
-      const notices: string[] = [];
-      if (employee.userId && form.email !== employee.email && !emailConflict) {
-        notices.push("This also changes the email they sign in with.");
-      }
-      return notices;
-    }, [employee.userId, employee.email, form.email, emailConflict]);
-
     // Only someone with management access can come off the schedule. For anyone
     // else the focus areas are the whole staff record, so an empty set is the
     // required-field error on the field itself rather than a consequence.
@@ -493,7 +482,6 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                 Details
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                <SectionNotice messages={detailsNotices} tone="warning" />
                 {!hideIdentityFields && (
                   <div
                     style={{

@@ -1391,9 +1391,7 @@ export default function PersonDetailScreen() {
       <ConfirmationModal
         body={
           draft
-            ? person?.userId
-              ? `They will sign in with ${draft.email.trim()} from now on. Check the address before saving.`
-              : `The staff email will change to ${draft.email.trim() || "no email address"}. Check the address before saving.`
+            ? `The staff email will change to ${draft.email.trim() || "no email address"}. Check the address before saving.`
             : ""
         }
         confirmLabel="Save"
@@ -1404,7 +1402,7 @@ export default function PersonDetailScreen() {
           setShowSaveConfirmation(false);
         }}
         onConfirm={confirmSave}
-        title={person?.userId ? "Change their sign-in email?" : "Change the staff email?"}
+        title="Change the staff email?"
         visible={showSaveConfirmation && !stepUp.active}
       />
       {stepUp.sheet}
@@ -1728,10 +1726,7 @@ function EditPanel({
         </ProfilePanel>
       </ProfileSection>
 
-      <ProfileSection
-        title="Contact"
-        description={hasAccount ? "The email is also the one they sign in with." : undefined}
-      >
+      <ProfileSection title="Contact">
         <ProfilePanel>
           <ProfileTextInput
             accessibilityLabel="Phone"
