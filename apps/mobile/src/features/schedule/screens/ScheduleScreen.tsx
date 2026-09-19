@@ -3499,6 +3499,15 @@ function TeamShiftMemberRow({
   const isMentored = segment
     ? segment.isMentored === true
     : hasMentoredSegments(getScheduleEntrySegments(entry));
+  // Once the reader raises the text size the role pill moves under the name:
+  // the two no longer share a row's width, so neither has to give.
+  const stackRolePill = useWindowDimensions().fontScale > 1;
+  const rolePill =
+    roleChip || isMentored ? (
+      <View style={[styles.teamMemberRoleRow, stackRolePill && styles.teamMemberRoleRowStacked]}>
+        <JobPill chip={roleChip} compact eyebrowDisplay="outside" isMentored={isMentored} />
+      </View>
+    ) : null;
 
   return (
     <Pressable
@@ -3536,12 +3545,9 @@ function TeamShiftMemberRow({
               />
             </View>
           ) : null}
+          {stackRolePill ? rolePill : null}
         </View>
-        {roleChip || isMentored ? (
-          <View style={styles.teamMemberRoleRow}>
-            <JobPill chip={roleChip} compact eyebrowDisplay="outside" isMentored={isMentored} />
-          </View>
-        ) : null}
+        {stackRolePill ? null : rolePill}
       </View>
     </Pressable>
   );

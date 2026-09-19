@@ -439,6 +439,11 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       justifyContent: "space-between",
       gap: mobileSpace.md,
     },
+    shiftmateHeaderStacked: {
+      flexDirection: "column",
+      alignItems: "stretch",
+      gap: mobileSpace.xs,
+    },
     shiftmateName: {
       ...mobileText.rowTitle,
       color: mobileColors.textPrimary,
@@ -450,6 +455,9 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       justifyContent: "flex-end",
       flexWrap: "wrap",
       gap: 8,
+    },
+    shiftmateChipRowStacked: {
+      justifyContent: "flex-start",
     },
     shiftmateMeta: {
       ...mobileTextWeighted("meta", "medium"),

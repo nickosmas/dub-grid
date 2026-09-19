@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, View, useWindowDimensions } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import { Pressable } from "../../../shared/components/Pressable";
 import { useLocalSearchParams } from "expo-router";
@@ -2127,6 +2127,7 @@ function ShiftmateRow({
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { resolvedTheme } = useThemeMode();
+  const stackJobPill = useWindowDimensions().fontScale > 1;
   const avatarTone = getAvatarTone(entry.employeeId, resolvedTheme === "dark");
   const displayName = entry.employeeId === linkedEmployeeId ? "You" : entry.employeeName;
   const jobChip = matchedSegment
@@ -2164,10 +2165,12 @@ function ShiftmateRow({
         </Text>
       </View>
       <View style={styles.shiftmateContent}>
-        <View style={styles.shiftmateHeader}>
+        {/* At a raised text size the pill moves under the name, the same
+            way the Schedule tab's team rows do, so neither squeezes the other. */}
+        <View style={[styles.shiftmateHeader, stackJobPill && styles.shiftmateHeaderStacked]}>
           <Text style={styles.shiftmateName}>{displayName}</Text>
           {jobChip || isMentored ? (
-            <View style={styles.shiftmateChipRow}>
+            <View style={[styles.shiftmateChipRow, stackJobPill && styles.shiftmateChipRowStacked]}>
               <DetailJobPill chip={jobChip} eyebrowDisplay="outside" isMentored={isMentored} />
             </View>
           ) : null}

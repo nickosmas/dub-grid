@@ -1349,23 +1349,15 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileAvatarText(48),
       color: mobileColors.brand,
     },
-    // The name column and the role pill share a line while both fit and the
-    // pill drops under the name when they do not, instead of the pill holding
-    // its width and squeezing the name into a column that broke it mid-name
-    // at a raised text size. `flexBasis: "auto"` is what lets Yoga judge the
-    // fit from the name's own width; `flex: 1` would zero it out.
     teamMemberMain: {
       flex: 1,
       minWidth: 0,
       flexDirection: "row",
-      flexWrap: "wrap",
       alignItems: "center",
       gap: 12,
     },
     teamMemberCopy: {
-      flexGrow: 1,
-      flexShrink: 1,
-      flexBasis: "auto",
+      flex: 1,
       minWidth: 0,
       gap: mobileSpace.xs,
     },
@@ -1393,6 +1385,12 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       justifyContent: "flex-end",
       flexWrap: "wrap",
       gap: 8,
+    },
+    // Under the name at a raised text size, where a trailing pill squeezed
+    // the name column until "Richard Bennett" broke and the split-shift
+    // badge truncated beside it.
+    teamMemberRoleRowStacked: {
+      justifyContent: "flex-start",
     },
     teamMemberRoleChip: {
       borderWidth: 1,
