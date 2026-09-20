@@ -16,3 +16,4 @@ export * from "./self-guard";
 export * from "./staff";
 export * from "./terms";
 export * from "./text";
+export * from "./shift-request-copy";

@@ -76,7 +76,8 @@ function buildHistoryRequest(id: string, requesterName: string, requesterShiftDa
     status: "approved",
     type: "calloff",
     requesterShiftLabel: "Day",
-    requesterEmpId: "emp-1",
+    // Someone else's request: the viewer's own reads "You" instead of the name.
+    requesterEmpId: "emp-7",
     targetEmpId: null,
     requesterPresentation: {
       label: "Day Shift",
@@ -727,18 +728,23 @@ describe("RequestsScreen", () => {
     expect(screen.getByText("Evening Shift")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("All"));
-    expect(screen.getByText(/Mina Diaz/)).toBeInTheDocument();
+    // A swap is one card holding both shifts: the requester heads the card, a
+    // sentence says whom they asked, and each panel says whose shift it is,
+    // with "you" wherever the viewer is that person.
+    expect(screen.getByText("Mina Diaz")).toBeInTheDocument();
+    expect(screen.getByText("Asked you to swap shifts")).toBeInTheDocument();
+    expect(screen.getByText("Mina Diaz's shift")).toBeInTheDocument();
+    expect(screen.getByText("Your shift")).toBeInTheDocument();
     expect(screen.getByText("Morning Shift")).toBeInTheDocument();
     expect(screen.getByText("Desk Shift")).toBeInTheDocument();
-    expect(screen.getByText("Target shift")).toBeInTheDocument();
     expect(screen.getByText("Target Day")).toBeInTheDocument();
     expect(screen.getByText("Target Evening")).toBeInTheDocument();
     expect(screen.getAllByText("Shift 1").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Shift 2").length).toBeGreaterThan(0);
-    // The type reads as the same badge Home's approval queue uses. The page
-    // also has a Swap tab, so the badge is one of several "Swap" texts.
-    expect(screen.getAllByText("Swap").length).toBeGreaterThan(0);
-    expect(screen.queryByText("Swap request")).not.toBeInTheDocument();
+    // The one pill names the kind, as "Open shift" does on the other card;
+    // "Open" on a swap read as an open shift.
+    expect(screen.getByText("Swap request")).toBeInTheDocument();
+    expect(screen.queryByText("Open")).not.toBeInTheDocument();
   });
 
   it("uses the org timezone for available day labels", () => {
@@ -850,7 +856,7 @@ describe("RequestsScreen", () => {
     expect(screen.getByText(/Mina Diaz/)).toBeInTheDocument();
     expect(screen.getByLabelText("Mentored assignment")).toHaveTextContent("Mentored");
     expect(screen.queryByText("(Mentored)")).not.toBeInTheDocument();
-    expect(screen.getByText("7:00 AM - 3:00 PM")).toBeInTheDocument();
+    expect(screen.getByText("Tomorrow, Apr 17 \u00b7 7:00 AM - 3:00 PM")).toBeInTheDocument();
   });
 
   it("defaults managers into the approval tab when a request is waiting for review", () => {
@@ -883,6 +889,50 @@ describe("RequestsScreen", () => {
 
     expect(screen.getByText("Approve")).toBeInTheDocument();
     expect(screen.queryByText("Nothing to approve")).not.toBeInTheDocument();
+  });
+
+  it("sends an optional note along with an approval", () => {
+    const mutate = vi.fn();
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate });
+    useQuery.mockReturnValue({
+      data: {
+        requests: [
+          {
+            id: "req-2",
+            requesterName: "Mina Diaz",
+            requesterShiftDate: "2026-04-17",
+            status: "pending_approval",
+            type: "pickup",
+            requesterShiftLabel: "Day",
+            requesterEmpId: "emp-2",
+            targetEmpId: null,
+            requesterPresentation: { label: "Day Shift" },
+          },
+        ],
+        openShifts: [],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<RequestsScreen />);
+
+    fireEvent.click(screen.getByText("Approve"));
+    const dialog = screen.getByRole("alert");
+    fireEvent.change(within(dialog).getByPlaceholderText("Note to Mina? (Optional)"), {
+      target: { value: "  Thanks for covering  " },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Approve" }));
+
+    expect(mutate).toHaveBeenCalledWith(
+      {
+        requestId: "req-2",
+        body: { action: "resolve", approved: true, note: "Thanks for covering" },
+      },
+      expect.objectContaining({ onSettled: expect.any(Function) }),
+    );
   });
 
   it("shows the all-requests tab for schedule editors without a linked employee", () => {
@@ -979,7 +1029,7 @@ describe("RequestsScreen", () => {
     render(<RequestsScreen />);
 
     expect(screen.getByText("Older Request")).toBeInTheDocument();
-    expect(screen.getByText(/2025-12-01/)).toBeInTheDocument();
+    expect(screen.getByText(/Mon, Dec 1/)).toBeInTheDocument();
   });
 
   it("shows a history-specific empty state", () => {

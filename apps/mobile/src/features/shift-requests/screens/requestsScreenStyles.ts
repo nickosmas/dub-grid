@@ -1,11 +1,13 @@
 import { StyleSheet } from "react-native";
 import {
+  mobileInputText,
   mobilePillOverflow,
   mobileElevation,
   mobileRadii,
   mobileRadius,
   mobileSpace,
   mobileSpacing,
+  mobileTabularText,
   mobileText,
   mobileTextWeighted,
   type MobileColors,
@@ -67,7 +69,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     cardHeader: {
       flexDirection: "row",
       justifyContent: "space-between",
-      alignItems: "flex-start",
+      alignItems: "center",
       gap: 12,
     },
     openShiftTitleRow: {
@@ -79,23 +81,10 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     cardTitleRow: {
       flex: 1,
       flexDirection: "row",
-      alignItems: "flex-start",
+      alignItems: "center",
       gap: mobileSpace.md,
     },
-    cardIconFrame: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: mobileColors.brandSoft,
-    },
-    cardIconFrameMuted: {
-      backgroundColor: mobileColors.surface,
-    },
-    titleColumn: {
-      flex: 1,
-      minWidth: 0,
+    cardBody: {
       gap: mobileSpace.md,
     },
     cardActions: {
@@ -103,13 +92,9 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexWrap: "wrap",
       justifyContent: "flex-start",
       gap: 8,
-      marginLeft: mobileSpace["4xl"],
       paddingTop: mobileSpace.md,
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: mobileColors.borderSubtle,
-    },
-    cardActionsFlush: {
-      marginLeft: 0,
     },
     requestTitle: {
       ...mobileText.cardTitle,
@@ -150,15 +135,44 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileTextWeighted("meta", "bold"),
       color: mobileColors.textMuted,
     },
-    shiftPill: {
-      borderRadius: mobileRadii.pill,
-      borderWidth: 1,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
+    // A shift inside a request card: a panel on the card's secondary surface,
+    // one radius step in from the card so the two read as nested, not stacked.
+    shiftPanel: {
+      gap: mobileSpace.xs,
+      padding: mobileSpace.md,
+      borderRadius: mobileRadii.control,
+      backgroundColor: mobileColors.surfaceSecondary,
     },
-    shiftPillText: {
-      ...mobileTextWeighted("meta", "semibold"),
-      includeFontPadding: false,
+    shiftPanelPerson: {
+      ...mobileText.meta,
+      color: mobileColors.textMuted,
+    },
+    shiftPanelTitle: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textPrimary,
+    },
+    shiftPanelContext: {
+      ...mobileText.body,
+      color: mobileColors.textSecondary,
+    },
+    shiftPanelWhen: {
+      ...mobileTextWeighted("meta", "medium"),
+      ...mobileTabularText,
+      color: mobileColors.textMuted,
+    },
+    // The arrow sits between the two panels, and its negative margin pulls
+    // them in so the column's gap does not open twice around it.
+    swapArrowRow: {
+      alignItems: "center",
+      marginVertical: -mobileSpace.xs,
+    },
+    swapArrow: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: mobileColors.brandSoft,
     },
     statusChip: {
       ...mobilePillOverflow.displayContainer,
@@ -180,10 +194,22 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileText.body,
       color: mobileColors.textMuted,
     },
-    requestTypeRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: mobileSpace.sm,
+    // Same field as the profile forms, minus the label: the confirmation's
+    // title already says what the note is for.
+    resolveNoteInput: {
+      ...mobileInputText("regular"),
+      fontSize: mobileText.input.fontSize,
+      lineHeight: mobileText.input.lineHeight,
+      alignSelf: "stretch",
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderColor: mobileColors.borderSubtle,
+      borderRadius: mobileRadii.control,
+      borderWidth: 1,
+      color: mobileColors.textPrimary,
+      minHeight: 80,
+      paddingHorizontal: mobileSpace.md,
+      paddingVertical: mobileSpace.sm,
+      textAlignVertical: "top",
     },
     openShiftContextStack: {
       gap: 8,

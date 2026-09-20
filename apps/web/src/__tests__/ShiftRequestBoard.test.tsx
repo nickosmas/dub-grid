@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import ShiftRequestBoard from "@/components/ShiftRequestBoard";
 import type { ShiftRequest } from "@/types";
@@ -71,6 +72,7 @@ function renderBoard({
 
   render(
     <ShiftRequestBoard
+      orgId="org-1"
       openPickups={openPickups}
       myRequests={myRequests}
       pendingApproval={pendingApproval}
@@ -86,6 +88,11 @@ function renderBoard({
       onClose={vi.fn()}
       assignmentNameMap={new Map()}
     />,
+    {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>
+      ),
+    },
   );
 
   return { onClaim, onRespond, onResolve, onCancel };
@@ -212,20 +219,22 @@ describe("ShiftRequestBoard", () => {
         .map((button) => button.textContent)
         .filter((label) => label === "Approve" || label === "Reject"),
     ).toEqual(["Reject", "Approve"]);
+    // The one note field serves both decisions: typed once, it rides along
+    // with whichever button is pressed, and clears after the decision lands.
+    await user.type(
+      screen.getByPlaceholderText(/^Note to .*\? \(Optional\)$/),
+      "Thanks for asking",
+    );
     await user.click(screen.getByRole("button", { name: "Approve" }));
     await confirmDialogAction(user, "Approve");
+    await user.type(
+      screen.getByPlaceholderText(/^Note to .*\? \(Optional\)$/),
+      "Need more coverage",
+    );
     await user.click(screen.getByRole("button", { name: "Reject" }));
-    await user.type(screen.getByPlaceholderText("Add a note (optional)"), "Need more coverage");
-    expect(
-      screen
-        .getAllByRole("button")
-        .map((button) => button.textContent)
-        .filter((label) => label === "Back" || label === "Confirm Reject"),
-    ).toEqual(["Back", "Confirm Reject"]);
-    await user.click(screen.getByRole("button", { name: "Confirm Reject" }));
     await confirmDialogAction(user, "Reject");
 
-    expect(onResolve).toHaveBeenNthCalledWith(1, "approve-1", true);
+    expect(onResolve).toHaveBeenNthCalledWith(1, "approve-1", true, "Thanks for asking");
     expect(onResolve).toHaveBeenNthCalledWith(2, "approve-1", false, "Need more coverage");
   });
 
@@ -251,7 +260,7 @@ describe("ShiftRequestBoard", () => {
     await user.click(screen.getByRole("button", { name: /approval queue/i }));
 
     expect(screen.getByText("Alice Smith")).toBeInTheDocument();
-    expect(screen.getByText("Open")).toBeInTheDocument();
+    expect(screen.getByText("Swap request")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
   });
 
@@ -278,7 +287,7 @@ describe("ShiftRequestBoard", () => {
     await user.click(screen.getByRole("button", { name: /all requests/i }));
 
     expect(screen.getByText("Alice Smith")).toBeInTheDocument();
-    expect(screen.getByText("Open")).toBeInTheDocument();
+    expect(screen.getByText("Swap request")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
   });
 

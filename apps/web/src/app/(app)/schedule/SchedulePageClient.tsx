@@ -331,10 +331,10 @@ function newEditorSessionId(): string {
 }
 
 /** The board tab a `?requests=` deep link may ask for. */
-type RequestsParam = "mine" | "approval";
+type RequestsParam = "mine" | "approval" | "history";
 
 function parseRequestsParam(value: string | null): RequestsParam | null {
-  return value === "mine" || value === "approval" ? value : null;
+  return value === "mine" || value === "approval" || value === "history" ? value : null;
 }
 
 function parseDateParam(value: string | null): string | null {
@@ -620,6 +620,14 @@ function SchedulerContent({
     selectedAssignmentDefinitionId: number;
   } | null>(null);
 
+  // Every person a request could name, past and present, sorted for a picker.
+  const requestHistoryStaffOptions = useMemo(
+    () =>
+      employeeDirectory
+        .map((e) => ({ id: e.id, name: `${e.firstName} ${e.lastName}`.trim() }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [employeeDirectory],
+  );
   const shiftRequests = useShiftRequests(
     orgId ?? org?.id ?? null,
     assignmentLabelMap,
@@ -7669,6 +7677,8 @@ function SchedulerContent({
           {/* ── Shift Request Board (slide-out panel) ── */}
           {showRequestBoard && (
             <ShiftRequestBoard
+              orgId={orgId ?? org?.id ?? null}
+              staffOptions={requestHistoryStaffOptions}
               openPickups={
                 canEditShifts
                   ? shiftRequests.openPickups

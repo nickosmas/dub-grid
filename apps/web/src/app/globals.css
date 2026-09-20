@@ -1732,6 +1732,8 @@ button {
   flex-direction: column;
   overflow: hidden;
   animation: panel-in var(--dg-duration-standard) ease-out;
+  /* On the base rule so shrinking back animates as well as growing. */
+  transition: width var(--dg-duration-standard) ease;
 }
 
 .dg-panel-overlay {
@@ -1754,6 +1756,18 @@ button {
 
   .dg-panel--x-wide {
     width: min(640px, calc(100vw - 24px));
+  }
+
+  /* Content-driven widths for a review surface: the panel opens at the
+     standard width and grows leftwards, one card column at a time, when the
+     tab in front has more to show. The transition is what makes that read as
+     the same panel making room rather than a new one opening. */
+  .dg-panel--cols-2 {
+    width: min(760px, calc(100vw - 24px));
+  }
+
+  .dg-panel--max {
+    width: min(1200px, calc(100vw - 24px));
   }
 }
 

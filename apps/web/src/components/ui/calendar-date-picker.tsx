@@ -11,6 +11,7 @@ const MONTH_FORMATTER = new Intl.DateTimeFormat("en-US", {
   month: "long",
   year: "numeric",
 });
+const RANGE_DAY_FORMATTER = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
 const FIELD_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
   weekday: "short",
   month: "short",
@@ -50,10 +51,22 @@ function buildCalendarDays(month: Date): Date[] {
   return Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
 }
 
+export interface CalendarDateRange {
+  from: string;
+  to: string;
+}
+
 export interface CalendarDatePickerProps {
   id?: string;
   value: string;
   onChange: (value: string) => void;
+  /**
+   * Range mode: the first click starts a range, the second ends it, and the
+   * days between are shaded. Either end may be empty for an open-ended range.
+   * `value`/`onChange` are ignored while this is set.
+   */
+  range?: CalendarDateRange;
+  onRangeChange?: (range: CalendarDateRange) => void;
   label: string;
   placeholder?: string;
   minDate?: string | null;
@@ -78,8 +91,17 @@ export default function CalendarDatePicker({
   style,
   triggerLabel: triggerLabelOverride,
   triggerVariant = "field",
+  range,
+  onRangeChange,
 }: CalendarDatePickerProps) {
-  const selectedDate = useMemo(() => (value ? parseLocalDate(value) : null), [value]);
+  const isRange = range != null;
+  const rangeFrom = range?.from ?? "";
+  const rangeTo = range?.to ?? "";
+  const anchorValue = isRange ? rangeFrom || rangeTo : value;
+  const selectedDate = useMemo(
+    () => (anchorValue ? parseLocalDate(anchorValue) : null),
+    [anchorValue],
+  );
   const minSelectableDate = useMemo(() => (minDate ? parseLocalDate(minDate) : null), [minDate]);
   const todayKey = formatLocalDate(new Date());
 
@@ -97,9 +119,43 @@ export default function CalendarDatePicker({
 
   const calendarDays = useMemo(() => buildCalendarDays(visibleMonth), [visibleMonth]);
 
+  const rangeLabel = (() => {
+    if (!isRange) return null;
+    if (!rangeFrom && !rangeTo) return placeholder;
+    const from = rangeFrom ? parseLocalDate(rangeFrom) : null;
+    const to = rangeTo ? parseLocalDate(rangeTo) : null;
+    if (from && to) {
+      return `${RANGE_DAY_FORMATTER.format(from)} \u2013 ${FIELD_DATE_FORMATTER.format(to)}`;
+    }
+    return from
+      ? `From ${FIELD_DATE_FORMATTER.format(from)}`
+      : `Until ${FIELD_DATE_FORMATTER.format(to!)}`;
+  })();
+  const hasSelection = isRange ? Boolean(rangeFrom || rangeTo) : Boolean(selectedDate);
   const triggerLabel =
     triggerLabelOverride ??
+    rangeLabel ??
     (selectedDate ? FIELD_DATE_FORMATTER.format(selectedDate) : placeholder);
+
+  const pickDay = (dateKey: string) => {
+    if (!isRange) {
+      onChange(dateKey);
+      setOpen(false);
+      return;
+    }
+    // A fresh range starts here; a started one ends here, unless the click
+    // lands before its start, in which case it moves the start instead.
+    if (!rangeFrom || rangeTo) {
+      onRangeChange?.({ from: dateKey, to: "" });
+      return;
+    }
+    if (dateKey < rangeFrom) {
+      onRangeChange?.({ from: dateKey, to: "" });
+      return;
+    }
+    onRangeChange?.({ from: rangeFrom, to: dateKey });
+    setOpen(false);
+  };
   const isInline = triggerVariant === "inline";
 
   return (
@@ -128,7 +184,7 @@ export default function CalendarDatePicker({
             padding: "10px 12px",
             fontSize: 13,
             fontWeight: 500,
-            color: selectedDate ? "var(--dg-color-text-secondary)" : "var(--dg-color-text-subtle)",
+            color: hasSelection ? "var(--dg-color-text-secondary)" : "var(--dg-color-text-subtle)",
             cursor: disabled ? "not-allowed" : "pointer",
             fontFamily: "inherit",
             textAlign: isInline ? "center" : "left",
@@ -141,7 +197,7 @@ export default function CalendarDatePicker({
           <CalendarDays
             size={15}
             style={{
-              color: selectedDate ? "var(--dg-color-text-muted)" : "var(--dg-color-text-faint)",
+              color: hasSelection ? "var(--dg-color-text-muted)" : "var(--dg-color-text-faint)",
               flexShrink: 0,
             }}
           />
@@ -268,7 +324,14 @@ export default function CalendarDatePicker({
             <div className="grid grid-cols-7 gap-1" aria-label={`${label} calendar`}>
               {calendarDays.map((day) => {
                 const dateKey = formatLocalDate(day);
-                const isSelected = value === dateKey;
+                const isSelected = isRange
+                  ? dateKey === rangeFrom || dateKey === rangeTo
+                  : value === dateKey;
+                const isInRange =
+                  isRange &&
+                  Boolean(rangeFrom && rangeTo) &&
+                  dateKey > rangeFrom &&
+                  dateKey < rangeTo;
                 const isToday = dateKey === todayKey;
                 const isCurrentMonth = day.getMonth() === visibleMonth.getMonth();
                 const isDisabled = !!minDate && dateKey < minDate && !isSelected;
@@ -277,19 +340,18 @@ export default function CalendarDatePicker({
                   <Button
                     key={dateKey}
                     type="button"
-                    onClick={() => {
-                      onChange(dateKey);
-                      setOpen(false);
-                    }}
+                    onClick={() => pickDay(dateKey)}
                     disabled={isDisabled}
                     aria-label={`${isSelected ? "Selected " : "Choose "}${DAY_ARIA_FORMATTER.format(day)}`}
                     className={cn(
                       "relative flex h-9 items-center justify-center rounded-lg text-[12px] transition-colors",
                       isSelected
                         ? "bg-[var(--dg-color-brand)] font-semibold text-[var(--dg-color-text-inverse)]"
-                        : isDisabled
-                          ? "cursor-not-allowed text-[var(--dg-color-text-faint)] opacity-35"
-                          : "text-[var(--dg-color-text-primary)] hover:bg-[var(--dg-color-bg-secondary)]",
+                        : isInRange
+                          ? "bg-[var(--dg-color-brand-bg)] text-[var(--dg-color-text-primary)]"
+                          : isDisabled
+                            ? "cursor-not-allowed text-[var(--dg-color-text-faint)] opacity-35"
+                            : "text-[var(--dg-color-text-primary)] hover:bg-[var(--dg-color-bg-secondary)]",
                       !isSelected &&
                         !isDisabled &&
                         !isCurrentMonth &&
@@ -326,10 +388,11 @@ export default function CalendarDatePicker({
                 type="button"
                 className="dg-btn dg-btn-secondary"
                 onClick={() => {
-                  onChange("");
+                  if (isRange) onRangeChange?.({ from: "", to: "" });
+                  else onChange("");
                   setOpen(false);
                 }}
-                disabled={!allowClear || !value}
+                disabled={!allowClear || !hasSelection}
                 style={{ fontSize: "var(--dg-fs-caption)", padding: "6px 10px" }}
               >
                 Clear
