@@ -1372,6 +1372,35 @@ describe("settings dirty save controls", () => {
     expect(screen.getByText("Spruce Wing")).toBeInTheDocument();
   });
 
+  it("offers to add a focus area to a scheduled department that has none", async () => {
+    const user = userEvent.setup();
+    render(
+      <DepartmentsSettings
+        departments={[
+          makeDepartment({
+            id: 1,
+            orgId: "org-1",
+            name: "Nursing",
+            type: "scheduled",
+            sortOrder: 0,
+          }),
+        ]}
+        focusAreas={[]}
+        orgId="org-1"
+        focusAreaLabel="Wings"
+        departmentLabel="Scheduled Departments"
+        canManageFocusAreas
+        onDepartmentsChange={vi.fn()}
+        onFocusAreasChange={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /^edit$/i }));
+
+    expect(screen.getByText(/No wings yet/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "+ Add Wing" })).toBeInTheDocument();
+  });
+
   it("reorders departments from their keyboard handles", async () => {
     const user = userEvent.setup();
     const departments: Department[] = [

@@ -50,8 +50,13 @@ function apexLoginUrl(
 // byte is sent, instead of deciding on the client after hydration (the
 // previous version rendered nothing at all until a mount effect resolved
 // window.location.host).
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const headersList = await headers();
+  const params = (await searchParams) ?? {};
   const parsed = parseHost(headersList.get("host") ?? "");
   const { subdomain } = parsed;
 
@@ -87,13 +92,20 @@ export default async function LoginPage() {
 
     const seed: OrgLoginSeed =
       result.status === "found"
-        ? { status: "found", name: result.org.name }
-        : // Couldn't check (rate-limited, no service key locally, query
-          // failed). Not the same as "not found" — the org probably does
-          // exist, so keep the sign-in form and let the client re-ask.
-          { status: "unresolved" };
+        ? { status: "found", name: result.org.name, suspended: Boolean(result.org.suspendedAt) }
+        : result.status === "archived"
+          ? { status: "deleted", name: result.org.name }
+          : // Couldn't check (rate-limited, no service key locally, query
+            // failed). Not the same as "not found" — the org probably does
+            // exist, so keep the sign-in form and let the client re-ask.
+            { status: "unresolved" };
 
-    return <OrgLogin orgSlug={subdomain} seed={seed} />;
+    // The proxy sends a signed-in member here with one of these flags when it
+    // finds their organization suspended or deleted mid-session (F-87).
+    const lockout =
+      params.deleted === "true" ? "deleted" : params.suspended === "true" ? "suspended" : null;
+
+    return <OrgLogin orgSlug={subdomain} seed={seed} lockout={lockout} />;
   }
   return <DomainSelector />;
 }

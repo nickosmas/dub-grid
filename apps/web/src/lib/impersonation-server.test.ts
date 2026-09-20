@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { verifyImpersonationSession } from "./impersonation-server";
+import { endImpersonationOnEscape, verifyImpersonationSession } from "./impersonation-server";
 
 const IMPERSONATION_ID = "11111111-1111-4111-8111-111111111111";
 const GRIDMASTER_ID = "22222222-2222-4222-8222-222222222222";
@@ -66,5 +66,25 @@ describe("verifyImpersonationSession", () => {
     await expect(
       verifyImpersonationSession(service, IMPERSONATION_ID, GRIDMASTER_ID, AUTH_SESSION_ID),
     ).resolves.toBeNull();
+  });
+});
+
+describe("endImpersonationOnEscape", () => {
+  it("ends the row as the gridmaster with the navigation reason", async () => {
+    const rpc = vi.fn(async () => ({ error: null }));
+    await expect(
+      endImpersonationOnEscape({ rpc } as unknown as SupabaseClient, IMPERSONATION_ID),
+    ).resolves.toBe(true);
+    expect(rpc).toHaveBeenCalledWith("end_impersonation", {
+      p_session_id: IMPERSONATION_ID,
+      p_reason: "navigation",
+    });
+  });
+
+  it("reports a failed end without throwing", async () => {
+    const rpc = vi.fn(async () => ({ error: { message: "nope" } }));
+    await expect(
+      endImpersonationOnEscape({ rpc } as unknown as SupabaseClient, IMPERSONATION_ID),
+    ).resolves.toBe(false);
   });
 });

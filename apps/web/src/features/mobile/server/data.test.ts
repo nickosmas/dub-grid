@@ -2049,6 +2049,10 @@ describe("fetchMobileCoverageSummary", () => {
 
       expect(summary.totals).toEqual({ totalRequired: 1, totalFilled: 1, pct: 100, openSlots: 0 });
       expect(summary.openShifts).toEqual([]);
+      // The per-day grid rides on the same snapshots as the totals.
+      expect(summary.dailyByFocusArea.get(summary.byFocusArea[0].focusAreaId)).toEqual([
+        { dateKey: "2026-04-16", filledCount: 1, requiredCount: 1, status: "green" },
+      ]);
     } finally {
       vi.useRealTimers();
     }

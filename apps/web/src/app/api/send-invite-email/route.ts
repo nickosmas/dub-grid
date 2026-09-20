@@ -5,6 +5,7 @@ import { z } from "zod";
 import { inviteLimiter, emailTargetLimiter, checkRateLimit, hashEmail } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { forbidIfSandboxCookie, requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
+import { getServiceClient } from "@/lib/supabase-service";
 import { sanitizeHeaderValue, emailBaseUrl } from "@/lib/email";
 import { InviteEmail } from "@/emails/InviteEmail";
 import logger from "@/lib/logger";
@@ -20,6 +21,23 @@ const bodySchema = z.object({
   orgName: z.string().trim().min(1).max(200),
   inviterName: z.string().trim().max(200).optional(),
 });
+
+async function lookupPendingInvitation(
+  token: string,
+): Promise<{ orgId: string; email: string; orgName: string } | null> {
+  const { data } = await getServiceClient()
+    .from("invitations")
+    .select("org_id, email, organizations!inner(name, archived_at)")
+    .eq("token", token)
+    .gt("expires_at", new Date().toISOString())
+    .is("accepted_at", null)
+    .is("revoked_at", null)
+    .is("organizations.archived_at", null)
+    .maybeSingle();
+  const orgName = (data?.organizations as { name?: string | null } | null)?.name;
+  if (!data || !orgName) return null;
+  return { orgId: data.org_id as string, email: data.email as string, orgName };
+}
 
 export async function POST(req: NextRequest) {
   const csrfError = validateCsrfOrigin(req);
@@ -88,7 +106,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
-  const { token, email, orgName, inviterName } = parsed.data;
+  const { token, email, inviterName } = parsed.data;
+
+  // ── The token must be a live invitation for this address, in an
+  // organization the caller may act for. Body copy is not trusted: the
+  // organization name comes from the row, so this route cannot be used to
+  // mail arbitrary addresses a branded invitation with any link (F-93).
+  const invitation = await lookupPendingInvitation(token);
+  const callerMayActForOrg =
+    isGridmaster || (typeof claims.org_id === "string" && claims.org_id === invitation?.orgId);
+  if (
+    !invitation ||
+    invitation.email.toLowerCase() !== email.toLowerCase() ||
+    !callerMayActForOrg
+  ) {
+    return NextResponse.json(
+      { success: false, error: "We couldn't send that email. Try again." },
+      { status: 404 },
+    );
+  }
+  const orgName = invitation.orgName;
 
   // ── Per-target-email rate limit ───────────────────────────────────────
   // The per-actor limit above doesn't stop one sender from flooding a single

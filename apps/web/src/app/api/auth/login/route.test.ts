@@ -88,7 +88,10 @@ function makeSession(
   };
 }
 
-function stubOrgLookup(orgId: string | null) {
+function stubOrgLookup(
+  orgId: string | null,
+  state: { archivedAt?: string | null; suspendedAt?: string | null } = {},
+) {
   serviceFrom.mockImplementation((table: string) => {
     if (table === "profiles") {
       return {
@@ -102,8 +105,16 @@ function stubOrgLookup(orgId: string | null) {
     return {
       select: () => ({
         eq: () => ({
-          is: () => ({
-            maybeSingle: async () => ({ data: orgId ? { id: orgId } : null, error: null }),
+          maybeSingle: async () => ({
+            data: orgId
+              ? {
+                  id: orgId,
+                  name: "Org",
+                  archived_at: state.archivedAt ?? null,
+                  suspended_at: state.suspendedAt ?? null,
+                }
+              : null,
+            error: null,
           }),
         }),
       }),
@@ -457,6 +468,32 @@ describe("POST /api/auth/login", () => {
 
     expect(res.status).toBe(403);
     expect(body.code).toBe("ORG_ACCESS_DENIED");
+    expect(rpc).not.toHaveBeenCalledWith("switch_org", expect.anything());
+  });
+
+  it.each([
+    ["suspended", { suspendedAt: "2026-09-01T00:00:00Z" }, "ORG_SUSPENDED"],
+    ["deleted", { archivedAt: "2026-09-01T00:00:00Z" }, "ORG_DELETED"],
+  ])("refuses login to a %s organization with its own code", async (_label, state, code) => {
+    signInWithPassword.mockResolvedValueOnce({
+      data: {
+        session: makeSession({ org_id: OTHER_ORG_ID, org_role: "user" }),
+        user: {
+          id: USER_ID,
+          email: "user@example.com",
+          email_confirmed_at: "2026-01-01T00:00:00Z",
+          factors: [],
+        },
+      },
+      error: null,
+    });
+    stubOrgLookup(ORG_ID, state);
+
+    const res = await POST(makeRequest("closed.localhost"));
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.code).toBe(code);
     expect(rpc).not.toHaveBeenCalledWith("switch_org", expect.anything());
   });
 

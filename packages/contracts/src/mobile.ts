@@ -250,6 +250,12 @@ export const mobileProfileResponseSchema = z.object({
    * hold without managing anything.
    */
   managementDepartmentIds: z.array(z.number().int()).default([]),
+  /**
+   * The same membership row's `updated_at`, the optimistic-concurrency guard
+   * the management-access write path takes, so the profile can edit its own
+   * management departments with the same sheet a manager uses on a teammate.
+   */
+  membershipUpdatedAt: z.string().nullable().default(null),
   pendingProfileChangeRequest: z.boolean().default(false),
   pendingAccountDeletionRequest: z.boolean().default(false),
 });
@@ -414,6 +420,24 @@ export const mobileProfileSessionRevokeBodySchema = z.object({
 export const mobileProfileSessionRevokeResponseSchema = z.object({
   success: z.literal(true),
 });
+
+export const mobileCalendarSubscriptionStatusSchema = z.object({
+  active: z.boolean(),
+  issuedAt: z.string().nullable(),
+});
+
+export const mobileCalendarSubscriptionIssuedSchema = z.object({
+  active: z.literal(true),
+  issuedAt: z.string().nullable(),
+  feedUrl: z.string().url(),
+});
+
+export type MobileCalendarSubscriptionStatus = z.infer<
+  typeof mobileCalendarSubscriptionStatusSchema
+>;
+export type MobileCalendarSubscriptionIssued = z.infer<
+  typeof mobileCalendarSubscriptionIssuedSchema
+>;
 
 export const MAX_MOBILE_SCHEDULE_RANGE_DAYS = 31;
 const MS_PER_DAY = 86_400_000;
@@ -618,11 +642,17 @@ export const mobileShiftRequestHistoryResponseSchema = z.object({
 });
 
 // ── Admin/super_admin dashboard (mobile home view) ──────────────────────────
-// Deliberately leaner than web's SuperAdminDashboard/AdminDashboard: coverage
-// is summarized as open-slot counts per section rather than a full
-// required-vs-filled daily grid, and activity is publish events only (no
-// shift-request/invitation events yet). See dashboard-stats.ts on web for the
-// full reference implementation this is a scoped-down mobile port of.
+// Mirrors web's SuperAdminDashboard/AdminDashboard metrics: per-section
+// coverage with its daily required-vs-filled grid, the same four activity
+// event types, staff hours, the action queue, and (for schedule editors) the
+// draft summary. See dashboard-stats.ts on web for the reference math.
+
+export const mobileDashboardCoverageDaySchema = z.object({
+  dateKey: z.string().date(),
+  filledCount: z.number().int().nonnegative(),
+  requiredCount: z.number().int().nonnegative(),
+  status: z.enum(["green", "amber", "red", "none"]),
+});
 
 export const mobileDashboardCoverageSectionSchema = z.object({
   focusAreaId: z.number().int(),
@@ -631,6 +661,9 @@ export const mobileDashboardCoverageSectionSchema = z.object({
   filledTotal: z.number().int(),
   pct: z.number().int(),
   openSlots: z.number().int(),
+  // One entry per day of the range, the same required-vs-filled grid web's
+  // expanded coverage panel shows. Defaulted so an older payload still parses.
+  daily: z.array(mobileDashboardCoverageDaySchema).default([]),
 });
 
 // Same 4 event types as web's dashboard activity feed (apps/web/src/lib/

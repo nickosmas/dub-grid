@@ -26,14 +26,17 @@ export function getHighlightedOrgRole(
   return role === "super_admin" || role === "admin" ? role : null;
 }
 
-/** The glyph an elevated member's avatar carries in directory and profile UI. */
-export type OrgRoleInsignia = "crown" | "star";
+/**
+ * The star an elevated member carries beside their name in directory and
+ * profile UI: gold for a Super Admin, blue for an Admin.
+ */
+export type OrgRoleInsignia = "gold" | "blue";
 
 /**
- * The avatar insignia for a role, or null for a plain user.
+ * The insignia for a role, or null for a plain user.
  *
- * Shared for the same reason the badge rule is: a crown that means Super Admin
- * on web and Admin on mobile would be worse than no crown. Styling stays
+ * Shared for the same reason the badge rule is: a gold star that means Super
+ * Admin on web and Admin on mobile would be worse than no star. Styling stays
  * per-platform.
  */
 export function getOrgRoleInsignia(
@@ -44,7 +47,7 @@ export function getOrgRoleInsignia(
     return null;
   }
 
-  return highlighted === "super_admin" ? "crown" : "star";
+  return highlighted === "super_admin" ? "gold" : "blue";
 }
 
 /** Display label for a role, falling back to "User" for unknown values. */

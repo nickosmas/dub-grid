@@ -154,7 +154,7 @@ export default function OnboardingPage() {
               boxShadow: "0 4px 12px rgba(37, 99, 235, 0.2)",
             }}
           >
-            <ButtonLoading loading={checking}>I've been invited — refresh</ButtonLoading>
+            <ButtonLoading loading={checking}>I've been invited, refresh</ButtonLoading>
           </Button>
 
           {pollTimedOut && (

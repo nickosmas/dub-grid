@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiResponseError } from "@dubgrid/api-client";
@@ -10,7 +11,12 @@ const useAccessToken = vi.fn();
 const useBootstrap = vi.fn();
 const useLocalSearchParams = vi.fn();
 // Every options object the screen hands the native header, in render order.
-const stackScreenOptions: { title?: string }[] = [];
+const stackScreenOptions: StackScreenOptions[] = [];
+
+type StackScreenOptions = {
+  title?: string;
+  headerRight?: () => ReactNode;
+};
 const pushToast = vi.fn();
 const routerReplace = vi.fn();
 const routerPush = vi.fn();
@@ -40,9 +46,11 @@ vi.mock("expo-router", () => ({
     push: routerPush,
   },
   Stack: {
-    Screen: (props: { options?: { title?: string } }) => {
+    // The bar's trailing slot rendered in place, so a test can press the
+    // header's "Edit" the way it presses anything else on the page.
+    Screen: (props: { options?: StackScreenOptions }) => {
       stackScreenOptions.push(props.options ?? {});
-      return null;
+      return <div data-testid="navigation-bar">{props.options?.headerRight?.() ?? null}</div>;
     },
   },
   useLocalSearchParams,
@@ -250,10 +258,11 @@ describe("PersonDetailScreen", () => {
     expect(emptyStateTitles).not.toContain("Person not found");
   });
 
-  // The hero states the access tier and nothing else. Status and account chips
-  // used to sit under the avatar as well, which made three competing labels out
-  // of a heading; both facts are stated further down the page instead.
-  it("badges the access tier and leaves the rest of the hero clear", () => {
+  // The hero is the name and the tier's insignia beside it, nothing else. A
+  // pill spelling the tier out used to sit under the avatar, and status and
+  // account chips before that; each made a second heading out of a fact the
+  // page states elsewhere.
+  it("marks the tier with the insignia alone and leaves the rest of the hero clear", () => {
     useQuery.mockReturnValue({
       data: { person: makePerson() },
       error: null,
@@ -264,7 +273,8 @@ describe("PersonDetailScreen", () => {
 
     render(<PersonDetailScreen />);
 
-    expect(screen.getByText("Super Admin")).toBeInTheDocument();
+    expect(screen.getByLabelText("Super Admin")).toBeInTheDocument();
+    expect(screen.queryByText("Super Admin")).not.toBeInTheDocument();
     expect(screen.queryByText("Active")).not.toBeInTheDocument();
     expect(screen.queryByText("App access")).not.toBeInTheDocument();
     expect(screen.queryByText("Super Admin Access")).not.toBeInTheDocument();
@@ -274,7 +284,7 @@ describe("PersonDetailScreen", () => {
   // The avatar's corner used to carry a status dot. The tier's insignia sits
   // beside the name now, and an inactive person reads as inactive from the
   // Activate button rather than from a chip.
-  it("crowns a super admin beside their name", () => {
+  it("stars a super admin beside their name", () => {
     useQuery.mockReturnValue({
       data: { person: makePerson({ status: "inactive" }) },
       error: null,
@@ -286,7 +296,7 @@ describe("PersonDetailScreen", () => {
     render(<PersonDetailScreen />);
 
     expect(screen.getByLabelText("Super Admin")).toBeInTheDocument();
-    expect(screen.getByText("Activate")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Activate" })).toBeInTheDocument();
   });
 
   // The page said nothing about management access: the only trace of it was
@@ -455,7 +465,7 @@ describe("PersonDetailScreen", () => {
 
     render(<PersonDetailScreen />);
 
-    expect(screen.getByText("Admin")).toBeInTheDocument();
+    expect(screen.getByLabelText("Admin")).toBeInTheDocument();
   });
 
   // The management label is fixed, never composed from the org's own noun for
@@ -685,7 +695,7 @@ describe("PersonDetailScreen", () => {
       ["unreadable", null, null],
       "emp-1",
     ]);
-    expect(screen.getByText("Super Admin")).toBeInTheDocument();
+    expect(screen.getByLabelText("Super Admin")).toBeInTheDocument();
     // Someone who already has an account gets no invitation banner: the two
     // states worth announcing are the ones a manager can still act on.
     expect(screen.queryByText("App access")).not.toBeInTheDocument();
@@ -758,11 +768,11 @@ describe("PersonDetailScreen", () => {
     expect(screen.getAllByText("Mina Diaz")).toHaveLength(1);
     expect(screen.getAllByText("mina@dubgrid.com")).toHaveLength(1);
 
-    // A plain user gets a badge here too. The People list only badges the
-    // tiers worth picking out of a list of names; a page about one person
-    // states the tier whatever it is.
-    expect(screen.getByText("User")).toBeInTheDocument();
-    // Status is not part of the heading any more, only the tier.
+    // A plain user gets no insignia and no pill: the tier is stated only
+    // where it says something, and "User" says nothing.
+    expect(screen.queryByText("User")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("User")).not.toBeInTheDocument();
+    // Status is not part of the heading either.
     expect(screen.queryByText("Active")).not.toBeInTheDocument();
   });
 
@@ -877,7 +887,7 @@ describe("PersonDetailScreen", () => {
     expect(screen.getByText("Cancel")).toBeInTheDocument();
     expect(screen.queryByText("Discard")).not.toBeInTheDocument();
     expect(screen.getByText("Save changes")).toBeInTheDocument();
-    expect(screen.queryByText("Call")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Call" })).not.toBeInTheDocument();
     expect(screen.queryByText("Bench")).not.toBeInTheDocument();
   });
 
@@ -1035,7 +1045,7 @@ describe("PersonDetailScreen", () => {
 
     render(<PersonDetailScreen />);
 
-    fireEvent.click(screen.getByText("Send Invitation"));
+    fireEvent.click(screen.getByRole("button", { name: "Send Invitation" }));
     expect(screen.getByText("Send invitation?")).toBeInTheDocument();
     confirmDialog("Send Invitation");
 
@@ -1136,7 +1146,7 @@ describe("PersonDetailScreen", () => {
 
     render(<PersonDetailScreen />);
 
-    fireEvent.click(screen.getByText("Send Invitation"));
+    fireEvent.click(screen.getByRole("button", { name: "Send Invitation" }));
     expect(screen.getByText("Send invitation?")).toBeInTheDocument();
     confirmDialog("Send Invitation");
 
@@ -1251,6 +1261,147 @@ describe("PersonDetailScreen", () => {
     });
   });
 
+  describe("page layout", () => {
+    function renderAsManager(person: Record<string, unknown>) {
+      useBootstrap.mockReturnValue({
+        data: {
+          currentOrg: {
+            labels: {
+              focusArea: "Focus Areas",
+              role: "Roles",
+              certification: "Certification",
+              department: "Departments",
+            },
+          },
+          focusAreas: [{ id: 2, name: "Skilled Nursing", departmentId: 4 }],
+          roles: [{ id: 3, name: "Charge Nurse" }],
+          certifications: [],
+          departments: [
+            { id: 4, name: "North Wing", abbr: "NW", type: "scheduled" },
+            { id: 9, name: "Operations", abbr: "OPS", type: "management" },
+          ],
+          permissions: {
+            canManageEmployees: true,
+            canViewEmployeeDetails: true,
+            canManageManagementAccess: true,
+          },
+        },
+        error: null,
+        isFetching: false,
+        isLoading: false,
+        refetch: vi.fn(),
+      } as never);
+      useQuery.mockReturnValue({
+        data: { person: makePerson(person) },
+        error: null,
+        isFetching: false,
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+
+      return render(<PersonDetailScreen />);
+    }
+
+    // Edit is about the page, not the person, so it takes the bar's trailing
+    // slot, where iOS puts it, and it is the one place the word appears.
+    it("puts Edit in the navigation bar, and clears it while editing", () => {
+      renderAsManager({});
+
+      const bar = within(screen.getByTestId("navigation-bar"));
+      expect(bar.getByRole("button", { name: "Edit" })).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: "Edit" })).toHaveLength(1);
+
+      fireEvent.click(bar.getByRole("button", { name: "Edit" }));
+
+      expect(screen.getByText("Save changes")).toBeInTheDocument();
+      expect(stackScreenOptions.at(-1)?.headerRight).toBeUndefined();
+      expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Call" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Deactivate" })).not.toBeInTheDocument();
+    });
+
+    // Under the hero: Call and Email, always both, the one without a number or
+    // address dimmed rather than dropped. At the foot: everything that manages
+    // the person, in web's staff-panel order, access first and status last.
+    it("keeps the contact pair under the hero and the management actions at the foot", () => {
+      renderAsManager({
+        userId: null,
+        phone: "",
+        focusAreaIds: [],
+        pendingInvitation: { id: "inv-1", expiresAt: "2030-01-01T00:00:00.000Z" },
+      });
+
+      const call = screen.getByRole("button", { name: "Call" });
+      const email = screen.getByRole("button", { name: "Email" });
+      expect(call).toHaveAttribute("aria-disabled", "true");
+      expect(email).toHaveAttribute("aria-disabled", "false");
+      // Named, not icon-only: the label prints inside the pill.
+      expect(call).toHaveTextContent("Call");
+      expect(email).toHaveTextContent("Email");
+
+      const names = screen
+        .getAllByRole("button")
+        .map((button) => button.getAttribute("aria-label") ?? button.textContent);
+      const footStart = names.indexOf("Reinvite");
+      expect(names.slice(footStart)).toEqual([
+        "Reinvite",
+        "Revoke Invite",
+        "Add to Schedule",
+        "Add to Management",
+        "Deactivate",
+      ]);
+      // The foot follows every section: Assignments is the last titled one.
+      const assignments = screen.getByText("Assignments");
+      expect(
+        assignments.compareDocumentPosition(screen.getByRole("button", { name: "Reinvite" })) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      // The pair sits above the sections.
+      expect(
+        call.compareDocumentPosition(assignments) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it("keeps the pair, and nothing at the foot, for a viewer who cannot manage staff", () => {
+      useBootstrap.mockReturnValue({
+        data: {
+          currentOrg: {
+            labels: {
+              focusArea: "Focus Areas",
+              role: "Roles",
+              certification: "Certification",
+              department: "Departments",
+            },
+          },
+          focusAreas: [{ id: 2, name: "Skilled Nursing", departmentId: 4 }],
+          roles: [{ id: 3, name: "Charge Nurse" }],
+          certifications: [],
+          departments: [{ id: 4, name: "North Wing" }],
+          permissions: { canManageEmployees: false, canViewEmployeeDetails: true },
+        },
+        error: null,
+        isFetching: false,
+        isLoading: false,
+        refetch: vi.fn(),
+      } as never);
+      useQuery.mockReturnValue({
+        data: { person: makePerson() },
+        error: null,
+        isFetching: false,
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+
+      render(<PersonDetailScreen />);
+
+      expect(screen.getByRole("button", { name: "Call" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Email" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Deactivate" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+      expect(stackScreenOptions.at(-1)?.headerRight).toBeUndefined();
+    });
+  });
+
   describe("management access", () => {
     function renderWithManagementAccess(options: {
       canManageManagementAccess?: boolean;
@@ -1333,8 +1484,28 @@ describe("PersonDetailScreen", () => {
 
       fireEvent.click(screen.getByRole("button", { name: "Add to Management" }));
 
-      expect(screen.getByText("OPS")).toBeInTheDocument();
-      expect(screen.queryByText("NW")).not.toBeInTheDocument();
+      expect(screen.getByRole("checkbox", { name: "Operations" })).toBeInTheDocument();
+      expect(screen.queryByRole("checkbox", { name: "North Wing" })).not.toBeInTheDocument();
+    });
+
+    // A grant to someone with no account is an invitation, and an invitation
+    // needs an address. The button stays off the page rather than opening a
+    // sheet that can only say so.
+    it("offers no Add to Management to someone with no email on file", () => {
+      renderWithManagementAccess({ person: { email: "" } });
+
+      expect(screen.queryByRole("button", { name: "Add to Management" })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Edit Management Access" }),
+      ).not.toBeInTheDocument();
+    });
+
+    // Existing access stays editable and removable whatever the contact
+    // details say: taking someone off the roster must never need an address.
+    it("keeps Edit Management Access for someone already on the roster without an email", () => {
+      renderWithManagementAccess({ person: { email: "", managementDepartmentIds: [9] } });
+
+      expect(screen.getByRole("button", { name: "Edit Management Access" })).toBeInTheDocument();
     });
 
     // A plain app invitation carries no management departments, so it must not
@@ -1359,8 +1530,8 @@ describe("PersonDetailScreen", () => {
     });
   });
 
-  describe("app access badge", () => {
-    function renderWithAccessBadge(options: {
+  describe("access level in the editor", () => {
+    function renderForAccess(options: {
       canManageManagementAccess?: boolean;
       person?: Record<string, unknown>;
     }) {
@@ -1403,47 +1574,51 @@ describe("PersonDetailScreen", () => {
       });
 
       render(<PersonDetailScreen />);
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
       return mutationCalls;
     }
 
-    const badge = () => screen.getByLabelText(/^App access: /);
+    const accessRow = () => screen.getByRole("button", { name: /^Access level/ });
 
-    it("makes the badge a control for a linked member", () => {
-      renderWithAccessBadge({
+    // The role is the first setting in the editor, ahead of the name, and it
+    // opens the picker on its own rather than riding on Save.
+    it("puts the access level first in the editor for a linked member", () => {
+      renderForAccess({
         person: { orgRole: "user", membershipUpdatedAt: "2026-01-01T00:00:00.000Z" },
       });
 
-      expect(badge()).toHaveAttribute("aria-label", "App access: User");
-      fireEvent.click(badge());
-      expect(screen.getByText("Access level")).toBeInTheDocument();
+      expect(accessRow()).toHaveTextContent("User");
+      const headings = ["Access", "Basic info"].map((title) => screen.getByText(title));
+      expect(
+        headings[0]!.compareDocumentPosition(headings[1]!) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+
+      fireEvent.click(accessRow());
+      expect(screen.getByRole("button", { name: /^Admin/ })).toBeInTheDocument();
     });
 
     // Nothing carries a role for someone with neither an account nor an invite,
     // so there is nothing for the picker to write. Web prints a dash here.
-    it("leaves the badge static, and says why, with no account and no invitation", () => {
-      renderWithAccessBadge({ person: { orgRole: null, userId: null } });
+    it("leaves the row out with no account and no invitation", () => {
+      renderForAccess({ person: { orgRole: null, userId: null } });
 
-      // A static badge is a plain label, not a button, so it carries no
-      // accessible name of its own.
-      expect(screen.queryByLabelText(/^App access: /)).not.toBeInTheDocument();
-      expect(screen.getByText("User")).toBeInTheDocument();
-      expect(screen.getByText("Send an invitation to give app access.")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^Access level/ })).not.toBeInTheDocument();
+      expect(screen.queryByText("Access")).not.toBeInTheDocument();
     });
 
-    it("keeps the badge static without the permission", () => {
-      renderWithAccessBadge({
+    it("leaves the row out without the permission", () => {
+      renderForAccess({
         canManageManagementAccess: false,
         person: { orgRole: "user", membershipUpdatedAt: "2026-01-01T00:00:00.000Z" },
       });
 
-      expect(screen.queryByLabelText(/^App access: /)).not.toBeInTheDocument();
-      expect(screen.getByText("User")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^Access level/ })).not.toBeInTheDocument();
     });
 
     // The invitation's `roleToAssign` is the role until it is accepted; reading
     // `orgRole` alone showed a pending Admin as "User".
-    it("badges a pending invitation with the role it will grant", () => {
-      renderWithAccessBadge({
+    it("shows a pending invitation with the role it will grant", () => {
+      renderForAccess({
         person: {
           orgRole: null,
           userId: null,
@@ -1457,15 +1632,15 @@ describe("PersonDetailScreen", () => {
         },
       });
 
-      expect(badge()).toHaveAttribute("aria-label", "App access: Admin");
+      expect(accessRow()).toHaveTextContent("Admin");
     });
 
     it("sends the picked role once the change is confirmed", () => {
-      const mutationCalls = renderWithAccessBadge({
+      const mutationCalls = renderForAccess({
         person: { orgRole: "user", membershipUpdatedAt: "2026-01-01T00:00:00.000Z" },
       });
 
-      fireEvent.click(badge());
+      fireEvent.click(accessRow());
       fireEvent.click(screen.getByRole("button", { name: /^Admin/ }));
       confirmDialog("Change role");
 
@@ -1473,7 +1648,7 @@ describe("PersonDetailScreen", () => {
     });
 
     it("asks about revoking and resending when the role lives on an invitation", () => {
-      renderWithAccessBadge({
+      renderForAccess({
         person: {
           orgRole: null,
           userId: null,
@@ -1487,7 +1662,7 @@ describe("PersonDetailScreen", () => {
         },
       });
 
-      fireEvent.click(badge());
+      fireEvent.click(accessRow());
       fireEvent.click(screen.getByRole("button", { name: /^Admin/ }));
 
       expect(screen.getByText("Replace invitation access?")).toBeInTheDocument();

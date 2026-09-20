@@ -50,9 +50,43 @@ const GRIDMASTER_PORTAL_REQUIRED_CODE = "GRIDMASTER_PORTAL_REQUIRED";
  * re-asks.
  */
 export type OrgLoginSeed =
-  { status: "found"; name: string } | { status: "not-found" } | { status: "unresolved" };
+  | { status: "found"; name: string; suspended?: boolean }
+  | { status: "deleted"; name: string }
+  | { status: "not-found" }
+  | { status: "unresolved" };
 
-export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: OrgLoginSeed }) {
+export type OrgLockout = "suspended" | "deleted";
+
+const ORG_SUSPENDED_CODE = "ORG_SUSPENDED";
+const ORG_DELETED_CODE = "ORG_DELETED";
+
+const LOCKOUT_COPY: Record<OrgLockout, { title: string; body: string }> = {
+  suspended: {
+    title: "This organization is suspended",
+    body: "Access has been paused by the DubGrid platform team. Contact support to restore it.",
+  },
+  deleted: {
+    title: "This organization has been deleted",
+    body: "Its subdomain no longer signs anyone in. Contact support if you believe this is a mistake.",
+  },
+};
+
+function initialLockout(seed: OrgLoginSeed, lockout: OrgLockout | null): OrgLockout | null {
+  if (lockout) return lockout;
+  if (seed.status === "deleted") return "deleted";
+  if (seed.status === "found" && seed.suspended) return "suspended";
+  return null;
+}
+
+export default function OrgLogin({
+  orgSlug,
+  seed,
+  lockout = null,
+}: {
+  orgSlug: string;
+  seed: OrgLoginSeed;
+  lockout?: OrgLockout | null;
+}) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [isHydrated, setIsHydrated] = useState(false);
@@ -220,7 +254,12 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
   // — cannot contribute to the server-rendered HTML, so the first frame would
   // always be the fallback. A prop is identical on both sides, so there is no
   // hydration mismatch either.
-  const [orgName, setOrgName] = useState<string | null>(seed.status === "found" ? seed.name : null);
+  const [orgName, setOrgName] = useState<string | null>(
+    seed.status === "found" || seed.status === "deleted" ? seed.name : null,
+  );
+  const [orgLockout, setOrgLockout] = useState<OrgLockout | null>(() =>
+    initialLockout(seed, lockout),
+  );
 
   const { theme } = useTheme();
   // The re-ask effect below may hop origins, and the apex has its own
@@ -297,6 +336,18 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
         }
         if (res.status === 403 && result?.code === ACCOUNT_DISABLED_CODE) {
           setAccountDisabled(true);
+          setPassword("");
+          setLoading(false);
+          return;
+        }
+        if (res.status === 403 && result?.code === ORG_SUSPENDED_CODE) {
+          setOrgLockout("suspended");
+          setPassword("");
+          setLoading(false);
+          return;
+        }
+        if (res.status === 403 && result?.code === ORG_DELETED_CODE) {
+          setOrgLockout("deleted");
           setPassword("");
           setLoading(false);
           return;
@@ -513,25 +564,35 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
               <DubGridWordmark />
             </a>
 
-            <p className="dg-auth-org-prefix">Sign in to</p>
-            <h1 className="dg-auth-heading">{orgName ?? orgSlug}</h1>
+            {orgLockout ? (
+              <div role="alert" data-testid="organization-lockout">
+                <p className="dg-auth-org-prefix">{orgName ?? orgSlug}</p>
+                <h1 className="dg-auth-heading">{LOCKOUT_COPY[orgLockout].title}</h1>
+                <p className="dg-form-hint dg-auth-progress">{LOCKOUT_COPY[orgLockout].body}</p>
+              </div>
+            ) : (
+              <>
+                <p className="dg-auth-org-prefix">Sign in to</p>
+                <h1 className="dg-auth-heading">{orgName ?? orgSlug}</h1>
 
-            {handoffFailed ? (
-              <p className="dg-form-error" role="alert">
-                We couldn't finish switching organizations. Sign in again.
-              </p>
-            ) : null}
+                {handoffFailed ? (
+                  <p className="dg-form-error" role="alert">
+                    We couldn't finish switching organizations. Sign in again.
+                  </p>
+                ) : null}
 
-            <EmailPasswordForm
-              email={email}
-              setEmail={setEmail}
-              password={password}
-              setPassword={setPassword}
-              loading={loading}
-              onSubmit={handleSubmit}
-              submitLabel={ACTION_SIGN_IN}
-              forgotPasswordHref="/forgot-password"
-            />
+                <EmailPasswordForm
+                  email={email}
+                  setEmail={setEmail}
+                  password={password}
+                  setPassword={setPassword}
+                  loading={loading}
+                  onSubmit={handleSubmit}
+                  submitLabel={ACTION_SIGN_IN}
+                  forgotPasswordHref="/forgot-password"
+                />
+              </>
+            )}
 
             {gridmasterPortalRequired ? (
               <p className="dg-form-hint dg-auth-progress" role="alert">

@@ -810,37 +810,20 @@ async function loadActiveRecurringStateDependencies(orgId: string) {
   return (data ?? []) as Array<{ id: string; state: ScheduleCellState }>;
 }
 
-async function loadActiveScheduleCellDependencies(orgId: string) {
-  const serviceClient = getServiceClient();
-  const { data, error } = await serviceClient
-    .from("schedule_cells")
-    .select(
-      `
-      id,
-      employees!inner(archived_at),
-      snapshots:schedule_cell_snapshots(
-        absence_type_id,
-        segments:schedule_cell_segments(
-          shift_id,
-          job_id
-        )
-      )
-    `,
-    )
-    .eq("org_id", orgId)
-    .is("employees.archived_at", null);
-
+// One server-side count instead of every cell with its snapshots and
+// segments (F-55). Archived employees' cells are excluded, as before.
+async function countScheduleCellUsage(
+  orgId: string,
+  usage: { shiftId?: number; jobId?: number; absenceTypeId?: number },
+): Promise<number> {
+  const { data, error } = await getServiceClient().rpc("count_schedule_cell_usage", {
+    p_org_id: orgId,
+    p_shift_id: usage.shiftId ?? null,
+    p_job_id: usage.jobId ?? null,
+    p_absence_type_id: usage.absenceTypeId ?? null,
+  });
   if (error) throw error;
-  return (data ?? []) as Array<{
-    id: string;
-    snapshots?: Array<{
-      absence_type_id?: number | null;
-      segments?: Array<{
-        shift_id?: number | null;
-        job_id?: number | null;
-      }> | null;
-    }> | null;
-  }>;
+  return typeof data === "number" ? data : 0;
 }
 
 // ─── hasAnyReferences checks ────────────────────────────────────────────────
@@ -862,50 +845,31 @@ async function loadAllRecurringStates(orgId: string): Promise<RecurringStateRow[
   return (data ?? []) as RecurringStateRow[];
 }
 
+// Segments and snapshots carry org_id, so "is this referenced anywhere,
+// current or historical" is a head count on the child table rather than a
+// scan of every cell (F-55).
 async function anyScheduleCellSegment(
   orgId: string,
-  match: (segment: { shift_id?: number | null; job_id?: number | null }) => boolean,
+  column: "shift_id" | "job_id",
+  id: number,
 ): Promise<boolean> {
-  const serviceClient = getServiceClient();
-  const { data, error } = await serviceClient
-    .from("schedule_cells")
-    .select(
-      `
-      id,
-      snapshots:schedule_cell_snapshots(
-        absence_type_id,
-        segments:schedule_cell_segments(
-          shift_id,
-          job_id
-        )
-      )
-    `,
-    )
-    .eq("org_id", orgId);
+  const { count, error } = await getServiceClient()
+    .from("schedule_cell_segments")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", orgId)
+    .eq(column, id);
   if (error) throw error;
-  return (data ?? []).some((cell: any) =>
-    (cell.snapshots ?? []).some((snap: any) =>
-      (snap.segments ?? []).some((seg: any) => match(seg)),
-    ),
-  );
+  return (count ?? 0) > 0;
 }
 
-async function anyScheduleCellSnapshot(
-  orgId: string,
-  match: (snapshot: { absence_type_id?: number | null }) => boolean,
-): Promise<boolean> {
-  const serviceClient = getServiceClient();
-  const { data, error } = await serviceClient
-    .from("schedule_cells")
-    .select(
-      `
-      id,
-      snapshots:schedule_cell_snapshots(absence_type_id)
-    `,
-    )
-    .eq("org_id", orgId);
+async function anyScheduleCellSnapshot(orgId: string, absenceTypeId: number): Promise<boolean> {
+  const { count, error } = await getServiceClient()
+    .from("schedule_cell_snapshots")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", orgId)
+    .eq("absence_type_id", absenceTypeId);
   if (error) throw error;
-  return (data ?? []).some((cell: any) => (cell.snapshots ?? []).some((snap: any) => match(snap)));
+  return (count ?? 0) > 0;
 }
 
 async function focusAreaHasAnyReferencesForOrg(
@@ -1065,7 +1029,7 @@ async function jobHasAnyReferencesForOrg(jobId: number, orgId: string): Promise<
   if ((coverageRes.count ?? 0) > 0) return true;
 
   const [cellHasJob, recurring] = await Promise.all([
-    anyScheduleCellSegment(orgId, (seg) => seg.job_id === jobId),
+    anyScheduleCellSegment(orgId, "job_id", jobId),
     loadAllRecurringStates(orgId),
   ]);
   if (cellHasJob) return true;
@@ -1085,7 +1049,7 @@ async function shiftCategoryHasAnyReferencesForOrg(
   if ((coverageRes.count ?? 0) > 0) return true;
 
   const [cellHasShift, recurring] = await Promise.all([
-    anyScheduleCellSegment(orgId, (seg) => seg.shift_id === categoryId),
+    anyScheduleCellSegment(orgId, "shift_id", categoryId),
     loadAllRecurringStates(orgId),
   ]);
   if (cellHasShift) return true;
@@ -1105,7 +1069,7 @@ async function absenceTypeHasAnyReferencesForOrg(
   if ((shiftReqRes.count ?? 0) > 0) return true;
 
   const [cellHasAbsence, recurring] = await Promise.all([
-    anyScheduleCellSnapshot(orgId, (snap) => snap.absence_type_id === absenceTypeId),
+    anyScheduleCellSnapshot(orgId, absenceTypeId),
     loadAllRecurringStates(orgId),
   ]);
   if (cellHasAbsence) return true;
@@ -1280,8 +1244,8 @@ async function checkShiftCategoryDependenciesForOrg(
   // job exists, so counting them would always report "used". Real usage
   // surfaces via schedule cells, recurring templates, and coverage rules.
   const serviceClient = getServiceClient();
-  const [scheduleCells, recurringStates, coverageRes, hasAny] = await Promise.all([
-    loadActiveScheduleCellDependencies(orgId),
+  const [scheduleCount, recurringStates, coverageRes, hasAny] = await Promise.all([
+    countScheduleCellUsage(orgId, { shiftId: categoryId }),
     loadActiveRecurringStateDependencies(orgId),
     serviceClient
       .from("coverage_requirements")
@@ -1291,11 +1255,6 @@ async function checkShiftCategoryDependenciesForOrg(
     shiftCategoryHasAnyReferencesForOrg(categoryId, orgId),
   ]);
 
-  const scheduleCount = scheduleCells.filter((cell) =>
-    (cell.snapshots ?? []).some((snapshot) =>
-      (snapshot.segments ?? []).some((segment) => segment.shift_id === categoryId),
-    ),
-  ).length;
   const recurringCount = recurringStates.filter((row) =>
     recurringStateUsesShift(row.state, categoryId),
   ).length;
@@ -1316,8 +1275,8 @@ async function checkShiftCategoryDependenciesForOrg(
 
 async function checkJobDependenciesForOrg(jobId: number, orgId: string): Promise<DependencyInfo> {
   const serviceClient = getServiceClient();
-  const [scheduleCells, recurringStates, coverageRes, hasAny] = await Promise.all([
-    loadActiveScheduleCellDependencies(orgId),
+  const [scheduleCount, recurringStates, coverageRes, hasAny] = await Promise.all([
+    countScheduleCellUsage(orgId, { jobId }),
     loadActiveRecurringStateDependencies(orgId),
     serviceClient
       .from("coverage_requirements")
@@ -1326,12 +1285,6 @@ async function checkJobDependenciesForOrg(jobId: number, orgId: string): Promise
       .eq("job_id", jobId),
     jobHasAnyReferencesForOrg(jobId, orgId),
   ]);
-
-  const scheduleCount = scheduleCells.filter((cell) =>
-    (cell.snapshots ?? []).some((snapshot) =>
-      (snapshot.segments ?? []).some((segment) => segment.job_id === jobId),
-    ),
-  ).length;
 
   const recurringCount = recurringStates.filter((row) =>
     recurringStateUsesJob(row.state, jobId),
@@ -1355,15 +1308,11 @@ async function checkAbsenceTypeDependenciesForOrg(
   absenceTypeId: number,
   orgId: string,
 ): Promise<DependencyInfo> {
-  const [scheduleCells, recurringStates, hasAny] = await Promise.all([
-    loadActiveScheduleCellDependencies(orgId),
+  const [scheduleCount, recurringStates, hasAny] = await Promise.all([
+    countScheduleCellUsage(orgId, { absenceTypeId }),
     loadActiveRecurringStateDependencies(orgId),
     absenceTypeHasAnyReferencesForOrg(absenceTypeId, orgId),
   ]);
-
-  const scheduleCount = scheduleCells.filter((cell) =>
-    (cell.snapshots ?? []).some((snapshot) => snapshot.absence_type_id === absenceTypeId),
-  ).length;
 
   const recurringCount = recurringStates.filter((row) =>
     recurringStateUsesAbsenceType(row.state, absenceTypeId),

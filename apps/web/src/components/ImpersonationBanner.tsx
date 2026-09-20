@@ -10,6 +10,8 @@ import {
   type ImpersonationData,
 } from "@/lib/impersonation";
 import { endGridmasterImpersonation } from "@/features/gridmaster/client";
+import { formatOrganizationRoleLabel } from "@/lib/client-facing";
+import { markAuthTransition } from "@/lib/auth-transition";
 import { Button } from "@/components/Button";
 import { MaybeHint } from "@/components/ui/hint";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -48,8 +50,9 @@ export default function ImpersonationBanner() {
       if (diff <= 0) {
         setCountdown(null);
         clearImpersonationCookie();
-        queryClient.clear();
         setImp(null);
+        markAuthTransition();
+        queryClient.clear();
         window.location.replace("/dashboard");
         return;
       }
@@ -86,8 +89,14 @@ export default function ImpersonationBanner() {
       // Best-effort — cookie clear + redirect is what matters
     }
     clearImpersonationCookie();
-    queryClient.clear();
     toast.success("Impersonation ended");
+    // Mark the transition before anything else tears down: clearing the
+    // cache mid-flight surfaced a transient null session that ProtectedRoute
+    // answered with a bounce to /login on Firefox (F-73), and the mark holds
+    // that guard until the portal document has taken over. The clear itself
+    // stays, right before the load, so no prior-tenant state outlives it.
+    markAuthTransition();
+    queryClient.clear();
     window.location.replace("/dashboard");
   }
 
@@ -111,8 +120,8 @@ export default function ImpersonationBanner() {
     >
       <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <User size={16} strokeWidth={2.5} />
-        Impersonating <strong>{imp.targetEmail}</strong>
-        {imp.targetOrgName && <span>({imp.targetOrgName})</span>}
+        Viewing <strong>{imp.targetOrgName || "organization"}</strong> as{" "}
+        {formatOrganizationRoleLabel(imp.targetOrgRole).toLowerCase()} ({imp.targetEmail})
         {imp.justification && (
           <MaybeHint content={imp.justification} side="bottom">
             <span

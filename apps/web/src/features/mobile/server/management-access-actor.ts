@@ -9,7 +9,13 @@ import {
 /**
  * Shared gate for every route that writes someone's access: granting management
  * departments and setting org roles are both super_admin-or-gridmaster, the same
- * bar web holds them behind, and never something you may do to your own account.
+ * bar web holds them behind.
+ *
+ * Your own account is off limits by default, as it is for a role change. The
+ * management-department routes opt in to `allowSelf`: web lets a super admin
+ * edit their own management departments from their profile, and the mobile
+ * profile does the same. The org role stays out of reach either way; a route
+ * that allows self must refuse a role change on it separately.
  *
  * It sits in its own module rather than beside `loadMobilePersonWithAccess`
  * because the route tests stub that loader wholesale; sharing a module would
@@ -18,7 +24,11 @@ import {
 export async function requireManagementAccessActor(
   req: NextRequest,
   employeeId: string,
-): Promise<{ response: NextResponse } | { auth: MobileAuthContext; loaded: LoadedMobilePerson }> {
+  { allowSelf = false }: { allowSelf?: boolean } = {},
+): Promise<
+  | { response: NextResponse }
+  | { auth: MobileAuthContext; loaded: LoadedMobilePerson; isSelf: boolean }
+> {
   const auth = await requireMobileAuth(req);
   if ("response" in auth) return auth;
 
@@ -47,14 +57,17 @@ export async function requireManagementAccessActor(
       ),
     };
   }
-  if (loaded.userId && loaded.userId === auth.user.id) {
-    return {
-      response: NextResponse.json(
-        { error: SELF_ACTION_FORBIDDEN_MESSAGE, code: SELF_ACTION_FORBIDDEN_CODE },
-        { status: 403 },
-      ),
-    };
+  const isSelf = Boolean(loaded.userId && loaded.userId === auth.user.id);
+  if (isSelf && !allowSelf) {
+    return { response: selfActionForbiddenResponse() };
   }
 
-  return { auth, loaded };
+  return { auth, loaded, isSelf };
+}
+
+export function selfActionForbiddenResponse() {
+  return NextResponse.json(
+    { error: SELF_ACTION_FORBIDDEN_MESSAGE, code: SELF_ACTION_FORBIDDEN_CODE },
+    { status: 403 },
+  );
 }

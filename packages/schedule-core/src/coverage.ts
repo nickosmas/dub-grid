@@ -668,6 +668,61 @@ export function summarizeCoverageByFocusArea(
     .filter((entry) => entry.requiredTotal > 0);
 }
 
+export type CoverageDayStatus = "green" | "amber" | "red" | "none";
+
+export interface CoverageDailyEntry {
+  dateKey: string;
+  filledCount: number;
+  requiredCount: number;
+  status: CoverageDayStatus;
+}
+
+function localDateKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * Per-day filled/required for one focus area, in the order of `dates`. Same
+ * arithmetic as web's dashboard coverage grid: a day with no requirement is
+ * `none`, fully staffed is `green`, partly staffed `amber`, empty `red`.
+ */
+export function summarizeCoverageDailyForFocusArea(
+  snapshots: ReadonlyArray<CoverageCategorySnapshot>,
+  focusAreaId: number,
+  dates: ReadonlyArray<Date>,
+): CoverageDailyEntry[] {
+  const totalsByDate = new Map<string, { filled: number; required: number }>();
+  for (const snapshot of snapshots) {
+    if (snapshot.focusAreaId !== focusAreaId) continue;
+    const key = localDateKey(snapshot.date);
+    const totals = totalsByDate.get(key) ?? { filled: 0, required: 0 };
+    totals.required += snapshot.status.required;
+    totals.filled += Math.min(snapshot.status.actual, snapshot.status.required);
+    totalsByDate.set(key, totals);
+  }
+  return dates.map((date) => {
+    const key = localDateKey(date);
+    const totals = totalsByDate.get(key) ?? { filled: 0, required: 0 };
+    const status: CoverageDayStatus =
+      totals.required === 0
+        ? "none"
+        : totals.filled >= totals.required
+          ? "green"
+          : totals.filled > 0
+            ? "amber"
+            : "red";
+    return {
+      dateKey: key,
+      filledCount: totals.filled,
+      requiredCount: totals.required,
+      status,
+    };
+  });
+}
+
 export type OpenShiftUrgency = "high" | "medium" | "low";
 
 /** High: today/tomorrow. Medium: within 3 days. Low: further out or already past. */

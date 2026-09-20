@@ -51,10 +51,14 @@ import { getSupabaseClient } from "../../../shared/lib/supabase";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
+import { ManagementAccessSheet } from "../../people/components/ManagementAccessSheet";
+import { SectionNotice } from "../../people/components/SectionNotice";
+import type { ManagementAccessSubject } from "../../people/lib/managementAccess";
 import {
   ProfileChoiceGroup,
   ProfileInfoRow,
   ProfileList,
+  ProfileNavRow,
   ProfilePanel,
   ProfileSection,
   ProfileTextInput,
@@ -151,8 +155,19 @@ function getProfileEditFieldErrors(
   {
     canEditProfileDirectly,
     hasLinkedEmployee,
+    isManagementUser,
     focusAreaLabel,
-  }: { canEditProfileDirectly: boolean; hasLinkedEmployee: boolean; focusAreaLabel: string },
+  }: {
+    canEditProfileDirectly: boolean;
+    hasLinkedEmployee: boolean;
+    /**
+     * Someone with management departments can come off the schedule without
+     * being orphaned, the same allowance the person page and web's editor
+     * make; for anyone else an empty set is a missing answer.
+     */
+    isManagementUser: boolean;
+    focusAreaLabel: string;
+  },
 ) {
   return {
     firstName: getStaffNameError(draft.firstName, "First name"),
@@ -162,7 +177,10 @@ function getProfileEditFieldErrors(
     contactNotes: getStaffNotesError(draft.contactNotes),
     requestNote: getStaffNotesError(draft.requestNote),
     focusAreaIds:
-      canEditProfileDirectly && hasLinkedEmployee && draft.focusAreaIds.length === 0
+      canEditProfileDirectly &&
+      hasLinkedEmployee &&
+      !isManagementUser &&
+      draft.focusAreaIds.length === 0
         ? `Select at least one ${singularLabelNoun(focusAreaLabel)}.`
         : null,
   };
@@ -225,6 +243,31 @@ export default function ProfileWorkScreen() {
     profile?.managementDepartmentIds ?? [],
     bootstrapQuery.data?.departments,
   );
+  const isManagementUser = (profile?.managementDepartmentIds.length ?? 0) > 0;
+  // Super-admin/gridmaster only, the same bar web holds management access
+  // behind on its profile page: the row below opens the same sheet a manager
+  // uses on a teammate, aimed at your own membership.
+  const canManageManagementAccess = Boolean(
+    bootstrapQuery.data?.permissions.canManageManagementAccess,
+  );
+  const managementDepartments = (bootstrapQuery.data?.departments ?? []).filter(
+    (department) => department.type === "management",
+  );
+  const [showManagementAccess, setShowManagementAccess] = useState(false);
+  const managementSubject: ManagementAccessSubject | null =
+    profile && linkedEmployee
+      ? {
+          id: linkedEmployee.id,
+          firstName: linkedEmployee.firstName,
+          lastName: linkedEmployee.lastName,
+          email: linkedEmployee.email,
+          orgRole: profile.currentMembership.orgRole,
+          userId: profile.user.id,
+          membershipUpdatedAt: profile.membershipUpdatedAt,
+          managementDepartmentIds: profile.managementDepartmentIds,
+          pendingInvitation: null,
+        }
+      : null;
   useEffect(() => {
     if (!profile) return;
     const identityKey = `${accessToken ?? "anonymous"}:${profile.user.id}:${linkedEmployee?.id ?? "no-employee"}`;
@@ -396,6 +439,7 @@ export default function ProfileWorkScreen() {
       ? getProfileEditFieldErrors(draft, {
           canEditProfileDirectly,
           hasLinkedEmployee: Boolean(linkedEmployee),
+          isManagementUser,
           focusAreaLabel: profile.currentOrg.labels.focusArea,
         })
       : null;
@@ -526,10 +570,27 @@ export default function ProfileWorkScreen() {
                     ) : null}
                     <ProfileInfoRow
                       iconName="business-outline"
+                      isLast={!canManageManagementAccess && managementDepartmentNames.length === 0}
                       label={profile.currentOrg.labels.department}
                       value={departmentNames.length > 0 ? departmentNames.join(", ") : "Not set"}
                     />
-                    {managementDepartmentNames.length > 0 ? (
+                    {/* Your own management departments, editable where web
+                        lets a super admin edit them, from the same sheet a
+                        manager gets on a teammate. Clearing every department
+                        there is how management access is given up. */}
+                    {canManageManagementAccess && managementSubject ? (
+                      <ProfileNavRow
+                        iconName="briefcase-outline"
+                        isLast
+                        label={MANAGEMENT_DEPARTMENT_LABELS.plural}
+                        value={
+                          managementDepartmentNames.length > 0
+                            ? managementDepartmentNames.join(", ")
+                            : "Not in management"
+                        }
+                        onPress={() => setShowManagementAccess(true)}
+                      />
+                    ) : managementDepartmentNames.length > 0 ? (
                       <ProfileInfoRow
                         iconName="briefcase-outline"
                         isLast
@@ -548,6 +609,7 @@ export default function ProfileWorkScreen() {
                 focusAreaLabel={profile.currentOrg.labels.focusArea}
                 focusAreas={focusAreas}
                 hasLinkedEmployee={Boolean(linkedEmployee)}
+                isManagementUser={isManagementUser}
                 isNameRequest={isNameRequest}
                 onChange={(nextDraft) => {
                   draftTouchedRef.current = true;
@@ -587,6 +649,15 @@ export default function ProfileWorkScreen() {
         visible={showSaveConfirmation}
       />
       <ConfirmationModal {...guard.confirmationProps} />
+      {canManageManagementAccess && managementSubject ? (
+        <ManagementAccessSheet
+          isSelf
+          managementDepartments={managementDepartments}
+          onDismiss={() => setShowManagementAccess(false)}
+          person={managementSubject}
+          visible={showManagementAccess}
+        />
+      ) : null}
     </Screen>
   );
 }
@@ -599,6 +670,7 @@ function EditPanel({
   focusAreaLabel,
   focusAreas,
   hasLinkedEmployee,
+  isManagementUser,
   isNameRequest,
   onChange,
   roleLabel,
@@ -613,6 +685,7 @@ function EditPanel({
   focusAreaLabel: string;
   focusAreas: MobileFocusArea[];
   hasLinkedEmployee: boolean;
+  isManagementUser: boolean;
   isNameRequest: boolean;
   onChange: (draft: ProfileDraft) => void;
   roleLabel: string;
@@ -627,8 +700,16 @@ function EditPanel({
   const fieldErrors = getProfileEditFieldErrors(draft, {
     canEditProfileDirectly,
     hasLinkedEmployee,
+    isManagementUser,
     focusAreaLabel,
   });
+  // Raised once for the whole section, the way the person page does: only a
+  // management user can come off the schedule at all, and for them an empty
+  // set is a consequence of saving rather than a missing answer.
+  const assignmentNotices =
+    isManagementUser && draft.focusAreaIds.length === 0
+      ? ["Saving now removes you from the schedule. You'll keep management access."]
+      : [];
 
   const setField = <K extends keyof ProfileDraft>(key: K, value: ProfileDraft[K]) => {
     onChange({ ...draft, [key]: value });
@@ -742,6 +823,7 @@ function EditPanel({
           </ProfileSection>
 
           <ProfileSection title="Assignments">
+            <SectionNotice messages={assignmentNotices} />
             <ProfileChoiceGroup
               error={fieldErrors.focusAreaIds}
               items={focusAreas.map((item) => ({

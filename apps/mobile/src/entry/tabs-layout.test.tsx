@@ -224,11 +224,12 @@ describe("TabsLayout", () => {
     render(<PeopleLayout />);
     render(<ProfileLayout />);
 
-    // Profile contributes nine: index, account, work, security, and the three
+    // Profile contributes ten: index, account, work, security, and the three
     // security flows split out of it (password, two-factor, sessions), plus
-    // notifications and privacy. People contributes its tab root and add form;
-    // Staff Profile deliberately lives above the tabs in the root stack.
-    expect(stackScreenMock).toHaveBeenCalledTimes(12);
+    // calendar subscription, notifications and privacy. People contributes
+    // its tab root and add form; Staff Profile deliberately lives above the
+    // tabs in the root stack.
+    expect(stackScreenMock).toHaveBeenCalledTimes(13);
     const requestsOptions = stackScreenMock.mock.calls[0]?.[0].options;
     const peopleOptions = stackScreenMock.mock.calls[1]?.[0].options;
     const profileOptions = stackScreenMock.mock.calls[3]?.[0].options;
@@ -290,6 +291,7 @@ describe("TabsLayout", () => {
       "password",
       "two-factor",
       "sessions",
+      "calendar",
       "notifications",
       "privacy",
     ]);

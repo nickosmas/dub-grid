@@ -1,8 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { NativeTabBarPresenceProvider } from "../navigation/NativeTabBarPresence";
+import { mobileSpacing } from "../theme/tokens";
 
 const nativeScrollTo = vi.fn();
+const nativeScrollToOffset = vi.fn();
 // Mutable so a test can stand the screen under a real notch. The default 8 is
 // deliberately small: it is also the floor the sticky header pads by, so a test
 // that wants to see the inset applied has to raise it first.
@@ -150,7 +152,58 @@ vi.mock("react-native", async () => {
       children as React.ReactNode,
     );
 
+  // Renders every item so list-mode tests can assert the header/items/footer
+  // order and the shared scroll props; virtualization itself is native.
+  const FlatList = React.forwardRef<{ scrollToOffset: () => void }, Record<string, any>>(
+    (
+      {
+        data,
+        renderItem,
+        keyExtractor,
+        ListHeaderComponent,
+        ListHeaderComponentStyle,
+        ListFooterComponent,
+        ItemSeparatorComponent,
+        contentContainerStyle,
+        refreshControl,
+        ...props
+      },
+      ref,
+    ) => {
+      React.useImperativeHandle(ref, () => ({ scrollToOffset: nativeScrollToOffset }), []);
+      const items = (data as unknown[]).map((item, index) =>
+        React.createElement(
+          React.Fragment,
+          { key: keyExtractor(item, index) },
+          index > 0 && ItemSeparatorComponent ? React.createElement(ItemSeparatorComponent) : null,
+          renderItem({ item, index }),
+        ),
+      );
+      return React.createElement(
+        "div",
+        {
+          ...pickDomProps(props),
+          "data-content-container-style": JSON.stringify(contentContainerStyle),
+          "data-content-inset-adjustment-behavior": props.contentInsetAdjustmentBehavior,
+          "data-testid": "screen-flat-list",
+        },
+        refreshControl as React.ReactNode,
+        React.createElement(
+          "div",
+          {
+            "data-testid": "screen-list-header",
+            "data-style": JSON.stringify(ListHeaderComponentStyle ?? null),
+          },
+          ListHeaderComponent as React.ReactNode,
+        ),
+        ...items,
+        ListFooterComponent as React.ReactNode,
+      );
+    },
+  );
+
   return {
+    FlatList,
     Platform: {
       OS: "ios",
     },
@@ -323,6 +376,79 @@ describe("Screen", () => {
     expect(footerStyle).toEqual(
       expect.arrayContaining([expect.objectContaining({ paddingBottom: 79 })]),
     );
+  });
+
+  it("renders a virtualized list with the children as its header", () => {
+    const scrollViewRef = { current: null } as {
+      current: { scrollTo: (o: unknown) => void } | null;
+    };
+    render(
+      <Screen
+        list={{
+          data: ["a", "b", "c"],
+          keyExtractor: (item) => item,
+          renderItem: (item) => <span>row {item}</span>,
+          itemSeparator: <hr />,
+          listFooter: <span>Load more</span>,
+        }}
+        onRefresh={() => undefined}
+        scrollViewRef={scrollViewRef as never}
+      >
+        <div>Search</div>
+      </Screen>,
+    );
+
+    const list = screen.getByTestId("screen-flat-list");
+    expect(screen.queryByTestId("screen-scroll-view")).toBeNull();
+    expect(list.getAttribute("data-content-inset-adjustment-behavior")).toBe("automatic");
+    expect(JSON.parse(list.getAttribute("data-content-container-style") ?? "{}")).toMatchObject({
+      flexGrow: 1,
+    });
+    // Header, rows in order with separators between them, footer last.
+    const text = list.textContent ?? "";
+    expect(text.indexOf("Search")).toBeLessThan(text.indexOf("row a"));
+    expect(text.indexOf("row c")).toBeLessThan(text.indexOf("Load more"));
+    expect(list.querySelectorAll("hr")).toHaveLength(2);
+    expect(screen.getByTestId("refresh-control")).toBeInTheDocument();
+    // With rows the header keeps a section gap above the first one and does
+    // not stretch.
+    expect(
+      JSON.parse(screen.getByTestId("screen-list-header").getAttribute("data-style") ?? "null"),
+    ).toEqual({ paddingBottom: mobileSpacing.sectionGap });
+
+    scrollViewRef.current?.scrollTo({ y: 40, animated: false });
+    expect(nativeScrollToOffset).toHaveBeenCalledWith({ offset: 40, animated: false });
+  });
+
+  it("lets a list screen choose a tighter gap between its header and first row", () => {
+    render(
+      <Screen
+        list={{
+          data: ["a"],
+          keyExtractor: (item) => item,
+          renderItem: (item) => <span>{item}</span>,
+          headerGap: 12,
+        }}
+      >
+        <div>Header</div>
+      </Screen>,
+    );
+
+    expect(
+      JSON.parse(screen.getByTestId("screen-list-header").getAttribute("data-style") ?? "null"),
+    ).toEqual({ paddingBottom: 12 });
+  });
+
+  it("lets a fillScreen state in the header claim the page when the list is empty", () => {
+    render(
+      <Screen list={{ data: [], keyExtractor: (item: string) => item, renderItem: () => null }}>
+        <div>Nothing here</div>
+      </Screen>,
+    );
+
+    expect(
+      JSON.parse(screen.getByTestId("screen-list-header").getAttribute("data-style") ?? "null"),
+    ).toMatchObject({ flexGrow: 1 });
   });
 
   it("forwards scroll events to callers", () => {

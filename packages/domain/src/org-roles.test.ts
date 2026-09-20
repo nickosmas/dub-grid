@@ -24,9 +24,9 @@ describe("getEffectiveOrgRole", () => {
 });
 
 describe("getOrgRoleInsignia", () => {
-  it("crowns a super admin and stars an admin", () => {
-    expect(getOrgRoleInsignia("super_admin")).toBe("crown");
-    expect(getOrgRoleInsignia("admin")).toBe("star");
+  it("gives a super admin a gold star and an admin a blue one", () => {
+    expect(getOrgRoleInsignia("super_admin")).toBe("gold");
+    expect(getOrgRoleInsignia("admin")).toBe("blue");
   });
 
   it("leaves a plain user unmarked", () => {

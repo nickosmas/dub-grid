@@ -930,7 +930,11 @@ function DepartmentSection({
             const motion = departmentReorder.getItemMotion(dept);
             const childFAs =
               type === "scheduled" ? faByDept(dept.id, isEditing ? localFAs : propFAs) : [];
+            // Zero focus areas is a real state (a wizard save interrupted
+            // between its two requests leaves it, F-92), and the row must
+            // offer a way out of it, not only Delete.
             const hasMultipleFAs = childFAs.length > 1;
+            const showFocusAreaRows = type === "scheduled" && childFAs.length !== 1;
             const isSingleFA = type === "scheduled" && childFAs.length === 1;
 
             return (
@@ -1084,8 +1088,14 @@ function DepartmentSection({
                 </div>
 
                 {/* ── Focus area sub-rows (scheduled only) ─────────────────── */}
-                {type === "scheduled" && hasMultipleFAs && (
+                {showFocusAreaRows && (
                   <>
+                    {childFAs.length === 0 && isEditing && (
+                      <p className="dg-form-hint" style={{ margin: 0, padding: "6px 16px 0 60px" }}>
+                        No {focusAreaLabel.toLowerCase()} yet. Add one so shifts can be scheduled
+                        here.
+                      </p>
+                    )}
                     <FocusAreaRows
                       deptId={dept.id}
                       focusAreas={childFAs}

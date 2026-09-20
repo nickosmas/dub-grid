@@ -14,13 +14,36 @@ vi.mock("@expo/vector-icons/Ionicons", () => ({
 }));
 
 let BottomSheetModal: (typeof import("./BottomSheetModal"))["BottomSheetModal"];
+let SheetHeader: (typeof import("./BottomSheetModal"))["SheetHeader"];
 
 beforeAll(async () => {
-  BottomSheetModal = (await import("./BottomSheetModal")).BottomSheetModal;
+  ({ BottomSheetModal, SheetHeader } = await import("./BottomSheetModal"));
 });
 
 beforeEach(() => {
   resetSheetPresentationTracking();
+});
+
+describe("SheetHeader", () => {
+  // A title naming a person ("Deactivate Margaret Sullivan?") used to run
+  // under the close button on one fixed line. It keeps the fixed, unscaled
+  // size of chrome but may take a second line, and the header itself leaves
+  // the button's column clear (a style, which this harness cannot read).
+  it("holds its size and takes a second line rather than truncating a name", () => {
+    render(
+      <BottomSheetModal
+        visible
+        onDismiss={vi.fn()}
+        header={<SheetHeader title="Deactivate Margaret Sullivan?" />}
+      >
+        <span>Body</span>
+      </BottomSheetModal>,
+    );
+
+    const title = screen.getByText("Deactivate Margaret Sullivan?");
+    expect(title).toHaveAttribute("data-number-of-lines", "2");
+    expect(title).toHaveAttribute("data-allow-font-scaling", "false");
+  });
 });
 
 describe("BottomSheetModal close button", () => {

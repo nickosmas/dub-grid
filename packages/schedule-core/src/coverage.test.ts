@@ -7,6 +7,7 @@ import {
   computeCoverageStatus,
   resolveRequirementByAssignment,
   summarizeCoverageByFocusArea,
+  summarizeCoverageDailyForFocusArea,
   summarizeCoverageTotals,
   type CoverageAssignmentDefinitionLike,
   type CoverageEmployeeLike,
@@ -243,6 +244,56 @@ describe("summarizeCoverageByFocusArea", () => {
     const result = summarizeCoverageByFocusArea(snapshots, focusAreas);
     expect(result).toEqual([
       { focusAreaId: 1, focusAreaName: "ICU", filledTotal: 1, requiredTotal: 2, pct: 50 },
+    ]);
+  });
+});
+
+describe("summarizeCoverageDailyForFocusArea", () => {
+  it("answers one entry per requested date with the day's staffing status", () => {
+    const monday = new Date(2026, 8, 21);
+    const tuesday = new Date(2026, 8, 22);
+    const wednesday = new Date(2026, 8, 23);
+    const base = {
+      focusAreaId: 1,
+      focusAreaName: "ICU",
+      shiftCategoryId: 1,
+      shiftCategoryName: "Day",
+      eligibleAssignmentDefinitionIds: [],
+      preferredOpenAssignmentDefinitionId: 1,
+      shortageDetails: [],
+    };
+    const snapshots = [
+      {
+        ...base,
+        date: monday,
+        status: { actual: 2, required: 2, isMet: true, hasRequirement: true },
+      },
+      {
+        ...base,
+        date: monday,
+        shiftCategoryId: 2,
+        status: { actual: 3, required: 1, isMet: true, hasRequirement: true },
+      },
+      {
+        ...base,
+        date: tuesday,
+        status: { actual: 1, required: 3, isMet: false, hasRequirement: true },
+      },
+      {
+        ...base,
+        focusAreaId: 2,
+        date: wednesday,
+        status: { actual: 0, required: 5, isMet: false, hasRequirement: true },
+      },
+    ];
+
+    expect(summarizeCoverageDailyForFocusArea(snapshots, 1, [monday, tuesday, wednesday])).toEqual([
+      { dateKey: "2026-09-21", filledCount: 3, requiredCount: 3, status: "green" },
+      { dateKey: "2026-09-22", filledCount: 1, requiredCount: 3, status: "amber" },
+      { dateKey: "2026-09-23", filledCount: 0, requiredCount: 0, status: "none" },
+    ]);
+    expect(summarizeCoverageDailyForFocusArea(snapshots, 2, [wednesday])).toEqual([
+      { dateKey: "2026-09-23", filledCount: 0, requiredCount: 5, status: "red" },
     ]);
   });
 });

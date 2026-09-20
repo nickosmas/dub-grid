@@ -109,7 +109,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     },
     detailInfoStack: {
       width: "100%",
-      gap: mobileSpace.sm,
+      gap: mobileSpace.md,
     },
     detailSplitNotice: {
       ...mobileText.bodyStrong,
@@ -130,7 +130,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       minHeight: 44,
       flexDirection: "row",
       alignItems: "center",
-      gap: mobileSpace.sm,
+      gap: mobileSpace.md,
     },
     detailPreviousShiftFooter: {
       minHeight: 48,
@@ -171,13 +171,23 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       alignItems: "center",
       gap: mobileSpace.md,
     },
-    // A bare muted glyph, matching how the home card sets a time or a focus
-    // area beside its copy. The tinted, bordered 32pt tile this replaced had no
-    // counterpart left anywhere else: the shared Card dropped its icon frame,
-    // so the detail screen was the only surface still drawing one.
-    detailInfoIcon: {
-      width: 18,
+    // A tinted, fill-only tile with a hue per row, so the card scans by colour
+    // the way the profile rows do. Its bordered predecessor was dropped when
+    // the shared Card lost its icon frame; this one carries no stroke.
+    detailIconTile: {
+      width: 32,
+      height: 32,
+      // A rounded square, not a circle: the same 10-on-32 the profile rows use,
+      // so the tile reads as a frame the glyph sits in rather than a bubble.
+      borderRadius: mobileRadius.lg,
       alignItems: "center",
+      justifyContent: "center",
+    },
+    detailIconTileBlue: {
+      backgroundColor: mobileColors.brandSoft,
+    },
+    detailIconTileGreen: {
+      backgroundColor: mobileColors.successSoft,
     },
     detailInfoCopy: {
       flex: 1,

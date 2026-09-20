@@ -104,6 +104,27 @@ describe("OrganizationSetupWizard", () => {
     vi.unstubAllGlobals();
   });
 
+  it("labels the details and super admin fields for assistive technology", async () => {
+    const user = userEvent.setup();
+    render(<OrganizationSetupWizard onCreated={vi.fn()} onCancel={vi.fn()} />);
+
+    expect(screen.getByLabelText(/organization name/i)).toHaveAttribute(
+      "placeholder",
+      "Acme Healthcare",
+    );
+    expect(screen.getByLabelText(/focus areas label/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/certifications label/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/roles label/i)).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/organization name/i), "Acme Health");
+    await user.click(screen.getByRole("button", { name: /^next$/i }));
+
+    expect(screen.getByLabelText(/first name/i)).toHaveAttribute("placeholder", "Jane");
+    expect(screen.getByLabelText(/last name/i)).toHaveAttribute("placeholder", "Doe");
+    expect(screen.getByLabelText(/^email/i)).toHaveAttribute("type", "email");
+    expect(screen.getByLabelText(/phone/i)).toHaveAttribute("type", "tel");
+  });
+
   it(
     "removes editable employee count from org details and shows read-only counts in the employee step",
     { timeout: 10000 },

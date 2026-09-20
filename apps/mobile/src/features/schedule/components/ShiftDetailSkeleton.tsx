@@ -3,6 +3,7 @@ import { StyleSheet, View } from "react-native";
 import {
   SkeletonCircle,
   SkeletonGroup,
+  SkeletonIcon,
   SkeletonLine,
   SkeletonPill,
   skeletonRows,
@@ -57,8 +58,8 @@ export function ShiftDetailSkeleton({
           <View style={detailStyles.detailSummaryContent}>
             {/* The card as it renders: the shift name alone at heroMetric
                 (its subtitle is a teammate's name, shown only on their
-                shift), then each info row's label over its value beside a
-                16pt icon. */}
+                shift), then each info row's label over its value beside its
+                32pt icon tile. */}
             <View style={detailStyles.detailHeroHeader}>
               <View style={detailStyles.detailHeroCopy}>
                 <SkeletonLine variant="heroMetric" width="56%" />
@@ -67,9 +68,7 @@ export function ShiftDetailSkeleton({
             <View style={detailStyles.detailInfoStack}>
               {skeletonRows(infoRows, (index) => (
                 <View key={`detail-info-${index}`} style={detailStyles.detailInfoRow}>
-                  <View style={detailStyles.detailInfoIcon}>
-                    <SkeletonCircle size={16} />
-                  </View>
+                  <SkeletonIcon />
                   <View style={detailStyles.detailInfoCopy}>
                     <SkeletonLine variant="label" width={index === 0 ? 64 : 76} />
                     <SkeletonLine
@@ -93,7 +92,7 @@ export function ShiftDetailSkeleton({
           </View>
         ) : null}
         <View style={detailStyles.detailPublishedFooter}>
-          <SkeletonCircle size={16} />
+          <SkeletonCircle size={20} />
           <View style={styles.infoCopy}>
             <SkeletonLine variant="meta" width="92%" />
           </View>

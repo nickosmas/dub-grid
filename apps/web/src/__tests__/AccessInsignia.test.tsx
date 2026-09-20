@@ -3,15 +3,15 @@ import { describe, expect, it } from "vitest";
 import { AccessInsignia } from "@/components/staff/AccessInsignia";
 
 describe("AccessInsignia", () => {
-  it("crowns a super admin", () => {
+  it("gives a super admin a gold star", () => {
     render(<AccessInsignia orgRole="super_admin" />);
 
     const insignia = screen.getByRole("img", { name: "Super Admin" });
     expect(insignia).toBeInTheDocument();
-    expect(insignia).toHaveStyle({ background: "var(--dg-color-insignia-crown)" });
+    expect(insignia).toHaveStyle({ background: "var(--dg-color-insignia-gold)" });
   });
 
-  it("stars an admin", () => {
+  it("gives an admin a blue star", () => {
     render(<AccessInsignia orgRole="admin" />);
 
     const insignia = screen.getByRole("img", { name: "Admin" });
@@ -32,9 +32,9 @@ describe("AccessInsignia", () => {
 
   it("grows with the name it follows", () => {
     const { rerender } = render(<AccessInsignia orgRole="admin" />);
-    expect(screen.getByRole("img", { name: "Admin" })).toHaveStyle({ width: "16px" });
+    expect(screen.getByRole("img", { name: "Admin" })).toHaveStyle({ width: "14px" });
 
     rerender(<AccessInsignia orgRole="admin" size="lg" />);
-    expect(screen.getByRole("img", { name: "Admin" })).toHaveStyle({ width: "26px" });
+    expect(screen.getByRole("img", { name: "Admin" })).toHaveStyle({ width: "20px" });
   });
 });

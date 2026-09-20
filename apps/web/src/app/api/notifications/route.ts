@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createRequestSupabaseClient, requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import logger from "@/lib/logger";
-import type { Notification, NotificationPriority, NotificationType } from "@/types";
+import { mapNotificationRow } from "@/features/notifications/server/map-row";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
 const searchSchema = z.object({
@@ -20,22 +20,6 @@ const patchSchema = z
   .refine((value) => value.markAll === true || typeof value.notificationId === "string", {
     message: "notificationId or markAll is required",
   });
-
-export function mapNotificationRow(row: Record<string, unknown>): Notification {
-  return {
-    id: row.id as string,
-    type: row.type as NotificationType,
-    channel: (row.channel as "in_app" | "email") ?? "in_app",
-    category: (row.category as string | null) ?? null,
-    priority: ((row.priority as string | null) ?? "normal") as NotificationPriority,
-    title: row.title as string,
-    message: row.message as string,
-    metadata: (row.metadata ?? {}) as Record<string, unknown>,
-    readAt: (row.read_at as string | null) ?? null,
-    archivedAt: (row.archived_at as string | null) ?? null,
-    createdAt: row.created_at as string,
-  };
-}
 
 export async function GET(req: NextRequest) {
   try {

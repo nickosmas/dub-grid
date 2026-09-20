@@ -143,7 +143,9 @@ describe("mobile person management-access route", () => {
     expect(updateMobileMembershipAccessRow).not.toHaveBeenCalled();
   });
 
-  it("refuses to let an actor grant themselves management access", async () => {
+  // Your own departments are yours to edit, as on web's profile page; your
+  // own role is not, and a request carrying both gets neither.
+  it("refuses to let an actor change their own role, departments included", async () => {
     loadMobilePersonWithAccess.mockResolvedValue({
       person: makePerson({ userId: ACTOR_ID }),
       userId: ACTOR_ID,
@@ -166,7 +168,82 @@ describe("mobile person management-access route", () => {
 
     expect(response.status).toBe(403);
     expect(payload.code).toBe("SELF_ACTION_FORBIDDEN");
+    expect(changeMobileMembershipOrgRole).not.toHaveBeenCalled();
     expect(updateMobileMembershipAccessRow).not.toHaveBeenCalled();
+  });
+
+  it("lets an actor edit their own management departments at their current role", async () => {
+    const self = {
+      person: makePerson({
+        userId: ACTOR_ID,
+        orgRole: "super_admin",
+        membershipUpdatedAt: "2026-05-01T00:00:00Z",
+      }),
+      userId: ACTOR_ID,
+      membership: {
+        user_id: ACTOR_ID,
+        org_role: "super_admin",
+        department_ids: [],
+        dept_admin_ids: [],
+        updated_at: "2026-05-01T00:00:00Z",
+      },
+      pendingInvitation: null,
+    };
+    loadMobilePersonWithAccess.mockResolvedValue(self);
+    updateMobileMembershipAccessRow.mockResolvedValue({ user_id: ACTOR_ID });
+
+    const { PUT } = await import("./person-management-access");
+    const response = await PUT(
+      makeRequest({
+        orgRole: "super_admin",
+        managementDepartmentIds: [9],
+        expectedMembershipUpdatedAt: "2026-05-01T00:00:00Z",
+      }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(changeMobileMembershipOrgRole).not.toHaveBeenCalled();
+    expect(updateMobileMembershipAccessRow).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ userId: ACTOR_ID, departmentIds: [9] }),
+    );
+  });
+
+  it("lets an actor take themselves off the management roster", async () => {
+    loadMobilePersonWithAccess.mockResolvedValue({
+      person: makePerson({
+        userId: ACTOR_ID,
+        orgRole: "super_admin",
+        managementDepartmentIds: [9],
+        membershipUpdatedAt: "2026-05-01T00:00:00Z",
+      }),
+      userId: ACTOR_ID,
+      membership: {
+        user_id: ACTOR_ID,
+        org_role: "super_admin",
+        department_ids: [9],
+        dept_admin_ids: [],
+        updated_at: "2026-05-01T00:00:00Z",
+      },
+      pendingInvitation: null,
+    });
+    updateMobileMembershipAccessRow.mockResolvedValue({ user_id: ACTOR_ID });
+
+    const { DELETE } = await import("./person-management-access");
+    const response = await DELETE(
+      makeRequest(
+        { expectedMembershipUpdatedAt: "2026-05-01T00:00:00Z", expectedInvitationUpdatedAt: null },
+        "DELETE",
+      ),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(updateMobileMembershipAccessRow).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ userId: ACTOR_ID, departmentIds: [] }),
+    );
   });
 
   // A scheduled department id would otherwise be written straight onto the

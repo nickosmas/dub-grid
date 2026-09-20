@@ -56,6 +56,7 @@ function pickDomProps(input: Record<string, any>) {
       key === "horizontal" ||
       key === "showsHorizontalScrollIndicator" ||
       key === "showsVerticalScrollIndicator" ||
+      key === "scrollEnabled" ||
       key === "contentInsetAdjustmentBehavior" ||
       key === "automaticallyAdjustContentInsets" ||
       key === "automaticallyAdjustsScrollIndicatorInsets" ||
@@ -80,6 +81,13 @@ function pickDomProps(input: Record<string, any>) {
 
     if (key === "accessibilityRole") {
       output.role = value;
+      continue;
+    }
+
+    if (key === "accessibilityHint") {
+      if (value != null) {
+        output["aria-description"] = value;
+      }
       continue;
     }
 
@@ -557,6 +565,7 @@ export function createScreenModule(React: ReactModule) {
       footer,
       scrollViewRef,
       onScroll,
+      list,
       children,
     }: {
       title?: string;
@@ -566,6 +575,15 @@ export function createScreenModule(React: ReactModule) {
       footer?: ReactType.ReactNode;
       scrollViewRef?: { current: unknown } | null;
       onScroll?: (event: unknown) => void;
+      // The real Screen virtualizes `list.data`; here every item renders, in
+      // order, after the header children, with separators between them.
+      list?: {
+        data: ReadonlyArray<unknown>;
+        renderItem: (item: unknown, index: number) => ReactType.ReactNode;
+        keyExtractor: (item: unknown, index: number) => string;
+        listFooter?: ReactType.ReactNode;
+        itemSeparator?: ReactType.ReactNode;
+      };
       children: ReactType.ReactNode;
     }) => {
       if (scrollViewRef) {
@@ -594,6 +612,17 @@ export function createScreenModule(React: ReactModule) {
           stickyHeaderHeight: 0,
         }) ?? null,
         children,
+        list
+          ? list.data.map((item, index) =>
+              React.createElement(
+                React.Fragment,
+                { key: list.keyExtractor(item, index) },
+                index > 0 ? (list.itemSeparator ?? null) : null,
+                list.renderItem(item, index),
+              ),
+            )
+          : null,
+        list?.listFooter ?? null,
         footer ?? null,
       );
     },

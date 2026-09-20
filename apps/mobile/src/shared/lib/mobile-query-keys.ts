@@ -14,6 +14,8 @@ export const mobileQueryKeys = {
     ["mobile", "profile-change-requests", "admin", getMobileAuthIdentityKey(accessToken)] as const,
   profileSessions: (accessToken: string | null) =>
     ["mobile", "profile", "sessions", getMobileAuthIdentityKey(accessToken)] as const,
+  calendarSubscription: (accessToken: string | null) =>
+    ["mobile", "profile", "calendar-subscription", getMobileAuthIdentityKey(accessToken)] as const,
   notificationPreferences: (accessToken: string | null) =>
     ["mobile", "notification-preferences", getMobileAuthIdentityKey(accessToken)] as const,
   notificationFacets: (accessToken: string | null) =>

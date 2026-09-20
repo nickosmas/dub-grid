@@ -23,7 +23,6 @@ import type {
   DbCoverageRequirement,
   DbAbsenceType,
   DbIndicatorType,
-  DbScheduleCell,
 } from "./types";
 import {
   rowToFocusArea,
@@ -43,7 +42,6 @@ import type {
   CoverageRequirement,
   AbsenceType,
   IndicatorType,
-  ScheduleCellState,
 } from "@/types";
 import { buildScheduleAssignmentOptions } from "@/lib/assignable-shifts";
 import {
@@ -78,76 +76,10 @@ const SCHEDULED_JOB_STORAGE_STYLE = {
   textColor: DEFAULT_SCHEDULED_JOB_STYLE.text,
 } as const;
 
-type ScheduleCellDependencyRow = Pick<DbScheduleCell, "id"> & {
-  employees?: { archived_at?: string | null } | Array<{ archived_at?: string | null }> | null;
-  snapshots?: Array<{
-    absence_type_id?: number | null;
-    segments?: Array<{
-      job_id?: number | null;
-      shift_id?: number | null;
-    }> | null;
-  }> | null;
-};
-
-type RecurringStateDependencyRow = {
-  id: string;
-  state: ScheduleCellState;
-};
-
 function buildSummary(parts: string[]): DependencyInfo {
   const active = parts.filter(Boolean);
   if (active.length === 0) return { hasDependencies: false, summary: "" };
   return { hasDependencies: true, summary: `Used by ${active.join(" and ")}` };
-}
-
-async function loadActiveScheduleCellDependencies(
-  orgId: string,
-): Promise<ScheduleCellDependencyRow[]> {
-  const { data, error } = await supabase
-    .from("schedule_cells")
-    .select(
-      `
-      id,
-      employees!inner(archived_at),
-      snapshots:schedule_cell_snapshots(
-        absence_type_id,
-        segments:schedule_cell_segments(
-          shift_id,
-          job_id
-        )
-      )
-    `,
-    )
-    .eq("org_id", orgId)
-    .is("employees.archived_at", null);
-
-  if (error) throw error;
-  return (data ?? []) as ScheduleCellDependencyRow[];
-}
-
-async function loadActiveRecurringStateDependencies(
-  orgId: string,
-): Promise<RecurringStateDependencyRow[]> {
-  const { data, error } = await supabase
-    .from("recurring_shifts")
-    .select("id, state")
-    .eq("org_id", orgId)
-    .is("archived_at", null);
-
-  if (error) throw error;
-  return (data ?? []) as RecurringStateDependencyRow[];
-}
-
-function recurringStateUsesShift(state: ScheduleCellState, shiftId: number): boolean {
-  return state.kind === "worked" && state.segments.some((segment) => segment.shiftId === shiftId);
-}
-
-function recurringStateUsesJob(state: ScheduleCellState, jobId: number): boolean {
-  return state.kind === "worked" && state.segments.some((segment) => segment.jobId === jobId);
-}
-
-function recurringStateUsesAbsenceType(state: ScheduleCellState, absenceTypeId: number): boolean {
-  return state.kind === "absence" && state.absenceTypeId === absenceTypeId;
 }
 
 export async function checkRoleDependencies(
@@ -236,82 +168,6 @@ export async function checkFocusAreaDependencies(
     codeCount ? `${codeCount} schedule option${codeCount !== 1 ? "s" : ""}` : "",
     covRes.count ? `${covRes.count} coverage requirement${covRes.count !== 1 ? "s" : ""}` : "",
     jobRes.count ? `${jobRes.count} job${jobRes.count !== 1 ? "s" : ""}` : "",
-  ]);
-}
-
-export async function checkShiftCategoryDependencies(
-  catId: number,
-  orgId: string,
-): Promise<DependencyInfo> {
-  const [assignments, recurringStates, coverageRes] = await Promise.all([
-    fetchAssignmentDefinitions(orgId, true),
-    loadActiveRecurringStateDependencies(orgId),
-    supabase
-      .from("coverage_requirements")
-      .select("id", { count: "exact", head: true })
-      .eq("org_id", orgId)
-      .eq("preferred_shift_id", catId),
-  ]);
-  const codeCount = assignments.filter(
-    (assignment) =>
-      !assignment.archivedAt && (assignment.shiftId === catId || assignment.categoryId === catId),
-  ).length;
-  const recurringCount = recurringStates.filter((row) =>
-    recurringStateUsesShift(row.state, catId),
-  ).length;
-  return buildSummary([
-    codeCount ? `${codeCount} assignment${codeCount !== 1 ? "s" : ""}` : "",
-    recurringCount ? `${recurringCount} recurring template${recurringCount !== 1 ? "s" : ""}` : "",
-    coverageRes.count
-      ? `${coverageRes.count} coverage requirement${coverageRes.count !== 1 ? "s" : ""}`
-      : "",
-  ]);
-}
-
-export async function checkJobDependencies(jobId: number, orgId: string): Promise<DependencyInfo> {
-  const [scheduleCells, recurringStates, coverageRes] = await Promise.all([
-    loadActiveScheduleCellDependencies(orgId),
-    loadActiveRecurringStateDependencies(orgId),
-    supabase
-      .from("coverage_requirements")
-      .select("id", { count: "exact", head: true })
-      .eq("org_id", orgId)
-      .eq("job_id", jobId),
-  ]);
-  const shiftCount = scheduleCells.filter((cell) =>
-    (cell.snapshots ?? []).some((snapshot) =>
-      (snapshot.segments ?? []).some((segment) => segment.job_id === jobId),
-    ),
-  ).length;
-  const recurringCount = recurringStates.filter((row) =>
-    recurringStateUsesJob(row.state, jobId),
-  ).length;
-  return buildSummary([
-    shiftCount ? `${shiftCount} shift${shiftCount !== 1 ? "s" : ""}` : "",
-    recurringCount ? `${recurringCount} recurring template${recurringCount !== 1 ? "s" : ""}` : "",
-    coverageRes.count
-      ? `${coverageRes.count} coverage requirement${coverageRes.count !== 1 ? "s" : ""}`
-      : "",
-  ]);
-}
-
-export async function checkAbsenceTypeDependencies(
-  atId: number,
-  orgId: string,
-): Promise<DependencyInfo> {
-  const [scheduleCells, recurringStates] = await Promise.all([
-    loadActiveScheduleCellDependencies(orgId),
-    loadActiveRecurringStateDependencies(orgId),
-  ]);
-  const shiftCount = scheduleCells.filter((cell) =>
-    (cell.snapshots ?? []).some((snapshot) => snapshot.absence_type_id === atId),
-  ).length;
-  const recurringCount = recurringStates.filter((row) =>
-    recurringStateUsesAbsenceType(row.state, atId),
-  ).length;
-  return buildSummary([
-    shiftCount ? `${shiftCount} shift${shiftCount !== 1 ? "s" : ""}` : "",
-    recurringCount ? `${recurringCount} recurring template${recurringCount !== 1 ? "s" : ""}` : "",
   ]);
 }
 

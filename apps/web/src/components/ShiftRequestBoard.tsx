@@ -327,7 +327,7 @@ export default function ShiftRequestBoard({
                 border: `1px solid ${absenceTypeColors?.border || "var(--dg-color-border)"}`,
               }}
             >
-              {absenceType.label} — {absenceType.name}
+              {absenceType.label}: {absenceType.name}
             </span>
           )}
         </div>

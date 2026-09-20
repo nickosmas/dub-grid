@@ -11,6 +11,7 @@ import {
   mobileListRow,
   mobileRadii,
   mobileSpace,
+  mobileTabularText,
   mobileText,
   type MobileColors,
 } from "../../../shared/theme/tokens";
@@ -27,6 +28,7 @@ export function CoverageSectionRow({ section }: { section: CoverageSection }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const pctColor = coverageColor(mobileColors, section.pct);
+  const daily = section.daily ?? [];
   return (
     <PressableRow
       accessibilityLabel={`${section.focusAreaName}, ${section.pct} percent covered`}
@@ -58,10 +60,59 @@ export function CoverageSectionRow({ section }: { section: CoverageSection }) {
         <View style={styles.track}>
           <View style={[styles.fill, { backgroundColor: pctColor, width: `${section.pct}%` }]} />
         </View>
+        {daily.length > 0 ? (
+          <View accessibilityLabel={describeDaily(daily)} style={styles.dailyRow}>
+            {daily.map((day) => (
+              <View key={day.dateKey} style={styles.dayCell}>
+                <Text fit="fixed" style={styles.dayLabel}>
+                  {dayLetter(day.dateKey)}
+                </Text>
+                <View
+                  style={[styles.dayDot, { backgroundColor: dayColor(mobileColors, day.status) }]}
+                />
+                <Text fit="fixed" style={[styles.dayCount, mobileTabularText]}>
+                  {day.status === "none" ? "-" : `${day.filledCount}/${day.requiredCount}`}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
       </View>
       <Ionicons color={mobileColors.textMuted} name="chevron-forward" size={16} />
     </PressableRow>
   );
+}
+
+type CoverageDay = CoverageSection["daily"][number];
+
+const DAY_LETTERS = ["S", "M", "T", "W", "T", "F", "S"];
+
+function dayLetter(dateKey: string): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  return DAY_LETTERS[new Date(y, m - 1, d).getDay()] ?? "";
+}
+
+function dayColor(mobileColors: MobileColors, status: CoverageDay["status"]): string {
+  switch (status) {
+    case "green":
+      return mobileColors.success;
+    case "amber":
+      return mobileColors.warning;
+    case "red":
+      return mobileColors.danger;
+    default:
+      return mobileColors.borderSubtle;
+  }
+}
+
+function describeDaily(daily: CoverageDay[]): string {
+  return daily
+    .map((day) =>
+      day.status === "none"
+        ? `${day.dateKey} no requirement`
+        : `${day.dateKey} ${day.filledCount} of ${day.requiredCount} filled`,
+    )
+    .join(", ");
 }
 
 const createStyles = (mobileColors: MobileColors) =>
@@ -112,5 +163,30 @@ const createStyles = (mobileColors: MobileColors) =>
     fill: {
       height: "100%",
       borderRadius: mobileRadii.pill,
+    },
+    // The daily grid web's expanded coverage panel shows, one column per day.
+    // Fixed-size chrome: it must keep its shape at every text setting.
+    dailyRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      gap: mobileSpace.xs,
+    },
+    dayCell: {
+      flex: 1,
+      alignItems: "center",
+      gap: mobileSpace.xs,
+    },
+    dayLabel: {
+      ...mobileText.micro,
+      color: mobileColors.textSubtle,
+    },
+    dayDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+    },
+    dayCount: {
+      ...mobileText.micro,
+      color: mobileColors.textMuted,
     },
   });

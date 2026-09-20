@@ -124,7 +124,13 @@ export function usePermissions(): WebPermissions {
   );
 
   const signedOut = !authLoading && (!accessToken || !userId);
-  const permissionsKey = queryKeys.account.permissions(userId, claims.orgId);
+  // Memoised because the realtime effect below lists it: a fresh array every
+  // render tore both channels down and re-subscribed them on every render of
+  // every consumer.
+  const permissionsKey = useMemo(
+    () => queryKeys.account.permissions(userId, claims.orgId),
+    [userId, claims.orgId],
+  );
 
   const query = useQuery({
     queryKey: permissionsKey,
@@ -194,9 +200,14 @@ export function usePermissions(): WebPermissions {
 
     // Invalidate rather than refetch-and-assign: React Query drops the stale
     // mark, refetches once no matter how many consumers are mounted, and keeps
-    // the previous value on screen if the refetch fails.
+    // the previous value on screen if the refetch fails. Every mounted
+    // consumer has its own channel, so one membership row update (opening the
+    // schedule writes its last-viewed stamp there) reaches this once per
+    // consumer at the same instant; with the default `cancelRefetch` each call
+    // cancelled the fetch the previous one had started, which sent ten
+    // requests for one answer and delayed it until the last of them.
     const reResolve = () => {
-      void queryClient.invalidateQueries({ queryKey: permissionsKey });
+      void queryClient.invalidateQueries({ queryKey: permissionsKey }, { cancelRefetch: false });
     };
 
     membershipChannel = createBrowserRealtimeChannel(`perms:m:${channelSuffix}`)

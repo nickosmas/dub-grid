@@ -217,7 +217,7 @@ describe("ProfileSessionsScreen", () => {
     // Neither destructive action is on the page until it is asked for.
     expect(screen.queryByRole("button", { name: "Sign out everywhere" })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Signing out devices" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign out devices" }));
 
     expect(
       screen.getByText("Every other device is signed out. You stay signed in here."),
@@ -245,7 +245,7 @@ describe("ProfileSessionsScreen", () => {
 
     render(<ProfileSessionsScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Signing out devices" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign out devices" }));
     fireEvent.click(screen.getByRole("button", { name: "Sign out other devices" }));
 
     await act(async () => {
@@ -263,7 +263,7 @@ describe("ProfileSessionsScreen", () => {
     mockSessions({ active: [currentSession], stale: [] });
 
     render(<ProfileSessionsScreen />);
-    fireEvent.click(screen.getByRole("button", { name: "Signing out devices" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign out devices" }));
 
     expect(screen.getByRole("button", { name: "Sign out other devices" })).toBeDisabled();
     expect(screen.getByText("No other active devices are signed in.")).toBeInTheDocument();

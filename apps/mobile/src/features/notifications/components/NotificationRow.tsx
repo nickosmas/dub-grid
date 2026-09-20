@@ -1,6 +1,6 @@
 import { useMemo, useRef, type MutableRefObject } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import ReanimatedSwipeable, {
   type SwipeableMethods,
@@ -50,18 +50,16 @@ export type OpenSwipeRegistry = MutableRefObject<SwipeableMethods | null>;
  * buttons on a card, so a list of alerts is a column of rows and not a stack
  * of panels. As in iOS Mail, the swiped row turns into a rounded card sliding
  * off the edge and each action is a round button on the page behind it.
- * Tapping the row opens the alert; the caller marks it read first.
+ * Tapping the row opens the alert; the caller marks it read as it goes.
  */
 export function NotificationRow({
   notification,
-  pending,
   openRegistry,
   onPress,
   onToggleRead,
   onArchive,
 }: {
   notification: MobileNotification;
-  pending: boolean;
   openRegistry?: OpenSwipeRegistry;
   onPress: () => void;
   onToggleRead: () => void;
@@ -134,13 +132,7 @@ export function NotificationRow({
           onPress={onPress}
           style={styles.row}
         >
-          <View style={styles.leading}>
-            {pending ? (
-              <ActivityIndicator color={mobileColors.brand} size="small" />
-            ) : isUnread ? (
-              <View style={styles.unreadDot} />
-            ) : null}
-          </View>
+          <View style={styles.leading}>{isUnread ? <View style={styles.unreadDot} /> : null}</View>
           <View style={styles.copy}>
             <View style={styles.titleLine}>
               {isUrgent ? (

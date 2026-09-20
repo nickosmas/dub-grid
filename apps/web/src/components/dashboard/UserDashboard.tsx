@@ -165,6 +165,7 @@ export default function UserDashboard(props: DashboardContentProps) {
     currentHours,
     currentPeriodShifts,
     recentPublishedChanges = new Map(),
+    permissions,
     employees,
     focusAreas,
     isMobile,
@@ -359,13 +360,21 @@ export default function UserDashboard(props: DashboardContentProps) {
   );
 
   if (!currentEmpId || !currentEmployee) {
+    // Impersonation applies the target's permissions to the gridmaster's own
+    // account, so there is no staff row to show here. Say that, rather than
+    // telling a support engineer their account needs linking.
+    const impersonating = permissions.isImpersonating;
     return (
       <section className="dg-card" data-testid="user-dashboard-unlinked">
         <div className="dg-card-header">
           <div>
-            <div className="dg-card-title">No linked staff profile</div>
+            <div className="dg-card-title">
+              {impersonating ? "Viewing with this member's permissions" : "No linked staff profile"}
+            </div>
             <div className="dg-card-subtitle">
-              Your account is not connected to an employee record.
+              {impersonating
+                ? "Impersonation applies their access to your own account. Their personal schedule and profile are not shown."
+                : "Your account is not connected to an employee record."}
             </div>
           </div>
         </div>
@@ -373,8 +382,12 @@ export default function UserDashboard(props: DashboardContentProps) {
           <EmptyState
             size="inline"
             icon={<UserRound size={22} />}
-            title="Schedule unavailable"
-            description="Ask an administrator to link this account to a staff profile."
+            title={impersonating ? "No personal schedule in this view" : "Schedule unavailable"}
+            description={
+              impersonating
+                ? "Open the Schedule page to see what this member can see."
+                : "Ask an administrator to link this account to a staff profile."
+            }
           />
         </div>
       </section>
@@ -387,6 +400,8 @@ export default function UserDashboard(props: DashboardContentProps) {
   // itself never scrolls.
   const stackLayout = isMobile || isTablet;
 
+  // The top grid follows the same breakpoint as the shell: a tablet used to
+  // stack the page but keep the two-column hero/requests composition (F-45).
   const topGrid = (
     <div
       data-testid="user-dashboard-top-grid"
@@ -394,7 +409,7 @@ export default function UserDashboard(props: DashboardContentProps) {
         alignItems: "stretch",
         columnGap: "var(--dg-space-xl)",
         display: "grid",
-        gridTemplateColumns: isMobile
+        gridTemplateColumns: stackLayout
           ? "minmax(0, 1fr)"
           : `minmax(0, ${HERO_MAX_WIDTH}px) minmax(320px, 1fr)`,
         rowGap: "var(--dg-space-lg)",
@@ -404,9 +419,9 @@ export default function UserDashboard(props: DashboardContentProps) {
         <div
           data-testid="user-dashboard-hero-shell"
           style={{
-            gridColumn: isMobile ? undefined : "1",
-            gridRow: isMobile ? undefined : "1 / span 2",
-            maxWidth: isMobile ? "none" : `${HERO_MAX_WIDTH}px`,
+            gridColumn: stackLayout ? undefined : "1",
+            gridRow: stackLayout ? undefined : "1 / span 2",
+            maxWidth: stackLayout ? "none" : `${HERO_MAX_WIDTH}px`,
             width: "100%",
           }}
         >
@@ -420,7 +435,7 @@ export default function UserDashboard(props: DashboardContentProps) {
             shiftmates={heroShiftmates}
             status={hero.status}
             timing={heroTiming}
-            stretch={isMobile ? false : true}
+            stretch={!stackLayout}
           />
         </div>
       ) : null}
@@ -428,16 +443,16 @@ export default function UserDashboard(props: DashboardContentProps) {
       <CoverRequestsSection
         requests={coverRequests}
         style={{
-          gridColumn: isMobile ? undefined : "2",
-          gridRow: isMobile ? undefined : "1",
+          gridColumn: stackLayout ? undefined : "2",
+          gridRow: stackLayout ? undefined : "1",
         }}
       />
       <AvailableShiftsSection
         isTwoWeekView={isTwoWeekView}
         items={availableShiftItems}
         style={{
-          gridColumn: isMobile ? undefined : "2",
-          gridRow: isMobile ? undefined : "2",
+          gridColumn: stackLayout ? undefined : "2",
+          gridRow: stackLayout ? undefined : "2",
         }}
       />
     </div>

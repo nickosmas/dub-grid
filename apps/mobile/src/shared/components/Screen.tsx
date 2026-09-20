@@ -10,6 +10,7 @@ import {
   type RefObject,
 } from "react";
 import {
+  FlatList,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -85,7 +86,34 @@ export type ScreenScrollHandle = ScrollView;
 export type { ScreenBottomPaddingMode } from "./screen-layout";
 type ScreenScrollViewProps = ComponentProps<typeof ScrollView>;
 
-export function Screen({
+/**
+ * A virtualized body. With `list` set, the screen renders a `FlatList` in
+ * place of its scroll view: `children` become the list header (search,
+ * filters, counts), each `data` item mounts only while it is near the
+ * viewport, and `footer`-style trailing content goes in `listFooter`. Sticky
+ * header, pull-to-refresh, bottom padding and the scroll handle all behave as
+ * they do for the plain scroll view. There is no keyboard tracking in this
+ * mode; a list screen's only field is its search bar at the top.
+ */
+export interface ScreenList<T> {
+  data: ReadonlyArray<T>;
+  renderItem: (item: T, index: number) => ReactNode;
+  keyExtractor: (item: T, index: number) => string;
+  /** Rendered after the last item (a Load more button, say). */
+  listFooter?: ReactNode;
+  /** Rendered between items; the list itself adds no divider. */
+  itemSeparator?: ReactNode;
+  onEndReached?: () => void;
+  onEndReachedThreshold?: number;
+  /**
+   * Space between the header and the first row. Defaults to the page's
+   * section gap; a screen whose header ends in a row of its own (a count and
+   * an action) reads better with the compact `mobileSpace.md`.
+   */
+  headerGap?: number;
+}
+
+export function Screen<T = never>({
   stickyHeader,
   stickyHeaderShellStyle,
   stickyHeaderTopPadding,
@@ -102,7 +130,9 @@ export function Screen({
   adjustsForKeyboard = true,
   bottomPaddingMode = DEFAULT_SCREEN_BOTTOM_PADDING_MODE,
   scrollEnabled = true,
+  list,
 }: PropsWithChildren<{
+  list?: ScreenList<T>;
   // No `title`/`subtitle` here on purpose. A page's title is the native header's
   // (`createTopLevelStackOptions` / `createDetailStackOptions` on its route), or
   // it belongs to a `stickyHeader` the screen builds itself. These props used to
@@ -183,6 +213,7 @@ export function Screen({
     nativeTabBarVisible,
   );
   const internalScrollViewRef = useRef<ScrollView>(null);
+  const internalListRef = useRef<FlatList<T>>(null);
   // Mirrors stickyHeaderHeight so the translating scroll handle below can
   // always read the *current* height at call time, not whatever it was
   // when the handle was created.
@@ -241,6 +272,13 @@ export function Screen({
             isIosStickyHeader && typeof target.y === "number"
               ? target.y - stickyHeaderHeightRef.current
               : target.y;
+          if (internalListRef.current) {
+            internalListRef.current.scrollToOffset({
+              offset: y ?? 0,
+              animated: target.animated ?? true,
+            });
+            return;
+          }
           internalScrollViewRef.current?.scrollTo({ ...target, y });
         },
       }) as unknown as ScreenScrollHandle,
@@ -266,7 +304,71 @@ export function Screen({
   // which collapses, and the whole page visibly jumps the instant the keyboard
   // opens. A screen whose only field is a search bar at the top never needed
   // lifting, so it turns this off and simply does not move on focus.
-  const scrollView = (
+  const contentContainerStyle = {
+    paddingTop: stickyHeader ? (isIosStickyHeader ? 0 : stickyHeaderHeight) : 0,
+    paddingBottom: footer ? mobileSpace.lg : resolvedBottomPadding,
+    flexGrow: 1,
+  };
+  // Mounted for the life of the screen once it can refresh, never only while
+  // `scrollEnabled`: on iOS the control is the scroll view's first child, so
+  // adding or removing it remounts the whole page under it (a sheet presented
+  // from that page was torn down and presented again). The lock on the scroll
+  // view stops the pull on iOS; Android's swipe layout needs `enabled`.
+  const refreshControl = onRefresh ? (
+    <RefreshControl
+      enabled={scrollEnabled}
+      refreshing={refreshing}
+      onRefresh={onRefresh}
+      progressViewOffset={stickyHeader ? stickyHeaderHeight : 0}
+      tintColor={mobileColors.brand}
+      colors={[mobileColors.brand]}
+    />
+  ) : undefined;
+  const contentStyle = [
+    styles.content,
+    stickyHeader ? styles.contentWithStickyHeader : styles.contentDefault,
+  ];
+  const scrollView = list ? (
+    <FlatList
+      ref={internalListRef}
+      data={list.data as T[]}
+      renderItem={({ item, index }) => <>{list.renderItem(item, index)}</>}
+      keyExtractor={list.keyExtractor}
+      ListHeaderComponent={<View style={contentStyle}>{children}</View>}
+      // With rows, the first one sits one section gap below the header, the
+      // distance the page content keeps between its own sections. Without
+      // rows the header is the whole page, and a `fillScreen` empty or error
+      // state inside it needs the same room to centre in that the plain scroll
+      // view's content gets from `flexGrow: 1`.
+      ListHeaderComponentStyle={
+        list.data.length === 0
+          ? styles.emptyListHeader
+          : { paddingBottom: list.headerGap ?? mobileSpacing.sectionGap }
+      }
+      ListFooterComponent={list.listFooter == null ? null : <>{list.listFooter}</>}
+      ItemSeparatorComponent={list.itemSeparator == null ? null : () => <>{list.itemSeparator}</>}
+      onEndReached={list.onEndReached}
+      onEndReachedThreshold={list.onEndReachedThreshold ?? 0.5}
+      automaticallyAdjustContentInsets={useNativeContentInsets}
+      automaticallyAdjustsScrollIndicatorInsets={useNativeContentInsets}
+      contentContainerStyle={contentContainerStyle}
+      contentInset={iosContentInset}
+      contentOffset={iosContentOffset}
+      contentInsetAdjustmentBehavior={useNativeContentInsets ? "automatic" : "never"}
+      scrollEnabled={scrollEnabled}
+      bounces={scrollEnabled}
+      alwaysBounceHorizontal={false}
+      directionalLockEnabled={Platform.OS === "ios"}
+      keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+      keyboardShouldPersistTaps="handled"
+      onScroll={onScroll}
+      refreshControl={refreshControl}
+      scrollEventThrottle={scrollEventThrottle}
+      showsVerticalScrollIndicator={false}
+      showsHorizontalScrollIndicator={false}
+      style={styles.scrollView}
+    />
+  ) : (
     <KeyboardAwareScrollView
       ref={internalScrollViewRef}
       enabled={adjustsForKeyboard}
@@ -275,25 +377,14 @@ export function Screen({
       bottomOffset={KEYBOARD_BOTTOM_OFFSET}
       automaticallyAdjustContentInsets={useNativeContentInsets}
       automaticallyAdjustsScrollIndicatorInsets={useNativeContentInsets}
-      contentContainerStyle={{
-        paddingTop: stickyHeader ? (isIosStickyHeader ? 0 : stickyHeaderHeight) : 0,
-        // A footer takes over clearing whatever floats at the bottom (the
-        // floating tab bar, in `tabbed` mode) — content just needs a small
-        // gap above the footer's divider, not the full clearance any more.
-        paddingBottom: footer ? mobileSpace.lg : resolvedBottomPadding,
-        // Makes the content container at least as tall as the viewport, so a
-        // `flex: 1` child (a `fillScreen` empty or error state) has real space
-        // to claim instead of collapsing to its own content height.
-        //
-        // Without this, centring a full-page state only worked by swapping the
-        // whole ScrollView out for a plain View — which cost two things that
-        // matter more than the swap saved: an iOS `headerLargeTitle` has
-        // nothing left to collapse against, so it sits permanently expanded and
-        // pushes the page down, and pull-to-refresh needs a scroll gesture to
-        // hang off, so it vanished on exactly the screens most likely to want
-        // a retry.
-        flexGrow: 1,
-      }}
+      // paddingBottom: a footer takes over clearing whatever floats at the
+      // bottom (the floating tab bar, in `tabbed` mode), so content just
+      // needs a small gap above the footer's divider. flexGrow makes the
+      // container at least viewport-tall, so a `flex: 1` child (a `fillScreen`
+      // empty or error state) has real space to claim; without it, centring a
+      // full-page state only worked by swapping the ScrollView for a View,
+      // which lost the iOS large-title collapse and pull-to-refresh.
+      contentContainerStyle={contentContainerStyle}
       contentInset={iosContentInset}
       contentOffset={iosContentOffset}
       contentInsetAdjustmentBehavior={useNativeContentInsets ? "automatic" : "never"}
@@ -316,31 +407,13 @@ export function Screen({
       // which read as a dead button). The lock on the scroll view already
       // stops the pull on iOS; Android's swipe layout owns the gesture and
       // needs `enabled` to stand down.
-      refreshControl={
-        onRefresh ? (
-          <RefreshControl
-            enabled={scrollEnabled}
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            progressViewOffset={stickyHeader ? stickyHeaderHeight : 0}
-            tintColor={mobileColors.brand}
-            colors={[mobileColors.brand]}
-          />
-        ) : undefined
-      }
+      refreshControl={refreshControl}
       scrollEventThrottle={scrollEventThrottle}
       showsVerticalScrollIndicator={false}
       showsHorizontalScrollIndicator={false}
       style={styles.scrollView}
     >
-      <View
-        style={[
-          styles.content,
-          stickyHeader ? styles.contentWithStickyHeader : styles.contentDefault,
-        ]}
-      >
-        {children}
-      </View>
+      <View style={contentStyle}>{children}</View>
     </KeyboardAwareScrollView>
   );
   const overlayLayer = (
@@ -394,6 +467,7 @@ export function Screen({
               // Self-correct once, right here, the moment the real height is
               // known, regardless of what any caller already tried.
               if (isIosStickyHeader && stickyHeaderHeight === 0) {
+                internalListRef.current?.scrollToOffset({ offset: -nextHeight, animated: false });
                 internalScrollViewRef.current?.scrollTo({ x: 0, y: -nextHeight, animated: false });
               }
               stickyHeaderHeightRef.current = nextHeight;
@@ -506,6 +580,9 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, hasPageBackgr
     },
     contentWithStickyHeader: {
       paddingTop: mobileSpacing.sectionGap,
+    },
+    emptyListHeader: {
+      flexGrow: 1,
     },
     footer: {
       borderTopWidth: 1,

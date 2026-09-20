@@ -1,4 +1,3 @@
-import { ActionButtons } from "../../../shared/components/ActionButtons";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import {
   Children,
@@ -9,7 +8,6 @@ import {
   type ReactNode,
 } from "react";
 import {
-  Pressable,
   StyleSheet,
   TextInput,
   View,
@@ -19,6 +17,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Text } from "../../../shared/components/Text";
+import { Button } from "../../../shared/components/Button";
 import { AccessInsignia } from "../../../shared/components/AccessInsignia";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { useIsInsideSheet } from "../../../shared/components/BottomSheetModal";
@@ -29,12 +28,13 @@ import {
   mobileAvatarText,
   MAX_FONT_SCALE,
   mobileElevation,
+  mobileIconToneColor,
   mobileInputText,
-  mobilePillOverflow,
   mobileRadii,
   mobileText,
   mobileTextWeighted,
   type MobileColors,
+  type MobileIconToneName,
   mobileSpace,
 } from "../../../shared/theme/tokens";
 
@@ -85,10 +85,6 @@ export function ProfileHero({
   initials,
   title,
   subtitle,
-  badge,
-  badgeTone = "brand",
-  onBadgePress,
-  badgeAccessibilityLabel,
   orgRole,
   avatarStyle,
   avatarTextStyle,
@@ -106,19 +102,11 @@ export function ProfileHero({
    */
   title?: string;
   subtitle?: string;
-  badge?: string;
-  badgeTone?: "brand" | "contrast" | "warning";
   /**
-   * Turns the badge into a control. Given one, the pill grows a chevron and
-   * takes presses; without one it stays the static label every other hero
-   * shows, so no existing caller changes shape.
-   */
-  onBadgePress?: () => void;
-  badgeAccessibilityLabel?: string;
-  /**
-   * Paints the access insignia on the avatar's corner, ringed in the page
-   * background so it reads as cut out of the avatar rather than sitting on it.
-   * Plain users and members with no account get none.
+   * The access insignia beside the name: the crown or star is the whole of
+   * how a hero states the tier. A pill under the name used to spell it out
+   * as well, User included, and read as a second heading. Plain users and
+   * members with no account get none.
    */
   orgRole?: string | null;
   avatarStyle?: StyleProp<ViewStyle>;
@@ -134,54 +122,7 @@ export function ProfileHero({
   // A screen whose native header already names it may want none of the
   // identity block at all, leaving the meta grid as the whole hero. Rendering
   // the row anyway would leave its gap above the grid.
-  const hasIdentity = Boolean(initials || title || badge || subtitle);
-
-  const badgeTextStyle = [
-    styles.heroBadgeText,
-    onBadgePress ? mobilePillOverflow.interactiveText : mobilePillOverflow.displayText,
-    badgeTone === "contrast" && styles.heroBadgeTextContrast,
-    badgeTone === "warning" && styles.heroBadgeTextWarning,
-  ];
-  const badgeStyle = [
-    styles.heroBadge,
-    onBadgePress ? mobilePillOverflow.interactiveContainer : mobilePillOverflow.displayContainer,
-    // `heroBadge` pins itself with `alignSelf: "flex-start"`, which beats a
-    // centered parent's `alignItems` and would hang the pill off the left
-    // edge of an otherwise centered block.
-    isCentered && styles.heroBadgeCentered,
-    badgeTone === "contrast" && styles.heroBadgeContrast,
-    badgeTone === "warning" && styles.heroBadgeWarning,
-  ];
-  const badgeChevronColor =
-    badgeTone === "contrast"
-      ? mobileColors.textInverse
-      : badgeTone === "warning"
-        ? mobileColors.warningText
-        : mobileColors.brand;
-
-  const badgeNode = badge ? (
-    onBadgePress ? (
-      <Pressable
-        accessibilityHint="Opens the access level picker"
-        accessibilityLabel={badgeAccessibilityLabel ?? badge}
-        accessibilityRole="button"
-        hitSlop={8}
-        onPress={onBadgePress}
-        style={({ pressed }) => [...badgeStyle, pressed && styles.heroBadgePressed]}
-      >
-        <Text fit="compact" style={badgeTextStyle}>
-          {badge}
-        </Text>
-        <Ionicons color={badgeChevronColor} name="chevron-down" size={13} />
-      </Pressable>
-    ) : (
-      <View style={badgeStyle}>
-        <Text fit="compact" style={badgeTextStyle}>
-          {badge}
-        </Text>
-      </View>
-    )
-  ) : null;
+  const hasIdentity = Boolean(initials || title || subtitle);
 
   return (
     <ProfileHeroAlignContext.Provider value={align}>
@@ -199,22 +140,15 @@ export function ProfileHero({
               </View>
             ) : null}
             <View style={[styles.heroCopy, isCentered && styles.heroCopyCentered]}>
-              {title || badgeNode ? (
+              {title ? (
                 <View style={[styles.heroTitleRow, isCentered && styles.heroTitleRowCentered]}>
-                  {title ? (
-                    <Text
-                      numberOfLines={2}
-                      style={[styles.heroTitle, isCentered && styles.heroTitleCentered]}
-                    >
-                      {title}
-                    </Text>
-                  ) : null}
+                  <Text
+                    numberOfLines={2}
+                    style={[styles.heroTitle, isCentered && styles.heroTitleCentered]}
+                  >
+                    {title}
+                  </Text>
                   <AccessInsignia orgRole={orgRole} size={isCentered ? "lg" : "sm"} />
-                  {/* Centered, the badge goes under the name instead of beside
-                      it: a pill tucked against a 26pt title pulls the whole
-                      block off center, and the eye reads the pair as one
-                      lopsided line rather than a name with a label. */}
-                  {isCentered ? null : badgeNode}
                 </View>
               ) : null}
               {subtitle ? (
@@ -225,7 +159,6 @@ export function ProfileHero({
                   {subtitle}
                 </Text>
               ) : null}
-              {isCentered ? badgeNode : null}
             </View>
           </View>
         ) : null}
@@ -454,7 +387,7 @@ export function ProfileTextInput({
         />
       )}
       {keyboardDoneAccessory}
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {error ? <Text style={[styles.errorText, styles.choiceGroupLabel]}>{error}</Text> : null}
     </View>
   );
 }
@@ -474,7 +407,12 @@ export function ProfileChoiceGroup<TId extends string | number>({
   error,
   onToggle,
 }: {
-  label: string;
+  /**
+   * Omit for a lone list under a sheet whose title already names it. Inside a
+   * page section, where several groups sit under one title, each keeps its
+   * own.
+   */
+  label?: string;
   items: Array<{
     id: TId;
     name: string;
@@ -490,12 +428,16 @@ export function ProfileChoiceGroup<TId extends string | number>({
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
+  // The same flattening `ProfileList` does: a sheet is one flat surface, and
+  // a shadow on a list inside it was both against the rule and clipped by
+  // the sheet's own scroll edges.
+  const insideSheet = useIsInsideSheet();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <View style={styles.choiceGroup}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <View style={styles.list}>
+      {label ? <Text style={[styles.fieldLabel, styles.choiceGroupLabel]}>{label}</Text> : null}
+      <View style={[styles.list, insideSheet ? styles.flatInSheet : null]}>
         <View style={styles.listClip}>
           {items.map((item, index) => {
             const selected = selectedIds.includes(item.id);
@@ -610,14 +552,16 @@ const personLayoutStyles = StyleSheet.create({
   },
   quickActions: {
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: mobileSpace.md,
     justifyContent: "center",
     paddingBottom: 16,
   },
   actionStack: {
     gap: mobileSpace.md,
-    paddingTop: 12,
+    // Twice the 12 an action group opens above its buttons, on top of the 20
+    // the screen puts between sections: these end the page rather than
+    // sitting among sibling rows, so they take the wider break.
+    paddingTop: mobileSpace["2xl"],
   },
   actionRow: {
     flexDirection: "row",
@@ -643,17 +587,52 @@ export function ProfileHeroFactsRow({ children }: { children: ReactNode }) {
 }
 
 /**
- * The row of plain pills directly under the hero. The colour lives in each
- * button's icon, so the set reads as one group of actions on the person rather
- * than as competing fills.
+ * The contact pair directly under the hero: Call and Email, always both, as
+ * tiles the reader can name at a glance. Everything that manages the person
+ * lives at the foot of the page instead.
  */
 export function ProfileQuickActions({ children }: { children: ReactNode }) {
   return <View style={personLayoutStyles.quickActions}>{children}</View>;
 }
 
-/** Management actions at the foot of a person page. */
+/**
+ * One pill in `ProfileQuickActions`: the neutral `plain` button with its
+ * glyph beside its name, so the button says what it does without a tap. The
+ * colour is the icon's. A pill with nothing to act on stays in place, dimmed,
+ * so the pair keeps its shape whether or not a phone or email is on file.
+ */
+export function ProfileQuickAction({
+  icon,
+  iconTone,
+  label,
+  disabled = false,
+  onPress,
+}: {
+  icon: IconName;
+  iconTone: MobileIconToneName;
+  label: string;
+  disabled?: boolean;
+  onPress: () => void;
+}) {
+  const isDark = useIsDarkMode();
+
+  return (
+    <Button
+      compact
+      disabled={disabled}
+      label={label}
+      leadingAccessory={
+        <Ionicons color={mobileIconToneColor(iconTone, isDark)} name={icon} size={18} />
+      }
+      onPress={onPress}
+      tone="plain"
+    />
+  );
+}
+
+/** The management actions at the foot of a person page, one full-width button each. */
 export function ProfileActionStack({ children }: { children: ReactNode }) {
-  return <ActionButtons style={personLayoutStyles.actionStack}>{children}</ActionButtons>;
+  return <View style={personLayoutStyles.actionStack}>{children}</View>;
 }
 
 /** Compatibility wrapper for existing two-action profile rows. */
@@ -764,42 +743,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     heroSubtitleCentered: {
       textAlign: "center",
-    },
-    heroBadge: {
-      alignItems: "center",
-      alignSelf: "flex-start",
-      backgroundColor: mobileColors.brandSoft,
-      borderColor: mobileColors.brandBorder,
-      borderRadius: mobileRadii.pill,
-      borderWidth: 1,
-      flexDirection: "row",
-      gap: mobileSpace.sm,
-      paddingHorizontal: mobileSpace.md,
-      paddingVertical: mobileSpace.xs,
-    },
-    heroBadgeCentered: {
-      alignSelf: "center",
-    },
-    heroBadgePressed: {
-      opacity: 0.6,
-    },
-    heroBadgeText: {
-      ...mobileTextWeighted("caption", "semibold"),
-      color: mobileColors.brand,
-    },
-    heroBadgeContrast: {
-      backgroundColor: mobileColors.textPrimary,
-      borderColor: mobileColors.textPrimary,
-    },
-    heroBadgeTextContrast: {
-      color: mobileColors.textInverse,
-    },
-    heroBadgeWarning: {
-      backgroundColor: mobileColors.warningSoft,
-      borderColor: mobileColors.warningBorder,
-    },
-    heroBadgeTextWarning: {
-      color: mobileColors.warningText,
     },
     heroDetail: {
       flexDirection: "row",
@@ -986,6 +929,13 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     choiceGroup: {
       gap: mobileSpace.sm,
+    },
+    // The one `fieldLabel` that sits outside a panel. Inside one the panel's
+    // padding lines the label up with its input; out here the same inset the
+    // section title and the rows take keeps "Employment" on the line
+    // "Staffing" and "Full-time" share, rather than flush with the card's edge.
+    choiceGroupLabel: {
+      paddingHorizontal: mobileSpace.lg,
     },
     choiceRow: {
       alignItems: "center",

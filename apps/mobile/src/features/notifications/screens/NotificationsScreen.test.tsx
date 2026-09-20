@@ -250,7 +250,7 @@ describe("NotificationsScreen", () => {
     });
   });
 
-  it("goes to the alert's subject when it is tapped and marks it read first", async () => {
+  it("goes to the alert's subject the moment it is tapped and marks it read behind the navigation", async () => {
     const queryResult = buildInfiniteQueryResult({
       notifications: [SAMPLE_NOTIFICATION],
       unreadCount: 1,
@@ -272,12 +272,14 @@ describe("NotificationsScreen", () => {
 
     fireEvent.click(screen.getByText("Pickup available"));
 
+    // The alert is about a request, so the tap lands on the Requests tab, and
+    // it does so synchronously: no network wait sits in front of it.
+    expect(push).toHaveBeenCalledWith("/(tabs)/requests");
+    // The row is marked read in the cached pages before the write resolves.
+    expect(setQueryData).toHaveBeenCalled();
     await waitFor(() => {
       expect(markNotificationRead).toHaveBeenCalledWith("token-123", SAMPLE_NOTIFICATION.id);
     });
-    // The alert is about a request, so the tap lands on the Requests tab.
-    expect(push).toHaveBeenCalledWith("/(tabs)/requests");
-    expect(setQueryData).toHaveBeenCalled();
     // Sidebar/chip badge bug: row-press must refetch both list + facets so
     // filter chip counts stay accurate. handleArchive/handleMarkAllRead already
     // do this — handleRowPress used to skip the facets refetch.
@@ -371,7 +373,7 @@ describe("NotificationsScreen", () => {
     expect(queryResult.refetch).toHaveBeenCalled();
   });
 
-  it("does not navigate when marking the alert read fails", async () => {
+  it("still navigates when marking the alert read fails, and says so", async () => {
     useInfiniteQuery.mockReturnValue(
       buildInfiniteQueryResult({
         notifications: [SAMPLE_NOTIFICATION],
@@ -384,9 +386,13 @@ describe("NotificationsScreen", () => {
 
     fireEvent.click(screen.getByText("Pickup available"));
 
+    expect(push).toHaveBeenCalledWith("/(tabs)/requests");
     await waitFor(() => {
-      expect(pushToast).toHaveBeenCalled();
+      expect(pushToast).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Could not update alerts" }),
+      );
     });
-    expect(push).not.toHaveBeenCalled();
+    // Marked read on tap, put back when the write failed.
+    expect(setQueryData).toHaveBeenCalledTimes(2);
   });
 });

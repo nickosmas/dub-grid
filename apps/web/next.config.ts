@@ -109,7 +109,6 @@ const composed = withBundleAnalyzer(withNextIntl(nextConfig));
 // In production: dynamically require withSentryConfig so the import is only
 // evaluated during a production build, keeping dev completely clean.
 if (process.env.NODE_ENV === "production") {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { withSentryConfig } = require("@sentry/nextjs");
 
   // No fallbacks here on purpose. A wrong default is worse than none: the

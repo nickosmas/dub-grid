@@ -2,6 +2,7 @@
 
 import { useOrganizationData, usePermissions } from "@/hooks";
 import { Button } from "@/components/Button";
+import AuthTransitionScreen from "@/components/AuthTransitionScreen";
 import { useLogout } from "@/hooks";
 
 /**
@@ -41,7 +42,9 @@ export default function SetupGuard({ children }: { children: React.ReactNode }) 
   // Show children immediately if setup is complete, or if we have cached org
   // data and are just revalidating (avoids blank screen on navigation).
   if (isComplete || (isLoading && hasCachedOrgData && hasEmployees)) return <>{children}</>;
-  if (isLoading) return null;
+  // Nothing cached and still loading: the bootstrap may be retrying a 5xx
+  // for several seconds, and an empty shell reads as a hung page (F-68).
+  if (isLoading) return <AuthTransitionScreen phase="workspace" />;
 
   // Regular user — show waiting message
   if (!perms.isSuperAdmin && !perms.canManageOrg) {

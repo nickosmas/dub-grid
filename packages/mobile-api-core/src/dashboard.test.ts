@@ -148,6 +148,7 @@ describe("buildCoverageSectionsResponse", () => {
         filledTotal: 2,
         pct: 33,
         openSlots: 4,
+        daily: [],
       },
       {
         focusAreaId: 1,
@@ -156,6 +157,7 @@ describe("buildCoverageSectionsResponse", () => {
         filledTotal: 4,
         pct: 100,
         openSlots: 0,
+        daily: [],
       },
     ]);
   });
@@ -173,6 +175,24 @@ describe("buildCoverageSectionsResponse", () => {
     }));
 
     expect(buildCoverageSectionsResponse(byFocusArea)).toHaveLength(14);
+  });
+
+  it("carries each section's daily grid when the summary provides one", () => {
+    const byFocusArea: CoverageByFocusAreaEntry[] = [
+      { focusAreaId: 1, focusAreaName: "ICU", filledTotal: 3, requiredTotal: 6, pct: 50 },
+    ];
+    const daily = new Map([
+      [
+        1,
+        [
+          { dateKey: "2026-09-21", filledCount: 3, requiredCount: 3, status: "green" as const },
+          { dateKey: "2026-09-22", filledCount: 0, requiredCount: 3, status: "red" as const },
+        ],
+      ],
+    ]);
+
+    expect(buildCoverageSectionsResponse(byFocusArea, daily)[0].daily).toEqual(daily.get(1));
+    expect(buildCoverageSectionsResponse(byFocusArea)[0].daily).toEqual([]);
   });
 });
 
@@ -712,6 +732,7 @@ describe("loadMobileDashboardPayload", () => {
         filledTotal: 67,
         pct: 96,
         openSlots: 3,
+        daily: [],
       },
     ]);
   });

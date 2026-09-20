@@ -6,20 +6,23 @@ import { useMobileColors } from "../providers/ThemeModeProvider";
 
 type InsigniaSize = "sm" | "lg";
 
-// Sized to stay legible at a glance rather than to stay discreet, with the glyph
-// at ~55% of the circle so the crown has room to read as a crown.
+// Sized to the cap height of the title it follows (22pt beside a screen title,
+// 28pt beside a display title), so the mark reads as part of the name rather
+// than as a chip the same height as the text. The star spans about two thirds
+// of the circle, matching web: the glyph's outline is ~83% of its font size.
 //
 // `pull` closes most of the row's own gap. The mark belongs to the name, so it
 // should read as attached to it, while the pill that follows keeps the row's
 // normal rhythm — which a smaller container gap would have tightened too.
 const SIZES: Record<InsigniaSize, { badge: number; glyph: number; pull: number }> = {
-  sm: { badge: 22, glyph: 12, pull: -5 },
-  lg: { badge: 28, glyph: 16, pull: -5 },
+  sm: { badge: 16, glyph: 13, pull: -5 },
+  lg: { badge: 20, glyph: 16, pull: -5 },
 };
 
 /**
- * The crown or star marking an elevated member, sitting just after their name.
- * Plain users get nothing, so the mark keeps meaning something.
+ * The star marking an elevated member, sitting just after their name: gold for
+ * a Super Admin, blue for an Admin. Plain users get nothing, so the mark keeps
+ * meaning something.
  */
 export function AccessInsignia({
   orgRole,
@@ -44,7 +47,7 @@ export function AccessInsignia({
       accessibilityRole="image"
       style={{
         alignItems: "center",
-        backgroundColor: insignia === "crown" ? mobileColors.insigniaCrown : mobileColors.brand,
+        backgroundColor: insignia === "gold" ? mobileColors.insigniaGold : mobileColors.brand,
         borderRadius: badge / 2,
         // A long name shrinks the title beside it, never this.
         flexShrink: 0,
@@ -54,11 +57,7 @@ export function AccessInsignia({
         width: badge,
       }}
     >
-      <MaterialCommunityIcons
-        color={mobileColors.textInverse}
-        name={insignia === "crown" ? "crown" : "star"}
-        size={glyph}
-      />
+      <MaterialCommunityIcons color={mobileColors.textInverse} name="star" size={glyph} />
     </View>
   );
 }

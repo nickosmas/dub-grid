@@ -110,3 +110,47 @@ describe("department authorization", () => {
     expect(canManage({ canManageOrgLabels: true })).toBeFalsy();
   });
 });
+
+describe("delete dependency checks", () => {
+  it("counts schedule usage with one RPC instead of reading every cell", async () => {
+    const tables: string[] = [];
+    const chain: Record<string, unknown> = {};
+    const passthrough = () => chain;
+    chain.select = passthrough;
+    chain.is = passthrough;
+    chain.eq = passthrough;
+    chain.then = (resolve: (v: { data: unknown[]; count: number; error: null }) => unknown) =>
+      resolve({ data: [], count: 0, error: null });
+    const rpc = vi.fn(async () => ({ data: 3, error: null }));
+    const client = {
+      from: (table: string) => {
+        tables.push(table);
+        return chain;
+      },
+      rpc,
+    };
+    getServiceClient.mockReturnValue(client);
+    requireOrgPermissions.mockResolvedValue({
+      actor: { id: "actor-1" },
+      serviceClient: client,
+      orgId: REAL_ORG,
+    });
+
+    const { GET } = await import("./route");
+    const res = await GET(
+      new NextRequest(
+        `https://app.test/api/settings/config?action=checkJobDependencies&orgId=${REAL_ORG}&itemId=42`,
+      ),
+    );
+
+    expect(res?.status).toBe(200);
+    expect(await res?.json()).toMatchObject({ hasDependencies: true, summary: "Used by 3 shifts" });
+    expect(rpc).toHaveBeenCalledWith("count_schedule_cell_usage", {
+      p_org_id: REAL_ORG,
+      p_shift_id: null,
+      p_job_id: 42,
+      p_absence_type_id: null,
+    });
+    expect(tables).not.toContain("schedule_cells");
+  });
+});

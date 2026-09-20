@@ -54,6 +54,8 @@ type OrchestrationOutcome =
 
 /** Returned when the user cannot access the organization named by the host. */
 const ORG_ACCESS_DENIED_CODE = "ORG_ACCESS_DENIED";
+const ORG_SUSPENDED_CODE = "ORG_SUSPENDED";
+const ORG_DELETED_CODE = "ORG_DELETED";
 const GRIDMASTER_PORTAL_REQUIRED_CODE = "GRIDMASTER_PORTAL_REQUIRED";
 const GRIDMASTER_PORTAL_REQUIRED_MESSAGE =
   "Gridmaster accounts must sign in through the Gridmaster Portal before impersonating an organization.";
@@ -94,12 +96,30 @@ async function switchSessionToHostOrganization(
   // Reuses the same 24h Redis-cached lookup app/login/page.tsx already ran for
   // this host moments earlier server-side, instead of a fresh DB round trip.
   const orgLookup = await lookupOrgBySlug(hostSlug);
+  // A closed organization gets its own code so the sign-in page can say so;
+  // switch_org would refuse it too, but only as a generic denial (F-87).
+  if (orgLookup.status === "archived") {
+    return {
+      ok: false,
+      status: 403,
+      code: ORG_DELETED_CODE,
+      error: "This organization has been deleted.",
+    };
+  }
   if (orgLookup.status !== "found") {
     return {
       ok: false,
       status: 403,
       code: ORG_ACCESS_DENIED_CODE,
       error: "Your account is not associated with this organization.",
+    };
+  }
+  if (orgLookup.org.suspendedAt) {
+    return {
+      ok: false,
+      status: 403,
+      code: ORG_SUSPENDED_CODE,
+      error: "This organization is suspended.",
     };
   }
 

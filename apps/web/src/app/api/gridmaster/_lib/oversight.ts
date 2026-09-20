@@ -19,7 +19,13 @@ type QueryClient = {
 type Row = Record<string, unknown>;
 
 const DAY_MS = 86_400_000;
-const HIGH_RISK_ACTION_PREFIXES = ["billing.", "gdpr.", "gridmaster_account.", "impersonation."];
+const HIGH_RISK_ACTION_PREFIXES = [
+  "billing.",
+  "gdpr.",
+  "gridmaster_account.",
+  "impersonation.",
+  "platform_feature_flags.",
+];
 const HIGH_RISK_ACTIONS = new Set([
   "account.deleted",
   "audit.exported",
@@ -156,7 +162,46 @@ export async function loadGridmasterCompliance(
   return buildComplianceSummary(facts, buildOrgHealthSummaries(facts));
 }
 
-async function loadOversightFacts(serviceClient: QueryClient) {
+// The portal opens all five oversight views at once and each one needs the
+// same twenty reads, so one load is shared for a few seconds. A change made
+// through the portal reads back after the window; the views already refetch.
+const OVERSIGHT_FACTS_TTL_MS = 10_000;
+let oversightFactsMemo: {
+  client: QueryClient;
+  loadedAt: number;
+  facts: Promise<OversightFacts>;
+} | null = null;
+
+type OversightFacts = Awaited<ReturnType<typeof loadOversightFactsUncached>>;
+
+/** Drop the shared facts load; the lifecycle route calls this after a change. */
+export function resetOversightFactsMemo(): void {
+  oversightFactsMemo = null;
+}
+
+export function resetOversightFactsMemoForTests(): void {
+  resetOversightFactsMemo();
+}
+
+function loadOversightFacts(serviceClient: QueryClient): Promise<OversightFacts> {
+  const nowMs = Date.now();
+  if (
+    oversightFactsMemo &&
+    oversightFactsMemo.client === serviceClient &&
+    nowMs - oversightFactsMemo.loadedAt < OVERSIGHT_FACTS_TTL_MS
+  ) {
+    return oversightFactsMemo.facts;
+  }
+  const facts = loadOversightFactsUncached(serviceClient);
+  oversightFactsMemo = { client: serviceClient, loadedAt: nowMs, facts };
+  // A failed load must not be served for the rest of the window.
+  facts.catch(() => {
+    if (oversightFactsMemo?.facts === facts) oversightFactsMemo = null;
+  });
+  return facts;
+}
+
+async function loadOversightFactsUncached(serviceClient: QueryClient) {
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * DAY_MS).toISOString();
   const [
@@ -367,9 +412,7 @@ function topCategory(rows: Row[]) {
   return [...counts.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] ?? null;
 }
 
-function buildOrgHealthSummaries(
-  facts: Awaited<ReturnType<typeof loadOversightFacts>>,
-): GridmasterOrgHealthSummary[] {
+function buildOrgHealthSummaries(facts: OversightFacts): GridmasterOrgHealthSummary[] {
   const userIdsByOrg = groupSet(facts.memberships, "org_id", "user_id");
   const membershipCount = groupCount(facts.memberships, "org_id");
   const employeeCount = groupCount(facts.employees, "org_id");
@@ -468,9 +511,7 @@ function buildOrgHealthSummaries(
   });
 }
 
-function buildSecuritySummary(
-  facts: Awaited<ReturnType<typeof loadOversightFacts>>,
-): GridmasterSecuritySummary {
+function buildSecuritySummary(facts: OversightFacts): GridmasterSecuritySummary {
   const nowMs = facts.now.getTime();
   const activeImpersonations = facts.impersonationSessions.filter(
     (row: Row) => !row.ended_at && dateMs(row.expires_at) > nowMs,
@@ -507,7 +548,7 @@ function buildSecuritySummary(
 }
 
 function buildBillingSummary(
-  facts: Awaited<ReturnType<typeof loadOversightFacts>>,
+  facts: OversightFacts,
   orgHealth: GridmasterOrgHealthSummary[],
 ): GridmasterBillingSummary {
   const subscriptionByOrg = new Map(facts.subscriptions.map((row) => [String(row.org_id), row]));
@@ -567,10 +608,7 @@ function buildBillingSummary(
   };
 }
 
-function billableAppUserCountForOrg(
-  facts: Awaited<ReturnType<typeof loadOversightFacts>>,
-  orgId: string,
-): number {
+function billableAppUserCountForOrg(facts: OversightFacts, orgId: string): number {
   const employees = facts.employees.filter((row) => row.org_id === orgId);
   const linkedEmployeeUserIds = new Set(
     employees
@@ -585,7 +623,7 @@ function billableAppUserCountForOrg(
 }
 
 function buildComplianceSummary(
-  facts: Awaited<ReturnType<typeof loadOversightFacts>>,
+  facts: OversightFacts,
   orgHealth: GridmasterOrgHealthSummary[],
 ): GridmasterComplianceSummary {
   const dataRetentionRisk = facts.organizations
@@ -622,15 +660,37 @@ function buildComplianceSummary(
 // Test Sandbox clones are not tenants: the dashboard list excludes them and
 // the manage route refuses them, so oversight must not count them either.
 async function selectRealOrganizations(client: QueryClient): Promise<Organization[]> {
-  const result = await client
-    .from("organizations")
-    .select(ORGANIZATION_WITH_BILLING_COLS)
-    .eq("workspace_kind", "real");
-  return toRows(result).map((row) => rowToOrganization(row as unknown as DbOrganization));
+  const rows = await selectAllPages(() =>
+    client
+      .from("organizations")
+      .select(ORGANIZATION_WITH_BILLING_COLS)
+      .eq("workspace_kind", "real"),
+  );
+  return rows.map((row) => rowToOrganization(row as unknown as DbOrganization));
+}
+
+// PostgREST answers at most `max_rows` (1000 locally) per request and says
+// nothing when it truncates, so a plain select silently under-counts a large
+// tenant (F-89). Page until a short page comes back instead.
+export const OVERSIGHT_PAGE_SIZE = 1000;
+
+async function selectAllPages(buildQuery: () => any): Promise<Row[]> {
+  const rows: Row[] = [];
+  for (let offset = 0; ; offset += OVERSIGHT_PAGE_SIZE) {
+    const query = buildQuery();
+    const page = toRows(
+      await (typeof query.range === "function"
+        ? query.range(offset, offset + OVERSIGHT_PAGE_SIZE - 1)
+        : query),
+    );
+    rows.push(...page);
+    if (page.length < OVERSIGHT_PAGE_SIZE || typeof query.range !== "function") break;
+  }
+  return rows;
 }
 
 async function selectRows(client: QueryClient, table: string, columns: string): Promise<Row[]> {
-  return toRows(await client.from(table).select(columns));
+  return selectAllPages(() => client.from(table).select(columns));
 }
 
 async function countRows(client: QueryClient, table: string): Promise<number> {
@@ -645,7 +705,7 @@ function toRows(result: { data?: unknown; error?: unknown }): Row[] {
 }
 
 function computeSetupSummary(
-  facts: Awaited<ReturnType<typeof loadOversightFacts>>,
+  facts: OversightFacts,
   orgId: string,
 ): GridmasterOrgHealthSummary["setup"] {
   const departments = facts.departments.filter((row) => row.org_id === orgId && !row.archived_at);

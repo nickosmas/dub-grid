@@ -91,9 +91,10 @@ DATABASE_URL='<branch connection string>' npm run db:seed:branch
 ```
 
 A preview branch proves a clean install. It does not prove the upgrade from
-production's real state, which is where the risk lives. Rehearse that by
-restoring a production backup into a persistent branch and taking the migration
-against it.
+production's real state, which is where the risk lives. DubGrid does not use
+branching for releases (decided 2026-09-19, no PITR yet either): rehearse the
+upgrade on a scratch local stack whose ledger matches production, then push
+the missing suffix onto it. The release runbook has the exact steps.
 
 ## config.toml: JWT Hook (CRITICAL)
 

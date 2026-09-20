@@ -62,7 +62,7 @@ export function PersonFormSkeleton({
         <View key={`form-choice-group-${index}`} style={styles.section}>
           <SkeletonLine style={styles.sectionTitle} variant="sectionTitle" width="34%" />
           <View style={styles.field}>
-            <SkeletonLine variant="caption" width="28%" />
+            <SkeletonLine style={styles.groupLabel} variant="caption" width="28%" />
             <View style={styles.list}>
               {skeletonRows(3, (row) => (
                 <View
@@ -111,6 +111,10 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     field: {
       gap: mobileSpace.sm,
+    },
+    // The group label sits on the section title's inset, as the real one does.
+    groupLabel: {
+      marginHorizontal: mobileSpace.lg,
     },
     list: {
       backgroundColor: mobileColors.surface,

@@ -50,6 +50,26 @@ describe("CalendarSubscriptionCard", () => {
     expect(screen.getByRole("button", { name: "Disable subscription" })).toBeInTheDocument();
   });
 
+  it("offers one-click subscribe links once the URL is disclosed", async () => {
+    render(<CalendarSubscriptionCard />);
+    fireEvent.click(await screen.findByRole("button", { name: "Create private link" }));
+    await screen.findByText(PRIVATE_URL);
+
+    const encoded = encodeURIComponent(PRIVATE_URL);
+    expect(screen.getByRole("link", { name: "Apple Calendar" })).toHaveAttribute(
+      "href",
+      PRIVATE_URL.replace("https:", "webcals:"),
+    );
+    const google = screen.getByRole("link", { name: "Google Calendar" });
+    expect(google).toHaveAttribute("href", `https://calendar.google.com/calendar/r?cid=${encoded}`);
+    expect(google).toHaveAttribute("target", "_blank");
+    expect(google).toHaveAttribute("rel", "noopener noreferrer");
+    expect(screen.getByRole("link", { name: "Outlook" })).toHaveAttribute(
+      "href",
+      `https://outlook.live.com/calendar/0/addfromweb?url=${encoded}&name=DubGrid`,
+    );
+  });
+
   it("does not redisclose an existing link after a fresh status load", async () => {
     fetchStatus.mockResolvedValue({
       active: true,
@@ -62,6 +82,8 @@ describe("CalendarSubscriptionCard", () => {
       await screen.findByText(/its private link is shown only when created or replaced/i),
     ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Copy link" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Apple Calendar" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Google Calendar" })).not.toBeInTheDocument();
   });
 
   it("confirms replacement and disable in an in-app dialog, then reflects revocation", async () => {

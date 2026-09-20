@@ -1,7 +1,7 @@
 "use client";
 import { X } from "lucide-react";
 
-import { useState, useCallback } from "react";
+import { useId, useState, useCallback } from "react";
 import { toast } from "sonner";
 import type { Organization, AssignableOrganizationRole } from "@/types";
 import { Button } from "@/components/Button";
@@ -47,6 +47,19 @@ export default function OrganizationSetupWizard({
   onCancel: () => void;
 }) {
   // ── Wizard state ──────────────────────────────────────────────────────────
+  // Labels point at their inputs so assistive technology announces them
+  // (F-101); the location fields on this step already do this via useId.
+  const fieldId = useId();
+  const ids = {
+    name: `${fieldId}-name`,
+    focusAreaLabel: `${fieldId}-focus-area-label`,
+    certificationLabel: `${fieldId}-certification-label`,
+    roleLabel: `${fieldId}-role-label`,
+    firstName: `${fieldId}-first-name`,
+    lastName: `${fieldId}-last-name`,
+    email: `${fieldId}-email`,
+    phone: `${fieldId}-phone`,
+  };
   const [currentStep, setCurrentStep] = useState<StepKey>("details");
   const [saving, setSaving] = useState(false);
   const [setupConfirmAction, setSetupConfirmAction] = useState<SetupConfirmAction | null>(null);
@@ -471,8 +484,11 @@ export default function OrganizationSetupWizard({
               }}
             >
               <div>
-                <label style={labelStyle}>Organization name *</label>
+                <label style={labelStyle} htmlFor={ids.name}>
+                  Organization name *
+                </label>
                 <input
+                  id={ids.name}
                   className="dg-input"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -530,8 +546,11 @@ export default function OrganizationSetupWizard({
               }}
             >
               <div>
-                <label style={labelStyle}>Focus areas label</label>
+                <label style={labelStyle} htmlFor={ids.focusAreaLabel}>
+                  Focus areas label
+                </label>
                 <input
+                  id={ids.focusAreaLabel}
                   className="dg-input"
                   value={focusAreaLabel}
                   onChange={(e) => setFocusAreaLabel(e.target.value)}
@@ -539,8 +558,11 @@ export default function OrganizationSetupWizard({
                 />
               </div>
               <div>
-                <label style={labelStyle}>Certifications label</label>
+                <label style={labelStyle} htmlFor={ids.certificationLabel}>
+                  Certifications label
+                </label>
                 <input
+                  id={ids.certificationLabel}
                   className="dg-input"
                   value={certificationLabel}
                   onChange={(e) => setCertificationLabel(e.target.value)}
@@ -548,8 +570,11 @@ export default function OrganizationSetupWizard({
                 />
               </div>
               <div>
-                <label style={labelStyle}>Roles label</label>
+                <label style={labelStyle} htmlFor={ids.roleLabel}>
+                  Roles label
+                </label>
                 <input
+                  id={ids.roleLabel}
                   className="dg-input"
                   value={roleLabel}
                   onChange={(e) => setRoleLabel(e.target.value)}
@@ -613,10 +638,11 @@ export default function OrganizationSetupWizard({
               }}
             >
               <div>
-                <label style={labelStyle}>
+                <label style={labelStyle} htmlFor={ids.firstName}>
                   First Name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                 </label>
                 <input
+                  id={ids.firstName}
                   className="dg-input"
                   value={superAdminFirstName}
                   onChange={(e) => setSuperAdminFirstName(e.target.value)}
@@ -624,10 +650,11 @@ export default function OrganizationSetupWizard({
                 />
               </div>
               <div>
-                <label style={labelStyle}>
+                <label style={labelStyle} htmlFor={ids.lastName}>
                   Last Name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                 </label>
                 <input
+                  id={ids.lastName}
                   className="dg-input"
                   value={superAdminLastName}
                   onChange={(e) => setSuperAdminLastName(e.target.value)}
@@ -635,10 +662,11 @@ export default function OrganizationSetupWizard({
                 />
               </div>
               <div style={{ gridColumn: "1 / -1" }}>
-                <label style={labelStyle}>
+                <label style={labelStyle} htmlFor={ids.email}>
                   Email <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                 </label>
                 <input
+                  id={ids.email}
                   className="dg-input"
                   type="email"
                   value={superAdminEmail}
@@ -647,8 +675,11 @@ export default function OrganizationSetupWizard({
                 />
               </div>
               <div style={{ gridColumn: "1 / -1" }}>
-                <label style={labelStyle}>Phone</label>
+                <label style={labelStyle} htmlFor={ids.phone}>
+                  Phone
+                </label>
                 <input
+                  id={ids.phone}
                   className="dg-input"
                   type="tel"
                   value={superAdminPhone}

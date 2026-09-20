@@ -39,6 +39,20 @@ on `main`. Keep `main` for an explicitly requested release PR whose head is
 `dev`; preparing that PR does not authorize a checkout, merge, rewrite, or push
 of `main`.
 
+A release PR merges only once every GitHub check on it is green: no pending,
+no failing, no skipped-by-cancel. A merge authorization given before the
+checks finish takes effect when they finish, and is withdrawn by any failure.
+Never merge past a red or still-running check, and never merge with the
+`--admin` override. This is a convention standing in for required status
+checks: the repository is private on the free plan, so branch protection,
+rulesets, and auto-merge are unavailable (GitHub reports 403 / leaves
+`allow_auto_merge` false). Never use `gh pr merge --auto` here: with no
+required checks it merges immediately (#94 merged with Playwright still
+running). Watch with `gh pr checks <n> --watch --fail-fast`, confirm every
+check reads pass, then `gh pr merge <n> --merge`, as the release PRs before it. If the repository
+moves to GitHub Pro or becomes public, replace this paragraph with required
+checks on `main` and enable auto-merge.
+
 This governs agent sessions working in this checkout, where several share one
 working tree and branches would collide. Branch-based contributions still
 exist and still merge into `dev` through a pull request: Claude Code cloud

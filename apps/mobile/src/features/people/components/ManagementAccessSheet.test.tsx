@@ -158,12 +158,23 @@ describe("ManagementAccessSheet", () => {
 
     expect(screen.getByText("Access level")).toBeInTheDocument();
     expect(screen.getByText("Super Admin")).toBeInTheDocument();
+    // Two lists on one sheet each carry a header to tell them apart.
+    expect(screen.getByText("Management Departments")).toBeInTheDocument();
+  });
+
+  // The sheet's title is the header. A lone departments list under it used
+  // to restate its own name in a small label, which said nothing.
+  it("leaves the header off a lone departments list", () => {
+    renderSheet({ userId: "user-1", orgRole: "admin", managementDepartmentIds: [9] });
+
+    expect(screen.queryByText("Management Departments")).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Operations" })).toBeInTheDocument();
   });
 
   it("sends the picked departments, defaulting a fresh grant to User", () => {
     const mutationCalls = renderSheet();
 
-    fireEvent.click(screen.getByText("OPS"));
+    fireEvent.click(screen.getByText("Operations"));
     fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
 
     expect(allMutatePayloads(mutationCalls)).toContainEqual({
@@ -181,7 +192,7 @@ describe("ManagementAccessSheet", () => {
 
     // Something has to change before Save will fire, so the seeded role rides
     // along on a department edit.
-    fireEvent.click(screen.getByText("FAC"));
+    fireEvent.click(screen.getByText("Facilities"));
     fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
 
     expect(allMutatePayloads(mutationCalls)).toContainEqual({
@@ -202,7 +213,7 @@ describe("ManagementAccessSheet", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
     expect(allMutatePayloads(mutationCalls)).toHaveLength(0);
 
-    fireEvent.click(screen.getByText("FAC"));
+    fireEvent.click(screen.getByText("Facilities"));
     fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
     expect(allMutatePayloads(mutationCalls)).toHaveLength(1);
   });
@@ -224,7 +235,7 @@ describe("ManagementAccessSheet", () => {
       userId: "user-1",
     });
 
-    fireEvent.click(screen.getByText("OPS"));
+    fireEvent.click(screen.getByText("Operations"));
 
     expect(
       screen.getByText(
@@ -249,7 +260,7 @@ describe("ManagementAccessSheet", () => {
       userId: "user-1",
     });
 
-    fireEvent.click(screen.getByText("OPS"));
+    fireEvent.click(screen.getByText("Operations"));
     fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
     const confirm = within(screen.getByRole("alert")).getByRole("button", {
       name: "Remove Access",

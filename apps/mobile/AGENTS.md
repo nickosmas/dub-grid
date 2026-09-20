@@ -220,6 +220,7 @@ import path screens should use. **The package is shared with `apps/web`** — ad
 | Any button                  | `<Button>` — solid fill, no border, squircle, sizes `sm`/`md`/`lg`, `iconOnly`                                                     |
 | A pressable list row        | `<PressableRow>` — background highlight on iOS, ripple on Android                                                                  |
 | A scrolling tab strip       | `<ScrollableTabStrip>` — pill tabs, optional count badges, scrolls the active tab into view                                        |
+| A text action in the bar    | `createHeaderTextAction()` — `HeaderTextButton` in `headerRight`; iOS 26 wraps it in Liquid Glass itself                           |
 | A pressable that is neither | `usePressAnimation()`                                                                                                              |
 | Status/metadata/filter pill | `<Chip>`                                                                                                                           |
 | Segmented toggle            | `<SegmentedControl>` — sliding thumb, optional count badges (same pill as the strip's)                                             |
@@ -338,6 +339,12 @@ Choose the surface by the user's task:
 
 Sheets have a grabber, 40pt top corners, and extend to the bottom edge.
 
+- **A sheet that holds one list gives it no caption.** The management-access
+  and app-access pickers are `ProfileChoiceGroup` / `SelectionSection` lists
+  under a `<SheetHeader>` that already names them; a small "Access level" or
+  "Management Departments" label between the two said nothing. Both accept an
+  omitted `label`. Two lists on one sheet (a fresh invitation's role and
+  departments) keep theirs, since then the captions tell them apart.
 - **Titles go in the `header` slot** via `<SheetHeader>`, which puts them in the
   drag region. A title rendered in the body scrolls out of view and takes its
   drag target with it.
@@ -372,10 +379,22 @@ Sheets have a grabber, 40pt top corners, and extend to the bottom edge.
   is a centered full-width row first, with help/navigation links centered
   underneath. This keeps `Continue` and `Sign In` visually dominant and stops
   a long help label from being compressed beside them.
-- **Profile hero quick actions keep their established centered wrapping
-  layout.** They are navigation and communication shortcuts, not a bottom form
-  action group. Keep `ProfileQuickActions` out of `ActionButtons`; apply the
-  secondary-first/primary-last rule to bottom content, form, and sheet actions.
+- **A person page keeps Call and Email under the hero, Edit in the bar, and
+  everything else at the foot.** `ProfileQuickActions` holds exactly the
+  contact pair as `ProfileQuickAction` pills (the `plain` button with its
+  glyph and its name; a missing number or address dims the pill rather than
+  dropping it, so the pair keeps its shape). Edit is about the page rather
+  than the person, so it is a text-only `createHeaderTextAction` in the
+  navigation bar, cleared while an inline editor's footer owns Save and
+  Cancel. It rides in `headerRight`, which iOS 26 wraps in the same Liquid
+  Glass capsule as the back button; native-stack's `unstable_headerRightItems`
+  would be the textbook route but comes up as an empty capsule on the pinned
+  react-native-screens 4.17 (it sends `title`, screens 4.17 reads `label`).
+  The management actions (invitation, schedule, management access, status)
+  end the page in `ProfileActionStack`, full width one under the other, in
+  web's staff-panel order: access first, status last. Keep the pair out of
+  `ActionButtons`; the secondary-first/primary-last rule is for bottom
+  content, form, and sheet actions.
 - **`backdrop="cover"`** paints out the app behind the sheet instead of dimming
   it. Only the app lock wants this, and for it the choice is a security one.
 - **A sheet holding unsaved input must guard its dismissal.** Route `onDismiss`

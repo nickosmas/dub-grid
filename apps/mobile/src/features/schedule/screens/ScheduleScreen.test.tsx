@@ -2269,10 +2269,7 @@ describe("ScheduleScreen", () => {
       "true",
     );
     const headerControlLabels = [...screen.getAllByRole("button"), ...screen.getAllByRole("tab")]
-      .sort((a, b) =>
-        // eslint-disable-next-line no-bitwise
-        a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1,
-      )
+      .sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1))
       .map((control) => control.getAttribute("aria-label") ?? control.textContent);
     expect(headerControlLabels.indexOf("Select Sat, Apr 18")).toBeLessThan(
       headerControlLabels.indexOf("Emergency"),

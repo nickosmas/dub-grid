@@ -86,7 +86,9 @@ import {
   formatLocalDateKey,
   hasShiftStartedAtTimeRanges,
   parseLocalDateKey,
+  summarizeCoverageDailyForFocusArea,
   type CoverageByFocusAreaEntry,
+  type CoverageDailyEntry,
   type CoverageGap,
   type CoverageTotals,
   type SegmentsForEmployeeDate,
@@ -1565,6 +1567,7 @@ export interface MobileCoverageSummary {
   openShifts: MobileOpenShift[];
   totals: CoverageTotals;
   byFocusArea: CoverageByFocusAreaEntry[];
+  dailyByFocusArea: Map<number, CoverageDailyEntry[]>;
   hasCoverageRequirements: boolean;
   scheduleRows: MobilePublishedScheduleRow[];
 }
@@ -1590,12 +1593,13 @@ export async function fetchMobileCoverageSummary(
       openShifts: [],
       totals: { totalRequired: 0, totalFilled: 0, pct: 100, openSlots: 0 },
       byFocusArea: [],
+      dailyByFocusArea: new Map(),
       hasCoverageRequirements,
       scheduleRows: inputs.scheduleRows,
     };
   }
 
-  const { gaps, totals, byFocusArea } = assembleDashboardCoverage({
+  const { gaps, totals, byFocusArea, snapshots } = assembleDashboardCoverage({
     focusAreas: inputs.context.focusAreas,
     shiftCategories: inputs.context.shiftCategories,
     assignments: inputs.context.assignments,
@@ -1611,6 +1615,12 @@ export async function fetchMobileCoverageSummary(
     openShifts: buildMobileOpenShiftsFromGaps(gaps, inputs, input),
     totals,
     byFocusArea,
+    dailyByFocusArea: new Map(
+      byFocusArea.map((entry) => [
+        entry.focusAreaId,
+        summarizeCoverageDailyForFocusArea(snapshots, entry.focusAreaId, inputs.dates),
+      ]),
+    ),
     hasCoverageRequirements,
     scheduleRows: inputs.scheduleRows,
   };

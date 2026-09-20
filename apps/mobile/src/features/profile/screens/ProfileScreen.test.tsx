@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule, createScreenModule } from "../../../test/native";
@@ -26,10 +27,13 @@ const handleExpiredMobileSession = vi.fn();
 const disablePushForCurrentDevice = vi.fn();
 const pushToast = vi.fn();
 // Every options object the screen hands the native header, in render order.
-const stackScreenOptions: {
+const stackScreenOptions: StackScreenOptions[] = [];
+
+type StackScreenOptions = {
   headerTitleStyle?: { color?: string; fontFamily?: string };
   title?: string;
-}[] = [];
+  headerRight?: () => ReactNode;
+};
 
 vi.mock("expo-router", () => ({
   router: {
@@ -37,11 +41,11 @@ vi.mock("expo-router", () => ({
     replace: routerReplace,
   },
   Stack: Object.assign(() => null, {
-    Screen: (props: {
-      options?: { headerTitleStyle?: { color?: string; fontFamily?: string }; title?: string };
-    }) => {
+    // The bar's trailing slot rendered in place, so a test can press the
+    // header's "Edit" the way it presses anything else on the page.
+    Screen: (props: { options?: StackScreenOptions }) => {
       stackScreenOptions.push(props.options ?? {});
-      return null;
+      return <div data-testid="navigation-bar">{props.options?.headerRight?.() ?? null}</div>;
     },
   }),
 }));
@@ -367,13 +371,15 @@ describe("ProfileScreen", () => {
     fireEvent.scroll(scrollRoot);
     // Once the hero starts moving under the native bar, it identifies the
     // person rather than the tab.
-    expect(stackScreenOptions.at(-1)).toEqual({
+    expect(stackScreenOptions.at(-1)).toMatchObject({
       headerTitleStyle: expect.objectContaining({ color: "#0F172A" }),
       title: "Mina Diaz",
     });
     expect(screen.getAllByText("Mina Diaz").length).toBeGreaterThan(0);
     expect(screen.getByText("MD")).toBeInTheDocument();
-    expect(screen.getAllByText("Admin").length).toBeGreaterThan(0);
+    // The tier is the insignia beside the name, no pill spelling it out.
+    expect(screen.getByLabelText("Admin")).toBeInTheDocument();
+    expect(screen.queryByText("Admin")).not.toBeInTheDocument();
     expect(screen.getAllByText("DubGrid Health").length).toBeGreaterThan(0);
     // One quiet line under the identity, and the only thing left of a hero meta
     // grid that also carried the organization and the phone number. The phone
@@ -574,7 +580,37 @@ describe("ProfileScreen", () => {
     expect(routerPush).not.toHaveBeenCalledWith("/(tabs)/profile/notifications");
   });
 
-  it("opens organization switching in a modal from the settings row", () => {
+  // The same bar action the person page has. "Profile details" is this
+  // profile's editor, so that is where Edit goes; the Settings row of the same
+  // name stays as the list's way in.
+  it("puts Edit in the navigation bar and opens Profile details from it", () => {
+    render(<ProfileScreen />);
+
+    const bar = within(screen.getByTestId("navigation-bar"));
+    fireEvent.click(bar.getByRole("button", { name: "Edit" }));
+
+    expect(routerPush).toHaveBeenCalledWith("/(tabs)/profile/work");
+    expect(screen.getAllByRole("button", { name: "Edit" })).toHaveLength(1);
+  });
+
+  // The two actions that leave the organization are full buttons at the very
+  // foot of the page, after every settings row: the switcher first, Sign Out
+  // last. Nothing sits in a row under the avatar.
+  it("ends the page with Switch organization and Sign Out as buttons", () => {
+    render(<ProfileScreen />);
+
+    expect(screen.queryByLabelText("Actions")).not.toBeInTheDocument();
+    const buttons = screen.getAllByRole("button");
+    const switchIndex = buttons.findIndex((b) => b.textContent === "Switch organization");
+    const signOutIndex = buttons.findIndex((b) => b.textContent === "Sign Out");
+    const appearanceIndex = buttons.findIndex((b) => b.textContent?.startsWith("Appearance"));
+    expect(appearanceIndex).toBeGreaterThan(-1);
+    expect(switchIndex).toBeGreaterThan(appearanceIndex);
+    expect(signOutIndex).toBe(switchIndex + 1);
+    expect(screen.getAllByRole("button", { name: "Sign Out" })).toHaveLength(1);
+  });
+
+  it("opens organization switching in a modal from the button at the foot", () => {
     render(<ProfileScreen />);
 
     fireEvent.click(screen.getByRole("button", { name: /^Switch organization/ }));
@@ -615,7 +651,7 @@ describe("ProfileScreen", () => {
 
     render(<ProfileScreen />);
 
-    fireEvent.click(screen.getByText("Sign Out"));
+    fireEvent.click(screen.getByRole("button", { name: "Sign Out" }));
     fireEvent.click(
       within(screen.getByRole("alert")).getByRole("button", {
         name: "Sign Out",

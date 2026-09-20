@@ -1195,7 +1195,14 @@ export default function DashboardView({
       {/* Content */}
       <div data-tour="dashboard-cards" style={contentStyle}>
         <DashboardGreeting
-          name={currentEmployee?.firstName?.trim() || authUser?.email?.split("@")[0] || null}
+          // Impersonation keeps the gridmaster's identity under the target's
+          // permissions, so a personal greeting here would name the wrong
+          // person. The banner above says whose view this is.
+          name={
+            permissions.isImpersonating
+              ? null
+              : currentEmployee?.firstName?.trim() || authUser?.email?.split("@")[0] || null
+          }
           now={currentTime}
           userId={authUser?.id ?? null}
           orgTimezone={org.timezone ?? null}

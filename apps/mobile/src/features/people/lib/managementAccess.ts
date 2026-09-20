@@ -18,6 +18,26 @@ export type ManagementAccessRole = "user" | "admin" | "super_admin";
  * carries no departments at all - so those people were offered "Edit Management
  * Access" for access they had never been given.
  */
-export function hasManagementAccess(person: MobilePerson): boolean {
+export function hasManagementAccess(
+  person: Pick<MobilePerson, "managementDepartmentIds">,
+): boolean {
   return person.managementDepartmentIds.length > 0;
 }
+
+/**
+ * What the management-access sheet needs to know about whoever it is editing:
+ * a teammate from the People directory, or the signed-in member's own record
+ * assembled from their profile.
+ */
+export type ManagementAccessSubject = Pick<
+  MobilePerson,
+  | "id"
+  | "firstName"
+  | "lastName"
+  | "email"
+  | "orgRole"
+  | "userId"
+  | "membershipUpdatedAt"
+  | "managementDepartmentIds"
+  | "pendingInvitation"
+>;

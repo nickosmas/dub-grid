@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 import type { MobileDepartment, MobileManagementUser } from "@dubgrid/contracts";
 import { AppText } from "../../../shared/components/AppText";
@@ -49,6 +49,7 @@ export function ManagementUserAccessSheet({
   onDismiss,
   onRemove,
   onSubmit,
+  overlay,
 }: {
   visible: boolean;
   managementUser: MobileManagementUser;
@@ -67,6 +68,12 @@ export function ManagementUserAccessSheet({
    */
   onRemove: () => void;
   onSubmit: (draft: Draft) => Promise<unknown>;
+  /**
+   * The parent's prompts, rendered inside this sheet while it is the one on
+   * top: iOS refuses a second Modal while a sheet is up, so a confirmation
+   * raised from here (`onRemove`) has to ride in the sheet's overlay slot.
+   */
+  overlay?: ReactNode;
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
@@ -136,80 +143,79 @@ export function ManagementUserAccessSheet({
   }
 
   return (
-    <>
-      <BottomSheetModal
-        footer={
-          <>
-            {error ? <InlineError message={error} /> : null}
-            <SheetActions
-              primaryAction={
-                <Button
-                  disabled={!canSubmit}
-                  label="Save Access"
-                  loading={isPending}
-                  onPress={submitDraft}
-                  tone="primary"
-                />
-              }
-            >
+    <BottomSheetModal
+      overlay={
+        <>
+          <ConfirmationModal presentation="inline" {...guard.confirmationProps} />
+          {overlay}
+        </>
+      }
+      footer={
+        <>
+          {error ? <InlineError message={error} /> : null}
+          <SheetActions
+            primaryAction={
               <Button
-                disabled={isPending}
-                // Same tri-state web uses. Discard resets the draft and leaves
-                // the sheet open; dismissing with edits in hand is the drag or
-                // the backdrop, which this guard already confirms.
-                label={getMobileEditorDismissLabel({ hasUnsavedChanges })}
-                onPress={hasUnsavedChanges ? guard.discard : guard.requestClose}
-                tone="neutral"
+                disabled={!canSubmit}
+                label="Save Access"
+                loading={isPending}
+                onPress={submitDraft}
+                tone="primary"
               />
-            </SheetActions>
-          </>
-        }
-        header={
-          <SheetHeader
-            subtitle={
-              `${managementUser.firstName} ${managementUser.lastName}`.trim() ||
-              managementUser.email
             }
-            title="Edit management access"
-          />
-        }
-        scrollable
-        visible={visible}
-        onDismiss={guard.requestClose}
-      >
-        <View style={styles.body}>
-          {/* A consequence of the save, so it is raised once for the sheet
+          >
+            <Button
+              disabled={isPending}
+              // Same tri-state web uses. Discard resets the draft and leaves
+              // the sheet open; dismissing with edits in hand is the drag or
+              // the backdrop, which this guard already confirms.
+              label={getMobileEditorDismissLabel({ hasUnsavedChanges })}
+              onPress={hasUnsavedChanges ? guard.discard : guard.requestClose}
+              tone="neutral"
+            />
+          </SheetActions>
+        </>
+      }
+      header={
+        <SheetHeader
+          subtitle={
+            `${managementUser.firstName} ${managementUser.lastName}`.trim() || managementUser.email
+          }
+          title="Edit management access"
+        />
+      }
+      scrollable
+      visible={visible}
+      onDismiss={guard.requestClose}
+    >
+      <View style={styles.body}>
+        {/* A consequence of the save, so it is raised once for the sheet
               rather than sitting under the chips that produced it. */}
-          <SectionNotice messages={removalNotices} />
-          <View style={styles.field}>
-            <AppText tone="secondary" variant="label">
-              {MANAGEMENT_DEPARTMENT_LABELS.plural}
-            </AppText>
-            <View style={styles.chipRow}>
-              {managementDepartments.map((department) => (
-                <Chip
-                  key={department.id}
-                  label={department.abbr || department.name}
-                  onPress={() =>
-                    setDraft((current) => ({
-                      ...current,
-                      managementDepartmentIds: current.managementDepartmentIds.includes(
-                        department.id,
-                      )
-                        ? current.managementDepartmentIds.filter((id) => id !== department.id)
-                        : [...current.managementDepartmentIds, department.id],
-                    }))
-                  }
-                  selected={draft.managementDepartmentIds.includes(department.id)}
-                />
-              ))}
-            </View>
+        <SectionNotice messages={removalNotices} />
+        <View style={styles.field}>
+          <AppText tone="secondary" variant="label">
+            {MANAGEMENT_DEPARTMENT_LABELS.plural}
+          </AppText>
+          <View style={styles.chipRow}>
+            {managementDepartments.map((department) => (
+              <Chip
+                key={department.id}
+                label={department.abbr || department.name}
+                onPress={() =>
+                  setDraft((current) => ({
+                    ...current,
+                    managementDepartmentIds: current.managementDepartmentIds.includes(department.id)
+                      ? current.managementDepartmentIds.filter((id) => id !== department.id)
+                      : [...current.managementDepartmentIds, department.id],
+                  }))
+                }
+                selected={draft.managementDepartmentIds.includes(department.id)}
+              />
+            ))}
           </View>
         </View>
-      </BottomSheetModal>
-
-      <ConfirmationModal {...guard.confirmationProps} />
-    </>
+      </View>
+    </BottomSheetModal>
   );
 }
 

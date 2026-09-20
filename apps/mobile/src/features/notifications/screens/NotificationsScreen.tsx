@@ -1,10 +1,9 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
-import { useInfiniteQuery } from "@tanstack/react-query";
-import type { MobileNotification } from "@dubgrid/contracts";
+import { useInfiniteQuery, type InfiniteData } from "@tanstack/react-query";
+import type { MobileNotification, MobileNotificationsResponse } from "@dubgrid/contracts";
 import { resolveAlertDestination } from "@dubgrid/domain";
-import { AnimatedListItem } from "../../../shared/motion/AnimatedListItem";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
@@ -42,12 +41,11 @@ import {
   resolveNativeRoute,
 } from "../lib/openNotificationAction";
 import { NotificationRowListSkeleton } from "../components/NotificationRowListSkeleton";
-import { SkeletonLine, SkeletonPill } from "../../../shared/components/skeleton";
+import { SkeletonLine } from "../../../shared/components/skeleton";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
-  mobileControl,
   mobileElevation,
   mobileRadii,
   mobilePillOverflow,
@@ -102,7 +100,6 @@ export default function NotificationsScreen() {
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [busy, setBusy] = useState(false);
-  const [pendingRowId, setPendingRowId] = useState<string | null>(null);
   const [confirmingMarkAllRead, setConfirmingMarkAllRead] = useState(false);
 
   const bootstrapQuery = useBootstrap(accessToken);
@@ -202,37 +199,57 @@ export default function NotificationsScreen() {
     setBootstrapUnreadCount(queryClient, accessToken, count);
   }
 
+  // Flip one row's read state in the cached pages without a refetch, so the
+  // list reflects a tap at once and can be put back if the write fails.
+  const patchNotificationReadAt = useCallback(
+    (id: string, readAt: string | null) => {
+      queryClient.setQueryData<InfiniteData<MobileNotificationsResponse>>(queryKey, (current) =>
+        current
+          ? {
+              ...current,
+              pages: current.pages.map((page) => ({
+                ...page,
+                notifications: page.notifications.map((entry) =>
+                  entry.id === id ? { ...entry, readAt } : entry,
+                ),
+              })),
+            }
+          : current,
+      );
+    },
+    [queryKey],
+  );
+
   const handleRowPress = useCallback(
-    async (notification: MobileNotification) => {
+    (notification: MobileNotification) => {
       if (!accessToken) return;
-      if (!notification.readAt) {
-        // Navigation deliberately waits on this write (a failure keeps the user
-        // here with the toast), so the row has to say it is working meanwhile.
-        setPendingRowId(notification.id);
-        try {
-          const response = await markNotificationRead(accessToken, notification.id);
+      // Go first. Waiting on the read write before navigating cost every tap
+      // a network round trip, which read as lag; the write now runs behind
+      // the navigation with the row already marked, and a failure puts the
+      // row back and says so.
+      const destination = resolveAlertDestination(notification);
+      if (destination && resolveNativeRoute(destination.href)) {
+        openNotificationAction(destination.href);
+      } else {
+        pushToast({ tone: "info", message: WEB_ONLY_ALERT_MESSAGE });
+      }
+      if (notification.readAt) return;
+      patchNotificationReadAt(notification.id, new Date().toISOString());
+      markNotificationRead(accessToken, notification.id)
+        .then((response) => {
           syncBootstrapUnread(response.unreadCount);
           void Promise.all([notificationsQuery.refetch(), facetsQuery.refetch()]);
-        } catch (error) {
+        })
+        .catch((error) => {
+          patchNotificationReadAt(notification.id, null);
           pushClientFriendlyErrorToast(pushToast, {
             error,
             title: "Could not update alerts",
             fallbackMessage: "We couldn't mark that alert as read.",
           });
-          return;
-        } finally {
-          setPendingRowId(null);
-        }
-      }
-      // The alert is one sentence about something else; go there.
-      const destination = resolveAlertDestination(notification);
-      if (destination && resolveNativeRoute(destination.href)) {
-        openNotificationAction(destination.href);
-        return;
-      }
-      pushToast({ tone: "info", message: WEB_ONLY_ALERT_MESSAGE });
+        });
     },
-    [accessToken, facetsQuery, notificationsQuery, pushToast],
+    [accessToken, facetsQuery, notificationsQuery, patchNotificationReadAt, pushToast],
   );
 
   const handleArchive = useCallback(
@@ -309,6 +326,14 @@ export default function NotificationsScreen() {
     }
   }, [accessToken, busy, facetsQuery, notificationsQuery, pushToast, unreadCount]);
 
+  // Virtualized: every "Load more" used to append another page of mounted
+  // rows to the page's scroll view, so a long history grew without bound
+  // (F-31). Rows now mount only near the viewport; the search, filters and
+  // unread row stay as the list header. The bleed past the gutter and the
+  // per-row inset are unchanged, so a swiped row's actions still reach the
+  // screen edge.
+  const listItems = contentState.kind === "ready" ? notifications : [];
+
   return (
     <Screen
       // Same as People: the search field sits at the top, so the keyboard
@@ -318,6 +343,32 @@ export default function NotificationsScreen() {
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
       scrollEnabled={contentState.kind !== "loading"}
+      list={{
+        data: listItems,
+        keyExtractor: (notification) => notification.id,
+        itemSeparator: <View style={styles.divider} />,
+        renderItem: (notification) => (
+          <NotificationRow
+            openRegistry={openSwipe}
+            notification={notification}
+            onPress={() => handleRowPress(notification)}
+            onToggleRead={() => handleToggleRead(notification)}
+            onArchive={() => handleArchive(notification)}
+          />
+        ),
+        headerGap: mobileSpace.md,
+        listFooter: notificationsQuery.hasNextPage ? (
+          <View style={styles.loadMore}>
+            <Button
+              compact
+              tone="secondary"
+              label="Load more"
+              loading={notificationsQuery.isFetchingNextPage}
+              onPress={() => notificationsQuery.fetchNextPage()}
+            />
+          </View>
+        ) : null,
+      }}
     >
       <View style={styles.headerArea}>
         <SearchBar
@@ -343,33 +394,35 @@ export default function NotificationsScreen() {
             tabs={filterTabs}
           />
         )}
-      </View>
-      {/* The unread row is almost always there once the facets land, so the
-          placeholder holds its height and the list does not drop on load. */}
-      {contentState.kind === "loading" && contentState.showSkeleton ? (
-        <View style={styles.actionRow}>
-          <SkeletonLine variant="sectionTitle" width={104} />
-          <SkeletonPill height={mobileControl.sm} width={124} />
-        </View>
-      ) : null}
-      {unreadCount > 0 ? (
-        <View style={styles.actionRow}>
-          <Text style={styles.actionCopy}>{unreadCount} unread</Text>
-          <Button
-            compact
-            label="Mark all read"
-            loading={busy}
-            onPress={() => setConfirmingMarkAllRead(true)}
-            tone="secondary"
-          />
-        </View>
-      ) : null}
-
-      {contentState.kind === "loading" ? (
-        contentState.showSkeleton ? (
+        {/* The unread row is almost always there once the facets land, so the
+            placeholder holds its height and the list does not drop on load.
+            Its action is a text button, so the placeholder is a text line. */}
+        {contentState.kind === "loading" && contentState.showSkeleton ? (
+          <View style={styles.actionRow}>
+            <SkeletonLine variant="sectionTitle" width={104} />
+            <SkeletonLine variant="bodyStrong" width={112} />
+          </View>
+        ) : null}
+        {unreadCount > 0 ? (
+          <View style={styles.actionRow}>
+            <Text style={styles.actionCopy}>{unreadCount} unread</Text>
+            <Button
+              compact
+              label="Mark all read"
+              loading={busy}
+              onPress={() => setConfirmingMarkAllRead(true)}
+              tone="link"
+            />
+          </View>
+        ) : null}
+        {/* Inside the header block so the placeholder rows sit the same
+            compact gap below the unread row that the real rows do. */}
+        {contentState.kind === "loading" && contentState.showSkeleton ? (
           <NotificationRowListSkeleton />
-        ) : null
-      ) : contentState.kind === "error" ? (
+        ) : null}
+      </View>
+
+      {contentState.kind === "loading" ? null : contentState.kind === "error" ? (
         <StatusBanner
           actionLabel="Try again"
           body={contentState.message}
@@ -389,34 +442,7 @@ export default function NotificationsScreen() {
           iconName="notifications-outline"
           title={debouncedSearch || filter !== "all" ? "No matching alerts" : "No alerts yet"}
         />
-      ) : (
-        <View style={styles.list}>
-          {notifications.map((notification, index) => (
-            <AnimatedListItem index={index} key={notification.id}>
-              {index > 0 ? <View style={styles.divider} /> : null}
-              <NotificationRow
-                openRegistry={openSwipe}
-                pending={pendingRowId === notification.id}
-                notification={notification}
-                onPress={() => handleRowPress(notification)}
-                onToggleRead={() => handleToggleRead(notification)}
-                onArchive={() => handleArchive(notification)}
-              />
-            </AnimatedListItem>
-          ))}
-          {notificationsQuery.hasNextPage ? (
-            <View style={styles.loadMore}>
-              <Button
-                compact
-                tone="secondary"
-                label="Load more"
-                loading={notificationsQuery.isFetchingNextPage}
-                onPress={() => notificationsQuery.fetchNextPage()}
-              />
-            </View>
-          ) : null}
-        </View>
-      )}
+      ) : null}
       <ConfirmationModal
         body={
           unreadCount === 1
@@ -440,7 +466,6 @@ const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     headerArea: {
       gap: mobileSpace.md,
-      paddingBottom: mobileSpace.md,
     },
     actionRow: {
       flexDirection: "row",
@@ -457,14 +482,12 @@ const createStyles = (mobileColors: MobileColors) =>
     // swipe rather than on a panel of their own. The column bleeds past the
     // page gutter so a swiped row's actions reach the screen edge; each row
     // pads itself back to the gutter.
-    list: {
-      gap: 0,
-      marginHorizontal: -getScreenGutter(),
-    },
-    // Back inside the gutter the bleeding list gave up.
+    // Rows are list items outside the header's gutter, and each row pads
+    // itself back to the gutter, so a swiped row's actions reach the edge.
     loadMore: {
       marginHorizontal: getScreenGutter(),
       marginTop: mobileSpace.lg,
+      marginBottom: mobileSpace.md,
     },
     divider: {
       height: StyleSheet.hairlineWidth,

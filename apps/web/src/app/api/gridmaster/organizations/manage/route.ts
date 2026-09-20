@@ -8,7 +8,11 @@ import { composeOrganizationAddress } from "@/lib/organization-profile";
 import { rowToOrganization } from "@/lib/db/mappers";
 import { ORGANIZATION_WITH_BILLING_COLS } from "@/lib/db/shared";
 import { getServiceClient } from "@/lib/supabase-service";
+import { cacheDel, CacheKey } from "@/lib/cache";
+import { cancelSubscription } from "@/lib/stripe";
+import logger from "@/lib/logger";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
+import { resetOversightFactsMemo } from "@/app/api/gridmaster/_lib/oversight";
 import { apiErrorResponse } from "@/lib/error-handling";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 
@@ -84,6 +88,48 @@ const requestSchema = z.discriminatedUnion("action", [
   }),
 ]);
 
+// The proxy caches org access and the login page caches the slug lookup
+// (including its suspended/archived state) for up to a day; without this,
+// members keep passing the gate after a suspension and the sign-in page keeps
+// treating a closed organization as open (F-95, F-87).
+async function invalidateOrganizationAccess(orgId: string, slug?: string | null): Promise<void> {
+  const keys = [CacheKey.mwOrgAccess(orgId), CacheKey.organization(orgId)];
+  if (slug) keys.push(CacheKey.orgBySlug(slug));
+  await cacheDel(...keys);
+  // The oversight views share one facts load for a few seconds (F-89); a
+  // lifecycle change must not be read back stale from it (F-107).
+  resetOversightFactsMemo();
+}
+
+// A Stripe failure must not block the archive: the row is already archived,
+// so log it and report false for the audit row.
+async function cancelOrganizationBilling(
+  serviceClient: ReturnType<typeof getServiceClient>,
+  orgId: string,
+): Promise<boolean> {
+  try {
+    const { data: sub } = await serviceClient
+      .from("subscriptions")
+      .select("stripe_subscription_id")
+      .eq("org_id", orgId)
+      .maybeSingle();
+    if (!sub?.stripe_subscription_id) return false;
+    await cancelSubscription(sub.stripe_subscription_id);
+    await serviceClient.from("subscriptions").update({ status: "canceled" }).eq("org_id", orgId);
+    await serviceClient
+      .from("organizations")
+      .update({ subscription_status: "canceled" })
+      .eq("id", orgId);
+    return true;
+  } catch (stripeError) {
+    logger.error(
+      { err: stripeError, orgId, path: "/api/gridmaster/organizations/manage" },
+      "Failed to cancel Stripe subscription on archive",
+    );
+    return false;
+  }
+}
+
 export async function POST(req: NextRequest) {
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) {
@@ -139,11 +185,16 @@ export async function POST(req: NextRequest) {
           .from("organizations")
           .update({ archived_at: new Date().toISOString() })
           .eq("id", parsed.data.orgId)
-          .select("id")
+          .select("id, slug")
           .maybeSingle();
         if (error) {
           throw error;
         }
+        // Billing ends server-side, as the super admin's delete route does
+        // (F-91). It used to be a fire-and-forget call from the browser that
+        // the API never made on its own.
+        const stripeCanceled = await cancelOrganizationBilling(serviceClient, parsed.data.orgId);
+        await invalidateOrganizationAccess(parsed.data.orgId, archived?.slug);
         await writeGridmasterAuditLog({
           serviceClient,
           actor: auth.user,
@@ -151,19 +202,23 @@ export async function POST(req: NextRequest) {
           resourceType: "organization",
           resourceId: parsed.data.orgId,
           orgId: parsed.data.orgId,
+          details: { stripeCanceled },
           request: req,
         });
-        return NextResponse.json({ success: true });
+        return NextResponse.json({ success: true, stripeCanceled });
       }
 
       case "restoreOrganization": {
-        const { error } = await serviceClient
+        const { data: restored, error } = await serviceClient
           .from("organizations")
           .update({ archived_at: null })
-          .eq("id", parsed.data.orgId);
+          .eq("id", parsed.data.orgId)
+          .select("id, slug")
+          .maybeSingle();
         if (error) {
           throw error;
         }
+        await invalidateOrganizationAccess(parsed.data.orgId, restored?.slug);
         await writeGridmasterAuditLog({
           serviceClient,
           actor: auth.user,
@@ -177,16 +232,19 @@ export async function POST(req: NextRequest) {
       }
 
       case "suspendOrganization": {
-        const { error } = await serviceClient
+        const { data: suspended, error } = await serviceClient
           .from("organizations")
           .update({
             suspended_at: new Date().toISOString(),
             suspended_reason: parsed.data.reason,
           })
-          .eq("id", parsed.data.orgId);
+          .eq("id", parsed.data.orgId)
+          .select("id, slug")
+          .maybeSingle();
         if (error) {
           throw error;
         }
+        await invalidateOrganizationAccess(parsed.data.orgId, suspended?.slug);
         await writeGridmasterAuditLog({
           serviceClient,
           actor: auth.user,
@@ -201,16 +259,19 @@ export async function POST(req: NextRequest) {
       }
 
       case "unsuspendOrganization": {
-        const { error } = await serviceClient
+        const { data: unsuspended, error } = await serviceClient
           .from("organizations")
           .update({
             suspended_at: null,
             suspended_reason: null,
           })
-          .eq("id", parsed.data.orgId);
+          .eq("id", parsed.data.orgId)
+          .select("id, slug")
+          .maybeSingle();
         if (error) {
           throw error;
         }
+        await invalidateOrganizationAccess(parsed.data.orgId, unsuspended?.slug);
         await writeGridmasterAuditLog({
           serviceClient,
           actor: auth.user,
@@ -420,7 +481,14 @@ export async function POST(req: NextRequest) {
           orgId: org.id,
           details: {
             name: org.name,
-            super_admin: superAdmin,
+            // The pending-invite token is a credential (it is what
+            // /api/invitations/register accepts), so it goes to the response
+            // for "Send Email" only and never into the audit row.
+            super_admin: {
+              kind: superAdmin.kind,
+              displayName: superAdmin.displayName ?? null,
+              email: email || null,
+            },
           },
           request: req,
         });

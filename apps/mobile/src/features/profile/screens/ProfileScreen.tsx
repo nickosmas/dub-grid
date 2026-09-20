@@ -23,6 +23,7 @@ import { SelectionCheck } from "../../../shared/components/SelectionCheck";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useModalHandoff } from "../../../shared/hooks/useModalHandoff";
+import { createHeaderTextAction } from "../../../shared/navigation/HeaderTextAction";
 import {
   getProfile,
   getProfileChangeRequests,
@@ -60,7 +61,6 @@ import {
   getScheduledDepartmentNames,
   MANAGEMENT_DEPARTMENT_LABELS,
 } from "../../../shared/lib/departments";
-import { getMobileOrgRoleHeroBadge } from "../../people/lib/orgRoleBadges";
 import {
   getProfileInitials,
   ProfileHero,
@@ -174,9 +174,6 @@ export default function ProfileScreen() {
     "App user";
   const memberships = bootstrapQuery.data?.memberships ?? [];
   const canSwitchOrganizations = memberships.length > 1;
-  // The hero's own badge, shared with both person pages: `ProfileHero` draws
-  // the pill, so all this decides is the label and the tone.
-  const orgRoleBadge = getMobileOrgRoleHeroBadge(profile?.effectiveRole);
   // Account id, matching every other surface. Seeding off the linked employee
   // gave the same person a different color here than on the web header.
   const avatarSeed = profile?.user.id ?? "";
@@ -404,11 +401,11 @@ export default function ProfileScreen() {
         contentState.showSkeleton ? (
           <ProfileSkeleton
             heroAlign="center"
-            heroChips={1}
             heroSubtitle
             metaItems={0}
             // Organization (name, subdomain), Departments, then the Settings
-            // list of navigation rows; the sign-out row has no frame to draw.
+            // list of navigation rows; the buttons at the foot have no frame
+            // to draw.
             sections={[{ rows: 2 }, { rows: 1 }, { rows: 5, rowVariant: "nav" }]}
           />
         ) : null
@@ -457,6 +454,14 @@ export default function ProfileScreen() {
                 color: isCompactTitleVisible ? mobileColors.textPrimary : "transparent",
                 fontFamily: mobileTypography.fontFamily.bold,
               },
+              // The same bar action the person page has. It opens "Profile
+              // details", which is this profile's editor; the Settings row of
+              // that name below stays as the list's way in.
+              ...createHeaderTextAction({
+                label: "Edit",
+                accessibilityHint: "Opens your profile details",
+                onPress: () => router.push("/(tabs)/profile/work"),
+              }),
             }}
           />
           {/* Centered, the same way both person pages are: this page's subject is
@@ -474,8 +479,6 @@ export default function ProfileScreen() {
                 : undefined
             }
             avatarTextStyle={avatarTone ? { color: avatarTone.textColor } : undefined}
-            badge={orgRoleBadge.label}
-            badgeTone={orgRoleBadge.tone}
             initials={getProfileInitials(displayName)}
             orgRole={profile.effectiveRole}
             title={displayName}
@@ -577,48 +580,51 @@ export default function ProfileScreen() {
                 onPress={() => router.push("/(tabs)/profile/notifications")}
               />
               <ProfileNavRow
+                iconName="calendar-outline"
+                label="Calendar subscription"
+                onPress={() => router.push("/(tabs)/profile/calendar")}
+              />
+              <ProfileNavRow
                 iconName="shield-outline"
                 label="Privacy & data"
                 onPress={() => router.push("/(tabs)/profile/privacy")}
               />
               <ProfileNavRow
                 iconName="color-palette-outline"
-                isLast={!canSwitchOrganizations}
+                isLast
                 label="Appearance"
                 value={getThemePreferenceLabel(preference)}
                 onPress={() => setIsAppearanceSheetVisible(true)}
               />
-              {/* A row, not a button beside Sign Out: switching organizations
-                  opens a picker, exactly like Appearance does, and pairing it
-                  with the one genuinely destructive action made the two read as
-                  equals. */}
-              {canSwitchOrganizations ? (
-                <ProfileNavRow
-                  iconName="swap-horizontal-outline"
-                  isLast
-                  label="Switch organization"
-                  value={profile.currentOrg.name}
-                  onPress={() => setIsSwitchModalVisible(true)}
-                />
-              ) : null}
             </ProfileList>
           </ProfileSection>
 
-          {/* Untitled: the button says "Sign Out", so a heading over it can only
-              restate it more vaguely. Set apart from the settings list above it
-              by more than the shared section gap, the same way the person
-              page sets its action stack off from the sections above it: at the
-              standard 20 the one destructive action on the screen reads as the
-              last row of that list, close enough to be hit on the way past. */}
-          <ProfileSection style={styles.signOutSection}>
-            <Button
-              label="Sign Out"
-              loading={isSigningOut}
-              onPress={() => {
-                setPendingConfirmation({ kind: "logout" });
-              }}
-              tone="neutral"
-            />
+          {/* The two actions that leave this organization, at the very foot
+              and untitled: each button names itself. Stacked full width
+              rather than paired in one row, since "Switch organization" does
+              not fit half a phone without truncating, and set apart from the
+              settings list above by more than the shared section gap so the
+              destructive one does not read as that list's last row. Switch
+              first, Sign Out last and in the danger fill: the one that ends
+              the session ends the page, and looks like what it does. */}
+          <ProfileSection style={styles.footerActions}>
+            <View style={styles.footerActionStack}>
+              {canSwitchOrganizations ? (
+                <Button
+                  label="Switch organization"
+                  onPress={() => setIsSwitchModalVisible(true)}
+                  tone="secondary"
+                />
+              ) : null}
+              <Button
+                label="Sign Out"
+                loading={isSigningOut}
+                onPress={() => {
+                  setPendingConfirmation({ kind: "logout" });
+                }}
+                tone="danger"
+              />
+            </View>
           </ProfileSection>
 
           <BottomSheetModal
@@ -841,12 +847,14 @@ const createStyles = (mobileColors: MobileColors) =>
       ...mobileText.body,
       color: mobileColors.textMuted,
     },
-    signOutSection: {
-      // Twice the 12 the person page's `actionStack` opens above its buttons,
-      // on top of the 20 the screen already puts between sections. Sign Out
-      // ends the screen rather than sitting among sibling actions, so it takes
-      // the wider break.
+    footerActions: {
+      // Twice the 12 an action stack opens above its buttons, on top of the
+      // 20 the screen already puts between sections: these end the page
+      // rather than sitting among sibling rows, so they take the wider break.
       paddingTop: mobileSpace["2xl"],
+    },
+    footerActionStack: {
+      gap: mobileSpace.md,
     },
     switchOverlay: {
       ...StyleSheet.absoluteFillObject,

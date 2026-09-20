@@ -268,6 +268,15 @@ function renderMembersSection(props: Partial<MembersSectionProps> = {}) {
   );
 }
 
+// A managing viewer's mount fetches pending invitations and commits them on
+// resolve. A test that asserts synchronously and returns leaves that commit
+// to land after it ends, outside act (F-42); flush it before asserting.
+async function settleInvitations() {
+  await act(async () => {
+    await Promise.resolve();
+  });
+}
+
 describe("MembersSection — management-only view access", () => {
   it("lets a self-management-only, non-admin viewer see (but not edit) other management users", async () => {
     const user = userEvent.setup();
@@ -912,7 +921,7 @@ const RN = { id: 10, orgId: "org-1", name: "Registered Nurse", abbr: "RN", sortO
 describe("MembersSection — certified staff count", () => {
   // Support staff hold no certification, which is the whole signal: a scheduler
   // reading "Certified staff" is reading the number of nurses.
-  it("counts staff holding a certification, and support staff separately", () => {
+  it("counts staff holding a certification, and support staff separately", async () => {
     mockDirectory = [];
     renderMembersSection({
       certifications: [RN],
@@ -924,12 +933,13 @@ describe("MembersSection — certified staff count", () => {
         makeEmployee({ id: "e3", firstName: "Robin", certificationId: null }),
       ],
     });
+    await settleInvitations();
 
     expect(screen.getByRole("button", { name: "Certified staff count, 2" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Not certified count, 1" })).toBeInTheDocument();
   });
 
-  it("reconciles with the on-schedule headcount beside it", () => {
+  it("reconciles with the on-schedule headcount beside it", async () => {
     mockDirectory = [];
     renderMembersSection({
       certifications: [RN],
@@ -941,6 +951,7 @@ describe("MembersSection — certified staff count", () => {
         makeEmployee({ id: "e3", certificationId: null }),
       ],
     });
+    await settleInvitations();
 
     expect(screen.getByLabelText("On schedule staff count")).toHaveTextContent("3");
     expect(screen.getByRole("button", { name: "Certified staff count, 1" })).toBeInTheDocument();
@@ -1001,30 +1012,33 @@ function renderWithCertifications(employees: Employee[], certifications = [RN, L
 }
 
 describe("MembersSection — per-certification cards", () => {
-  it("shows a card per certification with its holder count", () => {
+  it("shows a card per certification with its holder count", async () => {
     renderWithCertifications([
       makeEmployee({ id: "e1", certificationId: RN.id }),
       makeEmployee({ id: "e2", certificationId: RN.id }),
       makeEmployee({ id: "e3", certificationId: LPN.id }),
     ]);
+    await settleInvitations();
 
     expect(screen.getByRole("button", { name: "RN, 2 staff" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "LPN, 1 staff" })).toBeInTheDocument();
   });
 
   // A credential nobody holds is a staffing gap worth seeing, not noise.
-  it("shows a zero for a certification nobody holds", () => {
+  it("shows a zero for a certification nobody holds", async () => {
     renderWithCertifications([makeEmployee({ id: "e1", certificationId: RN.id })]);
+    await settleInvitations();
 
     expect(screen.getByRole("button", { name: "LPN, 0 staff" })).toBeInTheDocument();
   });
 
-  it("card counts sum to the certified staff total", () => {
+  it("card counts sum to the certified staff total", async () => {
     renderWithCertifications([
       makeEmployee({ id: "e1", certificationId: RN.id }),
       makeEmployee({ id: "e2", certificationId: LPN.id }),
       makeEmployee({ id: "e3", certificationId: null }),
     ]);
+    await settleInvitations();
 
     expect(screen.getByRole("button", { name: "Certified staff count, 2" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "RN, 1 staff" })).toBeInTheDocument();
@@ -1058,11 +1072,12 @@ describe("MembersSection — per-certification cards", () => {
     expect(screen.getByText(/Robin/)).toBeInTheDocument();
   });
 
-  it("keeps a holder of an archived certification visible in its own card", () => {
+  it("keeps a holder of an archived certification visible in its own card", async () => {
     renderWithCertifications([
       makeEmployee({ id: "e1", certificationId: RN.id }),
       makeEmployee({ id: "e2", certificationId: 999 }),
     ]);
+    await settleInvitations();
 
     expect(screen.getByRole("button", { name: "Archived, 1 staff" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Certified staff count, 2" })).toBeInTheDocument();
@@ -1083,7 +1098,7 @@ describe("MembersSection — per-certification cards", () => {
 
   // Headcounts describe who is on staff now. The helper filters on status
   // itself, so a non-active row reaching this list can never inflate a count.
-  it("counts active staff only", () => {
+  it("counts active staff only", async () => {
     renderWithCertifications([
       makeEmployee({ id: "e1", certificationId: RN.id }),
       makeEmployee({ id: "e2", certificationId: RN.id, status: "inactive" }),
@@ -1091,6 +1106,7 @@ describe("MembersSection — per-certification cards", () => {
       makeEmployee({ id: "e4", certificationId: null }),
       makeEmployee({ id: "e5", certificationId: null, status: "inactive" }),
     ]);
+    await settleInvitations();
 
     expect(screen.getByRole("button", { name: "Certified staff count, 1" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Not certified count, 1" })).toBeInTheDocument();
@@ -1098,8 +1114,9 @@ describe("MembersSection — per-certification cards", () => {
     expect(screen.getByRole("button", { name: "LPN, 0 staff" })).toBeInTheDocument();
   });
 
-  it("renders no cards when the org has no certifications configured", () => {
+  it("renders no cards when the org has no certifications configured", async () => {
     renderWithCertifications([makeEmployee({ id: "e1", certificationId: null })], []);
+    await settleInvitations();
 
     expect(screen.queryByRole("button", { name: /staff$/ })).not.toBeInTheDocument();
   });

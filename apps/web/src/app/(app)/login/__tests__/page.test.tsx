@@ -183,6 +183,48 @@ describe("OrgLogin submit states", () => {
     });
   });
 
+  it("renders the lockout state instead of the form for a suspended or deleted organization", () => {
+    const deleted = renderWithQueryClient(
+      <OrgLogin orgSlug="test-org" seed={{ status: "deleted", name: "Calm Haven" }} />,
+    );
+    expect(screen.getByText("This organization has been deleted")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /sign in/i })).not.toBeInTheDocument();
+    deleted.unmount();
+
+    renderWithQueryClient(
+      <OrgLogin
+        orgSlug="test-org"
+        seed={{ status: "found", name: "Calm Haven" }}
+        lockout="suspended"
+      />,
+    );
+    expect(screen.getByText("This organization is suspended")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /sign in/i })).not.toBeInTheDocument();
+  });
+
+  it("switches to the lockout state when the login route answers ORG_SUSPENDED", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/validate-domain")) {
+        return Promise.resolve(validateDomainResponse());
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ success: false, code: "ORG_SUSPENDED" }), {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    });
+
+    const { container } = renderWithQueryClient(<OrgLogin orgSlug="test-org" seed={FOUND} />);
+    submitForm(container);
+
+    await waitFor(() =>
+      expect(screen.getByText("This organization is suspended")).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("button", { name: /sign in/i })).not.toBeInTheDocument();
+  });
+
   it("failed sign-in: loading resets to false and error message is displayed", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
