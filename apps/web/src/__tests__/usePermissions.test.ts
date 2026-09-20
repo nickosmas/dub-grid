@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createElement, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import type { Session, User } from "@supabase/supabase-js";
 
 // ── Controlled mock for useAuth ─────────────────────────────────────────────
@@ -399,6 +399,45 @@ describe("usePermissions hook", () => {
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.role).toBe("super_admin");
+  });
+
+  it("refetches once when a membership update reaches every mounted consumer at the same time", async () => {
+    signIn({
+      platform_role: "none",
+      org_role: "admin",
+      org_id: "org-1",
+    });
+    mockFetchAccountPermissions.mockResolvedValue({
+      permissions: buildPerms("admin", "org-1", false, ALL_FALSE_PERMS),
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(QueryClientProvider, { client: queryClient }, children);
+    // Ten consumers, ten realtime channels, one shared query.
+    const channelsBefore = mockCreateBrowserRealtimeChannel.mock.results.length;
+    const hooks = Array.from({ length: 10 }, () => renderHook(() => usePermissions(), { wrapper }));
+    await waitFor(() => expect(hooks[0].result.current.isLoading).toBe(false));
+    const fetchesBefore = mockFetchAccountPermissions.mock.calls.length;
+
+    // Every membership channel's handler fires in the same tick, as one
+    // realtime UPDATE on the caller's membership row does.
+    const membershipHandlers = mockCreateBrowserRealtimeChannel.mock.results
+      .slice(channelsBefore)
+      .map((entry) => entry.value as { on: ReturnType<typeof vi.fn> })
+      .flatMap((channel) => channel.on.mock.calls)
+      .filter(([, config]) => (config as { table?: string }).table === "organization_memberships")
+      .map(([, , handler]) => handler as () => void);
+    expect(membershipHandlers).toHaveLength(10);
+    act(() => {
+      for (const handler of membershipHandlers) handler();
+    });
+
+    await waitFor(() =>
+      expect(mockFetchAccountPermissions.mock.calls.length).toBeGreaterThan(fetchesBefore),
+    );
+    await waitFor(() => expect(hooks[0].result.current.isLoading).toBe(false));
+    expect(mockFetchAccountPermissions.mock.calls.length - fetchesBefore).toBe(1);
+    hooks.forEach((hook) => hook.unmount());
   });
 
   it("re-resolves when auth changes to a different user", async () => {
