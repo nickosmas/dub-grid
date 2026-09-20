@@ -182,7 +182,6 @@ const documentedUppercaseStyleCounts = {
   "components/ScheduleOperationModal.tsx": 1,
   "components/ShiftEditPanel.tsx": 2,
   "components/ShiftPicker.tsx": 1,
-  "components/ShiftRequestBoard.tsx": 2,
   "components/dashboard/UserDashboard.tsx": 3,
   "components/dashboard/expanded/ExpandedCoverage.tsx": 1,
   "components/gridmaster/AllUsersView.tsx": 2,

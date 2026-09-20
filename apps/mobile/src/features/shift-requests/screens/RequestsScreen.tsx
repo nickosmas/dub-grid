@@ -188,6 +188,15 @@ function getPresentationShiftLabel(presentation: ResolvedSchedulePresentation | 
   return primarySegment?.shiftName ?? presentation?.shiftName ?? presentation?.label ?? "Shift";
 }
 
+// Every named job on the shift; the server already leaves the default shift
+// job unnamed, so a plain shift reads as just the shift.
+function getPresentationJobNames(presentation: ResolvedSchedulePresentation | null): string[] {
+  const names = (presentation?.segments ?? [])
+    .map((segment) => segment.jobName?.trim())
+    .filter((name): name is string => Boolean(name));
+  return [...new Set(names)];
+}
+
 function getPresentationTimeRange(
   presentation: ResolvedSchedulePresentation | null,
   state: ScheduleCellState | null,
@@ -1227,7 +1236,12 @@ function RequestShiftPanel({
         </View>
       ) : (
         <>
-          <Text style={styles.shiftPanelTitle}>{getPresentationShiftLabel(presentation)}</Text>
+          <Text style={styles.shiftPanelTitle}>
+            {[
+              getPresentationShiftLabel(presentation),
+              ...getPresentationJobNames(presentation),
+            ].join(" \u00b7 ")}
+          </Text>
           {focusAreaName ? <Text style={styles.shiftPanelContext}>{focusAreaName}</Text> : null}
           {isMentored ? <MentoredPill /> : null}
         </>

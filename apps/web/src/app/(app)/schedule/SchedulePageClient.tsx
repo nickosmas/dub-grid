@@ -620,6 +620,10 @@ function SchedulerContent({
     selectedAssignmentDefinitionId: number;
   } | null>(null);
 
+  const focusAreaNameById = useMemo(
+    () => new Map(focusAreas.map((focusArea) => [focusArea.id, focusArea.name])),
+    [focusAreas],
+  );
   // Every person a request could name, past and present, sorted for a picker.
   const requestHistoryStaffOptions = useMemo(
     () =>
@@ -7679,6 +7683,7 @@ function SchedulerContent({
             <ShiftRequestBoard
               orgId={orgId ?? org?.id ?? null}
               staffOptions={requestHistoryStaffOptions}
+              focusAreaNameMap={focusAreaNameById}
               openPickups={
                 canEditShifts
                   ? shiftRequests.openPickups

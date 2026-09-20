@@ -90,7 +90,7 @@ function buildEntriesByEmployeeAndDate(entries: MobileScheduleEntry[]) {
   return byKey;
 }
 
-function getSwapOptions(input: {
+export function getSwapOptions(input: {
   requesterEntry: MobileScheduleEntry;
   entries: MobileScheduleEntry[];
 }): MobileScheduleEntry[] {
@@ -116,11 +116,14 @@ function getSwapOptions(input: {
       return !timesOverlap(requesterRanges, targetRanges);
     }
 
+    // Mirrors `swap_request_conflict` (migration 026): a published absence on
+    // the day a shift would move to blocks the swap, as does overlapping work.
     const requesterExistingTargetDateEntry =
       entriesByEmployeeDate.get(`${input.requesterEntry.employeeId}:${entry.date}`) ?? null;
     if (
       requesterExistingTargetDateEntry &&
-      timesOverlap(getEntryTimeRanges(requesterExistingTargetDateEntry), targetRanges)
+      (requesterExistingTargetDateEntry.state.kind === "absence" ||
+        timesOverlap(getEntryTimeRanges(requesterExistingTargetDateEntry), targetRanges))
     ) {
       return false;
     }
@@ -129,7 +132,8 @@ function getSwapOptions(input: {
       entriesByEmployeeDate.get(`${entry.employeeId}:${input.requesterEntry.date}`) ?? null;
     if (
       targetExistingRequesterDateEntry &&
-      timesOverlap(getEntryTimeRanges(targetExistingRequesterDateEntry), requesterRanges)
+      (targetExistingRequesterDateEntry.state.kind === "absence" ||
+        timesOverlap(getEntryTimeRanges(targetExistingRequesterDateEntry), requesterRanges))
     ) {
       return false;
     }

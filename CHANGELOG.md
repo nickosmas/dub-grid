@@ -45,6 +45,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 #### Fixed
 
+- **Conflicting swaps are refused when made, not when approved** - migration `026` adds a `BEFORE INSERT` trigger on `shift_requests` (`swap_request_conflict`) that refuses a swap whose two shifts overlap on the same day (the identical-shift case), or where either person already works overlapping hours, or has published time off, on the day a shift would move to. Approval used to be the first place these were caught, and it never checked the time-off case at all. The web and mobile swap pickers apply the same time-off rule so the option is never offered.
+- Web request cards show each shift's job, focus area and time; the default shift job stays unnamed.
 - Swap partners and pickup claimants are notified when a request is finally approved or rejected, not only the requester (item 34); declined claimants are told; notifications are no longer double-sent.
 - The trial welcome modal waits for onboarding to finish and mounts only on authenticated app routes (item 36); the app shell no longer remounts when permissions resolve.
 - The publish banner's show-highlights control works after publishing, and the Highlight Changes toggle is honored on Month view and Mobile Day view (items 27, 31); shifts appended to an untouched published cell count as new everywhere.

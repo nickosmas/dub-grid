@@ -120,15 +120,16 @@ describe("ShiftRequestBoard", () => {
     });
     renderBoard({ openPickups: [request] });
 
-    expect(screen.getByText(/Day Shift · Registered Nurse on/)).toBeInTheDocument();
-    expect(screen.queryByText(/D RN on/)).not.toBeInTheDocument();
+    // The panel names the shift and its job together, never the grid abbreviation.
+    expect(screen.getByText("Day Shift · Registered Nurse")).toBeInTheDocument();
+    expect(screen.queryByText(/D RN/)).not.toBeInTheDocument();
   });
 
   it("falls back to the abbreviated label when a request has no resolvable segments", () => {
     const request = makeRequest({ requesterShiftLabel: "Day", requesterSegments: [] });
     renderBoard({ openPickups: [request] });
 
-    expect(screen.getByText(/Day on/)).toBeInTheDocument();
+    expect(screen.getByText("Day")).toBeInTheDocument();
   });
 
   it("falls back to the abbreviated label when segments came back without names", () => {
@@ -147,8 +148,8 @@ describe("ShiftRequestBoard", () => {
     });
     renderBoard({ openPickups: [request] });
 
-    expect(screen.getByText(/D · M on/)).toBeInTheDocument();
-    expect(screen.queryByText(/\? on/)).not.toBeInTheDocument();
+    expect(screen.getByText("D · M")).toBeInTheDocument();
+    expect(screen.queryByText("?")).not.toBeInTheDocument();
   });
 
   it("claims an available open pickup", async () => {

@@ -31,6 +31,7 @@ import {
   describeShiftRequestNoteRecipients,
   describeShiftRequestPill,
 } from "@dubgrid/domain";
+import { formatScheduleTimeRange } from "@dubgrid/schedule-core";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -41,6 +42,8 @@ interface ShiftRequestBoardProps {
   orgId: string | null;
   /** Everyone the history lookup can filter by; defaults to nobody. */
   staffOptions?: StaffOption[];
+  /** Focus area names by id, for the shift panels. */
+  focusAreaNameMap?: Map<number, string>;
   openPickups: ShiftRequest[];
   myRequests: ShiftRequest[];
   pendingApproval: ShiftRequest[];
@@ -121,6 +124,7 @@ export default function ShiftRequestBoard({
   initialTab,
   orgId,
   staffOptions = [],
+  focusAreaNameMap,
   openPickups,
   myRequests,
   pendingApproval,
@@ -268,9 +272,66 @@ export default function ShiftRequestBoard({
 
   // ── Shift panel ──────────────────────────────────────────────────────────
 
-  // A swap is one card about two shifts, so each party's shift gets its own
-  // panel and the arrow between them says which way the trade goes.
-  function renderShiftPanel(name: string, label: string, date: string) {
+  type ShiftParty = {
+    name: string;
+    shiftLabel: string;
+    jobs: string[];
+    focusAreaName: string | null;
+    date: string;
+    timeRange: string | null;
+  };
+
+  // One side of a request as the panel shows it: the shift by name, every
+  // job on it (shown even when the grid hides the job), the focus area, and
+  // the day with the resolved or custom time.
+  function describeParty(
+    req: ShiftRequest,
+    side: "requester" | "target",
+    name: string,
+    fallbackLabel: string,
+  ): ShiftParty | null {
+    const isRequester = side === "requester";
+    const date = isRequester ? req.requesterShiftDate : req.targetShiftDate;
+    if (!date) return null;
+    const segments = (isRequester ? req.requesterSegments : req.targetSegments) ?? [];
+    const presentation = isRequester ? req.requesterPresentation : req.targetPresentation;
+    const shiftNames = segments.map((segment) => segment.shiftName?.trim()).filter(Boolean);
+    const jobs = [
+      ...new Set(
+        segments
+          .map((segment) => {
+            // The default shift job is the shift itself, not a job worth naming.
+            const jobName = segment.isShiftOnly ? null : segment.jobName?.trim();
+            if (!jobName) return null;
+            return segment.isMentored ? `${jobName} (mentored)` : jobName;
+          })
+          .filter((job): job is string => job != null),
+      ),
+    ];
+    const focusAreaId =
+      (isRequester ? req.requesterFocusAreaId : req.targetFocusAreaId) ??
+      presentation?.focusAreaId ??
+      null;
+    const timeRange =
+      formatScheduleTimeRange(presentation?.startTime ?? null, presentation?.endTime ?? null) ??
+      formatScheduleTimeRange(
+        isRequester ? req.requesterCustomStartTime : req.targetCustomStartTime,
+        isRequester ? req.requesterCustomEndTime : req.targetCustomEndTime,
+      );
+
+    return {
+      name,
+      shiftLabel: shiftNames.length > 0 ? shiftNames.join(" / ") : fallbackLabel,
+      jobs,
+      focusAreaName: focusAreaId != null ? (focusAreaNameMap?.get(focusAreaId) ?? null) : null,
+      date,
+      timeRange,
+    };
+  }
+
+  function renderShiftPanel(party: ShiftParty) {
+    const title = [party.shiftLabel, ...party.jobs].join(" \u00b7 ");
+    const when = [formatShiftDate(party.date), party.timeRange].filter(Boolean).join(" \u00b7 ");
     return (
       <div
         style={{
@@ -284,7 +345,7 @@ export default function ShiftRequestBoard({
         }}
       >
         <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--dg-color-text-muted)" }}>
-          {name}
+          {party.name}
         </span>
         <span
           style={{
@@ -293,13 +354,20 @@ export default function ShiftRequestBoard({
             color: "var(--dg-color-text-primary)",
           }}
         >
-          {label}
+          {title}
         </span>
+        {party.focusAreaName ? (
+          <span
+            style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-secondary)" }}
+          >
+            {party.focusAreaName}
+          </span>
+        ) : null}
         <span
           className="dg-tabular-nums"
           style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--dg-color-text-secondary)" }}
         >
-          {formatShiftDate(date)}
+          {when}
         </span>
       </div>
     );
@@ -372,48 +440,50 @@ export default function ShiftRequestBoard({
           {copy.subtitle}
         </span>
 
-        {/* Shift info */}
-        {isSwap && req.targetName && req.targetShiftLabel && req.targetShiftDate ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {renderShiftPanel(copy.requesterShiftLabel, requesterLabel, req.requesterShiftDate)}
-            <div style={{ display: "flex", justifyContent: "center" }}>
-              <span
-                aria-label="swaps with"
-                role="img"
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 999,
-                  background: "var(--dg-color-brand-bg)",
-                  color: "var(--dg-color-brand)",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <ArrowUpDown size={13} strokeWidth={2.5} />
-              </span>
+        {/* Shift info: every request shows its shift as a panel; a swap shows both */}
+        {(() => {
+          const requesterParty = describeParty(
+            req,
+            "requester",
+            copy.requesterShiftLabel,
+            requesterLabel,
+          );
+          const targetParty = isSwap
+            ? describeParty(
+                req,
+                "target",
+                copy.targetShiftLabel ?? req.targetName ?? "",
+                targetLabel ?? req.targetShiftLabel ?? "",
+              )
+            : null;
+          if (!requesterParty) return null;
+          if (!targetParty) return renderShiftPanel(requesterParty);
+          return (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {renderShiftPanel(requesterParty)}
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <span
+                  aria-label="swaps with"
+                  role="img"
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: 999,
+                    background: "var(--dg-color-brand-bg)",
+                    color: "var(--dg-color-brand)",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <ArrowUpDown size={13} strokeWidth={2.5} />
+                </span>
+              </div>
+              {renderShiftPanel(targetParty)}
             </div>
-            {renderShiftPanel(
-              copy.targetShiftLabel ?? req.targetName,
-              targetLabel ?? req.targetShiftLabel,
-              req.targetShiftDate,
-            )}
-          </div>
-        ) : null}
+          );
+        })()}
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-          {!isSwap && (
-            <span
-              style={{
-                fontSize: "var(--dg-fs-caption)",
-                fontWeight: 600,
-                color: "var(--dg-color-text-secondary)",
-              }}
-            >
-              {requesterLabel} on {formatShiftDate(req.requesterShiftDate)}
-            </span>
-          )}
-
           {isCalloff && absenceType && (
             <span
               style={{
