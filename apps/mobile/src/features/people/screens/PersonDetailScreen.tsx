@@ -1327,7 +1327,16 @@ export default function PersonDetailScreen() {
                   tone="secondary"
                 />
               ) : null}
-              {canManageManagementAccess && person.status !== "removed" && !isSelf ? (
+              {/* Granting management access to someone with no account sends
+                  an invitation, and an invitation needs an address. With no
+                  email on file the button stays off the page rather than
+                  opening a sheet that can only say so; the editor is where an
+                  address gets added. Existing access is still editable and
+                  removable whatever the contact details say. */}
+              {canManageManagementAccess &&
+              person.status !== "removed" &&
+              !isSelf &&
+              (hasManagementAccess(person) || person.email) ? (
                 <Button
                   label={
                     hasManagementAccess(person) ? "Edit Management Access" : "Add to Management"

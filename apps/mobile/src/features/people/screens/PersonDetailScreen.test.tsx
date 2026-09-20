@@ -1488,6 +1488,26 @@ describe("PersonDetailScreen", () => {
       expect(screen.queryByRole("checkbox", { name: "North Wing" })).not.toBeInTheDocument();
     });
 
+    // A grant to someone with no account is an invitation, and an invitation
+    // needs an address. The button stays off the page rather than opening a
+    // sheet that can only say so.
+    it("offers no Add to Management to someone with no email on file", () => {
+      renderWithManagementAccess({ person: { email: "" } });
+
+      expect(screen.queryByRole("button", { name: "Add to Management" })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Edit Management Access" }),
+      ).not.toBeInTheDocument();
+    });
+
+    // Existing access stays editable and removable whatever the contact
+    // details say: taking someone off the roster must never need an address.
+    it("keeps Edit Management Access for someone already on the roster without an email", () => {
+      renderWithManagementAccess({ person: { email: "", managementDepartmentIds: [9] } });
+
+      expect(screen.getByRole("button", { name: "Edit Management Access" })).toBeInTheDocument();
+    });
+
     // A plain app invitation carries no management departments, so it must not
     // read as management access the person was never granted.
     it("offers Add to Management to someone holding only a staff invitation", () => {
