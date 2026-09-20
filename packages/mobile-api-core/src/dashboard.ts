@@ -17,6 +17,7 @@ import {
   parseLocalDateKey,
   resolveActiveShiftRequests,
   type CoverageByFocusAreaEntry,
+  type CoverageDailyEntry,
   type CoverageTotals,
 } from "@dubgrid/schedule-core";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -138,6 +139,7 @@ export type MobileCoverageSummary = {
   openShifts: MobileOpenShift[];
   totals: CoverageTotals;
   byFocusArea: CoverageByFocusAreaEntry[];
+  dailyByFocusArea?: ReadonlyMap<number, CoverageDailyEntry[]>;
   hasCoverageRequirements: boolean;
   // Draft-preferred ("effective") schedule rows for the same org/date range,
   // fetched once as part of the coverage-engine pass. Reused for
@@ -348,6 +350,7 @@ export function buildHeroSummary(input: {
 // per-employee-assignment counts — not an open-slot approximation.
 export function buildCoverageSectionsResponse(
   byFocusArea: CoverageByFocusAreaEntry[],
+  dailyByFocusArea?: ReadonlyMap<number, CoverageDailyEntry[]>,
 ): MobileDashboardResponse["coverageBySection"] {
   return byFocusArea
     .map((entry) => ({
@@ -357,6 +360,7 @@ export function buildCoverageSectionsResponse(
       filledTotal: entry.filledTotal,
       pct: entry.pct,
       openSlots: Math.max(0, entry.requiredTotal - entry.filledTotal),
+      daily: dailyByFocusArea?.get(entry.focusAreaId) ?? [],
     }))
     .sort((a, b) => a.pct - b.pct || b.openSlots - a.openSlots);
 }
@@ -673,8 +677,14 @@ export async function loadMobileDashboardPayload(
   const pendingApprovalRequests = activeShiftRequests.filter(
     (request) => request.status === "pending_approval",
   );
-  const { openShifts, totals, byFocusArea, hasCoverageRequirements, scheduleRows } =
-    coverageSummary;
+  const {
+    openShifts,
+    totals,
+    byFocusArea,
+    dailyByFocusArea,
+    hasCoverageRequirements,
+    scheduleRows,
+  } = coverageSummary;
   const openGapCount = openShifts.reduce((sum, shift) => sum + shift.needed, 0);
   const urgentGapCount = openShifts.reduce(
     (sum, shift) => sum + (shift.urgency === "high" ? shift.needed : 0),
@@ -698,7 +708,7 @@ export async function loadMobileDashboardPayload(
         ? summarizeDashboardDraftComparisons(draftComparisonRows, Boolean(auth.canEditSchedule))
         : null,
     },
-    coverageBySection: buildCoverageSectionsResponse(byFocusArea),
+    coverageBySection: buildCoverageSectionsResponse(byFocusArea, dailyByFocusArea),
     openShifts: openShifts.slice().sort((a, b) => (a.date < b.date ? -1 : 1)),
     activity: buildActivityFeed(
       publishHistoryRows,

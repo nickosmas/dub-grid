@@ -7,25 +7,25 @@
 > finding is `open` or `fixed`, then archives resolved findings with the work
 > and resets this file.
 
-### F-04 [P2] open - Mobile People renders an unvirtualized full roster
+### F-04 [P2] fixed - Mobile People renders an unvirtualized full roster
 
 **File:** apps/mobile/src/features/people/screens/PeopleScreen.tsx:761-866
 **Found:** 2026-08-28 by /audit (scope: full; lens: performance)
 **Why it matters:** Render, layout, animation, and memory cost grow with the complete organization roster.
 **Suggested fix:** Replace the roster body with a virtualized list while preserving existing behavior.
-**Resolution:** Not attempted. Deferred deliberately: the roster renders inside the shared `Screen`
+**Resolution:** Not attempted. Deferred deliberately: the roster renders inside the shared `Screen` Fixed 2026-09-20. `Screen` gained a `list` mode that swaps its scroll view for a `FlatList` while keeping the sticky header, pull-to-refresh, bottom padding, iOS insets and the scroll handle; `children` become the list header. The People roster (both tabs) renders through it, so only rows near the viewport mount; the index-staggered entrance is dropped for recycled rows. Screen list-mode tests (order, separators, footer, refresh control, scroll handle, empty-state fill) and the People suites pass; simulator check after the fast-forward. Requires `/audit` re-review before closing.
 ScrollView (sticky-header, scroll-offset, and scrollTo machinery), so virtualizing means moving the
 screen onto a FlatList with the filters and tabs as `ListHeaderComponent` and reworking
 `AnimatedListItem`'s index-staggered entrance for recycled rows. That is a feature-sized change to a
 shared scroll architecture and needs its own spec, not a cleanup pass.
 
-### F-17 [P2] open - Mobile dashboard remains an explicitly reduced analytics model
+### F-17 [P2] fixed - Mobile dashboard remains an explicitly reduced analytics model
 
 **File:** packages/contracts/src/mobile.ts:583-646; apps/web/src/features/mobile/server/routes/dashboard.ts
 **Found:** 2026-08-31 by /audit (scope: mobile parity; lenses: quality, performance, tests)
 **Why it matters:** The mobile contract deliberately omits the web dashboard's draft-versus-published metric, detailed coverage grid, and several activity-event types. The comments document the reduction, but it is still a functional gap under the requested full parity standard.
 **Suggested fix:** Align the mobile dashboard payload and screens with the web dashboard metrics and activity feed after the schedule lifecycle work establishes the required draft data.
-**Resolution:**
+**Resolution:** Fixed 2026-09-20. Two of the three cited gaps were already closed by 18b/18c (`draftSummary` and the four activity types). The remaining one, the per-day required-vs-filled grid, now ships: `summarizeCoverageDailyForFocusArea` in `@dubgrid/schedule-core` (same arithmetic as web's expanded coverage), threaded through `fetchMobileCoverageSummary` and `buildCoverageSectionsResponse` into `coverageBySection[].daily`, and rendered as a fixed-size day strip under each section row on the mobile coverage screen. Tests at each layer. Requires `/audit` re-review before closing.
 
 ### F-30 [P2] fixed - Most authenticated mobile queries use the rotating token as cache identity
 
@@ -35,13 +35,13 @@ shared scroll architecture and needs its own spec, not a cleanup pass.
 **Suggested fix:** Introduce a shared authenticated query identity built from stable `(sub, org_id)` claims, use it consistently in query and invalidation keys, keep the current token only inside the request function, and add token-rotation tests for representative schedule, profile, and infinite-query consumers.
 **Resolution:** Fixed 2026-09-09 by feature 19c4 Steps 5-7. Authenticated mobile read keys now use stable user and organization identity while request tokens remain inside query functions; optimistic writes, unread patches, realtime invalidation, and organization switching address the stable keys and clear old-tenant data at identity boundaries. Rotation, isolation, mutation rollback and success, realtime, and switch-race tests pass. Requires `/audit` re-review before closing.
 
-### F-31 [P2] open - Paginated mobile alerts accumulate in an unvirtualized ScrollView
+### F-31 [P2] fixed - Paginated mobile alerts accumulate in an unvirtualized ScrollView
 
 **File:** apps/mobile/src/features/notifications/screens/NotificationsScreen.tsx:148-173; apps/mobile/src/features/notifications/screens/NotificationsScreen.tsx:360-378
 **Found:** 2026-09-01 by /audit (scope: apps/mobile; lens: performance)
 **Why it matters:** The screen correctly fetches cursor-paginated pages, but flattens every loaded page and maps all alert cards inside the shared Screen ScrollView. Each "Load more" permanently increases mounted views, animations, layout work, and memory, so long alert histories lose the performance benefit pagination should provide.
 **Suggested fix:** Move the feed to FlatList or another virtualized list, place search/filter controls in its header, preserve pull-to-refresh and empty/error states, and avoid index-staggered entrance animations for recycled rows.
-**Resolution:**
+**Resolution:** Fixed 2026-09-20. Alerts render through `Screen`'s new `list` mode: search, filter strip and unread row stay as the header, rows mount only near the viewport, "Load more" is the list footer, and the hairline separators and gutter bleed are unchanged. Requires `/audit` re-review before closing.
 
 ### F-42 [P2] fixed - MembersSection tests finish with unwrapped responsive updates
 

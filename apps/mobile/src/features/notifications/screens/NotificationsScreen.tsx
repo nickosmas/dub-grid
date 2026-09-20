@@ -4,7 +4,6 @@ import { Text } from "../../../shared/components/Text";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import type { MobileNotification } from "@dubgrid/contracts";
 import { resolveAlertDestination } from "@dubgrid/domain";
-import { AnimatedListItem } from "../../../shared/motion/AnimatedListItem";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
@@ -309,6 +308,14 @@ export default function NotificationsScreen() {
     }
   }, [accessToken, busy, facetsQuery, notificationsQuery, pushToast, unreadCount]);
 
+  // Virtualized: every "Load more" used to append another page of mounted
+  // rows to the page's scroll view, so a long history grew without bound
+  // (F-31). Rows now mount only near the viewport; the search, filters and
+  // unread row stay as the list header. The bleed past the gutter and the
+  // per-row inset are unchanged, so a swiped row's actions still reach the
+  // screen edge.
+  const listItems = contentState.kind === "ready" ? notifications : [];
+
   return (
     <Screen
       // Same as People: the search field sits at the top, so the keyboard
@@ -318,6 +325,32 @@ export default function NotificationsScreen() {
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
       scrollEnabled={contentState.kind !== "loading"}
+      list={{
+        data: listItems,
+        keyExtractor: (notification) => notification.id,
+        itemSeparator: <View style={styles.divider} />,
+        renderItem: (notification) => (
+          <NotificationRow
+            openRegistry={openSwipe}
+            pending={pendingRowId === notification.id}
+            notification={notification}
+            onPress={() => handleRowPress(notification)}
+            onToggleRead={() => handleToggleRead(notification)}
+            onArchive={() => handleArchive(notification)}
+          />
+        ),
+        listFooter: notificationsQuery.hasNextPage ? (
+          <View style={styles.loadMore}>
+            <Button
+              compact
+              tone="secondary"
+              label="Load more"
+              loading={notificationsQuery.isFetchingNextPage}
+              onPress={() => notificationsQuery.fetchNextPage()}
+            />
+          </View>
+        ) : null,
+      }}
     >
       <View style={styles.headerArea}>
         <SearchBar
@@ -389,34 +422,7 @@ export default function NotificationsScreen() {
           iconName="notifications-outline"
           title={debouncedSearch || filter !== "all" ? "No matching alerts" : "No alerts yet"}
         />
-      ) : (
-        <View style={styles.list}>
-          {notifications.map((notification, index) => (
-            <AnimatedListItem index={index} key={notification.id}>
-              {index > 0 ? <View style={styles.divider} /> : null}
-              <NotificationRow
-                openRegistry={openSwipe}
-                pending={pendingRowId === notification.id}
-                notification={notification}
-                onPress={() => handleRowPress(notification)}
-                onToggleRead={() => handleToggleRead(notification)}
-                onArchive={() => handleArchive(notification)}
-              />
-            </AnimatedListItem>
-          ))}
-          {notificationsQuery.hasNextPage ? (
-            <View style={styles.loadMore}>
-              <Button
-                compact
-                tone="secondary"
-                label="Load more"
-                loading={notificationsQuery.isFetchingNextPage}
-                onPress={() => notificationsQuery.fetchNextPage()}
-              />
-            </View>
-          ) : null}
-        </View>
-      )}
+      ) : null}
       <ConfirmationModal
         body={
           unreadCount === 1
@@ -457,14 +463,12 @@ const createStyles = (mobileColors: MobileColors) =>
     // swipe rather than on a panel of their own. The column bleeds past the
     // page gutter so a swiped row's actions reach the screen edge; each row
     // pads itself back to the gutter.
-    list: {
-      gap: 0,
-      marginHorizontal: -getScreenGutter(),
-    },
-    // Back inside the gutter the bleeding list gave up.
+    // Rows are list items outside the header's gutter, and each row pads
+    // itself back to the gutter, so a swiped row's actions reach the edge.
     loadMore: {
       marginHorizontal: getScreenGutter(),
       marginTop: mobileSpace.lg,
+      marginBottom: mobileSpace.md,
     },
     divider: {
       height: StyleSheet.hairlineWidth,

@@ -140,6 +140,7 @@ describe("mobile dashboard route", () => {
         filledTotal: 0,
         pct: 0,
         openSlots: 2,
+        daily: [],
       },
     ]);
     expect(payload.openShifts).toHaveLength(1);

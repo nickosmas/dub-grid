@@ -29,10 +29,10 @@ import {
   SelectionSection,
 } from "../../../shared/components/FilterSheet";
 import { SearchBar } from "../../../shared/components/SearchBar";
-import { AnimatedListItem } from "../../../shared/motion/AnimatedListItem";
 import { usePressAnimation } from "../../../shared/motion/usePressAnimation";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { Screen } from "../../../shared/components/Screen";
+import { getScreenGutter } from "../../../shared/components/screen-layout";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { SegmentedControl } from "../../../shared/components/SegmentedControl";
@@ -171,6 +171,9 @@ function countManagementUsersWithRole(
 function countPeopleWithRole(people: MobilePerson[], role: NonNullable<MobileOrgRole>): number {
   return people.filter((person) => getEffectiveOrgRole(person.orgRole) === role).length;
 }
+
+type RosterItem =
+  { kind: "management"; user: MobileManagementUser } | { kind: "person"; person: MobilePerson };
 
 export default function PeopleScreen() {
   const mobileColors = useMobileColors();
@@ -529,6 +532,105 @@ export default function PeopleScreen() {
     error: peopleError,
   });
 
+  // The roster is virtualized (F-04): rows mount only near the viewport
+  // instead of the whole organization at once. Both tabs share one list;
+  // the search, filters, tab strip and requests stay as the list header.
+  const rosterItems = useMemo<RosterItem[]>(() => {
+    if (contentState.kind !== "ready") return [];
+    return isManagementTab
+      ? filteredManagementUsers.map((user) => ({ kind: "management" as const, user }))
+      : filteredPeople.map((person) => ({ kind: "person" as const, person }));
+  }, [contentState.kind, filteredManagementUsers, filteredPeople, isManagementTab]);
+
+  const renderRosterItem = (item: RosterItem, index: number) => {
+    const isLast = index === rosterItems.length - 1;
+    if (item.kind === "management") {
+      const managementUser = item.user;
+      const isSelf = Boolean(
+        currentUserId && managementUser.userId && managementUser.userId === currentUserId,
+      );
+      const departmentNames = getDepartmentNames(
+        managementUser.managementDepartmentIds,
+        managementDepartments,
+      );
+      return (
+        <View style={styles.rosterRow}>
+          <PersonRow
+            id={managementUser.id}
+            avatarSeed={resolveAvatarSeed({
+              userId: managementUser.userId,
+              id: managementUser.id,
+            })}
+            isLast={isLast}
+            name={getManagementUserName(managementUser)}
+            navigable
+            orgRole={managementUser.orgRole}
+            onPress={() => {
+              // Every row opens the one profile page there is. Your own goes
+              // to the profile tab, which owns the only page that can edit
+              // you; everyone else's opens their staff profile, which carries
+              // their management access along with the rest of their record.
+              if (isSelf) {
+                router.push("/(tabs)/profile");
+                return;
+              }
+              if (managementUser.employeeId) {
+                router.push({
+                  pathname: "/person/[id]",
+                  params: { id: managementUser.employeeId },
+                });
+                return;
+              }
+              // No staff profile to open: a management-only invitation has no
+              // `employees` row until it is accepted. Its actions come up here.
+              setManagementUserActions(managementUser);
+            }}
+            subtitle={departmentNames.join(", ") || managementUser.email || "No departments"}
+          />
+        </View>
+      );
+    }
+    const person = item.person;
+    const focusAreasForPerson = person.focusAreaIds
+      .map((focusAreaId) => focusAreaMap.get(focusAreaId) ?? null)
+      .filter((value): value is string => Boolean(value));
+    const subtitle =
+      focusAreasForPerson.length > 0
+        ? focusAreasForPerson.join(", ")
+        : canManageEmployees
+          ? person.email || person.phone || "No contact on file"
+          : "No focus area";
+    const isSelf =
+      (currentEmployeeId !== null && person.id === currentEmployeeId) ||
+      (currentUserId !== null && person.userId !== null && person.userId === currentUserId);
+    // Management users' profile view is manager-only; their rows stay visible
+    // but don't navigate for everyone else.
+    const navigable = isSelf || canManageEmployees || !person.managementDepartmentIds?.length;
+    return (
+      <View style={styles.rosterRow}>
+        <PersonRow
+          id={person.id}
+          avatarSeed={resolveAvatarSeed(person)}
+          isLast={isLast}
+          name={getFullName(person)}
+          navigable={navigable}
+          orgRole={person.orgRole}
+          onPress={() => {
+            if (isSelf) {
+              router.push("/(tabs)/profile");
+              return;
+            }
+            router.push({
+              pathname: "/person/[id]",
+              params: { id: person.id },
+            });
+          }}
+          subtitle={subtitle}
+        />
+      </View>
+    );
+  };
+
   return (
     <Screen
       // The only field here is the search bar at the top, which the keyboard
@@ -542,6 +644,11 @@ export default function PeopleScreen() {
       // error states stay scrollable so the large title can still collapse and
       // pull-to-refresh keeps working.
       scrollEnabled={contentState.kind !== "loading"}
+      list={{
+        data: rosterItems,
+        keyExtractor: (item) => (item.kind === "management" ? `m-${item.user.id}` : item.person.id),
+        renderItem: renderRosterItem,
+      }}
     >
       <FilterSheet
         clearDisabled={activeFilterCount === 0}
@@ -916,62 +1023,7 @@ export default function PeopleScreen() {
             iconName="search-outline"
             title="No matches"
           />
-        ) : (
-          <View style={styles.section}>
-            <View>
-              {filteredManagementUsers.map((managementUser, index) => {
-                const isSelf = Boolean(
-                  currentUserId && managementUser.userId && managementUser.userId === currentUserId,
-                );
-                const departmentNames = getDepartmentNames(
-                  managementUser.managementDepartmentIds,
-                  managementDepartments,
-                );
-
-                return (
-                  <AnimatedListItem index={index} key={managementUser.id}>
-                    <PersonRow
-                      id={managementUser.id}
-                      avatarSeed={resolveAvatarSeed({
-                        userId: managementUser.userId,
-                        id: managementUser.id,
-                      })}
-                      isLast={index === filteredManagementUsers.length - 1}
-                      name={getManagementUserName(managementUser)}
-                      navigable
-                      orgRole={managementUser.orgRole}
-                      onPress={() => {
-                        // Every row opens the one profile page there is. Your
-                        // own goes to the profile tab, which owns the only page
-                        // that can edit you; everyone else's opens their staff
-                        // profile, which carries their management access along
-                        // with the rest of their record.
-                        if (isSelf) {
-                          router.push("/(tabs)/profile");
-                          return;
-                        }
-                        if (managementUser.employeeId) {
-                          router.push({
-                            pathname: "/person/[id]",
-                            params: { id: managementUser.employeeId },
-                          });
-                          return;
-                        }
-                        // No staff profile to open: a management-only
-                        // invitation has no `employees` row until it is
-                        // accepted. Its handful of actions come up here.
-                        setManagementUserActions(managementUser);
-                      }}
-                      subtitle={
-                        departmentNames.join(", ") || managementUser.email || "No departments"
-                      }
-                    />
-                  </AnimatedListItem>
-                );
-              })}
-            </View>
-          </View>
-        )
+        ) : null
       ) : visiblePeople.length === 0 ? (
         <EmptyStateCard
           fillScreen
@@ -990,58 +1042,7 @@ export default function PeopleScreen() {
           iconName="search-outline"
           title="No matches"
         />
-      ) : (
-        <View style={styles.section}>
-          {/* The directory sits straight on the page background: no card
-              surface, rows aligned with the screen gutters. */}
-          <View>
-            {filteredPeople.map((person, index) => {
-              const focusAreasForPerson = person.focusAreaIds
-                .map((focusAreaId) => focusAreaMap.get(focusAreaId) ?? null)
-                .filter((value): value is string => Boolean(value));
-              const subtitle =
-                focusAreasForPerson.length > 0
-                  ? focusAreasForPerson.join(", ")
-                  : canManageEmployees
-                    ? person.email || person.phone || "No contact on file"
-                    : "No focus area";
-              const isSelf =
-                (currentEmployeeId !== null && person.id === currentEmployeeId) ||
-                (currentUserId !== null &&
-                  person.userId !== null &&
-                  person.userId === currentUserId);
-              // Management users' profile view is manager-only; their rows stay
-              // visible but don't navigate for everyone else.
-              const navigable =
-                isSelf || canManageEmployees || !person.managementDepartmentIds?.length;
-
-              return (
-                <AnimatedListItem index={index} key={person.id}>
-                  <PersonRow
-                    id={person.id}
-                    avatarSeed={resolveAvatarSeed(person)}
-                    isLast={index === filteredPeople.length - 1}
-                    name={getFullName(person)}
-                    navigable={navigable}
-                    orgRole={person.orgRole}
-                    onPress={() => {
-                      if (isSelf) {
-                        router.push("/(tabs)/profile");
-                        return;
-                      }
-                      router.push({
-                        pathname: "/person/[id]",
-                        params: { id: person.id },
-                      });
-                    }}
-                    subtitle={subtitle}
-                  />
-                </AnimatedListItem>
-              );
-            })}
-          </View>
-        </View>
-      )}
+      ) : null}
       <ManagementUserActionsSheet
         managementDepartments={managementDepartments}
         managementUser={managementUserActions}
@@ -1226,6 +1227,12 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     section: {
       gap: mobileSpace.md,
+    },
+    // The directory sits straight on the page background: no card surface,
+    // rows aligned with the screen gutters (list items sit outside the
+    // header's padded content, so each row pads itself).
+    rosterRow: {
+      paddingHorizontal: getScreenGutter(),
     },
     sectionTitle: {
       ...mobileTextWeighted("sectionTitle", "medium"),
