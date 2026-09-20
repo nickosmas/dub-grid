@@ -145,136 +145,134 @@ export function ManagementUserInviteSheet({
   }
 
   return (
-    <>
-      <BottomSheetModal
-        footer={
-          <>
-            {error ? <InlineError message={error} /> : null}
-            <SheetActions
-              primaryAction={
-                <Button
-                  disabled={isPending || managementDepartments.length === 0}
-                  label="Send Invitation"
-                  loading={isPending}
-                  onPress={submit}
-                  tone="primary"
-                />
-              }
-            >
+    <BottomSheetModal
+      // Inside the sheet: iOS refuses a second Modal while one is up.
+      overlay={<ConfirmationModal presentation="inline" {...guard.confirmationProps} />}
+      footer={
+        <>
+          {error ? <InlineError message={error} /> : null}
+          <SheetActions
+            primaryAction={
               <Button
-                disabled={isPending}
-                // Same tri-state the edit surfaces use. Discard clears the
-                // draft directly rather than through the guard, whose
-                // `onDiscard` would also run on the way out and reintroduce the
-                // fields emptying as the sheet slides away.
-                label={getMobileEditorDismissLabel({ hasUnsavedChanges })}
-                onPress={hasUnsavedChanges ? () => setDraft(EMPTY_DRAFT) : guard.requestClose}
-                tone="neutral"
+                disabled={isPending || managementDepartments.length === 0}
+                label="Send Invitation"
+                loading={isPending}
+                onPress={submit}
+                tone="primary"
               />
-            </SheetActions>
-          </>
-        }
-        header={
-          <SheetHeader
-            subtitle="They'll get an invitation to join management, with no schedule profile."
-            title="Invite management user"
+            }
+          >
+            <Button
+              disabled={isPending}
+              // Same tri-state the edit surfaces use. Discard clears the
+              // draft directly rather than through the guard, whose
+              // `onDiscard` would also run on the way out and reintroduce the
+              // fields emptying as the sheet slides away.
+              label={getMobileEditorDismissLabel({ hasUnsavedChanges })}
+              onPress={hasUnsavedChanges ? () => setDraft(EMPTY_DRAFT) : guard.requestClose}
+              tone="neutral"
+            />
+          </SheetActions>
+        </>
+      }
+      header={
+        <SheetHeader
+          subtitle="They'll get an invitation to join management, with no schedule profile."
+          title="Invite management user"
+        />
+      }
+      scrollable
+      visible={visible}
+      onDismiss={guard.requestClose}
+    >
+      {managementDepartments.length === 0 ? (
+        <AppText tone="secondary" variant="body">
+          {`There are no ${MANAGEMENT_DEPARTMENT_LABELS.pluralLower} yet. Add one on the web app, under Settings, before inviting anyone into management.`}
+        </AppText>
+      ) : (
+        <View style={styles.body}>
+          <ProfileTextInput
+            autoCapitalize="words"
+            editable={!isPending}
+            error={showErrors ? firstNameError : null}
+            label="First name"
+            onChangeText={(firstName) => setDraft((current) => ({ ...current, firstName }))}
+            value={draft.firstName}
           />
-        }
-        scrollable
-        visible={visible}
-        onDismiss={guard.requestClose}
-      >
-        {managementDepartments.length === 0 ? (
-          <AppText tone="secondary" variant="body">
-            {`There are no ${MANAGEMENT_DEPARTMENT_LABELS.pluralLower} yet. Add one on the web app, under Settings, before inviting anyone into management.`}
-          </AppText>
-        ) : (
-          <View style={styles.body}>
-            <ProfileTextInput
-              autoCapitalize="words"
-              editable={!isPending}
-              error={showErrors ? firstNameError : null}
-              label="First name"
-              onChangeText={(firstName) => setDraft((current) => ({ ...current, firstName }))}
-              value={draft.firstName}
-            />
-            <ProfileTextInput
-              autoCapitalize="words"
-              editable={!isPending}
-              error={showErrors ? lastNameError : null}
-              label="Last name"
-              onChangeText={(lastName) => setDraft((current) => ({ ...current, lastName }))}
-              value={draft.lastName}
-            />
-            <ProfileTextInput
-              autoCapitalize="none"
-              editable={!isPending}
-              error={showErrors ? emailError : null}
-              keyboardType="email-address"
-              autoComplete="email"
-              autoCorrect={false}
-              label="Email"
-              onChangeText={(email) => setDraft((current) => ({ ...current, email }))}
-              value={draft.email}
-            />
-            <ProfileTextInput
-              editable={!isPending}
-              error={showErrors ? phoneError : null}
-              keyboardType="phone-pad"
-              autoComplete="tel"
-              label="Phone (optional)"
-              onChangeText={(phone) => setDraft((current) => ({ ...current, phone }))}
-              value={draft.phone}
-            />
+          <ProfileTextInput
+            autoCapitalize="words"
+            editable={!isPending}
+            error={showErrors ? lastNameError : null}
+            label="Last name"
+            onChangeText={(lastName) => setDraft((current) => ({ ...current, lastName }))}
+            value={draft.lastName}
+          />
+          <ProfileTextInput
+            autoCapitalize="none"
+            editable={!isPending}
+            error={showErrors ? emailError : null}
+            keyboardType="email-address"
+            autoComplete="email"
+            autoCorrect={false}
+            label="Email"
+            onChangeText={(email) => setDraft((current) => ({ ...current, email }))}
+            value={draft.email}
+          />
+          <ProfileTextInput
+            editable={!isPending}
+            error={showErrors ? phoneError : null}
+            keyboardType="phone-pad"
+            autoComplete="tel"
+            label="Phone (optional)"
+            onChangeText={(phone) => setDraft((current) => ({ ...current, phone }))}
+            value={draft.phone}
+          />
 
-            <View style={styles.field}>
-              <AppText tone="secondary" variant="label">
-                Access level
-              </AppText>
-              <SegmentedControl
-                accessibilityLabel="Access level"
-                disabled={isPending}
-                onChange={(orgRole) => setDraft((current) => ({ ...current, orgRole }))}
-                options={ROLE_OPTIONS}
-                value={draft.orgRole}
-              />
-            </View>
-
-            <View style={styles.field}>
-              <AppText tone="secondary" variant="label">
-                {MANAGEMENT_DEPARTMENT_LABELS.plural}
-              </AppText>
-              <View style={styles.chipRow}>
-                {managementDepartments.map((department) => (
-                  <Chip
-                    key={department.id}
-                    label={department.abbr || department.name}
-                    onPress={() =>
-                      setDraft((current) => ({
-                        ...current,
-                        managementDepartmentIds: current.managementDepartmentIds.includes(
-                          department.id,
-                        )
-                          ? current.managementDepartmentIds.filter((id) => id !== department.id)
-                          : [...current.managementDepartmentIds, department.id],
-                      }))
-                    }
-                    selected={draft.managementDepartmentIds.includes(department.id)}
-                  />
-                ))}
-              </View>
-              {showErrors && departmentError ? (
-                <AppText tone="danger" variant="meta">
-                  {departmentError}
-                </AppText>
-              ) : null}
-            </View>
+          <View style={styles.field}>
+            <AppText tone="secondary" variant="label">
+              Access level
+            </AppText>
+            <SegmentedControl
+              accessibilityLabel="Access level"
+              disabled={isPending}
+              onChange={(orgRole) => setDraft((current) => ({ ...current, orgRole }))}
+              options={ROLE_OPTIONS}
+              value={draft.orgRole}
+            />
           </View>
-        )}
-      </BottomSheetModal>
 
-      <ConfirmationModal {...guard.confirmationProps} />
-    </>
+          <View style={styles.field}>
+            <AppText tone="secondary" variant="label">
+              {MANAGEMENT_DEPARTMENT_LABELS.plural}
+            </AppText>
+            <View style={styles.chipRow}>
+              {managementDepartments.map((department) => (
+                <Chip
+                  key={department.id}
+                  label={department.abbr || department.name}
+                  onPress={() =>
+                    setDraft((current) => ({
+                      ...current,
+                      managementDepartmentIds: current.managementDepartmentIds.includes(
+                        department.id,
+                      )
+                        ? current.managementDepartmentIds.filter((id) => id !== department.id)
+                        : [...current.managementDepartmentIds, department.id],
+                    }))
+                  }
+                  selected={draft.managementDepartmentIds.includes(department.id)}
+                />
+              ))}
+            </View>
+            {showErrors && departmentError ? (
+              <AppText tone="danger" variant="meta">
+                {departmentError}
+              </AppText>
+            ) : null}
+          </View>
+        </View>
+      )}
+    </BottomSheetModal>
   );
 }
 

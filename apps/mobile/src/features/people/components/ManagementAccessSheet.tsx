@@ -225,106 +225,11 @@ export function ManagementAccessSheet({
     mutation.mutate(draft);
   }
 
-  return (
+  // Both prompts ride inside the sheet: iOS refuses a second Modal while one
+  // is up, so as siblings neither ever appeared.
+  const confirmationOverlay = (
     <>
-      <BottomSheetModal
-        debugName="Management access"
-        footer={
-          <>
-            {error ? <InlineError message={error} /> : null}
-            <SheetActions
-              primaryAction={
-                <Button
-                  disabled={!canSubmit}
-                  label="Save Access"
-                  loading={mutation.isPending}
-                  onPress={submit}
-                  tone="primary"
-                />
-              }
-            >
-              {/* One label for both branches, as on web. "Send Invitation" would
-                  also collide with the staff-invitation action on the page behind
-                  this sheet, which does something else entirely. */}
-              <Button
-                disabled={mutation.isPending}
-                // Same tri-state web uses. Discard resets the draft and leaves
-                // the sheet open; dismissing with edits in hand is the drag or
-                // the backdrop, which this guard already confirms.
-                label={getMobileEditorDismissLabel({ hasUnsavedChanges })}
-                onPress={hasUnsavedChanges ? guard.discard : guard.requestClose}
-                tone="neutral"
-              />
-            </SheetActions>
-          </>
-        }
-        header={
-          <SheetHeader
-            subtitle={`${person.firstName} ${person.lastName}`.trim() || person.email}
-            title={isEditing ? "Edit management access" : "Add to management"}
-          />
-        }
-        scrollable
-        visible={visible}
-        onDismiss={guard.requestClose}
-      >
-        {managementDepartments.length === 0 ? (
-          <AppText tone="secondary" variant="body">
-            {`There are no ${MANAGEMENT_DEPARTMENT_LABELS.pluralLower} yet. Add one on the web app, under Settings, before granting management access.`}
-          </AppText>
-        ) : (
-          <View style={{ gap: mobileSpace.lg }}>
-            <SectionNotice messages={removalNotices} />
-            {/* The same ring-and-check lists the editor's Staffing and
-                Assignments sections use, one row per choice with the full
-                name: a chip row abbreviated departments to fit and read as a
-                different control from the one on the page behind. The lists
-                carry headers only when there are two of them to tell apart;
-                a lone departments list is named by the sheet's title. */}
-            {needsRoleForInvite ? (
-              <ProfileChoiceGroup
-                items={ROLE_OPTIONS.map((option) => ({
-                  ...option,
-                  disabled: mutation.isPending,
-                }))}
-                label="Access level"
-                selection="single"
-                selectedIds={[draft.orgRole]}
-                onToggle={(orgRole) => setDraft((current) => ({ ...current, orgRole }))}
-              />
-            ) : null}
-
-            {/* Only the missing answer stays by the list. The removal is a
-                consequence of the save, raised once at the top of the sheet. */}
-            <ProfileChoiceGroup
-              error={
-                !isRemoval && draft.managementDepartmentIds.length === 0
-                  ? `Select at least one ${MANAGEMENT_DEPARTMENT_LABELS.singularLower}`
-                  : null
-              }
-              items={managementDepartments.map((department) => ({
-                id: department.id,
-                name: department.name,
-                disabled: mutation.isPending,
-              }))}
-              label={needsRoleForInvite ? MANAGEMENT_DEPARTMENT_LABELS.plural : undefined}
-              selectedIds={draft.managementDepartmentIds}
-              onToggle={toggleDepartment}
-            />
-
-            {!person.userId ? (
-              <AppText tone="secondary" variant="meta">
-                {person.email
-                  ? `An invitation will be sent to ${person.email}.`
-                  : "Add an email address to this staff profile before inviting them."}
-              </AppText>
-            ) : null}
-          </View>
-        )}
-      </BottomSheetModal>
-
-      <ConfirmationModal {...guard.confirmationProps} />
-
+      <ConfirmationModal presentation="inline" {...guard.confirmationProps} />
       <ConfirmationModal
         body={
           isSelf
@@ -339,9 +244,109 @@ export function ManagementAccessSheet({
           setShowRemoveConfirmation(false);
           mutation.mutate({ remove: true });
         }}
+        presentation="inline"
         title="Remove management access?"
         visible={showRemoveConfirmation}
       />
     </>
+  );
+
+  return (
+    <BottomSheetModal
+      debugName="Management access"
+      overlay={confirmationOverlay}
+      footer={
+        <>
+          {error ? <InlineError message={error} /> : null}
+          <SheetActions
+            primaryAction={
+              <Button
+                disabled={!canSubmit}
+                label="Save Access"
+                loading={mutation.isPending}
+                onPress={submit}
+                tone="primary"
+              />
+            }
+          >
+            {/* One label for both branches, as on web. "Send Invitation" would
+                  also collide with the staff-invitation action on the page behind
+                  this sheet, which does something else entirely. */}
+            <Button
+              disabled={mutation.isPending}
+              // Same tri-state web uses. Discard resets the draft and leaves
+              // the sheet open; dismissing with edits in hand is the drag or
+              // the backdrop, which this guard already confirms.
+              label={getMobileEditorDismissLabel({ hasUnsavedChanges })}
+              onPress={hasUnsavedChanges ? guard.discard : guard.requestClose}
+              tone="neutral"
+            />
+          </SheetActions>
+        </>
+      }
+      header={
+        <SheetHeader
+          subtitle={`${person.firstName} ${person.lastName}`.trim() || person.email}
+          title={isEditing ? "Edit management access" : "Add to management"}
+        />
+      }
+      scrollable
+      visible={visible}
+      onDismiss={guard.requestClose}
+    >
+      {managementDepartments.length === 0 ? (
+        <AppText tone="secondary" variant="body">
+          {`There are no ${MANAGEMENT_DEPARTMENT_LABELS.pluralLower} yet. Add one on the web app, under Settings, before granting management access.`}
+        </AppText>
+      ) : (
+        <View style={{ gap: mobileSpace.lg }}>
+          <SectionNotice messages={removalNotices} />
+          {/* The same ring-and-check lists the editor's Staffing and
+                Assignments sections use, one row per choice with the full
+                name: a chip row abbreviated departments to fit and read as a
+                different control from the one on the page behind. The lists
+                carry headers only when there are two of them to tell apart;
+                a lone departments list is named by the sheet's title. */}
+          {needsRoleForInvite ? (
+            <ProfileChoiceGroup
+              items={ROLE_OPTIONS.map((option) => ({
+                ...option,
+                disabled: mutation.isPending,
+              }))}
+              label="Access level"
+              selection="single"
+              selectedIds={[draft.orgRole]}
+              onToggle={(orgRole) => setDraft((current) => ({ ...current, orgRole }))}
+            />
+          ) : null}
+
+          {/* Only the missing answer stays by the list. The removal is a
+                consequence of the save, raised once at the top of the sheet. */}
+          <ProfileChoiceGroup
+            error={
+              !isRemoval && draft.managementDepartmentIds.length === 0
+                ? `Select at least one ${MANAGEMENT_DEPARTMENT_LABELS.singularLower}`
+                : null
+            }
+            items={managementDepartments.map((department) => ({
+              id: department.id,
+              name: department.name,
+              disabled: mutation.isPending,
+            }))}
+            label={needsRoleForInvite ? MANAGEMENT_DEPARTMENT_LABELS.plural : undefined}
+            selectedIds={draft.managementDepartmentIds}
+            onToggle={toggleDepartment}
+          />
+
+          {!person.userId ? (
+            <AppText tone="secondary" variant="meta">
+              {person.email
+                ? `An invitation will be sent to ${person.email}.`
+                : "Add an email address to this staff profile before inviting them."}
+            </AppText>
+          ) : null}
+        </View>
+      )}
+    </BottomSheetModal>
   );
 }

@@ -279,7 +279,11 @@ export function BottomSheetModal({
                     <View style={styles.grabberArea}>
                       <View style={styles.grabber} />
                     </View>
-                    {header ? <View style={styles.header}>{header}</View> : null}
+                    {header ? (
+                      <View style={[styles.header, showsClose ? styles.headerWithClose : null]}>
+                        {header}
+                      </View>
+                    ) : null}
                   </View>
                   {scrollable ? (
                     <Animated.ScrollView
@@ -421,6 +425,13 @@ const createStyles = (
       paddingHorizontal: mobileSpace.xl,
       paddingBottom: mobileSpace.md,
     },
+    // The close button is absolute, so nothing in the flow keeps a title out
+    // from under it: "Deactivate Margaret Sullivan?" ran straight through the
+    // X. Reserve the button's column plus a gap, so a long title wraps or
+    // truncates before it gets there.
+    headerWithClose: {
+      paddingRight: mobileSpace.xl + CLOSE_BUTTON_SIZE + mobileSpace.md,
+    },
     root: {
       flex: 1,
       justifyContent: "flex-end",
@@ -515,7 +526,16 @@ export function SheetHeader({
   return (
     <View style={sheetHeaderStyles.root}>
       {icon ? <Ionicons color={mobileColors.brand} name={icon} size={28} /> : null}
-      <AppText fit="fixed" variant="screenTitle">
+      {/* Chrome-sized (no OS text scaling), like `fit="fixed"`, but allowed a
+          second line: a title that names a person ("Deactivate Margaret
+          Sullivan?") must not lose the name to an ellipsis for the sake of one
+          line, and the close button stays pinned to the first line either way. */}
+      <AppText
+        allowFontScaling={false}
+        ellipsizeMode="tail"
+        numberOfLines={2}
+        variant="screenTitle"
+      >
         {title}
       </AppText>
       {subtitle ? (

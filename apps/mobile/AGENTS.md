@@ -379,24 +379,22 @@ Sheets have a grabber, 40pt top corners, and extend to the bottom edge.
   is a centered full-width row first, with help/navigation links centered
   underneath. This keeps `Continue` and `Sign In` visually dominant and stops
   a long help label from being compressed beside them.
-- **A person page's actions are one row of icon buttons under the hero, and
-  Edit is in the bar.** `ProfileQuickActions` is a horizontal strip of
-  `ProfileQuickAction` circles: 44pt icon-only `plain` buttons whose meaning is
-  the icon and its colour (`red` for the destructive ones only) and whose
-  `label` is the accessibility name, since nothing prints it. The row centers
-  while the circles fit, scrolls sideways once they don't, and never wraps
-  into a second line. Every action on the person goes in it, in web's
-  staff-panel order after Call and Email; nothing is stacked at the foot of
-  the page. Edit is about the page rather than the
-  person, so it is a text-only `createHeaderTextAction` in the navigation bar,
-  cleared while an inline editor's footer owns Save and Cancel. It rides in
-  `headerRight`, which iOS 26 wraps in the same Liquid Glass capsule as the
-  back button; native-stack's `unstable_headerRightItems` would be the
-  textbook route but comes up as an empty capsule on the pinned
+- **A person page keeps Call and Email under the hero, Edit in the bar, and
+  everything else at the foot.** `ProfileQuickActions` holds exactly the
+  contact pair as `ProfileQuickAction` pills (the `plain` button with its
+  glyph and its name; a missing number or address dims the pill rather than
+  dropping it, so the pair keeps its shape). Edit is about the page rather
+  than the person, so it is a text-only `createHeaderTextAction` in the
+  navigation bar, cleared while an inline editor's footer owns Save and
+  Cancel. It rides in `headerRight`, which iOS 26 wraps in the same Liquid
+  Glass capsule as the back button; native-stack's `unstable_headerRightItems`
+  would be the textbook route but comes up as an empty capsule on the pinned
   react-native-screens 4.17 (it sends `title`, screens 4.17 reads `label`).
-  Keep `ProfileQuickActions` out of
-  `ActionButtons`; the secondary-first/primary-last rule is for bottom content,
-  form, and sheet actions.
+  The management actions (invitation, schedule, management access, status)
+  end the page in `ProfileActionStack`, full width one under the other, in
+  web's staff-panel order: access first, status last. Keep the pair out of
+  `ActionButtons`; the secondary-first/primary-last rule is for bottom
+  content, form, and sheet actions.
 - **`backdrop="cover"`** paints out the app behind the sheet instead of dimming
   it. Only the app lock wants this, and for it the choice is a security one.
 - **A sheet holding unsaved input must guard its dismissal.** Route `onDismiss`

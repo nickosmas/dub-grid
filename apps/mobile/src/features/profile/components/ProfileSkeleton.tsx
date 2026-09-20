@@ -152,8 +152,8 @@ export type ProfileSectionSkeleton = {
   rowVariant?: ProfileRowVariant;
 };
 
-/** The real row's icon-only circle: `Button` at `size="md"`. */
-const QUICK_ACTION_SIZE = 44;
+/** The real pair's widths: a compact pill with its glyph, "Call" then "Email". */
+const QUICK_ACTION_WIDTHS = [88, 100];
 
 /**
  * The placeholder every profile-shaped screen uses: the user's own profile,
@@ -189,7 +189,7 @@ export function ProfileSkeleton({
   /** On where the centered hero carries a subtitle under the name. */
   heroSubtitle?: boolean;
   showHero?: boolean;
-  /** Icon circles in the action row under the hero; 0 leaves the row out. */
+  /** Pills in the contact pair under the hero; 0 leaves the row out. */
   quickActions?: number;
   rowVariant?: ProfileRowVariant;
 }) {
@@ -206,14 +206,14 @@ export function ProfileSkeleton({
       {showHero ? (
         <ProfileHeroSkeleton align={heroAlign} metaItems={metaItems} subtitle={heroSubtitle} />
       ) : null}
-      {/* The real row, so the circles sit where the actions will. */}
+      {/* The real row, so the pills sit where the actions will. */}
       {quickActions > 0 ? (
-        <ProfileQuickActions accessibilityLabel="Loading actions" scrollEnabled={false}>
-          {skeletonRows(quickActions, (index) => (
+        <ProfileQuickActions>
+          {skeletonRows(Math.min(quickActions, QUICK_ACTION_WIDTHS.length), (index) => (
             <SkeletonPill
-              height={QUICK_ACTION_SIZE}
+              height={36}
               key={`profile-action-${index}`}
-              width={QUICK_ACTION_SIZE}
+              width={QUICK_ACTION_WIDTHS[index]}
             />
           ))}
         </ProfileQuickActions>

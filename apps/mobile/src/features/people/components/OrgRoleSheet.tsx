@@ -94,54 +94,58 @@ export function OrgRoleSheet({
     };
   }, [currentRole, invitationEmail, pendingRole]);
 
-  return (
-    <>
-      <BottomSheetModal
-        footer={
-          <>
-            {error ? <InlineError message={error} /> : null}
-            <SheetActions>
-              <Button disabled={isPending} label="Cancel" onPress={onDismiss} tone="neutral" />
-            </SheetActions>
-          </>
-        }
-        header={<SheetHeader subtitle={displayName} title="App access" />}
-        scrollable
-        visible={visible}
-        onDismiss={onDismiss}
-      >
-        {/* No header over the list: the sheet's own title is the header, and
-            one list under it needs no second name. */}
-        <SelectionSection>
-          {ROLE_OPTIONS.map((option) => (
-            <SelectionRow
-              detail={option.detail}
-              key={option.value}
-              label={ORG_ROLE_LABELS[option.value]}
-              onPress={() => {
-                if (isPending || option.value === currentRole) return;
-                setPendingRole(option.value);
-              }}
-              selected={option.value === currentRole}
-            />
-          ))}
-        </SelectionSection>
-      </BottomSheetModal>
+  // Inside the sheet, not beside it: iOS refuses a second Modal while one is
+  // up, so a sibling confirmation never appeared.
+  const confirmationOverlay = (
+    <ConfirmationModal
+      body={confirmation.body}
+      confirmLabel={confirmation.confirmLabel}
+      confirmTone={confirmation.confirmTone}
+      loading={isPending}
+      onCancel={() => setPendingRole(null)}
+      onConfirm={() => {
+        const next = pendingRole;
+        setPendingRole(null);
+        return next ? onSubmit(next) : undefined;
+      }}
+      presentation="inline"
+      title={confirmation.title}
+      visible={pendingRole !== null}
+    />
+  );
 
-      <ConfirmationModal
-        body={confirmation.body}
-        confirmLabel={confirmation.confirmLabel}
-        confirmTone={confirmation.confirmTone}
-        loading={isPending}
-        onCancel={() => setPendingRole(null)}
-        onConfirm={() => {
-          const next = pendingRole;
-          setPendingRole(null);
-          return next ? onSubmit(next) : undefined;
-        }}
-        title={confirmation.title}
-        visible={pendingRole !== null}
-      />
-    </>
+  return (
+    <BottomSheetModal
+      footer={
+        <>
+          {error ? <InlineError message={error} /> : null}
+          <SheetActions>
+            <Button disabled={isPending} label="Cancel" onPress={onDismiss} tone="neutral" />
+          </SheetActions>
+        </>
+      }
+      header={<SheetHeader subtitle={displayName} title="App access" />}
+      overlay={confirmationOverlay}
+      scrollable
+      visible={visible}
+      onDismiss={onDismiss}
+    >
+      {/* No header over the list: the sheet's own title is the header, and
+          one list under it needs no second name. */}
+      <SelectionSection>
+        {ROLE_OPTIONS.map((option) => (
+          <SelectionRow
+            detail={option.detail}
+            key={option.value}
+            label={ORG_ROLE_LABELS[option.value]}
+            onPress={() => {
+              if (isPending || option.value === currentRole) return;
+              setPendingRole(option.value);
+            }}
+            selected={option.value === currentRole}
+          />
+        ))}
+      </SelectionSection>
+    </BottomSheetModal>
   );
 }

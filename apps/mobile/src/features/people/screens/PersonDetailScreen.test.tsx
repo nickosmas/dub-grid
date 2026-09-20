@@ -1303,56 +1303,66 @@ describe("PersonDetailScreen", () => {
     }
 
     // Edit is about the page, not the person, so it takes the bar's trailing
-    // slot, where iOS puts it. It is the one place the word appears: the row
-    // under the avatar is for actions on the person.
+    // slot, where iOS puts it, and it is the one place the word appears.
     it("puts Edit in the navigation bar, and clears it while editing", () => {
       renderAsManager({});
 
       const bar = within(screen.getByTestId("navigation-bar"));
-      const actions = within(screen.getByLabelText("Actions"));
       expect(bar.getByRole("button", { name: "Edit" })).toBeInTheDocument();
-      expect(actions.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: "Edit" })).toHaveLength(1);
 
       fireEvent.click(bar.getByRole("button", { name: "Edit" }));
 
       expect(screen.getByText("Save changes")).toBeInTheDocument();
       expect(stackScreenOptions.at(-1)?.headerRight).toBeUndefined();
       expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
-      expect(screen.queryByLabelText("Actions")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Call" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Deactivate" })).not.toBeInTheDocument();
     });
 
-    // One row of icon buttons, in web's staff-panel order after the contact
-    // pair: the everyday grant first, the action that takes someone off the
-    // app last. Nothing is left at the foot of the page.
-    it("lines every action on the person up in the row under the hero", () => {
+    // Under the hero: Call and Email, always both, the one without a number or
+    // address dimmed rather than dropped. At the foot: everything that manages
+    // the person, in web's staff-panel order, access first and status last.
+    it("keeps the contact pair under the hero and the management actions at the foot", () => {
       renderAsManager({
         userId: null,
+        phone: "",
         focusAreaIds: [],
         pendingInvitation: { id: "inv-1", expiresAt: "2030-01-01T00:00:00.000Z" },
       });
 
-      const actions = within(screen.getByLabelText("Actions"));
-      expect(
-        actions.getAllByRole("button").map((button) => button.getAttribute("aria-label")),
-      ).toEqual([
-        "Call",
-        "Email",
+      const call = screen.getByRole("button", { name: "Call" });
+      const email = screen.getByRole("button", { name: "Email" });
+      expect(call).toHaveAttribute("aria-disabled", "true");
+      expect(email).toHaveAttribute("aria-disabled", "false");
+      // Named, not icon-only: the label prints inside the pill.
+      expect(call).toHaveTextContent("Call");
+      expect(email).toHaveTextContent("Email");
+
+      const names = screen
+        .getAllByRole("button")
+        .map((button) => button.getAttribute("aria-label") ?? button.textContent);
+      const footStart = names.indexOf("Reinvite");
+      expect(names.slice(footStart)).toEqual([
         "Reinvite",
         "Revoke Invite",
         "Add to Schedule",
         "Add to Management",
         "Deactivate",
       ]);
-      // Icons only: the name is the accessibility label, and no button in the
-      // row prints it.
-      for (const button of actions.getAllByRole("button")) {
-        expect(button).toHaveTextContent("");
-      }
-      // Every button on the page is either in the row or the bar's Edit.
-      expect(screen.getAllByRole("button")).toHaveLength(8);
+      // The foot follows every section: Assignments is the last titled one.
+      const assignments = screen.getByText("Assignments");
+      expect(
+        assignments.compareDocumentPosition(screen.getByRole("button", { name: "Reinvite" })) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      // The pair sits above the sections.
+      expect(
+        call.compareDocumentPosition(assignments) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
     });
 
-    it("keeps the row to the contact pair for a viewer who cannot manage staff", () => {
+    it("keeps the pair, and nothing at the foot, for a viewer who cannot manage staff", () => {
       useBootstrap.mockReturnValue({
         data: {
           currentOrg: {
@@ -1384,10 +1394,9 @@ describe("PersonDetailScreen", () => {
 
       render(<PersonDetailScreen />);
 
-      const actions = within(screen.getByLabelText("Actions"));
-      expect(
-        actions.getAllByRole("button").map((button) => button.getAttribute("aria-label")),
-      ).toEqual(["Call", "Email"]);
+      expect(screen.getByRole("button", { name: "Call" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Email" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Deactivate" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
       expect(stackScreenOptions.at(-1)?.headerRight).toBeUndefined();
     });

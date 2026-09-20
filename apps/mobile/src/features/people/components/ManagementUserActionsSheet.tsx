@@ -200,9 +200,62 @@ export function ManagementUserActionsSheet({
   );
   const isPending = accessMutation.isPending || invitationMutation.isPending;
 
+  // Both prompts ride inside whichever sheet is on top, this one or the access
+  // sheet that can raise the removal: iOS refuses a second Modal while a sheet
+  // is up, so as siblings neither ever appeared.
+  const confirmationOverlay = (
+    <>
+      <ConfirmationModal
+        presentation="inline"
+        body="They'll come off the management roster."
+        confirmLabel="Remove access"
+        error={error}
+        confirmTone="danger"
+        loading={accessMutation.isPending}
+        onCancel={() => {
+          setError(null);
+          setShowRemoveConfirmation(false);
+        }}
+        onConfirm={() =>
+          new Promise<void>((resolve) => {
+            accessMutation.mutate({ remove: true }, { onSettled: () => resolve() });
+          })
+        }
+        title={`Remove ${fullName} from management?`}
+        visible={showRemoveConfirmation}
+      />
+
+      <ConfirmationModal
+        presentation="inline"
+        body={
+          invitationConfirmAction === "resend"
+            ? `The current invitation for ${displayed.email} will be canceled and a new one sent.`
+            : `The current invite link for ${displayed.email} will stop working.`
+        }
+        confirmLabel={
+          invitationConfirmAction === "resend" ? "Reissue Invitation" : "Revoke Invitation"
+        }
+        confirmTone={invitationConfirmAction === "revoke" ? "danger" : "primary"}
+        error={error}
+        loading={invitationMutation.isPending}
+        onCancel={() => {
+          setError(null);
+          setInvitationConfirmAction(null);
+        }}
+        onConfirm={() => {
+          if (invitationConfirmAction)
+            return invitationMutation.mutateAsync(invitationConfirmAction);
+        }}
+        title={invitationConfirmAction === "resend" ? "Reissue invitation?" : "Revoke invitation?"}
+        visible={invitationConfirmAction != null}
+      />
+    </>
+  );
+
   return (
     <>
       <BottomSheetModal
+        overlay={confirmationOverlay}
         footer={
           <>
             {error && !showAccessSheet && !showRoleSheet ? <InlineError message={error} /> : null}
@@ -275,6 +328,7 @@ export function ManagementUserActionsSheet({
       </BottomSheetModal>
 
       <ManagementUserAccessSheet
+        overlay={confirmationOverlay}
         // The access sheet is the surface that failed while it is open, so the
         // message belongs there rather than on the actions sheet behind it.
         error={showAccessSheet ? error : null}
@@ -325,49 +379,6 @@ export function ManagementUserActionsSheet({
             );
           })
         }
-      />
-
-      <ConfirmationModal
-        body="They'll come off the management roster."
-        confirmLabel="Remove access"
-        error={error}
-        confirmTone="danger"
-        loading={accessMutation.isPending}
-        onCancel={() => {
-          setError(null);
-          setShowRemoveConfirmation(false);
-        }}
-        onConfirm={() =>
-          new Promise<void>((resolve) => {
-            accessMutation.mutate({ remove: true }, { onSettled: () => resolve() });
-          })
-        }
-        title={`Remove ${fullName} from management?`}
-        visible={showRemoveConfirmation}
-      />
-
-      <ConfirmationModal
-        body={
-          invitationConfirmAction === "resend"
-            ? `The current invitation for ${displayed.email} will be canceled and a new one sent.`
-            : `The current invite link for ${displayed.email} will stop working.`
-        }
-        confirmLabel={
-          invitationConfirmAction === "resend" ? "Reissue Invitation" : "Revoke Invitation"
-        }
-        confirmTone={invitationConfirmAction === "revoke" ? "danger" : "primary"}
-        error={error}
-        loading={invitationMutation.isPending}
-        onCancel={() => {
-          setError(null);
-          setInvitationConfirmAction(null);
-        }}
-        onConfirm={() => {
-          if (invitationConfirmAction)
-            return invitationMutation.mutateAsync(invitationConfirmAction);
-        }}
-        title={invitationConfirmAction === "resend" ? "Reissue invitation?" : "Revoke invitation?"}
-        visible={invitationConfirmAction != null}
       />
     </>
   );

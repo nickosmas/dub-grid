@@ -8,7 +8,6 @@ import {
   type ReactNode,
 } from "react";
 import {
-  ScrollView,
   StyleSheet,
   TextInput,
   View,
@@ -23,7 +22,6 @@ import { AccessInsignia } from "../../../shared/components/AccessInsignia";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { useIsInsideSheet } from "../../../shared/components/BottomSheetModal";
 import { useKeyboardDoneAccessory } from "../../../shared/components/KeyboardDoneAccessory";
-import { getScreenGutter } from "../../../shared/components/screen-layout";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   mobileListRow,
@@ -430,12 +428,16 @@ export function ProfileChoiceGroup<TId extends string | number>({
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
+  // The same flattening `ProfileList` does: a sheet is one flat surface, and
+  // a shadow on a list inside it was both against the rule and clipped by
+  // the sheet's own scroll edges.
+  const insideSheet = useIsInsideSheet();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <View style={styles.choiceGroup}>
       {label ? <Text style={[styles.fieldLabel, styles.choiceGroupLabel]}>{label}</Text> : null}
-      <View style={styles.list}>
+      <View style={[styles.list, insideSheet ? styles.flatInSheet : null]}>
         <View style={styles.listClip}>
           {items.map((item, index) => {
             const selected = selectedIds.includes(item.id);
@@ -549,25 +551,17 @@ const personLayoutStyles = StyleSheet.create({
     justifyContent: "center",
   },
   quickActions: {
-    // Bleeds to the screen edges so an overflowing row scrolls out from under
-    // the gutter, the way `ScrollableTabStrip` does, rather than clipping at
-    // it. Zero grow: a scroll view otherwise takes the page's spare height.
-    flexGrow: 0,
-    marginHorizontal: -getScreenGutter(),
-  },
-  quickActionsContent: {
-    alignItems: "center",
     flexDirection: "row",
-    // Fills the viewport while the pills fit, which is what lets them center
-    // under the avatar; once they outgrow it the content is wider than the
-    // viewport and simply scrolls.
-    flexGrow: 1,
-    // Tighter than the pill row's 12: seven 44pt circles at 8 apart fit a
-    // 402pt phone's 362pt content width, where at 12 the last one hung off.
-    gap: mobileSpace.sm,
+    gap: mobileSpace.md,
     justifyContent: "center",
     paddingBottom: 16,
-    paddingHorizontal: getScreenGutter(),
+  },
+  actionStack: {
+    gap: mobileSpace.md,
+    // Twice the 12 an action group opens above its buttons, on top of the 20
+    // the screen puts between sections: these end the page rather than
+    // sitting among sibling rows, so they take the wider break.
+    paddingTop: mobileSpace["2xl"],
   },
   actionRow: {
     flexDirection: "row",
@@ -593,81 +587,52 @@ export function ProfileHeroFactsRow({ children }: { children: ReactNode }) {
 }
 
 /**
- * Every action on the person, in one row directly under the hero.
- *
- * One row, never a wrap: the page's actions are a strip to scan, and a second
- * line of centered buttons read as a tag cloud. Icon-only circles keep even a
- * manager's full set on one line of a phone; should a set still outgrow the
- * viewport it scrolls sideways, the way the schedule's open-shift carousel
- * does, with the last visible circle cut at the edge as the cue. The colour
- * lives in each button's icon, so the set reads as one group of actions on the
- * person rather than as competing fills.
+ * The contact pair directly under the hero: Call and Email, always both, as
+ * tiles the reader can name at a glance. Everything that manages the person
+ * lives at the foot of the page instead.
  */
-export function ProfileQuickActions({
-  children,
-  accessibilityLabel = "Actions",
-  scrollEnabled = true,
-}: {
-  children: ReactNode;
-  accessibilityLabel?: string;
-  /** Off for the skeleton, which borrows the row's geometry but is not content. */
-  scrollEnabled?: boolean;
-}) {
-  return (
-    <ScrollView
-      accessibilityLabel={accessibilityLabel}
-      contentContainerStyle={personLayoutStyles.quickActionsContent}
-      horizontal
-      scrollEnabled={scrollEnabled}
-      showsHorizontalScrollIndicator={false}
-      style={personLayoutStyles.quickActions}
-    >
-      {children}
-    </ScrollView>
-  );
+export function ProfileQuickActions({ children }: { children: ReactNode }) {
+  return <View style={personLayoutStyles.quickActions}>{children}</View>;
 }
 
 /**
- * One circle in `ProfileQuickActions`: the white `plain` icon button, 44pt so
- * the target needs no slop, with its meaning in the icon's colour. `red` is
- * for the destructive ones only, so Revoke and Remove stay the two that ask
- * for attention. `label` is the action's name for assistive tech; nothing
- * prints it, so pick a glyph that says it on its own.
+ * One pill in `ProfileQuickActions`: the neutral `plain` button with its
+ * glyph beside its name, so the button says what it does without a tap. The
+ * colour is the icon's. A pill with nothing to act on stays in place, dimmed,
+ * so the pair keeps its shape whether or not a phone or email is on file.
  */
 export function ProfileQuickAction({
   icon,
   iconTone,
   label,
-  ...button
+  disabled = false,
+  onPress,
 }: {
   icon: IconName;
   iconTone: MobileIconToneName;
   label: string;
-} & Omit<
-  ComponentProps<typeof Button>,
-  | "accessibilityLabel"
-  | "compact"
-  | "icon"
-  | "iconOnly"
-  | "label"
-  | "leadingAccessory"
-  | "size"
-  | "tone"
->) {
+  disabled?: boolean;
+  onPress: () => void;
+}) {
   const isDark = useIsDarkMode();
 
   return (
     <Button
-      {...button}
-      accessibilityLabel={label}
-      iconOnly
+      compact
+      disabled={disabled}
+      label={label}
       leadingAccessory={
-        <Ionicons color={mobileIconToneColor(iconTone, isDark)} name={icon} size={22} />
+        <Ionicons color={mobileIconToneColor(iconTone, isDark)} name={icon} size={18} />
       }
-      size="md"
+      onPress={onPress}
       tone="plain"
     />
   );
+}
+
+/** The management actions at the foot of a person page, one full-width button each. */
+export function ProfileActionStack({ children }: { children: ReactNode }) {
+  return <View style={personLayoutStyles.actionStack}>{children}</View>;
 }
 
 /** Compatibility wrapper for existing two-action profile rows. */

@@ -93,6 +93,7 @@ import {
   ProfileInfoRow,
   ProfileList,
   ProfileNavRow,
+  ProfileActionStack,
   ProfilePanel,
   ProfileQuickAction,
   ProfileQuickActions,
@@ -735,10 +736,9 @@ export default function PersonDetailScreen() {
           <ProfileSkeleton
             heroAlign="center"
             metaItems={0}
-            // Call, Email and the management actions for a manager (Edit
-            // sits in the bar); Call and Email with employee details alone;
-            // nothing when contact details are redacted.
-            quickActions={canManageEmployees ? 4 : canViewEmployeeDetails ? 2 : 0}
+            // The Call and Email pair for anyone shown contact details;
+            // nothing when the API redacts them.
+            quickActions={canViewEmployeeDetails ? 2 : 0}
             sections={
               canViewEmployeeDetails
                 ? // Contact, Staffing, Assignments at their usual row counts.
@@ -856,7 +856,6 @@ export default function PersonDetailScreen() {
             body: canManageEmployees ? "Send an invitation to give app access." : undefined,
             tone: "info" as const,
           };
-  const showContact = Boolean(person.phone || person.email);
   // A manager reads "None" as a gap to fill; a colleague reads it as noise.
   // The rows that can be empty drop out for viewers without details, and the
   // Staffing section with them when nothing is left in it.
@@ -1063,125 +1062,32 @@ export default function PersonDetailScreen() {
         title={fullName}
       />
 
-      {/* Every action on the person, in one row. Only actions that do
-          something: a viewer the API redacts contact details for used to get
-          two disabled buttons and nothing to press. The management actions
-          keep web's staff-panel order after the contact pair: granting someone
-          the app is the everyday action, and the one that takes them off it
-          comes last. */}
-      {!editing && (showContact || canManageEmployees) ? (
+      {/* The contact pair, always both, as tiles the reader can name: a
+          missing number or address dims its tile rather than dropping it, so
+          the pair keeps its shape from one person to the next. Everything that
+          manages the person sits at the foot of the page. A viewer the API
+          redacts contact details for gets no pair at all: two tiles that can
+          never light up would be two things to wonder about. */}
+      {!editing && canViewEmployeeDetails ? (
         <ProfileQuickActions>
-          {person.phone ? (
-            <ProfileQuickAction
-              icon="call"
-              iconTone="green"
-              label="Call"
-              onPress={() => {
-                void Linking.openURL(`tel:${person.phone}`);
-              }}
-            />
-          ) : null}
-          {person.email ? (
-            <ProfileQuickAction
-              icon="mail"
-              iconTone="blue"
-              label="Email"
-              onPress={() => {
-                void Linking.openURL(`mailto:${person.email}`);
-              }}
-            />
-          ) : null}
-          {canManageEmployees && !person.userId && person.status !== "removed" && person.email ? (
-            person.pendingInvitation ? (
-              <>
-                <ProfileQuickAction
-                  icon="refresh"
-                  iconTone="purple"
-                  label="Reinvite"
-                  loading={invitationMutation.isPending}
-                  onPress={() => setInvitationConfirmAction("resend")}
-                />
-                <ProfileQuickAction
-                  disabled={invitationMutation.isPending}
-                  icon="close-circle"
-                  iconTone="red"
-                  label="Revoke Invite"
-                  onPress={() => setInvitationConfirmAction("revoke")}
-                />
-              </>
-            ) : (
-              <ProfileQuickAction
-                icon="paper-plane"
-                iconTone="purple"
-                label="Send Invitation"
-                loading={invitationMutation.isPending}
-                onPress={() => setInvitationConfirmAction("create")}
-              />
-            )
-          ) : null}
-          {/* Only offered to someone who isn't on the grid at all. Anyone with
-              focus areas changes them in the edit panel, where clearing them
-              all is what takes them back off it. */}
-          {canManageEmployees && person.status !== "removed" && !isOnSchedule ? (
-            <ProfileQuickAction
-              icon="calendar"
-              iconTone="teal"
-              label="Add to Schedule"
-              onPress={() =>
-                router.push({
-                  pathname: "/person/[id]/schedule",
-                  params: { id: person.id },
-                })
-              }
-            />
-          ) : null}
-          {canManageManagementAccess && person.status !== "removed" && !isSelf ? (
-            <ProfileQuickAction
-              icon="briefcase"
-              iconTone="slate"
-              label={hasManagementAccess(person) ? "Edit Management Access" : "Add to Management"}
-              onPress={() => setShowManagementAccess(true)}
-            />
-          ) : null}
-          {canManageEmployees && person.status !== "active" ? (
-            <ProfileQuickAction
-              disabled={statusMutation.isPending || isSelf}
-              icon="checkmark-circle"
-              iconTone="green"
-              label="Activate"
-              loading={statusMutation.isPending}
-              onPress={() => setConfirmAction("activate")}
-            />
-          ) : null}
-          {canManageEmployees && person.status === "active" ? (
-            <ProfileQuickAction
-              disabled={statusMutation.isPending || isSelf}
-              icon="close"
-              iconTone="orange"
-              label="Deactivate"
-              onPress={() => {
-                setInactiveNote("");
-                setConfirmationError(null);
-                setDeactivateOutcome("inactive");
-                setConfirmAction("deactivate");
-              }}
-            />
-          ) : null}
-          {/* Only reachable once someone is already inactive. While they're
-              active, Remove is the second option inside Deactivate. */}
-          {canManageEmployees && person.status === "inactive" ? (
-            <ProfileQuickAction
-              disabled={statusMutation.isPending || isSelf}
-              icon="person-remove"
-              iconTone="red"
-              label="Remove"
-              onPress={() => {
-                setInactiveNote("");
-                setConfirmationError(null);
-                setConfirmAction("remove");
-              }}
-            />
-          ) : null}
+          <ProfileQuickAction
+            disabled={!person.phone}
+            icon="call"
+            iconTone="green"
+            label="Call"
+            onPress={() => {
+              void Linking.openURL(`tel:${person.phone}`);
+            }}
+          />
+          <ProfileQuickAction
+            disabled={!person.email}
+            icon="mail"
+            iconTone="blue"
+            label="Email"
+            onPress={() => {
+              void Linking.openURL(`mailto:${person.email}`);
+            }}
+          />
         </ProfileQuickActions>
       ) : null}
 
@@ -1373,6 +1279,102 @@ export default function PersonDetailScreen() {
               </ProfilePanel>
             </ProfileSection>
           ) : null}
+
+          {/* The management actions end the page, untitled: every button
+              names its own action. Full width, one under the other, in web's
+              staff-panel order: access first, status last, so granting the
+              app is the everyday action and the one that takes them off it
+              sits at the very bottom on its own. */}
+          {canManageEmployees ? (
+            <ProfileActionStack>
+              {!person.userId && person.status !== "removed" && person.email ? (
+                person.pendingInvitation ? (
+                  <>
+                    <Button
+                      label="Reinvite"
+                      loading={invitationMutation.isPending}
+                      onPress={() => setInvitationConfirmAction("resend")}
+                      tone="neutral"
+                    />
+                    <Button
+                      disabled={invitationMutation.isPending}
+                      label="Revoke Invite"
+                      onPress={() => setInvitationConfirmAction("revoke")}
+                      tone="danger"
+                    />
+                  </>
+                ) : (
+                  <Button
+                    label="Send Invitation"
+                    loading={invitationMutation.isPending}
+                    onPress={() => setInvitationConfirmAction("create")}
+                    tone="secondary"
+                  />
+                )
+              ) : null}
+              {/* Only offered to someone who isn't on the grid at all. Anyone
+                  with focus areas changes them in the edit panel, where
+                  clearing them all is what takes them back off it. */}
+              {person.status !== "removed" && !isOnSchedule ? (
+                <Button
+                  label="Add to Schedule"
+                  onPress={() =>
+                    router.push({
+                      pathname: "/person/[id]/schedule",
+                      params: { id: person.id },
+                    })
+                  }
+                  tone="secondary"
+                />
+              ) : null}
+              {canManageManagementAccess && person.status !== "removed" && !isSelf ? (
+                <Button
+                  label={
+                    hasManagementAccess(person) ? "Edit Management Access" : "Add to Management"
+                  }
+                  onPress={() => setShowManagementAccess(true)}
+                  tone="secondary"
+                />
+              ) : null}
+              {person.status !== "active" ? (
+                <Button
+                  disabled={statusMutation.isPending || isSelf}
+                  label="Activate"
+                  loading={statusMutation.isPending}
+                  onPress={() => setConfirmAction("activate")}
+                  tone="success"
+                />
+              ) : null}
+              {person.status === "active" ? (
+                <Button
+                  disabled={statusMutation.isPending || isSelf}
+                  label="Deactivate"
+                  onPress={() => {
+                    setInactiveNote("");
+                    setConfirmationError(null);
+                    setDeactivateOutcome("inactive");
+                    setConfirmAction("deactivate");
+                  }}
+                  tone="warning"
+                />
+              ) : null}
+              {/* Only reachable once someone is already inactive. While
+                  they're active, Remove is the second option inside
+                  Deactivate. */}
+              {person.status === "inactive" ? (
+                <Button
+                  disabled={statusMutation.isPending || isSelf}
+                  label="Remove"
+                  onPress={() => {
+                    setInactiveNote("");
+                    setConfirmationError(null);
+                    setConfirmAction("remove");
+                  }}
+                  tone="danger"
+                />
+              ) : null}
+            </ProfileActionStack>
+          ) : null}
         </>
       )}
 
@@ -1409,6 +1411,10 @@ export default function PersonDetailScreen() {
         debugName="Change staff status"
         dismissDisabled={statusMutation.isPending}
         header={<SheetHeader title={statusConfirmationTitle} subtitle={statusConfirmationBody} />}
+        // The discard prompt rides inside the sheet: iOS refuses a second
+        // Modal while this one is up, so as a sibling it never appeared and a
+        // dismissal with a reason typed or Remove picked went nowhere.
+        overlay={<ConfirmationModal presentation="inline" {...statusGuard.confirmationProps} />}
         scrollable
         visible={confirmAction === "deactivate" || confirmAction === "remove"}
         onDismiss={statusGuard.requestClose}
@@ -1473,7 +1479,6 @@ export default function PersonDetailScreen() {
           />
         ) : null}
       </BottomSheetModal>
-      <ConfirmationModal {...statusGuard.confirmationProps} />
       <ManagementAccessSheet
         managementDepartments={managementDepartments}
         onDismiss={() => setShowManagementAccess(false)}
