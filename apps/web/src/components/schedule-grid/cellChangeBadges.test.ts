@@ -278,6 +278,41 @@ describe("resolveCellChangeBadges: publications", () => {
     expect(result.pillBadges[1]).toMatchObject({ source: "publish", kind: "new", label: "New" });
   });
 
+  it("marks an absence published into a double shift as Edited then New", () => {
+    // The stored change: Off became Day + Evening, no `from`/`to` ids, so both
+    // sides resolve through the shift/job pair map like the grid does.
+    const result = resolve({
+      entry: {
+        assignmentIds: [DAY, NIGHT],
+        label: "D/N",
+        segments: [segment(10, 0), segment(20, 1)],
+        publishedAssignmentDefinitionIds: [DAY, NIGHT],
+      },
+      publishChange: {
+        fromState: {
+          kind: "absence",
+          segments: [],
+          absenceTypeId: 133,
+          customStartTime: null,
+          customEndTime: null,
+          seriesId: null,
+          fromRecurring: false,
+        },
+        toState: workedState([segment(10, 0), segment(20, 1)]),
+        fromAbsenceTypeId: 133,
+        toAbsenceTypeId: null,
+      },
+      pillCount: 2,
+    });
+    expect(result.pillBadges[0]).toMatchObject({
+      source: "publish",
+      kind: "modified",
+      label: "Edited",
+      detail: "Was Vacation.",
+    });
+    expect(result.pillBadges[1]).toMatchObject({ source: "publish", kind: "new", label: "New" });
+  });
+
   it("marks a draft double shift the same way, minus the New chip the border already says", () => {
     const EVENING = 303;
     const result = resolve({
