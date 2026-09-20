@@ -12,6 +12,7 @@ import { cacheDel, CacheKey } from "@/lib/cache";
 import { cancelSubscription } from "@/lib/stripe";
 import logger from "@/lib/logger";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
+import { resetOversightFactsMemo } from "@/app/api/gridmaster/_lib/oversight";
 import { apiErrorResponse } from "@/lib/error-handling";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 
@@ -95,6 +96,9 @@ async function invalidateOrganizationAccess(orgId: string, slug?: string | null)
   const keys = [CacheKey.mwOrgAccess(orgId), CacheKey.organization(orgId)];
   if (slug) keys.push(CacheKey.orgBySlug(slug));
   await cacheDel(...keys);
+  // The oversight views share one facts load for a few seconds (F-89); a
+  // lifecycle change must not be read back stale from it (F-107).
+  resetOversightFactsMemo();
 }
 
 // A Stripe failure must not block the archive: the row is already archived,

@@ -768,7 +768,7 @@ export default function PublishHistoryPanel({
                         marginTop: 2,
                       }}
                     >
-                      {formatDateRange(entry.startDate, entry.endDate)} — {entry.changeCount} change
+                      {formatDateRange(entry.startDate, entry.endDate)}: {entry.changeCount} change
                       {entry.changeCount !== 1 ? "s" : ""} for {uniqueEmpCount} employee
                       {uniqueEmpCount !== 1 ? "s" : ""}
                     </div>

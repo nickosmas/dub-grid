@@ -47,7 +47,12 @@ describe("gridmaster platform activity summary", () => {
 
   it("reserves review signals for explicit high-risk audited actions", () => {
     const summary = buildPlatformActivitySummary({
-      auditRows: [auditRow("employee.updated", 1), auditRow("org.suspended", 2)],
+      auditRows: [
+        auditRow("employee.updated", 1),
+        auditRow("org.suspended", 2),
+        // A platform kill-switch change is a platform-wide risk (F-97).
+        auditRow("platform_feature_flags.updated", 3),
+      ],
       organizations: [{ id: orgId, name: "Arden Wood" }],
       now,
     });
@@ -56,8 +61,8 @@ describe("gridmaster platform activity summary", () => {
     expect(summary.reviewRecommendedOrganizations[0]).toMatchObject({
       orgId,
       classification: "review_recommended",
-      highRiskActionCount: 1,
-      reason: "1 review-worthy audited action",
+      highRiskActionCount: 2,
+      reason: "2 review-worthy audited actions",
     });
   });
 });
@@ -255,6 +260,18 @@ describe("gridmaster organization health facts", () => {
 
     expect(summaries[0].supportSnapshot.userCount).toBe(total);
     expect(client.reads.filter((table) => table === "organization_memberships")).toHaveLength(3);
+  });
+
+  it("drops the shared facts load when a lifecycle change asks it to", async () => {
+    const { resetOversightFactsMemo } = await import("./oversight");
+    const client = mockServiceClient({ organizations: [organizationRow()] });
+
+    await loadGridmasterOrgHealth(client);
+    const readsAfterFirst = client.reads.length;
+    resetOversightFactsMemo();
+    await loadGridmasterOrgHealth(client);
+
+    expect(client.reads.length).toBe(readsAfterFirst * 2);
   });
 
   it("shares one facts load across the portal's burst of requests", async () => {

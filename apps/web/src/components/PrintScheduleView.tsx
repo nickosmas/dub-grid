@@ -1093,7 +1093,7 @@ export default function PrintScheduleView({
     printWindow.document.write(`<!DOCTYPE html>
 <html><head>
   <meta charset="utf-8">
-  <title>Schedule — ${dateRangeLabel}</title>
+  <title>Schedule: ${dateRangeLabel}</title>
   <style>
     *, *::before, *::after {
       box-sizing: border-box;
@@ -1269,7 +1269,7 @@ export default function PrintScheduleView({
                   color: "#334766",
                 }}
               >
-                Schedule — {dateRangeLabel}
+                Schedule: {dateRangeLabel}
               </div>
             </div>
             <div

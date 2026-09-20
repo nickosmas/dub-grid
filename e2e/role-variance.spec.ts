@@ -150,7 +150,10 @@ async function expectBootstrapStates(page: Page, path: string) {
     page.getByRole("heading", { name: "Loading your workspace" }),
     `${path} recovery`,
   ).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByRole("button", { name: "Try again" })).toBeEnabled();
+  // The heading shows from the first attempt now (F-68); the retry button
+  // arrives with the recovery screen once the bootstrap's own retries (up to
+  // about seven seconds of backoff) are exhausted.
+  await expect(page.getByRole("button", { name: "Try again" })).toBeEnabled({ timeout: 15_000 });
   await page.unroute(`**${BOOTSTRAP_PATH}`);
 }
 

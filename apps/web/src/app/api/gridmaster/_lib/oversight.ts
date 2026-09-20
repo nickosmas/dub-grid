@@ -19,7 +19,13 @@ type QueryClient = {
 type Row = Record<string, unknown>;
 
 const DAY_MS = 86_400_000;
-const HIGH_RISK_ACTION_PREFIXES = ["billing.", "gdpr.", "gridmaster_account.", "impersonation."];
+const HIGH_RISK_ACTION_PREFIXES = [
+  "billing.",
+  "gdpr.",
+  "gridmaster_account.",
+  "impersonation.",
+  "platform_feature_flags.",
+];
 const HIGH_RISK_ACTIONS = new Set([
   "account.deleted",
   "audit.exported",
@@ -168,8 +174,13 @@ let oversightFactsMemo: {
 
 type OversightFacts = Awaited<ReturnType<typeof loadOversightFactsUncached>>;
 
-export function resetOversightFactsMemoForTests(): void {
+/** Drop the shared facts load; the lifecycle route calls this after a change. */
+export function resetOversightFactsMemo(): void {
   oversightFactsMemo = null;
+}
+
+export function resetOversightFactsMemoForTests(): void {
+  resetOversightFactsMemo();
 }
 
 function loadOversightFacts(serviceClient: QueryClient): Promise<OversightFacts> {
