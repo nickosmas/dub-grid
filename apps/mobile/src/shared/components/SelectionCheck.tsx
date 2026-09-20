@@ -1,24 +1,38 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useMemo } from "react";
+import { StyleSheet, View } from "react-native";
 import { useMobileColors } from "../providers/ThemeModeProvider";
+import type { MobileColors } from "../theme/tokens";
 
 /**
  * The mark on a selected row, in every list that asks the user to choose one.
  *
- * One component because the two pickers had already drifted: the organization
- * switcher drew a filled `checkmark-circle` at 22 while the filter sheet drew a
- * bare `checkmark` at 20, so the same idea was a heavy disc in one sheet and a
- * light tick in the other.
- *
- * The bare glyph is the one to keep, for two reasons. The row's tinted fill is
- * already the primary "this one is chosen" signal, so the mark only has to
- * confirm it — a filled disc on top of a filled row is the same statement made
- * twice. And `checkmark-circle` is spoken for: `ToastProvider` and
- * `StatusBanner` both use it to mean *success*. Keeping the disc for status and
- * the bare tick for selection means the two never have to be told apart by
- * context.
+ * A brand disc with a white tick, the same mark `ProfileChoiceGroup` and the
+ * split-shift selector draw, so the organization switcher, the role sheet and
+ * the filter sheets all say "chosen" the same way. A bare brand tick was tried
+ * here and read lighter than the disc on the pickers beside it. Drawn as a
+ * view rather than `checkmark-circle` because that glyph is spoken for:
+ * `ToastProvider` and `StatusBanner` use it to mean success.
  */
 export function SelectionCheck() {
   const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
 
-  return <Ionicons color={mobileColors.brand} name="checkmark" size={20} />;
+  return (
+    <View style={styles.disc}>
+      <Ionicons color={mobileColors.onBrandText} name="checkmark" size={14} />
+    </View>
+  );
 }
+
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    disc: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: mobileColors.brand,
+    },
+  });
