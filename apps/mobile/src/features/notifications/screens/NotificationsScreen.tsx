@@ -393,7 +393,7 @@ export default function NotificationsScreen() {
             label="Mark all read"
             loading={busy}
             onPress={() => setConfirmingMarkAllRead(true)}
-            tone="secondary"
+            tone="link"
           />
         </View>
       ) : null}
