@@ -106,7 +106,33 @@ describe("InboxView toolbar", () => {
     expect(toolbar.getByRole("button", { name: /^Archived/ }).getAttribute("aria-pressed")).toBe(
       "true",
     );
-    expect(toolbar.getByRole("button", { name: /^All/ }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("drops the read filter and Mark all read while showing the archive", async () => {
+    await renderInbox();
+    const toolbar = within(screen.getByRole("toolbar", { name: "Alerts" }));
+    fireEvent.click(toolbar.getByRole("button", { name: /^Archived/ }));
+
+    await waitFor(() =>
+      expect(toolbar.queryByRole("button", { name: /^Unread/ })).not.toBeInTheDocument(),
+    );
+    expect(toolbar.queryByRole("button", { name: /^All/ })).not.toBeInTheDocument();
+    expect(toolbar.queryByRole("button", { name: /^Read/ })).not.toBeInTheDocument();
+    expect(
+      toolbar.queryByRole("button", { name: "Mark all alerts as read" }),
+    ).not.toBeInTheDocument();
+    // Everything that still applies to archived alerts stays.
+    expect(toolbar.getByRole("textbox", { name: "Search alerts" })).toBeTruthy();
+    expect(toolbar.getByRole("button", { name: "Filter by category" })).toBeTruthy();
+    expect(toolbar.getByRole("button", { name: "Filter by priority" })).toBeTruthy();
+    expect(toolbar.getByRole("button", { name: /^Sort/ })).toBeTruthy();
+    expect(toolbar.getByLabelText(/Select/)).toBeTruthy();
+
+    fireEvent.click(toolbar.getByRole("button", { name: /^Inbox/ }));
+    await waitFor(() =>
+      expect(toolbar.getByRole("button", { name: /^Unread/ })).toBeInTheDocument(),
+    );
+    expect(toolbar.getByRole("button", { name: "Mark all alerts as read" })).toBeTruthy();
   });
 
   it("shows the archived and unread counts on their segments", async () => {

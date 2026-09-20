@@ -900,16 +900,21 @@ function Toolbar({
         ]}
       />
 
-      <Segments
-        label="Read state"
-        value={read}
-        onChange={onReadChange}
-        segments={[
-          { value: "all", label: "All" },
-          { value: "unread", label: "Unread", count: totalUnread || undefined },
-          { value: "read", label: "Read" },
-        ]}
-      />
+      {/* Read state describes the inbox. An archived alert is done, so the
+          filter and the unread count would only offer choices that change
+          nothing there. */}
+      {includeArchived ? null : (
+        <Segments
+          label="Read state"
+          value={read}
+          onChange={onReadChange}
+          segments={[
+            { value: "all", label: "All" },
+            { value: "unread", label: "Unread", count: totalUnread || undefined },
+            { value: "read", label: "Read" },
+          ]}
+        />
+      )}
 
       <div
         style={{
@@ -1011,17 +1016,19 @@ function Toolbar({
         />
       )}
 
-      <Button
-        type="button"
-        className="dg-btn dg-btn-secondary"
-        onClick={onMarkAllRead}
-        disabled={!canMarkAllRead}
-        aria-label="Mark all alerts as read"
-        style={{ marginLeft: "auto" }}
-      >
-        <CheckCheck size={14} style={{ marginRight: 6 }} />
-        Mark all read
-      </Button>
+      {includeArchived ? null : (
+        <Button
+          type="button"
+          className="dg-btn dg-btn-secondary"
+          onClick={onMarkAllRead}
+          disabled={!canMarkAllRead}
+          aria-label="Mark all alerts as read"
+          style={{ marginLeft: "auto" }}
+        >
+          <CheckCheck size={14} style={{ marginRight: 6 }} />
+          Mark all read
+        </Button>
+      )}
     </div>
   );
 }
