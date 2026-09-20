@@ -3,6 +3,7 @@ import { User } from "lucide-react";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -561,6 +562,13 @@ function BellRow({
 }) {
   const isUnread = !n.readAt;
   const destination = resolveAlertDestination(n);
+  // The popup renders on every page, so the rows do not prefetch on mount;
+  // hovering or focusing one is the signal that a click is likely, and by
+  // then the subject route is warm.
+  const router = useRouter();
+  const warm = () => {
+    if (destination) router.prefetch(destination.href);
+  };
   const label = `${n.title}: ${n.message}${isUnread ? " (unread)" : ""}${
     destination ? `. ${destination.label}` : ""
   }`;
@@ -656,6 +664,8 @@ function BellRow({
       aria-label={label}
       style={style}
       onClick={onNavigate}
+      onPointerEnter={warm}
+      onFocus={warm}
     >
       {content}
     </Link>

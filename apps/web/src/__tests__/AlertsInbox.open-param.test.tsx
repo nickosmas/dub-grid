@@ -95,6 +95,7 @@ async function renderInbox(props: {
   openNotificationId?: string | null;
   onOpenHandled?: () => void;
   navigate?: (href: string) => void;
+  prefetch?: (href: string) => void;
 }) {
   const { InboxView } = await import("@/app/(app)/alerts/AlertsInboxPage");
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -208,6 +209,28 @@ describe("InboxView rows", () => {
     expect(navigate).toHaveBeenCalledWith("/schedule?requests=approval");
     await waitFor(() => expect(markNotificationsRead).toHaveBeenCalledWith(["req"]));
     expect(screen.queryByRole("link", { name: "Review request" })).toBeNull();
+  });
+
+  it("warms a row's subject on hover or focus before it is clicked", async () => {
+    searchNotifications.mockResolvedValue({
+      notifications: [
+        alert("req", "New swap request", null, {
+          type: "shift_request_new",
+          metadata: { tab: "approval", requestId: "r-1" },
+        }),
+      ],
+      nextCursor: null,
+      facets: EMPTY_FACETS,
+    });
+    const prefetch = vi.fn();
+    await renderInbox({ navigate: vi.fn(), prefetch });
+    const row = await screen.findByRole("button", { name: /^New swap request/ });
+    expect(prefetch).not.toHaveBeenCalled();
+
+    fireEvent.pointerEnter(row);
+    expect(prefetch).toHaveBeenCalledWith("/schedule?requests=approval");
+    fireEvent.focus(row);
+    expect(prefetch).toHaveBeenCalledTimes(2);
   });
 
   it("shows an organization user's note inline and never the platform keys", async () => {

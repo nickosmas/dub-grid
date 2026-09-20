@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
-import { useInfiniteQuery } from "@tanstack/react-query";
-import type { MobileNotification } from "@dubgrid/contracts";
+import { useInfiniteQuery, type InfiniteData } from "@tanstack/react-query";
+import type { MobileNotification, MobileNotificationsResponse } from "@dubgrid/contracts";
 import { resolveAlertDestination } from "@dubgrid/domain";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
@@ -100,7 +100,6 @@ export default function NotificationsScreen() {
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [busy, setBusy] = useState(false);
-  const [pendingRowId, setPendingRowId] = useState<string | null>(null);
   const [confirmingMarkAllRead, setConfirmingMarkAllRead] = useState(false);
 
   const bootstrapQuery = useBootstrap(accessToken);
@@ -200,37 +199,57 @@ export default function NotificationsScreen() {
     setBootstrapUnreadCount(queryClient, accessToken, count);
   }
 
+  // Flip one row's read state in the cached pages without a refetch, so the
+  // list reflects a tap at once and can be put back if the write fails.
+  const patchNotificationReadAt = useCallback(
+    (id: string, readAt: string | null) => {
+      queryClient.setQueryData<InfiniteData<MobileNotificationsResponse>>(queryKey, (current) =>
+        current
+          ? {
+              ...current,
+              pages: current.pages.map((page) => ({
+                ...page,
+                notifications: page.notifications.map((entry) =>
+                  entry.id === id ? { ...entry, readAt } : entry,
+                ),
+              })),
+            }
+          : current,
+      );
+    },
+    [queryKey],
+  );
+
   const handleRowPress = useCallback(
-    async (notification: MobileNotification) => {
+    (notification: MobileNotification) => {
       if (!accessToken) return;
-      if (!notification.readAt) {
-        // Navigation deliberately waits on this write (a failure keeps the user
-        // here with the toast), so the row has to say it is working meanwhile.
-        setPendingRowId(notification.id);
-        try {
-          const response = await markNotificationRead(accessToken, notification.id);
+      // Go first. Waiting on the read write before navigating cost every tap
+      // a network round trip, which read as lag; the write now runs behind
+      // the navigation with the row already marked, and a failure puts the
+      // row back and says so.
+      const destination = resolveAlertDestination(notification);
+      if (destination && resolveNativeRoute(destination.href)) {
+        openNotificationAction(destination.href);
+      } else {
+        pushToast({ tone: "info", message: WEB_ONLY_ALERT_MESSAGE });
+      }
+      if (notification.readAt) return;
+      patchNotificationReadAt(notification.id, new Date().toISOString());
+      markNotificationRead(accessToken, notification.id)
+        .then((response) => {
           syncBootstrapUnread(response.unreadCount);
           void Promise.all([notificationsQuery.refetch(), facetsQuery.refetch()]);
-        } catch (error) {
+        })
+        .catch((error) => {
+          patchNotificationReadAt(notification.id, null);
           pushClientFriendlyErrorToast(pushToast, {
             error,
             title: "Could not update alerts",
             fallbackMessage: "We couldn't mark that alert as read.",
           });
-          return;
-        } finally {
-          setPendingRowId(null);
-        }
-      }
-      // The alert is one sentence about something else; go there.
-      const destination = resolveAlertDestination(notification);
-      if (destination && resolveNativeRoute(destination.href)) {
-        openNotificationAction(destination.href);
-        return;
-      }
-      pushToast({ tone: "info", message: WEB_ONLY_ALERT_MESSAGE });
+        });
     },
-    [accessToken, facetsQuery, notificationsQuery, pushToast],
+    [accessToken, facetsQuery, notificationsQuery, patchNotificationReadAt, pushToast],
   );
 
   const handleArchive = useCallback(
@@ -331,7 +350,6 @@ export default function NotificationsScreen() {
         renderItem: (notification) => (
           <NotificationRow
             openRegistry={openSwipe}
-            pending={pendingRowId === notification.id}
             notification={notification}
             onPress={() => handleRowPress(notification)}
             onToggleRead={() => handleToggleRead(notification)}

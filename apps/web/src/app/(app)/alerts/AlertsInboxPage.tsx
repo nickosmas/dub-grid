@@ -242,6 +242,7 @@ function AlertsInboxPage() {
           openNotificationId={openNotificationId}
           onOpenHandled={clearOpenParam}
           navigate={(href) => router.push(href)}
+          prefetch={(href) => router.prefetch(href)}
         />
       </PageContainer>
     </ProtectedRoute>
@@ -255,12 +256,20 @@ interface InboxViewProps {
   onOpenHandled?: () => void;
   /** Goes to an alert's subject; the page and the portal supply the router. */
   navigate?: (href: string) => void;
+  /**
+   * Warms an alert's subject before the click. Rows are buttons, not links,
+   * so nothing about the destination route loads until they call this on
+   * hover or focus; without it every click paid for the route's code and
+   * data after the fact, which read as lag.
+   */
+  prefetch?: (href: string) => void;
 }
 
 export function InboxView({
   openNotificationId = null,
   onOpenHandled,
   navigate,
+  prefetch,
 }: InboxViewProps = {}) {
   const { user } = useAuth();
   const perms = usePermissions();
@@ -522,6 +531,15 @@ export function InboxView({
     [applyOptimistic, refreshFacets, queryClient, userId],
   );
 
+  const handleRowIntent = useCallback(
+    (n: Notification) => {
+      if (!prefetch) return;
+      const destination = resolveAlertDestination(n);
+      if (destination) prefetch(destination.href);
+    },
+    [prefetch],
+  );
+
   const handleRowClick = useCallback(
     (n: Notification) => {
       void markReadInPlace(n);
@@ -677,6 +695,7 @@ export function InboxView({
                 expanded={expandedIds.has(n.id)}
                 onToggleSelect={() => handleToggleSelect(n.id)}
                 onClick={() => handleRowClick(n)}
+                onIntent={() => handleRowIntent(n)}
                 onArchive={() => handleBulk("archive", [n.id])}
                 onMarkUnread={() => handleBulk("unread", [n.id])}
                 onMarkRead={() => handleBulk("read", [n.id])}
@@ -1105,6 +1124,8 @@ interface NotificationRowProps {
   expanded: boolean;
   onToggleSelect: () => void;
   onClick: () => void;
+  /** Hover or keyboard focus on the row: a click is likely next. */
+  onIntent?: () => void;
   onArchive: () => void;
   onUnarchive: () => void;
   onMarkRead: () => void;
@@ -1119,6 +1140,7 @@ function NotificationRow({
   expanded,
   onToggleSelect,
   onClick,
+  onIntent,
   onArchive,
   onUnarchive,
   onMarkRead,
@@ -1175,6 +1197,8 @@ function NotificationRow({
       <Button
         type="button"
         onClick={onClick}
+        onPointerEnter={onIntent}
+        onFocus={onIntent}
         aria-label={`${notification.title}: ${notification.message}${isUnread ? " (unread)" : ""}. ${
           destination ? destination.label : expanded ? "Hide details" : "Show details"
         }`}

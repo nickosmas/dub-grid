@@ -26,6 +26,11 @@ vi.mock("@/features/notifications/client", () => ({
   markNotificationRead: (...args: unknown[]) => markNotificationRead(...args),
 }));
 
+const routerPrefetch = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: routerPrefetch }),
+}));
+
 vi.mock("next/link", () => ({
   default: ({
     href,
@@ -110,6 +115,14 @@ describe("NotificationBell rows", () => {
     expect(read.getAttribute("aria-label")).toMatch(/\. Open schedule$/);
     expect(read.getAttribute("aria-label")).not.toMatch(/unread/);
     expect(screen.queryByRole("button", { name: /^New swap request/ })).toBeNull();
+  });
+
+  it("warms a row's subject on hover so the click lands on a loaded route", async () => {
+    renderBell();
+    await openPopover();
+    expect(routerPrefetch).not.toHaveBeenCalled();
+    fireEvent.pointerEnter(screen.getByRole("link", { name: /^New swap request/ }));
+    expect(routerPrefetch).toHaveBeenCalledWith("/schedule?requests=approval");
   });
 
   it("closes the popover and marks an unread row read when it is followed", async () => {
