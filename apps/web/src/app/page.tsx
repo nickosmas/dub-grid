@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useTheme } from "next-themes";
@@ -17,6 +16,7 @@ import { buildSubdomainHost, isApexHost, parseHost } from "@/lib/subdomain";
 import { withThemeParam } from "@/lib/theme-preference";
 import ThemeToggleButton from "@/components/landing/ThemeToggleButton";
 import { LandingScreenshot, landingScreenshots } from "@/components/landing/LandingScreenshot";
+import { LandingPhone } from "@/components/landing/LandingPhone";
 import {
   BellRing,
   CalendarDays,
@@ -35,19 +35,6 @@ import {
   ArrowRight,
   type LucideIcon,
 } from "lucide-react";
-
-// One phone renders at 278x588 (see SCALE in MobileAppMockup); the placeholder
-// holds that height so the in-flow mockup below the fold does not shift the
-// page when it arrives.
-const MOCKUP_RESERVED_HEIGHT = 588;
-
-// ~1,800 lines of purely decorative phone mockups. The hero pair is absolutely
-// positioned and `display: none` below 1280px, and the in-flow one sits well
-// below the fold, so none of it belongs in the landing page's first load.
-const MobileAppMockup = dynamic(() => import("@/components/landing/MobileAppMockup"), {
-  ssr: false,
-  loading: () => <div aria-hidden="true" style={{ height: MOCKUP_RESERVED_HEIGHT }} />,
-});
 
 /* ─── Data ────────────────────────────────────────────── */
 
@@ -394,11 +381,11 @@ export default function RootPage() {
       {/* ── Schedule Grid Mockup ── */}
       <RevealSection className="landing-hero-screenshot -mt-20 pb-12 sm:pb-16">
         <div className="landing-hero-screenshot-stage max-w-5xl mx-auto px-6">
-          <div className="landing-hero-phone landing-hero-phone-left" aria-hidden="true">
-            <MobileAppMockup screens={["home"]} />
+          <div className="landing-hero-phone landing-hero-phone-left">
+            <LandingPhone screen="home" decorative />
           </div>
-          <div className="landing-hero-phone landing-hero-phone-right" aria-hidden="true">
-            <MobileAppMockup screens={["schedule"]} />
+          <div className="landing-hero-phone landing-hero-phone-right">
+            <LandingPhone screen="schedule" decorative />
           </div>
           <LandingScreenshot
             asset={landingScreenshots.schedule}
@@ -542,8 +529,10 @@ export default function RootPage() {
               and Android.
             </p>
           </div>
-          <div className="flex justify-center">
-            <MobileAppMockup />
+          <div className="flex flex-wrap justify-center gap-8">
+            <LandingPhone screen="home" />
+            <LandingPhone screen="schedule" />
+            <LandingPhone screen="requests" />
           </div>
         </div>
       </RevealSection>

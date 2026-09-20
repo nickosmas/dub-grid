@@ -34,15 +34,7 @@ const typographyEnforcementSourceFiles = allProductionSourceFiles.filter((filePa
 
   // Only fixed visual artifacts are excluded. Real route, auth, onboarding,
   // and landing controls stay in scope even when they sit beside a mockup.
-  const artifactExceptions = [
-    "components/landing/DashboardMockup.tsx",
-    "components/landing/MobileAppMockup.tsx",
-    "components/landing/RecurringShiftsMockup.tsx",
-    "components/landing/ScheduleGridMockup.tsx",
-    "components/landing/SettingsMockup.tsx",
-    "components/landing/StaffViewMockup.tsx",
-    "components/ui/calendar-date-picker.tsx",
-  ];
+  const artifactExceptions = ["components/ui/calendar-date-picker.tsx"];
 
   return (
     !relativePath.startsWith("app/api/") &&
@@ -174,7 +166,7 @@ function collectThinInteractiveOverrides(): string[] {
 }
 
 const documentedMicroTextCounts = {
-  "app/globals.css": 2,
+  "app/globals.css": 1,
   "components/dashboard/DonutChart.tsx": 1,
   "components/schedule-grid/badges.tsx": 1,
 };

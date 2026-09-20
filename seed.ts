@@ -3044,6 +3044,19 @@ async function main() {
       management_access: true,
       employee_status: "active",
     },
+    {
+      // Marketing captures (landing page, store listings, onboarding). A
+      // generic name so screenshots never show a personal or QA identity.
+      email: "marketing-demo@dubgrid.test",
+      platform_role: "none",
+      org_role: "super_admin",
+      label: "marketing_demo (screenshots)",
+      first_name: "Jane",
+      last_name: "Morgan",
+      preferred_org: "calmhaven",
+      management_access: true,
+      employee_status: "active",
+    },
   ];
 
   // All admin permissions (full edit access — for admin-role users)

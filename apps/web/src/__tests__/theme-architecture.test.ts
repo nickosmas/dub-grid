@@ -51,9 +51,6 @@ const documentedNeutralOutputExceptions = new Set([
   "app/opengraph-image.tsx",
   "app/twitter-image.tsx",
   "components/PrintScheduleView.tsx",
-  "components/landing/MobileAppMockup.tsx",
-  "components/landing/RecurringShiftsMockup.tsx",
-  "components/landing/ScheduleGridMockup.tsx",
   "components/settings/AbsenceTypes.tsx",
 ]);
 
