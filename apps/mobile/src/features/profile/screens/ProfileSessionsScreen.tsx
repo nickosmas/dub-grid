@@ -286,10 +286,10 @@ export default function ProfileSessionsScreen() {
               signed in, not on the two ways to sign everything out. */}
           <ProfileSection>
             <Button
-              label="Signing out devices"
+              label="Sign out devices"
               loading={sessionScopeLoading != null}
               onPress={() => setScopeSheetVisible(true)}
-              tone="secondary"
+              tone="danger"
             />
           </ProfileSection>
         </>
