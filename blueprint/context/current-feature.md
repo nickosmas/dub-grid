@@ -18,9 +18,10 @@ branch, and apply only reviewed missing migrations with post-apply verification.
 - A read-only remote inventory that reports migration-ledger, schema, grants,
   critical functions, tenant-isolation invariants, and deployment health without
   exposing credentials or tenant data.
-- A production-shaped branch rehearsal using a current production backup or
-  equivalent sanitized restore, followed by the exact forward-only migration
-  candidate and the same verification checks.
+- An upgrade-path rehearsal on a scratch local Supabase stack that starts at
+  production's exact ledger, followed by the exact forward-only migration
+  candidate and the same verification checks. No Supabase branching and no
+  PITR (decided 2026-09-19).
 - An operator runbook with preflight, backup, dry-run, apply, verification,
   rollback/stop conditions, and durable evidence capture.
 - Reconciliation of stale repository documentation that still says the schema
@@ -30,9 +31,9 @@ branch, and apply only reviewed missing migrations with post-apply verification.
 
 - Resetting, dropping, truncating, or reseeding production.
 - Rewriting migrations already present in any environment ledger.
-- Applying migrations to production, creating a hosted branch, restoring a
-  production backup, changing provider configuration, deploying, or pushing
-  without separate explicit authorization at that boundary.
+- Applying migrations to production, creating a hosted branch, enabling PITR,
+  restoring a production backup, changing provider configuration, deploying,
+  or pushing without separate explicit authorization at that boundary.
 - Product features or schema changes unrelated to the migration-safety tooling.
 
 ## Build steps
@@ -54,10 +55,11 @@ branch, and apply only reviewed missing migrations with post-apply verification.
       and production runbook. _Done when:_ a clean local replay passes and the
       runbook has explicit backup, dry-run, reviewed-diff, apply, health, schema,
       tenant-isolation, ledger, stop, and rollback checks.
-- [ ] **Step 4 - Qualify the linked production candidate** (read-only half done 2026-09-20; branch rehearsal and apply await authorization) - capture the linked
-      target and its read-only ledger, rehearse the missing sequence on a hosted
-      production-shaped branch, then—only with separate explicit authorization—
-      apply the reviewed missing migrations and re-run the qualification packet.
+- [ ] **Step 4 - Qualify the linked production candidate** - capture the linked
+      target and its read-only ledger, rehearse the missing sequence on a scratch
+      local stack at production's ledger, then, only with separate explicit
+      authorization, apply the reviewed missing migrations and re-run the
+      qualification packet.
       _Done when:_ production and repository ledgers match through migration 025,
       application health and isolation checks pass, and no unreviewed migration
       or legacy patch is applied.
@@ -83,8 +85,10 @@ branch, and apply only reviewed missing migrations with post-apply verification.
   the remote ledger and historical recovery record; do not accept the proposal.
 - Historical patches are evidence, not a second migration stream. Each must be
   mapped to an authoritative ledger state or an explicit one-time prerequisite.
-- A clean branch proves fresh install only. Upgrade safety requires a current
-  production-shaped restore and the exact missing forward sequence.
+- A clean install proves nothing about the upgrade. Upgrade safety requires a
+  rehearsal that starts at production's ledger and takes the exact missing
+  forward sequence. Branching and PITR are not used (2026-09-19); the restore
+  point is the latest daily backup, read from the dashboard by the operator.
 - Never print connection strings, access tokens, secret keys, tenant names,
   emails, or row contents in reports.
 
@@ -139,16 +143,34 @@ no migration). Every step below was read-only.
   production build 11/11 tasks with `/_not-found` and the new mobile calendar
   route listed as dynamic.
 
-## Stop point (needs separate explicit authorization)
+## Evidence, 2026-09-20 rehearsal (candidate `71e3f013`)
 
-Two actions remain and the plan itself says neither is authorized by it:
+`71e3f013` follows `4fab2f39` with no change under `supabase/`. The production
+re-check on it matched the morning run line for line: ledger 001-023, missing
+exactly `024`, `025`, twelve invariants PASS, health 200, CLI dry run proposing
+only those two files with no seeds or roles.
 
-1. Create the persistent, data-bearing Supabase branch from production
-   (dashboard, **Include data**; billable, needs point-in-time recovery) and
-   rehearse `024`-`025` there with the inspector and health checks.
-2. Apply `024` and `025` to production (`supabase db push`) after the
-   rehearsal, then re-run the inspector and the health, schema and
-   tenant-isolation checks.
+Upgrade-path rehearsal on a scratch local stack (`dg-rehearsal`, ports 5532x,
+studio/inbucket/analytics off, `sql_paths = []`, nothing seeded):
 
-Step 4's done-when (ledgers match through 025) and Step 5's post-apply checks
-depend on those two. Everything else in both steps is complete.
+- Started with migrations 001-023 only. Inspector `--local`: ledger 23,
+  missing `024`, `025`, twelve PASS, identical to the production report.
+- `024` and `025` restored into the scratch folder, sha256 identical to the
+  candidate (`5a38f2d0b86f`, `4e13ae1ccc3a`). `db push --local --dry-run`
+  proposed exactly those two.
+- Apply finished without error. Inspector `--local --expect-complete`: ledger
+  25, missing none, twelve PASS. Final dry run: "Local database is up to date".
+- `count_schedule_cell_usage` is SECURITY DEFINER, STABLE, executable by
+  `postgres` and `service_role` only, not by PUBLIC, `anon` or
+  `authenticated`. No `org.created` audit row carries the invite token key.
+- Neither migration touches authentication, claims, RLS or grants on existing
+  objects, so no app smoke beyond the inspector was needed. Stack stopped and
+  removed; the shared local stack on 5432x was never touched.
+
+## Stop point (needs the operator)
+
+The agent's sandbox refuses `supabase db push --linked` against production.
+The operator applies `024`-`025` from the candidate worktree after recording
+the latest daily backup timestamp; the agent then runs the post-apply packet
+(inspector `--expect-complete` with the production health URL, `migration
+list`, final dry run) and closes Steps 4 and 5.

@@ -511,9 +511,10 @@
         human note inline, with the title-versus-content hierarchy.
 - [ ] 37. **Production migration safety** - final release gate only after all
       product work and hardening are complete: inventory linked production,
-      reconcile migration history, rehearse on a production-shaped Supabase
-      branch, apply only reviewed forward migrations, and verify health, schema,
-      tenant isolation, and the migration ledger. This item must remain last and
-      does not itself authorize production changes. Local safety tooling and
-      qualification are preserved in checkpoint `ee4207e0`; resume with the
-      hosted production-data branch rehearsal when product work is complete.
+      reconcile migration history, rehearse the exact upgrade path on a scratch
+      local stack that starts at production's ledger (no Supabase branching, no
+      PITR: decided 2026-09-19), apply only reviewed forward migrations, and
+      verify health, schema, tenant isolation, and the migration ledger. This
+      item must remain last and does not itself authorize production changes.
+      Local safety tooling and qualification are preserved in checkpoint
+      `ee4207e0`.

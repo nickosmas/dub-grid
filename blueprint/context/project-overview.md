@@ -222,10 +222,11 @@ migration gate.
 
 28. **Production migration safety** - the final release gate after all product
     work and hardening: inventory linked production, reconcile migration
-    history, rehearse on a production-shaped Supabase branch, apply only
-    reviewed forward migrations, and verify health, schema, tenant isolation,
-    and ledger state. This item must remain last and does not authorize a
-    production mutation.
+    history, rehearse the exact upgrade path on a scratch local stack that
+    starts at production's ledger (no Supabase branching or PITR, decided
+    2026-09-19), apply only reviewed forward migrations, and verify health,
+    schema, tenant isolation, and ledger state. This item must remain last and
+    does not authorize a production mutation.
 
 ## Data model
 
@@ -388,9 +389,10 @@ Main route groups (web, App Router):
   expires stale shift requests and invitations; the two Vercel crons above
   handle trial-expiry notices and sandbox cleanup. All three need `CRON_SECRET`.
 - **Final migration gate:** after all product work and authentication release
-  qualification, inventory and reconcile linked production, rehearse against a
-  production-shaped Supabase branch, then apply only reviewed forward
-  migrations and verify health, schema, tenant isolation, and ledger state.
+  qualification, inventory and reconcile linked production, rehearse the
+  missing suffix on a scratch local stack at production's ledger, then apply
+  only reviewed forward migrations and verify health, schema, tenant
+  isolation, and ledger state. The restore point is the latest daily backup.
   The tracked plan grants no authority to mutate production.
 
 > Env vars by name and rotation procedure are in `docs/secrets-rotation.md`;
