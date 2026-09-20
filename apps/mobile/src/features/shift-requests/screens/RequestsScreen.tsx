@@ -188,15 +188,6 @@ function getPresentationShiftLabel(presentation: ResolvedSchedulePresentation | 
   return primarySegment?.shiftName ?? presentation?.shiftName ?? presentation?.label ?? "Shift";
 }
 
-// Every named job on the shift; the server already leaves the default shift
-// job unnamed, so a plain shift reads as just the shift.
-function getPresentationJobNames(presentation: ResolvedSchedulePresentation | null): string[] {
-  const names = (presentation?.segments ?? [])
-    .map((segment) => segment.jobName?.trim())
-    .filter((name): name is string => Boolean(name));
-  return [...new Set(names)];
-}
-
 function getPresentationTimeRange(
   presentation: ResolvedSchedulePresentation | null,
   state: ScheduleCellState | null,
@@ -1206,7 +1197,14 @@ function RequestShiftPanel({
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors]);
   const splitSegments = getSplitShiftSegmentsFromPresentation(presentation, state);
   const segments = presentation?.segments ?? [];
-  const isMentored = hasMentoredSegments(segments);
+  // One pill per named job (the default shift job arrives unnamed and draws
+  // nothing), the same chip the open-shift card uses, so colours match.
+  const jobChips = segments
+    .map((segment) => ({
+      chip: buildJobChip(mobileColors, isDark, segment.jobName ?? null, segment),
+      isMentored: segment.isMentored === true,
+    }))
+    .filter(({ chip, isMentored }) => chip != null || isMentored);
   const timeRange = getPresentationTimeRange(presentation, state);
   const dayLabel = date ? formatScheduleDayLabel(date, now, timeZone) : null;
   const whenLabel = [dayLabel, timeRange].filter(Boolean).join(" · ");
@@ -1236,14 +1234,13 @@ function RequestShiftPanel({
         </View>
       ) : (
         <>
-          <Text style={styles.shiftPanelTitle}>
-            {[
-              getPresentationShiftLabel(presentation),
-              ...getPresentationJobNames(presentation),
-            ].join(" \u00b7 ")}
-          </Text>
+          <View style={styles.shiftTitleRow}>
+            <Text style={styles.shiftPanelTitle}>{getPresentationShiftLabel(presentation)}</Text>
+            {jobChips.map(({ chip, isMentored: segmentMentored }, index) => (
+              <JobPill chip={chip} compact isMentored={segmentMentored} key={index} />
+            ))}
+          </View>
           {focusAreaName ? <Text style={styles.shiftPanelContext}>{focusAreaName}</Text> : null}
-          {isMentored ? <MentoredPill /> : null}
         </>
       )}
       {whenLabel ? <Text style={styles.shiftPanelWhen}>{whenLabel}</Text> : null}
@@ -1287,7 +1284,12 @@ function OpenShiftCard({
     <View style={[styles.requestCard, styles.openShiftCard]}>
       <View style={styles.openShiftTitleRow}>
         <View style={styles.shiftTitleTimeRow}>
-          <Text style={styles.openShiftTitle}>{shiftLabel}</Text>
+          <View style={styles.shiftTitleRow}>
+            <Text style={styles.openShiftTitle}>{shiftLabel}</Text>
+            {splitSegments.length <= 1 && (jobChip || isMentored) ? (
+              <JobPill chip={jobChip} compact isMentored={isMentored} />
+            ) : null}
+          </View>
           {splitSegments.length <= 1 && timeRange ? (
             <Text style={styles.shiftTitleTimeText}>{timeRange}</Text>
           ) : null}
@@ -1325,15 +1327,8 @@ function OpenShiftCard({
             variant="compact"
           />
         </View>
-      ) : jobChip || focusAreaName || isMentored ? (
-        <View style={styles.openShiftContextStack}>
-          {focusAreaName ? <Text style={styles.openShiftContextText}>{focusAreaName}</Text> : null}
-          {jobChip || isMentored ? (
-            <View style={styles.shiftPillRow}>
-              <JobPill chip={jobChip} compact isMentored={isMentored} />
-            </View>
-          ) : null}
-        </View>
+      ) : focusAreaName ? (
+        <Text style={styles.openShiftContextText}>{focusAreaName}</Text>
       ) : null}
       <Text style={styles.metaText}>
         {openShift.needed} teammate{openShift.needed === 1 ? "" : "s"} needed

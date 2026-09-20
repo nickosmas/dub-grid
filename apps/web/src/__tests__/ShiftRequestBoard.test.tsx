@@ -120,8 +120,10 @@ describe("ShiftRequestBoard", () => {
     });
     renderBoard({ openPickups: [request] });
 
-    // The panel names the shift and its job together, never the grid abbreviation.
-    expect(screen.getByText("Day Shift · Registered Nurse")).toBeInTheDocument();
+    // The panel names the shift, with each job as its own pill, never the
+    // grid abbreviation.
+    expect(screen.getByText("Day Shift")).toBeInTheDocument();
+    expect(screen.getByLabelText("Job Registered Nurse")).toHaveTextContent("Registered Nurse");
     expect(screen.queryByText(/D RN/)).not.toBeInTheDocument();
   });
 

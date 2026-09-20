@@ -147,6 +147,12 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileText.meta,
       color: mobileColors.textMuted,
     },
+    // The shift's name with its job pills directly under it; beside it they
+    // fought the name for width on a phone.
+    shiftTitleRow: {
+      alignItems: "flex-start",
+      gap: mobileSpace.xs,
+    },
     shiftPanelTitle: {
       ...mobileText.rowTitle,
       color: mobileColors.textPrimary,

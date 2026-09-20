@@ -32,6 +32,7 @@ import {
   describeShiftRequestPill,
 } from "@dubgrid/domain";
 import { formatScheduleTimeRange } from "@dubgrid/schedule-core";
+import { resolveJobChipTone } from "@dubgrid/design-tokens";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -275,7 +276,8 @@ export default function ShiftRequestBoard({
   type ShiftParty = {
     name: string;
     shiftLabel: string;
-    jobs: string[];
+    /** Named jobs on the shift; the default shift job stays unnamed. */
+    jobs: Array<{ label: string; isMentored: boolean }>;
     focusAreaName: string | null;
     date: string;
     timeRange: string | null;
@@ -296,18 +298,11 @@ export default function ShiftRequestBoard({
     const segments = (isRequester ? req.requesterSegments : req.targetSegments) ?? [];
     const presentation = isRequester ? req.requesterPresentation : req.targetPresentation;
     const shiftNames = segments.map((segment) => segment.shiftName?.trim()).filter(Boolean);
-    const jobs = [
-      ...new Set(
-        segments
-          .map((segment) => {
-            // The default shift job is the shift itself, not a job worth naming.
-            const jobName = segment.isShiftOnly ? null : segment.jobName?.trim();
-            if (!jobName) return null;
-            return segment.isMentored ? `${jobName} (mentored)` : jobName;
-          })
-          .filter((job): job is string => job != null),
-      ),
-    ];
+    const jobs = segments.flatMap((segment) => {
+      // The default shift job is the shift itself, not a job worth naming.
+      const jobName = segment.isShiftOnly ? null : segment.jobName?.trim();
+      return jobName ? [{ label: jobName, isMentored: segment.isMentored === true }] : [];
+    });
     const focusAreaId =
       (isRequester ? req.requesterFocusAreaId : req.targetFocusAreaId) ??
       presentation?.focusAreaId ??
@@ -329,8 +324,44 @@ export default function ShiftRequestBoard({
     };
   }
 
+  // The same tone rule the grid and mobile use, on the page's own tokens.
+  const jobChipContext = {
+    surfaceSecondary: "var(--dg-color-surface-alt)",
+    border: "var(--dg-color-border)",
+    textMuted: "var(--dg-color-text-muted)",
+    warningSoft: "var(--dg-color-warning-bg)",
+    warningBorder: "var(--dg-color-warning-border)",
+    warningText: "var(--dg-color-warning-text)",
+  };
+
+  function renderJobPill(job: ShiftParty["jobs"][number], key: number) {
+    const tone = resolveJobChipTone(job.label, isDarkTheme, jobChipContext);
+    return (
+      <span
+        key={key}
+        aria-label={`Job ${job.label}${job.isMentored ? ", mentored assignment" : ""}`}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 4,
+          padding: "2px 8px",
+          borderRadius: "var(--dg-radius-sm)",
+          border: `1px solid ${tone.borderColor}`,
+          background: tone.backgroundColor,
+          color: tone.textColor,
+          fontSize: "var(--dg-type-badge-size)",
+          fontWeight: 600,
+          lineHeight: 1.4,
+          whiteSpace: "nowrap",
+        }}
+      >
+        {job.label}
+        {job.isMentored ? <span style={{ fontWeight: 500 }}>Mentored</span> : null}
+      </span>
+    );
+  }
+
   function renderShiftPanel(party: ShiftParty) {
-    const title = [party.shiftLabel, ...party.jobs].join(" \u00b7 ");
     const when = [formatShiftDate(party.date), party.timeRange].filter(Boolean).join(" \u00b7 ");
     return (
       <div
@@ -354,8 +385,13 @@ export default function ShiftRequestBoard({
             color: "var(--dg-color-text-primary)",
           }}
         >
-          {title}
+          {party.shiftLabel}
         </span>
+        {party.jobs.length > 0 ? (
+          <span style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+            {party.jobs.map((job, index) => renderJobPill(job, index))}
+          </span>
+        ) : null}
         {party.focusAreaName ? (
           <span
             style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-secondary)" }}

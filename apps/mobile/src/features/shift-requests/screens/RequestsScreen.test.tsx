@@ -420,8 +420,11 @@ describe("RequestsScreen", () => {
     expect(screen.getByText("7:00 AM - 3:00 PM")).toBeInTheDocument();
     expect(screen.getAllByText("7:00 AM - 3:00 PM")).toHaveLength(1);
     const pageText = document.body.textContent ?? "";
-    expect(pageText.indexOf("Day Shift")).toBeLessThan(pageText.indexOf("7:00 AM - 3:00 PM"));
-    expect(pageText.indexOf("Skilled Nursing")).toBeLessThan(pageText.indexOf("Nurse"));
+    // Shift name, then its job pill on the same row, then the time, then the
+    // focus area.
+    expect(pageText.indexOf("Day Shift")).toBeLessThan(pageText.indexOf("Nurse"));
+    expect(pageText.indexOf("Nurse")).toBeLessThan(pageText.indexOf("7:00 AM - 3:00 PM"));
+    expect(pageText.indexOf("7:00 AM - 3:00 PM")).toBeLessThan(pageText.indexOf("Skilled Nursing"));
     fireEvent.click(screen.getByText("Volunteer"));
     expect(screen.getByText("Volunteer for open shift?")).toBeInTheDocument();
     expect(mutate).not.toHaveBeenCalled();
