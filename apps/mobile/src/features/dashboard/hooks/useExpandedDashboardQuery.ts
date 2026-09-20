@@ -6,7 +6,7 @@ import { getDashboardPeriodRange, type DashboardPeriodMode } from "../../../shar
 import { useAdminDashboard } from "./useAdminDashboard";
 
 function toDashboardPeriodMode(value: string | string[] | undefined): DashboardPeriodMode {
-  return value === "day" || value === "2weeks" ? value : "week";
+  return value === "2weeks" ? "2weeks" : "week";
 }
 
 /**

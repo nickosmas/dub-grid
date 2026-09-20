@@ -288,11 +288,7 @@ export function AdminHomeScreen() {
       stickyHeader={
         <DashboardHeader
           firstName={firstName}
-          periodLabel={formatDashboardDateRange(
-            data.range.startDate,
-            data.range.endDate,
-            periodMode,
-          )}
+          periodLabel={formatDashboardDateRange(data.range.startDate, data.range.endDate)}
         />
       }
     >

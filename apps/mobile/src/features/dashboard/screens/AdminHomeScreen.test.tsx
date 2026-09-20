@@ -473,28 +473,6 @@ describe("AdminHomeScreen", () => {
     expect(latestSpanDays).toBe(13);
   });
 
-  it("refetches with a single-day range when the global period toggle switches to Day", () => {
-    useBootstrap.mockReturnValue({
-      isLoading: false,
-      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
-    });
-    useAdminDashboard.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: EMPTY_DASHBOARD_DATA,
-    });
-
-    render(<AdminHomeScreen />);
-
-    fireEvent.click(screen.getByText("Day"));
-
-    const latestRange = useAdminDashboard.mock.calls.at(-1)?.[1] as {
-      startDate: string;
-      endDate: string;
-    };
-    expect(latestRange.startDate).toBe(latestRange.endDate);
-  });
-
   it("pull-to-refresh refetches the dashboard and bootstrap queries and invalidates the shared dashboard cache prefix", async () => {
     const dashboardRefetch = vi.fn().mockResolvedValue(undefined);
     const bootstrapRefetch = vi.fn().mockResolvedValue(undefined);

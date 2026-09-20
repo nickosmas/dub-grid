@@ -85,7 +85,6 @@ const weekDates = [
   new Date("2026-05-16T00:00:00"),
   new Date("2026-05-17T00:00:00"),
 ];
-const dayDates = weekDates.slice(0, 1);
 const twoWeekDates = Array.from({ length: 14 }, (_, index) => new Date(2026, 4, 11 + index));
 
 describe("MyScheduleRow", () => {
@@ -557,46 +556,6 @@ describe("MyScheduleRow", () => {
     expect(
       screen.getByTestId("my-schedule-row").querySelectorAll("[data-schedule-day]"),
     ).toHaveLength(expectedCount);
-  });
-
-  it("keeps a full populated week in Your schedule when the dashboard is on Today", () => {
-    const allShifts: ShiftMap = {
-      "emp-1_2026-05-11": {
-        label: "D",
-        assignmentIds: [101],
-        isDraft: false,
-        draftKind: null,
-        publishedAssignmentDefinitionIds: [101],
-        publishedLabel: "D",
-      },
-      "emp-1_2026-05-16": {
-        label: "N",
-        assignmentIds: [202],
-        isDraft: false,
-        draftKind: null,
-        publishedAssignmentDefinitionIds: [202],
-        publishedLabel: "N",
-      },
-    };
-
-    render(
-      <MyScheduleRow
-        currentEmpId="emp-1"
-        currentPeriodShifts={{ "emp-1_2026-05-11": allShifts["emp-1_2026-05-11"] }}
-        allShifts={allShifts}
-        viewMode="day"
-        assignmentById={assignmentById}
-        absenceTypeById={absenceTypeById}
-        periodDates={dayDates}
-        periodLabel="today"
-      />,
-    );
-
-    expect(screen.getByText("this week")).toBeInTheDocument();
-    expect(
-      screen.getByTestId("my-schedule-row").querySelectorAll("[data-schedule-day]"),
-    ).toHaveLength(7);
-    expect(screen.getByText("Night shift")).toBeInTheDocument();
   });
 
   it("shows every segment of a double (split) shift, each with its own color and time", () => {

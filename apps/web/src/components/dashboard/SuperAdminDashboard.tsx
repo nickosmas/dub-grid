@@ -22,13 +22,12 @@ export default function SuperAdminDashboard(props: DashboardContentProps) {
     currentEmpId,
     currentPeriodShifts,
     recentPublishedChanges,
-    allShifts,
+    publishedAssignmentIdByPair,
     assignmentById,
     absenceTypeById,
     jobs,
     shiftCategories,
     periodDates,
-    viewMode,
     periodLabel,
     overtimeThreshold,
     isMobile,
@@ -47,13 +46,12 @@ export default function SuperAdminDashboard(props: DashboardContentProps) {
         currentEmpId={currentEmpId}
         currentPeriodShifts={currentPeriodShifts}
         recentPublishedChanges={recentPublishedChanges}
-        allShifts={allShifts}
+        publishedAssignmentIdByPair={publishedAssignmentIdByPair}
         assignmentById={assignmentById}
         absenceTypeById={absenceTypeById}
         jobs={jobs}
         shiftCategories={shiftCategories}
         periodDates={periodDates}
-        viewMode={viewMode}
         isMobile={isMobile}
         periodLabel={periodLabel}
         isManagementOnly={isManagementOnly}

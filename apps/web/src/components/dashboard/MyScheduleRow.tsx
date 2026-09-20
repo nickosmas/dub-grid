@@ -11,7 +11,6 @@ import {
 } from "@/components/schedule-grid/cellChangeBadges";
 import { ScrollCueButton } from "@/components/ui/scroll-cue-button";
 import { formatDateKey } from "@/lib/utils";
-import { filterShiftsByWeek, getDatesInRange } from "@/lib/dashboard-stats";
 import { DRAFT_BORDER_COLORS, resolveShiftPillColors } from "@/lib/colors";
 import { shouldShowJobOnGrid } from "@/lib/job-placement";
 import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
@@ -60,8 +59,6 @@ type MyScheduleRowProps = Pick<
   jobs?: DashboardContentProps["jobs"];
   publishedAssignmentIdByPair?: DashboardContentProps["publishedAssignmentIdByPair"];
   shiftCategories?: DashboardContentProps["shiftCategories"];
-  allShifts?: DashboardContentProps["allShifts"];
-  viewMode?: DashboardContentProps["viewMode"];
   isMobile?: DashboardContentProps["isMobile"];
   // True for a management-only viewer (management department access, no
   // scheduled focus area) — they're never actually scheduled, so this card
@@ -669,8 +666,6 @@ export default function MyScheduleRow({
   absenceTypeById,
   jobs = [],
   shiftCategories = [],
-  allShifts,
-  viewMode,
   isMobile = false,
   periodDates,
   periodLabel,
@@ -693,34 +688,17 @@ export default function MyScheduleRow({
     () => new Map(shiftCategories.map((shift) => [shift.id, shift])),
     [shiftCategories],
   );
-  const displayDates = useMemo(() => {
-    if (viewMode !== "day" || !periodDates[0]) return periodDates;
-    const weekStart = new Date(periodDates[0]);
-    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-    weekStart.setHours(0, 0, 0, 0);
-    return getDatesInRange(weekStart, 7);
-  }, [periodDates, viewMode]);
-  const displayShifts = useMemo(() => {
-    if (viewMode !== "day" || !allShifts || displayDates.length === 0) {
-      return currentPeriodShifts;
-    }
-    return filterShiftsByWeek(
-      allShifts,
-      formatDateKey(displayDates[0]),
-      formatDateKey(displayDates[displayDates.length - 1]),
-    );
-  }, [allShifts, currentPeriodShifts, displayDates, viewMode]);
   const days = useMemo(
     () =>
       currentEmpId
         ? buildMyScheduleDays({
             currentEmpId,
-            currentPeriodShifts: displayShifts,
+            currentPeriodShifts,
             assignmentById,
             absenceTypeById,
             jobById,
             shiftById,
-            periodDates: displayDates,
+            periodDates,
             isDarkTheme,
             recentPublishedChanges,
             publishedAssignmentIdByPair: assignmentIdByPair,
@@ -728,12 +706,12 @@ export default function MyScheduleRow({
         : [],
     [
       currentEmpId,
-      displayShifts,
+      currentPeriodShifts,
       assignmentById,
       absenceTypeById,
       jobById,
       shiftById,
-      displayDates,
+      periodDates,
       isDarkTheme,
       recentPublishedChanges,
       assignmentIdByPair,
@@ -751,7 +729,7 @@ export default function MyScheduleRow({
       <div className="dg-card-header">
         <div>
           <div className="dg-card-title">Your schedule</div>
-          <div className="dg-card-subtitle">{viewMode === "day" ? "this week" : periodLabel}</div>
+          <div className="dg-card-subtitle">{periodLabel}</div>
         </div>
       </div>
       <div className="dg-card-body" style={hasAnySchedule ? { padding: "16px 0" } : undefined}>

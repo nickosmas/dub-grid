@@ -369,7 +369,6 @@ describe("dashboard user mode selection", () => {
   });
 
   it("labels admin dashboard periods and overtime thresholds from the selected range", () => {
-    expect(getDashboardPeriodLabel("day")).toBe("today");
     expect(getDashboardPeriodLabel("week")).toBe("this week");
     expect(getDashboardPeriodLabel("2weeks")).toBe("these 2 weeks");
     expect(getDashboardOvertimeThreshold(1)).toBe(40);

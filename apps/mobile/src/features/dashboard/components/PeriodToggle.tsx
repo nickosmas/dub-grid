@@ -3,7 +3,6 @@ import { SegmentedControl } from "../../../shared/components/SegmentedControl";
 import type { DashboardPeriodMode } from "../../../shared/lib/dates";
 
 const OPTIONS = [
-  { value: "day", label: "Day" },
   { value: "week", label: "Week" },
   { value: "2weeks", label: "2 Weeks" },
 ] as const satisfies ReadonlyArray<{ value: DashboardPeriodMode; label: string }>;
@@ -20,9 +19,9 @@ export function PeriodToggle({
   mode: DashboardPeriodMode;
   onChange: (mode: DashboardPeriodMode) => void;
 }) {
-  // A compact pill at the default size; once text is scaled up the three
-  // labels no longer fit it and truncated to their first letter, so the
-  // control takes the row instead.
+  // A compact pill at the default size; once text is scaled up the labels
+  // no longer fit it and truncated to their first letter, so the control
+  // takes the row instead.
   const { fontScale } = useWindowDimensions();
   // Never disabled while a period loads: the cards dim to say so, and a
   // second tap simply moves the query on. Locking the control read as a hang.
