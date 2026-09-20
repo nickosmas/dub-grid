@@ -60,6 +60,7 @@ import {
   MAX_FONT_SCALE,
   mobileBorderColorFromText,
   mobileDarkenTone,
+  mobileIconToneColor,
   mobileRadii,
   mobileText,
   mobileVisiblePillBorder,
@@ -1506,6 +1507,7 @@ export default function ShiftDetailScreen() {
                 <DetailInfoRow
                   iconName="time-outline"
                   label="Shift time"
+                  tone="blue"
                   value={timeRange}
                   prominent
                 />
@@ -1514,6 +1516,7 @@ export default function ShiftDetailScreen() {
                 <DetailInfoRow
                   iconName="location-outline"
                   label="Focus area"
+                  tone="green"
                   value={focusAreaName}
                 />
               ) : null}
@@ -1714,14 +1717,46 @@ function DetailHeaderJobPill({
   );
 }
 
+type DetailIconTone = "blue" | "green";
+
+/**
+ * The tinted tile a detail-card icon sits in. Fill only, like every other
+ * mobile badge, and its geometry is fixed so a raised text size grows the
+ * copy beside it rather than the tile.
+ */
+function DetailIconTile({
+  iconName,
+  tone,
+}: {
+  iconName: keyof typeof Ionicons.glyphMap;
+  tone: DetailIconTone;
+}) {
+  const mobileColors = useMobileColors();
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
+  return (
+    <View
+      style={[
+        styles.detailIconTile,
+        tone === "blue" ? styles.detailIconTileBlue : styles.detailIconTileGreen,
+      ]}
+    >
+      <Ionicons color={mobileIconToneColor(tone, isDark)} name={iconName} size={18} />
+    </View>
+  );
+}
+
 function DetailInfoRow({
   iconName,
   label,
+  tone,
   value,
   prominent = false,
 }: {
   iconName: keyof typeof Ionicons.glyphMap;
   label: string;
+  tone: DetailIconTone;
   value: string;
   prominent?: boolean;
 }) {
@@ -1730,9 +1765,7 @@ function DetailInfoRow({
 
   return (
     <View accessibilityLabel={`${label} ${value}`} style={styles.detailInfoRow}>
-      <View style={styles.detailInfoIcon}>
-        <Ionicons color={mobileColors.textMuted} name={iconName} size={16} />
-      </View>
+      <DetailIconTile iconName={iconName} tone={tone} />
       <View style={styles.detailInfoCopy}>
         <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.detailInfoLabel}>
           {label}
@@ -1876,12 +1909,18 @@ function PreviousShiftFooter({ entry }: { entry: MobileScheduleEntry }) {
               {getPreviousPresentationTitle(previous)}
             </Text>
             {previousTimeRange ? (
-              <DetailInfoRow iconName="time-outline" label="Shift time" value={previousTimeRange} />
+              <DetailInfoRow
+                iconName="time-outline"
+                label="Shift time"
+                tone="blue"
+                value={previousTimeRange}
+              />
             ) : null}
             {previousFocusAreaName ? (
               <DetailInfoRow
                 iconName="location-outline"
                 label="Focus area"
+                tone="green"
                 value={previousFocusAreaName}
               />
             ) : null}
@@ -1912,9 +1951,9 @@ function DetailPublishedFooter({
         onPress={() => setShowPublication(true)}
         style={styles.detailPublishedFooter}
       >
-        <View style={styles.detailInfoIcon}>
-          <Ionicons color={mobileColors.textSubtle} name="information-circle-outline" size={16} />
-        </View>
+        {/* The solid glyph is its own gray disc, so no tile: a tinted tile
+            around a filled circle would read as two badges. */}
+        <Ionicons color={mobileColors.textSubtle} name="information-circle" size={20} />
         {/* Two lines: one cut "Published Sep 18, 2026 at 3:3…" at a raised
             text size, and the time is the part worth reading. */}
         <Text
