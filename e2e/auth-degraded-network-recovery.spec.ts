@@ -82,7 +82,11 @@ test.describe("degraded-network authentication recovery", () => {
     await expect(page.getByRole("heading", { name: "Loading your workspace" })).toBeVisible({
       timeout: 30_000,
     });
-    await expect(page.getByRole("button", { name: "Try again" })).toBeEnabled();
+    // Up to eight automatic attempts may run first (asserted below), each a
+    // round trip on a loaded runner, so this waits longer than the default.
+    await expect(page.getByRole("button", { name: "Try again" })).toBeEnabled({
+      timeout: 20_000,
+    });
     const automaticAttemptCount = bootstrapStatuses.filter((status) => status === 503).length;
     expect(automaticAttemptCount).toBeGreaterThan(0);
     expect(automaticAttemptCount).toBeLessThanOrEqual(8);
