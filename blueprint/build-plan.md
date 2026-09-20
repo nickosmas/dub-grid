@@ -509,7 +509,7 @@
         existing hint, the detail route goes for organization users and push
         deep links follow the destination; rows show the full message and any
         human note inline, with the title-versus-content hierarchy.
-- [ ] 37. **Production migration safety** - final release gate only after all
+- [x] 37. **Production migration safety** - final release gate only after all
       product work and hardening are complete: inventory linked production,
       reconcile migration history, rehearse the exact upgrade path on a scratch
       local stack that starts at production's ledger (no Supabase branching, no
