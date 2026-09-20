@@ -51,6 +51,7 @@ import {
   buildActivityFeed,
 } from "@/lib/dashboard-stats";
 import { getScheduleStartForSpan, realignTwoWeekScheduleStart } from "@/lib/schedule-view";
+import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
 import { formatDateKey } from "@/lib/utils";
 
 export type ViewMode = "day" | "week" | "2weeks";
@@ -99,6 +100,8 @@ interface DashboardViewProps {
   org: Organization;
   focusAreas: FocusArea[];
   assignments: AssignmentDefinition[];
+  /** Every definition, archived included; defaults to the active list. */
+  allAssignmentDefinitions?: AssignmentDefinition[];
   shiftCategories: ShiftCategory[];
   jobs: JobDefinition[];
   coverageRequirements: CoverageRequirement[];
@@ -265,6 +268,7 @@ export default function DashboardView({
   org,
   focusAreas,
   assignments,
+  allAssignmentDefinitions,
   shiftCategories,
   jobs,
   coverageRequirements,
@@ -433,6 +437,13 @@ export default function DashboardView({
 
   const orgId = org.id;
   const isScheduler = permissions.level >= 2 || permissions.canEditShifts;
+  const publishedAssignmentIdByPair = useMemo(
+    () =>
+      createAssignmentDefinitionIdByPairMap(allAssignmentDefinitions ?? assignments, {
+        includeArchived: true,
+      }),
+    [allAssignmentDefinitions, assignments],
+  );
 
   // Only members who can manage staff may list invitations (the API enforces
   // the same rule), so don't request them for other management-tier viewers.
@@ -1120,6 +1131,7 @@ export default function DashboardView({
     assignmentLabelMap,
     assignmentNameMap,
     assignmentById,
+    publishedAssignmentIdByPair,
     employees,
     activeEmployees,
     permissions,

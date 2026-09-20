@@ -25,7 +25,7 @@ export type GridDiffBadgeConfig = {
  * as "Was ?" or "Changed" on the tiny pill made the schedule both ambiguous
  * and visually noisy.
  */
-function getGridDiffBadgeLabel(kind: GridDiffBadgeConfig["kind"]): string {
+export function getGridDiffBadgeLabel(kind: GridDiffBadgeConfig["kind"]): string {
   if (kind === "new") return "New";
   if (kind === "deleted") return "Deleted";
   return "Edited";

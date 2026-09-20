@@ -532,11 +532,15 @@ describe("UserDashboard", () => {
           recentPublishedChanges: new Map([
             [
               `emp-1_${todayKey}`,
+              // The publication dropped the shift's custom time.
               {
                 empId: "emp-1",
                 date: todayKey,
                 kind: "modified" as const,
                 from: [101],
+                to: [101],
+                fromCustomStart: "08:00",
+                fromCustomEnd: "16:00",
               },
             ],
           ]),
@@ -544,9 +548,11 @@ describe("UserDashboard", () => {
       />,
     );
 
-    expect(
-      within(screen.getByTestId("user-dashboard-hero")).getByLabelText("Edited shift"),
-    ).toHaveAttribute("data-draft-badge", "modified");
+    const heroBadge = within(screen.getByTestId("user-dashboard-hero")).getByLabelText(
+      "Edited shift",
+    );
+    expect(heroBadge).toHaveAttribute("data-publish-badge", "time");
+    expect(heroBadge).toHaveTextContent("Edited");
     expect(
       within(screen.getByTestId("user-dashboard-hero")).getByLabelText(
         "Previous shift: Day shift Care · 12:00 AM - 11:59 PM · Memory Care",

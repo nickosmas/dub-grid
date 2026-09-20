@@ -4,11 +4,16 @@ import { CalendarDays, Check, Clock3, Layers, MapPin, UserRound, Users } from "l
 import type { DashboardContentProps } from "./DashboardContentProps";
 import { EmptyState } from "@/components/EmptyState";
 import { PublishDiffPill } from "@/components/schedule-grid/publishDiffPill";
+import {
+  resolveCellChangeBadges,
+  type CellChangeBadge,
+} from "@/components/schedule-grid/cellChangeBadges";
 import { Button } from "@/components/Button";
 import { MaybeHint } from "@/components/ui/hint";
 import { formatDateKey, getAvatarInitials } from "@/lib/utils";
 import { resolveShiftPillColors } from "@/lib/colors";
 import { shouldShowJobOnGrid } from "@/lib/job-placement";
+import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
 import {
   getCurrentTimeValueInTimeZone,
   getIsoDateInTimeZone,
@@ -77,8 +82,8 @@ type DashboardScheduleItem = {
   key: string;
   segment: DashboardScheduleSegment;
   segmentIndex: number;
-  changeKind: PublishChange["kind"] | null;
-  isNewAddition: boolean;
+  /** The change chip this pill carries, resolved the way the grid resolves it. */
+  changeBadge: CellChangeBadge | null;
   isDeletedHistory: boolean;
   previousLabel: string | null;
 };
@@ -165,6 +170,7 @@ export default function UserDashboard(props: DashboardContentProps) {
     currentHours,
     currentPeriodShifts,
     recentPublishedChanges = new Map(),
+    publishedAssignmentIdByPair,
     permissions,
     employees,
     focusAreas,
@@ -204,11 +210,20 @@ export default function UserDashboard(props: DashboardContentProps) {
     () => new Map(employees.map((employee) => [employee.id, employee])),
     [employees],
   );
+  const assignmentIdByPair = useMemo(
+    () =>
+      publishedAssignmentIdByPair ??
+      createAssignmentDefinitionIdByPairMap([...assignmentById.values()], {
+        includeArchived: true,
+      }),
+    [assignmentById, publishedAssignmentIdByPair],
+  );
   const allScheduleItems = useMemo(
     () =>
       buildScheduleItemsFromShiftMap({
         absenceTypeById,
         assignmentById,
+        assignmentIdByPair,
         currentPeriodShifts,
         recentPublishedChanges,
         employeeById,
@@ -220,6 +235,7 @@ export default function UserDashboard(props: DashboardContentProps) {
     [
       absenceTypeById,
       assignmentById,
+      assignmentIdByPair,
       currentPeriodShifts,
       employeeById,
       focusAreaById,
@@ -242,6 +258,7 @@ export default function UserDashboard(props: DashboardContentProps) {
       buildScheduleItemsFromShiftMap({
         absenceTypeById,
         assignmentById,
+        assignmentIdByPair,
         currentPeriodShifts: allShifts,
         recentPublishedChanges,
         employeeById,
@@ -254,6 +271,7 @@ export default function UserDashboard(props: DashboardContentProps) {
       absenceTypeById,
       allShifts,
       assignmentById,
+      assignmentIdByPair,
       employeeById,
       focusAreaById,
       jobById,
@@ -611,6 +629,7 @@ function useMinuteNow(): Date {
 function buildScheduleItemsFromShiftMap(input: {
   absenceTypeById: Map<number, AbsenceType>;
   assignmentById: Map<number, AssignmentDefinition>;
+  assignmentIdByPair: Map<string, number>;
   currentPeriodShifts: ShiftMap;
   employeeById: Map<string, Employee>;
   focusAreaById: Map<number, FocusArea>;
@@ -622,8 +641,12 @@ function buildScheduleItemsFromShiftMap(input: {
   const items: DashboardScheduleItem[] = [];
 
   const entries = new Map(Object.entries(input.currentPeriodShifts));
+  // Cells a publication removed have no shift-map row, so their last
+  // published presentation is rebuilt here for the history line.
+  const historyKeys = new Set<string>();
   for (const [key, change] of input.recentPublishedChanges) {
     if (change.kind !== "deleted" || entries.has(key)) continue;
+    historyKeys.add(key);
     entries.set(key, {
       label: "",
       assignmentIds: change.from ?? [],
@@ -653,9 +676,8 @@ function buildScheduleItemsFromShiftMap(input: {
     const avatarSeed = employee ? resolveAvatarSeed(employee) : parsedKey.employeeId;
     const date = new Date(`${parsedKey.dateKey}T00:00:00`);
     const absenceTypeId = entry.absenceTypeId ?? null;
-    const changeKind = input.recentPublishedChanges.get(key)?.kind ?? null;
     const publishedChange = input.recentPublishedChanges.get(key) ?? null;
-    const isNewAddition = publishedChange?.isNewAddition === true;
+    const isDeletedHistory = historyKeys.has(key);
     const previousLabel = getPreviousChangeSummary({
       absenceTypeById: input.absenceTypeById,
       assignmentById: input.assignmentById,
@@ -664,6 +686,20 @@ function buildScheduleItemsFromShiftMap(input: {
       jobById: input.jobById,
       shiftById: input.shiftById,
     });
+
+    const rawSegments = absenceTypeId != null ? [] : getWorkedSegments(entry);
+    const badges = resolveCellChangeBadges({
+      entry: isDeletedHistory ? null : entry,
+      publishChange: publishedChange,
+      pillCount: absenceTypeId != null ? 1 : rawSegments.length,
+      publishedAssignmentIdByPair: input.assignmentIdByPair,
+      resolveAssignmentLabel: (assignmentId) => {
+        const assignment = input.assignmentById.get(assignmentId);
+        return assignment ? assignment.name || assignment.label : "?";
+      },
+      resolveAbsenceLabel: (id) => input.absenceTypeById.get(id)?.name ?? "?",
+    });
+    const badgeForPill = (index: number) => badges.pillBadges[index] ?? null;
 
     if (absenceTypeId != null) {
       const absence = input.absenceTypeById.get(absenceTypeId) ?? null;
@@ -677,15 +713,13 @@ function buildScheduleItemsFromShiftMap(input: {
         key: `${key}:absence`,
         segment: buildAbsenceSegment(entry, absence, parsedKey.dateKey, input.isDarkTheme),
         segmentIndex: 0,
-        changeKind,
-        isNewAddition,
-        isDeletedHistory: changeKind === "deleted",
+        changeBadge: badgeForPill(0),
+        isDeletedHistory,
         previousLabel,
       });
       continue;
     }
 
-    const rawSegments = getWorkedSegments(entry);
     rawSegments.forEach((rawSegment, segmentIndex) => {
       const segment = buildWorkedSegment({
         assignmentById: input.assignmentById,
@@ -703,7 +737,6 @@ function buildScheduleItemsFromShiftMap(input: {
       if (!segment) {
         return;
       }
-      const segmentChangeKind = getSegmentChangeKind(publishedChange, rawSegment, segmentIndex);
 
       items.push({
         avatarSeed,
@@ -715,9 +748,8 @@ function buildScheduleItemsFromShiftMap(input: {
         key: `${key}:${segmentIndex}`,
         segment,
         segmentIndex,
-        changeKind: segmentChangeKind,
-        isNewAddition,
-        isDeletedHistory: changeKind === "deleted",
+        changeBadge: badgeForPill(segmentIndex),
+        isDeletedHistory,
         previousLabel,
       });
     });
@@ -789,21 +821,27 @@ function getWorkedSegments(entry: ScheduleCellStateEntry): Array<Partial<ShiftJo
   }));
 }
 
-function getSegmentChangeKind(
-  change: PublishChange | null,
-  segment: Partial<ShiftJobSegment>,
-  segmentIndex: number,
-): PublishChange["kind"] | null {
-  if (!change || (change.kind === "new" && !change.isNewAddition)) return null;
-  if (change.kind !== "modified") return change.kind;
+function ChangeBadgePill({ badge }: { badge: CellChangeBadge }) {
+  const dataAttributes =
+    badge.source === "publish"
+      ? { "data-publish-badge": badge.kind }
+      : { "data-draft-badge": badge.kind };
+  return (
+    <PublishDiffPill
+      aria-label={`${badge.label} shift`}
+      title={badge.detail}
+      {...dataAttributes}
+      kind={badge.kind}
+      style={{ padding: "2px 6px" }}
+    >
+      {badge.label}
+    </PublishDiffPill>
+  );
+}
 
-  const previous = change.fromState?.segments[segmentIndex];
-  if (!previous) return "modified";
-  return previous.shiftId === segment.shiftId &&
-    previous.jobId === segment.jobId &&
-    Boolean(previous.isMentored) === Boolean(segment.isMentored)
-    ? null
-    : "modified";
+// "Was …" explains a chip; a pill the change left alone has nothing to explain.
+function showsPreviousLabel(item: DashboardScheduleItem): boolean {
+  return !!item.previousLabel && !!item.changeBadge && item.changeBadge.kind !== "new";
 }
 
 function buildAbsenceSegment(
@@ -1731,20 +1769,7 @@ function MeHeroCard({
             >
               {item.segment.title}
             </h2>
-            {item.changeKind && (item.changeKind !== "new" || item.isNewAddition) ? (
-              <PublishDiffPill
-                aria-label={`${item.changeKind === "modified" ? "Edited" : item.changeKind} shift`}
-                data-draft-badge={item.changeKind}
-                kind={item.changeKind}
-                style={{ padding: "2px 6px" }}
-              >
-                {item.changeKind === "modified"
-                  ? "Edited"
-                  : item.changeKind === "deleted"
-                    ? "Deleted"
-                    : "New"}
-              </PublishDiffPill>
-            ) : null}
+            {item.changeBadge ? <ChangeBadgePill badge={item.changeBadge} /> : null}
             {segmentCount > 1 ? (
               <SplitShiftBadge inverse label={`Shift ${item.segmentIndex + 1}`} />
             ) : null}
@@ -1802,7 +1827,7 @@ function MeHeroCard({
         {item.segment.focusAreaName ? (
           <HeroInfoRow icon={<MapPin size={18} />} text={item.segment.focusAreaName} />
         ) : null}
-        {item.previousLabel && item.changeKind === "modified" ? (
+        {showsPreviousLabel(item) ? (
           <div
             aria-label={`Previous shift: ${item.previousLabel}`}
             style={{ color: "rgba(255,255,255,0.82)", fontSize: "var(--dg-type-metadata-size)" }}
@@ -2960,20 +2985,7 @@ function WeekShiftRow({
                 ? (item.segment.typeLabel ?? item.segment.title)
                 : item.segment.title}
             </div>
-            {item.changeKind && (item.changeKind !== "new" || item.isNewAddition) ? (
-              <PublishDiffPill
-                aria-label={`${item.changeKind === "modified" ? "Edited" : item.changeKind} shift`}
-                data-draft-badge={item.changeKind}
-                kind={item.changeKind}
-                style={{ padding: "2px 6px" }}
-              >
-                {item.changeKind === "modified"
-                  ? "Edited"
-                  : item.changeKind === "deleted"
-                    ? "Deleted"
-                    : "New"}
-              </PublishDiffPill>
-            ) : null}
+            {item.changeBadge ? <ChangeBadgePill badge={item.changeBadge} /> : null}
             {showSegmentLabel && !item.segment.isAbsence ? (
               <SplitShiftBadge label={`Shift ${item.segmentIndex + 1}`} />
             ) : null}
@@ -3008,7 +3020,7 @@ function WeekShiftRow({
             {item.segment.focusAreaName}
           </div>
         ) : null}
-        {item.previousLabel ? (
+        {showsPreviousLabel(item) ? (
           <div
             aria-label={`Previous shift: ${item.previousLabel}`}
             style={{ color: "var(--dg-color-text-muted)", fontSize: 12, marginTop: 4 }}

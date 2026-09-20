@@ -202,8 +202,8 @@ describe("MyScheduleRow", () => {
         assignmentIds: [101],
         isDraft: true,
         draftKind: "modified",
-        publishedAssignmentDefinitionIds: [101],
-        publishedLabel: "D",
+        publishedAssignmentDefinitionIds: [202],
+        publishedLabel: "N",
       },
       "emp-1_2026-05-13": {
         label: "OFF",
@@ -233,6 +233,52 @@ describe("MyScheduleRow", () => {
     expect(screen.getByText("Night shift")).toBeInTheDocument();
   });
 
+  it("marks only the pill a draft actually changed, like the grid", () => {
+    render(
+      <MyScheduleRow
+        currentEmpId="emp-1"
+        currentPeriodShifts={{
+          // A second shift added beside the published one: the new pill is
+          // dashed green, the published sibling keeps its solid border, and
+          // no chip appears until publication.
+          "emp-1_2026-05-11": {
+            label: "D/N",
+            assignmentIds: [101, 202],
+            segments: [
+              { shiftId: 10, jobId: 7, position: 0, label: "D" },
+              { shiftId: 11, jobId: 8, position: 1, label: "N" },
+            ],
+            isDraft: true,
+            draftKind: "modified",
+            publishedAssignmentDefinitionIds: [101],
+            publishedLabel: "D",
+            publishedSegments: [{ shiftId: 10, jobId: 7, position: 0, label: "D" }],
+          },
+          // Same content as published: the grid dashes it and says nothing.
+          "emp-1_2026-05-12": {
+            label: "D",
+            assignmentIds: [101],
+            isDraft: true,
+            draftKind: "modified",
+            publishedAssignmentDefinitionIds: [101],
+            publishedLabel: "D",
+          },
+        }}
+        assignmentById={assignmentById}
+        absenceTypeById={absenceTypeById}
+        periodDates={weekDates}
+        periodLabel="this week"
+      />,
+    );
+
+    expect(screen.queryByLabelText("Edited shift")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("New shift")).not.toBeInTheDocument();
+    const dayPill = screen.getAllByText("Day shift")[0]!.parentElement as HTMLElement;
+    const nightPill = screen.getByText("Night shift").parentElement as HTMLElement;
+    expect(dayPill.style.border).toContain("1px solid");
+    expect(nightPill.style.border).toContain("2px dashed");
+  });
+
   it("shows a published edit with the same compact pill as the grid", () => {
     render(
       <MyScheduleRow
@@ -255,6 +301,8 @@ describe("MyScheduleRow", () => {
                 empId: "emp-1",
                 date: "2026-05-11",
                 kind: "modified" as const,
+                from: [202],
+                to: [101],
               },
             ],
           ])
@@ -266,7 +314,51 @@ describe("MyScheduleRow", () => {
       />,
     );
 
-    expect(screen.getByLabelText("Edited shift")).toHaveAttribute("data-draft-badge", "modified");
+    expect(screen.getByLabelText("Edited shift")).toHaveAttribute("data-publish-badge", "modified");
+  });
+
+  it("badges a published time change the way the grid does", () => {
+    render(
+      <MyScheduleRow
+        currentEmpId="emp-1"
+        currentPeriodShifts={{
+          "emp-1_2026-05-11": {
+            label: "D",
+            assignmentIds: [101],
+            isDraft: false,
+            draftKind: null,
+            customStartTime: "10:00",
+            customEndTime: "18:00",
+            publishedAssignmentDefinitionIds: [101],
+            publishedLabel: "D",
+          },
+        }}
+        recentPublishedChanges={
+          new Map([
+            [
+              "emp-1_2026-05-11",
+              {
+                empId: "emp-1",
+                date: "2026-05-11",
+                kind: "modified" as const,
+                from: [101],
+                to: [101],
+                toCustomStart: "10:00",
+                toCustomEnd: "18:00",
+              },
+            ],
+          ])
+        }
+        assignmentById={assignmentById}
+        absenceTypeById={absenceTypeById}
+        periodDates={weekDates}
+        periodLabel="this week"
+      />,
+    );
+
+    const badge = screen.getByLabelText("Edited shift");
+    expect(badge).toHaveAttribute("data-publish-badge", "time");
+    expect(badge).toHaveTextContent("Edited");
   });
 
   it("keeps a long changed shift name readable beside its change pill", () => {
@@ -292,7 +384,16 @@ describe("MyScheduleRow", () => {
         }}
         recentPublishedChanges={
           new Map([
-            ["emp-1_2026-05-11", { empId: "emp-1", date: "2026-05-11", kind: "modified" as const }],
+            [
+              "emp-1_2026-05-11",
+              {
+                empId: "emp-1",
+                date: "2026-05-11",
+                kind: "modified" as const,
+                from: [101],
+                to: [404],
+              },
+            ],
           ])
         }
         assignmentById={new Map([[longAssignment.id, longAssignment]])}
@@ -336,7 +437,16 @@ describe("MyScheduleRow", () => {
         }}
         recentPublishedChanges={
           new Map([
-            ["emp-1_2026-05-11", { empId: "emp-1", date: "2026-05-11", kind: "modified" as const }],
+            [
+              "emp-1_2026-05-11",
+              {
+                empId: "emp-1",
+                date: "2026-05-11",
+                kind: "modified" as const,
+                from: [101],
+                to: [606],
+              },
+            ],
           ])
         }
         assignmentById={new Map([[shortAssignment.id, shortAssignment]])}
@@ -549,7 +659,16 @@ describe("MyScheduleRow", () => {
         }}
         recentPublishedChanges={
           new Map([
-            ["emp-1_2026-05-11", { empId: "emp-1", date: "2026-05-11", kind: "modified" as const }],
+            [
+              "emp-1_2026-05-11",
+              {
+                empId: "emp-1",
+                date: "2026-05-11",
+                kind: "modified" as const,
+                from: [101, 202],
+                to: [101, 707],
+              },
+            ],
           ])
         }
         assignmentById={new Map([...assignmentById, [longAssignment.id, longAssignment]])}
