@@ -1912,7 +1912,9 @@ function DetailPublishedFooter({
         onPress={() => setShowPublication(true)}
         style={styles.detailPublishedFooter}
       >
-        <Ionicons color={mobileColors.textSubtle} name="information-circle" size={16} />
+        <View style={styles.detailInfoIcon}>
+          <Ionicons color={mobileColors.textSubtle} name="information-circle-outline" size={16} />
+        </View>
         {/* Two lines: one cut "Published Sep 18, 2026 at 3:3…" at a raised
             text size, and the time is the part worth reading. */}
         <Text

@@ -130,7 +130,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       minHeight: 44,
       flexDirection: "row",
       alignItems: "center",
-      gap: mobileSpace.sm,
+      gap: mobileSpace.md,
     },
     detailPreviousShiftFooter: {
       minHeight: 48,
