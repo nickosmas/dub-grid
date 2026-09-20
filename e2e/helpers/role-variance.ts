@@ -10,11 +10,32 @@ import { isKnownBenignConsoleNoise, isKnownBenignResponsePath } from "./runtime-
  * Records console errors, 403s and 5xx responses. A role hitting an endpoint
  * it may not use is a violation even when the page looks right (that is how
  * 25d2a found the invitations bug).
+ *
+ * `expectedFailurePaths` names request paths whose failure is an artifact of
+ * the test environment rather than of the role under test: their responses
+ * and the browser's "Failed to load resource" console line for them are
+ * left out.
  */
-export function collectUnexpectedRuntimeFailures(page: Page): string[] {
+export function collectUnexpectedRuntimeFailures(
+  page: Page,
+  options: { expectedFailurePaths?: readonly string[] } = {},
+): string[] {
+  const expectedFailurePaths = options.expectedFailurePaths ?? [];
+  const isExpectedFailure = (url: string | undefined): boolean => {
+    if (!url) return false;
+    try {
+      return expectedFailurePaths.includes(new URL(url).pathname);
+    } catch {
+      return false;
+    }
+  };
   const failures: string[] = [];
   page.on("console", (message) => {
-    if (message.type() === "error" && !isKnownBenignConsoleNoise(message.text())) {
+    if (
+      message.type() === "error" &&
+      !isKnownBenignConsoleNoise(message.text()) &&
+      !isExpectedFailure(message.location().url)
+    ) {
       failures.push(`console:${message.text()}`);
     }
   });
@@ -22,7 +43,8 @@ export function collectUnexpectedRuntimeFailures(page: Page): string[] {
     const path = new URL(response.url()).pathname;
     if (
       (response.status() >= 500 || response.status() === 403) &&
-      !isKnownBenignResponsePath(path)
+      !isKnownBenignResponsePath(path) &&
+      !expectedFailurePaths.includes(path)
     ) {
       failures.push(`response:${response.status()}:${path}`);
     }

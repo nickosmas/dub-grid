@@ -99,12 +99,21 @@ async function startImpersonation(page: Page) {
   await expect(page.getByText(BANNER_TEXT)).toBeVisible({ timeout: 20_000 });
 }
 
+// Starting and ending a session fires a fire-and-forget notification email
+// to the impersonated person. CI has no RESEND_API_KEY on purpose, so that
+// route answers 500 "Email service not configured"; whether the browser sees
+// the response before the document load that follows is a race, which made
+// these tests pass or fail by timing alone.
+const IMPERSONATION_RUNTIME_FAILURES = {
+  expectedFailurePaths: ["/api/notify-impersonation"],
+} as const;
+
 test.describe("role variance: gridmaster impersonation", () => {
   test("starts an impersonation session from the portal", async ({ page }) => {
     test.setTimeout(180_000);
     // Calm Haven's trial must be active before a member of it is impersonated.
     await warmUpAndCaptureEmployeeHref(page);
-    const failures = collectUnexpectedRuntimeFailures(page);
+    const failures = collectUnexpectedRuntimeFailures(page, IMPERSONATION_RUNTIME_FAILURES);
 
     await startImpersonation(page);
 
@@ -125,7 +134,7 @@ test.describe("role variance: gridmaster impersonation", () => {
   }) => {
     test.setTimeout(240_000);
     const employeeHref = await warmUpAndCaptureEmployeeHref(page);
-    const failures = collectUnexpectedRuntimeFailures(page);
+    const failures = collectUnexpectedRuntimeFailures(page, IMPERSONATION_RUNTIME_FAILURES);
     await startImpersonation(page);
 
     // Impersonation is role-scoped, not identity-scoped: the proxy verifies
@@ -211,7 +220,7 @@ test.describe("role variance: gridmaster impersonation", () => {
   test("navigating to /gridmaster while impersonating is the safety escape", async ({ page }) => {
     test.setTimeout(180_000);
     await warmUpAndCaptureEmployeeHref(page);
-    const failures = collectUnexpectedRuntimeFailures(page);
+    const failures = collectUnexpectedRuntimeFailures(page, IMPERSONATION_RUNTIME_FAILURES);
     await startImpersonation(page);
 
     // proxy.ts clears the cookie on any /gridmaster request instead of
