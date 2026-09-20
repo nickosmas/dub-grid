@@ -156,6 +156,7 @@ function makeNextRequest(
       get: (name: string) => headersMap.get(name.toLowerCase()) ?? null,
     },
     cookies: {
+      get: (name: string) => options.cookies?.find((cookie) => cookie.name === name),
       getAll: () => options.cookies ?? [],
     },
   };
@@ -739,6 +740,21 @@ describe("middleware: route guards", () => {
     expect((res as { _type: string })._type).toBe("redirect");
     expect((res as { _redirectUrl: string })._redirectUrl).toBe(
       "http://gridmaster.localhost:3000/gridmaster",
+    );
+  });
+
+  it("hands the theme cookie to the Gridmaster subdomain, whose storage is separate in dev", async () => {
+    mockSessionWithClaims({
+      platform_role: "gridmaster",
+      org_role: "user",
+      sub: "gm-1",
+    });
+    const req = makeNextRequest("http://localhost:3000/gridmaster", {
+      cookies: [{ name: "dg-theme", value: "dark" }],
+    });
+    const res = await runMiddleware(req);
+    expect((res as { _redirectUrl: string })._redirectUrl).toBe(
+      "http://gridmaster.localhost:3000/gridmaster?theme=dark",
     );
   });
 });

@@ -86,6 +86,17 @@ export function PageShell({
   );
 }
 
-export function Card({ children }: { children: React.ReactNode }) {
-  return <div className="dg-auth-card">{children}</div>;
+type CardProps = Omit<React.ComponentPropsWithoutRef<"div">, "className">;
+
+/**
+ * Markers such as `data-testid` go on the card itself. A wrapper div around
+ * it shrink-wraps under the shell's centered flex column and quietly narrows
+ * the card below its 440px contract.
+ */
+export function Card({ children, ...rest }: CardProps) {
+  return (
+    <div className="dg-auth-card" {...rest}>
+      {children}
+    </div>
+  );
 }

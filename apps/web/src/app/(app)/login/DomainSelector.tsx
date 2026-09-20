@@ -45,14 +45,18 @@ export default function DomainSelector() {
         e.preventDefault();
         tapCountRef.current = 0;
         const gridmasterHost = buildSubdomainHost("gridmaster", parsed!);
-        window.location.href = `${window.location.protocol}//${gridmasterHost}/login`;
+        // Another origin, so hand the theme over like the Continue button does.
+        window.location.href = withThemeParam(
+          `${window.location.protocol}//${gridmasterHost}/login`,
+          theme,
+        );
         return;
       }
       tapTimerRef.current = setTimeout(() => {
         tapCountRef.current = 0;
       }, 3000);
     },
-    [parsed],
+    [parsed, theme],
   );
 
   function showToast(msg: string) {

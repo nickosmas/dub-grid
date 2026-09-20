@@ -139,6 +139,16 @@ describe("DomainSelector", () => {
     });
   });
 
+  it("hands the theme to the hidden Gridmaster entry, which is another origin too", () => {
+    mockTheme = "dark";
+    render(<DomainSelector />);
+    const logo = document.querySelector(".dg-auth-logo-block")!;
+    act(() => {
+      for (let tap = 0; tap < 5; tap += 1) fireEvent.click(logo);
+    });
+    expect(hrefSetter).toHaveBeenCalledWith("https://gridmaster.localhost/login?theme=dark");
+  });
+
   it("shows a toast and does not redirect when the subdomain doesn't exist", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ valid: false, name: null }), {

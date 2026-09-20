@@ -7,6 +7,7 @@ import { getSandboxFromCookie } from "@/lib/sandbox-cookie";
 import { endImpersonationOnEscape, verifyImpersonationSession } from "@/lib/impersonation-server";
 import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
 import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
+import { THEME_COOKIE_NAME, withThemeParam } from "@/lib/theme-preference";
 import { cacheSet, cacheThrough, CacheKey, TTL } from "@/lib/cache";
 import { Timer } from "@/lib/server-timing";
 import { getSupabaseJwks } from "@/lib/auth/verify-token";
@@ -587,7 +588,10 @@ export async function proxy(req: NextRequest) {
   if (isGridmaster && !isImpersonating && subdomain !== "gridmaster") {
     const url = new URL(req.url);
     url.host = buildSubdomainHost("gridmaster", parsedHost);
-    return redirectWithCookies(url, res);
+    // In dev the theme cookie is host-only, so the hop hands the theme over in
+    // the URL, as the subdomain login page does when it bounces to the apex.
+    const theme = req.cookies.get(THEME_COOKIE_NAME)?.value;
+    return redirectWithCookies(new URL(withThemeParam(url.toString(), theme)), res);
   }
 
   // Keep regular organization users on the host named by their active-org

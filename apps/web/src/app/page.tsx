@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useTheme } from "next-themes";
 // @/features/account/client is imported dynamically inside the session effect —
 // see the comment there. A static import here pulls the Supabase auth SDK into
 // the landing page's initial bundle for visitors who are not signed in.
@@ -13,6 +14,7 @@ import ButtonSpinner from "@/components/ButtonSpinner";
 import { openConsentPreferences } from "@/components/CookieConsent";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { buildSubdomainHost, isApexHost, parseHost } from "@/lib/subdomain";
+import { withThemeParam } from "@/lib/theme-preference";
 import ThemeToggleButton from "@/components/landing/ThemeToggleButton";
 import { LandingScreenshot, landingScreenshots } from "@/components/landing/LandingScreenshot";
 import {
@@ -205,12 +207,18 @@ export default function RootPage() {
   const [ready, setReady] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [gridmasterLoginHref, setGridmasterLoginHref] = useState("/login");
+  const { theme } = useTheme();
 
   useEffect(() => {
+    // The Gridmaster host is a separate origin with its own localStorage, so
+    // the link hands the theme over like every other deliberate origin hop.
     setGridmasterLoginHref(
-      `${window.location.protocol}//${buildSubdomainHost("gridmaster", parseHost(window.location.host))}/login`,
+      withThemeParam(
+        `${window.location.protocol}//${buildSubdomainHost("gridmaster", parseHost(window.location.host))}/login`,
+        theme,
+      ),
     );
-  }, []);
+  }, [theme]);
 
   /* Session redirect.
    *
