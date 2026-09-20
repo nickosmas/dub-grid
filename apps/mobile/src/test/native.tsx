@@ -192,9 +192,13 @@ function pickDomProps(input: Record<string, any>) {
 
 export function createReactNativeModule(
   React: ReactModule,
-  options: { platformOS?: "ios" | "android" } = {},
+  options: { platformOS?: "ios" | "android"; layoutWidth?: number } = {},
 ) {
   const platformOS = options.platformOS ?? "ios";
+  // What every View reports as its width on layout. Zero by default, so a
+  // component that sizes itself from a measurement stays in its unmeasured
+  // branch unless a test asks for a width.
+  const layoutWidth = options.layoutWidth ?? 0;
   let layoutOffset = 0;
   const View = React.forwardRef<unknown, Record<string, any>>(
     ({ children, onLayout, ...props }, ref) => {
@@ -235,7 +239,7 @@ export function createReactNativeModule(
             layout: {
               x: 0,
               y: layoutYRef.current ?? 0,
-              width: 0,
+              width: layoutWidth,
               height: 100,
             },
           },

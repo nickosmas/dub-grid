@@ -75,6 +75,27 @@ describe("MyScheduleCard", () => {
     expect(screen.getByText("—")).toBeInTheDocument();
   });
 
+  it("hands a tapped day's shift to the caller, and an empty day with no item", () => {
+    const entry = makeEntry({ date: "2026-05-11" });
+    useQuery.mockReturnValue({
+      isLoading: false,
+      data: {
+        range: { startDate: "2026-05-11", endDate: "2026-05-12" },
+        entries: [entry],
+      },
+    });
+    const onOpenDay = vi.fn();
+
+    render(<MyScheduleCard accessToken="token" onOpenDay={onOpenDay} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Monday, May 11" }));
+    expect(onOpenDay).toHaveBeenLastCalledWith({ date: "2026-05-11", entry });
+
+    // An empty day is a target too, but there is no shift to open.
+    fireEvent.click(screen.getByRole("button", { name: "Tuesday, May 12" }));
+    expect(onOpenDay).toHaveBeenLastCalledWith({ date: "2026-05-12", entry: null });
+  });
+
   it("renders an absence as its own pill, not a blank day", () => {
     useQuery.mockReturnValue({
       isLoading: false,

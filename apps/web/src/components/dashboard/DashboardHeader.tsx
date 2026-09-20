@@ -8,10 +8,7 @@ import { hint } from "@/components/ui/hint.types";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
 const VIEW_MODES: { value: ViewMode; label: string }[] = [
-  { value: "day", label: "Day" },
   { value: "week", label: "Week" },
   { value: "2weeks", label: "2 Weeks" },
 ];
@@ -20,10 +17,6 @@ function formatDateRange(start: Date, end: Date, mode: ViewMode): string {
   const sMonth = MONTHS[start.getMonth()];
   const sDay = start.getDate();
   const year = start.getFullYear();
-
-  if (mode === "day") {
-    return `${DAYS[start.getDay()]}, ${sMonth} ${sDay}, ${year}`;
-  }
 
   const eMonth = MONTHS[end.getMonth()];
   const eDay = end.getDate();
@@ -51,7 +44,6 @@ interface DashboardHeaderProps {
   periodEnd: Date;
   viewMode: ViewMode;
   showViewModeTabs?: boolean;
-  availableViewModes?: ViewMode[];
   onPrev: () => void;
   onNext: () => void;
   onToday: () => void;
@@ -63,18 +55,13 @@ export default function DashboardHeader({
   periodEnd,
   viewMode,
   showViewModeTabs = true,
-  availableViewModes,
   onPrev,
   onNext,
   onToday,
   onViewModeChange,
 }: DashboardHeaderProps) {
-  const viewModeOptions = availableViewModes
-    ? VIEW_MODES.filter((mode) => availableViewModes.includes(mode.value))
-    : VIEW_MODES;
   const isMobile = useMediaQuery(MOBILE);
-  const todayLabel =
-    viewMode === "day" ? "Today" : viewMode === "week" ? "This week" : "Current period";
+  const todayLabel = viewMode === "week" ? "This week" : "Current period";
 
   const dateLabel = formatDateRange(periodStart, periodEnd, viewMode);
 
@@ -162,7 +149,7 @@ export default function DashboardHeader({
         >
           {showViewModeTabs ? (
             <ViewModeTabs
-              modes={viewModeOptions}
+              modes={VIEW_MODES}
               viewMode={viewMode}
               onViewModeChange={onViewModeChange}
               style={{
@@ -294,7 +281,7 @@ export default function DashboardHeader({
 
         {showViewModeTabs ? (
           <ViewModeTabs
-            modes={viewModeOptions}
+            modes={VIEW_MODES}
             viewMode={viewMode}
             onViewModeChange={onViewModeChange}
           />

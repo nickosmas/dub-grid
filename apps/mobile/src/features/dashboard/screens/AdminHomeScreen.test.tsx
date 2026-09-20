@@ -37,14 +37,44 @@ vi.mock("../hooks/useMyScheduleQuery", () => ({
   useMyScheduleQuery,
 }));
 
+const usePrefetchOtherDashboardPeriod = vi.fn();
+
+vi.mock("../hooks/usePrefetchOtherDashboardPeriod", () => ({
+  usePrefetchOtherDashboardPeriod,
+}));
+
 vi.mock("../components/MyScheduleCard", () => ({
-  MyScheduleCard: ({ onExpand }: { onExpand?: () => void }) => (
+  MyScheduleCard: ({
+    onExpand,
+    onOpenDay,
+    range,
+  }: {
+    onExpand?: () => void;
+    onOpenDay?: (day: { date: string; entry: { employeeId: string } | null }) => void;
+    range?: { startDate: string; endDate: string };
+  }) => (
     <div>
       my-schedule-card
+      {range ? (
+        <span data-testid="my-schedule-range">{`${range.startDate}..${range.endDate}`}</span>
+      ) : null}
       {onExpand ? (
         <button onClick={onExpand} type="button">
           expand
         </button>
+      ) : null}
+      {onOpenDay ? (
+        <>
+          <button
+            onClick={() => onOpenDay({ date: "2026-09-23", entry: { employeeId: "emp-9" } })}
+            type="button"
+          >
+            open shift day
+          </button>
+          <button onClick={() => onOpenDay({ date: "2026-09-24", entry: null })} type="button">
+            open empty day
+          </button>
+        </>
       ) : null}
     </div>
   ),
@@ -61,8 +91,10 @@ vi.mock("../../../shared/hooks/useManualRefresh", () => ({
   },
 }));
 
+const setQueryData = vi.fn();
+
 vi.mock("../../../shared/lib/query-client", () => ({
-  queryClient: { invalidateQueries },
+  queryClient: { invalidateQueries, setQueryData },
 }));
 
 let AdminHomeScreen: (typeof import("./AdminHomeScreen"))["AdminHomeScreen"];
@@ -140,6 +172,7 @@ describe("AdminHomeScreen", () => {
       },
     });
     invalidateQueries.mockReset();
+    setQueryData.mockReset();
     routerPush.mockReset();
     capturedOnRefresh = undefined;
     useSessionState.mockReturnValue({ accessToken: "token-1" });
@@ -373,6 +406,159 @@ describe("AdminHomeScreen", () => {
     expect(routerPush).toHaveBeenCalledWith("/(tabs)/home/my-schedule");
   });
 
+  it("opens a tapped shift's detail page straight from Your schedule", () => {
+    useBootstrap.mockReturnValue({
+      isLoading: false,
+      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
+    });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: EMPTY_DASHBOARD_DATA,
+    });
+    // One entry, or the card is not shown at all.
+    const scheduleData = {
+      range: { startDate: "2026-09-20", endDate: "2026-09-26" },
+      entries: [{ employeeId: "emp-9", date: "2026-09-23" }],
+    };
+    useMyScheduleQuery.mockReturnValue({ isLoading: false, data: scheduleData });
+
+    render(<AdminHomeScreen />);
+
+    const range = useAdminDashboard.mock.calls.at(-1)?.[1] as {
+      startDate: string;
+      endDate: string;
+    };
+    fireEvent.click(screen.getByText("open shift day"));
+
+    expect(routerPush).toHaveBeenCalledWith({
+      pathname: "/shift/[employeeId]/[date]",
+      params: {
+        employeeId: "emp-9",
+        date: "2026-09-23",
+        rangeStart: range.startDate,
+        rangeEnd: range.endDate,
+        source: "mine",
+      },
+    });
+    // The detail screen finds the card's schedule already under its own key.
+    expect(setQueryData).toHaveBeenCalledWith(
+      expect.arrayContaining(["mobile", "schedule", "mine", range.startDate, range.endDate]),
+      scheduleData,
+    );
+  });
+
+  it("opens the schedule on a tapped empty day, which has no item to detail", () => {
+    useBootstrap.mockReturnValue({
+      isLoading: false,
+      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
+    });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: EMPTY_DASHBOARD_DATA,
+    });
+
+    render(<AdminHomeScreen />);
+
+    fireEvent.click(screen.getByText("open empty day"));
+
+    expect(routerPush).toHaveBeenCalledWith({
+      pathname: "/(tabs)/home/my-schedule",
+      params: { date: "2026-09-24" },
+    });
+  });
+
+  it("warms the other period alongside the current one", () => {
+    useBootstrap.mockReturnValue({
+      isLoading: false,
+      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
+    });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isPlaceholderData: false,
+      isError: false,
+      data: EMPTY_DASHBOARD_DATA,
+      dataUpdatedAt: 1700,
+    });
+
+    render(<AdminHomeScreen />);
+
+    expect(usePrefetchOtherDashboardPeriod).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        periodMode: "week",
+        includeSchedule: true,
+        ready: true,
+        currentUpdatedAt: 1700,
+      }),
+    );
+  });
+
+  it("gives Your schedule the same period as the rest of the page", () => {
+    useBootstrap.mockReturnValue({
+      isLoading: false,
+      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
+    });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: EMPTY_DASHBOARD_DATA,
+    });
+
+    render(<AdminHomeScreen />);
+    fireEvent.click(screen.getByText("2 Weeks"));
+
+    const dashboardRange = useAdminDashboard.mock.calls.at(-1)?.[1] as {
+      startDate: string;
+      endDate: string;
+    };
+    expect(useMyScheduleQuery).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.objectContaining({ range: dashboardRange }),
+    );
+    expect(screen.getByTestId("my-schedule-range")).toHaveTextContent(
+      `${dashboardRange.startDate}..${dashboardRange.endDate}`,
+    );
+  });
+
+  it("covers the page with a centered spinner while the next period is still fetching", () => {
+    useBootstrap.mockReturnValue({
+      isLoading: false,
+      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
+    });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isPlaceholderData: true,
+      isError: false,
+      data: EMPTY_DASHBOARD_DATA,
+    });
+
+    render(<AdminHomeScreen />);
+
+    expect(screen.getByTestId("period-loading")).toBeInTheDocument();
+    expect(screen.getByLabelText("Loading period")).toBeInTheDocument();
+  });
+
+  it("lifts the loading overlay once the period has landed", () => {
+    useBootstrap.mockReturnValue({
+      isLoading: false,
+      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
+    });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isPlaceholderData: false,
+      // A background refetch of the period already on screen is not a period
+      // change, so it gets no scrim.
+      isFetching: true,
+      isError: false,
+      data: EMPTY_DASHBOARD_DATA,
+    });
+
+    render(<AdminHomeScreen />);
+
+    expect(screen.queryByTestId("period-loading")).not.toBeInTheDocument();
+  });
+
   it("renders the greeting header without the org name", () => {
     useBootstrap.mockReturnValue({
       isLoading: false,
@@ -471,28 +657,6 @@ describe("AdminHomeScreen", () => {
         new Date(`${latestRange.startDate}T00:00:00`).getTime()) /
       (24 * 60 * 60 * 1000);
     expect(latestSpanDays).toBe(13);
-  });
-
-  it("refetches with a single-day range when the global period toggle switches to Day", () => {
-    useBootstrap.mockReturnValue({
-      isLoading: false,
-      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
-    });
-    useAdminDashboard.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: EMPTY_DASHBOARD_DATA,
-    });
-
-    render(<AdminHomeScreen />);
-
-    fireEvent.click(screen.getByText("Day"));
-
-    const latestRange = useAdminDashboard.mock.calls.at(-1)?.[1] as {
-      startDate: string;
-      endDate: string;
-    };
-    expect(latestRange.startDate).toBe(latestRange.endDate);
   });
 
   it("pull-to-refresh refetches the dashboard and bootstrap queries and invalidates the shared dashboard cache prefix", async () => {

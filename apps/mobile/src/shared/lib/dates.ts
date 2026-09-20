@@ -21,7 +21,7 @@ export function formatUsTime(time: string): string {
   return `${hour12}:${String(minute).padStart(2, "0")} ${period}`;
 }
 
-export type DashboardPeriodMode = "day" | "week" | "2weeks";
+export type DashboardPeriodMode = "week" | "2weeks";
 
 // @dubgrid/schedule-core's canonical local Y-M-D formatter — deliberately
 // not toISOString(), which converts to UTC and can shift the calendar day on
@@ -33,7 +33,7 @@ export type DashboardPeriodMode = "day" | "week" | "2weeks";
 // correct implementation instead of a second hand-rolled copy.
 const formatIsoDateKey = formatLocalDateKey;
 
-// "day" = today only; "week" = Sunday-start current week; "2weeks" = the
+// "week" = Sunday-start current week; "2weeks" = the
 // org's actual 14-day pay period containing today when `payPeriodStartDate`
 // is configured (via @dubgrid/schedule-core's getDashboardPeriodStartIso —
 // the same anchor math web's schedule-view.ts uses), otherwise a plain
@@ -48,10 +48,6 @@ export function getDashboardPeriodRange(
   const today = new Date(reference);
   today.setHours(0, 0, 0, 0);
   const todayKey = formatIsoDateKey(today);
-
-  if (mode === "day") {
-    return { startDate: todayKey, endDate: todayKey };
-  }
 
   const startKey = getDashboardPeriodStartIso(
     todayKey,
@@ -78,24 +74,14 @@ const MONTH_NAMES = [
   "Nov",
   "Dec",
 ];
-const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-// Human-readable label for the active period, e.g. "Fri, Jul 10, 2026" (day),
-// "Jul 5–11, 2026" (week), or "Jul 26 – Aug 8, 2026" (span crossing months) —
-// matches web's DashboardHeader.tsx formatDateRange.
-export function formatDashboardDateRange(
-  startDate: string,
-  endDate: string,
-  mode: DashboardPeriodMode,
-): string {
+// Human-readable label for the active period, e.g. "Jul 5–11, 2026" (week)
+// or "Jul 26 – Aug 8, 2026" (span crossing months) — matches web's
+// DashboardHeader.tsx formatDateRange.
+export function formatDashboardDateRange(startDate: string, endDate: string): string {
   const start = new Date(`${startDate}T00:00:00`);
   const year = start.getFullYear();
   const sMonth = MONTH_NAMES[start.getMonth()];
   const sDay = start.getDate();
-
-  if (mode === "day") {
-    return `${DAY_NAMES[start.getDay()]}, ${sMonth} ${sDay}, ${year}`;
-  }
 
   const end = new Date(`${endDate}T00:00:00`);
   const eYear = end.getFullYear();

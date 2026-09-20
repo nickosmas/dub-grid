@@ -349,6 +349,12 @@ const viewports = [
 const zoomLevels = [1, 1.25, 2] as const;
 const themes = ["light", "dark"] as const;
 
+// A full document load shows the auth transition screen before the page, and
+// that screen has an h1 of its own. Between it and the page's title the
+// dashboard paints its skeleton with no h1 at all, so a wait for "any h1"
+// can pass on the handoff and then measure the gap.
+const AUTH_TRANSITION_TITLES = /^(Signing you in|Loading your workspace|Preparing your workspace)$/;
+
 test("productive typography keeps its hierarchy across routes, themes, widths, and zoom", async ({
   page,
 }, testInfo) => {
@@ -362,7 +368,9 @@ test("productive typography keeps its hierarchy across routes, themes, widths, a
     await page.goto(`${authenticatedOrigin}${route.path}`);
     await expect(page).not.toHaveURL(/\/login/);
     if (route.expectsPageTitle) {
-      await expect(page.locator("h1").first()).toBeVisible({ timeout: 15_000 });
+      await expect(
+        page.locator("h1").filter({ hasNotText: AUTH_TRANSITION_TITLES }).first(),
+      ).toBeVisible({ timeout: 15_000 });
     } else {
       await expect(page.getByRole("textbox", { name: "Search staff…" })).toBeVisible();
     }

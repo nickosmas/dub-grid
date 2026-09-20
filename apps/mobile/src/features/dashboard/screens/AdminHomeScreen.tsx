@@ -1,13 +1,12 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { StyleSheet, useWindowDimensions } from "react-native";
+import { useMemo, useState, type ReactNode } from "react";
+import { StyleSheet, View, useWindowDimensions } from "react-native";
 import { router } from "expo-router";
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { AnimatedListItem } from "../../../shared/motion/AnimatedListItem";
-import { useMotionPreference } from "../../../shared/motion/useMotionPreference";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
+import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import { queryClient } from "../../../shared/lib/query-client";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
@@ -18,15 +17,17 @@ import {
   getDashboardPeriodRange,
   type DashboardPeriodMode,
 } from "../../../shared/lib/dates";
-import { mobileMotion, mobileSpacing } from "../../../shared/theme/tokens";
+import { mobileSpacing } from "../../../shared/theme/tokens";
 import { useAdminDashboard } from "../hooks/useAdminDashboard";
 import { useMyScheduleQuery } from "../hooks/useMyScheduleQuery";
+import { usePrefetchOtherDashboardPeriod } from "../hooks/usePrefetchOtherDashboardPeriod";
 import { DashboardHeader } from "../components/DashboardHeader";
 import { DashboardHeaderSkeleton } from "../components/DashboardHeaderSkeleton";
 import { DashboardSkeleton } from "../components/DashboardSkeleton";
 import { DashboardHeroCard } from "../components/DashboardHeroCard";
 import { CoverageWash } from "../components/CoverageWash";
 import { DraftSummaryCard } from "../components/DraftSummaryCard";
+import { PeriodLoadingOverlay } from "../components/PeriodLoadingOverlay";
 import { PeriodToggle } from "../components/PeriodToggle";
 import { ActionQueueCard } from "../components/ActionQueueCard";
 import { MyScheduleCard } from "../components/MyScheduleCard";
@@ -34,12 +35,8 @@ import { OpenShiftsCard } from "../components/OpenShiftsCard";
 import { ActivityFeedCard } from "../components/ActivityFeedCard";
 import { StaffHoursCard } from "../components/StaffHoursCard";
 
-/** Opacity of the card column while a period change is still fetching. */
-const REFETCH_DIM = 0.6;
-
 export function AdminHomeScreen() {
   const { accessToken } = useSessionState();
-  const { timing } = useMotionPreference();
   const bootstrapQuery = useBootstrap(accessToken);
   // One global toggle (at the top of the screen) drives the whole dashboard —
   // a single fetch, one consistent period across every card.
@@ -59,8 +56,9 @@ export function AdminHomeScreen() {
   // Shares its key with MyScheduleCard's own call, so this is one fetch, not
   // two. Read here purely so the card's data gates the page's single skeleton
   // instead of the card popping in after it. Skipped entirely for
-  // management-only users, who never see the card.
-  const myScheduleQuery = useMyScheduleQuery(accessToken, { enabled: !managementOnly });
+  // management-only users, who never see the card. The same period as the
+  // rest of the page: Week shows one week of shifts, 2 Weeks shows two.
+  const myScheduleQuery = useMyScheduleQuery(accessToken, { enabled: !managementOnly, range });
   // Pull-to-refresh still reaches the card through the shared ["mobile",
   // "dashboard"] key prefix — the same mechanism realtime invalidation uses.
   const manualRefresh = useManualRefresh(() =>
@@ -85,18 +83,23 @@ export function AdminHomeScreen() {
     isLoading: dashboardQuery.isLoading || bootstrapQuery.isLoading || myScheduleQuery.isLoading,
     error: dashboardQuery.error ?? bootstrapQuery.error,
   });
-  // A period change keeps the previous period's cards on screen and dims
-  // them until the next one lands, instead of locking the toggle: the page
-  // stays readable and the change is visible as a change, not a freeze.
-  const isRefetching = dashboardQuery.isFetching && !dashboardQuery.isLoading;
-  const contentOpacity = useSharedValue(1);
-  useEffect(() => {
-    contentOpacity.value = withTiming(
-      isRefetching ? REFETCH_DIM : 1,
-      timing("standard", mobileMotion.duration.base),
-    );
-  }, [contentOpacity, isRefetching, timing]);
-  const dimStyle = useAnimatedStyle(() => ({ opacity: contentOpacity.value }));
+  // A period change keeps the previous period's cards on screen under a scrim
+  // with one spinner in the middle, instead of locking the toggle or dropping
+  // to a skeleton: the change is visible as a change, not a freeze. Placeholder
+  // data is exactly that state, the other period still on screen while this
+  // one loads; a background refetch of the period already shown, from a pull
+  // or a realtime nudge, is not.
+  const isRefetching = dashboardQuery.isPlaceholderData || myScheduleQuery.isPlaceholderData;
+  // The other period is fetched alongside this one, so the toggle finds it in
+  // cache and switches without the scrim.
+  usePrefetchOtherDashboardPeriod({
+    accessToken,
+    periodMode,
+    payPeriodStartDate,
+    includeSchedule: !managementOnly,
+    ready: bootstrapQuery.data !== undefined,
+    currentUpdatedAt: dashboardQuery.dataUpdatedAt,
+  });
   // The login page's aurora in the period's coverage colour, the viewport's
   // height and fixed behind everything: status bar, sticky header and content.
   const { height: windowHeight } = useWindowDimensions();
@@ -195,7 +198,33 @@ export function AdminHomeScreen() {
             node: (
               <MyScheduleCard
                 accessToken={accessToken}
+                range={range}
                 onExpand={() => router.push("/(tabs)/home/my-schedule")}
+                onOpenDay={({ date, entry }) => {
+                  if (!entry) {
+                    router.push({ pathname: "/(tabs)/home/my-schedule", params: { date } });
+                    return;
+                  }
+                  // The detail screen reads the same /me/schedule response
+                  // under the schedule key for this range; hand it the card's
+                  // copy so the shift is on screen before its own fetch.
+                  if (myScheduleQuery.data) {
+                    queryClient.setQueryData(
+                      mobileQueryKeys.schedule(accessToken, "mine", range),
+                      myScheduleQuery.data,
+                    );
+                  }
+                  router.push({
+                    pathname: "/shift/[employeeId]/[date]",
+                    params: {
+                      employeeId: entry.employeeId,
+                      date,
+                      rangeStart: range.startDate,
+                      rangeEnd: range.endDate,
+                      source: "mine",
+                    },
+                  });
+                }}
               />
             ),
           },
@@ -288,22 +317,19 @@ export function AdminHomeScreen() {
       stickyHeader={
         <DashboardHeader
           firstName={firstName}
-          periodLabel={formatDashboardDateRange(
-            data.range.startDate,
-            data.range.endDate,
-            periodMode,
-          )}
+          periodLabel={formatDashboardDateRange(data.range.startDate, data.range.endDate)}
         />
       }
+      renderOverlay={isRefetching ? () => <PeriodLoadingOverlay /> : undefined}
     >
       <PeriodToggle mode={periodMode} onChange={setPeriodMode} />
-      <Animated.View style={[styles.cards, dimStyle]}>
+      <View style={styles.cards}>
         {sections.map((section, index) => (
           <AnimatedListItem index={index} key={section.key}>
             {section.node}
           </AnimatedListItem>
         ))}
-      </Animated.View>
+      </View>
     </Screen>
   );
 }

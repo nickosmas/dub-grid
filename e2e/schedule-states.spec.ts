@@ -31,6 +31,17 @@ test.describe("schedule states", () => {
       uploadThroughput: -1,
     });
 
+    // Belt and braces with the throttle above: hold every RSC payload for
+    // /schedule for a moment, so even when the prefetch has raced ahead of the
+    // click, the navigation is still pending when the bar is checked.
+    await page.route(
+      (url) => url.pathname === "/schedule" && url.searchParams.has("_rsc"),
+      async (route) => {
+        await new Promise((resolve) => setTimeout(resolve, 2_500));
+        await route.continue();
+      },
+    );
+
     await loginAsQaSuperAdmin(page, QA_CALM_HAVEN_ORIGIN);
 
     await page.getByRole("link", { name: "Schedule", exact: true }).click();

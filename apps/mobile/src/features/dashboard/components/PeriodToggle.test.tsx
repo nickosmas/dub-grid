@@ -31,10 +31,17 @@ describe("PeriodToggle", () => {
     // A locked toggle read as a hang; the cards dim instead, and a second tap
     // just moves the query on.
     const onChange = vi.fn();
-    render(<PeriodToggle mode="week" onChange={onChange} />);
+    render(<PeriodToggle mode="2weeks" onChange={onChange} />);
 
-    fireEvent.click(screen.getByText("Day"));
+    fireEvent.click(screen.getByText("Week"));
 
-    expect(onChange).toHaveBeenCalledWith("day");
+    expect(onChange).toHaveBeenCalledWith("week");
+  });
+
+  it("offers Week and 2 Weeks only", () => {
+    render(<PeriodToggle mode="week" onChange={vi.fn()} />);
+
+    expect(screen.queryByText("Day")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button")).toHaveLength(2);
   });
 });

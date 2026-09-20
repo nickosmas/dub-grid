@@ -24,14 +24,13 @@ export default function AdminDashboard(props: DashboardContentProps) {
     currentEmpId,
     currentPeriodShifts,
     recentPublishedChanges,
-    allShifts,
+    publishedAssignmentIdByPair,
     assignmentById,
     assignmentNameMap,
     absenceTypeById,
     jobs,
     shiftCategories,
     periodDates,
-    viewMode,
     draftNewCount,
     draftModifiedCount,
     draftDeletedCount,
@@ -98,13 +97,12 @@ export default function AdminDashboard(props: DashboardContentProps) {
         currentEmpId={currentEmpId}
         currentPeriodShifts={currentPeriodShifts}
         recentPublishedChanges={recentPublishedChanges}
-        allShifts={allShifts}
+        publishedAssignmentIdByPair={publishedAssignmentIdByPair}
         assignmentById={assignmentById}
         absenceTypeById={absenceTypeById}
         jobs={jobs}
         shiftCategories={shiftCategories}
         periodDates={periodDates}
-        viewMode={viewMode}
         isMobile={isMobile}
         periodLabel={periodLabel}
         isManagementOnly={isManagementOnly}

@@ -36,6 +36,7 @@ function DashboardContent() {
     org,
     focusAreas,
     assignments: assignments,
+    allAssignmentDefinitions,
     shiftCategories,
     jobs,
     coverageRequirements,
@@ -86,6 +87,7 @@ function DashboardContent() {
           org={org}
           focusAreas={focusAreas}
           assignments={assignments}
+          allAssignmentDefinitions={allAssignmentDefinitions}
           shiftCategories={shiftCategories}
           jobs={jobs}
           coverageRequirements={coverageRequirements}

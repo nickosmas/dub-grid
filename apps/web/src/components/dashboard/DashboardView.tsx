@@ -51,9 +51,10 @@ import {
   buildActivityFeed,
 } from "@/lib/dashboard-stats";
 import { getScheduleStartForSpan, realignTwoWeekScheduleStart } from "@/lib/schedule-view";
+import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
 import { formatDateKey } from "@/lib/utils";
 
-export type ViewMode = "day" | "week" | "2weeks";
+export type ViewMode = "week" | "2weeks";
 
 import DashboardHeader from "./DashboardHeader";
 import UserDashboard from "./UserDashboard";
@@ -99,6 +100,8 @@ interface DashboardViewProps {
   org: Organization;
   focusAreas: FocusArea[];
   assignments: AssignmentDefinition[];
+  /** Every definition, archived included; defaults to the active list. */
+  allAssignmentDefinitions?: AssignmentDefinition[];
   shiftCategories: ShiftCategory[];
   jobs: JobDefinition[];
   coverageRequirements: CoverageRequirement[];
@@ -213,15 +216,7 @@ export function buildDashboardHeroMetrics(input: {
 }
 
 export function getDashboardPeriodLabel(viewMode: ViewMode): string {
-  if (viewMode === "day") {
-    return "today";
-  }
-
-  if (viewMode === "2weeks") {
-    return "these 2 weeks";
-  }
-
-  return "this week";
+  return viewMode === "2weeks" ? "these 2 weeks" : "this week";
 }
 
 // Weekly overtime threshold. computeEmployeeWeeklyHours evaluates it per
@@ -265,6 +260,7 @@ export default function DashboardView({
   org,
   focusAreas,
   assignments,
+  allAssignmentDefinitions,
   shiftCategories,
   jobs,
   coverageRequirements,
@@ -307,15 +303,8 @@ export default function DashboardView({
 
   // ─── View mode + period navigation ─────────────────────
   const [viewMode, setViewMode] = useState<ViewMode>("week");
-  // The user dashboard is built around a multi-day schedule view, so it offers
-  // Week and 2 Weeks only (no Day); any other selection falls back to Week.
-  const effectiveViewMode = isUserDashboardMode
-    ? viewMode === "2weeks"
-      ? "2weeks"
-      : "week"
-    : viewMode;
-  const periodDays = effectiveViewMode === "day" ? 1 : effectiveViewMode === "2weeks" ? 14 : 7;
-  const periodLabel = getDashboardPeriodLabel(effectiveViewMode);
+  const periodDays = viewMode === "2weeks" ? 14 : 7;
+  const periodLabel = getDashboardPeriodLabel(viewMode);
   const overtimeThreshold = getDashboardOvertimeThreshold(periodDays);
 
   // The 2-week view aligns to the org's biweekly pay-period anchor (when set),
@@ -324,11 +313,6 @@ export default function DashboardView({
   const payPeriodStartDate = org.payPeriodStartDate ?? null;
   const alignPeriodStart = useCallback(
     (date: Date, mode: ViewMode): Date => {
-      if (mode === "day") {
-        const d = new Date(date);
-        d.setHours(0, 0, 0, 0);
-        return d;
-      }
       if (mode === "2weeks") {
         return getScheduleStartForSpan({ date, span: 2, payPeriodStartDate });
       }
@@ -344,9 +328,9 @@ export default function DashboardView({
     getScheduleStartForSpan({ date: new Date(), span: 1, payPeriodStartDate: null }),
   );
   useEffect(() => {
-    if (effectiveViewMode !== "2weeks") return;
+    if (viewMode !== "2weeks") return;
     setPeriodStart((current) => realignTwoWeekScheduleStart(current, 2, payPeriodStartDate));
-  }, [effectiveViewMode, payPeriodStartDate]);
+  }, [viewMode, payPeriodStartDate]);
   const currentTime = useMinuteNow();
   // Day-granular "today" key: changes only at midnight, so it can drive the
   // fetch window / hero look-ahead without re-running every minute.
@@ -355,19 +339,9 @@ export default function DashboardView({
   const handleViewModeChange = useCallback(
     (mode: ViewMode) => {
       setViewMode(mode);
-      // Day mode has no "which day within the period" concept the way
-      // week/2weeks do — mobile's Day view has no period-navigation state at
-      // all and always resolves to today. Re-aligning the *current*
-      // periodStart (e.g. the currently-viewed week's Sunday) to day
-      // granularity would silently land on a different calendar day than
-      // mobile's Day view whenever that's not today, showing unrelated
-      // numbers for what looks like the same view. So switching into "day"
-      // always jumps to today, matching mobile and the "Today" button.
-      // Week/2weeks still re-align the current periodStart to the new
-      // granularity's boundary, preserving browsing context.
-      setPeriodStart((d) =>
-        mode === "day" ? alignPeriodStart(new Date(), "day") : alignPeriodStart(d, mode),
-      );
+      // Re-align the current periodStart to the new granularity's boundary,
+      // preserving browsing context.
+      setPeriodStart((d) => alignPeriodStart(d, mode));
     },
     [alignPeriodStart],
   );
@@ -376,14 +350,6 @@ export default function DashboardView({
   const periodDates = useMemo(
     () => getDatesInRange(periodStart, periodDays),
     [periodStart, periodDays],
-  );
-  const myScheduleStart = useMemo(
-    () => (effectiveViewMode === "day" ? alignPeriodStart(periodStart, "week") : periodStart),
-    [alignPeriodStart, effectiveViewMode, periodStart],
-  );
-  const myScheduleEnd = useMemo(
-    () => addDays(myScheduleStart, effectiveViewMode === "2weeks" ? 13 : 6),
-    [effectiveViewMode, myScheduleStart],
   );
   const prevPeriodStart = useMemo(
     () => addDays(periodStart, -periodDays),
@@ -401,12 +367,7 @@ export default function DashboardView({
     [prevPeriodStart, periodDays],
   );
 
-  const prevPeriodLabel =
-    effectiveViewMode === "day"
-      ? "yesterday"
-      : effectiveViewMode === "2weeks"
-        ? "last 2 weeks"
-        : "last week";
+  const prevPeriodLabel = viewMode === "2weeks" ? "last 2 weeks" : "last week";
 
   const handlePrev = useCallback(
     () => setPeriodStart((d) => addDays(d, -periodDays)),
@@ -414,8 +375,8 @@ export default function DashboardView({
   );
   const handleNext = useCallback(() => setPeriodStart((d) => addDays(d, periodDays)), [periodDays]);
   const handleToday = useCallback(() => {
-    setPeriodStart(alignPeriodStart(new Date(), effectiveViewMode));
-  }, [alignPeriodStart, effectiveViewMode]);
+    setPeriodStart(alignPeriodStart(new Date(), viewMode));
+  }, [alignPeriodStart, viewMode]);
 
   // ─── Data fetching ──────────────────────────────────────
   const [allShifts, setAllShifts] = useState<ShiftMap>({});
@@ -433,6 +394,13 @@ export default function DashboardView({
 
   const orgId = org.id;
   const isScheduler = permissions.level >= 2 || permissions.canEditShifts;
+  const publishedAssignmentIdByPair = useMemo(
+    () =>
+      createAssignmentDefinitionIdByPairMap(allAssignmentDefinitions ?? assignments, {
+        includeArchived: true,
+      }),
+    [allAssignmentDefinitions, assignments],
+  );
 
   // Only members who can manage staff may list invitations (the API enforces
   // the same rule), so don't request them for other management-tier viewers.
@@ -484,16 +452,11 @@ export default function DashboardView({
     // next upcoming shift even when it falls outside the period being browsed.
     const today = new Date(`${todayKey}T00:00:00`);
     const lookaheadEnd = addDays(today, HERO_LOOKAHEAD_DAYS);
-    const earliestDashboardDate =
-      myScheduleStart < prevPeriodStart ? myScheduleStart : prevPeriodStart;
-    const latestDashboardDate = myScheduleEnd > periodEnd ? myScheduleEnd : periodEnd;
     const fetchStart = formatDateKey(
-      isUserDashboardMode && today < earliestDashboardDate ? today : earliestDashboardDate,
+      isUserDashboardMode && today < prevPeriodStart ? today : prevPeriodStart,
     );
     const fetchEnd = formatDateKey(
-      isUserDashboardMode && lookaheadEnd > latestDashboardDate
-        ? lookaheadEnd
-        : latestDashboardDate,
+      isUserDashboardMode && lookaheadEnd > periodEnd ? lookaheadEnd : periodEnd,
     );
     Promise.all([
       fetchShifts(
@@ -549,8 +512,6 @@ export default function DashboardView({
     periodEndKey,
     periodStartKey,
     prevPeriodStart,
-    myScheduleEnd,
-    myScheduleStart,
   ]);
 
   // Shift requests
@@ -1081,9 +1042,8 @@ export default function DashboardView({
   const headerProps = {
     periodStart,
     periodEnd,
-    viewMode: effectiveViewMode,
+    viewMode,
     showViewModeTabs: true,
-    availableViewModes: isUserDashboardMode ? (["week", "2weeks"] as ViewMode[]) : undefined,
     onPrev: handlePrev,
     onNext: handleNext,
     onToday: handleToday,
@@ -1120,10 +1080,11 @@ export default function DashboardView({
     assignmentLabelMap,
     assignmentNameMap,
     assignmentById,
+    publishedAssignmentIdByPair,
     employees,
     activeEmployees,
     permissions,
-    viewMode: effectiveViewMode,
+    viewMode,
     periodDates,
     periodStart,
     periodEnd,

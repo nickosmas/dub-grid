@@ -36,6 +36,11 @@ export interface DashboardContentProps {
   assignmentLabelMap: Map<number, string>;
   assignmentNameMap: Map<number, string>;
   assignmentById: Map<number, AssignmentDefinition>;
+  /**
+   * Shift/job pair to assignment id, archived definitions included, so a
+   * published snapshot that names a since-archived assignment still diffs.
+   */
+  publishedAssignmentIdByPair?: Map<string, number>;
   employees: Employee[];
   activeEmployees: Employee[];
 

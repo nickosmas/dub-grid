@@ -369,7 +369,6 @@ describe("dashboard user mode selection", () => {
   });
 
   it("labels admin dashboard periods and overtime thresholds from the selected range", () => {
-    expect(getDashboardPeriodLabel("day")).toBe("today");
     expect(getDashboardPeriodLabel("week")).toBe("this week");
     expect(getDashboardPeriodLabel("2weeks")).toBe("these 2 weeks");
     expect(getDashboardOvertimeThreshold(1)).toBe(40);
@@ -532,11 +531,15 @@ describe("UserDashboard", () => {
           recentPublishedChanges: new Map([
             [
               `emp-1_${todayKey}`,
+              // The publication dropped the shift's custom time.
               {
                 empId: "emp-1",
                 date: todayKey,
                 kind: "modified" as const,
                 from: [101],
+                to: [101],
+                fromCustomStart: "08:00",
+                fromCustomEnd: "16:00",
               },
             ],
           ]),
@@ -544,9 +547,11 @@ describe("UserDashboard", () => {
       />,
     );
 
-    expect(
-      within(screen.getByTestId("user-dashboard-hero")).getByLabelText("Edited shift"),
-    ).toHaveAttribute("data-draft-badge", "modified");
+    const heroBadge = within(screen.getByTestId("user-dashboard-hero")).getByLabelText(
+      "Edited shift",
+    );
+    expect(heroBadge).toHaveAttribute("data-publish-badge", "time");
+    expect(heroBadge).toHaveTextContent("Edited");
     expect(
       within(screen.getByTestId("user-dashboard-hero")).getByLabelText(
         "Previous shift: Day shift Care · 12:00 AM - 11:59 PM · Memory Care",

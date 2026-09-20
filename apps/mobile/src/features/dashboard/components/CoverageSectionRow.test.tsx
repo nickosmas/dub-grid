@@ -1,8 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule } from "../../../test/native";
 
-vi.mock("react-native", async () => createReactNativeModule(await import("react")));
+// A measured width, so the two-week strip leaves its unmeasured first frame.
+vi.mock("react-native", async () =>
+  createReactNativeModule(await import("react"), { layoutWidth: 320 }),
+);
 vi.mock("@expo/vector-icons/Ionicons", () => ({ default: () => null }));
 vi.mock("expo-router", () => ({ router: { push: vi.fn() } }));
 
@@ -48,4 +51,39 @@ describe("CoverageSectionRow", () => {
     expect(screen.getByText("4 / 6 filled")).toBeInTheDocument();
     expect(screen.queryByText("3/3")).not.toBeInTheDocument();
   });
+
+  it("keeps a single week on one unpaged row", () => {
+    render(<CoverageSectionRow section={{ ...section, daily: makeDaily("2026-09-20", 7) }} />);
+
+    expect(screen.getAllByText("12/15")).toHaveLength(7);
+    expect(screen.queryByLabelText(/^Week \d+ of \d+$/)).not.toBeInTheDocument();
+  });
+
+  it("pages a two-week grid one week at a time", () => {
+    render(<CoverageSectionRow section={{ ...section, daily: makeDaily("2026-09-20", 14) }} />);
+
+    // Every day still renders, the reader just swipes to the second week.
+    expect(screen.getAllByText("12/15")).toHaveLength(14);
+    expect(screen.getByLabelText("Week 1 of 2")).toBeInTheDocument();
+    // The strip scrolls, so it lives beside the row's press target, not in it:
+    // nested in the Pressable, iOS turned the swipe into a press.
+    const rowButton = screen.getByRole("button", { name: "ICU, 67 percent covered" });
+    expect(within(rowButton).queryByText("12/15")).not.toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/^2026-09-20 12 of 15 filled, .*2026-10-03 12 of 15 filled$/),
+    ).toBeInTheDocument();
+  });
 });
+
+function makeDaily(startDate: string, count: number) {
+  const [y, m, d] = startDate.split("-").map(Number);
+  return Array.from({ length: count }, (_, index) => {
+    const date = new Date(Date.UTC(y!, m! - 1, d! + index));
+    return {
+      dateKey: date.toISOString().slice(0, 10),
+      filledCount: 12,
+      requiredCount: 15,
+      status: "amber" as const,
+    };
+  });
+}

@@ -5,11 +5,15 @@ import { CalendarDays } from "lucide-react";
 import type { DashboardContentProps } from "./DashboardContentProps";
 import { EmptyState } from "@/components/EmptyState";
 import { PublishDiffPill } from "@/components/schedule-grid/publishDiffPill";
+import {
+  resolveCellChangeBadges,
+  type CellChangeBadge,
+} from "@/components/schedule-grid/cellChangeBadges";
 import { ScrollCueButton } from "@/components/ui/scroll-cue-button";
 import { formatDateKey } from "@/lib/utils";
-import { filterShiftsByWeek, getDatesInRange } from "@/lib/dashboard-stats";
 import { DRAFT_BORDER_COLORS, resolveShiftPillColors } from "@/lib/colors";
 import { shouldShowJobOnGrid } from "@/lib/job-placement";
+import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
 import type {
   AbsenceType,
   AssignmentDefinition,
@@ -53,9 +57,8 @@ type MyScheduleRowProps = Pick<
   | "periodLabel"
 > & {
   jobs?: DashboardContentProps["jobs"];
+  publishedAssignmentIdByPair?: DashboardContentProps["publishedAssignmentIdByPair"];
   shiftCategories?: DashboardContentProps["shiftCategories"];
-  allShifts?: DashboardContentProps["allShifts"];
-  viewMode?: DashboardContentProps["viewMode"];
   isMobile?: DashboardContentProps["isMobile"];
   // True for a management-only viewer (management department access, no
   // scheduled focus area) — they're never actually scheduled, so this card
@@ -71,15 +74,8 @@ type MyScheduleShift = {
   background: string;
   border: string;
   textColor: string;
-  draftKind: DraftKind;
-  isDraft: boolean;
-  isNewAddition: boolean;
-};
-
-const DRAFT_LABELS: Record<NonNullable<DraftKind>, string> = {
-  deleted: "Deleted",
-  modified: "Edited",
-  new: "New",
+  badge: CellChangeBadge | null;
+  borderKind: DraftKind;
 };
 
 function capShiftText(value: string): string {
@@ -214,13 +210,43 @@ function buildWorkedShifts(input: {
       background: resolved?.color ?? "var(--dg-color-bg-secondary)",
       border: resolved?.border ?? "var(--dg-color-border)",
       textColor: resolved?.text ?? "var(--dg-color-text-primary)",
-      draftKind: entry.draftKind,
-      isDraft: entry.isDraft,
-      isNewAddition: false,
+      badge: null,
+      borderKind: null,
     });
   });
 
   return shifts;
+}
+
+function attachChangeBadges(
+  shifts: MyScheduleShift[],
+  input: {
+    entry: ScheduleCellStateEntry | undefined;
+    publishedChange: PublishChange | undefined;
+    assignmentById: Map<number, AssignmentDefinition>;
+    absenceTypeById: Map<number, AbsenceType>;
+    publishedAssignmentIdByPair: Map<string, number>;
+  },
+): MyScheduleShift[] {
+  const badges = resolveCellChangeBadges({
+    entry: input.entry,
+    publishChange: input.publishedChange,
+    pillCount: shifts.length,
+    publishedAssignmentIdByPair: input.publishedAssignmentIdByPair,
+    resolveAssignmentLabel: (assignmentId) => {
+      const assignment = input.assignmentById.get(assignmentId);
+      return assignment ? assignment.name || assignment.label : "?";
+    },
+    resolveAbsenceLabel: (absenceTypeId) => {
+      const absence = input.absenceTypeById.get(absenceTypeId);
+      return absence ? absence.name || absence.label : "?";
+    },
+  });
+  return shifts.map((shift, index) => ({
+    ...shift,
+    badge: badges.pillBadges[index] ?? null,
+    borderKind: badges.pillBorderKinds[index] ?? null,
+  }));
 }
 
 function buildMyScheduleDay(input: {
@@ -233,6 +259,7 @@ function buildMyScheduleDay(input: {
   shiftById: Map<number, ShiftCategory>;
   isDarkTheme: boolean;
   recentPublishedChanges: Map<string, PublishChange>;
+  publishedAssignmentIdByPair: Map<string, number>;
 }): MyScheduleDay {
   const dateKey = formatDateKey(input.date);
   const { entry } = input;
@@ -269,6 +296,14 @@ function buildMyScheduleDay(input: {
           publishedLabel: "",
         });
 
+  const badgeInput = {
+    entry,
+    publishedChange,
+    assignmentById: input.assignmentById,
+    absenceTypeById: input.absenceTypeById,
+    publishedAssignmentIdByPair: input.publishedAssignmentIdByPair,
+  };
+
   if (displayEntry.absenceTypeId != null) {
     const absence = input.absenceTypeById.get(displayEntry.absenceTypeId) ?? null;
     const resolved = absence
@@ -281,19 +316,21 @@ function buildMyScheduleDay(input: {
       key: dateKey,
       dateKey,
       date: input.date,
-      shifts: [
-        {
-          label: absence?.name ?? displayEntry.label ?? "Away",
-          jobName: null,
-          timeRange: null,
-          background: resolved?.color ?? "var(--dg-color-bg-secondary)",
-          border: resolved?.border ?? "var(--dg-color-border)",
-          textColor: resolved?.text ?? "var(--dg-color-text-secondary)",
-          draftKind: publishedChange?.kind ?? entry?.draftKind ?? null,
-          isDraft: entry?.isDraft ?? false,
-          isNewAddition: publishedChange?.isNewAddition === true,
-        },
-      ],
+      shifts: attachChangeBadges(
+        [
+          {
+            label: absence?.name ?? displayEntry.label ?? "Away",
+            jobName: null,
+            timeRange: null,
+            background: resolved?.color ?? "var(--dg-color-bg-secondary)",
+            border: resolved?.border ?? "var(--dg-color-border)",
+            textColor: resolved?.text ?? "var(--dg-color-text-secondary)",
+            badge: null,
+            borderKind: null,
+          },
+        ],
+        badgeInput,
+      ),
     };
   }
 
@@ -301,28 +338,16 @@ function buildMyScheduleDay(input: {
     key: dateKey,
     dateKey,
     date: input.date,
-    shifts: buildWorkedShifts({
-      entry: displayEntry,
-      assignmentById: input.assignmentById,
-      jobById: input.jobById,
-      shiftById: input.shiftById,
-      isDarkTheme: input.isDarkTheme,
-    }).map((shift, index) => {
-      const previous = publishedChange?.fromState?.segments[index];
-      const publishedKind =
-        publishedChange?.kind === "modified" &&
-        previous &&
-        previous.shiftId === displayEntry.segments?.[index]?.shiftId &&
-        previous.jobId === displayEntry.segments?.[index]?.jobId &&
-        Boolean(previous.isMentored) === Boolean(displayEntry.segments?.[index]?.isMentored)
-          ? null
-          : (publishedChange?.kind ?? shift.draftKind);
-      return {
-        ...shift,
-        draftKind: publishedKind,
-        isNewAddition: publishedChange?.isNewAddition === true,
-      };
-    }),
+    shifts: attachChangeBadges(
+      buildWorkedShifts({
+        entry: displayEntry,
+        assignmentById: input.assignmentById,
+        jobById: input.jobById,
+        shiftById: input.shiftById,
+        isDarkTheme: input.isDarkTheme,
+      }),
+      badgeInput,
+    ),
   };
 }
 
@@ -336,6 +361,7 @@ function buildMyScheduleDays(input: {
   periodDates: Date[];
   isDarkTheme: boolean;
   recentPublishedChanges: Map<string, PublishChange>;
+  publishedAssignmentIdByPair: Map<string, number>;
 }): MyScheduleDay[] {
   return input.periodDates.map((date) =>
     buildMyScheduleDay({
@@ -348,6 +374,7 @@ function buildMyScheduleDays(input: {
       shiftById: input.shiftById,
       isDarkTheme: input.isDarkTheme,
       recentPublishedChanges: input.recentPublishedChanges,
+      publishedAssignmentIdByPair: input.publishedAssignmentIdByPair,
     }),
   );
 }
@@ -441,9 +468,7 @@ function ScrollCue({
 }
 
 function resolveDraftLabel(shift: MyScheduleShift): string | null {
-  return shift.draftKind && (shift.draftKind !== "new" || shift.isNewAddition)
-    ? DRAFT_LABELS[shift.draftKind]
-    : null;
+  return shift.badge?.label ?? null;
 }
 
 // Only the name line can run under the change pill, so it alone decides the
@@ -473,10 +498,9 @@ function ShiftPill({ shift, alignLeft }: { shift: MyScheduleShift; alignLeft: bo
         textAlign: alignLeft ? "left" : undefined,
         padding: "8px",
         borderRadius: "var(--dg-radius-sm, 6px)",
-        border:
-          shift.isDraft && shift.draftKind
-            ? `2px dashed ${DRAFT_BORDER_COLORS[shift.draftKind]}`
-            : `1px solid ${shift.border}`,
+        border: shift.borderKind
+          ? `2px dashed ${DRAFT_BORDER_COLORS[shift.borderKind]}`
+          : `1px solid ${shift.border}`,
         background: shift.background,
         color: shift.textColor,
         boxSizing: "border-box",
@@ -496,11 +520,14 @@ function ShiftPill({ shift, alignLeft }: { shift: MyScheduleShift; alignLeft: bo
       >
         {label}
       </div>
-      {shift.draftKind && draftLabel ? (
+      {shift.badge && draftLabel ? (
         <PublishDiffPill
           aria-label={`${draftLabel} shift`}
-          data-draft-badge={shift.draftKind}
-          kind={shift.draftKind}
+          title={shift.badge.detail}
+          {...(shift.badge.source === "publish"
+            ? { "data-publish-badge": shift.badge.kind }
+            : { "data-draft-badge": shift.badge.kind })}
+          kind={shift.badge.kind}
           style={{ position: "absolute", top: 6, right: 6, padding: "1px 4px" }}
         >
           {draftLabel}
@@ -639,63 +666,55 @@ export default function MyScheduleRow({
   absenceTypeById,
   jobs = [],
   shiftCategories = [],
-  allShifts,
-  viewMode,
   isMobile = false,
   periodDates,
   periodLabel,
   isManagementOnly = false,
   recentPublishedChanges = new Map(),
+  publishedAssignmentIdByPair,
 }: MyScheduleRowProps) {
   const { resolvedTheme } = useTheme();
   const isDarkTheme = resolvedTheme === "dark";
   const jobById = useMemo(() => new Map(jobs.map((job) => [job.id, job])), [jobs]);
+  const assignmentIdByPair = useMemo(
+    () =>
+      publishedAssignmentIdByPair ??
+      createAssignmentDefinitionIdByPairMap([...assignmentById.values()], {
+        includeArchived: true,
+      }),
+    [assignmentById, publishedAssignmentIdByPair],
+  );
   const shiftById = useMemo(
     () => new Map(shiftCategories.map((shift) => [shift.id, shift])),
     [shiftCategories],
   );
-  const displayDates = useMemo(() => {
-    if (viewMode !== "day" || !periodDates[0]) return periodDates;
-    const weekStart = new Date(periodDates[0]);
-    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-    weekStart.setHours(0, 0, 0, 0);
-    return getDatesInRange(weekStart, 7);
-  }, [periodDates, viewMode]);
-  const displayShifts = useMemo(() => {
-    if (viewMode !== "day" || !allShifts || displayDates.length === 0) {
-      return currentPeriodShifts;
-    }
-    return filterShiftsByWeek(
-      allShifts,
-      formatDateKey(displayDates[0]),
-      formatDateKey(displayDates[displayDates.length - 1]),
-    );
-  }, [allShifts, currentPeriodShifts, displayDates, viewMode]);
   const days = useMemo(
     () =>
       currentEmpId
         ? buildMyScheduleDays({
             currentEmpId,
-            currentPeriodShifts: displayShifts,
+            currentPeriodShifts,
             assignmentById,
             absenceTypeById,
             jobById,
             shiftById,
-            periodDates: displayDates,
+            periodDates,
             isDarkTheme,
             recentPublishedChanges,
+            publishedAssignmentIdByPair: assignmentIdByPair,
           })
         : [],
     [
       currentEmpId,
-      displayShifts,
+      currentPeriodShifts,
       assignmentById,
       absenceTypeById,
       jobById,
       shiftById,
-      displayDates,
+      periodDates,
       isDarkTheme,
       recentPublishedChanges,
+      assignmentIdByPair,
     ],
   );
   const hasAnySchedule = days.some((day) => day.shifts.length > 0);
@@ -710,7 +729,7 @@ export default function MyScheduleRow({
       <div className="dg-card-header">
         <div>
           <div className="dg-card-title">Your schedule</div>
-          <div className="dg-card-subtitle">{viewMode === "day" ? "this week" : periodLabel}</div>
+          <div className="dg-card-subtitle">{periodLabel}</div>
         </div>
       </div>
       <div className="dg-card-body" style={hasAnySchedule ? { padding: "16px 0" } : undefined}>
