@@ -329,10 +329,14 @@ export function Screen<T = never>({
       renderItem={({ item, index }) => <>{list.renderItem(item, index)}</>}
       keyExtractor={list.keyExtractor}
       ListHeaderComponent={<View style={contentStyle}>{children}</View>}
-      // With no rows the header is the whole page, and a `fillScreen` empty
-      // or error state inside it needs the same room to centre in that the
-      // plain scroll view's content gets from `flexGrow: 1`.
-      ListHeaderComponentStyle={list.data.length === 0 ? styles.emptyListHeader : undefined}
+      // With rows, the first one sits one section gap below the header, the
+      // distance the page content keeps between its own sections. Without
+      // rows the header is the whole page, and a `fillScreen` empty or error
+      // state inside it needs the same room to centre in that the plain scroll
+      // view's content gets from `flexGrow: 1`.
+      ListHeaderComponentStyle={
+        list.data.length === 0 ? styles.emptyListHeader : styles.listHeaderAboveRows
+      }
       ListFooterComponent={list.listFooter == null ? null : <>{list.listFooter}</>}
       ItemSeparatorComponent={list.itemSeparator == null ? null : () => <>{list.itemSeparator}</>}
       onEndReached={list.onEndReached}
@@ -571,6 +575,9 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, hasPageBackgr
     },
     emptyListHeader: {
       flexGrow: 1,
+    },
+    listHeaderAboveRows: {
+      paddingBottom: mobileSpacing.sectionGap,
     },
     footer: {
       borderTopWidth: 1,

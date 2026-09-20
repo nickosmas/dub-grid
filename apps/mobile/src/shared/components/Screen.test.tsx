@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { NativeTabBarPresenceProvider } from "../navigation/NativeTabBarPresence";
+import { mobileSpacing } from "../theme/tokens";
 
 const nativeScrollTo = vi.fn();
 const nativeScrollToOffset = vi.fn();
@@ -409,8 +410,11 @@ describe("Screen", () => {
     expect(text.indexOf("row c")).toBeLessThan(text.indexOf("Load more"));
     expect(list.querySelectorAll("hr")).toHaveLength(2);
     expect(screen.getByTestId("refresh-control")).toBeInTheDocument();
-    // The header does not stretch while there are rows.
-    expect(screen.getByTestId("screen-list-header").getAttribute("data-style")).toBe("null");
+    // With rows the header keeps a section gap above the first one and does
+    // not stretch.
+    expect(
+      JSON.parse(screen.getByTestId("screen-list-header").getAttribute("data-style") ?? "null"),
+    ).toEqual({ paddingBottom: mobileSpacing.sectionGap });
 
     scrollViewRef.current?.scrollTo({ y: 40, animated: false });
     expect(nativeScrollToOffset).toHaveBeenCalledWith({ offset: 40, animated: false });
