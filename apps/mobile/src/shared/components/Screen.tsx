@@ -105,6 +105,12 @@ export interface ScreenList<T> {
   itemSeparator?: ReactNode;
   onEndReached?: () => void;
   onEndReachedThreshold?: number;
+  /**
+   * Space between the header and the first row. Defaults to the page's
+   * section gap; a screen whose header ends in a row of its own (a count and
+   * an action) reads better with the compact `mobileSpace.md`.
+   */
+  headerGap?: number;
 }
 
 export function Screen<T = never>({
@@ -335,7 +341,9 @@ export function Screen<T = never>({
       // state inside it needs the same room to centre in that the plain scroll
       // view's content gets from `flexGrow: 1`.
       ListHeaderComponentStyle={
-        list.data.length === 0 ? styles.emptyListHeader : styles.listHeaderAboveRows
+        list.data.length === 0
+          ? styles.emptyListHeader
+          : { paddingBottom: list.headerGap ?? mobileSpacing.sectionGap }
       }
       ListFooterComponent={list.listFooter == null ? null : <>{list.listFooter}</>}
       ItemSeparatorComponent={list.itemSeparator == null ? null : () => <>{list.itemSeparator}</>}
@@ -575,9 +583,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, hasPageBackgr
     },
     emptyListHeader: {
       flexGrow: 1,
-    },
-    listHeaderAboveRows: {
-      paddingBottom: mobileSpacing.sectionGap,
     },
     footer: {
       borderTopWidth: 1,

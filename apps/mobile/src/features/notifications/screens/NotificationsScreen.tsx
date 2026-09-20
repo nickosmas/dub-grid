@@ -41,12 +41,11 @@ import {
   resolveNativeRoute,
 } from "../lib/openNotificationAction";
 import { NotificationRowListSkeleton } from "../components/NotificationRowListSkeleton";
-import { SkeletonLine, SkeletonPill } from "../../../shared/components/skeleton";
+import { SkeletonLine } from "../../../shared/components/skeleton";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
-  mobileControl,
   mobileElevation,
   mobileRadii,
   mobilePillOverflow,
@@ -339,6 +338,7 @@ export default function NotificationsScreen() {
             onArchive={() => handleArchive(notification)}
           />
         ),
+        headerGap: mobileSpace.md,
         listFooter: notificationsQuery.hasNextPage ? (
           <View style={styles.loadMore}>
             <Button
@@ -376,33 +376,35 @@ export default function NotificationsScreen() {
             tabs={filterTabs}
           />
         )}
-      </View>
-      {/* The unread row is almost always there once the facets land, so the
-          placeholder holds its height and the list does not drop on load. */}
-      {contentState.kind === "loading" && contentState.showSkeleton ? (
-        <View style={styles.actionRow}>
-          <SkeletonLine variant="sectionTitle" width={104} />
-          <SkeletonPill height={mobileControl.sm} width={124} />
-        </View>
-      ) : null}
-      {unreadCount > 0 ? (
-        <View style={styles.actionRow}>
-          <Text style={styles.actionCopy}>{unreadCount} unread</Text>
-          <Button
-            compact
-            label="Mark all read"
-            loading={busy}
-            onPress={() => setConfirmingMarkAllRead(true)}
-            tone="link"
-          />
-        </View>
-      ) : null}
-
-      {contentState.kind === "loading" ? (
-        contentState.showSkeleton ? (
+        {/* The unread row is almost always there once the facets land, so the
+            placeholder holds its height and the list does not drop on load.
+            Its action is a text button, so the placeholder is a text line. */}
+        {contentState.kind === "loading" && contentState.showSkeleton ? (
+          <View style={styles.actionRow}>
+            <SkeletonLine variant="sectionTitle" width={104} />
+            <SkeletonLine variant="bodyStrong" width={112} />
+          </View>
+        ) : null}
+        {unreadCount > 0 ? (
+          <View style={styles.actionRow}>
+            <Text style={styles.actionCopy}>{unreadCount} unread</Text>
+            <Button
+              compact
+              label="Mark all read"
+              loading={busy}
+              onPress={() => setConfirmingMarkAllRead(true)}
+              tone="link"
+            />
+          </View>
+        ) : null}
+        {/* Inside the header block so the placeholder rows sit the same
+            compact gap below the unread row that the real rows do. */}
+        {contentState.kind === "loading" && contentState.showSkeleton ? (
           <NotificationRowListSkeleton />
-        ) : null
-      ) : contentState.kind === "error" ? (
+        ) : null}
+      </View>
+
+      {contentState.kind === "loading" ? null : contentState.kind === "error" ? (
         <StatusBanner
           actionLabel="Try again"
           body={contentState.message}
@@ -446,7 +448,6 @@ const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     headerArea: {
       gap: mobileSpace.md,
-      paddingBottom: mobileSpace.md,
     },
     actionRow: {
       flexDirection: "row",

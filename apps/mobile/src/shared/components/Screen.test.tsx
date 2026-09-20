@@ -420,6 +420,25 @@ describe("Screen", () => {
     expect(nativeScrollToOffset).toHaveBeenCalledWith({ offset: 40, animated: false });
   });
 
+  it("lets a list screen choose a tighter gap between its header and first row", () => {
+    render(
+      <Screen
+        list={{
+          data: ["a"],
+          keyExtractor: (item) => item,
+          renderItem: (item) => <span>{item}</span>,
+          headerGap: 12,
+        }}
+      >
+        <div>Header</div>
+      </Screen>,
+    );
+
+    expect(
+      JSON.parse(screen.getByTestId("screen-list-header").getAttribute("data-style") ?? "null"),
+    ).toEqual({ paddingBottom: 12 });
+  });
+
   it("lets a fillScreen state in the header claim the page when the list is empty", () => {
     render(
       <Screen list={{ data: [], keyExtractor: (item: string) => item, renderItem: () => null }}>
