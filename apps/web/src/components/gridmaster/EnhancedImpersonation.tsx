@@ -156,9 +156,12 @@ export default function EnhancedImpersonation({
         }),
       }).catch(() => {});
       toast.success(`Impersonating ${selectedUser.email} in ${selectedOrg.name}. Redirecting.`);
-      // Same teardown order as the banner's End Session (F-73): the document
-      // load discards the cache, so do not clear it mid-flight.
+      // Same order as the banner's End Session (F-73): mark the transition
+      // first so a transient null session cannot bounce to /login, then
+      // discard the prior tenant's client state right before the document
+      // load that replaces it.
       markAuthTransition();
+      queryClient.clear();
       window.location.replace("/schedule");
     } catch (err: unknown) {
       Sentry.captureException(err, { extra: { context: "impersonation-start" } });

@@ -2,6 +2,7 @@
 import { User } from "lucide-react";
 
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   getImpersonationFromCookie,
@@ -18,6 +19,7 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 const BANNER_HEIGHT = 40;
 
 export default function ImpersonationBanner() {
+  const queryClient = useQueryClient();
   const [imp, setImp] = useState<ImpersonationData | null>(null);
   const [countdown, setCountdown] = useState<string | null>(null);
   const [ending, setEnding] = useState(false);
@@ -50,6 +52,7 @@ export default function ImpersonationBanner() {
         clearImpersonationCookie();
         setImp(null);
         markAuthTransition();
+        queryClient.clear();
         window.location.replace("/dashboard");
         return;
       }
@@ -60,7 +63,7 @@ export default function ImpersonationBanner() {
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [imp?.expiresAt]);
+  }, [imp?.expiresAt, queryClient]);
 
   async function handleEnd() {
     if (!imp || ending) return;
@@ -87,12 +90,13 @@ export default function ImpersonationBanner() {
     }
     clearImpersonationCookie();
     toast.success("Impersonation ended");
-    // Navigate without clearing the query cache first. The full document
-    // load discards it anyway, and clearing it while queries are in flight
-    // surfaced a transient null session that ProtectedRoute answered with a
-    // bounce to /login on Firefox (F-73). The transition mark holds that
-    // guard until the portal document has taken over.
+    // Mark the transition before anything else tears down: clearing the
+    // cache mid-flight surfaced a transient null session that ProtectedRoute
+    // answered with a bounce to /login on Firefox (F-73), and the mark holds
+    // that guard until the portal document has taken over. The clear itself
+    // stays, right before the load, so no prior-tenant state outlives it.
     markAuthTransition();
+    queryClient.clear();
     window.location.replace("/dashboard");
   }
 
