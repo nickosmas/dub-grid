@@ -2,9 +2,14 @@ import { useMemo } from "react";
 import { ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import { addDaysToIsoDate, getDaysBetweenIsoDates } from "@dubgrid/schedule-core";
-import type { MobileScheduleEntry, ResolvedSchedulePresentationSegment } from "@dubgrid/contracts";
+import type {
+  MobileScheduleEntry,
+  MobileScheduleRange,
+  ResolvedSchedulePresentationSegment,
+} from "@dubgrid/contracts";
 import { resolveShiftPillColors, type ShiftPillColors } from "@dubgrid/design-tokens";
 import { DashboardCard } from "./DashboardCard";
+import { Pressable } from "../../../shared/components/Pressable";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { getClientFriendlyErrorMessage } from "../../../shared/lib/errors";
@@ -72,11 +77,21 @@ function normalizeLabel(value: string | null | undefined): string {
   return (value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
 }
 
-function formatDayHeader(dateIso: string): { weekday: string; dayNumber: string } {
+function formatDayHeader(dateIso: string): {
+  weekday: string;
+  dayNumber: string;
+  spokenDate: string;
+} {
   const date = new Date(`${dateIso}T00:00:00`);
   const weekday = new Intl.DateTimeFormat("en-US", { weekday: "short" }).format(date).toUpperCase();
   const dayNumber = new Intl.DateTimeFormat("en-US", { day: "numeric" }).format(date);
-  return { weekday, dayNumber };
+  // The card's press target reads as the full date, not "TUE 12".
+  const spokenDate = new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  }).format(date);
+  return { weekday, dayNumber, spokenDate };
 }
 
 function buildDateList(startDate: string, endDate: string): string[] {
@@ -161,10 +176,16 @@ function buildDaySegmentPills(
 // twice.
 export function MyScheduleCard({
   accessToken,
+  range: periodRange,
   onExpand,
+  onOpenDay,
 }: {
   accessToken: string | null;
+  /** The dashboard's period, so the strip shows one week or two with it. */
+  range?: MobileScheduleRange;
   onExpand?: () => void;
+  /** A day card opens the same schedule as See all, on that day. */
+  onOpenDay?: (date: string) => void;
 }) {
   const mobileColors = useMobileColors();
   const isDarkTheme = useIsDarkMode();
@@ -181,7 +202,7 @@ export function MyScheduleCard({
   // state, so by the time the card mounts the data is there. No local loading
   // branch: returning null here made the card appear after the page skeleton
   // had cleared, shifting everything below it down.
-  const query = useMyScheduleQuery(accessToken);
+  const query = useMyScheduleQuery(accessToken, { range: periodRange });
 
   const range = query.data?.range;
   const entries = query.data?.entries ?? [];
@@ -202,11 +223,18 @@ export function MyScheduleCard({
         >
           {dates.map((dateIso) => {
             const entry = entryByDate.get(dateIso);
-            const { weekday, dayNumber } = formatDayHeader(dateIso);
+            const { weekday, dayNumber, spokenDate } = formatDayHeader(dateIso);
             const segmentPills = buildDaySegmentPills(entry, mobileColors, isDarkTheme);
 
             return (
-              <View key={dateIso} style={styles.dayCard}>
+              <Pressable
+                key={dateIso}
+                accessibilityLabel={spokenDate}
+                accessibilityRole="button"
+                disabled={!onOpenDay}
+                onPress={() => onOpenDay?.(dateIso)}
+                style={({ pressed }) => [styles.dayCard, pressed && styles.dayCardPressed]}
+              >
                 <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.dayHeader}>
                   {weekday} {dayNumber}
                 </Text>
@@ -277,7 +305,7 @@ export function MyScheduleCard({
                     </Text>
                   </View>
                 )}
-              </View>
+              </Pressable>
             );
           })}
         </ScrollView>
@@ -335,6 +363,9 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, pillWidth: nu
     dayCard: {
       minWidth: pillWidth,
       gap: 8,
+    },
+    dayCardPressed: {
+      opacity: 0.7,
     },
     dayHeader: {
       ...mobileText.label,

@@ -75,6 +75,24 @@ describe("MyScheduleCard", () => {
     expect(screen.getByText("—")).toBeInTheDocument();
   });
 
+  it("opens the schedule on the tapped day, the same place See all goes", () => {
+    useQuery.mockReturnValue({
+      isLoading: false,
+      data: {
+        range: { startDate: "2026-05-11", endDate: "2026-05-12" },
+        entries: [makeEntry({ date: "2026-05-11" })],
+      },
+    });
+    const onOpenDay = vi.fn();
+
+    render(<MyScheduleCard accessToken="token" onOpenDay={onOpenDay} />);
+
+    // An empty day is a target too: it opens that day, not nothing.
+    fireEvent.click(screen.getByRole("button", { name: "Tuesday, May 12" }));
+
+    expect(onOpenDay).toHaveBeenCalledWith("2026-05-12");
+  });
+
   it("renders an absence as its own pill, not a blank day", () => {
     useQuery.mockReturnValue({
       isLoading: false,

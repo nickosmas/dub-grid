@@ -57,8 +57,15 @@ export const mobileQueryKeys = {
       range?.startDate,
       range?.endDate,
     ] as const,
-  dashboardSchedule: (accessToken: string | null) =>
-    ["mobile", "dashboard", "my-schedule", getMobileAuthIdentityKey(accessToken)] as const,
+  dashboardSchedule: (accessToken: string | null, range?: MobileScheduleRange) =>
+    [
+      "mobile",
+      "dashboard",
+      "my-schedule",
+      getMobileAuthIdentityKey(accessToken),
+      range?.startDate,
+      range?.endDate,
+    ] as const,
   schedule: (accessToken: string | null, scope: ScheduleScope, range: MobileScheduleRange) =>
     [
       "mobile",

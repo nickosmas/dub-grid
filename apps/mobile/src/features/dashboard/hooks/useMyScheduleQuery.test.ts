@@ -38,4 +38,19 @@ describe("useMyScheduleQuery", () => {
     expect(JSON.stringify(options.queryKey)).not.toContain(token);
     expect(getMySchedule).toHaveBeenCalledWith(token, undefined, signal);
   });
+
+  it("keys the dashboard's period into the query and requests that range", () => {
+    const token = tokenFor("current");
+    const range = { startDate: "2026-09-20", endDate: "2026-10-03" };
+    const signal = new AbortController().signal;
+
+    useMyScheduleQuery(token, { range });
+    const options = useQuery.mock.calls[0]?.[0];
+    options.queryFn({ signal });
+
+    expect(options.queryKey).toEqual(expect.arrayContaining(["2026-09-20", "2026-10-03"]));
+    expect(getMySchedule).toHaveBeenCalledWith(token, range, signal);
+    // A period change keeps the previous week on screen until the new one lands.
+    expect(options.placeholderData).toEqual(expect.any(Function));
+  });
 });

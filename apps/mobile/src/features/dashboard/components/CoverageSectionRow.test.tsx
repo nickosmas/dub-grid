@@ -2,7 +2,10 @@ import { render, screen, within } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule } from "../../../test/native";
 
-vi.mock("react-native", async () => createReactNativeModule(await import("react")));
+// A measured width, so the two-week strip leaves its unmeasured first frame.
+vi.mock("react-native", async () =>
+  createReactNativeModule(await import("react"), { layoutWidth: 320 }),
+);
 vi.mock("@expo/vector-icons/Ionicons", () => ({ default: () => null }));
 vi.mock("expo-router", () => ({ router: { push: vi.fn() } }));
 

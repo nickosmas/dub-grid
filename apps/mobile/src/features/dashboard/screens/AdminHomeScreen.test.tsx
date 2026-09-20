@@ -37,13 +37,35 @@ vi.mock("../hooks/useMyScheduleQuery", () => ({
   useMyScheduleQuery,
 }));
 
+const usePrefetchOtherDashboardPeriod = vi.fn();
+
+vi.mock("../hooks/usePrefetchOtherDashboardPeriod", () => ({
+  usePrefetchOtherDashboardPeriod,
+}));
+
 vi.mock("../components/MyScheduleCard", () => ({
-  MyScheduleCard: ({ onExpand }: { onExpand?: () => void }) => (
+  MyScheduleCard: ({
+    onExpand,
+    onOpenDay,
+    range,
+  }: {
+    onExpand?: () => void;
+    onOpenDay?: (date: string) => void;
+    range?: { startDate: string; endDate: string };
+  }) => (
     <div>
       my-schedule-card
+      {range ? (
+        <span data-testid="my-schedule-range">{`${range.startDate}..${range.endDate}`}</span>
+      ) : null}
       {onExpand ? (
         <button onClick={onExpand} type="button">
           expand
+        </button>
+      ) : null}
+      {onOpenDay ? (
+        <button onClick={() => onOpenDay("2026-09-23")} type="button">
+          open day
         </button>
       ) : null}
     </div>
@@ -371,6 +393,117 @@ describe("AdminHomeScreen", () => {
     fireEvent.click(screen.getByText("expand"));
 
     expect(routerPush).toHaveBeenCalledWith("/(tabs)/home/my-schedule");
+  });
+
+  it("opens the same schedule on a tapped day of Your schedule", () => {
+    useBootstrap.mockReturnValue({
+      isLoading: false,
+      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
+    });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: EMPTY_DASHBOARD_DATA,
+    });
+
+    render(<AdminHomeScreen />);
+
+    fireEvent.click(screen.getByText("open day"));
+
+    expect(routerPush).toHaveBeenCalledWith({
+      pathname: "/(tabs)/home/my-schedule",
+      params: { date: "2026-09-23" },
+    });
+  });
+
+  it("warms the other period alongside the current one", () => {
+    useBootstrap.mockReturnValue({
+      isLoading: false,
+      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
+    });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isPlaceholderData: false,
+      isError: false,
+      data: EMPTY_DASHBOARD_DATA,
+      dataUpdatedAt: 1700,
+    });
+
+    render(<AdminHomeScreen />);
+
+    expect(usePrefetchOtherDashboardPeriod).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        periodMode: "week",
+        includeSchedule: true,
+        ready: true,
+        currentUpdatedAt: 1700,
+      }),
+    );
+  });
+
+  it("gives Your schedule the same period as the rest of the page", () => {
+    useBootstrap.mockReturnValue({
+      isLoading: false,
+      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
+    });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: EMPTY_DASHBOARD_DATA,
+    });
+
+    render(<AdminHomeScreen />);
+    fireEvent.click(screen.getByText("2 Weeks"));
+
+    const dashboardRange = useAdminDashboard.mock.calls.at(-1)?.[1] as {
+      startDate: string;
+      endDate: string;
+    };
+    expect(useMyScheduleQuery).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.objectContaining({ range: dashboardRange }),
+    );
+    expect(screen.getByTestId("my-schedule-range")).toHaveTextContent(
+      `${dashboardRange.startDate}..${dashboardRange.endDate}`,
+    );
+  });
+
+  it("covers the page with a centered spinner while the next period is still fetching", () => {
+    useBootstrap.mockReturnValue({
+      isLoading: false,
+      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
+    });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isPlaceholderData: true,
+      isError: false,
+      data: EMPTY_DASHBOARD_DATA,
+    });
+
+    render(<AdminHomeScreen />);
+
+    expect(screen.getByTestId("period-loading")).toBeInTheDocument();
+    expect(screen.getByLabelText("Loading period")).toBeInTheDocument();
+  });
+
+  it("lifts the loading overlay once the period has landed", () => {
+    useBootstrap.mockReturnValue({
+      isLoading: false,
+      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
+    });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isPlaceholderData: false,
+      // A background refetch of the period already on screen is not a period
+      // change, so it gets no scrim.
+      isFetching: true,
+      isError: false,
+      data: EMPTY_DASHBOARD_DATA,
+    });
+
+    render(<AdminHomeScreen />);
+
+    expect(screen.queryByTestId("period-loading")).not.toBeInTheDocument();
   });
 
   it("renders the greeting header without the org name", () => {

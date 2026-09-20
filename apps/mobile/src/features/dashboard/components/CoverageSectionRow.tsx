@@ -42,6 +42,11 @@ export function CoverageSectionRow({ section }: { section: CoverageSection }) {
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const pctColor = coverageColor(mobileColors, section.pct);
   const daily = section.daily ?? [];
+  const [stripWidth, setStripWidth] = useState(0);
+  const handleStripLayout = (event: LayoutChangeEvent) => {
+    const width = event.nativeEvent.layout.width;
+    if (width > 0 && width !== stripWidth) setStripWidth(width);
+  };
   return (
     <View style={styles.row}>
       <PressableRow
@@ -79,7 +84,11 @@ export function CoverageSectionRow({ section }: { section: CoverageSection }) {
       </PressableRow>
       {daily.length > 0 ? (
         <View style={styles.strip}>
-          <DailyStrip daily={daily} styles={styles} />
+          {/* Measured inside the padding: the pages must match the strip's
+              own box, not the padded wrapper's. */}
+          <View onLayout={handleStripLayout}>
+            <DailyStrip daily={daily} pageWidth={stripWidth} styles={styles} />
+          </View>
         </View>
       ) : null}
     </View>
@@ -102,48 +111,116 @@ function chunkWeeks(daily: CoverageDay[]): CoverageDay[][] {
   return pages;
 }
 
-function DailyStrip({ daily, styles }: { daily: CoverageDay[]; styles: Styles }) {
+function WeekRow({ days, styles }: { days: CoverageDay[]; styles: Styles }) {
   const mobileColors = useMobileColors();
-  const pages = useMemo(() => chunkWeeks(daily), [daily]);
-  const [pageWidth, setPageWidth] = useState(0);
-  const [activePage, setActivePage] = useState(0);
+  return days.map((day) => (
+    <View key={day.dateKey} style={styles.dayCell}>
+      <Text fit="fixed" style={styles.dayLabel}>
+        {dayLetter(day.dateKey)}
+      </Text>
+      <View style={[styles.dayDot, { backgroundColor: dayColor(mobileColors, day.status) }]} />
+      <Text fit="fixed" style={[styles.dayCount, mobileTabularText]}>
+        {day.status === "none" ? "-" : `${day.filledCount}/${day.requiredCount}`}
+      </Text>
+    </View>
+  ));
+}
 
-  const renderWeek = (page: CoverageDay[]) =>
-    page.map((day) => (
-      <View key={day.dateKey} style={styles.dayCell}>
-        <Text fit="fixed" style={styles.dayLabel}>
-          {dayLetter(day.dateKey)}
-        </Text>
-        <View style={[styles.dayDot, { backgroundColor: dayColor(mobileColors, day.status) }]} />
-        <Text fit="fixed" style={[styles.dayCount, mobileTabularText]}>
-          {day.status === "none" ? "-" : `${day.filledCount}/${day.requiredCount}`}
-        </Text>
-      </View>
-    ));
+function PageDots({
+  count,
+  activeIndex,
+  styles,
+}: {
+  count: number;
+  activeIndex: number;
+  styles: Styles;
+}) {
+  const mobileColors = useMobileColors();
+  return (
+    <View accessibilityLabel={`Week ${activeIndex + 1} of ${count}`} style={styles.pageDots}>
+      {Array.from({ length: count }, (_, index) => (
+        <View
+          key={index}
+          style={[
+            styles.pageDot,
+            {
+              backgroundColor:
+                index === activeIndex ? mobileColors.textMuted : mobileColors.borderSubtle,
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
+// The strip's width is measured by the row's always-mounted wrapper and
+// handed down, so the pager has its page width on its very first frame. When
+// it measured inside the pager, the switch to 2 Weeks drew one frame of all
+// fourteen columns squeezed together before the pages got a width.
+function DailyStrip({
+  daily,
+  pageWidth,
+  styles,
+}: {
+  daily: CoverageDay[];
+  pageWidth: number;
+  styles: Styles;
+}) {
+  const pages = useMemo(() => chunkWeeks(daily), [daily]);
 
   if (pages.length <= 1) {
     return (
       <View accessibilityLabel={describeDaily(daily)} style={styles.dailyRow}>
-        {renderWeek(daily)}
+        <WeekRow days={daily} styles={styles} />
       </View>
     );
   }
 
-  const handleLayout = (event: LayoutChangeEvent) => {
-    const width = event.nativeEvent.layout.width;
-    if (width > 0 && width !== pageWidth) setPageWidth(width);
-  };
+  // Not measured yet (a cold mount straight into a two-week period): show the
+  // first week flat, which is exactly what the pager's first page looks like,
+  // rather than an unsized pager.
+  if (pageWidth <= 0) {
+    return (
+      <View accessibilityLabel={describeDaily(daily)} style={styles.dailyPager}>
+        <View style={styles.dailyRow}>
+          <WeekRow days={pages[0]!} styles={styles} />
+        </View>
+        <PageDots activeIndex={0} count={pages.length} styles={styles} />
+      </View>
+    );
+  }
+
+  // Keyed on the period so a new one remounts the scroller at its first week.
+  return (
+    <WeekPager
+      key={`${pages[0]?.[0]?.dateKey}:${pages.length}`}
+      daily={daily}
+      pageWidth={pageWidth}
+      pages={pages}
+      styles={styles}
+    />
+  );
+}
+
+function WeekPager({
+  daily,
+  pages,
+  pageWidth,
+  styles,
+}: {
+  daily: CoverageDay[];
+  pages: CoverageDay[][];
+  pageWidth: number;
+  styles: Styles;
+}) {
+  const [activePage, setActivePage] = useState(0);
   const handleMomentumScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (pageWidth <= 0) return;
     setActivePage(Math.round(event.nativeEvent.contentOffset.x / pageWidth));
   };
 
   return (
-    <View
-      accessibilityLabel={describeDaily(daily)}
-      style={styles.dailyPager}
-      onLayout={handleLayout}
-    >
+    <View accessibilityLabel={describeDaily(daily)} style={styles.dailyPager}>
       <ScrollView
         decelerationRate="fast"
         horizontal
@@ -153,31 +230,12 @@ function DailyStrip({ daily, styles }: { daily: CoverageDay[]; styles: Styles })
         showsHorizontalScrollIndicator={false}
       >
         {pages.map((page) => (
-          <View
-            key={page[0]?.dateKey}
-            style={[styles.dailyRow, pageWidth > 0 ? { width: pageWidth } : null]}
-          >
-            {renderWeek(page)}
+          <View key={page[0]?.dateKey} style={[styles.dailyRow, { width: pageWidth }]}>
+            <WeekRow days={page} styles={styles} />
           </View>
         ))}
       </ScrollView>
-      <View
-        accessibilityLabel={`Week ${activePage + 1} of ${pages.length}`}
-        style={styles.pageDots}
-      >
-        {pages.map((page, index) => (
-          <View
-            key={page[0]?.dateKey}
-            style={[
-              styles.pageDot,
-              {
-                backgroundColor:
-                  index === activePage ? mobileColors.textMuted : mobileColors.borderSubtle,
-              },
-            ]}
-          />
-        ))}
-      </View>
+      <PageDots activeIndex={activePage} count={pages.length} styles={styles} />
     </View>
   );
 }
