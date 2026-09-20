@@ -184,8 +184,11 @@ export function MyScheduleCard({
   /** The dashboard's period, so the strip shows one week or two with it. */
   range?: MobileScheduleRange;
   onExpand?: () => void;
-  /** A day card opens the same schedule as See all, on that day. */
-  onOpenDay?: (date: string) => void;
+  /**
+   * A day card opens its shift or absence; a day with nothing on it has no
+   * item to open, so it carries `entry: null` and the caller decides.
+   */
+  onOpenDay?: (day: { date: string; entry: MobileScheduleEntry | null }) => void;
 }) {
   const mobileColors = useMobileColors();
   const isDarkTheme = useIsDarkMode();
@@ -225,6 +228,9 @@ export function MyScheduleCard({
             const entry = entryByDate.get(dateIso);
             const { weekday, dayNumber, spokenDate } = formatDayHeader(dateIso);
             const segmentPills = buildDaySegmentPills(entry, mobileColors, isDarkTheme);
+            // What the pills show is what the tap opens: a deleted cell draws
+            // as an empty day and opens like one.
+            const openableEntry = segmentPills.length > 0 && entry ? entry : null;
 
             return (
               <Pressable
@@ -232,7 +238,7 @@ export function MyScheduleCard({
                 accessibilityLabel={spokenDate}
                 accessibilityRole="button"
                 disabled={!onOpenDay}
-                onPress={() => onOpenDay?.(dateIso)}
+                onPress={() => onOpenDay?.({ date: dateIso, entry: openableEntry })}
                 style={({ pressed }) => [styles.dayCard, pressed && styles.dayCardPressed]}
               >
                 <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.dayHeader}>

@@ -50,7 +50,7 @@ vi.mock("../components/MyScheduleCard", () => ({
     range,
   }: {
     onExpand?: () => void;
-    onOpenDay?: (date: string) => void;
+    onOpenDay?: (day: { date: string; entry: { employeeId: string } | null }) => void;
     range?: { startDate: string; endDate: string };
   }) => (
     <div>
@@ -64,9 +64,17 @@ vi.mock("../components/MyScheduleCard", () => ({
         </button>
       ) : null}
       {onOpenDay ? (
-        <button onClick={() => onOpenDay("2026-09-23")} type="button">
-          open day
-        </button>
+        <>
+          <button
+            onClick={() => onOpenDay({ date: "2026-09-23", entry: { employeeId: "emp-9" } })}
+            type="button"
+          >
+            open shift day
+          </button>
+          <button onClick={() => onOpenDay({ date: "2026-09-24", entry: null })} type="button">
+            open empty day
+          </button>
+        </>
       ) : null}
     </div>
   ),
@@ -83,8 +91,10 @@ vi.mock("../../../shared/hooks/useManualRefresh", () => ({
   },
 }));
 
+const setQueryData = vi.fn();
+
 vi.mock("../../../shared/lib/query-client", () => ({
-  queryClient: { invalidateQueries },
+  queryClient: { invalidateQueries, setQueryData },
 }));
 
 let AdminHomeScreen: (typeof import("./AdminHomeScreen"))["AdminHomeScreen"];
@@ -162,6 +172,7 @@ describe("AdminHomeScreen", () => {
       },
     });
     invalidateQueries.mockReset();
+    setQueryData.mockReset();
     routerPush.mockReset();
     capturedOnRefresh = undefined;
     useSessionState.mockReturnValue({ accessToken: "token-1" });
@@ -395,7 +406,49 @@ describe("AdminHomeScreen", () => {
     expect(routerPush).toHaveBeenCalledWith("/(tabs)/home/my-schedule");
   });
 
-  it("opens the same schedule on a tapped day of Your schedule", () => {
+  it("opens a tapped shift's detail page straight from Your schedule", () => {
+    useBootstrap.mockReturnValue({
+      isLoading: false,
+      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
+    });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: EMPTY_DASHBOARD_DATA,
+    });
+    // One entry, or the card is not shown at all.
+    const scheduleData = {
+      range: { startDate: "2026-09-20", endDate: "2026-09-26" },
+      entries: [{ employeeId: "emp-9", date: "2026-09-23" }],
+    };
+    useMyScheduleQuery.mockReturnValue({ isLoading: false, data: scheduleData });
+
+    render(<AdminHomeScreen />);
+
+    const range = useAdminDashboard.mock.calls.at(-1)?.[1] as {
+      startDate: string;
+      endDate: string;
+    };
+    fireEvent.click(screen.getByText("open shift day"));
+
+    expect(routerPush).toHaveBeenCalledWith({
+      pathname: "/shift/[employeeId]/[date]",
+      params: {
+        employeeId: "emp-9",
+        date: "2026-09-23",
+        rangeStart: range.startDate,
+        rangeEnd: range.endDate,
+        source: "mine",
+      },
+    });
+    // The detail screen finds the card's schedule already under its own key.
+    expect(setQueryData).toHaveBeenCalledWith(
+      expect.arrayContaining(["mobile", "schedule", "mine", range.startDate, range.endDate]),
+      scheduleData,
+    );
+  });
+
+  it("opens the schedule on a tapped empty day, which has no item to detail", () => {
     useBootstrap.mockReturnValue({
       isLoading: false,
       data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
@@ -408,11 +461,11 @@ describe("AdminHomeScreen", () => {
 
     render(<AdminHomeScreen />);
 
-    fireEvent.click(screen.getByText("open day"));
+    fireEvent.click(screen.getByText("open empty day"));
 
     expect(routerPush).toHaveBeenCalledWith({
       pathname: "/(tabs)/home/my-schedule",
-      params: { date: "2026-09-23" },
+      params: { date: "2026-09-24" },
     });
   });
 

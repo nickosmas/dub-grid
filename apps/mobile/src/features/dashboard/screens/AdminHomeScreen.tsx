@@ -6,6 +6,7 @@ import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
+import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import { queryClient } from "../../../shared/lib/query-client";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
@@ -199,9 +200,31 @@ export function AdminHomeScreen() {
                 accessToken={accessToken}
                 range={range}
                 onExpand={() => router.push("/(tabs)/home/my-schedule")}
-                onOpenDay={(date) =>
-                  router.push({ pathname: "/(tabs)/home/my-schedule", params: { date } })
-                }
+                onOpenDay={({ date, entry }) => {
+                  if (!entry) {
+                    router.push({ pathname: "/(tabs)/home/my-schedule", params: { date } });
+                    return;
+                  }
+                  // The detail screen reads the same /me/schedule response
+                  // under the schedule key for this range; hand it the card's
+                  // copy so the shift is on screen before its own fetch.
+                  if (myScheduleQuery.data) {
+                    queryClient.setQueryData(
+                      mobileQueryKeys.schedule(accessToken, "mine", range),
+                      myScheduleQuery.data,
+                    );
+                  }
+                  router.push({
+                    pathname: "/shift/[employeeId]/[date]",
+                    params: {
+                      employeeId: entry.employeeId,
+                      date,
+                      rangeStart: range.startDate,
+                      rangeEnd: range.endDate,
+                      source: "mine",
+                    },
+                  });
+                }}
               />
             ),
           },
