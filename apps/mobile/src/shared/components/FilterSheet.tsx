@@ -85,7 +85,18 @@ function isSelectionRow(child: ReactNode): child is SelectionRowElement {
   );
 }
 
-export function SelectionSection({ label, children }: { label: string; children: ReactNode }) {
+export function SelectionSection({
+  label,
+  children,
+}: {
+  /**
+   * Omit for the one list under a sheet whose title already names it: a
+   * header restating "Access level" under "App access" was the one thing on
+   * the sheet that said nothing.
+   */
+  label?: string;
+  children: ReactNode;
+}) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   // Flattened here rather than pushed onto the ten call sites: sections mix a
@@ -95,7 +106,7 @@ export function SelectionSection({ label, children }: { label: string; children:
 
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{label}</Text>
+      {label ? <Text style={styles.sectionTitle}>{label}</Text> : null}
       <View style={styles.selectionList}>
         {rows.map((child, index) => {
           if (!isSelectionRow(child)) return child;

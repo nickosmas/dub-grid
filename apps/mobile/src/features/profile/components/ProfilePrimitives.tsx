@@ -409,7 +409,12 @@ export function ProfileChoiceGroup<TId extends string | number>({
   error,
   onToggle,
 }: {
-  label: string;
+  /**
+   * Omit for a lone list under a sheet whose title already names it. Inside a
+   * page section, where several groups sit under one title, each keeps its
+   * own.
+   */
+  label?: string;
   items: Array<{
     id: TId;
     name: string;
@@ -429,7 +434,7 @@ export function ProfileChoiceGroup<TId extends string | number>({
 
   return (
     <View style={styles.choiceGroup}>
-      <Text style={[styles.fieldLabel, styles.choiceGroupLabel]}>{label}</Text>
+      {label ? <Text style={[styles.fieldLabel, styles.choiceGroupLabel]}>{label}</Text> : null}
       <View style={styles.list}>
         <View style={styles.listClip}>
           {items.map((item, index) => {

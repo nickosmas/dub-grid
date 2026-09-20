@@ -74,6 +74,7 @@ async function buildMobileProfilePayload(auth: Awaited<ReturnType<typeof require
   const metadataName = readUserMetadataName(auth.user.user_metadata);
   const firstName = profile?.firstName ?? metadataName.firstName;
   const lastName = profile?.lastName ?? metadataName.lastName;
+  const ownMembership = managementMemberships.find((row) => row.user_id === auth.user.id) ?? null;
 
   return {
     user: {
@@ -114,8 +115,8 @@ async function buildMobileProfilePayload(auth: Awaited<ReturnType<typeof require
         }
       : null,
     focusAreas,
-    managementDepartmentIds:
-      managementMemberships.find((row) => row.user_id === auth.user.id)?.department_ids ?? [],
+    managementDepartmentIds: ownMembership?.department_ids ?? [],
+    membershipUpdatedAt: ownMembership?.updated_at ?? null,
     pendingProfileChangeRequest: changeRequests.some(
       (request) => request.type === "profile_update" && request.status === "pending",
     ),

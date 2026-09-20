@@ -250,6 +250,12 @@ export const mobileProfileResponseSchema = z.object({
    * hold without managing anything.
    */
   managementDepartmentIds: z.array(z.number().int()).default([]),
+  /**
+   * The same membership row's `updated_at`, the optimistic-concurrency guard
+   * the management-access write path takes, so the profile can edit its own
+   * management departments with the same sheet a manager uses on a teammate.
+   */
+  membershipUpdatedAt: z.string().nullable().default(null),
   pendingProfileChangeRequest: z.boolean().default(false),
   pendingAccountDeletionRequest: z.boolean().default(false),
 });

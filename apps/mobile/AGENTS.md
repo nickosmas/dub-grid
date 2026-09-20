@@ -339,6 +339,12 @@ Choose the surface by the user's task:
 
 Sheets have a grabber, 40pt top corners, and extend to the bottom edge.
 
+- **A sheet that holds one list gives it no caption.** The management-access
+  and app-access pickers are `ProfileChoiceGroup` / `SelectionSection` lists
+  under a `<SheetHeader>` that already names them; a small "Access level" or
+  "Management Departments" label between the two said nothing. Both accept an
+  omitted `label`. Two lists on one sheet (a fresh invitation's role and
+  departments) keep theirs, since then the captions tell them apart.
 - **Titles go in the `header` slot** via `<SheetHeader>`, which puts them in the
   drag region. A title rendered in the body scrolls out of view and takes its
   drag target with it.

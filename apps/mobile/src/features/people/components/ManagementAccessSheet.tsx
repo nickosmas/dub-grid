@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { View } from "react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { MobileDepartment, MobilePerson } from "@dubgrid/contracts";
+import type { MobileDepartment } from "@dubgrid/contracts";
 import { AppText } from "../../../shared/components/AppText";
 import {
   BottomSheetModal,
@@ -9,15 +9,10 @@ import {
   SheetHeader,
 } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
-import { Chip } from "../../../shared/components/Chip";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { SectionNotice } from "./SectionNotice";
 import { getMobileEditorDismissLabel } from "@dubgrid/design-tokens";
 import { InlineError } from "../../../shared/components/InlineError";
-import {
-  SegmentedControl,
-  type SegmentedOption,
-} from "../../../shared/components/SegmentedControl";
 import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
 import {
   removeMobilePersonManagementAccess,
@@ -28,18 +23,23 @@ import { getClientFriendlyErrorMessage } from "../../../shared/lib/errors";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { mobileSpace } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
-import { hasManagementAccess, type ManagementAccessRole } from "../lib/managementAccess";
+import { ProfileChoiceGroup } from "../../profile/components/ProfilePrimitives";
+import {
+  hasManagementAccess,
+  type ManagementAccessRole,
+  type ManagementAccessSubject,
+} from "../lib/managementAccess";
 
 /**
  * Every tier, for the one case this sheet asks about a role at all: a brand-new
  * invitation, where nothing yet exists to hold one. Anyone with an account or a
- * pending invitation changes their role from the access badge on their profile,
+ * pending invitation changes their role from the Access row of their editor,
  * and this sheet edits their departments and nothing else.
  */
-const ROLE_OPTIONS: SegmentedOption<ManagementAccessRole>[] = [
-  { value: "user", label: "User" },
-  { value: "admin", label: "Admin" },
-  { value: "super_admin", label: "Super Admin" },
+const ROLE_OPTIONS: { id: ManagementAccessRole; name: string }[] = [
+  { id: "user", name: "User" },
+  { id: "admin", name: "Admin" },
+  { id: "super_admin", name: "Super Admin" },
 ];
 
 function sameIds(left: number[], right: number[]): boolean {
@@ -51,7 +51,7 @@ function sameIds(left: number[], right: number[]): boolean {
 
 /**
  * Grant, edit or revoke management access for someone who already has a staff
- * profile.
+ * profile, a teammate or yourself.
  *
  * A sheet, not a pushed screen: management settings always open in a popup over
  * whatever raised them. It is a focused task with its own save and discard
@@ -65,11 +65,14 @@ export function ManagementAccessSheet({
   visible,
   person,
   managementDepartments,
+  isSelf = false,
   onDismiss,
 }: {
   visible: boolean;
-  person: MobilePerson;
+  person: ManagementAccessSubject;
   managementDepartments: MobileDepartment[];
+  /** Editing your own membership from the profile: the copy says "your". */
+  isSelf?: boolean;
   onDismiss: () => void;
 }) {
   const accessToken = useAccessToken();
@@ -129,7 +132,9 @@ export function ManagementAccessSheet({
       setError(
         getClientFriendlyErrorMessage(
           mutationError,
-          "We couldn't update their management access right now.",
+          isSelf
+            ? "We couldn't update your management access right now."
+            : "We couldn't update their management access right now.",
         ),
       );
     },
@@ -138,6 +143,11 @@ export function ManagementAccessSheet({
         queryClient.invalidateQueries({ queryKey: ["mobile", "person"] }),
         queryClient.invalidateQueries({ queryKey: ["mobile", "people"] }),
         queryClient.invalidateQueries({ queryKey: ["mobile", "management-users"] }),
+        // Your own departments also live on the profile and in bootstrap's
+        // linked-membership facts; a teammate's edit invalidates them for
+        // nothing, which costs a refetch and nothing else.
+        queryClient.invalidateQueries({ queryKey: ["mobile", "profile"] }),
+        queryClient.invalidateQueries({ queryKey: ["mobile", "bootstrap"] }),
       ]);
       onDismiss();
       pushToast({
@@ -151,7 +161,9 @@ export function ManagementAccessSheet({
         message:
           result.result === "invitation_sent"
             ? "They'll join management once they accept."
-            : "Their management access was updated.",
+            : isSelf
+              ? "Your management access was updated."
+              : "Their management access was updated.",
       });
     },
   });
@@ -159,7 +171,9 @@ export function ManagementAccessSheet({
   const guard = useUnsavedChangesGuard({
     isDirty: hasUnsavedChanges,
     disabled: mutation.isPending,
-    body: "Your changes to their management access will be lost.",
+    body: isSelf
+      ? "Your changes to your management access will be lost."
+      : "Your changes to their management access will be lost.",
     onDiscard: () => setDraft(baseline),
     onClose: onDismiss,
   });
@@ -186,7 +200,9 @@ export function ManagementAccessSheet({
     ? [
         !person.userId && person.pendingInvitation
           ? "Saving now revokes their pending management invitation."
-          : "Saving now removes their management access. Their staff profile stays as it is.",
+          : isSelf
+            ? "Saving now removes your management access. Your staff profile stays as it is."
+            : "Saving now removes their management access. Their staff profile stays as it is.",
       ]
     : [];
 
@@ -259,43 +275,42 @@ export function ManagementAccessSheet({
         ) : (
           <View style={{ gap: mobileSpace.lg }}>
             <SectionNotice messages={removalNotices} />
+            {/* The same ring-and-check lists the editor's Staffing and
+                Assignments sections use, one row per choice with the full
+                name: a chip row abbreviated departments to fit and read as a
+                different control from the one on the page behind. The lists
+                carry headers only when there are two of them to tell apart;
+                a lone departments list is named by the sheet's title. */}
             {needsRoleForInvite ? (
-              <View style={{ gap: mobileSpace.sm }}>
-                <AppText tone="secondary" variant="label">
-                  Access level
-                </AppText>
-                <SegmentedControl
-                  accessibilityLabel="Access level"
-                  disabled={mutation.isPending}
-                  onChange={(orgRole) => setDraft((current) => ({ ...current, orgRole }))}
-                  options={ROLE_OPTIONS}
-                  value={draft.orgRole}
-                />
-              </View>
+              <ProfileChoiceGroup
+                items={ROLE_OPTIONS.map((option) => ({
+                  ...option,
+                  disabled: mutation.isPending,
+                }))}
+                label="Access level"
+                selection="single"
+                selectedIds={[draft.orgRole]}
+                onToggle={(orgRole) => setDraft((current) => ({ ...current, orgRole }))}
+              />
             ) : null}
 
-            <View style={{ gap: mobileSpace.sm }}>
-              <AppText tone="secondary" variant="label">
-                {MANAGEMENT_DEPARTMENT_LABELS.plural}
-              </AppText>
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: mobileSpace.xs }}>
-                {managementDepartments.map((department) => (
-                  <Chip
-                    key={department.id}
-                    label={department.abbr || department.name}
-                    onPress={() => toggleDepartment(department.id)}
-                    selected={draft.managementDepartmentIds.includes(department.id)}
-                  />
-                ))}
-              </View>
-              {/* Only the missing answer stays by the chips. The removal is a
-                  consequence of the save, raised once at the top of the sheet. */}
-              {!isRemoval && draft.managementDepartmentIds.length === 0 ? (
-                <AppText tone="danger" variant="meta">
-                  {`Select at least one ${MANAGEMENT_DEPARTMENT_LABELS.singularLower}`}
-                </AppText>
-              ) : null}
-            </View>
+            {/* Only the missing answer stays by the list. The removal is a
+                consequence of the save, raised once at the top of the sheet. */}
+            <ProfileChoiceGroup
+              error={
+                !isRemoval && draft.managementDepartmentIds.length === 0
+                  ? `Select at least one ${MANAGEMENT_DEPARTMENT_LABELS.singularLower}`
+                  : null
+              }
+              items={managementDepartments.map((department) => ({
+                id: department.id,
+                name: department.name,
+                disabled: mutation.isPending,
+              }))}
+              label={needsRoleForInvite ? MANAGEMENT_DEPARTMENT_LABELS.plural : undefined}
+              selectedIds={draft.managementDepartmentIds}
+              onToggle={toggleDepartment}
+            />
 
             {!person.userId ? (
               <AppText tone="secondary" variant="meta">
@@ -311,7 +326,11 @@ export function ManagementAccessSheet({
       <ConfirmationModal {...guard.confirmationProps} />
 
       <ConfirmationModal
-        body="They'll come off the management roster. Their staff profile and schedule stay exactly as they are."
+        body={
+          isSelf
+            ? "You'll come off the management roster. Your staff profile and schedule stay exactly as they are."
+            : "They'll come off the management roster. Their staff profile and schedule stay exactly as they are."
+        }
         confirmLabel="Remove Access"
         confirmTone="danger"
         loading={mutation.isPending}

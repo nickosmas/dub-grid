@@ -1475,8 +1475,8 @@ describe("PersonDetailScreen", () => {
 
       fireEvent.click(screen.getByRole("button", { name: "Add to Management" }));
 
-      expect(screen.getByText("OPS")).toBeInTheDocument();
-      expect(screen.queryByText("NW")).not.toBeInTheDocument();
+      expect(screen.getByRole("checkbox", { name: "Operations" })).toBeInTheDocument();
+      expect(screen.queryByRole("checkbox", { name: "North Wing" })).not.toBeInTheDocument();
     });
 
     // A plain app invitation carries no management departments, so it must not

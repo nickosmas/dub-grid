@@ -1,8 +1,4 @@
-import {
-  ORG_ROLE_LABELS,
-  getHighlightedOrgRole,
-  type OrgRole,
-} from "@dubgrid/domain";
+import { ORG_ROLE_LABELS, getHighlightedOrgRole, type OrgRole } from "@dubgrid/domain";
 import {
   mobileRadii,
   mobilePillOverflow,

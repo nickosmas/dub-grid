@@ -22,7 +22,10 @@ import {
   getInvitationEmailConfig,
   sendInvitationEmail,
 } from "@/features/mobile/server/invitation-email";
-import { requireManagementAccessActor } from "@/features/mobile/server/management-access-actor";
+import {
+  requireManagementAccessActor,
+  selfActionForbiddenResponse,
+} from "@/features/mobile/server/management-access-actor";
 import {
   loadMobilePersonWithAccess,
   type LoadedMobilePerson,
@@ -68,9 +71,9 @@ async function findInvalidManagementDepartmentIds(
 
 export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
-  const gated = await requireManagementAccessActor(req, id);
+  const gated = await requireManagementAccessActor(req, id, { allowSelf: true });
   if ("response" in gated) return gated.response;
-  const { auth, loaded } = gated;
+  const { auth, loaded, isSelf } = gated;
 
   const parsed = mobileManagementAccessBodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
@@ -78,6 +81,13 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
       { error: "Check the management access details and try again." },
       { status: 400 },
     );
+  }
+
+  // Your own departments, yes; your own role, never. The role RPC refuses a
+  // self change as well, but refusing it here keeps the departments write from
+  // going ahead on a request that asked for both.
+  if (isSelf && loaded.membership && loaded.membership.org_role !== parsed.data.orgRole) {
+    return selfActionForbiddenResponse();
   }
 
   const departmentIds = [...new Set(parsed.data.managementDepartmentIds)];
@@ -355,7 +365,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
  */
 export async function DELETE(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
-  const gated = await requireManagementAccessActor(req, id);
+  const gated = await requireManagementAccessActor(req, id, { allowSelf: true });
   if ("response" in gated) return gated.response;
   const { auth, loaded } = gated;
 

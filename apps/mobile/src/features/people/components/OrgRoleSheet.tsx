@@ -110,7 +110,9 @@ export function OrgRoleSheet({
         visible={visible}
         onDismiss={onDismiss}
       >
-        <SelectionSection label="Access level">
+        {/* No header over the list: the sheet's own title is the header, and
+            one list under it needs no second name. */}
+        <SelectionSection>
           {ROLE_OPTIONS.map((option) => (
             <SelectionRow
               detail={option.detail}

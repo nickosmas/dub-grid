@@ -37,6 +37,7 @@ vi.mock("@tanstack/react-query", async (importOriginal) => {
     ...actual,
     useMutation,
     useQuery,
+    useQueryClient: () => ({ invalidateQueries: vi.fn(() => Promise.resolve()) }),
   };
 });
 
@@ -123,7 +124,16 @@ const profileData = {
       departmentId: 7,
     },
   ],
+  currentMembership: {
+    id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+    name: "DubGrid Health",
+    slug: "dubgrid-health",
+    orgRole: "super_admin",
+    platformRole: "none",
+    isCurrent: true,
+  },
   managementDepartmentIds: [10],
+  membershipUpdatedAt: "2026-05-01T00:00:00.000Z",
   pendingProfileChangeRequest: false,
 };
 
@@ -239,6 +249,103 @@ describe("ProfileWorkScreen", () => {
     expect(screen.getByText("Clinical Leadership")).toBeInTheDocument();
     expect(screen.getByText("Employee ID")).toBeInTheDocument();
     expect(screen.getByText("#87")).toBeInTheDocument();
+  });
+
+  function grantManagementAccessPermission() {
+    // Reads the value `beforeEach` installed and layers the permission on it.
+    const bootstrap = useBootstrap();
+    useBootstrap.mockReturnValue({
+      ...bootstrap,
+      data: {
+        ...bootstrap.data,
+        permissions: { ...bootstrap.data.permissions, canManageManagementAccess: true },
+      },
+    });
+  }
+
+  // Web lets a super admin edit their own management departments from their
+  // profile; here the row opens the same sheet a manager gets on a teammate,
+  // aimed at your own membership, with your current departments checked.
+  it("opens the management access sheet from your management row", () => {
+    grantManagementAccessPermission();
+    render(<ProfileWorkScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: /^Management Departments/ }));
+
+    expect(screen.getByText("Edit management access")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Clinical Leadership" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+  });
+
+  it("offers Add to management from the row when you manage nothing yet", () => {
+    grantManagementAccessPermission();
+    useQuery.mockReturnValue({
+      data: { ...profileData, managementDepartmentIds: [] },
+      error: null,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    render(<ProfileWorkScreen />);
+
+    const row = screen.getByRole("button", { name: /^Management Departments/ });
+    expect(row).toHaveTextContent("Not in management");
+    fireEvent.click(row);
+
+    expect(screen.getByText("Add to management")).toBeInTheDocument();
+  });
+
+  // Without the permission the departments stay a fact, not a control, and
+  // someone who manages nothing sees no row at all.
+  it("keeps the management row read-only without the permission", () => {
+    render(<ProfileWorkScreen />);
+
+    expect(screen.getByText("Clinical Leadership")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^Management Departments/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  // The same allowance the person page makes for a teammate with management
+  // access: coming off the schedule is a consequence to announce, not a
+  // missing answer to block on.
+  it("lets a management user clear their own focus areas, with the notice", async () => {
+    render(<ProfileWorkScreen />);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "ICU" }));
+
+    expect(
+      screen.getByText("Saving now removes you from the schedule. You'll keep management access."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Select at least one focus area.")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save changes" })).not.toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => {
+      expect(updateMobilePerson).toHaveBeenCalledWith(
+        "token-123",
+        "d660d308-4e0d-4daf-84fd-6753405e6740",
+        expect.objectContaining({ focusAreaIds: [] }),
+      );
+    });
+  });
+
+  it("still requires a focus area from someone with no management access", () => {
+    useQuery.mockReturnValue({
+      data: { ...profileData, managementDepartmentIds: [] },
+      error: null,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    render(<ProfileWorkScreen />);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "ICU" }));
+
+    expect(screen.getByText("Select at least one focus area.")).toBeInTheDocument();
+    expect(screen.queryByText(/Saving now removes you/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
   });
 
   it("carries no organization block — that is the profile hub's job", () => {
