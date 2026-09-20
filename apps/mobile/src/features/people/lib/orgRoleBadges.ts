@@ -1,7 +1,6 @@
 import {
   ORG_ROLE_LABELS,
   getHighlightedOrgRole,
-  getOrgRoleInsignia,
   getOrgRoleLabel,
   type OrgRole,
 } from "@dubgrid/domain";
@@ -48,14 +47,11 @@ export function getMobileOrgRoleBadge(
     return null;
   }
 
-  // A list row prints one thing, not two: the pill carries the insignia and the
-  // tier's name together, so a scan for crowns and a read of the label are the
+  // A list row prints one thing, not two: the pill carries the star and the
+  // tier's name together, so a scan for stars and a read of the label are the
   // same glance. The detail hero keeps them apart, where the pill is a control.
-  const icon = getOrgRoleInsignia(highlightedRole);
-
   if (highlightedRole === "super_admin") {
     return {
-      icon,
       label: ORG_ROLE_LABELS[highlightedRole],
       tone: "warning" as const,
       containerStyle: {
@@ -79,7 +75,6 @@ export function getMobileOrgRoleBadge(
   }
 
   return {
-    icon,
     label: ORG_ROLE_LABELS[highlightedRole],
     tone: "brand" as const,
     containerStyle: {

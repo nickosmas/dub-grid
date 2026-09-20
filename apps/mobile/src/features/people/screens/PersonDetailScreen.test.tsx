@@ -274,7 +274,7 @@ describe("PersonDetailScreen", () => {
   // The avatar's corner used to carry a status dot. The tier's insignia sits
   // beside the name now, and an inactive person reads as inactive from the
   // Activate button rather than from a chip.
-  it("crowns a super admin beside their name", () => {
+  it("stars a super admin beside their name", () => {
     useQuery.mockReturnValue({
       data: { person: makePerson({ status: "inactive" }) },
       error: null,

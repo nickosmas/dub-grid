@@ -1,6 +1,5 @@
 "use client";
 
-import { Crown, Star } from "lucide-react";
 import { ORG_ROLE_LABELS, getHighlightedOrgRole, getOrgRoleInsignia } from "@dubgrid/domain";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
@@ -8,18 +7,32 @@ import type { OrganizationRole } from "@/types";
 
 type InsigniaSize = "sm" | "md" | "lg";
 
-// Sized to stay legible at a glance rather than to stay discreet, with the glyph
-// at ~55% of the circle so the crown has room to read as a crown.
+// Sized to the cap height of the name it follows, so the mark reads as part of
+// the name rather than as a chip beside it.
 //
 // `pull` closes most of the row's own gap. The mark belongs to the name, so it
 // should read as attached to it, while the chips that follow ("You", "On
 // Schedule") keep the row's normal rhythm — which a smaller container gap would
 // have tightened along with it.
-const SIZES: Record<InsigniaSize, { badge: number; glyph: number; pull: number }> = {
-  sm: { badge: 16, glyph: 9, pull: -4 },
-  md: { badge: 20, glyph: 11, pull: -5 },
-  lg: { badge: 26, glyph: 15, pull: -7 },
+const SIZES: Record<InsigniaSize, { badge: number; pull: number }> = {
+  sm: { badge: 14, pull: -4 },
+  md: { badge: 16, pull: -5 },
+  lg: { badge: 20, pull: -7 },
 };
+
+// A regular five-point star drawn about the viewBox center, spanning about two
+// thirds of it. A regular star's centroid is its circumcircle's center, so this
+// lands the star's visual weight on the circle's center; lucide's Star is drawn
+// off-center in its viewBox and sat visibly low and to the right. The svg is
+// the full chip rather than a smaller glyph centered in it, so it never lands
+// on a half pixel. The round stroke softens the points the way lucide's does.
+const STAR_OUTER_RADIUS = 7.6;
+const STAR_INNER_RADIUS = 3.4;
+const STAR_POINTS = Array.from({ length: 10 }, (_, i) => {
+  const radius = i % 2 === 0 ? STAR_OUTER_RADIUS : STAR_INNER_RADIUS;
+  const angle = -Math.PI / 2 + (i * Math.PI) / 5;
+  return `${(12 + radius * Math.cos(angle)).toFixed(2)},${(12 + radius * Math.sin(angle)).toFixed(2)}`;
+}).join(" ");
 
 interface AccessInsigniaProps {
   orgRole: OrganizationRole | string | null | undefined;
@@ -28,8 +41,9 @@ interface AccessInsigniaProps {
 }
 
 /**
- * The crown or star marking an elevated member, sitting just after their name.
- * Plain users get nothing, so the mark keeps meaning something.
+ * The star marking an elevated member, sitting just after their name: gold for
+ * a Super Admin, blue for an Admin. Plain users get nothing, so the mark keeps
+ * meaning something.
  */
 export function AccessInsignia({ orgRole, size = "sm" }: AccessInsigniaProps) {
   const insignia = getOrgRoleInsignia(orgRole);
@@ -38,8 +52,7 @@ export function AccessInsignia({ orgRole, size = "sm" }: AccessInsigniaProps) {
     return null;
   }
 
-  const { badge, glyph, pull } = SIZES[size];
-  const Glyph = insignia === "crown" ? Crown : Star;
+  const { badge, pull } = SIZES[size];
   const label = ORG_ROLE_LABELS[highlightedRole];
 
   return (
@@ -53,11 +66,22 @@ export function AccessInsignia({ orgRole, size = "sm" }: AccessInsigniaProps) {
           width: badge,
           height: badge,
           background:
-            insignia === "crown" ? "var(--dg-color-insignia-crown)" : "var(--dg-color-brand)",
+            insignia === "gold" ? "var(--dg-color-insignia-gold)" : "var(--dg-color-brand)",
           color: "var(--dg-color-text-inverse)",
         }}
       >
-        <Glyph aria-hidden size={glyph} strokeWidth={2} fill="currentColor" />
+        <svg
+          aria-hidden
+          viewBox="0 0 24 24"
+          width={badge}
+          height={badge}
+          fill="currentColor"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinejoin="round"
+        >
+          <polygon points={STAR_POINTS} />
+        </svg>
       </span>
     </Hint>
   );

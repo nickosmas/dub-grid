@@ -95,7 +95,7 @@
   --color-warning-text: var(--dg-color-warning-text);
   --color-warning-border: var(--dg-color-warning-border);
   --color-warning-dark: var(--dg-color-warning-dark);
-  --color-insignia-crown: var(--dg-color-insignia-crown);
+  --color-insignia-gold: var(--dg-color-insignia-gold);
   --color-danger: var(--dg-color-danger);
   --color-danger-bg: var(--dg-color-danger-bg);
   --color-danger-text: var(--dg-color-danger-text);
@@ -350,10 +350,10 @@
   --dg-color-warning-text: #92400e;
   --dg-color-warning-border: #fde68a;
   --dg-color-warning-dark: #d97706;
-  /* Super Admin avatar insignia. Deeper than --dg-color-warning so the white
-     crown reads, and deliberately not redefined for dark: the insignia is a
-     solid chip ringed in the surface behind it, so only the ring changes. */
-  --dg-color-insignia-crown: #d97706;
+  /* Super Admin star. Deeper than --dg-color-warning so the white star reads,
+     and deliberately not redefined for dark: the insignia is a solid chip
+     ringed in the surface behind it, so only the ring changes. */
+  --dg-color-insignia-gold: #d97706;
   --dg-color-danger: #ef4444;
   --dg-color-danger-bg: #fef2f2;
   --dg-color-danger-text: #b91c1c;

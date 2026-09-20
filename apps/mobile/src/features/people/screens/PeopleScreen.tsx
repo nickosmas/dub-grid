@@ -1201,11 +1201,7 @@ function PersonRow({
           </Text>
           {orgRoleBadge ? (
             <View style={orgRoleBadge.containerStyle}>
-              <MaterialCommunityIcons
-                color={orgRoleBadge.textStyle.color}
-                name={orgRoleBadge.icon === "crown" ? "crown" : "star"}
-                size={13}
-              />
+              <MaterialCommunityIcons color={orgRoleBadge.textStyle.color} name="star" size={13} />
               <Text fit="compact" style={orgRoleBadge.textStyle}>
                 {orgRoleBadge.label}
               </Text>

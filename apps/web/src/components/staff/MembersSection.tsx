@@ -2124,7 +2124,7 @@ export function MembersSection({
                                     </span>
                                   )}
                                   {/* A pending invite is badged too: the row
-                                      says the account isn't live yet, the crown
+                                      says the account isn't live yet, the star
                                       says which tier it will land on. */}
                                   <AccessInsignia orgRole={person.orgRole} />
                                   {isYou && (
