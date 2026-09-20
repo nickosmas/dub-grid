@@ -139,6 +139,16 @@ Sign-out must revoke this device's push token **before** dropping the session
 (`disablePushForCurrentDevice` in `shared/lib/auth-reset.ts`), or the phone
 keeps receiving the previous user's notifications.
 
+The notification permission is asked for once, with context, on the last slide
+of the first-run tour (`features/onboarding`, via
+`features/notifications/lib/push-permission.ts`). That slide's
+`NotificationReasons` card names the categories Profile > Notifications
+controls; keep the two in step. `usePushRegistration`'s
+automatic registration after sign-in never shows the system prompt on its own:
+it registers a device that already said yes, so someone who answered "Not now"
+on the tour is not met by the bare OS dialog on the home screen. The switch in
+Profile > Notifications is the only other place that prompts.
+
 ## Text Scaling
 
 Every text in the app goes through `shared/components/Text` (and `AppText` on

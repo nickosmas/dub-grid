@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type * as Notifications from "expo-notifications";
-import Constants, { ExecutionEnvironment } from "expo-constants";
 import { AppState, Platform } from "react-native";
 import { registerPushToken } from "../../../shared/lib/api";
 import {
@@ -8,43 +7,13 @@ import {
   saveStoredPushDevice,
   type StoredPushDevice,
 } from "../../../shared/lib/session";
-
-const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
-const pushUnsupported = Platform.OS === "web" || isExpoGo;
-
-// Lazy-load expo-notifications so importing this hook in Expo Go doesn't
-// trigger the module's import-time "remote push removed in SDK 53" error.
-async function loadNotifications(): Promise<typeof Notifications | null> {
-  if (pushUnsupported) return null;
-  return await import("expo-notifications");
-}
-
-type PushPermissionState = "unsupported" | "undetermined" | "denied" | "granted";
-
-type NotificationPermissionSnapshot = {
-  canAskAgain?: boolean;
-  granted?: boolean;
-};
-
-function toPermissionSnapshot(
-  permissions: Notifications.NotificationPermissionsStatus,
-): NotificationPermissionSnapshot {
-  return permissions as unknown as NotificationPermissionSnapshot;
-}
-
-function resolvePermissionState(
-  permissions: NotificationPermissionSnapshot | "unsupported",
-): PushPermissionState {
-  if (permissions === "unsupported") {
-    return "unsupported";
-  }
-
-  if (permissions.granted) {
-    return "granted";
-  }
-
-  return permissions.canAskAgain ? "undetermined" : "denied";
-}
+import {
+  loadNotifications,
+  pushUnsupported,
+  resolvePermissionState,
+  toPermissionSnapshot,
+  type PushPermissionState,
+} from "../lib/push-permission";
 
 async function getStoredOrFreshPushDevice(
   notifications: typeof Notifications,
@@ -161,8 +130,13 @@ export function usePushRegistration(
     // 5xx, a timeout — was never retried, and after an org switch the device
     // kept the previous org's id on its push row and went on receiving that
     // org's notifications.
+    //
+    // Never prompts. The first-run tour asks for the permission with context,
+    // and someone who answered "Not now" there would otherwise meet the bare
+    // system prompt the moment they signed in. This registers a device that
+    // already said yes; the switch in Profile > Notifications asks otherwise.
     attemptedKeyRef.current = nextKey;
-    void refreshPushRegistration({ requestPermission: true }).then((registered) => {
+    void refreshPushRegistration().then((registered) => {
       if (!registered && attemptedKeyRef.current === nextKey) {
         attemptedKeyRef.current = null;
       }

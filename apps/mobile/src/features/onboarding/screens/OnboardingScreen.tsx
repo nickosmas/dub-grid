@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { router } from "expo-router";
 import {
   Dimensions,
@@ -15,11 +15,16 @@ import { DubGridWordmark } from "../../../shared/components/DubGridWordmark";
 import { GradientBackdrop } from "../../../shared/components/GradientBackdrop";
 import { hapticSelection } from "../../../shared/lib/haptics";
 import { markHasSeenOnboarding } from "../../auth/hooks/useHasSeenOnboarding";
+import {
+  getPushPermissionState,
+  requestPushPermission,
+  type PushPermissionState,
+} from "../../notifications/lib/push-permission";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import type { MobileColors } from "../../../shared/theme/tokens";
+import { mobileControl, mobileSpace, type MobileColors } from "../../../shared/theme/tokens";
+import { NotificationReasons } from "../components/NotificationReasons";
 import { OnboardingCard } from "../components/OnboardingCard";
 import { OnboardingPagination } from "../components/OnboardingPagination";
-import { IllustrationNotifications } from "../components/illustrations/IllustrationNotifications";
 import { IllustrationSwapPreview } from "../components/illustrations/IllustrationSwapPreview";
 import { IllustrationUpcomingShift } from "../components/illustrations/IllustrationUpcomingShift";
 
@@ -34,10 +39,12 @@ const SLIDES: Array<{ visual: ReactNode; title: string; body: string }> = [
     title: "Cover shifts on the go",
     body: "Pick up open shifts, swap with teammates, or request time off. With manager approval built in.",
   },
+  // The permission step. It says what the OS prompt is for before the prompt
+  // appears, so the reasons card stands where the other slides have a mock-up.
   {
-    visual: <IllustrationNotifications />,
-    title: "Stay in the loop",
-    body: "Get notified instantly when your schedule changes or someone needs you to step in.",
+    visual: <NotificationReasons />,
+    title: "Know when things change",
+    body: "Shifts move and requests get answered while you're away. Notifications tell you in time, and you choose which kinds in Profile.",
   },
 ];
 
@@ -48,9 +55,25 @@ export default function OnboardingScreen() {
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const [pageWidth, setPageWidth] = useState(Dimensions.get("window").width);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [pushPermission, setPushPermission] = useState<PushPermissionState | null>(null);
   const scrollX = useSharedValue(0);
   const scrollRef = useRef<Animated.ScrollView>(null);
   const lastIndexRef = useRef(0);
+
+  // Resolved under the startup splash, which stays up for the tour's first
+  // frames, so the footer is already in its final shape when it appears.
+  useEffect(() => {
+    let cancelled = false;
+    void getPushPermissionState().then(
+      (state) => {
+        if (!cancelled) setPushPermission(state);
+      },
+      () => undefined,
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
@@ -80,19 +103,28 @@ export default function OnboardingScreen() {
     void completeOnboarding();
   }, [completeOnboarding]);
 
-  const handlePrimary = useCallback(() => {
-    if (activeIndex >= SLIDES.length - 1) {
-      void completeOnboarding();
-      return;
-    }
-
+  const handleAdvance = useCallback(() => {
     scrollRef.current?.scrollTo({
       x: (activeIndex + 1) * pageWidth,
       animated: true,
     });
-  }, [activeIndex, completeOnboarding, pageWidth]);
+  }, [activeIndex, pageWidth]);
+
+  const handleEnableNotifications = useCallback(async () => {
+    try {
+      await requestPushPermission();
+    } catch {
+      // A prompt that fails is no reason to hold the user on the tour; the
+      // switch in Profile > Notifications asks again.
+    }
+    await completeOnboarding();
+  }, [completeOnboarding]);
 
   const isLast = activeIndex >= SLIDES.length - 1;
+  // Only a device that has not answered yet gets the ask: the OS shows its
+  // prompt once, so on a decided device the button would do nothing.
+  const canAskForNotifications = pushPermission === "undetermined";
+  const asksForNotifications = isLast && canAskForNotifications;
 
   return (
     <View style={styles.root}>
@@ -136,6 +168,7 @@ export default function OnboardingScreen() {
             onScroll={scrollHandler}
             onMomentumScrollEnd={handleMomentumScrollEnd}
             decelerationRate="fast"
+            testID="onboarding-pager"
           >
             {SLIDES.map((slide, index) => (
               <OnboardingCard
@@ -153,7 +186,25 @@ export default function OnboardingScreen() {
 
         <View style={styles.footer}>
           <OnboardingPagination count={SLIDES.length} pageWidth={pageWidth} scrollX={scrollX} />
-          <Button label={isLast ? "Get Started" : "Continue"} onPress={handlePrimary} />
+          <View style={styles.actions}>
+            {asksForNotifications ? (
+              <Button label="Enable notifications" onPress={handleEnableNotifications} />
+            ) : (
+              <Button
+                label={isLast ? "Get started" : "Continue"}
+                onPress={isLast ? handleSkip : handleAdvance}
+              />
+            )}
+            {/* Reserved on every slide once the ask is possible, so the dots
+                and the button don't jump up when the last slide arrives. */}
+            {canAskForNotifications ? (
+              <View style={styles.secondarySlot}>
+                {asksForNotifications ? (
+                  <Button label="Not now" onPress={handleSkip} tone="link" />
+                ) : null}
+              </View>
+            ) : null}
+          </View>
         </View>
       </SafeAreaView>
     </View>
@@ -199,5 +250,13 @@ const createStyles = (mobileColors: MobileColors) =>
       paddingBottom: 16,
       gap: 24,
       alignItems: "stretch",
+    },
+    // Primary over a text link, spaced like the sign-in screen's action group.
+    actions: {
+      gap: mobileSpace.sm,
+    },
+    secondarySlot: {
+      minHeight: mobileControl.md,
+      justifyContent: "center",
     },
   });

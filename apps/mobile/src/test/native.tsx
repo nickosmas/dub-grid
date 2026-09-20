@@ -252,7 +252,7 @@ export function createReactNativeModule(
   const Text = ({ children, ...props }: Record<string, any>) =>
     React.createElement("span", pickDomProps(props), children as ReactType.ReactNode);
   const ScrollView = React.forwardRef<{ scrollTo: typeof screenScrollToMock }, Record<string, any>>(
-    ({ children, ...props }, ref) => {
+    ({ children, onMomentumScrollEnd, ...props }, ref) => {
       React.useImperativeHandle(
         ref,
         () => ({
@@ -261,10 +261,29 @@ export function createReactNativeModule(
         [],
       );
 
+      // A DOM scroll event stands in for a settled native swipe: a test sets
+      // `data-scroll-x` / `data-scroll-y` on the element and fires `scroll`,
+      // the way the Screen emulation below reads `data-scroll-y`.
+      const onScroll =
+        typeof onMomentumScrollEnd === "function"
+          ? (event: ReactType.UIEvent<HTMLElement>) => {
+              const { dataset } = event.currentTarget;
+              onMomentumScrollEnd({
+                nativeEvent: {
+                  contentOffset: {
+                    x: Number(dataset.scrollX ?? 0),
+                    y: Number(dataset.scrollY ?? 0),
+                  },
+                },
+              });
+            }
+          : undefined;
+
       return React.createElement(
         "div",
         {
           ...pickDomProps(props),
+          ...(onScroll ? { onScroll } : {}),
           "data-keyboard-dismiss-mode": props.keyboardDismissMode,
         },
         children as ReactType.ReactNode,
