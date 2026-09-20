@@ -16,7 +16,7 @@ import {
   type MobileColors,
   mobileSpace,
 } from "../../../shared/theme/tokens";
-import type { ProfileHeroAlign } from "./ProfilePrimitives";
+import { ProfileQuickActions, type ProfileHeroAlign } from "./ProfilePrimitives";
 
 /** `avatar` in ProfilePrimitives. */
 const AVATAR_SIZE = 64;
@@ -92,15 +92,13 @@ function ProfileRow({ variant }: { variant: ProfileRowVariant }) {
   );
 }
 
-/** The hero: avatar, name, badge, subtitle and the wrapped meta grid. */
+/** The hero: avatar, name, subtitle and the wrapped meta grid. */
 function ProfileHeroSkeleton({
   align,
-  chips,
   metaItems,
   subtitle,
 }: {
   align: ProfileHeroAlign;
-  chips: number;
   metaItems: number;
   subtitle: boolean;
 }) {
@@ -124,26 +122,12 @@ function ProfileHeroSkeleton({
         <View style={styles.heroTop}>
           <SkeletonCircle size={AVATAR_SIZE} />
           <View style={styles.heroCopy}>
-            <View style={styles.heroTitleRow}>
-              <SkeletonLine variant="screenTitle" width="52%" style={styles.grow} />
-              <SkeletonPill height={26} width={62} />
-            </View>
+            <SkeletonLine variant="screenTitle" width="52%" />
             <SkeletonLine variant="body" width="64%" />
           </View>
         </View>
       )}
-      {chips > 0 ? (
-        <View style={styles.heroChips}>
-          {skeletonRows(chips, (index) => (
-            <SkeletonPill
-              height={26}
-              key={`profile-chip-${index}`}
-              width={index === 0 ? 104 : 136}
-            />
-          ))}
-        </View>
-      ) : null}
-      {/* The profile's "Joined" line under its badge. */}
+      {/* The profile's "Joined" line under the name. */}
       {isCentered && subtitle ? <SkeletonLine variant="caption" width={128} /> : null}
       {metaItems > 0 ? (
         <View style={[styles.heroDetail, isCentered && styles.heroDetailCentered]}>
@@ -168,8 +152,8 @@ export type ProfileSectionSkeleton = {
   rowVariant?: ProfileRowVariant;
 };
 
-/** Quick action pill widths, in the order the real row lays them out. */
-const QUICK_ACTION_WIDTHS = [112, 96, 88];
+/** The real row's icon-only circle: `Button` at `size="md"`. */
+const QUICK_ACTION_SIZE = 44;
 
 /**
  * The placeholder every profile-shaped screen uses: the user's own profile,
@@ -191,7 +175,6 @@ export function ProfileSkeleton({
   rowsPerSection = 3,
   metaItems = 4,
   heroAlign = "row",
-  heroChips = 0,
   heroSubtitle = false,
   showHero = true,
   quickActions = 0,
@@ -203,12 +186,10 @@ export function ProfileSkeleton({
   metaItems?: number;
   /** Match the screen's own `ProfileHero`, or the silhouette shifts on load. */
   heroAlign?: ProfileHeroAlign;
-  /** Chips the hero prints under the name, drawn as a centered pill row. */
-  heroChips?: number;
   /** On where the centered hero carries a subtitle under the name. */
   heroSubtitle?: boolean;
   showHero?: boolean;
-  /** Pills in the action row under the hero; 0 leaves the row out. */
+  /** Icon circles in the action row under the hero; 0 leaves the row out. */
   quickActions?: number;
   rowVariant?: ProfileRowVariant;
 }) {
@@ -223,23 +204,19 @@ export function ProfileSkeleton({
   return (
     <SkeletonGroup style={styles.page}>
       {showHero ? (
-        <ProfileHeroSkeleton
-          align={heroAlign}
-          chips={heroChips}
-          metaItems={metaItems}
-          subtitle={heroSubtitle}
-        />
+        <ProfileHeroSkeleton align={heroAlign} metaItems={metaItems} subtitle={heroSubtitle} />
       ) : null}
+      {/* The real row, so the circles sit where the actions will. */}
       {quickActions > 0 ? (
-        <View style={[styles.quickActions, heroAlign === "center" && styles.quickActionsCentered]}>
-          {skeletonRows(Math.min(quickActions, QUICK_ACTION_WIDTHS.length), (index) => (
+        <ProfileQuickActions accessibilityLabel="Loading actions" scrollEnabled={false}>
+          {skeletonRows(quickActions, (index) => (
             <SkeletonPill
-              height={36}
+              height={QUICK_ACTION_SIZE}
               key={`profile-action-${index}`}
-              width={QUICK_ACTION_WIDTHS[index]}
+              width={QUICK_ACTION_SIZE}
             />
           ))}
-        </View>
+        </ProfileQuickActions>
       ) : null}
       {sectionSpecs.map((section, sectionIndex) => (
         <View key={`profile-section-${sectionIndex}`} style={styles.section}>
@@ -264,11 +241,6 @@ export function ProfileSkeleton({
 
 const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
-    // A percentage-wide line inside a row has no width of its own to take a
-    // percentage of; growing the wrapper gives it the row's free space.
-    grow: {
-      flex: 1,
-    },
     page: {
       gap: mobileSpacing.sectionGap,
     },
@@ -280,12 +252,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       alignItems: "center",
       paddingTop: 8,
     },
-    heroChips: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 8,
-      justifyContent: "center",
-    },
     heroTop: {
       alignItems: "center",
       flexDirection: "row",
@@ -294,12 +260,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     heroCopy: {
       flex: 1,
       gap: mobileSpace.xs,
-      minWidth: 0,
-    },
-    heroTitleRow: {
-      alignItems: "center",
-      flexDirection: "row",
-      gap: 8,
       minWidth: 0,
     },
     heroDetail: {
@@ -323,15 +283,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     sessionRow: {
       minHeight: 112,
       alignItems: "flex-start",
-    },
-    quickActions: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: mobileSpace.md,
-      paddingBottom: 16,
-    },
-    quickActionsCentered: {
-      justifyContent: "center",
     },
     section: {
       gap: mobileSpace.md,

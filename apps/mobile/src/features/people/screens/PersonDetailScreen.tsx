@@ -7,7 +7,6 @@ import {
   type NativeSyntheticEvent,
 } from "react-native";
 import { Text } from "../../../shared/components/Text";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
@@ -42,6 +41,7 @@ import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { SelectionRow, SelectionSection } from "../../../shared/components/FilterSheet";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
+import { createHeaderTextAction } from "../../../shared/navigation/HeaderTextAction";
 import {
   changeMobilePersonOrgRole,
   checkMobilePersonContact,
@@ -77,7 +77,6 @@ import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesG
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
-  mobileIconToneColor,
   mobileRadii,
   mobileText,
   mobileTextWeighted,
@@ -89,12 +88,13 @@ import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import {
   getProfileInitials,
-  ProfileActionStack,
   ProfileChoiceGroup,
   ProfileHero,
   ProfileInfoRow,
   ProfileList,
+  ProfileNavRow,
   ProfilePanel,
+  ProfileQuickAction,
   ProfileQuickActions,
   ProfileSection,
   ProfileTextInput,
@@ -104,7 +104,7 @@ import { isRoleCertificationBlocked } from "../../profile/lib/role-certification
 import { ProfileSkeleton } from "../../profile/components/ProfileSkeleton";
 import { EMAIL_CONFLICT_MESSAGES, PHONE_CONFLICT_MESSAGE } from "../lib/contactConflicts";
 import { hasManagementAccess } from "../lib/managementAccess";
-import { getHighlightedOrgRole, getMobileOrgRoleHeroBadge } from "../lib/orgRoleBadges";
+import { ORG_ROLE_LABELS } from "../lib/orgRoleBadges";
 import { SectionNotice } from "../components/SectionNotice";
 import { ManagementAccessSheet } from "../components/ManagementAccessSheet";
 import {
@@ -734,13 +734,11 @@ export default function PersonDetailScreen() {
         {contentState.showSkeleton ? (
           <ProfileSkeleton
             heroAlign="center"
-            // One pill at most, the access tier. A colleague sees it only on
-            // an admin, so it is left out of their guess.
-            heroChips={canViewEmployeeDetails ? 1 : 0}
             metaItems={0}
-            // Call, Email and Edit for a manager; Call and Email with employee
-            // details alone; nothing when contact details are redacted.
-            quickActions={canManageEmployees ? 3 : canViewEmployeeDetails ? 2 : 0}
+            // Call, Email and the management actions for a manager (Edit
+            // sits in the bar); Call and Email with employee details alone;
+            // nothing when contact details are redacted.
+            quickActions={canManageEmployees ? 4 : canViewEmployeeDetails ? 2 : 0}
             sections={
               canViewEmployeeDetails
                 ? // Contact, Staffing, Assignments at their usual row counts.
@@ -821,15 +819,16 @@ export default function PersonDetailScreen() {
   // never on the grid — telling them they'll come "off the schedule" would be
   // describing something that never happened. Same split web makes.
   const isOnSchedule = person.focusAreaIds.length > 0;
-  // Through the shared resolver so the badge and the picker inside the sheet
-  // can't disagree: an invitation's `roleToAssign` is the role until it is
-  // accepted, and reading `orgRole` alone showed a pending Admin as "User".
-  const orgRoleBadge = getMobileOrgRoleHeroBadge(getPersonOrgRole(person));
-  // The badge is the role control, the way web's Access column is. It only
-  // becomes one where there is something to write to: a membership, or an
-  // invitation carrying the role until it is accepted. Someone with neither has
-  // no access record at all, so web prints a dash and offers no dropdown; here
-  // the badge stays the plain "User" pill with the hint below it.
+  // Through the shared resolver so the hero, the editor's row and the picker
+  // inside the sheet can't disagree: an invitation's `roleToAssign` is the
+  // role until it is accepted, and reading `orgRole` alone showed a pending
+  // Admin as "User".
+  const orgRole = getPersonOrgRole(person);
+  // The editor's Access row is the role control, the way web's Access column
+  // is. It only exists where there is something to write to: a membership, or
+  // an invitation carrying the role until it is accepted. Someone with neither
+  // has no access record at all, so web prints a dash and offers no dropdown;
+  // here the row stays out and the banner below the hero says what to do.
   const canChangeOrgRole =
     canManageManagementAccess &&
     !isSelf &&
@@ -857,11 +856,6 @@ export default function PersonDetailScreen() {
             body: canManageEmployees ? "Send an invitation to give app access." : undefined,
             tone: "info" as const,
           };
-  // The access tier is management information. A regular viewer sees it only
-  // when it says something about the colleague, an Admin or Super admin
-  // insignia; a plain "User" pill on every colleague told them nothing.
-  const showOrgRoleBadge =
-    canViewEmployeeDetails || getHighlightedOrgRole(getPersonOrgRole(person)) != null;
   const showContact = Boolean(person.phone || person.email);
   // A manager reads "None" as a gap to fill; a colleague reads it as noise.
   // The rows that can be empty drop out for viewers without details, and the
@@ -1016,6 +1010,21 @@ export default function PersonDetailScreen() {
             color: isCompactTitleVisible ? mobileColors.textPrimary : "transparent",
             fontFamily: mobileTypography.fontFamily.bold,
           },
+          // Edit lives in the bar, where iOS puts it, not in the action row:
+          // it is the one action about the page rather than about the person.
+          // Cleared while editing, when the footer's Save and Cancel own it.
+          ...createHeaderTextAction(
+            canEdit && !editing
+              ? {
+                  label: "Edit",
+                  accessibilityHint: "Opens the staff details editor",
+                  onPress: () => {
+                    setEditing(true);
+                    setDraft(makeDraft(person));
+                  },
+                }
+              : null,
+          ),
         }}
       />
       <AccountLinkChallengeModal
@@ -1035,23 +1044,14 @@ export default function PersonDetailScreen() {
         }
       />
 
-      {/* The hero states the access tier and nothing else. Status and account
-          chips used to sit under the avatar too, which made three competing
-          labels out of a heading; status still reads from the Activate /
-          Deactivate button and the "Status updated" row below. */}
+      {/* The hero is the avatar, the name and the tier's insignia beside it,
+          nothing else. A pill under the name used to spell the tier out too,
+          and status and account chips sat there before that; each made a
+          second heading out of a fact stated elsewhere. Status reads from the
+          Activate / Deactivate button and the "Status updated" row below, and
+          the role from the editor's Access row. */}
       <ProfileHero
         align="center"
-        badge={showOrgRoleBadge ? orgRoleBadge.label : undefined}
-        badgeAccessibilityLabel={`App access: ${orgRoleBadge.label}`}
-        badgeTone={orgRoleBadge.tone}
-        onBadgePress={
-          canChangeOrgRole
-            ? () => {
-                setOrgRoleError(null);
-                setShowOrgRole(true);
-              }
-            : undefined
-        }
         avatarStyle={{
           backgroundColor: avatarTone.backgroundColor,
           borderColor: avatarTone.borderColor,
@@ -1059,52 +1059,127 @@ export default function PersonDetailScreen() {
         }}
         avatarTextStyle={{ color: avatarTone.textColor }}
         initials={getProfileInitials(fullName)}
-        orgRole={person.orgRole}
+        orgRole={orgRole}
         title={fullName}
       />
 
-      {/* Only actions that do something. A viewer the API redacts contact
-          details for used to get two disabled buttons and nothing to press. */}
-      {!editing && (showContact || canEdit) ? (
+      {/* Every action on the person, in one row. Only actions that do
+          something: a viewer the API redacts contact details for used to get
+          two disabled buttons and nothing to press. The management actions
+          keep web's staff-panel order after the contact pair: granting someone
+          the app is the everyday action, and the one that takes them off it
+          comes last. */}
+      {!editing && (showContact || canManageEmployees) ? (
         <ProfileQuickActions>
           {person.phone ? (
-            <Button
-              compact
+            <ProfileQuickAction
+              icon="call"
+              iconTone="green"
               label="Call"
-              leadingAccessory={
-                <Ionicons color={mobileIconToneColor("green", isDark)} name="call" size={18} />
-              }
               onPress={() => {
                 void Linking.openURL(`tel:${person.phone}`);
               }}
-              tone="plain"
             />
           ) : null}
           {person.email ? (
-            <Button
-              compact
+            <ProfileQuickAction
+              icon="mail"
+              iconTone="blue"
               label="Email"
-              leadingAccessory={
-                <Ionicons color={mobileIconToneColor("blue", isDark)} name="mail" size={18} />
-              }
               onPress={() => {
                 void Linking.openURL(`mailto:${person.email}`);
               }}
-              tone="plain"
             />
           ) : null}
-          {canEdit ? (
-            <Button
-              compact
-              label="Edit"
-              leadingAccessory={
-                <Ionicons color={mobileIconToneColor("orange", isDark)} name="create" size={18} />
+          {canManageEmployees && !person.userId && person.status !== "removed" && person.email ? (
+            person.pendingInvitation ? (
+              <>
+                <ProfileQuickAction
+                  icon="refresh"
+                  iconTone="purple"
+                  label="Reinvite"
+                  loading={invitationMutation.isPending}
+                  onPress={() => setInvitationConfirmAction("resend")}
+                />
+                <ProfileQuickAction
+                  disabled={invitationMutation.isPending}
+                  icon="close-circle"
+                  iconTone="red"
+                  label="Revoke Invite"
+                  onPress={() => setInvitationConfirmAction("revoke")}
+                />
+              </>
+            ) : (
+              <ProfileQuickAction
+                icon="paper-plane"
+                iconTone="purple"
+                label="Send Invitation"
+                loading={invitationMutation.isPending}
+                onPress={() => setInvitationConfirmAction("create")}
+              />
+            )
+          ) : null}
+          {/* Only offered to someone who isn't on the grid at all. Anyone with
+              focus areas changes them in the edit panel, where clearing them
+              all is what takes them back off it. */}
+          {canManageEmployees && person.status !== "removed" && !isOnSchedule ? (
+            <ProfileQuickAction
+              icon="calendar"
+              iconTone="teal"
+              label="Add to Schedule"
+              onPress={() =>
+                router.push({
+                  pathname: "/person/[id]/schedule",
+                  params: { id: person.id },
+                })
               }
+            />
+          ) : null}
+          {canManageManagementAccess && person.status !== "removed" && !isSelf ? (
+            <ProfileQuickAction
+              icon="briefcase"
+              iconTone="slate"
+              label={hasManagementAccess(person) ? "Edit Management Access" : "Add to Management"}
+              onPress={() => setShowManagementAccess(true)}
+            />
+          ) : null}
+          {canManageEmployees && person.status !== "active" ? (
+            <ProfileQuickAction
+              disabled={statusMutation.isPending || isSelf}
+              icon="checkmark-circle"
+              iconTone="green"
+              label="Activate"
+              loading={statusMutation.isPending}
+              onPress={() => setConfirmAction("activate")}
+            />
+          ) : null}
+          {canManageEmployees && person.status === "active" ? (
+            <ProfileQuickAction
+              disabled={statusMutation.isPending || isSelf}
+              icon="close"
+              iconTone="orange"
+              label="Deactivate"
               onPress={() => {
-                setEditing(true);
-                setDraft(makeDraft(person));
+                setInactiveNote("");
+                setConfirmationError(null);
+                setDeactivateOutcome("inactive");
+                setConfirmAction("deactivate");
               }}
-              tone="plain"
+            />
+          ) : null}
+          {/* Only reachable once someone is already inactive. While they're
+              active, Remove is the second option inside Deactivate. */}
+          {canManageEmployees && person.status === "inactive" ? (
+            <ProfileQuickAction
+              disabled={statusMutation.isPending || isSelf}
+              icon="person-remove"
+              iconTone="red"
+              label="Remove"
+              onPress={() => {
+                setInactiveNote("");
+                setConfirmationError(null);
+                setConfirmAction("remove");
+              }}
             />
           ) : null}
         </ProfileQuickActions>
@@ -1123,32 +1198,55 @@ export default function PersonDetailScreen() {
       ) : null}
 
       {editing ? (
-        <EditPanel
-          certificationLabel={certificationLabel}
-          certifications={bootstrapQuery.data?.certifications ?? []}
-          saving={updateMutation.isPending}
-          draft={draft}
-          focusAreaLabel={focusAreaLabel}
-          focusAreas={bootstrapQuery.data?.focusAreas ?? []}
-          hasManagementAccess={person.managementDepartmentIds.length > 0}
-          hasAccount={Boolean(person.userId)}
-          serverFieldErrors={serverFieldErrors}
-          onChange={(next) => {
-            // A server verdict only holds for the value it was given. Editing
-            // the field retires it and lets the debounced check speak again.
-            setServerFieldErrors((current) => {
-              const cleared = { ...current };
-              for (const key of SERVER_CHECKED_FIELDS) {
-                if (draft[key] !== next[key]) cleared[key] = undefined;
-              }
-              return cleared;
-            });
-            setDraft(next);
-          }}
-          roleLabel={roleLabel}
-          roles={bootstrapQuery.data?.roles ?? []}
-          useCompactRoleCertificationLabels={useCompactRoleCertificationLabels}
-        />
+        <>
+          {/* The role is the first setting in the editor, ahead of the name:
+              it is the one that changes what the person can do. It applies on
+              its own through the sheet's confirmation rather than with Save,
+              since changing it may revoke and resend an invitation, which is
+              nothing to bundle silently into a form submit. */}
+          {canChangeOrgRole ? (
+            <ProfileSection title="Access">
+              <ProfileList>
+                <ProfileNavRow
+                  iconName="key-outline"
+                  isLast
+                  label="Access level"
+                  value={ORG_ROLE_LABELS[orgRole]}
+                  onPress={() => {
+                    setOrgRoleError(null);
+                    setShowOrgRole(true);
+                  }}
+                />
+              </ProfileList>
+            </ProfileSection>
+          ) : null}
+          <EditPanel
+            certificationLabel={certificationLabel}
+            certifications={bootstrapQuery.data?.certifications ?? []}
+            saving={updateMutation.isPending}
+            draft={draft}
+            focusAreaLabel={focusAreaLabel}
+            focusAreas={bootstrapQuery.data?.focusAreas ?? []}
+            hasManagementAccess={person.managementDepartmentIds.length > 0}
+            hasAccount={Boolean(person.userId)}
+            serverFieldErrors={serverFieldErrors}
+            onChange={(next) => {
+              // A server verdict only holds for the value it was given. Editing
+              // the field retires it and lets the debounced check speak again.
+              setServerFieldErrors((current) => {
+                const cleared = { ...current };
+                for (const key of SERVER_CHECKED_FIELDS) {
+                  if (draft[key] !== next[key]) cleared[key] = undefined;
+                }
+                return cleared;
+              });
+              setDraft(next);
+            }}
+            roleLabel={roleLabel}
+            roles={bootstrapQuery.data?.roles ?? []}
+            useCompactRoleCertificationLabels={useCompactRoleCertificationLabels}
+          />
+        </>
       ) : (
         <>
           {/* Contact details are a manager's view; the API blanks them for
@@ -1278,116 +1376,6 @@ export default function PersonDetailScreen() {
         </>
       )}
 
-      {/* The section is untitled: every button in here already names its own
-          action, so a heading over them can only say "Actions" — the one word
-          they have in common and the one that tells the reader nothing. */}
-      {canManageEmployees && !editing ? (
-        <ProfileSection>
-          {/*
-           * Access first, status last, the way web's staff panel orders them:
-           * granting someone the app is the everyday action, and the one that
-           * takes them off it sits at the bottom on its own.
-           */}
-          <ProfileActionStack>
-            {!person.userId && person.status !== "removed" && person.email ? (
-              person.pendingInvitation ? (
-                <>
-                  {/* A filled control, not a link: it sits beside a solid
-                      Revoke, and a bare label next to one reads as the
-                      caption on it rather than the peer action it is. Neutral
-                      rather than brand, so the destructive half of the pair
-                      stays the only one asking for attention. */}
-                  <Button
-                    compact
-                    label="Reinvite"
-                    loading={invitationMutation.isPending}
-                    onPress={() => setInvitationConfirmAction("resend")}
-                    tone="neutral"
-                  />
-                  <Button
-                    compact
-                    disabled={invitationMutation.isPending}
-                    label="Revoke Invite"
-                    onPress={() => setInvitationConfirmAction("revoke")}
-                    tone="danger"
-                  />
-                </>
-              ) : (
-                <Button
-                  compact
-                  label="Send Invitation"
-                  loading={invitationMutation.isPending}
-                  onPress={() => setInvitationConfirmAction("create")}
-                  tone="link"
-                />
-              )
-            ) : null}
-            {/* Only offered to someone who isn't on the grid at all. Anyone with
-                focus areas changes them in the edit panel, where clearing them
-                all is what takes them back off it. */}
-            {canManageEmployees && person.status !== "removed" && !isOnSchedule ? (
-              <Button
-                compact
-                label="Add to Schedule"
-                onPress={() =>
-                  router.push({
-                    pathname: "/person/[id]/schedule",
-                    params: { id: person.id },
-                  })
-                }
-                tone="secondary"
-              />
-            ) : null}
-            {canManageManagementAccess && person.status !== "removed" && !isSelf ? (
-              <Button
-                compact
-                label={hasManagementAccess(person) ? "Edit Management Access" : "Add to Management"}
-                onPress={() => setShowManagementAccess(true)}
-                tone="secondary"
-              />
-            ) : null}
-            {person.status !== "active" ? (
-              <Button
-                compact
-                disabled={statusMutation.isPending || isSelf}
-                label="Activate"
-                loading={statusMutation.isPending}
-                onPress={() => setConfirmAction("activate")}
-                tone="success"
-              />
-            ) : null}
-            {person.status === "active" ? (
-              <Button
-                compact
-                disabled={statusMutation.isPending || isSelf}
-                label="Deactivate"
-                onPress={() => {
-                  setInactiveNote("");
-                  setConfirmationError(null);
-                  setDeactivateOutcome("inactive");
-                  setConfirmAction("deactivate");
-                }}
-                tone="warning"
-              />
-            ) : null}
-            {/* Only reachable once someone is already inactive. While they're
-                active, Remove is the second option inside Deactivate. */}
-            {person.status === "inactive" ? (
-              <Button
-                compact
-                disabled={statusMutation.isPending || isSelf}
-                label="Remove"
-                onPress={() => {
-                  setInactiveNote("");
-                  setConfirmationError(null);
-                  setConfirmAction("remove");
-                }}
-                tone="danger"
-              />
-            ) : null}
-          </ProfileActionStack>
-        </ProfileSection>
-      ) : null}
       <ConfirmationModal
         body={
           draft

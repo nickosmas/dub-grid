@@ -45,8 +45,9 @@ export function getPersonOrgRoleSubject(person: MobilePerson): OrgRoleSubject {
 }
 
 /**
- * The access level on its own, opened from the badge on a person's profile
- * and from the roster's actions sheet for someone with no profile to badge.
+ * The access level on its own, opened from the Access row at the top of a
+ * person's editor and from the roster's actions sheet for someone with no
+ * profile to edit.
  * Management departments are not here on purpose: someone can be an Admin
  * without managing a department, and bundling the two is what made this
  * unreachable from the app before - and what put a role control inside the

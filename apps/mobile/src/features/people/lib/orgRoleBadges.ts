@@ -1,7 +1,6 @@
 import {
   ORG_ROLE_LABELS,
   getHighlightedOrgRole,
-  getOrgRoleLabel,
   type OrgRole,
 } from "@dubgrid/domain";
 import {
@@ -19,25 +18,6 @@ type MobileOrgRole = OrgRole | null;
 // `@dubgrid/domain`; only the styling below is mobile-specific.
 export { ORG_ROLE_LABELS, getHighlightedOrgRole };
 
-/**
- * Which access badge a hero prints, with no styling attached.
- *
- * `ProfileHero` owns the pill itself, so a hero only ever needed the label and
- * the tone — the styled factory below is for the rows that draw their own pill
- * (the People list). Unlike that one this never returns null: a hero badges
- * every tier, User included, because on a page about one person the access
- * level is a fact about them rather than a highlight on a list.
- */
-export function getMobileOrgRoleHeroBadge(role: MobileOrgRole | null | undefined): {
-  label: string;
-  tone: "brand" | "warning";
-} {
-  return {
-    label: getOrgRoleLabel(role),
-    tone: getHighlightedOrgRole(role) === "super_admin" ? "warning" : "brand",
-  };
-}
-
 export function getMobileOrgRoleBadge(
   mobileColors: MobileColors,
   role: MobileOrgRole | null | undefined,
@@ -49,7 +29,7 @@ export function getMobileOrgRoleBadge(
 
   // A list row prints one thing, not two: the pill carries the star and the
   // tier's name together, so a scan for stars and a read of the label are the
-  // same glance. The detail hero keeps them apart, where the pill is a control.
+  // same glance. The detail hero shows the star alone.
   if (highlightedRole === "super_admin") {
     return {
       label: ORG_ROLE_LABELS[highlightedRole],

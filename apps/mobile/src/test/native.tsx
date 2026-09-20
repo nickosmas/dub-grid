@@ -56,6 +56,7 @@ function pickDomProps(input: Record<string, any>) {
       key === "horizontal" ||
       key === "showsHorizontalScrollIndicator" ||
       key === "showsVerticalScrollIndicator" ||
+      key === "scrollEnabled" ||
       key === "contentInsetAdjustmentBehavior" ||
       key === "automaticallyAdjustContentInsets" ||
       key === "automaticallyAdjustsScrollIndicatorInsets" ||
@@ -80,6 +81,13 @@ function pickDomProps(input: Record<string, any>) {
 
     if (key === "accessibilityRole") {
       output.role = value;
+      continue;
+    }
+
+    if (key === "accessibilityHint") {
+      if (value != null) {
+        output["aria-description"] = value;
+      }
       continue;
     }
 
