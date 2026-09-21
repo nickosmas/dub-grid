@@ -956,14 +956,22 @@ describe("RequestsScreen", () => {
     expect(screen.getAllByRole("button", { name: "Cancel request" })).toHaveLength(1);
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel request" }));
-    const dialog = screen.getByRole("alert");
+    // A manager's cancel takes an optional note to both people, so it opens
+    // the note sheet rather than a bare confirmation.
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(
-      within(dialog).getByText(/Laura hasn't responded to this swap yet\. Cancelling withdraws it/),
+      screen.getByText(/Laura hasn't responded to this swap yet\. Cancelling withdraws it/),
     ).toBeInTheDocument();
-    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel request" }));
+    fireEvent.change(screen.getByLabelText("Note to Jane and Laura? (Optional)"), {
+      target: { value: " Covered another way " },
+    });
+    fireEvent.click(screen.getAllByRole("button", { name: "Cancel request" }).at(-1)!);
 
     expect(mutate).toHaveBeenCalledWith(
-      { requestId: "req-3", body: { action: "cancel", empId: "emp-3" } },
+      {
+        requestId: "req-3",
+        body: { action: "cancel", empId: "emp-3", note: "Covered another way" },
+      },
       expect.objectContaining({ onSettled: expect.any(Function) }),
     );
   });

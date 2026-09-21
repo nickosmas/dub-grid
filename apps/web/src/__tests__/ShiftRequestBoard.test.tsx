@@ -309,7 +309,7 @@ describe("ShiftRequestBoard", () => {
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     await confirmDialogAction(user, "Cancel request");
 
-    expect(onCancel).toHaveBeenCalledWith("mine-1", "emp-2");
+    expect(onCancel).toHaveBeenCalledWith("mine-1", "emp-2", undefined);
   });
 
   it("groups the approval queue by what each request waits on", async () => {
@@ -358,6 +358,11 @@ describe("ShiftRequestBoard", () => {
 
     await user.click(screen.getByRole("button", { name: /approval queue/i }));
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+    // The note goes to both people; it is optional and travels with the cancel.
+    await user.type(
+      screen.getByLabelText("Note to Alice and Bob? (Optional)"),
+      "Covered another way",
+    );
     await user.click(screen.getByRole("button", { name: "Cancel request" }));
 
     expect(
@@ -365,6 +370,6 @@ describe("ShiftRequestBoard", () => {
     ).toBeInTheDocument();
     await confirmDialogAction(user, "Cancel request");
 
-    expect(onCancel).toHaveBeenCalledWith("sw-2", "emp-1");
+    expect(onCancel).toHaveBeenCalledWith("sw-2", "emp-1", "Covered another way");
   });
 });

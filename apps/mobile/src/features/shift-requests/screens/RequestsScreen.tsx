@@ -120,7 +120,7 @@ function getOptimisticRequestStatus(body: RequestActionBody): MobileShiftRequest
 
 type RequestTab = "available" | "all" | "mine" | "approval" | "history";
 type RequestActionBody =
-  | { action: "cancel"; empId: string }
+  | { action: "cancel"; empId: string; note?: string }
   | { action: "claim"; claimerEmpId: string }
   | { action: "respond"; empId: string; accept: boolean }
   | { action: "resolve"; approved: boolean; note?: string }
@@ -138,6 +138,8 @@ type RequestActionConfirmation = {
   requestId: string;
   body: RequestActionBody;
   feedback: MobileRequestActionFeedback;
+  /** A decision with an optional note to both people: a sheet, not a confirmation. */
+  takesNote: boolean;
 } | null;
 
 type ShiftPillColors = {
@@ -511,10 +513,23 @@ export default function RequestsScreen() {
 
       const request = requestsQuery.data?.requests.find((candidate) => candidate.id === requestId);
       const feedback = getMobileRequestActionFeedback({ requestId, body, request });
+      // A manager withdrawing over the recipient's head gets the note field
+      // too; the requester's own cancel stays a plain confirmation.
+      const takesNote =
+        body.action === "resolve" ||
+        (body.action === "cancel" &&
+          request != null &&
+          isAwaitingRecipient(request) &&
+          request.requesterEmpId !== linkedEmployeeId);
       setResolveNote("");
-      setRequestActionConfirmation({ requestId, body, feedback });
+      setRequestActionConfirmation({ requestId, body, feedback, takesNote });
     },
-    [pendingAction, requestActionMutation.isPending, requestsQuery.data?.requests],
+    [
+      linkedEmployeeId,
+      pendingAction,
+      requestActionMutation.isPending,
+      requestsQuery.data?.requests,
+    ],
   );
 
   const confirmRequestAction = useCallback(() => {
@@ -523,7 +538,10 @@ export default function RequestsScreen() {
     const { requestId, feedback } = requestActionConfirmation;
     const note = resolveNote.trim();
     const body: RequestActionBody =
-      requestActionConfirmation.body.action === "resolve" && note
+      requestActionConfirmation.takesNote &&
+      note &&
+      (requestActionConfirmation.body.action === "resolve" ||
+        requestActionConfirmation.body.action === "cancel")
         ? { ...requestActionConfirmation.body, note }
         : requestActionConfirmation.body;
     setRequestActionConfirmation(null);
@@ -546,10 +564,10 @@ export default function RequestsScreen() {
   }, [requestActionConfirmation, requestActionMutation, resolveNote]);
 
   const requests = requestsQuery.data?.requests ?? [];
-  const isResolveConfirmation = requestActionConfirmation?.body.action === "resolve";
+  const isResolveConfirmation = Boolean(requestActionConfirmation?.takesNote);
   const resolveNoteRecipients = useMemo(() => {
     const confirmation = requestActionConfirmation;
-    if (!confirmation || confirmation.body.action !== "resolve") return "";
+    if (!confirmation?.takesNote) return "";
     const request = requests.find((candidate) => candidate.id === confirmation.requestId);
     return request ? describeShiftRequestNoteRecipients(request) : "the staff involved";
   }, [requestActionConfirmation, requests]);
@@ -1167,33 +1185,36 @@ function RequestCard({
         {canApprove && awaitingRecipient && request.targetName ? (
           <Text style={styles.awaitingNote}>{describeAwaitingRecipient(request.targetName)}</Text>
         ) : null}
-        {/* A swap is one card about two shifts: each party's shift sits in its
-            own panel and the arrow between them says which way it goes. */}
-        <RequestShiftPanel
-          date={showDate || isSwap ? request.requesterShiftDate : null}
-          now={now}
-          personName={isSwap ? copy.requesterShiftLabel : null}
-          presentation={request.requesterPresentation}
-          state={request.requesterState}
-          timeZone={timeZone}
-        />
-        {isSwap ? (
-          <>
-            <View style={styles.swapArrowRow}>
-              <View style={styles.swapArrow}>
-                <Ionicons color={mobileColors.brand} name="swap-vertical" size={16} />
+        {/* A swap is one card about two shifts: the panels sit nearly flush
+            and the arrow straddles the seam, pointing from the requester's
+            shift to the one it goes to. */}
+        <View style={isSwap ? styles.swapPanels : undefined}>
+          <RequestShiftPanel
+            date={showDate || isSwap ? request.requesterShiftDate : null}
+            now={now}
+            personName={isSwap ? copy.requesterShiftLabel : null}
+            presentation={request.requesterPresentation}
+            state={request.requesterState}
+            timeZone={timeZone}
+          />
+          {isSwap ? (
+            <>
+              <RequestShiftPanel
+                date={request.targetShiftDate}
+                now={now}
+                personName={copy.targetShiftLabel}
+                presentation={request.targetPresentation ?? null}
+                state={request.targetState ?? null}
+                timeZone={timeZone}
+              />
+              <View pointerEvents="none" style={styles.swapArrowRow}>
+                <View style={styles.swapArrow}>
+                  <Ionicons color={mobileColors.brand} name="arrow-down" size={16} />
+                </View>
               </View>
-            </View>
-            <RequestShiftPanel
-              date={request.targetShiftDate}
-              now={now}
-              personName={copy.targetShiftLabel}
-              presentation={request.targetPresentation ?? null}
-              state={request.targetState ?? null}
-              timeZone={timeZone}
-            />
-          </>
-        ) : null}
+            </>
+          ) : null}
+        </View>
         {request.adminNote ? (
           <Text style={styles.metaText}>Manager note: {request.adminNote}</Text>
         ) : null}

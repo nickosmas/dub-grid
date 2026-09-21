@@ -764,6 +764,45 @@ describe("dispatchNotificationEvent", () => {
     },
   );
 
+  it("tells both people, with the note, when a manager withdraws a swap awaiting its recipient", async () => {
+    fromMock.mockImplementation((table: string) => {
+      if (table === "shift_requests") {
+        return makeShiftRequestBuilder({
+          status: "cancelled",
+          type: "swap",
+          requester: { user_id: "requester-user", first_name: "Sam", last_name: "Lee" },
+          target: { user_id: "partner-user", first_name: "Ada", last_name: "Ng" },
+        });
+      }
+      return makeSingleRowBuilder(null);
+    });
+
+    await dispatchNotificationEvent("admin-user", {
+      action: "shift_request_cancelled",
+      orgId: "org-1",
+      requestId: "req-1",
+      adminNote: "Covered another way",
+    });
+
+    expect(sendNotification).toHaveBeenCalledTimes(2);
+    expect(sendNotification).toHaveBeenCalledWith(
+      "requester-user",
+      "org-1",
+      "shift_request_rejected",
+      "Request cancelled",
+      "Your swap request was cancelled by a manager. Note: Covered another way",
+      expect.objectContaining({ requestId: "req-1", requestType: "swap" }),
+    );
+    expect(sendNotification).toHaveBeenCalledWith(
+      "partner-user",
+      "org-1",
+      "shift_request_rejected",
+      "Swap cancelled",
+      "Sam Lee's swap request was cancelled. Note: Covered another way",
+      expect.objectContaining({ requestId: "req-1", requestType: "swap" }),
+    );
+  });
+
   it("does not notify the other party when they are the actor", async () => {
     fromMock.mockImplementation((table: string) => {
       if (table === "shift_requests") {

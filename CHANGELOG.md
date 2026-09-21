@@ -51,6 +51,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 #### Fixed
 
+- **Cancelling a request awaiting its recipient takes a note to both people** - a manager withdrawing a swap (or a pickup offered to one person) before the recipient answers can leave an optional note, the way approve and reject can; migration `029` adds the note to `cancel_shift_request`, and both the requester and the recipient are notified with it (`shift_request_cancelled`). On web the note field sits on the card beside Cancel request; on mobile the cancel opens the same note sheet as a decision. The two shift panels of a swap now sit nearly flush with the arrow disc straddling their seam, pointing from the requester's shift to the one it goes to, on web and mobile.
 - **Mobile: no push-token warning on the simulator** - an iOS simulator cannot mint a push token, so it now counts as push-unsupported instead of asking `expo-notifications` and raising the library's warning toast on every dev launch.
 - **Mobile dashboard with no coverage requirements** - the Coverage card showed nothing for the meter and "0 open gaps", which read as fully staffed rather than as nothing to measure. It now says coverage requirements are not configured and where to set them, keeps the pending-approvals count, and the page takes the brand wash instead of no wash.
 - **Approving or rejecting on mobile opens a sheet** - the decision's optional note was a text field inside a confirmation modal, which the design rules forbid; it is now a small sheet with the same field and buttons.

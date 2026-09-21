@@ -238,12 +238,18 @@ export function resolveShiftRequest(
   }).then(() => undefined);
 }
 
-export function cancelShiftRequest(requestId: string, empId: string, orgId: string): Promise<void> {
+export function cancelShiftRequest(
+  requestId: string,
+  empId: string,
+  orgId: string,
+  note?: string,
+): Promise<void> {
   return requestScheduleAction<{ success: true }>({
     action: "cancelShiftRequest",
     orgId,
     requestId,
     empId,
+    ...(note ? { note } : {}),
   }).then(() => undefined);
 }
 

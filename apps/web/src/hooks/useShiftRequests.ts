@@ -90,7 +90,7 @@ export interface ShiftRequestsData {
     focusAreaId: number,
   ) => Promise<boolean>;
   /** Cancel your own request. */
-  cancel: (requestId: string, empId: string) => Promise<boolean>;
+  cancel: (requestId: string, empId: string, note?: string) => Promise<boolean>;
 }
 
 export function useShiftRequests(
@@ -387,10 +387,10 @@ export function useShiftRequests(
   );
 
   const cancel = useCallback(
-    async (requestId: string, empId: string): Promise<boolean> => {
+    async (requestId: string, empId: string, note?: string): Promise<boolean> => {
       if (!orgId) return false;
       try {
-        await cancelShiftRequest(requestId, empId, orgId);
+        await cancelShiftRequest(requestId, empId, orgId, note);
         toast.success("Request cancelled");
         await refetchAfterMutation();
         return true;

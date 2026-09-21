@@ -167,14 +167,22 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     // The arrow sits between the two panels, and its negative margin pulls
     // them in so the column's gap does not open twice around it.
+    swapPanels: {
+      gap: mobileSpace.xs,
+    },
+    // Centred on the seam between the two panels; the surface-coloured ring
+    // lifts the disc off both.
     swapArrowRow: {
+      ...StyleSheet.absoluteFillObject,
       alignItems: "center",
-      marginVertical: -mobileSpace.xs,
+      justifyContent: "center",
     },
     swapArrow: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      borderWidth: 3,
+      borderColor: mobileColors.surface,
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: mobileColors.brandSoft,

@@ -7740,7 +7740,9 @@ function SchedulerContent({
                 return shiftRequests.respond(id, currentEmpId, accept);
               }}
               onResolve={(id, approved, note) => shiftRequests.resolve(id, approved, note)}
-              onCancel={(id, requesterEmpId) => shiftRequests.cancel(id, requesterEmpId)}
+              onCancel={(id, requesterEmpId, note) =>
+                shiftRequests.cancel(id, requesterEmpId, note)
+              }
               onClose={() => setShowRequestBoard(false)}
               absenceTypeMap={absenceTypeObjectMap}
               assignmentNameMap={assignmentNameMap}

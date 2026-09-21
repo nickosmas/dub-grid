@@ -1,5 +1,5 @@
 "use client";
-import { ArrowUpDown, ChevronLeft, Clock } from "lucide-react";
+import { ArrowDown, ChevronLeft, Clock } from "lucide-react";
 
 import { Fragment, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -60,8 +60,12 @@ interface ShiftRequestBoardProps {
   onClaim: (requestId: string) => void | Promise<unknown>;
   onRespond: (requestId: string, accept: boolean) => void | Promise<unknown>;
   onResolve: (requestId: string, approved: boolean, note?: string) => void | Promise<unknown>;
-  /** `requesterEmpId` is whose request it is: the RPC checks it, whoever cancels. */
-  onCancel: (requestId: string, requesterEmpId: string) => void | Promise<unknown>;
+  /**
+   * `requesterEmpId` is whose request it is: the RPC checks it, whoever
+   * cancels. `note` is a manager's word to both people when withdrawing a
+   * request its recipient has not answered.
+   */
+  onCancel: (requestId: string, requesterEmpId: string, note?: string) => void | Promise<unknown>;
   onClose: () => void;
   absenceTypeMap?: Map<number, AbsenceType>;
   assignmentNameMap: Map<number, string>;
@@ -414,6 +418,43 @@ export default function ShiftRequestBoard({
     );
   }
 
+  function clearNote(requestId: string) {
+    setResolveNotes((prev) => {
+      const next = { ...prev };
+      delete next[requestId];
+      return next;
+    });
+  }
+
+  // One optional note per decision, sent with whichever of approve, reject or
+  // a manager's cancel is confirmed; it reaches both people on the request.
+  function renderNoteField(req: ShiftRequest) {
+    const notePlaceholder = `Note to ${describeShiftRequestNoteRecipients(req)}? (Optional)`;
+    return (
+      <textarea
+        key="resolve-note"
+        aria-label={notePlaceholder}
+        placeholder={notePlaceholder}
+        value={resolveNotes[req.id] ?? ""}
+        onChange={(e) => setResolveNotes((prev) => ({ ...prev, [req.id]: e.target.value }))}
+        style={{
+          width: "100%",
+          minHeight: 56,
+          padding: "8px 10px",
+          border: "1px solid var(--dg-color-border)",
+          borderRadius: "var(--dg-radius-md)",
+          fontSize: "var(--dg-fs-caption)",
+          fontFamily: "inherit",
+          color: "var(--dg-color-text-primary)",
+          background: "var(--dg-color-surface)",
+          resize: "vertical",
+          outline: "none",
+          boxSizing: "border-box",
+        }}
+      />
+    );
+  }
+
   // ── Request card ─────────────────────────────────────────────────────────
 
   function renderCard(req: ShiftRequest) {
@@ -499,27 +540,34 @@ export default function ShiftRequestBoard({
             : null;
           if (!requesterParty) return null;
           if (!targetParty) return renderShiftPanel(requesterParty);
+          // The two panels sit nearly flush and the arrow straddles the seam
+          // between them, pointing from the requester's shift to the one it
+          // goes to; a ring in the card's colour lifts it off both panels.
           return (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 4 }}>
               {renderShiftPanel(requesterParty)}
-              <div style={{ display: "flex", justifyContent: "center" }}>
-                <span
-                  aria-label="swaps with"
-                  role="img"
-                  style={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: 999,
-                    background: "var(--dg-color-brand-bg)",
-                    color: "var(--dg-color-brand)",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <ArrowUpDown size={13} strokeWidth={2.5} />
-                </span>
-              </div>
+              <span
+                aria-label="swaps with"
+                role="img"
+                style={{
+                  position: "absolute",
+                  left: "50%",
+                  top: "50%",
+                  transform: "translate(-50%, -50%)",
+                  width: 28,
+                  height: 28,
+                  borderRadius: 999,
+                  background: "var(--dg-color-brand-bg)",
+                  color: "var(--dg-color-brand)",
+                  boxShadow: "0 0 0 3px var(--dg-color-surface)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 1,
+                }}
+              >
+                <ArrowDown size={14} strokeWidth={2.5} />
+              </span>
               {renderShiftPanel(targetParty)}
             </div>
           );
@@ -695,37 +743,7 @@ export default function ShiftRequestBoard({
     // Approve / Reject: admin with permission, request is pending_approval
     if (canApprove && req.status === "pending_approval") {
       const note = resolveNotes[req.id]?.trim() || undefined;
-      const clearNote = () =>
-        setResolveNotes((prev) => {
-          const next = { ...prev };
-          delete next[req.id];
-          return next;
-        });
-
-      const notePlaceholder = `Note to ${describeShiftRequestNoteRecipients(req)}? (Optional)`;
-      actions.push(
-        <textarea
-          key="resolve-note"
-          aria-label={notePlaceholder}
-          placeholder={notePlaceholder}
-          value={resolveNotes[req.id] ?? ""}
-          onChange={(e) => setResolveNotes((prev) => ({ ...prev, [req.id]: e.target.value }))}
-          style={{
-            width: "100%",
-            minHeight: 56,
-            padding: "8px 10px",
-            border: "1px solid var(--dg-color-border)",
-            borderRadius: "var(--dg-radius-md)",
-            fontSize: "var(--dg-fs-caption)",
-            fontFamily: "inherit",
-            color: "var(--dg-color-text-primary)",
-            background: "var(--dg-color-surface)",
-            resize: "vertical",
-            outline: "none",
-            boxSizing: "border-box",
-          }}
-        />,
-      );
+      actions.push(renderNoteField(req));
       actions.push(
         <Button
           key="reject"
@@ -749,7 +767,7 @@ export default function ShiftRequestBoard({
               ),
               onConfirm: async () => {
                 await onResolve(req.id, false, note);
-                clearNote();
+                clearNote(req.id);
               },
               title: "Reject request?",
               variant: "warning",
@@ -783,7 +801,7 @@ export default function ShiftRequestBoard({
               ),
               onConfirm: async () => {
                 await onResolve(req.id, true, note);
-                clearNote();
+                clearNote(req.id);
               },
               title: "Approve request?",
               variant: "info",
@@ -803,7 +821,10 @@ export default function ShiftRequestBoard({
     const awaitingRecipient = isAwaitingRecipient(req);
     const canCancelOwn =
       isOwnRequest && (req.status === "open" || req.status === "pending_approval");
-    if (canCancelOwn || (canApprove && awaitingRecipient)) {
+    const managerCancel = !canCancelOwn && canApprove && awaitingRecipient;
+    if (canCancelOwn || managerCancel) {
+      if (managerCancel) actions.push(renderNoteField(req));
+      const cancelNote = managerCancel ? resolveNotes[req.id]?.trim() || undefined : undefined;
       actions.push(
         <Button
           key="cancel"
@@ -821,7 +842,10 @@ export default function ShiftRequestBoard({
                   <strong>{requestLabel}</strong>? It will no longer be available for review.
                 </>
               ),
-              onConfirm: () => onCancel(req.id, req.requesterEmpId),
+              onConfirm: async () => {
+                await onCancel(req.id, req.requesterEmpId, cancelNote);
+                if (cancelNote) clearNote(req.id);
+              },
               title: "Cancel request?",
               variant: "warning",
             })

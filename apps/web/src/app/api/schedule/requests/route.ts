@@ -84,6 +84,8 @@ const requestSchema = z
       orgId: z.string().uuid(),
       requestId: z.string().uuid(),
       empId: z.string().uuid(),
+      /** A manager's word to both people when withdrawing over the recipient's head. */
+      note: z.string().trim().max(1000).optional(),
     }),
   ])
   .superRefine((value, ctx) => {
@@ -527,10 +529,18 @@ export async function POST(req: NextRequest) {
         const { error } = await auth.userClient.rpc("cancel_shift_request", {
           p_request_id: data.requestId,
           p_emp_id: data.empId,
+          p_note: data.note || null,
         });
         if (error) {
           throw error;
         }
+
+        await dispatchNotificationEvent(auth.actor.id, {
+          action: "shift_request_cancelled",
+          orgId: data.orgId,
+          requestId: data.requestId,
+          ...(data.note ? { adminNote: data.note } : {}),
+        });
 
         return NextResponse.json({ success: true });
       }
