@@ -35,6 +35,16 @@ vi.mock("../../notifications/lib/push-permission", () => ({
   requestPushPermission: (...a: unknown[]) => requestPushPermission(...a),
 }));
 
+// The previews render the real Home and Requests components, whose screen
+// modules pull in queries, routing and gestures this test does not stand up.
+// `OnboardingPreviews.test.tsx` covers what they show.
+vi.mock("../components/previews/UpcomingShiftPreview", () => ({
+  UpcomingShiftPreview: () => null,
+}));
+vi.mock("../components/previews/CoverShiftsPreview", () => ({
+  CoverShiftsPreview: () => null,
+}));
+
 let OnboardingScreen: (typeof import("./OnboardingScreen"))["default"];
 let windowWidth = 0;
 

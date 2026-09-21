@@ -1343,7 +1343,8 @@ function RequestShiftPanel({
   );
 }
 
-function OpenShiftCard({
+// Exported for the first-run tour's live preview of the Available list.
+export function OpenShiftCard({
   openShift,
   linkedEmployeeId,
   pendingAction,

@@ -25,17 +25,17 @@ import { mobileControl, mobileSpace, type MobileColors } from "../../../shared/t
 import { NotificationReasons } from "../components/NotificationReasons";
 import { OnboardingCard } from "../components/OnboardingCard";
 import { OnboardingPagination } from "../components/OnboardingPagination";
-import { IllustrationSwapPreview } from "../components/illustrations/IllustrationSwapPreview";
-import { IllustrationUpcomingShift } from "../components/illustrations/IllustrationUpcomingShift";
+import { CoverShiftsPreview } from "../components/previews/CoverShiftsPreview";
+import { UpcomingShiftPreview } from "../components/previews/UpcomingShiftPreview";
 
 const SLIDES: Array<{ visual: ReactNode; title: string; body: string }> = [
   {
-    visual: <IllustrationUpcomingShift />,
+    visual: <UpcomingShiftPreview />,
     title: "Your schedule, always with you",
     body: "See your shifts at a glance, so you always know when and where you're working, and what's coming up next.",
   },
   {
-    visual: <IllustrationSwapPreview />,
+    visual: <CoverShiftsPreview />,
     title: "Cover shifts on the go",
     body: "Pick up open shifts, swap with teammates, or request time off. With manager approval built in.",
   },

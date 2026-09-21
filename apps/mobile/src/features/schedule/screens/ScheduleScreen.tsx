@@ -2005,7 +2005,7 @@ function MonthDayCell({
   );
 }
 
-function IconControlButton({
+export function IconControlButton({
   accessibilityLabel,
   iconName,
   iconSize = 20,
@@ -2044,7 +2044,7 @@ function IconControlButton({
   );
 }
 
-function AlertsChromeButton({ unreadCount }: { unreadCount: number }) {
+export function AlertsChromeButton({ unreadCount }: { unreadCount: number }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
@@ -2448,7 +2448,9 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
   );
 }
 
-function MeHeroCard({
+// The first-run tour renders this card and the header controls above it with
+// sample data (`onboarding/components/previews`), so they are exported.
+export function MeHeroCard({
   currentDate,
   currentTime,
   featuredItem,
