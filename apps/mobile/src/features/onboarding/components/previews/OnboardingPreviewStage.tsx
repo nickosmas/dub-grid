@@ -6,6 +6,30 @@ import {
   useWindowDimensions,
   type LayoutChangeEvent,
 } from "react-native";
+import { mobileSpace } from "../../../../shared/theme/tokens";
+
+// How far a card's shadow reaches past it. iOS blurs a shadow to about twice
+// its radius, so the hero card (28pt radius, 14pt down) still shows some
+// 40pt above itself and the open-shift card (12pt, 4pt down) some 20pt. The
+// scroll view clips to its frame whatever `overflow` says, so the frame is
+// grown by this much above and the content padded by it on both ends, and
+// the shadow lands inside the frame instead of ending on a hard line.
+export const SHADOW_BLEED = mobileSpace["5xl"];
+
+/**
+ * How far the stage shrinks its content: not at all while the card and its
+ * shadow fit, otherwise just enough that they do. Unmeasured is treated as
+ * fitting, so a stage never scales on a guess.
+ */
+export function getPreviewStageScale(
+  availableHeight: number | null,
+  contentHeight: number | null,
+): number {
+  if (availableHeight == null || contentHeight == null || contentHeight <= 0) {
+    return 1;
+  }
+  return Math.min(1, Math.max(0, availableHeight - SHADOW_BLEED) / contentHeight);
+}
 
 /**
  * The slide's own screen, live: the children are the real components of the
@@ -22,10 +46,7 @@ export function OnboardingPreviewStage({ children }: { children: ReactNode }) {
   const { width: windowWidth } = useWindowDimensions();
   const [availableHeight, setAvailableHeight] = useState<number | null>(null);
   const [contentHeight, setContentHeight] = useState<number | null>(null);
-  const scale =
-    availableHeight != null && contentHeight != null && contentHeight > 0
-      ? Math.min(1, availableHeight / contentHeight)
-      : 1;
+  const scale = getPreviewStageScale(availableHeight, contentHeight);
 
   const handleStageLayout = (event: LayoutChangeEvent) => {
     setAvailableHeight(event.nativeEvent.layout.height);
@@ -49,6 +70,7 @@ export function OnboardingPreviewStage({ children }: { children: ReactNode }) {
           of bounded height is measured "at most", which collapses a
           flex-basis-0 text such as the open-shift title. */}
       <ScrollView
+        contentContainerStyle={styles.scrollerContent}
         scrollEnabled={false}
         showsVerticalScrollIndicator={false}
         style={styles.scroller}
@@ -71,13 +93,18 @@ export function OnboardingPreviewStage({ children }: { children: ReactNode }) {
 }
 
 const styles = StyleSheet.create({
+  // No clip of its own: the page clips at the screen's edge, and a clip
+  // here would cut the card's shadow flat at the stage's top.
   stage: {
     flex: 1,
     alignSelf: "center",
-    overflow: "hidden",
   },
   scroller: {
     flex: 1,
+    marginTop: -SHADOW_BLEED,
+  },
+  scrollerContent: {
+    paddingVertical: SHADOW_BLEED,
   },
   content: {
     transformOrigin: "top center",
