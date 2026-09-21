@@ -425,12 +425,12 @@ describe("RequestsScreen", () => {
     expect(pageText.indexOf("Day Shift")).toBeLessThan(pageText.indexOf("Nurse"));
     expect(pageText.indexOf("Nurse")).toBeLessThan(pageText.indexOf("7:00 AM - 3:00 PM"));
     expect(pageText.indexOf("7:00 AM - 3:00 PM")).toBeLessThan(pageText.indexOf("Skilled Nursing"));
-    fireEvent.click(screen.getByText("Volunteer"));
-    expect(screen.getByText("Volunteer for open shift?")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Claim"));
+    expect(screen.getByText("Claim this shift?")).toBeInTheDocument();
     expect(mutate).not.toHaveBeenCalled();
     fireEvent.click(
       within(screen.getByRole("alert")).getByRole("button", {
-        name: "Volunteer",
+        name: "Claim",
       }),
     );
 
@@ -500,7 +500,7 @@ describe("RequestsScreen", () => {
     expect(
       screen.getByText("You are not assigned to the focus area required for this shift."),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByText("Volunteer"));
+    fireEvent.click(screen.getByText("Claim"));
 
     expect(mutate).not.toHaveBeenCalled();
   });
@@ -947,9 +947,9 @@ describe("RequestsScreen", () => {
 
     render(<RequestsScreen />);
 
-    expect(screen.getByText("Pending approval (1)")).toBeInTheDocument();
-    expect(screen.getByText("Pickups (1)")).toBeInTheDocument();
-    expect(screen.getByText("Swaps awaiting a response (1)")).toBeInTheDocument();
+    expect(screen.getByText("Pending approval")).toBeInTheDocument();
+    expect(screen.getByText("Pickups")).toBeInTheDocument();
+    expect(screen.getByText("Swaps awaiting a response")).toBeInTheDocument();
     expect(screen.getByText("Waiting for Laura to respond")).toBeInTheDocument();
     // Only the call-off can be decided; the open swap can only be withdrawn.
     expect(screen.getAllByRole("button", { name: "Approve" })).toHaveLength(1);

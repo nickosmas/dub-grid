@@ -341,7 +341,7 @@ export function useShiftRequests(
       if (!orgId) return false;
       try {
         const id = await volunteerForOpenShift(orgId, empId, shiftDate, input, focusAreaId);
-        toast.success("Volunteered for shift. Awaiting admin approval.");
+        toast.success("Shift claimed. Awaiting admin approval.");
         // Server route already dispatches shift_request_created.
         await refetchAfterMutation();
         return true;

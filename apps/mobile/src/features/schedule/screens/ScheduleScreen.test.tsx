@@ -539,8 +539,9 @@ describe("ScheduleScreen", () => {
 
     expect(screen.getByText("Open shifts")).toBeInTheDocument();
     expect(screen.getByText("Sun, Apr 19")).toBeInTheDocument();
-    expect(screen.getByText("Volunteer")).toBeInTheDocument();
-    expect(screen.getByText("Claim Shift")).toBeInTheDocument();
+    // One word for taking an open shift, whether it is a coverage gap or a
+    // posted pickup.
+    expect(screen.getAllByRole("button", { name: "Claim" })).toHaveLength(2);
     const openShiftCarouselText = screen.getByLabelText("Open shifts carousel").textContent ?? "";
     expect(openShiftCarouselText.indexOf("Skilled Nursing")).toBeLessThan(
       openShiftCarouselText.indexOf("Nurse"),
@@ -1768,10 +1769,11 @@ describe("ScheduleScreen", () => {
     fireEvent.click(screen.getByText("See all"));
     expect(routerPush).toHaveBeenCalledWith("/(tabs)/requests");
 
-    fireEvent.click(screen.getByText("Claim Shift"));
+    // The posted pickup leads the carousel; the coverage gap follows it.
+    fireEvent.click(screen.getAllByRole("button", { name: "Claim" })[0]!);
     expect(screen.getByText("Claim this shift?")).toBeInTheDocument();
     expect(mutationSpy).not.toHaveBeenCalled();
-    confirmDialog("Claim shift");
+    confirmDialog("Claim");
     expect(mutationSpy).toHaveBeenCalledWith(
       {
         requestId: "request-open-1",
@@ -1992,7 +1994,7 @@ describe("ScheduleScreen", () => {
     fireEvent.click(screen.getByLabelText("Show all open shifts for Sat, Apr 18"));
     expect(screen.getByText("Saturday Pickup Late")).toBeInTheDocument();
 
-    const claimButtons = screen.getAllByRole("button", { name: "Claim Shift" });
+    const claimButtons = screen.getAllByRole("button", { name: "Claim" });
     fireEvent.click(claimButtons[claimButtons.length - 1]!);
 
     // The sheet leaves first; the confirmation is its own Modal and waits for it.
@@ -2129,10 +2131,10 @@ describe("ScheduleScreen", () => {
     shiftRequests = [];
     render(<HomeScheduleScreen />);
 
-    fireEvent.click(screen.getByText("Volunteer"));
-    expect(screen.getByText("Volunteer for open shift?")).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("button", { name: "Claim" })[0]);
+    expect(screen.getByText("Claim this shift?")).toBeInTheDocument();
     expect(mutationSpy).not.toHaveBeenCalled();
-    confirmDialog("Volunteer");
+    confirmDialog("Claim");
 
     expect(mutationSpy).toHaveBeenCalledWith(
       {
@@ -2213,8 +2215,7 @@ describe("ScheduleScreen", () => {
     render(<HomeScheduleScreen />);
 
     expect(screen.queryByText("Open shifts")).not.toBeInTheDocument();
-    expect(screen.queryByText("Claim Shift")).not.toBeInTheDocument();
-    expect(screen.queryByText("Volunteer")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Claim" })).not.toBeInTheDocument();
   });
 
   it("accepts and declines shift cover requests from Home", async () => {

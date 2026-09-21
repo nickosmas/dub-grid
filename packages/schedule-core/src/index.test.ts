@@ -155,6 +155,72 @@ describe("getFeaturedMeScheduleSegment", () => {
     expect(result.item).toBeNull();
   });
 
+  it("features the first absence of a future week that holds nothing else", () => {
+    const result = getFeaturedMeScheduleSegment({
+      currentTime: "09:00",
+      entries: [
+        {
+          employeeId: "emp-1",
+          employeeName: "Jordan Lee",
+          date: "2026-05-19",
+          shiftName: "Vacation",
+          startTime: null,
+          endTime: null,
+          absenceTypeId: 3,
+        },
+      ],
+      rangeStartDate: "2026-05-17",
+      selectedDate: "2026-05-17",
+      todayDate,
+    });
+
+    expect(result.status).toBe("away");
+    expect(result.item?.date).toBe("2026-05-19");
+  });
+
+  it("keeps last night's overnight shift on duty until it ends, and tonight's out of it", () => {
+    const overnight = (date: string): ScheduleEntryLike => ({
+      employeeId: "emp-1",
+      employeeName: "Jordan Lee",
+      date,
+      shiftName: "Night Shift",
+      startTime: "22:00",
+      endTime: "06:00",
+      absenceTypeId: null,
+    });
+    const stillRunning = getFeaturedMeScheduleSegment({
+      currentTime: "02:00",
+      entries: [overnight("2026-05-13"), overnight(todayDate)],
+      rangeStartDate: "2026-05-10",
+      selectedDate: todayDate,
+      todayDate,
+    });
+    expect(stillRunning.status).toBe("active");
+    expect(stillRunning.item?.date).toBe("2026-05-13");
+
+    const tonightNotYet = getFeaturedMeScheduleSegment({
+      currentTime: "02:00",
+      entries: [overnight(todayDate)],
+      rangeStartDate: "2026-05-10",
+      selectedDate: todayDate,
+      todayDate,
+    });
+    expect(tonightNotYet.status).toBe("upcoming");
+  });
+
+  it("does not call a finished shift upcoming when browsing an earlier day", () => {
+    const result = getFeaturedMeScheduleSegment({
+      currentTime: "09:00",
+      entries: [{ ...endedTodayEntry, date: "2026-05-12" }],
+      rangeStartDate: "2026-05-10",
+      selectedDate: "2026-05-11",
+      todayDate,
+    });
+
+    expect(result.status).toBe("scheduled");
+    expect(result.item?.date).toBe("2026-05-12");
+  });
+
   it("does not feature a future deleted publication as an upcoming shift", () => {
     const result = getFeaturedMeScheduleSegment({
       currentTime: "20:06",

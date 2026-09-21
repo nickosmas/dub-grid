@@ -77,7 +77,7 @@ const requestSchema = z
       orgId: z.string().uuid(),
       requestId: z.string().uuid(),
       approved: z.boolean(),
-      note: z.string().optional(),
+      note: z.string().trim().max(1000).optional(),
     }),
     z.object({
       action: z.literal("cancelShiftRequest"),
@@ -150,7 +150,20 @@ async function fetchActorEmployeeId(
   return (data?.id as string | undefined) ?? null;
 }
 
-async function requireEmployeeAction(req: NextRequest, orgId: string, employeeId: string) {
+async function requireEmployeeAction(
+  req: NextRequest,
+  orgId: string,
+  employeeId: string,
+  options: {
+    /**
+     * Whether an approver may act for another employee. Withdrawing a
+     * request its recipient has not answered is an approver's call, on
+     * mobile and in the RPC alike, so the web route must not demand
+     * edit-shifts for it.
+     */
+    allowApprovers?: boolean;
+  } = {},
+) {
   const auth = await requireOrgPermissions(
     req,
     orgId,
@@ -170,7 +183,8 @@ async function requireEmployeeAction(req: NextRequest, orgId: string, employeeId
     auth.permissions.isGridmaster ||
     auth.permissions.isSuperAdmin ||
     auth.permissions.canManageEmployees ||
-    auth.permissions.canEditShifts;
+    auth.permissions.canEditShifts ||
+    (options.allowApprovers === true && auth.permissions.canApproveShiftRequests);
 
   if (!canActForOthers && actorEmployeeId !== employeeId) {
     return {
@@ -521,7 +535,9 @@ export async function POST(req: NextRequest) {
       }
 
       case "cancelShiftRequest": {
-        const auth = await requireEmployeeAction(req, data.orgId, data.empId);
+        const auth = await requireEmployeeAction(req, data.orgId, data.empId, {
+          allowApprovers: true,
+        });
         if ("response" in auth) {
           return auth.response;
         }

@@ -8,7 +8,7 @@ import {
   groupManagerQueue,
   isAwaitingRecipient,
 } from "@dubgrid/domain";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
@@ -31,6 +31,7 @@ import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { ProfileTextInput } from "../../profile/components/ProfilePrimitives";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
+import { NumericBadge } from "../../../shared/components/NumericBadge";
 import { Screen } from "../../../shared/components/Screen";
 import {
   ScrollableTabStrip,
@@ -503,7 +504,14 @@ export default function RequestsScreen() {
         await availabilityScheduleQuery.refetch();
       }
     },
-    invalidateKeys: [historyQueryKey],
+    // Claim, respond and volunteer patch nothing optimistically, so the
+    // requests query itself must be refetched or the card keeps its live
+    // Claim button after a success toast.
+    invalidateKeys: [
+      requestsQueryKey,
+      historyQueryKey,
+      mobileQueryKeys.shiftRequestAvailability(accessToken, requestRange),
+    ],
   });
   const runRequestAction = useCallback(
     (requestId: string, body: RequestActionBody) => {
@@ -796,6 +804,21 @@ export default function RequestsScreen() {
     visibleTabs,
   ]);
   const activeTab = selectedTab ?? defaultTab;
+  // The default is chosen once from the first loaded counts and then held:
+  // recomputing it on every change moved the strip out from under a manager
+  // the moment they approved the last pending request.
+  useEffect(() => {
+    if (selectedTab == null && contentState.kind !== "loading") {
+      setSelectedTab(defaultTab);
+    }
+  }, [contentState.kind, defaultTab, selectedTab]);
+  // A deep link that names a tab (an alert, a home card) still wins over the
+  // latched choice, as it did before the latch.
+  useEffect(() => {
+    if (routeTab) {
+      setSelectedTab(routeTab);
+    }
+  }, [routeTab]);
 
   return (
     <Screen
@@ -965,9 +988,10 @@ export default function RequestsScreen() {
           ) : (
             approvalGroups.map((group) => (
               <View key={group.key} style={styles.queueGroup}>
-                <Text style={styles.queueGroupTitle}>
-                  {group.label} ({group.requests.length})
-                </Text>
+                <View style={styles.queueGroupHeader}>
+                  <Text style={styles.queueGroupTitle}>{group.label}</Text>
+                  <NumericBadge count={group.requests.length} size="sm" tone="secondary" />
+                </View>
                 {group.requests.map((request) => (
                   <RequestCard
                     now={now}
@@ -1057,16 +1081,14 @@ export default function RequestsScreen() {
               <Button
                 label={requestActionConfirmation?.feedback.confirmLabel ?? "Confirm"}
                 onPress={confirmRequestAction}
-                tone={
-                  requestActionConfirmation?.feedback.confirmStyle === "destructive"
-                    ? "secondary"
-                    : "primary"
-                }
+                tone="primary"
               />
             }
           >
+            {/* "Dismiss" when the decision itself is a cancel, so the two
+                buttons cannot read as the same word. */}
             <Button
-              label="Cancel"
+              label={requestActionConfirmation?.body.action === "cancel" ? "Dismiss" : "Cancel"}
               onPress={() => setRequestActionConfirmation(null)}
               tone="neutral"
             />
@@ -1199,6 +1221,13 @@ function RequestCard({
           />
           {isSwap ? (
             <>
+              {/* A fixed strip between the panels owns the disc, so it sits
+                  on the seam whatever the panels' heights or the text size. */}
+              <View pointerEvents="none" style={styles.swapSeam}>
+                <View style={styles.swapArrow}>
+                  <Ionicons color={mobileColors.brand} name="swap-vertical" size={16} />
+                </View>
+              </View>
               <RequestShiftPanel
                 date={request.targetShiftDate}
                 now={now}
@@ -1208,11 +1237,6 @@ function RequestCard({
                 state={request.targetState ?? null}
                 timeZone={timeZone}
               />
-              <View pointerEvents="none" style={styles.swapArrowRow}>
-                <View style={styles.swapArrow}>
-                  <Ionicons color={mobileColors.brand} name="swap-vertical" size={16} />
-                </View>
-              </View>
             </>
           ) : null}
         </View>
@@ -1446,7 +1470,7 @@ export function OpenShiftCard({
               <Button
                 compact
                 disabled={Boolean(pendingAction) || openShift.canVolunteer === false}
-                label="Volunteer"
+                label="Claim"
                 loading={isLoading}
                 onPress={() => {
                   if (openShift.canVolunteer === false) {

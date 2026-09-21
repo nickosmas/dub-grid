@@ -174,15 +174,15 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     // The arrow sits between the two panels, and its negative margin pulls
     // them in so the column's gap does not open twice around it.
-    swapPanels: {
-      gap: mobileSpace.xs,
-    },
+    swapPanels: {},
     // Centred on the seam between the two panels; the surface-coloured ring
     // lifts the disc off both.
-    swapArrowRow: {
-      ...StyleSheet.absoluteFillObject,
+    swapSeam: {
+      height: mobileSpace.xs,
       alignItems: "center",
       justifyContent: "center",
+      overflow: "visible",
+      zIndex: 1,
     },
     swapArrow: {
       width: 32,
@@ -220,6 +220,11 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     queueGroup: {
       gap: mobileSpace.md,
+    },
+    queueGroupHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: mobileSpace.sm,
     },
     queueGroupTitle: {
       ...mobileTextWeighted("sectionTitle", "medium"),

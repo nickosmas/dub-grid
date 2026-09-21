@@ -150,7 +150,9 @@ export function getCurrentTimeValueInTimeZone(value: Date, timeZone?: string | n
     timeZone: timeZone ?? "UTC",
     hour: "2-digit",
     minute: "2-digit",
-    hour12: false,
+    // Not `hour12: false`, which some engines render as "24:xx" at midnight
+    // and which then sorts after every shift start.
+    hourCycle: "h23",
   });
   const parts = formatter.formatToParts(value);
   const hour = parts.find((part) => part.type === "hour")?.value ?? "00";

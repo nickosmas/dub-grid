@@ -450,7 +450,7 @@ describe("UserDashboard", () => {
     ).not.toBeInTheDocument();
     expect(
       within(screen.getByTestId("user-dashboard-available-shifts")).queryByRole("button", {
-        name: "Volunteer",
+        name: "Claim",
       }),
     ).not.toBeInTheDocument();
     expect(screen.getByText("Your Week")).toBeInTheDocument();
@@ -478,12 +478,15 @@ describe("UserDashboard", () => {
       expect(props.shiftRequests.respond).toHaveBeenCalledWith("cover-request", "emp-1", true);
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Claim" }));
+    // A posted pickup and a coverage gap share the one Claim label; the
+    // coverage gap leads the rail, the pickup follows.
+    const claimButtons = screen.getAllByRole("button", { name: "Claim" });
+    fireEvent.click(claimButtons[1]!);
     await waitFor(() => {
       expect(props.shiftRequests.claim).toHaveBeenCalledWith("pickup-request", "emp-1");
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Volunteer" }));
+    fireEvent.click(claimButtons[0]!);
     await waitFor(() => {
       expect(props.shiftRequests.volunteer).toHaveBeenCalledWith(
         "emp-1",
@@ -840,8 +843,9 @@ describe("UserDashboard", () => {
     expect(within(rail).getByText("Day shift · Nurse")).toBeInTheDocument();
     expect(within(rail).getByText(/2 teammates needed/)).toBeInTheDocument();
 
-    const volunteerButtons = within(rail).getAllByRole("button", { name: "Volunteer" });
-    expect(volunteerButtons).toHaveLength(2);
+    // Two coverage gaps lead the rail, then the posted pickup; all say Claim.
+    const volunteerButtons = within(rail).getAllByRole("button", { name: "Claim" });
+    expect(volunteerButtons).toHaveLength(3);
     fireEvent.click(volunteerButtons[1]!);
     await waitFor(() => {
       expect(props.shiftRequests.volunteer).toHaveBeenCalledWith(

@@ -60,14 +60,14 @@ export function getMobileRequestActionFeedback({
   switch (getActionVariant(body)) {
     case "volunteer_open_shift":
       return {
-        confirmLabel: "Volunteer",
+        confirmLabel: "Claim",
         key,
-        message: "Volunteer for this open shift? We'll send it to your admin for approval.",
-        title: "Volunteer for open shift?",
+        message: "Claim this open shift? We'll send it to your admin for approval.",
+        title: "Claim this shift?",
       };
     case "claim":
       return {
-        confirmLabel: "Claim shift",
+        confirmLabel: "Claim",
         key,
         message: "Claim this open shift? We'll send it to your admin for approval.",
         title: "Claim this shift?",
@@ -133,7 +133,7 @@ export function getMobileRequestActionSuccessToast(
   switch (getActionVariant(body)) {
     case "volunteer_open_shift":
       return {
-        title: "Volunteer request sent",
+        title: "Claim request sent",
         message: "Your shift is pending approval.",
       };
     case "claim":

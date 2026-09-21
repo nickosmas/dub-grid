@@ -1055,7 +1055,7 @@ describe("PersonDetailScreen", () => {
     expect(screen.queryByText("Send invitation?")).not.toBeInTheDocument();
 
     for (const call of mutationCalls) call.mutate.mockClear();
-    fireEvent.click(screen.getByText("Link Existing Account"));
+    fireEvent.click(screen.getByText("Link existing account"));
 
     expect(allMutatePayloads(mutationCalls)).toContainEqual({
       action: "create",
@@ -1069,7 +1069,7 @@ describe("PersonDetailScreen", () => {
     expect(screen.getByText(/Minnie Diaz[\s\S]*Link it and update Mina Diaz/)).toBeInTheDocument();
 
     for (const call of mutationCalls) call.mutate.mockClear();
-    fireEvent.click(screen.getByText("Use Account Name"));
+    fireEvent.click(screen.getByText("Use account name"));
 
     expect(allMutatePayloads(mutationCalls)).toContainEqual({
       action: "create",
@@ -1155,7 +1155,7 @@ describe("PersonDetailScreen", () => {
     expect(screen.queryByText("Send invitation?")).not.toBeInTheDocument();
 
     for (const call of mutationCalls) call.mutate.mockClear();
-    fireEvent.click(screen.getByText("Link Existing Account"));
+    fireEvent.click(screen.getByText("Link existing account"));
 
     expect(allMutatePayloads(mutationCalls)).toContainEqual({
       action: "create",

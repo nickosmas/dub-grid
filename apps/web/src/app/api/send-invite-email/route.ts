@@ -150,10 +150,12 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Build email ─────────────────────────────────────────────────────
+  // Throws in production when no public origin is configured, so a bad
+  // deploy fails here instead of mailing localhost links.
   const baseUrl = emailBaseUrl();
   if (!clientEnv?.NEXT_PUBLIC_SITE_URL && !clientEnv?.NEXT_PUBLIC_VERCEL_URL) {
     logger.warn(
-      "No NEXT_PUBLIC_SITE_URL or NEXT_PUBLIC_VERCEL_URL set — using localhost:3000 for invite links",
+      "No NEXT_PUBLIC_SITE_URL or NEXT_PUBLIC_VERCEL_URL set - using localhost:3000 for invite links",
     );
   }
 

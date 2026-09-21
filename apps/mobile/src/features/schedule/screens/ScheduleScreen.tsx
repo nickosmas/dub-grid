@@ -727,9 +727,16 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     : false;
   const isTeamScope = scope === "team";
   const isBlockedTeamView = isTeamScope && !canViewTeamSchedule && Boolean(bootstrapQuery.data);
-  const canLoadSchedule = Boolean(accessToken) && (!isTeamScope || canViewTeamSchedule);
-  const canLoadRequests = Boolean(accessToken) && !isTeamScope;
-  const canLoadMeTeamSchedule = Boolean(accessToken) && !isTeamScope && canViewTeamSchedule;
+  // The week is keyed by "today" in the organization's time zone, which
+  // bootstrap supplies. Fetching before it arrived keyed the first request
+  // by the UTC date, which near the day boundary is the wrong week: a wasted
+  // round trip and a skeleton flash on every cold start.
+  const hasBootstrap = bootstrapQuery.data !== undefined;
+  const canLoadSchedule =
+    Boolean(accessToken) && hasBootstrap && (!isTeamScope || canViewTeamSchedule);
+  const canLoadRequests = Boolean(accessToken) && hasBootstrap && !isTeamScope;
+  const canLoadMeTeamSchedule =
+    Boolean(accessToken) && hasBootstrap && !isTeamScope && canViewTeamSchedule;
   // These three are keyed by the visible date range. Without `keepPreviousData`,
   // paging to the next week drops each of them to `isLoading` and flashes a
   // skeleton over a schedule the user was already reading.
@@ -857,6 +864,12 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
   const activeData = scheduleQuery.data;
   const scheduleEntries = activeData?.entries ?? [];
+  // Paging to another week serves the old week's data as a placeholder until
+  // the new one arrives. Filtered to the new dates that is an empty week, so
+  // every empty state fired for a beat on each page; the skeleton holds the
+  // page instead until the fetch settles.
+  const isRangeSwitching =
+    scheduleQuery.isPlaceholderData || (canLoadRequests && requestsQuery.isPlaceholderData);
   const linkedEmployee = bootstrapQuery.data?.linkedEmployee ?? null;
   const canManageEmployees = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
   const unreadNotificationCount = bootstrapQuery.data?.unreadNotificationCount ?? 0;
@@ -1750,8 +1763,8 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
             tabs={teamFocusAreaTabs}
           />
         ) : null}
-        {contentState.kind === "loading" ? (
-          contentState.showSkeleton ? (
+        {contentState.kind === "loading" || isRangeSwitching ? (
+          isRangeSwitching || (contentState.kind === "loading" && contentState.showSkeleton) ? (
             isTeamScope ? (
               <ScheduleTeamSkeleton />
             ) : (
@@ -1796,6 +1809,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
               currentDate={todayDate}
               currentTime={currentTimeValue}
               featuredItem={meHeroState.item}
+              hasWeekItems={hasScheduledWeekDay}
               timing={meHeroTiming}
               shiftmates={meHeroShiftmates}
               status={meHeroState.status}
@@ -2457,6 +2471,7 @@ export function MeHeroCard({
   status,
   timing,
   shiftmates,
+  hasWeekItems = false,
   onPress,
 }: {
   currentDate: string;
@@ -2465,6 +2480,8 @@ export function MeHeroCard({
   status: FeaturedMeScheduleSegment["status"];
   timing: HeroTiming | null;
   shiftmates: MobileScheduleEntry[];
+  /** Whether Your Week below has any scheduled day; the empty copy differs. */
+  hasWeekItems?: boolean;
   onPress?: () => void;
 }) {
   const mobileColors = useMobileColors();
@@ -2472,12 +2489,18 @@ export function MeHeroCard({
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   if (!featuredItem) {
+    // Late in a week that had shifts, "nothing scheduled this week" sat over
+    // a list of them; what is true is that nothing more is coming.
     return (
       <View style={styles.meSectionBlock} testID="me-empty-schedule-state">
         <EmptyStateCard
           iconName="calendar-outline"
-          title="Nothing scheduled this week"
-          body="Your upcoming shifts will appear here once published."
+          title={hasWeekItems ? "Nothing more this week" : "Nothing scheduled this week"}
+          body={
+            hasWeekItems
+              ? "Your remaining shifts this week are done."
+              : "Your upcoming shifts will appear here once published."
+          }
         />
       </View>
     );
@@ -2495,8 +2518,14 @@ export function MeHeroCard({
   const heroDateParts = getCompactScheduleDateParts(featuredItem.date);
   const shiftName = getScheduleItemShiftName(featuredItem);
   const change = getScheduleEntrySegmentChange(featuredItem.entry, featuredItem.segment);
-  const typeChip = getVisibleScheduleItemTypeChip(mobileColors, isDark, featuredItem);
-  const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, typeChip);
+  const visibleTypeChip = getVisibleScheduleItemTypeChip(mobileColors, isDark, featuredItem);
+  // An absence is one fact: the "Away" badge already says the kind, so the
+  // card leads with the absence's own name and skips the "Absence" eyebrow
+  // and pill that restated it as three lines.
+  const isAbsenceHero = visibleTypeChip?.kind === "absence";
+  const typeChip = isAbsenceHero ? null : visibleTypeChip;
+  const heroTitle = isAbsenceHero ? visibleTypeChip.label : shiftName;
+  const shouldShowShiftName = isAbsenceHero || shouldShowMePrimaryTitle(shiftName, typeChip);
   const timeRange = getScheduleItemTimeRange(featuredItem);
   const splitSegments = featuredItem ? getSplitShiftSegmentsForEntry(featuredItem.entry) : [];
   const splitShiftCount = splitSegments.length;
@@ -2536,7 +2565,7 @@ export function MeHeroCard({
             ) : null}
             {shouldShowShiftName || shouldShowHeroSplitBadge || heroChangeLabel ? (
               <View style={styles.meHeroTitleRow}>
-                {shouldShowShiftName ? <Text style={styles.meHeroTitle}>{shiftName}</Text> : null}
+                {shouldShowShiftName ? <Text style={styles.meHeroTitle}>{heroTitle}</Text> : null}
                 {heroChangeLabel ? (
                   <View style={styles.meHeroTitleBadgeSlot}>
                     <ShiftChangeBadge change={heroChange} inverse />
@@ -3133,7 +3162,7 @@ function OpenShiftsSection({
             disabled={
               Boolean(pendingAction) || !linkedEmployeeId || item.openShift.canVolunteer === false
             }
-            label="Volunteer"
+            label="Claim"
             leadingAccessory={
               <Ionicons color={mobileColors.brand} name="add-circle-outline" size={18} />
             }
@@ -3222,7 +3251,7 @@ function OpenShiftsSection({
         {cardSurface}
         <Button
           disabled={isPendingVolunteerRequest || Boolean(pendingAction) || !linkedEmployeeId}
-          label={isPendingVolunteerRequest ? "Pending approval" : "Claim Shift"}
+          label={isPendingVolunteerRequest ? "Pending approval" : "Claim"}
           leadingAccessory={
             <Ionicons
               color={mobileColors.brand}

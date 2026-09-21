@@ -21,7 +21,8 @@ export function getTimePartsInTimeZone(
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
-    hour12: false,
+    // Not `hour12: false`: some engines render midnight as "24".
+    hourCycle: "h23",
   });
   const parts = formatter.formatToParts(value);
 

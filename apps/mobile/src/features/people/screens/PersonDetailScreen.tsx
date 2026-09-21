@@ -1591,10 +1591,9 @@ function AccountLinkChallengeModal({
           primaryAction={
             <Button
               disabled={isPending}
-              label={isMismatch ? "Use Account Name" : "Link Existing Account"}
+              label={isMismatch ? "Use account name" : "Link existing account"}
               loading={isPending}
               onPress={onConfirm}
-              tone="secondary"
             />
           }
         >

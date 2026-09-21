@@ -94,7 +94,7 @@ describe("UpcomingShiftPreview", () => {
 });
 
 describe("CoverShiftsPreview", () => {
-  it("shows the Available list with an open shift to volunteer for", () => {
+  it("shows the Available list with an open shift to claim", () => {
     render(<CoverShiftsPreview />);
 
     expect(screen.getByText("Requests")).toBeInTheDocument();
@@ -103,6 +103,6 @@ describe("CoverShiftsPreview", () => {
     expect(screen.getByText("Day Shift")).toBeInTheDocument();
     expect(screen.getByText("Skilled Nursing")).toBeInTheDocument();
     expect(screen.getByText("1 teammate needed")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Volunteer" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Claim" })).toBeInTheDocument();
   });
 });

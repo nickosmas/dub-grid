@@ -228,8 +228,10 @@ export default function ShiftRequestBoard({
 
     setRunningConfirmationKey(pendingConfirmation.key);
     try {
-      await pendingConfirmation.onConfirm();
-      setPendingConfirmation(null);
+      // The hooks resolve `false` on a failure they have already toasted; the
+      // dialog then stays up with the note intact instead of closing over it.
+      const result = await pendingConfirmation.onConfirm();
+      if (result !== false) setPendingConfirmation(null);
     } finally {
       setRunningConfirmationKey(null);
     }
@@ -277,7 +279,11 @@ export default function ShiftRequestBoard({
 
   function renderRequestPill(req: ShiftRequest) {
     const pill = describeShiftRequestPill(req.type, req.status);
-    return <StatusPill tone={PILL_TONES[pill.tone]}>{pill.label}</StatusPill>;
+    return (
+      <StatusPill dot={false} tone={PILL_TONES[pill.tone]}>
+        {pill.label}
+      </StatusPill>
+    );
   }
 
   // ── Shift panel ──────────────────────────────────────────────────────────
@@ -768,8 +774,9 @@ export default function ShiftRequestBoard({
                 </>
               ),
               onConfirm: async () => {
-                await onResolve(req.id, false, note);
-                clearNote(req.id);
+                const done = await onResolve(req.id, false, note);
+                if (done !== false) clearNote(req.id);
+                return done;
               },
               title: "Reject request?",
               variant: "warning",
@@ -802,8 +809,9 @@ export default function ShiftRequestBoard({
                 </>
               ),
               onConfirm: async () => {
-                await onResolve(req.id, true, note);
-                clearNote(req.id);
+                const done = await onResolve(req.id, true, note);
+                if (done !== false) clearNote(req.id);
+                return done;
               },
               title: "Approve request?",
               variant: "info",
@@ -845,8 +853,9 @@ export default function ShiftRequestBoard({
                 </>
               ),
               onConfirm: async () => {
-                await onCancel(req.id, req.requesterEmpId, cancelNote);
-                if (cancelNote) clearNote(req.id);
+                const done = await onCancel(req.id, req.requesterEmpId, cancelNote);
+                if (cancelNote && done !== false) clearNote(req.id);
+                return done;
               },
               title: "Cancel request?",
               variant: "warning",
@@ -1116,9 +1125,10 @@ export default function ShiftRequestBoard({
             <div
               style={{
                 display: "grid",
-                // Groups wrap under one another once the panel cannot hold
-                // them side by side, rather than running off its edge.
-                gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(300px, 1fr))",
+                // A column is never narrower than a card needs to show a name
+                // beside its pill; groups wrap under one another once the
+                // panel cannot hold them side by side.
+                gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(340px, 1fr))",
                 gap: 16,
                 alignItems: "start",
               }}

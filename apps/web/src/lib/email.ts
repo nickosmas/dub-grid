@@ -8,13 +8,16 @@ export function sanitizeHeaderValue(str: string): string {
 
 /**
  * Resolve the public origin used for email links and the logo image, with no
- * trailing slash. Falls back to localhost in dev with a soft warning handled
- * by callers that care.
+ * trailing slash. Falls back to localhost in development; in production a
+ * missing origin throws rather than mailing anyone a localhost link.
  */
 export function emailBaseUrl(): string {
-  return (
+  const configured =
     clientEnv?.NEXT_PUBLIC_SITE_URL ||
-    (clientEnv?.NEXT_PUBLIC_VERCEL_URL ? `https://${clientEnv?.NEXT_PUBLIC_VERCEL_URL}` : null) ||
-    "http://localhost:3000"
-  );
+    (clientEnv?.NEXT_PUBLIC_VERCEL_URL ? `https://${clientEnv?.NEXT_PUBLIC_VERCEL_URL}` : null);
+  if (configured) return configured;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("NEXT_PUBLIC_SITE_URL is not set; refusing to send email with localhost links");
+  }
+  return "http://localhost:3000";
 }

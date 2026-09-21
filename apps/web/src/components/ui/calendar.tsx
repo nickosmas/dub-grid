@@ -7,6 +7,11 @@ import { DayPicker, getDefaultClassNames, type DayButton, type Locale } from "re
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+// The span between two chosen days: the brand at a fifth strength over the
+// popover, which reads as a band in both themes where the soft brand token
+// (a near-white in light, a near-black in dark) did not.
+const RANGE_BAND = "color-mix(in srgb, var(--dg-color-brand) 20%, transparent)";
+
 function Calendar({
   className,
   classNames,
@@ -31,6 +36,7 @@ function Calendar({
         String.raw`rtl:**:[.rdp-button\_previous>svg]:rotate-180`,
         className,
       )}
+      style={{ "--dg-calendar-range-bg": RANGE_BAND } as React.CSSProperties}
       captionLayout={captionLayout}
       locale={locale}
       formatters={{
@@ -95,12 +101,12 @@ function Calendar({
           defaultClassNames.day,
         ),
         range_start: cn(
-          "relative isolate z-0 rounded-l-(--cell-radius) bg-muted after:absolute after:inset-y-0 after:right-0 after:w-4 after:bg-muted",
+          "relative isolate z-0 rounded-l-(--cell-radius) bg-[var(--dg-calendar-range-bg)] after:absolute after:inset-y-0 after:right-0 after:w-4 after:bg-[var(--dg-calendar-range-bg)]",
           defaultClassNames.range_start,
         ),
         range_middle: cn("rounded-none", defaultClassNames.range_middle),
         range_end: cn(
-          "relative isolate z-0 rounded-r-(--cell-radius) bg-muted after:absolute after:inset-y-0 after:left-0 after:w-4 after:bg-muted",
+          "relative isolate z-0 rounded-r-(--cell-radius) bg-[var(--dg-calendar-range-bg)] after:absolute after:inset-y-0 after:left-0 after:w-4 after:bg-[var(--dg-calendar-range-bg)]",
           defaultClassNames.range_end,
         ),
         today: cn(
@@ -176,7 +182,7 @@ function CalendarDayButton({
       data-range-end={modifiers.range_end}
       data-range-middle={modifiers.range_middle}
       className={cn(
-        "relative isolate z-10 flex aspect-square size-auto w-full min-w-(--cell-size) flex-col gap-1 border-0 leading-none group-data-[focused=true]/day:relative group-data-[focused=true]/day:z-10 group-data-[focused=true]/day:border-ring group-data-[focused=true]/day:ring-[3px] group-data-[focused=true]/day:ring-ring/50 data-[range-end=true]:rounded-(--cell-radius) data-[range-end=true]:rounded-r-(--cell-radius) data-[range-end=true]:bg-primary! data-[range-end=true]:text-primary-foreground! data-[range-end=true]:hover:bg-primary! data-[range-end=true]:hover:text-primary-foreground! data-[range-middle=true]:rounded-none data-[range-middle=true]:bg-muted data-[range-middle=true]:text-foreground data-[range-start=true]:rounded-(--cell-radius) data-[range-start=true]:rounded-l-(--cell-radius) data-[range-start=true]:bg-primary! data-[range-start=true]:text-primary-foreground! data-[range-start=true]:hover:bg-primary! data-[range-start=true]:hover:text-primary-foreground! data-[selected-single=true]:bg-primary! data-[selected-single=true]:text-primary-foreground! data-[selected-single=true]:hover:bg-primary! data-[selected-single=true]:hover:text-primary-foreground! dark:hover:text-foreground [&>span]:text-xs [&>span]:opacity-70",
+        "relative isolate z-10 flex aspect-square size-auto w-full min-w-(--cell-size) flex-col gap-1 border-0 leading-none group-data-[focused=true]/day:relative group-data-[focused=true]/day:z-10 group-data-[focused=true]/day:border-ring group-data-[focused=true]/day:ring-[3px] group-data-[focused=true]/day:ring-ring/50 data-[range-end=true]:rounded-(--cell-radius) data-[range-end=true]:rounded-r-(--cell-radius) data-[range-end=true]:bg-primary! data-[range-end=true]:text-primary-foreground! data-[range-end=true]:hover:bg-primary! data-[range-end=true]:hover:text-primary-foreground! data-[range-middle=true]:rounded-none data-[range-middle=true]:bg-[var(--dg-calendar-range-bg)] data-[range-middle=true]:text-foreground data-[range-middle=true]:hover:bg-[var(--dg-calendar-range-bg)] data-[range-start=true]:rounded-(--cell-radius) data-[range-start=true]:rounded-l-(--cell-radius) data-[range-start=true]:bg-primary! data-[range-start=true]:text-primary-foreground! data-[range-start=true]:hover:bg-primary! data-[range-start=true]:hover:text-primary-foreground! data-[selected-single=true]:bg-primary! data-[selected-single=true]:text-primary-foreground! data-[selected-single=true]:hover:bg-primary! data-[selected-single=true]:hover:text-primary-foreground! dark:hover:text-foreground [&>span]:text-xs [&>span]:opacity-70",
         defaultClassNames.day,
         className,
       )}

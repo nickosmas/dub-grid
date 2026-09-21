@@ -7352,16 +7352,16 @@ function SchedulerContent({
             )}
             {pendingCoverageGapVolunteer && currentEmpId && (
               <ConfirmDialog
-                confirmLabel="Volunteer"
+                confirmLabel="Claim"
                 isLoading={isCoverageGapVolunteerPending}
                 message={
                   <>
-                    Volunteer for <strong>{pendingCoverageGapVolunteer.assignmentLabel}</strong> on{" "}
+                    Claim <strong>{pendingCoverageGapVolunteer.assignmentLabel}</strong> on{" "}
                     <strong>{pendingCoverageGapVolunteer.date}</strong>? This will be sent to your
                     admin for approval.
                   </>
                 }
-                title="Volunteer for this shift?"
+                title="Claim this shift?"
                 variant="info"
                 onCancel={() => {
                   if (!isCoverageGapVolunteerPending) {
@@ -7393,11 +7393,7 @@ function SchedulerContent({
             )}
             {pendingClaimShift && currentEmpId && (
               <ConfirmDialog
-                title={
-                  pendingClaimShift.source === "calloff"
-                    ? "Claim This Shift?"
-                    : "Volunteer for This Shift?"
-                }
+                title="Claim this shift?"
                 message={
                   <>
                     <strong>
@@ -7412,7 +7408,7 @@ function SchedulerContent({
                     We'll send this to your admin for approval.
                   </>
                 }
-                confirmLabel={pendingClaimShift.source === "calloff" ? "Claim" : "Volunteer"}
+                confirmLabel="Claim"
                 variant="info"
                 isLoading={isClaimShiftPending}
                 // Async so the dialog's latch holds for the whole request:
