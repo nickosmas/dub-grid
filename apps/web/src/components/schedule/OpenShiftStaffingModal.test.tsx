@@ -35,11 +35,13 @@ const dayOption = {
   assignmentIds: [100],
   alignedTimeRanges: [{ start: "07:00", end: "15:00" }],
   timeRanges: [{ start: "07:00", end: "15:00" }],
+  alignedCustomTimeRanges: [null],
 };
 const eveningOption = {
   assignmentIds: [101],
   alignedTimeRanges: [{ start: "15:00", end: "23:00" }],
   timeRanges: [{ start: "15:00", end: "23:00" }],
+  alignedCustomTimeRanges: [null],
 };
 
 function candidates(): OpenShiftStaffingCandidate[] {

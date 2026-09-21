@@ -3191,8 +3191,10 @@ function SchedulerContent({
         ruleLabel: gap.ruleLabel,
         assignmentLabel: gap.assignmentLabel,
         assignmentFullName: gap.assignmentFullName,
-        customStartTime: sc?.defaultStartTime ?? null,
-        customEndTime: sc?.defaultEndTime ?? null,
+        // A gap runs at the assignment's default time; only a calloff carries
+        // custom times, so these stay null and never reach the cell as custom.
+        customStartTime: null,
+        customEndTime: null,
         needed: remainingNeeded,
       });
       return items;
@@ -5934,8 +5936,8 @@ function SchedulerContent({
                     selectedAssignmentDefinition.jobId != null
                       ? [selectedAssignmentDefinition.jobId]
                       : [],
-                  customStartTime: selectedRange?.start ?? null,
-                  customEndTime: selectedRange?.end ?? null,
+                  customStartTime: null,
+                  customEndTime: null,
                 });
                 return;
               }
@@ -7322,8 +7324,8 @@ function SchedulerContent({
                             selectedAssignmentDefinition.jobId != null
                               ? [selectedAssignmentDefinition.jobId]
                               : [],
-                          customStartTime: selectedRange?.start ?? null,
-                          customEndTime: selectedRange?.end ?? null,
+                          customStartTime: null,
+                          customEndTime: null,
                         });
                         if (!volunteerInput) {
                           toast.error("That open shift is no longer available.");
