@@ -356,7 +356,8 @@ describe("productive typography contract", () => {
     expect(enforcedPaths.has("app/(app)/login/OrgLogin.tsx")).toBe(true);
     expect(enforcedPaths.has("app/(app)/onboarding/page.tsx")).toBe(true);
     expect(enforcedPaths.has("app/page.tsx")).toBe(true);
-    expect(enforcedPaths.has("components/landing/ThemeToggleButton.tsx")).toBe(true);
+    expect(enforcedPaths.has("components/ThemeToggleButton.tsx")).toBe(true);
+    expect(enforcedPaths.has("components/landing/LandingPhone.tsx")).toBe(true);
     expect(enforcedPaths.has("components/landing/ScheduleGridMockup.tsx")).toBe(false);
   });
 

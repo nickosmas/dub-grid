@@ -14,7 +14,7 @@ import { openConsentPreferences } from "@/components/CookieConsent";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { buildSubdomainHost, isApexHost, parseHost } from "@/lib/subdomain";
 import { withThemeParam } from "@/lib/theme-preference";
-import ThemeToggleButton from "@/components/landing/ThemeToggleButton";
+import ThemeToggleButton from "@/components/ThemeToggleButton";
 import { LandingScreenshot, landingScreenshots } from "@/components/landing/LandingScreenshot";
 import { LandingPhone } from "@/components/landing/LandingPhone";
 import {

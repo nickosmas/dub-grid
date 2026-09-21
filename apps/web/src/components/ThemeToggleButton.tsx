@@ -22,12 +22,18 @@ const THEME_CYCLE = [
   { value: "system", Icon: Monitor, label: "Theme: system. Switch to light mode." },
 ] as const;
 
+/**
+ * `landing` is the bare icon the marketing nav uses; `header` takes the app
+ * header's 36px icon-button geometry so it sits level with the alerts bell.
+ */
 export default function ThemeToggleButton({
   className = "",
   onDarkSurface = false,
+  appearance = "landing",
 }: {
   className?: string;
   onDarkSurface?: boolean;
+  appearance?: "landing" | "header";
 }) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -45,18 +51,24 @@ export default function ThemeToggleButton({
   const next = THEME_CYCLE[(index + 1) % THEME_CYCLE.length]!;
   const Icon = current.Icon;
 
+  const appearanceClass =
+    appearance === "header"
+      ? "dg-header-icon-btn"
+      : `p-2 transition-colors ${
+          onDarkSurface
+            ? "text-white/80 hover:text-white"
+            : "text-[var(--dg-color-text-muted)] hover:text-[var(--dg-color-text-secondary)]"
+        }`;
+  const iconSize = appearance === "header" ? 18 : 20;
+
   return (
     <Button
       type="button"
       onClick={() => setTheme(next.value)}
-      className={`p-2 transition-colors ${
-        onDarkSurface
-          ? "text-white/80 hover:text-white"
-          : "text-[var(--dg-color-text-muted)] hover:text-[var(--dg-color-text-secondary)]"
-      } ${className}`}
+      className={`${appearanceClass} ${className}`}
       aria-label={current.label}
     >
-      {!mounted ? <span className="dg-theme-toggle-placeholder" /> : <Icon size={20} />}
+      {!mounted ? <span className="dg-theme-toggle-placeholder" /> : <Icon size={iconSize} />}
     </Button>
   );
 }

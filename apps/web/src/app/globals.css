@@ -4695,6 +4695,40 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   height: 20px;
 }
 
+/* App header icon button: the alerts bell's geometry and hover, so a theme
+   toggle beside it reads as the same control. */
+.dg-header-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--dg-btn-radius);
+  color: var(--dg-color-text-muted);
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+}
+
+.dg-header-icon-btn:hover {
+  background: var(--dg-color-bg-secondary);
+  border-color: var(--dg-color-border);
+}
+
+.dg-header-icon-btn:focus-visible {
+  outline: 2px solid var(--dg-color-border-focus);
+  outline-offset: 2px;
+}
+
+.dg-header-icon-btn .dg-theme-toggle-placeholder {
+  width: 18px;
+  height: 18px;
+}
+
 .dg-auth-state-heading {
   margin-bottom: 12px;
 }

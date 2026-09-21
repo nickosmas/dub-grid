@@ -21,7 +21,6 @@ import { DubGridLogo } from "@/components/Logo";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { getAvatarInitials } from "@/lib/utils";
 import { useAvatarTone } from "@/hooks/useAvatarTone";
-import { useTheme } from "next-themes";
 import {
   SidebarProvider,
   Sidebar,
@@ -106,6 +105,7 @@ const ImpersonationHistory = dynamic(() => import("@/components/gridmaster/Imper
 });
 
 import NotificationBell from "@/components/NotificationBell";
+import ThemeToggleButton from "@/components/ThemeToggleButton";
 import ProgressBar from "@/components/ProgressBar";
 import { EmptyState } from "@/components/EmptyState";
 import { InboxView as AlertsInboxView } from "@/app/(app)/alerts/AlertsInboxPage";
@@ -415,7 +415,6 @@ export default function GridmasterPortal() {
   }, [signOut]);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const { theme, setTheme } = useTheme();
   const [selectedOrgInitialTab, setSelectedOrgInitialTab] = useState<
     OrganizationDetailTab | undefined
   >();
@@ -792,10 +791,13 @@ export default function GridmasterPortal() {
             flexShrink: 0,
             display: "flex",
             alignItems: "center",
+            gap: 8,
             marginRight: isMobile ? 0 : 4,
           }}
         >
+          <ThemeToggleButton appearance="header" />
           <NotificationBell
+            hidden={view === "notifications"}
             onViewAll={() => {
               setView("notifications");
               setSelectedId(null);
@@ -909,36 +911,6 @@ export default function GridmasterPortal() {
                   <User size={13} />
                   Profile
                 </Button>
-                <div className="dg-menu-divider" />
-                {/* Same theme control as the organization header's avatar
-                    menu: appearance lives here, not in a settings section. */}
-                <div style={{ padding: "6px 10px 4px" }}>
-                  <div
-                    style={{
-                      fontSize: "var(--dg-type-field-title-size)",
-                      fontWeight: "var(--dg-type-field-title-weight)",
-                      color: "var(--dg-type-field-title-color)",
-                      textTransform: "none",
-                      letterSpacing: "var(--dg-type-field-title-letter-spacing)",
-                      marginBottom: 6,
-                    }}
-                  >
-                    Theme
-                  </div>
-                  <div className="dg-segment" style={{ display: "flex" }}>
-                    {(["light", "dark", "system"] as const).map((option) => (
-                      <Button
-                        key={option}
-                        type="button"
-                        className={`dg-segment-btn${theme === option ? " active" : ""}`}
-                        style={{ flex: 1 }}
-                        onClick={() => setTheme(option)}
-                      >
-                        {option === "light" ? "Light" : option === "dark" ? "Dark" : "System"}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
                 <div className="dg-menu-divider" />
                 <Button
                   className="dg-menu-item dg-menu-item--danger"
