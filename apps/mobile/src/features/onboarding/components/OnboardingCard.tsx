@@ -114,15 +114,19 @@ const createStyles = (mobileColors: MobileColors) =>
       overflow: "hidden",
     },
     content: {
+      flex: 1,
       alignItems: "center",
       gap: mobileSpace.lg,
       maxWidth: 360,
       width: "100%",
     },
-    // Stretches so the mock-up inside can bleed out to the app's own screen
-    // gutter; an auto-width frame would shrink-wrap it back to the copy's
-    // measure. The copy above keeps the slide's wider padding.
+    // Takes the rest of the slide, so a live preview knows how tall it may
+    // be; stretches so a card inside can bleed out to the app's own screen
+    // gutter, where an auto-width frame would shrink-wrap it back to the
+    // copy's measure. The copy above keeps the slide's wider padding.
     visualFrame: {
+      flex: 1,
+      minHeight: 0,
       alignSelf: "stretch",
       marginTop: mobileSpace.xs,
     },

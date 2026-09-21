@@ -98,10 +98,3 @@ export function buildPreviewOpenShift(today: string): MobileOpenShift {
     volunteerBlockReason: null,
   };
 }
-
-/** The tabs a regular staff member sees on Requests. */
-export const PREVIEW_REQUEST_TABS = [
-  { key: "available", label: "Available", count: 2 },
-  { key: "mine", label: "Mine", count: 1 },
-  { key: "history", label: "History", count: 3 },
-] as const;
