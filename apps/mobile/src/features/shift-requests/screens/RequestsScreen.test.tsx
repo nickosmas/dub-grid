@@ -894,6 +894,80 @@ describe("RequestsScreen", () => {
     expect(screen.queryByText("Nothing to approve")).not.toBeInTheDocument();
   });
 
+  it("groups the approval queue by what each request waits on, and lets a manager withdraw a swap its recipient has not answered", () => {
+    const mutate = vi.fn();
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate });
+    useQuery.mockReturnValue({
+      data: {
+        requests: [
+          {
+            id: "req-2",
+            requesterName: "Mina Diaz",
+            requesterShiftDate: "2026-04-17",
+            status: "pending_approval",
+            type: "calloff",
+            requesterShiftLabel: "Day",
+            requesterEmpId: "emp-2",
+            targetEmpId: null,
+            requesterPresentation: { label: "Day Shift" },
+          },
+          {
+            id: "req-3",
+            requesterName: "Jane Morgan",
+            requesterShiftDate: "2026-04-18",
+            targetShiftDate: "2026-04-19",
+            status: "open",
+            type: "swap",
+            requesterShiftLabel: "Day",
+            requesterEmpId: "emp-3",
+            targetEmpId: "emp-4",
+            targetName: "Laura Marshall",
+            requesterPresentation: { label: "Day Shift" },
+            targetPresentation: { label: "Evening Shift" },
+          },
+          {
+            id: "req-4",
+            requesterName: "Owen Lee",
+            requesterShiftDate: "2026-04-20",
+            status: "open",
+            type: "pickup",
+            requesterShiftLabel: "Day",
+            requesterEmpId: "emp-5",
+            targetEmpId: null,
+            requesterPresentation: { label: "Day Shift" },
+          },
+        ],
+        openShifts: [],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<RequestsScreen />);
+
+    expect(screen.getByText("Pending approval (1)")).toBeInTheDocument();
+    expect(screen.getByText("Pickups (1)")).toBeInTheDocument();
+    expect(screen.getByText("Swaps awaiting a response (1)")).toBeInTheDocument();
+    expect(screen.getByText("Waiting for Laura to respond")).toBeInTheDocument();
+    // Only the call-off can be decided; the open swap can only be withdrawn.
+    expect(screen.getAllByRole("button", { name: "Approve" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Cancel request" })).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel request" }));
+    const dialog = screen.getByRole("alert");
+    expect(
+      within(dialog).getByText(/Laura hasn't responded to this swap yet\. Cancelling withdraws it/),
+    ).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel request" }));
+
+    expect(mutate).toHaveBeenCalledWith(
+      { requestId: "req-3", body: { action: "cancel", empId: "emp-3" } },
+      expect.objectContaining({ onSettled: expect.any(Function) }),
+    );
+  });
+
   it("sends an optional note along with an approval", () => {
     const mutate = vi.fn();
     useMutation.mockReturnValue({ error: null, isPending: false, mutate });
@@ -923,11 +997,14 @@ describe("RequestsScreen", () => {
     render(<RequestsScreen />);
 
     fireEvent.click(screen.getByText("Approve"));
-    const dialog = screen.getByRole("alert");
-    fireEvent.change(within(dialog).getByPlaceholderText("Note to Mina? (Optional)"), {
+    // The decision opens a sheet rather than a confirmation: it holds a field.
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByText("Approve request?")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Note to Mina? (Optional)"), {
       target: { value: "  Thanks for covering  " },
     });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Approve" }));
+    // The card's own Approve is still on the page behind the sheet.
+    fireEvent.click(screen.getAllByRole("button", { name: "Approve" }).at(-1)!);
 
     expect(mutate).toHaveBeenCalledWith(
       {

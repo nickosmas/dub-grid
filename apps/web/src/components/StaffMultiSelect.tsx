@@ -19,12 +19,15 @@ export default function StaffMultiSelect({
   onChange,
   options,
   placeholder = "All staff",
+  style,
   value,
 }: {
   ariaLabel?: string;
   onChange: (ids: string[]) => void;
   options: StaffOption[];
   placeholder?: string;
+  /** Content-sized by default; pass a width to fill a form column. */
+  style?: React.CSSProperties;
   value: string[];
 }) {
   const [open, setOpen] = useState(false);
@@ -47,7 +50,7 @@ export default function StaffMultiSelect({
   };
 
   return (
-    <div ref={ref} style={{ display: "inline-block", width: "100%" }}>
+    <div ref={ref} style={{ display: "inline-block", ...style }}>
       <Button
         type="button"
         aria-label={ariaLabel}
@@ -76,9 +79,7 @@ export default function StaffMultiSelect({
           borderColor: open ? "var(--dg-color-border-focus)" : "var(--dg-color-border)",
         }}
       >
-        <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
-          {label}
-        </span>
+        <span style={{ flex: 1, minWidth: 0 }}>{label}</span>
         <ChevronDown
           size={12}
           strokeWidth={2.5}

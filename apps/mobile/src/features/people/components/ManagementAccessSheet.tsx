@@ -23,24 +23,14 @@ import { getClientFriendlyErrorMessage } from "../../../shared/lib/errors";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { mobileSpace } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
+import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import { ProfileChoiceGroup } from "../../profile/components/ProfilePrimitives";
+import { OrgRoleChoice } from "./OrgRoleChoice";
 import {
   hasManagementAccess,
   type ManagementAccessRole,
   type ManagementAccessSubject,
 } from "../lib/managementAccess";
-
-/**
- * Every tier, for the one case this sheet asks about a role at all: a brand-new
- * invitation, where nothing yet exists to hold one. Anyone with an account or a
- * pending invitation changes their role from the Access row of their editor,
- * and this sheet edits their departments and nothing else.
- */
-const ROLE_OPTIONS: { id: ManagementAccessRole; name: string }[] = [
-  { id: "user", name: "User" },
-  { id: "admin", name: "Admin" },
-  { id: "super_admin", name: "Super Admin" },
-];
 
 function sameIds(left: number[], right: number[]): boolean {
   if (left.length !== right.length) return false;
@@ -76,6 +66,8 @@ export function ManagementAccessSheet({
   onDismiss: () => void;
 }) {
   const accessToken = useAccessToken();
+  // Only a Super Admin may invite another one, as on web.
+  const canGrantSuperAdmin = useBootstrap(accessToken).data?.effectiveRole === "super_admin";
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
 
@@ -236,7 +228,7 @@ export function ManagementAccessSheet({
             ? "You'll come off the management roster. Your staff profile and schedule stay exactly as they are."
             : "They'll come off the management roster. Their staff profile and schedule stay exactly as they are."
         }
-        confirmLabel="Remove Access"
+        confirmLabel="Remove access"
         confirmTone="danger"
         loading={mutation.isPending}
         onCancel={() => setShowRemoveConfirmation(false)}
@@ -262,7 +254,7 @@ export function ManagementAccessSheet({
             primaryAction={
               <Button
                 disabled={!canSubmit}
-                label="Save Access"
+                label="Save access"
                 loading={mutation.isPending}
                 onPress={submit}
                 tone="primary"
@@ -307,16 +299,17 @@ export function ManagementAccessSheet({
                 different control from the one on the page behind. The lists
                 carry headers only when there are two of them to tell apart;
                 a lone departments list is named by the sheet's title. */}
+          {/* A role is asked only for a brand-new invitation, where nothing
+                yet exists to hold one. Anyone with an account or a pending
+                invitation changes their role from the Access row of their
+                editor, and this sheet edits their departments and nothing
+                else. */}
           {needsRoleForInvite ? (
-            <ProfileChoiceGroup
-              items={ROLE_OPTIONS.map((option) => ({
-                ...option,
-                disabled: mutation.isPending,
-              }))}
-              label="Access level"
-              selection="single"
-              selectedIds={[draft.orgRole]}
-              onToggle={(orgRole) => setDraft((current) => ({ ...current, orgRole }))}
+            <OrgRoleChoice
+              canGrantSuperAdmin={canGrantSuperAdmin}
+              disabled={mutation.isPending}
+              value={draft.orgRole}
+              onChange={(orgRole) => setDraft((current) => ({ ...current, orgRole }))}
             />
           ) : null}
 

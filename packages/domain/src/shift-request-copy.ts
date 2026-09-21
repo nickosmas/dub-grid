@@ -109,3 +109,74 @@ export function describeShiftRequestNoteRecipients(
     ? `${first(request.requesterName)} and ${first(request.targetName)}`
     : first(request.requesterName);
 }
+
+export type ShiftRequestQueueInput = Pick<ShiftRequestCopyInput, "type" | "targetEmpId"> & {
+  status: ShiftRequestStatus;
+};
+
+/**
+ * An open request aimed at one person (a swap, or a pickup offered to cover
+ * someone's shift) waits on that person before a manager can decide it.
+ */
+export function isAwaitingRecipient(request: ShiftRequestQueueInput): boolean {
+  return request.status === "open" && request.targetEmpId != null;
+}
+
+function firstName(name: string): string {
+  return name.trim().split(/\s+/)[0] ?? name;
+}
+
+export function describeAwaitingRecipient(targetName: string): string {
+  return `Waiting for ${firstName(targetName)} to respond`;
+}
+
+/** The confirm-dialog warning for cancelling a request the recipient has not answered. */
+export function describeCancelAwaitingRecipientCaution(
+  request: Pick<ShiftRequestCopyInput, "type" | "targetName">,
+): string {
+  const who = request.targetName ? firstName(request.targetName) : "The other person";
+  const kind = request.type === "swap" ? "swap" : "pickup";
+  return `${who} hasn't responded to this ${kind} yet. Cancelling withdraws it for both people and the schedule stays as it is.`;
+}
+
+export type ShiftRequestQueueGroupKey = "pending_approval" | "pickups" | "awaiting_recipient";
+
+export type ShiftRequestQueueGroup<T extends ShiftRequestQueueInput> = {
+  key: ShiftRequestQueueGroupKey;
+  label: string;
+  requests: T[];
+};
+
+const QUEUE_GROUP_LABEL: Record<ShiftRequestQueueGroupKey, string> = {
+  pending_approval: "Pending approval",
+  pickups: "Pickups",
+  awaiting_recipient: "Swaps awaiting a response",
+};
+
+function queueGroupKey(request: ShiftRequestQueueInput): ShiftRequestQueueGroupKey | null {
+  if (request.status === "pending_approval") return "pending_approval";
+  if (request.status !== "open") return null;
+  return isAwaitingRecipient(request) ? "awaiting_recipient" : "pickups";
+}
+
+/**
+ * The manager's queue split by what each request is waiting on: the
+ * manager, a claimant, or the person it was aimed at. Order within a group
+ * is the caller's; empty groups are dropped.
+ */
+export function groupManagerQueue<T extends ShiftRequestQueueInput>(
+  requests: readonly T[],
+): ShiftRequestQueueGroup<T>[] {
+  const buckets: Record<ShiftRequestQueueGroupKey, T[]> = {
+    pending_approval: [],
+    pickups: [],
+    awaiting_recipient: [],
+  };
+  for (const request of requests) {
+    const key = queueGroupKey(request);
+    if (key) buckets[key].push(request);
+  }
+  return (Object.keys(buckets) as ShiftRequestQueueGroupKey[])
+    .filter((key) => buckets[key].length > 0)
+    .map((key) => ({ key, label: QUEUE_GROUP_LABEL[key], requests: buckets[key] }));
+}

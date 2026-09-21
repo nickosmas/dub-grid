@@ -465,8 +465,8 @@ export default function LoginScreen() {
                 style={styles.progressText}
               >
                 {slowSubmission
-                  ? "This is taking longer than usual. We’re still checking your Organization."
-                  : "Checking your workspace…"}
+                  ? "This is taking longer than usual. We’re still checking your organization."
+                  : "Checking your organization…"}
               </Text>
             ) : null}
 
@@ -549,7 +549,7 @@ export default function LoginScreen() {
               primaryAction={
                 <Button
                   disabled={submitting || !isValidEmail(email) || !password}
-                  label="Sign In"
+                  label="Sign in"
                   loading={submitting}
                   onPress={() => handleLogin()}
                 />
@@ -620,7 +620,7 @@ export default function LoginScreen() {
               primaryAction={
                 <Button
                   disabled={submitting || mfaCode.length !== 6}
-                  label="Verify and Sign In"
+                  label="Verify and sign in"
                   loading={submitting}
                   onPress={() => handleMfaVerify()}
                 />

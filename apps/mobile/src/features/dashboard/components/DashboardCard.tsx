@@ -119,14 +119,20 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textPrimary,
       flex: 1,
     },
+    // Pressed, the link takes the same rounded highlight as a row rather
+    // than fading its text; the inset bleeds past the label and is given
+    // back as padding so the label stays put.
     seeAll: {
       flexDirection: "row",
       alignItems: "center",
       gap: mobileSpace.xs,
+      borderRadius: mobileRadii.control,
+      marginHorizontal: -mobileSpace.sm,
+      paddingHorizontal: mobileSpace.sm,
       paddingVertical: mobileSpace.xs,
     },
     seeAllPressed: {
-      opacity: 0.6,
+      backgroundColor: mobileColors.navActiveBg,
     },
     seeAllLabel: {
       ...mobileText.label,

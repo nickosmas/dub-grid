@@ -556,7 +556,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
               ...organizations.map((org) => ({ value: org.id, label: org.name })),
             ]}
             onChange={updateOrgFilter}
-            style={{ width: "auto", minWidth: 170 }}
+            style={{ flex: "1 1 auto" }}
             fontSize={12}
           />
           <CustomSelect
@@ -569,7 +569,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
               { value: "unknown", label: "Unknown" },
             ]}
             onChange={updatePlatformFilter}
-            style={{ width: "auto", minWidth: 140 }}
+            style={{ flex: "1 1 auto" }}
             fontSize={12}
           />
           <CustomSelect
@@ -585,7 +585,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
             fontSize={12}
           />
           <div style={{ flex: 1 }} />
-          <div style={{ position: "relative", flex: "1 1 220px", maxWidth: 300, minWidth: 180 }}>
+          <div style={{ position: "relative", flex: "1 1 auto" }}>
             <input
               className="dg-input"
               value={search}

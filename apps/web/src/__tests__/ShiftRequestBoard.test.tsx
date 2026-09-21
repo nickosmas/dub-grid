@@ -309,6 +309,62 @@ describe("ShiftRequestBoard", () => {
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     await confirmDialogAction(user, "Cancel request");
 
-    expect(onCancel).toHaveBeenCalledWith("mine-1");
+    expect(onCancel).toHaveBeenCalledWith("mine-1", "emp-2");
+  });
+
+  it("groups the approval queue by what each request waits on", async () => {
+    const user = userEvent.setup();
+    const calloff = makeRequest({ id: "co-1", type: "calloff", status: "pending_approval" });
+    const pickup = makeRequest({ id: "pu-1", type: "pickup", status: "open" });
+    const swap = makeRequest({
+      id: "sw-1",
+      type: "swap",
+      status: "open",
+      targetEmpId: "emp-9",
+      targetName: "Bob Jones",
+      targetShiftDate: "2026-04-17",
+      targetAssignmentDefinitionIds: [2],
+      targetShiftLabel: "Night",
+    });
+
+    renderBoard({ approvalQueue: [swap, pickup, calloff], canApprove: true, currentEmpId: "m-1" });
+    await user.click(screen.getByRole("button", { name: /approval queue/i }));
+
+    const headings = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
+    expect(headings).toEqual(["Pending approval1", "Pickups1", "Swaps awaiting a response1"]);
+    const swapColumn = screen.getByRole("region", { name: /swaps awaiting a response/i });
+    expect(swapColumn).toHaveTextContent("Waiting for Bob to respond");
+    expect(swapColumn).toHaveTextContent("Cancel request");
+    expect(screen.getByRole("region", { name: /pending approval/i })).toHaveTextContent("Approve");
+  });
+
+  it("lets a manager withdraw a swap its recipient has not answered, with a caution", async () => {
+    const user = userEvent.setup();
+    const swap = makeRequest({
+      id: "sw-2",
+      type: "swap",
+      status: "open",
+      targetEmpId: "emp-9",
+      targetName: "Bob Jones",
+      targetShiftDate: "2026-04-17",
+      targetAssignmentDefinitionIds: [2],
+      targetShiftLabel: "Night",
+    });
+    const { onCancel } = renderBoard({
+      approvalQueue: [swap],
+      canApprove: true,
+      currentEmpId: "manager-1",
+    });
+
+    await user.click(screen.getByRole("button", { name: /approval queue/i }));
+    expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Cancel request" }));
+
+    expect(
+      screen.getByText(/Bob hasn't responded to this swap yet\. Cancelling withdraws it/),
+    ).toBeInTheDocument();
+    await confirmDialogAction(user, "Cancel request");
+
+    expect(onCancel).toHaveBeenCalledWith("sw-2", "emp-1");
   });
 });

@@ -23,6 +23,7 @@ import { PressableRow } from "../../../shared/components/PressableRow";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { FullPageSheet } from "../../../shared/components/FullPageSheet";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
+import { SelectionRow, SelectionSection } from "../../../shared/components/FilterSheet";
 import { InlineError } from "../../../shared/components/InlineError";
 import { Card, Screen } from "../../../shared/components/Screen";
 import { SkeletonCardSurface, SkeletonLine } from "../../../shared/components/skeleton";
@@ -1184,31 +1185,30 @@ export default function ShiftDetailScreen() {
             </View>
           ) : null}
           {coverageRequestType === "calloff" ? (
-            <View style={styles.modalInlinePanel}>
-              <Text style={styles.subsectionLabel}>
-                {selectedCalloffAbsenceType ? "Absence reason" : "Select absence reason"}
-              </Text>
-              {selectedCalloffAbsenceType ? (
-                <Text style={styles.subsectionBody}>Review your call-off below, then submit.</Text>
-              ) : null}
-              <View style={styles.selectorWrap}>
-                {(selectedCalloffAbsenceType
-                  ? [selectedCalloffAbsenceType]
-                  : activeAbsenceTypes
-                ).map((absenceType) => (
-                  <SelectorChip
-                    key={absenceType.id}
-                    active={selectedCalloffAbsenceTypeId === absenceType.id}
+            <View style={styles.subsection}>
+              {/* The same ring-and-check list every other pick-one uses; a
+                  chip cloud read as a different control from the rest of the
+                  sheet. Tapping the chosen reason again clears it. */}
+              <SelectionSection
+                label={selectedCalloffAbsenceType ? "Absence reason" : "Select absence reason"}
+              >
+                {activeAbsenceTypes.map((absenceType) => (
+                  <SelectionRow
                     disabled={createRequestMutation.isPending}
+                    key={absenceType.id}
                     label={getAbsenceTypeOptionLabel(absenceType)}
                     onPress={() =>
                       setSelectedCalloffAbsenceTypeId(
                         selectedCalloffAbsenceTypeId === absenceType.id ? null : absenceType.id,
                       )
                     }
+                    selected={selectedCalloffAbsenceTypeId === absenceType.id}
                   />
                 ))}
-              </View>
+              </SelectionSection>
+              {selectedCalloffAbsenceType ? (
+                <Text style={styles.subsectionBody}>Review your call-off below, then submit.</Text>
+              ) : null}
             </View>
           ) : null}
         </View>
@@ -1274,63 +1274,27 @@ export default function ShiftDetailScreen() {
                 ) : (
                   <View style={styles.swapDateFilteredList}>
                     <View style={styles.swapWeekNav}>
-                      <Pressable
+                      <Button
                         accessibilityLabel="Go to previous week"
-                        accessibilityRole="button"
-                        accessibilityState={{
-                          disabled: previousEligibleSwapWeekStart == null,
-                        }}
-                        android_ripple={
-                          previousEligibleSwapWeekStart == null
-                            ? undefined
-                            : { color: mobileColors.rippleNeutral }
-                        }
                         disabled={previousEligibleSwapWeekStart == null}
+                        icon="chevron-back"
+                        iconOnly
+                        shape="squircle"
+                        tone="secondary"
                         onPress={() => handleSwapWeek(-1)}
-                        style={({ pressed }) => [
-                          styles.swapWeekNavButton,
-                          pressed &&
-                            previousEligibleSwapWeekStart != null &&
-                            styles.swapWeekNavButtonPressed,
-                          previousEligibleSwapWeekStart == null && styles.swapWeekNavButtonDisabled,
-                        ]}
-                      >
-                        <Ionicons
-                          color={mobileColors.textSecondary}
-                          name="chevron-back"
-                          size={20}
-                        />
-                      </Pressable>
+                      />
                       <Text style={styles.swapWeekRangeLabel}>
                         {activeSwapWeekStart ? formatWeekRangeLabel(activeSwapWeekStart) : ""}
                       </Text>
-                      <Pressable
+                      <Button
                         accessibilityLabel="Go to next week"
-                        accessibilityRole="button"
-                        accessibilityState={{
-                          disabled: nextEligibleSwapWeekStart == null,
-                        }}
-                        android_ripple={
-                          nextEligibleSwapWeekStart == null
-                            ? undefined
-                            : { color: mobileColors.rippleNeutral }
-                        }
                         disabled={nextEligibleSwapWeekStart == null}
+                        icon="chevron-forward"
+                        iconOnly
+                        shape="squircle"
+                        tone="secondary"
                         onPress={() => handleSwapWeek(1)}
-                        style={({ pressed }) => [
-                          styles.swapWeekNavButton,
-                          pressed &&
-                            nextEligibleSwapWeekStart != null &&
-                            styles.swapWeekNavButtonPressed,
-                          nextEligibleSwapWeekStart == null && styles.swapWeekNavButtonDisabled,
-                        ]}
-                      >
-                        <Ionicons
-                          color={mobileColors.textSecondary}
-                          name="chevron-forward"
-                          size={20}
-                        />
-                      </Pressable>
+                      />
                     </View>
                     <View accessibilityLabel="Eligible swap dates" style={styles.swapDateGrid}>
                       {swapWeekDates.map((date) => (
@@ -2485,10 +2449,10 @@ function SwapOptionCard({
   const optionLabel = segmentIndex != null ? getActionSegmentLabel(entry, segmentIndex) : null;
 
   return (
-    <Pressable
-      accessibilityState={{ disabled, selected: active }}
+    <PressableRow
       disabled={disabled}
       onPress={onPress}
+      selected={active}
       style={[
         styles.swapOptionCard,
         active && styles.swapOptionCardActive,
@@ -2512,7 +2476,7 @@ function SwapOptionCard({
           variant="supporting"
         />
       ) : null}
-    </Pressable>
+    </PressableRow>
   );
 }
 

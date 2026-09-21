@@ -258,7 +258,7 @@ export default function AddToScheduleScreen() {
           <View style={{ gap: mobileSpace.sm }}>
             <Button
               disabled={!canSubmit}
-              label="Add to Schedule"
+              label="Add to schedule"
               loading={mutation.isPending}
               onPress={() => mutation.mutate(draft)}
               tone="primary"

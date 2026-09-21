@@ -2644,7 +2644,7 @@ button {
   display: flex;
   flex: 0 1 auto;
   min-width: 0;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-start;
   gap: 8px;
@@ -2652,8 +2652,7 @@ button {
 
 .dg-activity-search {
   position: relative;
-  flex: 0 1 220px;
-  min-width: 150px;
+  flex: 1 1 auto;
 }
 
 .dg-activity-search-icon {
@@ -2687,8 +2686,10 @@ button {
   flex-shrink: 0;
 }
 
+/* Content-sized: the period label is never clipped. */
 .dg-activity-period-label {
-  width: 210px;
+  width: auto;
+  flex: 0 0 auto;
 }
 
 .dg-activity-today {

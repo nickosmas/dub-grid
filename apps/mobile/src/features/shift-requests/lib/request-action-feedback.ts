@@ -1,7 +1,17 @@
+import { describeCancelAwaitingRecipientCaution, isAwaitingRecipient } from "@dubgrid/domain";
+
 export type MobileRequestActionBody = {
   action: string;
   accept?: boolean;
   approved?: boolean;
+};
+
+/** What the cancel confirmation needs to know about the request itself. */
+export type MobileRequestActionSubject = {
+  type: "pickup" | "swap" | "calloff";
+  status: "open" | "pending_approval" | "approved" | "rejected" | "cancelled" | "expired";
+  targetEmpId: string | null;
+  targetName: string | null;
 };
 
 export type MobileRequestActionFeedback = {
@@ -39,9 +49,11 @@ export function getMobileRequestActionKey(
 export function getMobileRequestActionFeedback({
   requestId,
   body,
+  request,
 }: {
   requestId: string;
   body: MobileRequestActionBody;
+  request?: MobileRequestActionSubject;
 }): MobileRequestActionFeedback {
   const key = getMobileRequestActionKey(requestId, body);
 
@@ -97,7 +109,12 @@ export function getMobileRequestActionFeedback({
         confirmLabel: "Cancel request",
         confirmStyle: "destructive",
         key,
-        message: "Cancel this request? It will no longer be available for review.",
+        // Cancelling over the recipient's head is the one case that needs a
+        // caution: they were asked and have not answered yet.
+        message:
+          request && isAwaitingRecipient(request)
+            ? describeCancelAwaitingRecipientCaution(request)
+            : "Cancel this request? It will no longer be available for review.",
         title: "Cancel request?",
       };
     default:

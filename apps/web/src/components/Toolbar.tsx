@@ -600,7 +600,7 @@ export default function Toolbar({
             fontWeight="var(--dg-type-control-weight)"
             activeFontWeight="var(--dg-type-control-weight)"
             letterSpacing="normal"
-            style={{ minWidth: 0, flex: "1 1 110px" }}
+            style={{ flex: "0 1 auto" }}
           />
           <Button
             onClick={onToday}
@@ -763,11 +763,7 @@ export default function Toolbar({
             style={{
               color: "var(--dg-color-text-secondary)",
               whiteSpace: "nowrap",
-              minWidth: 0,
-              width: 120,
-              flex: "1 1 120px",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
+              flex: "0 0 auto",
               textAlign: "center",
               userSelect: "none",
             }}

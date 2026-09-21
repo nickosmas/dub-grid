@@ -602,12 +602,12 @@ describe("ProfileScreen", () => {
     expect(screen.queryByLabelText("Actions")).not.toBeInTheDocument();
     const buttons = screen.getAllByRole("button");
     const switchIndex = buttons.findIndex((b) => b.textContent === "Switch organization");
-    const signOutIndex = buttons.findIndex((b) => b.textContent === "Sign Out");
+    const signOutIndex = buttons.findIndex((b) => b.textContent === "Sign out");
     const appearanceIndex = buttons.findIndex((b) => b.textContent?.startsWith("Appearance"));
     expect(appearanceIndex).toBeGreaterThan(-1);
     expect(switchIndex).toBeGreaterThan(appearanceIndex);
     expect(signOutIndex).toBe(switchIndex + 1);
-    expect(screen.getAllByRole("button", { name: "Sign Out" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Sign out" })).toHaveLength(1);
   });
 
   it("opens organization switching in a modal from the button at the foot", () => {
@@ -651,10 +651,10 @@ describe("ProfileScreen", () => {
 
     render(<ProfileScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Sign Out" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
     fireEvent.click(
       within(screen.getByRole("alert")).getByRole("button", {
-        name: "Sign Out",
+        name: "Sign out",
       }),
     );
 

@@ -35,15 +35,14 @@ function washHue(pct: number, isDark: boolean): string | null {
 /**
  * The dashboard's wash. Normal coverage is the brand aurora itself, blue for
  * "nothing to see"; below that, one status hue at the aurora's three alphas,
- * so it fades to clear exactly the way the brand halo does. Null when
- * coverage is not configured: nothing to say, so a plain page.
+ * so it fades to clear exactly the way the brand halo does. Unconfigured
+ * coverage has nothing to warn about either, so it shares the aurora.
  */
 export function buildCoverageWash(
   pct: number | null,
   isDark: boolean,
-): readonly [string, string, string] | null {
-  if (pct == null) return null;
-  const hex = washHue(pct, isDark);
+): readonly [string, string, string] {
+  const hex = pct == null ? null : washHue(pct, isDark);
   if (hex == null) return mobileSoftGradientStops("aurora", isDark);
   const alphas = isDark ? DARK_ALPHAS : LIGHT_ALPHAS;
   return [withAlpha(hex, alphas[0]), withAlpha(hex, alphas[1]), withAlpha(hex, alphas[2])];

@@ -152,11 +152,13 @@ export default function CoveragePanel({
               padding: "10px 20px",
               borderBottom: "1px solid var(--dg-color-border)",
               display: "flex",
+              flexWrap: "wrap",
               gap: 8,
               flexShrink: 0,
             }}
           >
             <CustomSelect
+              style={{ flex: "1 1 auto" }}
               value={filterFocusArea === "all" ? "all" : String(filterFocusArea)}
               options={[
                 { value: "all", label: "All Focus Areas" },
@@ -164,9 +166,9 @@ export default function CoveragePanel({
               ]}
               onChange={(val) => setFilterFocusArea(val === "all" ? "all" : Number(val))}
               fontSize="var(--dg-fs-caption)"
-              style={{ flex: 1 }}
             />
             <CustomSelect
+              style={{ flex: "1 1 auto" }}
               value={filterCategory === "all" ? "all" : String(filterCategory)}
               options={[
                 { value: "all", label: "All Categories" },
@@ -174,7 +176,6 @@ export default function CoveragePanel({
               ]}
               onChange={(val) => setFilterCategory(val === "all" ? "all" : Number(val))}
               fontSize="var(--dg-fs-caption)"
-              style={{ flex: 1 }}
             />
           </div>
         )}

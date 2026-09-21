@@ -163,7 +163,7 @@ describe("AddToScheduleScreen", () => {
     renderScreen({ canManageEmployees: false });
 
     expect(emptyStateTitles).toContain("Scheduling unavailable");
-    expect(screen.queryByRole("button", { name: "Add to Schedule" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add to schedule" })).not.toBeInTheDocument();
   });
 
   it("says so when the org has no focus areas to assign", () => {
@@ -175,8 +175,8 @@ describe("AddToScheduleScreen", () => {
   it("holds the save until at least one focus area is picked", () => {
     const mutationCalls = renderScreen({});
 
-    expect(screen.getByRole("button", { name: "Add to Schedule" })).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "Add to Schedule" }));
+    expect(screen.getByRole("button", { name: "Add to schedule" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Add to schedule" }));
     expect(allMutatePayloads(mutationCalls)).toHaveLength(0);
   });
 
@@ -184,7 +184,7 @@ describe("AddToScheduleScreen", () => {
     const mutationCalls = renderScreen({});
 
     fireEvent.click(screen.getByRole("checkbox", { name: "Skilled Nursing" }));
-    fireEvent.click(screen.getByRole("button", { name: "Add to Schedule" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add to schedule" }));
 
     expect(allMutatePayloads(mutationCalls)).toContainEqual(
       expect.objectContaining({ focusAreaIds: [2], roleIds: [], certificationId: null }),

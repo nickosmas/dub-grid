@@ -1026,7 +1026,6 @@ export function RecurringScheduleSection({
             options={focusAreaOptions}
             onChange={setFilterFocusArea}
             fontSize={12}
-            style={{ minWidth: isMobile ? 120 : 160 }}
           />
         )}
         <div style={{ flex: 1, minWidth: isMobile ? "100%" : 0 }} />

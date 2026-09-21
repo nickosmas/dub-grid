@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  describeAwaitingRecipient,
+  describeCancelAwaitingRecipientCaution,
+  groupManagerQueue,
+  isAwaitingRecipient,
   describeShiftRequest,
   describeShiftRequestNoteRecipients,
   describeShiftRequestPill,
@@ -85,5 +89,48 @@ describe("describeShiftRequestNoteRecipients", () => {
   it("names both people on a swap and only the requester otherwise", () => {
     expect(describeShiftRequestNoteRecipients(swap)).toBe("Laura and Jane");
     expect(describeShiftRequestNoteRecipients({ ...swap, targetName: null })).toBe("Laura");
+  });
+});
+
+describe("awaiting-recipient requests", () => {
+  it("is an open request aimed at one person", () => {
+    expect(isAwaitingRecipient({ type: "swap", status: "open", targetEmpId: "e2" })).toBe(true);
+    expect(isAwaitingRecipient({ type: "pickup", status: "open", targetEmpId: "e2" })).toBe(true);
+    expect(isAwaitingRecipient({ type: "pickup", status: "open", targetEmpId: null })).toBe(false);
+    expect(
+      isAwaitingRecipient({ type: "swap", status: "pending_approval", targetEmpId: "e2" }),
+    ).toBe(false);
+  });
+
+  it("names the recipient by first name", () => {
+    expect(describeAwaitingRecipient("Jane Morgan")).toBe("Waiting for Jane to respond");
+    expect(
+      describeCancelAwaitingRecipientCaution({ type: "swap", targetName: "Jane Morgan" }),
+    ).toBe(
+      "Jane hasn't responded to this swap yet. Cancelling withdraws it for both people and the schedule stays as it is.",
+    );
+    expect(describeCancelAwaitingRecipientCaution({ type: "pickup", targetName: null })).toMatch(
+      /^The other person hasn't responded to this pickup yet/,
+    );
+  });
+});
+
+describe("groupManagerQueue", () => {
+  it("splits the queue by what each request waits on and drops empty groups", () => {
+    const groups = groupManagerQueue([
+      { id: 1, type: "swap", status: "open", targetEmpId: "e2" },
+      { id: 2, type: "pickup", status: "open", targetEmpId: null },
+      { id: 3, type: "calloff", status: "pending_approval", targetEmpId: null },
+      { id: 4, type: "swap", status: "pending_approval", targetEmpId: "e2" },
+      { id: 5, type: "swap", status: "approved", targetEmpId: "e2" },
+    ] as const);
+    expect(
+      groups.map((group) => [group.key, group.label, group.requests.map((r) => r.id)]),
+    ).toEqual([
+      ["pending_approval", "Pending approval", [3, 4]],
+      ["pickups", "Pickups", [2]],
+      ["awaiting_recipient", "Swaps awaiting a response", [1]],
+    ]);
+    expect(groupManagerQueue([])).toEqual([]);
   });
 });

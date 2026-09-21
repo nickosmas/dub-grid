@@ -300,7 +300,7 @@ describe("PersonDetailScreen", () => {
   });
 
   // The page said nothing about management access: the only trace of it was
-  // whether the button at the foot read "Add to Management" or "Edit
+  // whether the button at the foot read "Add to management" or "Edit
   // Management Access", and the number an admin identifies someone by was
   // missing entirely. The two kinds of department take a row each — where they
   // are scheduled, and what they manage, are different facts.
@@ -1045,9 +1045,9 @@ describe("PersonDetailScreen", () => {
 
     render(<PersonDetailScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Send Invitation" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send invitation" }));
     expect(screen.getByText("Send invitation?")).toBeInTheDocument();
-    confirmDialog("Send Invitation");
+    confirmDialog("Send invitation");
 
     expect(await screen.findByText("Account found")).toBeInTheDocument();
     expect(screen.getByText(/Minnie Diaz[\s\S]*matches this staff profile/)).toBeInTheDocument();
@@ -1146,9 +1146,9 @@ describe("PersonDetailScreen", () => {
 
     render(<PersonDetailScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Send Invitation" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send invitation" }));
     expect(screen.getByText("Send invitation?")).toBeInTheDocument();
-    confirmDialog("Send Invitation");
+    confirmDialog("Send invitation");
 
     expect(await screen.findByText("Account found")).toBeInTheDocument();
     expect(screen.getByText(/matches this staff profile[\s\S]*new invitation/)).toBeInTheDocument();
@@ -1345,9 +1345,9 @@ describe("PersonDetailScreen", () => {
       const footStart = names.indexOf("Reinvite");
       expect(names.slice(footStart)).toEqual([
         "Reinvite",
-        "Revoke Invite",
-        "Add to Schedule",
-        "Add to Management",
+        "Revoke invite",
+        "Add to schedule",
+        "Add to management",
         "Deactivate",
       ]);
       // The foot follows every section: Assignments is the last titled one.
@@ -1456,15 +1456,15 @@ describe("PersonDetailScreen", () => {
     it("keeps management access out of reach without the permission", () => {
       renderWithManagementAccess({ canManageManagementAccess: false });
 
-      expect(screen.queryByRole("button", { name: "Add to Management" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Add to management" })).not.toBeInTheDocument();
     });
 
     it("names the action for whether they are already on the roster", () => {
       renderWithManagementAccess({});
-      expect(screen.getByRole("button", { name: "Add to Management" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Add to management" })).toBeInTheDocument();
 
       renderWithManagementAccess({ person: { managementDepartmentIds: [9] } });
-      expect(screen.getByRole("button", { name: "Edit Management Access" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Edit management access" })).toBeInTheDocument();
     });
 
     // Management settings always open in a popup over whatever raised them,
@@ -1473,16 +1473,17 @@ describe("PersonDetailScreen", () => {
     it("opens management access in a sheet, not a pushed screen", () => {
       renderWithManagementAccess({});
 
-      fireEvent.click(screen.getByRole("button", { name: "Add to Management" }));
+      fireEvent.click(screen.getByRole("button", { name: "Add to management" }));
 
-      expect(screen.getByText("Add to management")).toBeInTheDocument();
+      // The button and, now, the sheet's title.
+      expect(screen.getAllByText("Add to management")).toHaveLength(2);
       expect(routerPush).not.toHaveBeenCalled();
     });
 
     it("offers only the org's management departments, never its scheduled ones", () => {
       renderWithManagementAccess({});
 
-      fireEvent.click(screen.getByRole("button", { name: "Add to Management" }));
+      fireEvent.click(screen.getByRole("button", { name: "Add to management" }));
 
       expect(screen.getByRole("checkbox", { name: "Operations" })).toBeInTheDocument();
       expect(screen.queryByRole("checkbox", { name: "North Wing" })).not.toBeInTheDocument();
@@ -1494,9 +1495,9 @@ describe("PersonDetailScreen", () => {
     it("offers no Add to Management to someone with no email on file", () => {
       renderWithManagementAccess({ person: { email: "" } });
 
-      expect(screen.queryByRole("button", { name: "Add to Management" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Add to management" })).not.toBeInTheDocument();
       expect(
-        screen.queryByRole("button", { name: "Edit Management Access" }),
+        screen.queryByRole("button", { name: "Edit management access" }),
       ).not.toBeInTheDocument();
     });
 
@@ -1505,7 +1506,7 @@ describe("PersonDetailScreen", () => {
     it("keeps Edit Management Access for someone already on the roster without an email", () => {
       renderWithManagementAccess({ person: { email: "", managementDepartmentIds: [9] } });
 
-      expect(screen.getByRole("button", { name: "Edit Management Access" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Edit management access" })).toBeInTheDocument();
     });
 
     // A plain app invitation carries no management departments, so it must not
@@ -1523,9 +1524,9 @@ describe("PersonDetailScreen", () => {
         },
       });
 
-      expect(screen.getByRole("button", { name: "Add to Management" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Add to management" })).toBeInTheDocument();
       expect(
-        screen.queryByRole("button", { name: "Edit Management Access" }),
+        screen.queryByRole("button", { name: "Edit management access" }),
       ).not.toBeInTheDocument();
     });
   });
@@ -1796,19 +1797,19 @@ describe("PersonDetailScreen", () => {
     it("offers Add to Schedule to someone who isn't on it", () => {
       renderForSchedule({ focusAreaIds: [], managementDepartmentIds: [9] });
 
-      expect(screen.getByRole("button", { name: "Add to Schedule" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Add to schedule" })).toBeInTheDocument();
     });
 
     it("withholds Add to Schedule from someone already on it", () => {
       renderForSchedule({ focusAreaIds: [2] });
 
-      expect(screen.queryByRole("button", { name: "Add to Schedule" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Add to schedule" })).not.toBeInTheDocument();
     });
 
     it("opens the add-to-schedule screen rather than stacking a sheet", () => {
       renderForSchedule({ focusAreaIds: [], managementDepartmentIds: [9] });
 
-      fireEvent.click(screen.getByRole("button", { name: "Add to Schedule" }));
+      fireEvent.click(screen.getByRole("button", { name: "Add to schedule" }));
 
       expect(routerPush).toHaveBeenCalledWith({
         pathname: "/person/[id]/schedule",

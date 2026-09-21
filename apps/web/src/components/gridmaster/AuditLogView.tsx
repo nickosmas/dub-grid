@@ -185,7 +185,7 @@ export default function AuditLogView({
             options={categoryOptions.map(({ value, label }) => ({ value, label }))}
             onChange={resetPage(setActionFilter)}
             ariaLabel="Filter by activity type"
-            style={{ width: "auto", minWidth: 160 }}
+            style={{ flex: "1 1 auto" }}
             fontSize={12}
           />
           <CustomSelect
@@ -193,7 +193,7 @@ export default function AuditLogView({
             options={AUDIT_RESOURCE_TYPE_OPTIONS}
             onChange={resetPage(setResourceType)}
             ariaLabel="Item type"
-            style={{ width: "auto", minWidth: 170 }}
+            style={{ flex: "1 1 auto" }}
             fontSize={12}
           />
           <input

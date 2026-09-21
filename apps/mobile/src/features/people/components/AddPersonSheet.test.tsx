@@ -1,19 +1,13 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { createReactNativeModule, createScreenModule } from "../../../test/native";
-import {
-  navigatedActions,
-  pressBack,
-  resetNavigationShim,
-} from "../../../test/shims/react-navigation-native";
+import { createReactNativeModule, createSafeAreaContextModule } from "../../../test/native";
 
 const useMutation = vi.fn();
 const useQueryClient = vi.fn();
 const useAccessToken = vi.fn();
 const useBootstrap = vi.fn();
 const pushToast = vi.fn();
-const routerPush = vi.fn();
-const routerBack = vi.fn();
+const onDismiss = vi.fn();
 const createMobilePerson = vi.fn();
 const createMobilePersonInvitation = vi.fn();
 const checkMobilePersonContact = vi.fn();
@@ -21,6 +15,10 @@ const parseMobileContactConflict = vi.fn();
 const parseMobileStaffFieldErrors = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
+
+vi.mock("react-native-safe-area-context", async () =>
+  createSafeAreaContextModule(await import("react")),
+);
 
 vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: () => null,
@@ -33,15 +31,6 @@ vi.mock("@tanstack/react-query", () => ({
   useMutation,
   useQueryClient,
 }));
-
-vi.mock("expo-router", () => ({
-  router: {
-    push: routerPush,
-    back: routerBack,
-  },
-}));
-
-vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));
 
 vi.mock("../../../shared/lib/api", () => ({
   createMobilePerson: (...args: unknown[]) => createMobilePerson(...args),
@@ -65,21 +54,19 @@ vi.mock("../../../shared/providers/ToastProvider", () => ({
   }),
 }));
 
-let AddPersonScreen: (typeof import("./AddPersonScreen"))["default"];
+let AddPersonSheet: (typeof import("./AddPersonSheet"))["AddPersonSheet"];
 
 beforeAll(async () => {
-  AddPersonScreen = (await import("./AddPersonScreen")).default;
+  AddPersonSheet = (await import("./AddPersonSheet")).AddPersonSheet;
 });
 
-describe("AddPersonScreen", () => {
+describe("AddPersonSheet", () => {
   beforeEach(() => {
-    resetNavigationShim();
     useQueryClient.mockReset();
     useAccessToken.mockReset();
     useBootstrap.mockReset();
     pushToast.mockReset();
-    routerPush.mockReset();
-    routerBack.mockReset();
+    onDismiss.mockReset();
     createMobilePerson.mockReset();
     createMobilePersonInvitation.mockReset();
     checkMobilePersonContact.mockReset();
@@ -126,7 +113,7 @@ describe("AddPersonScreen", () => {
         ...overrides,
       };
     });
-    render(<AddPersonScreen />);
+    render(<AddPersonSheet visible onDismiss={onDismiss} />);
   }
 
   it("says the form could not load rather than rendering it with empty pickers", () => {
@@ -180,7 +167,7 @@ describe("AddPersonScreen", () => {
     expect(screen.queryByText("Select at least one Wings")).not.toBeInTheDocument();
   });
 
-  it("creates the person and navigates back on success, without inviting when no email is set", async () => {
+  it("creates the person and closes on success, without inviting when no email is set", async () => {
     createMobilePerson.mockResolvedValue({
       success: true,
       person: { id: "emp-1" },
@@ -204,7 +191,7 @@ describe("AddPersonScreen", () => {
     });
     expect(createMobilePersonInvitation).not.toHaveBeenCalled();
     await waitFor(() => {
-      expect(routerBack).toHaveBeenCalled();
+      expect(onDismiss).toHaveBeenCalled();
     });
   });
 
@@ -273,7 +260,7 @@ describe("AddPersonScreen", () => {
       );
     });
     // The person really was created, so this stays a success path.
-    expect(routerBack).toHaveBeenCalled();
+    expect(onDismiss).toHaveBeenCalled();
   });
 
   it("shows an error toast when creation fails", async () => {
@@ -290,19 +277,17 @@ describe("AddPersonScreen", () => {
         expect.objectContaining({ tone: "error", title: "Could not add person" }),
       );
     });
-    expect(routerBack).not.toHaveBeenCalled();
+    expect(onDismiss).not.toHaveBeenCalled();
   });
 
-  it("leaves an untouched form without asking", () => {
+  it("closes an untouched form without asking", () => {
     renderWithMutation();
 
-    act(() => {
-      expect(pressBack()).toBe(false);
-    });
-    expect(navigatedActions).toEqual([{ type: "GO_BACK" }]);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
-  it("swaps Cancel for Discard once filled in, and Discard empties the form without leaving", () => {
+  it("swaps Cancel for Discard once filled in, and Discard empties the form without closing", () => {
     renderWithMutation();
 
     expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
@@ -314,35 +299,26 @@ describe("AddPersonScreen", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Discard" }));
 
-    // Emptied in place. Leaving with details filled in is the back gesture's
-    // job, so Discard must not navigate.
+    // Emptied in place; Discard must not close the sheet.
     expect(screen.getByLabelText("First name")).toHaveValue("");
-    expect(navigatedActions).toHaveLength(0);
+    expect(onDismiss).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
   });
 
-  it("asks before a back press throws away a part-filled form", () => {
+  it("asks before a dismiss throws away a part-filled form, and keeps it when called off", () => {
     renderWithMutation();
 
     fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Nia" } });
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Nia" } });
 
-    act(() => {
-      expect(pressBack()).toBe(true);
-    });
-    expect(navigatedActions).toHaveLength(0);
+    // The sheet's own dismissal (drag, backdrop) goes through the guard too.
+    fireEvent.click(screen.getByLabelText("Dismiss"));
+    expect(onDismiss).not.toHaveBeenCalled();
     expect(screen.getByText("Discard this staff profile?")).toBeInTheDocument();
-  });
 
-  it("keeps the form when the back press is called off", () => {
-    renderWithMutation();
-
-    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Nia" } });
-    act(() => {
-      pressBack();
-    });
     fireEvent.click(screen.getByRole("button", { name: "Keep Editing" }));
-
-    expect(navigatedActions).toHaveLength(0);
+    expect(onDismiss).not.toHaveBeenCalled();
     expect(screen.getByLabelText("First name")).toHaveValue("Nia");
   });
 
@@ -445,19 +421,5 @@ describe("AddPersonScreen", () => {
       });
       expect(screen.getByRole("button", { name: "Add person" })).toBeDisabled();
     });
-  });
-
-  it("does not ask on the way out after the person was saved", () => {
-    // The success handler navigates away with the fields still filled in, so a
-    // guard that only watched the fields would meet a saved person with
-    // "discard your changes?".
-    renderWithMutation({ isSuccess: true });
-
-    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Nia" } });
-
-    act(() => {
-      expect(pressBack()).toBe(false);
-    });
-    expect(navigatedActions).toEqual([{ type: "GO_BACK" }]);
   });
 });

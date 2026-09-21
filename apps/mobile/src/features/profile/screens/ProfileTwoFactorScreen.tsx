@@ -125,8 +125,8 @@ export default function ProfileTwoFactorScreen() {
     disabled: mfaLoading,
     title: "Cancel two-factor setup?",
     body: "You'll need to start again with a new secret.",
-    confirmLabel: "Cancel Setup",
-    cancelLabel: "Keep Going",
+    confirmLabel: "Cancel setup",
+    cancelLabel: "Keep going",
   });
   useNavigationDiscardGuard(guard);
 

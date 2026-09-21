@@ -333,7 +333,7 @@ describe("OrgLogin submit states", () => {
     client.setQueryData(["old-organization"], "must-clear");
     submitForm(container);
 
-    await waitFor(() => expect(screen.getByText("Loading your workspace")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Loading your organization")).toBeInTheDocument());
     expect(client.getQueryData(["old-organization"])).toBeUndefined();
     expect(window.location.replace).not.toHaveBeenCalled();
 
@@ -391,7 +391,7 @@ describe("OrgLogin submit states", () => {
     fireEvent.click(complete);
     fireEvent.click(complete);
 
-    await waitFor(() => expect(screen.getByText("Loading your workspace")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Loading your organization")).toBeInTheDocument());
     expect(mockSwitchOrganization).toHaveBeenCalledTimes(1);
     expect(window.location.replace).not.toHaveBeenCalled();
 
@@ -480,7 +480,7 @@ describe("OrgLogin submit states", () => {
       <OrgLogin orgSlug="calmhaven" seed={{ status: "found", name: "Calm Haven" }} />,
     );
     submitForm(container);
-    await waitFor(() => expect(screen.getByText("Loading your workspace")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Loading your organization")).toBeInTheDocument());
 
     unmount();
     finishSetSession();

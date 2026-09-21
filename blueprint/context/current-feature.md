@@ -1,61 +1,63 @@
-# Open-shift assignments must not carry a custom time
+# Mobile consistency fixes, manager swap cancel, request queue columns
 
 **Type:** Fix
 
-**Status:** verified
+**Status:** built, verifying
 
 ## The problem
 
-A cell shows "Custom time" whenever `custom_start_time` and `custom_end_time`
-are set; nothing compared them with the segment's own default. Two web flows
-wrote the resolved default into those fields, so every open-shift assignment
-looked deliberately retimed:
+Reported on mobile and traced across both apps:
 
-- Scheduler staffing (`open-shift-staffing.ts`): the option's resolved times,
-  needed for the conflict checks, were also persisted as custom.
-- Coverage-gap volunteering (`SchedulePageClient.tsx`): the gap's
-  `GridOpenShift` and the claim handlers sent the assignment default as custom,
-  and approval copied it verbatim into the published cell.
-
-Every other path (request approval, swaps, moves, paste, series, recurring,
-import, publish, mobile volunteering) only copies existing custom times.
+- The dashboard Coverage card shows nothing for the meter and "0 open gaps"
+  when no coverage requirements exist, and the page has no wash at all.
+- People rows highlight as a square block flush with the text.
+- Scheduled staff are added on a pushed page, management users on a sheet;
+  the Add button follows the roster tab instead of asking which kind; the
+  invitation picks the access level with a segmented control and departments
+  with a chip cloud.
+- A swap (or a pickup offered to one person) that its recipient has not
+  answered sits in the web approval queue with no note and no action, and is
+  filtered off the mobile Approval tab; `cancel_shift_request` already lets an
+  admin withdraw it, only the UI was missing.
+- The approval queue is one flat grid mixing call-offs, accepted swaps, open
+  pickups and swaps awaiting a response.
+- The History tab's range picker committed on every tap; Reports had its own
+  hand-rolled calendar with the same two-tap commit.
+- App-wide: chip clouds in two more places, no press feedback on several
+  schedule rows and cards, opacity fades elsewhere, a note field inside a
+  confirmation modal, Title Case action labels, "workspace" on the login
+  screen.
 
 ## The fix
 
-- Options carry `alignedCustomTimeRanges` (the calloff's own custom times,
-  null otherwise); `buildStaffedOpenShiftInput` persists only those.
-  `alignedTimeRanges` keeps resolving defaults for the overlap checks.
-- Coverage-gap open shifts and the volunteer payloads carry `null` custom
-  times; `getOpenShiftTimeRanges` already falls back to defaults for the
-  started and conflict checks.
-- Migration `027`: `normalize_schedule_custom_times` blanks a per-segment
-  slot only when both ends equal the default resolved by
-  `resolve_work_assignment_time_ranges`; `sync_schedule_cell_snapshot`, the
-  single snapshot insert site, applies it to every worked write; an
-  idempotent UPDATE repairs draft and published rows already stored that way.
+- `@dubgrid/domain`: `isAwaitingRecipient`, `describeAwaitingRecipient`,
+  `describeCancelAwaitingRecipientCaution`, `groupManagerQueue`.
+- Mobile: coverage setup empty state and aurora wash; rounded bleed
+  highlight on People rows and the schedule rows, cards and stat tiles;
+  `AddPersonKindSheet` + `AddPersonSheet` replace `/people/add`;
+  `OrgRoleChoice` (described radio list, Super Admin gated) and
+  `ProfileChoiceGroup` departments in both invitation sheets; call-off reason
+  as a `SelectionSection`; Approval tab grouped with manager Cancel and the
+  caution; Approve/Reject note in a sheet; sentence-case labels.
+- Web: `ShiftRequestBoard` awaiting note, manager Cancel with the caution,
+  `onCancel(requestId, requesterEmpId)`, approval queue as titled columns;
+  shadcn `Calendar` (`react-day-picker`) behind a new `DateRangePicker` with
+  draft + Apply, used by History and Reports.
 
 ## Build steps
 
-- [x] **1. Staffing writes only explicit custom times** - `alignedCustomTimeRanges`
-      on `OpenShiftStaffingOption`; tests flip the pinned default-as-custom
-      expectation and add calloff-preserve and gap-null cases.
-- [x] **2. Coverage-gap volunteering sends null custom times** - the gap
-      `GridOpenShift`, the single-eligible claim, and the multi-choice confirm.
-- [x] **3. Server guard and data repair** - migration `027`, checksum lock,
-      `schedule-custom-time-sql.test.ts` contract test, CHANGELOG and doc notes.
+- [x] **1. Domain helpers** - predicate, copy and grouping, with tests.
+- [x] **2. Mobile dashboard and People row** - empty state, wash, highlight.
+- [x] **3. Mobile add-person flow** - kind chooser, both sheets, list choices.
+- [x] **4. Mobile app-wide pass** - copy, chip clouds, press feedback, note sheet.
+- [x] **5. Requests on both apps** - awaiting note, manager cancel, grouping.
+- [x] **6. Web date range picker** - shadcn calendar, Apply, History and Reports.
+- [x] **7. Content-sized toolbars and fields** - wrapping rows of content-sized
+      controls app-wide; tables left as they were.
 
 ## Verify
 
-- Unit: `open-shift-staffing.test.ts` (14), `OpenShiftStaffingModal.test.tsx`,
-  `schedule-custom-time-sql.test.ts` (3); full web suite 460 files / 3997
-  tests green; web type-check, lint, Prettier, `db:migrations:check` (027
-  listed), production build.
-- Migration dry run (rolled back) on the local seed: equal-to-default slot
-  nulled, a differing end kept, a second-slot default blanked to `16:00|`,
-  garbage left alone; a corrupted row repaired on the first UPDATE, 0 rows on
-  the second.
-- Live, Calm Haven on the worktree dev server: super admin staffed a coverage
-  gap (draft cell: existing segment kept, custom NULL); `qa-regular`
-  volunteered for a gap (request state custom NULL) and the super admin's
-  approval published the cell with custom NULL; `upsertShift` with the default
-  as custom stored NULL, with `15:30-21:30` stored as sent.
+- Unit: domain (11), mobile people/dashboard/schedule/requests suites, web
+  board (11), reports (16), date-range-picker (4), typography contract.
+- Type-check, lint and the full mobile and web suites from the worktree.
+- Manual: see the verification list in the plan (simulator and browser).

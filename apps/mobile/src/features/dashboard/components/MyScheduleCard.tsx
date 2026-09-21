@@ -18,6 +18,7 @@ import {
   MAX_FONT_SCALE,
   mobileBorderColorFromText,
   mobileElevation,
+  mobileRadii,
   mobileRadius,
   mobileText,
   mobileTabularText,
@@ -369,9 +370,12 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, pillWidth: nu
     dayCard: {
       minWidth: pillWidth,
       gap: 8,
+      borderRadius: mobileRadii.control,
+      marginHorizontal: -mobileSpace.xs,
+      paddingHorizontal: mobileSpace.xs,
     },
     dayCardPressed: {
-      opacity: 0.7,
+      backgroundColor: mobileColors.navActiveBg,
     },
     dayHeader: {
       ...mobileText.label,

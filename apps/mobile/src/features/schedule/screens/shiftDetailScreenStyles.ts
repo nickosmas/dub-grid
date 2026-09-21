@@ -622,11 +622,6 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       ...mobileText.body,
       color: mobileColors.warningText,
     },
-    selectorWrap: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 8,
-    },
     selectorChip: {
       borderRadius: mobileRadii.pill,
       minHeight: 44,
@@ -706,22 +701,6 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       alignItems: "center",
       gap: 8,
     },
-    swapWeekNavButton: {
-      width: 44,
-      height: 44,
-      borderRadius: mobileRadii.control,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      backgroundColor: mobileColors.surfaceSecondary,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    swapWeekNavButtonPressed: {
-      transform: [{ scale: 0.98 }],
-    },
-    swapWeekNavButtonDisabled: {
-      opacity: 0.5,
-    },
     swapWeekRangeLabel: {
       ...mobileTextWeighted("rowTitle", "bold"),
       color: mobileColors.textPrimary,
@@ -793,6 +772,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       borderRadius: mobileRadii.card,
       borderWidth: 1,
       borderColor: mobileColors.cardBorder,
+      overflow: "hidden",
       padding: mobileSpace.md,
       gap: 8,
     },

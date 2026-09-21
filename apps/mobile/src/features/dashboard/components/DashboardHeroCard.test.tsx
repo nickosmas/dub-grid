@@ -47,7 +47,7 @@ describe("DashboardHeroCard", () => {
     expect(onOpenApprovals).not.toHaveBeenCalled();
   });
 
-  it("omits the coverage figure and meter when coveragePct is null", () => {
+  it("asks for coverage setup and hides the open-gap count when coveragePct is null", () => {
     render(
       <DashboardHeroCard
         metrics={{
@@ -59,9 +59,10 @@ describe("DashboardHeroCard", () => {
       />,
     );
 
-    expect(screen.queryByText("—")).not.toBeInTheDocument();
+    expect(screen.getByText("Coverage requirements not configured")).toBeInTheDocument();
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
-    expect(screen.getByText("open gaps")).toBeInTheDocument();
+    expect(screen.queryByText("open gaps")).not.toBeInTheDocument();
+    expect(screen.getByText("pending approvals")).toBeInTheDocument();
   });
 
   it("previews the first three focus areas above the stats", () => {

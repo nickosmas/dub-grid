@@ -1,13 +1,16 @@
 import { ActionButtons } from "../../../shared/components/ActionButtons";
 import { resolveJobChipTone } from "@dubgrid/design-tokens";
 import {
+  describeAwaitingRecipient,
   describeShiftRequest,
   describeShiftRequestNoteRecipients,
   describeShiftRequestPill,
+  groupManagerQueue,
+  isAwaitingRecipient,
 } from "@dubgrid/domain";
 import { useCallback, useMemo, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
@@ -19,8 +22,14 @@ import type {
   ResolvedSchedulePresentation,
   ScheduleCellState,
 } from "@dubgrid/contracts";
+import {
+  BottomSheetModal,
+  SheetActions,
+  SheetHeader,
+} from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
+import { ProfileTextInput } from "../../profile/components/ProfilePrimitives";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Screen } from "../../../shared/components/Screen";
 import {
@@ -500,11 +509,12 @@ export default function RequestsScreen() {
         return;
       }
 
-      const feedback = getMobileRequestActionFeedback({ requestId, body });
+      const request = requestsQuery.data?.requests.find((candidate) => candidate.id === requestId);
+      const feedback = getMobileRequestActionFeedback({ requestId, body, request });
       setResolveNote("");
       setRequestActionConfirmation({ requestId, body, feedback });
     },
-    [pendingAction, requestActionMutation.isPending],
+    [pendingAction, requestActionMutation.isPending, requestsQuery.data?.requests],
   );
 
   const confirmRequestAction = useCallback(() => {
@@ -536,6 +546,7 @@ export default function RequestsScreen() {
   }, [requestActionConfirmation, requestActionMutation, resolveNote]);
 
   const requests = requestsQuery.data?.requests ?? [];
+  const isResolveConfirmation = requestActionConfirmation?.body.action === "resolve";
   const resolveNoteRecipients = useMemo(() => {
     const confirmation = requestActionConfirmation;
     if (!confirmation || confirmation.body.action !== "resolve") return "";
@@ -582,17 +593,22 @@ export default function RequestsScreen() {
         : [],
     [linkedEmployeeId, now, requests, timeZone],
   );
+  // The manager's queue: what waits on them, and, so it is not invisible
+  // until the recipient answers, what waits on someone else.
   const approvalRequests = useMemo(
     () =>
       canApprove
         ? requests.filter(
             (request) =>
-              request.status === "pending_approval" &&
+              (request.status === "pending_approval" ||
+                (request.status === "open" && request.targetEmpId == null) ||
+                isAwaitingRecipient(request)) &&
               !hasShiftRequestStarted(request, now, timeZone),
           )
         : [],
     [canApprove, now, requests, timeZone],
   );
+  const approvalGroups = useMemo(() => groupManagerQueue(approvalRequests), [approvalRequests]);
   const allRequests = useMemo(
     () =>
       canViewAllRequests
@@ -929,18 +945,25 @@ export default function RequestsScreen() {
               title="Nothing to approve"
             />
           ) : (
-            approvalRequests.map((request) => (
-              <RequestCard
-                now={now}
-                timeZone={timeZone}
-                key={request.id}
-                canApprove={canApprove}
-                linkedEmployeeId={linkedEmployeeId}
-                pendingAction={pendingAction}
-                onAction={(body) => runRequestAction(request.id, body)}
-                highlighted={highlightedRequestId === request.id}
-                request={request}
-              />
+            approvalGroups.map((group) => (
+              <View key={group.key} style={styles.queueGroup}>
+                <Text style={styles.queueGroupTitle}>
+                  {group.label} ({group.requests.length})
+                </Text>
+                {group.requests.map((request) => (
+                  <RequestCard
+                    now={now}
+                    timeZone={timeZone}
+                    key={request.id}
+                    canApprove={canApprove}
+                    linkedEmployeeId={linkedEmployeeId}
+                    pendingAction={pendingAction}
+                    onAction={(body) => runRequestAction(request.id, body)}
+                    highlighted={highlightedRequestId === request.id}
+                    request={request}
+                  />
+                ))}
+              </View>
             ))
           )}
         </View>
@@ -996,6 +1019,8 @@ export default function RequestsScreen() {
           )}
         </View>
       )}
+      {/* A decision that takes a note is a small form, so it gets a sheet;
+          the confirmation modal stays for the one-tap actions. */}
       <ConfirmationModal
         body={requestActionConfirmation?.feedback.message}
         confirmLabel={requestActionConfirmation?.feedback.confirmLabel ?? "Confirm"}
@@ -1005,21 +1030,49 @@ export default function RequestsScreen() {
         onCancel={() => setRequestActionConfirmation(null)}
         onConfirm={confirmRequestAction}
         title={requestActionConfirmation?.feedback.title ?? "Confirm action?"}
-        visible={Boolean(requestActionConfirmation)}
-      >
-        {requestActionConfirmation?.body.action === "resolve" ? (
-          <TextInput
-            accessibilityLabel={`Note to ${resolveNoteRecipients}? (Optional)`}
-            maxLength={500}
-            multiline
-            onChangeText={setResolveNote}
-            placeholder={`Note to ${resolveNoteRecipients}? (Optional)`}
-            placeholderTextColor={mobileColors.textSubtle}
-            style={styles.resolveNoteInput}
-            value={resolveNote}
+        visible={Boolean(requestActionConfirmation) && !isResolveConfirmation}
+      />
+      <BottomSheetModal
+        footer={
+          <SheetActions
+            primaryAction={
+              <Button
+                label={requestActionConfirmation?.feedback.confirmLabel ?? "Confirm"}
+                onPress={confirmRequestAction}
+                tone={
+                  requestActionConfirmation?.feedback.confirmStyle === "destructive"
+                    ? "secondary"
+                    : "primary"
+                }
+              />
+            }
+          >
+            <Button
+              label="Cancel"
+              onPress={() => setRequestActionConfirmation(null)}
+              tone="neutral"
+            />
+          </SheetActions>
+        }
+        header={
+          <SheetHeader
+            subtitle={requestActionConfirmation?.feedback.message}
+            title={requestActionConfirmation?.feedback.title ?? "Confirm action?"}
           />
-        ) : null}
-      </ConfirmationModal>
+        }
+        visible={isResolveConfirmation}
+        onDismiss={() => setRequestActionConfirmation(null)}
+      >
+        <ProfileTextInput
+          accessibilityLabel={`Note to ${resolveNoteRecipients}? (Optional)`}
+          label={`Note to ${resolveNoteRecipients} (optional)`}
+          maxLength={500}
+          multiline
+          onChangeText={setResolveNote}
+          placeholder="Anything they should know"
+          value={resolveNote}
+        />
+      </BottomSheetModal>
     </Screen>
   );
 }
@@ -1054,10 +1107,14 @@ function RequestCard({
   const pillTone = pill.tone === "kind" ? chipTones[request.type] : chipTones[pill.tone];
   const copy = describeShiftRequest(request, linkedEmployeeId);
 
+  const awaitingRecipient = isAwaitingRecipient(request);
+  // The requester withdraws their own request; a manager may also withdraw
+  // one still waiting on its recipient, since nothing else can move it.
   const canCancel =
-    Boolean(linkedEmployeeId) &&
-    request.requesterEmpId === linkedEmployeeId &&
-    (request.status === "open" || request.status === "pending_approval");
+    (Boolean(linkedEmployeeId) &&
+      request.requesterEmpId === linkedEmployeeId &&
+      (request.status === "open" || request.status === "pending_approval")) ||
+    (canApprove && awaitingRecipient);
   const canClaim =
     Boolean(linkedEmployeeId) &&
     request.type === "pickup" &&
@@ -1107,6 +1164,9 @@ function RequestCard({
       </View>
       <View style={styles.cardBody}>
         <Text style={styles.metaText}>{copy.subtitle}</Text>
+        {canApprove && awaitingRecipient && request.targetName ? (
+          <Text style={styles.awaitingNote}>{describeAwaitingRecipient(request.targetName)}</Text>
+        ) : null}
         {/* A swap is one card about two shifts: each party's shift sits in its
             own panel and the arrow between them says which way it goes. */}
         <RequestShiftPanel
@@ -1141,7 +1201,11 @@ function RequestCard({
       {hasActions ? (
         <ActionButtons style={styles.cardActions}>
           {canCancel
-            ? actionButton({ action: "cancel", empId: linkedEmployeeId! }, "Cancel", "neutral")
+            ? actionButton(
+                { action: "cancel", empId: request.requesterEmpId },
+                "Cancel request",
+                "neutral",
+              )
             : null}
           {canClaim
             ? actionButton({ action: "claim", claimerEmpId: linkedEmployeeId! }, "Claim")

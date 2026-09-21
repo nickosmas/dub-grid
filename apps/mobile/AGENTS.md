@@ -355,6 +355,15 @@ Sheets have a grabber, 40pt top corners, and extend to the bottom edge.
   "Management Departments" label between the two said nothing. Both accept an
   omitted `label`. Two lists on one sheet (a fresh invitation's role and
   departments) keep theirs, since then the captions tell them apart.
+- **Adding a person is a sheet, whichever kind.** The People tab's one Add
+  button asks scheduled or management (`AddPersonKindSheet`, handed off with
+  `useModalHandoff`) and opens `AddPersonSheet` or
+  `ManagementUserInviteSheet`. An access level offered as part of an
+  invitation is `OrgRoleChoice`, the same described radio list as the App
+  access sheet, which hides Super Admin unless the inviter holds it.
+- **A decision that takes a note is a sheet, not a confirmation.** The
+  Requests tab's Approve/Reject opens a `BottomSheetModal` with the note
+  field; `ConfirmationModal` must never hold an editable field.
 - **Titles go in the `header` slot** via `<SheetHeader>`, which puts them in the
   drag region. A title rendered in the body scrolls out of view and takes its
   drag target with it.

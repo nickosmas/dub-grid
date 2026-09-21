@@ -23,6 +23,7 @@ import {
 } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import { Pressable } from "../../../shared/components/Pressable";
+import { PressableRow } from "../../../shared/components/PressableRow";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
@@ -2817,8 +2818,7 @@ function UpcomingShiftsSection({
                       return (
                         <Fragment key={item.key}>
                           {itemIndex > 0 ? <UpcomingShiftDashedDivider /> : null}
-                          <Pressable
-                            accessibilityRole="button"
+                          <PressableRow
                             onPress={() => onPressEntry(item.entry)}
                             style={styles.upcomingShiftRow}
                           >
@@ -2882,7 +2882,7 @@ function UpcomingShiftsSection({
                               ) : null}
                               <PreviousShiftRow change={change} />
                             </View>
-                          </Pressable>
+                          </PressableRow>
                         </Fragment>
                       );
                     })}
@@ -3106,13 +3106,13 @@ function OpenShiftsSection({
         </>
       );
       const cardSurface = cardSurfaceProps ? (
-        <Pressable
+        <PressableRow
           accessibilityLabel={cardSurfaceProps.accessibilityLabel}
           onPress={cardSurfaceProps.onPress}
           style={styles.openShiftCardSurface}
         >
           {content}
-        </Pressable>
+        </PressableRow>
       ) : (
         <View style={styles.openShiftCardSurface}>{content}</View>
       );
@@ -3170,7 +3170,7 @@ function OpenShiftsSection({
     const focusAreaName = getRequestFocusAreaName(item.request, "requester");
     const timeRange = getRequestTimeRange(item.request, "requester");
     const cardSurface = cardSurfaceProps ? (
-      <Pressable
+      <PressableRow
         accessibilityLabel={cardSurfaceProps.accessibilityLabel}
         onPress={cardSurfaceProps.onPress}
         style={styles.openShiftCardSurface}
@@ -3192,7 +3192,7 @@ function OpenShiftsSection({
             <Text style={styles.scheduleRowTimeText}>{timeRange}</Text>
           </View>
         ) : null}
-      </Pressable>
+      </PressableRow>
     ) : (
       <View style={styles.openShiftCardSurface}>
         {shouldShowShiftName ? <Text style={styles.scheduleRowTitle}>{shiftName}</Text> : null}
@@ -3242,7 +3242,7 @@ function OpenShiftsSection({
 
   return (
     <View style={styles.meSectionBlock}>
-      <MeSectionHeader actionLabel="See all" onAction={onSeeAll} title="Open Shifts" />
+      <MeSectionHeader actionLabel="See all" onAction={onSeeAll} title="Open shifts" />
 
       <ScrollView
         accessibilityLabel="Open shifts carousel"
@@ -3390,7 +3390,7 @@ function ShiftCoverRequestsSection({
 
   return (
     <View style={styles.meSectionBlock}>
-      <MeSectionHeader title="Needs Your Response" />
+      <MeSectionHeader title="Needs your response" />
 
       <View style={styles.requestList}>
         {requests.map((request) => {
@@ -3532,45 +3532,43 @@ function TeamShiftMemberRow({
     ) : null;
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={[styles.teamMemberRow, !isFirst && styles.teamMemberRowBorder]}
-    >
-      <View
-        style={[
-          styles.teamMemberAvatar,
-          {
-            backgroundColor: avatarTone.backgroundColor,
-            borderColor: avatarTone.borderColor,
-          },
-        ]}
-      >
-        <Text fit="fixed" style={[styles.teamMemberAvatarText, { color: avatarTone.textColor }]}>
-          {getInitials(entry.employeeName)}
-        </Text>
-      </View>
-      <View style={styles.teamMemberCopy}>
-        {/* The role pill shares the name's line and the tags take the full
+    <View style={!isFirst && styles.teamMemberRowBorder}>
+      <PressableRow onPress={onPress} style={styles.teamMemberRow}>
+        <View
+          style={[
+            styles.teamMemberAvatar,
+            {
+              backgroundColor: avatarTone.backgroundColor,
+              borderColor: avatarTone.borderColor,
+            },
+          ]}
+        >
+          <Text fit="fixed" style={[styles.teamMemberAvatarText, { color: avatarTone.textColor }]}>
+            {getInitials(entry.employeeName)}
+          </Text>
+        </View>
+        <View style={styles.teamMemberCopy}>
+          {/* The role pill shares the name's line and the tags take the full
             width beneath, so a split chip is never squeezed into the column
             beside the pill and cut to "Also Day Shift ·…". */}
-        <View style={styles.teamMemberHeaderRow}>
-          <View style={styles.teamMemberNameRow}>
-            <Text style={styles.teamMemberName}>{memberName}</Text>
-            <ShiftChangeBadge change={splitChipLabel ? null : change} />
+          <View style={styles.teamMemberHeaderRow}>
+            <View style={styles.teamMemberNameRow}>
+              <Text style={styles.teamMemberName}>{memberName}</Text>
+              <ShiftChangeBadge change={splitChipLabel ? null : change} />
+            </View>
+            {stackRolePill ? null : rolePill}
           </View>
-          {stackRolePill ? null : rolePill}
+          {memberTimeRange ? <Text style={styles.teamMemberTime}>{memberTimeRange}</Text> : null}
+          <PreviousShiftRow change={change} />
+          {splitChipLabel ? (
+            <View style={styles.teamMemberSplitBadgeRow}>
+              <SplitShiftBadge count={row.alternateShiftTitles.length + 1} label={splitChipLabel} />
+            </View>
+          ) : null}
+          {stackRolePill ? rolePill : null}
         </View>
-        {memberTimeRange ? <Text style={styles.teamMemberTime}>{memberTimeRange}</Text> : null}
-        <PreviousShiftRow change={change} />
-        {splitChipLabel ? (
-          <View style={styles.teamMemberSplitBadgeRow}>
-            <SplitShiftBadge count={row.alternateShiftTitles.length + 1} label={splitChipLabel} />
-          </View>
-        ) : null}
-        {stackRolePill ? rolePill : null}
-      </View>
-    </Pressable>
+      </PressableRow>
+    </View>
   );
 }
 

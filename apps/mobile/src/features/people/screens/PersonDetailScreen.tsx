@@ -941,7 +941,7 @@ export default function PersonDetailScreen() {
         : `The current invite link for ${person.email} will stop working.`;
   const invitationConfirmationLabel =
     invitationConfirmAction === "create"
-      ? "Send Invitation"
+      ? "Send invitation"
       : invitationConfirmAction === "resend"
         ? "Reissue Invitation"
         : "Revoke Invitation";
@@ -1298,14 +1298,14 @@ export default function PersonDetailScreen() {
                     />
                     <Button
                       disabled={invitationMutation.isPending}
-                      label="Revoke Invite"
+                      label="Revoke invite"
                       onPress={() => setInvitationConfirmAction("revoke")}
                       tone="danger"
                     />
                   </>
                 ) : (
                   <Button
-                    label="Send Invitation"
+                    label="Send invitation"
                     loading={invitationMutation.isPending}
                     onPress={() => setInvitationConfirmAction("create")}
                     tone="secondary"
@@ -1317,7 +1317,7 @@ export default function PersonDetailScreen() {
                   clearing them all is what takes them back off it. */}
               {person.status !== "removed" && !isOnSchedule ? (
                 <Button
-                  label="Add to Schedule"
+                  label="Add to schedule"
                   onPress={() =>
                     router.push({
                       pathname: "/person/[id]/schedule",
@@ -1339,7 +1339,7 @@ export default function PersonDetailScreen() {
               (hasManagementAccess(person) || person.email) ? (
                 <Button
                   label={
-                    hasManagementAccess(person) ? "Edit Management Access" : "Add to Management"
+                    hasManagementAccess(person) ? "Edit management access" : "Add to management"
                   }
                   onPress={() => setShowManagementAccess(true)}
                   tone="secondary"

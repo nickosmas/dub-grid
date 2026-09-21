@@ -457,7 +457,7 @@ describe("PeopleScreen", () => {
 
     expect(routerPush).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Reinvite" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Edit Management Access" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit management access" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Revoke Invitation" })).toBeInTheDocument();
     // The sheet names the departments too — the row behind it already does, so
     // both are on screen.
@@ -522,7 +522,7 @@ describe("PeopleScreen", () => {
     fireEvent.click(screen.getByText("Management"));
     fireEvent.click(screen.getByText("Done"));
     fireEvent.click(screen.getByText("Jo Park"));
-    fireEvent.click(screen.getByRole("button", { name: "Change Access Level" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change access level" }));
     // The role sheet is presented only once the actions sheet has finished
     // leaving: iOS refuses a present that overlaps a dismiss.
     fireEvent.click(await screen.findByText("Super Admin"));
@@ -540,7 +540,7 @@ describe("PeopleScreen", () => {
     });
   });
 
-  it("navigates to the add-person screen for admins who can manage employees", () => {
+  it("opens the add-person sheet directly for admins who can only manage employees", () => {
     useQuery.mockReturnValue({
       data: { people: [] },
       error: null,
@@ -553,7 +553,51 @@ describe("PeopleScreen", () => {
 
     fireEvent.click(screen.getByLabelText("Add person"));
 
-    expect(routerPush).toHaveBeenCalledWith("/people/add");
+    expect(screen.queryByText("Scheduled staff")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("They'll appear on the schedule with a staff profile."),
+    ).toBeInTheDocument();
+  });
+
+  it("asks what kind of person to add when both kinds are allowed, then opens that sheet", async () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        currentOrg: { labels: { department: "Departments" } },
+        focusAreas: [],
+        departments: [{ id: 10, name: "Clinical Leadership", abbr: "CL", type: "management" }],
+        effectiveRole: "admin",
+        permissions: { canManageEmployees: true, canManageManagementAccess: true },
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
+    useQuery.mockReturnValue({
+      data: { people: [], managementUsers: [] },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PeopleScreen />);
+
+    fireEvent.click(screen.getByLabelText("Add person"));
+    expect(screen.getByText("Scheduled staff")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Management staff"));
+
+    // The chooser leaves first, then the form is presented: iOS refuses a
+    // present that overlaps a dismiss.
+    expect(await screen.findByText("Invite management user")).toBeInTheDocument();
+    // Access levels are the described list, and an admin cannot hand out Super Admin.
+    expect(
+      screen.getByText("Manages the schedule and staff, within their permissions."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Super Admin")).not.toBeInTheDocument();
+    // Departments are the same check list, by full name rather than an abbreviated chip.
+    expect(screen.getByText("Clinical Leadership")).toBeInTheDocument();
+    expect(screen.queryByText("CL")).not.toBeInTheDocument();
   });
 
   it("sorts the directory by seniority by default", () => {

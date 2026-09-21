@@ -531,13 +531,13 @@ describe("ScheduleScreen", () => {
     expect(screen.getAllByText("Mentor").length).toBeGreaterThan(0);
     expect(screen.getAllByText("7:00 AM - 3:00 PM").length).toBeGreaterThan(0);
 
-    expect(screen.getByText("Needs Your Response")).toBeInTheDocument();
+    expect(screen.getByText("Needs your response")).toBeInTheDocument();
     expect(screen.getByText("Sarah Jenkins")).toBeInTheDocument();
     expect(screen.getByText("Needs shift coverage")).toBeInTheDocument();
     expect(screen.getByText("Accept")).toBeInTheDocument();
     expect(screen.getByText("Decline")).toBeInTheDocument();
 
-    expect(screen.getByText("Open Shifts")).toBeInTheDocument();
+    expect(screen.getByText("Open shifts")).toBeInTheDocument();
     expect(screen.getByText("Sun, Apr 19")).toBeInTheDocument();
     expect(screen.getByText("Volunteer")).toBeInTheDocument();
     expect(screen.getByText("Claim Shift")).toBeInTheDocument();
@@ -594,8 +594,8 @@ describe("ScheduleScreen", () => {
 
     expect(within(emptyState).getByText("Nothing scheduled this week")).toBeInTheDocument();
     expect(screen.queryByTestId("me-hero-card")).not.toBeInTheDocument();
-    expect(screen.queryByText("Needs Your Response")).not.toBeInTheDocument();
-    expect(screen.queryByText("Open Shifts")).not.toBeInTheDocument();
+    expect(screen.queryByText("Needs your response")).not.toBeInTheDocument();
+    expect(screen.queryByText("Open shifts")).not.toBeInTheDocument();
     expect(within(emptyState).queryByText("No Shift")).not.toBeInTheDocument();
     expect(within(emptyState).queryByText("Nothing scheduled")).not.toBeInTheDocument();
     expect(
@@ -2212,7 +2212,7 @@ describe("ScheduleScreen", () => {
 
     render(<HomeScheduleScreen />);
 
-    expect(screen.queryByText("Open Shifts")).not.toBeInTheDocument();
+    expect(screen.queryByText("Open shifts")).not.toBeInTheDocument();
     expect(screen.queryByText("Claim Shift")).not.toBeInTheDocument();
     expect(screen.queryByText("Volunteer")).not.toBeInTheDocument();
   });

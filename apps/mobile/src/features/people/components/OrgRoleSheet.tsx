@@ -14,11 +14,12 @@ import { ORG_ROLE_LABELS } from "../lib/orgRoleBadges";
 export type OrgRole = "user" | "admin" | "super_admin";
 
 /**
- * Every tier, matching web's Access column. The narrower set the management
- * sheet offers is about what an invitation may grant; this control is the role
- * itself, and web has never held Super Admin back from it.
+ * Every tier, matching web's Access column, with the one sentence each needs.
+ * This sheet changes the role itself, and web has never held Super Admin back
+ * from it; an invitation offers the tier only to someone who holds it, which
+ * `OrgRoleChoice` filters.
  */
-const ROLE_OPTIONS: { value: OrgRole; detail: string }[] = [
+export const ORG_ROLE_OPTIONS: { value: OrgRole; detail: string }[] = [
   { value: "user", detail: "Sees their own schedule and submits requests." },
   { value: "admin", detail: "Manages the schedule and staff, within their permissions." },
   { value: "super_admin", detail: "Full control of this organization, including billing." },
@@ -133,7 +134,7 @@ export function OrgRoleSheet({
       {/* No header over the list: the sheet's own title is the header, and
           one list under it needs no second name. */}
       <SelectionSection>
-        {ROLE_OPTIONS.map((option) => (
+        {ORG_ROLE_OPTIONS.map((option) => (
           <SelectionRow
             detail={option.detail}
             key={option.value}

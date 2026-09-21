@@ -290,7 +290,6 @@ export function UsersTab({
                         ]}
                         onChange={(v) => handleRoleChange(u.id, v as OrganizationRole)}
                         disabled={changingRole === u.id || roleChangeConfirm?.user.id === u.id}
-                        style={{ width: 140 }}
                         fontSize={12}
                       />
                     </td>

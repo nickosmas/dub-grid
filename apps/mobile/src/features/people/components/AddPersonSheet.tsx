@@ -1,7 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
-import { mobileSpace } from "../../../shared/theme/tokens";
-import { StyleSheet, View } from "react-native";
-import { router } from "expo-router";
+import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getOptionalStaffEmailError,
@@ -10,9 +7,13 @@ import {
   normalizeStaffName,
 } from "@dubgrid/contracts";
 import { getMobileEditorDismissLabel } from "@dubgrid/design-tokens";
+import {
+  BottomSheetModal,
+  SheetActions,
+  SheetHeader,
+} from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
-import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import {
   checkMobilePersonContact,
@@ -26,9 +27,8 @@ import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { singularLabelNoun } from "../../../shared/lib/labels";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
-import { useNavigationDiscardGuard } from "../../../shared/hooks/useNavigationDiscardGuard";
 import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
-import { PersonFormSkeleton } from "../components/PersonFormSkeleton";
+import { PersonFormSkeleton } from "./PersonFormSkeleton";
 import { EMAIL_CONFLICT_MESSAGES } from "../lib/contactConflicts";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
@@ -39,7 +39,18 @@ import {
   ProfileTextInput,
 } from "../../profile/components/ProfilePrimitives";
 
-export default function AddPersonScreen() {
+/**
+ * Add a scheduled staff member. A sheet, like the management invitation next
+ * to it, so the two kinds of person are added the same way: the pushed page
+ * this used to be made one flow leave the roster and the other stay on it.
+ */
+export function AddPersonSheet({
+  visible,
+  onDismiss,
+}: {
+  visible: boolean;
+  onDismiss: () => void;
+}) {
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const queryClient = useQueryClient();
@@ -70,6 +81,14 @@ export default function AddPersonScreen() {
   const [serverFieldErrors, setServerFieldErrors] = useState<
     Partial<Record<MobileStaffField, string>>
   >({});
+  const [wasVisible, setWasVisible] = useState(visible);
+
+  // Cleared on each open rather than on close, so the fields are never seen
+  // emptying themselves as the sheet slides away.
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
+    if (visible) resetDraft();
+  }
 
   // Anything typed or picked counts: this form starts empty, so any departure
   // from that is work the user did.
@@ -193,7 +212,7 @@ export default function AddPersonScreen() {
               message: `${firstName} ${lastName} is on your roster. Resend the invitation from their profile.`,
             },
       );
-      router.back();
+      onDismiss();
     },
     onError: (error) => {
       // A rejection the server pinned to a field belongs on that field. Left as
@@ -214,31 +233,18 @@ export default function AddPersonScreen() {
     },
   });
 
-  // Header back, Android hardware back, the iOS back swipe and the Cancel
-  // button all reach the guard the same way: through the stack removal they
-  // each dispatch. Cancel deliberately keeps its plain `router.back()` rather
-  // than closing through the guard, which would ask, navigate, and be asked
-  // again by this same hook.
-  //
-  // `isSuccess` disarms it, because the success handler navigates away with the
-  // fields still filled in — without it a saved person would be met with
-  // "discard your changes?" on the way out.
+  // The success handler closes the sheet directly rather than through the
+  // guard, so the still-filled fields never prompt "discard your changes?".
+  // No `onDiscard` either: the draft is cleared on open, above.
   const guard = useUnsavedChangesGuard({
     isDirty: hasUnsavedChanges,
-    disabled: createMutation.isPending || createMutation.isSuccess,
+    disabled: createMutation.isPending,
     title: "Discard this staff profile?",
     body: "The details you filled in won't be saved.",
+    onClose: onDismiss,
   });
-  useNavigationDiscardGuard(guard);
 
-  /**
-   * Back to the empty form the screen opened with.
-   *
-   * Wired to the Discard button rather than the guard's `onDiscard`, which runs
-   * on every exit through the guard: this screen unmounts when it is left, so
-   * clearing there would only risk the fields being seen emptying on the way
-   * out.
-   */
+  /** Back to the empty form the sheet opened with. */
   function resetDraft() {
     setFirstName("");
     setLastName("");
@@ -265,169 +271,159 @@ export default function AddPersonScreen() {
   // Focus areas and certifications come from bootstrap. Rendering the form
   // before it resolves shows an empty Assignments picker next to a live
   // "Select at least one <focus area>" error, which reads as broken rather
-  // than loading.
-  if (contentState.kind === "loading") {
-    return (
-      <Screen bottomPaddingMode="tabbed" scrollEnabled={false}>
-        {contentState.showSkeleton ? <PersonFormSkeleton /> : null}
-      </Screen>
-    );
-  }
+  // than loading. A bootstrap that failed is the same picture with no way to
+  // retry, so it is a state of its own.
+  const isReady = contentState.kind !== "loading" && contentState.kind !== "error";
 
-  // The same reasoning applies to a bootstrap that *failed*: gating on
-  // `isLoading` alone let an error fall straight through to the form, with the
-  // pickers empty and no way to retry. That is the state the comment above
-  // describes as reading broken, so it needs saying out loud.
-  if (contentState.kind === "error") {
-    return (
-      <Screen bottomPaddingMode="tabbed">
+  return (
+    <BottomSheetModal
+      // Inside the sheet: iOS refuses a second Modal while one is up.
+      overlay={<ConfirmationModal presentation="inline" {...guard.confirmationProps} />}
+      footer={
+        isReady ? (
+          <SheetActions
+            primaryAction={
+              <Button
+                disabled={!canSubmit || createMutation.isPending}
+                label="Add person"
+                loading={createMutation.isPending}
+                onPress={() =>
+                  new Promise<void>((resolve) => {
+                    createMutation.mutate(undefined, { onSettled: () => resolve() });
+                  })
+                }
+              />
+            }
+          >
+            <Button
+              disabled={createMutation.isPending}
+              // Same tri-state the edit surfaces use: Discard empties the form
+              // and stays put, Cancel closes.
+              label={getMobileEditorDismissLabel({ hasUnsavedChanges })}
+              onPress={hasUnsavedChanges ? resetDraft : guard.requestClose}
+              tone="neutral"
+            />
+          </SheetActions>
+        ) : undefined
+      }
+      header={
+        <SheetHeader
+          subtitle="They'll appear on the schedule with a staff profile."
+          title="Add person"
+        />
+      }
+      scrollable
+      visible={visible}
+      onDismiss={guard.requestClose}
+    >
+      {contentState.kind === "loading" ? (
+        contentState.showSkeleton ? (
+          <PersonFormSkeleton />
+        ) : null
+      ) : contentState.kind === "error" ? (
         <StatusBanner
           actionLabel="Try again"
           body={contentState.message}
-          fillScreen
           title="Could not load this form"
           variant="centered"
           onAction={() => {
             void bootstrapQuery.refetch();
           }}
         />
-      </Screen>
-    );
-  }
+      ) : (
+        <>
+          <ProfileSection title="Basic info">
+            <ProfilePanel>
+              <ProfileTextInput
+                accessibilityLabel="First name"
+                autoCapitalize="words"
+                error={fieldErrors.firstName}
+                focused={focusedField === "firstName"}
+                label="First name"
+                placeholder="First name"
+                value={firstName}
+                onBlur={() => setFocusedField(null)}
+                onChangeText={(value) => {
+                  setFirstName(value);
+                  retireServerError("firstName");
+                }}
+                onFocus={() => setFocusedField("firstName")}
+              />
+              <ProfileTextInput
+                accessibilityLabel="Last name"
+                autoCapitalize="words"
+                error={fieldErrors.lastName}
+                focused={focusedField === "lastName"}
+                label="Last name"
+                placeholder="Last name"
+                value={lastName}
+                onBlur={() => setFocusedField(null)}
+                onChangeText={(value) => {
+                  setLastName(value);
+                  retireServerError("lastName");
+                }}
+                onFocus={() => setFocusedField("lastName")}
+              />
+            </ProfilePanel>
+          </ProfileSection>
 
-  return (
-    <Screen
-      bottomPaddingMode="tabbed"
-      footer={
-        <View style={styles.actionsRow}>
-          <View style={styles.actionButton}>
-            <Button
-              disabled={createMutation.isPending}
-              // Same tri-state the edit surfaces use. Discard empties the form
-              // and stays put; leaving with details filled in is the back
-              // gesture, which `useNavigationDiscardGuard` already confirms.
-              label={getMobileEditorDismissLabel({ hasUnsavedChanges })}
-              onPress={hasUnsavedChanges ? resetDraft : () => router.back()}
-              tone="neutral"
+          <ProfileSection title="Contact">
+            <ProfilePanel>
+              <ProfileTextInput
+                accessibilityLabel="Email"
+                autoCapitalize="none"
+                error={fieldErrors.email}
+                focused={focusedField === "email"}
+                keyboardType="email-address"
+                autoComplete="email"
+                autoCorrect={false}
+                label="Email (optional)"
+                placeholder="name@example.com"
+                value={email}
+                onBlur={() => setFocusedField(null)}
+                onChangeText={setEmail}
+                onFocus={() => setFocusedField("email")}
+              />
+            </ProfilePanel>
+          </ProfileSection>
+
+          <ProfileSection title="Staffing">
+            <ProfileChoiceGroup
+              items={[
+                { id: 0, name: "Full-time" },
+                { id: 1, name: "Part-time" },
+              ]}
+              label="Employment"
+              selection="single"
+              selectedIds={[employmentType === "part_time" ? 1 : 0]}
+              onToggle={(id) => setEmploymentType(id === 1 ? "part_time" : "full_time")}
             />
-          </View>
-          <View style={styles.actionButton}>
-            <Button
-              disabled={!canSubmit || createMutation.isPending}
-              label="Add person"
-              loading={createMutation.isPending}
-              onPress={() =>
-                new Promise<void>((resolve) => {
-                  createMutation.mutate(undefined, { onSettled: () => resolve() });
-                })
-              }
+            <ProfileChoiceGroup
+              items={[
+                { id: -1, name: "None" },
+                ...certifications.map((item) => ({
+                  id: item.id,
+                  name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
+                })),
+              ]}
+              label={certificationLabel}
+              selection="single"
+              selectedIds={certificationId == null ? [-1] : [certificationId]}
+              onToggle={(id) => setCertificationId(id === -1 ? null : id)}
             />
-          </View>
-        </View>
-      }
-    >
-      <ProfileSection title="Basic info">
-        <ProfilePanel>
-          <ProfileTextInput
-            accessibilityLabel="First name"
-            autoCapitalize="words"
-            error={fieldErrors.firstName}
-            focused={focusedField === "firstName"}
-            label="First name"
-            placeholder="First name"
-            value={firstName}
-            onBlur={() => setFocusedField(null)}
-            onChangeText={(value) => {
-              setFirstName(value);
-              retireServerError("firstName");
-            }}
-            onFocus={() => setFocusedField("firstName")}
-          />
-          <ProfileTextInput
-            accessibilityLabel="Last name"
-            autoCapitalize="words"
-            error={fieldErrors.lastName}
-            focused={focusedField === "lastName"}
-            label="Last name"
-            placeholder="Last name"
-            value={lastName}
-            onBlur={() => setFocusedField(null)}
-            onChangeText={(value) => {
-              setLastName(value);
-              retireServerError("lastName");
-            }}
-            onFocus={() => setFocusedField("lastName")}
-          />
-        </ProfilePanel>
-      </ProfileSection>
+          </ProfileSection>
 
-      <ProfileSection title="Contact">
-        <ProfilePanel>
-          <ProfileTextInput
-            accessibilityLabel="Email"
-            autoCapitalize="none"
-            error={fieldErrors.email}
-            focused={focusedField === "email"}
-            keyboardType="email-address"
-            autoComplete="email"
-            autoCorrect={false}
-            label="Email (optional)"
-            placeholder="name@example.com"
-            value={email}
-            onBlur={() => setFocusedField(null)}
-            onChangeText={setEmail}
-            onFocus={() => setFocusedField("email")}
-          />
-        </ProfilePanel>
-      </ProfileSection>
-
-      <ProfileSection title="Staffing">
-        <ProfileChoiceGroup
-          items={[
-            { id: 0, name: "Full-time" },
-            { id: 1, name: "Part-time" },
-          ]}
-          label="Employment"
-          selection="single"
-          selectedIds={[employmentType === "part_time" ? 1 : 0]}
-          onToggle={(id) => setEmploymentType(id === 1 ? "part_time" : "full_time")}
-        />
-        <ProfileChoiceGroup
-          items={[
-            { id: -1, name: "None" },
-            ...certifications.map((item) => ({
-              id: item.id,
-              name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
-            })),
-          ]}
-          label={certificationLabel}
-          selection="single"
-          selectedIds={certificationId == null ? [-1] : [certificationId]}
-          onToggle={(id) => setCertificationId(id === -1 ? null : id)}
-        />
-      </ProfileSection>
-
-      <ProfileSection title="Assignments">
-        <ProfileChoiceGroup
-          error={fieldErrors.focusAreaIds}
-          items={focusAreas.map((item) => ({ id: item.id, name: item.name }))}
-          label={focusAreaLabel}
-          selectedIds={focusAreaIds}
-          onToggle={toggleFocusArea}
-        />
-      </ProfileSection>
-
-      <ConfirmationModal {...guard.confirmationProps} />
-    </Screen>
+          <ProfileSection title="Assignments">
+            <ProfileChoiceGroup
+              error={fieldErrors.focusAreaIds}
+              items={focusAreas.map((item) => ({ id: item.id, name: item.name }))}
+              label={focusAreaLabel}
+              selectedIds={focusAreaIds}
+              onToggle={toggleFocusArea}
+            />
+          </ProfileSection>
+        </>
+      )}
+    </BottomSheetModal>
   );
 }
-
-const styles = StyleSheet.create({
-  actionsRow: {
-    flexDirection: "row",
-    gap: mobileSpace.md,
-  },
-  actionButton: {
-    flex: 1,
-  },
-});

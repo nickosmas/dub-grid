@@ -1,6 +1,5 @@
 import { StyleSheet } from "react-native";
 import {
-  mobileInputText,
   mobilePillOverflow,
   mobileElevation,
   mobileRadii,
@@ -200,22 +199,16 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileText.body,
       color: mobileColors.textMuted,
     },
-    // Same field as the profile forms, minus the label: the confirmation's
-    // title already says what the note is for.
-    resolveNoteInput: {
-      ...mobileInputText("regular"),
-      fontSize: mobileText.input.fontSize,
-      lineHeight: mobileText.input.lineHeight,
-      alignSelf: "stretch",
-      backgroundColor: mobileColors.surfaceSecondary,
-      borderColor: mobileColors.borderSubtle,
-      borderRadius: mobileRadii.control,
-      borderWidth: 1,
-      color: mobileColors.textPrimary,
-      minHeight: 80,
-      paddingHorizontal: mobileSpace.md,
-      paddingVertical: mobileSpace.sm,
-      textAlignVertical: "top",
+    awaitingNote: {
+      ...mobileText.meta,
+      color: mobileColors.warningText,
+    },
+    queueGroup: {
+      gap: mobileSpace.md,
+    },
+    queueGroupTitle: {
+      ...mobileTextWeighted("sectionTitle", "medium"),
+      color: mobileColors.textSubtle,
     },
     openShiftContextStack: {
       gap: 8,

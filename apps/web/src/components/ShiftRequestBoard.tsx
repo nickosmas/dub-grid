@@ -23,13 +23,17 @@ import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { NumericBadge } from "@/components/ui/numeric-badge";
 import CustomSelect from "@/components/CustomSelect";
 import StaffMultiSelect, { type StaffOption } from "@/components/StaffMultiSelect";
-import CalendarDatePicker from "@/components/ui/calendar-date-picker";
+import DateRangePicker from "@/components/ui/date-range-picker";
 import { fetchShiftRequests } from "@/features/schedule/client/api";
 import { queryKeys } from "@/lib/query-keys";
 import {
+  describeAwaitingRecipient,
+  describeCancelAwaitingRecipientCaution,
   describeShiftRequest,
   describeShiftRequestNoteRecipients,
   describeShiftRequestPill,
+  groupManagerQueue,
+  isAwaitingRecipient,
 } from "@dubgrid/domain";
 import { formatScheduleTimeRange } from "@dubgrid/schedule-core";
 import { resolveJobChipTone } from "@dubgrid/design-tokens";
@@ -56,7 +60,8 @@ interface ShiftRequestBoardProps {
   onClaim: (requestId: string) => void | Promise<unknown>;
   onRespond: (requestId: string, accept: boolean) => void | Promise<unknown>;
   onResolve: (requestId: string, approved: boolean, note?: string) => void | Promise<unknown>;
-  onCancel: (requestId: string) => void | Promise<unknown>;
+  /** `requesterEmpId` is whose request it is: the RPC checks it, whoever cancels. */
+  onCancel: (requestId: string, requesterEmpId: string) => void | Promise<unknown>;
   onClose: () => void;
   absenceTypeMap?: Map<number, AbsenceType>;
   assignmentNameMap: Map<number, string>;
@@ -537,6 +542,23 @@ export default function ShiftRequestBoard({
           )}
         </div>
 
+        {/* A manager sees why an open swap cannot be decided yet: it is
+            waiting on the person it was aimed at, not on them. */}
+        {canApprove && isAwaitingRecipient(req) && req.targetName ? (
+          <div
+            role="note"
+            style={{
+              fontSize: "var(--dg-fs-footnote)",
+              color: "var(--dg-color-warning-text)",
+              background: "var(--dg-color-warning-bg)",
+              border: "1px solid var(--dg-color-warning-border)",
+              borderRadius: "var(--dg-radius-sm)",
+              padding: "6px 10px",
+            }}
+          >
+            {describeAwaitingRecipient(req.targetName)}
+          </div>
+        ) : null}
         {/* Expiry while it can still be acted on; when it was decided once it is over */}
         <div
           style={{
@@ -774,8 +796,14 @@ export default function ShiftRequestBoard({
       );
     }
 
-    // Cancel: requester can cancel own open/pending request
-    if (isOwnRequest && (req.status === "open" || req.status === "pending_approval")) {
+    // Cancel: the requester withdraws their own open or pending request; a
+    // manager may also withdraw one still waiting on its recipient, since
+    // nothing else can move it. Either way, cancelling over the recipient's
+    // head gets the caution.
+    const awaitingRecipient = isAwaitingRecipient(req);
+    const canCancelOwn =
+      isOwnRequest && (req.status === "open" || req.status === "pending_approval");
+    if (canCancelOwn || (canApprove && awaitingRecipient)) {
       actions.push(
         <Button
           key="cancel"
@@ -785,13 +813,15 @@ export default function ShiftRequestBoard({
             setPendingConfirmation({
               confirmLabel: "Cancel request",
               key: `cancel:${req.id}`,
-              message: (
+              message: awaitingRecipient ? (
+                describeCancelAwaitingRecipientCaution(req)
+              ) : (
                 <>
-                  Cancel your request for <strong>{requestLabel}</strong>? It will no longer be
-                  available for review.
+                  Cancel {isOwnRequest ? "your" : "this"} request for{" "}
+                  <strong>{requestLabel}</strong>? It will no longer be available for review.
                 </>
               ),
-              onConfirm: () => onCancel(req.id),
+              onConfirm: () => onCancel(req.id, req.requesterEmpId),
               title: "Cancel request?",
               variant: "warning",
             })
@@ -801,7 +831,7 @@ export default function ShiftRequestBoard({
             padding: "7px 14px",
           }}
         >
-          Cancel
+          {isOwnRequest ? "Cancel" : "Cancel request"}
         </Button>,
       );
     }
@@ -819,13 +849,18 @@ export default function ShiftRequestBoard({
   // ── Render ───────────────────────────────────────────────────────────────
 
   const tabData = getTabData();
+  // The approval queue is split by what each request is waiting on: the
+  // manager, a claimant, or the person it was aimed at. One column per group.
+  const queueGroups = activeTab === "approval" ? groupManagerQueue(tabData) : null;
   // The panel opens at the standard width and grows leftwards only when the
-  // tab in front needs the room: a second column once there are two cards, a
-  // third from three, and the history filters always want the full spread.
+  // tab in front needs the room: a second column once there are two cards (or
+  // two queue groups), a third from three, and the history filters always
+  // want the full spread.
+  const columnCount = queueGroups ? queueGroups.length : tabData.length;
   const panelWidthClass =
-    activeTab === "history" || tabData.length >= 3
+    activeTab === "history" || columnCount >= 3
       ? " dg-panel--max"
-      : tabData.length === 2
+      : columnCount === 2
         ? " dg-panel--cols-2"
         : "";
 
@@ -970,27 +1005,30 @@ export default function ShiftRequestBoard({
         >
           {activeTab === "history" ? (
             <div
+              // Each filter is at least as wide as its own value and shares
+              // the leftover, wrapping as needed, rather than four equal
+              // tracks that clip the date range and pad "All types".
               style={{
-                display: "grid",
-                gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(160px, 1fr))",
+                display: "flex",
+                flexWrap: "wrap",
                 gap: 8,
                 marginBottom: 16,
               }}
             >
-              <CalendarDatePicker
+              <DateRangePicker
                 id="request-history-dates"
+                style={{ flex: "1 1 auto" }}
                 allowClear
                 label="Shift dates"
-                onChange={() => undefined}
-                onRangeChange={(next) => {
+                onChange={(next) => {
                   setHistoryFrom(next.from);
                   setHistoryTo(next.to);
                 }}
                 placeholder="Any shift date"
-                range={{ from: historyFrom, to: historyTo }}
-                value=""
+                value={{ from: historyFrom, to: historyTo }}
               />
               <CustomSelect
+                style={{ flex: "1 1 auto" }}
                 ariaLabel="Request type"
                 fontSize="var(--dg-fs-caption)"
                 onChange={setHistoryType}
@@ -1003,6 +1041,7 @@ export default function ShiftRequestBoard({
                 value={historyType}
               />
               <CustomSelect
+                style={{ flex: "1 1 auto" }}
                 ariaLabel="Outcome"
                 fontSize="var(--dg-fs-caption)"
                 onChange={setHistoryStatus}
@@ -1016,6 +1055,7 @@ export default function ShiftRequestBoard({
                 value={historyStatus}
               />
               <StaffMultiSelect
+                style={{ flex: "1 1 auto" }}
                 onChange={setHistoryStaff}
                 options={staffOptions}
                 value={historyStaff}
@@ -1046,6 +1086,42 @@ export default function ShiftRequestBoard({
                 style={{ padding: "40px 24px", border: "none", background: "transparent" }}
               />
             )
+          ) : queueGroups ? (
+            <div
+              style={{
+                display: "grid",
+                // Groups wrap under one another once the panel cannot hold
+                // them side by side, rather than running off its edge.
+                gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(300px, 1fr))",
+                gap: 16,
+                alignItems: "start",
+              }}
+            >
+              {queueGroups.map((group) => (
+                <section
+                  key={group.key}
+                  aria-labelledby={`request-queue-${group.key}`}
+                  style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}
+                >
+                  <h3
+                    id={`request-queue-${group.key}`}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      margin: 0,
+                      fontSize: "var(--dg-fs-caption)",
+                      fontWeight: 600,
+                      color: "var(--dg-color-text-secondary)",
+                    }}
+                  >
+                    {group.label}
+                    <NumericBadge count={group.requests.length} />
+                  </h3>
+                  {group.requests.map((req) => renderCard(req))}
+                </section>
+              ))}
+            </div>
           ) : (
             <div
               style={{

@@ -3,6 +3,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import type { MobileDashboardResponse } from "@dubgrid/contracts";
+import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Pressable } from "../../../shared/components/Pressable";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
@@ -74,6 +75,10 @@ function MetricStat({
  * need a hand. One card for all of it; a second "Coverage by wings" card
  * said the same thing twice, and "See all" opens the full breakdown, but
  * only while there are more focus areas than the card previews.
+ *
+ * A null percentage means no coverage requirements exist yet. The card then
+ * says so in place of the meter and the open-gap count: a zero there would
+ * read as fully staffed rather than as nothing to measure.
  */
 export function DashboardHeroCard({
   metrics,
@@ -92,15 +97,22 @@ export function DashboardHeroCard({
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const coverage = metrics.coveragePct;
-  const meterColor =
-    coverage == null ? mobileColors.textMuted : coverageColor(mobileColors, coverage);
+  const configured = coverage != null;
+  const meterColor = configured ? coverageColor(mobileColors, coverage) : mobileColors.textMuted;
 
   return (
     <DashboardCard
       title="Coverage"
       onOpen={hasMoreDashboardRows(sections.length) ? onOpenCoverage : undefined}
     >
-      {coverage != null ? (
+      {!configured ? (
+        <EmptyStateCard
+          body="Set staffing requirements in Settings on the web to track coverage and open gaps here."
+          compact
+          iconName="options-outline"
+          title="Coverage requirements not configured"
+        />
+      ) : (
         <View style={styles.coverage}>
           <View style={styles.coverageFigureRow}>
             <Text
@@ -127,9 +139,9 @@ export function DashboardHeroCard({
             />
           </View>
         </View>
-      ) : null}
+      )}
       {sections.length > 0 ? (
-        <View style={[styles.breakdown, coverage != null ? styles.breakdownDivided : null]}>
+        <View style={styles.breakdown}>
           <DashboardRowList
             items={sections}
             keyExtractor={(section) => String(section.focusAreaId)}
@@ -138,19 +150,18 @@ export function DashboardHeroCard({
           />
         </View>
       ) : null}
-      <View
-        style={[
-          styles.statRow,
-          coverage != null || sections.length > 0 ? styles.statRowDivided : null,
-        ]}
-      >
-        <MetricStat
-          label={metrics.openGapCount === 1 ? "open gap" : "open gaps"}
-          onPress={metrics.openGapCount > 0 ? onOpenGaps : undefined}
-          tone="danger"
-          value={metrics.openGapCount}
-        />
-        <View style={styles.statDivider} />
+      <View style={styles.statRow}>
+        {configured ? (
+          <>
+            <MetricStat
+              label={metrics.openGapCount === 1 ? "open gap" : "open gaps"}
+              onPress={metrics.openGapCount > 0 ? onOpenGaps : undefined}
+              tone="danger"
+              value={metrics.openGapCount}
+            />
+            <View style={styles.statDivider} />
+          </>
+        ) : null}
         <MetricStat
           label={metrics.pendingApprovalsCount === 1 ? "pending approval" : "pending approvals"}
           onPress={metrics.pendingApprovalsCount > 0 ? onOpenApprovals : undefined}
@@ -191,14 +202,12 @@ const createStyles = (mobileColors: MobileColors) =>
       height: "100%",
       borderRadius: mobileRadii.pill,
     },
+    // A hairline above the stats so they read as the card's closing section
+    // rather than another line of it.
     statRow: {
       flexDirection: "row",
       alignItems: "stretch",
       gap: mobileSpace.lg,
-    },
-    // A hairline above the stats when anything sits above them, so they
-    // read as the card's closing section rather than another line of it.
-    statRowDivided: {
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: mobileColors.borderSubtle,
       paddingTop: mobileSpace.lg,
@@ -208,9 +217,11 @@ const createStyles = (mobileColors: MobileColors) =>
       alignItems: "center",
       gap: mobileSpace.xs,
       borderRadius: mobileRadii.control,
+      marginVertical: -mobileSpace.xs,
+      paddingVertical: mobileSpace.xs,
     },
     statPressed: {
-      opacity: 0.6,
+      backgroundColor: mobileColors.navActiveBg,
     },
     statFigureRow: {
       flexDirection: "row",
@@ -237,8 +248,6 @@ const createStyles = (mobileColors: MobileColors) =>
     breakdown: {
       paddingTop: mobileSpace.xs,
       marginBottom: -mobileSpace.sm,
-    },
-    breakdownDivided: {
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: mobileColors.borderSubtle,
     },
