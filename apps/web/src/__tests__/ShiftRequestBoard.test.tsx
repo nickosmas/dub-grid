@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import ShiftRequestBoard from "@/components/ShiftRequestBoard";
 import type { ShiftRequest } from "@/types";
@@ -71,6 +72,7 @@ function renderBoard({
 
   render(
     <ShiftRequestBoard
+      orgId="org-1"
       openPickups={openPickups}
       myRequests={myRequests}
       pendingApproval={pendingApproval}
@@ -86,6 +88,11 @@ function renderBoard({
       onClose={vi.fn()}
       assignmentNameMap={new Map()}
     />,
+    {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>
+      ),
+    },
   );
 
   return { onClaim, onRespond, onResolve, onCancel };
@@ -113,15 +120,18 @@ describe("ShiftRequestBoard", () => {
     });
     renderBoard({ openPickups: [request] });
 
-    expect(screen.getByText(/Day Shift · Registered Nurse on/)).toBeInTheDocument();
-    expect(screen.queryByText(/D RN on/)).not.toBeInTheDocument();
+    // The panel names the shift, with each job as its own pill, never the
+    // grid abbreviation.
+    expect(screen.getByText("Day Shift")).toBeInTheDocument();
+    expect(screen.getByLabelText("Job Registered Nurse")).toHaveTextContent("Registered Nurse");
+    expect(screen.queryByText(/D RN/)).not.toBeInTheDocument();
   });
 
   it("falls back to the abbreviated label when a request has no resolvable segments", () => {
     const request = makeRequest({ requesterShiftLabel: "Day", requesterSegments: [] });
     renderBoard({ openPickups: [request] });
 
-    expect(screen.getByText(/Day on/)).toBeInTheDocument();
+    expect(screen.getByText("Day")).toBeInTheDocument();
   });
 
   it("falls back to the abbreviated label when segments came back without names", () => {
@@ -140,8 +150,8 @@ describe("ShiftRequestBoard", () => {
     });
     renderBoard({ openPickups: [request] });
 
-    expect(screen.getByText(/D · M on/)).toBeInTheDocument();
-    expect(screen.queryByText(/\? on/)).not.toBeInTheDocument();
+    expect(screen.getByText("D · M")).toBeInTheDocument();
+    expect(screen.queryByText("?")).not.toBeInTheDocument();
   });
 
   it("claims an available open pickup", async () => {
@@ -212,20 +222,22 @@ describe("ShiftRequestBoard", () => {
         .map((button) => button.textContent)
         .filter((label) => label === "Approve" || label === "Reject"),
     ).toEqual(["Reject", "Approve"]);
+    // The one note field serves both decisions: typed once, it rides along
+    // with whichever button is pressed, and clears after the decision lands.
+    await user.type(
+      screen.getByPlaceholderText(/^Note to .*\? \(Optional\)$/),
+      "Thanks for asking",
+    );
     await user.click(screen.getByRole("button", { name: "Approve" }));
     await confirmDialogAction(user, "Approve");
+    await user.type(
+      screen.getByPlaceholderText(/^Note to .*\? \(Optional\)$/),
+      "Need more coverage",
+    );
     await user.click(screen.getByRole("button", { name: "Reject" }));
-    await user.type(screen.getByPlaceholderText("Add a note (optional)"), "Need more coverage");
-    expect(
-      screen
-        .getAllByRole("button")
-        .map((button) => button.textContent)
-        .filter((label) => label === "Back" || label === "Confirm Reject"),
-    ).toEqual(["Back", "Confirm Reject"]);
-    await user.click(screen.getByRole("button", { name: "Confirm Reject" }));
     await confirmDialogAction(user, "Reject");
 
-    expect(onResolve).toHaveBeenNthCalledWith(1, "approve-1", true);
+    expect(onResolve).toHaveBeenNthCalledWith(1, "approve-1", true, "Thanks for asking");
     expect(onResolve).toHaveBeenNthCalledWith(2, "approve-1", false, "Need more coverage");
   });
 
@@ -251,7 +263,7 @@ describe("ShiftRequestBoard", () => {
     await user.click(screen.getByRole("button", { name: /approval queue/i }));
 
     expect(screen.getByText("Alice Smith")).toBeInTheDocument();
-    expect(screen.getByText("Open")).toBeInTheDocument();
+    expect(screen.getByText("Swap request")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
   });
 
@@ -278,7 +290,7 @@ describe("ShiftRequestBoard", () => {
     await user.click(screen.getByRole("button", { name: /all requests/i }));
 
     expect(screen.getByText("Alice Smith")).toBeInTheDocument();
-    expect(screen.getByText("Open")).toBeInTheDocument();
+    expect(screen.getByText("Swap request")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
   });
 
@@ -297,6 +309,67 @@ describe("ShiftRequestBoard", () => {
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     await confirmDialogAction(user, "Cancel request");
 
-    expect(onCancel).toHaveBeenCalledWith("mine-1");
+    expect(onCancel).toHaveBeenCalledWith("mine-1", "emp-2", undefined);
+  });
+
+  it("groups the approval queue by what each request waits on", async () => {
+    const user = userEvent.setup();
+    const calloff = makeRequest({ id: "co-1", type: "calloff", status: "pending_approval" });
+    const pickup = makeRequest({ id: "pu-1", type: "pickup", status: "open" });
+    const swap = makeRequest({
+      id: "sw-1",
+      type: "swap",
+      status: "open",
+      targetEmpId: "emp-9",
+      targetName: "Bob Jones",
+      targetShiftDate: "2026-04-17",
+      targetAssignmentDefinitionIds: [2],
+      targetShiftLabel: "Night",
+    });
+
+    renderBoard({ approvalQueue: [swap, pickup, calloff], canApprove: true, currentEmpId: "m-1" });
+    await user.click(screen.getByRole("button", { name: /approval queue/i }));
+
+    const headings = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
+    expect(headings).toEqual(["Pending approval1", "Pickups1", "Swaps awaiting a response1"]);
+    const swapColumn = screen.getByRole("region", { name: /swaps awaiting a response/i });
+    expect(swapColumn).toHaveTextContent("Waiting for Bob to respond");
+    expect(swapColumn).toHaveTextContent("Cancel request");
+    expect(screen.getByRole("region", { name: /pending approval/i })).toHaveTextContent("Approve");
+  });
+
+  it("lets a manager withdraw a swap its recipient has not answered, with a caution", async () => {
+    const user = userEvent.setup();
+    const swap = makeRequest({
+      id: "sw-2",
+      type: "swap",
+      status: "open",
+      targetEmpId: "emp-9",
+      targetName: "Bob Jones",
+      targetShiftDate: "2026-04-17",
+      targetAssignmentDefinitionIds: [2],
+      targetShiftLabel: "Night",
+    });
+    const { onCancel } = renderBoard({
+      approvalQueue: [swap],
+      canApprove: true,
+      currentEmpId: "manager-1",
+    });
+
+    await user.click(screen.getByRole("button", { name: /approval queue/i }));
+    expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+    // The note goes to both people; it is optional and travels with the cancel.
+    await user.type(
+      screen.getByLabelText("Note to Alice and Bob? (Optional)"),
+      "Covered another way",
+    );
+    await user.click(screen.getByRole("button", { name: "Cancel request" }));
+
+    expect(
+      screen.getByText(/Bob hasn't responded to this swap yet\. Cancelling withdraws it/),
+    ).toBeInTheDocument();
+    await confirmDialogAction(user, "Cancel request");
+
+    expect(onCancel).toHaveBeenCalledWith("sw-2", "emp-1", "Covered another way");
   });
 });

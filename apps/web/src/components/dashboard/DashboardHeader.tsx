@@ -233,7 +233,6 @@ export default function DashboardHeader({
             style={{
               textAlign: "center",
               userSelect: "none",
-              minWidth: 120,
             }}
           >
             <span

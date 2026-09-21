@@ -363,7 +363,7 @@ export default function ProfileScreen() {
     : pendingConfirmation?.force
       ? "You'll be signed out immediately, even if data hasn't synced."
       : "You'll be signed out on this device.";
-  const confirmationLabel = isSwitchConfirmation ? "Switch" : "Sign Out";
+  const confirmationLabel = isSwitchConfirmation ? "Switch" : "Sign out";
 
   function handleProfileScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
     // Keep the hero as the identity at rest. Once it begins to pass under the
@@ -423,7 +423,7 @@ export default function ProfileScreen() {
           />
           {accessToken ? (
             <Button
-              label="Force Sign Out"
+              label="Force sign out"
               loading={isSigningOut}
               onPress={() => {
                 setPendingConfirmation({ kind: "logout", force: true });
@@ -617,7 +617,7 @@ export default function ProfileScreen() {
                 />
               ) : null}
               <Button
-                label="Sign Out"
+                label="Sign out"
                 loading={isSigningOut}
                 onPress={() => {
                   setPendingConfirmation({ kind: "logout" });

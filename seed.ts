@@ -1,6 +1,7 @@
 import { copycat } from "@snaplet/copycat";
 import { readFileSync } from "fs";
 import { connectSqlClient, type SqlClient } from "./scripts/lib/db-client";
+import { seedCalmHavenShiftRequests } from "./scripts/lib/seed-shift-requests";
 import { getPresetByBg, normalizePresetBg } from "./apps/web/src/lib/colors";
 
 // ── Schedule date anchoring ──────────────────────────────────────────────────
@@ -3044,6 +3045,19 @@ async function main() {
       management_access: true,
       employee_status: "active",
     },
+    {
+      // Marketing captures (landing page, store listings, onboarding). A
+      // generic name so screenshots never show a personal or QA identity.
+      email: "marketing-demo@dubgrid.test",
+      platform_role: "none",
+      org_role: "super_admin",
+      label: "marketing_demo (screenshots)",
+      first_name: "Jane",
+      last_name: "Morgan",
+      preferred_org: "calmhaven",
+      management_access: true,
+      employee_status: "active",
+    },
   ];
 
   // All admin permissions (full edit access — for admin-role users)
@@ -3420,6 +3434,13 @@ async function main() {
      RETURNING id`,
   );
   console.log(`    ✓ ${publishHistoryCount} organizations marked as published`);
+
+  // ── Standing shift requests ────────────────────────────────────────────
+  // Runs last: it reads the published schedule above and the demo login's
+  // employee row, and lets the database's own conflict rule choose the pairs.
+  console.log("\n  Seeding shift requests for Calm Haven...");
+  const requestCount = await seedCalmHavenShiftRequests(db);
+  console.log(`    ✓ ${requestCount} shift requests seeded`);
 
   console.log(
     `\n✅ All 7 tenants + ${TEST_USERS.length} test users + memberships seeded successfully!`,

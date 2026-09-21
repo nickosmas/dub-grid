@@ -22,6 +22,9 @@ vi.mock("@tanstack/react-query", () => ({
 }));
 
 vi.mock("../../auth/hooks/useAccessToken", () => ({ useAccessToken }));
+vi.mock("../../auth/hooks/useBootstrap", () => ({
+  useBootstrap: () => ({ data: { effectiveRole: "super_admin" } }),
+}));
 vi.mock("../../../shared/providers/ToastProvider", () => ({
   useToast: () => ({ pushToast }),
 }));
@@ -175,7 +178,7 @@ describe("ManagementAccessSheet", () => {
     const mutationCalls = renderSheet();
 
     fireEvent.click(screen.getByText("Operations"));
-    fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save access" }));
 
     expect(allMutatePayloads(mutationCalls)).toContainEqual({
       orgRole: "user",
@@ -193,7 +196,7 @@ describe("ManagementAccessSheet", () => {
     // Something has to change before Save will fire, so the seeded role rides
     // along on a department edit.
     fireEvent.click(screen.getByText("Facilities"));
-    fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save access" }));
 
     expect(allMutatePayloads(mutationCalls)).toContainEqual({
       orgRole: "admin",
@@ -210,18 +213,18 @@ describe("ManagementAccessSheet", () => {
       userId: "user-1",
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save access" }));
     expect(allMutatePayloads(mutationCalls)).toHaveLength(0);
 
     fireEvent.click(screen.getByText("Facilities"));
-    fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save access" }));
     expect(allMutatePayloads(mutationCalls)).toHaveLength(1);
   });
 
   it("refuses to submit with no department selected", () => {
     const mutationCalls = renderSheet();
 
-    fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save access" }));
 
     expect(allMutatePayloads(mutationCalls)).toHaveLength(0);
   });
@@ -243,11 +246,11 @@ describe("ManagementAccessSheet", () => {
       ),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save access" }));
 
     expect(allMutatePayloads(mutationCalls)).toHaveLength(0);
     fireEvent.click(
-      within(screen.getByRole("alert")).getByRole("button", { name: "Remove Access" }),
+      within(screen.getByRole("alert")).getByRole("button", { name: "Remove access" }),
     );
 
     expect(allMutatePayloads(mutationCalls).filter((payload) => payload?.remove)).toHaveLength(1);
@@ -261,9 +264,9 @@ describe("ManagementAccessSheet", () => {
     });
 
     fireEvent.click(screen.getByText("Operations"));
-    fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save access" }));
     const confirm = within(screen.getByRole("alert")).getByRole("button", {
-      name: "Remove Access",
+      name: "Remove access",
     });
     fireEvent.click(confirm);
     fireEvent.click(confirm);

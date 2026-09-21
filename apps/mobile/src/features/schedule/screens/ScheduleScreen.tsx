@@ -23,6 +23,7 @@ import {
 } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import { Pressable } from "../../../shared/components/Pressable";
+import { PressableRow } from "../../../shared/components/PressableRow";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
@@ -726,9 +727,16 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     : false;
   const isTeamScope = scope === "team";
   const isBlockedTeamView = isTeamScope && !canViewTeamSchedule && Boolean(bootstrapQuery.data);
-  const canLoadSchedule = Boolean(accessToken) && (!isTeamScope || canViewTeamSchedule);
-  const canLoadRequests = Boolean(accessToken) && !isTeamScope;
-  const canLoadMeTeamSchedule = Boolean(accessToken) && !isTeamScope && canViewTeamSchedule;
+  // The week is keyed by "today" in the organization's time zone, which
+  // bootstrap supplies. Fetching before it arrived keyed the first request
+  // by the UTC date, which near the day boundary is the wrong week: a wasted
+  // round trip and a skeleton flash on every cold start.
+  const hasBootstrap = bootstrapQuery.data !== undefined;
+  const canLoadSchedule =
+    Boolean(accessToken) && hasBootstrap && (!isTeamScope || canViewTeamSchedule);
+  const canLoadRequests = Boolean(accessToken) && hasBootstrap && !isTeamScope;
+  const canLoadMeTeamSchedule =
+    Boolean(accessToken) && hasBootstrap && !isTeamScope && canViewTeamSchedule;
   // These three are keyed by the visible date range. Without `keepPreviousData`,
   // paging to the next week drops each of them to `isLoading` and flashes a
   // skeleton over a schedule the user was already reading.
@@ -856,6 +864,12 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
   const activeData = scheduleQuery.data;
   const scheduleEntries = activeData?.entries ?? [];
+  // Paging to another week serves the old week's data as a placeholder until
+  // the new one arrives. Filtered to the new dates that is an empty week, so
+  // every empty state fired for a beat on each page; the skeleton holds the
+  // page instead until the fetch settles.
+  const isRangeSwitching =
+    scheduleQuery.isPlaceholderData || (canLoadRequests && requestsQuery.isPlaceholderData);
   const linkedEmployee = bootstrapQuery.data?.linkedEmployee ?? null;
   const canManageEmployees = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
   const unreadNotificationCount = bootstrapQuery.data?.unreadNotificationCount ?? 0;
@@ -1749,8 +1763,8 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
             tabs={teamFocusAreaTabs}
           />
         ) : null}
-        {contentState.kind === "loading" ? (
-          contentState.showSkeleton ? (
+        {contentState.kind === "loading" || isRangeSwitching ? (
+          isRangeSwitching || (contentState.kind === "loading" && contentState.showSkeleton) ? (
             isTeamScope ? (
               <ScheduleTeamSkeleton />
             ) : (
@@ -1795,6 +1809,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
               currentDate={todayDate}
               currentTime={currentTimeValue}
               featuredItem={meHeroState.item}
+              hasWeekItems={hasScheduledWeekDay}
               timing={meHeroTiming}
               shiftmates={meHeroShiftmates}
               status={meHeroState.status}
@@ -2004,7 +2019,7 @@ function MonthDayCell({
   );
 }
 
-function IconControlButton({
+export function IconControlButton({
   accessibilityLabel,
   iconName,
   iconSize = 20,
@@ -2043,7 +2058,7 @@ function IconControlButton({
   );
 }
 
-function AlertsChromeButton({ unreadCount }: { unreadCount: number }) {
+export function AlertsChromeButton({ unreadCount }: { unreadCount: number }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
@@ -2447,13 +2462,16 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
   );
 }
 
-function MeHeroCard({
+// The first-run tour renders this card and the header controls above it with
+// sample data (`onboarding/components/previews`), so they are exported.
+export function MeHeroCard({
   currentDate,
   currentTime,
   featuredItem,
   status,
   timing,
   shiftmates,
+  hasWeekItems = false,
   onPress,
 }: {
   currentDate: string;
@@ -2462,6 +2480,8 @@ function MeHeroCard({
   status: FeaturedMeScheduleSegment["status"];
   timing: HeroTiming | null;
   shiftmates: MobileScheduleEntry[];
+  /** Whether Your Week below has any scheduled day; the empty copy differs. */
+  hasWeekItems?: boolean;
   onPress?: () => void;
 }) {
   const mobileColors = useMobileColors();
@@ -2469,12 +2489,18 @@ function MeHeroCard({
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   if (!featuredItem) {
+    // Late in a week that had shifts, "nothing scheduled this week" sat over
+    // a list of them; what is true is that nothing more is coming.
     return (
       <View style={styles.meSectionBlock} testID="me-empty-schedule-state">
         <EmptyStateCard
           iconName="calendar-outline"
-          title="Nothing scheduled this week"
-          body="Your upcoming shifts will appear here once published."
+          title={hasWeekItems ? "Nothing more this week" : "Nothing scheduled this week"}
+          body={
+            hasWeekItems
+              ? "Your remaining shifts this week are done."
+              : "Your upcoming shifts will appear here once published."
+          }
         />
       </View>
     );
@@ -2492,8 +2518,14 @@ function MeHeroCard({
   const heroDateParts = getCompactScheduleDateParts(featuredItem.date);
   const shiftName = getScheduleItemShiftName(featuredItem);
   const change = getScheduleEntrySegmentChange(featuredItem.entry, featuredItem.segment);
-  const typeChip = getVisibleScheduleItemTypeChip(mobileColors, isDark, featuredItem);
-  const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, typeChip);
+  const visibleTypeChip = getVisibleScheduleItemTypeChip(mobileColors, isDark, featuredItem);
+  // An absence is one fact: the "Away" badge already says the kind, so the
+  // card leads with the absence's own name and skips the "Absence" eyebrow
+  // and pill that restated it as three lines.
+  const isAbsenceHero = visibleTypeChip?.kind === "absence";
+  const typeChip = isAbsenceHero ? null : visibleTypeChip;
+  const heroTitle = isAbsenceHero ? visibleTypeChip.label : shiftName;
+  const shouldShowShiftName = isAbsenceHero || shouldShowMePrimaryTitle(shiftName, typeChip);
   const timeRange = getScheduleItemTimeRange(featuredItem);
   const splitSegments = featuredItem ? getSplitShiftSegmentsForEntry(featuredItem.entry) : [];
   const splitShiftCount = splitSegments.length;
@@ -2533,7 +2565,7 @@ function MeHeroCard({
             ) : null}
             {shouldShowShiftName || shouldShowHeroSplitBadge || heroChangeLabel ? (
               <View style={styles.meHeroTitleRow}>
-                {shouldShowShiftName ? <Text style={styles.meHeroTitle}>{shiftName}</Text> : null}
+                {shouldShowShiftName ? <Text style={styles.meHeroTitle}>{heroTitle}</Text> : null}
                 {heroChangeLabel ? (
                   <View style={styles.meHeroTitleBadgeSlot}>
                     <ShiftChangeBadge change={heroChange} inverse />
@@ -2817,8 +2849,7 @@ function UpcomingShiftsSection({
                       return (
                         <Fragment key={item.key}>
                           {itemIndex > 0 ? <UpcomingShiftDashedDivider /> : null}
-                          <Pressable
-                            accessibilityRole="button"
+                          <PressableRow
                             onPress={() => onPressEntry(item.entry)}
                             style={styles.upcomingShiftRow}
                           >
@@ -2882,7 +2913,7 @@ function UpcomingShiftsSection({
                               ) : null}
                               <PreviousShiftRow change={change} />
                             </View>
-                          </Pressable>
+                          </PressableRow>
                         </Fragment>
                       );
                     })}
@@ -3106,13 +3137,13 @@ function OpenShiftsSection({
         </>
       );
       const cardSurface = cardSurfaceProps ? (
-        <Pressable
+        <PressableRow
           accessibilityLabel={cardSurfaceProps.accessibilityLabel}
           onPress={cardSurfaceProps.onPress}
           style={styles.openShiftCardSurface}
         >
           {content}
-        </Pressable>
+        </PressableRow>
       ) : (
         <View style={styles.openShiftCardSurface}>{content}</View>
       );
@@ -3131,7 +3162,7 @@ function OpenShiftsSection({
             disabled={
               Boolean(pendingAction) || !linkedEmployeeId || item.openShift.canVolunteer === false
             }
-            label="Volunteer"
+            label="Claim"
             leadingAccessory={
               <Ionicons color={mobileColors.brand} name="add-circle-outline" size={18} />
             }
@@ -3170,7 +3201,7 @@ function OpenShiftsSection({
     const focusAreaName = getRequestFocusAreaName(item.request, "requester");
     const timeRange = getRequestTimeRange(item.request, "requester");
     const cardSurface = cardSurfaceProps ? (
-      <Pressable
+      <PressableRow
         accessibilityLabel={cardSurfaceProps.accessibilityLabel}
         onPress={cardSurfaceProps.onPress}
         style={styles.openShiftCardSurface}
@@ -3192,7 +3223,7 @@ function OpenShiftsSection({
             <Text style={styles.scheduleRowTimeText}>{timeRange}</Text>
           </View>
         ) : null}
-      </Pressable>
+      </PressableRow>
     ) : (
       <View style={styles.openShiftCardSurface}>
         {shouldShowShiftName ? <Text style={styles.scheduleRowTitle}>{shiftName}</Text> : null}
@@ -3220,7 +3251,7 @@ function OpenShiftsSection({
         {cardSurface}
         <Button
           disabled={isPendingVolunteerRequest || Boolean(pendingAction) || !linkedEmployeeId}
-          label={isPendingVolunteerRequest ? "Pending approval" : "Claim Shift"}
+          label={isPendingVolunteerRequest ? "Pending approval" : "Claim"}
           leadingAccessory={
             <Ionicons
               color={mobileColors.brand}
@@ -3242,7 +3273,7 @@ function OpenShiftsSection({
 
   return (
     <View style={styles.meSectionBlock}>
-      <MeSectionHeader actionLabel="See all" onAction={onSeeAll} title="Open Shifts" />
+      <MeSectionHeader actionLabel="See all" onAction={onSeeAll} title="Open shifts" />
 
       <ScrollView
         accessibilityLabel="Open shifts carousel"
@@ -3390,7 +3421,7 @@ function ShiftCoverRequestsSection({
 
   return (
     <View style={styles.meSectionBlock}>
-      <MeSectionHeader title="Needs Your Response" />
+      <MeSectionHeader title="Needs your response" />
 
       <View style={styles.requestList}>
         {requests.map((request) => {
@@ -3532,45 +3563,43 @@ function TeamShiftMemberRow({
     ) : null;
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={[styles.teamMemberRow, !isFirst && styles.teamMemberRowBorder]}
-    >
-      <View
-        style={[
-          styles.teamMemberAvatar,
-          {
-            backgroundColor: avatarTone.backgroundColor,
-            borderColor: avatarTone.borderColor,
-          },
-        ]}
-      >
-        <Text fit="fixed" style={[styles.teamMemberAvatarText, { color: avatarTone.textColor }]}>
-          {getInitials(entry.employeeName)}
-        </Text>
-      </View>
-      <View style={styles.teamMemberCopy}>
-        {/* The role pill shares the name's line and the tags take the full
+    <View style={!isFirst && styles.teamMemberRowBorder}>
+      <PressableRow onPress={onPress} style={styles.teamMemberRow}>
+        <View
+          style={[
+            styles.teamMemberAvatar,
+            {
+              backgroundColor: avatarTone.backgroundColor,
+              borderColor: avatarTone.borderColor,
+            },
+          ]}
+        >
+          <Text fit="fixed" style={[styles.teamMemberAvatarText, { color: avatarTone.textColor }]}>
+            {getInitials(entry.employeeName)}
+          </Text>
+        </View>
+        <View style={styles.teamMemberCopy}>
+          {/* The role pill shares the name's line and the tags take the full
             width beneath, so a split chip is never squeezed into the column
             beside the pill and cut to "Also Day Shift ·…". */}
-        <View style={styles.teamMemberHeaderRow}>
-          <View style={styles.teamMemberNameRow}>
-            <Text style={styles.teamMemberName}>{memberName}</Text>
-            <ShiftChangeBadge change={splitChipLabel ? null : change} />
+          <View style={styles.teamMemberHeaderRow}>
+            <View style={styles.teamMemberNameRow}>
+              <Text style={styles.teamMemberName}>{memberName}</Text>
+              <ShiftChangeBadge change={splitChipLabel ? null : change} />
+            </View>
+            {stackRolePill ? null : rolePill}
           </View>
-          {stackRolePill ? null : rolePill}
+          {memberTimeRange ? <Text style={styles.teamMemberTime}>{memberTimeRange}</Text> : null}
+          <PreviousShiftRow change={change} />
+          {splitChipLabel ? (
+            <View style={styles.teamMemberSplitBadgeRow}>
+              <SplitShiftBadge count={row.alternateShiftTitles.length + 1} label={splitChipLabel} />
+            </View>
+          ) : null}
+          {stackRolePill ? rolePill : null}
         </View>
-        {memberTimeRange ? <Text style={styles.teamMemberTime}>{memberTimeRange}</Text> : null}
-        <PreviousShiftRow change={change} />
-        {splitChipLabel ? (
-          <View style={styles.teamMemberSplitBadgeRow}>
-            <SplitShiftBadge count={row.alternateShiftTitles.length + 1} label={splitChipLabel} />
-          </View>
-        ) : null}
-        {stackRolePill ? rolePill : null}
-      </View>
-    </Pressable>
+      </PressableRow>
+    </View>
   );
 }
 

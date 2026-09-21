@@ -75,8 +75,9 @@ vi.mock("sonner", () => ({
 vi.mock("lucide-react", () => ({
   CalendarDays: () => <span data-testid="calendar-icon" />,
   ChevronDown: () => <span data-testid="chevron-down-icon" />,
-  ChevronLeft: () => <span data-testid="chevron-left-icon" />,
-  ChevronRight: () => <span data-testid="chevron-right-icon" />,
+  ChevronDownIcon: () => <span data-testid="chevron-down-icon" />,
+  ChevronLeftIcon: () => <span data-testid="chevron-left-icon" />,
+  ChevronRightIcon: () => <span data-testid="chevron-right-icon" />,
   FileText: () => <span data-testid="file-text-icon" />,
   FileUp: () => <span data-testid="file-up-icon" />,
   // The export buttons now render <ButtonLoading>, whose spinner is this icon.
@@ -356,8 +357,10 @@ describe("ReportsPageContent", () => {
     expect(runActions).toHaveStyle({
       justifyContent: "flex-end",
     });
+    // A wrapping row of content-sized fields, not equal grid tracks.
     expect(screen.getByTestId("reports-filter-controls")).toHaveStyle({
-      display: "grid",
+      display: "flex",
+      flexWrap: "wrap",
     });
     expect(
       Array.from(runActions.querySelectorAll("button")).map((button) => button.textContent?.trim()),
@@ -547,15 +550,12 @@ describe("ReportsPageContent", () => {
     await chooseCustomSelect("Range", "Custom");
     expect(screen.getByLabelText("Range")).toHaveTextContent("Custom");
     fireEvent.click(screen.getByLabelText("Date range"));
-    expect(await screen.findByText("Select start date")).toBeInTheDocument();
-    fireEvent.click(await screen.findByRole("button", { name: "May 4, 2026" }));
-    expect(await screen.findByText("Select end date for May 4, 2026")).toBeInTheDocument();
-    fireEvent.click(await screen.findByRole("button", { name: "May 8, 2026" }));
-    expect(screen.getByLabelText("Date range")).toHaveStyle({
-      minWidth: "0",
-      width: "100%",
-    });
-    expect(screen.getByText("May 4, 2026 - May 8, 2026")).toHaveStyle({
+    // Two taps make a draft; nothing applies until the button says so.
+    fireEvent.click(await screen.findByRole("button", { name: /Monday, May 4th, 2026/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Friday, May 8th, 2026/ }));
+    expect(screen.getByLabelText("Range")).not.toHaveTextContent("May 4 - May 8");
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+    expect(screen.getByText("May 4 \u2013 May 8, 2026")).toHaveStyle({
       overflow: "hidden",
       textOverflow: "ellipsis",
       whiteSpace: "nowrap",

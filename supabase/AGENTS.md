@@ -15,7 +15,7 @@ supabase/
     002_functions_triggers.sql    # Functions, triggers, RPCs, JWT hook implementation
     003_rls_policies.sql          # RLS ENABLE + all row-level security policies
     004_grants.sql                # Grants + default privileges + supabase_auth_admin grants
-    005_*.sql ... 021_*.sql       # Ordered, idempotent forward migrations
+    005_*.sql ... 027_*.sql       # Ordered, idempotent forward migrations
     checksums.sha256              # Locks every reviewed migration (db:migrations:check)
   patches/                        # Historical one-time production patches (evidence only, never replayed)
   seed_arden_wood.sql             # Local seed: Arden Wood org

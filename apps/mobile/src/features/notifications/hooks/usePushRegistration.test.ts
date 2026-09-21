@@ -22,6 +22,9 @@ vi.mock("react-native", () => ({
   },
 }));
 
+// A real device: the simulator counts as unsupported for push.
+vi.mock("expo-device", () => ({ isDevice: true }));
+
 const getPermissionsAsync = vi.fn();
 const requestPermissionsAsync = vi.fn();
 const getExpoPushTokenAsync = vi.fn();
@@ -103,15 +106,55 @@ describe("usePushRegistration", () => {
     expect(getExpoPushTokenAsync).not.toHaveBeenCalled();
   });
 
-  it("does not register when the user refuses the permission prompt", async () => {
+  // The first-run tour is where the permission is asked for, with context.
+  // Prompting here as well would put the bare system dialog in front of
+  // someone who just answered "Not now" on that tour.
+  it("never shows the system prompt on its own", async () => {
     getPermissionsAsync.mockResolvedValue(UNDETERMINED);
-    requestPermissionsAsync.mockResolvedValue(DENIED);
 
     const { result } = renderHook(() => usePushRegistration("token-123", "org-1"));
 
     await waitFor(() => {
-      expect(result.current.permissionState).toBe("denied");
+      expect(getPermissionsAsync).toHaveBeenCalled();
     });
+    expect(result.current.permissionState).toBe("undetermined");
+    expect(requestPermissionsAsync).not.toHaveBeenCalled();
+    expect(registerPushToken).not.toHaveBeenCalled();
+  });
+
+  it("enablePush shows the system prompt and registers on a yes", async () => {
+    getPermissionsAsync.mockResolvedValue(UNDETERMINED);
+    requestPermissionsAsync.mockResolvedValue(GRANTED);
+
+    const { result } = renderHook(() =>
+      usePushRegistration("token-123", "org-1", { autoRegister: false }),
+    );
+
+    await act(async () => {
+      await result.current.enablePush();
+    });
+
+    expect(requestPermissionsAsync).toHaveBeenCalledTimes(1);
+    expect(result.current.permissionState).toBe("granted");
+    expect(registerPushToken).toHaveBeenCalledWith("token-123", {
+      expoPushToken: "ExponentPushToken[fresh]",
+      platform: "ios",
+    });
+  });
+
+  it("does not register when the user refuses the permission prompt", async () => {
+    getPermissionsAsync.mockResolvedValue(UNDETERMINED);
+    requestPermissionsAsync.mockResolvedValue(DENIED);
+
+    const { result } = renderHook(() =>
+      usePushRegistration("token-123", "org-1", { autoRegister: false }),
+    );
+
+    await act(async () => {
+      await result.current.enablePush();
+    });
+
+    expect(result.current.permissionState).toBe("denied");
     expect(registerPushToken).not.toHaveBeenCalled();
   });
 

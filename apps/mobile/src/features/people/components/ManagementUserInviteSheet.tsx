@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import {
   getOptionalUsPhoneError,
@@ -17,24 +17,13 @@ import {
 } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
 import { InlineError } from "../../../shared/components/InlineError";
-import { Chip } from "../../../shared/components/Chip";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
-import {
-  SegmentedControl,
-  type SegmentedOption,
-} from "../../../shared/components/SegmentedControl";
-import { ProfileTextInput } from "../../profile/components/ProfilePrimitives";
+import { ProfileChoiceGroup, ProfileTextInput } from "../../profile/components/ProfilePrimitives";
 import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
 import { MANAGEMENT_DEPARTMENT_LABELS } from "../../../shared/lib/departments";
-import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileSpace, type MobileColors } from "../../../shared/theme/tokens";
+import { mobileSpace } from "../../../shared/theme/tokens";
 import type { ManagementAccessRole } from "../lib/managementAccess";
-
-const ROLE_OPTIONS: SegmentedOption<ManagementAccessRole>[] = [
-  { value: "user", label: "User" },
-  { value: "admin", label: "Admin" },
-  { value: "super_admin", label: "Super Admin" },
-];
+import { OrgRoleChoice } from "./OrgRoleChoice";
 
 type InviteDraft = {
   firstName: string;
@@ -70,6 +59,7 @@ function getEmailError(value: string): string | null {
 export function ManagementUserInviteSheet({
   visible,
   managementDepartments,
+  canGrantSuperAdmin,
   isPending,
   error,
   onDismiss,
@@ -77,6 +67,8 @@ export function ManagementUserInviteSheet({
 }: {
   visible: boolean;
   managementDepartments: MobileDepartment[];
+  /** Only a Super Admin may invite another one, as on web. */
+  canGrantSuperAdmin: boolean;
   isPending: boolean;
   /**
    * Why the last submit failed. The sheet stays open on error, and a toast
@@ -86,8 +78,6 @@ export function ManagementUserInviteSheet({
   onDismiss: () => void;
   onSubmit: (body: MobileManagementUserInviteBody) => Promise<unknown>;
 }) {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const [draft, setDraft] = useState<InviteDraft>(EMPTY_DRAFT);
   const [wasVisible, setWasVisible] = useState(visible);
   const [showErrors, setShowErrors] = useState(false);
@@ -155,7 +145,7 @@ export function ManagementUserInviteSheet({
             primaryAction={
               <Button
                 disabled={isPending || managementDepartments.length === 0}
-                label="Send Invitation"
+                label="Send invitation"
                 loading={isPending}
                 onPress={submit}
                 tone="primary"
@@ -228,65 +218,41 @@ export function ManagementUserInviteSheet({
             value={draft.phone}
           />
 
-          <View style={styles.field}>
-            <AppText tone="secondary" variant="label">
-              Access level
-            </AppText>
-            <SegmentedControl
-              accessibilityLabel="Access level"
-              disabled={isPending}
-              onChange={(orgRole) => setDraft((current) => ({ ...current, orgRole }))}
-              options={ROLE_OPTIONS}
-              value={draft.orgRole}
-            />
-          </View>
+          <OrgRoleChoice
+            canGrantSuperAdmin={canGrantSuperAdmin}
+            disabled={isPending}
+            value={draft.orgRole}
+            onChange={(orgRole) => setDraft((current) => ({ ...current, orgRole }))}
+          />
 
-          <View style={styles.field}>
-            <AppText tone="secondary" variant="label">
-              {MANAGEMENT_DEPARTMENT_LABELS.plural}
-            </AppText>
-            <View style={styles.chipRow}>
-              {managementDepartments.map((department) => (
-                <Chip
-                  key={department.id}
-                  label={department.abbr || department.name}
-                  onPress={() =>
-                    setDraft((current) => ({
-                      ...current,
-                      managementDepartmentIds: current.managementDepartmentIds.includes(
-                        department.id,
-                      )
-                        ? current.managementDepartmentIds.filter((id) => id !== department.id)
-                        : [...current.managementDepartmentIds, department.id],
-                    }))
-                  }
-                  selected={draft.managementDepartmentIds.includes(department.id)}
-                />
-              ))}
-            </View>
-            {showErrors && departmentError ? (
-              <AppText tone="danger" variant="meta">
-                {departmentError}
-              </AppText>
-            ) : null}
-          </View>
+          {/* The same ring-and-check list the management-access sheet uses,
+              one row per department with its full name. */}
+          <ProfileChoiceGroup
+            error={showErrors ? departmentError : null}
+            items={managementDepartments.map((department) => ({
+              id: department.id,
+              name: department.name,
+              disabled: isPending,
+            }))}
+            label={MANAGEMENT_DEPARTMENT_LABELS.plural}
+            selectedIds={draft.managementDepartmentIds}
+            onToggle={(id) =>
+              setDraft((current) => ({
+                ...current,
+                managementDepartmentIds: current.managementDepartmentIds.includes(id)
+                  ? current.managementDepartmentIds.filter((value) => value !== id)
+                  : [...current.managementDepartmentIds, id],
+              }))
+            }
+          />
         </View>
       )}
     </BottomSheetModal>
   );
 }
 
-const createStyles = (_mobileColors: MobileColors) =>
-  StyleSheet.create({
-    body: {
-      gap: mobileSpace.lg,
-    },
-    field: {
-      gap: mobileSpace.sm,
-    },
-    chipRow: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: mobileSpace.xs,
-    },
-  });
+const styles = StyleSheet.create({
+  body: {
+    gap: mobileSpace.lg,
+  },
+});

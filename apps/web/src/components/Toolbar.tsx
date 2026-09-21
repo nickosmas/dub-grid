@@ -84,7 +84,7 @@ interface ToolbarProps {
   presenceSlot?: React.ReactNode;
   showAudit?: boolean;
   onAuditToggle?: () => void;
-  /** Badge count for shift requests (swaps directed at me + pending approvals for admins). */
+  /** Badge count for shift requests: every active request for approvers, otherwise the ones awaiting my answer. */
   requestsBadgeCount?: number;
   /** Toggle the shift requests board panel. */
   onRequestsToggle?: () => void;
@@ -600,7 +600,7 @@ export default function Toolbar({
             fontWeight="var(--dg-type-control-weight)"
             activeFontWeight="var(--dg-type-control-weight)"
             letterSpacing="normal"
-            style={{ minWidth: 0, flex: "1 1 110px" }}
+            style={{ flex: "0 1 auto" }}
           />
           <Button
             onClick={onToday}
@@ -679,7 +679,7 @@ export default function Toolbar({
               Tools
               <NumericBadge
                 count={requestsBadgeCount}
-                label={`${requestsBadgeCount} pending requests`}
+                label={`${requestsBadgeCount} active requests`}
                 size="sm"
                 tone="danger"
                 style={FLOATING_BADGE_STYLE}
@@ -763,11 +763,7 @@ export default function Toolbar({
             style={{
               color: "var(--dg-color-text-secondary)",
               whiteSpace: "nowrap",
-              minWidth: 0,
-              width: 120,
-              flex: "1 1 120px",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
+              flex: "0 0 auto",
               textAlign: "center",
               userSelect: "none",
             }}
@@ -1021,7 +1017,7 @@ export default function Toolbar({
               Tools
               <NumericBadge
                 count={requestsBadgeCount}
-                label={`${requestsBadgeCount} pending requests`}
+                label={`${requestsBadgeCount} active requests`}
                 size="sm"
                 tone="danger"
                 style={FLOATING_BADGE_STYLE}

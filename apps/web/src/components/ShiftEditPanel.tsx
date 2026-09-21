@@ -1048,6 +1048,15 @@ export default function ShiftEditPanel({
         return timesOverlap(requesterTimes, targetTimes);
       }
 
+      // Mirrors `swap_request_conflict` (migration 026): time off on the day a
+      // shift would move to blocks the swap, as does overlapping work.
+      if (
+        getAbsenceTypeIdForKey?.(modal.empId, viewDateObj) != null ||
+        getAbsenceTypeIdForKey?.(targetEmpId, requestDateObj) != null
+      ) {
+        return true;
+      }
+
       const requesterExisting = getShiftTimeRanges(modal.empId, viewDateObj);
       if (requesterExisting.length > 0) {
         const incoming = getShiftTimeRanges(targetEmpId, viewDateObj);
@@ -1066,7 +1075,7 @@ export default function ShiftEditPanel({
 
       return false;
     },
-    [getShiftTimeRanges, modal.empId, requestShiftDate],
+    [getAbsenceTypeIdForKey, getShiftTimeRanges, modal.empId, requestShiftDate],
   );
 
   const canWorkRequiredFocusAreas = useCallback(

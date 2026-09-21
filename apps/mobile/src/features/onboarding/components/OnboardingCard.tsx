@@ -86,13 +86,13 @@ export function OnboardingCard({
   return (
     <View style={[styles.page, { width }]}>
       <View style={styles.content}>
-        <Animated.View style={[styles.visualFrame, visualStyle]}>{visual}</Animated.View>
         <Animated.View style={[styles.copy, copyStyle]}>
           <Text accessibilityRole="header" style={styles.title}>
             {title}
           </Text>
           <Text style={styles.body}>{body}</Text>
         </Animated.View>
+        <Animated.View style={[styles.visualFrame, visualStyle]}>{visual}</Animated.View>
       </View>
     </View>
   );
@@ -121,10 +121,10 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     // Stretches so the mock-up inside can bleed out to the app's own screen
     // gutter; an auto-width frame would shrink-wrap it back to the copy's
-    // measure. The copy below keeps the slide's wider padding.
+    // measure. The copy above keeps the slide's wider padding.
     visualFrame: {
       alignSelf: "stretch",
-      marginBottom: mobileSpace.xs,
+      marginTop: mobileSpace.xs,
     },
     copy: {
       alignItems: "center",

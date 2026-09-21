@@ -181,6 +181,17 @@ export function getFeaturedMeScheduleSegment(input: {
       };
     }
 
+    // A week of nothing but absences is still a week with something on it:
+    // lead with the first absence rather than saying nothing is scheduled
+    // above a list that shows it.
+    const firstAbsence = items[0] ?? null;
+    if (firstAbsence) {
+      return {
+        item: firstAbsence,
+        status: "away",
+      };
+    }
+
     return {
       item: null,
       status: "empty",
@@ -188,16 +199,32 @@ export function getFeaturedMeScheduleSegment(input: {
   }
 
   if (input.selectedDate === input.todayDate) {
+    const segmentTimes = (item: MeScheduleSegmentItem) => ({
+      start: item.segment.startTime ?? getScheduleEntryStartTime(item.entry),
+      end: item.segment.endTime ?? getScheduleEntryEndTime(item.entry),
+    });
+    const isOvernight = ({ start, end }: { start: string | null; end: string | null }) =>
+      Boolean(start && end) && (getSortableTime(end) ?? "") <= (getSortableTime(start) ?? "");
+    // An overnight shift is "on duty" on two calendar days: after its start
+    // today, and before its end on the morning after. Checking only today's
+    // entries called tonight's 22:00 shift active at 02:00 (twenty hours
+    // early) and never saw last night's shift still running.
+    const yesterday = addDaysToIsoDate(input.todayDate, -1);
     const activeItem =
-      selectedDayItems.find(
-        (item) =>
-          getScheduleEntryAbsenceTypeId(item.entry) == null &&
-          isTimeWithinRange(
-            item.segment.startTime ?? getScheduleEntryStartTime(item.entry),
-            item.segment.endTime ?? getScheduleEntryEndTime(item.entry),
-            input.currentTime,
-          ),
-      ) ?? null;
+      selectedDayItems.find((item) => {
+        if (getScheduleEntryAbsenceTypeId(item.entry) != null) return false;
+        const times = segmentTimes(item);
+        if (!isTimeWithinRange(times.start, times.end, input.currentTime)) return false;
+        return !isOvernight(times) || input.currentTime >= (getSortableTime(times.start) ?? "");
+      }) ??
+      items.find((item) => {
+        if (item.date !== yesterday || getScheduleEntryAbsenceTypeId(item.entry) != null) {
+          return false;
+        }
+        const times = segmentTimes(item);
+        return isOvernight(times) && input.currentTime < (getSortableTime(times.end) ?? "");
+      }) ??
+      null;
 
     if (activeItem) {
       return {
@@ -270,9 +297,16 @@ export function getFeaturedMeScheduleSegment(input: {
   const nextItem = items.find((item) => item.date.localeCompare(input.selectedDate) > 0) ?? null;
 
   if (nextItem) {
+    // Browsing a past day: the next shift on the list may itself be over,
+    // and "Upcoming" on a finished shift read as a scheduling error.
     return {
       item: nextItem,
-      status: getScheduleEntryAbsenceTypeId(nextItem.entry) != null ? "away" : "upcoming",
+      status:
+        getScheduleEntryAbsenceTypeId(nextItem.entry) != null
+          ? "away"
+          : nextItem.date.localeCompare(input.todayDate) > 0
+            ? "upcoming"
+            : "scheduled",
     };
   }
 

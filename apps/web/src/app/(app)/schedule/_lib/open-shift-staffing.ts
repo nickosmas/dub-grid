@@ -25,8 +25,12 @@ export interface StaffingScheduleState {
 
 export interface OpenShiftStaffingOption {
   assignmentIds: number[];
+  /** Resolved per segment (custom or default): what the conflict checks see. */
   alignedTimeRanges: Array<TimeRange | null>;
   timeRanges: TimeRange[];
+  /** Only the calloff's own custom times, per segment: the only times that
+   *  may be written as custom. A default is never persisted as custom. */
+  alignedCustomTimeRanges: Array<TimeRange | null>;
 }
 
 export interface OpenShiftStaffingExistingAssignment {
@@ -186,17 +190,21 @@ function buildOptions(
       openShift.source === "calloff" ? openShift.customEndTime : null,
       assignmentIds.length,
     );
-    const alignedTimeRanges = resolved.map((assignment, index) => {
-      if (customStarts[index] && customEnds[index]) {
-        return { start: customStarts[index]!, end: customEnds[index]! };
-      }
-      return assignmentTimeRange(assignment!, context.shiftCategories);
-    });
+    const alignedCustomTimeRanges = assignmentIds.map((_, index) =>
+      customStarts[index] && customEnds[index]
+        ? { start: customStarts[index]!, end: customEnds[index]! }
+        : null,
+    );
+    const alignedTimeRanges = resolved.map(
+      (assignment, index) =>
+        alignedCustomTimeRanges[index] ?? assignmentTimeRange(assignment!, context.shiftCategories),
+    );
     return [
       {
         assignmentIds,
         alignedTimeRanges,
         timeRanges: alignedTimeRanges.filter((range): range is TimeRange => range != null),
+        alignedCustomTimeRanges,
       },
     ];
   });
@@ -293,8 +301,8 @@ export function buildStaffedOpenShiftInput({
   const existingSegments = existingWorkedState?.segments ?? [];
   const existingStarts = splitAlignedTimes(existingState?.customStartTime, existingSegments.length);
   const existingEnds = splitAlignedTimes(existingState?.customEndTime, existingSegments.length);
-  const addedStarts = option.alignedTimeRanges.map((range) => range?.start ?? null);
-  const addedEnds = option.alignedTimeRanges.map((range) => range?.end ?? null);
+  const addedStarts = option.alignedCustomTimeRanges.map((range) => range?.start ?? null);
+  const addedEnds = option.alignedCustomTimeRanges.map((range) => range?.end ?? null);
 
   return {
     kind: "worked",

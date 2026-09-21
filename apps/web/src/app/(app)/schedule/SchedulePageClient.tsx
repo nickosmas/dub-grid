@@ -331,10 +331,10 @@ function newEditorSessionId(): string {
 }
 
 /** The board tab a `?requests=` deep link may ask for. */
-type RequestsParam = "mine" | "approval";
+type RequestsParam = "mine" | "approval" | "history";
 
 function parseRequestsParam(value: string | null): RequestsParam | null {
-  return value === "mine" || value === "approval" ? value : null;
+  return value === "mine" || value === "approval" || value === "history" ? value : null;
 }
 
 function parseDateParam(value: string | null): string | null {
@@ -620,6 +620,18 @@ function SchedulerContent({
     selectedAssignmentDefinitionId: number;
   } | null>(null);
 
+  const focusAreaNameById = useMemo(
+    () => new Map(focusAreas.map((focusArea) => [focusArea.id, focusArea.name])),
+    [focusAreas],
+  );
+  // Every person a request could name, past and present, sorted for a picker.
+  const requestHistoryStaffOptions = useMemo(
+    () =>
+      employeeDirectory
+        .map((e) => ({ id: e.id, name: `${e.firstName} ${e.lastName}`.trim() }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [employeeDirectory],
+  );
   const shiftRequests = useShiftRequests(
     orgId ?? org?.id ?? null,
     assignmentLabelMap,
@@ -3179,8 +3191,10 @@ function SchedulerContent({
         ruleLabel: gap.ruleLabel,
         assignmentLabel: gap.assignmentLabel,
         assignmentFullName: gap.assignmentFullName,
-        customStartTime: sc?.defaultStartTime ?? null,
-        customEndTime: sc?.defaultEndTime ?? null,
+        // A gap runs at the assignment's default time; only a calloff carries
+        // custom times, so these stay null and never reach the cell as custom.
+        customStartTime: null,
+        customEndTime: null,
         needed: remainingNeeded,
       });
       return items;
@@ -5922,8 +5936,8 @@ function SchedulerContent({
                     selectedAssignmentDefinition.jobId != null
                       ? [selectedAssignmentDefinition.jobId]
                       : [],
-                  customStartTime: selectedRange?.start ?? null,
-                  customEndTime: selectedRange?.end ?? null,
+                  customStartTime: null,
+                  customEndTime: null,
                 });
                 return;
               }
@@ -7310,8 +7324,8 @@ function SchedulerContent({
                             selectedAssignmentDefinition.jobId != null
                               ? [selectedAssignmentDefinition.jobId]
                               : [],
-                          customStartTime: selectedRange?.start ?? null,
-                          customEndTime: selectedRange?.end ?? null,
+                          customStartTime: null,
+                          customEndTime: null,
                         });
                         if (!volunteerInput) {
                           toast.error("That open shift is no longer available.");
@@ -7338,16 +7352,16 @@ function SchedulerContent({
             )}
             {pendingCoverageGapVolunteer && currentEmpId && (
               <ConfirmDialog
-                confirmLabel="Volunteer"
+                confirmLabel="Claim"
                 isLoading={isCoverageGapVolunteerPending}
                 message={
                   <>
-                    Volunteer for <strong>{pendingCoverageGapVolunteer.assignmentLabel}</strong> on{" "}
+                    Claim <strong>{pendingCoverageGapVolunteer.assignmentLabel}</strong> on{" "}
                     <strong>{pendingCoverageGapVolunteer.date}</strong>? This will be sent to your
                     admin for approval.
                   </>
                 }
-                title="Volunteer for this shift?"
+                title="Claim this shift?"
                 variant="info"
                 onCancel={() => {
                   if (!isCoverageGapVolunteerPending) {
@@ -7379,11 +7393,7 @@ function SchedulerContent({
             )}
             {pendingClaimShift && currentEmpId && (
               <ConfirmDialog
-                title={
-                  pendingClaimShift.source === "calloff"
-                    ? "Claim This Shift?"
-                    : "Volunteer for This Shift?"
-                }
+                title="Claim this shift?"
                 message={
                   <>
                     <strong>
@@ -7398,7 +7408,7 @@ function SchedulerContent({
                     We'll send this to your admin for approval.
                   </>
                 }
-                confirmLabel={pendingClaimShift.source === "calloff" ? "Claim" : "Volunteer"}
+                confirmLabel="Claim"
                 variant="info"
                 isLoading={isClaimShiftPending}
                 // Async so the dialog's latch holds for the whole request:
@@ -7669,6 +7679,9 @@ function SchedulerContent({
           {/* ── Shift Request Board (slide-out panel) ── */}
           {showRequestBoard && (
             <ShiftRequestBoard
+              orgId={orgId ?? org?.id ?? null}
+              staffOptions={requestHistoryStaffOptions}
+              focusAreaNameMap={focusAreaNameById}
               openPickups={
                 canEditShifts
                   ? shiftRequests.openPickups
@@ -7723,10 +7736,9 @@ function SchedulerContent({
                 return shiftRequests.respond(id, currentEmpId, accept);
               }}
               onResolve={(id, approved, note) => shiftRequests.resolve(id, approved, note)}
-              onCancel={(id) => {
-                if (!currentEmpId) return;
-                return shiftRequests.cancel(id, currentEmpId);
-              }}
+              onCancel={(id, requesterEmpId, note) =>
+                shiftRequests.cancel(id, requesterEmpId, note)
+              }
               onClose={() => setShowRequestBoard(false)}
               absenceTypeMap={absenceTypeObjectMap}
               assignmentNameMap={assignmentNameMap}

@@ -6,6 +6,7 @@ import {
   mobileRadius,
   mobileSpace,
   mobileSpacing,
+  mobileTabularText,
   mobileText,
   mobileTextWeighted,
   type MobileColors,
@@ -67,7 +68,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     cardHeader: {
       flexDirection: "row",
       justifyContent: "space-between",
-      alignItems: "flex-start",
+      alignItems: "center",
       gap: 12,
     },
     openShiftTitleRow: {
@@ -79,23 +80,10 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     cardTitleRow: {
       flex: 1,
       flexDirection: "row",
-      alignItems: "flex-start",
+      alignItems: "center",
       gap: mobileSpace.md,
     },
-    cardIconFrame: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: mobileColors.brandSoft,
-    },
-    cardIconFrameMuted: {
-      backgroundColor: mobileColors.surface,
-    },
-    titleColumn: {
-      flex: 1,
-      minWidth: 0,
+    cardBody: {
       gap: mobileSpace.md,
     },
     cardActions: {
@@ -103,13 +91,9 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexWrap: "wrap",
       justifyContent: "flex-start",
       gap: 8,
-      marginLeft: mobileSpace["4xl"],
       paddingTop: mobileSpace.md,
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: mobileColors.borderSubtle,
-    },
-    cardActionsFlush: {
-      marginLeft: 0,
     },
     requestTitle: {
       ...mobileText.cardTitle,
@@ -150,15 +134,65 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileTextWeighted("meta", "bold"),
       color: mobileColors.textMuted,
     },
-    shiftPill: {
-      borderRadius: mobileRadii.pill,
-      borderWidth: 1,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
+    // A shift inside a request card: a panel on the card's secondary surface,
+    // one radius step in from the card so the two read as nested, not stacked.
+    shiftPanel: {
+      gap: mobileSpace.xs,
+      padding: mobileSpace.md,
+      borderRadius: mobileRadii.control,
+      backgroundColor: mobileColors.surfaceSecondary,
     },
-    shiftPillText: {
-      ...mobileTextWeighted("meta", "semibold"),
-      includeFontPadding: false,
+    // Room for the swap disc that straddles the seam between two panels.
+    shiftPanelSeamBelow: {
+      paddingBottom: mobileSpace.lg + mobileSpace.sm,
+    },
+    shiftPanelSeamAbove: {
+      paddingTop: mobileSpace.lg + mobileSpace.sm,
+    },
+    shiftPanelPerson: {
+      ...mobileText.meta,
+      color: mobileColors.textMuted,
+    },
+    // The shift's name with its job pills directly under it; beside it they
+    // fought the name for width on a phone.
+    shiftTitleRow: {
+      alignItems: "flex-start",
+      gap: mobileSpace.xs,
+    },
+    shiftPanelTitle: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textPrimary,
+    },
+    shiftPanelContext: {
+      ...mobileText.body,
+      color: mobileColors.textSecondary,
+    },
+    shiftPanelWhen: {
+      ...mobileTextWeighted("meta", "medium"),
+      ...mobileTabularText,
+      color: mobileColors.textMuted,
+    },
+    // The arrow sits between the two panels, and its negative margin pulls
+    // them in so the column's gap does not open twice around it.
+    swapPanels: {},
+    // Centred on the seam between the two panels; the surface-coloured ring
+    // lifts the disc off both.
+    swapSeam: {
+      height: mobileSpace.xs,
+      alignItems: "center",
+      justifyContent: "center",
+      overflow: "visible",
+      zIndex: 1,
+    },
+    swapArrow: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      borderWidth: 3,
+      borderColor: mobileColors.surface,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: mobileColors.brandSoft,
     },
     statusChip: {
       ...mobilePillOverflow.displayContainer,
@@ -180,10 +214,21 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileText.body,
       color: mobileColors.textMuted,
     },
-    requestTypeRow: {
+    awaitingNote: {
+      ...mobileText.meta,
+      color: mobileColors.warningText,
+    },
+    queueGroup: {
+      gap: mobileSpace.md,
+    },
+    queueGroupHeader: {
       flexDirection: "row",
       alignItems: "center",
       gap: mobileSpace.sm,
+    },
+    queueGroupTitle: {
+      ...mobileTextWeighted("sectionTitle", "medium"),
+      color: mobileColors.textSubtle,
     },
     openShiftContextStack: {
       gap: 8,

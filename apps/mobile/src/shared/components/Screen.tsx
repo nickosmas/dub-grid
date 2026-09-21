@@ -655,10 +655,13 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, hasPageBackgr
       flexDirection: "row",
       alignItems: "center",
       gap: mobileSpace.xs,
+      borderRadius: mobileRadii.control,
+      marginHorizontal: -mobileSpace.sm,
+      paddingHorizontal: mobileSpace.sm,
       paddingVertical: mobileSpace.xs,
     },
     cardSeeAllPressed: {
-      opacity: 0.6,
+      backgroundColor: mobileColors.navActiveBg,
     },
     cardSeeAllLabel: {
       ...mobileText.label,

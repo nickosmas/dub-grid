@@ -252,6 +252,29 @@ describe("useShiftRequests", () => {
     expect(result.current.badgeCount).toBe(1);
   });
 
+  it("counts every active request for an approver, matching the Approval Queue tab", async () => {
+    mockFetchShiftRequests.mockResolvedValue([
+      buildRequest({ id: "public-pickup" }),
+      buildRequest({ id: "pending-swap", type: "swap", status: "pending_approval" }),
+      buildRequest({
+        id: "targeted-for-me",
+        targetEmpId: "claimer-1",
+        targetName: "Casey Target",
+        targetShiftDate: "2026-04-18",
+        absenceTypeId: 7,
+      }),
+    ]);
+
+    const { result } = renderHook(
+      () => useShiftRequests("org-1", new Map(), "claimer-1", true, "America/Los_Angeles"),
+      { wrapper },
+    );
+
+    await flush();
+
+    expect(result.current.badgeCount).toBe(3);
+  });
+
   it("omits date filters by default but threads them through when a dateRange is given", async () => {
     mockFetchShiftRequests.mockResolvedValue([]);
 

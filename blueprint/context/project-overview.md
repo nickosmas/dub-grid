@@ -382,7 +382,7 @@ Main route groups (web, App Router):
   (`npm run build`) and start (`npm run start`).
 - **Database:** Supabase-hosted Postgres with an immutable ordered migration
   stream in `supabase/migrations/` (`001`-`004` frozen, forward migrations
-  through `023`, checksum-locked, applied by ledger). Feature flags are seeded
+  through `027`, checksum-locked, applied by ledger). Feature flags are seeded
   in `001` and toggled through the Gridmaster UI; a new switch is one INSERT in
   a forward migration plus a call site.
 - **Background jobs:** `cron-expire-requests.yml` (GitHub Action, hourly)

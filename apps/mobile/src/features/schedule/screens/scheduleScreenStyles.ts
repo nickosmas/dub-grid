@@ -21,6 +21,17 @@ import { SCHEDULE_DATE_TILE_MIN_WIDTH } from "../components/ScheduleDateTile";
 /**
  * Fixed pixel geometry shared by the screen and its stylesheet.
  */
+
+const PRESSABLE_INSET = mobileSpace.sm;
+
+/** A rounded press highlight that reaches past the content on both sides. */
+const pressableBleed = {
+  borderRadius: mobileRadii.control,
+  marginHorizontal: -PRESSABLE_INSET,
+  overflow: "hidden" as const,
+  paddingHorizontal: PRESSABLE_INSET,
+};
+
 export const MAX_VISIBLE_OPEN_SHIFT_STACK_CARDS = 4;
 export const OPEN_SHIFT_CARD_MIN_HEIGHT = 180;
 /**
@@ -578,12 +589,16 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flex: 1,
       minWidth: 0,
     },
+    // Rows and card surfaces that navigate take the same rounded highlight
+    // as every other pressable row: it bleeds past the content by the inset
+    // and gives it back as padding, so the text stays where it was.
     upcomingShiftRow: {
       minHeight: 132,
       flexDirection: "row",
       alignItems: "center",
       gap: mobileSpace.lg,
       paddingVertical: mobileSpace.lg,
+      ...pressableBleed,
     },
     upcomingUnscheduledRow: {
       minHeight: 132,
@@ -828,6 +843,9 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     openShiftCardSurface: {
       gap: 12,
+      ...pressableBleed,
+      marginVertical: -PRESSABLE_INSET,
+      paddingVertical: PRESSABLE_INSET,
     },
     openShiftSplitPanel: {
       gap: mobileSpace.md,
@@ -1293,6 +1311,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: 16,
       minHeight: 72,
       paddingVertical: 16,
+      ...pressableBleed,
     },
     teamMemberRowBorder: {
       borderTopWidth: 1,

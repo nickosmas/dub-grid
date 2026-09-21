@@ -139,6 +139,22 @@ Sign-out must revoke this device's push token **before** dropping the session
 (`disablePushForCurrentDevice` in `shared/lib/auth-reset.ts`), or the phone
 keeps receiving the previous user's notifications.
 
+The first two slides of the first-run tour are live previews, not captures:
+`features/onboarding/components/previews` renders `MeHeroCard` (exported from
+`schedule/screens/ScheduleScreen.tsx`) and `OpenShiftCard` (from
+`shift-requests/screens/RequestsScreen.tsx`) from sample data inside a scaled
+device frame, so a change to either card shows on the tour as well.
+
+The notification permission is asked for once, with context, on the last slide
+of the first-run tour (`features/onboarding`, via
+`features/notifications/lib/push-permission.ts`). That slide's
+`NotificationReasons` card names the categories Profile > Notifications
+controls; keep the two in step. `usePushRegistration`'s
+automatic registration after sign-in never shows the system prompt on its own:
+it registers a device that already said yes, so someone who answered "Not now"
+on the tour is not met by the bare OS dialog on the home screen. The switch in
+Profile > Notifications is the only other place that prompts.
+
 ## Text Scaling
 
 Every text in the app goes through `shared/components/Text` (and `AppText` on
@@ -345,6 +361,15 @@ Sheets have a grabber, 40pt top corners, and extend to the bottom edge.
   "Management Departments" label between the two said nothing. Both accept an
   omitted `label`. Two lists on one sheet (a fresh invitation's role and
   departments) keep theirs, since then the captions tell them apart.
+- **Adding a person is a sheet, whichever kind.** The People tab's one Add
+  button asks scheduled or management (`AddPersonKindSheet`, handed off with
+  `useModalHandoff`) and opens `AddPersonSheet` or
+  `ManagementUserInviteSheet`. An access level offered as part of an
+  invitation is `OrgRoleChoice`, the same described radio list as the App
+  access sheet, which hides Super Admin unless the inviter holds it.
+- **A decision that takes a note is a sheet, not a confirmation.** The
+  Requests tab's Approve/Reject opens a `BottomSheetModal` with the note
+  field; `ConfirmationModal` must never hold an editable field.
 - **Titles go in the `header` slot** via `<SheetHeader>`, which puts them in the
   drag region. A title rendered in the body scrolls out of view and takes its
   drag target with it.

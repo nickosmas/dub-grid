@@ -46,7 +46,7 @@ test.describe("settings states", () => {
     await page.goto(`${QA_CALM_HAVEN_ORIGIN}/settings`);
 
     // settings/page.tsx: `loadError && !org` renders OrganizationBootstrapRecovery.
-    await expect(page.getByRole("heading", { name: "Loading your workspace" })).toBeVisible({
+    await expect(page.getByRole("heading", { name: "Loading your organization" })).toBeVisible({
       timeout: 15_000,
     });
     await expect(page.getByRole("button", { name: "Try again" })).toBeEnabled();

@@ -192,11 +192,11 @@ export default function ActivityLog({
             )}
           </div>
           <CustomSelect
+            style={{ flex: "1 1 auto" }}
             value={categoryFilter}
             options={categoryOptions.map(({ value, label }) => ({ value, label }))}
             onChange={resetPage(setCategoryFilter)}
             ariaLabel="Filter by activity type"
-            style={{ minWidth: 160 }}
             fontSize="var(--dg-fs-navigation-item)"
             fontWeight="var(--dg-type-control-weight)"
             activeFontWeight="var(--dg-type-control-weight)"

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { PublicRoute } from "@/components/RouteGuards";
 import { ACCOUNT_DISABLED_CODE } from "@dubgrid/domain";
@@ -23,6 +24,7 @@ import {
 } from "./shared";
 import { fetchWithTimeout, settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
 import { getWebAuthRecoveryMessage } from "@/lib/auth-recovery";
+import { withThemeParam } from "@/lib/theme-preference";
 
 export default function GridmasterLogin() {
   const router = useRouter();
@@ -41,8 +43,14 @@ export default function GridmasterLogin() {
 
   useSessionInvalidToast();
 
+  const { theme } = useTheme();
   const { parsed, protocol } = useClientHost();
-  const landingUrl = `${protocol}//${parsed?.rootDomain ?? "localhost"}${parsed?.port ?? ""}/`;
+  // The apex is a separate origin with its own localStorage, so every link
+  // back to it hands the theme over, the way the domain selector does on the
+  // way in.
+  const apexOrigin = `${protocol}//${parsed?.rootDomain ?? "localhost"}${parsed?.port ?? ""}`;
+  const landingUrl = withThemeParam(`${apexOrigin}/`, theme);
+  const apexLoginUrl = withThemeParam(`${apexOrigin}/login`, theme);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -142,40 +150,35 @@ export default function GridmasterLogin() {
   return (
     <PublicRoute>
       <PageShell signInDisclaimer>
-        <div data-testid="gridmaster-login" data-hydrated={isHydrated}>
-          <Card>
-            <a href={landingUrl} className="dg-auth-logo-block">
-              <DubGridLogo size={52} />
-              <span className="dg-auth-portal-label">Gridmaster portal</span>
+        <Card data-testid="gridmaster-login" data-hydrated={isHydrated}>
+          <a href={landingUrl} className="dg-auth-logo-block">
+            <DubGridLogo size={52} />
+            <span className="dg-auth-portal-label">Gridmaster portal</span>
+          </a>
+
+          <h1 className="dg-auth-heading">Platform admin sign in</h1>
+
+          <EmailPasswordForm
+            email={email}
+            setEmail={setEmail}
+            password={password}
+            setPassword={setPassword}
+            loading={loading}
+            onSubmit={handleSubmit}
+            submitLabel="Access Portal"
+            forgotPasswordHref="/forgot-password"
+          />
+
+          {/* Navigation links */}
+          <div className="dg-auth-login-navigation">
+            <a href={apexLoginUrl} className="dg-auth-link">
+              Back to standard login
             </a>
-
-            <h1 className="dg-auth-heading">Platform admin sign in</h1>
-
-            <EmailPasswordForm
-              email={email}
-              setEmail={setEmail}
-              password={password}
-              setPassword={setPassword}
-              loading={loading}
-              onSubmit={handleSubmit}
-              submitLabel="Access Portal"
-              forgotPasswordHref="/forgot-password"
-            />
-
-            {/* Navigation links */}
-            <div className="dg-auth-login-navigation">
-              <a
-                href={`${protocol}//${parsed?.rootDomain ?? "localhost"}${parsed?.port ?? ""}/login`}
-                className="dg-auth-link"
-              >
-                Back to standard login
-              </a>
-              <a href={landingUrl} className="dg-auth-link">
-                Back to home
-              </a>
-            </div>
-          </Card>
-        </div>
+            <a href={landingUrl} className="dg-auth-link">
+              Back to home
+            </a>
+          </div>
+        </Card>
         {accountDisabled && <AccountDisabledModal onClose={() => setAccountDisabled(false)} />}
       </PageShell>
     </PublicRoute>

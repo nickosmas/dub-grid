@@ -90,7 +90,7 @@ export interface ShiftRequestsData {
     focusAreaId: number,
   ) => Promise<boolean>;
   /** Cancel your own request. */
-  cancel: (requestId: string, empId: string) => Promise<boolean>;
+  cancel: (requestId: string, empId: string, note?: string) => Promise<boolean>;
 }
 
 export function useShiftRequests(
@@ -253,19 +253,20 @@ export function useShiftRequests(
     [activeRequests],
   );
 
-  // Badge count: for employees = swap proposals directed at them (open status);
-  // for admins = pending_approval count
+  // Badge count: what the board will show you. Approvers see every active
+  // request, which is what their Approval Queue tab lists (it used to count
+  // only the pending ones, so the badge and the tab disagreed); everyone else
+  // sees the requests waiting on their own answer.
   const badgeCount = useMemo(() => {
-    const myPendingTargetedRequests = currentEmpId
-      ? activeRequests.filter(
-          (r) =>
-            (r.type === "swap" || (r.type === "pickup" && r.targetEmpId != null)) &&
-            r.status === "open" &&
-            r.targetEmpId === currentEmpId,
-        ).length
-      : 0;
-    return myPendingTargetedRequests + (canApprove ? pendingApproval.length : 0);
-  }, [activeRequests, currentEmpId, canApprove, pendingApproval]);
+    if (canApprove) return activeRequests.length;
+    if (!currentEmpId) return 0;
+    return activeRequests.filter(
+      (r) =>
+        (r.type === "swap" || (r.type === "pickup" && r.targetEmpId != null)) &&
+        r.status === "open" &&
+        r.targetEmpId === currentEmpId,
+    ).length;
+  }, [activeRequests, currentEmpId, canApprove]);
 
   const create = useCallback(
     async (
@@ -340,7 +341,7 @@ export function useShiftRequests(
       if (!orgId) return false;
       try {
         const id = await volunteerForOpenShift(orgId, empId, shiftDate, input, focusAreaId);
-        toast.success("Volunteered for shift. Awaiting admin approval.");
+        toast.success("Shift claimed. Awaiting admin approval.");
         // Server route already dispatches shift_request_created.
         await refetchAfterMutation();
         return true;
@@ -386,10 +387,10 @@ export function useShiftRequests(
   );
 
   const cancel = useCallback(
-    async (requestId: string, empId: string): Promise<boolean> => {
+    async (requestId: string, empId: string, note?: string): Promise<boolean> => {
       if (!orgId) return false;
       try {
-        await cancelShiftRequest(requestId, empId, orgId);
+        await cancelShiftRequest(requestId, empId, orgId, note);
         toast.success("Request cancelled");
         await refetchAfterMutation();
         return true;

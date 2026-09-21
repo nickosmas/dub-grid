@@ -2,21 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import {
-  CalendarDays,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  FileText,
-  FileUp,
-  RefreshCw,
-  Upload,
-  X,
-} from "lucide-react";
+import { ChevronDown, FileText, FileUp, RefreshCw, Upload, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import CustomSelect, { type SelectOption } from "@/components/CustomSelect";
+import DateRangePicker from "@/components/ui/date-range-picker";
 import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import ProgressBar from "@/components/ProgressBar";
@@ -157,16 +148,6 @@ function parseIsoDate(date: string): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function addMonths(date: Date, months: number): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, 1));
-}
-
-function getMonthStart(date: string | null | undefined): Date {
-  const parsed = date ? parseIsoDate(date) : null;
-  const source = parsed ?? new Date();
-  return new Date(Date.UTC(source.getUTCFullYear(), source.getUTCMonth(), 1));
-}
-
 function formatDateLabel(date: string): string {
   const parsed = parseIsoDate(date);
   if (!parsed) return date || "Choose date";
@@ -193,18 +174,6 @@ function formatCompactRangeLabel(range: OperationsReportRange): string {
   }
   const formatter = new Intl.DateTimeFormat("en-US", dateOptions);
   return `${formatter.format(start)} - ${formatter.format(end)}`;
-}
-
-function formatMonthLabel(date: Date): string {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(date);
-}
-
-function compareIsoDates(left: string, right: string): number {
-  return left.localeCompare(right);
 }
 
 function getDefaultRange(): OperationsReportRange {
@@ -288,188 +257,6 @@ function employeeMatchesFocusAreas(
 ): boolean {
   if (focusAreaIds.length === 0) return true;
   return employee.focusAreaIds.some((id) => focusAreaIds.includes(id));
-}
-
-function buildCalendarDates(month: Date): Array<{ date: string; inMonth: boolean }> {
-  const firstOfMonth = new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth(), 1));
-  const gridStart = addDays(firstOfMonth, -firstOfMonth.getUTCDay());
-  return Array.from({ length: 42 }, (_, index) => {
-    const date = addDays(gridStart, index);
-    return {
-      date: toIsoDate(date),
-      inMonth: date.getUTCMonth() === month.getUTCMonth(),
-    };
-  });
-}
-
-function CalendarGrid({
-  max,
-  min,
-  onSelectDate,
-  pendingStartDate,
-  rangeEndDate,
-  rangeStartDate,
-  selectedDates,
-  value,
-}: {
-  min?: string;
-  max?: string;
-  pendingStartDate?: string | null;
-  rangeStartDate?: string;
-  rangeEndDate?: string;
-  selectedDates?: string[];
-  value?: string;
-  onSelectDate: (date: string) => void;
-}) {
-  const [visibleMonth, setVisibleMonth] = useState(() =>
-    getMonthStart(value ?? selectedDates?.[0] ?? rangeStartDate ?? min),
-  );
-  const selectedDateSet = useMemo(() => new Set(selectedDates ?? []), [selectedDates]);
-  const dates = useMemo(() => buildCalendarDates(visibleMonth), [visibleMonth]);
-
-  return (
-    <div style={calendarShellStyle}>
-      <div style={calendarHeaderStyle}>
-        <Button
-          aria-label="Previous month"
-          className="dg-btn dg-btn-secondary"
-          onClick={() => setVisibleMonth((current) => addMonths(current, -1))}
-          style={calendarNavButtonStyle}
-          type="button"
-        >
-          <ChevronLeft size={15} />
-        </Button>
-        <div style={calendarMonthLabelStyle}>{formatMonthLabel(visibleMonth)}</div>
-        <Button
-          aria-label="Next month"
-          className="dg-btn dg-btn-secondary"
-          onClick={() => setVisibleMonth((current) => addMonths(current, 1))}
-          style={calendarNavButtonStyle}
-          type="button"
-        >
-          <ChevronRight size={15} />
-        </Button>
-      </div>
-      <div style={calendarWeekdayGridStyle} aria-hidden="true">
-        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-          <div key={day}>{day}</div>
-        ))}
-      </div>
-      <div style={calendarGridStyle}>
-        {dates.map(({ date, inMonth }) => {
-          const disabled =
-            (min != null && compareIsoDates(date, min) < 0) ||
-            (max != null && compareIsoDates(date, max) > 0);
-          const isRangeEndpoint =
-            date === rangeStartDate || date === rangeEndDate || date === pendingStartDate;
-          const isInRange =
-            rangeStartDate != null &&
-            rangeEndDate != null &&
-            compareIsoDates(date, rangeStartDate) > 0 &&
-            compareIsoDates(date, rangeEndDate) < 0;
-          const isSelected = value === date || selectedDateSet.has(date) || isRangeEndpoint;
-          const dayNumber = parseIsoDate(date)?.getUTCDate() ?? date.slice(-2);
-          return (
-            <Button
-              key={date}
-              aria-label={formatDateLabel(date)}
-              aria-pressed={isSelected}
-              disabled={disabled}
-              onClick={() => onSelectDate(date)}
-              style={{
-                ...calendarDayStyle,
-                ...(isInRange ? calendarDayInRangeStyle : null),
-                ...(isSelected ? calendarDaySelectedStyle : null),
-                ...(!inMonth ? calendarDayMutedStyle : null),
-                ...(disabled ? calendarDayDisabledStyle : null),
-              }}
-              type="button"
-            >
-              {dayNumber}
-            </Button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function ReportRangePicker({
-  label,
-  onChange,
-  value,
-}: {
-  label: string;
-  value: OperationsReportRange;
-  onChange: (range: OperationsReportRange) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [pendingStartDate, setPendingStartDate] = useState<string | null>(null);
-  const anchorRef = useRef<HTMLButtonElement>(null);
-  const rangeLabel = `${formatDateLabel(value.startDate)} - ${formatDateLabel(value.endDate)}`;
-
-  const handleOpenChange = (nextOpen: boolean) => {
-    setOpen(nextOpen);
-    if (!nextOpen) {
-      setPendingStartDate(null);
-    }
-  };
-
-  const handleSelectDate = (date: string) => {
-    if (pendingStartDate == null) {
-      setPendingStartDate(date);
-      return;
-    }
-    const [startDate, endDate] =
-      compareIsoDates(pendingStartDate, date) <= 0
-        ? [pendingStartDate, date]
-        : [date, pendingStartDate];
-    onChange({ startDate, endDate });
-    handleOpenChange(false);
-  };
-
-  return (
-    <label style={controlLabelStyle}>
-      {label}
-      <Button
-        ref={anchorRef}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        aria-label={label}
-        className="dg-input"
-        onClick={() => setOpen((current) => !current)}
-        style={datePickerButtonStyle}
-        type="button"
-      >
-        <span style={datePickerLabelStyle}>{rangeLabel}</span>
-        <CalendarDays size={16} style={{ flexShrink: 0 }} />
-      </Button>
-      <Popover open={open} onOpenChange={handleOpenChange}>
-        <PopoverContent
-          anchor={anchorRef}
-          align="start"
-          className="dg-menu"
-          collisionPadding={12}
-          positionMethod="fixed"
-          side="bottom"
-          sideOffset={6}
-          style={calendarPopoverStyle}
-        >
-          <div style={calendarInstructionStyle}>
-            {pendingStartDate == null
-              ? "Select start date"
-              : `Select end date for ${formatDateLabel(pendingStartDate)}`}
-          </div>
-          <CalendarGrid
-            onSelectDate={handleSelectDate}
-            pendingStartDate={pendingStartDate}
-            rangeEndDate={pendingStartDate == null ? value.endDate : undefined}
-            rangeStartDate={pendingStartDate ?? value.startDate}
-          />
-        </PopoverContent>
-      </Popover>
-    </label>
-  );
 }
 
 function TargetDropdown({
@@ -1020,7 +807,14 @@ function ReportsContent() {
               </label>
             ) : null}
             {reportMetadata.usesDateRange && quickRange === "custom" ? (
-              <ReportRangePicker label="Date range" onChange={updateCustomRange} value={range} />
+              <label style={controlLabelStyle}>
+                Date range
+                <DateRangePicker
+                  label="Date range"
+                  onChange={(next) => updateCustomRange({ startDate: next.from, endDate: next.to })}
+                  value={{ from: range.startDate, to: range.endDate }}
+                />
+              </label>
             ) : null}
             {showsFocusAreaTarget ? (
               <TargetDropdown
@@ -1317,8 +1111,12 @@ function ReportsContent() {
   );
 }
 
+// Content width is the floor; with room to spare the fields share the rest
+// of the row so the toolbar spans the page.
 const controlLabelStyle: CSSProperties = {
   display: "grid",
+  flex: "1 1 auto",
+  maxWidth: "100%",
   gap: 6,
   color: "var(--dg-type-field-title-color)",
   fontSize: "var(--dg-type-field-title-size)",
@@ -1358,135 +1156,20 @@ const reportsSettingsDescriptionStyle: CSSProperties = {
   margin: "4px 0 0",
 };
 
+// A wrapping row where each field is at least as wide as its own value, so
+// "Custom (Aug 30 - Oct 3)" and "Aug 30 - Oct 3, 2026" both show in full and
+// "All jobs" does not sit in a column sized for them.
 const reportsFilterControlsStyle: CSSProperties = {
-  display: "grid",
+  display: "flex",
+  flexWrap: "wrap",
   gap: 12,
-  gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))",
+  alignItems: "flex-end",
 };
 
 const fullWidthControlStyle: CSSProperties = {
   display: "block",
   minWidth: 0,
   width: "100%",
-};
-
-const datePickerButtonStyle: CSSProperties = {
-  alignItems: "center",
-  cursor: "pointer",
-  display: "flex",
-  fontFamily: "inherit",
-  gap: 8,
-  justifyContent: "space-between",
-  minHeight: "var(--dg-toolbar-h)",
-  minWidth: 0,
-  padding: "0 10px 0 12px",
-  textAlign: "left",
-  width: "100%",
-};
-
-const datePickerLabelStyle: CSSProperties = {
-  flex: 1,
-  minWidth: 0,
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
-};
-
-const calendarPopoverStyle: CSSProperties = {
-  background: "var(--dg-color-surface)",
-  border: "1px solid var(--dg-color-border)",
-  borderRadius: "var(--dg-radius-md)",
-  boxShadow: "0 18px 40px rgba(0, 0, 0, 0.14)",
-  padding: 12,
-  width: 292,
-};
-
-const calendarShellStyle: CSSProperties = {
-  display: "grid",
-  gap: 10,
-};
-
-const calendarHeaderStyle: CSSProperties = {
-  alignItems: "center",
-  display: "flex",
-  justifyContent: "space-between",
-  gap: 8,
-};
-
-const calendarNavButtonStyle: CSSProperties = {
-  height: 32,
-  minHeight: 32,
-  padding: 0,
-  width: 32,
-};
-
-const calendarMonthLabelStyle: CSSProperties = {
-  color: "var(--dg-color-text-primary)",
-  flex: 1,
-  fontSize: "var(--dg-fs-body)",
-  fontWeight: 600,
-  textAlign: "center",
-};
-
-const calendarInstructionStyle: CSSProperties = {
-  color: "var(--dg-color-text-muted)",
-  fontSize: "var(--dg-fs-caption)",
-  fontWeight: 600,
-  marginBottom: 10,
-};
-
-const calendarWeekdayGridStyle: CSSProperties = {
-  color: "var(--dg-color-text-muted)",
-  display: "grid",
-  fontSize: "var(--dg-fs-caption)",
-  fontWeight: 600,
-  gap: 4,
-  gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-  textAlign: "center",
-};
-
-const calendarGridStyle: CSSProperties = {
-  display: "grid",
-  gap: 4,
-  gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-};
-
-const calendarDayStyle: CSSProperties = {
-  alignItems: "center",
-  background: "transparent",
-  borderColor: "transparent",
-  borderRadius: "var(--dg-radius-md)",
-  borderStyle: "solid",
-  borderWidth: 1,
-  color: "var(--dg-color-text-primary)",
-  cursor: "pointer",
-  display: "flex",
-  fontFamily: "inherit",
-  fontSize: "var(--dg-fs-body)",
-  fontWeight: 700,
-  height: 34,
-  justifyContent: "center",
-};
-
-const calendarDaySelectedStyle: CSSProperties = {
-  background: "var(--dg-color-brand-bg)",
-  borderColor: "var(--dg-color-brand-border)",
-  color: "var(--dg-color-brand)",
-};
-
-const calendarDayInRangeStyle: CSSProperties = {
-  background: "color-mix(in srgb, var(--dg-color-brand-bg) 68%, transparent)",
-  borderColor: "transparent",
-  color: "var(--dg-color-brand)",
-};
-
-const calendarDayMutedStyle: CSSProperties = {
-  color: "var(--dg-color-text-subtle)",
-};
-
-const calendarDayDisabledStyle: CSSProperties = {
-  cursor: "not-allowed",
-  opacity: 0.35,
 };
 
 const metricStyle: CSSProperties = {
@@ -1532,9 +1215,6 @@ const targetDropdownSummaryStyle: CSSProperties = {
   flex: 1,
   fontSize: "var(--dg-fs-body)",
   fontWeight: 500,
-  minWidth: 0,
-  overflow: "hidden",
-  textOverflow: "ellipsis",
   whiteSpace: "nowrap",
 };
 

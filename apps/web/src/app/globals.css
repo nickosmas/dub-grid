@@ -1083,118 +1083,33 @@ button {
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.48);
 }
 
-.landing-screenshot-mobile {
-  border-radius: 32px;
-  box-shadow: 0 24px 60px rgba(7, 21, 53, 0.2);
+/* A simulated iPhone: bezel, band highlight, and the screen's rounded corners. */
+.landing-phone {
+  box-sizing: border-box;
+  width: 278px;
+  padding: 8px;
+  border-radius: 44px;
+  background: #0a0a0c;
+  box-shadow:
+    inset 0 0 0 1.5px rgba(255, 255, 255, 0.14),
+    0 30px 80px rgba(15, 23, 42, 0.28),
+    0 6px 18px rgba(15, 23, 42, 0.14);
 }
 
-.landing-security-mockup {
-  max-width: 880px;
-  margin: 0 auto;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.38);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.22);
-  box-shadow: 0 20px 50px rgba(7, 21, 53, 0.15);
+/* A near-black bezel disappears against the dark page, so it lightens there. */
+.dark .landing-phone {
+  background: #3f3f46;
+  box-shadow:
+    inset 0 0 0 1.5px rgba(255, 255, 255, 0.16),
+    0 30px 80px rgba(0, 0, 0, 0.5),
+    0 6px 18px rgba(0, 0, 0, 0.3);
 }
 
-.dark .landing-security-mockup {
-  border-color: rgba(174, 196, 255, 0.24);
-  background: rgba(7, 30, 89, 0.48);
-}
-
-.landing-security-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 28px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-.landing-security-eyebrow {
-  margin: 0 0 6px;
-  color: var(--dg-color-text-muted);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-}
-
-.landing-security-header h3 {
-  margin: 0;
-  color: var(--dg-color-text-primary);
-  font-size: 26px;
-  line-height: 1.2;
-}
-
-.landing-security-header p:not(.landing-security-eyebrow) {
-  max-width: 480px;
-  margin: 6px 0 0;
-  color: var(--dg-color-text-muted);
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.landing-security-status {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 10px;
-  border: 1px solid var(--dg-color-success-border);
-  border-radius: 999px;
-  color: var(--dg-color-success-text);
-  background: var(--dg-color-success-bg);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.landing-security-list {
-  padding: 8px 28px;
-}
-
-.landing-security-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 18px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.24);
-}
-
-.landing-security-row:last-child {
-  border-bottom: 0;
-}
-
-.landing-security-icon {
-  display: grid;
-  width: 40px;
-  height: 40px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 12px;
-  color: var(--dg-color-brand);
-  background: var(--dg-color-brand-bg);
-}
-
-.landing-security-copy {
-  display: grid;
-  gap: 3px;
-}
-
-.landing-security-copy strong {
-  color: var(--dg-color-text-primary);
-  font-size: 14px;
-}
-
-.landing-security-copy span,
-.landing-security-item-status {
-  color: var(--dg-color-text-muted);
-  font-size: 13px;
-}
-
-.landing-security-item-status {
-  margin-left: auto;
-  font-weight: 600;
+.landing-phone-screen {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 36px;
 }
 
 @media (max-width: 640px) {
@@ -1205,24 +1120,6 @@ button {
 
   .landing-hero-gradient {
     height: 880px;
-  }
-
-  .landing-security-header {
-    display: grid;
-  }
-
-  .landing-security-list {
-    padding: 8px 20px;
-  }
-
-  .landing-security-row {
-    align-items: flex-start;
-    flex-wrap: wrap;
-  }
-
-  .landing-security-item-status {
-    width: calc(100% - 54px);
-    margin-left: 54px;
   }
 }
 
@@ -1835,6 +1732,8 @@ button {
   flex-direction: column;
   overflow: hidden;
   animation: panel-in var(--dg-duration-standard) ease-out;
+  /* On the base rule so shrinking back animates as well as growing. */
+  transition: width var(--dg-duration-standard) ease;
 }
 
 .dg-panel-overlay {
@@ -1857,6 +1756,18 @@ button {
 
   .dg-panel--x-wide {
     width: min(640px, calc(100vw - 24px));
+  }
+
+  /* Content-driven widths for a review surface: the panel opens at the
+     standard width and grows leftwards, one card column at a time, when the
+     tab in front has more to show. The transition is what makes that read as
+     the same panel making room rather than a new one opening. */
+  .dg-panel--cols-2 {
+    width: min(760px, calc(100vw - 24px));
+  }
+
+  .dg-panel--max {
+    width: min(1200px, calc(100vw - 24px));
   }
 }
 
@@ -2733,7 +2644,7 @@ button {
   display: flex;
   flex: 0 1 auto;
   min-width: 0;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-start;
   gap: 8px;
@@ -2741,8 +2652,7 @@ button {
 
 .dg-activity-search {
   position: relative;
-  flex: 0 1 220px;
-  min-width: 150px;
+  flex: 1 1 auto;
 }
 
 .dg-activity-search-icon {
@@ -2776,8 +2686,10 @@ button {
   flex-shrink: 0;
 }
 
+/* Content-sized: the period label is never clipped. */
 .dg-activity-period-label {
-  width: 210px;
+  width: auto;
+  flex: 0 0 auto;
 }
 
 .dg-activity-today {

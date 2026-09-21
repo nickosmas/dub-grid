@@ -227,12 +227,12 @@ describe("TabsLayout", () => {
     // Profile contributes ten: index, account, work, security, and the three
     // security flows split out of it (password, two-factor, sessions), plus
     // calendar subscription, notifications and privacy. People contributes
-    // its tab root and add form; Staff Profile deliberately lives above the
-    // tabs in the root stack.
-    expect(stackScreenMock).toHaveBeenCalledTimes(13);
+    // only its tab root: adding a person is a sheet over it, and Staff
+    // Profile deliberately lives above the tabs in the root stack.
+    expect(stackScreenMock).toHaveBeenCalledTimes(12);
     const requestsOptions = stackScreenMock.mock.calls[0]?.[0].options;
     const peopleOptions = stackScreenMock.mock.calls[1]?.[0].options;
-    const profileOptions = stackScreenMock.mock.calls[3]?.[0].options;
+    const profileOptions = stackScreenMock.mock.calls[2]?.[0].options;
 
     expect(stackScreenMock.mock.calls[0]?.[0]).toMatchObject({
       name: "index",
@@ -258,18 +258,7 @@ describe("TabsLayout", () => {
       },
     });
     expect(peopleOptions).not.toHaveProperty("headerLargeStyle");
-    // The People and Profile sections take large titles at every level, so
-    // their pushed screens opt in too, and follow the same no-background rule.
     expect(stackScreenMock.mock.calls[2]?.[0]).toMatchObject({
-      name: "add",
-      options: {
-        headerLargeTitle: true,
-        headerLargeTitleEnabled: true,
-        headerStyle: undefined,
-        title: "Add Person",
-      },
-    });
-    expect(stackScreenMock.mock.calls[3]?.[0]).toMatchObject({
       name: "index",
       options: {
         headerLargeTitle: false,
@@ -282,7 +271,7 @@ describe("TabsLayout", () => {
     });
     expect(profileOptions).not.toHaveProperty("headerLargeStyle");
     expect(profileOptions).not.toHaveProperty("headerRight");
-    expect(stackScreenMock.mock.calls.slice(4).map((call) => call[0]?.name)).toEqual([
+    expect(stackScreenMock.mock.calls.slice(3).map((call) => call[0]?.name)).toEqual([
       "account",
       "work",
       "security",

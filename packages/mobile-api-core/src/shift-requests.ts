@@ -107,6 +107,12 @@ type ShiftRequestNotificationEvent =
       requestType: "pickup" | "swap" | "calloff";
       approved: boolean;
       adminNote?: string;
+    }
+  | {
+      action: "shift_request_cancelled";
+      orgId: string;
+      requestId: string;
+      adminNote?: string;
     };
 
 // The dispatcher may return a structured result (e.g. { success, error }) or
@@ -481,10 +487,18 @@ export async function updateMobileShiftRequest(
       const { error } = await auth.userClient.rpc("cancel_shift_request", {
         p_request_id: requestId,
         p_emp_id: data.empId,
+        p_note: data.note || null,
       });
       if (error) {
         throw error;
       }
+
+      await deps.dispatchNotificationEvent(auth.user.id, {
+        action: "shift_request_cancelled",
+        orgId: auth.currentOrg.id,
+        requestId,
+        ...(data.note ? { adminNote: data.note } : {}),
+      });
       return;
     }
 

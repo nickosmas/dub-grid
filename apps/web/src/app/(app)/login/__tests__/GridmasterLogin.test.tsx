@@ -9,6 +9,12 @@ const toastError = vi.fn();
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace }) }));
 vi.mock("sonner", () => ({ toast: { error: (...args: unknown[]) => toastError(...args) } }));
+// The apex is a separate origin, so the links back to it carry the theme.
+// Defaults to undefined, matching next-themes before it has mounted.
+let mockTheme: string | undefined;
+vi.mock("next-themes", () => ({
+  useTheme: () => ({ theme: mockTheme, setTheme: vi.fn() }),
+}));
 vi.mock("@/components/RouteGuards", () => ({
   PublicRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
@@ -103,5 +109,37 @@ describe("GridmasterLogin recovery", () => {
     });
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("provider detail")).not.toBeInTheDocument();
+  });
+});
+
+describe("GridmasterLogin card and theme handover", () => {
+  beforeEach(() => {
+    mockTheme = undefined;
+  });
+
+  it("keeps the hydration marker on the card so no wrapper can shrink-wrap it", () => {
+    render(<GridmasterLogin />);
+    expect(screen.getByTestId("gridmaster-login")).toHaveClass("dg-auth-card");
+  });
+
+  it("hands the theme to the apex links, which live on another origin", () => {
+    mockTheme = "dark";
+    render(<GridmasterLogin />);
+    expect(screen.getByRole("link", { name: "Back to standard login" })).toHaveAttribute(
+      "href",
+      "http://localhost/login?theme=dark",
+    );
+    expect(screen.getByRole("link", { name: "Back to home" })).toHaveAttribute(
+      "href",
+      "http://localhost/?theme=dark",
+    );
+  });
+
+  it("leaves the apex links bare until next-themes has mounted", () => {
+    render(<GridmasterLogin />);
+    expect(screen.getByRole("link", { name: "Back to home" })).toHaveAttribute(
+      "href",
+      "http://localhost/",
+    );
   });
 });

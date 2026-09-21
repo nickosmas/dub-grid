@@ -77,13 +77,15 @@ const requestSchema = z
       orgId: z.string().uuid(),
       requestId: z.string().uuid(),
       approved: z.boolean(),
-      note: z.string().optional(),
+      note: z.string().trim().max(1000).optional(),
     }),
     z.object({
       action: z.literal("cancelShiftRequest"),
       orgId: z.string().uuid(),
       requestId: z.string().uuid(),
       empId: z.string().uuid(),
+      /** A manager's word to both people when withdrawing over the recipient's head. */
+      note: z.string().trim().max(1000).optional(),
     }),
   ])
   .superRefine((value, ctx) => {
@@ -148,7 +150,20 @@ async function fetchActorEmployeeId(
   return (data?.id as string | undefined) ?? null;
 }
 
-async function requireEmployeeAction(req: NextRequest, orgId: string, employeeId: string) {
+async function requireEmployeeAction(
+  req: NextRequest,
+  orgId: string,
+  employeeId: string,
+  options: {
+    /**
+     * Whether an approver may act for another employee. Withdrawing a
+     * request its recipient has not answered is an approver's call, on
+     * mobile and in the RPC alike, so the web route must not demand
+     * edit-shifts for it.
+     */
+    allowApprovers?: boolean;
+  } = {},
+) {
   const auth = await requireOrgPermissions(
     req,
     orgId,
@@ -168,7 +183,8 @@ async function requireEmployeeAction(req: NextRequest, orgId: string, employeeId
     auth.permissions.isGridmaster ||
     auth.permissions.isSuperAdmin ||
     auth.permissions.canManageEmployees ||
-    auth.permissions.canEditShifts;
+    auth.permissions.canEditShifts ||
+    (options.allowApprovers === true && auth.permissions.canApproveShiftRequests);
 
   if (!canActForOthers && actorEmployeeId !== employeeId) {
     return {
@@ -519,7 +535,9 @@ export async function POST(req: NextRequest) {
       }
 
       case "cancelShiftRequest": {
-        const auth = await requireEmployeeAction(req, data.orgId, data.empId);
+        const auth = await requireEmployeeAction(req, data.orgId, data.empId, {
+          allowApprovers: true,
+        });
         if ("response" in auth) {
           return auth.response;
         }
@@ -527,10 +545,18 @@ export async function POST(req: NextRequest) {
         const { error } = await auth.userClient.rpc("cancel_shift_request", {
           p_request_id: data.requestId,
           p_emp_id: data.empId,
+          p_note: data.note || null,
         });
         if (error) {
           throw error;
         }
+
+        await dispatchNotificationEvent(auth.actor.id, {
+          action: "shift_request_cancelled",
+          orgId: data.orgId,
+          requestId: data.requestId,
+          ...(data.note ? { adminNote: data.note } : {}),
+        });
 
         return NextResponse.json({ success: true });
       }

@@ -25,6 +25,17 @@ const REPORT_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
   timeZone: "UTC",
 });
+// Submitted and decided instants, in UTC like every other report date: the
+// export is read across time zones and a bare wall-clock time would lie.
+const REPORT_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  timeZone: "UTC",
+  timeZoneName: "short",
+});
 
 const REPORT_NUMBER_FORMATTER = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 2,
@@ -106,6 +117,18 @@ function formatMissingCertification(value: boolean): string {
 
 function formatMissingRole(value: boolean): string {
   return value ? "Missing role" : "Role assigned";
+}
+
+function formatReportTimestampForDisplay(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return REPORT_TIMESTAMP_FORMATTER.format(date);
+}
+
+function formatNoticeHours(value: number | null): string {
+  if (value == null) return "-";
+  if (value < 0) return `${formatReportNumber(Math.abs(value))} hours after start`;
+  return `${formatReportNumber(value)} ${value === 1 ? "hour" : "hours"} before`;
 }
 
 function formatResolutionHours(value: number | null): string {
@@ -298,18 +321,46 @@ export function buildOperationsReportPreviewTable(
         columns: [
           { label: "Request type" },
           { label: "Request status" },
-          { label: "Requested by" },
-          { label: "Requested with" },
-          { label: "Shift date" },
+          { label: "Requester" },
+          { label: "Requester's shift date" },
+          { label: "Requester's shift" },
+          { label: "Requester's job" },
+          { label: "Requester's focus area" },
+          { label: "Requester's time" },
+          { label: "Teammate" },
+          { label: "Teammate's shift date" },
+          { label: "Teammate's shift" },
+          { label: "Teammate's job" },
+          { label: "Teammate's focus area" },
+          { label: "Teammate's time" },
+          { label: "Absence type" },
+          { label: "Submitted" },
+          { label: "Decided" },
+          { label: "Decided by" },
           { label: "Time to resolution" },
+          { label: "Manager note" },
         ],
         rows: payload.reports.shiftRequests.map((row) => [
           formatKnownReportValue(row.type),
           formatKnownReportValue(row.status),
           row.requester,
-          formatListValue(row.target, "No teammate"),
           formatReportDateForDisplay(row.requesterShiftDate),
+          formatListValue(row.requesterShift, "-"),
+          formatListValue(row.requesterJobs, "-"),
+          formatListValue(row.requesterFocusArea, "-"),
+          formatListValue(row.requesterTime, "-"),
+          formatListValue(row.target, "No teammate"),
+          row.targetShiftDate ? formatReportDateForDisplay(row.targetShiftDate) : "-",
+          formatListValue(row.targetShift, "-"),
+          formatListValue(row.targetJobs, "-"),
+          formatListValue(row.targetFocusArea, "-"),
+          formatListValue(row.targetTime, "-"),
+          formatListValue(row.absenceType, "-"),
+          formatReportTimestampForDisplay(row.createdAt),
+          row.resolvedAt ? formatReportTimestampForDisplay(row.resolvedAt) : "-",
+          formatListValue(row.decidedBy, "-"),
           formatResolutionHours(row.resolutionHours),
+          formatListValue(row.managerNote, "-"),
         ]),
         emptyText: "No matching requests for this range.",
       };
@@ -322,6 +373,13 @@ export function buildOperationsReportPreviewTable(
           { label: "Schedule date" },
           { label: "Absence type" },
           { label: "Status" },
+          { label: "Dropped shift" },
+          { label: "Shift time" },
+          { label: "Called off at" },
+          { label: "Notice given" },
+          { label: "Decided" },
+          { label: "Decided by" },
+          { label: "Manager note" },
         ],
         rows: payload.reports.absencesCalloffs.map((row) => [
           formatKnownReportValue(row.kind),
@@ -329,8 +387,15 @@ export function buildOperationsReportPreviewTable(
           formatReportDateForDisplay(row.date),
           formatListValue(row.absenceType, "No absence type"),
           formatKnownReportValue(row.status),
+          formatListValue(row.droppedShift, "-"),
+          formatListValue(row.droppedShiftTime, "-"),
+          row.submittedAt ? formatReportTimestampForDisplay(row.submittedAt) : "-",
+          formatNoticeHours(row.noticeHours),
+          row.decidedAt ? formatReportTimestampForDisplay(row.decidedAt) : "-",
+          formatListValue(row.decidedBy, "-"),
+          formatListValue(row.managerNote, "-"),
         ]),
-        emptyText: "No absences or approved call-offs for this range.",
+        emptyText: "No absences or call-offs for this range.",
       };
     case "roster-status":
       return {
@@ -518,15 +583,63 @@ export function buildOperationsReportMetrics(
         { label: "Requests", value: String(summary.requestCount) },
         { label: "Overtime alerts", value: String(summary.overtimeAlertCount) },
       ];
-    case "shift-requests":
-      return [{ label: "Requests", value: String(payload.reports.shiftRequests.length) }];
-    case "absences-calloffs":
+    case "shift-requests": {
+      const rows = payload.reports.shiftRequests;
+      const count = (predicate: (row: (typeof rows)[number]) => boolean) =>
+        String(rows.filter(predicate).length);
+      const decided = rows.filter((row) => row.resolutionHours != null);
+      const averageHours =
+        decided.length === 0
+          ? null
+          : decided.reduce((total, row) => total + (row.resolutionHours ?? 0), 0) / decided.length;
       return [
+        { label: "Requests", value: String(rows.length) },
+        { label: "Approved", value: count((row) => row.status === "approved") },
+        { label: "Rejected", value: count((row) => row.status === "rejected") },
         {
-          label: "Absences and call-offs",
-          value: String(payload.reports.absencesCalloffs.length),
+          label: "Cancelled or expired",
+          value: count((row) => row.status === "cancelled" || row.status === "expired"),
+        },
+        {
+          label: "Still open",
+          value: count((row) => row.status === "open" || row.status === "pending_approval"),
+        },
+        { label: "Pickups", value: count((row) => row.type === "pickup") },
+        { label: "Swaps", value: count((row) => row.type === "swap") },
+        { label: "Call-offs", value: count((row) => row.type === "calloff") },
+        {
+          label: "Average time to resolution",
+          value:
+            averageHours == null ? "-" : formatResolutionHours(Math.round(averageHours * 10) / 10),
         },
       ];
+    }
+    case "absences-calloffs": {
+      const rows = payload.reports.absencesCalloffs;
+      const calloffs = rows.filter((row) => row.kind === "calloff");
+      const noticed = calloffs.filter((row) => row.noticeHours != null);
+      const averageNotice =
+        noticed.length === 0
+          ? null
+          : noticed.reduce((total, row) => total + (row.noticeHours ?? 0), 0) / noticed.length;
+      return [
+        { label: "Published absences", value: String(rows.length - calloffs.length) },
+        { label: "Call-offs", value: String(calloffs.length) },
+        {
+          label: "Call-offs approved",
+          value: String(calloffs.filter((row) => row.status === "approved").length),
+        },
+        {
+          label: "Called off under 24h before",
+          value: String(noticed.filter((row) => (row.noticeHours ?? 0) < 24).length),
+        },
+        {
+          label: "Average notice",
+          value:
+            averageNotice == null ? "-" : formatNoticeHours(Math.round(averageNotice * 10) / 10),
+        },
+      ];
+    }
     case "roster-status":
       return [
         { label: "Staff records", value: String(payload.reports.rosterStatus.length) },

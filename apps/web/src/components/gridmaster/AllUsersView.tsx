@@ -394,7 +394,7 @@ export default function AllUsersView({
               { value: "user", label: "User" },
             ]}
             onChange={setRoleFilter}
-            style={{ width: "auto", minWidth: 140 }}
+            style={{ flex: "1 1 auto" }}
             fontSize={12}
           />
           <CustomSelect
@@ -404,7 +404,7 @@ export default function AllUsersView({
               ...organizations.map((c) => ({ value: c.id, label: c.name })),
             ]}
             onChange={setOrgFilter}
-            style={{ width: "auto", minWidth: 160 }}
+            style={{ flex: "1 1 auto" }}
             fontSize={12}
           />
           <CustomSelect
@@ -417,7 +417,7 @@ export default function AllUsersView({
               { value: "inactive", label: "Never Logged In" },
             ]}
             onChange={setStatusFilter}
-            style={{ width: "auto", minWidth: 150 }}
+            style={{ flex: "1 1 auto" }}
             fontSize={12}
           />
           {(search || roleFilter !== "all" || orgFilter !== "all" || statusFilter !== "all") && (

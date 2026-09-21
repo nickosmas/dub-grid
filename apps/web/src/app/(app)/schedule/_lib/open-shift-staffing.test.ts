@@ -127,6 +127,12 @@ describe("buildOpenShiftStaffingCandidates", () => {
     });
     expect(candidates).toHaveLength(1);
     expect(candidates[0].options.map((option) => option.assignmentIds)).toEqual([[100], [101]]);
+    expect(candidates[0].options[0]).toEqual({
+      assignmentIds: [100],
+      alignedTimeRanges: [{ start: "07:00", end: "15:00" }],
+      timeRanges: [{ start: "07:00", end: "15:00" }],
+      alignedCustomTimeRanges: [null],
+    });
   });
 
   it("excludes inactive, wrong-area, and AND-rule role or certification mismatches", () => {
@@ -296,6 +302,34 @@ describe("buildOpenShiftStaffingCandidates", () => {
     });
     expect(candidates.map((candidate) => candidate.employee.id)).toEqual(["qualified"]);
     expect(candidates[0].options[0].assignmentIds).toEqual([100, 101]);
+    expect(candidates[0].options[0].alignedCustomTimeRanges).toEqual([null, null]);
+  });
+
+  it("carries only the calloff's own custom times as custom, resolving the rest for conflicts", () => {
+    const candidates = buildOpenShiftStaffingCandidates({
+      ...baseContext,
+      openShift: gap({
+        source: "calloff",
+        assignmentIds: [100, 101],
+        eligibleAssignmentDefinitionIds: undefined,
+        customStartTime: "|16:00",
+        customEndTime: "|22:00",
+      }),
+      employees: [employee()],
+      scheduleByEmployeeId: new Map(),
+    });
+    expect(candidates[0].options[0]).toEqual({
+      assignmentIds: [100, 101],
+      alignedTimeRanges: [
+        { start: "07:00", end: "15:00" },
+        { start: "16:00", end: "22:00" },
+      ],
+      timeRanges: [
+        { start: "07:00", end: "15:00" },
+        { start: "16:00", end: "22:00" },
+      ],
+      alignedCustomTimeRanges: [null, { start: "16:00", end: "22:00" }],
+    });
   });
 });
 
@@ -348,6 +382,7 @@ describe("buildStaffedOpenShiftInput", () => {
           assignmentIds: [100],
           alignedTimeRanges: [{ start: "07:00", end: "15:00" }],
           timeRanges: [{ start: "07:00", end: "15:00" }],
+          alignedCustomTimeRanges: [null],
         },
       }),
     ).toEqual({
@@ -357,11 +392,44 @@ describe("buildStaffedOpenShiftInput", () => {
         { shiftId: 1, jobId: 10, position: 1, isMentored: false },
       ],
       absenceTypeId: null,
-      customStartTime: "16:00|07:00",
-      customEndTime: "22:00|15:00",
+      customStartTime: "16:00|",
+      customEndTime: "22:00|",
       seriesId: "series-1",
       fromRecurring: true,
     });
+  });
+
+  it("writes a calloff's custom time as custom and a default time as nothing", () => {
+    expect(
+      buildStaffedOpenShiftInput({
+        ...baseContext,
+        existingState: null,
+        option: {
+          assignmentIds: [100, 101],
+          alignedTimeRanges: [
+            { start: "07:00", end: "15:00" },
+            { start: "16:00", end: "22:00" },
+          ],
+          timeRanges: [
+            { start: "07:00", end: "15:00" },
+            { start: "16:00", end: "22:00" },
+          ],
+          alignedCustomTimeRanges: [null, { start: "16:00", end: "22:00" }],
+        },
+      }),
+    ).toMatchObject({ customStartTime: "|16:00", customEndTime: "|22:00" });
+    expect(
+      buildStaffedOpenShiftInput({
+        ...baseContext,
+        existingState: null,
+        option: {
+          assignmentIds: [100],
+          alignedTimeRanges: [{ start: "07:00", end: "15:00" }],
+          timeRanges: [{ start: "07:00", end: "15:00" }],
+          alignedCustomTimeRanges: [null],
+        },
+      }),
+    ).toMatchObject({ customStartTime: null, customEndTime: null });
   });
 
   it("replaces an absence with staffed work but refuses an unresolved assignment", () => {
@@ -377,7 +445,12 @@ describe("buildStaffedOpenShiftInput", () => {
       buildStaffedOpenShiftInput({
         ...baseContext,
         existingState: absence,
-        option: { assignmentIds: [100], alignedTimeRanges: [null], timeRanges: [] },
+        option: {
+          assignmentIds: [100],
+          alignedTimeRanges: [null],
+          timeRanges: [],
+          alignedCustomTimeRanges: [null],
+        },
       }),
     ).toEqual({
       kind: "worked",
@@ -392,7 +465,12 @@ describe("buildStaffedOpenShiftInput", () => {
       buildStaffedOpenShiftInput({
         ...baseContext,
         existingState: null,
-        option: { assignmentIds: [999], alignedTimeRanges: [null], timeRanges: [] },
+        option: {
+          assignmentIds: [999],
+          alignedTimeRanges: [null],
+          timeRanges: [],
+          alignedCustomTimeRanges: [null],
+        },
       }),
     ).toBeNull();
   });

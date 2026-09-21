@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import { buildCoverageWash } from "./coverage-wash";
 
 describe("buildCoverageWash", () => {
-  it("is absent when coverage is not configured", () => {
-    expect(buildCoverageWash(null, false)).toBeNull();
+  it("is the brand aurora when coverage is not configured", () => {
+    expect(buildCoverageWash(null, false)).toEqual(buildCoverageWash(100, false));
+    expect(buildCoverageWash(null, true)).toEqual(buildCoverageWash(100, true));
   });
 
   it("is the brand aurora when coverage is normal: blue says nothing is wrong", () => {

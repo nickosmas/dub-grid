@@ -139,7 +139,7 @@ describe("LoginScreen", () => {
     expect(screen.getByText(/Continue to/)).toBeInTheDocument();
     expect(screen.getByText("DubGrid Health")).toBeInTheDocument();
     expect(screen.queryByText("dubgrid-health")).not.toBeInTheDocument();
-    const primaryAction = screen.getByRole("button", { name: "Sign In" });
+    const primaryAction = screen.getByRole("button", { name: "Sign in" });
     const switchOrganization = screen.getByRole("button", { name: "Switch organization" });
     const forgotPassword = screen.getByRole("button", { name: "Forgot password?" });
     expect(primaryAction.compareDocumentPosition(switchOrganization)).toBe(
@@ -426,7 +426,7 @@ describe("LoginScreen", () => {
     fireEvent.change(passwordInput, {
       target: { value: "super-secret" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
     await waitFor(() => {
       expect(loginToOrganization).toHaveBeenCalledWith({
@@ -479,7 +479,7 @@ describe("LoginScreen", () => {
     fireEvent.change(screen.getByPlaceholderText("Password"), {
       target: { value: "super-secret" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
     // A failed warm-up is the tab gate's problem to report, not a reason to
     // strand the user on the login form with a session already stored.
@@ -549,7 +549,7 @@ describe("LoginScreen", () => {
     fireEvent.change(screen.getByPlaceholderText("Password"), {
       target: { value: "super-secret" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
     expect(await screen.findByText("Two-factor authentication")).toBeInTheDocument();
     expect(setSession).not.toHaveBeenCalled();
@@ -557,7 +557,7 @@ describe("LoginScreen", () => {
     fireEvent.change(screen.getByLabelText("Verification code"), {
       target: { value: "123456" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Verify and Sign In" }));
+    fireEvent.click(screen.getByRole("button", { name: "Verify and sign in" }));
 
     await waitFor(() => {
       expect(verifyMobileTotpFactor).toHaveBeenCalledWith({
@@ -627,13 +627,13 @@ describe("LoginScreen", () => {
     fireEvent.change(screen.getByPlaceholderText("Password"), {
       target: { value: "super-secret" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
     await screen.findByText("Two-factor authentication");
 
     fireEvent.change(screen.getByLabelText("Verification code"), {
       target: { value: "123456" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Verify and Sign In" }));
+    fireEvent.click(screen.getByRole("button", { name: "Verify and sign in" }));
 
     expect(await screen.findByText("That code didn't match")).toBeInTheDocument();
     expect(setSession).not.toHaveBeenCalled();
@@ -664,7 +664,7 @@ describe("LoginScreen", () => {
     fireEvent.change(screen.getByPlaceholderText("Password"), {
       target: { value: "wrong-password" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
     expect(
       await screen.findByText("Check your email and password and try again."),
@@ -690,7 +690,7 @@ describe("LoginScreen", () => {
     fireEvent.change(screen.getByPlaceholderText("Password"), {
       target: { value: "super-secret" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
     fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     expect(loginToOrganization).toHaveBeenCalledTimes(1);
@@ -720,12 +720,12 @@ describe("LoginScreen", () => {
     fireEvent.change(screen.getByPlaceholderText("Password"), {
       target: { value: "super-secret" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
     await screen.findByText("Two-factor authentication");
     fireEvent.change(screen.getByLabelText("Verification code"), {
       target: { value: "123456" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Verify and Sign In" }));
+    fireEvent.click(screen.getByRole("button", { name: "Verify and sign in" }));
 
     await waitFor(() => expect(verifyMobileTotpFactor).toHaveBeenCalledTimes(1));
     expect(screen.getByLabelText("Verification code")).toHaveValue("123456");
@@ -795,7 +795,7 @@ describe("LoginScreen", () => {
     fireEvent.change(screen.getByPlaceholderText("Password"), {
       target: { value: "wrong-password" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
     await waitFor(() => {
       expect(pushToast).toHaveBeenCalledWith({
@@ -857,7 +857,7 @@ describe("LoginScreen", () => {
       target: { value: "super-secret" },
     });
     vi.useFakeTimers();
-    fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(15_000);
@@ -870,6 +870,6 @@ describe("LoginScreen", () => {
       dedupeKey: "network-connection-error",
     });
     expect(routerReplace).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Sign In" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeEnabled();
   });
 });

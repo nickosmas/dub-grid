@@ -2911,7 +2911,7 @@ function AvailableShiftActionCard({
         ) : (
           <AsyncActionButton
             disabled={!volunteerInput}
-            label="Volunteer"
+            label="Claim"
             onClick={() =>
               volunteerInput
                 ? onVolunteer(

@@ -21,6 +21,12 @@ export type NotificationEvent =
       accepted: boolean;
     }
   | {
+      action: "shift_request_cancelled";
+      orgId: string;
+      requestId: string;
+      adminNote?: string;
+    }
+  | {
       action: "shift_request_resolved";
       orgId: string;
       requestId: string;
@@ -628,6 +634,43 @@ async function dispatchNotificationEventInternal(
             action: "view_request",
             tab: "mine",
           },
+        );
+      }
+      return;
+    }
+
+    // Withdrawing a request tells whoever did not do the withdrawing: the
+    // requester when a manager cancelled over their head, and the person it
+    // was aimed at, whose answer is no longer wanted. The note rides along.
+    case "shift_request_cancelled": {
+      const requestInfo = await getRequestInfo(event.requestId);
+      const typeLabel = getShiftRequestTypeLabel(requestInfo.requestType ?? "swap");
+      const noteText = event.adminNote ? ` Note: ${event.adminNote}` : "";
+      const metadata = {
+        requestId: event.requestId,
+        requestType: requestInfo.requestType ?? "swap",
+        action: "view_request",
+        tab: "mine",
+      } as const;
+      const { requesterUserId, targetUserId } = requestInfo;
+      if (requesterUserId && requesterUserId !== actorUserId) {
+        await sendNotification(
+          requesterUserId,
+          event.orgId,
+          "shift_request_rejected",
+          "Request cancelled",
+          `Your ${typeLabel} request was cancelled by a manager.${noteText}`,
+          metadata,
+        );
+      }
+      if (targetUserId && targetUserId !== requesterUserId && targetUserId !== actorUserId) {
+        await sendNotification(
+          targetUserId,
+          event.orgId,
+          "shift_request_rejected",
+          `${capitalize(typeLabel)} cancelled`,
+          `${requestInfo.requesterName}'s ${typeLabel} request was cancelled.${noteText}`,
+          metadata,
         );
       }
       return;

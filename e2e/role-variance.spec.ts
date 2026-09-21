@@ -147,7 +147,7 @@ async function expectBootstrapStates(page: Page, path: string) {
   });
   await page.goto(`${QA_CALM_HAVEN_ORIGIN}${path}`);
   await expect(
-    page.getByRole("heading", { name: "Loading your workspace" }),
+    page.getByRole("heading", { name: "Loading your organization" }),
     `${path} recovery`,
   ).toBeVisible({ timeout: 15_000 });
   // The heading shows from the first attempt now (F-68); the retry button

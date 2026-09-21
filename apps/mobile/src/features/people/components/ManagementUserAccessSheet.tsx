@@ -1,7 +1,6 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 import type { MobileDepartment, MobileManagementUser } from "@dubgrid/contracts";
-import { AppText } from "../../../shared/components/AppText";
 import {
   BottomSheetModal,
   SheetActions,
@@ -10,13 +9,12 @@ import {
 import { Button } from "../../../shared/components/Button";
 import { getMobileEditorDismissLabel } from "@dubgrid/design-tokens";
 import { InlineError } from "../../../shared/components/InlineError";
-import { Chip } from "../../../shared/components/Chip";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { SectionNotice } from "./SectionNotice";
 import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
 import { MANAGEMENT_DEPARTMENT_LABELS } from "../../../shared/lib/departments";
-import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileSpace, type MobileColors } from "../../../shared/theme/tokens";
+import { ProfileChoiceGroup } from "../../profile/components/ProfilePrimitives";
+import { mobileSpace } from "../../../shared/theme/tokens";
 import type { ManagementAccessRole } from "../lib/managementAccess";
 
 type Draft = {
@@ -75,9 +73,6 @@ export function ManagementUserAccessSheet({
    */
   overlay?: ReactNode;
 }) {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-
   function seed(): Draft {
     return {
       orgRole: managementUser.orgRole ?? "user",
@@ -157,7 +152,7 @@ export function ManagementUserAccessSheet({
             primaryAction={
               <Button
                 disabled={!canSubmit}
-                label="Save Access"
+                label="Save access"
                 loading={isPending}
                 onPress={submitDraft}
                 tone="primary"
@@ -192,44 +187,32 @@ export function ManagementUserAccessSheet({
         {/* A consequence of the save, so it is raised once for the sheet
               rather than sitting under the chips that produced it. */}
         <SectionNotice messages={removalNotices} />
-        <View style={styles.field}>
-          <AppText tone="secondary" variant="label">
-            {MANAGEMENT_DEPARTMENT_LABELS.plural}
-          </AppText>
-          <View style={styles.chipRow}>
-            {managementDepartments.map((department) => (
-              <Chip
-                key={department.id}
-                label={department.abbr || department.name}
-                onPress={() =>
-                  setDraft((current) => ({
-                    ...current,
-                    managementDepartmentIds: current.managementDepartmentIds.includes(department.id)
-                      ? current.managementDepartmentIds.filter((id) => id !== department.id)
-                      : [...current.managementDepartmentIds, department.id],
-                  }))
-                }
-                selected={draft.managementDepartmentIds.includes(department.id)}
-              />
-            ))}
-          </View>
-        </View>
+        {/* The same ring-and-check list the management-access sheet uses,
+            one row per department with its full name. */}
+        <ProfileChoiceGroup
+          items={managementDepartments.map((department) => ({
+            id: department.id,
+            name: department.name,
+            disabled: isPending,
+          }))}
+          label={MANAGEMENT_DEPARTMENT_LABELS.plural}
+          selectedIds={draft.managementDepartmentIds}
+          onToggle={(id) =>
+            setDraft((current) => ({
+              ...current,
+              managementDepartmentIds: current.managementDepartmentIds.includes(id)
+                ? current.managementDepartmentIds.filter((value) => value !== id)
+                : [...current.managementDepartmentIds, id],
+            }))
+          }
+        />
       </View>
     </BottomSheetModal>
   );
 }
 
-const createStyles = (_mobileColors: MobileColors) =>
-  StyleSheet.create({
-    body: {
-      gap: mobileSpace.lg,
-    },
-    field: {
-      gap: mobileSpace.sm,
-    },
-    chipRow: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: mobileSpace.xs,
-    },
-  });
+const styles = StyleSheet.create({
+  body: {
+    gap: mobileSpace.lg,
+  },
+});

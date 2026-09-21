@@ -35,6 +35,7 @@ import { Screen } from "../../../shared/components/Screen";
 import { getScreenGutter } from "../../../shared/components/screen-layout";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
+import { useModalHandoff } from "../../../shared/hooks/useModalHandoff";
 import { SegmentedControl } from "../../../shared/components/SegmentedControl";
 import {
   getAdminProfileChangeRequests,
@@ -69,6 +70,8 @@ import {
 } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
+import { AddPersonKindSheet, type AddPersonKind } from "../components/AddPersonKindSheet";
+import { AddPersonSheet } from "../components/AddPersonSheet";
 import { ManagementUserActionsSheet } from "../components/ManagementUserActionsSheet";
 import { ManagementUserInviteSheet } from "../components/ManagementUserInviteSheet";
 import { PersonListSkeleton } from "../components/PersonListSkeleton";
@@ -189,8 +192,11 @@ export default function PeopleScreen() {
   );
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
   const [rosterTab, setRosterTab] = useState<RosterTab>("schedule");
+  const [showAddPersonKind, setShowAddPersonKind] = useState(false);
+  const [showAddPerson, setShowAddPerson] = useState(false);
   const [showInviteManagementUser, setShowInviteManagementUser] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
+  const handoff = useModalHandoff();
   /** The roster row whose actions sheet is open, for rows with no staff profile. */
   const [managementUserActions, setManagementUserActions] = useState<MobileManagementUser | null>(
     null,
@@ -348,6 +354,20 @@ export default function PeopleScreen() {
   // hides it for orgs with no management departments for the same reason.
   const canSeeManagementRoster =
     (canManageManagementAccess || canManageEmployees) && managementDepartments.length > 0;
+  // Mirrors web's Add menu: both kinds ask which, one kind goes straight there.
+  const canAddScheduled = canManageEmployees;
+  const canAddManagement = canManageManagementAccess && managementDepartments.length > 0;
+  const canGrantSuperAdmin = bootstrapQuery.data?.effectiveRole === "super_admin";
+
+  function openAddPersonKind(kind: AddPersonKind) {
+    if (kind === "scheduled") setShowAddPerson(true);
+    else setShowInviteManagementUser(true);
+  }
+
+  function openAddPerson() {
+    if (canAddScheduled && canAddManagement) setShowAddPersonKind(true);
+    else openAddPersonKind(canAddScheduled ? "scheduled" : "management");
+  }
   const managementUsers = managementUsersQuery.data?.managementUsers ?? [];
   const isManagementTab = rosterTab === "management" && canSeeManagementRoster;
   const currentUserId = bootstrapQuery.data?.user?.id ?? null;
@@ -914,18 +934,8 @@ export default function PeopleScreen() {
             expanded={isFilterModalVisible}
             onPress={() => setIsFilterModalVisible(true)}
           />
-          {isManagementTab ? (
-            canManageManagementAccess ? (
-              <AddPersonButton
-                accessibilityLabel="Invite management user"
-                onPress={() => setShowInviteManagementUser(true)}
-              />
-            ) : null
-          ) : canManageEmployees ? (
-            <AddPersonButton
-              accessibilityLabel="Add person"
-              onPress={() => router.push("/people/add")}
-            />
+          {canAddScheduled || canAddManagement ? (
+            <AddPersonButton accessibilityLabel="Add person" onPress={openAddPerson} />
           ) : null}
         </View>
       </View>
@@ -1049,7 +1059,18 @@ export default function PeopleScreen() {
         onDismiss={() => setManagementUserActions(null)}
       />
 
+      <AddPersonKindSheet
+        onDismiss={() => setShowAddPersonKind(false)}
+        onSelect={(kind) => {
+          // One sheet at a time: the chooser leaves first, then the form.
+          setShowAddPersonKind(false);
+          handoff(() => openAddPersonKind(kind));
+        }}
+        visible={showAddPersonKind}
+      />
+      <AddPersonSheet onDismiss={() => setShowAddPerson(false)} visible={showAddPerson} />
       <ManagementUserInviteSheet
+        canGrantSuperAdmin={canGrantSuperAdmin}
         error={inviteError}
         isPending={inviteManagementUserMutation.isPending}
         managementDepartments={managementDepartments}
@@ -1140,6 +1161,8 @@ function AddPersonButton({
   );
 }
 
+const PERSON_ROW_INSET = mobileSpace.sm;
+
 function PersonRow({
   id,
   avatarSeed,
@@ -1175,47 +1198,53 @@ function PersonRow({
       .join("") || "?";
 
   return (
-    <PressableRow
-      accessibilityLabel={name}
-      disabled={!navigable}
-      onPress={onPress}
-      style={[styles.personRow, !isLast && styles.personRowDivider]}
-    >
-      <View
-        style={[
-          styles.personAvatar,
-          {
-            backgroundColor: avatarTone.backgroundColor,
-            borderColor: avatarTone.borderColor,
-          },
-        ]}
+    <View style={!isLast && styles.personRowDivider}>
+      <PressableRow
+        accessibilityLabel={name}
+        disabled={!navigable}
+        onPress={onPress}
+        style={styles.personRow}
       >
-        <Text fit="fixed" style={[styles.personAvatarText, { color: avatarTone.textColor }]}>
-          {initials}
-        </Text>
-      </View>
-      <View style={styles.personCopy}>
-        <View style={styles.personNameRow}>
-          <Text numberOfLines={1} style={styles.personName}>
-            {name}
+        <View
+          style={[
+            styles.personAvatar,
+            {
+              backgroundColor: avatarTone.backgroundColor,
+              borderColor: avatarTone.borderColor,
+            },
+          ]}
+        >
+          <Text fit="fixed" style={[styles.personAvatarText, { color: avatarTone.textColor }]}>
+            {initials}
           </Text>
-          {orgRoleBadge ? (
-            <View style={orgRoleBadge.containerStyle}>
-              <MaterialCommunityIcons color={orgRoleBadge.textStyle.color} name="star" size={13} />
-              <Text fit="compact" style={orgRoleBadge.textStyle}>
-                {orgRoleBadge.label}
-              </Text>
-            </View>
-          ) : null}
         </View>
-        <Text numberOfLines={1} style={styles.personSubtitle}>
-          {subtitle}
-        </Text>
-      </View>
-      {navigable ? (
-        <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={22} />
-      ) : null}
-    </PressableRow>
+        <View style={styles.personCopy}>
+          <View style={styles.personNameRow}>
+            <Text numberOfLines={1} style={styles.personName}>
+              {name}
+            </Text>
+            {orgRoleBadge ? (
+              <View style={orgRoleBadge.containerStyle}>
+                <MaterialCommunityIcons
+                  color={orgRoleBadge.textStyle.color}
+                  name="star"
+                  size={13}
+                />
+                <Text fit="compact" style={orgRoleBadge.textStyle}>
+                  {orgRoleBadge.label}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+          <Text numberOfLines={1} style={styles.personSubtitle}>
+            {subtitle}
+          </Text>
+        </View>
+        {navigable ? (
+          <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={22} />
+        ) : null}
+      </PressableRow>
+    </View>
   );
 }
 
@@ -1272,13 +1301,22 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       overflow: "hidden",
       borderRadius: mobileRadii.card - 1,
     },
+    // The highlight bleeds past the content on both sides and rounds off,
+    // rather than sitting as a square block flush with the text. The inset
+    // is given back as padding so the row stays on the gutter line, and
+    // `overflow: hidden` is what clips the Android ripple to the radius.
     personRow: {
       alignItems: "center",
+      borderRadius: mobileRadii.control,
       flexDirection: "row",
       gap: 8,
+      marginHorizontal: -PERSON_ROW_INSET,
       minHeight: 76,
+      overflow: "hidden",
+      paddingHorizontal: PERSON_ROW_INSET,
       paddingVertical: 12,
     },
+    // On the wrapper, so the rounded row does not clip the hairline.
     personRowDivider: {
       borderBottomColor: mobileColors.borderSubtle,
       borderBottomWidth: StyleSheet.hairlineWidth,

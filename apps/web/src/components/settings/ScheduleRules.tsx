@@ -227,7 +227,6 @@ export default function ScheduleRules({
               { value: 50, label: "Counts as half" },
               { value: 0, label: "Does not count" },
             ]}
-            style={{ maxWidth: 260, width: "100%" }}
           />
         </div>
 
@@ -247,7 +246,6 @@ export default function ScheduleRules({
             value={coverageGapVisibility}
             onChange={setCoverageGapVisibility}
             options={visibilityOptions}
-            style={{ maxWidth: 320, width: "100%" }}
           />
         </div>
 
@@ -267,7 +265,6 @@ export default function ScheduleRules({
             value={calloffVisibility}
             onChange={setCalloffVisibility}
             options={visibilityOptions}
-            style={{ maxWidth: 320, width: "100%" }}
           />
         </div>
 

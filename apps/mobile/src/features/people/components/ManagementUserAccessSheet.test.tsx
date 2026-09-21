@@ -69,13 +69,13 @@ describe("ManagementUserAccessSheet", () => {
   it("hands an emptied selection to onRemove rather than saving it", () => {
     const { onRemove, onSubmit } = renderSheet();
 
-    fireEvent.click(screen.getByText("OPS"));
+    fireEvent.click(screen.getByText("Operations"));
 
     expect(
       screen.getByText("Saving now takes them off the management roster."),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save access" }));
 
     expect(onRemove).toHaveBeenCalledOnce();
     expect(onSubmit).not.toHaveBeenCalled();
@@ -84,7 +84,7 @@ describe("ManagementUserAccessSheet", () => {
   it("says an emptied invitation is being revoked instead", () => {
     renderSheet({ source: "pending_invite", userId: null, invitationId: "inv-1" });
 
-    fireEvent.click(screen.getByText("OPS"));
+    fireEvent.click(screen.getByText("Operations"));
 
     expect(
       screen.getByText("Saving now revokes their pending management invitation."),
@@ -94,8 +94,8 @@ describe("ManagementUserAccessSheet", () => {
   it("still saves an ordinary department change through onSubmit", () => {
     const { onRemove, onSubmit } = renderSheet();
 
-    fireEvent.click(screen.getByText("FAC"));
-    fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
+    fireEvent.click(screen.getByText("Facilities"));
+    fireEvent.click(screen.getByRole("button", { name: "Save access" }));
 
     expect(onRemove).not.toHaveBeenCalled();
     expect(onSubmit).toHaveBeenCalledWith({
@@ -109,7 +109,7 @@ describe("ManagementUserAccessSheet", () => {
   it("holds Save until something actually changes", () => {
     const { onRemove, onSubmit } = renderSheet();
 
-    fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save access" }));
 
     expect(onRemove).not.toHaveBeenCalled();
     expect(onSubmit).not.toHaveBeenCalled();

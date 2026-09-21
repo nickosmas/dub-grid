@@ -504,7 +504,6 @@ export function BillingTab({ organization }: { organization: Organization }) {
                 value: nextStatus,
                 label: formatBillingStatusLabel(nextStatus),
               }))}
-              style={{ width: 180 }}
               height={34}
               fontSize="var(--dg-fs-label)"
             />

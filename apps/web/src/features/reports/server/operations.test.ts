@@ -276,7 +276,10 @@ describe("operations reports", () => {
       type: "calloff",
       status: "approved",
       requester: "Avery Ng",
+      absenceType: "Sick",
       resolutionHours: 2.5,
+      decidedBy: "",
+      managerNote: "",
     });
     expect(payload.reports.absencesCalloffs).toEqual(
       expect.arrayContaining([
@@ -440,11 +443,67 @@ describe("operations reports", () => {
     ]);
   });
 
+  it("reports when a call-off was made and how much notice it gave, in the org's time zone", () => {
+    const source = buildSource({
+      shiftCategories: [
+        { id: 60, name: "Day", focus_area_id: 10, start_time: "07:00:00", end_time: "15:30:00" },
+      ],
+      shiftRequests: [
+        {
+          ...buildSource().shiftRequests[0],
+          // 7:00 AM Pacific on May 3 is 14:00 UTC; submitted 20 hours before.
+          created_at: "2026-05-02T18:00:00.000Z",
+          resolved_at: "2026-05-02T19:00:00.000Z",
+          admin_note: "Feel better",
+          requester_state: {
+            kind: "worked",
+            segments: [{ shiftId: 60, jobId: 70, position: 0 }],
+            absenceTypeId: 50,
+            customStartTime: null,
+            customEndTime: null,
+            seriesId: null,
+            fromRecurring: false,
+          },
+        },
+      ],
+    });
+    const payload = buildOperationsReportPayload(source, {
+      startDate: "2026-05-03",
+      endDate: "2026-05-09",
+    });
+
+    expect(payload.reports.absencesCalloffs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "calloff",
+          employeeName: "Avery Ng",
+          droppedShift: "Day",
+          droppedShiftTime: "7:00 AM - 3:30 PM",
+          submittedAt: "2026-05-02T18:00:00.000Z",
+          noticeHours: 20,
+          decidedAt: "2026-05-02T19:00:00.000Z",
+          managerNote: "Feel better",
+        }),
+      ]),
+    );
+    const table = buildOperationsReportTable(payload, "absences-calloffs");
+    const calloffRow = table.rows.find((row) => row[0] === "Call-off")!;
+    expect(calloffRow.slice(5)).toEqual([
+      "Day",
+      "7:00 AM - 3:30 PM",
+      "May 2, 2026, 6:00 PM UTC",
+      "20 hours before",
+      "May 2, 2026, 7:00 PM UTC",
+      "-",
+      "Feel better",
+    ]);
+  });
+
   it("builds staff activity from published cells and request snapshots", () => {
     const source = buildSource({
       shiftCategories: [
-        { id: 60, name: "Day", focus_area_id: 10 },
-        { id: 61, name: "Night", focus_area_id: 10 },
+        { id: 60, name: "Day", focus_area_id: 10, start_time: "07:00:00", end_time: "15:30:00" },
+        { id: 61, name: "Night", focus_area_id: 10, start_time: "23:00:00", end_time: "07:00:00" },
       ],
       publishedRows: [
         {
@@ -502,6 +561,19 @@ describe("operations reports", () => {
       { employeeIds: ["aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"], shiftCategoryIds: [60] },
     );
 
+    // The request row carries both sides of the swap as the card shows them.
+    expect(payload.reports.shiftRequests[0]).toMatchObject({
+      type: "swap",
+      requester: "Avery Ng",
+      requesterShift: "Day",
+      requesterJobs: "Caregiver",
+      requesterFocusArea: "North",
+      requesterTime: "7:00 AM - 3:30 PM",
+      target: "Blake Diaz",
+      targetShiftDate: "2026-05-04",
+      targetShift: "Night",
+      targetTime: "11:00 PM - 7:00 AM",
+    });
     expect(payload.reports.staffHours[0]).toMatchObject({
       scheduledHours: 8,
       shiftBreakdown: "Day (1, 8h)",
@@ -1103,17 +1175,80 @@ describe("operations reports", () => {
         headers: [
           "Request type",
           "Request status",
-          "Requested by",
-          "Requested with",
-          "Shift date",
+          "Requester",
+          "Requester's shift date",
+          "Requester's shift",
+          "Requester's job",
+          "Requester's focus area",
+          "Requester's time",
+          "Teammate",
+          "Teammate's shift date",
+          "Teammate's shift",
+          "Teammate's job",
+          "Teammate's focus area",
+          "Teammate's time",
+          "Absence type",
+          "Submitted",
+          "Decided",
+          "Decided by",
           "Time to resolution",
+          "Manager note",
         ],
-        firstRow: ["Call-off", "Approved", "Avery Ng", "No teammate", "May 3, 2026", "2.5 hours"],
+        firstRow: [
+          "Call-off",
+          "Approved",
+          "Avery Ng",
+          "May 3, 2026",
+          "-",
+          "-",
+          "-",
+          "-",
+          "No teammate",
+          "-",
+          "-",
+          "-",
+          "-",
+          "-",
+          "Sick",
+          "May 2, 2026, 10:00 AM UTC",
+          "May 2, 2026, 12:30 PM UTC",
+          "-",
+          "2.5 hours",
+          "-",
+        ],
       },
       {
         report: "absences-calloffs",
-        headers: ["Entry type", "Staff member", "Schedule date", "Absence type", "Status"],
-        firstRow: ["Call-off", "Avery Ng", "May 3, 2026", "Sick", "Approved"],
+        headers: [
+          "Entry type",
+          "Staff member",
+          "Schedule date",
+          "Absence type",
+          "Status",
+          "Dropped shift",
+          "Shift time",
+          "Called off at",
+          "Notice given",
+          "Decided",
+          "Decided by",
+          "Manager note",
+        ],
+        // The fixture's call-off carries no shift snapshot, so the shift and
+        // notice columns are blank; the timing test below covers them.
+        firstRow: [
+          "Call-off",
+          "Avery Ng",
+          "May 3, 2026",
+          "Sick",
+          "Approved",
+          "-",
+          "-",
+          "May 2, 2026, 10:00 AM UTC",
+          "-",
+          "May 2, 2026, 12:30 PM UTC",
+          "-",
+          "-",
+        ],
       },
       {
         report: "roster-status",

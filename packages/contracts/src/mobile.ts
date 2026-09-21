@@ -817,6 +817,7 @@ export const mobileUpdateShiftRequestBodySchema = z.discriminatedUnion("action",
   z.object({
     action: z.literal("cancel"),
     empId: z.string().uuid(),
+    note: z.string().trim().max(1000).optional(),
   }),
   z.object({
     action: z.literal("volunteer_open_shift"),

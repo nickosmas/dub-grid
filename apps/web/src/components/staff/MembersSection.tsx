@@ -1240,7 +1240,6 @@ export function MembersSection({
                       setActiveTab(canManageEmployees ? "all" : "active");
                     }
                   }}
-                  style={{ minWidth: 180 }}
                   fontSize="var(--dg-fs-navigation-item)"
                   fontWeight="var(--dg-type-control-weight)"
                   activeFontWeight="var(--dg-type-control-weight)"
@@ -1258,7 +1257,6 @@ export function MembersSection({
                       : STAFF_SORT_OPTIONS.filter((option) => option.value !== "access")
                   }
                   onChange={setSortKey}
-                  style={{ minWidth: 180 }}
                   fontSize="var(--dg-fs-navigation-item)"
                   fontWeight="var(--dg-type-control-weight)"
                   activeFontWeight="var(--dg-type-control-weight)"

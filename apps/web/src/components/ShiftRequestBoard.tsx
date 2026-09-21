@@ -1,11 +1,12 @@
 "use client";
-import { ChevronLeft, Clock } from "lucide-react";
+import { ArrowUpDown, ChevronLeft, Clock } from "lucide-react";
 
-import { Fragment, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { createPortal } from "react-dom";
 import { useTheme } from "next-themes";
 import type { ReactNode } from "react";
-import type { ShiftRequest, ShiftRequestStatus, AbsenceType } from "@/types";
+import type { ShiftRequest, ShiftRequestStatus, ShiftRequestType, AbsenceType } from "@/types";
 import { Button } from "@/components/Button";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { useSlideoverClose } from "@/hooks/useSlideoverClose";
@@ -20,12 +21,34 @@ import { joinAssignmentNames } from "@/lib/assignable-shifts";
 import { resolveShiftPillColors } from "@/lib/colors";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { NumericBadge } from "@/components/ui/numeric-badge";
+import CustomSelect from "@/components/CustomSelect";
+import StaffMultiSelect, { type StaffOption } from "@/components/StaffMultiSelect";
+import DateRangePicker from "@/components/ui/date-range-picker";
+import { fetchShiftRequests } from "@/features/schedule/client/api";
+import { queryKeys } from "@/lib/query-keys";
+import {
+  describeAwaitingRecipient,
+  describeCancelAwaitingRecipientCaution,
+  describeShiftRequest,
+  describeShiftRequestNoteRecipients,
+  describeShiftRequestPill,
+  groupManagerQueue,
+  isAwaitingRecipient,
+} from "@dubgrid/domain";
+import { formatScheduleTimeRange } from "@dubgrid/schedule-core";
+import { resolveJobChipTone } from "@dubgrid/design-tokens";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface ShiftRequestBoardProps {
   /** The tab to open on; a deep link from an alert names it. */
   initialTab?: Tab;
+  /** Needed for the history lookup, which fetches on its own terms. */
+  orgId: string | null;
+  /** Everyone the history lookup can filter by; defaults to nobody. */
+  staffOptions?: StaffOption[];
+  /** Focus area names by id, for the shift panels. */
+  focusAreaNameMap?: Map<number, string>;
   openPickups: ShiftRequest[];
   myRequests: ShiftRequest[];
   pendingApproval: ShiftRequest[];
@@ -37,13 +60,37 @@ interface ShiftRequestBoardProps {
   onClaim: (requestId: string) => void | Promise<unknown>;
   onRespond: (requestId: string, accept: boolean) => void | Promise<unknown>;
   onResolve: (requestId: string, approved: boolean, note?: string) => void | Promise<unknown>;
-  onCancel: (requestId: string) => void | Promise<unknown>;
+  /**
+   * `requesterEmpId` is whose request it is: the RPC checks it, whoever
+   * cancels. `note` is a manager's word to both people when withdrawing a
+   * request its recipient has not answered.
+   */
+  onCancel: (requestId: string, requesterEmpId: string, note?: string) => void | Promise<unknown>;
   onClose: () => void;
   absenceTypeMap?: Map<number, AbsenceType>;
   assignmentNameMap: Map<number, string>;
 }
 
-type Tab = "available" | "mine" | "approval";
+type Tab = "available" | "mine" | "approval" | "history";
+
+const HISTORY_STATUSES: ShiftRequestStatus[] = ["approved", "rejected", "cancelled", "expired"];
+const HISTORY_DEFAULT_DAYS = 30;
+
+function isoDateDaysAgo(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
+function formatResolvedAt(value: string): string {
+  return new Date(value).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
 type PendingConfirmation = {
   confirmLabel: string;
   key: string;
@@ -72,19 +119,22 @@ function timeRemainingLabel(expiresAt: string): string {
   return `${days}d left`;
 }
 
-const STATUS_TONES: Record<ShiftRequestStatus, StatusPillTone> = {
-  open: "info",
-  pending_approval: "warning",
+// One pill per card: the kind while open, kind and status once it is waiting
+// or decided (`describeShiftRequestPill`). No red: a rejection is history.
+const PILL_TONES: Record<ReturnType<typeof describeShiftRequestPill>["tone"], StatusPillTone> = {
+  kind: "info",
+  pending: "warning",
   approved: "success",
-  rejected: "danger",
-  cancelled: "neutral",
-  expired: "neutral",
+  closed: "neutral",
 };
 
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function ShiftRequestBoard({
   initialTab,
+  orgId,
+  staffOptions = [],
+  focusAreaNameMap,
   openPickups,
   myRequests,
   pendingApproval,
@@ -107,13 +157,58 @@ export default function ShiftRequestBoard({
   const isDarkTheme = resolvedTheme === "dark";
   // A deep link may name the approval tab for someone who cannot see it;
   // their own requests are the nearest tab that exists for them.
+  const canReviewOrg = canApprove || canViewAllRequests;
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     if (!initialTab) return "available";
-    if (initialTab === "approval" && !(canApprove || canViewAllRequests)) return "mine";
+    if ((initialTab === "approval" || initialTab === "history") && !canReviewOrg) return "mine";
     return initialTab;
   });
-  const [rejectNotes, setRejectNotes] = useState<Record<string, string>>({});
-  const [showRejectInput, setShowRejectInput] = useState<Record<string, boolean>>({});
+
+  // History is a lookup rather than a live list: it fetches the decided
+  // requests for a shift-date window on demand, and the staff and outcome
+  // filters narrow that result in place, so a manager can answer "what did
+  // Laura ask for in March" without paging through everything since launch.
+  const [historyFrom, setHistoryFrom] = useState(() => isoDateDaysAgo(HISTORY_DEFAULT_DAYS));
+  const [historyTo, setHistoryTo] = useState("");
+  const [historyType, setHistoryType] = useState<ShiftRequestType | "all">("all");
+  const [historyStatus, setHistoryStatus] = useState<ShiftRequestStatus | "all">("all");
+  const [historyStaff, setHistoryStaff] = useState<string[]>([]);
+  const historyQuery = useQuery({
+    queryKey: [
+      ...queryKeys.shiftRequests.all(orgId ?? "none"),
+      "history",
+      historyFrom,
+      historyTo,
+      historyType,
+    ],
+    queryFn: () =>
+      fetchShiftRequests(orgId!, assignmentNameMap, {
+        status: HISTORY_STATUSES,
+        ...(historyType === "all" ? {} : { type: historyType }),
+        ...(historyFrom ? { startDate: historyFrom } : {}),
+        ...(historyTo ? { endDate: historyTo } : {}),
+      }),
+    enabled: Boolean(orgId) && canReviewOrg && activeTab === "history",
+    staleTime: 60_000,
+  });
+  const historyRequests = useMemo(() => {
+    const people = new Set(historyStaff);
+    return (historyQuery.data ?? [])
+      .filter((r) => historyStatus === "all" || r.status === historyStatus)
+      .filter(
+        (r) =>
+          people.size === 0 ||
+          people.has(r.requesterEmpId) ||
+          (r.targetEmpId != null && people.has(r.targetEmpId)),
+      )
+      .sort(
+        (left, right) =>
+          new Date(right.resolvedAt ?? right.createdAt).getTime() -
+          new Date(left.resolvedAt ?? left.createdAt).getTime(),
+      );
+  }, [historyQuery.data, historyStaff, historyStatus]);
+  // One optional note per pending card, sent with whichever decision is made.
+  const [resolveNotes, setResolveNotes] = useState<Record<string, string>>({});
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
   const [runningConfirmationKey, setRunningConfirmationKey] = useState<string | null>(null);
   const managerQueue = [...(approvalQueue ?? pendingApproval)].sort((left, right) => {
@@ -133,8 +228,10 @@ export default function ShiftRequestBoard({
 
     setRunningConfirmationKey(pendingConfirmation.key);
     try {
-      await pendingConfirmation.onConfirm();
-      setPendingConfirmation(null);
+      // The hooks resolve `false` on a failure they have already toasted; the
+      // dialog then stays up with the note intact instead of closing over it.
+      const result = await pendingConfirmation.onConfirm();
+      if (result !== false) setPendingConfirmation(null);
     } finally {
       setRunningConfirmationKey(null);
     }
@@ -147,8 +244,9 @@ export default function ShiftRequestBoard({
       key: "approval",
       label: canApprove ? "Approval Queue" : "All Requests",
       count: managerQueue.length,
-      visible: canApprove || canViewAllRequests,
+      visible: canReviewOrg,
     },
+    { key: "history", label: "History", count: historyRequests.length, visible: canReviewOrg },
   ];
 
   function getTabData(): ShiftRequest[] {
@@ -159,6 +257,8 @@ export default function ShiftRequestBoard({
         return myRequests;
       case "approval":
         return managerQueue;
+      case "history":
+        return historyRequests;
     }
   }
 
@@ -170,41 +270,197 @@ export default function ShiftRequestBoard({
         return "No requests yet";
       case "approval":
         return canApprove ? "No active requests" : "No organization requests";
+      case "history":
+        return historyQuery.isPending ? "Loading history" : "No decided requests match";
     }
   }
 
   // ── Status badge ─────────────────────────────────────────────────────────
 
-  function renderStatusBadge(status: ShiftRequestStatus) {
-    const label =
-      status === "pending_approval" ? "Pending" : status.charAt(0).toUpperCase() + status.slice(1);
+  function renderRequestPill(req: ShiftRequest) {
+    const pill = describeShiftRequestPill(req.type, req.status);
     return (
-      <StatusPill tone={STATUS_TONES[status]} className="uppercase tracking-wide">
-        {label}
+      <StatusPill dot={false} tone={PILL_TONES[pill.tone]}>
+        {pill.label}
       </StatusPill>
     );
   }
 
-  // ── Swap arrow icon ──────────────────────────────────────────────────────
+  // ── Shift panel ──────────────────────────────────────────────────────────
 
-  function renderSwapArrow() {
+  type ShiftParty = {
+    name: string;
+    shiftLabel: string;
+    /** Named jobs on the shift; the default shift job stays unnamed. */
+    jobs: Array<{ label: string; isMentored: boolean }>;
+    focusAreaName: string | null;
+    date: string;
+    timeRange: string | null;
+  };
+
+  // One side of a request as the panel shows it: the shift by name, every
+  // job on it (shown even when the grid hides the job), the focus area, and
+  // the day with the resolved or custom time.
+  function describeParty(
+    req: ShiftRequest,
+    side: "requester" | "target",
+    name: string,
+    fallbackLabel: string,
+  ): ShiftParty | null {
+    const isRequester = side === "requester";
+    const date = isRequester ? req.requesterShiftDate : req.targetShiftDate;
+    if (!date) return null;
+    const segments = (isRequester ? req.requesterSegments : req.targetSegments) ?? [];
+    const presentation = isRequester ? req.requesterPresentation : req.targetPresentation;
+    const shiftNames = segments.map((segment) => segment.shiftName?.trim()).filter(Boolean);
+    const jobs = segments.flatMap((segment) => {
+      // The default shift job is the shift itself, not a job worth naming.
+      const jobName = segment.isShiftOnly ? null : segment.jobName?.trim();
+      return jobName ? [{ label: jobName, isMentored: segment.isMentored === true }] : [];
+    });
+    const focusAreaId =
+      (isRequester ? req.requesterFocusAreaId : req.targetFocusAreaId) ??
+      presentation?.focusAreaId ??
+      null;
+    const timeRange =
+      formatScheduleTimeRange(presentation?.startTime ?? null, presentation?.endTime ?? null) ??
+      formatScheduleTimeRange(
+        isRequester ? req.requesterCustomStartTime : req.targetCustomStartTime,
+        isRequester ? req.requesterCustomEndTime : req.targetCustomEndTime,
+      );
+
+    return {
+      name,
+      shiftLabel: shiftNames.length > 0 ? shiftNames.join(" / ") : fallbackLabel,
+      jobs,
+      focusAreaName: focusAreaId != null ? (focusAreaNameMap?.get(focusAreaId) ?? null) : null,
+      date,
+      timeRange,
+    };
+  }
+
+  // The same tone rule the grid and mobile use, on the page's own tokens.
+  const jobChipContext = {
+    surfaceSecondary: "var(--dg-color-surface-alt)",
+    border: "var(--dg-color-border)",
+    textMuted: "var(--dg-color-text-muted)",
+    warningSoft: "var(--dg-color-warning-bg)",
+    warningBorder: "var(--dg-color-warning-border)",
+    warningText: "var(--dg-color-warning-text)",
+  };
+
+  function renderJobPill(job: ShiftParty["jobs"][number], key: number) {
+    const tone = resolveJobChipTone(job.label, isDarkTheme, jobChipContext);
     return (
-      <svg
-        width="14"
-        height="14"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="var(--dg-color-text-muted)"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        style={{ flexShrink: 0 }}
+      <span
+        key={key}
+        aria-label={`Job ${job.label}${job.isMentored ? ", mentored assignment" : ""}`}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 4,
+          padding: "2px 8px",
+          borderRadius: "var(--dg-radius-sm)",
+          border: `1px solid ${tone.borderColor}`,
+          background: tone.backgroundColor,
+          color: tone.textColor,
+          fontSize: "var(--dg-type-badge-size)",
+          fontWeight: 600,
+          lineHeight: 1.4,
+          whiteSpace: "nowrap",
+        }}
       >
-        <polyline points="17 1 21 5 17 9" />
-        <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-        <polyline points="7 23 3 19 7 15" />
-        <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-      </svg>
+        {job.label}
+        {job.isMentored ? <span style={{ fontWeight: 500 }}>Mentored</span> : null}
+      </span>
+    );
+  }
+
+  function renderShiftPanel(party: ShiftParty, seam?: "above" | "below") {
+    const when = [formatShiftDate(party.date), party.timeRange].filter(Boolean).join(" \u00b7 ");
+    return (
+      <div
+        style={{
+          background: "var(--dg-color-surface-alt)",
+          borderRadius: "var(--dg-radius-sm)",
+          padding: "10px 12px",
+          // Room for the swap disc that straddles the seam between two panels.
+          ...(seam === "below" ? { paddingBottom: 24 } : {}),
+          ...(seam === "above" ? { paddingTop: 24 } : {}),
+          display: "flex",
+          flexDirection: "column",
+          gap: 2,
+          minWidth: 0,
+        }}
+      >
+        <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--dg-color-text-muted)" }}>
+          {party.name}
+        </span>
+        <span
+          style={{
+            fontSize: "var(--dg-fs-caption)",
+            fontWeight: 600,
+            color: "var(--dg-color-text-primary)",
+          }}
+        >
+          {party.shiftLabel}
+        </span>
+        {party.jobs.length > 0 ? (
+          <span style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+            {party.jobs.map((job, index) => renderJobPill(job, index))}
+          </span>
+        ) : null}
+        {party.focusAreaName ? (
+          <span
+            style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-secondary)" }}
+          >
+            {party.focusAreaName}
+          </span>
+        ) : null}
+        <span
+          className="dg-tabular-nums"
+          style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--dg-color-text-secondary)" }}
+        >
+          {when}
+        </span>
+      </div>
+    );
+  }
+
+  function clearNote(requestId: string) {
+    setResolveNotes((prev) => {
+      const next = { ...prev };
+      delete next[requestId];
+      return next;
+    });
+  }
+
+  // One optional note per decision, sent with whichever of approve, reject or
+  // a manager's cancel is confirmed; it reaches both people on the request.
+  function renderNoteField(req: ShiftRequest) {
+    const notePlaceholder = `Note to ${describeShiftRequestNoteRecipients(req)}? (Optional)`;
+    return (
+      <textarea
+        key="resolve-note"
+        aria-label={notePlaceholder}
+        placeholder={notePlaceholder}
+        value={resolveNotes[req.id] ?? ""}
+        onChange={(e) => setResolveNotes((prev) => ({ ...prev, [req.id]: e.target.value }))}
+        style={{
+          width: "100%",
+          minHeight: 56,
+          padding: "8px 10px",
+          border: "1px solid var(--dg-color-border)",
+          borderRadius: "var(--dg-radius-md)",
+          fontSize: "var(--dg-fs-caption)",
+          fontFamily: "inherit",
+          color: "var(--dg-color-text-primary)",
+          background: "var(--dg-color-surface)",
+          resize: "vertical",
+          outline: "none",
+          boxSizing: "border-box",
+        }}
+      />
     );
   }
 
@@ -215,6 +471,7 @@ export default function ShiftRequestBoard({
     const isCalloff = req.type === "calloff";
     const isOwnRequest = currentEmpId === req.requesterEmpId;
     const isTarget = currentEmpId === req.targetEmpId;
+    const copy = describeShiftRequest(req, currentEmpId);
     const absenceType =
       isCalloff && req.absenceTypeId ? absenceTypeMap?.get(req.absenceTypeId) : null;
     const absenceTypeColors = absenceType
@@ -265,56 +522,65 @@ export default function ShiftRequestBoard({
               minWidth: 0,
             }}
           >
-            {req.requesterName}
+            {copy.title}
           </span>
-          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-            {isCalloff && (
-              <span
-                style={{
-                  fontSize: "var(--dg-type-badge-size)",
-                  fontWeight: 500,
-                  padding: "2px 7px",
-                  borderRadius: "var(--dg-radius-sm)",
-                  background: "var(--dg-color-danger-bg, #FEF2F2)",
-                  color: "var(--dg-color-danger-text, #991B1B)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                Calloff
-              </span>
-            )}
-            {renderStatusBadge(req.status)}
-          </div>
+          {renderRequestPill(req)}
         </div>
 
-        {/* Shift info */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-          <span
-            style={{
-              fontSize: "var(--dg-fs-caption)",
-              fontWeight: 600,
-              color: "var(--dg-color-text-secondary)",
-            }}
-          >
-            {requesterLabel} on {formatShiftDate(req.requesterShiftDate)}
-          </span>
+        <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-secondary)" }}>
+          {copy.subtitle}
+        </span>
 
-          {isSwap && req.targetName && req.targetShiftLabel && req.targetShiftDate && (
-            <>
-              {renderSwapArrow()}
+        {/* Shift info: every request shows its shift as a panel; a swap shows both */}
+        {(() => {
+          const requesterParty = describeParty(
+            req,
+            "requester",
+            copy.requesterShiftLabel,
+            requesterLabel,
+          );
+          const targetParty = isSwap
+            ? describeParty(
+                req,
+                "target",
+                copy.targetShiftLabel ?? req.targetName ?? "",
+                targetLabel ?? req.targetShiftLabel ?? "",
+              )
+            : null;
+          if (!requesterParty) return null;
+          if (!targetParty) return renderShiftPanel(requesterParty);
+          // The two panels sit nearly flush and the swap disc straddles the
+          // seam between them; a ring in the card's colour lifts it off both.
+          return (
+            <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 4 }}>
+              {renderShiftPanel(requesterParty, "below")}
               <span
+                aria-label="swaps with"
+                role="img"
                 style={{
-                  fontSize: "var(--dg-fs-caption)",
-                  fontWeight: 600,
-                  color: "var(--dg-color-text-secondary)",
+                  position: "absolute",
+                  left: "50%",
+                  top: "50%",
+                  transform: "translate(-50%, -50%)",
+                  width: 28,
+                  height: 28,
+                  borderRadius: 999,
+                  background: "var(--dg-color-brand-bg)",
+                  color: "var(--dg-color-brand)",
+                  boxShadow: "0 0 0 3px var(--dg-color-surface)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 1,
                 }}
               >
-                {req.targetName}: {targetLabel} on {formatShiftDate(req.targetShiftDate)}
+                <ArrowUpDown size={14} strokeWidth={2.5} />
               </span>
-            </>
-          )}
-
+              {renderShiftPanel(targetParty, "above")}
+            </div>
+          );
+        })()}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
           {isCalloff && absenceType && (
             <span
               style={{
@@ -332,7 +598,24 @@ export default function ShiftRequestBoard({
           )}
         </div>
 
-        {/* Expiry */}
+        {/* A manager sees why an open swap cannot be decided yet: it is
+            waiting on the person it was aimed at, not on them. */}
+        {canApprove && isAwaitingRecipient(req) && req.targetName ? (
+          <div
+            role="note"
+            style={{
+              fontSize: "var(--dg-fs-footnote)",
+              color: "var(--dg-color-warning-text)",
+              background: "var(--dg-color-warning-bg)",
+              border: "1px solid var(--dg-color-warning-border)",
+              borderRadius: "var(--dg-radius-sm)",
+              padding: "6px 10px",
+            }}
+          >
+            {describeAwaitingRecipient(req.targetName)}
+          </div>
+        ) : null}
+        {/* Expiry while it can still be acted on; when it was decided once it is over */}
         <div
           style={{
             fontSize: "var(--dg-fs-footnote)",
@@ -343,8 +626,19 @@ export default function ShiftRequestBoard({
           }}
         >
           <Clock size={11} strokeWidth={2.5} style={{ flexShrink: 0 }} />
-          {timeRemainingLabel(req.expiresAt)}
+          {req.status === "open" || req.status === "pending_approval"
+            ? timeRemainingLabel(req.expiresAt)
+            : req.resolvedAt
+              ? `Decided ${formatResolvedAt(req.resolvedAt)}`
+              : `Requested ${formatShiftDate(req.createdAt.slice(0, 10))}`}
         </div>
+        {req.adminNote ? (
+          <div
+            style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--dg-color-text-secondary)" }}
+          >
+            Manager note: {req.adminNote}
+          </div>
+        ) : null}
 
         {/* Action buttons */}
         {renderActions(req, isOwnRequest, isTarget)}
@@ -428,7 +722,7 @@ export default function ShiftRequestBoard({
       actions.push(
         <Button
           key="decline"
-          className="dg-btn dg-btn-ghost"
+          className="dg-btn dg-btn-secondary"
           disabled={hasRunningAction}
           onClick={() =>
             setPendingConfirmation({
@@ -441,13 +735,12 @@ export default function ShiftRequestBoard({
               ),
               onConfirm: () => onRespond(req.id, false),
               title: "Decline request?",
-              variant: "danger",
+              variant: "warning",
             })
           }
           style={{
             fontSize: "var(--dg-fs-caption)",
             padding: "7px 14px",
-            border: "1px solid var(--dg-color-border)",
           }}
         >
           Decline
@@ -457,158 +750,123 @@ export default function ShiftRequestBoard({
 
     // Approve / Reject: admin with permission, request is pending_approval
     if (canApprove && req.status === "pending_approval") {
-      const isRejecting = showRejectInput[req.id];
-
-      if (isRejecting) {
-        actions.push(
-          <div
-            key="reject-form"
-            style={{ width: "100%", display: "flex", flexDirection: "column", gap: 6 }}
-          >
-            <textarea
-              placeholder="Add a note (optional)"
-              value={rejectNotes[req.id] ?? ""}
-              onChange={(e) => setRejectNotes((prev) => ({ ...prev, [req.id]: e.target.value }))}
-              style={{
-                width: "100%",
-                minHeight: 56,
-                padding: "8px 10px",
-                border: "1px solid var(--dg-color-border)",
-                borderRadius: "var(--dg-radius-md)",
-                fontSize: "var(--dg-fs-caption)",
-                fontFamily: "inherit",
-                color: "var(--dg-color-text-primary)",
-                background: "var(--dg-color-surface)",
-                resize: "vertical",
-                outline: "none",
-                boxSizing: "border-box",
-              }}
-            />
-            <div style={{ display: "flex", gap: 6 }}>
-              <Button
-                className="dg-btn dg-btn-ghost"
-                onClick={() => setShowRejectInput((prev) => ({ ...prev, [req.id]: false }))}
-                style={{
-                  fontSize: "var(--dg-fs-caption)",
-                  padding: "7px 14px",
-                  border: "1px solid var(--dg-color-border)",
-                }}
-              >
-                Back
-              </Button>
-              <Button
-                className="dg-btn dg-btn-danger-filled"
-                disabled={hasRunningAction}
-                onClick={() => {
-                  const note = rejectNotes[req.id] || undefined;
-
-                  setPendingConfirmation({
-                    confirmLabel: "Reject",
-                    key: `reject:${req.id}`,
-                    message: (
-                      <>
-                        Reject {req.requesterName}&apos;s request for{" "}
-                        <strong>{requestLabel}</strong>? The original schedule will stay in place.
-                      </>
-                    ),
-                    onConfirm: async () => {
-                      await onResolve(req.id, false, note);
-                      setShowRejectInput((prev) => ({ ...prev, [req.id]: false }));
-                      setRejectNotes((prev) => {
-                        const next = { ...prev };
-                        delete next[req.id];
-                        return next;
-                      });
-                    },
-                    title: "Reject request?",
-                    variant: "danger",
-                  });
-                }}
-                style={{
-                  flex: 1,
-                  fontSize: "var(--dg-fs-caption)",
-                  padding: "7px 14px",
-                }}
-              >
-                Confirm Reject
-              </Button>
-            </div>
-          </div>,
-        );
-      } else {
-        primaryActions.push(
-          <Button
-            key="approve"
-            className="dg-btn dg-btn-primary"
-            disabled={hasRunningAction}
-            onClick={() =>
-              setPendingConfirmation({
-                confirmLabel: "Approve",
-                key: `approve:${req.id}`,
-                message: (
-                  <>
-                    Approve {req.requesterName}&apos;s request for <strong>{requestLabel}</strong>?
-                    This will finalize the staffing change.
-                  </>
-                ),
-                onConfirm: () => onResolve(req.id, true),
-                title: "Approve request?",
-                variant: "info",
-              })
-            }
-            style={{ fontSize: "var(--dg-fs-caption)", padding: "7px 14px" }}
-          >
-            Approve
-          </Button>,
-        );
-        actions.push(
-          <Button
-            key="reject"
-            className="dg-btn dg-btn-ghost"
-            onClick={() => setShowRejectInput((prev) => ({ ...prev, [req.id]: true }))}
-            style={{
-              fontSize: "var(--dg-fs-caption)",
-              padding: "7px 14px",
-              border: "1px solid var(--dg-color-danger-border)",
-              color: "var(--dg-color-danger)",
-            }}
-          >
-            Reject
-          </Button>,
-        );
-      }
+      const note = resolveNotes[req.id]?.trim() || undefined;
+      actions.push(renderNoteField(req));
+      actions.push(
+        <Button
+          key="reject"
+          className="dg-btn dg-btn-secondary"
+          disabled={hasRunningAction}
+          onClick={() =>
+            setPendingConfirmation({
+              confirmLabel: "Reject",
+              key: `reject:${req.id}`,
+              message: (
+                <>
+                  Reject {req.requesterName}&apos;s request for <strong>{requestLabel}</strong>? The
+                  original schedule will stay in place.
+                  {note ? (
+                    <>
+                      {" "}
+                      Your note: <em>{note}</em>
+                    </>
+                  ) : null}
+                </>
+              ),
+              onConfirm: async () => {
+                const done = await onResolve(req.id, false, note);
+                if (done !== false) clearNote(req.id);
+                return done;
+              },
+              title: "Reject request?",
+              variant: "warning",
+            })
+          }
+          style={{ fontSize: "var(--dg-fs-caption)", padding: "7px 14px" }}
+        >
+          Reject
+        </Button>,
+      );
+      primaryActions.push(
+        <Button
+          key="approve"
+          className="dg-btn dg-btn-primary"
+          disabled={hasRunningAction}
+          onClick={() =>
+            setPendingConfirmation({
+              confirmLabel: "Approve",
+              key: `approve:${req.id}`,
+              message: (
+                <>
+                  Approve {req.requesterName}&apos;s request for <strong>{requestLabel}</strong>?
+                  This will finalize the staffing change.
+                  {note ? (
+                    <>
+                      {" "}
+                      Your note: <em>{note}</em>
+                    </>
+                  ) : null}
+                </>
+              ),
+              onConfirm: async () => {
+                const done = await onResolve(req.id, true, note);
+                if (done !== false) clearNote(req.id);
+                return done;
+              },
+              title: "Approve request?",
+              variant: "info",
+            })
+          }
+          style={{ fontSize: "var(--dg-fs-caption)", padding: "7px 14px" }}
+        >
+          Approve
+        </Button>,
+      );
     }
 
-    // Cancel: requester can cancel own open/pending request
-    if (isOwnRequest && (req.status === "open" || req.status === "pending_approval")) {
+    // Cancel: the requester withdraws their own open or pending request; a
+    // manager may also withdraw one still waiting on its recipient, since
+    // nothing else can move it. Either way, cancelling over the recipient's
+    // head gets the caution.
+    const awaitingRecipient = isAwaitingRecipient(req);
+    const canCancelOwn =
+      isOwnRequest && (req.status === "open" || req.status === "pending_approval");
+    const managerCancel = !canCancelOwn && canApprove && awaitingRecipient;
+    if (canCancelOwn || managerCancel) {
+      if (managerCancel) actions.push(renderNoteField(req));
+      const cancelNote = managerCancel ? resolveNotes[req.id]?.trim() || undefined : undefined;
       actions.push(
         <Button
           key="cancel"
-          className="dg-btn dg-btn-ghost"
+          className="dg-btn dg-btn-secondary"
           disabled={hasRunningAction}
           onClick={() =>
             setPendingConfirmation({
               confirmLabel: "Cancel request",
               key: `cancel:${req.id}`,
-              message: (
+              message: awaitingRecipient ? (
+                describeCancelAwaitingRecipientCaution(req)
+              ) : (
                 <>
-                  Cancel your request for <strong>{requestLabel}</strong>? It will no longer be
-                  available for review.
+                  Cancel {isOwnRequest ? "your" : "this"} request for{" "}
+                  <strong>{requestLabel}</strong>? It will no longer be available for review.
                 </>
               ),
-              onConfirm: () => onCancel(req.id),
+              onConfirm: async () => {
+                const done = await onCancel(req.id, req.requesterEmpId, cancelNote);
+                if (cancelNote && done !== false) clearNote(req.id);
+                return done;
+              },
               title: "Cancel request?",
-              variant: "danger",
+              variant: "warning",
             })
           }
           style={{
             fontSize: "var(--dg-fs-caption)",
             padding: "7px 14px",
-            border: "1px solid var(--dg-color-danger-border)",
-            color: "var(--dg-color-danger)",
           }}
         >
-          Cancel
+          {isOwnRequest ? "Cancel" : "Cancel request"}
         </Button>,
       );
     }
@@ -626,6 +884,20 @@ export default function ShiftRequestBoard({
   // ── Render ───────────────────────────────────────────────────────────────
 
   const tabData = getTabData();
+  // The approval queue is split by what each request is waiting on: the
+  // manager, a claimant, or the person it was aimed at. One column per group.
+  const queueGroups = activeTab === "approval" ? groupManagerQueue(tabData) : null;
+  // The panel opens at the standard width and grows leftwards only when the
+  // tab in front needs the room: a second column once there are two cards (or
+  // two queue groups), a third from three, and the history filters always
+  // want the full spread.
+  const columnCount = queueGroups ? queueGroups.length : tabData.length;
+  const panelWidthClass =
+    activeTab === "history" || columnCount >= 3
+      ? " dg-panel--max"
+      : columnCount === 2
+        ? " dg-panel--cols-2"
+        : "";
 
   return createPortal(
     <>
@@ -650,7 +922,7 @@ export default function ShiftRequestBoard({
 
       {/* Panel */}
       <div
-        className={`dg-panel${closing ? " closing" : ""}`}
+        className={`dg-panel${panelWidthClass}${closing ? " closing" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-label="Shift requests"
@@ -766,8 +1038,67 @@ export default function ShiftRequestBoard({
             padding: isMobile ? "16px" : "20px 24px",
           }}
         >
+          {activeTab === "history" ? (
+            <div
+              // Each filter is at least as wide as its own value and shares
+              // the leftover, wrapping as needed, rather than four equal
+              // tracks that clip the date range and pad "All types".
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 8,
+                marginBottom: 16,
+              }}
+            >
+              <DateRangePicker
+                id="request-history-dates"
+                style={{ flex: "1 1 auto" }}
+                allowClear
+                label="Shift dates"
+                onChange={(next) => {
+                  setHistoryFrom(next.from);
+                  setHistoryTo(next.to);
+                }}
+                placeholder="Any shift date"
+                value={{ from: historyFrom, to: historyTo }}
+              />
+              <CustomSelect
+                style={{ flex: "1 1 auto" }}
+                ariaLabel="Request type"
+                fontSize="var(--dg-fs-caption)"
+                onChange={setHistoryType}
+                options={[
+                  { value: "all", label: "All types" },
+                  { value: "swap", label: "Swaps" },
+                  { value: "pickup", label: "Pickups" },
+                  { value: "calloff", label: "Time off" },
+                ]}
+                value={historyType}
+              />
+              <CustomSelect
+                style={{ flex: "1 1 auto" }}
+                ariaLabel="Outcome"
+                fontSize="var(--dg-fs-caption)"
+                onChange={setHistoryStatus}
+                options={[
+                  { value: "all", label: "All outcomes" },
+                  { value: "approved", label: "Approved" },
+                  { value: "rejected", label: "Rejected" },
+                  { value: "cancelled", label: "Cancelled" },
+                  { value: "expired", label: "Expired" },
+                ]}
+                value={historyStatus}
+              />
+              <StaffMultiSelect
+                style={{ flex: "1 1 auto" }}
+                onChange={setHistoryStaff}
+                options={staffOptions}
+                value={historyStaff}
+              />
+            </div>
+          ) : null}
           {tabData.length === 0 ? (
-            loading ? null : (
+            loading || (activeTab === "history" && historyQuery.isPending) ? null : (
               <EmptyState
                 icon={
                   <svg
@@ -790,8 +1121,52 @@ export default function ShiftRequestBoard({
                 style={{ padding: "40px 24px", border: "none", background: "transparent" }}
               />
             )
+          ) : queueGroups ? (
+            <div
+              style={{
+                display: "grid",
+                // A column is never narrower than a card needs to show a name
+                // beside its pill; groups wrap under one another once the
+                // panel cannot hold them side by side.
+                gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(340px, 1fr))",
+                gap: 16,
+                alignItems: "start",
+              }}
+            >
+              {queueGroups.map((group) => (
+                <section
+                  key={group.key}
+                  aria-labelledby={`request-queue-${group.key}`}
+                  style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}
+                >
+                  <h3
+                    id={`request-queue-${group.key}`}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      margin: 0,
+                      fontSize: "var(--dg-fs-caption)",
+                      fontWeight: 600,
+                      color: "var(--dg-color-text-secondary)",
+                    }}
+                  >
+                    {group.label}
+                    <NumericBadge count={group.requests.length} />
+                  </h3>
+                  {group.requests.map((req) => renderCard(req))}
+                </section>
+              ))}
+            </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(340px, 1fr))",
+                gap: 10,
+                alignItems: "start",
+              }}
+            >
               {tabData.map((req) => renderCard(req))}
             </div>
           )}

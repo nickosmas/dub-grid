@@ -271,7 +271,7 @@ export function ManagementUserActionsSheet({
               ) : null}
               <Button
                 disabled={isPending}
-                label="Edit Management Access"
+                label="Edit management access"
                 // Sequenced, not swapped: presenting the access sheet in the same
                 // commit that dismisses this one is the case iOS refuses, and the
                 // access sheet could come up unreachable behind a dead backdrop.
@@ -283,7 +283,7 @@ export function ManagementUserActionsSheet({
               />
               <Button
                 disabled={isPending}
-                label="Change Access Level"
+                label="Change access level"
                 onPress={() => {
                   setIsActionsHidden(true);
                   handoff(() => setShowRoleSheet(true));

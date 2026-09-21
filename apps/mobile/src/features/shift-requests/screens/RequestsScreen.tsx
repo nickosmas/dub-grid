@@ -1,8 +1,14 @@
 import { ActionButtons } from "../../../shared/components/ActionButtons";
-import { CountBadge } from "../../dashboard/components/CountBadge";
-import { REQUEST_TYPE_LABEL, REQUEST_TYPE_TONE } from "../lib/request-type";
 import { resolveJobChipTone } from "@dubgrid/design-tokens";
-import { useCallback, useMemo, useState } from "react";
+import {
+  describeAwaitingRecipient,
+  describeShiftRequest,
+  describeShiftRequestNoteRecipients,
+  describeShiftRequestPill,
+  groupManagerQueue,
+  isAwaitingRecipient,
+} from "@dubgrid/domain";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
@@ -13,10 +19,19 @@ import type {
   MobileScheduleEntrySegment,
   MobileShiftRequest,
   MobileShiftRequestHistoryCursor,
+  ResolvedSchedulePresentation,
+  ScheduleCellState,
 } from "@dubgrid/contracts";
+import {
+  BottomSheetModal,
+  SheetActions,
+  SheetHeader,
+} from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
+import { ProfileTextInput } from "../../profile/components/ProfilePrimitives";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
+import { NumericBadge } from "../../../shared/components/NumericBadge";
 import { Screen } from "../../../shared/components/Screen";
 import {
   ScrollableTabStrip,
@@ -49,7 +64,6 @@ import {
   mobileRadii,
   mobileSpacing,
   mobileText,
-  mobileVisiblePillBorder,
   type MobileColors,
 } from "../../../shared/theme/tokens";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
@@ -107,7 +121,7 @@ function getOptimisticRequestStatus(body: RequestActionBody): MobileShiftRequest
 
 type RequestTab = "available" | "all" | "mine" | "approval" | "history";
 type RequestActionBody =
-  | { action: "cancel"; empId: string }
+  | { action: "cancel"; empId: string; note?: string }
   | { action: "claim"; claimerEmpId: string }
   | { action: "respond"; empId: string; accept: boolean }
   | { action: "resolve"; approved: boolean; note?: string }
@@ -125,6 +139,8 @@ type RequestActionConfirmation = {
   requestId: string;
   body: RequestActionBody;
   feedback: MobileRequestActionFeedback;
+  /** A decision with an optional note to both people: a sheet, not a confirmation. */
+  takesNote: boolean;
 } | null;
 
 type ShiftPillColors = {
@@ -178,57 +194,17 @@ function readOptionalColor(value: string | null | undefined): string | null {
   return trimmedValue.toLowerCase() === "transparent" ? null : trimmedValue;
 }
 
-function getShiftPillColors(
-  mobileColors: MobileColors,
-  isDark: boolean,
-  presentation:
-    | MobileShiftRequest["requesterPresentation"]
-    | MobileOpenShift["presentation"]
-    | null
-    | undefined,
-): ShiftPillColors {
-  const shiftColor = readOptionalColor(presentation?.shiftColor);
+function getPresentationShiftLabel(presentation: ResolvedSchedulePresentation | null): string {
+  const primarySegment = presentation?.segments?.[0] ?? null;
 
-  // Without a stored fill the pill runs on brand tokens, which are already
-  // theme-correct — a stored text color alone would be a light-page hex on a
-  // dark surface, so it only applies alongside its own fill.
-  if (!shiftColor) {
-    return {
-      backgroundColor: mobileColors.brandSoft,
-      borderColor: mobileColors.brandBorder,
-      textColor: mobileColors.brand,
-    };
-  }
-
-  const textColor = readOptionalColor(presentation?.shiftTextColor) ?? mobileColors.brand;
-
-  return mobileDarkenTone(
-    {
-      backgroundColor: shiftColor,
-      borderColor: mobileVisiblePillBorder(presentation?.shiftBorderColor, textColor),
-      textColor,
-    },
-    isDark,
-  );
+  return primarySegment?.shiftName ?? presentation?.shiftName ?? presentation?.label ?? "Shift";
 }
 
-function getRequestShiftLabel(request: MobileShiftRequest): string {
-  const primarySegment = request.requesterPresentation?.segments?.[0] ?? null;
-
-  return (
-    primarySegment?.shiftName ??
-    request.requesterPresentation?.shiftName ??
-    request.requesterPresentation?.label ??
-    "Shift"
-  );
-}
-
-function getRequestSegments(request: MobileShiftRequest) {
-  return request.requesterPresentation?.segments ?? [];
-}
-
-function getRequestTimeRange(request: MobileShiftRequest): string | null {
-  const segments = getRequestSegments(request);
+function getPresentationTimeRange(
+  presentation: ResolvedSchedulePresentation | null,
+  state: ScheduleCellState | null,
+): string | null {
+  const segments = presentation?.segments ?? [];
   const firstSegmentWithTime = segments.find((segment) => segment.startTime && segment.endTime);
   const lastSegmentWithTime =
     [...segments].reverse().find((segment) => segment.startTime && segment.endTime) ?? null;
@@ -237,25 +213,15 @@ function getRequestTimeRange(request: MobileShiftRequest): string | null {
     return formatScheduleTimeRange(firstSegmentWithTime.startTime, lastSegmentWithTime.endTime);
   }
 
-  if (request.requesterPresentation?.startTime && request.requesterPresentation.endTime) {
-    return formatScheduleTimeRange(
-      request.requesterPresentation.startTime,
-      request.requesterPresentation.endTime,
-    );
+  if (presentation?.startTime && presentation.endTime) {
+    return formatScheduleTimeRange(presentation.startTime, presentation.endTime);
   }
 
-  return formatScheduleTimeRange(
-    request.requesterState?.customStartTime ?? null,
-    request.requesterState?.customEndTime ?? null,
-  );
+  return formatScheduleTimeRange(state?.customStartTime ?? null, state?.customEndTime ?? null);
 }
 
 function getOpenShiftLabel(openShift: MobileOpenShift): string {
-  const primarySegment = openShift.presentation.segments[0] ?? null;
-
-  return (
-    primarySegment?.shiftName ?? openShift.presentation.shiftName ?? openShift.presentation.label
-  );
+  return getPresentationShiftLabel(openShift.presentation);
 }
 
 function buildJobChip(
@@ -359,70 +325,47 @@ function getSegmentJobChip(
   return buildJobChip(mobileColors, isDark, segment.jobName ?? null, segment);
 }
 
-function formatRequestStatus(status: MobileShiftRequest["status"]): string {
-  return status === "pending_approval"
-    ? "Pending approval"
-    : status.charAt(0).toUpperCase() + status.slice(1);
-}
-
-type StatusChipTone = {
+type ChipTone = {
   backgroundColor: string;
   borderColor: string;
   textColor: string;
 };
 
-function createStatusChipTones(
+// The one pill a card carries: a kind while open, in the tone Home's approval
+// queue gives that kind (an open shift shares the brand tone), and a status
+// tone once the request is waiting or decided. No red: a rejection is history.
+function createChipTones(
   mobileColors: MobileColors,
-): Record<MobileShiftRequest["status"], StatusChipTone> {
+): Record<MobileShiftRequest["type"] | "openShift" | "pending" | "approved" | "closed", ChipTone> {
+  const brand = {
+    backgroundColor: mobileColors.brandSoft,
+    borderColor: mobileColors.brandBorder,
+    textColor: mobileColors.brand,
+  };
+  const success = {
+    backgroundColor: mobileColors.successSoft,
+    borderColor: mobileColors.successBorder,
+    textColor: mobileColors.successText,
+  };
+  const warning = {
+    backgroundColor: mobileColors.warningSoft,
+    borderColor: mobileColors.warningBorder,
+    textColor: mobileColors.warningText,
+  };
+
   return {
-    open: {
-      backgroundColor: mobileColors.brandSoft,
-      borderColor: mobileColors.brandBorder,
-      textColor: mobileColors.brand,
-    },
-    pending_approval: {
-      backgroundColor: mobileColors.warningSoft,
-      borderColor: mobileColors.warningBorder,
-      textColor: mobileColors.warningText,
-    },
-    approved: {
-      backgroundColor: mobileColors.successSoft,
-      borderColor: mobileColors.successBorder,
-      textColor: mobileColors.successText,
-    },
-    rejected: {
-      backgroundColor: mobileColors.dangerSoft,
-      borderColor: mobileColors.dangerBorder,
-      textColor: mobileColors.dangerText,
-    },
-    cancelled: {
+    openShift: brand,
+    pickup: brand,
+    swap: success,
+    calloff: warning,
+    pending: warning,
+    approved: success,
+    closed: {
       backgroundColor: mobileColors.surfaceSecondary,
       borderColor: mobileColors.border,
-      textColor: mobileColors.textSubtle,
-    },
-    expired: {
-      backgroundColor: mobileColors.surfaceSecondary,
-      borderColor: mobileColors.border,
-      textColor: mobileColors.textSubtle,
+      textColor: mobileColors.textSecondary,
     },
   };
-}
-
-function CardIcon({
-  name,
-  muted = false,
-}: {
-  name: keyof typeof Ionicons.glyphMap;
-  muted?: boolean;
-}) {
-  const mobileColors = useMobileColors();
-  const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors]);
-  return (
-    <View style={[styles.cardIconFrame, muted && styles.cardIconFrameMuted]}>
-      <Ionicons color={mobileColors.brand} name={name} size={18} />
-    </View>
-  );
 }
 
 export default function RequestsScreen() {
@@ -441,6 +384,9 @@ export default function RequestsScreen() {
   const [pendingAction, setPendingAction] = useState<PendingRequestAction>(null);
   const [requestActionConfirmation, setRequestActionConfirmation] =
     useState<RequestActionConfirmation>(null);
+  // An approver may leave a note with either decision; it lives in the
+  // confirmation and travels with the body when the decision is confirmed.
+  const [resolveNote, setResolveNote] = useState("");
   const linkedEmployeeId = bootstrapQuery.data?.linkedEmployee?.id ?? null;
   const timeZone = bootstrapQuery.data?.currentOrg.timezone;
   const openShiftVisibility = bootstrapQuery.data?.currentOrg.openShiftVisibility;
@@ -558,7 +504,14 @@ export default function RequestsScreen() {
         await availabilityScheduleQuery.refetch();
       }
     },
-    invalidateKeys: [historyQueryKey],
+    // Claim, respond and volunteer patch nothing optimistically, so the
+    // requests query itself must be refetched or the card keeps its live
+    // Claim button after a success toast.
+    invalidateKeys: [
+      requestsQueryKey,
+      historyQueryKey,
+      mobileQueryKeys.shiftRequestAvailability(accessToken, requestRange),
+    ],
   });
   const runRequestAction = useCallback(
     (requestId: string, body: RequestActionBody) => {
@@ -566,16 +519,39 @@ export default function RequestsScreen() {
         return;
       }
 
-      const feedback = getMobileRequestActionFeedback({ requestId, body });
-      setRequestActionConfirmation({ requestId, body, feedback });
+      const request = requestsQuery.data?.requests.find((candidate) => candidate.id === requestId);
+      const feedback = getMobileRequestActionFeedback({ requestId, body, request });
+      // A manager withdrawing over the recipient's head gets the note field
+      // too; the requester's own cancel stays a plain confirmation.
+      const takesNote =
+        body.action === "resolve" ||
+        (body.action === "cancel" &&
+          request != null &&
+          isAwaitingRecipient(request) &&
+          request.requesterEmpId !== linkedEmployeeId);
+      setResolveNote("");
+      setRequestActionConfirmation({ requestId, body, feedback, takesNote });
     },
-    [pendingAction, requestActionMutation.isPending],
+    [
+      linkedEmployeeId,
+      pendingAction,
+      requestActionMutation.isPending,
+      requestsQuery.data?.requests,
+    ],
   );
 
   const confirmRequestAction = useCallback(() => {
     if (!requestActionConfirmation) return;
 
-    const { requestId, body, feedback } = requestActionConfirmation;
+    const { requestId, feedback } = requestActionConfirmation;
+    const note = resolveNote.trim();
+    const body: RequestActionBody =
+      requestActionConfirmation.takesNote &&
+      note &&
+      (requestActionConfirmation.body.action === "resolve" ||
+        requestActionConfirmation.body.action === "cancel")
+        ? { ...requestActionConfirmation.body, note }
+        : requestActionConfirmation.body;
     setRequestActionConfirmation(null);
     setPendingAction({ key: feedback.key });
     // Returned so `ConfirmationModal` can latch on it. The guard above reads
@@ -593,9 +569,17 @@ export default function RequestsScreen() {
         },
       );
     });
-  }, [requestActionConfirmation, requestActionMutation]);
+  }, [requestActionConfirmation, requestActionMutation, resolveNote]);
 
   const requests = requestsQuery.data?.requests ?? [];
+  const isResolveConfirmation = Boolean(requestActionConfirmation?.takesNote);
+  const resolveNoteRecipients = useMemo(() => {
+    const confirmation = requestActionConfirmation;
+    if (!confirmation?.takesNote) return "";
+    const request = requests.find((candidate) => candidate.id === confirmation.requestId);
+    return request ? describeShiftRequestNoteRecipients(request) : "the staff involved";
+  }, [requestActionConfirmation, requests]);
+
   const openShifts = requestsQuery.data?.openShifts ?? [];
   const availabilityScheduleEntries = availabilityScheduleQuery.data?.entries ?? [];
   const availableOpenShiftFeed = useMemo(
@@ -635,17 +619,22 @@ export default function RequestsScreen() {
         : [],
     [linkedEmployeeId, now, requests, timeZone],
   );
+  // The manager's queue: what waits on them, and, so it is not invisible
+  // until the recipient answers, what waits on someone else.
   const approvalRequests = useMemo(
     () =>
       canApprove
         ? requests.filter(
             (request) =>
-              request.status === "pending_approval" &&
+              (request.status === "pending_approval" ||
+                (request.status === "open" && request.targetEmpId == null) ||
+                isAwaitingRecipient(request)) &&
               !hasShiftRequestStarted(request, now, timeZone),
           )
         : [],
     [canApprove, now, requests, timeZone],
   );
+  const approvalGroups = useMemo(() => groupManagerQueue(approvalRequests), [approvalRequests]);
   const allRequests = useMemo(
     () =>
       canViewAllRequests
@@ -815,6 +804,21 @@ export default function RequestsScreen() {
     visibleTabs,
   ]);
   const activeTab = selectedTab ?? defaultTab;
+  // The default is chosen once from the first loaded counts and then held:
+  // recomputing it on every change moved the strip out from under a manager
+  // the moment they approved the last pending request.
+  useEffect(() => {
+    if (selectedTab == null && contentState.kind !== "loading") {
+      setSelectedTab(defaultTab);
+    }
+  }, [contentState.kind, defaultTab, selectedTab]);
+  // A deep link that names a tab (an alert, a home card) still wins over the
+  // latched choice, as it did before the latch.
+  useEffect(() => {
+    if (routeTab) {
+      setSelectedTab(routeTab);
+    }
+  }, [routeTab]);
 
   return (
     <Screen
@@ -903,6 +907,8 @@ export default function RequestsScreen() {
                         />
                       ) : (
                         <RequestCard
+                          now={now}
+                          timeZone={timeZone}
                           key={item.key}
                           canApprove={false}
                           linkedEmployeeId={linkedEmployeeId}
@@ -932,6 +938,8 @@ export default function RequestsScreen() {
           ) : (
             allRequests.map((request) => (
               <RequestCard
+                now={now}
+                timeZone={timeZone}
                 key={request.id}
                 canApprove={canApprove}
                 linkedEmployeeId={linkedEmployeeId}
@@ -955,6 +963,8 @@ export default function RequestsScreen() {
           ) : (
             myRequests.map((request) => (
               <RequestCard
+                now={now}
+                timeZone={timeZone}
                 key={request.id}
                 canApprove={false}
                 linkedEmployeeId={linkedEmployeeId}
@@ -976,16 +986,26 @@ export default function RequestsScreen() {
               title="Nothing to approve"
             />
           ) : (
-            approvalRequests.map((request) => (
-              <RequestCard
-                key={request.id}
-                canApprove={canApprove}
-                linkedEmployeeId={linkedEmployeeId}
-                pendingAction={pendingAction}
-                onAction={(body) => runRequestAction(request.id, body)}
-                highlighted={highlightedRequestId === request.id}
-                request={request}
-              />
+            approvalGroups.map((group) => (
+              <View key={group.key} style={styles.queueGroup}>
+                <View style={styles.queueGroupHeader}>
+                  <Text style={styles.queueGroupTitle}>{group.label}</Text>
+                  <NumericBadge count={group.requests.length} size="sm" tone="secondary" />
+                </View>
+                {group.requests.map((request) => (
+                  <RequestCard
+                    now={now}
+                    timeZone={timeZone}
+                    key={request.id}
+                    canApprove={canApprove}
+                    linkedEmployeeId={linkedEmployeeId}
+                    pendingAction={pendingAction}
+                    onAction={(body) => runRequestAction(request.id, body)}
+                    highlighted={highlightedRequestId === request.id}
+                    request={request}
+                  />
+                ))}
+              </View>
             ))
           )}
         </View>
@@ -1017,6 +1037,8 @@ export default function RequestsScreen() {
             <>
               {historyRequests.map((request) => (
                 <RequestCard
+                  now={now}
+                  timeZone={timeZone}
                   key={request.id}
                   canApprove={canApprove}
                   linkedEmployeeId={linkedEmployeeId}
@@ -1039,6 +1061,8 @@ export default function RequestsScreen() {
           )}
         </View>
       )}
+      {/* A decision that takes a note is a small form, so it gets a sheet;
+          the confirmation modal stays for the one-tap actions. */}
       <ConfirmationModal
         body={requestActionConfirmation?.feedback.message}
         confirmLabel={requestActionConfirmation?.feedback.confirmLabel ?? "Confirm"}
@@ -1048,8 +1072,47 @@ export default function RequestsScreen() {
         onCancel={() => setRequestActionConfirmation(null)}
         onConfirm={confirmRequestAction}
         title={requestActionConfirmation?.feedback.title ?? "Confirm action?"}
-        visible={Boolean(requestActionConfirmation)}
+        visible={Boolean(requestActionConfirmation) && !isResolveConfirmation}
       />
+      <BottomSheetModal
+        footer={
+          <SheetActions
+            primaryAction={
+              <Button
+                label={requestActionConfirmation?.feedback.confirmLabel ?? "Confirm"}
+                onPress={confirmRequestAction}
+                tone="primary"
+              />
+            }
+          >
+            {/* "Dismiss" when the decision itself is a cancel, so the two
+                buttons cannot read as the same word. */}
+            <Button
+              label={requestActionConfirmation?.body.action === "cancel" ? "Dismiss" : "Cancel"}
+              onPress={() => setRequestActionConfirmation(null)}
+              tone="neutral"
+            />
+          </SheetActions>
+        }
+        header={
+          <SheetHeader
+            subtitle={requestActionConfirmation?.feedback.message}
+            title={requestActionConfirmation?.feedback.title ?? "Confirm action?"}
+          />
+        }
+        visible={isResolveConfirmation}
+        onDismiss={() => setRequestActionConfirmation(null)}
+      >
+        <ProfileTextInput
+          accessibilityLabel={`Note to ${resolveNoteRecipients}? (Optional)`}
+          label={`Note to ${resolveNoteRecipients} (optional)`}
+          maxLength={500}
+          multiline
+          onChangeText={setResolveNote}
+          placeholder="Anything they should know"
+          value={resolveNote}
+        />
+      </BottomSheetModal>
     </Screen>
   );
 }
@@ -1061,6 +1124,8 @@ function RequestCard({
   highlighted,
   pendingAction,
   onAction,
+  now,
+  timeZone,
   showDate = true,
 }: {
   request: MobileShiftRequest;
@@ -1069,29 +1134,27 @@ function RequestCard({
   highlighted: boolean;
   pendingAction: PendingRequestAction;
   onAction: (body: RequestActionBody) => void;
+  now: Date;
+  timeZone: string | null | undefined;
   showDate?: boolean;
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors]);
-  const statusChipTones = useMemo(() => createStatusChipTones(mobileColors), [mobileColors]);
-  const shiftLabel = getRequestShiftLabel(request);
-  const timeRange = getRequestTimeRange(request);
-  const isMentored = hasMentoredSegments(getRequestSegments(request));
-  const requesterSplitSegments = getSplitShiftSegmentsFromPresentation(
-    request.requesterPresentation,
-    request.requesterState,
-  );
-  const targetSplitSegments = getSplitShiftSegmentsFromPresentation(
-    request.targetPresentation,
-    request.targetState ?? null,
-  );
-  const statusTone = statusChipTones[request.status];
+  const chipTones = useMemo(() => createChipTones(mobileColors), [mobileColors]);
+  const isSwap = request.type === "swap" && request.targetName != null;
+  const pill = describeShiftRequestPill(request.type, request.status);
+  const pillTone = pill.tone === "kind" ? chipTones[request.type] : chipTones[pill.tone];
+  const copy = describeShiftRequest(request, linkedEmployeeId);
 
+  const awaitingRecipient = isAwaitingRecipient(request);
+  // The requester withdraws their own request; a manager may also withdraw
+  // one still waiting on its recipient, since nothing else can move it.
   const canCancel =
-    Boolean(linkedEmployeeId) &&
-    request.requesterEmpId === linkedEmployeeId &&
-    (request.status === "open" || request.status === "pending_approval");
+    (Boolean(linkedEmployeeId) &&
+      request.requesterEmpId === linkedEmployeeId &&
+      (request.status === "open" || request.status === "pending_approval")) ||
+    (canApprove && awaitingRecipient);
   const canClaim =
     Boolean(linkedEmployeeId) &&
     request.type === "pickup" &&
@@ -1105,218 +1168,111 @@ function RequestCard({
   const canResolve = canApprove && request.status === "pending_approval";
   const hasActions = canCancel || canClaim || canRespond || canResolve;
 
+  const actionButton = (
+    body: RequestActionBody,
+    label: string,
+    tone: "primary" | "neutral" = "primary",
+  ) => (
+    <Button
+      compact
+      disabled={Boolean(pendingAction)}
+      label={label}
+      loading={pendingAction?.key === getMobileRequestActionKey(request.id, body)}
+      onPress={() => {
+        onAction(body);
+      }}
+      tone={tone}
+    />
+  );
+
   return (
     <View style={[styles.requestCard, highlighted && styles.requestCardHighlighted]}>
       <View style={styles.cardHeader}>
         <View style={styles.cardTitleRow}>
-          <CardIcon muted={highlighted} name="swap-horizontal-outline" />
-          <View style={styles.titleColumn}>
-            <Text style={styles.requestTitle}>{request.requesterName}</Text>
-            <View style={styles.requestTypeRow}>
-              <CountBadge
-                label={REQUEST_TYPE_LABEL[request.type]}
-                tone={REQUEST_TYPE_TONE[request.type]}
-              />
-              {showDate ? <Text style={styles.metaText}>{request.requesterShiftDate}</Text> : null}
-            </View>
-            {requesterSplitSegments.length > 1 ? (
-              <View style={styles.splitShiftPanel}>
-                <SplitShiftBadge count={requesterSplitSegments.length} />
-                <SplitShiftSegmentList
-                  renderSegmentChip={(segment) => (
-                    <JobPill
-                      chip={getSegmentJobChip(mobileColors, isDark, segment)}
-                      compact
-                      isMentored={segment.isMentored === true}
-                    />
-                  )}
-                  segments={requesterSplitSegments}
-                  variant="compact"
-                />
-              </View>
-            ) : (
-              <View style={styles.shiftPillRow}>
-                <ShiftPill
-                  colors={getShiftPillColors(mobileColors, isDark, request.requesterPresentation)}
-                  label={shiftLabel}
-                />
-                {timeRange ? <Text style={styles.shiftTitleTimeText}>{timeRange}</Text> : null}
-                {isMentored ? <MentoredPill /> : null}
-              </View>
-            )}
-            {request.targetName ? (
-              <Text style={styles.metaText}>Target: {request.targetName}</Text>
-            ) : null}
-            {targetSplitSegments.length > 1 ? (
-              <View style={styles.splitShiftPanel}>
-                <Text style={styles.splitShiftPanelLabel}>Target shift</Text>
-                <SplitShiftBadge count={targetSplitSegments.length} />
-                <SplitShiftSegmentList
-                  renderSegmentChip={(segment) => (
-                    <JobPill
-                      chip={getSegmentJobChip(mobileColors, isDark, segment)}
-                      compact
-                      isMentored={segment.isMentored === true}
-                    />
-                  )}
-                  segments={targetSplitSegments}
-                  variant="compact"
-                />
-              </View>
-            ) : null}
-            {request.adminNote ? (
-              <Text style={styles.metaText}>Manager note: {request.adminNote}</Text>
-            ) : null}
-          </View>
+          <Text style={styles.requestTitle}>{copy.title}</Text>
         </View>
         <View
           style={[
             styles.statusChip,
-            { backgroundColor: statusTone.backgroundColor, borderColor: statusTone.borderColor },
+            { backgroundColor: pillTone.backgroundColor, borderColor: pillTone.borderColor },
           ]}
         >
-          <Text fit="compact" style={[styles.statusChipText, { color: statusTone.textColor }]}>
-            {formatRequestStatus(request.status)}
+          <Text fit="compact" style={[styles.statusChipText, { color: pillTone.textColor }]}>
+            {pill.label}
           </Text>
         </View>
+      </View>
+      <View style={styles.cardBody}>
+        <Text style={styles.metaText}>{copy.subtitle}</Text>
+        {canApprove && awaitingRecipient && request.targetName ? (
+          <Text style={styles.awaitingNote}>{describeAwaitingRecipient(request.targetName)}</Text>
+        ) : null}
+        {/* A swap is one card about two shifts: the panels sit nearly flush
+            and the swap disc straddles the seam between them. */}
+        <View style={isSwap ? styles.swapPanels : undefined}>
+          <RequestShiftPanel
+            date={showDate || isSwap ? request.requesterShiftDate : null}
+            now={now}
+            personName={isSwap ? copy.requesterShiftLabel : null}
+            presentation={request.requesterPresentation}
+            seam={isSwap ? "below" : undefined}
+            state={request.requesterState}
+            timeZone={timeZone}
+          />
+          {isSwap ? (
+            <>
+              {/* A fixed strip between the panels owns the disc, so it sits
+                  on the seam whatever the panels' heights or the text size. */}
+              <View pointerEvents="none" style={styles.swapSeam}>
+                <View style={styles.swapArrow}>
+                  <Ionicons color={mobileColors.brand} name="swap-vertical" size={16} />
+                </View>
+              </View>
+              <RequestShiftPanel
+                date={request.targetShiftDate}
+                now={now}
+                personName={copy.targetShiftLabel}
+                presentation={request.targetPresentation ?? null}
+                seam="above"
+                state={request.targetState ?? null}
+                timeZone={timeZone}
+              />
+            </>
+          ) : null}
+        </View>
+        {request.adminNote ? (
+          <Text style={styles.metaText}>Manager note: {request.adminNote}</Text>
+        ) : null}
       </View>
       {hasActions ? (
         <ActionButtons style={styles.cardActions}>
           {canCancel
-            ? (() => {
-                const body: RequestActionBody = {
-                  action: "cancel",
-                  empId: linkedEmployeeId!,
-                };
-                const isLoading =
-                  pendingAction?.key === getMobileRequestActionKey(request.id, body);
-
-                return (
-                  <Button
-                    compact
-                    disabled={Boolean(pendingAction)}
-                    label="Cancel"
-                    loading={isLoading}
-                    onPress={() => {
-                      onAction(body);
-                    }}
-                    tone="neutral"
-                  />
-                );
-              })()
+            ? actionButton(
+                { action: "cancel", empId: request.requesterEmpId },
+                "Cancel request",
+                "neutral",
+              )
             : null}
           {canClaim
-            ? (() => {
-                const body: RequestActionBody = {
-                  action: "claim",
-                  claimerEmpId: linkedEmployeeId!,
-                };
-                const isLoading =
-                  pendingAction?.key === getMobileRequestActionKey(request.id, body);
-
-                return (
-                  <Button
-                    compact
-                    disabled={Boolean(pendingAction)}
-                    label="Claim"
-                    loading={isLoading}
-                    onPress={() => {
-                      onAction(body);
-                    }}
-                  />
-                );
-              })()
+            ? actionButton({ action: "claim", claimerEmpId: linkedEmployeeId! }, "Claim")
             : null}
           {canRespond ? (
             <>
-              {(() => {
-                const body: RequestActionBody = {
-                  action: "respond",
-                  empId: linkedEmployeeId!,
-                  accept: false,
-                };
-                const isLoading =
-                  pendingAction?.key === getMobileRequestActionKey(request.id, body);
-
-                return (
-                  <Button
-                    compact
-                    disabled={Boolean(pendingAction)}
-                    label="Decline"
-                    loading={isLoading}
-                    onPress={() => {
-                      onAction(body);
-                    }}
-                    tone="neutral"
-                  />
-                );
-              })()}
-              {(() => {
-                const body: RequestActionBody = {
-                  action: "respond",
-                  empId: linkedEmployeeId!,
-                  accept: true,
-                };
-                const isLoading =
-                  pendingAction?.key === getMobileRequestActionKey(request.id, body);
-
-                return (
-                  <Button
-                    compact
-                    disabled={Boolean(pendingAction)}
-                    label="Accept"
-                    loading={isLoading}
-                    onPress={() => {
-                      onAction(body);
-                    }}
-                  />
-                );
-              })()}
+              {actionButton(
+                { action: "respond", empId: linkedEmployeeId!, accept: false },
+                "Decline",
+                "neutral",
+              )}
+              {actionButton(
+                { action: "respond", empId: linkedEmployeeId!, accept: true },
+                "Accept",
+              )}
             </>
           ) : null}
           {canResolve ? (
             <>
-              {(() => {
-                const body: RequestActionBody = {
-                  action: "resolve",
-                  approved: false,
-                };
-                const isLoading =
-                  pendingAction?.key === getMobileRequestActionKey(request.id, body);
-
-                return (
-                  <Button
-                    compact
-                    disabled={Boolean(pendingAction)}
-                    label="Reject"
-                    loading={isLoading}
-                    onPress={() => {
-                      onAction(body);
-                    }}
-                    tone="danger"
-                  />
-                );
-              })()}
-              {(() => {
-                const body: RequestActionBody = {
-                  action: "resolve",
-                  approved: true,
-                };
-                const isLoading =
-                  pendingAction?.key === getMobileRequestActionKey(request.id, body);
-
-                return (
-                  <Button
-                    compact
-                    disabled={Boolean(pendingAction)}
-                    label="Approve"
-                    loading={isLoading}
-                    onPress={() => {
-                      onAction(body);
-                    }}
-                  />
-                );
-              })()}
+              {actionButton({ action: "resolve", approved: false }, "Reject", "neutral")}
+              {actionButton({ action: "resolve", approved: true }, "Approve")}
             </>
           ) : null}
         </ActionButtons>
@@ -1325,7 +1281,94 @@ function RequestCard({
   );
 }
 
-function OpenShiftCard({
+/**
+ * One shift inside a request card: whose it is (only when the card holds
+ * more than one person's shift), the shift and its focus area as text, and
+ * the day and time on one tabular line. Split shifts list their segments
+ * the way the open-shift card does.
+ */
+function RequestShiftPanel({
+  date,
+  now,
+  personName,
+  presentation,
+  seam,
+  state,
+  timeZone,
+}: {
+  date: string | null;
+  now: Date;
+  personName: string | null;
+  presentation: ResolvedSchedulePresentation | null;
+  state: ScheduleCellState | null;
+  timeZone: string | null | undefined;
+  /** Which edge meets the other panel of a swap, so the disc has room. */
+  seam?: "above" | "below";
+}) {
+  const mobileColors = useMobileColors();
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors]);
+  const splitSegments = getSplitShiftSegmentsFromPresentation(presentation, state);
+  const segments = presentation?.segments ?? [];
+  // One pill per named job (the default shift job arrives unnamed and draws
+  // nothing), the same chip the open-shift card uses, so colours match.
+  const jobChips = segments
+    .map((segment) => ({
+      chip: buildJobChip(mobileColors, isDark, segment.jobName ?? null, segment),
+      isMentored: segment.isMentored === true,
+    }))
+    .filter(({ chip, isMentored }) => chip != null || isMentored);
+  const timeRange = getPresentationTimeRange(presentation, state);
+  const dayLabel = date ? formatScheduleDayLabel(date, now, timeZone) : null;
+  const whenLabel = [dayLabel, timeRange].filter(Boolean).join(" · ");
+  const focusAreaName =
+    presentation?.displayFocusAreaName ??
+    presentation?.focusAreaName ??
+    segments[0]?.displayFocusAreaName ??
+    null;
+
+  return (
+    <View
+      style={[
+        styles.shiftPanel,
+        seam === "below" && styles.shiftPanelSeamBelow,
+        seam === "above" && styles.shiftPanelSeamAbove,
+      ]}
+    >
+      {personName ? <Text style={styles.shiftPanelPerson}>{personName}</Text> : null}
+      {splitSegments.length > 1 ? (
+        <View style={styles.splitShiftPanel}>
+          <SplitShiftBadge count={splitSegments.length} />
+          <SplitShiftSegmentList
+            renderSegmentChip={(segment) => (
+              <JobPill
+                chip={getSegmentJobChip(mobileColors, isDark, segment)}
+                compact
+                isMentored={segment.isMentored === true}
+              />
+            )}
+            segments={splitSegments}
+            variant="compact"
+          />
+        </View>
+      ) : (
+        <>
+          <View style={styles.shiftTitleRow}>
+            <Text style={styles.shiftPanelTitle}>{getPresentationShiftLabel(presentation)}</Text>
+            {jobChips.map(({ chip, isMentored: segmentMentored }, index) => (
+              <JobPill chip={chip} compact isMentored={segmentMentored} key={index} />
+            ))}
+          </View>
+          {focusAreaName ? <Text style={styles.shiftPanelContext}>{focusAreaName}</Text> : null}
+        </>
+      )}
+      {whenLabel ? <Text style={styles.shiftPanelWhen}>{whenLabel}</Text> : null}
+    </View>
+  );
+}
+
+// Exported for the first-run tour's live preview of the Available list.
+export function OpenShiftCard({
   openShift,
   linkedEmployeeId,
   pendingAction,
@@ -1341,8 +1384,7 @@ function OpenShiftCard({
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors]);
-  const statusChipTones = useMemo(() => createStatusChipTones(mobileColors), [mobileColors]);
-  const openShiftChipTone = statusChipTones.open;
+  const openShiftChipTone = useMemo(() => createChipTones(mobileColors), [mobileColors]).openShift;
   const shiftLabel = getOpenShiftLabel(openShift);
   const focusAreaName = getOpenShiftFocusAreaName(openShift);
   const jobChip = getOpenShiftJobChip(mobileColors, isDark, openShift);
@@ -1362,7 +1404,12 @@ function OpenShiftCard({
     <View style={[styles.requestCard, styles.openShiftCard]}>
       <View style={styles.openShiftTitleRow}>
         <View style={styles.shiftTitleTimeRow}>
-          <Text style={styles.openShiftTitle}>{shiftLabel}</Text>
+          <View style={styles.shiftTitleRow}>
+            <Text style={styles.openShiftTitle}>{shiftLabel}</Text>
+            {splitSegments.length <= 1 && (jobChip || isMentored) ? (
+              <JobPill chip={jobChip} compact isMentored={isMentored} />
+            ) : null}
+          </View>
           {splitSegments.length <= 1 && timeRange ? (
             <Text style={styles.shiftTitleTimeText}>{timeRange}</Text>
           ) : null}
@@ -1400,22 +1447,15 @@ function OpenShiftCard({
             variant="compact"
           />
         </View>
-      ) : jobChip || focusAreaName || isMentored ? (
-        <View style={styles.openShiftContextStack}>
-          {focusAreaName ? <Text style={styles.openShiftContextText}>{focusAreaName}</Text> : null}
-          {jobChip || isMentored ? (
-            <View style={styles.shiftPillRow}>
-              <JobPill chip={jobChip} compact isMentored={isMentored} />
-            </View>
-          ) : null}
-        </View>
+      ) : focusAreaName ? (
+        <Text style={styles.openShiftContextText}>{focusAreaName}</Text>
       ) : null}
       <Text style={styles.metaText}>
         {openShift.needed} teammate{openShift.needed === 1 ? "" : "s"} needed
       </Text>
       {volunteerBlockReason ? <Text style={styles.metaText}>{volunteerBlockReason}</Text> : null}
       {hasActions ? (
-        <View style={[styles.cardActions, styles.cardActionsFlush]}>
+        <ActionButtons style={styles.cardActions}>
           {(() => {
             const body: RequestActionBody = {
               action: "volunteer_open_shift",
@@ -1430,10 +1470,7 @@ function OpenShiftCard({
               <Button
                 compact
                 disabled={Boolean(pendingAction) || openShift.canVolunteer === false}
-                label="Volunteer"
-                leadingAccessory={
-                  <Ionicons color={mobileColors.brand} name="add-circle-outline" size={18} />
-                }
+                label="Claim"
                 loading={isLoading}
                 onPress={() => {
                   if (openShift.canVolunteer === false) {
@@ -1442,11 +1479,10 @@ function OpenShiftCard({
 
                   onAction(body);
                 }}
-                tone="secondary"
               />
             );
           })()}
-        </View>
+        </ActionButtons>
       ) : null}
     </View>
   );
@@ -1541,28 +1577,6 @@ function JobPill({
           ) : null}
         </View>
       )}
-    </View>
-  );
-}
-
-function ShiftPill({ colors, label }: { colors: ShiftPillColors; label: string }) {
-  const mobileColors = useMobileColors();
-  const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors]);
-  return (
-    <View
-      accessibilityLabel={`Shift ${label}`}
-      style={[
-        styles.shiftPill,
-        {
-          backgroundColor: colors.backgroundColor,
-          borderColor: colors.borderColor,
-        },
-      ]}
-    >
-      <Text fit="compact" style={[styles.shiftPillText, { color: colors.textColor }]}>
-        {label}
-      </Text>
     </View>
   );
 }

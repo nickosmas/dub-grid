@@ -97,9 +97,15 @@ export default function CalendarDatePicker({
 
   const calendarDays = useMemo(() => buildCalendarDays(visibleMonth), [visibleMonth]);
 
+  const hasSelection = Boolean(selectedDate);
   const triggerLabel =
     triggerLabelOverride ??
     (selectedDate ? FIELD_DATE_FORMATTER.format(selectedDate) : placeholder);
+
+  const pickDay = (dateKey: string) => {
+    onChange(dateKey);
+    setOpen(false);
+  };
   const isInline = triggerVariant === "inline";
 
   return (
@@ -128,7 +134,7 @@ export default function CalendarDatePicker({
             padding: "10px 12px",
             fontSize: 13,
             fontWeight: 500,
-            color: selectedDate ? "var(--dg-color-text-secondary)" : "var(--dg-color-text-subtle)",
+            color: hasSelection ? "var(--dg-color-text-secondary)" : "var(--dg-color-text-subtle)",
             cursor: disabled ? "not-allowed" : "pointer",
             fontFamily: "inherit",
             textAlign: isInline ? "center" : "left",
@@ -141,7 +147,7 @@ export default function CalendarDatePicker({
           <CalendarDays
             size={15}
             style={{
-              color: selectedDate ? "var(--dg-color-text-muted)" : "var(--dg-color-text-faint)",
+              color: hasSelection ? "var(--dg-color-text-muted)" : "var(--dg-color-text-faint)",
               flexShrink: 0,
             }}
           />
@@ -277,10 +283,7 @@ export default function CalendarDatePicker({
                   <Button
                     key={dateKey}
                     type="button"
-                    onClick={() => {
-                      onChange(dateKey);
-                      setOpen(false);
-                    }}
+                    onClick={() => pickDay(dateKey)}
                     disabled={isDisabled}
                     aria-label={`${isSelected ? "Selected " : "Choose "}${DAY_ARIA_FORMATTER.format(day)}`}
                     className={cn(
@@ -329,7 +332,7 @@ export default function CalendarDatePicker({
                   onChange("");
                   setOpen(false);
                 }}
-                disabled={!allowClear || !value}
+                disabled={!allowClear || !hasSelection}
                 style={{ fontSize: "var(--dg-fs-caption)", padding: "6px 10px" }}
               >
                 Clear

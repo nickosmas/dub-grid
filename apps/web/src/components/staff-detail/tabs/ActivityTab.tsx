@@ -164,11 +164,11 @@ export function ActivityTab({
             )}
           </div>
           <CustomSelect
+            style={{ flex: "1 1 auto" }}
             value={categoryFilter}
             options={categoryOptions}
             onChange={setCategoryFilter}
             ariaLabel="Filter by activity type"
-            style={{ minWidth: 160 }}
             fontSize="var(--dg-fs-navigation-item)"
             fontWeight="var(--dg-type-control-weight)"
             activeFontWeight="var(--dg-type-control-weight)"

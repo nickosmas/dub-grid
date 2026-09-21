@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { deflateSync, inflateSync } from "node:zlib";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ScheduleCellState } from "@dubgrid/contracts";
+import { formatScheduleTimeRange } from "@dubgrid/schedule-core";
 import {
   fetchPublishedShiftRows,
   resolvePublishedScheduleEntry,
@@ -171,12 +172,26 @@ export interface ShiftRequestReportRow {
   type: string;
   status: string;
   requester: string;
-  target: string;
   requesterShiftDate: string;
+  /** Shift names on the requester's day, joined; the schedule's own labels. */
+  requesterShift: string;
+  requesterJobs: string;
+  requesterFocusArea: string;
+  requesterTime: string;
+  target: string;
   targetShiftDate: string;
+  targetShift: string;
+  targetJobs: string;
+  targetFocusArea: string;
+  targetTime: string;
+  /** The reason on a call-off; empty otherwise. */
+  absenceType: string;
   createdAt: string;
   resolvedAt: string;
   resolutionHours: number | null;
+  /** Who decided it, when the deciding account is on the staff list. */
+  decidedBy: string;
+  managerNote: string;
 }
 
 export interface AbsenceCalloffReportRow {
@@ -185,6 +200,16 @@ export interface AbsenceCalloffReportRow {
   date: string;
   absenceType: string;
   status: string;
+  /** The shift given up, as the schedule names it; empty on a published absence. */
+  droppedShift: string;
+  droppedShiftTime: string;
+  /** When the call-off was submitted; empty on a published absence. */
+  submittedAt: string;
+  /** Hours between submitting and the shift's start; negative once it had begun. */
+  noticeHours: number | null;
+  decidedAt: string;
+  decidedBy: string;
+  managerNote: string;
 }
 
 export interface RosterStatusReportRow {
@@ -353,6 +378,8 @@ type ShiftCategoryRow = {
   id: number;
   name: string;
   focus_area_id: number | null;
+  start_time?: string | null;
+  end_time?: string | null;
 };
 
 type ShiftRequestRow = {
@@ -369,6 +396,8 @@ type ShiftRequestRow = {
   created_at: string;
   resolved_at: string | null;
   updated_at: string;
+  admin_user_id?: string | null;
+  admin_note?: string | null;
 };
 
 type InvitationRow = {
@@ -468,6 +497,39 @@ export function resolveCurrentPayPeriodRange(
     startDate: toIsoDate(start),
     endDate: toIsoDate(addDays(start, 13)),
   };
+}
+
+/**
+ * The instant a wall-clock date and time fall on in a time zone. Read a guess
+ * back through the zone's clock and correct by the difference, twice: one
+ * pass lands an hour out on the day the clocks change.
+ */
+function zonedDateTimeToInstant(date: string, time: string, timeZone: string | null): Date {
+  const [year, month, day] = date.split("-").map(Number);
+  const [hour = 0, minute = 0] = time.split(":").map(Number);
+  const wanted = Date.UTC(year, (month || 1) - 1, day || 1, hour, minute);
+  if (!timeZone) return new Date(wanted);
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const asSeen = (instant: number) => {
+    const parts = formatter.formatToParts(new Date(instant));
+    const read = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? 0);
+    return Date.UTC(read("year"), read("month") - 1, read("day"), read("hour"), read("minute"));
+  };
+  let guess = wanted;
+  for (let pass = 0; pass < 2; pass += 1) {
+    const drift = asSeen(guess) - wanted;
+    if (drift === 0) break;
+    guess -= drift;
+  }
+  return new Date(guess);
 }
 
 function formatName(row: { first_name?: string | null; last_name?: string | null }): string {
@@ -1101,7 +1163,45 @@ export function buildOperationsReportPayload(
     }
     return true;
   });
-  const shiftRequests = matchingShiftRequests.map((request) => {
+  const employeeNameByUserId = new Map(
+    historicalEmployeeDirectory
+      .filter((row) => row.user_id)
+      .map((row) => [row.user_id as string, formatName(row)]),
+  );
+  // Everything a manager reads off the request card, flattened: the shifts
+  // by name, job, focus area and time on each side, the call-off reason, who
+  // decided and what they wrote.
+  const describeRequestShift = (state: ScheduleCellState | null | undefined) => {
+    const segments = state?.segments ?? [];
+    const shifts = segments
+      .map((segment) => (segment.shiftId == null ? null : shiftById.get(segment.shiftId)))
+      .filter((shift): shift is ShiftCategoryRow => shift != null);
+    const times = segments.map((segment) => {
+      const shift = segment.shiftId == null ? null : shiftById.get(segment.shiftId);
+      return formatScheduleTimeRange(
+        state?.customStartTime ?? shift?.start_time ?? null,
+        state?.customEndTime ?? shift?.end_time ?? null,
+      );
+    });
+    const focusAreaIds = new Set<number>();
+    if (state?.focusAreaId != null) focusAreaIds.add(state.focusAreaId);
+    for (const shift of shifts) {
+      if (shift.focus_area_id != null) focusAreaIds.add(shift.focus_area_id);
+    }
+    return {
+      shift: shifts.map((shift) => shift.name).join("; "),
+      jobs: segments
+        .map((segment) => jobById.get(segment.jobId))
+        .filter((job): job is string => Boolean(job))
+        .join("; "),
+      focusArea: [...focusAreaIds]
+        .map((id) => focusAreaById.get(id))
+        .filter((name): name is string => Boolean(name))
+        .join("; "),
+      time: times.filter((time): time is string => Boolean(time)).join("; "),
+    };
+  };
+  const shiftRequests: ShiftRequestReportRow[] = matchingShiftRequests.map((request) => {
     const resolvedAt = request.resolved_at ?? "";
     const resolutionHours = request.resolved_at
       ? roundHours(
@@ -1109,20 +1209,36 @@ export function buildOperationsReportPayload(
             3_600_000,
         )
       : null;
+    const requesterShift = describeRequestShift(request.requester_state);
+    const targetShift = describeRequestShift(request.target_state);
 
     return {
       id: request.id,
       type: request.type,
       status: request.status,
       requester: employeeNameById.get(request.requester_emp_id) ?? "Unknown employee",
+      requesterShiftDate: request.requester_shift_date,
+      requesterShift: requesterShift.shift,
+      requesterJobs: requesterShift.jobs,
+      requesterFocusArea: requesterShift.focusArea,
+      requesterTime: requesterShift.time,
       target: request.target_emp_id
         ? (employeeNameById.get(request.target_emp_id) ?? "Unknown employee")
         : "",
-      requesterShiftDate: request.requester_shift_date,
       targetShiftDate: request.target_shift_date ?? "",
+      targetShift: targetShift.shift,
+      targetJobs: targetShift.jobs,
+      targetFocusArea: targetShift.focusArea,
+      targetTime: targetShift.time,
+      absenceType:
+        request.absence_type_id == null ? "" : (absenceTypeById.get(request.absence_type_id) ?? ""),
       createdAt: request.created_at,
       resolvedAt,
       resolutionHours,
+      decidedBy: request.admin_user_id
+        ? (employeeNameByUserId.get(request.admin_user_id) ?? "Manager")
+        : "",
+      managerNote: request.admin_note ?? "",
     };
   });
 
@@ -1233,10 +1349,20 @@ export function buildOperationsReportPayload(
     date: entry.date,
     absenceType: entry.label,
     status: "published",
+    droppedShift: "",
+    droppedShiftTime: "",
+    submittedAt: "",
+    noticeHours: null,
+    decidedAt: "",
+    decidedBy: "",
+    managerNote: "",
   }));
+  // Every call-off in the range, whatever became of it: a manager reading
+  // this wants to know who called off, when, and with how much notice, and a
+  // rejected or withdrawn call-off is still a call-off.
   const calloffRows: AbsenceCalloffReportRow[] = source.shiftRequests
     .filter((request) => {
-      if (request.type !== "calloff" || request.status !== "approved") {
+      if (request.type !== "calloff") {
         return false;
       }
       if (!reportDateSet.has(request.requester_shift_date)) return false;
@@ -1244,16 +1370,40 @@ export function buildOperationsReportPayload(
       if (!requester) return false;
       return hasAnyNumber(requester.focus_area_ids, focusAreaIdSet);
     })
-    .map((request) => ({
-      kind: "calloff",
-      employeeName: employeeNameById.get(request.requester_emp_id) ?? "Unknown employee",
-      date: request.requester_shift_date,
-      absenceType:
-        request.absence_type_id == null
-          ? ""
-          : (absenceTypeById.get(request.absence_type_id) ?? "Unknown absence type"),
-      status: request.status,
-    }));
+    .map((request) => {
+      const dropped = describeRequestShift(request.requester_state);
+      const earliestStart = (request.requester_state?.segments ?? [])
+        .map((segment) => {
+          const shift = segment.shiftId == null ? null : shiftById.get(segment.shiftId);
+          return request.requester_state?.customStartTime ?? shift?.start_time ?? null;
+        })
+        .filter((value): value is string => Boolean(value))
+        .sort()[0];
+      const shiftStart = earliestStart
+        ? zonedDateTimeToInstant(request.requester_shift_date, earliestStart, source.org.timezone)
+        : null;
+      return {
+        kind: "calloff" as const,
+        employeeName: employeeNameById.get(request.requester_emp_id) ?? "Unknown employee",
+        date: request.requester_shift_date,
+        absenceType:
+          request.absence_type_id == null
+            ? ""
+            : (absenceTypeById.get(request.absence_type_id) ?? "Unknown absence type"),
+        status: request.status,
+        droppedShift: dropped.shift,
+        droppedShiftTime: dropped.time,
+        submittedAt: request.created_at,
+        noticeHours: shiftStart
+          ? roundHours((shiftStart.getTime() - new Date(request.created_at).getTime()) / 3_600_000)
+          : null,
+        decidedAt: request.resolved_at ?? "",
+        decidedBy: request.admin_user_id
+          ? (employeeNameByUserId.get(request.admin_user_id) ?? "Manager")
+          : "",
+        managerNote: request.admin_note ?? "",
+      };
+    });
 
   const rosterStatus = rosterEmployees.map((employee) => ({
     employeeId: employee.id,
@@ -2143,7 +2293,7 @@ function fetchFilterOptionSource(serviceClient: SupabaseClient, orgId: string) {
     shiftCategories: fetchTableRows<ShiftCategoryRow>(
       serviceClient
         .from("shift_categories")
-        .select("id, name, focus_area_id")
+        .select("id, name, focus_area_id, start_time, end_time")
         .eq("org_id", orgId)
         .is("archived_at", null),
     ),
@@ -2272,7 +2422,7 @@ export async function loadOperationsReport(
       serviceClient
         .from("shift_requests")
         .select(
-          "id, type, status, requester_emp_id, target_emp_id, requester_shift_date, target_shift_date, requester_state, target_state, absence_type_id, created_at, resolved_at, updated_at",
+          "id, type, status, requester_emp_id, target_emp_id, requester_shift_date, target_shift_date, requester_state, target_state, absence_type_id, created_at, resolved_at, updated_at, admin_user_id, admin_note",
         )
         .eq("org_id", input.orgId)
         .or(
