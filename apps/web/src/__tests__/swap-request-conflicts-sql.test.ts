@@ -40,4 +40,23 @@ describe("swap request conflict contract", () => {
       "REVOKE ALL ON FUNCTION public.refuse_conflicting_swap_request() FROM PUBLIC, anon, authenticated;",
     );
   });
+
+  it("asks the same question again at approval, on the schedule as it is then", () => {
+    const approval = readFileSync(
+      migrationPath("028_swap_approval_rechecks_conflicts.sql"),
+      "utf8",
+    );
+    expect(approval).toContain("RENAME TO resolve_shift_request_unchecked");
+    expect(approval).toContain(
+      "REVOKE ALL ON FUNCTION public.resolve_shift_request_unchecked(UUID, BOOLEAN, TEXT)\n  FROM PUBLIC, anon, authenticated;",
+    );
+    expect(approval).toContain("v_reason := public.swap_request_conflict(");
+    expect(approval).toContain("RAISE EXCEPTION 'Cannot approve: %', v_reason;");
+    expect(approval).toContain(
+      "PERFORM public.resolve_shift_request_unchecked(p_request_id, p_approved, p_note);",
+    );
+    expect(approval).toContain(
+      "GRANT EXECUTE ON FUNCTION public.resolve_shift_request(UUID, BOOLEAN, TEXT) TO authenticated;",
+    );
+  });
 });

@@ -253,19 +253,20 @@ export function useShiftRequests(
     [activeRequests],
   );
 
-  // Badge count: for employees = swap proposals directed at them (open status);
-  // for admins = pending_approval count
+  // Badge count: what the board will show you. Approvers see every active
+  // request, which is what their Approval Queue tab lists (it used to count
+  // only the pending ones, so the badge and the tab disagreed); everyone else
+  // sees the requests waiting on their own answer.
   const badgeCount = useMemo(() => {
-    const myPendingTargetedRequests = currentEmpId
-      ? activeRequests.filter(
-          (r) =>
-            (r.type === "swap" || (r.type === "pickup" && r.targetEmpId != null)) &&
-            r.status === "open" &&
-            r.targetEmpId === currentEmpId,
-        ).length
-      : 0;
-    return myPendingTargetedRequests + (canApprove ? pendingApproval.length : 0);
-  }, [activeRequests, currentEmpId, canApprove, pendingApproval]);
+    if (canApprove) return activeRequests.length;
+    if (!currentEmpId) return 0;
+    return activeRequests.filter(
+      (r) =>
+        (r.type === "swap" || (r.type === "pickup" && r.targetEmpId != null)) &&
+        r.status === "open" &&
+        r.targetEmpId === currentEmpId,
+    ).length;
+  }, [activeRequests, currentEmpId, canApprove]);
 
   const create = useCallback(
     async (

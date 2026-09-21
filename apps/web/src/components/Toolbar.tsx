@@ -84,7 +84,7 @@ interface ToolbarProps {
   presenceSlot?: React.ReactNode;
   showAudit?: boolean;
   onAuditToggle?: () => void;
-  /** Badge count for shift requests (swaps directed at me + pending approvals for admins). */
+  /** Badge count for shift requests: every active request for approvers, otherwise the ones awaiting my answer. */
   requestsBadgeCount?: number;
   /** Toggle the shift requests board panel. */
   onRequestsToggle?: () => void;
@@ -679,7 +679,7 @@ export default function Toolbar({
               Tools
               <NumericBadge
                 count={requestsBadgeCount}
-                label={`${requestsBadgeCount} pending requests`}
+                label={`${requestsBadgeCount} active requests`}
                 size="sm"
                 tone="danger"
                 style={FLOATING_BADGE_STYLE}
@@ -1021,7 +1021,7 @@ export default function Toolbar({
               Tools
               <NumericBadge
                 count={requestsBadgeCount}
-                label={`${requestsBadgeCount} pending requests`}
+                label={`${requestsBadgeCount} active requests`}
                 size="sm"
                 tone="danger"
                 style={FLOATING_BADGE_STYLE}
