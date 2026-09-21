@@ -58,4 +58,5 @@ BEGIN
 END;
 $$;
 
+REVOKE ALL ON FUNCTION public.resolve_shift_request(UUID, BOOLEAN, TEXT) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.resolve_shift_request(UUID, BOOLEAN, TEXT) TO authenticated;
