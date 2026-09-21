@@ -1,9 +1,11 @@
-import { getAvatarTypography } from "@dubgrid/design-tokens";
+import { getAvatarTone, getAvatarTypography, resolveAvatarSeed } from "@dubgrid/design-tokens";
 import { useState, useMemo } from "react";
 import Link from "next/link";
+import { useTheme } from "next-themes";
 import type { EmployeeHours } from "@/lib/dashboard-stats";
 import { Button } from "@/components/Button";
-import { getAvatarInitials } from "@/lib/utils";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { getEmployeeDisplayName, getInitials } from "@/lib/utils";
 import type { Employee, FocusArea } from "@/types";
 import Modal from "@/components/Modal";
 import CustomSelect from "@/components/CustomSelect";
@@ -32,6 +34,8 @@ export default function ExpandedStaffHours({
   otThreshold = 40,
   onClose,
 }: ExpandedStaffHoursProps) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
   const [sort, setSort] = useState<SortMode>("hours");
   const [faFilter, setFaFilter] = useState<"all" | number>("all");
 
@@ -156,7 +160,8 @@ export default function ExpandedStaffHours({
               if (!emp) return null;
               const faId = emp.focusAreaIds[0];
               const fa = faId != null ? faMap.get(faId) : undefined;
-              const initials = getAvatarInitials(`${emp.firstName} ${emp.lastName}`);
+              const avatarTone = getAvatarTone(resolveAvatarSeed(emp), isDark);
+              const initials = getInitials(getEmployeeDisplayName(emp));
               const prev = prevMap.get(h.empId);
               const delta = prev ? h.totalHours - prev.totalHours : 0;
 
@@ -173,27 +178,18 @@ export default function ExpandedStaffHours({
                     marginBottom: 8,
                   }}
                 >
-                  {/* Avatar */}
-                  <div
-                    style={{
-                      ...getAvatarTypography(34),
-                      width: 34,
-                      height: 34,
-                      borderRadius: "var(--dg-radius-md)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                      background: h.isOvertime
-                        ? "var(--dg-color-danger-bg)"
-                        : "var(--dg-color-bg-secondary)",
-                      color: h.isOvertime
-                        ? "var(--dg-color-danger)"
-                        : "var(--dg-color-text-secondary)",
-                    }}
-                  >
-                    {initials}
-                  </div>
+                  <Avatar>
+                    <AvatarFallback
+                      style={{
+                        ...getAvatarTypography(32),
+                        background: avatarTone.backgroundColor,
+                        color: avatarTone.textColor,
+                        border: `1px solid ${avatarTone.borderColor}`,
+                      }}
+                    >
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
 
                   {/* Name + focus area */}
                   <div style={{ flex: 1, minWidth: 0 }}>
