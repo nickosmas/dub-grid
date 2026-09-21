@@ -38,6 +38,7 @@ export async function GET(req: NextRequest) {
     serviceClient: auth.serviceClient,
     // Effective (sandbox-redirected) org, not the raw query param (M-1).
     orgId: auth.orgId,
+    includeAccountDeletion: auth.permissions.isGridmaster || auth.permissions.isSuperAdmin,
     status,
   });
 

@@ -107,6 +107,7 @@ type ShiftRequestNotificationEvent =
       requestType: "pickup" | "swap" | "calloff";
       approved: boolean;
       adminNote?: string;
+      autoApproved?: boolean;
     }
   | {
       action: "shift_request_cancelled";
@@ -123,6 +124,62 @@ type DispatchShiftRequestNotificationEvent = (
   actorUserId: string,
   event: ShiftRequestNotificationEvent,
 ) => Promise<unknown>;
+
+export type MobileShiftRequestSettlement =
+  | {
+      autoApproved: false;
+      reason: "skipped" | "not_pending" | "no_approver" | "error";
+      error?: string;
+    }
+  | { autoApproved: true; approverUserId: string; adminNote: string };
+
+/** `settleShiftRequestAfterTransition` from data-access, injected like the dispatcher. */
+type SettleShiftRequest = (input: {
+  userClient: SupabaseClient;
+  serviceClient: SupabaseClient;
+  requestId: string;
+}) => Promise<MobileShiftRequestSettlement>;
+
+type MobileShiftRequestTransitionDeps = {
+  dispatchNotificationEvent: DispatchShiftRequestNotificationEvent;
+  settleShiftRequestAfterTransition: SettleShiftRequest;
+};
+
+/**
+ * After a request enters pending_approval: an approver party settles it on
+ * the spot and the other party hears about the approval; otherwise the
+ * transition event reaches the approvers as before. Mobile never
+ * impersonates, so nothing is skipped here.
+ */
+async function settleOrNotify(
+  auth: MobileShiftRequestsContext,
+  requestId: string,
+  requestType: "pickup" | "swap" | "calloff",
+  transitionEvent: ShiftRequestNotificationEvent,
+  deps: MobileShiftRequestTransitionDeps,
+): Promise<{ autoApproved: boolean }> {
+  const settlement = await deps.settleShiftRequestAfterTransition({
+    userClient: auth.userClient,
+    serviceClient: auth.serviceClient,
+    requestId,
+  });
+
+  if (settlement.autoApproved) {
+    await deps.dispatchNotificationEvent(auth.user.id, {
+      action: "shift_request_resolved",
+      orgId: auth.currentOrg.id,
+      requestId,
+      requestType,
+      approved: true,
+      adminNote: settlement.adminNote,
+      autoApproved: true,
+    });
+    return { autoApproved: true };
+  }
+
+  await deps.dispatchNotificationEvent(auth.user.id, transitionEvent);
+  return { autoApproved: false };
+}
 
 type MobileShiftRequestsResponse = {
   requests: MobileShiftRequest[];
@@ -371,10 +428,8 @@ export async function loadMobileShiftRequestHistoryPayload<
 export async function createMobileShiftRequest(
   auth: MobileShiftRequestsContext,
   data: MobileCreateShiftRequestBody,
-  deps: {
-    dispatchNotificationEvent: DispatchShiftRequestNotificationEvent;
-  },
-): Promise<{ requestId: string }> {
+  deps: MobileShiftRequestTransitionDeps,
+): Promise<{ requestId: string; autoApproved: boolean }> {
   const { data: requestId, error } = await auth.userClient.rpc("create_shift_request", {
     p_org_id: auth.currentOrg.id,
     p_type: data.type,
@@ -391,15 +446,22 @@ export async function createMobileShiftRequest(
     throw error ?? new Error("Unable to create shift request");
   }
 
-  await deps.dispatchNotificationEvent(auth.user.id, {
-    action: "shift_request_created",
-    orgId: auth.currentOrg.id,
-    requestId: requestId as string,
-    requestType: data.type,
-  });
+  const { autoApproved } = await settleOrNotify(
+    auth,
+    requestId as string,
+    data.type,
+    {
+      action: "shift_request_created",
+      orgId: auth.currentOrg.id,
+      requestId: requestId as string,
+      requestType: data.type,
+    },
+    deps,
+  );
 
   return {
     requestId: requestId as string,
+    autoApproved,
   };
 }
 
@@ -407,10 +469,8 @@ export async function updateMobileShiftRequest(
   auth: MobileShiftRequestsContext,
   requestId: string,
   data: MobileUpdateShiftRequestBody,
-  deps: {
-    dispatchNotificationEvent: DispatchShiftRequestNotificationEvent;
-  },
-): Promise<void> {
+  deps: MobileShiftRequestTransitionDeps,
+): Promise<{ autoApproved: boolean }> {
   switch (data.action) {
     case "claim": {
       const { error } = await auth.userClient.rpc("claim_shift_request", {
@@ -421,13 +481,18 @@ export async function updateMobileShiftRequest(
         throw error;
       }
 
-      await deps.dispatchNotificationEvent(auth.user.id, {
-        action: "shift_request_claimed",
-        orgId: auth.currentOrg.id,
+      return settleOrNotify(
+        auth,
         requestId,
-        requestType: "pickup",
-      });
-      return;
+        "pickup",
+        {
+          action: "shift_request_claimed",
+          orgId: auth.currentOrg.id,
+          requestId,
+          requestType: "pickup",
+        },
+        deps,
+      );
     }
 
     case "respond": {
@@ -446,14 +511,20 @@ export async function updateMobileShiftRequest(
         .eq("id", requestId)
         .single();
 
-      await deps.dispatchNotificationEvent(auth.user.id, {
+      const requestType = (requestRow?.type as "pickup" | "swap" | "calloff" | undefined) ?? "swap";
+      const respondedEvent = {
         action: "shift_request_responded",
         orgId: auth.currentOrg.id,
         requestId,
-        requestType: (requestRow?.type as "pickup" | "swap" | "calloff" | undefined) ?? "swap",
+        requestType,
         accepted: data.accept,
-      });
-      return;
+      } as const;
+      if (!data.accept) {
+        await deps.dispatchNotificationEvent(auth.user.id, respondedEvent);
+        return { autoApproved: false };
+      }
+
+      return settleOrNotify(auth, requestId, requestType, respondedEvent, deps);
     }
 
     case "resolve": {
@@ -480,7 +551,7 @@ export async function updateMobileShiftRequest(
         approved: data.approved,
         ...(data.note !== undefined ? { adminNote: data.note } : {}),
       });
-      return;
+      return { autoApproved: false };
     }
 
     case "cancel": {
@@ -499,7 +570,7 @@ export async function updateMobileShiftRequest(
         requestId,
         ...(data.note ? { adminNote: data.note } : {}),
       });
-      return;
+      return { autoApproved: false };
     }
 
     case "volunteer_open_shift": {
@@ -525,12 +596,18 @@ export async function updateMobileShiftRequest(
         throw error ?? new Error("Unable to volunteer");
       }
 
-      await deps.dispatchNotificationEvent(auth.user.id, {
-        action: "shift_request_created",
-        orgId: auth.currentOrg.id,
-        requestId: createdRequestId as string,
-        requestType: "pickup",
-      });
+      return settleOrNotify(
+        auth,
+        createdRequestId as string,
+        "pickup",
+        {
+          action: "shift_request_created",
+          orgId: auth.currentOrg.id,
+          requestId: createdRequestId as string,
+          requestType: "pickup",
+        },
+        deps,
+      );
     }
   }
 }

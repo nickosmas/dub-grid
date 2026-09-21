@@ -15,6 +15,11 @@ const toast = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn() }));
 const stepUpRun = vi.hoisted(() => vi.fn());
 
 vi.mock("sonner", () => ({ toast }));
+vi.mock("@/hooks", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/hooks")>()),
+  useIsInSandbox: () => false,
+  useLogout: () => ({ signOut: vi.fn() }),
+}));
 vi.mock("@/hooks/useStepUpAction", () => ({
   useStepUpAction: () => ({ run: stepUpRun, dialog: null }),
 }));
@@ -135,6 +140,7 @@ function renderPanel(overrides: Partial<React.ComponentProps<typeof ProfilePanel
     orgId: "org-1",
     canEditProfileDirectly: true,
     isGridmaster: false,
+    canDeleteAccountDirectly: false,
     role: "admin",
     departments: [],
     isOnSchedule: true,
@@ -356,5 +362,43 @@ describe("ProfilePanel change-request loading", () => {
     vi.mocked(fetchOwnProfileChangeRequests).mockClear();
     renderPanel({ isOrgMember: true, canEditProfileDirectly: false });
     await waitFor(() => expect(fetchOwnProfileChangeRequests).toHaveBeenCalledWith("org-1"));
+  });
+
+  describe("account deletion", () => {
+    it("offers a people manager the request path, not a direct delete", async () => {
+      renderPanel({ canEditProfileDirectly: true, canDeleteAccountDirectly: false });
+      await waitFor(() =>
+        expect(
+          screen.getByRole("button", { name: /request account deletion/i }),
+        ).toBeInTheDocument(),
+      );
+      expect(screen.queryByRole("button", { name: /^delete account$/i })).not.toBeInTheDocument();
+    });
+
+    it("gives a super admin the direct delete card with the ownership rule", async () => {
+      renderPanel({
+        canEditProfileDirectly: true,
+        canDeleteAccountDirectly: true,
+        role: "super_admin",
+      });
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: /^delete account$/i })).toBeInTheDocument(),
+      );
+      expect(
+        screen.getByText(/only super admin of an organization, transfer ownership first/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /request account deletion/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("shows a gridmaster neither path", async () => {
+      renderPanel({ isGridmaster: true, canDeleteAccountDirectly: true, role: "gridmaster" });
+      await waitFor(() => expect(screen.getByText("Alice Smith")).toBeInTheDocument());
+      expect(screen.queryByRole("button", { name: /^delete account$/i })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /request account deletion/i }),
+      ).not.toBeInTheDocument();
+    });
   });
 });

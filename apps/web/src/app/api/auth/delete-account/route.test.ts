@@ -6,7 +6,7 @@ const forbidIfSandboxCookie = vi.fn();
 const validateCsrfOrigin = vi.fn();
 const checkRateLimit = vi.fn();
 const getServiceClient = vi.fn();
-const canManageProfileChangeRequests = vi.fn();
+const canDeleteAccountDirectly = vi.fn();
 const captureException = vi.fn();
 const loggerError = vi.fn();
 const loggerInfo = vi.fn();
@@ -26,7 +26,7 @@ vi.mock("@/lib/supabase-service", () => ({
   getServiceClient: () => getServiceClient(),
 }));
 vi.mock("@/features/account/server", () => ({
-  canManageProfileChangeRequests: (...args: unknown[]) => canManageProfileChangeRequests(...args),
+  canDeleteAccountDirectly: (...args: unknown[]) => canDeleteAccountDirectly(...args),
 }));
 vi.mock("@/lib/sentry", () => ({
   captureException: (...args: unknown[]) => captureException(...args),
@@ -81,16 +81,22 @@ function buildServiceClient(opts: ServiceOpts) {
       if (table === "organization_memberships") {
         // .select(...).eq("user_id", X) returns list
         // .select(..., { count: 'exact', head: true }).eq("org_id", X).eq("org_role", "super_admin") returns count
+        // Both reads end in .is("archived_at", null): removed people never
+        // count as peers.
         const listSelect = vi.fn((_cols: string, opts2?: { head?: boolean }) => {
           if (opts2?.head) {
             return {
               eq: vi.fn((_col1: string, orgId: string) => ({
-                eq: vi.fn(async () => ({ count: counts[orgId] ?? 0, error: null })),
+                eq: vi.fn(() => ({
+                  is: vi.fn(async () => ({ count: counts[orgId] ?? 0, error: null })),
+                })),
               })),
             };
           }
           return {
-            eq: vi.fn(async () => ({ data: memberships, error: null })),
+            eq: vi.fn(() => ({
+              is: vi.fn(async () => ({ data: memberships, error: null })),
+            })),
           };
         });
         const deleteEq = vi.fn(async () => ({
@@ -144,7 +150,7 @@ beforeEach(() => {
     reset: 0,
     misconfigured: false,
   });
-  canManageProfileChangeRequests.mockResolvedValue(true);
+  canDeleteAccountDirectly.mockResolvedValue(true);
   requireSensitiveActionAuth.mockResolvedValue({
     user: { id: USER_ID, email: "u@test.com" },
     session: { access_token: "tok" },

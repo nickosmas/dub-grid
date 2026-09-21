@@ -163,8 +163,8 @@ export function createShiftRequest(
   absenceTypeId?: number,
   requesterSegmentIndex?: number,
   targetSegmentIndex?: number,
-): Promise<string> {
-  return requestScheduleAction<{ requestId: string }>({
+): Promise<{ requestId: string; autoApproved: boolean }> {
+  return requestScheduleAction<{ requestId: string; autoApproved?: boolean }>({
     action: "createShiftRequest",
     orgId,
     type,
@@ -175,20 +175,20 @@ export function createShiftRequest(
     absenceTypeId,
     requesterSegmentIndex,
     targetSegmentIndex,
-  }).then((data) => data.requestId);
+  }).then((data) => ({ requestId: data.requestId, autoApproved: data.autoApproved === true }));
 }
 
 export function claimShiftRequest(
   requestId: string,
   claimerEmpId: string,
   orgId: string,
-): Promise<void> {
-  return requestScheduleAction<{ success: true }>({
+): Promise<{ autoApproved: boolean }> {
+  return requestScheduleAction<{ success: true; autoApproved?: boolean }>({
     action: "claimShiftRequest",
     orgId,
     requestId,
     claimerEmpId,
-  }).then(() => undefined);
+  }).then((data) => ({ autoApproved: data.autoApproved === true }));
 }
 
 export function volunteerForOpenShift(
@@ -197,15 +197,15 @@ export function volunteerForOpenShift(
   shiftDate: string,
   input: ScheduleCellInput,
   focusAreaId: number,
-): Promise<string> {
-  return requestScheduleAction<{ requestId: string }>({
+): Promise<{ requestId: string; autoApproved: boolean }> {
+  return requestScheduleAction<{ requestId: string; autoApproved?: boolean }>({
     action: "volunteerForOpenShift",
     orgId,
     empId,
     shiftDate,
     input,
     focusAreaId,
-  }).then((data) => data.requestId);
+  }).then((data) => ({ requestId: data.requestId, autoApproved: data.autoApproved === true }));
 }
 
 export function respondToShiftRequest(
@@ -213,14 +213,14 @@ export function respondToShiftRequest(
   empId: string,
   accept: boolean,
   orgId: string,
-): Promise<void> {
-  return requestScheduleAction<{ success: true }>({
+): Promise<{ autoApproved: boolean }> {
+  return requestScheduleAction<{ success: true; autoApproved?: boolean }>({
     action: "respondToShiftRequest",
     orgId,
     requestId,
     empId,
     accept,
-  }).then(() => undefined);
+  }).then((data) => ({ autoApproved: data.autoApproved === true }));
 }
 
 export function resolveShiftRequest(

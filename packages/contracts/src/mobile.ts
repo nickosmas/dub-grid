@@ -797,6 +797,9 @@ export const mobileCreateShiftRequestBodySchema = z
 
 export const mobileCreateShiftRequestResponseSchema = z.object({
   requestId: z.string().uuid(),
+  // Settled on the spot because an approver was party to it. Defaulted so
+  // an older server's response still parses as "pending".
+  autoApproved: z.boolean().default(false),
 });
 
 export const mobileUpdateShiftRequestBodySchema = z.discriminatedUnion("action", [
@@ -830,6 +833,7 @@ export const mobileUpdateShiftRequestBodySchema = z.discriminatedUnion("action",
 
 export const mobileUpdateShiftRequestResponseSchema = z.object({
   success: z.literal(true),
+  autoApproved: z.boolean().default(false),
 });
 
 export const mobilePersonSchema = z.object({

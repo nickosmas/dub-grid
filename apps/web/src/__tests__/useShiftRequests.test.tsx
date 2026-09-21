@@ -199,7 +199,7 @@ describe("useShiftRequests", () => {
     mockFetchShiftRequests
       .mockResolvedValueOnce([buildRequest({ id: "claimable-request" })])
       .mockResolvedValueOnce([]);
-    mockClaimShiftRequest.mockResolvedValue(undefined);
+    mockClaimShiftRequest.mockResolvedValue({ autoApproved: false });
 
     const { result } = renderHook(
       () => useShiftRequests("org-1", new Map(), "claimer-1", false, "America/Los_Angeles"),
@@ -217,6 +217,28 @@ describe("useShiftRequests", () => {
 
     expect(mockClaimShiftRequest).toHaveBeenCalledWith("claimable-request", "claimer-1", "org-1");
     expect(mockFetchShiftRequests).toHaveBeenCalledTimes(2);
+    expect(mockToastSuccess).toHaveBeenCalledWith("Claim request sent", {
+      description: "Your shift is pending approval.",
+    });
+  });
+
+  it("says the shift is theirs when the claim settled on the spot", async () => {
+    mockFetchShiftRequests.mockResolvedValue([]);
+    mockClaimShiftRequest.mockResolvedValue({ autoApproved: true });
+
+    const { result } = renderHook(
+      () => useShiftRequests("org-1", new Map(), "claimer-1", true, "America/Los_Angeles"),
+      { wrapper },
+    );
+    await flush();
+
+    await act(async () => {
+      await result.current.claim("claimable-request", "claimer-1");
+    });
+
+    expect(mockToastSuccess).toHaveBeenCalledWith("Shift is yours", {
+      description: "The claim was approved and is on the schedule.",
+    });
   });
 
   it("only shows targeted pickup requests to the requested teammate", async () => {

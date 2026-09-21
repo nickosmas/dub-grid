@@ -135,14 +135,19 @@ function makeRequestResolveBuilder(row: Record<string, unknown>) {
   };
 }
 
-function makeRequesterMembershipBuilder() {
+function makeRequesterMembershipBuilder(
+  membership: { org_role: string; admin_permissions: Record<string, boolean> | null } = {
+    org_role: "user",
+    admin_permissions: null,
+  },
+) {
   return {
     select: vi.fn(() => ({
       eq: vi.fn(() => ({
         eq: vi.fn(() => ({
           is: vi.fn(() => ({
             maybeSingle: vi.fn().mockResolvedValue({
-              data: { org_role: "user", admin_permissions: null },
+              data: membership,
               error: null,
             }),
           })),
@@ -303,6 +308,78 @@ describe("createProfileChangeRequest", () => {
   });
 });
 
+describe("createProfileChangeRequest for account deletion", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fetchLinkedEmployeeForUser.mockResolvedValue(null);
+  });
+
+  function serviceClientFor(input: {
+    membership: { org_role: string; admin_permissions: Record<string, boolean> | null };
+    notificationInsert: ReturnType<typeof vi.fn>;
+  }) {
+    const createdRequestRow = makeRequestRow({
+      request_type: "account_deletion",
+      requested_changes: {},
+      version: 0,
+    });
+    const membershipFrom = vi
+      .fn()
+      .mockReturnValueOnce(makeRequesterMembershipBuilder(input.membership))
+      .mockReturnValueOnce(makeReviewerMembershipBuilder());
+    const requestFrom = vi
+      .fn()
+      .mockReturnValueOnce(makeExistingRequestBuilder())
+      .mockReturnValueOnce(makeRequestInsertBuilder(createdRequestRow));
+    return {
+      from: vi.fn((table: string) => {
+        if (table === "organization_memberships") return membershipFrom();
+        if (table === "profile_change_requests") return requestFrom();
+        if (table === "notifications") return { insert: input.notificationInsert };
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    } as unknown as SupabaseClient;
+  }
+
+  it("lets a people manager request deletion and tells only super admins", async () => {
+    const notificationInsert = vi.fn().mockResolvedValue({ error: null });
+    const serviceClient = serviceClientFor({
+      membership: { org_role: "admin", admin_permissions: { canManageEmployees: true } },
+      notificationInsert,
+    });
+
+    await createProfileChangeRequest({
+      serviceClient,
+      user: { id: REQUESTER_USER_ID, email: "alex@example.com" } as User,
+      orgId: ORG_ID,
+      type: "account_deletion",
+    });
+
+    expect(notificationInsert).toHaveBeenCalledWith([
+      expect.objectContaining({
+        user_id: "77777777-7777-4777-8777-777777777777",
+        title: "Account deletion request",
+      }),
+    ]);
+  });
+
+  it("sends a super admin to the direct path instead", async () => {
+    const serviceClient = serviceClientFor({
+      membership: { org_role: "super_admin", admin_permissions: null },
+      notificationInsert: vi.fn(),
+    });
+
+    await expect(
+      createProfileChangeRequest({
+        serviceClient,
+        user: { id: REQUESTER_USER_ID, email: "alex@example.com" } as User,
+        orgId: ORG_ID,
+        type: "account_deletion",
+      }),
+    ).rejects.toThrow("You can delete your account directly from your profile.");
+  });
+});
+
 describe("resolveProfileChangeRequest", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -381,5 +458,44 @@ describe("resolveProfileChangeRequest", () => {
         resource_id: EMPLOYEE_ID,
       }),
     );
+  });
+
+  it("refuses an account deletion decision from anyone below super admin", async () => {
+    const requestRow = makeRequestRow({ request_type: "account_deletion", requested_changes: {} });
+    const serviceClient = {
+      from: vi.fn((table: string) => {
+        if (table === "profile_change_requests") return makeSelectMaybeSingleBuilder(requestRow);
+        if (table === "organization_memberships") {
+          return makeRequesterMembershipBuilder({
+            org_role: "admin",
+            admin_permissions: { canManageEmployees: true },
+          });
+        }
+        if (table === "profiles") {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: { platform_role: "none" },
+                  error: null,
+                }),
+              })),
+            })),
+          };
+        }
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    } as unknown as SupabaseClient;
+
+    await expect(
+      resolveProfileChangeRequest({
+        serviceClient,
+        actor: { id: ACTOR_ID, email: "manager@example.com" } as User,
+        orgId: ORG_ID,
+        requestId: REQUEST_ID,
+        action: "approve",
+      }),
+    ).rejects.toThrow("Unauthorized: only a super admin can decide an account deletion.");
+    expect(deleteUserAccountWithCleanup).not.toHaveBeenCalled();
   });
 });

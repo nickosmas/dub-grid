@@ -11,7 +11,7 @@ import {
   type MobileScheduleEntrySegment,
   type MobileShiftRequest,
 } from "@dubgrid/contracts";
-import { indefiniteArticle } from "@dubgrid/domain";
+import { describeShiftRequestSubmitted, indefiniteArticle } from "@dubgrid/domain";
 import { getAvatarTone } from "@dubgrid/design-tokens";
 import {
   BottomSheetModal,
@@ -281,6 +281,7 @@ export default function ShiftDetailScreen() {
         : null);
   const source = readParam(params.source) === "team" ? "team" : "mine";
   const linkedEmployeeId = bootstrapQuery.data?.linkedEmployee?.id ?? null;
+  const canApproveShiftRequests = Boolean(bootstrapQuery.data?.permissions.canApproveShiftRequests);
   const linkedEmployeeFocusAreaIds = bootstrapQuery.data?.linkedEmployee?.focusAreaIds ?? [];
   const timeZone = bootstrapQuery.data?.currentOrg.timezone;
   const todayDateKey = getCurrentDateTimeParts(timeZone).dateKey;
@@ -392,16 +393,13 @@ export default function ShiftDetailScreen() {
     // No `onError` toast: the request is sent from inside the sheet, which is
     // its own native window, and a toast lands in the root window behind it
     // where nobody sees it. The error renders in the sheet's footer instead.
-    onSuccess: async (_, variables) => {
+    onSuccess: async (data, variables) => {
       pushToast({
         tone: "success",
-        title: "Request sent",
-        message:
-          variables.type === "calloff"
-            ? "Calloff request sent."
-            : variables.type === "swap"
-              ? "Swap request sent."
-              : "Pickup request sent.",
+        ...describeShiftRequestSubmitted(
+          { action: "created", type: variables.type, targeted: variables.targetEmpId != null },
+          { autoApproved: data.autoApproved, viewerCanApprove: canApproveShiftRequests },
+        ),
       });
       setRequestMode(null);
       setCoverageRequestType(null);
@@ -929,7 +927,9 @@ export default function ShiftDetailScreen() {
 
     setPendingConfirmation({
       title: "Submit this call-off?",
-      body: `${indefiniteArticle(absenceTypeLabel) === "an" ? "An" : "A"} ${absenceTypeLabel} absence will be submitted for your ${shiftLabel} shift on ${shiftDateLabel}.`,
+      body: `${indefiniteArticle(absenceTypeLabel) === "an" ? "An" : "A"} ${absenceTypeLabel} absence will be submitted for your ${shiftLabel} shift on ${shiftDateLabel}.${
+        canApproveShiftRequests ? " As an approver, it goes on the schedule right away." : ""
+      }`,
       confirmLabel: "Submit Call-off",
       confirmTone: "danger",
       onConfirm: () =>

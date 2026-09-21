@@ -81,34 +81,34 @@ demotion), so a user row that still carries one never widens what that member se
 
 `canViewSchedule` and `canViewStaff` are **always true** for any authenticated user (including Tier 0 `user`). Every other key defaults per role baseline: a `user` resolves against `READ_ONLY_PERMS` (all `false`) and stays there whatever the row stores, and an `admin` resolves against `ADMIN_DEFAULT_PERMS`, the core scheduling set (`canEditShifts`, `canPublishSchedule`, `canEditNotes`, `canEditScheduleIndicators`, the four recurring-shift keys, and `canViewReports`) with nothing in people management or administration. For an admin, a stored JSONB overrides the baseline key by key in both directions, so an unconfigured admin (or one whose row predates a key) can edit and publish the schedule and see Reports, but cannot manage people until a super admin switches that on. The order below matches the interface definition.
 
-| #   | Category  | Permission                      | Delegatable | Description                                                                      |
-| --- | --------- | ------------------------------- | ----------- | -------------------------------------------------------------------------------- |
-| 1   | Schedule  | `canViewSchedule`               | Always on   | View the schedule grid (always true for all authed users)                        |
-| 2   | Schedule  | `canEditShifts`                 | Yes         | Create, edit, delete schedule cells                                              |
-| 3   | Schedule  | `canPublishSchedule`            | Yes         | Publish draft changes                                                            |
-| 4   | Schedule  | `canApplyRecurringSchedule`     | Yes         | Apply recurring shift templates onto the grid                                    |
-| 5   | Notes     | `canEditNotes`                  | Yes         | Manage schedule notes                                                            |
-| 6   | Notes     | `canEditScheduleIndicators`     | Yes         | Manage schedule indicators (gates `schedule_notes` RLS — §4.5)                   |
-| 7   | Recurring | `canViewRecurringShifts`        | Yes         | View recurring shift templates                                                   |
-| 8   | Recurring | `canManageRecurringShifts`      | Yes         | Configure recurring shift templates                                              |
-| 9   | Recurring | `canManageShiftSeries`          | Yes         | Manage repeating shift series                                                    |
-| 10  | Staff     | `canViewStaff`                  | Always on   | View staff roster (always true for all authed users)                             |
-| 11  | Staff     | `canViewEmployeeDetails`        | Yes         | View full employee detail records                                                |
-| 12  | Staff     | `canManageEmployees`            | Yes         | Add, edit, bench, terminate employees                                            |
-| 13  | Config    | `canViewFocusAreas`             | Yes         | View focus areas                                                                 |
-| 14  | Config    | `canManageFocusAreas`           | Yes         | Manage focus areas / departments                                                 |
-| 15  | Config    | `canViewScheduleDefinitions`    | Yes         | View schedule definitions (shift codes, absence types)                           |
-| 16  | Config    | `canManageScheduleDefinitions`  | Yes         | Manage schedule definitions                                                      |
-| 17  | Config    | `canViewIndicatorTypes`         | Yes         | View note/indicator type definitions                                             |
-| 18  | Config    | `canManageIndicatorTypes`       | Yes         | Manage note/indicator type definitions                                           |
-| 19  | Config    | `canManageOrgSettings`          | No          | Edit org name, address, phone, timezone (super_admin only)                       |
-| 20  | Config    | `canViewOrgLabels`              | Yes         | View custom terminology labels                                                   |
-| 21  | Config    | `canManageOrgLabels`            | Yes         | Edit custom terminology labels                                                   |
-| 22  | Coverage  | `canViewCoverageRequirements`   | Yes         | View staffing minimum requirements                                               |
-| 23  | Coverage  | `canManageCoverageRequirements` | Yes         | Manage staffing minimum requirements                                             |
-| 24  | Requests  | `canApproveShiftRequests`       | Yes         | Approve or reject shift pickup/swap requests                                     |
-| 25  | Dashboard | `canViewDashboardAnalytics`     | Yes         | View dashboard analytics                                                         |
-| 26  | Reports   | `canViewReports`                | Yes         | View and export the operations reports (staff hours, activity, shift categories) |
+| #   | Category  | Permission                      | Delegatable | Description                                                                              |
+| --- | --------- | ------------------------------- | ----------- | ---------------------------------------------------------------------------------------- |
+| 1   | Schedule  | `canViewSchedule`               | Always on   | View the schedule grid (always true for all authed users)                                |
+| 2   | Schedule  | `canEditShifts`                 | Yes         | Create, edit, delete schedule cells                                                      |
+| 3   | Schedule  | `canPublishSchedule`            | Yes         | Publish draft changes                                                                    |
+| 4   | Schedule  | `canApplyRecurringSchedule`     | Yes         | Apply recurring shift templates onto the grid                                            |
+| 5   | Notes     | `canEditNotes`                  | Yes         | Manage schedule notes                                                                    |
+| 6   | Notes     | `canEditScheduleIndicators`     | Yes         | Manage schedule indicators (gates `schedule_notes` RLS — §4.5)                           |
+| 7   | Recurring | `canViewRecurringShifts`        | Yes         | View recurring shift templates                                                           |
+| 8   | Recurring | `canManageRecurringShifts`      | Yes         | Configure recurring shift templates                                                      |
+| 9   | Recurring | `canManageShiftSeries`          | Yes         | Manage repeating shift series                                                            |
+| 10  | Staff     | `canViewStaff`                  | Always on   | View staff roster (always true for all authed users)                                     |
+| 11  | Staff     | `canViewEmployeeDetails`        | Yes         | View full employee detail records                                                        |
+| 12  | Staff     | `canManageEmployees`            | Yes         | Add, edit, bench, terminate employees                                                    |
+| 13  | Config    | `canViewFocusAreas`             | Yes         | View focus areas                                                                         |
+| 14  | Config    | `canManageFocusAreas`           | Yes         | Manage focus areas / departments                                                         |
+| 15  | Config    | `canViewScheduleDefinitions`    | Yes         | View schedule definitions (shift codes, absence types)                                   |
+| 16  | Config    | `canManageScheduleDefinitions`  | Yes         | Manage schedule definitions                                                              |
+| 17  | Config    | `canViewIndicatorTypes`         | Yes         | View note/indicator type definitions                                                     |
+| 18  | Config    | `canManageIndicatorTypes`       | Yes         | Manage note/indicator type definitions                                                   |
+| 19  | Config    | `canManageOrgSettings`          | No          | Edit org name, address, phone, timezone (super_admin only)                               |
+| 20  | Config    | `canViewOrgLabels`              | Yes         | View custom terminology labels                                                           |
+| 21  | Config    | `canManageOrgLabels`            | Yes         | Edit custom terminology labels                                                           |
+| 22  | Coverage  | `canViewCoverageRequirements`   | Yes         | View staffing minimum requirements                                                       |
+| 23  | Coverage  | `canManageCoverageRequirements` | Yes         | Manage staffing minimum requirements                                                     |
+| 24  | Requests  | `canApproveShiftRequests`       | Yes         | Approve or reject shift pickup/swap requests; a holder's own requests settle on the spot |
+| 25  | Dashboard | `canViewDashboardAnalytics`     | Yes         | View dashboard analytics                                                                 |
+| 26  | Reports   | `canViewReports`                | Yes         | View and export the operations reports (staff hours, activity, shift categories)         |
 
 **View-implications.** `@dubgrid/authz`'s `applyViewImplications` guarantees that every `canManage*` permission implies its matching `canView*` permission, and that `canViewDashboardAnalytics` follows from any of `canEditShifts`, `canManageEmployees`, `canPublishSchedule`, or `canApproveShiftRequests`. The map lives once, as the exported `VIEW_IMPLICATIONS`; the resolver applies it and `PermissionsEditor` reads it, so a view switch shows as "Included" rather than a live control whenever the resolver would grant it anyway. A membership row only needs to store the `canManage*` flag; the resolved permission set always exposes the corresponding `canView*` as `true`. `canViewReports` is never implied. The view-only baseline (`READ_ONLY_PERMS`) is what a Tier 0 `user` receives.
 

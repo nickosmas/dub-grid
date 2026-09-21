@@ -127,6 +127,7 @@ describe("ProfileSecurityScreen", () => {
       data: {
         permissions: {
           canManageEmployees: true,
+          canManageManagementAccess: true,
         },
       },
       error: null,
@@ -239,14 +240,14 @@ describe("ProfileSecurityScreen", () => {
     });
   });
 
-  it("requests account deletion after confirming, for a user who can't edit their own record", async () => {
+  it("requests account deletion after confirming, for a member below super admin", async () => {
     // `mutateAsync`, not `mutate`: the confirmation sheet latches on the
     // promise its handler returns, which is what stops a second confirm from
     // filing a second deletion request.
     const mutateAsync = vi.fn(() => Promise.resolve());
     useMutation.mockReturnValue({ isPending: false, mutate: vi.fn(), mutateAsync });
     useBootstrap.mockReturnValue({
-      data: { permissions: { canManageEmployees: false } },
+      data: { permissions: { canManageEmployees: false, canManageManagementAccess: false } },
       error: null,
       isLoading: false,
       refetch: vi.fn(),
@@ -265,7 +266,20 @@ describe("ProfileSecurityScreen", () => {
     expect(mutateAsync).toHaveBeenCalled();
   });
 
-  it("hides account deletion from a user who can edit employee records", () => {
+  it("still offers the request to a people manager who is not a super admin", () => {
+    useBootstrap.mockReturnValue({
+      data: { permissions: { canManageEmployees: true, canManageManagementAccess: false } },
+      error: null,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<ProfileSecurityScreen />);
+
+    expect(screen.getByRole("button", { name: "Request account deletion" })).toBeInTheDocument();
+  });
+
+  it("hides the request from a super admin, who deletes from the web profile", () => {
     render(<ProfileSecurityScreen />);
 
     expect(

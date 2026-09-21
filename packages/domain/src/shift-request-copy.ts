@@ -180,3 +180,66 @@ export function groupManagerQueue<T extends ShiftRequestQueueInput>(
     .filter((key) => buckets[key].length > 0)
     .map((key) => ({ key, label: QUEUE_GROUP_LABEL[key], requests: buckets[key] }));
 }
+
+export type ShiftRequestSubmission =
+  | { action: "created"; type: ShiftRequestType; targeted: boolean }
+  | { action: "claimed" }
+  | { action: "accepted"; type: "swap" | "pickup" };
+
+export type ShiftRequestSubmittedCopy = {
+  title: string;
+  message: string;
+};
+
+/**
+ * The toast after a request is sent, claimed or accepted. `autoApproved`
+ * means an approver was party to it, so the schedule already changed and
+ * nothing waits on a manager. `viewerCanApprove` covers the requests that
+ * still wait on their recipient: once they accept, the approval is theirs.
+ */
+export function describeShiftRequestSubmitted(
+  submission: ShiftRequestSubmission,
+  options: { autoApproved: boolean; viewerCanApprove?: boolean },
+): ShiftRequestSubmittedCopy {
+  if (options.autoApproved) {
+    return describeAutoApproved(submission);
+  }
+
+  switch (submission.action) {
+    case "created":
+      if (submission.type === "calloff") {
+        return { title: "Request sent", message: "Calloff request sent." };
+      }
+      if (submission.type === "swap" || submission.targeted) {
+        const kind = submission.type === "swap" ? "Swap" : "Pickup";
+        return options.viewerCanApprove
+          ? { title: `${kind} request sent`, message: "It's approved once they accept." }
+          : { title: "Request sent", message: `${kind} request sent.` };
+      }
+      return options.viewerCanApprove
+        ? { title: "Shift posted for pickup", message: "A claim on it is approved right away." }
+        : { title: "Request sent", message: "Your shift is posted for pickup." };
+    case "claimed":
+      return { title: "Claim request sent", message: "Your shift is pending approval." };
+    case "accepted":
+      return { title: "Request accepted", message: "Your response was sent." };
+  }
+}
+
+function describeAutoApproved(submission: ShiftRequestSubmission): ShiftRequestSubmittedCopy {
+  switch (submission.action) {
+    case "created":
+      return submission.type === "calloff"
+        ? {
+            title: "Call-off approved",
+            message: "Your absence is on the schedule.",
+          }
+        : { title: "Request approved", message: "The schedule is updated." };
+    case "claimed":
+      return { title: "Shift is yours", message: "The claim was approved and is on the schedule." };
+    case "accepted":
+      return submission.type === "swap"
+        ? { title: "Swap approved", message: "Both schedules are updated." }
+        : { title: "Pickup approved", message: "The shift is on your schedule." };
+  }
+}

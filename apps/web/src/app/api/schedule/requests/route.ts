@@ -3,6 +3,10 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DbShiftRequest } from "@dubgrid/db-types";
 import { scheduleCellStateSchema } from "@dubgrid/contracts";
+import {
+  settleShiftRequestAfterTransition,
+  type ShiftRequestSettlement,
+} from "@dubgrid/data-access";
 import { requireOrgPermissions, resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
@@ -11,6 +15,7 @@ import { dispatchNotificationEvent } from "@/features/notifications/server";
 import { rowToShiftRequest } from "@/lib/db/mappers";
 import { assertSafeFilterValue } from "@/lib/db/shared";
 import { apiErrorResponse } from "@/lib/error-handling";
+import logger from "@/lib/logger";
 import type { ShiftRequestStatus, ShiftRequestType } from "@/types";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
@@ -193,6 +198,52 @@ async function requireEmployeeAction(
   }
 
   return auth;
+}
+
+type EmployeeActionAuth = Exclude<
+  Awaited<ReturnType<typeof requireEmployeeAction>>,
+  { response: NextResponse }
+>;
+
+/**
+ * After a request enters pending_approval: an approver who is party to it
+ * settles it right away, otherwise the ordinary approver notifications go
+ * out. A gridmaster impersonating a member never settles anything.
+ */
+async function settleOrNotify(
+  auth: EmployeeActionAuth,
+  requestId: string,
+  requestType: ShiftRequestType,
+  transitionEvent: Parameters<typeof dispatchNotificationEvent>[1] & { orgId: string },
+): Promise<ShiftRequestSettlement> {
+  const settlement = await settleShiftRequestAfterTransition({
+    userClient: auth.userClient,
+    serviceClient: auth.serviceClient,
+    requestId,
+    skip: auth.permissions.isImpersonating,
+  });
+
+  if (settlement.autoApproved) {
+    await dispatchNotificationEvent(auth.actor.id, {
+      action: "shift_request_resolved",
+      orgId: transitionEvent.orgId,
+      requestId,
+      requestType,
+      approved: true,
+      adminNote: settlement.adminNote,
+      autoApproved: true,
+    });
+    return settlement;
+  }
+
+  if (settlement.reason === "error") {
+    logger.warn(
+      { requestId, error: settlement.error },
+      "Shift request auto-approval failed; left in the approval queue",
+    );
+  }
+  await dispatchNotificationEvent(auth.actor.id, transitionEvent);
+  return settlement;
 }
 
 export async function POST(req: NextRequest) {
@@ -390,14 +441,17 @@ export async function POST(req: NextRequest) {
           throw error;
         }
 
-        await dispatchNotificationEvent(auth.actor.id, {
+        const settlement = await settleOrNotify(auth, requestId as string, data.type, {
           action: "shift_request_created",
           orgId: data.orgId,
           requestId: requestId as string,
           requestType: data.type,
         });
 
-        return NextResponse.json({ requestId: requestId as string });
+        return NextResponse.json({
+          requestId: requestId as string,
+          autoApproved: settlement.autoApproved,
+        });
       }
 
       case "claimShiftRequest": {
@@ -414,14 +468,14 @@ export async function POST(req: NextRequest) {
           throw error;
         }
 
-        await dispatchNotificationEvent(auth.actor.id, {
+        const settlement = await settleOrNotify(auth, data.requestId, "pickup", {
           action: "shift_request_claimed",
           orgId: data.orgId,
           requestId: data.requestId,
           requestType: "pickup",
         });
 
-        return NextResponse.json({ success: true });
+        return NextResponse.json({ success: true, autoApproved: settlement.autoApproved });
       }
 
       case "volunteerForOpenShift": {
@@ -452,14 +506,17 @@ export async function POST(req: NextRequest) {
           throw error;
         }
 
-        await dispatchNotificationEvent(auth.actor.id, {
+        const settlement = await settleOrNotify(auth, requestId as string, "pickup", {
           action: "shift_request_created",
           orgId: data.orgId,
           requestId: requestId as string,
           requestType: "pickup",
         });
 
-        return NextResponse.json({ requestId: requestId as string });
+        return NextResponse.json({
+          requestId: requestId as string,
+          autoApproved: settlement.autoApproved,
+        });
       }
 
       case "respondToShiftRequest": {
@@ -477,15 +534,22 @@ export async function POST(req: NextRequest) {
           throw error;
         }
 
-        await dispatchNotificationEvent(auth.actor.id, {
+        const respondedEvent = {
           action: "shift_request_responded",
           orgId: data.orgId,
           requestId: data.requestId,
           requestType: "swap",
           accepted: data.accept,
-        });
+        } as const;
+        if (!data.accept) {
+          await dispatchNotificationEvent(auth.actor.id, respondedEvent);
+          return NextResponse.json({ success: true, autoApproved: false });
+        }
 
-        return NextResponse.json({ success: true });
+        // A declined request never reaches the queue; only an acceptance can settle.
+        const settlement = await settleOrNotify(auth, data.requestId, "swap", respondedEvent);
+
+        return NextResponse.json({ success: true, autoApproved: settlement.autoApproved });
       }
 
       case "resolveShiftRequest": {

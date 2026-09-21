@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase-service";
 import { validateCsrfOrigin } from "@/lib/csrf";
-import { canManageProfileChangeRequests } from "@/features/account/server";
+import { canDeleteAccountDirectly } from "@/features/account/server";
 import { forbidIfSandboxCookie, requireSensitiveActionAuth } from "@/lib/api-auth";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
@@ -47,7 +47,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     const canDeleteDirectly = orgId
-      ? await canManageProfileChangeRequests({
+      ? await canDeleteAccountDirectly({
           serviceClient: getServiceClient(),
           actorId: user.id,
           orgId,
@@ -96,11 +96,13 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    // Prevent super_admins who are the sole super_admin of an org
+    // Prevent super_admins who are the sole super_admin of an org. Archived
+    // memberships are removed people, so they never count as a peer.
     const { data: memberships } = await serviceClient
       .from("organization_memberships")
       .select("org_id, org_role")
-      .eq("user_id", userId);
+      .eq("user_id", userId)
+      .is("archived_at", null);
 
     for (const m of memberships ?? []) {
       if ((m as Record<string, unknown>).org_role === "super_admin") {
@@ -109,7 +111,8 @@ export async function DELETE(req: NextRequest) {
           .from("organization_memberships")
           .select("*", { count: "exact", head: true })
           .eq("org_id", membershipOrgId)
-          .eq("org_role", "super_admin");
+          .eq("org_role", "super_admin")
+          .is("archived_at", null);
         if ((count ?? 0) <= 1) {
           return NextResponse.json(
             { error: "You are the only super admin of an organization. Transfer ownership first." },

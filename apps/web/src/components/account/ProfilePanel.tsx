@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { Check, Trash2, X } from "lucide-react";
 
 import { SectionCard } from "@/components/settings/shared";
+import DeleteAccountCard from "@/components/account/DeleteAccountCard";
 import { Form } from "@/components/Form";
 import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -73,6 +74,8 @@ interface ProfilePanelProps {
   orgId: string | null;
   canEditProfileDirectly: boolean;
   isGridmaster: boolean;
+  /** Super admins delete their own account directly; everyone else requests it. */
+  canDeleteAccountDirectly: boolean;
   /** Effective permission role (e.g. "user" / "admin" / "super_admin" / "gridmaster"). */
   role: string;
   departments: Department[];
@@ -132,6 +135,7 @@ export function ProfilePanel({
   orgId,
   canEditProfileDirectly,
   isGridmaster,
+  canDeleteAccountDirectly,
   role,
   departments,
   isOnSchedule,
@@ -226,7 +230,9 @@ export function ProfilePanel({
     requestLastName.trim().length > 0 ? getStaffNameError(requestLastName, "Last name") : null;
   const requestNoteError = getStaffNotesError(requestNote);
 
-  const showDeletion = !isGridmaster && !canEditProfileDirectly;
+  // Deletion is a super admin's decision: managers below that tier request
+  // it like any member, and a super admin gets the direct card instead.
+  const showDeletion = !isGridmaster && !canDeleteAccountDirectly;
 
   const allManagementDepartments = departments.filter((d) => d.type === "management");
   const managementDepartments = allManagementDepartments.filter((d) =>
@@ -1082,6 +1088,8 @@ export function ProfilePanel({
           </div>
         </SectionCard>
       )}
+
+      {!isGridmaster && canDeleteAccountDirectly && <DeleteAccountCard />}
 
       {confirmation && !stepUp.dialog && (
         <ConfirmDialog

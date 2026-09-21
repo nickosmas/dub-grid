@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase-service";
 import { validateCsrfOrigin } from "@/lib/csrf";
-import { canManageProfileChangeRequests } from "@/features/account/server";
+import { canDeleteAccountDirectly } from "@/features/account/server";
 import { forbidIfSandboxCookie, requireSensitiveActionAuth } from "@/lib/api-auth";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     const orgId = typeof auth.claims.org_id === "string" ? auth.claims.org_id : null;
 
     const canEraseDirectly = orgId
-      ? await canManageProfileChangeRequests({
+      ? await canDeleteAccountDirectly({
           serviceClient: getServiceClient(),
           actorId: user.id,
           orgId,

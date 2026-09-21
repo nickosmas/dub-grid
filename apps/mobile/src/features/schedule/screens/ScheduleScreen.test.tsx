@@ -650,10 +650,13 @@ describe("ScheduleScreen", () => {
     };
 
     await act(async () => {
-      await mutationConfig.onSuccess(undefined, {
-        requestId: "request-open-1",
-        body: { action: "claim" },
-      });
+      await mutationConfig.onSuccess(
+        { success: true, autoApproved: false },
+        {
+          requestId: "request-open-1",
+          body: { action: "claim" },
+        },
+      );
     });
 
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({
@@ -663,6 +666,22 @@ describe("ScheduleScreen", () => {
       tone: "success",
       title: "Claim request sent",
       message: "Your shift is pending approval.",
+    });
+
+    await act(async () => {
+      await mutationConfig.onSuccess(
+        { success: true, autoApproved: true },
+        {
+          requestId: "request-open-2",
+          body: { action: "claim" },
+        },
+      );
+    });
+
+    expect(pushToast).toHaveBeenLastCalledWith({
+      tone: "success",
+      title: "Shift is yours",
+      message: "The claim was approved and is on the schedule.",
     });
   });
 

@@ -609,7 +609,7 @@ the Activity Log.
 
 `/api/auth/data-export`, `/api/auth/delete-account`, and `/api/auth/gdpr-erase` (all
 behind fresh sensitive-action auth), plus `/api/account/change-requests` for
-manager-approved deletions. See `docs/cookies-and-gdpr.md`.
+super-admin-approved deletions. See `docs/cookies-and-gdpr.md`.
 
 ### 8.4 Summary
 

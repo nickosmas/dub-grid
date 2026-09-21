@@ -924,4 +924,81 @@ describe("dispatchNotificationEvent", () => {
       { acceptedUserId: "new-user", invitationId: "inv-1" },
     );
   });
+
+  describe("requests settled by an approver party", () => {
+    function mockSettledSwap() {
+      fromMock.mockImplementation((table: string) => {
+        if (table === "shift_requests") {
+          return makeShiftRequestBuilder({
+            status: "approved",
+            type: "swap",
+            requester: { user_id: "approver-user", first_name: "Jane", last_name: "Doe" },
+            target: { user_id: "recipient-user", first_name: "Sam", last_name: "Lee" },
+          });
+        }
+        return makeMembershipBuilder({ superAdmins: [{ user_id: "super-admin-user" }] });
+      });
+    }
+
+    it("does not ping the queue about an acceptance that already settled", async () => {
+      mockSettledSwap();
+
+      await dispatchNotificationEvent("recipient-user", {
+        action: "shift_request_responded",
+        orgId: "org-1",
+        requestId: "request-1",
+        requestType: "swap",
+        accepted: true,
+      });
+
+      expect(sendNotification).not.toHaveBeenCalled();
+    });
+
+    it("does not ping the queue about a claim that already settled", async () => {
+      fromMock.mockImplementation((table: string) => {
+        if (table === "shift_requests") {
+          return makeShiftRequestBuilder({
+            status: "approved",
+            type: "pickup",
+            requester: { user_id: "approver-user", first_name: "Jane", last_name: "Doe" },
+            target: { user_id: "claimant-user", first_name: "Sam", last_name: "Lee" },
+          });
+        }
+        return makeMembershipBuilder({ superAdmins: [{ user_id: "super-admin-user" }] });
+      });
+
+      await dispatchNotificationEvent("claimant-user", {
+        action: "shift_request_claimed",
+        orgId: "org-1",
+        requestId: "request-1",
+        requestType: "pickup",
+      });
+
+      expect(sendNotification).not.toHaveBeenCalled();
+    });
+
+    it("tells the approver their request settled when the other party accepted", async () => {
+      mockSettledSwap();
+
+      await dispatchNotificationEvent("recipient-user", {
+        action: "shift_request_resolved",
+        orgId: "org-1",
+        requestId: "request-1",
+        requestType: "swap",
+        approved: true,
+        adminNote: "Auto-approved: Jane Doe can approve shift requests",
+        autoApproved: true,
+      });
+
+      expect(sendNotification).toHaveBeenCalledTimes(1);
+      expect(sendNotification).toHaveBeenCalledWith(
+        "approver-user",
+        "org-1",
+        "shift_request_approved",
+        "Request approved",
+        "Sam Lee accepted your swap request. It's approved and on the schedule.",
+        expect.objectContaining({ requestId: "request-1", approved: true }),
+      );
+    });
+  });
 });

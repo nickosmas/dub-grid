@@ -34,6 +34,7 @@ describe("GET /api/people/change-requests", () => {
     requireOrgPermissions.mockResolvedValue({
       orgId: SANDBOX_ORG_ID,
       serviceClient: SERVICE_CLIENT,
+      permissions: { isGridmaster: false, isSuperAdmin: false, canManageEmployees: true },
     });
 
     const { GET } = await import("./route");
@@ -46,7 +47,26 @@ describe("GET /api/people/change-requests", () => {
       expect.any(Function),
     );
     expect(listAdminProfileChangeRequests).toHaveBeenCalledWith(
-      expect.objectContaining({ orgId: SANDBOX_ORG_ID, serviceClient: SERVICE_CLIENT }),
+      expect.objectContaining({
+        orgId: SANDBOX_ORG_ID,
+        serviceClient: SERVICE_CLIENT,
+        includeAccountDeletion: false,
+      }),
+    );
+  });
+
+  it("shows account deletion requests to super admins only", async () => {
+    requireOrgPermissions.mockResolvedValue({
+      orgId: SANDBOX_ORG_ID,
+      serviceClient: SERVICE_CLIENT,
+      permissions: { isGridmaster: false, isSuperAdmin: true, canManageEmployees: true },
+    });
+
+    const { GET } = await import("./route");
+    await GET(makeRequest(REQUESTED_ORG_ID));
+
+    expect(listAdminProfileChangeRequests).toHaveBeenCalledWith(
+      expect.objectContaining({ includeAccountDeletion: true }),
     );
   });
 

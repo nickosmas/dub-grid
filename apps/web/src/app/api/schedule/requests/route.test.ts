@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const validateCsrfOrigin = vi.fn();
 const requireOrgPermissions = vi.fn();
 const dispatchNotificationEvent = vi.fn();
+const settleShiftRequestAfterTransition = vi.fn();
 
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
@@ -22,6 +23,11 @@ vi.mock("@/app/api/shared/schedule", () => ({
 
 vi.mock("@/features/notifications/server", () => ({
   dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
+}));
+
+vi.mock("@dubgrid/data-access", () => ({
+  settleShiftRequestAfterTransition: (...args: unknown[]) =>
+    settleShiftRequestAfterTransition(...args),
 }));
 
 import { POST } from "./route";
@@ -196,5 +202,139 @@ describe("POST /api/schedule/requests", () => {
         previousTargetEmpId: CLAIMANT_EMP_ID,
       }),
     );
+  });
+
+  describe("settling a request an approver is party to", () => {
+    const REQUEST_ID = "33333333-3333-4333-8333-333333333333";
+
+    function mockActorContext(permissions: Record<string, boolean>) {
+      const rpc = vi.fn(async () => ({ data: null, error: null }));
+      const employeesQuery = chainableQuery({ data: { id: MY_EMP_ID }, error: null });
+      const auth = {
+        serviceClient: { from: () => employeesQuery },
+        userClient: { rpc },
+        actor: { id: "actor-user" },
+        orgId: ORG_ID,
+        permissions: { canViewSchedule: true, ...permissions },
+      };
+      requireOrgPermissions.mockImplementation(async () => auth);
+      return { rpc, auth };
+    }
+
+    function claimRequest() {
+      return new NextRequest("http://localhost/api/schedule/requests", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "claimShiftRequest",
+          orgId: ORG_ID,
+          requestId: REQUEST_ID,
+          claimerEmpId: MY_EMP_ID,
+        }),
+      });
+    }
+
+    it("reports the approval instead of pinging the queue when it settled", async () => {
+      const { auth } = mockActorContext({});
+      settleShiftRequestAfterTransition.mockResolvedValueOnce({
+        autoApproved: true,
+        approverUserId: "approver-user",
+        adminNote: "Auto-approved: Jane Doe can approve shift requests",
+      });
+
+      const response = await POST(claimRequest());
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ success: true, autoApproved: true });
+      expect(settleShiftRequestAfterTransition).toHaveBeenCalledWith({
+        userClient: auth.userClient,
+        serviceClient: auth.serviceClient,
+        requestId: REQUEST_ID,
+        skip: undefined,
+      });
+      expect(dispatchNotificationEvent).toHaveBeenCalledTimes(1);
+      expect(dispatchNotificationEvent).toHaveBeenCalledWith("actor-user", {
+        action: "shift_request_resolved",
+        orgId: ORG_ID,
+        requestId: REQUEST_ID,
+        requestType: "pickup",
+        approved: true,
+        adminNote: "Auto-approved: Jane Doe can approve shift requests",
+        autoApproved: true,
+      });
+    });
+
+    it("falls back to the queue and its notifications when nothing settled", async () => {
+      mockActorContext({});
+      settleShiftRequestAfterTransition.mockResolvedValueOnce({
+        autoApproved: false,
+        reason: "no_approver",
+      });
+
+      const response = await POST(claimRequest());
+
+      await expect(response.json()).resolves.toEqual({ success: true, autoApproved: false });
+      expect(dispatchNotificationEvent).toHaveBeenCalledWith(
+        "actor-user",
+        expect.objectContaining({ action: "shift_request_claimed", requestId: REQUEST_ID }),
+      );
+    });
+
+    it("still succeeds when the settlement itself failed", async () => {
+      mockActorContext({});
+      settleShiftRequestAfterTransition.mockResolvedValueOnce({
+        autoApproved: false,
+        reason: "error",
+        error: "Cannot approve: overlap",
+      });
+
+      const response = await POST(claimRequest());
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ success: true, autoApproved: false });
+      expect(dispatchNotificationEvent).toHaveBeenCalledWith(
+        "actor-user",
+        expect.objectContaining({ action: "shift_request_claimed" }),
+      );
+    });
+
+    it("never settles while a gridmaster is impersonating", async () => {
+      mockActorContext({ isImpersonating: true });
+      settleShiftRequestAfterTransition.mockResolvedValueOnce({
+        autoApproved: false,
+        reason: "skipped",
+      });
+
+      await POST(claimRequest());
+
+      expect(settleShiftRequestAfterTransition).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: true }),
+      );
+    });
+
+    it("does not try to settle a declined swap", async () => {
+      mockActorContext({});
+
+      const response = await POST(
+        new NextRequest("http://localhost/api/schedule/requests", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            action: "respondToShiftRequest",
+            orgId: ORG_ID,
+            requestId: REQUEST_ID,
+            empId: MY_EMP_ID,
+            accept: false,
+          }),
+        }),
+      );
+
+      await expect(response.json()).resolves.toEqual({ success: true, autoApproved: false });
+      expect(settleShiftRequestAfterTransition).not.toHaveBeenCalled();
+      expect(dispatchNotificationEvent).toHaveBeenCalledWith(
+        "actor-user",
+        expect.objectContaining({ action: "shift_request_responded", accepted: false }),
+      );
+    });
   });
 });

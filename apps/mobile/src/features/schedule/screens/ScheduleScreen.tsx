@@ -814,7 +814,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         fallbackMessage: "We couldn't update that shift request right now.",
       });
     },
-    onSuccess: async (_, variables) => {
+    onSuccess: async (data, variables) => {
       await Promise.all([
         refetchScreenContent(),
         queryClient.invalidateQueries({
@@ -823,7 +823,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       ]);
       pushToast({
         tone: "success",
-        ...getMobileRequestActionSuccessToast(variables.body),
+        ...getMobileRequestActionSuccessToast(variables.body, data),
       });
     },
   });
@@ -833,10 +833,18 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         return;
       }
 
-      const feedback = getMobileRequestActionFeedback({ requestId, body });
+      const feedback = getMobileRequestActionFeedback({
+        requestId,
+        body,
+        viewerCanApprove: Boolean(bootstrapQuery.data?.permissions.canApproveShiftRequests),
+      });
       setRequestActionConfirmation({ requestId, body, feedback });
     },
-    [pendingAction, requestActionMutation.isPending],
+    [
+      bootstrapQuery.data?.permissions.canApproveShiftRequests,
+      pendingAction,
+      requestActionMutation.isPending,
+    ],
   );
 
   const confirmRequestAction = useCallback(() => {

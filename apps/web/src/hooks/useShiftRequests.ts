@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { describeShiftRequestSubmitted } from "@dubgrid/domain";
 import { getIsoDateInTimeZone, resolveActiveShiftRequests } from "@dubgrid/schedule-core";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
@@ -268,6 +269,17 @@ export function useShiftRequests(
     ).length;
   }, [activeRequests, currentEmpId, canApprove]);
 
+  const showSubmitted = useCallback(
+    (submission: Parameters<typeof describeShiftRequestSubmitted>[0], autoApproved: boolean) => {
+      const copy = describeShiftRequestSubmitted(submission, {
+        autoApproved,
+        viewerCanApprove: canApprove,
+      });
+      toast.success(copy.title, { description: copy.message });
+    },
+    [canApprove],
+  );
+
   const create = useCallback(
     async (
       type: ShiftRequestType,
@@ -281,7 +293,7 @@ export function useShiftRequests(
     ): Promise<string | null> => {
       if (!orgId) return null;
       try {
-        const id = await createShiftRequest(
+        const { requestId, autoApproved } = await createShiftRequest(
           orgId,
           type,
           requesterEmpId,
@@ -292,34 +304,26 @@ export function useShiftRequests(
           requesterSegmentIndex,
           targetSegmentIndex,
         );
-        toast.success(
-          type === "calloff"
-            ? "Calloff submitted for approval"
-            : type === "pickup"
-              ? targetEmpId
-                ? "Pickup request sent"
-                : "Shift posted as available"
-              : "Swap request sent",
-        );
+        showSubmitted({ action: "created", type, targeted: targetEmpId != null }, autoApproved);
         // The server route already dispatches shift_request_created via
         // dispatchNotificationEvent; queuing it again here double-sent every
         // request's notification.
         await refetchAfterMutation();
-        return id;
+        return requestId;
       } catch (err: unknown) {
         toast.error(errMsg(err, "We couldn't create request. Try again."));
         return null;
       }
     },
-    [orgId, refetchAfterMutation],
+    [orgId, refetchAfterMutation, showSubmitted],
   );
 
   const claim = useCallback(
     async (requestId: string, claimerEmpId: string): Promise<boolean> => {
       if (!orgId) return false;
       try {
-        await claimShiftRequest(requestId, claimerEmpId, orgId);
-        toast.success("Shift claimed. Awaiting admin approval.");
+        const { autoApproved } = await claimShiftRequest(requestId, claimerEmpId, orgId);
+        showSubmitted({ action: "claimed" }, autoApproved);
         // Server route already dispatches shift_request_claimed.
         await refetchAfterMutation();
         return true;
@@ -328,7 +332,7 @@ export function useShiftRequests(
         return false;
       }
     },
-    [orgId, refetchAfterMutation],
+    [orgId, refetchAfterMutation, showSubmitted],
   );
 
   const volunteer = useCallback(
@@ -340,8 +344,14 @@ export function useShiftRequests(
     ): Promise<boolean> => {
       if (!orgId) return false;
       try {
-        const id = await volunteerForOpenShift(orgId, empId, shiftDate, input, focusAreaId);
-        toast.success("Shift claimed. Awaiting admin approval.");
+        const { autoApproved } = await volunteerForOpenShift(
+          orgId,
+          empId,
+          shiftDate,
+          input,
+          focusAreaId,
+        );
+        showSubmitted({ action: "claimed" }, autoApproved);
         // Server route already dispatches shift_request_created.
         await refetchAfterMutation();
         return true;
@@ -350,15 +360,19 @@ export function useShiftRequests(
         return false;
       }
     },
-    [orgId, refetchAfterMutation],
+    [orgId, refetchAfterMutation, showSubmitted],
   );
 
   const respond = useCallback(
     async (requestId: string, empId: string, accept: boolean): Promise<boolean> => {
       if (!orgId) return false;
       try {
-        await respondToShiftRequest(requestId, empId, accept, orgId);
-        toast.success(accept ? "Swap accepted, awaiting admin approval" : "Swap declined");
+        const { autoApproved } = await respondToShiftRequest(requestId, empId, accept, orgId);
+        if (accept) {
+          showSubmitted({ action: "accepted", type: "swap" }, autoApproved);
+        } else {
+          toast.success("Swap declined");
+        }
         await refetchAfterMutation();
         return true;
       } catch (err: unknown) {
@@ -366,7 +380,7 @@ export function useShiftRequests(
         return false;
       }
     },
-    [orgId, refetchAfterMutation],
+    [orgId, refetchAfterMutation, showSubmitted],
   );
 
   const resolve = useCallback(

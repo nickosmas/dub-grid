@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { authenticatedSecurityDefinerAllowlist } from "./helpers/sql-inventory";
 
 function supabaseRoot(): string {
   const fromRoot = resolve(process.cwd(), "supabase");
@@ -10,6 +11,7 @@ function supabaseRoot(): string {
 const expectedAuthenticatedSecurityDefiners = [
   "accept_invitation",
   "assign_org_role_by_email",
+  "auto_approve_shift_request",
   "caller_org_id",
   "caller_org_role",
   "cancel_shift_request",
@@ -72,15 +74,7 @@ describe("authorization SQL inventory", () => {
   );
 
   it("classifies the complete authenticated SECURITY DEFINER entry-point set", () => {
-    const allowlist = hardening.match(
-      /authenticated_entry_points CONSTANT TEXT\[\] := ARRAY\[([\s\S]*?)\n\s*\];/,
-    )?.[1];
-    expect(allowlist).toBeDefined();
-
-    const actual = [...(allowlist ?? "").matchAll(/'([a-z0-9_]+)'/g)]
-      .map((match) => match[1])
-      .sort();
-    expect(actual).toEqual(expectedAuthenticatedSecurityDefiners);
+    expect(authenticatedSecurityDefinerAllowlist()).toEqual(expectedAuthenticatedSecurityDefiners);
   });
 
   it("removes anonymous and implicit future function execution", () => {
