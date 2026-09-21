@@ -22,6 +22,9 @@ vi.mock("react-native", () => ({
   },
 }));
 
+// A real device: the simulator counts as unsupported for push.
+vi.mock("expo-device", () => ({ isDevice: true }));
+
 const getPermissionsAsync = vi.fn();
 const requestPermissionsAsync = vi.fn();
 const getExpoPushTokenAsync = vi.fn();

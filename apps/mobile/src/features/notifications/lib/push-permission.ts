@@ -1,11 +1,17 @@
 import type * as Notifications from "expo-notifications";
 import Constants, { ExecutionEnvironment } from "expo-constants";
+import * as Device from "expo-device";
 import { Platform } from "react-native";
 
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
-/** Web has no push at all, and Expo Go dropped remote push in SDK 53. */
-export const pushUnsupported = Platform.OS === "web" || isExpoGo;
+/**
+ * Web has no push at all, Expo Go dropped remote push in SDK 53, and an iOS
+ * simulator cannot mint a push token: asking it to only raises a library
+ * warning on every launch.
+ */
+export const pushUnsupported =
+  Platform.OS === "web" || isExpoGo || (Platform.OS === "ios" && !Device.isDevice);
 
 export type PushPermissionState = "unsupported" | "undetermined" | "denied" | "granted";
 
