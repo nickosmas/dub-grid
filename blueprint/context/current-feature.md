@@ -27,6 +27,11 @@ Reported on mobile and traced across both apps:
   schedule rows and cards, opacity fades elsewhere, a note field inside a
   confirmation modal, Title Case action labels, "workspace" on the login
   screen.
+- The mobile People filter sheet never offers the role filter to anyone who
+  can manage employees: the section was gated to regular users when it was
+  added, while the state, matcher, search index and badge count behind it
+  already served everyone. The Role and Certification section titles were
+  also hardcoded instead of reading the organization's terminology.
 
 ## The fix
 
@@ -43,6 +48,11 @@ Reported on mobile and traced across both apps:
   `onCancel(requestId, requesterEmpId)`, approval queue as titled columns;
   shadcn `Calendar` (`react-day-picker`) behind a new `DateRangePicker` with
   draft + Apply, used by History and Reports.
+- Mobile People filters: the role section renders whenever the organization
+  has roles, for every viewer, and the Role and Certification section titles
+  come from `currentOrg.labels` (falling back to the plural defaults the web
+  filter popover uses). Nothing about which people a regular user can see or
+  search changes.
 
 ## Build steps
 
@@ -54,10 +64,20 @@ Reported on mobile and traced across both apps:
 - [x] **6. Web date range picker** - shadcn calendar, Apply, History and Reports.
 - [x] **7. Content-sized toolbars and fields** - wrapping rows of content-sized
       controls app-wide; tables left as they were.
+- [x] **8. Mobile role filter for managers** - drop the regular-user gate on
+      the Role section and read both qualification section titles from the
+      organization's labels. Done when a manager opening the People filters
+      sees the role section under the org's label and picking a role narrows
+      the roster, with a test proving it.
 
 ## Verify
 
-- Unit: domain (11), mobile people/dashboard/schedule/requests suites, web
-  board (11), reports (16), date-range-picker (4), typography contract.
+- Unit: domain (11), mobile people/dashboard/schedule/requests suites
+  (PeopleScreen 25, including the manager role filter), web board (11),
+  reports (16), date-range-picker (4), typography contract.
 - Type-check, lint and the full mobile and web suites from the worktree.
 - Manual: see the verification list in the plan (simulator and browser).
+- Manual, step 8: sign in on mobile as a manager, open People, tap the filter
+  button, confirm the role section is listed under the org's role label, pick
+  one role and confirm only people holding it remain. Wrong: no role section,
+  or a section titled "Role" for an org that renamed roles.

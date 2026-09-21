@@ -341,6 +341,9 @@ export default function PeopleScreen() {
   const focusAreas = bootstrapQuery.data?.focusAreas ?? [];
   const certifications = bootstrapQuery.data?.certifications ?? [];
   const roles = bootstrapQuery.data?.roles ?? [];
+  const certificationLabel =
+    bootstrapQuery.data?.currentOrg.labels.certification ?? "Certifications";
+  const roleLabel = bootstrapQuery.data?.currentOrg.labels.role ?? "Roles";
   const useCompactRoleCertificationLabels =
     bootstrapQuery.data?.currentOrg?.useCompactRoleCertificationLabels ?? false;
   const managementDepartments = useMemo(
@@ -777,7 +780,7 @@ export default function PeopleScreen() {
             </SelectionSection>
 
             {certifications.length > 0 ? (
-              <SelectionSection label="Certification">
+              <SelectionSection label={certificationLabel}>
                 <SelectionRow
                   label="All certifications"
                   onPress={() => setStaffFilter("certificationId", "all")}
@@ -798,8 +801,8 @@ export default function PeopleScreen() {
               </SelectionSection>
             ) : null}
 
-            {regularUserMode && roles.length > 0 ? (
-              <SelectionSection label="Role">
+            {roles.length > 0 ? (
+              <SelectionSection label={roleLabel}>
                 <SelectionRow
                   label="All roles"
                   onPress={() => setStaffFilter("roleId", "all")}
