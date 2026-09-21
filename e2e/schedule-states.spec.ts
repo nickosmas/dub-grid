@@ -57,9 +57,12 @@ test.describe("schedule states", () => {
     await page.goto(`${QA_CALM_HAVEN_ORIGIN}/schedule`);
     await page.waitForLoadState("networkidle");
 
-    // exact: true - Next.js's own dev-tools button's accessible name ("Open
-    // Next.js Dev Tools") also contains "Tools" as a substring match.
-    const toolsButton = page.getByRole("button", { name: "Tools", exact: true });
+    // Anchored, not exact: the requests badge inside the button joins its
+    // accessible name once the organization has active requests ("Tools 4
+    // active requests"), and the seed leaves Calm Haven with four. Next.js's
+    // own dev-tools button ("Open Next.js Dev Tools") contains "Tools" but
+    // does not start with it.
+    const toolsButton = page.getByRole("button", { name: /^Tools\b/ });
     await expect(toolsButton).toBeVisible({ timeout: 15_000 });
     await toolsButton.click();
     await page.getByRole("menuitem", { name: "Print" }).click();

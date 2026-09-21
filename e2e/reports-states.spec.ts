@@ -19,14 +19,17 @@ test.describe("reports states", () => {
     await rangeSelect.click();
     await page.getByRole("option", { name: "Custom", exact: true }).click();
 
-    // Its popover opens on the calendar's first prompt.
+    // Its popover is the day picker over a Clear / Apply footer
+    // (ui/date-range-picker.tsx); Apply is the popover's only such button on
+    // this page.
     const rangeTrigger = page.getByRole("button", { name: "Date range", exact: true });
     await expect(rangeTrigger).toBeVisible({ timeout: 15_000 });
     await rangeTrigger.click();
-    await expect(page.getByText("Select start date")).toBeVisible();
+    const applyButton = page.getByRole("button", { name: "Apply", exact: true });
+    await expect(applyButton).toBeVisible();
 
     await page.keyboard.press("Escape");
-    await expect(page.getByText("Select start date")).toBeHidden();
+    await expect(applyButton).toBeHidden();
 
     // TargetDropdown: its popover carries the title and a Clear action.
     const targetTrigger = page.getByRole("button", { name: "Focus areas", exact: true });
