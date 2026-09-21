@@ -1,5 +1,5 @@
 "use client";
-import { ArrowDown, ChevronLeft, Clock } from "lucide-react";
+import { ArrowUpDown, ChevronLeft, Clock } from "lucide-react";
 
 import { Fragment, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -370,7 +370,7 @@ export default function ShiftRequestBoard({
     );
   }
 
-  function renderShiftPanel(party: ShiftParty) {
+  function renderShiftPanel(party: ShiftParty, seam?: "above" | "below") {
     const when = [formatShiftDate(party.date), party.timeRange].filter(Boolean).join(" \u00b7 ");
     return (
       <div
@@ -378,6 +378,9 @@ export default function ShiftRequestBoard({
           background: "var(--dg-color-surface-alt)",
           borderRadius: "var(--dg-radius-sm)",
           padding: "10px 12px",
+          // Room for the swap disc that straddles the seam between two panels.
+          ...(seam === "below" ? { paddingBottom: 24 } : {}),
+          ...(seam === "above" ? { paddingTop: 24 } : {}),
           display: "flex",
           flexDirection: "column",
           gap: 2,
@@ -540,12 +543,11 @@ export default function ShiftRequestBoard({
             : null;
           if (!requesterParty) return null;
           if (!targetParty) return renderShiftPanel(requesterParty);
-          // The two panels sit nearly flush and the arrow straddles the seam
-          // between them, pointing from the requester's shift to the one it
-          // goes to; a ring in the card's colour lifts it off both panels.
+          // The two panels sit nearly flush and the swap disc straddles the
+          // seam between them; a ring in the card's colour lifts it off both.
           return (
             <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 4 }}>
-              {renderShiftPanel(requesterParty)}
+              {renderShiftPanel(requesterParty, "below")}
               <span
                 aria-label="swaps with"
                 role="img"
@@ -566,9 +568,9 @@ export default function ShiftRequestBoard({
                   zIndex: 1,
                 }}
               >
-                <ArrowDown size={14} strokeWidth={2.5} />
+                <ArrowUpDown size={14} strokeWidth={2.5} />
               </span>
-              {renderShiftPanel(targetParty)}
+              {renderShiftPanel(targetParty, "above")}
             </div>
           );
         })()}

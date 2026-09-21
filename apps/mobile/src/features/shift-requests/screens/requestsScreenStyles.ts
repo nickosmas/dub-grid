@@ -142,6 +142,13 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderRadius: mobileRadii.control,
       backgroundColor: mobileColors.surfaceSecondary,
     },
+    // Room for the swap disc that straddles the seam between two panels.
+    shiftPanelSeamBelow: {
+      paddingBottom: mobileSpace.lg + mobileSpace.sm,
+    },
+    shiftPanelSeamAbove: {
+      paddingTop: mobileSpace.lg + mobileSpace.sm,
+    },
     shiftPanelPerson: {
       ...mobileText.meta,
       color: mobileColors.textMuted,

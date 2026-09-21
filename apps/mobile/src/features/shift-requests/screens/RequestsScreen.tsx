@@ -1186,14 +1186,14 @@ function RequestCard({
           <Text style={styles.awaitingNote}>{describeAwaitingRecipient(request.targetName)}</Text>
         ) : null}
         {/* A swap is one card about two shifts: the panels sit nearly flush
-            and the arrow straddles the seam, pointing from the requester's
-            shift to the one it goes to. */}
+            and the swap disc straddles the seam between them. */}
         <View style={isSwap ? styles.swapPanels : undefined}>
           <RequestShiftPanel
             date={showDate || isSwap ? request.requesterShiftDate : null}
             now={now}
             personName={isSwap ? copy.requesterShiftLabel : null}
             presentation={request.requesterPresentation}
+            seam={isSwap ? "below" : undefined}
             state={request.requesterState}
             timeZone={timeZone}
           />
@@ -1204,12 +1204,13 @@ function RequestCard({
                 now={now}
                 personName={copy.targetShiftLabel}
                 presentation={request.targetPresentation ?? null}
+                seam="above"
                 state={request.targetState ?? null}
                 timeZone={timeZone}
               />
               <View pointerEvents="none" style={styles.swapArrowRow}>
                 <View style={styles.swapArrow}>
-                  <Ionicons color={mobileColors.brand} name="arrow-down" size={16} />
+                  <Ionicons color={mobileColors.brand} name="swap-vertical" size={16} />
                 </View>
               </View>
             </>
@@ -1267,6 +1268,7 @@ function RequestShiftPanel({
   now,
   personName,
   presentation,
+  seam,
   state,
   timeZone,
 }: {
@@ -1276,6 +1278,8 @@ function RequestShiftPanel({
   presentation: ResolvedSchedulePresentation | null;
   state: ScheduleCellState | null;
   timeZone: string | null | undefined;
+  /** Which edge meets the other panel of a swap, so the disc has room. */
+  seam?: "above" | "below";
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
@@ -1300,7 +1304,13 @@ function RequestShiftPanel({
     null;
 
   return (
-    <View style={styles.shiftPanel}>
+    <View
+      style={[
+        styles.shiftPanel,
+        seam === "below" && styles.shiftPanelSeamBelow,
+        seam === "above" && styles.shiftPanelSeamAbove,
+      ]}
+    >
       {personName ? <Text style={styles.shiftPanelPerson}>{personName}</Text> : null}
       {splitSegments.length > 1 ? (
         <View style={styles.splitShiftPanel}>
