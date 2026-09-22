@@ -253,7 +253,7 @@ before conversion is required.
 - **Background jobs:** `cron-expire-requests.yml` GitHub Action (hourly)
   expires stale shift requests and invitations; Vercel crons run
   trial-expiry notices and sandbox cleanup daily. All need `CRON_SECRET`.
-- **Env vars and health check:** `docs/secrets-rotation.md` lists every
+- **Env vars and health check:** `internal/secrets-rotation.md` lists every
   variable with its rotation procedure; `GET /api/health` is the health check.
 - **Domain notes:** not captured during adoption.
 

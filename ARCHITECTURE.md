@@ -203,7 +203,7 @@ The authentication system includes complete self-service flows:
 - **Forgot Password** (`/forgot-password`) - the browser posts to `POST /api/auth/recovery-request`, which applies source, per-target, and global rate limits, writes a security audit event, and only then calls Supabase `resetPasswordForEmail()`. The response is generic (always success) so account existence is never revealed. Mobile uses the same handler at `/api/mobile/v1/auth/recovery-request` and completes the reset in-app with a 6-digit code (`verifyOtp`).
 - **Reset Password** (`/reset-password`) - Token-validated form with password strength meter (4 levels). Password rules live once in `@dubgrid/domain` (`password.ts`). Signs the user out after reset.
 - **Email Verification** (`/verify-email`) - Invited accounts are created pre-confirmed by `/api/invitations/register`, so this page only serves accounts that are genuinely unconfirmed (resend with a 60-second cooldown, auto-redirect on the `SIGNED_IN` event).
-- **MFA (TOTP)** - enrollment, verification, and removal run through `POST /api/account/mfa-lifecycle` (mobile: `/api/mobile/v1/profile/mfa-lifecycle`), one shared handler with `enroll`, `remove`, `reauthenticate`, and `cleanup` actions. Enforcement is account-based: once a verified factor exists, sign-in requires the TOTP challenge and sensitive actions require fresh AAL2 proof. Accounts without a factor get a dismissible nag banner, not a hard block. See `docs/mfa-provider-boundary.md`.
+- **MFA (TOTP)** - enrollment, verification, and removal run through `POST /api/account/mfa-lifecycle` (mobile: `/api/mobile/v1/profile/mfa-lifecycle`), one shared handler with `enroll`, `remove`, `reauthenticate`, and `cleanup` actions. Enforcement is account-based: once a verified factor exists, sign-in requires the TOTP challenge and sensitive actions require fresh AAL2 proof. Accounts without a factor get a dismissible nag banner, not a hard block. See `internal/mfa-provider-boundary.md`.
 - **Sensitive-action reauthentication** - `@dubgrid/authz`'s `assurance.ts` defines a five-minute fresh-auth window derived from the JWT's `amr` timestamps. Route Handlers call `requireSensitiveActionAuth` before MFA changes, credential updates (`POST /api/account/credential-assurance` preflights Supabase `updateUser`), session revocation, data export, and account or organization deletion; the web `StepUpDialog` and the mobile step-up flow satisfy it.
 
 All auth pages use the `AuthCard` layout component (`PageShell` + `Card`) and `PasswordInput` / `PasswordStrength` reusable components from `apps/web/src/components/auth/`.
@@ -236,7 +236,7 @@ Database history is an immutable, ordered migration stream under `supabase/migra
 | `004_grants.sql`             | Baseline: grants for anon, authenticated, service_role, supabase_auth_admin                                                                                                                                                                                                                                                                              |
 | `005`-`020`                  | Forward migrations: live-membership guard, atomic notification and mobile-employee mutations, calendar feed tokens, invitation replacement and hardened acceptance, schedule editor session terminations, schedule notes requiring a shift, authorization and effective-tenant hardening, the scheduler-staffed call-off trigger and its publish repairs |
 
-Migrations are applied by ledger (`supabase db push`, Supabase branching, or the local `db:reset`), never by dropping and replaying the schema on production. `supabase/patches/` holds historical one-time production patches as evidence only. The runbook is `docs/operations/production-migration-safety.md`; `npm run db:migrations:inspect` is the read-only ledger and invariant check.
+Migrations are applied by ledger (`supabase db push`, Supabase branching, or the local `db:reset`), never by dropping and replaying the schema on production. `supabase/patches/` holds historical one-time production patches as evidence only. The runbook is `internal/operations/production-migration-safety.md`; `npm run db:migrations:inspect` is the read-only ledger and invariant check.
 
 Seeds: root `seed.ts` orchestrates the SQL seed fixtures `supabase/seed_arden_wood.sql`, `supabase/seed_calm_haven.sql`, and `supabase/seed_gridmaster.sql` (local, staging, and preview branches only; never production).
 
@@ -329,7 +329,7 @@ Each UI feature lives in `apps/web/src/features/<feature>/` with up to `client/`
 - `server/` — server-only logic invoked by Route Handlers.
 - `shared/` — types and helpers used by both sides.
 
-`apps/web/src/features/permissions/` wraps `@dubgrid/authz` (`core`, `client`, `shared`, `index`, `usePermissions.ts`). `docs/architecture/folder-structure.md` describes this layout in detail.
+`apps/web/src/features/permissions/` wraps `@dubgrid/authz` (`core`, `client`, `shared`, `index`, `usePermissions.ts`). `internal/architecture/folder-structure.md` describes this layout in detail.
 
 ### Data Access Pattern
 
@@ -455,7 +455,7 @@ The mobile API exposes its own Route Handlers under `apps/web/src/app/api/mobile
 - **Shift requests:** `/shift-requests`, `/shift-requests/[id]`, `/shift-requests/history`, `/shift-requests/swap-options`
 - **Device/session:** `/push-tokens`, `/session-presence`
 
-The full method-by-method list is in `docs/api-reference.md`.
+The full method-by-method list is in `internal/api-reference.md`.
 
 ---
 
@@ -528,7 +528,7 @@ DubGrid uses Supabase Realtime for three purposes:
 | `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`                                | Supabase Auth and Realtime from the mobile app                                        | mobile: client           |
 | `EXPO_PUBLIC_API_BASE_URL`                                                                         | Base URL the mobile app calls for `/api/mobile/v1/*`                                  | mobile: client           |
 
-The complete list with rotation procedures is in `docs/secrets-rotation.md`. Server variables are validated by `apps/web/src/lib/env.server.ts`, public ones by `apps/web/src/lib/env.ts`.
+The complete list with rotation procedures is in `internal/secrets-rotation.md`. Server variables are validated by `apps/web/src/lib/env.server.ts`, public ones by `apps/web/src/lib/env.ts`.
 
 ---
 

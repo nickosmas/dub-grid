@@ -1,0 +1,57 @@
+---
+title: "Calendar Export"
+description: "Export your personal shift schedule as an ICS file to import into any calendar app."
+---
+
+The calendar export endpoint generates an ICS file containing your personal shift schedule. You can import this file into Google Calendar, Apple Calendar, Outlook, or any other calendar application that supports the ICS format.
+
+## Endpoint
+
+```
+GET /api/calendar
+```
+
+**Authentication:** Required — you must be logged in (session cookie).
+
+**Response:** `text/calendar` (ICS format), delivered as a downloadable attachment.
+
+## Query parameters
+
+<ParamField query="weeks" type="integer" default="4">
+  Number of weeks to include, starting from the current week. Maximum value is `12`.
+</ParamField>
+
+## How to use
+
+Navigate to the following URL in your browser while logged in to your DubGrid account:
+
+```
+https://[your-org].dubgrid.com/api/calendar?weeks=8
+```
+
+Your browser will download a `.ics` file containing your shifts for the requested period.
+
+<Note>
+  The ICS export is a snapshot of your schedule at the time of download. It does not automatically
+  sync when the schedule changes. Re-export periodically to keep your calendar up to date.
+</Note>
+
+## Import into Google Calendar
+
+<Steps>
+  <Step title="Download the ICS file">
+    While logged in, visit `https://[your-org].dubgrid.com/api/calendar` in your browser. Your
+    browser will download the file automatically.
+  </Step>
+  <Step title="Open Google Calendar settings">
+    In Google Calendar, click the gear icon and go to **Settings**.
+  </Step>
+  <Step title="Go to Import & Export">
+    In the left sidebar, select **Import & Export**, then click **Import**.
+  </Step>
+  <Step title="Select the file">
+    Click **Select file from your computer** and choose the `.ics` file you downloaded.
+  </Step>
+  <Step title="Choose a calendar">Select which calendar you want to add the events to.</Step>
+  <Step title="Import">Click **Import**. Your shifts will appear in the selected calendar.</Step>
+</Steps>

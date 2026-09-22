@@ -1,0 +1,42 @@
+---
+title: "Shift Requests"
+description: "Staff can request to pick up open shifts or propose swaps with colleagues, with admin approval at every step."
+---
+
+Shift requests give staff members a way to pick up extra shifts or trade shifts with colleagues. Admins review and approve or reject requests through the **Shift Request Board**.
+
+## Request types
+
+**Pickup requests** — An employee requests to pick up a shift that is currently open (unassigned). The request goes to an admin for approval.
+
+**Swap requests** — An employee proposes to swap one of their existing shifts with a colleague. Both the colleague and an admin must approve before the swap takes effect.
+
+## Request lifecycle
+
+Each request moves through a defined set of statuses from creation to resolution.
+
+| Status             | Meaning                                                                           |
+| ------------------ | --------------------------------------------------------------------------------- |
+| `open`             | The request has been submitted and is waiting for the involved parties to respond |
+| `pending_approval` | All parties have agreed — the request is awaiting final admin approval            |
+| `approved`         | An admin has approved the request; the schedule change is applied as a draft      |
+| `rejected`         | An admin has rejected the request                                                 |
+| `cancelled`        | The requesting employee cancelled their own request                               |
+| `expired`          | The request was not resolved before its expiration deadline                       |
+
+<Note>
+  Staff can cancel their own requests at any time while the request is still in `open` or
+  `pending_approval` status.
+</Note>
+
+## Admin approval
+
+Admins with the `canApproveShiftRequests` permission can access the **Shift Request Board** from the schedule toolbar. The board lists all active requests and allows filtering by status and request type.
+
+To approve or reject a request:
+
+1. Open the **Shift Request Board**.
+2. Locate the request you want to act on.
+3. Click **Approve** or **Reject**.
+
+Approved shift changes are applied to the schedule as drafts and must be published before they are visible to all staff.

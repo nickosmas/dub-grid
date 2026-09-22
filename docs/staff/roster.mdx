@@ -1,0 +1,87 @@
+---
+title: "Staff Roster"
+description: "View, add, and manage every employee in your organization from the staff roster."
+---
+
+The staff roster at `/staff` is your central list of all employees. You can search, filter, and sort the table, and take actions on individual records — adding new hires, benching staff temporarily, or terminating employees who have left.
+
+<Note>
+  Add, edit, bench, and terminate actions require the `canManageEmployees` permission. Users without
+  this permission can view the roster but cannot make changes.
+</Note>
+
+## What the roster shows
+
+Each row in the table displays:
+
+- **Name** — the employee's full name
+- **Certification** — their primary certification abbreviation (e.g. `JLCSN`, `CSN III`)
+- **Roles** — one or more role tags (e.g. `Supv`, `CN`, `Mentor`)
+- **Focus areas** — the wings or sections they are assigned to
+- **Status** — a badge indicating `active`, `benched`, or `terminated`
+
+## Employee statuses
+
+| Status         | Meaning                                                                                   |
+| -------------- | ----------------------------------------------------------------------------------------- |
+| **Active**     | The employee is included in scheduling.                                                   |
+| **Benched**    | Temporarily removed from scheduling without being terminated.                             |
+| **Terminated** | Marked as no longer with the organization. Retained in the roster for historical records. |
+
+## Search and filter
+
+Use the **search bar** at the top of the toolbar to find employees by name. To narrow the list further, open the **filter panel** to filter by:
+
+- **Status** — active, benched, or terminated
+- **Focus area** — a specific wing or section
+- **Certification** — a certification level defined in your org's settings
+
+You can also **sort** the table by seniority or name.
+
+## Adding a new employee
+
+<Steps>
+  <Step title="Open the Add Employee modal">
+    Click **Add Employee** in the top-right of the roster toolbar. The modal opens.
+  </Step>
+  <Step title="Enter the employee's name">Fill in the employee's first and last name.</Step>
+  <Step title="Set their certification and role(s)">
+    Select their primary certification from the dropdown, then assign one or more role tags.
+  </Step>
+  <Step title="Assign focus areas and seniority">
+    Choose which focus areas (wings/sections) the employee works in. Set their seniority number —
+    lower numbers appear higher in the roster.
+  </Step>
+  <Step title="Add contact information">Enter the employee's phone number and email address.</Step>
+  <Step title="Save">
+    Click **Save** to add the employee to the roster. They will appear as **Active** immediately.
+  </Step>
+</Steps>
+
+<Tip>
+  If you're onboarding many employees at once, use **Bulk Import** to upload multiple records in a
+  single step instead of adding them one by one.
+</Tip>
+
+## Editing an employee
+
+Click anywhere on an employee's row to open the **Edit Employee** panel. Update any field — name, certification, roles, focus areas, seniority, phone, or email — then click **Save**.
+
+## Benching an employee
+
+Benching temporarily removes an employee from scheduling without terminating their record. Use this for staff on extended leave.
+
+To bench an employee, open their row in the roster and select **Bench**. Their status badge changes to `benched` and they will no longer appear in the schedule grid.
+
+To return them to active scheduling, select **Activate** from their row.
+
+## Terminating an employee
+
+Terminating marks an employee as no longer with the organization. Their record is retained for historical reporting.
+
+To terminate an employee, open their row and select **Terminate**. You can add an optional note and the timestamp is recorded automatically. Their status badge changes to `terminated`.
+
+<Note>
+  Terminated employees remain visible in the roster when you filter by **Terminated** status. Their
+  historical shifts and reports are preserved.
+</Note>

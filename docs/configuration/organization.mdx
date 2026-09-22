@@ -1,0 +1,83 @@
+---
+title: "Organization Settings"
+description: "Configure your organization's name, contact details, timezone, shift categories, and custom terminology labels."
+---
+
+Organization settings let you control the core details of your DubGrid account and how the app is structured for your facility. You'll find these settings at **Settings → Organization**.
+
+<Note>
+  Only Super Admins can edit the organization name, address, and timezone. Admins with the
+  `canManageOrgSettings` permission can edit the remaining fields.
+</Note>
+
+## Basic information
+
+The following fields identify your organization across the platform and in printed schedules:
+
+| Field                 | Description                                                         |
+| --------------------- | ------------------------------------------------------------------- |
+| **Organization name** | Appears in the schedule header, printed output, and the browser tab |
+| **Address**           | Your facility's street address                                      |
+| **Phone number**      | A contact number for your organization                              |
+| **Employee count**    | An approximate count of your total staff                            |
+| **Timezone**          | The timezone used for shift times and schedule date boundaries      |
+
+Select your timezone carefully — it affects how shift start and end times are displayed throughout the app.
+
+## Custom terminology
+
+DubGrid lets you rename three default labels to match the language your facility already uses. For example, you might call focus areas "Wings", "Units", or "Departments" instead.
+
+See [Custom Terminology](/configuration/terminology) for the full list of labels you can change and how they affect the app.
+
+---
+
+## Shift categories
+
+Shift categories are found at **Settings → Shift Categories**. They group shift codes into tally buckets that appear as count rows at the bottom of each focus area section on the schedule grid.
+
+### What shift categories do
+
+When the schedule grid renders a focus area section, it automatically totals how many employees are scheduled for each shift category on each date. These count rows let schedulers quickly verify that staffing levels look right without counting individual rows by hand.
+
+### Category fields
+
+Each shift category has the following configurable fields:
+
+| Field                | Description                                                                                              |
+| -------------------- | -------------------------------------------------------------------------------------------------------- |
+| **Name**             | The label shown in the count row header (e.g., "Day", "Evening", "Night")                                |
+| **Color**            | A background color used to visually distinguish the category                                             |
+| **Start time**       | Optional. The earliest shift start time that falls within this category                                  |
+| **End time**         | Optional. The latest shift end time that falls within this category                                      |
+| **Sort order**       | Controls the display order of count rows within a section                                                |
+| **Focus area scope** | Optional. Limits the category's count rows to a specific focus area instead of appearing in all sections |
+
+### Adding a shift category
+
+<Steps>
+  <Step title="Open Shift Categories">
+    Go to **Settings → Shift Categories** and click **Add Category**.
+  </Step>
+  <Step title="Name and color the category">
+    Enter a name and choose a color. The name will appear as the row label on the schedule grid.
+  </Step>
+  <Step title="Set an optional time window">
+    If you want the category to capture only shifts within a specific time range, set a **Start
+    time** and **End time**. Leave these blank to match shifts regardless of time.
+  </Step>
+  <Step title="Assign shift codes">
+    In **Settings → Shift Codes**, assign each relevant shift code to this category using the
+    **Shift category** field. See [Shift Codes](/configuration/shift-codes) for details.
+  </Step>
+  <Step title="Save">
+    Click **Save**. The new count row will appear at the bottom of the appropriate sections on the
+    grid.
+  </Step>
+</Steps>
+
+<Tip>
+  If a shift category is scoped to a specific focus area, its count row only appears in that
+  section. Use this to create wing-specific tallies (for example, a "Sheltered Care Day" category
+  that only counts in the Sheltered Care section).
+</Tip>

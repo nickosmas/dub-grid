@@ -167,7 +167,7 @@ so a planted `.claude/setup.mjs` would never surface in `git status`.
 
 ## Operational Security
 
-- [Secret Rotation Runbook](docs/secrets-rotation.md)
-- [Cookie and GDPR Compliance](docs/cookies-and-gdpr.md)
+- [Secret Rotation Runbook](internal/secrets-rotation.md)
+- [Cookie and GDPR Compliance](internal/cookies-and-gdpr.md)
 - [Full Security Audit](SECURITY_AUDIT.md)
 - [RBAC System Design](RBAC_SYSTEM_DESIGN.md)

@@ -1,0 +1,48 @@
+---
+title: "Admin Permissions"
+description: "A complete list of permissions a Super Admin can grant to individual Admins."
+---
+
+Super Admins can grant granular permissions to each Admin individually. Rather than every Admin having identical access, you decide exactly what each person can do within your organization.
+
+## Where to configure permissions
+
+Go to **Settings → Users**, click the Admin you want to configure, then click **Edit permissions**. Changes take effect immediately.
+
+<Warning>
+  Removing a permission takes effect immediately. The Admin will lose access to that action as soon
+  as you save.
+</Warning>
+
+## All permissions
+
+| Permission                      | What it allows                                       | Delegatable to Admins         |
+| ------------------------------- | ---------------------------------------------------- | ----------------------------- |
+| `canViewSchedule`               | View the schedule grid                               | Always on — cannot be removed |
+| `canEditShifts`                 | Create, edit, and delete shift entries               | Yes                           |
+| `canPublishSchedule`            | Publish draft changes to the live schedule           | Yes                           |
+| `canApplyRecurringSchedule`     | Apply recurring shift templates to a date range      | Yes                           |
+| `canEditNotes`                  | Add, edit, and delete schedule notes and indicators  | Yes                           |
+| `canManageRecurringShifts`      | Configure recurring shift templates per employee     | Yes                           |
+| `canManageShiftSeries`          | Create and manage repeating shift series             | Yes                           |
+| `canViewStaff`                  | View the staff roster                                | Always on — cannot be removed |
+| `canManageEmployees`            | Add, edit, bench, and terminate employees            | Yes                           |
+| `canManageFocusAreas`           | Manage focus areas and wings                         | Yes                           |
+| `canManageShiftCodes`           | Manage shift code definitions                        | Yes                           |
+| `canManageIndicatorTypes`       | Manage note and indicator type definitions           | Yes                           |
+| `canManageOrgLabels`            | Edit custom terminology labels for the organization  | Yes                           |
+| `canManageOrgSettings`          | Edit organization name, address, phone, and timezone | No — Super Admin only         |
+| `canManageCoverageRequirements` | Manage minimum staffing requirements                 | Yes                           |
+| `canApproveShiftRequests`       | Approve or reject shift pickup and swap requests     | Yes                           |
+
+## Always-on permissions
+
+`canViewSchedule` and `canViewStaff` are always enabled for all roles and cannot be removed. Every authenticated member of your organization can view the schedule and the staff roster.
+
+## Super Admin-only permissions
+
+The following permissions are reserved for Super Admins and cannot be delegated to Admins:
+
+- **canManageUsers** — add, remove, and manage organization members
+- **canConfigureAdminPermissions** — configure which permissions each Admin has
+- **canManageOrgSettings** — edit organization name, address, phone, and timezone

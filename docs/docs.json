@@ -1,0 +1,70 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "DubGrid",
+  "theme": "almond",
+  "favicon": "https://media.brand.dev/dc0c42b2-b4b8-4985-a040-610c085c30d3.png",
+  "colors": {
+    "primary": "#2663EB"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/nickosmas/dub-grid"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": ["introduction", "quickstart", "onboarding"]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/schedule-grid",
+              "features/draft-publish",
+              "features/recurring-shifts",
+              "features/real-time-collaboration",
+              "features/shift-requests",
+              "features/dashboard"
+            ]
+          },
+          {
+            "group": "Staff Management",
+            "pages": ["staff/roster", "staff/detail-page", "staff/invitations"]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/organization",
+              "configuration/shift-codes",
+              "configuration/focus-areas",
+              "configuration/coverage-requirements",
+              "configuration/terminology"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Reference",
+        "groups": [
+          {
+            "group": "Roles & Permissions",
+            "pages": ["reference/roles", "reference/admin-permissions"]
+          },
+          {
+            "group": "Billing",
+            "pages": ["reference/billing", "reference/subscription"]
+          },
+          {
+            "group": "API",
+            "pages": ["reference/api-overview", "reference/calendar-export"]
+          }
+        ]
+      }
+    ]
+  }
+}

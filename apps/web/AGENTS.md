@@ -24,7 +24,7 @@ apps/web/
   src/
     proxy.ts                        # Request proxy: RBAC + org isolation (jwtVerify + decodeJwt fallback), CSP
     app/                            # Next.js App Router
-      api/                          # Route Handlers (154 files; see docs/api-reference.md)
+      api/                          # Route Handlers (154 files; see internal/api-reference.md)
         auth/                       # login, recovery-request, sign-out, start-trial, etc.
         cron/                       # expire-requests, trial-expiry, sandbox-cleanup (CRON_SECRET)
         mobile/v1/                  # Mobile API (auth, bootstrap, dashboard, org-status, me, org,

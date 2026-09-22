@@ -25,7 +25,7 @@ Version 2.3 | Updated 2026-09-19 | Confidential
 > document reflect the monorepo layout (`apps/web/...`, `apps/web/src/proxy.ts`).
 > Route Handlers verify tokens locally (`lib/auth/verify-token.ts`, JWKS/ES256) with a
 > Redis revocation check; a live `auth.getUser()` is reserved for sensitive actions and
-> the mobile MFA-factor lookup. See `docs/authentication.md` §5a for that contract.
+> the mobile MFA-factor lookup. See `internal/authentication.md` §5a for that contract.
 
 ---
 
@@ -1453,7 +1453,7 @@ signed JWT `amr` timestamps in `packages/authz/src/assurance.ts` and enforced by
 `requireSensitiveActionAuth` (web) / `requireMobileSensitiveActionAuth` (mobile) on
 factor and credential changes, other-session revocation, data export, account and
 organization deletion, and approving another person's account deletion; the web
-`StepUpDialog` and the mobile step-up flow satisfy it. `docs/mfa-provider-boundary.md`
+`StepUpDialog` and the mobile step-up flow satisfy it. `internal/mfa-provider-boundary.md`
 records the hosted-provider qualification and the accepted limit that direct calls to
 Supabase's own factor-removal endpoint follow the provider's AAL2 rule, not DubGrid's
 five-minute window.
@@ -1477,7 +1477,7 @@ The following features are recommended before a production launch.
 | Status           | Enrollment, challenge, unenrollment, and the five-minute sensitive-action step-up are built on web and mobile (see §12.6). An enrolled account cannot sign in or act sensitively without its factor.                        |
 | Gap              | Role-based enforcement is a dismissible nag for gridmaster/super_admin/admin accounts without a verified factor, not a hard block; a compromised password alone still grants such an account full access until they enroll. |
 | Recommendation   | If a hard requirement is wanted later, gate `/settings` and `/gridmaster` in `proxy.ts` behind AAL2 for privileged roles — deliberately not done now to avoid locking out existing accounts.                                |
-| Supabase support | Built-in via `supabase.auth.mfa.enroll()` / `challengeAndVerify()` / `unenroll()`; provider-boundary limits in `docs/mfa-provider-boundary.md`                                                                              |
+| Supabase support | Built-in via `supabase.auth.mfa.enroll()` / `challengeAndVerify()` / `unenroll()`; provider-boundary limits in `internal/mfa-provider-boundary.md`                                                                          |
 
 #### Failed Login Attempt Tracking & Account Lockout: Rate-Limit Based
 

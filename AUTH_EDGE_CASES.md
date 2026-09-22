@@ -13,7 +13,7 @@ in **Checked — not a finding** so the verification is auditable.
 the **Fixed this pass** rows are the fixes shipped 2026-05-24, **Already fixed**
 confirms earlier items, and **Checked — not a finding** records disproven leads
 with their source reference. For the steady-state auth model see
-`docs/authentication.md`; for RBAC see `RBAC_SYSTEM_DESIGN.md`. All rows below were
+`internal/authentication.md`; for RBAC see `RBAC_SYSTEM_DESIGN.md`. All rows below were
 re-confirmed against current source on 2026-05-25.
 
 > Companion to `SECURITY_AUDIT.md` (2026-05-21, F-1..F-7) and `POTENTIAL_BUGS.md`
@@ -24,7 +24,7 @@ re-confirmed against current source on 2026-05-25.
 > epic (build-plan items 19a-19e, completed 2026-09-14) rebuilt most of the
 > surface this log examined: server-mediated recovery requests, the five-minute
 > sensitive-action window, live tenant authorization, single-use invitation and
-> recovery credentials, and a release qualification matrix. `docs/authentication.md`
+> recovery credentials, and a release qualification matrix. `internal/authentication.md`
 > §5a and §8 and the `SECURITY_AUDIT.md` 2026-09-14 section describe the
 > steady state; the rows below remain accurate as a record of May 2026.
 

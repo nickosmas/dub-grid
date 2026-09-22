@@ -395,7 +395,7 @@ Main route groups (web, App Router):
   isolation, and ledger state. The restore point is the latest daily backup.
   The tracked plan grants no authority to mutate production.
 
-> Env vars by name and rotation procedure are in `docs/secrets-rotation.md`;
+> Env vars by name and rotation procedure are in `internal/secrets-rotation.md`;
 > the health check is `GET /api/health`. Run `/release vercel` for a real
 > readiness pass on domain notes.
 
@@ -403,4 +403,4 @@ Main route groups (web, App Router):
 
 - Exact per-seat billing price points / tier breaks are unconfirmed.
 - Deployment domain notes are unconfirmed (env vars are listed in
-  `docs/secrets-rotation.md`; the health check is `GET /api/health`).
+  `internal/secrets-rotation.md`; the health check is `GET /api/health`).

@@ -1,0 +1,72 @@
+---
+title: "API Overview"
+description: "A reference for DubGrid's HTTP endpoints available for integrations and exports."
+---
+
+DubGrid exposes a set of HTTP endpoints for programmatic access. These endpoints cover calendar exports, data exports, and utility functions.
+
+<Note>
+  Most operations in DubGrid are performed through the web app. The API is provided for
+  integrations, exports, and automations that require programmatic access.
+</Note>
+
+## Base URL
+
+```
+https://[your-org].dubgrid.com
+```
+
+Replace `[your-org]` with your organization's subdomain.
+
+## Authentication
+
+All authenticated endpoints require a valid session cookie. You must be logged in to your DubGrid account before making requests to these endpoints. Public endpoints do not require authentication.
+
+## Endpoints
+
+| Endpoint               | Method | Auth              | Description                                                                                             |
+| ---------------------- | ------ | ----------------- | ------------------------------------------------------------------------------------------------------- |
+| `/api/calendar`        | `GET`  | Required          | Export your personal shifts as an ICS calendar file. See [Calendar Export](/reference/calendar-export). |
+| `/api/export`          | `GET`  | Required (Admin+) | Export staff or schedule data as a CSV file.                                                            |
+| `/api/validate-domain` | `GET`  | Public            | Check whether an organization subdomain is available.                                                   |
+| `/api/request-demo`    | `POST` | Public            | Submit a demo request from the landing page.                                                            |
+
+## Export endpoint parameters
+
+The `/api/export` endpoint accepts the following query parameters:
+
+<ParamField query="type" type="string" required>
+  The type of data to export. Must be `staff` or `schedule`.
+</ParamField>
+
+<ParamField query="orgId" type="string (UUID)" required>
+  The UUID of your organization. Find this in your organization's settings.
+</ParamField>
+
+<ParamField query="startDate" type="string (YYYY-MM-DD)">
+  Start of the date range for schedule exports. Defaults to the start of the current week. Not used
+  for staff exports.
+</ParamField>
+
+<ParamField query="endDate" type="string (YYYY-MM-DD)">
+  End of the date range for schedule exports. Defaults to the end of the current week. Not used for
+  staff exports.
+</ParamField>
+
+### Staff export columns
+
+When `type=staff`, the CSV includes the following columns for each active employee:
+
+`First Name`, `Last Name`, `Email`, `Phone`, `Status`, `Seniority`, `Focus Areas`, `Certification`, `Roles`, `Notes`
+
+### Schedule export columns
+
+When `type=schedule`, the CSV includes one row per employee with date columns spanning the requested range. Each cell contains the shift code assigned on that date.
+
+## Response formats
+
+All API responses use JSON, except `/api/calendar` which returns `text/calendar` (ICS format).
+
+## Rate limiting
+
+Rate limiting is applied to all endpoints. If you exceed the limit, you will receive a `429 Too Many Requests` response with a `Retry-After` header indicating when you can retry.

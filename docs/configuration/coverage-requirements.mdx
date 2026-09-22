@@ -1,0 +1,59 @@
+---
+title: "Coverage Requirements"
+description: "Set minimum staffing levels per focus area, shift code, and day of week to track whether your schedule meets required coverage."
+---
+
+Coverage requirements let you define the minimum number of staff you need for a given focus area, shift code, and day of the week. Once configured, DubGrid automatically compares actual staffing against your requirements and surfaces the results in two places: the **Coverage panel** on the schedule grid and the **Coverage** card on the dashboard.
+
+Find these settings at **Settings → Coverage**.
+
+Requires the `canManageCoverageRequirements` permission.
+
+---
+
+## How coverage is surfaced
+
+**Coverage panel on the schedule grid**
+The coverage panel (accessible from the schedule view) shows actual vs. required staff counts for each focus area and shift code combination. Met requirements are shown in green; unmet requirements are flagged in red, so you can spot gaps at a glance without scanning individual rows.
+
+**Dashboard coverage card**
+The dashboard includes a donut chart showing coverage status broken down by focus area. Each segment reflects whether requirements are currently met or unmet across the active schedule period.
+
+---
+
+## Adding a coverage requirement
+
+<Steps>
+  <Step title="Open Coverage settings">
+    Go to **Settings → Coverage** and click **Add Requirement**.
+  </Step>
+  <Step title="Select a focus area">Choose the wing or section this requirement applies to.</Step>
+  <Step title="Select a shift code">
+    Choose the shift code you want to set a minimum for (e.g., `D` for Day Shift, `N` for Night
+    Shift).
+  </Step>
+  <Step title="Choose a day of the week">
+    Select the day this requirement applies to. You can add separate requirements for the same focus
+    area and shift code on different days.
+  </Step>
+  <Step title="Set the minimum staff count">
+    Enter the minimum number of staff required to meet coverage for this combination.
+  </Step>
+  <Step title="Save">
+    Click **Save**. The requirement immediately becomes active in the coverage panel and dashboard.
+  </Step>
+</Steps>
+
+<Tip>
+  Setting requirements by day of the week lets you handle different weekend and weekday staffing
+  needs. For example, you might require three Day Shift nurses Monday through Friday, but only two
+  on Saturday and Sunday.
+</Tip>
+
+---
+
+## Editing and removing requirements
+
+Click any existing requirement in **Settings → Coverage** to edit its minimum count, shift code, or day of week. To remove a requirement, open it and click **Delete**.
+
+Deleting a requirement removes it from the coverage panel immediately — no published or draft shifts are affected.

@@ -1,0 +1,59 @@
+---
+title: "Staff Detail"
+description: "View an employee's full profile, schedule history, activity timeline, and reports."
+---
+
+Click any employee row in the roster to open their detail page at `/staff/[id]`. The detail page gives you a complete picture of a single employee — their profile, historical shifts, status changes, and hours data.
+
+## Page header
+
+The top of the page shows:
+
+- **Avatar** — auto-generated from the employee's initials
+- **Full name**
+- **Status badge** — `active`, `benched`, or `terminated`
+- **Certifications** — their certification abbreviation(s)
+- **Quick actions** — bench, activate, or terminate the employee directly from this page
+
+## Tabs
+
+<Tabs>
+  <Tab title="Overview">
+    The **Overview** tab shows the employee's complete profile information:
+
+    - **Contact details** — phone number, email address, and any contact notes
+    - **Certifications** — the certification levels assigned to this employee
+    - **Focus areas** — the wings or sections they are assigned to
+    - **Role tags** — their org-defined display roles (e.g. `Supv`, `CN`, `Mentor`)
+
+    Use this tab when you need to quickly look up contact information or confirm an employee's assignments.
+
+  </Tab>
+  <Tab title="Schedule">
+    The **Schedule** tab shows a historical view of this employee's shifts.
+
+    Use the **date range picker** to select any time window and review the shifts that were published for this employee. This is useful for checking past coverage patterns or verifying what an employee worked on a given date.
+
+  </Tab>
+  <Tab title="Activity">
+    The **Activity** tab shows a chronological timeline of changes made to this employee's record, including:
+
+    - Status changes (e.g. benched, activated, terminated)
+    - Role or certification updates
+    - Other notable events
+
+    Each entry shows what changed, when it happened, and who made the change.
+
+  </Tab>
+  <Tab title="Reports">
+    The **Reports** tab provides analytics for this individual employee:
+
+    - **Hours history** — total hours worked over time
+    - **Shift distribution** — a chart showing the breakdown of shift codes (D, E, N, etc.)
+    - **Day-of-week patterns** — which days this employee typically works
+    - **Focus area breakdown** — how their time is distributed across different wings or sections
+
+    Use reports to identify scheduling patterns, balance workloads, or prepare for staffing reviews.
+
+  </Tab>
+</Tabs>

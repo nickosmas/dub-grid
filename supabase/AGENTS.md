@@ -70,7 +70,7 @@ from the sequence rather than from any one file being complete.
 `npm run db:migrations:inspect` (remote) and `npm run db:migrations:inspect:local`
 are read-only: they compare the ledger with the local sequence and check schema,
 RLS, grant, hook, historical-patch, and scheduler-calloff invariants. The release
-runbook is `docs/operations/production-migration-safety.md`.
+runbook is `internal/operations/production-migration-safety.md`.
 
 This holds because migrations are applied by ledger now, through Supabase
 branching or `supabase db push`, rather than by dropping and replaying the
