@@ -53,10 +53,14 @@ export default function NotificationDetailScreen() {
     queryKey: mobileQueryKeys.notificationDetail(accessToken, id),
     enabled: Boolean(accessToken && id && !cachedNotification),
     queryFn: async ({ signal }) => {
+      // By id, not the first page: a link can name an alert far older than
+      // anything the inbox has loaded, and searching a page silently failed
+      // for those.
       const page = await getNotifications(
         accessToken!,
         {
-          limit: 100,
+          id: id!,
+          limit: 1,
           archived: "any",
         },
         signal,

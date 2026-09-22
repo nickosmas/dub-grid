@@ -28,16 +28,18 @@ vi.mock("@/lib/sentry", () => ({
   captureException: vi.fn(),
 }));
 
+import { SANDBOX_COOKIE_NAME } from "@/lib/sandbox-cookie";
 import { POST } from "./route";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
 
-function makeRequest(body: unknown) {
+function makeRequest(body: unknown, options?: { sandbox?: boolean }) {
   return new NextRequest("http://localhost/api/stripe/checkout-complete", {
     method: "POST",
     headers: {
       origin: "http://localhost:3000",
       "content-type": "application/json",
+      ...(options?.sandbox ? { cookie: `${SANDBOX_COOKIE_NAME}=sandbox-org-1` } : {}),
     },
     body: JSON.stringify(body),
   });
@@ -88,6 +90,20 @@ describe("POST /api/stripe/checkout-complete", () => {
       },
     );
     await expect(response.json()).resolves.toEqual({ success: true });
+  });
+
+  it("refuses a sandboxed caller the way its sibling routes do", async () => {
+    const response = await POST(
+      makeRequest({ orgId: ORG_ID, sessionId: "cs_test_123" }, { sandbox: true }),
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error:
+        "This action isn't available in sandbox mode. Exit the sandbox to perform it on your real organization.",
+    });
+    expect(requireOrgPermissions).not.toHaveBeenCalled();
+    expect(syncCheckoutSessionToDb).not.toHaveBeenCalled();
   });
 
   it("does not sync when org permissions fail", async () => {

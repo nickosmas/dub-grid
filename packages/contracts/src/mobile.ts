@@ -1161,6 +1161,8 @@ export const mobileNotificationsCursorSchema = z.object({
 });
 
 export const mobileNotificationsQuerySchema = z.object({
+  /** One alert by id, for a deep link whose target may sit far past the first page. */
+  id: z.string().uuid().optional(),
   limit: z.coerce.number().int().positive().max(100).optional(),
   cursorCreatedAt: z.string().optional(),
   cursorId: z.string().uuid().optional(),

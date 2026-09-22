@@ -199,6 +199,7 @@ type FetchMobilePeople = (
 ) => Promise<MobilePersonSource[]>;
 
 export type FetchMobileNotificationsInput = {
+  id?: string;
   limit: number;
   cursor?: MobileNotificationsCursor | null;
   category?: string;
@@ -470,6 +471,7 @@ export async function loadMobileNotificationsPayload(
       : null;
 
   return deps.fetchMobileNotifications(auth.userClient, {
+    id: input.id,
     limit: input.limit ?? 25,
     cursor,
     category: input.category,

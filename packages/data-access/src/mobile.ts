@@ -1993,6 +1993,7 @@ export async function fetchMobileNotificationFacets(userClient: SupabaseClient):
 }
 
 export type FetchMobileNotificationsInput = {
+  id?: string;
   limit: number;
   cursor?: MobileNotificationsCursor | null;
   category?: string;
@@ -2026,6 +2027,12 @@ export async function fetchMobileNotificationsPage(
     .order("created_at", { ascending })
     .order("id", { ascending })
     .limit(limit + 1);
+
+  // A deep link names one alert, which may be older than any page the inbox
+  // has loaded, so the id short-circuits the filters that would hide it.
+  if (input.id) {
+    query = query.eq("id", input.id);
+  }
 
   const archived = input.archived ?? "inbox";
   if (archived === "archived") {

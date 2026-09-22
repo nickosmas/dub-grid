@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  fetchMobileNotificationsPage,
   fetchMobilePeopleRows,
   fetchMobileRoleRows,
   fetchScheduleCellQueryRows,
@@ -370,5 +371,41 @@ describe("fetchScheduleCellQueryRows", () => {
     const { client } = makeCellClient([{ data: null, error: { message: "boom" } }]);
 
     await expect(fetchScheduleCellQueryRows(client, input, 2)).rejects.toEqual({ message: "boom" });
+  });
+});
+
+describe("fetchMobileNotificationsPage", () => {
+  function makeNotificationsClient(rows: unknown[]) {
+    const chain: Record<string, ReturnType<typeof vi.fn>> = {};
+    for (const method of ["select", "eq", "order", "limit", "is", "not", "or"]) {
+      chain[method] = vi.fn(() => chain);
+    }
+    // The builder is awaited, so it must also be thenable.
+    (chain as unknown as { then: unknown }).then = (resolve: (value: unknown) => unknown) =>
+      resolve({ data: rows, error: null });
+    const rpc = vi.fn(async () => ({ data: 0, error: null }));
+    return {
+      client: { from: vi.fn(() => chain), rpc } as unknown as SupabaseClient,
+      chain,
+    };
+  }
+
+  it("asks for one alert by id, so a deep link is not limited to the first page", async () => {
+    const { client, chain } = makeNotificationsClient([
+      { id: "alert-1", type: "x", channel: "in_app", created_at: "2026-01-01T00:00:00.000Z" },
+    ]);
+
+    const page = await fetchMobileNotificationsPage(client, { id: "alert-1", limit: 1 });
+
+    expect(chain.eq).toHaveBeenCalledWith("id", "alert-1");
+    expect(page.notifications).toHaveLength(1);
+  });
+
+  it("leaves the id filter off an ordinary page", async () => {
+    const { client, chain } = makeNotificationsClient([]);
+
+    await fetchMobileNotificationsPage(client, { limit: 25 });
+
+    expect(chain.eq).not.toHaveBeenCalledWith("id", expect.anything());
   });
 });

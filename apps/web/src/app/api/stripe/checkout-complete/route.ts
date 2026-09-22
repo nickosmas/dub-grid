@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { forbidIfSandboxCookie } from "@/lib/api-auth";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { syncCheckoutSessionToDb, requireStripeEnabled } from "@/lib/stripe";
 import logger from "@/lib/logger";
@@ -16,6 +17,12 @@ const bodySchema = z.object({
 export async function POST(req: NextRequest) {
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) return csrfError;
+
+  // Same refusal create-checkout and billing-portal give. Without it a
+  // sandboxed caller reached syncCheckoutSessionToDb and got its generic
+  // organization-mismatch error instead.
+  const sandboxBlock = forbidIfSandboxCookie(req);
+  if (sandboxBlock) return sandboxBlock;
 
   try {
     let body: unknown;
