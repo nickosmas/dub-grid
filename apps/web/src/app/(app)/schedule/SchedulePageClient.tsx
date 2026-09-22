@@ -3808,7 +3808,14 @@ function SchedulerContent({
     })();
     conflictRefetchRef.current = refetch;
     await refetch;
-  }, [org?.id, canEditShifts, shiftFetchStart, shiftFetchEnd, segmentCompatibility]);
+  }, [
+    broadcastDraftReconcile,
+    org?.id,
+    canEditShifts,
+    shiftFetchStart,
+    shiftFetchEnd,
+    segmentCompatibility,
+  ]);
 
   /**
    * Serializes a write behind every write already pending on the cells it
@@ -4030,6 +4037,7 @@ function SchedulerContent({
     },
     [
       broadcastDraftChanged,
+      broadcastDraftReconcile,
       deleteShiftBatch,
       enqueueShiftWrite,
       guardActiveSession,
@@ -4178,6 +4186,7 @@ function SchedulerContent({
       applyShiftDeleteUpdates,
       buildShiftDeleteUpdate,
       broadcastDraftChanged,
+      broadcastDraftReconcile,
       enqueueShiftWrite,
       getInputAssignmentDefinitionIds,
       getPublishedSnapshot,
@@ -4750,6 +4759,7 @@ function SchedulerContent({
       guardActiveSession,
       org?.id,
       broadcastDraftChanged,
+      broadcastDraftReconcile,
       shiftFetchEnd,
       shiftFetchStart,
     ],
