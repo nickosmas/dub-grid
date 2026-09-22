@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 /**
- * Migration 033 (audit findings F-04, F-05, F-06): rules the routes enforce
+ * Migrations 033 and 034 (audit findings F-04, F-05, F-06, F-21): rules the routes enforce
  * now hold at the row level too. Every case runs inside BEGIN/ROLLBACK on
  * the seeded local database and simulates the caller the way PostgREST
  * does, so it is the policies and grants that answer, not the routes.
@@ -240,6 +240,18 @@ describe.runIf(reachable)("profile lifecycle columns (F-05, live DB)", () => {
           ]);
         }, /permission denied for table profiles/);
       }
+      // Consent is recorded by the terms route through the service role;
+      // a member forging a colleague's (or their own) acceptance is refused.
+      for (const who of [fx.admin, fx.member]) {
+        await expectRaise(async () => {
+          await asUser(who, fx.orgId);
+          await db.query(
+            `UPDATE public.profiles SET terms_accepted_at = now(), terms_version = 'forged'
+              WHERE id = $1`,
+            [fx.member.userId],
+          );
+        }, /permission denied for table profiles/);
+      }
       await expectRaise(async () => {
         await asUser(fx.superAdmin, fx.orgId);
         await db.query(`UPDATE public.profiles SET platform_role = 'gridmaster' WHERE id = $1`, [
@@ -269,6 +281,13 @@ describe.runIf(reachable)("profile lifecycle columns (F-05, live DB)", () => {
         [fx.member.userId, fx.superAdmin.userId],
       );
       expect(rows[0].deactivated_at).not.toBeNull();
+      // The terms route records acceptance the same way.
+      const { rows: accepted } = await db.query<{ terms_version: string }>(
+        `UPDATE public.profiles SET terms_accepted_at = now(), terms_version = 'live-test'
+          WHERE id = $1 RETURNING terms_version`,
+        [fx.member.userId],
+      );
+      expect(accepted).toEqual([{ terms_version: "live-test" }]);
     } finally {
       await db.query("ROLLBACK");
     }
@@ -310,15 +329,19 @@ describe.runIf(reachable)("session rows are server-owned (F-06, live DB)", () =>
           [fx.member.userId, fx.orgId],
         );
       }, /row-level security/);
-      await expectRaise(async () => {
-        await asUser(fx.member, fx.orgId);
-        await db.query(`DELETE FROM public.user_sessions WHERE id = $1`, [seeded[0].id]);
-        const { rowCount } = await db.query(`SELECT 1 FROM public.user_sessions WHERE id = $1`, [
-          seeded[0].id,
-        ]);
-        if (rowCount !== 1) throw new Error("member deleted a session row");
-        throw new Error("delete silently matched nothing under row-level security");
-      }, /row-level security/);
+      // No delete policy exists, so the statement matches nothing rather
+      // than raising; the row must still be there afterwards.
+      await asUser(fx.member, fx.orgId);
+      const deleted = await db.query(`DELETE FROM public.user_sessions WHERE id = $1`, [
+        seeded[0].id,
+      ]);
+      expect(deleted.rowCount).toBe(0);
+      await asSuperuser();
+      const { rowCount: stillThere } = await db.query(
+        `SELECT 1 FROM public.user_sessions WHERE id = $1`,
+        [seeded[0].id],
+      );
+      expect(stillThere).toBe(1);
     } finally {
       await db.query("ROLLBACK");
     }

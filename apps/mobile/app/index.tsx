@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { router } from "expo-router";
+import { router, useNavigation } from "expo-router";
 import { useHasSeenOnboarding } from "../src/features/auth/hooks/useHasSeenOnboarding";
 import LoginScreen from "../src/features/auth/screens/LoginScreen";
 import { useSessionState } from "../src/shared/providers/AuthSessionProvider";
@@ -14,12 +14,16 @@ export default function IndexScreen() {
   const { accessToken, isLoading, restoreError } = useSessionState();
   const onboardingQuery = useHasSeenOnboarding();
   const needsOnboarding = onboardingQuery.data === false;
+  const navigation = useNavigation();
   const hasNavigatedRef = useRef(false);
 
   useEffect(() => {
     if (isLoading || restoreError || onboardingQuery.isLoading || hasNavigatedRef.current) {
       return;
     }
+    // A protected route may have put the login screen on top of this one
+    // with its own way back; that screen owns the hop after sign-in.
+    if (!navigation.isFocused()) return;
 
     if (accessToken) {
       hasNavigatedRef.current = true;
@@ -31,7 +35,14 @@ export default function IndexScreen() {
       hasNavigatedRef.current = true;
       router.replace("/(auth)/onboarding");
     }
-  }, [accessToken, isLoading, needsOnboarding, onboardingQuery.isLoading, restoreError]);
+  }, [
+    accessToken,
+    isLoading,
+    navigation,
+    needsOnboarding,
+    onboardingQuery.isLoading,
+    restoreError,
+  ]);
 
   // Nothing to paint until the destination is known: the splash is on top, and
   // rendering the login screen early would flash it at a signed-in or first-run

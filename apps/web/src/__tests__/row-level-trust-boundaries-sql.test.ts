@@ -74,6 +74,18 @@ describe("row-level trust boundaries (migration 033)", () => {
     });
   });
 
+  describe("terms columns are server-owned (F-21, migration 034)", () => {
+    const followUp = readFileSync(migrationPath("034_terms_columns_server_owned.sql"), "utf8");
+
+    it("regrants the member columns without the terms pair", () => {
+      expect(followUp).toContain("REVOKE UPDATE ON public.profiles FROM authenticated;");
+      expect(followUp).toMatch(
+        /GRANT UPDATE \(first_name, last_name, updated_at, version\)\s+ON public\.profiles TO authenticated;/,
+      );
+      expect(followUp).not.toMatch(/GRANT UPDATE \([^)]*terms_/);
+    });
+  });
+
   describe("session rows (F-06)", () => {
     it("leaves members a read-only view of their own sessions", () => {
       expect(migration).toContain(

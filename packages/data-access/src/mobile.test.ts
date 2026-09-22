@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   fetchMobilePeopleRows,
   fetchMobileRoleRows,
+  fetchScheduleCellQueryRows,
   fetchMobilePublishHistoryRows,
   fetchMobileShiftRequestHistoryRows,
   insertMobileAuditLogEntry,
@@ -312,5 +313,62 @@ describe("fetchMobilePublishHistoryRows", () => {
 
     expect(rows[0].changes).toHaveLength(1);
     expect(rows[0].changes[0].empId).toBe("emp-2");
+  });
+});
+
+describe("fetchScheduleCellQueryRows", () => {
+  const input = { orgId: "org-1", startDate: "2026-09-01", endDate: "2026-09-30" };
+
+  function makeCellClient(pages: Array<{ data: unknown[] | null; error: unknown }>) {
+    const range = vi.fn(async () => pages.shift() ?? { data: [], error: null });
+    const chain = {
+      select: vi.fn(() => chain),
+      eq: vi.fn(() => chain),
+      gte: vi.fn(() => chain),
+      lte: vi.fn(() => chain),
+      order: vi.fn((_column: string) => chain),
+      range,
+    };
+    const from = vi.fn(() => chain);
+    return { client: { from } as unknown as SupabaseClient, chain, range };
+  }
+
+  it("concatenates every page until a short one, in a total order", async () => {
+    const cell = (n: number) => ({ id: `cell-${n}`, emp_id: `emp-${n % 3}`, date: "2026-09-01" });
+    const { client, chain, range } = makeCellClient([
+      { data: [cell(1), cell(2)], error: null },
+      { data: [cell(3), cell(4)], error: null },
+      { data: [cell(5)], error: null },
+    ]);
+
+    const result = await fetchScheduleCellQueryRows(client, input, 2);
+
+    expect(result.map((row) => row.id)).toEqual(["cell-1", "cell-2", "cell-3", "cell-4", "cell-5"]);
+    expect(range).toHaveBeenCalledTimes(3);
+    expect(range).toHaveBeenNthCalledWith(1, 0, 1);
+    expect(range).toHaveBeenNthCalledWith(2, 2, 3);
+    expect(range).toHaveBeenNthCalledWith(3, 4, 5);
+    expect(chain.order.mock.calls.slice(0, 3).map(([column]) => column)).toEqual([
+      "date",
+      "emp_id",
+      "id",
+    ]);
+    expect(chain.eq).not.toHaveBeenCalledWith("emp_id", expect.anything());
+  });
+
+  it("stops after one page when the range fits in it, and scopes to one employee", async () => {
+    const { client, chain, range } = makeCellClient([{ data: [{ id: "cell-1" }], error: null }]);
+
+    const result = await fetchScheduleCellQueryRows(client, { ...input, employeeId: "emp-7" }, 2);
+
+    expect(result).toHaveLength(1);
+    expect(range).toHaveBeenCalledTimes(1);
+    expect(chain.eq).toHaveBeenCalledWith("emp_id", "emp-7");
+  });
+
+  it("surfaces a page error instead of returning a partial range", async () => {
+    const { client } = makeCellClient([{ data: null, error: { message: "boom" } }]);
+
+    await expect(fetchScheduleCellQueryRows(client, input, 2)).rejects.toEqual({ message: "boom" });
   });
 });

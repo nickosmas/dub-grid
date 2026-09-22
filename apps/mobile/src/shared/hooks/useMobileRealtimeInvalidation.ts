@@ -1,9 +1,9 @@
 import { useEffect } from "react";
 import type { QueryClient } from "@tanstack/react-query";
 import { subscribeOrgScopedRealtime } from "@dubgrid/realtime-core";
-import { BOOTSTRAP_QUERY_KEY_PREFIX } from "../../features/auth/hooks/useBootstrap";
 import {
   invalidateMobileRealtimeQueries,
+  invalidateMobileRealtimeQueriesForTables,
   type MobileRealtimeTable,
 } from "../lib/mobile-realtime-invalidation";
 import { getSupabaseClient } from "../lib/supabase";
@@ -69,10 +69,14 @@ export function useMobileRealtimeInvalidation({
           invalidateMobileRealtimeQueries(queryClient, accessToken, table);
         }
       },
+      // Events missed while the channel was down could be on any table it
+      // watches, so the catch-up refreshes every family those tables feed
+      // (bootstrap included, through the organizations row).
       onReconnectAfterError: () => {
-        void queryClient.invalidateQueries({
-          queryKey: BOOTSTRAP_QUERY_KEY_PREFIX,
-        });
+        invalidateMobileRealtimeQueriesForTables(queryClient, accessToken, [
+          "organizations",
+          ...ORG_FILTER_TABLES,
+        ]);
       },
       onError: (error) => {
         console.error("Mobile realtime freshness channel error", error);

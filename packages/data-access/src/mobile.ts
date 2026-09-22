@@ -935,7 +935,12 @@ export async function fetchProfileNameRowsByIds(
   return (data ?? []) as MobileProfileNameRow[];
 }
 
-async function fetchScheduleCellQueryRows(
+// Half PostgREST's 1,000-row cap: each cell carries its snapshots and
+// segments, so a page of these is a heavy response.
+const MOBILE_SCHEDULE_CELL_PAGE_SIZE = 500;
+
+/** Every cell in the range, paged so a large organization or a long range is never silently cut off. */
+export async function fetchScheduleCellQueryRows(
   serviceClient: SupabaseClient,
   input: {
     orgId: string;
@@ -943,6 +948,30 @@ async function fetchScheduleCellQueryRows(
     endDate: string;
     employeeId?: string;
   },
+  pageSize: number = MOBILE_SCHEDULE_CELL_PAGE_SIZE,
+): Promise<MobileScheduleCellQueryRow[]> {
+  const rows: MobileScheduleCellQueryRow[] = [];
+  let from = 0;
+  for (;;) {
+    const page = await fetchScheduleCellQueryPage(serviceClient, input, from, from + pageSize - 1);
+    rows.push(...page);
+    if (page.length < pageSize) break;
+    from += pageSize;
+  }
+  return rows;
+}
+
+// A fresh builder per page: Supabase builders are single-use once awaited.
+async function fetchScheduleCellQueryPage(
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    startDate: string;
+    endDate: string;
+    employeeId?: string;
+  },
+  from: number,
+  to: number,
 ): Promise<MobileScheduleCellQueryRow[]> {
   let query = serviceClient
     .from("schedule_cells")
@@ -984,14 +1013,18 @@ async function fetchScheduleCellQueryRows(
     )
     .eq("org_id", input.orgId)
     .gte("date", input.startDate)
-    .lte("date", input.endDate)
-    .order("date", { ascending: true });
+    .lte("date", input.endDate);
 
   if (input.employeeId) {
     query = query.eq("emp_id", input.employeeId);
   }
 
-  const { data, error } = await query;
+  const { data, error } = await query
+    // A total order, so consecutive pages never overlap or skip a row.
+    .order("date", { ascending: true })
+    .order("emp_id", { ascending: true })
+    .order("id", { ascending: true })
+    .range(from, to);
   if (error) throw error;
 
   return (data ?? []) as MobileScheduleCellQueryRow[];

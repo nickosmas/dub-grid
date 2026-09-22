@@ -1,6 +1,25 @@
-import { describe, expect, it } from "vitest";
-import { getMobileRealtimeInvalidationKeys } from "../lib/mobile-realtime-invalidation";
+import { renderHook } from "@testing-library/react";
+import { QueryClient } from "@tanstack/react-query";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  getMobileRealtimeInvalidationKeys,
+  invalidateMobileRealtimeQueriesForTables,
+} from "../lib/mobile-realtime-invalidation";
 import { mobileQueryKeys } from "../lib/mobile-query-keys";
+
+const subscribeOrgScopedRealtime = vi.fn(
+  (_options: { onReconnectAfterError: () => void }) => () => {},
+);
+
+vi.mock("@dubgrid/realtime-core", () => ({
+  subscribeOrgScopedRealtime: (options: { onReconnectAfterError: () => void }) =>
+    subscribeOrgScopedRealtime(options),
+}));
+vi.mock("../lib/supabase", () => ({
+  getSupabaseClient: () => ({ channel: () => ({}), removeChannel: () => {} }),
+}));
+
+import { useMobileRealtimeInvalidation } from "./useMobileRealtimeInvalidation";
 
 const TOKEN = "token-1";
 
@@ -105,5 +124,57 @@ describe("getMobileRealtimeInvalidationKeys", () => {
       ["mobile", "bootstrap"],
       mobileQueryKeys.profile(TOKEN),
     ]);
+  });
+});
+
+describe("invalidateMobileRealtimeQueriesForTables", () => {
+  it("invalidates each family once across the tables that share it", () => {
+    const queryClient = new QueryClient();
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
+
+    invalidateMobileRealtimeQueriesForTables(queryClient, TOKEN, [
+      "schedule_cells",
+      "schedule_cell_snapshots",
+      "publish_history",
+    ]);
+
+    expect(invalidateQueries.mock.calls.map(([filters]) => filters?.queryKey)).toEqual([
+      ["mobile", "schedule"],
+      ["mobile", "requests"],
+      ["mobile", "dashboard"],
+      ["mobile", "shift-swap-options"],
+    ]);
+  });
+});
+
+describe("useMobileRealtimeInvalidation", () => {
+  beforeEach(() => {
+    subscribeOrgScopedRealtime.mockClear();
+  });
+
+  it("refreshes every family the channel watches when it recovers from a gap", () => {
+    const queryClient = new QueryClient();
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
+
+    renderHook(() =>
+      useMobileRealtimeInvalidation({ accessToken: TOKEN, orgId: "org-1", queryClient }),
+    );
+
+    expect(subscribeOrgScopedRealtime).toHaveBeenCalledTimes(1);
+    subscribeOrgScopedRealtime.mock.calls[0][0].onReconnectAfterError();
+
+    const keys = invalidateQueries.mock.calls.map(([filters]) => JSON.stringify(filters?.queryKey));
+    expect(new Set(keys).size).toBe(keys.length);
+    for (const expected of [
+      ["mobile", "bootstrap"],
+      ["mobile", "schedule"],
+      ["mobile", "requests"],
+      ["mobile", "dashboard"],
+      mobileQueryKeys.people(TOKEN),
+      mobileQueryKeys.profile(TOKEN),
+      mobileQueryKeys.adminProfileChangeRequests(TOKEN),
+    ]) {
+      expect(keys).toContain(JSON.stringify(expected));
+    }
   });
 });
