@@ -2153,6 +2153,7 @@ function SchedulerContent({
             const actions = readDraftChangedBroadcast(msg.payload, {
               editorSessionId: editorSessionIdRef.current,
               canEditShifts: canEditShiftsRef.current,
+              currentShifts: shiftsRef.current,
             });
             if (!actions) return;
 
@@ -3761,6 +3762,17 @@ function SchedulerContent({
     [sendDraftBroadcast],
   );
 
+  // Told to peers when a write this tab already broadcast optimistically did
+  // not commit. It carries no diff on purpose: that is the "something changed,
+  // I cannot say what" signal every receiver answers with a debounced refetch,
+  // so a cell that never landed is corrected everywhere instead of only here.
+  const broadcastDraftReconcile = useCallback(() => {
+    sendDraftBroadcast("draft_changed", {
+      senderId: currentUserRef.current?.id,
+      senderSessionId: editorSessionIdRef.current,
+    });
+  }, [sendDraftBroadcast]);
+
   // Conflicts arrive in bursts once several people edit the same period, and a
   // full window refetch per conflict is expensive. Share one in-flight refetch
   // between them: they all want the same fresh state.
@@ -3769,6 +3781,9 @@ function SchedulerContent({
     const orgId = org?.id;
     if (!orgId) return;
     toast.error("This shift was modified elsewhere. Reloading the latest version.");
+    // Peers may be holding the optimistic diff this tab broadcast before the
+    // write was refused; tell them to go back to the server.
+    broadcastDraftReconcile();
 
     if (conflictRefetchRef.current) {
       await conflictRefetchRef.current;
@@ -3985,6 +4000,7 @@ function SchedulerContent({
             await handleShiftWriteConflict();
           } else {
             toast.error(options.failureMessage);
+            broadcastDraftReconcile();
             Sentry.captureException(err);
           }
         }
@@ -4003,6 +4019,7 @@ function SchedulerContent({
                 await handleShiftWriteConflict();
               } else {
                 toast.error(options.failureMessage);
+                broadcastDraftReconcile();
                 Sentry.captureException(err);
               }
             }
@@ -4146,6 +4163,7 @@ function SchedulerContent({
               await handleShiftWriteConflict();
             } else {
               toast.error("We couldn't save that shift. Try again.");
+              broadcastDraftReconcile();
               Sentry.captureException(err);
             }
           }
@@ -4712,6 +4730,12 @@ function SchedulerContent({
           await refetchScheduleDataRef.current();
         } else {
           toast.error("We couldn't save your shift changes. Try again.");
+          // The panel's edits are already on this grid, and some of the batch
+          // may have committed before the failure, so go back to the server
+          // and tell peers to do the same rather than leaving either side on
+          // a state the database never agreed to.
+          broadcastDraftReconcile();
+          void refetchScheduleDataRef.current();
           Sentry.captureException(err);
         }
       } finally {

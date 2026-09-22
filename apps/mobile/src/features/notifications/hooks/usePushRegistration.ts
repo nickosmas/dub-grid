@@ -9,7 +9,9 @@ import {
 } from "../../../shared/lib/session";
 import {
   loadNotifications,
+  MissingPushProjectIdError,
   pushUnsupported,
+  resolveExpoProjectId,
   resolvePermissionState,
   toPermissionSnapshot,
   type PushPermissionState,
@@ -23,7 +25,13 @@ async function getStoredOrFreshPushDevice(
     return storedDevice;
   }
 
-  const response = await notifications.getExpoPushTokenAsync();
+  // A standalone build resolves nothing on its own, so the missing setting is
+  // named here rather than surfacing as the library's generic failure.
+  const projectId = resolveExpoProjectId();
+  if (!projectId) {
+    throw new MissingPushProjectIdError();
+  }
+  const response = await notifications.getExpoPushTokenAsync({ projectId });
   const platform = Platform.OS === "android" ? "android" : "ios";
   const device = {
     expoPushToken: response.data,
