@@ -37,3 +37,28 @@ export function authenticatedSecurityDefinerAllowlist(): string[] {
   }
   return [...names].sort();
 }
+
+/**
+ * The newest migration that defines `public.<name>`, which is the definition a
+ * freshly migrated database actually holds. Tests that read a fixed migration
+ * file pin history; this pins live behaviour, so a later redefinition that
+ * drops something load-bearing fails rather than passing unnoticed.
+ */
+export function latestFunctionDefinition(name: string): { file: string; text: string } {
+  const dir = supabaseMigrationsDir();
+  const header = `CREATE OR REPLACE FUNCTION public.${name}(`;
+  let latest: { file: string; text: string } | null = null;
+
+  for (const file of readdirSync(dir).sort()) {
+    if (!file.endsWith(".sql")) continue;
+    const sql = readFileSync(resolve(dir, file), "utf8");
+    const start = sql.indexOf(header);
+    if (start < 0) continue;
+    const end = sql.indexOf("\n$$;", start);
+    if (end < 0) throw new Error(`Unterminated definition of ${name} in ${file}`);
+    latest = { file, text: sql.slice(start, end + "\n$$;".length) };
+  }
+
+  if (!latest) throw new Error(`No migration defines public.${name}`);
+  return latest;
+}
