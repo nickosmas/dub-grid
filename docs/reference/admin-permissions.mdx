@@ -16,24 +16,36 @@ Go to **Settings → Users**, click the Admin you want to configure, then click 
 
 ## All permissions
 
-| Permission                      | What it allows                                       | Delegatable to Admins         |
-| ------------------------------- | ---------------------------------------------------- | ----------------------------- |
-| `canViewSchedule`               | View the schedule grid                               | Always on — cannot be removed |
-| `canEditShifts`                 | Create, edit, and delete shift entries               | Yes                           |
-| `canPublishSchedule`            | Publish draft changes to the live schedule           | Yes                           |
-| `canApplyRecurringSchedule`     | Apply recurring shift templates to a date range      | Yes                           |
-| `canEditNotes`                  | Add, edit, and delete schedule notes and indicators  | Yes                           |
-| `canManageRecurringShifts`      | Configure recurring shift templates per employee     | Yes                           |
-| `canManageShiftSeries`          | Create and manage repeating shift series             | Yes                           |
-| `canViewStaff`                  | View the staff roster                                | Always on — cannot be removed |
-| `canManageEmployees`            | Add, edit, bench, and terminate employees            | Yes                           |
-| `canManageFocusAreas`           | Manage focus areas and wings                         | Yes                           |
-| `canManageShiftCodes`           | Manage shift code definitions                        | Yes                           |
-| `canManageIndicatorTypes`       | Manage note and indicator type definitions           | Yes                           |
-| `canManageOrgLabels`            | Edit custom terminology labels for the organization  | Yes                           |
-| `canManageOrgSettings`          | Edit organization name, address, phone, and timezone | No — Super Admin only         |
-| `canManageCoverageRequirements` | Manage minimum staffing requirements                 | Yes                           |
-| `canApproveShiftRequests`       | Approve or reject shift pickup and swap requests     | Yes                           |
+DubGrid has 26 permissions. Admins start with a default set and a Super Admin adjusts each one individually.
+
+| Permission                      | What it allows                                        | Delegatable to Admins        |
+| ------------------------------- | ----------------------------------------------------- | ---------------------------- |
+| `canViewSchedule`               | View the schedule grid                                | Always on, cannot be removed |
+| `canViewStaff`                  | View the staff roster                                 | Always on, cannot be removed |
+| `canEditShifts`                 | Create, edit, and delete shift entries                | Yes                          |
+| `canPublishSchedule`            | Publish draft changes to the live schedule            | Yes                          |
+| `canEditNotes`                  | Add, edit, and delete schedule notes                  | Yes                          |
+| `canEditScheduleIndicators`     | Add and remove shift indicators on schedule cells     | Yes                          |
+| `canViewRecurringShifts`        | View recurring shift templates                        | Yes                          |
+| `canManageRecurringShifts`      | Configure recurring shift templates per employee      | Yes                          |
+| `canApplyRecurringSchedule`     | Apply recurring shift templates to a date range       | Yes                          |
+| `canManageShiftSeries`          | Create and manage repeating shift series              | Yes                          |
+| `canViewEmployeeDetails`        | Open individual staff detail pages                    | Yes                          |
+| `canManageEmployees`            | Add, edit, bench, and terminate employees             | Yes                          |
+| `canViewFocusAreas`             | View the configured focus areas                       | Yes                          |
+| `canManageFocusAreas`           | Create, rename, and remove focus areas                | Yes                          |
+| `canViewScheduleDefinitions`    | View shift code definitions                           | Yes                          |
+| `canManageScheduleDefinitions`  | Create and edit shift codes and their default times   | Yes                          |
+| `canViewIndicatorTypes`         | View note and indicator type definitions              | Yes                          |
+| `canManageIndicatorTypes`       | Manage note and indicator type definitions            | Yes                          |
+| `canViewOrgLabels`              | View the custom terminology labels                    | Yes                          |
+| `canManageOrgLabels`            | Edit custom terminology labels for the organization   | Yes                          |
+| `canManageOrgSettings`          | Edit organization name, address, phone, and timezone  | No, Super Admin only         |
+| `canViewCoverageRequirements`   | View minimum staffing requirements                    | Yes                          |
+| `canManageCoverageRequirements` | Manage minimum staffing requirements                  | Yes                          |
+| `canApproveShiftRequests`       | Approve or reject pickup, swap, and call-off requests | Yes                          |
+| `canViewDashboardAnalytics`     | View the dashboard coverage and analytics cards       | Yes                          |
+| `canViewReports`                | View and export reports                               | Yes                          |
 
 ## Always-on permissions
 
