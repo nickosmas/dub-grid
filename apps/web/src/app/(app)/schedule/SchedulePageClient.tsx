@@ -191,7 +191,10 @@ import CustomSelect from "@/components/CustomSelect";
 import MobileDayView from "@/components/MobileDayView";
 import { useMediaQuery, MOBILE, AUTO_ONE_WEEK } from "@/hooks";
 import { useSetMobileSubNav, SubNavItem } from "@/components/MobileSubNavContext";
-import { mergeDraftChangedBroadcastPayload } from "./_lib/draft-broadcast";
+import {
+  mergeDraftChangedBroadcastPayload,
+  readDraftChangedBroadcast,
+} from "./_lib/draft-broadcast";
 import { shouldRenderScheduleAuthorNames } from "./_lib/editor-visibility";
 import {
   canJoinScheduleDraftsChannel,
@@ -1973,6 +1976,10 @@ function SchedulerContent({
             Sentry.captureException(err);
           }
         })
+        // Sent by peers as they move around the grid. Informational only: a
+        // dropped message means a briefly stale marker, never a blocked cell.
+        // A lock change reaches everyone even if the editor that made it has
+        // already navigated away.
         .on("broadcast", { event: "editing_cell" }, (msg: { payload?: unknown }) => {
           if (msg.payload) handleEditingCellBroadcastRef.current(msg.payload);
         })
@@ -2143,13 +2150,14 @@ function SchedulerContent({
           "broadcast",
           { event: "draft_changed" },
           (msg: { payload?: Record<string, unknown> }) => {
-            if (msg.payload?.senderSessionId === editorSessionIdRef.current) {
-              return;
-            }
+            const actions = readDraftChangedBroadcast(msg.payload, {
+              editorSessionId: editorSessionIdRef.current,
+              canEditShifts: canEditShiftsRef.current,
+            });
+            if (!actions) return;
 
-            const p = msg.payload;
-            if (p?.shifts) {
-              const shiftUpdates = p.shifts as Record<string, ShiftMap[string] | null>;
+            if (actions.shifts) {
+              const shiftUpdates = actions.shifts;
               setShifts((prev) => {
                 const next = { ...prev };
                 for (const [key, value] of Object.entries(shiftUpdates)) {
@@ -2159,15 +2167,11 @@ function SchedulerContent({
                 return next;
               });
             }
-            if (p?.notes) {
-              const noteUpdates = p.notes as ScheduleNoteMap;
+            if (actions.notes) {
+              const noteUpdates = actions.notes;
               setNotes((prev) => ({ ...prev, ...noteUpdates }));
             }
-            // A broadcast that carried a diff has already been applied above, and
-            // the sender built it from the cells the server handed back, so it is
-            // authoritative. A payload-less broadcast is the gap case: something
-            // changed without saying what, so that one still refetches.
-            if (p?.shifts || p?.notes) return;
+            if (!actions.refetch) return;
 
             if (draftChangedDebounceRef.current) clearTimeout(draftChangedDebounceRef.current);
             draftChangedDebounceRef.current = setTimeout(async () => {
