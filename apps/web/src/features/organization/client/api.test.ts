@@ -41,6 +41,46 @@ describe("organization bootstrap client", () => {
     expect(isRetryableOrganizationBootstrapError(new RequestTimeoutError(5_000))).toBe(true);
   });
 
+  // A step-up refusal here means the request rode a session that was
+  // mid-upgrade: the browser had just answered an MFA challenge and the
+  // cookie the Route Handler reads had not caught up. Retrying is the
+  // difference between the shell recovering and sitting on its loading
+  // screen; an account that genuinely lacks the factor keeps failing.
+  it("retries a step-up refusal, and only that kind of refusal", () => {
+    expect(
+      isRetryableOrganizationBootstrapError(
+        new OrganizationRequestError("Confirm your identity", 403, null, "STEP_UP_REQUIRED"),
+      ),
+    ).toBe(true);
+    expect(
+      isRetryableOrganizationBootstrapError(
+        new OrganizationRequestError("Forbidden", 403, null, null),
+      ),
+    ).toBe(false);
+    expect(
+      isRetryableOrganizationBootstrapError(
+        new OrganizationRequestError("Forbidden", 403, null, "SOMETHING_ELSE"),
+      ),
+    ).toBe(false);
+  });
+
+  it("carries the API's code onto the error it throws", async () => {
+    fetchWithTimeout.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          code: "STEP_UP_REQUIRED",
+          error: "Confirm your identity, then try again.",
+        }),
+        { status: 403, headers: { "content-type": "application/json" } },
+      ),
+    );
+
+    await expect(fetchOrganizationBootstrap()).rejects.toMatchObject({
+      status: 403,
+      code: "STEP_UP_REQUIRED",
+    });
+  });
+
   it("gives every bootstrap observer the same bounded query policy", () => {
     const policy = getOrganizationBootstrapQueryPolicy();
     const retryableError = new OrganizationRequestError("Temporary failure", 503, null);

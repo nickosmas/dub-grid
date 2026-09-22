@@ -5,10 +5,12 @@ import { RequestTimeoutError } from "@/lib/fetch-with-timeout";
 
 const listBrowserMfaFactors = vi.fn();
 const verifyBrowserTotpEnrollment = vi.fn();
+const setBrowserSession = vi.fn();
 
 vi.mock("@/features/account/client", () => ({
   listBrowserMfaFactors: (...args: unknown[]) => listBrowserMfaFactors(...args),
   verifyBrowserTotpEnrollment: (...args: unknown[]) => verifyBrowserTotpEnrollment(...args),
+  setBrowserSession: (...args: unknown[]) => setBrowserSession(...args),
 }));
 
 describe("MFAVerify recovery", () => {
@@ -18,7 +20,11 @@ describe("MFAVerify recovery", () => {
       data: { totp: [{ id: "factor-1", status: "verified" }] },
       error: null,
     });
-    verifyBrowserTotpEnrollment.mockResolvedValue({ error: null });
+    verifyBrowserTotpEnrollment.mockResolvedValue({
+      data: { access_token: "verified-token", refresh_token: "verified-refresh" },
+      error: null,
+    });
+    setBrowserSession.mockResolvedValue(undefined);
   });
 
   async function enterCode() {
@@ -100,5 +106,61 @@ describe("MFAVerify recovery", () => {
       await screen.findByText("Invalid verification code. Please try again."),
     ).toBeInTheDocument();
     expect(input).toHaveValue("");
+  });
+});
+
+describe("MFAVerify session handoff", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    listBrowserMfaFactors.mockResolvedValue({
+      data: { totp: [{ id: "factor-1", status: "verified" }] },
+      error: null,
+    });
+    verifyBrowserTotpEnrollment.mockResolvedValue({
+      data: { access_token: "verified-token", refresh_token: "verified-refresh" },
+      error: null,
+    });
+    setBrowserSession.mockResolvedValue(undefined);
+  });
+
+  // The challenge is answered against Supabase from the browser, so the cookie
+  // every Route Handler reads still carries the password-only token until this
+  // write lands. Navigating first let the shell's requests ride the stale
+  // cookie, which an enrolled account below aal2 is now refused.
+  it("writes the verified session before handing control to the caller", async () => {
+    const order: string[] = [];
+    setBrowserSession.mockImplementation(async () => {
+      order.push("setSession");
+    });
+    const onVerified = vi.fn(async () => {
+      order.push("onVerified");
+    });
+
+    render(<MFAVerify onVerified={onVerified} onCancel={vi.fn()} />);
+    const input = screen.getByPlaceholderText("000000");
+    fireEvent.change(input, { target: { value: "123456" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Verify" })).toBeEnabled());
+    fireEvent.submit(input.closest("form") as HTMLFormElement);
+
+    await waitFor(() => expect(onVerified).toHaveBeenCalled());
+    expect(setBrowserSession).toHaveBeenCalledWith({
+      access_token: "verified-token",
+      refresh_token: "verified-refresh",
+    });
+    expect(order).toEqual(["setSession", "onVerified"]);
+  });
+
+  it("still hands over when the verification returns no session to write", async () => {
+    verifyBrowserTotpEnrollment.mockResolvedValue({ data: null, error: null });
+    const onVerified = vi.fn();
+
+    render(<MFAVerify onVerified={onVerified} onCancel={vi.fn()} />);
+    const input = screen.getByPlaceholderText("000000");
+    fireEvent.change(input, { target: { value: "123456" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Verify" })).toBeEnabled());
+    fireEvent.submit(input.closest("form") as HTMLFormElement);
+
+    await waitFor(() => expect(onVerified).toHaveBeenCalled());
+    expect(setBrowserSession).not.toHaveBeenCalled();
   });
 });
