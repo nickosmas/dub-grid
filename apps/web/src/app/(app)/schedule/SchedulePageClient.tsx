@@ -193,7 +193,13 @@ import { useMediaQuery, MOBILE, AUTO_ONE_WEEK } from "@/hooks";
 import { useSetMobileSubNav, SubNavItem } from "@/components/MobileSubNavContext";
 import { mergeDraftChangedBroadcastPayload } from "./_lib/draft-broadcast";
 import { shouldRenderScheduleAuthorNames } from "./_lib/editor-visibility";
-import { getScheduleRealtimeChannelOptions } from "./_lib/realtime-channel";
+import {
+  canJoinScheduleDraftsChannel,
+  getScheduleChannelName,
+  getScheduleDraftsChannelName,
+  getScheduleDraftsChannelOptions,
+  getScheduleRealtimeChannelOptions,
+} from "./_lib/realtime-channel";
 import {
   cloneDraftNotes,
   cloneShiftEntry,
@@ -1053,9 +1059,18 @@ function SchedulerContent({
   const {
     sendBroadcast: sendReliableBroadcast,
     flushPendingBroadcasts,
-    clearPendingBroadcast,
     resetPendingBroadcasts,
   } = useReliableRealtimeBroadcasts(realtimeChannelRef);
+  // Draft diffs travel on an editor-only topic (migration 035 refuses a
+  // viewer's join), with their own pending queue so a publish can drop a
+  // queued diff without touching the shared channel's queue.
+  const draftsChannelRef = useRef<BrowserRealtimeChannel | null>(null);
+  const {
+    sendBroadcast: sendDraftBroadcast,
+    flushPendingBroadcasts: flushPendingDraftBroadcasts,
+    clearPendingBroadcast: clearPendingDraftBroadcast,
+    resetPendingBroadcasts: resetPendingDraftBroadcasts,
+  } = useReliableRealtimeBroadcasts(draftsChannelRef);
 
   // Refs for values used by the realtime channel — reading from refs avoids
   // tearing down & recreating the channel when these change.
@@ -1897,7 +1912,7 @@ function SchedulerContent({
   useEffect(() => {
     if (!org) return;
 
-    const channelName = `schedule:${org.id}`;
+    const channelName = getScheduleChannelName(org.id);
     // Both flags belong to this effect run, not to the component. They were
     // briefly refs, which meant a later run reset the flag an earlier run's
     // pending async setup was about to check: the stale run then built a second
@@ -1958,56 +1973,6 @@ function SchedulerContent({
             Sentry.captureException(err);
           }
         })
-        .on(
-          "broadcast",
-          { event: "draft_changed" },
-          (msg: { payload?: Record<string, unknown> }) => {
-            if (msg.payload?.senderSessionId === editorSessionIdRef.current) {
-              return;
-            }
-
-            const p = msg.payload;
-            if (p?.shifts) {
-              const shiftUpdates = p.shifts as Record<string, ShiftMap[string] | null>;
-              setShifts((prev) => {
-                const next = { ...prev };
-                for (const [key, value] of Object.entries(shiftUpdates)) {
-                  if (value === null) delete next[key];
-                  else next[key] = value;
-                }
-                return next;
-              });
-            }
-            if (p?.notes) {
-              const noteUpdates = p.notes as ScheduleNoteMap;
-              setNotes((prev) => ({ ...prev, ...noteUpdates }));
-            }
-            // A broadcast that carried a diff has already been applied above, and
-            // the sender built it from the cells the server handed back, so it is
-            // authoritative — there is nothing left to ask for. Refetching anyway
-            // meant one scheduler editing one cell made every other open tab pull
-            // the org's whole loaded window two seconds later.
-            //
-            // A payload-less broadcast is the gap case: the sender is telling us
-            // something changed without saying what, so that one still refetches.
-            // Reconnect and tab-visibility refetches remain the recovery path for
-            // a tab that missed broadcasts entirely.
-            if (p?.shifts || p?.notes) return;
-
-            if (draftChangedDebounceRef.current) clearTimeout(draftChangedDebounceRef.current);
-            draftChangedDebounceRef.current = setTimeout(async () => {
-              try {
-                await refetchScheduleDataRef.current();
-              } catch (err) {
-                Sentry.captureException(err);
-              }
-            }, 150);
-          },
-        )
-        // Sent by peers as they move around the grid. Informational only: a
-        // dropped message means a briefly stale marker, never a blocked cell.
-        // a lock change reaches everyone even if the editor that made it has
-        // already navigated away.
         .on("broadcast", { event: "editing_cell" }, (msg: { payload?: unknown }) => {
           if (msg.payload) handleEditingCellBroadcastRef.current(msg.payload);
         })
@@ -2148,6 +2113,103 @@ function SchedulerContent({
     removeBrowserRealtimeChannel,
     announceEditingCell,
     refreshPresence,
+  ]);
+
+  // The editor-only draft channel. Viewers never join: the server refuses
+  // them, and nothing here would run for them anyway. It carries only
+  // `draft_changed`; presence and the publish and discard signals stay on
+  // the shared channel above.
+  const joinsDraftsChannel = canJoinScheduleDraftsChannel({ canEditShifts, canEditNotes });
+  useEffect(() => {
+    if (!org || !joinsDraftsChannel) return;
+
+    const channelName = getScheduleDraftsChannelName(org.id);
+    let disposed = false;
+    let hadError = false;
+    let channel: ReturnType<typeof createBrowserRealtimeChannel> | null = null;
+    void (async () => {
+      for (const stale of getBrowserRealtimeChannels()) {
+        if (stale.topic !== channelName && stale.topic !== `realtime:${channelName}`) continue;
+        try {
+          await removeBrowserRealtimeChannel(stale);
+        } catch {
+          // Best effort; creation below still yields a usable channel.
+        }
+      }
+      if (disposed) return;
+
+      channel = createBrowserRealtimeChannel(channelName, getScheduleDraftsChannelOptions())
+        .on(
+          "broadcast",
+          { event: "draft_changed" },
+          (msg: { payload?: Record<string, unknown> }) => {
+            if (msg.payload?.senderSessionId === editorSessionIdRef.current) {
+              return;
+            }
+
+            const p = msg.payload;
+            if (p?.shifts) {
+              const shiftUpdates = p.shifts as Record<string, ShiftMap[string] | null>;
+              setShifts((prev) => {
+                const next = { ...prev };
+                for (const [key, value] of Object.entries(shiftUpdates)) {
+                  if (value === null) delete next[key];
+                  else next[key] = value;
+                }
+                return next;
+              });
+            }
+            if (p?.notes) {
+              const noteUpdates = p.notes as ScheduleNoteMap;
+              setNotes((prev) => ({ ...prev, ...noteUpdates }));
+            }
+            // A broadcast that carried a diff has already been applied above, and
+            // the sender built it from the cells the server handed back, so it is
+            // authoritative. A payload-less broadcast is the gap case: something
+            // changed without saying what, so that one still refetches.
+            if (p?.shifts || p?.notes) return;
+
+            if (draftChangedDebounceRef.current) clearTimeout(draftChangedDebounceRef.current);
+            draftChangedDebounceRef.current = setTimeout(async () => {
+              try {
+                await refetchScheduleDataRef.current();
+              } catch (err) {
+                Sentry.captureException(err);
+              }
+            }, 150);
+          },
+        )
+        .subscribe(async (status: string, err?: Error) => {
+          if (status === "SUBSCRIBED") {
+            if (hadError) {
+              hadError = false;
+              refetchScheduleDataRef.current().catch(() => {});
+            }
+            await flushPendingDraftBroadcasts();
+          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            hadError = true;
+            console.warn("[Realtime] Draft channel error (auto-retrying):", err ?? "unknown");
+          }
+        });
+
+      draftsChannelRef.current = channel;
+    })();
+
+    return () => {
+      disposed = true;
+      draftsChannelRef.current = null;
+      resetPendingDraftBroadcasts();
+      if (draftChangedDebounceRef.current) clearTimeout(draftChangedDebounceRef.current);
+      const active = channel;
+      if (active) void removeBrowserRealtimeChannel(active);
+    };
+  }, [
+    createBrowserRealtimeChannel,
+    flushPendingDraftBroadcasts,
+    joinsDraftsChannel,
+    org,
+    removeBrowserRealtimeChannel,
+    resetPendingDraftBroadcasts,
   ]);
 
   // Track presence once currentUser and schedule-editor permissions are available.
@@ -3679,7 +3741,7 @@ function SchedulerContent({
 
   const broadcastDraftChanged = useCallback(
     (payload?: Record<string, unknown>) => {
-      sendReliableBroadcast(
+      sendDraftBroadcast(
         "draft_changed",
         {
           ...payload,
@@ -3692,7 +3754,7 @@ function SchedulerContent({
         },
       );
     },
-    [sendReliableBroadcast],
+    [sendDraftBroadcast],
   );
 
   // Conflicts arrive in bursts once several people edit the same period, and a
@@ -5578,7 +5640,7 @@ function SchedulerContent({
 
       // Tell other tabs/users to refetch before we refetch ourselves, so a
       // slow local refresh can't leave them stale.
-      clearPendingBroadcast(DRAFT_CHANGED_BROADCAST_KEY);
+      clearPendingDraftBroadcast(DRAFT_CHANGED_BROADCAST_KEY);
       sendReliableBroadcast("schedule_published", {}, { key: "schedule_published" });
       // Update last-viewed so publisher doesn't see their own changes as "new" on next visit
       void updateScheduleLastViewed(org.id);
@@ -5620,7 +5682,7 @@ function SchedulerContent({
     refetchScheduleData,
     refetchPublishedRanges,
     closeEditPanel,
-    clearPendingBroadcast,
+    clearPendingDraftBroadcast,
     sendReliableBroadcast,
     guardActiveSession,
     publishWindowDateRange,
@@ -5659,7 +5721,7 @@ function SchedulerContent({
           // Dedicated event for discard-all — triggers immediate refetch on all
           // clients. Sent before our own refetch so a slow local refresh can't
           // leave everyone else looking at drafts that no longer exist.
-          clearPendingBroadcast(DRAFT_CHANGED_BROADCAST_KEY);
+          clearPendingDraftBroadcast(DRAFT_CHANGED_BROADCAST_KEY);
           sendReliableBroadcast("drafts_discarded", {}, { key: "drafts_discarded" });
         }
 
@@ -5693,7 +5755,7 @@ function SchedulerContent({
       org,
       broadcastDraftChanged,
       closeEditPanel,
-      clearPendingBroadcast,
+      clearPendingDraftBroadcast,
       sendReliableBroadcast,
       publishWindowDateRange.startDateKey,
       publishWindowDateRange.endDateKey,

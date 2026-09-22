@@ -822,16 +822,23 @@ export async function POST(req: NextRequest) {
             .range(from, to);
         };
         const noteRows = await fetchAllRows<DbScheduleNote>(buildNotesPage);
+        // The service client reads past the row policy, so the same rule is
+        // applied here: a viewer never sees a draft note, and a note pending
+        // removal is still the published note to them.
+        const canSeeDraftNotes = auth.permissions.canEditShifts || auth.permissions.canEditNotes;
+        const visibleRows = canSeeDraftNotes
+          ? noteRows
+          : noteRows.filter((row) => row.status !== "draft");
 
         return NextResponse.json({
-          notes: noteRows.map((row) => ({
+          notes: visibleRows.map((row) => ({
             id: row.id,
             orgId: row.org_id,
             empId: row.emp_id,
             date: row.date,
             indicatorTypeId: row.indicator_type_id,
             focusAreaId: row.focus_area_id,
-            status: row.status,
+            status: !canSeeDraftNotes && row.status === "draft_deleted" ? "published" : row.status,
             createdBy: row.created_by,
             updatedBy: row.updated_by,
             createdAt: row.created_at,
