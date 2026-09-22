@@ -922,11 +922,6 @@ button {
   font-size: var(--dg-fs-footnote);
   margin: 4px 0 0;
 }
-/* ── Segment Control ────────────────────────────────────── */
-.dg-segment-btn.active {
-  background: var(--dg-color-brand);
-  color: var(--dg-color-on-brand-text);
-}
 /* ── Span Tabs (pill-style period / filter selector) ────── */
 .dg-span-tab:hover:not(.active) {
   color: var(--dg-on-dark-secondary);
@@ -949,18 +944,6 @@ button {
   pointer-events: auto;
 }
 /* ── Nav Tab (Header Tier 1) ────────────────────────────── */
-/* Active state is background + color only — no border. The transparent
-   border on the base class stays so the tab's geometry never shifts. */
-.dg-nav-tab.active {
-  background: var(--dg-color-nav-active-bg);
-  color: var(--dg-color-text-primary);
-}
-/* ── Sub Tab (Settings / Contextual Tier 2) ─────────────── */
-.dg-sub-tab.active {
-  color: var(--dg-color-brand);
-  font-weight: var(--dg-type-navigation-weight);
-  border-bottom-color: var(--dg-color-brand);
-}
 .dg-toolbar-type .dg-btn,
 .dg-toolbar-type .dg-input {
   font-size: var(--dg-type-navigation-size);
@@ -1251,13 +1234,6 @@ button {
   opacity: 0;
   pointer-events: none;
   border-right: none;
-}
-/* ── Table Row Hover (replaces JS onMouseEnter/Leave) ── */
-.dg-table-row.expanded {
-  background: var(--dg-color-info-bg);
-}
-.dg-table-row.expanded:hover {
-  background: var(--dg-color-info-bg);
 }
 /* Strip the trailing divider from the last row of every <tbody>. :last-child
    also covers single-row tables (the only row is the last row). !important
@@ -1892,16 +1868,6 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     border-color: var(--dg-color-brand-border);
   }
   /* ── Bottom sheet navigation (Vercel-style) ──────────── */
-  .dg-bottom-sheet-main-item.active {
-    font-weight: var(--dg-type-navigation-weight);
-    color: var(--dg-color-brand);
-    background: var(--dg-color-brand-bg);
-  }
-  .dg-bottom-sheet-drill-item.active {
-    font-weight: var(--dg-type-navigation-weight);
-    color: var(--dg-color-brand);
-    background: var(--dg-color-brand-bg);
-  }
   @keyframes sheet-up {
     from {
       transform: translateY(100%);
