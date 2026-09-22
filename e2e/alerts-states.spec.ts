@@ -24,8 +24,11 @@ test.describe("alerts states", () => {
     await expect(placeholder).toBeVisible({ timeout: 15_000 });
     await expect(placeholder).toHaveCount(0, { timeout: 15_000 });
 
-    // The bell's own request must not have been intercepted.
-    await expect(page.getByRole("button", { name: /^Alerts/ })).toBeVisible();
+    // The header hides the bell on this page on purpose (it would point at
+    // the page you are already on), so the check that the mock stayed on the
+    // search endpoint is made against the page's own list instead.
+    await expect(page.getByRole("button", { name: /^Alerts/ })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Alerts" })).toBeVisible();
   });
 
   test("shows the error empty state when the inbox search fails", async ({ page }) => {

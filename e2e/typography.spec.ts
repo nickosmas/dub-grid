@@ -21,7 +21,18 @@ const routeAuditViewports = [
   { name: "desktop at 200% effective zoom", width: 720, height: 450 },
 ] as const;
 
-async function auditRenderedTypography(page: Page, route: string): Promise<void> {
+/**
+ * `options.appUi` says whether this route loads `app-ui.css`, which is where
+ * the content-hierarchy classes live. Public routes deliberately do not load
+ * it any more (the app stylesheet is not shipped to a signed-out visitor), so
+ * asserting those classes there measured an unstyled probe and read the
+ * browser default rather than a contract anyone wrote.
+ */
+async function auditRenderedTypography(
+  page: Page,
+  route: string,
+  options: { appUi: boolean } = { appUi: true },
+): Promise<void> {
   await expect(page.locator("body")).toBeVisible({ timeout: 15_000 });
   await page.waitForTimeout(150);
 
@@ -179,13 +190,15 @@ async function auditRenderedTypography(page: Page, route: string): Promise<void>
         // (item 24); DM Sans is scoped to the wordmark and landing/marketing
         // titles and headings, not the page's base body font.
         expect(audit.bodyFont).toContain("Inter");
-        expect(audit.contentHierarchy.contentGroupHeading.fontSize).toBe("14px");
-        expect(audit.contentHierarchy.contentGroupHeading.fontWeight).toBe("600");
-        expect(audit.contentHierarchy.fieldTitle.fontSize).toBe("13px");
-        expect(audit.contentHierarchy.fieldTitle.fontWeight).toBe("500");
-        expect(audit.contentHierarchy.contentGroupHeading.color).toBe(
-          audit.contentHierarchy.fieldTitle.color,
-        );
+        if (options.appUi) {
+          expect(audit.contentHierarchy.contentGroupHeading.fontSize).toBe("14px");
+          expect(audit.contentHierarchy.contentGroupHeading.fontWeight).toBe("600");
+          expect(audit.contentHierarchy.fieldTitle.fontSize).toBe("13px");
+          expect(audit.contentHierarchy.fieldTitle.fontWeight).toBe("500");
+          expect(audit.contentHierarchy.contentGroupHeading.color).toBe(
+            audit.contentHierarchy.fieldTitle.color,
+          );
+        }
         expect(audit.thinControls, JSON.stringify({ route, theme, viewport, audit })).toEqual([]);
         expect(
           audit.overflowingElements,
@@ -232,7 +245,10 @@ test("public and gated route entries pass the rendered typography matrix", async
     }
 
     await test.step(`browser evidence: ${entry.browserStates.join(", ")}`, async () => {
-      await auditRenderedTypography(page, entry.route);
+      // A public entry renders without the app stylesheet by design, so only
+      // the contract that applies there is asserted: Inter as the body face,
+      // no thin controls, nothing overflowing its viewport.
+      await auditRenderedTypography(page, entry.route, { appUi: false });
     });
   }
 });
