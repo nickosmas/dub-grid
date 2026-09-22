@@ -98,6 +98,29 @@ describe("public CSS boundary", () => {
     expect(rootLayout).not.toContain("app-ui.css");
   });
 
+  /**
+   * The split exists to keep app-only CSS off the public routes, and nothing
+   * else notices it eroding: a rule added to the wrong file still renders
+   * correctly, it just ships to visitors who never use it. The ceiling is a
+   * budget, not a law. Raise it deliberately when public CSS genuinely grows,
+   * and move the rule when it does not.
+   */
+  it("keeps the public stylesheet within its budget", () => {
+    const PUBLIC_CSS_BUDGET_BYTES = 70 * 1024;
+    const bytes = Buffer.byteLength(globals, "utf8");
+
+    expect(
+      bytes,
+      `globals.css is ${(bytes / 1024).toFixed(1)}KB, over the ` +
+        `${PUBLIC_CSS_BUDGET_BYTES / 1024}KB budget for CSS every visitor downloads. ` +
+        "Does the new rule belong in app-ui.css?",
+    ).toBeLessThanOrEqual(PUBLIC_CSS_BUDGET_BYTES);
+
+    // The split is only worth its complexity while it still holds most of the
+    // app's CSS back.
+    expect(Buffer.byteLength(appUi, "utf8")).toBeGreaterThan(bytes / 2);
+  });
+
   it("does not split a publicly used class across the two stylesheets", () => {
     // Partially moving a class is worse than moving it: the public page keeps
     // the class, loads half its rules, and renders subtly wrong.

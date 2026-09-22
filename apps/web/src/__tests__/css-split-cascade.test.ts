@@ -115,31 +115,56 @@ function parseRules(css: string, file: string): Rule[] {
   return rules;
 }
 
+/** Splits on `separator` only outside brackets, so a comma inside `:is(a, b)`
+ *  does not tear one selector into two. */
+function splitTopLevel(selector: string, separator: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (const character of selector) {
+    if (character === "(" || character === "[") depth += 1;
+    else if (character === ")" || character === "]") depth -= 1;
+    if (character === separator && depth === 0) {
+      parts.push(current);
+      current = "";
+      continue;
+    }
+    current += character;
+  }
+  parts.push(current);
+  return parts;
+}
+
 /** Specificity of the most specific comma-part, as one comparable number. */
 function specificity(selector: string): number {
   let best = 0;
-  for (const rawPart of selector.split(",")) {
+  for (const rawPart of splitTopLevel(selector, ",")) {
     const part = rawPart.trim();
     if (!part) continue;
     let ids = 0;
     let classes = 0;
     let elements = 0;
-    let rest = part.replace(/:where\([^)]*\)/g, " ");
-    rest = rest.replace(/:(?:is|matches|any|not)\(([^)]*)\)/g, (_match, inner: string) => {
-      const sub = specificity(inner);
-      ids += Math.floor(sub / 10000);
-      classes += Math.floor((sub % 10000) / 100);
-      elements += sub % 100;
-      return " ";
-    });
+    let rest = part.replace(/:where\([^()]*(?:\([^()]*\)[^()]*)*\)/g, " ");
+    rest = rest.replace(
+      /:(?:is|matches|any|not)\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g,
+      (_match, inner: string) => {
+        const sub = specificity(inner);
+        ids += Math.floor(sub / 10000);
+        classes += Math.floor((sub % 10000) / 100);
+        elements += sub % 100;
+        return " ";
+      },
+    );
+    // A pseudo-element counts as an element. Removing them here stops the
+    // pseudo-class pass below from counting them a second time.
+    elements += (rest.match(/::[a-zA-Z-]+/g) ?? []).length;
+    rest = rest.replace(/::[a-zA-Z-]+/g, " ");
     ids += (rest.match(/#[\w-]+/g) ?? []).length;
     classes +=
       (rest.match(/\.[\w-]+/g) ?? []).length +
       (rest.match(/\[[^\]]+\]/g) ?? []).length +
-      (rest.match(/:(?!:)[a-z-]+(?:\([^)]*\))?/g) ?? []).length;
-    elements +=
-      (rest.match(/(?:^|[\s>+~])[a-zA-Z][\w-]*/g) ?? []).length +
-      (rest.match(/::[a-z-]+/g) ?? []).length;
+      (rest.match(/:[a-zA-Z-]+(?:\([^)]*\))?/g) ?? []).length;
+    elements += (rest.match(/(?:^|[\s>+~])[a-zA-Z][\w-]*/g) ?? []).length;
     best = Math.max(best, ids * 10000 + classes * 100 + elements);
   }
   return best;
@@ -153,7 +178,7 @@ function specificity(selector: string): number {
  * contend for one element.
  */
 function subjects(selector: string): string[] {
-  return selector.split(",").map(
+  return splitTopLevel(selector, ",").map(
     (part) =>
       part
         .trim()
@@ -189,6 +214,49 @@ function canCollide(first: string, second: string): boolean {
   const tokens = subjectTokens(second);
   return [...subjectTokens(first)].some((token) => tokens.has(token));
 }
+
+/**
+ * The contract skips a pair whose specificities differ, because the cascade
+ * then picks a winner whatever file each rule sits in. A specificity this
+ * computes wrongly therefore skips a real conflict in silence, so the
+ * calculation is pinned against the rules in Selectors Level 4.
+ */
+describe("specificity", () => {
+  const CASES: [selector: string, expected: number][] = [
+    [".a", 100],
+    [".a.b", 200],
+    ["#id", 10_000],
+    ["div", 1],
+    [".a div", 101],
+    [":hover", 100],
+    [".a:hover", 200],
+    ["a:focus-visible", 101],
+    ["[data-x]", 100],
+    ['input[type="text"].a', 201],
+    ["ul li a", 3],
+    [".a > .b + .c ~ .d", 400],
+    // A pseudo-element is an element, not a class.
+    ["::before", 1],
+    [".a::before", 101],
+    // :is()/:not() take the specificity of their most specific argument,
+    // :where() contributes nothing.
+    [":not(.a)", 100],
+    [".a:not(.b.c)", 300],
+    [":is(.a, #b)", 10_000],
+    [":where(.a)", 0],
+    [".dg-x:not(:disabled):hover", 300],
+    // A comma inside :is() must not split the selector in two.
+    [".overflow-x-auto :is(table, .dg-staff-directory-table) .dg-pill-display", 300],
+    [".a, .b.c", 200],
+    // The pairs this contract exists to compare.
+    [".dg-nav-tab.active", 200],
+    [".dg-nav-tab:hover", 200],
+  ];
+
+  it.each(CASES)("scores %s as %i", (selector, expected) => {
+    expect(specificity(selector)).toBe(expected);
+  });
+});
 
 describe("CSS split cascade safety", () => {
   const globals = parseRules(
