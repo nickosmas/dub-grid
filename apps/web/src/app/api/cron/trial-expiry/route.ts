@@ -5,6 +5,7 @@ import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import { serverEnv } from "@/lib/env.server";
+import { bearerMatchesSecret } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -27,8 +28,7 @@ export async function GET(req: NextRequest) {
     logger.error("CRON_SECRET not configured — refusing to run trial-expiry");
     return NextResponse.json({ error: "Not configured" }, { status: 503 });
   }
-  const auth = req.headers.get("authorization");
-  if (auth !== `Bearer ${secret}`) {
+  if (!bearerMatchesSecret(req.headers.get("authorization"), secret)) {
     return NextResponse.json({ error: API_ERRORS.UNAUTHORIZED }, { status: 401 });
   }
   if (!(await isFeatureEnabled("cron_trial_expiry"))) {

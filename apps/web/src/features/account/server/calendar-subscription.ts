@@ -82,6 +82,11 @@ async function loadActiveLinkedEmployee(
       .select("id")
       .eq("id", input.userId)
       .is("deactivated_at", null)
+      // Platform termination is how a gridmaster cuts an account off: the
+      // token hook refuses it at issue and requireOrgPermissions refuses the
+      // token already held, but this feed answers an opaque URL, so without
+      // this line a terminated person's calendar kept filling in.
+      .is("terminated_at", null)
       .is("scheduled_deletion_at", null)
       .maybeSingle(),
   ]);
