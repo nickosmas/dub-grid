@@ -300,7 +300,6 @@ export function ManagementUserActionsSheet({
                 }
                 tone="danger"
               />
-              <Button disabled={isPending} label="Cancel" onPress={onDismiss} tone="neutral" />
             </SheetActions>
           </>
         }

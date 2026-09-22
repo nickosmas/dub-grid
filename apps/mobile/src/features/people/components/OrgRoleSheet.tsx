@@ -1,11 +1,6 @@
 import { useMemo, useState } from "react";
 import type { MobilePerson } from "@dubgrid/contracts";
-import {
-  BottomSheetModal,
-  SheetActions,
-  SheetHeader,
-} from "../../../shared/components/BottomSheetModal";
-import { Button } from "../../../shared/components/Button";
+import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { SelectionRow, SelectionSection } from "../../../shared/components/FilterSheet";
 import { InlineError } from "../../../shared/components/InlineError";
@@ -117,14 +112,7 @@ export function OrgRoleSheet({
 
   return (
     <BottomSheetModal
-      footer={
-        <>
-          {error ? <InlineError message={error} /> : null}
-          <SheetActions>
-            <Button disabled={isPending} label="Cancel" onPress={onDismiss} tone="neutral" />
-          </SheetActions>
-        </>
-      }
+      footer={error ? <InlineError message={error} /> : undefined}
       header={<SheetHeader subtitle={displayName} title="App access" />}
       overlay={confirmationOverlay}
       scrollable
