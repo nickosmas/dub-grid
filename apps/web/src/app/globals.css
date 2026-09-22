@@ -915,28 +915,28 @@ button {
 .dg-btn-icon.dg-btn-lg {
   width: var(--dg-btn-h-lg);
 }
+
+/* Icon-only button: square, so a lone glyph isn't stranded in text padding.
+   Declared after the size modifiers so its zero padding wins, and the width
+   follows whichever size the button is wearing. */
+.dg-btn-icon {
+  width: var(--dg-btn-h);
+  padding: 0;
+}
+
+.dg-btn-icon.dg-btn-sm {
+  width: var(--dg-btn-h-sm);
+}
+
+.dg-btn-icon.dg-btn-xs {
+  width: var(--dg-btn-h-xs);
+}
 /* ── Input System ───────────────────────────────────────── */
 /* ── Label System ──────────────────────────────────────── */
 .dg-form-error {
   color: var(--dg-color-danger);
   font-size: var(--dg-fs-footnote);
   margin: 4px 0 0;
-}
-/* ── Span Tabs (pill-style period / filter selector) ────── */
-.dg-span-tab:hover:not(.active) {
-  color: var(--dg-on-dark-secondary);
-}
-.dg-span-tab.active {
-  background: var(--dg-color-brand);
-  color: var(--dg-color-on-brand-text);
-}
-.dg-span-tabs--light .dg-span-tab:hover:not(.active) {
-  color: var(--dg-color-text-secondary);
-  background: var(--dg-color-bg-secondary);
-}
-.dg-span-tabs--light .dg-span-tab.active {
-  background: var(--dg-color-brand);
-  color: var(--dg-color-on-brand-text);
 }
 /* ── Scrollable Tabs (Apple-style chevrons + edge fade) ── */
 .dg-scroll-fade.visible {

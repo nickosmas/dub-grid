@@ -256,19 +256,6 @@
   padding: 0 var(--dg-btn-px-xs);
   gap: 6px;
 }
-/* Icon-only button: square, so a lone glyph isn't stranded in text padding.
-   Declared after the size modifiers so its zero padding wins, and the width
-   follows whichever size the button is wearing. */
-.dg-btn-icon {
-  width: var(--dg-btn-h);
-  padding: 0;
-}
-.dg-btn-icon.dg-btn-sm {
-  width: var(--dg-btn-h-sm);
-}
-.dg-btn-icon.dg-btn-xs {
-  width: var(--dg-btn-h-xs);
-}
 /* Hover row (settings list items) */
 .dg-hover-row:hover {
   background: var(--dg-color-bg-secondary);
@@ -485,6 +472,16 @@
     background 200ms ease;
   flex: 1 0 auto;
 }
+
+/* ── Span Tabs (pill-style period / filter selector) ────── */
+.dg-span-tab:hover:not(.active) {
+  color: var(--dg-on-dark-secondary);
+}
+
+.dg-span-tab.active {
+  background: var(--dg-color-brand);
+  color: var(--dg-color-on-brand-text);
+}
 /* Light variant — white container, dark active pill */
 .dg-span-tabs--light {
   background: var(--dg-color-surface);
@@ -493,6 +490,16 @@
 .dg-span-tabs--light .dg-span-tab {
   color: var(--dg-type-navigation-color);
   border-radius: var(--dg-tab-inner-radius);
+}
+
+.dg-span-tabs--light .dg-span-tab:hover:not(.active) {
+  color: var(--dg-color-text-secondary);
+  background: var(--dg-color-bg-secondary);
+}
+
+.dg-span-tabs--light .dg-span-tab.active {
+  background: var(--dg-color-brand);
+  color: var(--dg-color-on-brand-text);
 }
 .dg-scrollable-tabs {
   position: relative;
