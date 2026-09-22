@@ -90,6 +90,9 @@ export function usePushResponseHandler(enabled: boolean) {
     let cleanup: (() => void) | null = null;
 
     function handleResponse(response: Notifications.NotificationResponse) {
+      // A tap that lands after this mount is gone belongs to whoever is
+      // signed in now, which may be nobody or somebody else.
+      if (cancelled) return;
       const responseId = response.notification.request.identifier;
       if (responseId && responseId === lastHandledResponseId) {
         return;
@@ -120,6 +123,21 @@ export function usePushResponseHandler(enabled: boolean) {
         handleResponse(response);
       });
 
+      // Registered before the await below, and run immediately if this effect
+      // was already torn down: assigning it afterwards left both listeners
+      // attached whenever the hook unmounted while the cold-start lookup was
+      // still in flight, and the stale response listener then navigated a
+      // signed-out or different session.
+      cleanup = () => {
+        receivedSub.remove();
+        responseSub.remove();
+      };
+      if (cancelled) {
+        cleanup();
+        cleanup = null;
+        return;
+      }
+
       // The listener above only fires while the app is running. When the app was
       // killed and is launched *by* a notification tap, the tap is replayed here
       // instead — without this, a cold-start tap silently lands on Home.
@@ -127,11 +145,6 @@ export function usePushResponseHandler(enabled: boolean) {
       if (!cancelled && initialResponse) {
         handleResponse(initialResponse);
       }
-
-      cleanup = () => {
-        receivedSub.remove();
-        responseSub.remove();
-      };
     })();
 
     return () => {

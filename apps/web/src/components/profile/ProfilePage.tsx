@@ -80,6 +80,7 @@ export function ProfilePage() {
   const canEditProfileDirectly =
     Boolean(canManageEmployees) || Boolean(isSuperAdmin) || Boolean(isGridmaster);
   const canManageManagementAccess = Boolean(isSuperAdmin) || Boolean(isGridmaster);
+  const canDeleteAccountDirectly = Boolean(isSuperAdmin) || Boolean(isGridmaster);
   const canManageScheduleEmployees = Boolean(canManageEmployees);
 
   // Wait for real permissions before rendering: canEditProfileDirectly
@@ -119,6 +120,7 @@ export function ProfilePage() {
           orgId={orgId}
           canEditProfileDirectly={canEditProfileDirectly}
           isGridmaster={Boolean(isGridmaster)}
+          canDeleteAccountDirectly={canDeleteAccountDirectly}
           role={role}
           departments={departments}
           isOnSchedule={isOnSchedule}

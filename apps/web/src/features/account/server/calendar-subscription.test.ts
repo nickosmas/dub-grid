@@ -178,6 +178,35 @@ describe("calendar feed tokens", () => {
     });
   });
 
+  // Platform termination is the gridmaster's way of cutting an account off,
+  // and this feed answers an opaque URL rather than a session, so the check
+  // has to live in the query rather than in an auth layer.
+  it("refuses a terminated account, and asks the database for that", async () => {
+    const token = createCalendarFeedToken();
+    const tokenRow = { user_id: "user-1", org_id: "org-1", employee_id: "employee-1" };
+    const { client, calls } = makeClient({
+      calendar_feed_tokens: [{ data: tokenRow, error: null }],
+      employees: [{ data: EMPLOYEE, error: null }],
+      organization_memberships: [{ data: { id: 1 }, error: null }],
+      organizations: [{ data: { id: "org-1", timezone: "America/Los_Angeles" }, error: null }],
+      // The terminated profile matches nothing once the condition is applied.
+      profiles: [{ data: null, error: null }],
+    });
+    getServiceClient.mockReturnValue(client);
+
+    await expect(resolveCalendarFeed(token)).resolves.toBeNull();
+    expect(calls).toContainEqual({
+      table: "profiles",
+      method: "is",
+      args: ["terminated_at", null],
+    });
+    expect(calls).toContainEqual({
+      table: "profiles",
+      method: "is",
+      args: ["deactivated_at", null],
+    });
+  });
+
   it("rejects a token when its employee is not active and linked in the same organization", async () => {
     const token = createCalendarFeedToken();
     const tokenRow = { user_id: "user-1", org_id: "org-1", employee_id: "employee-1" };

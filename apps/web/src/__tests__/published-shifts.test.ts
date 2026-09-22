@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildShiftJobPairKey } from "@/lib/shift-job-segments";
 import {
+  fetchPublishedShiftRows,
   mapNormalizedScheduleCellToPublishedShiftRow,
   hasPublishedScheduleContent,
   resolvePublishedScheduleEntry,
@@ -215,5 +217,95 @@ describe("published shift helpers", () => {
       published_custom_start_time: null,
       published_custom_end_time: null,
     });
+  });
+});
+
+describe("fetchPublishedShiftRows reads past the API row cap", () => {
+  const ORG = "11111111-1111-4111-8111-111111111111";
+
+  /**
+   * PostgREST answers at most `db.max_rows` rows for every role, the service
+   * role included, so one request returned the first page and nothing said
+   * so. Each call builds its own chain, mirroring the single-use builder the
+   * real client hands back.
+   */
+  function pagingClient(totalCells: number) {
+    const ranges: Array<[number, number]> = [];
+    const cells = Array.from({ length: totalCells }, (_, index) => ({
+      id: `cell-${index}`,
+      org_id: ORG,
+      emp_id: `emp-${index}`,
+      date: "2026-09-21",
+      focus_area_id: 1,
+      snapshots: [
+        {
+          id: `snap-${index}`,
+          cell_id: `cell-${index}`,
+          org_id: ORG,
+          snapshot_kind: "published",
+          state_kind: "worked",
+          absence_type_id: null,
+          custom_start_time: null,
+          custom_end_time: null,
+          segments: [],
+        },
+      ],
+    }));
+
+    const client = {
+      from(table: string) {
+        if (table !== "schedule_cells") {
+          const other: Record<string, unknown> = {};
+          for (const method of ["select", "eq", "is", "in", "order", "gte", "lte", "lt"]) {
+            other[method] = vi.fn(() => other);
+          }
+          (other as { then: unknown }).then = (resolve: (value: unknown) => unknown) =>
+            resolve({ data: [], error: null });
+          return other;
+        }
+        const chain: Record<string, unknown> = {};
+        for (const method of ["select", "eq", "is", "in", "order", "gte", "lte", "lt", "limit"]) {
+          chain[method] = vi.fn(() => chain);
+        }
+        chain.range = vi.fn(async (from: number, to: number) => {
+          ranges.push([from, to]);
+          return { data: cells.slice(from, to + 1), error: null };
+        });
+        return chain;
+      },
+    } as unknown as SupabaseClient;
+
+    return { client, ranges };
+  }
+
+  it("keeps paging until a page comes back short", async () => {
+    const { client, ranges } = pagingClient(1203);
+
+    const rows = await fetchPublishedShiftRows(client, {
+      orgId: ORG,
+      startDate: "2026-09-01",
+      endDate: "2026-09-30",
+    });
+
+    expect(rows).toHaveLength(1203);
+    expect(ranges).toEqual([
+      [0, 499],
+      [500, 999],
+      [1000, 1499],
+    ]);
+  });
+
+  it("treats a caller's own limit as a ceiling, in one request", async () => {
+    const { client, ranges } = pagingClient(1203);
+
+    const rows = await fetchPublishedShiftRows(client, {
+      orgId: ORG,
+      startDate: "2026-09-01",
+      endDate: "2026-09-30",
+      limit: 5,
+    });
+
+    expect(rows).toHaveLength(5);
+    expect(ranges).toEqual([[0, 4]]);
   });
 });

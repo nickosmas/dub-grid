@@ -478,8 +478,12 @@ Calls the `gdpr_erase_user_data(p_user_id)` RPC which:
 
 Follows the same erasure path with additional guards:
 
+- Only super admins delete their own account directly. Every other member,
+  people managers included, submits an account-deletion request that a super
+  admin approves from People > Requests (with fresh sensitive-action auth).
 - Gridmasters cannot self-delete.
-- Sole super_admins cannot delete their account (must transfer ownership first).
+- Sole super_admins cannot delete their account (must transfer ownership
+  first); archived memberships never count as a peer.
 
 ### Automated Account Cleanup
 

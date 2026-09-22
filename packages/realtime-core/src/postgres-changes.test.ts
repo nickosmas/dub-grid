@@ -149,6 +149,33 @@ describe("subscribeToPostgresChanges", () => {
     expect(onError).toHaveBeenNthCalledWith(4, error, 1);
   });
 
+  it("fires onReconnectAfterError after a TIMED_OUT join recovers, without counting it as an error", () => {
+    const mock = createMockChannel();
+    const client = createMockClient(mock.channel);
+    const onError = vi.fn();
+    const onReconnectAfterError = vi.fn();
+
+    subscribeToPostgresChanges(client, "ch", [], { onError, onReconnectAfterError });
+
+    mock.emitStatus("SUBSCRIBED");
+    expect(onReconnectAfterError).not.toHaveBeenCalled();
+
+    mock.emitStatus("TIMED_OUT");
+    expect(onError).not.toHaveBeenCalled();
+    expect(onReconnectAfterError).not.toHaveBeenCalled();
+
+    mock.emitStatus("SUBSCRIBED");
+    expect(onReconnectAfterError).toHaveBeenCalledTimes(1);
+
+    // A clean re-subscribe after the recovery is not a second gap.
+    mock.emitStatus("SUBSCRIBED");
+    expect(onReconnectAfterError).toHaveBeenCalledTimes(1);
+
+    // The error count starts fresh for the next CHANNEL_ERROR.
+    mock.emitStatus("CHANNEL_ERROR", new Error("boom"));
+    expect(onError).toHaveBeenCalledWith(expect.any(Error), 1);
+  });
+
   it("does not let a throwing onError hook propagate out of the subscribe callback", () => {
     const mock = createMockChannel();
     const client = createMockClient(mock.channel);

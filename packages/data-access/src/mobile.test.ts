@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  fetchMobileManagementRosterRows,
+  fetchMobileNotificationsPage,
   fetchMobilePeopleRows,
   fetchMobileRoleRows,
+  fetchScheduleCellQueryRows,
   fetchMobilePublishHistoryRows,
   fetchMobileShiftRequestHistoryRows,
   insertMobileAuditLogEntry,
@@ -312,5 +315,173 @@ describe("fetchMobilePublishHistoryRows", () => {
 
     expect(rows[0].changes).toHaveLength(1);
     expect(rows[0].changes[0].empId).toBe("emp-2");
+  });
+});
+
+describe("fetchScheduleCellQueryRows", () => {
+  const input = { orgId: "org-1", startDate: "2026-09-01", endDate: "2026-09-30" };
+
+  function makeCellClient(pages: Array<{ data: unknown[] | null; error: unknown }>) {
+    const range = vi.fn(async () => pages.shift() ?? { data: [], error: null });
+    const chain = {
+      select: vi.fn(() => chain),
+      eq: vi.fn(() => chain),
+      gte: vi.fn(() => chain),
+      lte: vi.fn(() => chain),
+      order: vi.fn((_column: string) => chain),
+      range,
+    };
+    const from = vi.fn(() => chain);
+    return { client: { from } as unknown as SupabaseClient, chain, range };
+  }
+
+  it("concatenates every page until a short one, in a total order", async () => {
+    const cell = (n: number) => ({ id: `cell-${n}`, emp_id: `emp-${n % 3}`, date: "2026-09-01" });
+    const { client, chain, range } = makeCellClient([
+      { data: [cell(1), cell(2)], error: null },
+      { data: [cell(3), cell(4)], error: null },
+      { data: [cell(5)], error: null },
+    ]);
+
+    const result = await fetchScheduleCellQueryRows(client, input, 2);
+
+    expect(result.map((row) => row.id)).toEqual(["cell-1", "cell-2", "cell-3", "cell-4", "cell-5"]);
+    expect(range).toHaveBeenCalledTimes(3);
+    expect(range).toHaveBeenNthCalledWith(1, 0, 1);
+    expect(range).toHaveBeenNthCalledWith(2, 2, 3);
+    expect(range).toHaveBeenNthCalledWith(3, 4, 5);
+    expect(chain.order.mock.calls.slice(0, 3).map(([column]) => column)).toEqual([
+      "date",
+      "emp_id",
+      "id",
+    ]);
+    expect(chain.eq).not.toHaveBeenCalledWith("emp_id", expect.anything());
+  });
+
+  it("stops after one page when the range fits in it, and scopes to one employee", async () => {
+    const { client, chain, range } = makeCellClient([{ data: [{ id: "cell-1" }], error: null }]);
+
+    const result = await fetchScheduleCellQueryRows(client, { ...input, employeeId: "emp-7" }, 2);
+
+    expect(result).toHaveLength(1);
+    expect(range).toHaveBeenCalledTimes(1);
+    expect(chain.eq).toHaveBeenCalledWith("emp_id", "emp-7");
+  });
+
+  it("surfaces a page error instead of returning a partial range", async () => {
+    const { client } = makeCellClient([{ data: null, error: { message: "boom" } }]);
+
+    await expect(fetchScheduleCellQueryRows(client, input, 2)).rejects.toEqual({ message: "boom" });
+  });
+});
+
+describe("fetchMobileNotificationsPage", () => {
+  function makeNotificationsClient(rows: unknown[]) {
+    const chain: Record<string, ReturnType<typeof vi.fn>> = {};
+    for (const method of ["select", "eq", "order", "limit", "is", "not", "or"]) {
+      chain[method] = vi.fn(() => chain);
+    }
+    // The builder is awaited, so it must also be thenable.
+    (chain as unknown as { then: unknown }).then = (resolve: (value: unknown) => unknown) =>
+      resolve({ data: rows, error: null });
+    const rpc = vi.fn(async () => ({ data: 0, error: null }));
+    return {
+      client: { from: vi.fn(() => chain), rpc } as unknown as SupabaseClient,
+      chain,
+    };
+  }
+
+  it("asks for one alert by id, so a deep link is not limited to the first page", async () => {
+    const { client, chain } = makeNotificationsClient([
+      { id: "alert-1", type: "x", channel: "in_app", created_at: "2026-01-01T00:00:00.000Z" },
+    ]);
+
+    const page = await fetchMobileNotificationsPage(client, { id: "alert-1", limit: 1 });
+
+    expect(chain.eq).toHaveBeenCalledWith("id", "alert-1");
+    expect(page.notifications).toHaveLength(1);
+  });
+
+  it("does not let the inbox filters hide the alert a link names", async () => {
+    const { client, chain } = makeNotificationsClient([
+      {
+        id: "alert-1",
+        type: "x",
+        channel: "in_app",
+        created_at: "2026-01-01T00:00:00.000Z",
+        archived_at: "2026-01-02T00:00:00.000Z",
+      },
+    ]);
+
+    // No archived argument, and the alert is archived: a filtered page would
+    // miss it, a lookup must not.
+    const page = await fetchMobileNotificationsPage(client, { id: "alert-1", limit: 1 });
+
+    expect(page.notifications).toHaveLength(1);
+    expect(chain.is).not.toHaveBeenCalled();
+    expect(chain.not).not.toHaveBeenCalled();
+    expect(chain.or).not.toHaveBeenCalled();
+  });
+
+  it("leaves the id filter off an ordinary page", async () => {
+    const { client, chain } = makeNotificationsClient([]);
+
+    await fetchMobileNotificationsPage(client, { limit: 25 });
+
+    expect(chain.eq).not.toHaveBeenCalledWith("id", expect.anything());
+  });
+});
+
+describe("fetchMobileManagementRosterRows", () => {
+  /** Each call builds its own chain, as the real single-use builder does. */
+  function rosterClient(memberships: unknown[], invitations: unknown[]) {
+    const ranges: Record<string, Array<[number, number]>> = {};
+    const rowsByTable: Record<string, unknown[]> = {
+      organization_memberships: memberships,
+      invitations,
+    };
+    const client = {
+      from(table: string) {
+        const chain: Record<string, unknown> = {};
+        for (const method of ["select", "eq", "is", "in", "order"]) {
+          chain[method] = vi.fn(() => chain);
+        }
+        chain.range = vi.fn(async (from: number, to: number) => {
+          (ranges[table] ??= []).push([from, to]);
+          return { data: (rowsByTable[table] ?? []).slice(from, to + 1), error: null };
+        });
+        return chain;
+      },
+      auth: {
+        admin: {
+          getUserById: vi.fn(async (id: string) => ({
+            data: { user: { id, email: `${id}@dubgrid.test` } },
+            error: null,
+          })),
+        },
+      },
+    } as unknown as SupabaseClient;
+    return { client, ranges };
+  }
+
+  it("pages both lists, so a large organization's roster is not cut at the API row cap", async () => {
+    const pageSize = 500;
+    const memberships = Array.from({ length: pageSize + 2 }, (_, index) => ({
+      user_id: `user-${index}`,
+      org_role: "admin",
+      department_ids: [1],
+      dept_admin_ids: [],
+      updated_at: null,
+      phone: null,
+    }));
+
+    const { client, ranges } = rosterClient(memberships, []);
+    const rows = await fetchMobileManagementRosterRows(client, "org-1");
+
+    expect(rows.memberships).toHaveLength(pageSize + 2);
+    expect(ranges.organization_memberships).toEqual([
+      [0, pageSize - 1],
+      [pageSize, pageSize * 2 - 1],
+    ]);
   });
 });

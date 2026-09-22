@@ -814,7 +814,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         fallbackMessage: "We couldn't update that shift request right now.",
       });
     },
-    onSuccess: async (_, variables) => {
+    onSuccess: async (data, variables) => {
       await Promise.all([
         refetchScreenContent(),
         queryClient.invalidateQueries({
@@ -823,7 +823,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       ]);
       pushToast({
         tone: "success",
-        ...getMobileRequestActionSuccessToast(variables.body),
+        ...getMobileRequestActionSuccessToast(variables.body, data),
       });
     },
   });
@@ -833,10 +833,18 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         return;
       }
 
-      const feedback = getMobileRequestActionFeedback({ requestId, body });
+      const feedback = getMobileRequestActionFeedback({
+        requestId,
+        body,
+        viewerCanApprove: Boolean(bootstrapQuery.data?.permissions.canApproveShiftRequests),
+      });
       setRequestActionConfirmation({ requestId, body, feedback });
     },
-    [pendingAction, requestActionMutation.isPending],
+    [
+      bootstrapQuery.data?.permissions.canApproveShiftRequests,
+      pendingAction,
+      requestActionMutation.isPending,
+    ],
   );
 
   const confirmRequestAction = useCallback(() => {
@@ -2019,7 +2027,7 @@ function MonthDayCell({
   );
 }
 
-export function IconControlButton({
+function IconControlButton({
   accessibilityLabel,
   iconName,
   iconSize = 20,
@@ -2058,7 +2066,7 @@ export function IconControlButton({
   );
 }
 
-export function AlertsChromeButton({ unreadCount }: { unreadCount: number }) {
+function AlertsChromeButton({ unreadCount }: { unreadCount: number }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
@@ -2462,8 +2470,8 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
   );
 }
 
-// The first-run tour renders this card and the header controls above it with
-// sample data (`onboarding/components/previews`), so they are exported.
+// The first-run tour renders this card with sample data
+// (`onboarding/components/previews`), so it is exported.
 export function MeHeroCard({
   currentDate,
   currentTime,

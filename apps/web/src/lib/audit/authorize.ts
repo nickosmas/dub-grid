@@ -6,7 +6,12 @@ import { getServiceClient } from "@/lib/supabase-service";
 
 type ServiceClient = ReturnType<typeof getServiceClient>;
 
-export type AuditLogReader = { serviceClient: ServiceClient; audience: Audience };
+export type AuditLogReader = {
+  serviceClient: ServiceClient;
+  audience: Audience;
+  /** The effective organization (a Test Sandbox when one is active), or undefined for the platform log. */
+  orgId: string | undefined;
+};
 
 /**
  * Who may read an audit log: a super admin for their own organization, and a
@@ -22,7 +27,7 @@ export async function authorizeAuditLogRead(
     if ("response" in auth) {
       return { response: auth.response };
     }
-    return { serviceClient: getServiceClient(), audience: "platform" };
+    return { serviceClient: getServiceClient(), audience: "platform", orgId: undefined };
   }
 
   const auth = await requireOrgPermissions(
@@ -33,5 +38,9 @@ export async function authorizeAuditLogRead(
   if ("response" in auth) {
     return { response: auth.response };
   }
-  return { serviceClient: auth.serviceClient, audience: audienceForViewer(auth.permissions) };
+  return {
+    serviceClient: auth.serviceClient,
+    audience: audienceForViewer(auth.permissions),
+    orgId: auth.orgId,
+  };
 }

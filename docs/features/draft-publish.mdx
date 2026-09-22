@@ -1,0 +1,56 @@
+---
+title: "Draft & Publish"
+description: "All schedule edits are saved as drafts first, nothing is visible to staff until you explicitly publish."
+---
+
+DubGrid uses a draft/publish workflow to give you full control over when schedule changes go live. Every edit you make, adding a shift, modifying a code, deleting an entry, is saved as a draft. Drafts are visible only to users with edit access, not to general staff.
+
+## Draft state
+
+When a cell has a pending draft change, it displays a visual indicator so you can distinguish it from published shifts at a glance. The indicator varies by change type:
+
+- **New** - a shift that has been added but not yet published
+- **Modified** - an existing published shift that has been edited
+- **Deleted** - a published shift that has been marked for removal
+
+## Draft banner
+
+The **Draft Banner** appears at the top of the schedule grid whenever there are unpublished changes. It shows the number of pending changes across the current view. Use it as a quick check before publishing.
+
+## Publishing changes
+
+<Note>
+  Before publishing, DubGrid shows a confirmation dialog summarizing the changes. Review the count
+  carefully, publishing promotes all drafts to the live schedule simultaneously and notifies any
+  connected users.
+</Note>
+
+To publish all pending changes:
+
+1. Click **Publish** in the draft banner.
+2. Review the confirmation dialog.
+3. Click **Confirm** to publish.
+
+All drafts across the organization are promoted to published status at once. Connected users see the updated schedule in real time.
+
+## Discarding changes
+
+To roll back all unpublished drafts:
+
+1. Click **Discard** in the draft banner.
+2. Confirm the action when prompted.
+
+All pending draft changes are removed and the schedule reverts to the last published state. This action cannot be undone.
+
+## Draft recovery
+
+If you close your browser or navigate away before publishing, your drafts are not lost. DubGrid automatically saves your draft session. The next time you open the schedule, a recovery prompt appears so you can pick up where you left off.
+
+## Who can publish
+
+Only the following users can publish schedule changes:
+
+- **Super Admins** - always have publish access
+- **Admins** with the `canPublishSchedule` permission, granted by a Super Admin
+
+To learn more about admin permissions, see [Admin Permissions](/reference/admin-permissions).

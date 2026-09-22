@@ -1,0 +1,66 @@
+---
+title: "Focus Areas"
+description: "Define and manage the wings, departments, or sections that organize your schedule grid and staff roster."
+---
+
+Focus areas are the sections that divide your schedule, typically the wings, departments, or units of your facility. The schedule grid groups staff by their assigned focus area, and the toolbar lets you filter down to any single section. You'll find these settings at **Settings → Staff Config**, in the **Focus Areas** section.
+
+Requires the `canManageFocusAreas` permission.
+
+<Tip>
+  The label "Focus Areas" is customizable. Your organization may display this as "Wings", "Units",
+  "Departments", or another term. See [Custom Terminology](/configuration/terminology) for details.
+</Tip>
+
+---
+
+## Focus area fields
+
+Each focus area has the following configurable properties:
+
+| Field                | Description                                                            |
+| -------------------- | ---------------------------------------------------------------------- |
+| **Name**             | The section label shown in the schedule grid header and filter toolbar |
+| **Background color** | The color used for the section header on the schedule grid             |
+| **Text color**       | The text color used within the section header                          |
+| **Sort order**       | Controls the top-to-bottom order of sections on the grid               |
+| **Break minutes**    | Default break duration (in minutes) for shifts in this section         |
+
+---
+
+## Adding a focus area
+
+<Steps>
+  <Step title="Open Staff Config settings">
+    Go to **Settings → Staff Config** and scroll to the **Focus Areas** section.
+  </Step>
+  <Step title="Click Add">Click **Add Focus Area** to open the editor.</Step>
+  <Step title="Name and color the section">
+    Enter a name and pick a background and text color that makes this section visually distinct on
+    the grid.
+  </Step>
+  <Step title="Set sort order and break minutes">
+    Assign a sort order to control where this section appears relative to others. Set a break
+    duration if applicable.
+  </Step>
+  <Step title="Save">Click **Save**. The section immediately appears on the schedule grid.</Step>
+</Steps>
+
+---
+
+## Assigning employees to focus areas
+
+Each employee can be assigned to one or more focus areas from their profile in the staff roster. Go to **Staff**, open the employee's record, and update their focus area assignments in the edit panel.
+
+Employees assigned to multiple focus areas appear as a separate row in **each** of those sections on the schedule grid. This is how cross-wing or float staff are handled, their name and shifts appear wherever they are assigned.
+
+---
+
+## Filtering by focus area
+
+The toolbar at the top of the schedule grid includes a **focus area filter**. You can switch between:
+
+- **All** - shows all sections stacked vertically
+- **A specific section** - shows only that section's staff rows, making it easier to work with large facilities
+
+The filter also scopes the staff search to the visible section when a specific focus area is selected.

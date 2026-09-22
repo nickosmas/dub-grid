@@ -4,7 +4,8 @@ import { ApiResponseError } from "@dubgrid/api-client";
 import { isRetryableAuthRecoveryError } from "@dubgrid/client-errors";
 import type { MobileAuthLoginResponse } from "@dubgrid/contracts";
 import { ACCOUNT_DISABLED_CODE, ACCOUNT_DISABLED_MESSAGE } from "@dubgrid/domain";
-import { Redirect, router } from "expo-router";
+import { Redirect, router, useLocalSearchParams } from "expo-router";
+import { resolvePostLoginDestination } from "../lib/post-login-destination";
 import { Platform, StyleSheet, TextInput, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import { Button } from "../../../shared/components/Button";
@@ -76,6 +77,9 @@ export default function LoginScreen() {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { accessToken, isLoading, restoreError, retryRestore } = useSessionState();
+  // A protected route that sent us here names itself in `next`.
+  const { next } = useLocalSearchParams<{ next?: string }>();
+  const postLoginDestination = resolvePostLoginDestination(next);
   const isConsentDecisionPending = useIsConsentDecisionPending();
   const recheckConsentDecision = useRecheckConsentDecision();
   const passwordInputRef = useRef<TextInput>(null);
@@ -192,7 +196,7 @@ export default function LoginScreen() {
   }
 
   if (accessToken) {
-    return <Redirect href="/(tabs)/home" />;
+    return <Redirect href={postLoginDestination} />;
   }
 
   async function finishLogin(response: MobileAuthLoginResponse, session = response.session) {
@@ -228,7 +232,7 @@ export default function LoginScreen() {
       retry: false,
     });
 
-    router.replace("/(tabs)/home");
+    router.replace(postLoginDestination);
     requestAnimationFrame(() => {
       authEntryRecorder.markAuthenticatedNavigationReady("cold_sign_in");
     });

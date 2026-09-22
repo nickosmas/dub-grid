@@ -101,3 +101,24 @@ export function invalidateMobileRealtimeQueries(
     void queryClient.invalidateQueries({ queryKey });
   }
 }
+
+/**
+ * Every query family the given tables feed, each invalidated once. For a
+ * realtime catch-up after a dropped channel, when any of them may have
+ * changed unseen; per-table calls would restart the same refetch many times.
+ */
+export function invalidateMobileRealtimeQueriesForTables(
+  queryClient: QueryClient,
+  accessToken: string,
+  tables: readonly MobileRealtimeTable[],
+): void {
+  const seen = new Set<string>();
+  for (const table of tables) {
+    for (const queryKey of getMobileRealtimeInvalidationKeys(accessToken, table)) {
+      const id = JSON.stringify(queryKey);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      void queryClient.invalidateQueries({ queryKey });
+    }
+  }
+}

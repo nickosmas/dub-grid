@@ -35,6 +35,7 @@ import { getAvatarInitials } from "@/lib/utils";
 import { getAvatarTypography, getAvatarTone } from "@dubgrid/design-tokens";
 import * as Sentry from "@/lib/sentry";
 import NotificationBell from "@/components/NotificationBell";
+import ThemeToggleButton from "@/components/ThemeToggleButton";
 import { MaybeHint } from "@/components/ui/hint";
 import type { OrganizationBillingSummary } from "@/types";
 import SandboxBanner from "@/components/test-sandbox/SandboxBanner";
@@ -269,6 +270,9 @@ export default function Header({ orgName }: HeaderProps) {
   const isHeaderNarrow = useMediaQuery(HEADER_NARROW);
   const featureFlags = useClientFeatureFlags();
 
+  // The bell opens a preview of the inbox; on the inbox itself it is noise.
+  const onAlertsPage = pathname.startsWith("/alerts");
+
   // Match each top-nav route explicitly. Routes like /profile and
   // /alerts aren't top-nav items and should leave every tab
   // un-highlighted — don't fall through to "schedule".
@@ -302,7 +306,7 @@ export default function Header({ orgName }: HeaderProps) {
   });
 
   const { user: authUser } = useAuth();
-  const { theme, setTheme, resolvedTheme } = useTheme();
+  const { resolvedTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
@@ -481,6 +485,8 @@ export default function Header({ orgName }: HeaderProps) {
           </div>
 
           {canShowBillingNotice && orgId && <HeaderBillingNotice orgId={orgId} compact />}
+
+          <ThemeToggleButton appearance="header" />
 
           {/* Hamburger */}
           <Button
@@ -663,20 +669,14 @@ export default function Header({ orgName }: HeaderProps) {
           )}
         </div>
 
-        {/* Alerts */}
-        {!isGridmaster && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-            {canShowBillingNotice && orgId && !isHeaderNarrow && (
-              <HeaderBillingNotice orgId={orgId} compact={isTablet} />
-            )}
-            <NotificationBell />
-          </div>
-        )}
-        {isGridmaster && canShowBillingNotice && orgId && !isHeaderNarrow && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+        {/* Billing notice, theme, alerts */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          {canShowBillingNotice && orgId && !isHeaderNarrow && (
             <HeaderBillingNotice orgId={orgId} compact={isTablet} />
-          </div>
-        )}
+          )}
+          <ThemeToggleButton appearance="header" />
+          {!isGridmaster && <NotificationBell hidden={onAlertsPage} />}
+        </div>
         <div ref={menuRef} style={{ position: "relative", flexShrink: 0 }}>
           <Button
             onClick={() => setMenuOpen((o) => !o)}
@@ -847,47 +847,6 @@ export default function Header({ orgName }: HeaderProps) {
                   </Button>
                 </>
               )}
-              <div className="dg-menu-divider" />
-              <div style={{ padding: "6px 10px 4px" }}>
-                <div
-                  style={{
-                    fontSize: "var(--dg-type-field-title-size)",
-                    fontWeight: "var(--dg-type-field-title-weight)",
-                    color: "var(--dg-type-field-title-color)",
-                    textTransform: "none",
-                    letterSpacing: "var(--dg-type-field-title-letter-spacing)",
-                    marginBottom: 6,
-                  }}
-                >
-                  Theme
-                </div>
-                <div className="dg-segment" style={{ display: "flex" }}>
-                  <Button
-                    type="button"
-                    className={`dg-segment-btn${theme === "light" ? " active" : ""}`}
-                    style={{ flex: 1 }}
-                    onClick={() => setTheme("light")}
-                  >
-                    Light
-                  </Button>
-                  <Button
-                    type="button"
-                    className={`dg-segment-btn${theme === "dark" ? " active" : ""}`}
-                    style={{ flex: 1 }}
-                    onClick={() => setTheme("dark")}
-                  >
-                    Dark
-                  </Button>
-                  <Button
-                    type="button"
-                    className={`dg-segment-btn${theme === "system" ? " active" : ""}`}
-                    style={{ flex: 1 }}
-                    onClick={() => setTheme("system")}
-                  >
-                    System
-                  </Button>
-                </div>
-              </div>
               <div className="dg-menu-divider" />
               <Button
                 className="dg-menu-item dg-menu-item--danger"

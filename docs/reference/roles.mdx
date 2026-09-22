@@ -1,0 +1,30 @@
+---
+title: "Roles"
+description: "An overview of DubGrid's four-tier role hierarchy and what each role can do."
+---
+
+DubGrid uses a four-tier role hierarchy. Every action you take in DubGrid is governed by your role, and access is enforced automatically at every level.
+
+## Role hierarchy
+
+| Role            | Scope         | What they can do                                                                                                                                                                  |
+| --------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Gridmaster**  | Platform-wide | Platform-level administration held by the DubGrid team: tenant lifecycle, cross-organization support, and audit logging. Not an organization role and never granted to customers. |
+| **Super Admin** | Organization  | Full access to their organization, all settings, user management, permission configuration, and publishing schedules.                                                             |
+| **Admin**       | Organization  | Configurable access. A Super Admin grants specific permissions to each Admin individually. See [Admin Permissions](/reference/admin-permissions).                                 |
+| **User**        | Organization  | View their own schedule, submit pickup, swap, and call-off requests, and receive alerts and notifications. Available on web and mobile.                                           |
+
+## Role scope
+
+Roles are scoped to a specific organization. A Super Admin of one organization has no access to any other organization, their permissions apply only within their own organization.
+
+The one exception is the Gridmaster role, which the DubGrid team uses to operate the platform itself. It is not tied to any single organization and is never assigned to customers.
+
+<Note>
+  The **Gridmaster** is a platform role, not an organization role. It is not assigned per
+  organization and does not appear in any organization's user list.
+</Note>
+
+## How access is enforced
+
+You do not need to manage access enforcement yourself. DubGrid enforces your role automatically on every request, including page navigation, data reads, and data writes. If you attempt an action your role does not permit, access is denied.

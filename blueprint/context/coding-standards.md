@@ -92,17 +92,20 @@
   the final action spans both columns (three is two above, one full-width below;
   five continues with two equal rows, then one full-width below). Do not let
   labels or variants make a peer larger within a row.
-- Button labels never wrap on either platform. Keep them to one line and
-  truncate rather than creating a second line. Mobile does not shrink a label
-  to fit: React Native's new architecture fits against the button's
-  default-size height with no floor, which is what left labels tiny beside
-  large text.
+- Button labels never wrap on either platform. Keep them to one line. Web
+  truncates rather than creating a second line. Mobile fits the label to the
+  button's width by measurement (`FitText`): the font shrinks by the ratio of
+  slot to natural width, floored at half size, and only then ellipsizes. Never
+  reach for `adjustsFontSizeToFit`: React Native's new architecture ignores
+  its floor and fits against the button's default-size height, which is what
+  left labels tiny beside large text.
 - On mobile, text inside a control is `fit` text, always one line, truncating
   rather than wrapping. Chrome is `fit="fixed"` and never scales with the OS
   text setting: header titles and the labels beside them, sheet titles, the
   tab bar, avatar initials, date tiles, count dots, the wordmark. Labels the
   reader acts on are `fit="compact"` and grow to `MAX_FONT_SCALE_COMPACT`
   (1.2x) and no further: button, pill, chip, badge, segment and tab labels.
+  A button label additionally shrinks to its slot through `FitText`.
   Reading text keeps `MAX_FONT_SCALE`. Padding and control geometry never
   derive from the font scale.
 

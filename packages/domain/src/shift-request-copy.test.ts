@@ -7,6 +7,7 @@ import {
   describeShiftRequest,
   describeShiftRequestNoteRecipients,
   describeShiftRequestPill,
+  describeShiftRequestSubmitted,
 } from "./shift-request-copy";
 
 const swap = {
@@ -132,5 +133,70 @@ describe("groupManagerQueue", () => {
       ["awaiting_recipient", "Swaps awaiting a response", [1]],
     ]);
     expect(groupManagerQueue([])).toEqual([]);
+  });
+});
+
+describe("describeShiftRequestSubmitted", () => {
+  it("keeps the pending copy when a manager still has to decide", () => {
+    expect(
+      describeShiftRequestSubmitted(
+        { action: "created", type: "calloff", targeted: false },
+        { autoApproved: false },
+      ),
+    ).toEqual({ title: "Request sent", message: "Calloff request sent." });
+    expect(
+      describeShiftRequestSubmitted(
+        { action: "created", type: "pickup", targeted: false },
+        { autoApproved: false },
+      ).message,
+    ).toBe("Your shift is posted for pickup.");
+    expect(describeShiftRequestSubmitted({ action: "claimed" }, { autoApproved: false })).toEqual({
+      title: "Claim request sent",
+      message: "Your shift is pending approval.",
+    });
+    expect(
+      describeShiftRequestSubmitted({ action: "accepted", type: "swap" }, { autoApproved: false }),
+    ).toEqual({ title: "Request accepted", message: "Your response was sent." });
+  });
+
+  it("says the schedule already changed when an approver was party to it", () => {
+    expect(
+      describeShiftRequestSubmitted(
+        { action: "created", type: "calloff", targeted: false },
+        { autoApproved: true },
+      ),
+    ).toEqual({
+      title: "Call-off approved",
+      message: "Your absence is on the schedule.",
+    });
+    expect(describeShiftRequestSubmitted({ action: "claimed" }, { autoApproved: true })).toEqual({
+      title: "Shift is yours",
+      message: "The claim was approved and is on the schedule.",
+    });
+    expect(
+      describeShiftRequestSubmitted({ action: "accepted", type: "swap" }, { autoApproved: true }),
+    ).toEqual({ title: "Swap approved", message: "Both schedules are updated." });
+    expect(
+      describeShiftRequestSubmitted({ action: "accepted", type: "pickup" }, { autoApproved: true })
+        .title,
+    ).toBe("Pickup approved");
+  });
+
+  it("tells an approver the decision waits only on the recipient", () => {
+    expect(
+      describeShiftRequestSubmitted(
+        { action: "created", type: "swap", targeted: true },
+        { autoApproved: false, viewerCanApprove: true },
+      ),
+    ).toEqual({ title: "Swap request sent", message: "It's approved once they accept." });
+    expect(
+      describeShiftRequestSubmitted(
+        { action: "created", type: "pickup", targeted: false },
+        { autoApproved: false, viewerCanApprove: true },
+      ),
+    ).toEqual({
+      title: "Shift posted for pickup",
+      message: "A claim on it is approved right away.",
+    });
   });
 });

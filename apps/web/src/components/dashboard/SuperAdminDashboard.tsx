@@ -9,7 +9,7 @@ import ActivityFeed from "./ActivityFeed";
 export default function SuperAdminDashboard(props: DashboardContentProps) {
   const {
     org,
-    coverageRequirements,
+    hasCoverageRequirements,
     permissions,
     sectionCoverage,
     openShifts,
@@ -68,7 +68,7 @@ export default function SuperAdminDashboard(props: DashboardContentProps) {
           sections={sectionCoverage}
           focusAreaLabel={org.focusAreaLabel || "section"}
           isMobile={isMobile}
-          hasRequirements={coverageRequirements.length > 0}
+          hasRequirements={hasCoverageRequirements}
           canManageCoverageRequirements={permissions.canManageCoverageRequirements}
           publishedWindowState={publishedWindowState}
           publishHistory={publishHistory}

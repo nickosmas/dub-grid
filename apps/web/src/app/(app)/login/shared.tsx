@@ -75,13 +75,21 @@ export function apexLoginHref(search = ""): string {
   return `${protocol}//${rootDomain}${port}/login${search}`;
 }
 
+const LOGIN_REDIRECT_MESSAGES: Record<string, string> = {
+  session_invalid: "We couldn't verify your session. Sign in again.",
+  // The proxy sends an enrolled account here when its session never answered
+  // a challenge; signing in again runs it.
+  mfa_required: "Finish signing in with your authenticator app.",
+};
+
 export function useSessionInvalidToast() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const code = params.get("error");
-    if (code === "session_invalid") {
-      toast.error("We couldn't verify your session. Sign in again.");
+    const message = code ? LOGIN_REDIRECT_MESSAGES[code] : undefined;
+    if (message) {
+      toast.error(message);
       // Clean the URL so a refresh doesn't re-show the toast
       window.history.replaceState({}, "", window.location.pathname);
     }

@@ -899,6 +899,8 @@ export function updateShiftRequest(
 }
 
 export type MobileNotificationsListParams = {
+  /** One alert by id, for a deep link that may name an older one. */
+  id?: string;
   limit?: number;
   cursorCreatedAt?: string;
   cursorId?: string;
@@ -917,6 +919,7 @@ export function getNotifications(
   signal?: AbortSignal,
 ) {
   const query: Record<string, string | undefined> = {
+    id: params.id,
     limit: params.limit ? String(params.limit) : undefined,
     cursorCreatedAt: params.cursorCreatedAt,
     cursorId: params.cursorId,

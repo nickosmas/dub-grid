@@ -1,0 +1,40 @@
+---
+title: "Dashboard"
+description: "A real-time overview of your organization's scheduling health, coverage, staffing, open shifts, and recent activity."
+---
+
+The dashboard at `/dashboard` gives you an at-a-glance picture of your organization's scheduling status. It loads automatically when you sign in and updates based on your current schedule data.
+
+If there are critical coverage issues, an **Alert Banner** appears at the top of the page to draw your attention before you review the individual cards.
+
+Each card on the dashboard can be expanded to a full-page detail view. Click the expand icon in the top-right corner of any card to open the detailed view for deeper analysis.
+
+## Dashboard cards
+
+<CardGroup cols={2}>
+  <Card title="KPI stat cards" icon="chart-bar">
+    Four summary metrics displayed as a row of stat cards: **Total Hours**, **Active Employees**,
+    **Open Shifts**, and **Coverage Rate**. These give you an instant read on overall schedule
+    health for the current period.
+  </Card>
+  <Card title="Coverage by section" icon="chart-pie">
+    A donut chart showing coverage status broken down by focus area (wing or department). Each
+    segment indicates whether the minimum staffing requirement for that section is met or unmet.
+  </Card>
+  <Card title="Open shifts" icon="calendar-x">
+    A list of uncovered shifts that need attention. Each entry shows the date, focus area, and shift
+    code so you can quickly identify gaps and take action on the schedule.
+  </Card>
+  <Card title="Staff hours" icon="clock">
+    A trend visualization of total hours across your staff for the schedule period. Use this to spot
+    whether hours are tracking high, low, or unevenly distributed.
+  </Card>
+  <Card title="Shift breakdown" icon="layers">
+    A distribution chart showing how shifts are allocated across the different shift codes in your
+    organization. Useful for identifying whether certain shift types are over- or under-assigned.
+  </Card>
+  <Card title="Activity feed" icon="activity">
+    A chronological feed of recent schedule changes, publish events, and user actions. Each entry
+    shows who made the change, what changed, and when.
+  </Card>
+</CardGroup>

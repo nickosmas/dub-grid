@@ -199,13 +199,20 @@ function NotificationIcon({ type }: { type: string }) {
  *   to the alert's subject (the schedule, a person, the request board) and
  *   marks it read on the way; the gridmaster portal passes it to open the
  *   alert in its own inbox view.
+ * @param hidden Render nothing while the reader is already on the alerts
+ *   page. The bell stays mounted rather than being dropped from the header
+ *   because it is the only host of the account-freshness realtime channel
+ *   (profile, session and preference changes), and unmounting it there would
+ *   silently drop those invalidations on that one route.
  */
 export default function NotificationBell({
   onViewAll,
   onOpenItem,
+  hidden = false,
 }: {
   onViewAll?: () => void;
   onOpenItem?: (id: string) => void;
+  hidden?: boolean;
 } = {}) {
   const { user } = useAuth();
   const userId = user?.id ?? null;
@@ -245,6 +252,10 @@ export default function NotificationBell({
 
   useNotificationsRealtime({ userId });
   useAccountRealtimeInvalidation({ userId, queryClient });
+
+  useEffect(() => {
+    if (hidden) setOpen(false);
+  }, [hidden]);
 
   // Close on outside click or Escape key
   useEffect(() => {
@@ -302,6 +313,8 @@ export default function NotificationBell({
       setConfirmingMarkAllRead(false);
     }
   }
+
+  if (hidden) return null;
 
   return (
     <div ref={ref} style={{ position: "relative", display: "flex", alignItems: "center" }}>

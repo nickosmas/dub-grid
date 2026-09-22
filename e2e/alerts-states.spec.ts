@@ -24,8 +24,11 @@ test.describe("alerts states", () => {
     await expect(placeholder).toBeVisible({ timeout: 15_000 });
     await expect(placeholder).toHaveCount(0, { timeout: 15_000 });
 
-    // The bell's own request must not have been intercepted.
-    await expect(page.getByRole("button", { name: /^Alerts/ })).toBeVisible();
+    // The header hides the bell on this page on purpose (it would point at
+    // the page you are already on), so the check that the mock stayed on the
+    // search endpoint is made against the page's own list instead.
+    await expect(page.getByRole("button", { name: /^Alerts/ })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Alerts" })).toBeVisible();
   });
 
   test("shows the error empty state when the inbox search fails", async ({ page }) => {
@@ -73,24 +76,53 @@ test.describe("alerts states", () => {
   });
 });
 
-// No route mocks here: a bell row is a link to the alert's subject.
+// The bell reads GET /api/notifications. The whole suite shares one server
+// and one database, and several specs create alerts as they run (a sign-in
+// writes a security alert, a request writes its own), so reading the first
+// row's href and then clicking "the first row" sampled two different alerts
+// whenever one arrived in between: the click landed on the newcomer's
+// subject while the assertion still held the older row's href. The inbox is
+// pinned to one alert here so the test measures the contract it is about,
+// that a row goes where its href says.
+const BELL_PATH = "/api/notifications";
+const BELL_ALERT = {
+  id: "11111111-2222-4333-8444-555555555555",
+  type: "billing_subscription_changed",
+  channel: "in_app",
+  category: "billing",
+  priority: "normal",
+  title: "Trial started",
+  message: "Your 14-day free trial is now active.",
+  metadata: {},
+  readAt: null,
+  archivedAt: null,
+  createdAt: "2026-09-01T00:00:00.000Z",
+};
+
 test.describe("alerts from the header bell", () => {
   test("goes to the clicked alert's subject", async ({ page }) => {
     test.setTimeout(90_000);
     await loginAsQaSuperAdmin(page, QA_CALM_HAVEN_ORIGIN);
+
+    await page.route(`**${BELL_PATH}?*`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ notifications: [BELL_ALERT], unreadCount: 1 }),
+      });
+    });
+
     await page.goto(`${QA_CALM_HAVEN_ORIGIN}/dashboard`);
 
     await page.getByRole("button", { name: /^Alerts/ }).click();
     const popover = page.getByRole("region", { name: "Alerts" });
     await expect(popover).toBeVisible();
-    const rows = popover.locator("a[href]");
-    const empty = popover.getByText("No alerts");
-    await expect(rows.first().or(empty)).toBeVisible({ timeout: 15_000 });
-    test.skip(await empty.isVisible(), "the QA inbox holds no alerts to open");
+    const row = popover.locator("a[href]").first();
+    await expect(row).toBeVisible({ timeout: 15_000 });
 
-    const href = (await rows.first().getAttribute("href")) ?? "";
+    const href = (await row.getAttribute("href")) ?? "";
     expect(href).toMatch(/^\/(schedule|people|profile|settings|alerts)/);
-    await rows.first().click();
+    await row.click();
 
     // The destination drops its own deep-link parameters once applied.
     const path = href.split("?")[0];

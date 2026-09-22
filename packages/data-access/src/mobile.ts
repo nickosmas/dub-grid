@@ -543,16 +543,16 @@ export async function fetchMobileManagementMembershipRowsByUserIds(
     return [];
   }
 
-  const { data, error } = await serviceClient
-    .from("organization_memberships")
-    .select("user_id, department_ids, dept_admin_ids, org_role, updated_at")
-    .eq("org_id", orgId)
-    .in("user_id", uniqueUserIds)
-    .is("archived_at", null);
-
-  if (error) {
-    throw error;
-  }
+  const data = await fetchAllMobileRows<Record<string, unknown>>((from, to) =>
+    serviceClient
+      .from("organization_memberships")
+      .select("user_id, department_ids, dept_admin_ids, org_role, updated_at")
+      .eq("org_id", orgId)
+      .in("user_id", uniqueUserIds)
+      .is("archived_at", null)
+      .order("user_id", { ascending: true })
+      .range(from, to),
+  );
 
   return (
     (data ?? []) as Array<{
@@ -600,37 +600,40 @@ export async function fetchMobileManagementRosterRows(
   serviceClient: SupabaseClient,
   orgId: string,
 ): Promise<MobileManagementRosterRows> {
-  const [membershipResult, invitationResult] = await Promise.all([
-    serviceClient
-      .from("organization_memberships")
-      .select("user_id, org_role, department_ids, dept_admin_ids, updated_at, phone")
-      .eq("org_id", orgId)
-      .is("archived_at", null),
-    serviceClient
-      .from("invitations")
-      .select(INVITATION_COLS)
-      .eq("org_id", orgId)
-      .is("accepted_at", null)
-      .is("revoked_at", null),
-  ]);
-
-  if (membershipResult.error) throw membershipResult.error;
-  if (invitationResult.error) throw invitationResult.error;
-
-  const managementMemberships = (
-    (membershipResult.data ?? []) as Array<{
+  const [membershipRows, invitationRows] = await Promise.all([
+    fetchAllMobileRows<{
       user_id: string;
       org_role: string;
       department_ids: number[] | null;
       dept_admin_ids: number[] | null;
       updated_at: string | null;
       phone: string | null;
-    }>
-  ).filter((row) => (row.department_ids ?? []).length > 0);
+    }>((from, to) =>
+      serviceClient
+        .from("organization_memberships")
+        .select("user_id, org_role, department_ids, dept_admin_ids, updated_at, phone")
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .order("user_id", { ascending: true })
+        .range(from, to),
+    ),
+    fetchAllMobileRows<MobileInvitationRow>((from, to) =>
+      serviceClient
+        .from("invitations")
+        .select(INVITATION_COLS)
+        .eq("org_id", orgId)
+        .is("accepted_at", null)
+        .is("revoked_at", null)
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
+  ]);
 
-  const invitations = ((invitationResult.data ?? []) as MobileInvitationRow[]).filter(
+  const managementMemberships = membershipRows.filter(
     (row) => (row.department_ids ?? []).length > 0,
   );
+
+  const invitations = invitationRows.filter((row) => (row.department_ids ?? []).length > 0);
 
   const userIds = managementMemberships.map((row) => row.user_id);
   const [profiles, employeeResult, users] = await Promise.all([
@@ -935,7 +938,12 @@ export async function fetchProfileNameRowsByIds(
   return (data ?? []) as MobileProfileNameRow[];
 }
 
-async function fetchScheduleCellQueryRows(
+// Half PostgREST's 1,000-row cap: each cell carries its snapshots and
+// segments, so a page of these is a heavy response.
+const MOBILE_SCHEDULE_CELL_PAGE_SIZE = 500;
+
+/** Every cell in the range, paged so a large organization or a long range is never silently cut off. */
+export async function fetchScheduleCellQueryRows(
   serviceClient: SupabaseClient,
   input: {
     orgId: string;
@@ -943,6 +951,30 @@ async function fetchScheduleCellQueryRows(
     endDate: string;
     employeeId?: string;
   },
+  pageSize: number = MOBILE_SCHEDULE_CELL_PAGE_SIZE,
+): Promise<MobileScheduleCellQueryRow[]> {
+  const rows: MobileScheduleCellQueryRow[] = [];
+  let from = 0;
+  for (;;) {
+    const page = await fetchScheduleCellQueryPage(serviceClient, input, from, from + pageSize - 1);
+    rows.push(...page);
+    if (page.length < pageSize) break;
+    from += pageSize;
+  }
+  return rows;
+}
+
+// A fresh builder per page: Supabase builders are single-use once awaited.
+async function fetchScheduleCellQueryPage(
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    startDate: string;
+    endDate: string;
+    employeeId?: string;
+  },
+  from: number,
+  to: number,
 ): Promise<MobileScheduleCellQueryRow[]> {
   let query = serviceClient
     .from("schedule_cells")
@@ -984,14 +1016,18 @@ async function fetchScheduleCellQueryRows(
     )
     .eq("org_id", input.orgId)
     .gte("date", input.startDate)
-    .lte("date", input.endDate)
-    .order("date", { ascending: true });
+    .lte("date", input.endDate);
 
   if (input.employeeId) {
     query = query.eq("emp_id", input.employeeId);
   }
 
-  const { data, error } = await query;
+  const { data, error } = await query
+    // A total order, so consecutive pages never overlap or skip a row.
+    .order("date", { ascending: true })
+    .order("emp_id", { ascending: true })
+    .order("id", { ascending: true })
+    .range(from, to);
   if (error) throw error;
 
   return (data ?? []) as MobileScheduleCellQueryRow[];
@@ -1208,6 +1244,31 @@ export async function fetchMobileShiftRequestHistoryRows(
 }
 
 const MOBILE_PEOPLE_PAGE_SIZE = 500;
+
+/**
+ * Every row the query matches, not the first page.
+ *
+ * PostgREST answers at most `db.max_rows` rows for every role, the service
+ * role included, so a single await returns a short list for a large
+ * organization and says nothing about it. Each page builds a FRESH query,
+ * because a Supabase builder is single-use once awaited.
+ */
+async function fetchAllMobileRows<T>(
+  buildPage: (from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }>,
+  pageSize: number = MOBILE_PEOPLE_PAGE_SIZE,
+): Promise<T[]> {
+  const rows: T[] = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await buildPage(from, from + pageSize - 1);
+    if (error) throw error;
+    const page = (data ?? []) as T[];
+    rows.push(...page);
+    if (page.length < pageSize) break;
+    from += pageSize;
+  }
+  return rows;
+}
 
 export async function fetchMobilePeopleRows(
   serviceClient: SupabaseClient,
@@ -1960,6 +2021,7 @@ export async function fetchMobileNotificationFacets(userClient: SupabaseClient):
 }
 
 export type FetchMobileNotificationsInput = {
+  id?: string;
   limit: number;
   cursor?: MobileNotificationsCursor | null;
   category?: string;
@@ -1994,49 +2056,57 @@ export async function fetchMobileNotificationsPage(
     .order("id", { ascending })
     .limit(limit + 1);
 
-  const archived = input.archived ?? "inbox";
-  if (archived === "archived") {
-    query = query.not("archived_at", "is", null);
-  } else if (archived === "inbox") {
-    query = query.is("archived_at", null);
-  }
-
-  if (input.read === "unread") {
-    query = query.is("read_at", null);
-  } else if (input.read === "read") {
-    query = query.not("read_at", "is", null);
-  }
-
-  if (input.category) {
-    query = query.eq("category", input.category);
-  }
-
-  if (input.type) {
-    query = query.eq("type", input.type);
-  }
-
-  if (input.priority) {
-    query = query.eq("priority", input.priority);
-  }
-
-  if (input.search) {
-    const term = input.search.replace(/[%,]/g, " ").trim();
-    if (term) {
-      const pattern = `%${term}%`;
-      query = query.or(`title.ilike.${pattern},message.ilike.${pattern}`);
+  // A deep link names one alert, which may be archived, read, or older than
+  // any page the inbox has loaded. It is a lookup, not a filtered page, so
+  // the list filters and the cursor do not apply; row-level security still
+  // decides whether this viewer may see the row.
+  if (input.id) {
+    query = query.eq("id", input.id);
+  } else {
+    const archived = input.archived ?? "inbox";
+    if (archived === "archived") {
+      query = query.not("archived_at", "is", null);
+    } else if (archived === "inbox") {
+      query = query.is("archived_at", null);
     }
-  }
 
-  if (input.cursor) {
-    const cmp = ascending ? "gt" : "lt";
-    // Keyset on (created_at, id) tuple. Postgres row-value compare is exposed
-    // via PostgREST's `or` with explicit equality on the tiebreaker.
-    query = query.or(
-      [
-        `created_at.${cmp}.${input.cursor.createdAt}`,
-        `and(created_at.eq.${input.cursor.createdAt},id.${cmp}.${input.cursor.id})`,
-      ].join(","),
-    );
+    if (input.read === "unread") {
+      query = query.is("read_at", null);
+    } else if (input.read === "read") {
+      query = query.not("read_at", "is", null);
+    }
+
+    if (input.category) {
+      query = query.eq("category", input.category);
+    }
+
+    if (input.type) {
+      query = query.eq("type", input.type);
+    }
+
+    if (input.priority) {
+      query = query.eq("priority", input.priority);
+    }
+
+    if (input.search) {
+      const term = input.search.replace(/[%,]/g, " ").trim();
+      if (term) {
+        const pattern = `%${term}%`;
+        query = query.or(`title.ilike.${pattern},message.ilike.${pattern}`);
+      }
+    }
+
+    if (input.cursor) {
+      const cmp = ascending ? "gt" : "lt";
+      // Keyset on (created_at, id) tuple. Postgres row-value compare is exposed
+      // via PostgREST's `or` with explicit equality on the tiebreaker.
+      query = query.or(
+        [
+          `created_at.${cmp}.${input.cursor.createdAt}`,
+          `and(created_at.eq.${input.cursor.createdAt},id.${cmp}.${input.cursor.id})`,
+        ].join(","),
+      );
+    }
   }
 
   const [{ data: rows, error: notificationError }, { data: unreadCount, error: unreadError }] =

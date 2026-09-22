@@ -76,7 +76,8 @@ vi.mock("@/features/organization/client/api", () => ({
 // NotificationBell starts a realtime subscription once a user is present; stub
 // it so the sandbox sign-out tests (which set a user) don't hit realtime.
 vi.mock("@/components/NotificationBell", () => ({
-  default: () => null,
+  default: ({ hidden }: { hidden?: boolean }) =>
+    hidden ? null : <button type="button" aria-label="Alerts" />,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -446,6 +447,32 @@ describe("Header sign out in sandbox mode", () => {
     expect(vi.mocked(exitSandbox).mock.invocationCallOrder[0]).toBeLessThan(
       mockSignOut.mock.invocationCallOrder[0],
     );
+  });
+});
+
+describe("Header alerts bell", () => {
+  it("shows the bell on ordinary routes", () => {
+    mockPathname = "/schedule";
+    renderHeader(<Header />);
+    expect(screen.getByRole("button", { name: "Alerts" })).toBeInTheDocument();
+  });
+
+  it("drops the bell while the reader is on the alerts page", () => {
+    mockPathname = "/alerts";
+    renderHeader(<Header />);
+    expect(screen.queryByRole("button", { name: "Alerts" })).not.toBeInTheDocument();
+  });
+});
+
+describe("Header theme toggle", () => {
+  it("cycles the theme from the header instead of the account menu", async () => {
+    const user = userEvent.setup();
+    renderHeader(<Header />);
+    expect(screen.getByRole("button", { name: /^Theme:/ })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /account menu/i }));
+    expect(screen.queryByRole("button", { name: "Light" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "System" })).not.toBeInTheDocument();
   });
 });
 

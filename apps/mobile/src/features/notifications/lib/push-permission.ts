@@ -15,6 +15,39 @@ export const pushUnsupported =
 
 export type PushPermissionState = "unsupported" | "undetermined" | "denied" | "granted";
 
+export class MissingPushProjectIdError extends Error {
+  constructor() {
+    super(
+      "This build has no Expo project id, so it cannot register for push. " +
+        "Set expo.extra.eas.projectId in apps/mobile/app.json (or EAS_PROJECT_ID " +
+        "in the build profile) and rebuild.",
+    );
+    this.name = "MissingPushProjectIdError";
+  }
+}
+
+/**
+ * The project identity a release build mints its push token against.
+ *
+ * `getExpoPushTokenAsync()` resolves this itself in a development client and
+ * throws a generic library error in a standalone build that has none, which
+ * reads as a push bug rather than a missing setting. Resolving it here names
+ * the setting instead, and the value travels in the token request so both
+ * paths agree.
+ */
+export function resolveExpoProjectId(): string | null {
+  const config = Constants.expoConfig as
+    { extra?: { eas?: { projectId?: unknown } } } | null | undefined;
+  const fromConfig = config?.extra?.eas?.projectId;
+  if (typeof fromConfig === "string" && fromConfig.length > 0) return fromConfig;
+
+  const legacy = (Constants as unknown as { easConfig?: { projectId?: unknown } }).easConfig
+    ?.projectId;
+  if (typeof legacy === "string" && legacy.length > 0) return legacy;
+
+  return null;
+}
+
 export type NotificationPermissionSnapshot = {
   canAskAgain?: boolean;
   granted?: boolean;

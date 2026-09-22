@@ -46,10 +46,13 @@ describe("GET /api/gridmaster/audit-log/day-counts", () => {
       { created_at: "2026-09-04T16:00:00.000Z" },
       { created_at: "2026-09-01T16:00:00.000Z" },
     ]);
-    authorizeAuditLogRead.mockResolvedValue({
+    // The reader hands back the organization it authorized; the route never
+    // reads the query-string id again.
+    authorizeAuditLogRead.mockImplementation(async (_req: unknown, orgId?: string) => ({
       serviceClient: { from: vi.fn(() => query) },
       audience: "platform",
-    });
+      orgId,
+    }));
   });
 
   it("counts a period's days in the organization's zone", async () => {

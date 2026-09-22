@@ -9,7 +9,11 @@ import { PageShell, Card } from "@/components/auth/AuthCard";
 import { ApexLandingLink } from "@/components/auth/ApexLandingLink";
 import { OrganizationBadge } from "@/components/auth/OrganizationBadge";
 import { ShieldCheck } from "lucide-react";
-import { listBrowserMfaFactors, verifyBrowserTotpEnrollment } from "@/features/account/client";
+import {
+  listBrowserMfaFactors,
+  setBrowserSession,
+  verifyBrowserTotpEnrollment,
+} from "@/features/account/client";
 import { settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
 import { getWebAuthRecoveryMessage } from "@/lib/auth-recovery";
 import { isRetryableAuthRecoveryError } from "@dubgrid/client-errors";
@@ -81,13 +85,29 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
     setError(null);
 
     try {
-      const { error: verifyError } = await settleWithRequestTimeout(
+      const { data: verified, error: verifyError } = await settleWithRequestTimeout(
         verifyBrowserTotpEnrollment({
           factorId,
           code,
         }),
       );
       if (verifyError) throw verifyError;
+
+      // Write the verified session before handing control back. The challenge
+      // is answered against Supabase from the browser, so nothing has told
+      // this app about it yet: the cookie every Route Handler reads still
+      // carries the password-only token for a moment afterwards. The caller
+      // navigates immediately, the shell's first requests ride that stale
+      // cookie, and now that an enrolled account below aal2 is refused they
+      // come back 403 and the app sits on its loading screen. Awaiting the
+      // write makes the cookie authoritative first.
+      if (verified?.access_token && verified.refresh_token) {
+        await setBrowserSession({
+          access_token: verified.access_token,
+          refresh_token: verified.refresh_token,
+        });
+      }
+
       // Stay in the loading state through the caller's post-verification
       // work (org switch, navigation) so the button doesn't flash idle
       // before the page transitions.

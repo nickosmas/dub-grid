@@ -555,6 +555,55 @@ describe("POST /api/schedule/manage", () => {
     ]);
   });
 
+  it("hands a viewer only the published notes and hides a pending removal", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const empId = "22222222-2222-4222-8222-222222222222";
+    const note = (id: number, status: string) => ({
+      id,
+      org_id: orgId,
+      emp_id: empId,
+      date: "2026-08-02",
+      indicator_type_id: id,
+      focus_area_id: 2,
+      status,
+      created_by: "user-1",
+      created_at: "2026-08-01T00:00:00.000Z",
+      updated_at: "2026-08-01T00:00:00.000Z",
+    });
+    const rows = [note(1, "published"), note(2, "draft"), note(3, "draft_deleted")];
+
+    requireOrgPermissions.mockImplementation(async (_req, id) => ({
+      userClient: { rpc: userRpc },
+      serviceClient: { from: serviceFrom, rpc: serviceRpc },
+      actor: { id: "actor-user" },
+      orgId: id,
+      permissions: { canEditShifts: false, canEditNotes: false },
+    }));
+    serviceFrom.mockReturnValue(chainableQuery({ data: rows, error: null }));
+
+    const viewer = await (await POST(makeRequest({ action: "fetchScheduleNotes", orgId }))).json();
+    expect(viewer.notes.map((n: { id: number; status: string }) => [n.id, n.status])).toEqual([
+      [1, "published"],
+      [3, "published"],
+    ]);
+
+    requireOrgPermissions.mockImplementation(async (_req, id) => ({
+      userClient: { rpc: userRpc },
+      serviceClient: { from: serviceFrom, rpc: serviceRpc },
+      actor: { id: "actor-user" },
+      orgId: id,
+      permissions: { canEditShifts: false, canEditNotes: true },
+    }));
+    serviceFrom.mockReturnValue(chainableQuery({ data: rows, error: null }));
+
+    const editor = await (await POST(makeRequest({ action: "fetchScheduleNotes", orgId }))).json();
+    expect(editor.notes.map((n: { id: number; status: string }) => [n.id, n.status])).toEqual([
+      [1, "published"],
+      [2, "draft"],
+      [3, "draft_deleted"],
+    ]);
+  });
+
   describe("applyRecurringSchedules", () => {
     const orgId = "11111111-1111-4111-8111-111111111111";
     const empId = "22222222-2222-4222-8222-222222222222";

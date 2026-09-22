@@ -1,5 +1,5 @@
 import { computeShiftDurationHours } from "@/lib/dashboard-stats";
-import { FOCUS_AREA_COLS, JOB_COLS, SHIFT_CATEGORY_COLS } from "@/lib/db/shared";
+import { FOCUS_AREA_COLS, JOB_COLS, SHIFT_CATEGORY_COLS, fetchAllRows } from "@/lib/db/shared";
 import { rowToFocusArea, rowToJobDefinition, rowToShiftCategory } from "@/lib/db/mappers";
 import type {
   DbFocusArea,
@@ -229,36 +229,58 @@ async function fetchNormalizedPublishedShiftRows(
   client: SupabaseClient,
   args: PublishedScheduleLoaderArgs,
 ): Promise<PublishedScheduleRecord[]> {
-  let query = client
-    .from("schedule_cells")
-    .select(buildNormalizedPublishedShiftSelect(args.extraSelects))
-    .order("date", { ascending: args.orderAscending ?? true });
+  // A fresh builder per page: a Supabase builder is single-use once awaited,
+  // so ranging the same one twice re-resolves the first response.
+  const buildPage = (from: number, to: number) => {
+    const ascending = args.orderAscending ?? true;
+    let query = client
+      .from("schedule_cells")
+      .select(buildNormalizedPublishedShiftSelect(args.extraSelects))
+      .order("date", { ascending })
+      // Date alone is not a total order, so two pages of the same day could
+      // overlap and drop rows between them; these two settle every tie.
+      .order("emp_id", { ascending })
+      .order("id", { ascending });
 
-  if (args.orgId) {
-    query = query.eq("org_id", args.orgId);
-  }
-  if (args.employeeId) {
-    query = query.eq("emp_id", args.employeeId);
-  } else if ((args.employeeIds?.length ?? 0) > 0) {
-    query = query.in("emp_id", args.employeeIds ?? []);
-  }
-  if (args.startDate) {
-    query = query.gte("date", args.startDate);
-  }
-  if (args.endDate) {
-    query = query.lte("date", args.endDate);
-  }
-  if (args.endDateExclusive) {
-    query = query.lt("date", args.endDateExclusive);
-  }
-  if (args.limit != null) {
-    query = query.limit(args.limit);
-  }
+    if (args.orgId) {
+      query = query.eq("org_id", args.orgId);
+    }
+    if (args.employeeId) {
+      query = query.eq("emp_id", args.employeeId);
+    } else if ((args.employeeIds?.length ?? 0) > 0) {
+      query = query.in("emp_id", args.employeeIds ?? []);
+    }
+    if (args.startDate) {
+      query = query.gte("date", args.startDate);
+    }
+    if (args.endDate) {
+      query = query.lte("date", args.endDate);
+    }
+    if (args.endDateExclusive) {
+      query = query.lt("date", args.endDateExclusive);
+    }
 
-  const { data, error } = await query;
-  if (error) throw error;
+    return query.range(from, to) as PromiseLike<{
+      data: unknown[] | null;
+      error: { message: string } | null;
+    }>;
+  };
 
-  const rows = (data ?? []) as unknown as NormalizedPublishedScheduleRow[];
+  // PostgREST caps a response at `db.max_rows` for every role, the service
+  // role included, so awaiting one request returned the first thousand cells
+  // and nothing said so: the export, the report and the subscribed calendar
+  // were all quietly short for a large organization or a long range. A
+  // caller's own `limit` stays a real ceiling, read as a single page.
+  const rawRows =
+    args.limit != null
+      ? await buildPage(0, args.limit - 1).then(({ data, error }) => {
+          if (error) throw error;
+          return data ?? [];
+        })
+      : await fetchAllRows<unknown>(buildPage);
+
+  const rows = rawRows as unknown as NormalizedPublishedScheduleRow[];
+
   const orgIds = Array.from(new Set(rows.map((row) => row.org_id).filter(Boolean)));
 
   const segmentDetailsByOrg = new Map<string, Map<string, PublishedScheduleSegment>>();

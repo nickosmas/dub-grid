@@ -5,6 +5,7 @@ import {
   mobileUpdateShiftRequestBodySchema,
   mobileUpdateShiftRequestResponseSchema,
 } from "@dubgrid/contracts";
+import { settleShiftRequestAfterTransition } from "@dubgrid/data-access";
 import { updateMobileShiftRequest } from "@dubgrid/mobile-api-core";
 import { dispatchNotificationEvent } from "@/features/notifications/server";
 import { requireMobileAuth } from "@/features/mobile/server";
@@ -48,13 +49,15 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   }
 
   try {
-    await updateMobileShiftRequest(auth, id, parsed.data, {
+    const { autoApproved } = await updateMobileShiftRequest(auth, id, parsed.data, {
       dispatchNotificationEvent,
+      settleShiftRequestAfterTransition,
     });
 
     return NextResponse.json(
       mobileUpdateShiftRequestResponseSchema.parse({
         success: true,
+        autoApproved,
       }),
     );
   } catch (err) {

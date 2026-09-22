@@ -76,6 +76,7 @@ describe("POST /api/stripe/billing-portal", () => {
     });
     requireOrgPermissions.mockResolvedValue({
       actor: { id: "user-1" },
+      orgId: ORG_ID,
       permissions: { isGridmaster: false, isSuperAdmin: true },
       serviceClient: { from: serviceFrom },
       userClient: { from: vi.fn() },

@@ -1,61 +1,50 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// `pushUnsupported` is computed at module scope, and the shared expo-constants
-// shim reports Expo Go so every other suite short-circuits. Override it here to
-// exercise the real path.
-vi.mock("expo-constants", () => ({
-  ExecutionEnvironment: {
-    Bare: "bare",
-    Standalone: "standalone",
-    StoreClient: "storeClient",
+const mocks = vi.hoisted(() => ({
+  constants: { executionEnvironment: "standalone" } as {
+    expoConfig?: unknown;
+    easConfig?: unknown;
+    executionEnvironment: string;
   },
-  default: { executionEnvironment: "standalone" },
 }));
+const constants = mocks.constants;
 
-vi.mock("react-native", () => ({
-  Platform: { OS: "ios" },
+vi.mock("expo-constants", () => ({
+  ExecutionEnvironment: { Bare: "bare", Standalone: "standalone", StoreClient: "storeClient" },
+  default: mocks.constants,
 }));
-
-// A real device: the simulator counts as unsupported for push.
 vi.mock("expo-device", () => ({ isDevice: true }));
+vi.mock("react-native", () => ({ Platform: { OS: "ios" } }));
 
-const getPermissionsAsync = vi.fn();
-const requestPermissionsAsync = vi.fn();
+import { MissingPushProjectIdError, resolveExpoProjectId } from "./push-permission";
 
-vi.mock("expo-notifications", () => ({
-  getPermissionsAsync: (...a: unknown[]) => getPermissionsAsync(...a),
-  requestPermissionsAsync: (...a: unknown[]) => requestPermissionsAsync(...a),
-}));
-
-import {
-  getPushPermissionState,
-  requestPushPermission,
-  resolvePermissionState,
-} from "./push-permission";
-
-describe("push permission", () => {
+describe("resolveExpoProjectId", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    constants.expoConfig = undefined;
+    constants.easConfig = undefined;
   });
 
-  it("maps the OS answer onto the four states", () => {
-    expect(resolvePermissionState("unsupported")).toBe("unsupported");
-    expect(resolvePermissionState({ granted: true, canAskAgain: false })).toBe("granted");
-    expect(resolvePermissionState({ granted: false, canAskAgain: true })).toBe("undetermined");
-    expect(resolvePermissionState({ granted: false, canAskAgain: false })).toBe("denied");
+  it("reads the id a build profile writes into the config", () => {
+    constants.expoConfig = { extra: { eas: { projectId: "project-1" } } };
+    expect(resolveExpoProjectId()).toBe("project-1");
   });
 
-  it("reads the current answer without prompting", async () => {
-    getPermissionsAsync.mockResolvedValue({ granted: false, canAskAgain: true });
-
-    await expect(getPushPermissionState()).resolves.toBe("undetermined");
-    expect(requestPermissionsAsync).not.toHaveBeenCalled();
+  it("falls back to the legacy easConfig an older build carries", () => {
+    constants.easConfig = { projectId: "project-legacy" };
+    expect(resolveExpoProjectId()).toBe("project-legacy");
   });
 
-  it("prompts and reports the answer", async () => {
-    requestPermissionsAsync.mockResolvedValue({ granted: false, canAskAgain: false });
+  it("answers null rather than an empty id when the build has none", () => {
+    expect(resolveExpoProjectId()).toBeNull();
+    constants.expoConfig = { extra: { eas: { projectId: "" } } };
+    expect(resolveExpoProjectId()).toBeNull();
+    constants.expoConfig = { extra: {} };
+    expect(resolveExpoProjectId()).toBeNull();
+  });
 
-    await expect(requestPushPermission()).resolves.toBe("denied");
-    expect(requestPermissionsAsync).toHaveBeenCalledTimes(1);
+  it("names the setting to change in its error", () => {
+    const error = new MissingPushProjectIdError();
+    expect(error.message).toContain("expo.extra.eas.projectId");
+    expect(error.name).toBe("MissingPushProjectIdError");
   });
 });

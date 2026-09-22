@@ -1,4 +1,8 @@
-import { describeCancelAwaitingRecipientCaution, isAwaitingRecipient } from "@dubgrid/domain";
+import {
+  describeCancelAwaitingRecipientCaution,
+  describeShiftRequestSubmitted,
+  isAwaitingRecipient,
+} from "@dubgrid/domain";
 
 export type MobileRequestActionBody = {
   action: string;
@@ -50,26 +54,32 @@ export function getMobileRequestActionFeedback({
   requestId,
   body,
   request,
+  viewerCanApprove = false,
 }: {
   requestId: string;
   body: MobileRequestActionBody;
   request?: MobileRequestActionSubject;
+  /** An approver's own claim is approved on the spot, so the confirm says so. */
+  viewerCanApprove?: boolean;
 }): MobileRequestActionFeedback {
   const key = getMobileRequestActionKey(requestId, body);
+  const claimMessage = viewerCanApprove
+    ? "Claim this open shift? As an admin, it goes on the schedule right away."
+    : "Claim this open shift? We'll send it to your admin for approval.";
 
   switch (getActionVariant(body)) {
     case "volunteer_open_shift":
       return {
         confirmLabel: "Claim",
         key,
-        message: "Claim this open shift? We'll send it to your admin for approval.",
+        message: claimMessage,
         title: "Claim this shift?",
       };
     case "claim":
       return {
         confirmLabel: "Claim",
         key,
-        message: "Claim this open shift? We'll send it to your admin for approval.",
+        message: claimMessage,
         title: "Claim this shift?",
       };
     case "accept":
@@ -129,23 +139,15 @@ export function getMobileRequestActionFeedback({
 
 export function getMobileRequestActionSuccessToast(
   body: MobileRequestActionBody,
+  result?: { autoApproved?: boolean },
 ): MobileRequestActionSuccessToast {
+  const autoApproved = result?.autoApproved === true;
   switch (getActionVariant(body)) {
     case "volunteer_open_shift":
-      return {
-        title: "Claim request sent",
-        message: "Your shift is pending approval.",
-      };
     case "claim":
-      return {
-        title: "Claim request sent",
-        message: "Your shift is pending approval.",
-      };
+      return describeShiftRequestSubmitted({ action: "claimed" }, { autoApproved });
     case "accept":
-      return {
-        title: "Request accepted",
-        message: "Your response was sent.",
-      };
+      return describeShiftRequestSubmitted({ action: "accepted", type: "swap" }, { autoApproved });
     case "decline":
       return {
         title: "Request declined",

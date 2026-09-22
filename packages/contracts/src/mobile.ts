@@ -797,6 +797,9 @@ export const mobileCreateShiftRequestBodySchema = z
 
 export const mobileCreateShiftRequestResponseSchema = z.object({
   requestId: z.string().uuid(),
+  // Settled on the spot because an approver was party to it. Defaulted so
+  // an older server's response still parses as "pending".
+  autoApproved: z.boolean().default(false),
 });
 
 export const mobileUpdateShiftRequestBodySchema = z.discriminatedUnion("action", [
@@ -830,6 +833,7 @@ export const mobileUpdateShiftRequestBodySchema = z.discriminatedUnion("action",
 
 export const mobileUpdateShiftRequestResponseSchema = z.object({
   success: z.literal(true),
+  autoApproved: z.boolean().default(false),
 });
 
 export const mobilePersonSchema = z.object({
@@ -1157,6 +1161,8 @@ export const mobileNotificationsCursorSchema = z.object({
 });
 
 export const mobileNotificationsQuerySchema = z.object({
+  /** One alert by id, for a deep link whose target may sit far past the first page. */
+  id: z.string().uuid().optional(),
   limit: z.coerce.number().int().positive().max(100).optional(),
   cursorCreatedAt: z.string().optional(),
   cursorId: z.string().uuid().optional(),

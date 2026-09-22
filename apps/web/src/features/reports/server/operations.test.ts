@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   buildOperationsReportCsv,
   buildOperationsReportFilterOptions,
@@ -9,6 +10,7 @@ import {
   resolveCurrentPayPeriodRange,
   type OperationsReportType,
   type OperationsReportSourceData,
+  loadOperationsReportFilterOptions,
 } from "./operations";
 import { buildOperationsReportMetrics } from "@/features/reports/shared/table";
 import { resolvePublishedScheduleEntry } from "@/lib/published-shifts";
@@ -1540,5 +1542,68 @@ describe("buildOperationsReportFilterOptions", () => {
     expect(optionsOnly.employees.length).toBe(source.employees.length);
     expect(optionsOnly.jobs.length).toBe(source.jobs.length);
     expect(optionsOnly.dates).toHaveLength(7);
+  });
+});
+
+describe("report reads page past the API row cap", () => {
+  /**
+   * PostgREST answers at most `db.max_rows` rows (1,000 here) for every role,
+   * the service role included, so a report that asked once came back short
+   * for a large organization with no error. Each table answers a full page
+   * and then a short one.
+   */
+  function pagingServiceClient(pageSize: number) {
+    const ranges: Array<[number, number]> = [];
+    const rowsByTable: Record<string, Array<Record<string, unknown>>> = {
+      employees: Array.from({ length: pageSize + 3 }, (_, index) => ({
+        id: `emp-${index}`,
+        first_name: "Page",
+        last_name: `Row ${index}`,
+        status: "active",
+        seniority: index,
+        focus_area_ids: [],
+        role_ids: [],
+        department_ids: [],
+      })),
+      focus_areas: [{ id: 1, name: "Wing", department_id: null }],
+      shift_categories: [{ id: 1, label: "D", name: "Day", color: null }],
+      jobs: [{ id: 1, name: "Nurse" }],
+      indicator_types: [{ id: 1, name: "Note", color: null }],
+    };
+
+    const client = {
+      from(table: string) {
+        const chain: Record<string, unknown> = {};
+        for (const method of ["select", "eq", "is", "not", "order", "in", "or", "gte", "lte"]) {
+          chain[method] = vi.fn(() => chain);
+        }
+        chain.range = vi.fn(async (from: number, to: number) => {
+          ranges.push([from, to]);
+          const all = rowsByTable[table] ?? [];
+          return { data: all.slice(from, to + 1), error: null };
+        });
+        return chain;
+      },
+    } as unknown as SupabaseClient;
+
+    return { client, ranges };
+  }
+
+  it("keeps asking until a page comes back short", async () => {
+    // fetchAllRows' own page size, which is what the report now ranges by.
+    const pageSize = 500;
+    const { client, ranges } = pagingServiceClient(pageSize);
+
+    const { filterOptions } = await loadOperationsReportFilterOptions(client, {
+      orgId: "11111111-1111-4111-8111-111111111111",
+      range: { startDate: "2026-09-01", endDate: "2026-09-07" },
+    });
+
+    // The employee list is longer than one page, so every row survived.
+    expect(filterOptions.employees).toHaveLength(pageSize + 3);
+    const employeeRanges = ranges.filter(([from]) => from === 0 || from === pageSize);
+    expect(employeeRanges.length).toBeGreaterThanOrEqual(2);
+    expect(ranges).toContainEqual([0, pageSize - 1]);
+    expect(ranges).toContainEqual([pageSize, pageSize * 2 - 1]);
   });
 });

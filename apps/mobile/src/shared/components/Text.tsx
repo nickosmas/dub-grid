@@ -20,10 +20,11 @@ import { MAX_FONT_SCALE, MAX_FONT_SCALE_COMPACT, MAX_TEXT_SIZE } from "../theme/
  *   further: button, pill, chip, badge, segment and tab labels, which the
  *   reader acts on and so should answer the setting a little.
  *
- * Shrinking to fit was tried instead and rejected: React Native's new
- * architecture parses `minimumFontScale` but never applies it, and fits
- * against the container's height as well as its width, so a button label at
- * a raised text size shrank to a fraction of its base size.
+ * Native shrink-to-fit is not used here: React Native's new architecture
+ * parses `minimumFontScale` but never applies it, and fits against the
+ * container's height as well as its width, so a button label at a raised
+ * text size shrank to a fraction of its base size. A label that must fit its
+ * width goes through `FitText`, which measures and scales the font itself.
  */
 export type TextFit = "fixed" | "compact";
 
@@ -75,6 +76,10 @@ function readStyleNumber(style: unknown, key: "fontSize" | "lineHeight"): number
 
 export function readFontSize(style: unknown): number | undefined {
   return readStyleNumber(style, "fontSize");
+}
+
+export function readLineHeight(style: unknown): number | undefined {
+  return readStyleNumber(style, "lineHeight");
 }
 
 /**

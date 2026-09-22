@@ -67,7 +67,9 @@ export default function ProfileSecurityScreen() {
     enabled: Boolean(accessToken),
   });
   const bootstrapQuery = useBootstrap(accessToken);
-  const canEditProfileDirectly = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
+  // Deletion is a super admin's decision, and a super admin deletes from the
+  // web profile; every other member, people managers included, requests it.
+  const isSuperAdmin = Boolean(bootstrapQuery.data?.permissions.canManageManagementAccess);
   const deletionRequestMutation = useMutation({
     mutationFn: () =>
       createProfileChangeRequest(accessToken!, {
@@ -207,7 +209,7 @@ export default function ProfileSecurityScreen() {
             </ProfileSection>
           ) : null}
 
-          {!canEditProfileDirectly ? (
+          {!isSuperAdmin ? (
             <ProfileSection>
               <Button
                 disabled={

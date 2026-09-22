@@ -60,14 +60,9 @@ beforeAll(async () => {
 });
 
 describe("UpcomingShiftPreview", () => {
-  it("shows today's schedule header with the sample shift on duty", () => {
+  it("shows the sample shift on duty today", () => {
     render(<UpcomingShiftPreview />);
 
-    const today = getPreviewToday();
-    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    expect(
-      screen.getByText(formatScheduleDayLabel(today, new Date(), timeZone)),
-    ).toBeInTheDocument();
     expect(screen.getByText("On Duty")).toBeInTheDocument();
     expect(screen.getByText("Day Shift")).toBeInTheDocument();
     expect(screen.getByText("Sheltered Care")).toBeInTheDocument();
@@ -80,6 +75,19 @@ describe("UpcomingShiftPreview", () => {
     render(<UpcomingShiftPreview />);
 
     expect(screen.getByText("5h 49m left")).toBeInTheDocument();
+  });
+
+  // The card itself, not the page around it: no simulated status bar,
+  // bezel or island, and none of Home's header (the date and week range).
+  it("draws neither device chrome nor the page header", () => {
+    render(<UpcomingShiftPreview />);
+
+    const today = getPreviewToday();
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    expect(screen.queryByText("9:41")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(formatScheduleDayLabel(today, new Date(), timeZone)),
+    ).not.toBeInTheDocument();
   });
 
   it("stacks three shiftmates and counts the rest", () => {
@@ -97,12 +105,19 @@ describe("CoverShiftsPreview", () => {
   it("shows the Available list with an open shift to claim", () => {
     render(<CoverShiftsPreview />);
 
-    expect(screen.getByText("Requests")).toBeInTheDocument();
-    expect(screen.getByText("Available")).toBeInTheDocument();
     expect(screen.getByText("Open shift")).toBeInTheDocument();
     expect(screen.getByText("Day Shift")).toBeInTheDocument();
     expect(screen.getByText("Skilled Nursing")).toBeInTheDocument();
     expect(screen.getByText("1 teammate needed")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Claim" })).toBeInTheDocument();
+    // The stage is decorative and hidden from assistive tech, so the role
+    // query has to look past `aria-hidden`.
+    expect(screen.getByRole("button", { name: "Claim", hidden: true })).toBeInTheDocument();
+  });
+
+  it("leaves the page title and tab strip behind", () => {
+    render(<CoverShiftsPreview />);
+
+    expect(screen.queryByText("Requests")).not.toBeInTheDocument();
+    expect(screen.queryByText("Available")).not.toBeInTheDocument();
   });
 });

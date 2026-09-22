@@ -10,6 +10,7 @@ const organizationEq = vi.fn();
 const organizationUpdate = vi.fn();
 const auditInsert = vi.fn();
 const dedupInsert = vi.fn();
+const dedupRelease = vi.fn();
 
 vi.mock("@/lib/stripe", async () => ({
   ...(await vi.importActual<typeof import("@/lib/stripe")>("@/lib/stripe")),
@@ -68,9 +69,10 @@ describe("POST /api/stripe/webhook", () => {
     auditInsert.mockResolvedValue({ error: null });
     // First-time event by default (no prior row) — the replay-dedup insert succeeds.
     dedupInsert.mockResolvedValue({ error: null });
+    dedupRelease.mockResolvedValue({ error: null });
     serviceFrom.mockImplementation((table: string) => {
       if (table === "stripe_processed_events") {
-        return { insert: dedupInsert };
+        return { insert: dedupInsert, delete: vi.fn(() => ({ eq: dedupRelease })) };
       }
       if (table === "subscriptions") {
         return {
@@ -433,6 +435,59 @@ describe("POST /api/stripe/webhook", () => {
     });
     expect(organizationUpdate).not.toHaveBeenCalled();
     expect(auditInsert).not.toHaveBeenCalled();
+    // The claim is released so Stripe's redelivery is not read as a duplicate.
+    expect(dedupRelease).toHaveBeenCalledWith("event_id", "evt_123");
+  });
+
+  it("applies the update on redelivery after a failed first attempt", async () => {
+    const subscriptionEvent = {
+      id: "evt_retry",
+      type: "customer.subscription.updated",
+      data: {
+        object: {
+          id: "sub_123",
+          customer: "cus_123",
+          status: "active",
+          metadata: { org_id: "11111111-1111-4111-8111-111111111111" },
+          items: {
+            data: [
+              {
+                price: { id: "price_123" },
+                quantity: 9,
+                current_period_start: 1_778_284_800,
+                current_period_end: 1_780_876_800,
+              },
+            ],
+          },
+          cancel_at: null,
+          canceled_at: null,
+          trial_end: null,
+        },
+      },
+    };
+    constructEvent.mockReturnValue(subscriptionEvent);
+    // A real ledger: the second insert is a duplicate only if the first
+    // claim was never released.
+    const ledger = new Set<string>();
+    dedupInsert.mockImplementation(async ({ event_id }: { event_id: string }) => {
+      if (ledger.has(event_id)) return { error: { code: "23505" } };
+      ledger.add(event_id);
+      return { error: null };
+    });
+    dedupRelease.mockImplementation(async (_column: string, eventId: string) => {
+      ledger.delete(eventId);
+      return { error: null };
+    });
+    subscriptionUpsert.mockResolvedValueOnce({ error: new Error("database unavailable") });
+
+    const first = await POST(makeRequest());
+    expect(first.status).toBe(500);
+    expect(organizationUpdate).not.toHaveBeenCalled();
+
+    const second = await POST(makeRequest());
+    expect(second.status).toBe(200);
+    await expect(second.json()).resolves.toEqual({ received: true });
+    expect(organizationUpdate).toHaveBeenCalledTimes(1);
   });
 
   it("skips reprocessing a redelivered event (replay idempotency, M-4)", async () => {

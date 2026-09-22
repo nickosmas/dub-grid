@@ -1,9 +1,13 @@
-import { getAvatarTypography } from "@dubgrid/design-tokens";
+"use client";
+
+import { getAvatarTone, getAvatarTypography, resolveAvatarSeed } from "@dubgrid/design-tokens";
 import Link from "next/link";
+import { useTheme } from "next-themes";
 import type { EmployeeHours } from "@/lib/dashboard-stats";
-import { getAvatarInitials } from "@/lib/utils";
+import { getEmployeeDisplayName, getInitials } from "@/lib/utils";
 import type { Employee, FocusArea } from "@/types";
 import ExpandButton from "./ExpandButton";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { EmptyState } from "@/components/EmptyState";
 
 interface StaffHoursCardProps {
@@ -33,6 +37,8 @@ export default function StaffHoursCard({
   emptyMessage = "No shifts scheduled",
   onExpand,
 }: StaffHoursCardProps) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
   const empMap = new Map(employees.map((e) => [e.id, e]));
   const faMap = new Map(focusAreas.map((fa) => [fa.id, fa]));
 
@@ -67,7 +73,8 @@ export default function StaffHoursCard({
             if (!emp) return null;
             const faId = emp.focusAreaIds[0];
             const fa = faId != null ? faMap.get(faId) : undefined;
-            const initials = getAvatarInitials(`${emp.firstName} ${emp.lastName}`);
+            const avatarTone = getAvatarTone(resolveAvatarSeed(emp), isDark);
+            const initials = getInitials(getEmployeeDisplayName(emp));
 
             const row = (
               <div
@@ -80,27 +87,18 @@ export default function StaffHoursCard({
                   margin: "0 16px",
                 }}
               >
-                {/* Avatar */}
-                <div
-                  style={{
-                    ...getAvatarTypography(30),
-                    width: 30,
-                    height: 30,
-                    borderRadius: 7,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                    background: h.isOvertime
-                      ? "var(--dg-color-danger-bg)"
-                      : "var(--dg-color-bg-secondary)",
-                    color: h.isOvertime
-                      ? "var(--dg-color-danger)"
-                      : "var(--dg-color-text-secondary)",
-                  }}
-                >
-                  {initials}
-                </div>
+                <Avatar>
+                  <AvatarFallback
+                    style={{
+                      ...getAvatarTypography(32),
+                      background: avatarTone.backgroundColor,
+                      color: avatarTone.textColor,
+                      border: `1px solid ${avatarTone.borderColor}`,
+                    }}
+                  >
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
 
                 {/* Info */}
                 <div style={{ flex: 1, minWidth: 0 }}>

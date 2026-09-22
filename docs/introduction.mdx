@@ -1,0 +1,51 @@
+---
+title: "Introduction"
+description: "DubGrid is a multi-tenant employee scheduling platform built for care facilities."
+---
+
+DubGrid replaces spreadsheet-based scheduling with a modern web application designed for care facilities. Schedulers and admins manage staff rosters, build and publish shift schedules, and collaborate in real time, all from one place.
+
+## What DubGrid does
+
+Each organization is fully isolated, with its own staff roster, shift codes, focus areas (wings or departments), and schedule. You reach your organization at a unique subdomain, for example, `acme.dubgrid.com`.
+
+## Product pillars
+
+**Schedule grid** - A 1-week, 2-week, or month view of your schedule. Staff are listed by row, dates by column. Click any cell to assign a shift code; drag and drop to move shifts. Auto-calculated count rows appear at the bottom of each section.
+
+**Role-based access control (RBAC)** - Four roles control what each person can do: Super Admin, Admin, and User within your organization, plus a platform-level Gridmaster role. Admins receive a configurable set of granular permissions set by the Super Admin.
+
+**Real-time collaboration** - Changes sync across all open tabs and users instantly. Cell locks show when someone else is editing a cell, and presence indicators show who else is viewing the schedule.
+
+**Draft/publish workflow** - Every edit is a draft until a Super Admin or permitted Admin publishes it. A banner shows the count of pending changes. Drafts are saved across browser sessions so nothing is lost.
+
+## How organizations are structured
+
+Each organization on DubGrid has:
+
+- A **subdomain** (e.g., `acme.dubgrid.com`) that routes all users to the correct organization
+- A configurable **staff roster** with employee records, certifications, roles, and focus area assignments
+- Custom **focus areas** (wings, departments, or sections) that organize the schedule grid
+- Custom **shift codes** with colors, time defaults, and certification requirements
+- A **Super Admin** who owns the organization and manages users and settings
+
+## Invite-only access
+
+DubGrid does not have public registration. Every account is created through an invitation sent by a Super Admin or Admin with the appropriate permission. Invitation links expire after **72 hours**.
+
+## Explore
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Set up your organization for the first time as a Super Admin.
+  </Card>
+  <Card title="Schedule Grid" icon="calendar" href="/features/schedule-grid">
+    Learn how to build and publish a schedule.
+  </Card>
+  <Card title="Staff Roster" icon="users" href="/staff/roster">
+    Add employees, assign roles, and manage your roster.
+  </Card>
+  <Card title="Roles & Permissions" icon="shield" href="/reference/roles">
+    Understand the four-tier role hierarchy and admin permissions.
+  </Card>
+</CardGroup>

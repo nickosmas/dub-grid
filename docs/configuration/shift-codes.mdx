@@ -1,0 +1,91 @@
+---
+title: "Shift Codes"
+description: "View and customize the shift codes used on the schedule grid, including colors, default times, certifications, and category assignments."
+---
+
+Shift codes are the single-character or short-text labels that fill each cell on the schedule grid, `D` for a day shift, `X` for a day off, `V` for PTO, and so on. You can customize the appearance and behavior of every shift code, or add your own. Find these settings at **Settings → Shift Codes**.
+
+Requires the `canManageShiftCodes` permission.
+
+---
+
+## Default shift codes
+
+DubGrid includes the following shift codes out of the box. All of them can be customized.
+
+| Code                  | Name                   | Description                                                                 |
+| --------------------- | ---------------------- | --------------------------------------------------------------------------- |
+| `D`                   | Day Shift              | Standard daytime shift                                                      |
+| `E`                   | Evening Shift          | Standard evening shift                                                      |
+| `N`                   | Night Shift            | Overnight shift                                                             |
+| `X`                   | Day Off                | Scheduled off day                                                           |
+| `Ds` / `Es` / `Ns`    | Supervisor Shift       | Supervisor on duty for the respective shift period                          |
+| `Dcn` / `Ecn`         | Charge Nurse           | Charge nurse role for Day or Evening shift                                  |
+| `SCD`                 | Sheltered Care Day     | Day shift assignment to Sheltered Care wing                                 |
+| `SCE`                 | Sheltered Care Evening | Evening shift assignment to Sheltered Care wing                             |
+| `VN`                  | Visiting CS Nurse      | Visiting CS Nurse covering the Visiting CSNS section                        |
+| `V`                   | PTO                    | Paid Time Off                                                               |
+| `Ofc`                 | Office                 | Administrative or office duty (non-floor)                                   |
+| `T`                   | Travel                 | Staff member is traveling                                                   |
+| `A`                   | CS Association (PTO)   | CS Association meeting day (counts as PTO)                                  |
+| `(D)` / `(E)` / `(N)` | Orientation / Shadow   | New staff in orientation, shadowing, or mentoring mode                      |
+| `0.3`                 | Part-Time Fraction     | Denotes part-time staffing weight (e.g., 0.3 FTE)                           |
+| `E/Ns`                | Split / Transition     | Shift spanning two shift types (e.g., Evening moving into Night Supervisor) |
+
+---
+
+## Customizing a shift code
+
+Click any shift code in **Settings → Shift Codes** to open its editor. The following fields are available:
+
+| Field                       | Description                                                                                                                |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| **Label**                   | The short code displayed in the schedule grid cell (e.g., `D`, `Ds`, `SCD`)                                                |
+| **Name**                    | The human-readable name shown in the shift picker and legend (e.g., "Day Shift")                                           |
+| **Background color**        | Cell fill color                                                                                                            |
+| **Text color**              | Color of the label text inside the cell                                                                                    |
+| **Border color**            | Color of the cell border                                                                                                   |
+| **Default start time**      | Pre-filled start time when this code is selected for a shift entry                                                         |
+| **Default end time**        | Pre-filled end time when this code is selected                                                                             |
+| **Required certifications** | One or more certifications an employee must hold to be assigned this shift code                                            |
+| **Off-day designation**     | When enabled, this code counts as a day off for staffing tally purposes                                                    |
+| **Shift category**          | Assigns the code to a tally bucket; its count appears in the category's count row at the bottom of each focus area section |
+| **Focus area scope**        | Limits the code to a specific focus area, hiding it from the shift picker in other sections                                |
+
+<Note>
+  If you change a shift code's **Label**, all existing shift entries using that code are preserved,
+  they automatically reflect the new label without any data loss.
+</Note>
+
+---
+
+## Adding a custom shift code
+
+If your facility uses a code not in the default set, you can create one from scratch.
+
+<Steps>
+  <Step title="Open Shift Codes settings">
+    Go to **Settings → Shift Codes** and click **Add Shift Code**.
+  </Step>
+  <Step title="Enter the label and name">
+    The **Label** is what appears in the cell (keep it short, one to four characters). The **Name**
+    is what shows in the shift picker and printed legend.
+  </Step>
+  <Step title="Set colors">
+    Choose a **Background color**, **Text color**, and optionally a **Border color** so the code is
+    visually distinct on the grid.
+  </Step>
+  <Step title="Configure optional fields">
+    Set default start and end times, required certifications, off-day designation, shift category,
+    and focus area scope as needed.
+  </Step>
+  <Step title="Save">
+    Click **Save**. The new code immediately appears in the shift picker for all users.
+  </Step>
+</Steps>
+
+<Tip>
+  Assign your shift codes to shift categories so they appear in the count rows at the bottom of each
+  schedule section. See [Organization Settings](/configuration/organization#shift-categories) for
+  how to set up categories.
+</Tip>

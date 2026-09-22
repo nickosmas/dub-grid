@@ -427,6 +427,10 @@ describe("RequestsScreen", () => {
     expect(pageText.indexOf("7:00 AM - 3:00 PM")).toBeLessThan(pageText.indexOf("Skilled Nursing"));
     fireEvent.click(screen.getByText("Claim"));
     expect(screen.getByText("Claim this shift?")).toBeInTheDocument();
+    // This viewer can approve, so the claim lands on the schedule at once.
+    expect(
+      screen.getByText("Claim this open shift? As an admin, it goes on the schedule right away."),
+    ).toBeInTheDocument();
     expect(mutate).not.toHaveBeenCalled();
     fireEvent.click(
       within(screen.getByRole("alert")).getByRole("button", {

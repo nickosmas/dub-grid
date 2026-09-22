@@ -17,8 +17,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Client } from "pg";
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { authenticatedSecurityDefinerAllowlist } from "./helpers/sql-inventory";
 
 const SUPABASE_URL = process.env.LOCAL_SUPABASE_URL ?? "http://127.0.0.1:54321";
 const ANON_KEY =
@@ -34,22 +33,6 @@ const DB_CONFIG = {
   connectionString: DB_URL,
   ssl: DB_URL.includes("supabase.co") ? { rejectUnauthorized: false } : false,
 } as const;
-
-function authenticatedSecurityDefinerAllowlist(): string[] {
-  const rootMigration = resolve(
-    process.cwd(),
-    "supabase/migrations/016_harden_authorization_boundaries.sql",
-  );
-  const migrationPath = existsSync(rootMigration)
-    ? rootMigration
-    : resolve(process.cwd(), "../../supabase/migrations/016_harden_authorization_boundaries.sql");
-  const migration = readFileSync(migrationPath, "utf8");
-  const block = migration.match(
-    /authenticated_entry_points CONSTANT TEXT\[\] := ARRAY\[([\s\S]*?)\n\s*\];/,
-  )?.[1];
-  if (!block) throw new Error("Missing authenticated SQL entry-point inventory");
-  return [...block.matchAll(/'([a-z0-9_]+)'/g)].map((match) => match[1]).sort();
-}
 
 async function probeSupabase(): Promise<boolean> {
   try {

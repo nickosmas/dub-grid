@@ -283,6 +283,7 @@ function makeProps(overrides: Partial<DashboardContentProps> = {}): DashboardCon
     assignmentNameMap: new Map([[assignment.id, assignment.name]]),
     assignments: [assignment],
     coverageRequirements: [],
+    hasCoverageRequirements: false,
     currentEmpId: employee.id,
     currentEmployee: employee,
     currentHours: [

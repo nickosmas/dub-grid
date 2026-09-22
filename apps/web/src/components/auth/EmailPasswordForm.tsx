@@ -31,7 +31,7 @@ export function EmailPasswordForm({
 }) {
   const [showPassword, setShowPassword] = useState(false);
   return (
-    <Form onSubmit={onSubmit} className="dg-auth-form">
+    <Form onSubmit={onSubmit} className="dg-auth-form dg-auth-form--narrow">
       <div>
         <label htmlFor="auth-email" className="dg-auth-field-label">
           Email

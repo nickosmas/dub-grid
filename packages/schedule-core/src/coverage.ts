@@ -178,6 +178,22 @@ export function resolveRequirementByJobShift(
   );
 }
 
+/**
+ * Coverage counts as configured only when at least one requirement asks for
+ * staff and resolves to an active assignment. Rows left behind by an archived
+ * or renamed assignment must read as "not configured", not as 100% covered.
+ */
+export function hasEffectiveCoverageRequirements(
+  requirements: CoverageRequirementLike[],
+  assignments: CoverageAssignmentDefinitionLike[],
+): boolean {
+  return requirements.some(
+    (requirement) =>
+      requirement.minStaff > 0 &&
+      findCoverageAssignmentDefinition(assignments, requirement) != null,
+  );
+}
+
 function findCoverageAssignmentDefinition(
   assignments: CoverageAssignmentDefinitionLike[],
   requirement: CoverageRequirementLike,

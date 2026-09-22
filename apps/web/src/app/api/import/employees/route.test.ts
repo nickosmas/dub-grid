@@ -29,6 +29,7 @@ vi.mock("@/lib/logger", () => ({ default: { error: vi.fn() } }));
 import { POST } from "./route";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
+const SANDBOX_ORG_ID = "99999999-9999-4999-8999-999999999999";
 
 function request(rows: unknown[]) {
   return new NextRequest("http://localhost/api/import/employees", {
@@ -46,8 +47,12 @@ function createServiceClient() {
     organization_roles: [],
   };
 
+  const fromTables: Record<string, { eq: ReturnType<typeof vi.fn> }> = {};
+
   return {
     employeeInserts,
+    auditInsert,
+    fromTables,
     serviceClient: {
       from(table: string) {
         if (table === "employees") {
@@ -77,6 +82,7 @@ function createServiceClient() {
             );
           },
         };
+        fromTables[table] = query;
         return query;
       },
     },
@@ -96,7 +102,7 @@ describe("POST /api/import/employees", () => {
 
   it("rejects an invalid focus area row and imports the remaining valid rows", async () => {
     const { serviceClient, employeeInserts } = createServiceClient();
-    requireOrgPermissions.mockResolvedValue({ serviceClient });
+    requireOrgPermissions.mockResolvedValue({ serviceClient, orgId: ORG_ID });
 
     const response = await POST(
       request([
@@ -116,5 +122,31 @@ describe("POST /api/import/employees", () => {
     expect(employeeInserts).toHaveBeenCalledWith([
       expect.objectContaining({ first_name: "Emily", last_name: "Carter", focus_area_ids: [1] }),
     ]);
+  });
+
+  it("imports into the effective organization when the caller is inside a sandbox", async () => {
+    const { serviceClient, employeeInserts, auditInsert, fromTables } = createServiceClient();
+    // Authorization redirected the caller to their sandbox: only that id was checked.
+    requireOrgPermissions.mockResolvedValue({ serviceClient, orgId: SANDBOX_ORG_ID });
+
+    const response = await POST(
+      request([{ firstName: "Emily", lastName: "Carter", focusAreaNames: "Skilled Nursing" }]),
+    );
+
+    expect(response.status).toBe(200);
+    expect(requireOrgPermissions).toHaveBeenCalledWith(
+      expect.anything(),
+      ORG_ID,
+      expect.any(Function),
+      expect.anything(),
+    );
+    expect(employeeInserts).toHaveBeenCalledWith([
+      expect.objectContaining({ org_id: SANDBOX_ORG_ID }),
+    ]);
+    expect(auditInsert).toHaveBeenCalledWith(expect.objectContaining({ org_id: SANDBOX_ORG_ID }));
+    for (const table of ["focus_areas", "certifications", "organization_roles"]) {
+      expect(fromTables[table].eq).toHaveBeenCalledWith("org_id", SANDBOX_ORG_ID);
+      expect(fromTables[table].eq).not.toHaveBeenCalledWith("org_id", ORG_ID);
+    }
   });
 });

@@ -10,7 +10,9 @@ function resolveRepoRoot(): string {
 const sourceRoot = resolve(resolveRepoRoot(), "apps/web/src");
 const publicRoot = resolve(resolveRepoRoot(), "apps/web/public");
 const rootLayout = readFileSync(resolve(sourceRoot, "app/layout.tsx"), "utf-8");
-const globalsCss = readFileSync(resolve(sourceRoot, "app/globals.css"), "utf-8");
+const globalsCss =
+  readFileSync(resolve(sourceRoot, "app/globals.css"), "utf-8") +
+  readFileSync(resolve(sourceRoot, "app/app-ui.css"), "utf-8");
 const lightThemeCss = globalsCss.slice(0, globalsCss.indexOf(".dark {"));
 const globalError = readFileSync(resolve(sourceRoot, "app/global-error.tsx"), "utf-8");
 const appShell = readFileSync(resolve(sourceRoot, "components/AppShell.tsx"), "utf-8");
@@ -142,6 +144,7 @@ describe("theme architecture", () => {
       const relativePath = file.slice(sourceRoot.length + 1);
       if (
         relativePath === "app/globals.css" ||
+        relativePath === "app/app-ui.css" ||
         documentedNeutralOutputExceptions.has(relativePath)
       ) {
         return [];

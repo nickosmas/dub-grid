@@ -139,6 +139,32 @@ describe("NotificationDetailScreen", () => {
     expect(openNotificationAction).not.toHaveBeenCalled();
   });
 
+  // A deep link can name an alert far older than anything the inbox has
+  // loaded; this used to search the first page and silently find nothing.
+  it("asks the API for the one alert the link names", async () => {
+    useLocalSearchParams.mockReturnValue({ id: NOTIFICATION_ID });
+    useQueryClient.mockReturnValue(mockQueryClient());
+    getNotifications.mockResolvedValue({
+      notifications: [{ id: NOTIFICATION_ID, title: "Old alert" }],
+      unreadCount: 0,
+      nextCursor: null,
+    });
+
+    render(<NotificationDetailScreen />);
+
+    const options = useQuery.mock.calls.at(-1)?.[0] as {
+      enabled: boolean;
+      queryFn: (context: { signal?: AbortSignal }) => Promise<unknown>;
+    };
+    expect(options.enabled).toBe(true);
+    await expect(options.queryFn({})).resolves.toMatchObject({ id: NOTIFICATION_ID });
+    expect(getNotifications).toHaveBeenCalledWith(
+      "token-123",
+      expect.objectContaining({ id: NOTIFICATION_ID, archived: "any" }),
+      undefined,
+    );
+  });
+
   it("shows an empty state when the notification isn't cached or fetched", () => {
     useLocalSearchParams.mockReturnValue({ id: NOTIFICATION_ID });
     useQueryClient.mockReturnValue(mockQueryClient());

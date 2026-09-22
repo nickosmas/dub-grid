@@ -15,7 +15,8 @@ supabase/
     002_functions_triggers.sql    # Functions, triggers, RPCs, JWT hook implementation
     003_rls_policies.sql          # RLS ENABLE + all row-level security policies
     004_grants.sql                # Grants + default privileges + supabase_auth_admin grants
-    005_*.sql ... 027_*.sql       # Ordered, idempotent forward migrations
+    005_*.sql ... 040_*.sql       # Ordered, idempotent forward migrations
+                                  # (030 holds the canonical resolve_shift_request text)
     checksums.sha256              # Locks every reviewed migration (db:migrations:check)
   patches/                        # Historical one-time production patches (evidence only, never replayed)
   seed_arden_wood.sql             # Local seed: Arden Wood org
@@ -69,7 +70,7 @@ from the sequence rather than from any one file being complete.
 `npm run db:migrations:inspect` (remote) and `npm run db:migrations:inspect:local`
 are read-only: they compare the ledger with the local sequence and check schema,
 RLS, grant, hook, historical-patch, and scheduler-calloff invariants. The release
-runbook is `docs/operations/production-migration-safety.md`.
+runbook is `internal/operations/production-migration-safety.md`.
 
 This holds because migrations are applied by ledger now, through Supabase
 branching or `supabase db push`, rather than by dropping and replaying the

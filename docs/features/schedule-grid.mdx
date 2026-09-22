@@ -1,0 +1,85 @@
+---
+title: "Schedule Grid"
+description: "The main scheduling interface, staff rows crossed with date columns, giving you a complete view of your organization's schedule."
+---
+
+The schedule grid is where you will spend most of your time in DubGrid. Each row represents a staff member, and each column represents a date. Cells show the shift code assigned to that employee on that day.
+
+## View modes
+
+The grid supports three view modes. Use the view toggle in the toolbar to switch between them.
+
+| Mode      | Description                                                             |
+| --------- | ----------------------------------------------------------------------- |
+| **1W**    | One-week view, seven columns, Sunday through Saturday                   |
+| **2W**    | Two-week view (default), fourteen columns across two consecutive weeks  |
+| **Month** | Calendar month view, shows the full calendar grid for the current month |
+
+## Navigating dates
+
+Use the date navigator buttons in the toolbar to move through time:
+
+- **Back** - moves backward by one full view span (one week, two weeks, or one month)
+- **Today** - jumps directly to the period containing today's date
+- **Forward** - moves forward by one full view span
+
+Today's date column is always highlighted so you can orient yourself at a glance.
+
+## Editing a shift
+
+<Steps>
+  <Step title="Click a cell">
+    Click any cell in the grid to open the **Shift Edit Panel** on the right side of the screen. The
+    panel shows the employee name and date for context.
+  </Step>
+  <Step title="Select a shift code">
+    Choose a shift code from the list of your organization's configured codes. You can also select
+    multiple codes for split or multi-part shifts. To clear a shift, select **OFF** or remove all
+    codes.
+  </Step>
+  <Step title="Set custom times (optional)">
+    Adjust the start and end times for the shift if the defaults don't apply. Custom times override
+    the shift code's default schedule.
+  </Step>
+  <Step title="Save">
+    Changes save automatically as drafts. The cell updates immediately and shows a visual draft
+    indicator.
+  </Step>
+</Steps>
+
+<Tip>
+  All edits are saved as drafts and are not visible to staff until you publish them. See [Draft &
+  Publish](/features/draft-publish) for details.
+</Tip>
+
+## Drag and drop
+
+You can move a shift from one employee or date to another by dragging:
+
+1. Click and hold a shift cell until it lifts.
+2. Drag it to the target cell, a different employee row, a different date column, or both.
+3. Release to drop. The move is saved as a draft immediately.
+
+If the target cell already has a shift, the move replaces it (as a draft).
+
+## Focus area filter
+
+The toolbar includes a **Focus Area** filter that lets you narrow the grid to a specific section of your facility. Select **All** to see every staff member, or choose any configured focus area (wing, department, or section) to show only the employees assigned there.
+
+Your organization may use a custom label for focus areas, the filter label in the toolbar reflects that terminology.
+
+## Staff search
+
+While a focus area is active, use the **Search** field in the toolbar to filter the visible staff rows by name. The grid highlights matching employees as you type.
+
+## Printing
+
+DubGrid generates a print-optimized layout for your schedule.
+
+1. Click the **Print** button in the toolbar.
+2. In the **Print Options** dialog, select which focus areas to include.
+3. Choose the date range to print.
+4. Configure additional options such as orientation and whether to include the shift code legend.
+5. Click **Print** to send to your printer or save as a PDF.
+
+The printed output includes your organization name, the date the schedule was printed, and the selected date range. Shift codes are shown with their colors, and a legend appears at the bottom.

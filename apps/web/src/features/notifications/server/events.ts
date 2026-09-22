@@ -34,6 +34,11 @@ export type NotificationEvent =
       approved: boolean;
       adminNote?: string;
       /**
+       * Approved on the spot because an approver was party to the request;
+       * the actor may be the other party rather than the approver.
+       */
+      autoApproved?: boolean;
+      /**
        * The claimant's employee id as it stood before the resolve RPC ran.
        * Rejecting a claimed pickup clears target_emp_id on the row, so this
        * is the only way to still notify them once the RPC has run.
@@ -591,7 +596,9 @@ async function dispatchNotificationEventInternal(
     }
 
     case "shift_request_claimed": {
-      const { requesterName, targetName } = await getRequestInfo(event.requestId);
+      const { requesterName, targetName, status } = await getRequestInfo(event.requestId);
+      // Settled on the spot by an approver party: nothing waits on the queue.
+      if (status !== "pending_approval") return;
       await notifyShiftRequestApprovers({
         actorUserId,
         orgId: event.orgId,
@@ -609,6 +616,7 @@ async function dispatchNotificationEventInternal(
       const typeLabel = getShiftRequestTypeLabel(requestType);
 
       if (event.accepted) {
+        if (requestInfo.status !== "pending_approval") return;
         await notifyShiftRequestApprovers({
           actorUserId,
           orgId: event.orgId,
@@ -687,21 +695,20 @@ async function dispatchNotificationEventInternal(
           ? "shift_request_approved"
           : "shift_request_rejected";
         const noteText = event.adminNote ? ` Note: ${event.adminNote}` : "";
+        // An auto-approved request reaches its requester only when the
+        // other party's acceptance settled it, so say that rather than
+        // quoting the requester their own name from the note.
+        const message = event.autoApproved
+          ? `${requestInfo.targetName} accepted your ${typeLabel} request. It's approved and on the schedule.`
+          : `Your ${typeLabel} request has been ${status}.${noteText}`;
 
-        await sendNotification(
-          requesterUserId,
-          event.orgId,
-          type,
-          `Request ${status}`,
-          `Your ${typeLabel} request has been ${status}.${noteText}`,
-          {
-            requestId: event.requestId,
-            requestType,
-            approved: event.approved,
-            action: "view_request",
-            tab: "mine",
-          },
-        );
+        await sendNotification(requesterUserId, event.orgId, type, `Request ${status}`, message, {
+          requestId: event.requestId,
+          requestType,
+          approved: event.approved,
+          action: "view_request",
+          tab: "mine",
+        });
       }
 
       // The other party is affected just as directly as the requester: a swap

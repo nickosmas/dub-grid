@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
       .select(SESSION_SELECT)
       // Skip transient rows inserted by the JWT hook / switch_org before
       // track-session fills in device + org. Matches the filter used by
-      // fetchUserSessions and fetchUserSessionsForUser.
+      // fetchUserSessionsForUser.
       .not("refresh_token_hash", "is", null)
       .order("last_active_at", { ascending: false })
       .range(offset, offset + limit - 1);

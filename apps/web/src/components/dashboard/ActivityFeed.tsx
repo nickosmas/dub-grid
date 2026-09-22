@@ -1,93 +1,9 @@
 import { useState } from "react";
 import Link from "next/link";
-import type { ActivityItem, ActivityIconVariant } from "@/lib/dashboard-stats";
+import type { ActivityItem } from "@/lib/dashboard-stats";
+import { ActivityIcon } from "./ActivityIcon";
 import ExpandButton from "./ExpandButton";
 import { EmptyState } from "@/components/EmptyState";
-
-const ICON_STYLES: Record<ActivityIconVariant, { bg: string; stroke: string }> = {
-  success: { bg: "var(--dg-color-success-bg)", stroke: "var(--dg-color-success-text)" },
-  danger: { bg: "var(--dg-color-danger-bg)", stroke: "var(--dg-color-danger)" },
-  warning: { bg: "var(--dg-color-warning-bg)", stroke: "var(--dg-color-warning)" },
-  neutral: { bg: "var(--dg-color-bg-secondary)", stroke: "var(--dg-color-text-secondary)" },
-};
-
-function ActivityIcon({ variant }: { variant: ActivityIconVariant }) {
-  const style = ICON_STYLES[variant];
-
-  const icons: Record<ActivityIconVariant, React.ReactNode> = {
-    success: (
-      <svg
-        width="14"
-        height="14"
-        viewBox="0 0 14 14"
-        fill="none"
-        stroke={style.stroke}
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M2 7l3.5 3.5L12 3" />
-      </svg>
-    ),
-    danger: (
-      <svg
-        width="14"
-        height="14"
-        viewBox="0 0 14 14"
-        fill="none"
-        stroke={style.stroke}
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      >
-        <path d="M7 4v4M7 10v.5" />
-        <circle cx="7" cy="7" r="6" />
-      </svg>
-    ),
-    warning: (
-      <svg
-        width="14"
-        height="14"
-        viewBox="0 0 14 14"
-        fill="none"
-        stroke={style.stroke}
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      >
-        <path d="M7 2v3M7 9v3M2 7h3M9 7h3" />
-      </svg>
-    ),
-    neutral: (
-      <svg
-        width="14"
-        height="14"
-        viewBox="0 0 14 14"
-        fill="none"
-        stroke={style.stroke}
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      >
-        <path d="M2 4h10M2 7h7M2 10h5" />
-      </svg>
-    ),
-  };
-
-  return (
-    <div
-      style={{
-        width: 28,
-        height: 28,
-        borderRadius: 7,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-        background: style.bg,
-      }}
-    >
-      {icons[variant]}
-    </div>
-  );
-}
 
 function EmptyActivityState() {
   return (
@@ -187,7 +103,7 @@ export default function ActivityFeed({
                           : "none",
                     }}
                   >
-                    <ActivityIcon variant={item.iconVariant} />
+                    <ActivityIcon kind={item.iconKind} variant={item.iconVariant} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div
                         style={{

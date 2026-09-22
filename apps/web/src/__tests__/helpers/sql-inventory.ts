@@ -1,0 +1,39 @@
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { resolve } from "node:path";
+
+export function supabaseMigrationsDir(): string {
+  const fromRoot = resolve(process.cwd(), "supabase/migrations");
+  return existsSync(fromRoot) ? fromRoot : resolve(process.cwd(), "../../supabase/migrations");
+}
+
+export function migrationPath(filename: string): string {
+  return resolve(supabaseMigrationsDir(), filename);
+}
+
+/**
+ * The SECURITY DEFINER functions `authenticated` may call: 016's literal
+ * inventory, plus every name a later migration grants. 016 is checksum
+ * locked, so a new entry point is recorded by its own migration's GRANT
+ * rather than by editing the array.
+ */
+export function authenticatedSecurityDefinerAllowlist(): string[] {
+  const dir = supabaseMigrationsDir();
+  const hardening = readFileSync(resolve(dir, "016_harden_authorization_boundaries.sql"), "utf8");
+  const block = hardening.match(
+    /authenticated_entry_points CONSTANT TEXT\[\] := ARRAY\[([\s\S]*?)\n\s*\];/,
+  )?.[1];
+  if (!block) throw new Error("Missing authenticated SQL entry-point inventory");
+  const names = new Set([...block.matchAll(/'([a-z0-9_]+)'/g)].map((match) => match[1]));
+
+  for (const file of readdirSync(dir)) {
+    const ordinal = Number(file.slice(0, 3));
+    if (!file.endsWith(".sql") || !Number.isFinite(ordinal) || ordinal <= 16) continue;
+    const sql = readFileSync(resolve(dir, file), "utf8");
+    for (const match of sql.matchAll(
+      /GRANT EXECUTE ON FUNCTION public\.([a-z0-9_]+)\([^)]*\)\s+TO authenticated;/g,
+    )) {
+      names.add(match[1]);
+    }
+  }
+  return [...names].sort();
+}

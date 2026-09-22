@@ -41,17 +41,19 @@ describe("Button", () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps labels to one line and truncates rather than shrinking", () => {
+  it("keeps labels to one line and fits by measurement, not adjustsFontSizeToFit", () => {
     render(<Button label="Accept and continue" onPress={vi.fn()} />);
 
-    // Shrink-to-fit is gone on purpose: the new architecture fits against the
+    // Native shrink-to-fit stays out: the new architecture fits against the
     // button's default-size height with no floor, which is what left labels
-    // tiny beside large body copy.
+    // tiny beside large body copy. FitText measures and scales the font
+    // itself, so the label never wraps and only ellipsizes past the floor.
     const label = screen.getByText("Accept and continue");
     expect(label).toHaveAttribute("data-number-of-lines", "1");
     expect(label).not.toHaveAttribute("data-adjusts-font-size-to-fit");
     expect(label).not.toHaveAttribute("data-minimum-font-scale");
     expect(label).toHaveAttribute("data-ellipsize-mode", "tail");
+    expect(screen.getByTestId("fit-text-measure")).toHaveTextContent("Accept and continue");
   });
 
   it("lets a link ellipsize instead of shrinking, with text padding", () => {

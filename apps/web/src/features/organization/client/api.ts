@@ -16,6 +16,7 @@ import type {
 import type { BillingAccessState } from "@dubgrid/domain";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { fetchWithTimeout, RequestTimeoutError } from "@/lib/fetch-with-timeout";
+import { STEP_UP_REQUIRED_CODE } from "@dubgrid/authz";
 
 const ORGANIZATION_BOOTSTRAP_TIMEOUT_MS = 5_000;
 const ORGANIZATION_BOOTSTRAP_STALE_TIME_MS = 5 * 60_000;
@@ -55,6 +56,8 @@ export class OrganizationRequestError extends Error {
     message: string,
     public readonly status: number,
     public readonly retryAfterMs: number | null,
+    /** The API's machine-readable code, when the body carried one. */
+    public readonly code: string | null = null,
   ) {
     super(message);
     this.name = "OrganizationRequestError";
@@ -92,6 +95,7 @@ async function requestOrganizationJson<T>(
       Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
         ? retryAfterSeconds * 1_000
         : null,
+      typeof body?.code === "string" ? body.code : null,
     );
   }
 
@@ -115,6 +119,14 @@ export function fetchOrganizationBootstrap(signal?: AbortSignal): Promise<Organi
 
 export function isRetryableOrganizationBootstrapError(error: unknown): boolean {
   if (error instanceof OrganizationRequestError) {
+    // A step-up refusal on the bootstrap means this request rode a session
+    // that is mid-upgrade: the browser answered an MFA challenge, or a token
+    // refresh landed, and the cookie had not caught up when the request left.
+    // The next attempt carries the current cookie, so retrying is the
+    // difference between the shell recovering by itself and sitting on its
+    // loading screen. A caller who genuinely lacks the factor keeps failing
+    // and lands on the same refusal it would have had.
+    if (error.status === 403 && error.code === STEP_UP_REQUIRED_CODE) return true;
     return error.status === 408 || error.status === 429 || error.status >= 500;
   }
   if (error instanceof RequestTimeoutError) return true;

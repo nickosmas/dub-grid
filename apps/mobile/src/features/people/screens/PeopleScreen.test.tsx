@@ -836,7 +836,7 @@ describe("PeopleScreen", () => {
     expect(screen.queryByText("App access")).not.toBeInTheDocument();
     expect(screen.queryByText("Status")).not.toBeInTheDocument();
     expect(screen.getByText("Focus area")).toBeInTheDocument();
-    expect(screen.getByText("Role")).toBeInTheDocument();
+    expect(screen.getByText("Roles")).toBeInTheDocument();
     expect(screen.getByText("Sort by")).toBeInTheDocument();
   });
 
@@ -1074,6 +1074,53 @@ describe("PeopleScreen", () => {
 
     fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
     fireEvent.click(screen.getByText("RN"));
+
+    expect(screen.queryByText("June Patel")).not.toBeInTheDocument();
+    expect(screen.getByText("Mina Diaz")).toBeInTheDocument();
+  });
+
+  it("filters the staff directory by role for managers, under the organization's label", () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        currentOrg: { labels: { department: "Departments", role: "Positions" } },
+        focusAreas: [],
+        certifications: [],
+        roles: [
+          { id: 9, name: "Charge Nurse", abbr: "CN" },
+          { id: 12, name: "Med Tech", abbr: "MT" },
+        ],
+        departments: [],
+        permissions: { canManageEmployees: true },
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
+    useQuery.mockReturnValue({
+      data: {
+        people: [
+          buildPerson({ id: "emp-1", firstName: "Mina", lastName: "Diaz", roleIds: [9] }),
+          buildPerson({
+            id: "emp-2",
+            firstName: "June",
+            lastName: "Patel",
+            roleIds: [12],
+            seniority: 2,
+          }),
+        ],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PeopleScreen />);
+
+    fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
+    expect(screen.getByText("Positions")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Charge Nurse"));
 
     expect(screen.queryByText("June Patel")).not.toBeInTheDocument();
     expect(screen.getByText("Mina Diaz")).toBeInTheDocument();

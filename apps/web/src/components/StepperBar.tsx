@@ -10,9 +10,11 @@ export interface StepperStep {
 interface StepperBarProps {
   steps: StepperStep[];
   currentStepIndex: number;
+  /** Mark every step done, including the current one. */
+  complete?: boolean;
 }
 
-export default function StepperBar({ steps, currentStepIndex }: StepperBarProps) {
+export default function StepperBar({ steps, currentStepIndex, complete = false }: StepperBarProps) {
   return (
     <div
       style={{ display: "flex", alignItems: "center", gap: 0, width: "100%" }}
@@ -23,8 +25,8 @@ export default function StepperBar({ steps, currentStepIndex }: StepperBarProps)
       aria-label={`Step ${currentStepIndex + 1} of ${steps.length}: ${steps[currentStepIndex]?.label ?? ""}`}
     >
       {steps.map((step, i) => {
-        const isCompleted = i < currentStepIndex;
-        const isCurrent = i === currentStepIndex;
+        const isCompleted = complete || i < currentStepIndex;
+        const isCurrent = !complete && i === currentStepIndex;
 
         return (
           <div

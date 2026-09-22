@@ -81,7 +81,7 @@ const alerts: Notification[] = [
   },
 ];
 
-function renderBell(props: { onOpenItem?: (id: string) => void } = {}) {
+function renderBell(props: { onOpenItem?: (id: string) => void; hidden?: boolean } = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
@@ -102,6 +102,11 @@ describe("NotificationBell rows", () => {
     fetchUnreadNotificationCount.mockResolvedValue(1);
     fetchNotifications.mockResolvedValue(alerts);
     markNotificationRead.mockResolvedValue(undefined);
+  });
+
+  it("renders nothing while the reader is already on the alerts page", () => {
+    renderBell({ hidden: true });
+    expect(screen.queryByRole("button", { name: /^Alerts/ })).toBeNull();
   });
 
   it("links every row to the alert's subject", async () => {

@@ -19,8 +19,11 @@ interface CustomSelectProps<T extends string | number> {
   disabled?: boolean;
   placeholder?: string;
   height?: React.CSSProperties["height"];
-  /** Extra style on the trigger button */
+  /** Extra style on the wrapper, for how the control sits in its layout
+   *  (width, flex). For the trigger's own chrome use `triggerStyle`. */
   style?: React.CSSProperties;
+  /** Extra style on the trigger button itself: border, radius, padding. */
+  triggerStyle?: React.CSSProperties;
   /** Font size override (default productive control size) */
   fontSize?: number | string;
   /** Font weight override (default productive control weight) */
@@ -41,6 +44,7 @@ export default function CustomSelect<T extends string | number>({
   placeholder,
   height,
   style,
+  triggerStyle,
   fontSize = "var(--dg-type-control-size)",
   fontWeight = 500,
   activeFontWeight = 500,
@@ -120,6 +124,7 @@ export default function CustomSelect<T extends string | number>({
           boxShadow: open ? "0 0 0 3px rgba(59,130,246,0.15)" : undefined,
           borderColor: open ? "var(--dg-color-border-focus)" : "var(--dg-color-border)",
           opacity: disabled ? 0.5 : 1,
+          ...triggerStyle,
         }}
       >
         <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>

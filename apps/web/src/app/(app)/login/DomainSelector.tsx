@@ -170,7 +170,7 @@ export default function DomainSelector() {
             Enter your organization&apos;s subdomain to sign in.
           </p>
 
-          <Form onSubmit={handleContinue}>
+          <Form onSubmit={handleContinue} className="dg-auth-form--narrow">
             <SubdomainField
               value={slug}
               onChange={(v) => {

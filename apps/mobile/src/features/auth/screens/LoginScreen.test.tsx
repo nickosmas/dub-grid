@@ -14,6 +14,7 @@ vi.mock("@expo/vector-icons/Ionicons", () => ({
 
 const routerPush = vi.fn();
 const routerReplace = vi.fn();
+const searchParams: { next?: string } = {};
 const useSessionState = vi.fn();
 const getSupabaseClient = vi.fn();
 const loginToOrganization = vi.fn();
@@ -34,6 +35,7 @@ vi.mock("expo-router", async () => {
       push: routerPush,
       replace: routerReplace,
     },
+    useLocalSearchParams: () => searchParams,
   };
 });
 
@@ -73,9 +75,11 @@ vi.mock("../../consent/components/ConsentGate", () => ({
 }));
 
 let LoginScreen: (typeof import("./LoginScreen"))["default"];
+let queryClient: (typeof import("../../../shared/lib/query-client"))["queryClient"];
 
 beforeAll(async () => {
   LoginScreen = (await import("./LoginScreen")).default;
+  queryClient = (await import("../../../shared/lib/query-client")).queryClient;
 });
 
 describe("LoginScreen", () => {
@@ -96,6 +100,9 @@ describe("LoginScreen", () => {
     pushToast.mockReset();
     getBootstrap.mockReset();
     getBootstrap.mockResolvedValue({ currentOrg: { id: "org-1" } });
+    // The bootstrap prefetch key comes from the token claims, which every fake
+    // token here shares, so a warmed cache would hide the next sign-in's fetch.
+    queryClient.clear();
 
     useSessionState.mockReturnValue({
       session: null,
@@ -229,6 +236,36 @@ describe("LoginScreen", () => {
     expect(screen.getByText("redirect:/(tabs)/home")).toBeInTheDocument();
     expect(loadLastOrg).not.toHaveBeenCalled();
     expect(lookupOrganization).not.toHaveBeenCalled();
+  });
+
+  it("sends an already authenticated session on to the protected route that asked", () => {
+    useSessionState.mockReturnValue({
+      session: { user: { id: "user-1" } },
+      accessToken: "active-token",
+      isLoading: false,
+    });
+    searchParams.next = "/alerts/alert-42";
+    try {
+      render(<LoginScreen />);
+      expect(screen.getByText("redirect:/alerts/alert-42")).toBeInTheDocument();
+    } finally {
+      delete searchParams.next;
+    }
+  });
+
+  it("ignores a next that is not an in-app path", () => {
+    useSessionState.mockReturnValue({
+      session: { user: { id: "user-1" } },
+      accessToken: "active-token",
+      isLoading: false,
+    });
+    searchParams.next = "https://evil.example/phish";
+    try {
+      render(<LoginScreen />);
+      expect(screen.getByText("redirect:/(tabs)/home")).toBeInTheDocument();
+    } finally {
+      delete searchParams.next;
+    }
   });
 
   it("verifies the organization before showing the credential form", async () => {
@@ -367,6 +404,62 @@ describe("LoginScreen", () => {
       pathname: "/(auth)/forgot-password",
       params: { email: "nurse@dubgrid.test" },
     });
+  });
+
+  it("routes a fresh sign-in on to the protected route that asked for it", async () => {
+    searchParams.next = "/shift/emp-1/2026-05-04";
+    lookupOrganization.mockResolvedValue({
+      organization: {
+        id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+        name: "DubGrid Health",
+        slug: "dubgrid-health",
+      },
+    });
+    loginToOrganization.mockResolvedValue({
+      session: {
+        accessToken: "token-next",
+        refreshToken: "refresh-next",
+        expiresIn: 3600,
+        tokenType: "bearer",
+      },
+      organization: {
+        id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+        name: "DubGrid Health",
+        slug: "dubgrid-health",
+      },
+      user: {
+        id: "8af6f242-c060-4920-a7db-91b4cb66fd26",
+        email: "staff@dubgrid.com",
+        firstName: "Mina",
+        lastName: "Diaz",
+      },
+    });
+    getSupabaseClient.mockReturnValue({
+      auth: { setSession: vi.fn().mockResolvedValue({ error: null }) },
+    } as never);
+
+    try {
+      render(<LoginScreen />);
+      fireEvent.change(screen.getByPlaceholderText("yourorg"), {
+        target: { value: "dubgrid-health" },
+      });
+      fireEvent.click(screen.getByText("Continue"));
+      await screen.findByPlaceholderText("Email");
+      fireEvent.change(screen.getByPlaceholderText("Email"), {
+        target: { value: "staff@dubgrid.com" },
+      });
+      fireEvent.change(screen.getByPlaceholderText("Password"), {
+        target: { value: "super-secret" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+      await waitFor(() => {
+        expect(routerReplace).toHaveBeenCalledWith("/shift/emp-1/2026-05-04");
+      });
+      expect(routerReplace).toHaveBeenCalledTimes(1);
+    } finally {
+      delete searchParams.next;
+    }
   });
 
   it("signs in successfully and routes into the Home tab", async () => {

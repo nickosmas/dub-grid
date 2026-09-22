@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }
-    const { orgId } = parsed.data;
+    const { orgId: requestedOrgId } = parsed.data;
     const returnUrl = resolveBillingReturnUrl(parsed.data.returnUrl, [
       req.headers.get("origin"),
       req.nextUrl.origin,
@@ -51,12 +51,15 @@ export async function POST(req: NextRequest) {
 
     const auth = await requireOrgPermissions(
       req,
-      orgId,
+      requestedOrgId,
       (permissions) => permissions.isGridmaster || permissions.isSuperAdmin,
       { allowLockedOrganization: true },
     );
     if ("response" in auth) return auth.response;
     const supabase = auth.serviceClient;
+    // Sandbox cookies were refused above, so this equals the requested id;
+    // every route still binds the organization from authorization alone.
+    const orgId = auth.orgId;
 
     const { limited, reset, misconfigured } = await checkRateLimit(
       apiLimiter,

@@ -14,7 +14,7 @@ vi.mock("next-themes", () => ({
   useTheme: () => ({ theme, setTheme }),
 }));
 
-import ThemeToggleButton from "@/components/landing/ThemeToggleButton";
+import ThemeToggleButton from "@/components/ThemeToggleButton";
 
 describe("ThemeToggleButton", () => {
   beforeEach(() => {

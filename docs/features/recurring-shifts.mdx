@@ -1,0 +1,61 @@
+---
+title: "Recurring Shifts"
+description: "Define repeating shift patterns for employees and apply them to any date range in seconds."
+---
+
+Recurring shifts let you build schedule templates so you don't have to enter the same shift codes week after week. DubGrid supports two types of recurring shifts: day-of-week templates and shift series.
+
+## Day-of-week templates
+
+A day-of-week template assigns a shift code to a specific day of the week for a given employee. For example, you can set an employee to work a Day shift every Monday.
+
+Each template includes:
+
+- **Employee** - the staff member the template applies to
+- **Shift code** - the shift assigned on that day
+- **Day of week** - the day the template repeats on (Sunday through Saturday)
+- **Effective from / Effective until** - the date range during which the template is active
+
+Templates only apply within their effective date range. You can create multiple templates per employee to cover different days or different periods.
+
+## Shift series
+
+A shift series defines a repeating pattern that runs for a set duration. Series are useful for temporary assignments, rotations, or blocks of coverage.
+
+Each series includes:
+
+- **Employee** - the staff member the series applies to
+- **Shift code** - the shift code for each occurrence
+- **Frequency** - `daily`, `weekly`, or `biweekly`
+- **Days of week** - which days within the frequency pattern are active
+- **Start date / End date** - the bounds of the series
+- **Max occurrences** - an optional limit on how many times the shift generates
+
+## Applying a recurring schedule
+
+Once you have templates or series configured, apply them to a date range to populate the grid with draft shifts.
+
+<Steps>
+  <Step title="Open the Apply dialog">
+    Click **Apply Recurring Schedule** in the schedule toolbar. This button is only visible if you
+    have the `canApplyRecurringSchedule` permission.
+  </Step>
+  <Step title="Select a date range">
+    Choose the start and end dates for the period you want to fill. DubGrid will generate draft
+    shifts for all matching templates and series within that range.
+  </Step>
+  <Step title="Confirm">
+    Review the summary and click **Confirm**. The generated shifts appear on the grid as drafts.
+    Publish them when you are ready to make them live.
+  </Step>
+</Steps>
+
+## Permissions
+
+Managing recurring shifts and series requires specific permissions granted by a Super Admin:
+
+| Action                                        | Required permission         |
+| --------------------------------------------- | --------------------------- |
+| Apply recurring schedule to a date range      | `canApplyRecurringSchedule` |
+| Create, edit, or delete day-of-week templates | `canManageRecurringShifts`  |
+| Create, edit, or delete shift series          | `canManageShiftSeries`      |

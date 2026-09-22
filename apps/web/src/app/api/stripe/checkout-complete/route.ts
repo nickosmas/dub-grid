@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { forbidIfSandboxCookie } from "@/lib/api-auth";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { syncCheckoutSessionToDb, requireStripeEnabled } from "@/lib/stripe";
 import logger from "@/lib/logger";
@@ -16,6 +17,12 @@ const bodySchema = z.object({
 export async function POST(req: NextRequest) {
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) return csrfError;
+
+  // Same refusal create-checkout and billing-portal give. Without it a
+  // sandboxed caller reached syncCheckoutSessionToDb and got its generic
+  // organization-mismatch error instead.
+  const sandboxBlock = forbidIfSandboxCookie(req);
+  if (sandboxBlock) return sandboxBlock;
 
   try {
     let body: unknown;
@@ -40,7 +47,7 @@ export async function POST(req: NextRequest) {
 
     const { limited, reset, misconfigured } = await checkRateLimit(
       apiLimiter,
-      `billing-checkout-complete:${auth.actor.id}:${parsed.data.orgId}`,
+      `billing-checkout-complete:${auth.actor.id}:${auth.orgId}`,
     );
     if (misconfigured) {
       return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
@@ -64,7 +71,7 @@ export async function POST(req: NextRequest) {
     const stripeDisabled = await requireStripeEnabled();
     if (stripeDisabled) return stripeDisabled;
 
-    await syncCheckoutSessionToDb(auth.serviceClient, parsed.data.sessionId, parsed.data.orgId, {
+    await syncCheckoutSessionToDb(auth.serviceClient, parsed.data.sessionId, auth.orgId, {
       actor: {
         id: auth.actor.id,
         email: auth.actor.email,

@@ -9,11 +9,12 @@ import {
 import {
   cancelOwnProfileChangeRequest,
   createProfileChangeRequest,
+  fetchProfileChangeRequestForResolution,
   listAdminProfileChangeRequests,
   listOwnProfileChangeRequests,
   resolveProfileChangeRequest,
 } from "@/features/account/server";
-import { requireMobileAuth } from "@/features/mobile/server";
+import { requireMobileAuth, requireMobileSensitiveActionAuth } from "@/features/mobile/server";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
 
@@ -33,6 +34,7 @@ export async function GET(req: NextRequest) {
       serviceClient: auth.serviceClient,
       orgId: auth.currentOrg.id,
       status: "pending",
+      includeAccountDeletion: auth.permissions.isGridmaster || auth.permissions.isSuperAdmin,
     });
     return NextResponse.json(mobileProfileChangeRequestsResponseSchema.parse({ requests }));
   }
@@ -114,6 +116,28 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
         { error: "You don't have permission to update that request." },
         { status: 403 },
       );
+    }
+
+    if (parsed.data.action !== "cancel") {
+      const pending = await fetchProfileChangeRequestForResolution(
+        auth.serviceClient,
+        auth.currentOrg.id,
+        id,
+      );
+      if (pending.type === "account_deletion") {
+        if (!(auth.permissions.isGridmaster || auth.permissions.isSuperAdmin)) {
+          return NextResponse.json(
+            { error: "Only a super admin can decide an account deletion." },
+            { status: 403 },
+          );
+        }
+        // Approving a deletion is irreversible; the web queue asks for fresh
+        // credentials here too.
+        if (parsed.data.action === "approve") {
+          const assurance = await requireMobileSensitiveActionAuth(req);
+          if ("response" in assurance) return assurance.response;
+        }
+      }
     }
 
     const request =

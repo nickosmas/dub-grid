@@ -73,6 +73,7 @@ export async function GET(req: NextRequest) {
     }
     const filters = {
       ...parsed.data,
+      orgId: reader.orgId,
       actionPrefixes: scope.kind === "open" ? scope.prefixes : scope.actions,
     };
 

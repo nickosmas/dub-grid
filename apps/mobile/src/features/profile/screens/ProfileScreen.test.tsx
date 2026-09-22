@@ -601,8 +601,12 @@ describe("ProfileScreen", () => {
 
     expect(screen.queryByLabelText("Actions")).not.toBeInTheDocument();
     const buttons = screen.getAllByRole("button");
-    const switchIndex = buttons.findIndex((b) => b.textContent === "Switch organization");
-    const signOutIndex = buttons.findIndex((b) => b.textContent === "Sign out");
+    // By accessible name: a button's text content also holds FitText's
+    // hidden measuring copy of the label.
+    const switchIndex = buttons.findIndex(
+      (b) => b.getAttribute("aria-label") === "Switch organization",
+    );
+    const signOutIndex = buttons.findIndex((b) => b.getAttribute("aria-label") === "Sign out");
     const appearanceIndex = buttons.findIndex((b) => b.textContent?.startsWith("Appearance"));
     expect(appearanceIndex).toBeGreaterThan(-1);
     expect(switchIndex).toBeGreaterThan(appearanceIndex);

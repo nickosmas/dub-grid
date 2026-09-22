@@ -10,7 +10,10 @@ vi.mock("expo-constants", () => ({
     Standalone: "standalone",
     StoreClient: "storeClient",
   },
-  default: { executionEnvironment: "standalone" },
+  default: {
+    executionEnvironment: "standalone",
+    expoConfig: { extra: { eas: { projectId: "11111111-2222-4333-8444-555555555555" } } },
+  },
 }));
 
 const addEventListener = vi.fn();
@@ -76,6 +79,19 @@ describe("usePushRegistration", () => {
       });
     });
     expect(saveStoredPushDevice).toHaveBeenCalled();
+  });
+
+  // A standalone build resolves no project id on its own, so it travels with
+  // the request and a build without one fails by name rather than through the
+  // library's generic error.
+  it("mints the token against the configured Expo project", async () => {
+    renderHook(() => usePushRegistration("token-123", "org-1"));
+
+    await waitFor(() => {
+      expect(getExpoPushTokenAsync).toHaveBeenCalledWith({
+        projectId: "11111111-2222-4333-8444-555555555555",
+      });
+    });
   });
 
   it("does nothing without an access token or an org", async () => {

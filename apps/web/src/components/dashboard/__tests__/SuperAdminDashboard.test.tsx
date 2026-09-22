@@ -10,6 +10,7 @@ function makeProps(overrides: Partial<DashboardContentProps> = {}): DashboardCon
     activeEmployees: [],
     activityItems: [],
     coverageRequirements: [{ id: 1 }],
+    hasCoverageRequirements: true,
     currentEmpId: "emp-1",
     currentHours: [],
     currentPeriodShifts: {},

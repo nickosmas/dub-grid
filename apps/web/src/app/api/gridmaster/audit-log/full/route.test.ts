@@ -132,7 +132,7 @@ describe("GET /api/gridmaster/audit-log/full", () => {
     requireOrgPermissions.mockImplementation(
       async (
         _req: NextRequest,
-        _orgId: string,
+        requestedOrgId: string,
         isAllowed: (permissions: Record<string, boolean>) => boolean,
       ) => {
         const permissions = {
@@ -148,10 +148,32 @@ describe("GET /api/gridmaster/audit-log/full", () => {
         return {
           actor: { id: "super-admin-user" },
           permissions,
+          orgId: requestedOrgId,
           serviceClient: { from: orgFrom },
           userClient: {},
         };
       },
+    );
+  });
+
+  it("filters by the effective organization when the caller is inside a sandbox", async () => {
+    const SANDBOX_ORG_ID = "99999999-9999-4999-8999-999999999999";
+    requireOrgPermissions.mockResolvedValue({
+      actor: { id: "super-admin-user" },
+      permissions: { isGridmaster: false, isSuperAdmin: true, canManageEmployees: false },
+      orgId: SANDBOX_ORG_ID,
+      serviceClient: { from: orgFrom },
+      userClient: {},
+    });
+
+    const response = await GET(
+      makeRequest(`http://localhost/api/gridmaster/audit-log/full?orgId=${ORG_ID}&limit=25`),
+    );
+
+    expect(response.status).toBe(200);
+    expect(fetchFilteredAuditRows).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ orgId: SANDBOX_ORG_ID }),
     );
   });
 

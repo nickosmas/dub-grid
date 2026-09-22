@@ -16,5 +16,4 @@ export * from "./shifts";
 export * from "./schedule";
 export * from "./invitations";
 export * from "./requests";
-export * from "./sessions";
 export * from "./access";

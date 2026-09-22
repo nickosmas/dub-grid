@@ -14,9 +14,10 @@ import { openConsentPreferences } from "@/components/CookieConsent";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { buildSubdomainHost, isApexHost, parseHost } from "@/lib/subdomain";
 import { withThemeParam } from "@/lib/theme-preference";
-import ThemeToggleButton from "@/components/landing/ThemeToggleButton";
+import ThemeToggleButton from "@/components/ThemeToggleButton";
 import { LandingScreenshot, landingScreenshots } from "@/components/landing/LandingScreenshot";
 import { LandingPhone } from "@/components/landing/LandingPhone";
+import { LandingPhoneCarousel } from "@/components/landing/LandingPhoneCarousel";
 import {
   BellRing,
   CalendarDays,
@@ -129,6 +130,14 @@ const SECURITY_FEATURES: Feature[] = [
   },
 ];
 
+const NAV_SECTIONS = [
+  { id: "features", label: "Features" },
+  { id: "dashboard", label: "Dashboard" },
+  { id: "team", label: "Team" },
+  { id: "mobile", label: "Mobile" },
+  { id: "security", label: "Security" },
+] as const;
+
 /* ─── Scroll Reveal Hook ──────────────────────────────── */
 
 function useScrollReveal() {
@@ -167,7 +176,7 @@ function RevealSection({
     <section
       ref={ref}
       id={id}
-      className={`${
+      className={`scroll-mt-14 ${
         isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
       } ${className}`}
       style={{
@@ -274,6 +283,15 @@ export default function RootPage() {
     };
   }, [router]);
 
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [mobileMenuOpen]);
+
   /* Loading state */
   if (!ready) {
     return (
@@ -302,13 +320,21 @@ export default function RootPage() {
             <DubGridWordmark fontSize={18} color="var(--dg-color-text-inverse)" />
           </div>
 
+          <div className="hidden md:flex items-center gap-1">
+            {NAV_SECTIONS.map((section) => (
+              <a
+                key={section.id}
+                href={`#${section.id}`}
+                className="landing-nav-link rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+              >
+                {section.label}
+              </a>
+            ))}
+          </div>
+
           <div className="flex items-center gap-4">
             <ThemeToggleButton onDarkSurface />
-            <Link
-              href="/login"
-              prefetch={false}
-              className="landing-nav-sign-in hidden sm:inline-flex dg-btn dg-btn-lg"
-            >
+            <Link href="/login" prefetch={false} className="landing-nav-sign-in dg-btn dg-btn-lg">
               Sign In
             </Link>
             {/* Mobile hamburger */}
@@ -328,20 +354,32 @@ export default function RootPage() {
         <div className="landing-mobile-menu fixed inset-0 z-[60] flex flex-col">
           <div className="flex items-center justify-between px-6 h-14">
             <div className="flex items-center gap-2.5">
-              <DubGridLogo size={28} color="var(--dg-color-brand)" />
-              <DubGridWordmark fontSize={18} />
+              <DubGridLogo size={28} color="var(--dg-color-text-inverse)" />
+              <DubGridWordmark fontSize={18} color="var(--dg-color-text-inverse)" />
             </div>
             <div className="flex items-center gap-1">
-              <ThemeToggleButton />
+              <ThemeToggleButton onDarkSurface />
               <CloseButton
                 size="lg"
-                className="-mr-2"
+                className="landing-mobile-menu-close -mr-2"
                 onClick={() => setMobileMenuOpen(false)}
                 aria-label="Close menu"
               />
             </div>
           </div>
           <div className="flex flex-col items-center justify-center flex-1 gap-8">
+            <nav aria-label="Sections" className="flex flex-col items-center gap-2">
+              {NAV_SECTIONS.map((section) => (
+                <a
+                  key={section.id}
+                  href={`#${section.id}`}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="landing-mobile-menu-link dg-font-brand-heading rounded-xl px-4 py-2 text-2xl font-semibold transition-colors"
+                >
+                  {section.label}
+                </a>
+              ))}
+            </nav>
             <Link href="/login" prefetch={false} className="dg-btn dg-btn-primary dg-btn-lg">
               Sign In
             </Link>
@@ -436,7 +474,7 @@ export default function RootPage() {
       </RevealSection>
 
       {/* ── Dashboard Mockup ── */}
-      <RevealSection className="landing-section-alt py-12 sm:py-16 lg:py-20">
+      <RevealSection id="dashboard" className="landing-section-alt py-12 sm:py-16 lg:py-20">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-10">
             <h2 className="dg-font-brand-heading text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--dg-color-text-primary)]">
@@ -497,7 +535,7 @@ export default function RootPage() {
       </RevealSection>
 
       {/* ── Staff View Mockup ── */}
-      <RevealSection className="landing-section-alt py-12 sm:py-16 lg:py-20">
+      <RevealSection id="team" className="landing-section-alt py-12 sm:py-16 lg:py-20">
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-10">
             <h2 className="dg-font-brand-heading text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--dg-color-text-primary)]">
@@ -518,7 +556,7 @@ export default function RootPage() {
       </RevealSection>
 
       {/* ── Mobile App Mockup ── */}
-      <RevealSection className="py-12 sm:py-16 lg:py-20">
+      <RevealSection id="mobile" className="py-12 sm:py-16 lg:py-20">
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-10">
             <h2 className="dg-font-brand-heading text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--dg-color-text-primary)]">
@@ -529,16 +567,12 @@ export default function RootPage() {
               and Android.
             </p>
           </div>
-          <div className="flex flex-wrap justify-center gap-8">
-            <LandingPhone screen="home" />
-            <LandingPhone screen="schedule" />
-            <LandingPhone screen="requests" />
-          </div>
+          <LandingPhoneCarousel />
         </div>
       </RevealSection>
 
       {/* ── Security features ── */}
-      <RevealSection className="landing-section-alt py-12 sm:py-16 lg:py-20">
+      <RevealSection id="security" className="landing-section-alt py-12 sm:py-16 lg:py-20">
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-10">
             <h2 className="dg-font-brand-heading text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--dg-color-text-primary)]">
@@ -594,8 +628,8 @@ export default function RootPage() {
       <footer className="border-t border-[var(--dg-color-border-light)]">
         <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <a href={gridmasterLoginHref} className="flex items-center gap-2.5">
-            <DubGridLogo size={20} color="var(--dg-color-text-faint)" />
-            <span className="text-xs text-[var(--dg-color-text-faint)]">
+            <DubGridLogo size={20} color="var(--dg-color-text-label)" />
+            <span className="text-xs text-[var(--dg-color-text-label)]">
               &copy; {new Date().getFullYear()} DubGrid
             </span>
           </a>

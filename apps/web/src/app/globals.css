@@ -1,15 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "./shadcn-tailwind.css";
-
-.dg-pill-display {
-  max-inline-size: 100%;
-  min-inline-size: 0;
-  block-size: auto;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-
 /* Inside a horizontally scrollable table the pill keeps its full width, so
    the column's minimum grows and the table scrolls. Otherwise auto layout
    treats a wrappable pill as one character wide and squeezes the column
@@ -18,22 +9,6 @@
   white-space: nowrap;
   overflow-wrap: normal;
 }
-
-.dg-pill-action {
-  max-inline-size: 100%;
-  min-inline-size: 0;
-  overflow: hidden;
-  white-space: nowrap;
-}
-
-.dg-pill-action-label {
-  display: block;
-  min-inline-size: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /*
   ┌────────────────────────────────────────────────────────────────────┐
   │  DubGrid Design System — Responsive Strategy                      │
@@ -51,7 +26,6 @@
   │  Prefer CSS @media for layout; JS for behavior changes.            │
   └────────────────────────────────────────────────────────────────────┘
 */
-
 @theme inline {
   --font-sans: var(--font-inter), "Inter", system-ui, sans-serif;
   --font-brand: var(--font-dm-sans), "DM Sans", system-ui, sans-serif;
@@ -114,13 +88,11 @@
   --color-shadow: var(--dg-color-shadow);
   --color-shadow-strong: var(--dg-color-shadow-strong);
 }
-
 *,
 *::before,
 *::after {
   box-sizing: border-box;
 }
-
 /* ============================================================
    Design Tokens — Full Palette
    ============================================================ */
@@ -223,6 +195,14 @@
   --dg-fs-heading: 18px;
   --dg-fs-title: 16px;
   --dg-fs-body: 15px;
+  /* Height of a text field on the auth surface, so a control that cannot
+     derive it from padding (a select) lines up with the fields beside it. */
+  --dg-auth-control-h: 54px;
+  /* Every card on the auth surface, sign-in and the demo request form alike. */
+  --dg-auth-card-w: 560px;
+  /* Sign-in keeps the field measure it had on the narrower card: a wider card
+     should not stretch an email and a password across the whole surface. */
+  --dg-auth-field-w: 352px;
   --dg-fs-body-sm: 14px;
   --dg-fs-label: 13px;
   --dg-fs-caption: 12px;
@@ -431,7 +411,6 @@
      pixel on every route — see PageContainer and Header. */
   --dg-page-gutter: 16px;
 }
-
 .dark {
   color-scheme: dark;
   --dg-color-bg: #02070f;
@@ -538,7 +517,6 @@
   --sidebar-border: oklch(1 0 0 / 12%);
   --sidebar-ring: #4a9bff;
 }
-
 html,
 body {
   margin: 0;
@@ -559,144 +537,25 @@ body {
      instantly while their children fade, so children look like they lag. */
   transition: background-color var(--dg-duration-fast) ease;
 }
-
 /* The root theme class is installed before paint by next-themes. If that
    pre-paint work is delayed during a hard refresh, keep category-pill layout
    stable without briefly showing the default neutral palette. */
 html:not(.light):not(.dark) [data-status-pill-variant="category"] {
   visibility: hidden;
 }
-
 button,
 input,
 select,
 textarea {
   font-family: inherit;
 }
-
 .dg-font-brand-heading {
   font-family: var(--font-dm-sans), "DM Sans", system-ui, sans-serif;
 }
-
-.dg-tabular-nums {
-  font-variant-numeric: tabular-nums;
-}
-
-.dg-type-attention-primary {
-  color: var(--dg-type-attention-primary-color);
-}
-
-.dg-type-attention-secondary {
-  color: var(--dg-type-attention-secondary-color);
-}
-
-.dg-type-attention-muted {
-  color: var(--dg-type-attention-muted-color);
-}
-
-.dg-type-page-title {
-  color: var(--dg-type-page-title-color);
-  font-size: var(--dg-type-page-title-size);
-  font-weight: var(--dg-type-page-title-weight);
-  letter-spacing: var(--dg-type-page-title-letter-spacing);
-  line-height: var(--dg-type-page-title-line-height);
-}
-
-.dg-type-section-title {
-  color: var(--dg-type-section-title-color);
-  font-size: var(--dg-type-section-title-size);
-  font-weight: var(--dg-type-section-title-weight);
-  letter-spacing: var(--dg-type-section-title-letter-spacing);
-  line-height: var(--dg-type-section-title-line-height);
-}
-
-.dg-type-component-heading {
-  color: var(--dg-type-component-heading-color);
-  font-size: var(--dg-type-component-heading-size);
-  font-weight: var(--dg-type-component-heading-weight);
-  letter-spacing: var(--dg-type-component-heading-letter-spacing);
-  line-height: var(--dg-type-component-heading-line-height);
-}
-
-.dg-type-content-group-heading {
-  color: var(--dg-type-content-group-heading-color);
-  font-size: var(--dg-type-content-group-heading-size);
-  font-weight: var(--dg-type-content-group-heading-weight);
-  letter-spacing: var(--dg-type-content-group-heading-letter-spacing);
-  line-height: var(--dg-type-content-group-heading-line-height);
-}
-
-.dg-type-body {
-  color: var(--dg-type-body-color);
-  font-size: var(--dg-type-body-size);
-  font-weight: var(--dg-type-body-weight);
-  letter-spacing: var(--dg-type-body-letter-spacing);
-  line-height: var(--dg-type-body-line-height);
-}
-
-.dg-type-navigation {
-  color: var(--dg-type-navigation-color);
-  font-size: var(--dg-type-navigation-size);
-  font-weight: var(--dg-type-navigation-weight);
-  letter-spacing: var(--dg-type-navigation-letter-spacing);
-  line-height: var(--dg-type-navigation-line-height);
-}
-
-.dg-type-navigation-section {
-  color: var(--dg-type-navigation-section-color);
-  font-size: var(--dg-type-navigation-section-size);
-  font-weight: var(--dg-type-navigation-section-weight);
-  letter-spacing: var(--dg-type-navigation-section-letter-spacing);
-  line-height: var(--dg-type-navigation-section-line-height);
-}
-
-.dg-type-control {
-  color: var(--dg-type-control-color);
-  font-size: var(--dg-type-control-size);
-  font-weight: var(--dg-type-control-weight);
-  letter-spacing: var(--dg-type-control-letter-spacing);
-  line-height: var(--dg-type-control-line-height);
-}
-
-.dg-type-field-title {
-  color: var(--dg-type-field-title-color);
-  font-size: var(--dg-type-field-title-size);
-  font-weight: var(--dg-type-field-title-weight);
-  letter-spacing: var(--dg-type-field-title-letter-spacing);
-  line-height: var(--dg-type-field-title-line-height);
-  text-transform: var(--dg-type-field-title-transform);
-}
-
-.dg-type-table-heading {
-  color: var(--dg-type-table-heading-color);
-  font-size: var(--dg-type-table-heading-size);
-  font-weight: var(--dg-type-table-heading-weight);
-  letter-spacing: var(--dg-type-table-heading-letter-spacing);
-  line-height: var(--dg-type-table-heading-line-height);
-  text-transform: var(--dg-type-table-heading-transform);
-}
-
-.dg-type-metadata {
-  color: var(--dg-type-metadata-color);
-  font-size: var(--dg-type-metadata-size);
-  font-weight: var(--dg-type-metadata-weight);
-  letter-spacing: var(--dg-type-metadata-letter-spacing);
-  line-height: var(--dg-type-metadata-line-height);
-}
-
-.dg-type-badge {
-  color: var(--dg-type-badge-color);
-  font-size: var(--dg-type-badge-size);
-  font-weight: var(--dg-type-badge-weight);
-  letter-spacing: var(--dg-type-badge-letter-spacing);
-  line-height: var(--dg-type-badge-line-height);
-}
-
 /* ── Button System ──────────────────────────────────────── */
 button {
   white-space: nowrap;
 }
-
 .dg-btn {
   display: inline-flex;
   align-items: center;
@@ -725,62 +584,51 @@ button {
   white-space: nowrap;
   text-decoration: none;
 }
-
 .dg-btn > svg {
   width: var(--dg-btn-icon);
   height: var(--dg-btn-icon);
   flex-shrink: 0;
 }
-
 .dg-btn:active {
   transform: scale(0.98);
 }
-
 .dg-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   pointer-events: none;
   outline: none;
 }
-
 .dg-btn:focus-visible {
   outline: 2px solid var(--dg-color-border-focus);
   outline-offset: 2px;
 }
-
 /* Primary */
 .dg-btn-primary {
   background: var(--dg-color-brand);
   color: var(--dg-color-on-brand-text);
   border: none;
 }
-
 .dg-btn-primary:hover {
   background: var(--dg-color-brand-light);
 }
-
 .dg-btn-primary:active {
   background: var(--dg-color-brand-light);
 }
-
 /* Secondary */
 .dg-btn-secondary {
   background: var(--dg-color-surface);
   color: var(--dg-type-control-color);
   border: 1px solid var(--dg-color-control-active-border);
 }
-
 /* Hover moves the fill only. A border that darkens under the cursor reads as
    the button changing size, so the border is left as structure. */
 .dg-btn-secondary:hover {
   background: var(--dg-color-surface-hover);
 }
-
 .dg-btn-secondary:active {
   background: var(--dg-color-control-active-border);
   border-color: var(--dg-color-border-strong);
 }
-
 /* Ghost */
 .dg-btn-ghost {
   background: transparent;
@@ -791,136 +639,22 @@ button {
   padding: 0 var(--dg-btn-px-sm);
   border-radius: var(--dg-btn-radius);
 }
-
 .dg-btn-ghost:hover {
   background: var(--dg-color-border-light);
 }
-
 .dg-btn-ghost:active {
   background: var(--dg-color-border);
 }
-
-/* Danger */
-.dg-btn-danger {
-  background: var(--dg-color-danger-bg);
-  color: var(--dg-color-danger-text);
-  border: 1px solid var(--dg-color-danger-border);
-}
-
-.dg-btn-danger:hover {
-  background: var(--dg-color-danger-border);
-}
-
-.dg-btn-danger:active {
-  background: var(--dg-color-danger-border);
-}
-
-/* Danger filled (destructive confirm) */
-.dg-btn-danger-filled {
-  background: var(--dg-color-danger);
-  color: var(--dg-color-text-inverse);
-  border: 1px solid var(--dg-color-danger);
-}
-
-.dg-btn-danger-filled:hover {
-  background: color-mix(in srgb, var(--dg-color-danger) 95%, black);
-}
-
-.dg-btn-danger-filled:active {
-  background: color-mix(in srgb, var(--dg-color-danger) 90%, black);
-}
-
 /* Success (soft affirmative, e.g. reactivating a staff member) */
-/* Solid, not tinted: this is the affirmative action on a staff record, and the
-   pale fill read as disabled. */
-.dg-btn-success {
-  background: var(--dg-color-success-solid);
-  color: var(--dg-color-on-success-text);
-  border: 1px solid var(--dg-color-success-solid);
-}
-
-.dg-btn-success:hover {
-  background: color-mix(in srgb, var(--dg-color-success-solid) 95%, black);
-}
-
-.dg-btn-success:active {
-  background: color-mix(in srgb, var(--dg-color-success-solid) 90%, black);
-}
-
-/* Info (soft, for a secondary button in its toggled-on state) */
-.dg-btn-info {
-  background: var(--dg-color-info-bg);
-  color: var(--dg-color-accent-text);
-  border: 1px solid var(--dg-color-info-border);
-}
-
-.dg-btn-info:hover {
-  background: var(--dg-color-info-border);
-}
-
-.dg-btn-info:active {
-  background: var(--dg-color-info-border);
-}
-
-/* Buttons that sit ON a solid danger surface (e.g. the sandbox banner).
-   Solid = filled inverse with danger text; outline = inverse border/text. */
-.dg-btn-on-danger-solid {
-  background: var(--dg-color-text-inverse);
-  color: var(--dg-color-danger);
-  border: 1px solid var(--dg-color-text-inverse);
-}
-
-.dg-btn-on-danger-solid:hover {
-  background: color-mix(in srgb, var(--dg-color-text-inverse) 92%, black);
-}
-
-.dg-btn-on-danger-solid:active {
-  background: color-mix(in srgb, var(--dg-color-text-inverse) 85%, black);
-}
-
-.dg-btn-on-danger-outline {
-  background: transparent;
-  color: var(--dg-color-text-inverse);
-  border: 1px solid var(--dg-color-text-inverse);
-}
-
-.dg-btn-on-danger-outline:hover {
-  background: color-mix(in srgb, var(--dg-color-text-inverse) 18%, transparent);
-}
-
-.dg-btn-on-danger-outline:active {
-  background: color-mix(in srgb, var(--dg-color-text-inverse) 28%, transparent);
-}
-
-/* Buttons that sit ON a solid brand surface (e.g. the landing page closing CTA).
-   Uses --color-on-brand-surface (fixed white in both themes), not --color-surface
-   — the latter inverts to near-black in dark mode, which would kill contrast
-   against the still-blue CTA backdrop the button sits on. */
-.dg-btn-on-brand-solid {
-  background: var(--dg-color-on-brand-surface);
-  color: var(--dg-color-brand);
-  border: 1px solid var(--dg-color-on-brand-surface);
-}
-
-.dg-btn-on-brand-solid:hover {
-  background: color-mix(in srgb, var(--dg-color-on-brand-surface) 92%, black);
-}
-
-.dg-btn-on-brand-solid:active {
-  background: color-mix(in srgb, var(--dg-color-on-brand-surface) 85%, black);
-}
-
 /* Landing page: the brand field belongs to the header and hero; content settles
  * onto the same white and soft-blue surfaces used by onboarding. */
 .landing-page {
   position: relative;
   background: #ffffff;
 }
-
 .dark .landing-page {
   background: #050609;
 }
-
 .landing-hero-gradient {
   position: absolute;
   z-index: 0;
@@ -931,80 +665,78 @@ button {
   pointer-events: none;
   background: linear-gradient(180deg, #0b2d75 0%, #4a83ef 42%, #dbeafe 70%, #ffffff 100%);
 }
-
 .dark .landing-hero-gradient {
   background: linear-gradient(180deg, #1d3aa0 0%, #0b2d75 38%, #071535 68%, #050609 100%);
 }
-
+/* Opaque enough that the white logo, wordmark and links keep contrast once
+   the bar has scrolled past the hero onto the page's own background. */
 .landing-nav {
   color: #ffffff;
   border-bottom: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(11, 45, 117, 0.55);
+  background: rgba(11, 45, 117, 0.88);
 }
-
 .dark .landing-nav {
-  background: rgba(29, 58, 160, 0.55);
+  background: rgba(29, 58, 160, 0.72);
 }
-
 .landing-nav-sign-in {
   color: #071535;
   border: 1px solid rgba(255, 255, 255, 0.92);
   background: rgba(255, 255, 255, 0.94);
 }
-
 .landing-nav-sign-in:hover {
   color: #071535;
   background: #ffffff;
 }
-
+/* .dg-btn is unlayered, so Tailwind's `hidden` utility cannot switch it off.
+   Below md the Sign In link lives in the hamburger menu instead. */
+@media (max-width: 47.99rem) {
+  .landing-nav-sign-in {
+    display: none;
+  }
+}
+.landing-nav-link,
 .landing-nav-menu {
   color: rgba(255, 255, 255, 0.8);
 }
-
+.landing-nav-link:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+}
 .landing-nav-menu:hover {
   color: #ffffff;
 }
-
 .landing-hero {
   z-index: 1;
   color: #ffffff;
 }
-
 .landing-hero-primary {
   color: #ffffff;
   border: 1px solid #071535;
   background: #071535;
 }
-
 .landing-hero-primary:hover {
   color: #ffffff;
   background: #02081f;
 }
-
 .landing-hero-secondary {
   color: #071535;
   border: 1px solid rgba(255, 255, 255, 0.92);
   background: rgba(255, 255, 255, 0.94);
 }
-
 .landing-hero-secondary:hover {
   color: #071535;
   background: #ffffff;
 }
-
 .landing-hero-screenshot {
   position: relative;
   z-index: 1;
 }
-
 .landing-hero-screenshot-stage {
   position: relative;
 }
-
 .landing-hero-phone {
   display: none;
 }
-
 @media (min-width: 1280px) {
   .landing-hero-phone {
     position: absolute;
@@ -1014,50 +746,53 @@ button {
     width: 278px;
     transform: scale(0.9);
   }
-
   .landing-hero-phone-left {
     right: calc(100% - 56px);
     transform-origin: top right;
   }
-
   .landing-hero-phone-right {
     left: calc(100% - 56px);
     transform-origin: top left;
   }
 }
-
 .landing-section-alt {
   background: #eff6ff;
 }
-
 .dark .landing-section-alt {
   background: #0a0e17;
 }
-
 .landing-cta-section {
   background: #ffffff;
 }
-
 .dark .landing-cta-section {
   background: #050609;
 }
-
 .landing-feature-card {
   background: #ffffff;
 }
-
 .dark .landing-feature-card {
   background: #0a0e17;
 }
-
 .landing-mobile-menu {
   background: linear-gradient(180deg, #071535 0%, #173780 50%, #7686e5 100%);
 }
-
+.landing-mobile-menu-close {
+  color: rgba(255, 255, 255, 0.8);
+}
+.landing-mobile-menu-close:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+}
+.landing-mobile-menu-link {
+  color: rgba(255, 255, 255, 0.85);
+}
+.landing-mobile-menu-link:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+}
 .dark .landing-mobile-menu {
   background: linear-gradient(180deg, #1d3aa0 0%, #0b2d75 42%, #071535 70%, #050609 100%);
 }
-
 .landing-screenshot {
   box-sizing: border-box;
   overflow: hidden;
@@ -1067,22 +802,18 @@ button {
   background: #ffffff;
   box-shadow: 0 20px 50px rgba(7, 21, 53, 0.13);
 }
-
 .dark .landing-screenshot {
   border-color: #3b4252;
   outline-color: rgba(203, 213, 225, 0.22);
   background: #3b4252;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.34);
 }
-
 .landing-screenshot-hero {
   box-shadow: 0 24px 60px rgba(7, 21, 53, 0.28);
 }
-
 .dark .landing-screenshot-hero {
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.48);
 }
-
 /* A simulated iPhone: bezel, band highlight, and the screen's rounded corners. */
 .landing-phone {
   box-sizing: border-box;
@@ -1095,7 +826,6 @@ button {
     0 30px 80px rgba(15, 23, 42, 0.28),
     0 6px 18px rgba(15, 23, 42, 0.14);
 }
-
 /* A near-black bezel disappears against the dark page, so it lightens there. */
 .dark .landing-phone {
   background: #3f3f46;
@@ -1104,65 +834,72 @@ button {
     0 30px 80px rgba(0, 0, 0, 0.5),
     0 6px 18px rgba(0, 0, 0, 0.3);
 }
-
 .landing-phone-screen {
   display: block;
   width: 100%;
   height: auto;
   border-radius: 36px;
 }
-
+/* Desktop: three phones side by side. */
+.landing-phone-track {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2rem;
+}
+.landing-phone-slot {
+  flex: 0 0 auto;
+  transition:
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 320ms ease;
+}
+/* Phones: one horizontal snap scroller, the centred phone at full size. The
+   negative margin lets the track bleed to the viewport edges past the section's
+   16px gutter; scroll-padding keeps the first and last phone centre-able. */
+@media (max-width: 767px) {
+  .landing-phone-track {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    gap: 0.75rem;
+    margin: 0 -1.5rem;
+    padding: 24px calc(50vw - 120px) 40px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .landing-phone-track::-webkit-scrollbar {
+    display: none;
+  }
+  .landing-phone-slot {
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
+    transform: scale(0.84);
+    opacity: 0.55;
+  }
+  .landing-phone-slot[data-active="true"] {
+    transform: scale(1);
+    opacity: 1;
+  }
+  .landing-phone-slot .landing-phone {
+    width: 240px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-phone-slot {
+    transition: none;
+  }
+}
 @media (max-width: 640px) {
   .landing-screenshot {
     border-width: 5px;
     border-radius: 10px;
   }
-
   .landing-hero-gradient {
     height: 880px;
   }
 }
-
-/* Warning filled (bench/attention CTA) */
-.dg-btn-warning-filled {
-  background: var(--dg-color-warning);
-  color: var(--dg-color-on-warning-text);
-  border: 1px solid var(--dg-color-warning);
-}
-
-.dg-btn-warning-filled:hover {
-  background: color-mix(in srgb, var(--dg-color-warning) 95%, black);
-}
-
-.dg-btn-warning-filled:active {
-  background: color-mix(in srgb, var(--dg-color-warning) 90%, black);
-}
-
-/* Dashed outline (add item) */
-.dg-btn-dashed {
-  background: transparent;
-  color: var(--dg-type-control-color);
-  border: 1px solid var(--dg-color-border);
-}
-
-.dg-btn-dashed:hover {
-  background: var(--dg-color-bg-secondary);
-}
-
-/* Toggled-on state for a button whose menu or overlay is open. A class rather
-   than an inline background, because an inline one outranks every :hover rule
-   above and leaves the button dead under the cursor. Placed last so it wins
-   over the variant it modifies. */
-.dg-btn-toggled {
-  background: var(--dg-color-brand-bg);
-  border-color: var(--dg-color-brand-border);
-  color: var(--dg-color-brand);
-}
-
-.dg-btn-toggled:hover {
-  background: var(--dg-color-brand-border);
-}
-
 /* Large variant (marketing/auth CTAs — landing page, login/auth submit buttons) */
 .dg-btn-lg {
   font-size: var(--dg-fs-body);
@@ -1171,27 +908,12 @@ button {
   padding: 0 28px;
   gap: 10px;
 }
-
 .dg-btn-lg > svg {
   width: 18px;
   height: 18px;
 }
-
-/* Small variant */
-.dg-btn-sm {
-  font-size: var(--dg-type-field-title-size);
-  height: var(--dg-btn-h-sm);
-  min-height: var(--dg-btn-h-sm);
-  padding: 0 var(--dg-btn-px-sm);
-}
-
-/* Extra small variant */
-.dg-btn-xs {
-  font-size: var(--dg-type-field-title-size);
-  height: var(--dg-btn-h-xs);
-  min-height: var(--dg-btn-h-xs);
-  padding: 0 var(--dg-btn-px-xs);
-  gap: 6px;
+.dg-btn-icon.dg-btn-lg {
+  width: var(--dg-btn-h-lg);
 }
 
 /* Icon-only button: square, so a lone glyph isn't stranded in text padding.
@@ -1202,10 +924,6 @@ button {
   padding: 0;
 }
 
-.dg-btn-icon.dg-btn-lg {
-  width: var(--dg-btn-h-lg);
-}
-
 .dg-btn-icon.dg-btn-sm {
   width: var(--dg-btn-h-sm);
 }
@@ -1213,564 +931,29 @@ button {
 .dg-btn-icon.dg-btn-xs {
   width: var(--dg-btn-h-xs);
 }
-
-/* Hover row (settings list items) */
-.dg-hover-row:hover {
-  background: var(--dg-color-bg-secondary);
-}
-
 /* ── Input System ───────────────────────────────────────── */
-.dg-input {
-  width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-  height: var(--dg-toolbar-h);
-  padding: 0 12px;
-  border: 1px solid var(--dg-color-border);
-  border-radius: var(--dg-btn-radius);
-  font-size: var(--dg-type-control-size);
-  font-weight: var(--dg-type-control-weight);
-  font-family: inherit;
-  color: var(--dg-type-control-color);
-  background: var(--dg-color-surface);
-  outline: none;
-  transition:
-    border-color 150ms ease,
-    box-shadow 150ms ease;
-}
-
-.dg-input::placeholder {
-  color: var(--dg-color-text-faint);
-}
-
-.dg-input:focus {
-  border-color: var(--dg-color-border-focus);
-  box-shadow: 0 0 0 3px var(--dg-focus-ring);
-}
-
-.dg-input:disabled {
-  background: var(--dg-color-bg);
-  color: var(--dg-color-text-subtle);
-  cursor: not-allowed;
-}
-
-/* Read-only is not disabled. The value still has to read and copy cleanly, so
-   it keeps full text color and a text cursor; the recessed fill is the cue
-   that it cannot be edited. This carries the signal for a removed employee's
-   record, which used to be a blanket 50% dim over the whole card. */
-.dg-input[readonly] {
-  background: var(--dg-color-bg);
-}
-
-.dg-input-error {
-  border-color: var(--dg-color-danger);
-  box-shadow: 0 0 0 3px var(--dg-danger-ring);
-}
-
-/* Integer entry (NumberField): a minus, the value, a plus, in one bordered
-   box with the same corner as every other input. The box is the input's
-   chrome (border, radius, focus ring), the value is centred between the two
-   buttons, and the wheel never steps it. Width is the caller's, set on the
-   box; the minimum leaves room for three digits. */
-.dg-number-field {
-  display: inline-flex;
-  align-items: center;
-  box-sizing: border-box;
-  width: 100%;
-  min-width: 112px;
-  height: var(--dg-toolbar-h);
-  padding: 3px;
-  gap: 2px;
-  border: 1px solid var(--dg-color-border);
-  border-radius: var(--dg-btn-radius);
-  background: var(--dg-color-surface);
-  vertical-align: middle;
-  transition:
-    border-color 150ms ease,
-    box-shadow 150ms ease;
-}
-
-.dg-number-field:focus-within {
-  border-color: var(--dg-color-border-focus);
-  box-shadow: 0 0 0 3px var(--dg-focus-ring);
-}
-
-.dg-number-field-disabled,
-.dg-number-field-readonly {
-  background: var(--dg-color-bg);
-}
-
-.dg-number-field-input {
-  flex: 1;
-  min-width: 0;
-  height: 100%;
-  padding: 0 4px;
-  border: 0;
-  outline: none;
-  background: transparent;
-  text-align: center;
-  font-size: var(--dg-type-control-size);
-  font-weight: var(--dg-type-control-weight);
-  font-family: inherit;
-  font-variant-numeric: tabular-nums;
-  color: var(--dg-type-control-color);
-}
-
-.dg-number-field-input:disabled {
-  color: var(--dg-color-text-subtle);
-  cursor: not-allowed;
-}
-
-/* Inset from the box: a button that ran to the edge read as part of the
-   border. The rounded square inside the field is the target. */
-.dg-number-field-step {
-  flex: 0 0 auto;
-  align-self: stretch;
-  width: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  padding: 0;
-  border-radius: calc(var(--dg-btn-radius) - 2px);
-  background: transparent;
-  color: var(--dg-color-text-muted);
-  cursor: pointer;
-  transition:
-    background-color 120ms ease,
-    color 120ms ease;
-}
-
-.dg-number-field-step:hover:not(:disabled) {
-  background: var(--dg-color-bg-secondary);
-  color: var(--dg-color-text-primary);
-}
-
-.dg-number-field-step:active:not(:disabled) {
-  background: var(--dg-color-border-light);
-}
-
-.dg-number-field-step:disabled {
-  color: var(--dg-color-text-faint);
-  cursor: default;
-}
-
-.dg-number-field-sm {
-  min-width: 92px;
-  height: 30px;
-  padding: 2px;
-}
-
-.dg-number-field-sm .dg-number-field-step {
-  width: 24px;
-}
-
-.dg-number-field-sm .dg-number-field-input {
-  font-size: var(--dg-fs-caption);
-}
-
 /* ── Label System ──────────────────────────────────────── */
-.dg-label {
-  font-size: var(--dg-type-field-title-size);
-  font-weight: var(--dg-type-field-title-weight);
-  color: var(--dg-type-field-title-color);
-  letter-spacing: var(--dg-type-field-title-letter-spacing);
-  line-height: var(--dg-type-field-title-line-height);
-  text-transform: var(--dg-type-field-title-transform);
-  display: block;
-  margin-bottom: 5px;
-}
-
 .dg-form-error {
   color: var(--dg-color-danger);
   font-size: var(--dg-fs-footnote);
   margin: 4px 0 0;
 }
-
-/* ── Segment Control ────────────────────────────────────── */
-.dg-segment {
-  display: flex;
-  height: var(--dg-toolbar-h);
-  background: var(--dg-color-surface);
-  border-radius: var(--dg-btn-radius);
-  border: 1px solid var(--dg-color-border);
-  overflow: hidden;
-}
-
-.dg-segment-btn {
-  background: transparent;
-  border: none;
-  color: var(--dg-type-navigation-color);
-  padding: 0 14px;
-  font-size: var(--dg-type-navigation-size);
-  font-weight: var(--dg-type-navigation-weight);
-  letter-spacing: var(--dg-type-navigation-letter-spacing);
-  cursor: pointer;
-  transition:
-    background 150ms ease,
-    color 150ms ease;
-  font-family: inherit;
-  line-height: 1;
-  height: 100%;
-}
-
-.dg-segment-btn + .dg-segment-btn {
-  border-left: 1px solid var(--dg-color-border);
-}
-
-.dg-segment-btn:hover {
-  background: var(--dg-color-border-light);
-}
-
-.dg-segment-btn:focus-visible {
-  outline: 2px solid var(--dg-color-border-focus);
-  outline-offset: -2px;
-}
-
-.dg-segment-btn.active {
-  background: var(--dg-color-brand);
-  color: var(--dg-color-on-brand-text);
-}
-
-/* ── Span Tabs (pill-style period / filter selector) ────── */
-.dg-span-tabs {
-  display: flex;
-  align-items: stretch;
-  height: var(--dg-toolbar-h);
-  background: var(--dg-color-dark);
-  border-radius: var(--dg-tab-shell-radius);
-  padding: var(--dg-tab-shell-pad);
-  gap: var(--dg-tab-shell-pad);
-}
-
-.dg-span-tab {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  color: var(--dg-on-dark-muted);
-  padding: 0 16px;
-  font-size: var(--dg-type-navigation-size);
-  font-weight: var(--dg-type-navigation-weight);
-  letter-spacing: var(--dg-type-navigation-letter-spacing);
-  cursor: pointer;
-  height: 100%;
-  border-radius: var(--dg-tab-inner-radius);
-  font-family: inherit;
-  line-height: 1;
-  white-space: nowrap;
-  transition:
-    color 200ms ease,
-    background 200ms ease;
-  flex: 1 0 auto;
-}
-
-.dg-span-tab:hover:not(.active) {
-  color: var(--dg-on-dark-secondary);
-}
-
-.dg-span-tab.active {
-  background: var(--dg-color-brand);
-  color: var(--dg-color-on-brand-text);
-}
-
-/* Light variant — white container, dark active pill */
-.dg-span-tabs--light {
-  background: var(--dg-color-surface);
-  border: 1px solid var(--dg-color-border);
-}
-
-.dg-span-tabs--light .dg-span-tab {
-  color: var(--dg-type-navigation-color);
-  border-radius: var(--dg-tab-inner-radius);
-}
-
-.dg-span-tabs--light .dg-span-tab:hover:not(.active) {
-  color: var(--dg-color-text-secondary);
-  background: var(--dg-color-bg-secondary);
-}
-
-.dg-span-tabs--light .dg-span-tab.active {
-  background: var(--dg-color-brand);
-  color: var(--dg-color-on-brand-text);
-}
-
 /* ── Scrollable Tabs (Apple-style chevrons + edge fade) ── */
-.dg-scrollable-tabs {
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  align-items: stretch;
-}
-
-.dg-scroll-inner {
-  display: flex;
-  align-items: stretch;
-  flex: 1;
-  height: 100%;
-  min-width: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  -webkit-overflow-scrolling: touch;
-}
-
-.dg-scroll-inner::-webkit-scrollbar {
-  display: none;
-}
-
-/* Hide scrollbars while keeping scroll behaviour (Firefox, IE, WebKit) */
-.dg-no-scrollbar {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.dg-no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-
-/* Fade overlays — hidden by default, shown via .visible */
-.dg-scroll-fade {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 40px;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 200ms ease;
-}
-
 .dg-scroll-fade.visible {
   opacity: 1;
   pointer-events: auto;
 }
-
-.dg-scroll-fade--left {
-  left: 0;
-  justify-content: flex-start;
-  background: linear-gradient(
-    to right,
-    var(--scrollable-bg, var(--dg-color-surface)) 30%,
-    transparent
-  );
-  padding-left: 2px;
-}
-
-.dg-scroll-fade--right {
-  right: 0;
-  justify-content: flex-end;
-  background: linear-gradient(
-    to left,
-    var(--scrollable-bg, var(--dg-color-surface)) 30%,
-    transparent
-  );
-  padding-right: 2px;
-}
-
-/* Chevron button */
-.dg-scroll-chevron {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: calc(var(--dg-toolbar-h) - 10px);
-  height: calc(var(--dg-toolbar-h) - 10px);
-  border-radius: var(--dg-btn-radius);
-  border: none;
-  background: transparent;
-  color: var(--dg-color-text-muted);
-  cursor: pointer;
-  padding: 0;
-  flex-shrink: 0;
-  transition:
-    color 150ms ease,
-    background 150ms ease;
-}
-
-.dg-scroll-chevron:hover {
-  color: var(--dg-color-text-primary);
-  background: var(--dg-color-bg-secondary);
-}
-
-.dg-scroll-chevron:focus-visible {
-  outline: 2px solid var(--dg-color-border-focus);
-  outline-offset: 1px;
-}
-
-/* Dark variant — adjust gradient + chevron bg */
-.dg-span-tabs:not(.dg-span-tabs--light) .dg-scroll-fade--left {
-  background: linear-gradient(to right, var(--dg-color-dark) 30%, transparent);
-}
-
-.dg-span-tabs:not(.dg-span-tabs--light) .dg-scroll-fade--right {
-  background: linear-gradient(to left, var(--dg-color-dark) 30%, transparent);
-}
-
-.dg-span-tabs:not(.dg-span-tabs--light) .dg-scroll-chevron {
-  background: var(--dg-color-dark);
-  color: var(--dg-on-dark-subtle);
-}
-
-.dg-span-tabs:not(.dg-span-tabs--light) .dg-scroll-chevron:hover {
-  color: var(--dg-color-text-inverse);
-  background: var(--dg-color-dark-elevated);
-}
-
 /* ── Nav Tab (Header Tier 1) ────────────────────────────── */
-.dg-nav-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: var(--dg-toolbar-h);
-  padding: 0 14px;
-  font-size: var(--dg-type-navigation-size);
-  font-weight: var(--dg-type-navigation-weight);
-  letter-spacing: var(--dg-type-navigation-letter-spacing);
-  border-radius: var(--dg-btn-radius);
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--dg-type-navigation-color);
-  cursor: pointer;
-  text-decoration: none;
-  transition:
-    background 150ms ease,
-    border-color 150ms ease,
-    color 150ms ease;
-  font-family: inherit;
-}
-
-.dg-nav-tab:hover {
-  background: var(--dg-color-bg-secondary);
-}
-
-.dg-nav-tab:focus-visible {
-  outline: 2px solid var(--dg-color-border-focus);
-  outline-offset: 2px;
-}
-
-/* Active state is background + color only — no border. The transparent
-   border on the base class stays so the tab's geometry never shifts. */
-.dg-nav-tab.active {
-  background: var(--dg-color-nav-active-bg);
-  color: var(--dg-color-text-primary);
-}
-
-/* ── Sub Tab (Settings / Contextual Tier 2) ─────────────── */
-.dg-sub-tab {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: var(--dg-toolbar-h);
-  padding: 0 16px;
-  font-size: var(--dg-type-navigation-size);
-  font-weight: var(--dg-type-navigation-weight);
-  letter-spacing: var(--dg-type-navigation-letter-spacing);
-  border: none;
-  border-bottom: 2px solid transparent;
-  border-radius: var(--dg-btn-radius) var(--dg-btn-radius) 0 0;
-  background: transparent;
-  color: var(--dg-type-navigation-color);
-  cursor: pointer;
-  transition:
-    color 150ms ease,
-    border-color 150ms ease;
-  font-family: inherit;
-  margin-bottom: -1px;
-}
-
-.dg-sub-tab:hover {
-  color: var(--dg-color-text-secondary);
-}
-
-.dg-sub-tab:focus-visible {
-  outline: 2px solid var(--dg-color-border-focus);
-  outline-offset: -2px;
-}
-
-.dg-sub-tab.active {
-  color: var(--dg-color-brand);
-  font-weight: var(--dg-type-navigation-weight);
-  border-bottom-color: var(--dg-color-brand);
-}
-
-/* Navbar and page-toolbar labels share the same quiet reference typography. */
-.dg-toolbar-type {
-  color: var(--dg-type-navigation-color);
-  font-size: var(--dg-type-navigation-size);
-  font-weight: var(--dg-type-navigation-weight);
-  letter-spacing: var(--dg-type-navigation-letter-spacing);
-}
-
 .dg-toolbar-type .dg-btn,
 .dg-toolbar-type .dg-input {
   font-size: var(--dg-type-navigation-size);
   font-weight: var(--dg-type-navigation-weight);
   letter-spacing: var(--dg-type-navigation-letter-spacing);
 }
-
-.dg-toolbar-type .dg-input {
-  color: inherit;
-}
-
 /* ── Slide-over Panel ───────────────────────────────────── */
-.dg-panel {
-  position: fixed;
-  top: 12px;
-  right: 12px;
-  bottom: 12px;
-  width: min(480px, calc(100vw - 24px));
-  background: var(--dg-color-surface);
-  z-index: 10001;
-  box-shadow: var(--shadow-panel);
-  border: 1px solid var(--dg-color-border);
-  border-radius: var(--dg-radius-lg);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  animation: panel-in var(--dg-duration-standard) ease-out;
-  /* On the base rule so shrinking back animates as well as growing. */
-  transition: width var(--dg-duration-standard) ease;
-}
-
-.dg-panel-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--dg-overlay);
-  backdrop-filter: blur(var(--dg-overlay-blur));
-  -webkit-backdrop-filter: blur(var(--dg-overlay-blur));
-  z-index: 10000;
-  animation: fade-in var(--dg-duration-standard) ease;
-}
-
 /* Wider variants for panels with richer content. Scoped to the same
    breakpoint as .dg-panel's own mobile full-screen override below, so
    neither fights over width. */
-@media (min-width: 768px) {
-  .dg-panel--wide {
-    width: min(560px, calc(100vw - 24px));
-  }
-
-  .dg-panel--x-wide {
-    width: min(640px, calc(100vw - 24px));
-  }
-
-  /* Content-driven widths for a review surface: the panel opens at the
-     standard width and grows leftwards, one card column at a time, when the
-     tab in front has more to show. The transition is what makes that read as
-     the same panel making room rather than a new one opening. */
-  .dg-panel--cols-2 {
-    width: min(760px, calc(100vw - 24px));
-  }
-
-  .dg-panel--max {
-    width: min(1200px, calc(100vw - 24px));
-  }
-}
-
 @keyframes panel-in {
   from {
     transform: translateX(100%);
@@ -1780,7 +963,6 @@ button {
     transform: translateX(0);
   }
 }
-
 @keyframes fade-in {
   from {
     opacity: 0;
@@ -1790,7 +972,6 @@ button {
     opacity: 1;
   }
 }
-
 /* ── Entrance Animations ──────────────────────────────── */
 @keyframes dg-enter {
   from {
@@ -1800,7 +981,6 @@ button {
     opacity: 1;
   }
 }
-
 @keyframes dg-enter-scale {
   from {
     opacity: 0;
@@ -1809,365 +989,6 @@ button {
     opacity: 1;
   }
 }
-
-.dg-page-enter {
-  animation: dg-enter var(--dg-duration-standard) ease-out both;
-}
-
-.dg-card-enter {
-  animation: dg-enter-scale var(--dg-duration-standard) ease-out both;
-}
-
-.dg-row-enter {
-  animation: dg-enter 200ms ease-out both;
-}
-
-.dg-staff-directory-header,
-.dg-staff-directory-row {
-  display: grid;
-  grid-template-columns:
-    100px minmax(180px, 2fr) 110px 110px minmax(140px, 1fr) minmax(120px, 0.8fr)
-    minmax(140px, 1fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) 140px 40px;
-  align-items: stretch;
-}
-
-@media (min-width: 768px) {
-  .dg-staff-directory-header,
-  .dg-staff-directory-row {
-    grid-template-columns:
-      100px minmax(180px, 2fr) 110px 110px minmax(140px, 1fr) minmax(120px, 0.8fr)
-      minmax(140px, 1fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) 140px 40px;
-  }
-}
-
-@media (min-width: 1024px) {
-  .dg-staff-directory-header,
-  .dg-staff-directory-row {
-    grid-template-columns:
-      100px minmax(180px, 2fr) 110px 110px minmax(140px, 1fr) minmax(120px, 0.8fr)
-      minmax(140px, 1fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) 140px 40px;
-  }
-}
-
-.dg-staff-directory-header {
-  min-height: 40px;
-  border-bottom: 1px solid var(--dg-color-border-light);
-}
-
-.dg-staff-directory-head-cell {
-  align-items: center;
-  min-width: 0;
-  padding-block: 10px;
-  color: var(--dg-type-table-heading-color);
-  font-size: var(--dg-type-table-heading-size);
-  font-weight: var(--dg-type-table-heading-weight);
-  letter-spacing: var(--dg-type-table-heading-letter-spacing);
-  line-height: var(--dg-type-table-heading-line-height);
-  text-transform: var(--dg-type-table-heading-transform);
-}
-
-.dg-staff-directory-row {
-  background: var(--dg-color-surface);
-  position: relative;
-  z-index: 1;
-  transform: translate3d(0, 0, 0);
-  transition: transform 220ms cubic-bezier(0.2, 0, 0, 1);
-  border-bottom: 1px solid var(--dg-color-border-light);
-  will-change: transform;
-}
-
-.dg-staff-directory-row:last-child {
-  border-bottom: 0;
-}
-
-.dg-staff-directory-row {
-  touch-action: none;
-  user-select: none;
-}
-
-.dg-staff-directory-row[data-dragging="true"] {
-  z-index: 5;
-  cursor: grabbing;
-  box-shadow: var(--shadow-drag);
-}
-
-.dg-staff-directory-row[data-dragging="true"][data-drag-phase="dragging"] {
-  transition: none;
-}
-
-.dg-staff-directory-row[data-dragging="true"][data-drag-phase="settling"] {
-  transition: transform 220ms cubic-bezier(0.2, 0, 0, 1);
-}
-
-.dg-staff-directory-row[data-moving="true"] {
-  z-index: 3;
-}
-
-.dg-staff-directory-cell {
-  align-items: center;
-  min-width: 0;
-  padding-inline: 16px;
-}
-
-/* Headers share the cell padding so column labels line up with cell content. */
-.dg-staff-directory-head-cell {
-  padding-inline: 16px;
-}
-
-/* Vertical dividers between visible columns. The rightmost data cell at
-   each breakpoint drops its right border so the row doesn't end with a
-   hanging line before the empty chevron / utility column. */
-.dg-staff-directory-head-cell:not(:last-child),
-.dg-staff-directory-cell:not(:last-child) {
-  border-right: 1px solid var(--dg-color-border-light);
-}
-
-/* Base (<md): Status (col 4) is the rightmost visible data column. */
-.dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(4),
-.dg-staff-directory-row > .dg-staff-directory-cell:nth-child(4) {
-  border-right: none;
-}
-
-@media (min-width: 768px) {
-  /* md: Status regains its divider; Certification (col 6) is now rightmost. */
-  .dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(4),
-  .dg-staff-directory-row > .dg-staff-directory-cell:nth-child(4) {
-    border-right: 1px solid var(--dg-color-border-light);
-  }
-  .dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(6),
-  .dg-staff-directory-row > .dg-staff-directory-cell:nth-child(6) {
-    border-right: none;
-  }
-}
-
-@media (min-width: 1024px) {
-  /* lg: Certification regains its divider; Date Joined (col 10) is the rightmost. */
-  .dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(6),
-  .dg-staff-directory-row > .dg-staff-directory-cell:nth-child(6) {
-    border-right: 1px solid var(--dg-color-border-light);
-  }
-  .dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(10),
-  .dg-staff-directory-row > .dg-staff-directory-cell:nth-child(10) {
-    border-right: none;
-  }
-}
-
-/* Outer column gutters (24px) match the table-mode `pl-6` / `pr-6` so reorder mode aligns with normal mode. */
-.dg-staff-directory-cell--rank,
-.dg-staff-directory-head-cell:first-child {
-  padding-left: 24px;
-}
-
-.dg-staff-directory-cell--chevron,
-.dg-staff-directory-head-cell:last-child {
-  padding-right: 24px;
-}
-
-.dg-staff-directory-cell--rank {
-  width: 100px;
-}
-
-.dg-staff-directory-cell--employment {
-  width: 110px;
-}
-
-.dg-staff-directory-cell--status {
-  width: 110px;
-}
-
-/* Reordering is available only in the Active tab, where a status column would
-   repeat information the selected tab already provides. */
-.dg-staff-directory-table--without-status .dg-staff-directory-header,
-.dg-staff-directory-table--without-status .dg-staff-directory-row {
-  grid-template-columns:
-    100px minmax(180px, 2fr) 110px minmax(140px, 1fr) minmax(120px, 0.8fr)
-    minmax(140px, 1fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) 140px 40px;
-}
-
-.dg-staff-directory-table--without-status
-  .dg-staff-directory-header
-  > .dg-staff-directory-head-cell:nth-child(3),
-.dg-staff-directory-table--without-status
-  .dg-staff-directory-row
-  > .dg-staff-directory-cell:nth-child(3) {
-  border-right: none;
-}
-
-@media (min-width: 768px) {
-  .dg-staff-directory-table--without-status .dg-staff-directory-header,
-  .dg-staff-directory-table--without-status .dg-staff-directory-row {
-    grid-template-columns:
-      100px minmax(180px, 2fr) 110px minmax(140px, 1fr) minmax(120px, 0.8fr)
-      minmax(140px, 1fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) 140px 40px;
-  }
-
-  .dg-staff-directory-table--without-status
-    .dg-staff-directory-header
-    > .dg-staff-directory-head-cell:nth-child(3),
-  .dg-staff-directory-table--without-status
-    .dg-staff-directory-row
-    > .dg-staff-directory-cell:nth-child(3),
-  .dg-staff-directory-table--without-status
-    .dg-staff-directory-header
-    > .dg-staff-directory-head-cell:nth-child(4),
-  .dg-staff-directory-table--without-status
-    .dg-staff-directory-row
-    > .dg-staff-directory-cell:nth-child(4) {
-    border-right: 1px solid var(--dg-color-border-light);
-  }
-
-  .dg-staff-directory-table--without-status
-    .dg-staff-directory-header
-    > .dg-staff-directory-head-cell:nth-child(5),
-  .dg-staff-directory-table--without-status
-    .dg-staff-directory-row
-    > .dg-staff-directory-cell:nth-child(5) {
-    border-right: none;
-  }
-}
-
-@media (min-width: 1024px) {
-  .dg-staff-directory-table--without-status .dg-staff-directory-header,
-  .dg-staff-directory-table--without-status .dg-staff-directory-row {
-    grid-template-columns:
-      100px minmax(180px, 2fr) 110px minmax(140px, 1fr) minmax(120px, 0.8fr)
-      minmax(140px, 1fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) 140px 40px;
-  }
-
-  .dg-staff-directory-table--without-status
-    .dg-staff-directory-header
-    > .dg-staff-directory-head-cell:nth-child(5),
-  .dg-staff-directory-table--without-status
-    .dg-staff-directory-row
-    > .dg-staff-directory-cell:nth-child(5) {
-    border-right: 1px solid var(--dg-color-border-light);
-  }
-
-  .dg-staff-directory-table--without-status
-    .dg-staff-directory-header
-    > .dg-staff-directory-head-cell:nth-child(9),
-  .dg-staff-directory-table--without-status
-    .dg-staff-directory-row
-    > .dg-staff-directory-cell:nth-child(9) {
-    border-right: none;
-  }
-}
-
-/* Every directory column stays in the stable-width horizontal table at every
-   viewport. Breakpoints no longer remove data; the outer container scrolls. */
-.dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(4),
-.dg-staff-directory-row > .dg-staff-directory-cell:nth-child(4),
-.dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(6),
-.dg-staff-directory-row > .dg-staff-directory-cell:nth-child(6) {
-  border-right: 1px solid var(--dg-color-border-light);
-}
-
-.dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(10),
-.dg-staff-directory-row > .dg-staff-directory-cell:nth-child(10) {
-  border-right: none;
-}
-
-.dg-staff-directory-table--without-status
-  .dg-staff-directory-header
-  > .dg-staff-directory-head-cell:nth-child(3),
-.dg-staff-directory-table--without-status
-  .dg-staff-directory-row
-  > .dg-staff-directory-cell:nth-child(3),
-.dg-staff-directory-table--without-status
-  .dg-staff-directory-header
-  > .dg-staff-directory-head-cell:nth-child(5),
-.dg-staff-directory-table--without-status
-  .dg-staff-directory-row
-  > .dg-staff-directory-cell:nth-child(5) {
-  border-right: 1px solid var(--dg-color-border-light);
-}
-
-.dg-staff-directory-table--without-status
-  .dg-staff-directory-header
-  > .dg-staff-directory-head-cell:nth-child(9),
-.dg-staff-directory-table--without-status
-  .dg-staff-directory-row
-  > .dg-staff-directory-cell:nth-child(9) {
-  border-right: none;
-}
-
-.dg-staff-directory-cell--date-joined {
-  width: 140px;
-}
-
-.dg-staff-directory-cell--name {
-  min-width: 0;
-}
-
-.dg-staff-directory-cell--chevron {
-  justify-content: flex-end;
-}
-
-.dg-settings-reorder-item,
-.dg-settings-reorder-group,
-.dg-settings-reorder-subitem {
-  position: relative;
-  z-index: 1;
-  transform: translate3d(0, var(--dg-settings-reorder-offset, 0px), 0);
-  transition:
-    transform 180ms cubic-bezier(0.2, 0, 0, 1),
-    background 150ms ease;
-  will-change: transform;
-}
-
-.dg-settings-reorder-item,
-.dg-settings-reorder-subitem {
-  align-items: center;
-}
-
-.dg-settings-reorder-item[data-dragging="true"],
-.dg-settings-reorder-group[data-dragging="true"],
-.dg-settings-reorder-subitem[data-dragging="true"] {
-  z-index: 5;
-  background: var(--dg-color-surface);
-  box-shadow: var(--shadow-drag);
-  cursor: grabbing;
-}
-
-.dg-settings-reorder-item[data-dragging="true"][data-drag-phase="dragging"],
-.dg-settings-reorder-group[data-dragging="true"][data-drag-phase="dragging"],
-.dg-settings-reorder-subitem[data-dragging="true"][data-drag-phase="dragging"] {
-  transition: none;
-}
-
-.dg-settings-reorder-item[data-dragging="true"][data-drag-phase="settling"],
-.dg-settings-reorder-group[data-dragging="true"][data-drag-phase="settling"],
-.dg-settings-reorder-subitem[data-dragging="true"][data-drag-phase="settling"] {
-  transition:
-    transform 180ms cubic-bezier(0.2, 0, 0, 1),
-    background 150ms ease;
-}
-
-.dg-settings-reorder-item[data-moving="true"],
-.dg-settings-reorder-group[data-moving="true"],
-.dg-settings-reorder-subitem[data-moving="true"] {
-  z-index: 3;
-}
-
-.dg-settings-reorder-handle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 28px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--dg-color-text-faint);
-  cursor: grab;
-  touch-action: none;
-  user-select: none;
-}
-
-.dg-settings-reorder-handle:active {
-  cursor: grabbing;
-}
-
 /* ── Dropdown Menu ─────────────────────────────────────── */
 .dg-menu {
   background: var(--dg-color-surface);
@@ -2178,19 +999,12 @@ button {
   min-width: 160px;
   scrollbar-width: none;
 }
-
 .dg-menu::-webkit-scrollbar {
   display: none;
 }
-
-.dg-profile-menu {
-  min-width: 224px;
-}
-
 .dg-profile-menu .dg-menu-item {
   white-space: nowrap;
 }
-
 .dg-menu-item {
   display: flex;
   align-items: center;
@@ -2209,165 +1023,24 @@ button {
   font-family: inherit;
   transition: background 150ms ease;
 }
-
 /* Keeps a hovered row from fusing with the selected one below it. */
 .dg-menu-item + .dg-menu-item {
   margin-top: 2px;
 }
-
 .dg-menu-item:hover {
   background: var(--dg-color-bg-secondary);
 }
-
 .dg-menu-item:focus-visible {
   outline: 2px solid var(--dg-color-border-focus);
   outline-offset: -2px;
 }
-
 .dg-menu-item:disabled,
 .dg-menu-item[aria-disabled="true"] {
   opacity: 0.5;
   cursor: default;
   pointer-events: none;
 }
-
-.dg-menu-item--danger {
-  color: var(--dg-color-danger);
-}
-
-.dg-menu-item--danger:hover {
-  background: var(--dg-color-danger-bg);
-}
-
-.dg-menu-item--accent {
-  color: var(--dg-color-link);
-}
-
-.dg-menu-item--accent:hover {
-  background: var(--dg-color-bg-secondary);
-}
-
-.dg-menu-divider {
-  height: 1px;
-  background: var(--dg-color-border-light);
-  margin: 4px 0;
-}
-
 /* ── Address Autocomplete ─────────────────────────────── */
-.dg-address-autocomplete {
-  position: relative;
-}
-
-.dg-address-panel {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border: 1px solid var(--dg-color-border);
-  border-radius: var(--dg-radius-lg);
-  background: var(--dg-color-surface);
-  box-shadow: var(--shadow-menu);
-}
-
-.dg-address-panel-list {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: 4px;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 4px;
-  scrollbar-width: none;
-}
-
-.dg-address-panel-list::-webkit-scrollbar {
-  display: none;
-}
-
-.dg-address-item {
-  display: grid;
-  grid-template-columns: 16px minmax(0, 1fr);
-  gap: 10px;
-  width: 100%;
-  padding: 9px 12px;
-  border: none;
-  border-radius: var(--dg-radius-sm);
-  background: transparent;
-  text-align: left;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background 150ms ease;
-}
-
-.dg-address-item:hover,
-.dg-address-item[aria-selected="true"] {
-  background: var(--dg-color-bg-secondary);
-}
-
-.dg-address-item:focus-visible {
-  outline: 2px solid var(--dg-color-border-focus);
-  outline-offset: -2px;
-}
-
-.dg-address-item-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  color: var(--dg-color-text-faint);
-  margin-top: 1px;
-}
-
-.dg-address-item-copy {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.dg-address-item-title {
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.35;
-  color: var(--dg-color-text-primary);
-}
-
-.dg-address-item-subtitle {
-  font-size: 12px;
-  line-height: 1.35;
-  color: var(--dg-color-text-muted);
-}
-
-.dg-address-match {
-  color: var(--dg-color-text-primary);
-  font-weight: 600;
-}
-
-.dg-address-state {
-  padding: 12px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--dg-color-text-muted);
-}
-
-.dg-address-panel-foot {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: flex-end;
-  padding: 8px 12px;
-  border-top: 1px solid var(--dg-color-border-light);
-}
-
-.dg-address-panel-attribution {
-  display: inline-flex;
-  align-items: center;
-  font-size: var(--dg-type-metadata-size);
-  font-weight: var(--dg-type-metadata-weight);
-  line-height: var(--dg-type-metadata-line-height);
-  color: var(--dg-color-text-faint);
-}
-
 /* ── Modal ──────────────────────────────────────────────── */
 .dg-modal-overlay {
   position: fixed;
@@ -2385,237 +1058,10 @@ button {
   justify-content: center;
   animation: fade-in var(--dg-duration-standard) ease;
 }
-
 /* Variant: keep the sticky app header visible above the overlay. */
 .dg-modal-overlay.is-header-safe {
   top: var(--dg-app-shell-header-height);
 }
-
-.dg-app-shell-header {
-  position: sticky;
-  top: 0;
-  z-index: 9999;
-}
-
-.dg-app-shell-header-surface {
-  background: var(--dg-color-bg);
-}
-
-.dg-modal {
-  position: relative;
-  background: var(--dg-color-surface);
-  border-radius: var(--dg-radius-xl);
-  padding: 28px 32px;
-  min-width: 320px;
-  max-width: 480px;
-  max-height: calc(100vh - 48px);
-  width: 100%;
-  box-shadow: var(--shadow-modal);
-  border: 1px solid var(--dg-color-border);
-  outline: none;
-  animation: modal-in var(--dg-duration-standard) ease-out;
-  display: flex;
-  flex-direction: column;
-}
-
-.dg-scroll-overflow-marker {
-  display: none;
-}
-
-.dg-modal-scroll-region {
-  display: flex;
-  min-height: 0;
-  flex: 1 1 auto;
-  flex-direction: column;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
-/* A pinned action row keeps 16px on both sides of its buttons, so the modal's
-   own bottom padding tightens to match instead of stacking underneath. */
-.dg-modal-footer {
-  flex: 0 0 auto;
-  padding-top: 16px;
-  border-top: 1px solid var(--dg-color-border-light);
-}
-
-.dg-modal.dg-modal--with-footer {
-  padding-bottom: 16px;
-}
-
-.dg-scroll-overflow-cue {
-  position: absolute;
-  left: 50%;
-  z-index: 6;
-  display: grid;
-  width: 48px;
-  height: 48px;
-  place-items: center;
-  padding: 0;
-  color: var(--dg-color-text-primary);
-  background: var(--dg-color-surface);
-  border: 1px solid var(--dg-color-border);
-  border-radius: 9999px;
-  box-shadow: var(--shadow-raised);
-  cursor: pointer;
-  transform: translateX(-50%);
-  transition:
-    background-color var(--dg-duration-fast) ease,
-    border-color var(--dg-duration-fast) ease,
-    transform var(--dg-duration-fast) ease;
-}
-
-.dg-scroll-overflow-cue:hover {
-  background: var(--dg-color-bg-secondary);
-}
-
-.dg-scroll-overflow-cue:active {
-  transform: translateX(-50%) scale(0.96);
-}
-
-.dg-scroll-overflow-cue:focus-visible {
-  outline: 2px solid var(--dg-color-brand);
-  outline-offset: 2px;
-}
-
-.dg-scroll-overflow-cue--viewport {
-  position: fixed;
-  bottom: 20px;
-  z-index: 100;
-}
-
-/* Modal sub-elements */
-.dg-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 24px;
-}
-
-.dg-modal-title {
-  font-size: var(--dg-fs-title);
-  font-weight: 700;
-  color: var(--dg-color-text-primary);
-}
-
-.dg-modal--auth-help {
-  max-width: 360px;
-}
-
-.dg-modal--account-disabled {
-  max-width: 400px;
-}
-
-/* Activity details keeps context quiet so the event and changed values lead. */
-.dg-activity-details-modal {
-  max-width: 520px;
-  width: min(520px, calc(100vw - 32px));
-}
-
-.dg-activity-details-modal .dg-modal-header {
-  margin-bottom: 18px;
-}
-
-/* For a body that opens on a filled notice: 24px under a 16px title leaves
-   the banner floating, so the header holds the same 12px the banner keeps
-   inside its own edge. */
-.dg-modal--tight-header .dg-modal-header {
-  margin-bottom: 12px;
-}
-
-.dg-activity-details-modal .dg-modal-title {
-  color: var(--dg-type-content-group-heading-color);
-  font-size: var(--dg-type-content-group-heading-size);
-  font-weight: var(--dg-type-content-group-heading-weight);
-  line-height: var(--dg-type-content-group-heading-line-height);
-}
-
-.dg-activity-details {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.dg-activity-details-summary {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.dg-activity-details-headline {
-  color: var(--dg-type-component-heading-color);
-  font-size: var(--dg-type-component-heading-size);
-  font-weight: var(--dg-type-component-heading-weight);
-  letter-spacing: var(--dg-type-component-heading-letter-spacing);
-  line-height: var(--dg-type-component-heading-line-height);
-}
-
-.dg-activity-details-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin: 0;
-}
-
-.dg-activity-details-row {
-  display: grid;
-  grid-template-columns: minmax(116px, 128px) minmax(0, 1fr);
-  gap: 16px;
-  align-items: start;
-}
-
-.dg-activity-details-label {
-  color: var(--dg-type-field-title-color);
-  font-size: var(--dg-type-field-title-size);
-  font-weight: var(--dg-type-field-title-weight);
-  line-height: var(--dg-type-field-title-line-height);
-}
-
-.dg-activity-details-value {
-  min-width: 0;
-  margin: 0;
-  overflow-wrap: anywhere;
-  color: var(--dg-type-body-color);
-  font-size: var(--dg-type-body-size);
-  font-weight: var(--dg-type-body-weight);
-  line-height: var(--dg-type-body-line-height);
-}
-
-.dg-activity-details-identity,
-.dg-activity-details-identity-primary,
-.dg-activity-details-identity-secondary {
-  display: block;
-}
-
-.dg-activity-details-identity-primary {
-  color: var(--dg-color-text-primary);
-  font-weight: 500;
-}
-
-.dg-activity-details-identity-secondary {
-  margin-top: 2px;
-  color: var(--dg-type-metadata-color);
-  font-size: var(--dg-type-metadata-size);
-  font-weight: var(--dg-type-metadata-weight);
-  line-height: var(--dg-type-metadata-line-height);
-}
-
-.dg-activity-details-changes {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding-top: 16px;
-  border-top: 1px solid var(--dg-color-border-light);
-}
-
-.dg-activity-details-empty {
-  color: var(--dg-type-metadata-color);
-  font-size: var(--dg-type-metadata-size);
-  font-weight: var(--dg-type-metadata-weight);
-  line-height: var(--dg-type-metadata-line-height);
-}
-
 /* Activity toolbar controls read as one line, so a long period label cannot
    make its button grow mid-row and push the rest of the toolbar out of line.
    Deliberately not app-wide: the schedule toolbar relies on its buttons
@@ -2626,393 +1072,30 @@ button {
 .dg-activity-toolbar [role="button"] {
   white-space: nowrap;
 }
-
 /* ── Activity log: period navigation, summary, and table ── */
-
-.dg-activity-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px 16px;
-  margin-bottom: 12px;
-}
-
-/* The filters move as one cluster: either they sit beside the navigation or
-   they take their own row, never split with the select stranded below. */
-.dg-activity-toolbar-filters {
-  display: flex;
-  flex: 0 1 auto;
-  min-width: 0;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 8px;
-}
-
-.dg-activity-search {
-  position: relative;
-  flex: 1 1 auto;
-}
-
-.dg-activity-search-icon {
-  position: absolute;
-  left: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  pointer-events: none;
-  color: var(--dg-color-text-faint);
-}
-
-.dg-activity-search .dg-input {
-  width: 100%;
-  padding-left: 32px;
-  padding-right: 30px;
-}
-
-.dg-activity-navigator {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-/* The arrows and the period they move stay together when the toolbar wraps. */
-.dg-activity-stepper {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-/* Content-sized: the period label is never clipped. */
-.dg-activity-period-label {
-  width: auto;
-  flex: 0 0 auto;
-}
-
-.dg-activity-today {
-  height: var(--dg-toolbar-h);
-  padding: 0 14px;
-  flex-shrink: 0;
-}
-
-.dg-activity-zone-note {
-  font-size: var(--dg-fs-footnote);
-  color: var(--dg-color-text-muted);
-}
-
 /* Below this the row genuinely cannot hold every control, so the stepper takes
    its own line and the remaining tools sit under it. */
-@media (max-width: 640px) {
-  .dg-activity-navigator,
-  .dg-activity-stepper {
-    width: 100%;
-  }
-
-  .dg-activity-period-label {
-    flex: 1;
-    width: auto;
-    min-width: 0;
-  }
-
-  .dg-activity-navigator .dg-span-tabs {
-    flex: 1 1 auto;
-  }
-}
-
-@media (max-width: 520px) {
-  .dg-activity-toolbar-filters {
-    width: 100%;
-    flex-wrap: wrap;
-  }
-
-  .dg-activity-search {
-    flex: 1 1 150px;
-  }
-}
-
-.dg-activity-summary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-  margin: 12px 0;
-}
-
-.dg-activity-summary-meta {
-  font-size: var(--dg-fs-body-sm);
-  color: var(--dg-color-text-muted);
-}
-
-.dg-activity-summary-chips {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
-
-.dg-activity-chip-button {
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  font: inherit;
-  border-radius: 4px;
-}
-
-.dg-activity-chip-button:focus-visible {
-  outline: 2px solid var(--dg-color-border-focus);
-  outline-offset: 2px;
-}
-
-.dg-activity-chip-button[aria-pressed="true"] {
-  box-shadow: 0 0 0 1px var(--dg-color-brand);
-  border-radius: 4px;
-}
-
-/* `clip` rather than `hidden`: `hidden` makes a scroll container, which would
-   become the containing block for the sticky day headings inside. */
-.dg-activity-table-shell {
-  overflow: clip;
-  border: 1px solid var(--dg-color-border-light);
-  border-radius: var(--dg-radius-md);
-  background: var(--dg-color-surface);
-}
-
-/* Separate borders keep the day headings' background painted while stuck;
-   collapsed borders detach from a sticky cell in Chromium. */
-.dg-activity-table {
-  border-collapse: separate;
-  border-spacing: 0;
-}
-
 .dg-activity-head-row > th {
   background: var(--dg-color-bg);
   padding: 10px 12px;
   border-bottom: 1px solid var(--dg-color-border-light);
   border-right: 1px solid var(--dg-color-border-light);
 }
-
 .dg-activity-head-row > th:first-child {
   padding-left: 24px;
 }
-
 .dg-activity-head-row > th:last-child {
   padding-right: 24px;
   border-right: 0;
 }
-
-.dg-activity-day-heading {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  background: var(--dg-color-bg);
-  padding: 10px 24px;
-  text-align: left;
-  border-bottom: 1px solid var(--dg-color-border-light);
-}
-
-.dg-activity-day-heading-inner {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.dg-activity-day-label {
-  font-size: var(--dg-type-content-group-heading-size);
-  font-weight: var(--dg-type-content-group-heading-weight);
-  line-height: var(--dg-type-content-group-heading-line-height);
-  color: var(--dg-type-content-group-heading-color);
-}
-
-.dg-activity-day-date {
-  font-size: var(--dg-fs-footnote);
-  color: var(--dg-color-text-muted);
-}
-
-.dg-activity-row {
-  cursor: pointer;
-  transition: background 150ms ease;
-}
-
-.dg-activity-row:hover,
-.dg-activity-row:focus-visible {
-  background: var(--dg-color-row-alt);
-}
-
-.dg-activity-row:focus-visible {
-  outline: 2px solid var(--dg-color-border-focus);
-  outline-offset: -2px;
-}
-
-.dg-activity-cell {
-  padding: 14px 12px;
-  vertical-align: top;
-  font-size: var(--dg-fs-body-sm);
-  color: var(--dg-color-text-primary);
-  border-bottom: 1px solid var(--dg-color-border-light);
-  border-right: 1px solid var(--dg-color-border-light);
-}
-
-.dg-activity-cell:first-child {
-  padding-left: 24px;
-}
-
-.dg-activity-cell:last-child {
-  padding-right: 24px;
-  border-right: 0;
-}
-
-.dg-activity-cell--when,
-.dg-activity-cell--type,
-.dg-activity-cell--identity {
-  white-space: nowrap;
-}
-
-.dg-activity-time {
-  font-weight: 500;
-  color: var(--dg-color-text-primary);
-  font-variant-numeric: tabular-nums;
-}
-
-.dg-activity-identity {
-  min-width: 0;
-  max-width: 220px;
-}
-
-.dg-activity-identity-primary {
-  font-weight: 500;
-  color: var(--dg-color-text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.dg-activity-identity-secondary {
-  font-size: var(--dg-fs-footnote);
-  color: var(--dg-color-text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.dg-activity-description {
-  font-weight: 500;
-  color: var(--dg-color-text-primary);
-}
-
-.dg-activity-detail-list {
-  margin-top: 2px;
-  font-size: var(--dg-fs-footnote);
-  color: var(--dg-color-text-muted);
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
-
-.dg-activity-detail-key {
-  font-weight: 600;
-}
-
-.dg-activity-context {
-  margin-top: 4px;
-  font-size: var(--dg-fs-footnote);
-  color: var(--dg-color-text-muted);
-}
-
-.dg-activity-cell--chevron {
-  width: 40px;
-  text-align: right;
-  vertical-align: middle;
-  color: var(--dg-color-text-faint);
-}
-
-.dg-activity-skeleton-row {
-  display: flex;
-  gap: 16px;
-  padding: 14px 24px;
-  border-bottom: 1px solid var(--dg-color-border-light);
-}
-
-.dg-activity-skeleton-row:last-child {
-  border-bottom: 0;
-}
-
-.dg-role-department-edit-pills,
-.dg-role-requirement-edit-pills,
-.dg-role-requirement-pills {
-  display: flex;
-  min-width: 0;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.dg-role-requirement-pills--view {
-  flex-wrap: wrap;
-}
-
-.dg-role-requirement-cell {
-  position: relative;
-  min-width: 0;
-}
-
-.dg-role-requirement-view-pill {
-  flex: 0 1 auto;
-  max-width: 100%;
-}
-
 .dg-role-department-edit-pills > button,
 .dg-role-requirement-edit-pills > button {
   min-width: 0;
   max-width: 100%;
 }
-
-.dg-role-requirement-overflow-trigger {
-  min-width: max-content;
-  flex: none;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  cursor: help;
-  font: inherit;
-}
-
-.dg-role-requirement-overflow-trigger:focus-visible {
-  border-radius: 4px;
-  outline: 2px solid var(--dg-color-border-focus);
-  outline-offset: 2px;
-}
-
-.dg-role-requirement-pill-label {
-  display: block;
-  min-width: 0;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-
-.dg-role-requirement-measurer {
-  position: absolute;
-  width: max-content;
-  visibility: hidden;
-  pointer-events: none;
-}
-
 .dg-role-requirement-measurer > span {
   display: inline-block;
 }
-
-.dg-role-requirement-measurer .dg-role-requirement-pill-label {
-  white-space: nowrap;
-}
-
-@media (max-width: 480px) {
-  .dg-activity-details-row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 2px;
-  }
-}
-
 /* Shared close/clear "X" button. Used by <CloseButton> (components/ui/CloseButton.tsx). */
 .dg-close-btn {
   display: inline-flex;
@@ -3029,311 +1112,95 @@ button {
     color var(--dg-duration-fast) ease,
     border-color var(--dg-duration-fast) ease;
 }
-
 .dg-close-btn:hover {
   background: color-mix(in srgb, var(--dg-color-text-primary) 12%, transparent);
   color: var(--dg-color-text-primary);
 }
-
 .dg-close-btn:active {
   background: color-mix(in srgb, var(--dg-color-text-primary) 20%, transparent);
 }
-
 .dg-close-btn:focus-visible {
   outline: 2px solid var(--dg-color-border-focus);
   outline-offset: -2px;
 }
-
 .dg-close-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   pointer-events: none;
 }
-
 .dg-close-btn--xs {
   width: 24px;
   height: 24px;
 }
-
 .dg-close-btn--sm {
   width: 26px;
   height: 26px;
 }
-
 .dg-close-btn--md,
 .dg-close-btn--lg {
   border-radius: 8px;
   border: 1px solid transparent;
 }
-
 .dg-close-btn--md {
   width: 32px;
   height: 32px;
 }
-
 .dg-close-btn--lg {
   width: 40px;
   height: 40px;
 }
-
 .dg-close-btn--md:hover,
 .dg-close-btn--lg:hover,
 .dg-close-btn--md:focus-visible,
 .dg-close-btn--lg:focus-visible {
   border-color: var(--dg-color-border);
 }
-
 @media (max-width: 767px) {
   .dg-close-btn--xs,
   .dg-close-btn--sm {
     width: 32px;
     height: 32px;
   }
-
   .dg-close-btn--lg {
     width: 44px;
     height: 44px;
   }
 }
-
-.dg-modal-section {
-  margin-bottom: 20px;
-}
-
-.dg-modal-section-label {
-  font-size: var(--dg-fs-footnote);
-  font-weight: 700;
-  color: var(--dg-color-text-subtle);
-  letter-spacing: 0.07em;
-  margin-bottom: 8px;
-}
-
-.dg-modal-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-.dg-open-shift-staffing-modal {
-  width: min(560px, calc(100vw - 32px));
-}
-
-.dg-open-shift-staffing-summary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 10px;
-  padding: 14px 16px;
-  border: 1px solid var(--dg-color-border-light);
-  border-radius: var(--dg-btn-radius);
-  background: var(--dg-color-bg-secondary);
-  color: var(--dg-color-text-secondary);
-  font-size: var(--dg-fs-caption);
-}
-
 .dg-open-shift-staffing-summary strong {
   width: 100%;
   color: var(--dg-color-text-primary);
   font-size: var(--dg-fs-body);
 }
-
-.dg-open-shift-staffing-search {
-  position: relative;
-  display: flex;
-  align-items: center;
-  margin-top: 16px;
-}
-
 .dg-open-shift-staffing-search > svg {
   position: absolute;
   left: 13px;
   color: var(--dg-color-text-muted);
   pointer-events: none;
 }
-
-.dg-open-shift-staffing-search .dg-input {
-  width: 100%;
-  padding-left: 39px;
-}
-
-.dg-open-shift-staffing-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.dg-open-shift-staffing-person {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  min-height: 60px;
-  padding: 10px 12px;
-  border: 1px solid var(--dg-color-border);
-  border-radius: var(--dg-btn-radius);
-  background: var(--dg-color-surface);
-  color: var(--dg-color-text-primary);
-  text-align: left;
-  cursor: pointer;
-}
-
-.dg-open-shift-staffing-person:hover,
-.dg-open-shift-staffing-person[aria-checked="true"] {
-  border-color: var(--dg-color-brand);
-  background: var(--dg-color-brand-bg);
-}
-
-.dg-open-shift-staffing-radio {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
-  border: 2px solid var(--dg-color-border-strong);
-  border-radius: 50%;
-  background: var(--dg-color-surface);
-  box-shadow: inset 0 0 0 4px var(--dg-color-surface);
-}
-
-.dg-open-shift-staffing-person[aria-checked="true"] .dg-open-shift-staffing-radio {
-  border-color: var(--dg-color-brand);
-  background: var(--dg-color-brand);
-}
-
-.dg-open-shift-staffing-person-copy {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-  gap: 2px;
-}
-
 .dg-open-shift-staffing-person-copy strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 .dg-open-shift-staffing-person-copy span {
   color: var(--dg-color-text-muted);
   font-size: var(--dg-fs-footnote);
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
-
-.dg-open-shift-staffing-assignment {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 16px;
-}
-
 .dg-open-shift-staffing-assignment > label {
   color: var(--dg-color-text-secondary);
   font-size: var(--dg-fs-footnote);
   font-weight: 600;
 }
-
-.dg-open-shift-staffing-empty {
-  display: flex;
-  min-height: 150px;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 24px;
-  color: var(--dg-color-text-muted);
-  text-align: center;
-}
-
 .dg-open-shift-staffing-empty strong {
   color: var(--dg-color-text-primary);
 }
-
-.dg-open-shift-staffing-actions {
-  display: grid;
-  width: 100%;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
 .dg-open-shift-staffing-actions .dg-btn {
   width: 100%;
   min-width: 0;
   white-space: nowrap;
 }
-
-/* Custom checkbox — replaces native checkboxes for brand consistency */
-.dg-checkbox {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
-  border-width: 2px;
-  border-style: solid;
-  border-color: var(--dg-color-text-muted);
-  background: var(--dg-color-surface);
-  cursor: pointer;
-  flex-shrink: 0;
-  position: relative;
-  transition:
-    background var(--dg-duration-fast) ease,
-    border-color var(--dg-duration-fast) ease;
-}
-
-.dg-checkbox:hover:not(:checked):not(:disabled) {
-  border-color: var(--dg-color-text-secondary);
-}
-
-.dg-checkbox:checked {
-  background: var(--dg-color-brand);
-  border-color: var(--dg-color-brand);
-}
-
-.dg-checkbox:checked::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 46%;
-  width: 5px;
-  height: 9px;
-  border: solid var(--dg-color-on-brand-text);
-  border-width: 0 2px 2px 0;
-  transform: translate(-50%, -50%) rotate(45deg);
-}
-
-.dg-checkbox:focus-visible {
-  outline: 2px solid var(--dg-color-brand);
-  outline-offset: 2px;
-}
-
-.dg-checkbox-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  cursor: pointer;
-  font-size: var(--dg-fs-label);
-  color: var(--dg-color-text-secondary);
-  border-bottom: 1px solid var(--dg-color-border-light);
-}
-
-.dg-checkbox-row:last-child {
-  border-bottom: none;
-}
-
-.dg-checkbox-row--header {
-  background: var(--dg-color-bg-secondary);
-  border-bottom: 1px solid var(--dg-color-border);
-  font-weight: 600;
-}
-
-.dg-checklist {
-  border: 1px solid var(--dg-color-border);
-  border-radius: var(--dg-radius-md);
-  overflow: hidden;
-}
-
 @keyframes modal-in {
   from {
     transform: scale(0.96);
@@ -3345,7 +1212,6 @@ button {
     opacity: 1;
   }
 }
-
 /* ── Staff Detail Panel (master-detail split) ──────────── */
 .staff-master-detail {
   display: flex;
@@ -3353,7 +1219,6 @@ button {
   width: 100%;
   min-height: 0;
 }
-
 .staff-list-pane {
   flex: 1;
   min-width: 0;
@@ -3362,17 +1227,7 @@ button {
   gap: 16px;
   transition: flex 220ms ease;
 }
-
 /* ── Sidebar collapse ────────────────────────────────────────── */
-.dg-sidebar {
-  transition:
-    width 220ms ease,
-    padding 220ms ease,
-    opacity 180ms ease;
-  overflow: hidden;
-  position: relative;
-}
-
 .dg-sidebar.collapsed {
   width: 0 !important;
   padding: 0 !important;
@@ -3380,81 +1235,6 @@ button {
   pointer-events: none;
   border-right: none;
 }
-
-.dg-sidebar-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  border: 1px solid var(--dg-color-border);
-  background: var(--dg-color-surface);
-  cursor: pointer;
-  color: var(--dg-color-text-muted);
-  transition:
-    background 120ms ease,
-    color 120ms ease;
-  flex-shrink: 0;
-  padding: 0;
-}
-
-.dg-sidebar-toggle:hover {
-  background: var(--dg-color-bg-secondary);
-  color: var(--dg-color-text-primary);
-}
-
-.dg-sidebar-toggle:focus-visible {
-  outline: 2px solid var(--dg-color-border-focus);
-  outline-offset: 2px;
-}
-
-.dg-sidebar-expand {
-  position: absolute;
-  top: 12px;
-  left: 8px;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  border: 1px solid var(--dg-color-border);
-  background: var(--dg-color-surface);
-  cursor: pointer;
-  color: var(--dg-color-text-muted);
-  box-shadow: var(--dg-shadow-sidebar-toggle);
-  transition:
-    background 120ms ease,
-    color 120ms ease;
-  padding: 0;
-}
-
-.dg-sidebar-expand:hover {
-  background: var(--dg-color-bg-secondary);
-  color: var(--dg-color-text-primary);
-}
-
-.dg-sidebar-expand:focus-visible {
-  outline: 2px solid var(--dg-color-border-focus);
-  outline-offset: 2px;
-}
-
-/* ── Table Row Hover (replaces JS onMouseEnter/Leave) ── */
-.dg-table-row {
-  transition: background 150ms ease;
-}
-.dg-table-row:hover {
-  background: var(--dg-color-row-alt);
-}
-.dg-table-row.expanded {
-  background: var(--dg-color-info-bg);
-}
-.dg-table-row.expanded:hover {
-  background: var(--dg-color-info-bg);
-}
-
 /* Strip the trailing divider from the last row of every <tbody>. :last-child
    also covers single-row tables (the only row is the last row). !important
    overrides inline `style={{ borderBottom: ... }}` used by bespoke tables
@@ -3465,15 +1245,6 @@ table tbody > tr:last-child > td,
 table tbody > tr:last-child > th {
   border-bottom: 0 !important;
 }
-
-/* Div-based "table" lists (settings panels: AbsenceTypeRow, CoverageOptionRow,
-   IndicatorRow, JobRow, ActivityLog skeleton). Each row component renders its
-   own outer <div> with inline borderBottom; this strips the divider on the
-   last (or only) row. */
-.dg-list-row:last-child {
-  border-bottom: 0 !important;
-}
-
 .staff-detail-header {
   display: flex;
   flex-direction: column;
@@ -3485,36 +1256,29 @@ table tbody > tr:last-child > th {
   background: var(--dg-color-surface);
   z-index: 2;
 }
-
 .staff-panel-action-footer,
 .staff-panel-editor-footer {
   flex-shrink: 0;
   border-top: 1px solid var(--dg-color-border-light);
   background: var(--dg-color-surface);
 }
-
 .staff-panel-action-footer {
   max-height: min(45dvh, 360px);
   overflow-y: auto;
   padding: 12px 24px;
 }
-
 .staff-panel-editor-footer {
   padding: 16px 24px;
 }
-
 /* Mobile: full-screen panel */
-
 @media (max-width: 767px) {
   .staff-panel-action-footer {
     padding: 12px 16px;
   }
-
   .staff-panel-editor-footer {
     padding: 12px 16px max(12px, env(safe-area-inset-bottom));
   }
 }
-
 /* ── Staff Detail Tab Styles ──────────────────────────── */
 .staff-detail-tab[data-selected] {
   color: var(--dg-color-info-text) !important;
@@ -3525,7 +1289,6 @@ table tbody > tr:last-child > th {
   background: var(--dg-color-bg-secondary);
   border-radius: 6px 6px 0 0;
 }
-
 /* ── Staff Detail Hero ──────────────────────────────────── */
 .staff-hero {
   background: var(--dg-color-surface);
@@ -3543,7 +1306,6 @@ table tbody > tr:last-child > th {
   height: 80px;
   pointer-events: none;
 }
-
 /* ── Staff Detail Grids ─────────────────────────────────── */
 .staff-grid-3 {
   display: grid;
@@ -3561,7 +1323,6 @@ table tbody > tr:last-child > th {
     grid-template-columns: 1fr;
   }
 }
-
 /* ── Staff Stat Widget ──────────────────────────────────── */
 .staff-stat {
   background: var(--dg-color-surface);
@@ -3573,283 +1334,16 @@ table tbody > tr:last-child > th {
   flex-direction: column;
   gap: 8px;
 }
-
 /* ── Grid Cell Styles ──────────────────────────────────── */
-.dg-grid-slot,
-.dg-grid-cell {
-  position: relative;
-  transition:
-    background 100ms ease,
-    box-shadow 100ms ease;
-}
-
-.dg-grid-slot[data-today="true"],
-.dg-grid-cell[data-today="true"] {
-  background: var(--dg-color-today-bg);
-}
-
-.dg-grid-cell {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  /* Change chips intentionally rise above their pills. They must be allowed
-     to clear a neighbouring cell instead of being cropped at the cell edge. */
-  overflow: visible;
-}
-
-.dg-grid-cell__content {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  width: 100%;
-  height: 100%;
-  align-items: stretch;
-  justify-content: center;
-}
-
-.dg-grid-slot > :not(.dg-grid-slot__chrome),
-.dg-grid-cell > :not(.dg-grid-cell__chrome) {
-  position: relative;
-  z-index: 1;
-}
-
-.dg-grid-slot__chrome,
-.dg-grid-cell__chrome {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 3;
-}
-
-.dg-grid-slot[data-leading-divider="light"] .dg-grid-slot__chrome::before,
-.dg-grid-cell[data-leading-divider="light"] .dg-grid-cell__chrome::before,
-.dg-grid-slot[data-leading-divider="split"] .dg-grid-slot__chrome::before,
-.dg-grid-cell[data-leading-divider="split"] .dg-grid-cell__chrome::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 0;
-}
-
-.dg-grid-slot[data-leading-divider="light"] .dg-grid-slot__chrome::before,
-.dg-grid-cell[data-leading-divider="light"] .dg-grid-cell__chrome::before {
-  border-left: 1px solid var(--dg-color-border-light);
-}
-
-.dg-grid-slot[data-leading-divider="split"] .dg-grid-slot__chrome::before,
-.dg-grid-cell[data-leading-divider="split"] .dg-grid-cell__chrome::before {
-  border-left: 1px solid var(--dg-color-grid-divider-strong);
-}
-
-.dg-grid-cell[data-top-divider] .dg-grid-cell__chrome,
-.dg-grid-slot[data-bottom-divider] .dg-grid-slot__chrome {
-  --dg-grid-divider-inset: 0px;
-}
-
-.dg-grid-cell[data-week-split-start="true"][data-top-divider] .dg-grid-cell__chrome,
-.dg-grid-slot[data-week-split-start="true"][data-bottom-divider] .dg-grid-slot__chrome {
-  --dg-grid-divider-inset: 1px;
-}
-
-.dg-grid-cell[data-top-divider="light"] .dg-grid-cell__chrome {
-  background-image: linear-gradient(
-    to right,
-    var(--dg-color-border-light),
-    var(--dg-color-border-light)
-  );
-  background-position: var(--dg-grid-divider-inset) 0;
-  background-repeat: no-repeat;
-  background-size: calc(100% - var(--dg-grid-divider-inset)) 1px;
-}
-
-.dg-grid-cell[data-top-divider="dark"] .dg-grid-cell__chrome {
-  background-image: linear-gradient(to right, var(--dg-color-dark), var(--dg-color-dark));
-  background-position: var(--dg-grid-divider-inset) 0;
-  background-repeat: no-repeat;
-  background-size: calc(100% - var(--dg-grid-divider-inset)) 1px;
-}
-
-.dg-grid-cell[data-top-divider="warning"] .dg-grid-cell__chrome {
-  background-image: repeating-linear-gradient(
-    to right,
-    var(--dg-color-warning-border) 0 6px,
-    transparent 6px 10px
-  );
-  background-position: var(--dg-grid-divider-inset) 0;
-  background-repeat: no-repeat;
-  background-size: calc(100% - var(--dg-grid-divider-inset)) 2px;
-}
-
-.dg-grid-slot[data-bottom-divider="light"] .dg-grid-slot__chrome {
-  background-image: linear-gradient(
-    to right,
-    var(--dg-color-border-light),
-    var(--dg-color-border-light)
-  );
-  background-position: var(--dg-grid-divider-inset) 100%;
-  background-repeat: no-repeat;
-  background-size: calc(100% - var(--dg-grid-divider-inset)) 1px;
-}
-
-.dg-grid-slot[data-bottom-divider="warning"] .dg-grid-slot__chrome {
-  background-image: repeating-linear-gradient(
-    to right,
-    var(--dg-color-warning-border) 0 6px,
-    transparent 6px 10px
-  );
-  background-position: var(--dg-grid-divider-inset) 100%;
-  background-repeat: no-repeat;
-  background-size: calc(100% - var(--dg-grid-divider-inset)) 2px;
-}
-
-.dg-grid-cell[data-locked="true"] {
-  background: var(--dg-locked-bg);
-}
-
-.dg-grid-cell[data-drop-target="true"] {
-  z-index: 4;
-  background: var(--dg-color-bg-secondary) !important;
-}
-
-.dg-grid-cell[data-active="true"] {
-  background: var(--dg-color-bg-secondary) !important;
-}
-
-.dg-grid-cell[data-bulk-mode="true"] {
-  cursor: default;
-}
-
-.dg-grid-cell[data-bulk-mode="true"][data-bulk-selectable="true"] {
-  cursor: pointer;
-}
-
-.dg-grid-cell[data-bulk-mode="true"][data-bulk-selected="true"] {
-  background: var(--dg-color-brand-bg) !important;
-}
-
-.dg-grid-cell__bulk-selection-ring {
-  position: absolute;
-  z-index: 7;
-  pointer-events: none;
-  border: 2px solid var(--dg-color-danger);
-  box-shadow: 0 0 0 1px var(--dg-color-surface);
-}
-
-.dg-grid-cell__bulk-selected-indicator {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  z-index: 8;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  background: var(--dg-color-danger);
-  color: var(--dg-color-surface);
-  border: 2px solid var(--dg-color-surface);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
-  font-size: var(--dg-type-badge-size);
-  font-weight: 600;
-  line-height: 1;
-  pointer-events: none;
-}
-
-.dg-grid-cell:focus-visible .dg-grid-cell__chrome::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  border-radius: 0;
-}
-
-.dg-grid-cell[data-week-split-start="true"]:focus-visible .dg-grid-cell__chrome::after {
-  left: 1px;
-}
-
-/* The focus-area label and the date row pin as one native sticky group beneath
-   the app header and the schedule toolbar. It only layers above the rows while
-   it is actually stuck: at rest the first staff row's change chip must keep
-   hanging over the header cap the way chips hang into the row above everywhere
-   else. The group is opaque so nothing scrolls through the label. */
-.dg-grid-sticky-group {
-  position: sticky;
-  top: calc(var(--dg-app-shell-header-height, 56px) + var(--dg-schedule-chrome-height, 0px));
-  background: var(--dg-color-bg);
-}
-
-.dg-grid-sticky-group[data-stuck="true"] {
-  z-index: 11;
-}
-
-@media print {
-  .dg-grid-sticky-group {
-    position: static;
-  }
-}
-
-.dg-grid-active-outline {
-  position: absolute;
-  box-sizing: border-box;
-  border: 1px solid var(--dg-color-primary);
-  pointer-events: none;
-  z-index: 6;
-}
-
-.dg-grid-cell[data-interactive="true"]:not([data-locked="true"]):hover {
-  background: var(--dg-color-bg-secondary) !important;
-}
-
 /* Suppress hover effects during active drag */
 html[data-dragging] .dg-grid-cell[data-interactive="true"]:not([data-locked="true"]):hover {
   background: transparent !important;
 }
-
-.dg-grid-cell[data-interactive="true"]:not([data-locked="true"]) {
-  cursor: pointer;
-}
-
-.dg-grid-cell[data-locked="true"] {
-  cursor: not-allowed;
-}
-
 /* Dim locked cells during active drag to show they are invalid drop targets */
 html[data-dragging] .dg-grid-cell[data-locked="true"] {
   opacity: 0.4;
 }
-
-.dg-grid-cell:focus-visible {
-  outline: none;
-  z-index: 5;
-}
-
-.dg-grid-cell:focus-visible .dg-grid-cell__chrome::after {
-  box-shadow:
-    inset 0 0 0 1px var(--dg-color-border-focus),
-    1px 0 0 0 var(--dg-color-border-focus),
-    0 1px 0 0 var(--dg-color-border-focus);
-}
-
 /* ── Open Shift Button ────────────────────────────────── */
-.dg-open-shift-btn {
-  transition:
-    filter 100ms ease,
-    border-color 100ms ease,
-    box-shadow 100ms ease;
-}
-.dg-open-shift-btn:hover {
-  filter: brightness(0.93);
-}
-.dg-open-shift-btn:focus-visible {
-  outline: 2px solid var(--dg-color-border-focus);
-  outline-offset: -2px;
-}
-
 /* ── Tooltip Animation ─────────────────────────────────── */
 @keyframes tooltipFadeIn {
   from {
@@ -3861,14 +1355,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     transform: translate(-50%, -100%) scale(1);
   }
 }
-
 /* ── Shift Cell Transition ─────────────────────────────── */
-.dg-shift-pill {
-  transition:
-    transform 150ms ease,
-    opacity 150ms ease;
-}
-
 /* ── Snap-back Animation (when drag is cancelled) ─────── */
 @keyframes dg-snap-back {
   0% {
@@ -3884,213 +1371,51 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     opacity: 1;
   }
 }
-.dg-draggable-shift.dg-snap-back {
-  animation: dg-snap-back 200ms ease-out;
-}
-
 /* ── Empty Cell Hover Affordance ──────────────────────── */
-.dg-grid-cell[data-interactive="true"][data-empty="true"]:not([data-locked="true"]):hover::after {
-  content: "+";
-  position: absolute;
-  font-size: 25px;
-  font-weight: 400;
-  color: var(--dg-color-text-faint);
-  opacity: 0.6;
-  pointer-events: none;
-}
-
 /* ── Draft Banner ───────────────────────────────────────── */
-.dg-draft-banner {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding: 8px 16px;
-  margin: 8px 16px;
-  background: var(--dg-color-warning-bg);
-  border: 1px solid var(--dg-color-warning-border);
-  border-radius: var(--dg-radius-md);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--dg-color-warning-text);
-}
-
-.dg-draft-banner-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--dg-color-warning);
-  flex-shrink: 0;
-}
-
-.dg-draft-banner-actions {
-  margin-left: auto;
-  display: flex;
-  gap: 8px;
-}
-
-/* Draft breakdown chips */
-.dg-draft-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: var(--dg-radius-md);
-}
-.dg-draft-chip--new {
-  background: var(--dg-color-success-bg);
-  color: var(--dg-color-success-text);
-}
-/* Amber, not brand: this chip keys the grid's own "edited" tone, and a
-   brand-tinted chip next to an amber cell reads as a different thing. */
-.dg-draft-chip--modified {
-  background: var(--dg-color-warning-bg);
-  color: var(--dg-color-warning-text);
-}
-.dg-draft-chip--deleted {
-  background: var(--dg-color-danger-bg);
-  color: var(--dg-color-danger);
-}
-.dg-draft-chip--notes {
-  background: var(--dg-color-brand-bg);
-  color: var(--dg-color-brand);
-}
-
 /* ── Dashboard Card ─────────────────────────────────────── */
-.dg-card {
-  --dg-card-padding-x: 18px;
-  background: var(--dg-color-surface);
-  border: 1px solid var(--dg-color-border);
-  border-radius: var(--dg-radius-md);
-  overflow: hidden;
-  animation: dg-enter-scale var(--dg-duration-standard) ease-out both;
-}
-
-.dg-card-header {
-  padding: 14px var(--dg-card-padding-x);
-  border-bottom: 1px solid var(--dg-color-border-light);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.dg-card-title {
-  font-size: var(--dg-fs-label);
-  font-weight: 600;
-  color: var(--dg-color-text-primary);
-}
-
-.dg-card-subtitle {
-  font-size: var(--dg-fs-footnote);
-  color: var(--dg-color-text-subtle);
-  margin-top: 1px;
-}
-
-.dg-card-body {
-  padding: 16px var(--dg-card-padding-x);
-}
-
-/* Side padding only, for an embedded editor that brings its own vertical rhythm. */
-.dg-card-body-sides {
-  padding-left: var(--dg-card-padding-x);
-  padding-right: var(--dg-card-padding-x);
-}
-
 /* ── Form Layout Helpers ───────────────────────────────── */
-.dg-form-row {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.dg-form-grid-2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-.dg-form-grid-3 {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 16px;
-}
-
-@media (max-width: 767px) {
-  .dg-form-grid-2,
-  .dg-form-grid-3 {
-    grid-template-columns: 1fr;
-  }
-}
-
-.dg-form-hint {
-  font-size: var(--dg-fs-footnote);
-  color: var(--dg-color-text-muted);
-  margin: 4px 0 0;
-}
-
-.dg-form-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.dg-save-badge {
-  font-size: var(--dg-fs-label);
-  color: var(--dg-color-success);
-  font-weight: 600;
-}
-
 /* ── Toast Overrides (Sonner) ───────────────────────────── */
 /* Vibrant, full-color banner toasts — no shadows */
 [data-sonner-toaster] {
   --width: min(calc(100vw - 48px), 720px) !important;
 }
-
 [data-sonner-toast] {
   box-shadow: none !important;
   padding: 14px 48px 14px 20px !important;
   width: var(--width) !important;
 }
-
 /* Toast type colors — vibrant solid backgrounds with white text */
 [data-sonner-toast][data-type="success"] {
   background: var(--dg-toast-success-bg) !important;
   color: var(--dg-color-text-inverse) !important;
   border: 1px solid var(--dg-toast-success-border) !important;
 }
-
 [data-sonner-toast][data-type="error"] {
   background: var(--dg-toast-error-bg) !important;
   color: var(--dg-color-text-inverse) !important;
   border: 1px solid var(--dg-toast-error-border) !important;
 }
-
 [data-sonner-toast][data-type="info"] {
   background: var(--dg-toast-info-bg) !important;
   color: var(--dg-color-text-inverse) !important;
   border: 1px solid var(--dg-toast-info-border) !important;
 }
-
 [data-sonner-toast][data-type="warning"] {
   background: var(--dg-toast-warning-bg) !important;
   color: var(--dg-color-text-inverse) !important;
   border: 1px solid var(--dg-toast-warning-border) !important;
 }
-
 [data-sonner-toast] [data-title] {
   color: inherit !important;
   font-size: 14px !important;
   font-weight: 600 !important;
 }
-
 [data-sonner-toast] [data-description] {
   color: var(--dg-on-dark-description) !important;
   font-size: 13px !important;
   font-weight: 500 !important;
 }
-
 /* Close button — white pill */
 [data-sonner-toast] [data-close-button] {
   position: absolute !important;
@@ -4112,18 +1437,15 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   width: 28px !important;
   height: 28px !important;
 }
-
 [data-sonner-toast] [data-close-button]:hover {
   background: var(--dg-on-dark-control-hover) !important;
   transform: translateY(-50%) scale(1.1) !important;
 }
-
 [data-sonner-toast] [data-close-button] svg {
   width: 14px !important;
   height: 14px !important;
   color: var(--dg-color-text-inverse) !important;
 }
-
 /* Action button — dark for universal contrast */
 [data-sonner-toast] [data-button] {
   background: var(--dg-color-dark) !important;
@@ -4136,103 +1458,49 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   margin-left: auto !important;
   transition: all 150ms ease !important;
 }
-
 [data-sonner-toast] [data-button]:hover {
   background: var(--dg-color-dark-elevated) !important;
   transform: translateY(-1px);
 }
-
 /* ── Loading Patterns ──────────────────────────────────── */
-/*
-  Four sanctioned loading patterns:
-  1. Page-level:   <ProgressBar loading={bool} />      — thin bar at top of viewport
-  2. Button-level: <ButtonLoading loading={bool}>      — spinner overlay preserving button size
-  3. Skeleton:     .dg-skeleton + size variants below  — shimmer placeholder while content loads
-  4. Spinner:      <ButtonSpinner>                     — shared native activity indicator
-*/
-
-:where(.dg-skeleton) {
-  position: relative;
-  overflow: hidden;
-  background: var(--dg-color-bg-secondary);
-  border-radius: var(--dg-radius-sm);
-}
-
-:where(.dg-skeleton)::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  transform: translateX(-100%);
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.62), transparent);
-  animation: dg-shimmer 1.5s linear infinite;
-}
-
-.dg-skeleton--text {
-  height: 14px;
-  width: 60%;
-}
-.dg-skeleton--heading {
-  height: 22px;
-  width: 40%;
-}
-.dg-skeleton--avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-}
-.dg-skeleton--card {
-  height: 120px;
-  border-radius: var(--dg-radius-md);
-}
-
 @keyframes dg-shimmer {
   100% {
     transform: translateX(100%);
   }
 }
-
 /* ── Modal / Panel Exit Animations ─────────────────────── */
 .dg-modal-overlay.closing {
   animation: fade-out var(--dg-duration-fast) ease forwards;
 }
-
 .dg-modal-overlay.closing .dg-modal {
   animation: modal-out var(--dg-duration-fast) ease forwards;
 }
-
 @keyframes fade-out {
   to {
     opacity: 0;
   }
 }
-
 @keyframes modal-out {
   to {
     transform: scale(0.96);
     opacity: 0;
   }
 }
-
 .dg-panel.closing {
   animation: panel-out var(--dg-duration-standard) ease forwards;
 }
-
 .dg-panel-overlay.closing {
   animation: fade-out var(--dg-duration-standard) ease forwards;
 }
-
 @keyframes panel-out {
   to {
     transform: translateX(100%);
   }
 }
-
 /* ── Print Legend (hidden on screen, shown on last print page) ── */
 .print-legend {
   display: none;
 }
-
 .print-legend__title {
   font-size: 16px;
   font-weight: 700;
@@ -4241,19 +1509,16 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   padding-bottom: 8px;
   border-bottom: 2px solid var(--dg-color-text-primary);
 }
-
 .print-legend__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 8px 24px;
 }
-
 .print-legend__item {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-
 .print-legend__badge {
   display: inline-block;
   font-size: 11px;
@@ -4263,20 +1528,11 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   white-space: nowrap;
   flex-shrink: 0;
 }
-
 .print-legend__name {
   font-size: 12px;
   color: var(--dg-color-text-secondary);
 }
-
 /* ── Auth Form System ──────────────────────────────────── */
-.dg-auth-loading {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .dg-auth-shell {
   min-height: 100vh;
   background: var(--dg-color-auth-shell-bg);
@@ -4286,7 +1542,6 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   justify-content: center;
   padding: 24px 16px;
 }
-
 .dg-auth-logo-block {
   display: flex;
   flex-direction: column;
@@ -4295,17 +1550,11 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   margin-bottom: 28px;
   text-decoration: none;
 }
-
-.dg-auth-logo-block--compact {
-  gap: 8px;
-}
-
 .dg-auth-logo-block--spacious {
   margin-bottom: 32px;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
-
 .dg-auth-heading {
   font-size: var(--dg-fs-card-title);
   font-weight: 700;
@@ -4313,11 +1562,9 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   text-align: center;
   margin-bottom: 24px;
 }
-
 .dg-auth-page-heading {
   margin-bottom: 8px;
 }
-
 .dg-auth-description {
   margin: 0 0 24px;
   color: var(--dg-color-text-muted);
@@ -4325,7 +1572,6 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   line-height: 1.5;
   text-align: center;
 }
-
 .dg-auth-field-label {
   display: block;
   font-size: var(--dg-fs-label);
@@ -4333,9 +1579,9 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   margin-bottom: 6px;
   color: var(--dg-color-text-label);
 }
-
 .dg-auth-input {
   width: 100%;
+  min-height: var(--dg-auth-control-h);
   padding: 14px 16px;
   border: 1.5px solid var(--dg-color-border);
   border-radius: var(--dg-radius-md);
@@ -4350,33 +1596,31 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     border-color 150ms ease,
     box-shadow 150ms ease;
 }
-
+.dg-auth-textarea {
+  min-height: 92px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.dg-auth-required {
+  color: var(--dg-color-danger);
+}
 .dg-auth-input::placeholder {
   color: var(--dg-color-text-faint);
 }
-
 .dg-auth-input:focus {
   border-color: var(--dg-color-border-focus);
   box-shadow: 0 0 0 3px var(--dg-focus-ring);
 }
-
 .dg-auth-input:disabled {
   background: var(--dg-color-bg);
   color: var(--dg-color-text-subtle);
   cursor: not-allowed;
 }
-
-.dg-auth-input--readonly {
-  background: var(--dg-color-bg-secondary);
-  color: var(--dg-color-text-subtle);
-}
-
 .dg-auth-input--error,
 .dg-auth-input--error:focus {
   border-color: var(--dg-color-danger);
   box-shadow: 0 0 0 3px var(--dg-danger-ring);
 }
-
 /* Icon tile — the 56px circle behind Mail / CheckCircle on status cards */
 .dg-auth-icon-tile {
   width: 56px;
@@ -4389,34 +1633,10 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   justify-content: center;
   margin: 0 auto 20px;
 }
-
 .dg-auth-icon-tile--success {
   background: var(--dg-color-success-bg);
   color: var(--dg-color-success);
 }
-
-/* Workspace pill (slug.basedomain) shown on org login + MFA screens */
-.dg-auth-badge {
-  display: inline-block;
-  background: var(--dg-color-brand-bg);
-  color: var(--dg-color-brand);
-  border: 1px solid var(--dg-color-brand-border);
-  border-radius: 999px;
-  padding: 4px 14px;
-  font-size: var(--dg-fs-label);
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-
-.dg-auth-badge-wrap {
-  margin-bottom: 28px;
-  text-align: center;
-}
-
-.dg-auth-badge-wrap--compact {
-  margin-bottom: 20px;
-}
-
 .dg-auth-link {
   background: none;
   border: none;
@@ -4427,19 +1647,15 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   padding: 0;
   text-decoration: underline;
 }
-
 .dg-auth-link:hover {
   color: var(--dg-color-text-primary);
 }
-
 .dg-auth-link--subtle {
   color: var(--dg-color-text-subtle);
 }
-
 .dg-auth-link--subtle:hover {
   color: var(--dg-color-text-label);
 }
-
 .dg-auth-footer {
   display: flex;
   align-items: center;
@@ -4451,7 +1667,6 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   color: var(--dg-color-text-label);
   font-size: var(--dg-fs-label);
 }
-
 .dg-auth-footer-content {
   display: flex;
   flex-wrap: wrap;
@@ -4459,20 +1674,16 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   justify-content: center;
   gap: 4px;
 }
-
 .dg-auth-sentence-link {
   color: inherit;
   text-decoration: underline;
 }
-
 .dg-auth-sentence-link:hover {
   color: var(--dg-color-text-primary);
 }
-
 .dg-auth-footer-separator {
   margin: 0 4px;
 }
-
 .dg-auth-footer-button {
   padding: 0;
   border: 0;
@@ -4481,224 +1692,63 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   cursor: pointer;
   font: inherit;
 }
-
 .dg-auth-footer-button:hover {
   color: var(--dg-color-text-primary);
 }
-
 .dg-auth-form {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
-
-.dg-auth-forgot {
-  margin-top: 2px;
-  text-align: right;
-}
-
 .dg-auth-submit,
 .dg-auth-state-primary {
   width: 100%;
 }
-
 .dg-auth-submit {
   margin-top: 4px;
 }
-
-.dg-auth-progress {
-  margin: 0;
-  text-align: center;
-}
-
 .dg-auth-back-link {
   margin-top: 20px;
   text-align: center;
 }
-
-.dg-auth-resend {
-  width: 100%;
-  margin-bottom: 16px;
-}
-
-.dg-auth-footnote {
-  margin: 0 0 16px;
-  color: var(--dg-color-text-subtle);
-  font-size: var(--dg-fs-caption);
-  text-align: center;
-}
-
-.dg-auth-centered {
-  text-align: center;
-}
-
-.dg-auth-portal-label {
-  color: var(--dg-color-text-label);
-  font-size: var(--dg-fs-label);
-  font-weight: var(--dg-type-field-title-weight);
-}
-
-.dg-auth-login-navigation,
-.dg-auth-selector-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.dg-auth-login-navigation {
-  gap: 10px;
-  margin-top: 20px;
-}
-
-.dg-auth-org-prefix {
-  margin: 0 0 4px;
-  color: var(--dg-color-text-secondary);
-  font-size: var(--dg-fs-body);
-  font-weight: 500;
-  text-align: center;
-}
-
-.dg-auth-org-navigation {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  margin-top: 20px;
-}
-
-.dg-auth-selector-description {
-  margin: 0 0 28px;
-  color: var(--dg-color-text-secondary);
-  font-size: var(--dg-fs-body);
-  font-weight: 500;
-  text-align: center;
-}
-
-.dg-auth-selector-actions {
-  gap: 12px;
-}
-
-.dg-auth-help-link {
-  font-size: var(--dg-fs-body-sm);
-}
-
-.dg-auth-modal-copy {
-  margin: 0 0 20px;
-  color: var(--dg-color-text-secondary);
-  font-size: var(--dg-fs-body-sm);
-  line-height: 1.5;
-}
-
-.dg-auth-agreement {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  color: var(--dg-color-text-secondary);
-  cursor: pointer;
-  font-size: var(--dg-fs-body-sm);
-}
-
-.dg-auth-agreement-checkbox {
-  width: 18px;
-  height: 18px;
-  margin-top: 2px;
-  accent-color: var(--dg-color-brand);
-  cursor: pointer;
-}
-
-.dg-auth-policy-link {
-  color: var(--dg-color-brand);
-  text-decoration: underline;
-}
-
-.dg-auth-policy-link:hover {
-  color: var(--dg-color-brand-light);
-}
-
-.dg-terms-acceptance {
-  display: flex;
-  width: 100%;
-  max-width: 960px;
-  flex-direction: column;
-  overflow: hidden;
-  border-radius: var(--dg-radius-xl);
-  background: var(--dg-color-surface);
-  box-shadow: var(--dg-shadow-auth-card);
-}
-
-.dg-terms-acceptance__header {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  padding: 32px 32px 16px;
-  text-align: center;
-}
-
-.dg-terms-acceptance__title {
-  margin: 0;
-  color: var(--dg-color-text-primary);
-  font-size: var(--dg-fs-heading);
-  font-weight: 700;
-}
-
-.dg-terms-acceptance__intro {
-  max-width: 520px;
-  margin: 0;
-  color: var(--dg-color-text-secondary);
-  font-size: var(--dg-fs-body-sm);
-  line-height: 1.6;
-}
-
-.dg-terms-acceptance__content {
-  max-height: min(65vh, 640px);
-  margin: 0 32px;
-  padding: 16px 24px;
-  overflow-y: auto;
-  border: 1px solid var(--dg-color-border-light);
-  border-radius: var(--dg-radius-lg);
-  background: var(--dg-color-bg-secondary);
-  font-family: var(--font-sans);
-}
-
-.dg-terms-acceptance__actions {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 20px 32px 28px;
-}
-
-.dg-terms-acceptance__scroll-hint {
-  min-height: 1.2em;
-  margin: 0;
-  color: var(--dg-color-text-label);
-  font-size: var(--dg-fs-label);
-  text-align: center;
-  transition: color 150ms ease;
-}
-
-.dg-terms-acceptance__button {
-  width: 100%;
-  padding: 12px 16px;
-}
-
-.dg-terms-acceptance__meta {
-  margin: 0;
-  color: var(--dg-color-text-faint);
-  font-size: var(--dg-fs-caption);
-  text-align: center;
-}
-
 .dg-theme-toggle-placeholder {
   display: block;
   width: 20px;
   height: 20px;
 }
-
+/* App header icon button: the alerts bell's geometry and hover, so a theme
+   toggle beside it reads as the same control. */
+.dg-header-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--dg-btn-radius);
+  color: var(--dg-color-text-muted);
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+}
+.dg-header-icon-btn:hover {
+  background: var(--dg-color-bg-secondary);
+  border-color: var(--dg-color-border);
+}
+.dg-header-icon-btn:focus-visible {
+  outline: 2px solid var(--dg-color-border-focus);
+  outline-offset: 2px;
+}
+.dg-header-icon-btn .dg-theme-toggle-placeholder {
+  width: 18px;
+  height: 18px;
+}
 .dg-auth-state-heading {
   margin-bottom: 12px;
 }
-
 .dg-auth-state-message {
   margin: 0 0 24px;
   color: var(--dg-color-text-muted);
@@ -4706,127 +1756,11 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   line-height: 1.6;
   text-align: center;
 }
-
-.dg-auth-state-secondary {
-  margin-top: 16px;
-  text-align: center;
-}
-
-.dg-auth-gate-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.dg-password-input {
-  position: relative;
-}
-
-.dg-password-input__field {
-  padding-right: 48px;
-}
-
-.dg-password-input__toggle {
-  position: absolute;
-  top: 50%;
-  right: 12px;
-  display: flex;
-  align-items: center;
-  padding: 4px;
-  border: 0;
-  background: none;
-  color: var(--dg-color-text-subtle);
-  cursor: pointer;
-  transform: translateY(-50%);
-  transition: color 150ms ease;
-}
-
-.dg-password-input__toggle:hover {
-  color: var(--dg-color-text-primary);
-}
-
-.dg-subdomain-field {
-  margin-bottom: 24px;
-}
-
-.dg-subdomain-field--has-hint {
-  margin-bottom: 8px;
-}
-
-.dg-subdomain-field__control {
-  display: flex;
-  align-items: center;
-  overflow: hidden;
-  border: 1.5px solid var(--dg-color-brand);
-  border-radius: var(--dg-radius-md);
-  background: var(--dg-color-surface);
-}
-
-.dg-subdomain-field__control--error {
-  border-color: var(--dg-color-danger);
-}
-
-.dg-subdomain-field__input {
-  min-width: 0;
-  flex: 1;
-  padding: 14px 14px 14px 16px;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--dg-color-text-primary);
-  font-size: var(--dg-fs-body);
-}
-
-.dg-subdomain-field__suffix {
-  flex-shrink: 0;
-  padding: 14px 16px;
-  border-left: 1px solid var(--dg-color-border-light);
-  background: var(--dg-color-bg);
-  color: var(--dg-color-text-subtle);
-  font-size: var(--dg-fs-body);
-  white-space: nowrap;
-}
-
-.dg-subdomain-field__hint {
-  margin: 8px 0 16px;
-  color: var(--dg-color-text-subtle);
-  font-size: var(--dg-fs-label);
-}
-
-.dg-subdomain-field__hint--error {
-  color: var(--dg-color-danger);
-}
-
-.dg-password-strength {
-  margin-top: 8px;
-}
-
-.dg-password-strength__meter {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 4px;
-}
-
-.dg-password-strength__bar {
-  height: 4px;
-  flex: 1;
-  border-radius: 2px;
-  background: var(--dg-color-border-light);
-  transition: background 150ms ease;
-}
-
-.dg-password-strength__label {
-  color: var(--dg-color-text-muted);
-  font-size: var(--dg-fs-caption);
-  font-weight: 500;
-}
-
 .dg-password-strength--level-0 .dg-password-strength__bar.is-active,
 .dg-password-strength--level-0 .dg-password-strength__label.is-active {
   background: var(--dg-color-danger);
   color: var(--dg-color-danger);
 }
-
 .dg-password-strength--level-1 .dg-password-strength__bar.is-active,
 .dg-password-strength--level-1 .dg-password-strength__label.is-active,
 .dg-password-strength--level-2 .dg-password-strength__bar.is-active,
@@ -4834,71 +1768,35 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   background: var(--dg-color-warning);
   color: var(--dg-color-warning);
 }
-
 .dg-password-strength--level-3 .dg-password-strength__bar.is-active,
 .dg-password-strength--level-3 .dg-password-strength__label.is-active {
   background: var(--dg-color-success);
   color: var(--dg-color-success);
 }
-
-.dg-password-strength__hints {
-  display: grid;
-  gap: 4px;
-  margin: 8px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.dg-password-strength__hint {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--dg-color-text-muted);
-  font-size: var(--dg-fs-caption);
-}
-
 .dg-password-strength__hint.is-met {
   color: var(--dg-color-success-text);
 }
-
-.dg-password-strength__hint-dot {
-  width: 6px;
-  height: 6px;
-  flex: 0 0 6px;
-  border-radius: 999px;
-  background: var(--dg-color-border);
-}
-
 .dg-password-strength__hint.is-met .dg-password-strength__hint-dot {
   background: var(--dg-color-success);
 }
-
 /* Bare (non-sentence) auth footer links — underline only on hover */
 .dg-auth-footer-link {
   color: inherit;
   font-weight: var(--dg-type-control-weight);
   text-decoration: none;
 }
-
 .dg-auth-footer-link:hover {
   text-decoration: underline;
 }
-
 /* ── Auth card (responsive padding) ────────────────────── */
 .dg-auth-card {
   padding: 48px 44px 44px;
   width: 100%;
-  max-width: 440px;
+  max-width: var(--dg-auth-card-w);
   background: var(--dg-color-surface);
   border-radius: var(--dg-radius-xl);
   box-shadow: var(--dg-shadow-auth-card);
 }
-
-.dg-auth-organization-login {
-  width: 100%;
-  max-width: 440px;
-}
-
 /* ── Responsive: Tablet ────────────────────────────────── */
 @media (min-width: 768px) and (max-width: 1024px) {
   :root {
@@ -4906,7 +1804,6 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     --dg-grid-col-min: var(--dg-grid-col-min-tablet);
   }
 }
-
 /* ── Responsive: Small Desktop ─────────────────────────── */
 @media (min-width: 768px) and (max-width: 1280px) {
   :root {
@@ -4914,18 +1811,12 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     --dg-fs-section-title: var(--dg-fs-section-title-small-desktop);
   }
 }
-
 /* ── Shift Display: Name Mode (wider columns for full names) ── */
 [data-shift-display="name"] {
   --dg-grid-col-min: 160px;
 }
-
 /* ── Responsive: Mobile ────────────────────────────────── */
 @media (max-width: 767px) {
-  .dg-app-header-desktop {
-    display: none !important;
-  }
-
   /* Typography — responsive overrides */
   :root {
     --dg-toolbar-h: var(--dg-toolbar-h-mobile);
@@ -4944,16 +1835,13 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     --dg-fs-micro: var(--dg-fs-micro-mobile);
     --dg-grid-name-col: var(--dg-grid-name-col-mobile);
   }
-
   .dg-auth-card {
     padding: 32px 20px 28px;
   }
-
   .dg-standalone-input,
   .dg-auth-input {
     font-size: 16px !important;
   }
-
   /* Touch-friendly targets (min 44px) */
   .dg-btn {
     height: var(--dg-btn-h-lg);
@@ -4961,104 +1849,11 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     padding: 0 18px;
     font-size: 14px;
   }
-
   .dg-btn-ghost {
     height: var(--dg-btn-h-lg);
     min-height: var(--dg-btn-h-lg);
     padding: 0 12px;
   }
-
-  .dg-input {
-    padding: 10px 12px;
-    font-size: 16px; /* Prevents iOS auto-zoom on focus */
-    min-height: 44px;
-  }
-
-  .dg-segment-btn {
-    padding: 10px 12px;
-    font-size: 13px;
-    min-height: 44px;
-  }
-
-  .dg-span-tabs {
-    height: var(--dg-toolbar-h);
-  }
-
-  .dg-span-tab {
-    padding: 0 8px;
-  }
-
-  .dg-nav-tab {
-    padding: 10px 16px;
-    font-size: var(--dg-fs-navigation-item);
-    min-height: 44px;
-  }
-
-  .dg-sub-tab {
-    padding: 12px 16px;
-    font-size: var(--dg-fs-navigation-item);
-    min-height: 44px;
-  }
-
-  /* Panels — full-screen on mobile */
-  .dg-panel {
-    top: 0;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    width: 100vw;
-    border-radius: 0;
-    border: none;
-  }
-
-  /* Modals — nearly full-width */
-  .dg-modal {
-    max-width: 100vw;
-    min-width: unset;
-    width: calc(100vw - 32px);
-    max-height: calc(100dvh - 32px);
-    border-radius: 12px;
-    padding: 20px 16px;
-  }
-
-  /* Draft banner — allow wrapping */
-  .dg-draft-banner {
-    flex-wrap: wrap;
-    padding: 10px 12px;
-    margin: 8px 8px;
-  }
-
-  .dg-draft-banner-actions {
-    width: 100%;
-    margin-left: 0;
-    margin-top: 8px;
-  }
-
-  /* Mobile nav drawer */
-  .dg-mobile-drawer-overlay {
-    position: fixed;
-    inset: 0;
-    background: var(--dg-overlay);
-    backdrop-filter: blur(var(--dg-overlay-blur));
-    z-index: 10000;
-    animation: fade-in var(--dg-duration-standard) ease;
-  }
-
-  .dg-mobile-drawer {
-    position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    width: min(300px, calc(100vw - 56px));
-    background: var(--dg-color-surface);
-    z-index: 10001;
-    box-shadow: var(--shadow-panel);
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-    animation: drawer-in var(--dg-duration-standard) ease-out;
-  }
-
   @keyframes drawer-in {
     from {
       transform: translateX(-100%);
@@ -5067,329 +1862,12 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
       transform: translateX(0);
     }
   }
-
-  /* Mobile section selector (for sidebar replacement) */
-  .dg-mobile-section-bar {
-    display: flex;
-    gap: 6px;
-    padding: 8px 12px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    border-bottom: 1px solid var(--dg-color-border-light);
-    background: var(--dg-color-surface);
-    position: sticky;
-    top: var(--dg-app-shell-header-height);
-    z-index: 50;
-  }
-  .dg-mobile-section-bar::-webkit-scrollbar {
-    display: none;
-  }
-
-  .dg-mobile-section-chip {
-    display: inline-flex;
-    align-items: center;
-    padding: 8px 14px;
-    border-radius: 20px;
-    font-size: var(--dg-fs-navigation-item);
-    font-weight: var(--dg-type-navigation-weight);
-    letter-spacing: normal;
-    color: var(--dg-type-navigation-color);
-    background: var(--dg-color-bg-secondary);
-    border: 1px solid var(--dg-color-border-light);
-    cursor: pointer;
-    flex-shrink: 0;
-    min-height: 44px;
-    white-space: nowrap;
-    transition:
-      background 150ms ease,
-      border-color 150ms ease,
-      color 150ms ease;
-  }
-
   .dg-mobile-section-chip.active {
     background: var(--dg-color-brand-bg);
     color: var(--dg-color-brand);
     border-color: var(--dg-color-brand-border);
   }
-
   /* ── Bottom sheet navigation (Vercel-style) ──────────── */
-  .dg-bottom-sheet-overlay {
-    position: fixed;
-    inset: 0;
-    background: var(--dg-overlay);
-    backdrop-filter: blur(var(--dg-overlay-blur));
-    -webkit-backdrop-filter: blur(var(--dg-overlay-blur));
-    z-index: 10000;
-    animation: fade-in var(--dg-duration-standard) ease;
-  }
-
-  .dg-bottom-sheet {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: var(--dg-color-bg);
-    border-radius: 12px 12px 0 0;
-    z-index: 10001;
-    max-height: 85dvh;
-    overflow-y: auto;
-    animation: sheet-up var(--dg-duration-standard) cubic-bezier(0.32, 0.72, 0, 1);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-    display: flex;
-    flex-direction: column;
-  }
-
-  .dg-bottom-sheet-handle {
-    width: 36px;
-    height: 4px;
-    border-radius: 2px;
-    background: var(--dg-color-border);
-    margin: 8px auto 4px;
-    flex-shrink: 0;
-  }
-
-  /* Top section — main navigation (floating card) */
-  .dg-bottom-sheet-top {
-    display: flex;
-    flex-direction: column;
-    margin: 8px 12px;
-    background: var(--dg-color-surface);
-    border-radius: 12px;
-    border: 1px solid var(--dg-color-border-light);
-    overflow: hidden;
-  }
-
-  .dg-bottom-sheet-main-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 14px 16px;
-    font-size: var(--dg-fs-navigation-item);
-    font-weight: var(--dg-type-navigation-weight);
-    letter-spacing: normal;
-    color: var(--dg-type-navigation-color);
-    background: transparent;
-    border: none;
-    border-top: 1px solid var(--dg-color-border-light);
-    cursor: pointer;
-    font-family: inherit;
-    text-align: left;
-    min-height: 48px;
-    transition: background 120ms ease;
-  }
-
-  .dg-bottom-sheet-main-item:first-child {
-    border-top: none;
-  }
-
-  .dg-bottom-sheet-main-item:active {
-    background: var(--dg-color-bg-secondary);
-  }
-
-  .dg-bottom-sheet-main-item.active {
-    font-weight: var(--dg-type-navigation-weight);
-    color: var(--dg-color-brand);
-    background: var(--dg-color-brand-bg);
-  }
-
-  .dg-bottom-sheet-main-item--gridmaster {
-    color: var(--dg-color-brand);
-  }
-
-  /* Chevron indicator on main items */
-  .dg-bottom-sheet-chevron {
-    display: flex;
-    align-items: center;
-    color: var(--dg-color-text-muted);
-    margin-left: auto;
-    flex-shrink: 0;
-  }
-
-  /* Drill-down header — back button + title */
-  .dg-bottom-sheet-drill-header {
-    display: flex;
-    align-items: center;
-    padding: 12px 16px 8px;
-    position: relative;
-  }
-
-  .dg-bottom-sheet-drill-back {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    background: transparent;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    color: var(--dg-color-text-secondary);
-    padding: 0;
-    flex-shrink: 0;
-    transition: background 120ms ease;
-  }
-
-  .dg-bottom-sheet-drill-back:active {
-    background: var(--dg-color-bg-secondary);
-  }
-
-  .dg-bottom-sheet-drill-title {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: var(--dg-fs-navigation-item);
-    font-weight: var(--dg-type-navigation-weight);
-    letter-spacing: normal;
-    color: var(--dg-color-text-primary);
-  }
-
-  /* Drill-down sub-item list — no card, no dividers */
-  .dg-bottom-sheet-drill-list {
-    display: flex;
-    flex-direction: column;
-    padding: 4px 12px 16px;
-  }
-
-  .dg-bottom-sheet-drill-item {
-    display: flex;
-    align-items: center;
-    padding: 12px 16px;
-    font-size: var(--dg-fs-navigation-item);
-    font-weight: var(--dg-type-navigation-weight);
-    letter-spacing: normal;
-    color: var(--dg-color-text-secondary);
-    background: transparent;
-    border: none;
-    border-radius: 10px;
-    cursor: pointer;
-    font-family: inherit;
-    text-align: left;
-    min-height: 44px;
-    transition: background 120ms ease;
-  }
-
-  /* Same reason as .dg-menu-item: a pressed row must not fuse with the
-     current one next to it. Group labels already separate their own runs. */
-  .dg-bottom-sheet-drill-item + .dg-bottom-sheet-drill-item {
-    margin-top: 2px;
-  }
-
-  .dg-bottom-sheet-drill-item:active {
-    background: var(--dg-color-bg-secondary);
-  }
-
-  .dg-bottom-sheet-drill-item.active {
-    font-weight: var(--dg-type-navigation-weight);
-    color: var(--dg-color-brand);
-    background: var(--dg-color-brand-bg);
-  }
-
-  .dg-bottom-sheet-group-label {
-    padding: 10px 16px 4px;
-    font-size: var(--dg-type-navigation-section-size);
-    font-weight: var(--dg-type-navigation-section-weight);
-    letter-spacing: var(--dg-type-navigation-section-letter-spacing);
-    color: var(--dg-type-navigation-section-color);
-    border-top: 1px solid var(--dg-color-border-light);
-  }
-  .dg-bottom-sheet-group-label:first-child {
-    border-top: none;
-  }
-
-  /* Shared item utilities */
-  .dg-bottom-sheet-item-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 20px;
-    height: 20px;
-    flex-shrink: 0;
-  }
-
-  .dg-bottom-sheet-item-label {
-    flex: 1;
-  }
-
-  /* Footer — user info + actions */
-  .dg-bottom-sheet-footer {
-    margin: 4px 12px 12px;
-    background: var(--dg-color-surface);
-    border-radius: 12px;
-    border: 1px solid var(--dg-color-border-light);
-    overflow: hidden;
-  }
-
-  .dg-bottom-sheet-user {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--dg-color-border-light);
-  }
-
-  /* Colors come from the shared avatar palette, applied inline by the caller. */
-  .dg-bottom-sheet-avatar {
-    width: 32px;
-    height: 32px;
-    box-sizing: border-box;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    font-weight: 700;
-    flex-shrink: 0;
-  }
-
-  .dg-bottom-sheet-user-name {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--dg-color-text-primary);
-    line-height: 1.3;
-  }
-
-  .dg-bottom-sheet-user-role {
-    font-size: 12px;
-    color: var(--dg-color-text-muted);
-    line-height: 1.3;
-  }
-
-  .dg-bottom-sheet-footer-actions {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .dg-bottom-sheet-footer-btn {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 16px;
-    font-size: var(--dg-fs-navigation-item);
-    font-weight: var(--dg-type-navigation-weight);
-    letter-spacing: normal;
-    color: var(--dg-type-navigation-color);
-    background: transparent;
-    border: none;
-    border-top: 1px solid var(--dg-color-border-light);
-    cursor: pointer;
-    font-family: inherit;
-    text-align: left;
-    min-height: 44px;
-  }
-
-  .dg-bottom-sheet-footer-btn:first-child {
-    border-top: none;
-  }
-
-  .dg-bottom-sheet-footer-btn:active {
-    background: var(--dg-color-bg-secondary);
-  }
-
-  .dg-bottom-sheet-footer-btn--danger {
-    color: var(--dg-color-danger);
-  }
-
   @keyframes sheet-up {
     from {
       transform: translateY(100%);
@@ -5399,7 +1877,6 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     }
   }
 }
-
 /* ── Print Styles ───────────────────────────────────────── */
 /* NOTE: The custom print view opens in a new window via window.open().
    These styles are only for the fallback Ctrl+P case on the main page. */
@@ -5408,32 +1885,27 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     size: A3 landscape;
     margin: 0.5in;
   }
-
   *,
   *::before,
   *::after {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
-
   html,
   body {
     overflow: visible !important;
     background: var(--dg-color-surface) !important;
   }
-
   /* Fallback: direct Ctrl+P on the main schedule page */
   .no-print {
     display: none !important;
   }
-
   .print-legend {
     display: block !important;
     break-before: page;
     page-break-before: always;
   }
 }
-
 @theme inline {
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -5475,7 +1947,6 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
 }
-
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -5487,11 +1958,9 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     @apply font-sans;
   }
 }
-
 /* ── Help Hint ────────────────────────────────────────────────────────────
  * Styles for <HelpHint /> trigger.
  * ──────────────────────────────────────────────────────────────────────── */
-
 .help-hint-trigger {
   display: inline-flex;
   align-items: center;
@@ -5507,7 +1976,6 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   vertical-align: middle;
   flex-shrink: 0;
 }
-
 /* ── Reduced motion ────────────────────────────────────────────────────────
  * Disables non-essential animations and transitions for users who have
  * enabled the "reduce motion" accessibility setting in their OS.

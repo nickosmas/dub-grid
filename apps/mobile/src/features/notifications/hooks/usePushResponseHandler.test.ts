@@ -100,6 +100,49 @@ describe("usePushResponseHandler", () => {
     });
   });
 
+  it("removes both listeners when the hook unmounts while the cold-start lookup is in flight", async () => {
+    const receivedRemove = vi.fn();
+    const responseRemove = vi.fn();
+    addNotificationReceivedListener.mockReturnValue({ remove: receivedRemove });
+    addNotificationResponseReceivedListener.mockReturnValue({ remove: responseRemove });
+    let releaseLookup: (value: unknown) => void = () => {};
+    getLastNotificationResponseAsync.mockReturnValue(
+      new Promise((resolve) => {
+        releaseLookup = resolve;
+      }),
+    );
+
+    const { unmount } = renderHook(() => usePushResponseHandler(true));
+    await waitFor(() => {
+      expect(addNotificationResponseReceivedListener).toHaveBeenCalled();
+    });
+
+    unmount();
+    await waitFor(() => {
+      expect(responseRemove).toHaveBeenCalledTimes(1);
+    });
+    expect(receivedRemove).toHaveBeenCalledTimes(1);
+
+    // The lookup lands after the unmount; its tap belongs to whoever is
+    // signed in now, so it must not navigate.
+    releaseLookup(response("notif-late", { notificationId: "abc-123" }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(routerPush).not.toHaveBeenCalled();
+  });
+
+  it("ignores a response delivered after the hook unmounts", async () => {
+    renderHook(() => usePushResponseHandler(true));
+    await waitFor(() => {
+      expect(addNotificationResponseReceivedListener).toHaveBeenCalled();
+    });
+    const deliver = addNotificationResponseReceivedListener.mock.calls[0][0] as (
+      response: unknown,
+    ) => void;
+
+    deliver(response("notif-live", { notificationId: "seen" }));
+    expect(routerPush).toHaveBeenCalledTimes(1);
+  });
+
   it("stays inert until the user is signed in", async () => {
     renderHook(() => usePushResponseHandler(false));
 

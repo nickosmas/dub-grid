@@ -64,6 +64,7 @@ function pickDomProps(input: Record<string, any>) {
       key === "stickyHeaderIndices" ||
       key === "onStartShouldSetResponder" ||
       key === "onLayout" ||
+      key === "onTextLayout" ||
       key === "onResponderGrant" ||
       key === "onResponderRelease" ||
       key === "pointerEvents" ||
@@ -71,6 +72,16 @@ function pickDomProps(input: Record<string, any>) {
       key === "accessibilityIgnoresInvertColors" ||
       key === "android_ripple"
     ) {
+      continue;
+    }
+
+    if (key === "accessibilityElementsHidden") {
+      if (value) output["aria-hidden"] = "true";
+      continue;
+    }
+
+    if (key === "importantForAccessibility") {
+      if (value === "no-hide-descendants") output["aria-hidden"] = "true";
       continue;
     }
 

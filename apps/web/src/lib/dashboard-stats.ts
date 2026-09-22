@@ -117,10 +117,12 @@ export interface ShiftTypeBreakdown {
 }
 
 export type ActivityIconVariant = "success" | "danger" | "warning" | "neutral";
+export type ActivityIconKind = "publish" | "pickup" | "swap" | "calloff" | "user_signup";
 
 export interface ActivityItem {
   id: string;
   type: string;
+  iconKind: ActivityIconKind;
   iconVariant: ActivityIconVariant;
   description: string;
   highlight: string;
@@ -708,6 +710,7 @@ export function buildActivityFeed(
     items.push({
       id: `pub_${historyEntry.id}`,
       type: "publish",
+      iconKind: "publish",
       iconVariant: "success",
       description: `${publisher} · ${summary}`,
       highlight: summary,
@@ -721,6 +724,7 @@ export function buildActivityFeed(
     items.push({
       id: `req_${req.id}`,
       type: "request",
+      iconKind: req.type === "pickup" ? "pickup" : req.type === "calloff" ? "calloff" : "swap",
       iconVariant:
         req.status === "open" ? "warning" : req.status === "approved" ? "success" : "neutral",
       description: describeShiftRequestActivity({
@@ -741,6 +745,7 @@ export function buildActivityFeed(
     items.push({
       id: `signup_${invitation.id}`,
       type: "user_signup",
+      iconKind: "user_signup",
       iconVariant: "success",
       description: describeMemberSignupActivity({
         email: invitation.email,

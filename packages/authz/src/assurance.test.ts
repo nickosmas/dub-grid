@@ -9,6 +9,7 @@ import {
   evaluateSensitiveActionAssurance,
   resolveVerifiedTotpFactorPresence,
   type AuthenticationAssuranceClaims,
+  requiresMfaChallenge,
 } from "./assurance";
 
 const NOW = 1_789_064_802;
@@ -213,5 +214,26 @@ describe("sensitive-action server contract", () => {
       method: "totp",
       error: STEP_UP_REQUIRED_MESSAGE,
     });
+  });
+});
+
+describe("requiresMfaChallenge", () => {
+  it("refuses an enrolled account that has not answered a challenge", () => {
+    expect(requiresMfaChallenge({ mfa_enrolled: true, aal: "aal1" })).toBe(true);
+    expect(requiresMfaChallenge({ mfa_enrolled: true })).toBe(true);
+  });
+
+  it("accepts an enrolled account at aal2", () => {
+    expect(requiresMfaChallenge({ mfa_enrolled: true, aal: "aal2" })).toBe(false);
+  });
+
+  it("accepts an account with no factor, and a token minted before the claim existed", () => {
+    expect(requiresMfaChallenge({ mfa_enrolled: false, aal: "aal1" })).toBe(false);
+    expect(requiresMfaChallenge({ aal: "aal1" })).toBe(false);
+    expect(requiresMfaChallenge({})).toBe(false);
+  });
+
+  it("ignores a client-supplied string, which is not the hook's boolean", () => {
+    expect(requiresMfaChallenge({ mfa_enrolled: "true", aal: "aal1" })).toBe(false);
   });
 });

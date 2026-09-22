@@ -334,7 +334,7 @@ Database history is an immutable ordered migration stream:
 - `supabase/migrations/checksums.sha256` locks every reviewed migration.
 - Never edit an applied migration or replay `supabase/patches/` as a migration
   stream. See [Supabase migration instructions](supabase/AGENTS.md) and the
-  [production migration runbook](docs/operations/production-migration-safety.md).
+  [production migration runbook](internal/operations/production-migration-safety.md).
 
 ## Deployment
 
@@ -365,28 +365,28 @@ Important:
 
 ## Documentation
 
-| Document                                                                          | Description                                                                                                 |
-| --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| [PRD.md](PRD.md)                                                                  | Product requirements, feature specs, and implementation status                                              |
-| [ARCHITECTURE.md](ARCHITECTURE.md)                                                | System design, layered architecture, and technical decisions                                                |
-| [RBAC_SYSTEM_DESIGN.md](RBAC_SYSTEM_DESIGN.md)                                    | Four-tier role hierarchy, 26 admin permissions, race condition mitigations                                  |
-| [SYSTEM_FLOWCHARTS.md](SYSTEM_FLOWCHARTS.md)                                      | Mermaid-based diagrams for auth, JWT hook, org validation, and request flows                                |
-| [AGENTS.md](AGENTS.md)                                                            | Repo conventions, git policy, and commands for AI coding agents (`CLAUDE.md` imports it)                    |
-| [blueprint/context/](blueprint/context/)                                          | Project overview, coding standards, and the active feature spec                                             |
-| [CONTRIBUTING.md](CONTRIBUTING.md)                                                | Branching, commit, PR, testing, and monorepo contribution conventions                                       |
-| [SECURITY.md](SECURITY.md)                                                        | Security policy and vulnerability disclosure process                                                        |
-| [CHANGELOG.md](CHANGELOG.md)                                                      | Release history (Keep a Changelog format)                                                                   |
-| [docs/api-reference.md](docs/api-reference.md)                                    | API surface — Route Handlers and the `/api/mobile/v1` mobile API                                            |
-| [docs/authentication.md](docs/authentication.md)                                  | Auth flows — login, JWT hook, invitations, verification                                                     |
-| [docs/cookies-and-gdpr.md](docs/cookies-and-gdpr.md)                              | Cookie consent, GDPR data export, and account deletion                                                      |
-| [docs/secrets-rotation.md](docs/secrets-rotation.md)                              | Secret rotation procedures per environment                                                                  |
-| [docs/mfa-provider-boundary.md](docs/mfa-provider-boundary.md)                    | MFA lifecycle contract and the Supabase provider-boundary qualification                                     |
-| [docs/architecture/folder-structure.md](docs/architecture/folder-structure.md)    | Monorepo + `apps/web` feature-module folder layout                                                          |
-| [docs/operations/auth-resilience.md](docs/operations/auth-resilience.md)          | Diagnosing and recovering organization-bootstrap failures                                                   |
-| [docs/operations/](docs/operations/)                                              | Auth entry performance, degraded-network recovery, session continuity, and the production migration runbook |
-| [SECURITY_AUDIT.md](SECURITY_AUDIT.md)                                            | Dated security audit findings and their remediation status                                                  |
-| [AUTH_EDGE_CASES.md](AUTH_EDGE_CASES.md) / [POTENTIAL_BUGS.md](POTENTIAL_BUGS.md) | Point-in-time findings logs from the May 2026 sweeps                                                        |
-| [code_review.md](code_review.md)                                                  | Review priorities and checklists for this repository                                                        |
+| Document                                                                               | Description                                                                                                 |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| [PRD.md](PRD.md)                                                                       | Product requirements, feature specs, and implementation status                                              |
+| [ARCHITECTURE.md](ARCHITECTURE.md)                                                     | System design, layered architecture, and technical decisions                                                |
+| [RBAC_SYSTEM_DESIGN.md](RBAC_SYSTEM_DESIGN.md)                                         | Four-tier role hierarchy, 26 admin permissions, race condition mitigations                                  |
+| [SYSTEM_FLOWCHARTS.md](SYSTEM_FLOWCHARTS.md)                                           | Mermaid-based diagrams for auth, JWT hook, org validation, and request flows                                |
+| [AGENTS.md](AGENTS.md)                                                                 | Repo conventions, git policy, and commands for AI coding agents (`CLAUDE.md` imports it)                    |
+| [blueprint/context/](blueprint/context/)                                               | Project overview, coding standards, and the active feature spec                                             |
+| [CONTRIBUTING.md](CONTRIBUTING.md)                                                     | Branching, commit, PR, testing, and monorepo contribution conventions                                       |
+| [SECURITY.md](SECURITY.md)                                                             | Security policy and vulnerability disclosure process                                                        |
+| [CHANGELOG.md](CHANGELOG.md)                                                           | Release history (Keep a Changelog format)                                                                   |
+| [internal/api-reference.md](internal/api-reference.md)                                 | API surface — Route Handlers and the `/api/mobile/v1` mobile API                                            |
+| [internal/authentication.md](internal/authentication.md)                               | Auth flows — login, JWT hook, invitations, verification                                                     |
+| [internal/cookies-and-gdpr.md](internal/cookies-and-gdpr.md)                           | Cookie consent, GDPR data export, and account deletion                                                      |
+| [internal/secrets-rotation.md](internal/secrets-rotation.md)                           | Secret rotation procedures per environment                                                                  |
+| [internal/mfa-provider-boundary.md](internal/mfa-provider-boundary.md)                 | MFA lifecycle contract and the Supabase provider-boundary qualification                                     |
+| [internal/architecture/folder-structure.md](internal/architecture/folder-structure.md) | Monorepo + `apps/web` feature-module folder layout                                                          |
+| [internal/operations/auth-resilience.md](internal/operations/auth-resilience.md)       | Diagnosing and recovering organization-bootstrap failures                                                   |
+| [internal/operations/](internal/operations/)                                           | Auth entry performance, degraded-network recovery, session continuity, and the production migration runbook |
+| [SECURITY_AUDIT.md](SECURITY_AUDIT.md)                                                 | Dated security audit findings and their remediation status                                                  |
+| [AUTH_EDGE_CASES.md](AUTH_EDGE_CASES.md) / [POTENTIAL_BUGS.md](POTENTIAL_BUGS.md)      | Point-in-time findings logs from the May 2026 sweeps                                                        |
+| [code_review.md](code_review.md)                                                       | Review priorities and checklists for this repository                                                        |
 
 ## License
 

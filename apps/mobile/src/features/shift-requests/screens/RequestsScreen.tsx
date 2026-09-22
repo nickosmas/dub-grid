@@ -487,16 +487,16 @@ export default function RequestsScreen() {
         ),
       ];
     },
-    successToast: (_data, variables) => ({
+    successToast: (data, variables) => ({
       tone: "success",
-      ...getMobileRequestActionSuccessToast(variables.body),
+      ...getMobileRequestActionSuccessToast(variables.body, data),
     }),
     errorToast: {
       title: "Could not update request",
       fallbackMessage: "We couldn't update that shift request.",
     },
-    announceOnSuccess: (_data, variables) =>
-      getMobileRequestActionSuccessToast(variables.body).title ?? null,
+    announceOnSuccess: (data, variables) =>
+      getMobileRequestActionSuccessToast(variables.body, data).title ?? null,
     onSuccess: async () => {
       // The user's own availability view is derived from schedule cells the
       // server rewrites on approval, so it has to come from the server.
@@ -520,7 +520,12 @@ export default function RequestsScreen() {
       }
 
       const request = requestsQuery.data?.requests.find((candidate) => candidate.id === requestId);
-      const feedback = getMobileRequestActionFeedback({ requestId, body, request });
+      const feedback = getMobileRequestActionFeedback({
+        requestId,
+        body,
+        request,
+        viewerCanApprove: canApprove,
+      });
       // A manager withdrawing over the recipient's head gets the note field
       // too; the requester's own cancel stays a plain confirmation.
       const takesNote =
@@ -533,6 +538,7 @@ export default function RequestsScreen() {
       setRequestActionConfirmation({ requestId, body, feedback, takesNote });
     },
     [
+      canApprove,
       linkedEmployeeId,
       pendingAction,
       requestActionMutation.isPending,

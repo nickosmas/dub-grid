@@ -154,7 +154,7 @@ export async function GET(req: NextRequest) {
       .select(
         "id, org_id, published_by, start_date, end_date, change_count, published_at, schedule_publish_changes(emp_id, date, kind, from_state, to_state, from_absence_type_id, to_absence_type_id, updated_by, from_custom_start, from_custom_end, to_custom_start, to_custom_end)",
       )
-      .eq("org_id", parsed.data.orgId);
+      .eq("org_id", auth.orgId);
     if (parsed.data.startDate && parsed.data.endDate) {
       query = query.lte("start_date", parsed.data.endDate).gte("end_date", parsed.data.startDate);
     } else if (parsed.data.since) {
@@ -181,11 +181,7 @@ export async function GET(req: NextRequest) {
       noteChanges: toNotePublishChanges(row.schedule_publish_changes as ScheduleChangeRow[]),
       publishedAt: row.published_at as string,
     }));
-    const priorPeriods = await fetchPriorPublishedPeriods(
-      auth.serviceClient,
-      parsed.data.orgId,
-      entries,
-    );
+    const priorPeriods = await fetchPriorPublishedPeriods(auth.serviceClient, auth.orgId, entries);
 
     return NextResponse.json({ entries: addNewAdditionFlags(entries, priorPeriods) });
   } catch (error) {

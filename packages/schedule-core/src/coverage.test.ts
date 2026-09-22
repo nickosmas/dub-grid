@@ -5,6 +5,7 @@ import {
   computeCoverageCategorySnapshots,
   computeCoverageGaps,
   computeCoverageStatus,
+  hasEffectiveCoverageRequirements,
   resolveRequirementByAssignment,
   summarizeCoverageByFocusArea,
   summarizeCoverageDailyForFocusArea,
@@ -49,6 +50,44 @@ function makeCoverageRequirement(
     ...overrides,
   };
 }
+
+describe("hasEffectiveCoverageRequirements", () => {
+  it("is false with no rows", () => {
+    expect(hasEffectiveCoverageRequirements([], [makeAssignment()])).toBe(false);
+  });
+
+  it("is false when every row asks for zero staff", () => {
+    expect(
+      hasEffectiveCoverageRequirements(
+        [makeCoverageRequirement({ minStaff: 0 })],
+        [makeAssignment()],
+      ),
+    ).toBe(false);
+  });
+
+  it("is false when no row resolves to an active assignment", () => {
+    const orphaned = makeCoverageRequirement({ assignmentId: null, jobId: 9, preferredShiftId: 9 });
+    const archived = makeCoverageRequirement({ assignmentId: 2 });
+    expect(
+      hasEffectiveCoverageRequirements(
+        [orphaned, archived],
+        [makeAssignment({ id: 2, archivedAt: "2026-01-01" })],
+      ),
+    ).toBe(false);
+  });
+
+  it("is true once one row resolves by assignment id or by job and shift", () => {
+    expect(hasEffectiveCoverageRequirements([makeCoverageRequirement()], [makeAssignment()])).toBe(
+      true,
+    );
+    expect(
+      hasEffectiveCoverageRequirements(
+        [makeCoverageRequirement({ assignmentId: null, jobId: 4, preferredShiftId: 7 })],
+        [makeAssignment({ id: 5, jobId: 4, shiftId: 7 })],
+      ),
+    ).toBe(true);
+  });
+});
 
 describe("resolveRequirementByAssignment", () => {
   it("returns day-specific match", () => {

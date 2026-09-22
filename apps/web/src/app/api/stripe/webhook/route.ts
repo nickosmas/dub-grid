@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
   // first; a unique-violation means we already processed it → ack and skip so
   // we don't write duplicate audit/activity rows. Fail open if the ledger table
   // isn't present yet (pre-migration) so the webhook keeps working.
+  let claimed = false;
   {
     const { error: claimError } = await getServiceClient()
       .from("stripe_processed_events")
@@ -80,6 +81,8 @@ export async function POST(req: NextRequest) {
         { error: claimError, id: event.id },
         "Stripe event dedup ledger unavailable — processing without replay guard",
       );
+    } else {
+      claimed = true;
     }
   }
 
@@ -169,6 +172,20 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     Sentry.captureException(err, { extra: { eventType: event.type, eventId: event.id } });
     logger.error({ error: err, type: event.type }, "Error processing Stripe webhook");
+    // The 500 asks Stripe to redeliver; the claim has to go too, or that
+    // redelivery is acknowledged as a duplicate and the update never lands.
+    if (claimed) {
+      const { error: releaseError } = await getServiceClient()
+        .from("stripe_processed_events")
+        .delete()
+        .eq("event_id", event.id);
+      if (releaseError) {
+        logger.error(
+          { error: releaseError, id: event.id },
+          "Stripe event claim could not be released; the redelivery will be skipped",
+        );
+      }
+    }
     return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 });
   }
 

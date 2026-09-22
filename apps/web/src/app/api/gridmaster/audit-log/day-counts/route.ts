@@ -89,8 +89,8 @@ export async function GET(req: NextRequest) {
       .order("created_at", { ascending: false })
       .limit(MAX_ROWS);
 
-    if (parsed.data.orgId) {
-      query = query.eq("org_id", parsed.data.orgId);
+    if (reader.orgId) {
+      query = query.eq("org_id", reader.orgId);
     }
     if (parsed.data.resourceType) {
       query = query.eq("resource_type", parsed.data.resourceType);

@@ -29,8 +29,9 @@ export interface RealtimeErrorHooks {
    */
   onError?: (error: Error, consecutiveErrorCount: number) => void;
   /**
-   * Called once when the channel re-SUBSCRIBEs after a prior error — the
-   * "we may have missed events while disconnected" catch-up signal.
+   * Called once when the channel re-SUBSCRIBEs after an interruption, a
+   * CHANNEL_ERROR or a TIMED_OUT — the "we may have missed events while
+   * disconnected" catch-up signal.
    */
   onReconnectAfterError?: () => void;
 }
@@ -52,6 +53,10 @@ export function subscribeToPostgresChanges<Table extends string>(
   hooks: RealtimeErrorHooks = {},
 ): () => void {
   let errorCount = 0;
+  // A TIMED_OUT join is a gap in the stream just like an error, but the
+  // client reports it without an error object, so it is tracked apart from
+  // the error count that feeds onError.
+  let interrupted = false;
   const channel = client.channel(channelName);
 
   for (const listener of listeners) {
@@ -74,8 +79,9 @@ export function subscribeToPostgresChanges<Table extends string>(
     // A throwing consumer hook must not propagate into the Supabase client's
     // own status-callback dispatch — that's shared machinery for this socket,
     // not something a single listener's bug should be able to disrupt.
-    if (status === "SUBSCRIBED" && errorCount > 0) {
+    if (status === "SUBSCRIBED" && interrupted) {
       errorCount = 0;
+      interrupted = false;
       try {
         hooks.onReconnectAfterError?.();
       } catch (hookError) {
@@ -84,8 +90,11 @@ export function subscribeToPostgresChanges<Table extends string>(
           hookError,
         );
       }
+    } else if (status === "TIMED_OUT") {
+      interrupted = true;
     } else if (status === "CHANNEL_ERROR") {
       errorCount += 1;
+      interrupted = true;
       try {
         hooks.onError?.(err ?? new Error(`realtime channel error: ${channelName}`), errorCount);
       } catch (hookError) {

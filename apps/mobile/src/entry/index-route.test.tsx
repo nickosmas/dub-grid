@@ -9,6 +9,7 @@ vi.mock("react-native-safe-area-context", async () =>
 );
 
 const routerReplace = vi.fn();
+const isFocused = vi.fn();
 const useSessionState = vi.fn();
 const getSupabaseClient = vi.fn();
 const useHasSeenOnboarding = vi.fn();
@@ -17,6 +18,7 @@ vi.mock("expo-router", () => ({
   router: {
     replace: routerReplace,
   },
+  useNavigation: () => ({ isFocused }),
 }));
 
 vi.mock("../shared/providers/AuthSessionProvider", () => ({
@@ -55,6 +57,8 @@ beforeAll(async () => {
 describe("IndexScreen", () => {
   beforeEach(() => {
     routerReplace.mockReset();
+    isFocused.mockReset();
+    isFocused.mockReturnValue(true);
     useSessionState.mockReset();
     getSupabaseClient.mockReset();
     useHasSeenOnboarding.mockReset();
@@ -124,6 +128,15 @@ describe("IndexScreen", () => {
 
     expect(routerReplace).toHaveBeenCalledWith("/(tabs)/home");
     expect(routerReplace).not.toHaveBeenCalledWith("/(auth)/onboarding");
+  });
+
+  it("leaves the hop to a login screen a protected route put on top of it", () => {
+    isFocused.mockReturnValue(false);
+    useSessionState.mockReturnValue({ accessToken: "token", isLoading: false });
+
+    render(<IndexScreen />);
+
+    expect(routerReplace).not.toHaveBeenCalled();
   });
 
   it("waits for the first-run flag before picking a destination", () => {

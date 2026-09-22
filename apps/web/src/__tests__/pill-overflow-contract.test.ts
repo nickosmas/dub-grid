@@ -2,7 +2,9 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-const css = readFileSync(path.resolve(__dirname, "../app/globals.css"), "utf8");
+const css =
+  readFileSync(path.resolve(__dirname, "../app/globals.css"), "utf8") +
+  readFileSync(path.resolve(__dirname, "../app/app-ui.css"), "utf8");
 
 describe("pill overflow contract", () => {
   it("bounds display pills while allowing their full text to wrap", () => {

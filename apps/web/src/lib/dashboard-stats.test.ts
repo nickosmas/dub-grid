@@ -76,6 +76,33 @@ describe("buildActivityFeed", () => {
     expect(feed[1]?.iconVariant).toBe("success");
   });
 
+  it("picks one glyph per event kind so the icon says what the row is", () => {
+    const feed = buildActivityFeed(
+      [publish({ changeCount: 1 })],
+      [
+        request(),
+        request({ id: "req-2", type: "swap" }),
+        request({ id: "req-3", type: "calloff" }),
+      ],
+      [
+        {
+          id: "inv-1",
+          email: "jane@example.com",
+          roleToAssign: "user",
+          acceptedAt: "2026-05-10T09:00:00.000Z",
+        } as Invitation,
+      ],
+    );
+
+    expect(feed.map((item) => item.iconKind).sort()).toEqual([
+      "calloff",
+      "pickup",
+      "publish",
+      "swap",
+      "user_signup",
+    ]);
+  });
+
   it("names the role of a new member instead of its enum", () => {
     const invitation = {
       id: "inv-1",

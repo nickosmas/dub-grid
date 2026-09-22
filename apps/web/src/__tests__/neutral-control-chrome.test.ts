@@ -18,7 +18,11 @@ function resolveWebSource(path: string): string {
   return resolve(resolveRepoRoot(), "apps/web/src", path);
 }
 
-const globalsCss = readFileSync(resolveWebSource("app/globals.css"), "utf-8");
+// The authored stylesheet is split by who loads it (globals.css for every
+// route, app-ui.css only inside the app), so the contract reads both.
+const globalsCss =
+  readFileSync(resolveWebSource("app/globals.css"), "utf-8") +
+  readFileSync(resolveWebSource("app/app-ui.css"), "utf-8");
 const settingsShell = readFileSync(
   resolveWebSource("components/settings/SettingsShell.tsx"),
   "utf-8",

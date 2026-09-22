@@ -8,6 +8,7 @@ import {
   mobileShiftRequestsResponseSchema,
   normalizeMobileScheduleRange,
 } from "@dubgrid/contracts";
+import { settleShiftRequestAfterTransition } from "@dubgrid/data-access";
 import { createMobileShiftRequest, loadMobileShiftRequestsPayload } from "@dubgrid/mobile-api-core";
 import { dispatchNotificationEvent } from "@/features/notifications/server";
 import {
@@ -83,6 +84,7 @@ export async function POST(req: NextRequest) {
   try {
     const payload = await createMobileShiftRequest(auth, parsed.data, {
       dispatchNotificationEvent,
+      settleShiftRequestAfterTransition,
     });
 
     return NextResponse.json(mobileCreateShiftRequestResponseSchema.parse(payload), {

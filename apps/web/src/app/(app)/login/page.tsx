@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { parseHost, type ParsedHost } from "@/lib/subdomain";
 import { lookupOrgBySlug } from "@/lib/org-lookup";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
-import { THEME_COOKIE_NAME, withThemeParam } from "@/lib/theme-preference";
+import { THEME_COOKIE_NAME, resolveRequestTheme, withThemeParam } from "@/lib/theme-preference";
 import { ORG_NOT_FOUND_PARAM } from "./constants";
 import type { OrgLoginSeed } from "./OrgLogin";
 
@@ -59,9 +59,14 @@ export default async function LoginPage({
   const params = (await searchParams) ?? {};
   const parsed = parseHost(headersList.get("host") ?? "");
   const { subdomain } = parsed;
+  // Links that hop origins carry the theme. Resolving it from the request
+  // rather than from next-themes on the client means the server HTML and the
+  // first client render build the same hrefs, and a click before hydration
+  // still hands the theme over.
+  const theme = resolveRequestTheme(params.theme, (await cookies()).get(THEME_COOKIE_NAME)?.value);
 
   if (subdomain === "gridmaster") {
-    return <GridmasterLogin />;
+    return <GridmasterLogin initialTheme={theme} />;
   }
   if (subdomain) {
     // Resolve the organization here, not on the client, so the very first
@@ -86,7 +91,6 @@ export default async function LoginPage({
     // makes the redirect possible at all: the client-resolved version had
     // already committed to the page by the time it found out.
     if (result.status === "not-found") {
-      const theme = (await cookies()).get(THEME_COOKIE_NAME)?.value;
       redirect(apexLoginUrl(parsed, headersList.get("x-forwarded-proto"), theme));
     }
 

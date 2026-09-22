@@ -56,7 +56,7 @@ Each cron is also behind a `platform_feature_flags` kill switch (`cron_expire_re
 | POST   | `/api/auth/sign-out`       | Server-side sign-out: local scope writes the revocation marker; `global`/`others` scope requires fresh sensitive-action auth |
 | GET    | `/api/auth/data-export`    | GDPR personal data export (JSON download); requires fresh sensitive-action auth                                              |
 | POST   | `/api/auth/gdpr-erase`     | GDPR full data anonymization; requires fresh sensitive-action auth                                                           |
-| DELETE | `/api/auth/delete-account` | Delete the authenticated user's account; requires fresh sensitive-action auth                                                |
+| DELETE | `/api/auth/delete-account` | Delete the authenticated user's account (super admins only; everyone else requests it); requires fresh sensitive-action auth |
 | POST   | `/api/invitations/accept`  | Accept a pending invitation and complete registration                                                                        |
 | GET    | `/api/trial-welcome`       | Check whether to show the trial welcome modal (held until onboarding completes)                                              |
 | POST   | `/api/trial-welcome`       | Send trial welcome email via Resend (claimed atomically, sent once)                                                          |
@@ -120,16 +120,16 @@ Each cron is also behind a `platform_feature_flags` kill switch (`cron_expire_re
 
 ### Employees
 
-| Method | Path                               | Purpose                                                                                                        |
-| ------ | ---------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| POST   | `/api/employees/manage`            | Create or update an employee record                                                                            |
-| POST   | `/api/employees/status`            | Update employee status (active/benched/terminated)                                                             |
-| PATCH  | `/api/employees/identity`          | Update employee identity fields                                                                                |
-| POST   | `/api/employees/check-email`       | Pre-flight duplicate check for an invite or management-access email                                            |
-| POST   | `/api/employees/check-phone`       | Pre-flight duplicate check for an invite phone number                                                          |
-| GET    | `/api/people/change-requests`      | List pending people change requests                                                                            |
-| PATCH  | `/api/people/change-requests/[id]` | Approve or reject a people change request (approving an account deletion requires fresh sensitive-action auth) |
-| POST   | `/api/import/employees`            | Bulk-import employees from CSV (blocks exact duplicates, warns on similar names)                               |
+| Method | Path                               | Purpose                                                                                                                                            |
+| ------ | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/api/employees/manage`            | Create or update an employee record                                                                                                                |
+| POST   | `/api/employees/status`            | Update employee status (active/benched/terminated)                                                                                                 |
+| PATCH  | `/api/employees/identity`          | Update employee identity fields                                                                                                                    |
+| POST   | `/api/employees/check-email`       | Pre-flight duplicate check for an invite or management-access email                                                                                |
+| POST   | `/api/employees/check-phone`       | Pre-flight duplicate check for an invite phone number                                                                                              |
+| GET    | `/api/people/change-requests`      | List pending people change requests (account deletions are listed for super admins only)                                                           |
+| PATCH  | `/api/people/change-requests/[id]` | Approve or reject a people change request (only a super admin decides an account deletion, and approving one requires fresh sensitive-action auth) |
+| POST   | `/api/import/employees`            | Bulk-import employees from CSV (blocks exact duplicates, warns on similar names)                                                                   |
 
 ---
 
@@ -321,21 +321,21 @@ The mobile app (Expo) communicates exclusively with these endpoints. All routes 
 
 ### Profile
 
-| Method   | Path                                              | Purpose                                                                       |
-| -------- | ------------------------------------------------- | ----------------------------------------------------------------------------- |
-| GET      | `/api/mobile/v1/profile`                          | Authenticated user's profile                                                  |
-| PATCH    | `/api/mobile/v1/profile/account`                  | Update account fields                                                         |
-| PATCH    | `/api/mobile/v1/profile/phone`                    | Update phone number                                                           |
-| PATCH    | `/api/mobile/v1/profile/mfa-status`               | Persist post-enrollment MFA status                                            |
-| POST     | `/api/mobile/v1/profile/mfa-lifecycle`            | `enroll`, `remove`, `reauthenticate`, or `cleanup` a TOTP factor              |
-| POST     | `/api/mobile/v1/profile/credential-assurance`     | Preflight a credential change against the five-minute sensitive-action policy |
-| POST     | `/api/mobile/v1/profile/terms`                    | Record acceptance of the current terms version                                |
-| GET      | `/api/mobile/v1/profile/change-requests`          | List pending change requests                                                  |
-| POST     | `/api/mobile/v1/profile/change-requests`          | Submit a change request                                                       |
-| PATCH    | `/api/mobile/v1/profile/change-requests/[id]`     | Approve or reject a change request                                            |
-| GET, PUT | `/api/mobile/v1/profile/notification-preferences` | Get/set notification preferences                                              |
-| GET      | `/api/mobile/v1/profile/sessions`                 | List active sessions                                                          |
-| DELETE   | `/api/mobile/v1/profile/sessions`                 | Revoke a session                                                              |
+| Method   | Path                                              | Purpose                                                                                              |
+| -------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| GET      | `/api/mobile/v1/profile`                          | Authenticated user's profile                                                                         |
+| PATCH    | `/api/mobile/v1/profile/account`                  | Update account fields                                                                                |
+| PATCH    | `/api/mobile/v1/profile/phone`                    | Update phone number                                                                                  |
+| PATCH    | `/api/mobile/v1/profile/mfa-status`               | Persist post-enrollment MFA status                                                                   |
+| POST     | `/api/mobile/v1/profile/mfa-lifecycle`            | `enroll`, `remove`, `reauthenticate`, or `cleanup` a TOTP factor                                     |
+| POST     | `/api/mobile/v1/profile/credential-assurance`     | Preflight a credential change against the five-minute sensitive-action policy                        |
+| POST     | `/api/mobile/v1/profile/terms`                    | Record acceptance of the current terms version                                                       |
+| GET      | `/api/mobile/v1/profile/change-requests`          | List pending change requests                                                                         |
+| POST     | `/api/mobile/v1/profile/change-requests`          | Submit a change request                                                                              |
+| PATCH    | `/api/mobile/v1/profile/change-requests/[id]`     | Approve or reject a change request (account deletions: super admin plus fresh sensitive-action auth) |
+| GET, PUT | `/api/mobile/v1/profile/notification-preferences` | Get/set notification preferences                                                                     |
+| GET      | `/api/mobile/v1/profile/sessions`                 | List active sessions                                                                                 |
+| DELETE   | `/api/mobile/v1/profile/sessions`                 | Revoke a session                                                                                     |
 
 ### Device and Presence
 
@@ -399,14 +399,24 @@ These RPC calls are made from Route Handlers and use the caller's session or the
 
 ### Shift Requests
 
-| RPC                        | Purpose                              | Auth          |
-| -------------------------- | ------------------------------------ | ------------- |
-| `create_shift_request`     | Create a pickup/swap/calloff request | Authenticated |
-| `respond_to_shift_request` | Accept or decline a shift request    | Authenticated |
-| `resolve_shift_request`    | Approve or reject a shift request    | Admin+        |
-| `cancel_shift_request`     | Cancel a pending request             | Authenticated |
-| `claim_shift_request`      | Claim an open pickup request         | Authenticated |
-| `volunteer_for_open_shift` | Volunteer for an open shift          | Authenticated |
+| RPC                          | Purpose                                                                                                                                                                          | Auth            |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| `create_shift_request`       | Create a pickup/swap/calloff request                                                                                                                                             | Authenticated   |
+| `respond_to_shift_request`   | Accept or decline a shift request                                                                                                                                                | Authenticated   |
+| `resolve_shift_request`      | Approve or reject a shift request                                                                                                                                                | Admin+          |
+| `auto_approve_shift_request` | Approve a request just entered into the queue when the requester or the accepting party can approve shift requests; returns the approver and note, or NULL when nobody qualifies | Party or admin+ |
+| `cancel_shift_request`       | Cancel a pending request                                                                                                                                                         | Authenticated   |
+| `claim_shift_request`        | Claim an open pickup request                                                                                                                                                     | Authenticated   |
+| `volunteer_for_open_shift`   | Volunteer for an open shift                                                                                                                                                      | Authenticated   |
+
+Every transition into `pending_approval` (a call-off, a volunteer, a claim, an
+accepted swap or targeted pickup) is followed by `auto_approve_shift_request`
+on the same session. When an approver is party to the request it is approved
+on their behalf with the note `Auto-approved: <name> can approve shift
+requests`, and the create and update responses on `/api/schedule/requests` and
+`/api/mobile/v1/shift-requests` carry `autoApproved: true`. A gridmaster
+impersonating a member never settles anything, and any failure leaves the
+request in the queue exactly as before.
 
 ### Notifications
 

@@ -166,6 +166,8 @@ export async function listAdminProfileChangeRequests(input: {
   serviceClient: SupabaseClient;
   orgId: string;
   status?: ProfileChangeRequestStatus;
+  /** Account deletions are a super admin's call; other managers never see them. */
+  includeAccountDeletion: boolean;
 }): Promise<ProfileChangeRequestRecord[]> {
   let query = input.serviceClient
     .from("profile_change_requests")
@@ -175,6 +177,9 @@ export async function listAdminProfileChangeRequests(input: {
 
   if (input.status) {
     query = query.eq("status", input.status);
+  }
+  if (!input.includeAccountDeletion) {
+    query = query.eq("request_type", "profile_update");
   }
 
   const { data, error } = await query;
@@ -186,6 +191,7 @@ async function fetchProfileChangeRequestReviewerIds(input: {
   serviceClient: SupabaseClient;
   orgId: string;
   requesterUserId: string;
+  type: ProfileChangeRequestType;
 }): Promise<string[]> {
   const { data, error } = await input.serviceClient
     .from("organization_memberships")
@@ -208,7 +214,7 @@ async function fetchProfileChangeRequestReviewerIds(input: {
     }
 
     const permissions = buildPermissionContext(row.org_role, input.orgId, row.admin_permissions);
-    if (permissions.isSuperAdmin || permissions.canManageEmployees) {
+    if (canDecideProfileChangeRequest(permissions, input.type)) {
       reviewerIds.add(row.user_id);
     }
   }
@@ -299,6 +305,7 @@ async function notifyProfileChangeRequestReviewers(input: {
       serviceClient: input.serviceClient,
       orgId: input.request.orgId,
       requesterUserId: input.request.requesterUserId,
+      type: input.request.type,
     });
     if (reviewerIds.length === 0) {
       return;
@@ -385,8 +392,11 @@ export async function createProfileChangeRequest(input: {
     input.orgId,
     membership.admin_permissions,
   );
-  if (permissions.isSuperAdmin || permissions.canManageEmployees) {
+  if (input.type === "profile_update" && permissions.canManageEmployees) {
     throw new Error("You can edit profile details directly.");
+  }
+  if (input.type === "account_deletion" && permissions.isSuperAdmin) {
+    throw new Error("You can delete your account directly from your profile.");
   }
 
   const linkedEmployee = await fetchLinkedEmployeeForUser(
@@ -596,6 +606,16 @@ export async function resolveProfileChangeRequest(input: {
   if (request.status !== "pending") {
     throw new Error("Only pending requests can be resolved.");
   }
+  if (
+    request.type === "account_deletion" &&
+    !(await canDeleteAccountDirectly({
+      serviceClient: input.serviceClient,
+      actorId: input.actor.id,
+      orgId: input.orgId,
+    }))
+  ) {
+    throw new Error("Unauthorized: only a super admin can decide an account deletion.");
+  }
 
   if (input.action === "approve") {
     if (request.type === "profile_update") {
@@ -714,11 +734,25 @@ async function fetchResolverDisplayName(
   return full || "An administrator";
 }
 
-export async function canManageProfileChangeRequests(input: {
+/**
+ * Profile updates are any people manager's call; account deletion is a super
+ * admin's (or the platform's). Gridmasters and super admins hold every
+ * permission, so the second test is the narrower one.
+ */
+function canDecideProfileChangeRequest(
+  permissions: ReturnType<typeof buildPermissionContext>,
+  type: ProfileChangeRequestType,
+): boolean {
+  return type === "account_deletion"
+    ? permissions.isGridmaster || permissions.isSuperAdmin
+    : permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageEmployees;
+}
+
+async function resolveActorPermissions(input: {
   serviceClient: SupabaseClient;
   actorId: string;
   orgId: string;
-}): Promise<boolean> {
+}): Promise<ReturnType<typeof buildPermissionContext>> {
   const [{ data: membership }, { data: profile }] = await Promise.all([
     input.serviceClient
       .from("organization_memberships")
@@ -737,11 +771,27 @@ export async function canManageProfileChangeRequests(input: {
     profile?.platform_role === "gridmaster"
       ? "gridmaster"
       : ((membership?.org_role as OrganizationRole | null) ?? "user");
-  const permissions = buildPermissionContext(
+  return buildPermissionContext(
     role,
     input.orgId,
     (membership?.admin_permissions as AdminPermissions | null) ?? null,
   );
+}
 
-  return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageEmployees;
+/** Whether the actor edits staff profiles directly instead of requesting a change. */
+export async function canManageProfileChangeRequests(input: {
+  serviceClient: SupabaseClient;
+  actorId: string;
+  orgId: string;
+}): Promise<boolean> {
+  return canDecideProfileChangeRequest(await resolveActorPermissions(input), "profile_update");
+}
+
+/** Whether the actor deletes or erases their own account without a request. */
+export async function canDeleteAccountDirectly(input: {
+  serviceClient: SupabaseClient;
+  actorId: string;
+  orgId: string;
+}): Promise<boolean> {
+  return canDecideProfileChangeRequest(await resolveActorPermissions(input), "account_deletion");
 }

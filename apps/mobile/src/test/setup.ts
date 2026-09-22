@@ -1,5 +1,7 @@
 import "@testing-library/jest-dom/vitest";
+import { configure } from "@testing-library/react";
 import { afterEach } from "vitest";
+import { FIT_TEXT_MEASURE_TEST_ID } from "../shared/components/fit-text-measure-id";
 import { resetSheetPresentationTracking } from "../shared/lib/modal-presentation";
 
 // The sheet-depth counter is module state. Testing Library unmounts between
@@ -8,6 +10,11 @@ import { resetSheetPresentationTracking } from "../shared/lib/modal-presentation
 afterEach(() => {
   resetSheetPresentationTracking();
 });
+
+// FitText renders a hidden second copy of every button label to measure its
+// natural width. Text queries would otherwise find two "Sign in"s; the
+// visible one is the label a test means.
+configure({ defaultIgnore: `script, style, [data-testid="${FIT_TEXT_MEASURE_TEST_ID}"] *` });
 
 // jsdom's own localStorage sometimes fails to install here — Node's own
 // experimental global `localStorage` getter (which throws without

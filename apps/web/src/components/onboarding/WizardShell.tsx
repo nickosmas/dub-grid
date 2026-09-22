@@ -9,8 +9,8 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 interface WizardShellProps {
   steps: StepConfig[];
   currentStepIndex: number;
-  /** Hide the stepper bar (used on welcome + completion screens). */
-  hideStepper?: boolean;
+  /** Every step reads as done, for the completion screen. */
+  stepsComplete?: boolean;
   /** Optional click handler for the "Skip setup" link in the top-right. Hidden when undefined. */
   onSkip?: () => void;
   skipLoading?: boolean;
@@ -27,7 +27,7 @@ interface WizardShellProps {
 export default function WizardShell({
   steps,
   currentStepIndex,
-  hideStepper,
+  stepsComplete,
   onSkip,
   skipLoading,
   centerContent,
@@ -91,18 +91,16 @@ export default function WizardShell({
         )}
       </div>
 
-      {!hideStepper && steps.length > 2 && (
-        <div
-          style={{
-            padding: "0 24px 24px",
-            maxWidth: 860,
-            margin: "0 auto",
-            width: "100%",
-          }}
-        >
-          <StepperBar steps={steps} currentStepIndex={currentStepIndex} />
-        </div>
-      )}
+      <div
+        style={{
+          padding: "0 24px 24px",
+          maxWidth: 860,
+          margin: "0 auto",
+          width: "100%",
+        }}
+      >
+        <StepperBar steps={steps} currentStepIndex={currentStepIndex} complete={stepsComplete} />
+      </div>
 
       <div
         style={{

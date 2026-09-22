@@ -58,7 +58,8 @@
     "deps:rebuild": "npm rebuild --ignore-scripts=false --foreground-scripts @prisma/engines @snaplet/seed @sentry/cli",
     "deps:audit": "node scripts/audit-check.mjs",
     "deps:scan": "node scripts/supply-chain-scan.mjs",
-    "build:packages": "turbo run build --filter=@dubgrid/authz --filter=@dubgrid/domain --filter=@dubgrid/schedule-core --filter=@dubgrid/design-tokens --filter=@dubgrid/api-client --filter=@dubgrid/db-types --filter=@dubgrid/data-access --filter=@dubgrid/mobile-api-core --filter=@dubgrid/contracts --filter=@dubgrid/client-errors --filter=@dubgrid/realtime-core"
+    "build:packages": "turbo run build --filter=@dubgrid/authz --filter=@dubgrid/domain --filter=@dubgrid/schedule-core --filter=@dubgrid/design-tokens --filter=@dubgrid/api-client --filter=@dubgrid/db-types --filter=@dubgrid/data-access --filter=@dubgrid/mobile-api-core --filter=@dubgrid/contracts --filter=@dubgrid/client-errors --filter=@dubgrid/realtime-core",
+    "test:load:schedule": "SCHEDULE_AUTH=1 k6 run load-tests/schedule-load.js"
   },
   "overrides": {
     "@hono/node-server": "2.1.0",

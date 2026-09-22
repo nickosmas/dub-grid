@@ -11,6 +11,7 @@ import {
   type PublishedScheduleSegment,
   type PublishedShiftRow,
 } from "@/lib/published-shifts";
+import { fetchAllRows } from "@/lib/db/shared";
 import {
   buildOperationsReportMetrics,
   buildOperationsReportPreviewTable,
@@ -2257,12 +2258,25 @@ export function buildOperationsReportPdf(
   return buildPdfDocument(pageStreams, logo, wordmark);
 }
 
+/**
+ * Every row a report query matches, not the first thousand.
+ *
+ * PostgREST caps a response at `db.max_rows` (1,000 here) for every role,
+ * the service role included, and this used to await one request and return
+ * whatever came back: an organization past the cap got a report, a CSV and a
+ * PDF that were quietly short, with no error anywhere. Takes a page builder
+ * rather than a promise so each caller can range, and leans on the same
+ * `fetchAllRows` the schedule reads use. Every caller ends its ordering with
+ * `id`: without a unique tiebreaker two pages of equal-ranked rows can
+ * overlap and drop rows between them.
+ */
 async function fetchTableRows<T>(
-  promise: PromiseLike<{ data: unknown; error: unknown }>,
+  buildPage: (from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }>,
 ): Promise<T[]> {
-  const { data, error } = await promise;
-  if (error) throw error;
-  return (data ?? []) as T[];
+  return fetchAllRows<T>(
+    (from, to) =>
+      buildPage(from, to) as PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  );
 }
 
 const EMPLOYEE_REPORT_COLUMNS =
@@ -2275,38 +2289,52 @@ const EMPLOYEE_REPORT_COLUMNS =
  */
 function fetchFilterOptionSource(serviceClient: SupabaseClient, orgId: string) {
   return {
-    employees: fetchTableRows<EmployeeReportRow>(
+    employees: fetchTableRows<EmployeeReportRow>((from, to) =>
       serviceClient
         .from("employees")
         .select(EMPLOYEE_REPORT_COLUMNS)
         .eq("org_id", orgId)
         .is("archived_at", null)
-        .order("seniority", { ascending: true }),
+        .order("seniority", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to),
     ),
-    focusAreas: fetchTableRows<FocusAreaRow>(
+    focusAreas: fetchTableRows<FocusAreaRow>((from, to) =>
       serviceClient
         .from("focus_areas")
         .select("id, name, department_id")
         .eq("org_id", orgId)
-        .is("archived_at", null),
+        .is("archived_at", null)
+        .order("id", { ascending: true })
+        .range(from, to),
     ),
-    shiftCategories: fetchTableRows<ShiftCategoryRow>(
+    shiftCategories: fetchTableRows<ShiftCategoryRow>((from, to) =>
       serviceClient
         .from("shift_categories")
         .select("id, name, focus_area_id, start_time, end_time")
         .eq("org_id", orgId)
-        .is("archived_at", null),
+        .is("archived_at", null)
+        .order("id", { ascending: true })
+        .range(from, to),
     ),
-    jobs: fetchTableRows<NamedRow>(
-      serviceClient.from("jobs").select("id, name").eq("org_id", orgId).is("archived_at", null),
+    jobs: fetchTableRows<NamedRow>((from, to) =>
+      serviceClient
+        .from("jobs")
+        .select("id, name")
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .order("id", { ascending: true })
+        .range(from, to),
     ),
-    indicatorTypes: fetchTableRows<IndicatorTypeRow>(
+    indicatorTypes: fetchTableRows<IndicatorTypeRow>((from, to) =>
       serviceClient
         .from("indicator_types")
         .select("id, name")
         .eq("org_id", orgId)
         .is("archived_at", null)
-        .order("sort_order", { ascending: true }),
+        .order("sort_order", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to),
     ),
   };
 }
@@ -2365,60 +2393,74 @@ export async function loadOperationsReport(
     indicatorTypes,
     scheduleNotes,
   ] = await Promise.all([
-    fetchTableRows<OrganizationRow>(
+    fetchTableRows<OrganizationRow>((from, to) =>
       serviceClient
         .from("organizations")
         .select("id, name, timezone, pay_period_start_date")
         .eq("id", input.orgId)
-        .limit(1),
+        .limit(1)
+        .order("id", { ascending: true })
+        .range(from, to),
     ),
     optionSource.employees,
-    fetchTableRows<EmployeeReportRow>(
+    fetchTableRows<EmployeeReportRow>((from, to) =>
       serviceClient
         .from("employees")
         .select(EMPLOYEE_REPORT_COLUMNS)
         .eq("org_id", input.orgId)
         .not("archived_at", "is", null)
-        .order("seniority", { ascending: true }),
+        .order("seniority", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to),
     ),
     optionSource.focusAreas,
-    fetchTableRows<NamedRow>(
+    fetchTableRows<NamedRow>((from, to) =>
       serviceClient
         .from("organization_roles")
         .select("id, name, abbr")
         .eq("org_id", input.orgId)
-        .is("archived_at", null),
+        .is("archived_at", null)
+        .order("id", { ascending: true })
+        .range(from, to),
     ),
-    fetchTableRows<NamedRow>(
+    fetchTableRows<NamedRow>((from, to) =>
       serviceClient
         .from("certifications")
         .select("id, name, abbr")
         .eq("org_id", input.orgId)
-        .is("archived_at", null),
+        .is("archived_at", null)
+        .order("id", { ascending: true })
+        .range(from, to),
     ),
-    fetchTableRows<NamedRow>(
+    fetchTableRows<NamedRow>((from, to) =>
       serviceClient
         .from("departments")
         .select("id, name, abbr")
         .eq("org_id", input.orgId)
-        .is("archived_at", null),
+        .is("archived_at", null)
+        .order("id", { ascending: true })
+        .range(from, to),
     ),
-    fetchTableRows<NamedRow>(
+    fetchTableRows<NamedRow>((from, to) =>
       serviceClient
         .from("absence_types")
         .select("id, label, name")
         .eq("org_id", input.orgId)
-        .is("archived_at", null),
+        .is("archived_at", null)
+        .order("id", { ascending: true })
+        .range(from, to),
     ),
-    fetchTableRows<CoverageRequirementRow>(
+    fetchTableRows<CoverageRequirementRow>((from, to) =>
       serviceClient
         .from("coverage_requirements")
         .select("id, focus_area_id, job_id, preferred_shift_id, day_of_week, min_staff")
-        .eq("org_id", input.orgId),
+        .eq("org_id", input.orgId)
+        .order("id", { ascending: true })
+        .range(from, to),
     ),
     optionSource.shiftCategories,
     optionSource.jobs,
-    fetchTableRows<ShiftRequestRow>(
+    fetchTableRows<ShiftRequestRow>((from, to) =>
       serviceClient
         .from("shift_requests")
         .select(
@@ -2431,16 +2473,20 @@ export async function loadOperationsReport(
             `and(target_shift_date.gte.${input.range.startDate},target_shift_date.lte.${input.range.endDate})`,
           ].join(","),
         )
-        .order("created_at", { ascending: false }),
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to),
     ),
-    fetchTableRows<InvitationRow>(
+    fetchTableRows<InvitationRow>((from, to) =>
       serviceClient
         .from("invitations")
         .select("employee_id, email, expires_at")
         .eq("org_id", input.orgId)
         .is("accepted_at", null)
         .is("revoked_at", null)
-        .gte("expires_at", now),
+        .gte("expires_at", now)
+        .order("id", { ascending: true })
+        .range(from, to),
     ),
     fetchPublishedShiftRows(serviceClient, {
       orgId: input.orgId,
@@ -2451,14 +2497,16 @@ export async function loadOperationsReport(
     optionSource.indicatorTypes,
     // draft_deleted notes are still published until the next publish runs, so
     // they belong in a published view of the schedule; plain drafts do not.
-    fetchTableRows<ScheduleNoteRow>(
+    fetchTableRows<ScheduleNoteRow>((from, to) =>
       serviceClient
         .from("schedule_notes")
         .select("emp_id, date, indicator_type_id, focus_area_id, status")
         .eq("org_id", input.orgId)
         .gte("date", input.range.startDate)
         .lte("date", input.range.endDate)
-        .in("status", ["published", "draft_deleted"]),
+        .in("status", ["published", "draft_deleted"])
+        .order("id", { ascending: true })
+        .range(from, to),
     ),
   ]);
 
