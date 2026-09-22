@@ -2028,55 +2028,57 @@ export async function fetchMobileNotificationsPage(
     .order("id", { ascending })
     .limit(limit + 1);
 
-  // A deep link names one alert, which may be older than any page the inbox
-  // has loaded, so the id short-circuits the filters that would hide it.
+  // A deep link names one alert, which may be archived, read, or older than
+  // any page the inbox has loaded. It is a lookup, not a filtered page, so
+  // the list filters and the cursor do not apply; row-level security still
+  // decides whether this viewer may see the row.
   if (input.id) {
     query = query.eq("id", input.id);
-  }
-
-  const archived = input.archived ?? "inbox";
-  if (archived === "archived") {
-    query = query.not("archived_at", "is", null);
-  } else if (archived === "inbox") {
-    query = query.is("archived_at", null);
-  }
-
-  if (input.read === "unread") {
-    query = query.is("read_at", null);
-  } else if (input.read === "read") {
-    query = query.not("read_at", "is", null);
-  }
-
-  if (input.category) {
-    query = query.eq("category", input.category);
-  }
-
-  if (input.type) {
-    query = query.eq("type", input.type);
-  }
-
-  if (input.priority) {
-    query = query.eq("priority", input.priority);
-  }
-
-  if (input.search) {
-    const term = input.search.replace(/[%,]/g, " ").trim();
-    if (term) {
-      const pattern = `%${term}%`;
-      query = query.or(`title.ilike.${pattern},message.ilike.${pattern}`);
+  } else {
+    const archived = input.archived ?? "inbox";
+    if (archived === "archived") {
+      query = query.not("archived_at", "is", null);
+    } else if (archived === "inbox") {
+      query = query.is("archived_at", null);
     }
-  }
 
-  if (input.cursor) {
-    const cmp = ascending ? "gt" : "lt";
-    // Keyset on (created_at, id) tuple. Postgres row-value compare is exposed
-    // via PostgREST's `or` with explicit equality on the tiebreaker.
-    query = query.or(
-      [
-        `created_at.${cmp}.${input.cursor.createdAt}`,
-        `and(created_at.eq.${input.cursor.createdAt},id.${cmp}.${input.cursor.id})`,
-      ].join(","),
-    );
+    if (input.read === "unread") {
+      query = query.is("read_at", null);
+    } else if (input.read === "read") {
+      query = query.not("read_at", "is", null);
+    }
+
+    if (input.category) {
+      query = query.eq("category", input.category);
+    }
+
+    if (input.type) {
+      query = query.eq("type", input.type);
+    }
+
+    if (input.priority) {
+      query = query.eq("priority", input.priority);
+    }
+
+    if (input.search) {
+      const term = input.search.replace(/[%,]/g, " ").trim();
+      if (term) {
+        const pattern = `%${term}%`;
+        query = query.or(`title.ilike.${pattern},message.ilike.${pattern}`);
+      }
+    }
+
+    if (input.cursor) {
+      const cmp = ascending ? "gt" : "lt";
+      // Keyset on (created_at, id) tuple. Postgres row-value compare is exposed
+      // via PostgREST's `or` with explicit equality on the tiebreaker.
+      query = query.or(
+        [
+          `created_at.${cmp}.${input.cursor.createdAt}`,
+          `and(created_at.eq.${input.cursor.createdAt},id.${cmp}.${input.cursor.id})`,
+        ].join(","),
+      );
+    }
   }
 
   const [{ data: rows, error: notificationError }, { data: unreadCount, error: unreadError }] =

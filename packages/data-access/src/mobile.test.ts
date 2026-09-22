@@ -401,6 +401,27 @@ describe("fetchMobileNotificationsPage", () => {
     expect(page.notifications).toHaveLength(1);
   });
 
+  it("does not let the inbox filters hide the alert a link names", async () => {
+    const { client, chain } = makeNotificationsClient([
+      {
+        id: "alert-1",
+        type: "x",
+        channel: "in_app",
+        created_at: "2026-01-01T00:00:00.000Z",
+        archived_at: "2026-01-02T00:00:00.000Z",
+      },
+    ]);
+
+    // No archived argument, and the alert is archived: a filtered page would
+    // miss it, a lookup must not.
+    const page = await fetchMobileNotificationsPage(client, { id: "alert-1", limit: 1 });
+
+    expect(page.notifications).toHaveLength(1);
+    expect(chain.is).not.toHaveBeenCalled();
+    expect(chain.not).not.toHaveBeenCalled();
+    expect(chain.or).not.toHaveBeenCalled();
+  });
+
   it("leaves the id filter off an ordinary page", async () => {
     const { client, chain } = makeNotificationsClient([]);
 
