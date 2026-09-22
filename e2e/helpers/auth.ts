@@ -42,6 +42,11 @@ export async function clearBlockingOverlays(page: Page): Promise<void> {
     // Modal-based interstitial, e.g. TrialWelcomeModal on a first-ever login
     // for a fresh org, without needing to special-case each one by title.
     page.getByRole("button", { name: "Close modal" }),
+    // TrialWelcomeModal's own dismissal. Its sibling action is "Set up
+    // billing", which navigates to the subscription settings, so a run that
+    // left this modal standing could end up asserting against that page
+    // instead of where the sign-in actually landed.
+    page.getByRole("button", { name: "Maybe later" }),
   ];
   let consecutiveEmptyPasses = 0;
   for (let attempt = 0; attempt < 6 && consecutiveEmptyPasses < 2; attempt++) {

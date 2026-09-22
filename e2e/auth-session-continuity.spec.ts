@@ -7,6 +7,16 @@ interface RuntimeFailures {
   authBoundaryRejections: string[];
 }
 
+/**
+ * Reads the dashboard mount fires that can still be in flight when the other
+ * tab signs out. A 401 on one of these is the boundary working, not a defect.
+ */
+const SESSION_SCOPED_DASHBOARD_READS = new Set([
+  "/api/organization/bootstrap",
+  "/api/trial-welcome",
+  "/api/account/identity",
+]);
+
 function collectRuntimeFailures(page: Page): RuntimeFailures {
   const failures: RuntimeFailures = { unexpected: [], authBoundaryRejections: [] };
 
@@ -29,15 +39,13 @@ function collectRuntimeFailures(page: Page): RuntimeFailures {
       // and only resolves inside a real Vercel runtime.
       return;
     }
-    if (
-      response.status() === 401 &&
-      (path === "/api/organization/bootstrap" || path === "/api/trial-welcome")
-    ) {
+    if (response.status() === 401 && SESSION_SCOPED_DASHBOARD_READS.has(path)) {
       // A request already accepted by the browser can reach the server after
       // the sibling tab revokes the shared session. The boundary still aborts
       // the client work and redirects before that response can render data.
-      // trial-welcome fires from the same dashboard mount as bootstrap, so it
-      // races the same way.
+      // Every path here fires from the same dashboard mount, so they race the
+      // revocation the same way; account/identity was missing and turned an
+      // ordinary race into a failed run about one in several.
       failures.authBoundaryRejections.push(path);
     } else if (response.status() >= 400) {
       failures.unexpected.push(`response:${response.status()}:${path}`);
@@ -78,8 +86,8 @@ test("a Calm Haven sign-out propagates to another authenticated tab", async ({
   expect(firstTabFailures.unexpected).toEqual([]);
   expect(secondTabFailures.unexpected).toEqual([]);
   expect(
-    secondTabFailures.authBoundaryRejections.every(
-      (path) => path === "/api/organization/bootstrap" || path === "/api/trial-welcome",
+    secondTabFailures.authBoundaryRejections.every((path) =>
+      SESSION_SCOPED_DASHBOARD_READS.has(path),
     ),
   ).toBe(true);
 });
