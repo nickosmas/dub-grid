@@ -6,16 +6,6 @@ import { fetchAllRows, type PagedQueryResult } from "@/lib/db/shared";
 import { getServiceClient } from "@/lib/supabase-service";
 import { mapNormalizedScheduleCellRowToScheduleEntry } from "@/lib/schedule-cells";
 
-const POSTGREST_MUTATION_BATCH_SIZE = 50;
-
-function chunkIds(ids: string[]): string[][] {
-  const chunks: string[][] = [];
-  for (let i = 0; i < ids.length; i += POSTGREST_MUTATION_BATCH_SIZE) {
-    chunks.push(ids.slice(i, i + POSTGREST_MUTATION_BATCH_SIZE));
-  }
-  return chunks;
-}
-
 export async function fetchScheduleDraftBreakdown(input: {
   orgId: string;
   startDate?: string;
@@ -219,6 +209,10 @@ export async function recordNotePublishChanges(input: {
  * user a count for one window must pass that window, or they delete far more
  * than they counted. Omitting both discards every date in the org, which only
  * unattended tooling should ask for.
+ *
+ * One database transaction: the function locks each candidate cell before
+ * deciding whether it is draft-only, so a publish landing between selection
+ * and deletion can no longer lose published data (audit finding F-03).
  */
 export async function discardScheduleDraftsDirect(input: {
   orgId: string;
@@ -228,97 +222,11 @@ export async function discardScheduleDraftsDirect(input: {
   serviceClient?: SupabaseClient;
 }): Promise<void> {
   const serviceClient = input.serviceClient ?? getServiceClient();
-  let scheduleCellQuery = serviceClient
-    .from("schedule_cells")
-    .select("id, version, snapshots:schedule_cell_snapshots(id, snapshot_kind)")
-    .eq("org_id", input.orgId);
-
-  if (input.startDate) scheduleCellQuery = scheduleCellQuery.gte("date", input.startDate);
-  if (input.endDate) scheduleCellQuery = scheduleCellQuery.lte("date", input.endDate);
-  if (input.userId) scheduleCellQuery = scheduleCellQuery.eq("updated_by", input.userId);
-
-  const { data: scheduleCells, error: fetchError } = await scheduleCellQuery;
-  if (fetchError) throw fetchError;
-
-  const cells = (scheduleCells ?? []) as Array<{
-    id: string;
-    version: number;
-    snapshots?: Array<{ id: string; snapshot_kind: "draft" | "published" }>;
-  }>;
-
-  const draftSnapshotIdsToDelete: string[] = [];
-  const cellIdsToDelete: string[] = [];
-  const cellsToTouch: Array<{ id: string; version: number }> = [];
-
-  for (const cell of cells) {
-    const draftSnapshot = (cell.snapshots ?? []).find(
-      (snapshot) => snapshot.snapshot_kind === "draft",
-    );
-    if (!draftSnapshot) continue;
-
-    const hasPublished = (cell.snapshots ?? []).some(
-      (snapshot) => snapshot.snapshot_kind === "published",
-    );
-    if (hasPublished) {
-      draftSnapshotIdsToDelete.push(draftSnapshot.id);
-      cellsToTouch.push({ id: cell.id, version: cell.version });
-    } else {
-      cellIdsToDelete.push(cell.id);
-    }
-  }
-
-  if (draftSnapshotIdsToDelete.length > 0) {
-    for (const batch of chunkIds(draftSnapshotIdsToDelete)) {
-      const { error: deleteDraftsError } = await serviceClient
-        .from("schedule_cell_snapshots")
-        .delete()
-        .in("id", batch);
-      if (deleteDraftsError) throw deleteDraftsError;
-    }
-  }
-
-  if (cellIdsToDelete.length > 0) {
-    for (const batch of chunkIds(cellIdsToDelete)) {
-      const { error: deleteCellsError } = await serviceClient
-        .from("schedule_cells")
-        .delete()
-        .in("id", batch);
-      if (deleteCellsError) throw deleteCellsError;
-    }
-  }
-
-  for (const cell of cellsToTouch) {
-    const { error: touchError } = await serviceClient
-      .from("schedule_cells")
-      .update({
-        version: cell.version + 1,
-        updated_by: input.userId ?? null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", cell.id)
-      .eq("version", cell.version);
-    if (touchError) throw touchError;
-  }
-
-  let noteDeleteQuery = serviceClient
-    .from("schedule_notes")
-    .delete()
-    .eq("org_id", input.orgId)
-    .eq("status", "draft");
-  if (input.startDate) noteDeleteQuery = noteDeleteQuery.gte("date", input.startDate);
-  if (input.endDate) noteDeleteQuery = noteDeleteQuery.lte("date", input.endDate);
-  if (input.userId) noteDeleteQuery = noteDeleteQuery.eq("updated_by", input.userId);
-  const { error: noteDeleteError } = await noteDeleteQuery;
-  if (noteDeleteError) throw noteDeleteError;
-
-  let noteRevertQuery = serviceClient
-    .from("schedule_notes")
-    .update({ status: "published" })
-    .eq("org_id", input.orgId)
-    .eq("status", "draft_deleted");
-  if (input.startDate) noteRevertQuery = noteRevertQuery.gte("date", input.startDate);
-  if (input.endDate) noteRevertQuery = noteRevertQuery.lte("date", input.endDate);
-  if (input.userId) noteRevertQuery = noteRevertQuery.eq("updated_by", input.userId);
-  const { error: noteRevertError } = await noteRevertQuery;
-  if (noteRevertError) throw noteRevertError;
+  const { error } = await serviceClient.rpc("discard_schedule_drafts", {
+    p_org_id: input.orgId,
+    p_user_id: input.userId ?? null,
+    p_start_date: input.startDate ?? null,
+    p_end_date: input.endDate ?? null,
+  });
+  if (error) throw error;
 }

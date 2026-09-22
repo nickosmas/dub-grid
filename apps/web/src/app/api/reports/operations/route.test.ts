@@ -63,6 +63,7 @@ describe("reports operations API", () => {
     auditInsert.mockResolvedValue({ error: null });
     requireOrgPermissions.mockResolvedValue({
       actor: { id: "user-1", email: "owner@example.com" },
+      orgId: ORG_ID,
       permissions: { role: "admin", isSuperAdmin: false },
       serviceClient: {
         from: vi.fn((table: string) => {

@@ -147,6 +147,7 @@ describe("POST /api/stripe/create-checkout", () => {
     });
     requireOrgPermissions.mockResolvedValue({
       actor: { id: "user-1", email: "actor@example.com" },
+      orgId: ORG_ID,
       permissions: { isGridmaster: false, isSuperAdmin: true },
       serviceClient: {
         from: serviceFrom,

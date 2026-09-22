@@ -52,11 +52,11 @@ export async function GET(req: NextRequest) {
     const payload =
       parsed.data.optionsOnly === "1"
         ? await loadOperationsReportFilterOptions(auth.serviceClient, {
-            orgId: parsed.data.orgId,
+            orgId: auth.orgId,
             range,
           })
         : await loadOperationsReport(auth.serviceClient, {
-            orgId: parsed.data.orgId,
+            orgId: auth.orgId,
             range,
             filters,
           });

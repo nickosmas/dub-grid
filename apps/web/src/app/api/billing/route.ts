@@ -41,7 +41,7 @@ async function handleGET(req: NextRequest, timer: Timer) {
 
   try {
     return NextResponse.json(
-      await loadOrganizationBillingSummary(auth.serviceClient, parsed.data.orgId, {
+      await loadOrganizationBillingSummary(auth.serviceClient, auth.orgId, {
         canManageBilling: auth.permissions.isGridmaster || auth.permissions.isSuperAdmin,
         actor: auth.actor,
       }),

@@ -57,12 +57,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
-  const { orgId, scope, startDate, endDate } = parsed.data;
+  const { orgId: requestedOrgId, scope, startDate, endDate } = parsed.data;
 
   try {
     const orgAuth = await requireOrgPermissions(
       req,
-      orgId,
+      requestedOrgId,
       (permissions) =>
         scope === "all"
           ? permissions.isGridmaster || permissions.isSuperAdmin
@@ -76,6 +76,8 @@ export async function POST(req: NextRequest) {
       return orgAuth.response;
     }
     const serviceClient = orgAuth.serviceClient;
+    // Effective organization: a sandboxed caller discards the sandbox's drafts.
+    const orgId = orgAuth.orgId;
 
     // Snapshot the breakdown that's about to be discarded, for the audit log.
     const discardedSummary = await fetchScheduleDraftBreakdown({
@@ -111,8 +113,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, summary: discardedSummary });
   } catch (err) {
-    Sentry.captureException(err, { extra: { context: "shifts/discard", orgId } });
-    logger.error({ error: err, orgId }, "Schedule discard failed");
+    Sentry.captureException(err, {
+      extra: { context: "shifts/discard", orgId: requestedOrgId },
+    });
+    logger.error({ error: err, orgId: requestedOrgId }, "Schedule discard failed");
     return NextResponse.json({ error: API_ERRORS.UNEXPECTED }, { status: 500 });
   }
 }

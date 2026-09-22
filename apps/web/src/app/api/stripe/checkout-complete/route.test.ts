@@ -49,6 +49,7 @@ describe("POST /api/stripe/checkout-complete", () => {
     validateCsrfOrigin.mockReturnValue(null);
     requireOrgPermissions.mockResolvedValue({
       actor: { id: "user-1", email: "owner@example.com" },
+      orgId: ORG_ID,
       permissions: { isGridmaster: false, isSuperAdmin: true },
       serviceClient: { from: vi.fn() },
       userClient: { from: vi.fn() },

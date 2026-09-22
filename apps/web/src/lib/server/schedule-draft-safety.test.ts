@@ -1,129 +1,50 @@
 import { describe, expect, it, vi } from "vitest";
 import { discardScheduleDraftsDirect } from "./schedule-draft-safety";
 
-function resolvedQuery<T>(result: T) {
-  return {
-    then: (resolve: (value: T) => unknown, reject: (reason: unknown) => unknown) =>
-      Promise.resolve(result).then(resolve, reject),
-  };
-}
-
 describe("discardScheduleDraftsDirect", () => {
-  it("batches new draft cell deletes to keep PostgREST filters bounded", async () => {
-    const deletedCellBatches: string[][] = [];
-    const draftCells = Array.from({ length: 120 }, (_, index) => ({
-      id: `cell-${index}`,
-      version: 0,
-      snapshots: [{ id: `snapshot-${index}`, snapshot_kind: "draft" }],
-    }));
-
-    const serviceClient = {
-      from: vi.fn((table: string) => {
-        if (table === "schedule_cells") {
-          const selectQuery = {
-            eq: vi.fn(() => selectQuery),
-            then: resolvedQuery({ data: draftCells, error: null }).then,
-          };
-          return {
-            select: vi.fn(() => selectQuery),
-            delete: vi.fn(() => ({
-              in: vi.fn((_column: string, ids: string[]) => {
-                deletedCellBatches.push(ids);
-                return resolvedQuery({ error: null });
-              }),
-            })),
-          };
-        }
-
-        if (table === "schedule_notes") {
-          const query = {
-            eq: vi.fn(() => query),
-            then: resolvedQuery({ error: null }).then,
-          };
-          return {
-            delete: vi.fn(() => query),
-            update: vi.fn(() => query),
-          };
-        }
-
-        throw new Error(`Unexpected table: ${table}`);
-      }),
-    };
+  it("hands the whole discard to one database transaction with the caller's bounds", async () => {
+    const rpc = vi.fn().mockResolvedValue({ error: null });
 
     await discardScheduleDraftsDirect({
       orgId: "11111111-1111-4111-8111-111111111111",
-      serviceClient: serviceClient as never,
+      userId: "22222222-2222-4222-8222-222222222222",
+      startDate: "2026-04-12",
+      endDate: "2026-04-18",
+      serviceClient: { rpc } as never,
     });
 
-    expect(deletedCellBatches.map((batch) => batch.length)).toEqual([50, 50, 20]);
+    expect(rpc).toHaveBeenCalledWith("discard_schedule_drafts", {
+      p_org_id: "11111111-1111-4111-8111-111111111111",
+      p_user_id: "22222222-2222-4222-8222-222222222222",
+      p_start_date: "2026-04-12",
+      p_end_date: "2026-04-18",
+    });
   });
 
-  it("batches modified draft snapshot deletes to keep PostgREST filters bounded", async () => {
-    const deletedSnapshotBatches: string[][] = [];
-    const touchedCells: string[] = [];
-    const draftCells = Array.from({ length: 105 }, (_, index) => ({
-      id: `cell-${index}`,
-      version: 0,
-      snapshots: [
-        { id: `published-snapshot-${index}`, snapshot_kind: "published" },
-        { id: `draft-snapshot-${index}`, snapshot_kind: "draft" },
-      ],
-    }));
-
-    const serviceClient = {
-      from: vi.fn((table: string) => {
-        if (table === "schedule_cells") {
-          const selectQuery = {
-            eq: vi.fn(() => selectQuery),
-            then: resolvedQuery({ data: draftCells, error: null }).then,
-          };
-          const updateQuery = {
-            eq: vi.fn((column: string, value: string | number) => {
-              if (column === "id" && typeof value === "string") {
-                touchedCells.push(value);
-              }
-              return updateQuery;
-            }),
-            then: resolvedQuery({ error: null }).then,
-          };
-          return {
-            select: vi.fn(() => selectQuery),
-            update: vi.fn(() => updateQuery),
-          };
-        }
-
-        if (table === "schedule_cell_snapshots") {
-          return {
-            delete: vi.fn(() => ({
-              in: vi.fn((_column: string, ids: string[]) => {
-                deletedSnapshotBatches.push(ids);
-                return resolvedQuery({ error: null });
-              }),
-            })),
-          };
-        }
-
-        if (table === "schedule_notes") {
-          const query = {
-            eq: vi.fn(() => query),
-            then: resolvedQuery({ error: null }).then,
-          };
-          return {
-            delete: vi.fn(() => query),
-            update: vi.fn(() => query),
-          };
-        }
-
-        throw new Error(`Unexpected table: ${table}`);
-      }),
-    };
+  it("passes nulls for an unbounded, everyone's-drafts discard", async () => {
+    const rpc = vi.fn().mockResolvedValue({ error: null });
 
     await discardScheduleDraftsDirect({
       orgId: "11111111-1111-4111-8111-111111111111",
-      serviceClient: serviceClient as never,
+      serviceClient: { rpc } as never,
     });
 
-    expect(deletedSnapshotBatches.map((batch) => batch.length)).toEqual([50, 50, 5]);
-    expect(touchedCells).toHaveLength(105);
+    expect(rpc).toHaveBeenCalledWith("discard_schedule_drafts", {
+      p_org_id: "11111111-1111-4111-8111-111111111111",
+      p_user_id: null,
+      p_start_date: null,
+      p_end_date: null,
+    });
+  });
+
+  it("surfaces a database refusal instead of reporting a discard that did not happen", async () => {
+    const rpc = vi.fn().mockResolvedValue({ error: new Error("permission denied") });
+
+    await expect(
+      discardScheduleDraftsDirect({
+        orgId: "11111111-1111-4111-8111-111111111111",
+        serviceClient: { rpc } as never,
+      }),
+    ).rejects.toThrow("permission denied");
   });
 });

@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { orgId, rows: rawRows } = parsed.data;
+    const { orgId: requestedOrgId, rows: rawRows } = parsed.data;
 
     // Validate each row individually — one malformed row (e.g. an invalid
     // email) shouldn't fail the whole batch. Its error joins the same
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
 
     const orgAuth = await requireOrgPermissions(
       req,
-      orgId,
+      requestedOrgId,
       (permissions) =>
         permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageEmployees,
       { allowDuringSetup: true },
@@ -104,6 +104,9 @@ export async function POST(req: NextRequest) {
       return orgAuth.response;
     }
     const serviceClient = orgAuth.serviceClient;
+    // The effective organization: a caller inside a Test Sandbox imports into
+    // the sandbox, never into the real organization their client named.
+    const orgId = orgAuth.orgId;
 
     // Fetch org's focus areas, certifications, and roles for name matching,
     // plus the current max seniority so imported rows can be appended to the

@@ -55,14 +55,14 @@ export async function GET(req: NextRequest) {
     }
 
     const payload = await loadOperationsReport(auth.serviceClient, {
-      orgId: parsed.data.orgId,
+      orgId: auth.orgId,
       range,
       filters,
     });
     const filename = `reports-${parsed.data.report}-${range.startDate}-${range.endDate}.${parsed.data.format}`;
 
     await auth.serviceClient.from("audit_log").insert({
-      org_id: parsed.data.orgId,
+      org_id: auth.orgId,
       actor_id: auth.actor.id,
       actor_email: auth.actor.email,
       action: "data.exported",

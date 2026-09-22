@@ -217,7 +217,7 @@ async function handleGET(req: NextRequest, timer: Timer) {
           // permissions, session, impersonation, sandbox selection, and staff
           // count remain request-scoped.
           timeBootstrapStage(timer, deadlineAt, "config", () =>
-            cacheThrough(CacheKey.bootstrapConfig(authorizedOrgId), TTL.MIDDLEWARE, () =>
+            cacheThrough(CacheKey.bootstrapConfig(orgAuth.orgId), TTL.MIDDLEWARE, () =>
               Promise.all([
                 serviceClient
                   .from("organizations")
@@ -290,7 +290,7 @@ async function handleGET(req: NextRequest, timer: Timer) {
               .from("organization_memberships")
               .select("onboarding_completed_at")
               .eq("user_id", auth.user.id)
-              .eq("org_id", authorizedOrgId)
+              .eq("org_id", orgAuth.orgId)
               .maybeSingle(),
           ),
           // Whether the organization is open to anyone else yet. A member who
@@ -304,7 +304,7 @@ async function handleGET(req: NextRequest, timer: Timer) {
             serviceClient
               .from("organization_memberships")
               .select("user_id", { count: "exact", head: true })
-              .eq("org_id", authorizedOrgId)
+              .eq("org_id", orgAuth.orgId)
               .eq("org_role", "super_admin")
               .is("archived_at", null)
               .not("onboarding_completed_at", "is", null),
