@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  fetchMobileManagementRosterRows,
   fetchMobileNotificationsPage,
   fetchMobilePeopleRows,
   fetchMobileRoleRows,
@@ -428,5 +429,59 @@ describe("fetchMobileNotificationsPage", () => {
     await fetchMobileNotificationsPage(client, { limit: 25 });
 
     expect(chain.eq).not.toHaveBeenCalledWith("id", expect.anything());
+  });
+});
+
+describe("fetchMobileManagementRosterRows", () => {
+  /** Each call builds its own chain, as the real single-use builder does. */
+  function rosterClient(memberships: unknown[], invitations: unknown[]) {
+    const ranges: Record<string, Array<[number, number]>> = {};
+    const rowsByTable: Record<string, unknown[]> = {
+      organization_memberships: memberships,
+      invitations,
+    };
+    const client = {
+      from(table: string) {
+        const chain: Record<string, unknown> = {};
+        for (const method of ["select", "eq", "is", "in", "order"]) {
+          chain[method] = vi.fn(() => chain);
+        }
+        chain.range = vi.fn(async (from: number, to: number) => {
+          (ranges[table] ??= []).push([from, to]);
+          return { data: (rowsByTable[table] ?? []).slice(from, to + 1), error: null };
+        });
+        return chain;
+      },
+      auth: {
+        admin: {
+          getUserById: vi.fn(async (id: string) => ({
+            data: { user: { id, email: `${id}@dubgrid.test` } },
+            error: null,
+          })),
+        },
+      },
+    } as unknown as SupabaseClient;
+    return { client, ranges };
+  }
+
+  it("pages both lists, so a large organization's roster is not cut at the API row cap", async () => {
+    const pageSize = 500;
+    const memberships = Array.from({ length: pageSize + 2 }, (_, index) => ({
+      user_id: `user-${index}`,
+      org_role: "admin",
+      department_ids: [1],
+      dept_admin_ids: [],
+      updated_at: null,
+      phone: null,
+    }));
+
+    const { client, ranges } = rosterClient(memberships, []);
+    const rows = await fetchMobileManagementRosterRows(client, "org-1");
+
+    expect(rows.memberships).toHaveLength(pageSize + 2);
+    expect(ranges.organization_memberships).toEqual([
+      [0, pageSize - 1],
+      [pageSize, pageSize * 2 - 1],
+    ]);
   });
 });

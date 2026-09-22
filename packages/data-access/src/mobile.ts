@@ -543,16 +543,16 @@ export async function fetchMobileManagementMembershipRowsByUserIds(
     return [];
   }
 
-  const { data, error } = await serviceClient
-    .from("organization_memberships")
-    .select("user_id, department_ids, dept_admin_ids, org_role, updated_at")
-    .eq("org_id", orgId)
-    .in("user_id", uniqueUserIds)
-    .is("archived_at", null);
-
-  if (error) {
-    throw error;
-  }
+  const data = await fetchAllMobileRows<Record<string, unknown>>((from, to) =>
+    serviceClient
+      .from("organization_memberships")
+      .select("user_id, department_ids, dept_admin_ids, org_role, updated_at")
+      .eq("org_id", orgId)
+      .in("user_id", uniqueUserIds)
+      .is("archived_at", null)
+      .order("user_id", { ascending: true })
+      .range(from, to),
+  );
 
   return (
     (data ?? []) as Array<{
@@ -600,37 +600,40 @@ export async function fetchMobileManagementRosterRows(
   serviceClient: SupabaseClient,
   orgId: string,
 ): Promise<MobileManagementRosterRows> {
-  const [membershipResult, invitationResult] = await Promise.all([
-    serviceClient
-      .from("organization_memberships")
-      .select("user_id, org_role, department_ids, dept_admin_ids, updated_at, phone")
-      .eq("org_id", orgId)
-      .is("archived_at", null),
-    serviceClient
-      .from("invitations")
-      .select(INVITATION_COLS)
-      .eq("org_id", orgId)
-      .is("accepted_at", null)
-      .is("revoked_at", null),
-  ]);
-
-  if (membershipResult.error) throw membershipResult.error;
-  if (invitationResult.error) throw invitationResult.error;
-
-  const managementMemberships = (
-    (membershipResult.data ?? []) as Array<{
+  const [membershipRows, invitationRows] = await Promise.all([
+    fetchAllMobileRows<{
       user_id: string;
       org_role: string;
       department_ids: number[] | null;
       dept_admin_ids: number[] | null;
       updated_at: string | null;
       phone: string | null;
-    }>
-  ).filter((row) => (row.department_ids ?? []).length > 0);
+    }>((from, to) =>
+      serviceClient
+        .from("organization_memberships")
+        .select("user_id, org_role, department_ids, dept_admin_ids, updated_at, phone")
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .order("user_id", { ascending: true })
+        .range(from, to),
+    ),
+    fetchAllMobileRows<MobileInvitationRow>((from, to) =>
+      serviceClient
+        .from("invitations")
+        .select(INVITATION_COLS)
+        .eq("org_id", orgId)
+        .is("accepted_at", null)
+        .is("revoked_at", null)
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
+  ]);
 
-  const invitations = ((invitationResult.data ?? []) as MobileInvitationRow[]).filter(
+  const managementMemberships = membershipRows.filter(
     (row) => (row.department_ids ?? []).length > 0,
   );
+
+  const invitations = invitationRows.filter((row) => (row.department_ids ?? []).length > 0);
 
   const userIds = managementMemberships.map((row) => row.user_id);
   const [profiles, employeeResult, users] = await Promise.all([
@@ -1241,6 +1244,31 @@ export async function fetchMobileShiftRequestHistoryRows(
 }
 
 const MOBILE_PEOPLE_PAGE_SIZE = 500;
+
+/**
+ * Every row the query matches, not the first page.
+ *
+ * PostgREST answers at most `db.max_rows` rows for every role, the service
+ * role included, so a single await returns a short list for a large
+ * organization and says nothing about it. Each page builds a FRESH query,
+ * because a Supabase builder is single-use once awaited.
+ */
+async function fetchAllMobileRows<T>(
+  buildPage: (from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }>,
+  pageSize: number = MOBILE_PEOPLE_PAGE_SIZE,
+): Promise<T[]> {
+  const rows: T[] = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await buildPage(from, from + pageSize - 1);
+    if (error) throw error;
+    const page = (data ?? []) as T[];
+    rows.push(...page);
+    if (page.length < pageSize) break;
+    from += pageSize;
+  }
+  return rows;
+}
 
 export async function fetchMobilePeopleRows(
   serviceClient: SupabaseClient,
