@@ -146,24 +146,48 @@ function specificity(selector: string): number {
 }
 
 /**
- * The component classes of each comma-part's subject: the rightmost compound,
- * which is the element the rule actually styles. An ancestor mentioned earlier
- * in the selector narrows when the rule applies, it is not what the rule
- * paints, so `.dg-span-tabs .dg-scroll-chevron` and `.dg-span-tabs .dg-span-tab`
- * never contend for one element. Generic state words such as `.active` are
- * ignored on purpose: sharing one is not sharing a component.
+ * Each comma-part's subject: the rightmost compound, which is the element the
+ * rule actually styles. An ancestor mentioned earlier in the selector narrows
+ * when the rule applies, it is not what the rule paints, so
+ * `.dg-span-tabs .dg-scroll-chevron` and `.dg-span-tabs .dg-span-tab` never
+ * contend for one element.
  */
-function subjectClasses(selector: string): Set<string> {
-  const names = new Set<string>();
-  for (const part of selector.split(",")) {
-    const subject =
+function subjects(selector: string): string[] {
+  return selector.split(",").map(
+    (part) =>
       part
         .trim()
         .split(/(?<![([,])[\s>+~]+(?![^([]*[)\]])/)
-        .pop() ?? "";
+        .pop() ?? "",
+  );
+}
+
+/** Component classes in the subject. Generic state words such as `.active` are
+ *  ignored on purpose: sharing one is not sharing a component. */
+function subjectComponents(selector: string): Set<string> {
+  const names = new Set<string>();
+  for (const subject of subjects(selector)) {
     for (const match of subject.matchAll(/\.((?:dg|landing)-[\w-]+)/g)) names.add(match[1]);
   }
   return names;
+}
+
+/** The subject written out, minus its pseudo-classes, so a rule whose subject
+ *  is a bare element or a generic class is compared rather than skipped. */
+function subjectTokens(selector: string): Set<string> {
+  return new Set(
+    subjects(selector)
+      .map((subject) => subject.replace(/:[a-z-]+(?:\([^)]*\))?/g, "").trim())
+      .filter(Boolean),
+  );
+}
+
+/** Whether two rules could ever paint one element. */
+function canCollide(first: string, second: string): boolean {
+  const components = subjectComponents(second);
+  if ([...subjectComponents(first)].some((name) => components.has(name))) return true;
+  const tokens = subjectTokens(second);
+  return [...subjectTokens(first)].some((token) => tokens.has(token));
 }
 
 describe("CSS split cascade safety", () => {
@@ -193,13 +217,11 @@ describe("CSS split cascade safety", () => {
         const first = all[a];
         const second = all[b];
         if (first.file === second.file) continue;
-        if (first.context !== second.context) continue;
         if (first.selector === second.selector) continue;
-
-        const shared = [...subjectClasses(first.selector)].filter((name) =>
-          subjectClasses(second.selector).has(name),
-        );
-        if (shared.length === 0) continue;
+        // At-rule context is deliberately not required to match: two media
+        // queries can both apply at one width, so a pair split across
+        // `max-width: 767px` and `max-width: 640px` is just as order-dependent.
+        if (!canCollide(first.selector, second.selector)) continue;
 
         const sameProperty = [...first.properties].some((property) =>
           second.properties.has(property),
