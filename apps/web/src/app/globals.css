@@ -936,14 +936,16 @@ button {
   background: linear-gradient(180deg, #1d3aa0 0%, #0b2d75 38%, #071535 68%, #050609 100%);
 }
 
+/* Opaque enough that the white logo, wordmark and links keep contrast once
+   the bar has scrolled past the hero onto the page's own background. */
 .landing-nav {
   color: #ffffff;
   border-bottom: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(11, 45, 117, 0.55);
+  background: rgba(11, 45, 117, 0.88);
 }
 
 .dark .landing-nav {
-  background: rgba(29, 58, 160, 0.55);
+  background: rgba(29, 58, 160, 0.72);
 }
 
 .landing-nav-sign-in {
@@ -957,8 +959,22 @@ button {
   background: #ffffff;
 }
 
+/* .dg-btn is unlayered, so Tailwind's `hidden` utility cannot switch it off.
+   Below md the Sign In link lives in the hamburger menu instead. */
+@media (max-width: 47.99rem) {
+  .landing-nav-sign-in {
+    display: none;
+  }
+}
+
+.landing-nav-link,
 .landing-nav-menu {
   color: rgba(255, 255, 255, 0.8);
+}
+
+.landing-nav-link:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .landing-nav-menu:hover {
@@ -1052,6 +1068,24 @@ button {
 
 .landing-mobile-menu {
   background: linear-gradient(180deg, #071535 0%, #173780 50%, #7686e5 100%);
+}
+
+.landing-mobile-menu-close {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.landing-mobile-menu-close:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.landing-mobile-menu-link {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.landing-mobile-menu-link:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .dark .landing-mobile-menu {

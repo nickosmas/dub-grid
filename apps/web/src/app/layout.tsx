@@ -6,10 +6,12 @@ import "./globals.css";
 import "@/lib/env.server";
 import { clientEnv } from "@/lib/env";
 
+// Brand headings only ever render at semibold or heavier, so lighter faces
+// would preload on every page without being drawn.
 const dmSans = DM_Sans({
   subsets: ["latin"],
   variable: "--font-dm-sans",
-  weight: ["300", "400", "500", "600", "700"],
+  weight: ["600", "700"],
 });
 
 const inter = Inter({
