@@ -10,10 +10,9 @@ import Link from "next/link";
 import { toast } from "sonner";
 import CustomSelect from "@/components/CustomSelect";
 import { Form } from "@/components/Form";
-import { Button } from "@/components/Button";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
-import { openConsentPreferences } from "@/components/CookieConsent";
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { PageShell, Card } from "@/components/auth/AuthCard";
+import { CheckCircle } from "lucide-react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import {
   getLineTextError,
@@ -25,27 +24,15 @@ import {
 
 const ORG_SIZE_OPTIONS = ["1-25", "26-50", "51-100", "101-250", "250+"];
 
-const labelStyle: React.CSSProperties = {
-  display: "block",
-  fontSize: "var(--dg-fs-label)",
-  fontWeight: "var(--dg-type-field-title-weight)",
-  marginBottom: "6px",
-  color: "var(--dg-color-text-label)",
-};
+type DemoField = "contactName" | "email" | "phone" | "orgName" | "industry" | "message";
 
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "11px 13px",
-  border: "1.5px solid var(--dg-color-border)",
-  borderRadius: "var(--dg-radius-md)",
-  fontSize: "var(--dg-fs-body)",
-  fontWeight: "var(--dg-type-control-weight)",
-  background: "var(--dg-color-bg)",
-  color: "var(--dg-color-text-primary)",
-  outline: "none",
-  boxSizing: "border-box",
-  fontFamily: "inherit",
-};
+function RequiredMark() {
+  return (
+    <span aria-hidden="true" className="dg-auth-required">
+      *
+    </span>
+  );
+}
 
 export default function RequestDemoPage() {
   const [contactName, setContactName] = useState("");
@@ -58,6 +45,10 @@ export default function RequestDemoPage() {
 
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  // A field the visitor has not reached yet is not wrong yet: without this the
+  // page opens already accusing them of three missing required fields.
+  const [touched, setTouched] = useState<Partial<Record<DemoField, boolean>>>({});
+  const touch = (field: DemoField) => setTouched((prev) => ({ ...prev, [field]: true }));
   const contactNameError = getStaffNameError(contactName, "Contact name");
   const emailError = getRequiredStaffEmailError(email);
   const phoneError = getOptionalUsPhoneFieldError(phone);
@@ -74,6 +65,8 @@ export default function RequestDemoPage() {
     label: "Additional notes",
     maxLength: 2000,
   });
+  const shownError = (field: DemoField, error: string | null | undefined) =>
+    touched[field] ? (error ?? null) : null;
   const hasValidationErrors = Boolean(
     contactNameError || emailError || phoneError || orgNameError || industryError || messageError,
   );
@@ -144,342 +137,204 @@ export default function RequestDemoPage() {
     }
   }
 
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--dg-color-surface)",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        fontFamily: "var(--font-sans)",
-        padding: "24px 16px",
-      }}
-    >
-      {submitted ? (
-        /* ── Success state ──────────────────────────────────────────────── */
-        <div
-          style={{
-            background: "var(--dg-color-bg)",
-            borderRadius: "20px",
-            padding: "48px 40px",
-            maxWidth: "480px",
-            width: "100%",
-            textAlign: "center",
-            boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
-          }}
-        >
-          <CheckCircle2
-            size={48}
-            style={{
-              color: "var(--dg-color-success)",
-              marginBottom: "16px",
-              margin: "0 auto 16px",
-            }}
-          />
-          <h1
-            className="dg-font-brand-heading"
-            style={{
-              fontSize: "22px",
-              fontWeight: 700,
-              color: "var(--dg-color-text-primary)",
-              margin: "0 0 12px",
-              letterSpacing: "-0.02em",
-            }}
-          >
-            Demo Request Submitted
+  if (submitted) {
+    return (
+      <PageShell>
+        <Card>
+          <div className="dg-auth-icon-tile dg-auth-icon-tile--success">
+            <CheckCircle size={28} />
+          </div>
+          <h1 className="dg-font-brand-heading dg-auth-heading dg-auth-state-heading">
+            Demo request submitted
           </h1>
-          <p
-            style={{
-              fontSize: "var(--dg-fs-body)",
-              color: "var(--dg-color-text-secondary)",
-              lineHeight: 1.6,
-              margin: "0 0 32px",
-            }}
-          >
+          <p aria-live="polite" className="dg-auth-state-message">
             Thanks, {contactName}! We&apos;ll review your request and get back to you shortly.
           </p>
-          <Link
-            href="/"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "13px 32px",
-              background: "var(--dg-color-brand)",
-              color: "var(--dg-color-text-inverse)",
-              border: "none",
-              borderRadius: "999px",
-              fontSize: "var(--dg-fs-body)",
-              fontWeight: 600,
-              textDecoration: "none",
-            }}
-          >
-            <ArrowLeft size={16} />
-            Back to Home
+          <Link href="/" className="dg-btn dg-btn-primary dg-btn-lg dg-auth-state-primary">
+            Back to home
           </Link>
-        </div>
-      ) : (
-        /* ── Form ───────────────────────────────────────────────────────── */
-        <div
-          style={{
-            background: "var(--dg-color-bg)",
-            borderRadius: "20px",
-            padding: "40px 36px",
-            maxWidth: "540px",
-            width: "100%",
-            boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
-          }}
-        >
-          {/* Header */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: "32px",
-            }}
-          >
-            <Link
-              href="/"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                color: "var(--dg-color-text-secondary)",
-                textDecoration: "none",
-                fontSize: "var(--dg-fs-label)",
-                fontWeight: 500,
-              }}
-            >
-              <ArrowLeft size={16} />
-              Back
-            </Link>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <DubGridLogo size={28} />
-              <DubGridWordmark fontSize={16} />
-            </div>
+        </Card>
+      </PageShell>
+    );
+  }
+
+  return (
+    <PageShell>
+      <Card>
+        <Link href="/" className="dg-auth-logo-block dg-auth-logo-block--spacious">
+          <DubGridLogo size={52} />
+          <DubGridWordmark />
+        </Link>
+
+        <h1 className="dg-font-brand-heading dg-auth-heading dg-auth-page-heading">
+          Request a demo
+        </h1>
+        <p className="dg-auth-description">
+          Tell us about your organization and we&apos;ll be in touch.
+        </p>
+
+        <Form onSubmit={handleSubmit} className="dg-auth-form">
+          <div>
+            <label htmlFor="demo-contact-name" className="dg-auth-field-label">
+              Contact name <RequiredMark />
+            </label>
+            <input
+              id="demo-contact-name"
+              type="text"
+              required
+              autoComplete="name"
+              className={`dg-auth-input${shownError("contactName", contactNameError) ? " dg-auth-input--error" : ""}`}
+              value={contactName}
+              onChange={(e) => setContactName(e.target.value)}
+              placeholder="Your full name"
+              onBlur={() => touch("contactName")}
+            />
+            {shownError("contactName", contactNameError) ? (
+              <p className="dg-form-error">{contactNameError}</p>
+            ) : null}
           </div>
 
-          <h1
-            className="dg-font-brand-heading"
-            style={{
-              fontSize: "22px",
-              fontWeight: 700,
-              color: "var(--dg-color-text-primary)",
-              margin: "0 0 6px",
-              letterSpacing: "-0.02em",
-            }}
-          >
-            Request a Demo
-          </h1>
-          <p
-            style={{
-              fontSize: "var(--dg-fs-body)",
-              color: "var(--dg-color-text-secondary)",
-              margin: "0 0 28px",
-              lineHeight: 1.5,
-            }}
-          >
-            Tell us about your organization and we&apos;ll be in touch.
-          </p>
+          <div>
+            <label htmlFor="demo-email" className="dg-auth-field-label">
+              Email <RequiredMark />
+            </label>
+            <input
+              id="demo-email"
+              type="email"
+              required
+              autoComplete="email"
+              className={`dg-auth-input${shownError("email", emailError) ? " dg-auth-input--error" : ""}`}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@company.com"
+              onBlur={() => touch("email")}
+            />
+            {shownError("email", emailError) ? <p className="dg-form-error">{emailError}</p> : null}
+          </div>
+          <div>
+            <label htmlFor="demo-phone" className="dg-auth-field-label">
+              Phone
+            </label>
+            <input
+              id="demo-phone"
+              type="tel"
+              autoComplete="tel"
+              className={`dg-auth-input${shownError("phone", phoneError) ? " dg-auth-input--error" : ""}`}
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="(optional)"
+              onBlur={() => {
+                touch("phone");
+                if (!phoneError && phone.trim()) {
+                  setPhone(normalizeOptionalUsPhone(phone));
+                }
+              }}
+            />
+            {shownError("phone", phoneError) ? <p className="dg-form-error">{phoneError}</p> : null}
+          </div>
 
-          <Form onSubmit={handleSubmit}>
-            <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
-              {/* Contact Name */}
-              <div>
-                <label style={labelStyle}>
-                  Contact name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={contactName}
-                  onChange={(e) => setContactName(e.target.value)}
-                  placeholder="Your full name"
-                  style={inputStyle}
-                />
-                {contactNameError ? <p style={errorStyle}>{contactNameError}</p> : null}
-              </div>
+          <div>
+            <label htmlFor="demo-org-name" className="dg-auth-field-label">
+              Organization name <RequiredMark />
+            </label>
+            <input
+              id="demo-org-name"
+              type="text"
+              required
+              autoComplete="organization"
+              className={`dg-auth-input${shownError("orgName", orgNameError) ? " dg-auth-input--error" : ""}`}
+              value={orgName}
+              onChange={(e) => setOrgName(e.target.value)}
+              placeholder="Your company or facility name"
+              onBlur={() => touch("orgName")}
+            />
+            {shownError("orgName", orgNameError) ? (
+              <p className="dg-form-error">{orgNameError}</p>
+            ) : null}
+          </div>
 
-              {/* Email + Phone row */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
-                <div>
-                  <label style={labelStyle}>
-                    Email <span style={{ color: "var(--dg-color-danger)" }}>*</span>
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@company.com"
-                    style={inputStyle}
-                  />
-                  {emailError ? <p style={errorStyle}>{emailError}</p> : null}
-                </div>
-                <div>
-                  <label style={labelStyle}>Phone</label>
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="(optional)"
-                    style={inputStyle}
-                    onBlur={() => {
-                      if (!phoneError && phone.trim()) {
-                        setPhone(normalizeOptionalUsPhone(phone));
-                      }
-                    }}
-                  />
-                  {phoneError ? <p style={errorStyle}>{phoneError}</p> : null}
-                </div>
-              </div>
-
-              {/* Organization Name */}
-              <div>
-                <label style={labelStyle}>
-                  Organization name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={orgName}
-                  onChange={(e) => setOrgName(e.target.value)}
-                  placeholder="Your company or facility name"
-                  style={inputStyle}
-                />
-                {orgNameError ? <p style={errorStyle}>{orgNameError}</p> : null}
-              </div>
-
-              {/* Org Size + Industry row */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
-                <div>
-                  <label style={labelStyle}>
-                    Employee count <span style={{ color: "var(--dg-color-danger)" }}>*</span>
-                  </label>
-                  <CustomSelect
-                    value={orgSize || ""}
-                    options={[
-                      { value: "", label: "Select range" },
-                      ...ORG_SIZE_OPTIONS.map((opt) => ({ value: opt, label: opt })),
-                    ]}
-                    onChange={setOrgSize}
-                    style={{ width: "100%" }}
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>Industry / facility type</label>
-                  <input
-                    type="text"
-                    value={industry}
-                    onChange={(e) => setIndustry(e.target.value)}
-                    placeholder="e.g. Residential Care"
-                    style={inputStyle}
-                  />
-                  {industryError ? <p style={errorStyle}>{industryError}</p> : null}
-                </div>
-              </div>
-
-              {/* Message */}
-              <div>
-                <label style={labelStyle}>Anything else we should know?</label>
-                <textarea
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  maxLength={2000}
-                  rows={3}
-                  placeholder="Tell us about your scheduling challenges, team size, or any questions..."
-                  style={{
-                    ...inputStyle,
-                    resize: "vertical",
-                    minHeight: "80px",
-                  }}
-                />
-                {messageError ? <p style={errorStyle}>{messageError}</p> : null}
-              </div>
+          <div>
+            <label htmlFor="demo-org-size" className="dg-auth-field-label">
+              Employee count <RequiredMark />
+            </label>
+            {/* CustomSelect puts its `style` on the wrapper, not the trigger,
+                so the trigger's chrome is matched to the text fields from CSS
+                (see .dg-auth-select). */}
+            <div className="dg-auth-select">
+              <CustomSelect
+                id="demo-org-size"
+                ariaLabel="Employee count"
+                value={orgSize || ""}
+                options={[
+                  { value: "", label: "Select range" },
+                  ...ORG_SIZE_OPTIONS.map((opt) => ({ value: opt, label: opt })),
+                ]}
+                onChange={setOrgSize}
+                height="var(--dg-auth-control-h)"
+                fontSize="var(--dg-fs-body)"
+                fontWeight="var(--dg-type-control-weight)"
+                style={{ width: "100%" }}
+              />
             </div>
+          </div>
+          <div>
+            <label htmlFor="demo-industry" className="dg-auth-field-label">
+              Industry / facility type
+            </label>
+            <input
+              id="demo-industry"
+              type="text"
+              className={`dg-auth-input${shownError("industry", industryError) ? " dg-auth-input--error" : ""}`}
+              value={industry}
+              onChange={(e) => setIndustry(e.target.value)}
+              placeholder="e.g. Residential Care"
+              onBlur={() => touch("industry")}
+            />
+            {shownError("industry", industryError) ? (
+              <p className="dg-form-error">{industryError}</p>
+            ) : null}
+          </div>
 
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={loading || hasValidationErrors}
-              className="dg-btn dg-btn-primary dg-btn-lg"
-              style={{ width: "100%", marginTop: "28px" }}
+          <div>
+            <label htmlFor="demo-message" className="dg-auth-field-label">
+              Anything else we should know?
+            </label>
+            <textarea
+              id="demo-message"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              maxLength={2000}
+              rows={3}
+              placeholder="Tell us about your scheduling challenges, team size, or any questions..."
+              onBlur={() => touch("message")}
+              className={`dg-auth-input dg-auth-textarea${shownError("message", messageError) ? " dg-auth-input--error" : ""}`}
+            />
+            {shownError("message", messageError) ? (
+              <p className="dg-form-error">{messageError}</p>
+            ) : null}
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading || hasValidationErrors}
+            className="dg-btn dg-btn-primary dg-btn-lg dg-auth-submit"
+          >
+            <ButtonLoading
+              loading={loading}
+              spinnerColor="var(--dg-color-text-inverse)"
+              spinnerSize={20}
             >
-              <ButtonLoading
-                loading={loading}
-                spinnerColor="var(--dg-color-text-inverse)"
-                spinnerSize={20}
-              >
-                Submit Request
-              </ButtonLoading>
-            </button>
-          </Form>
-        </div>
-      )}
+              Submit request
+            </ButtonLoading>
+          </button>
+        </Form>
 
-      {/* Footer */}
-      <footer
-        style={{
-          marginTop: "36px",
-          display: "flex",
-          gap: "4px",
-          alignItems: "center",
-          fontSize: "var(--dg-fs-label)",
-          color: "var(--dg-color-text-label)",
-        }}
-      >
-        <Link
-          href="/privacy"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            color: "var(--dg-color-text-label)",
-            textDecoration: "none",
-            fontWeight: "var(--dg-type-control-weight)",
-          }}
-        >
-          Privacy Policy
-        </Link>
-        <span style={{ margin: "0 4px" }}>·</span>
-        <Link
-          href="/terms"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            color: "var(--dg-color-text-label)",
-            textDecoration: "none",
-            fontWeight: "var(--dg-type-control-weight)",
-          }}
-        >
-          Terms of Service
-        </Link>
-        <span style={{ margin: "0 4px" }}>·</span>
-        <Button
-          type="button"
-          onClick={openConsentPreferences}
-          style={{
-            color: "var(--dg-color-text-label)",
-            textDecoration: "none",
-            background: "none",
-            border: "none",
-            padding: 0,
-            cursor: "pointer",
-            font: "inherit",
-            fontWeight: "var(--dg-type-control-weight)",
-          }}
-        >
-          Cookie preferences
-        </Button>
-      </footer>
-    </div>
+        <div className="dg-auth-back-link">
+          <Link href="/" className="dg-auth-link dg-auth-link--subtle">
+            Back to home
+          </Link>
+        </div>
+      </Card>
+    </PageShell>
   );
 }
-
-const errorStyle: React.CSSProperties = {
-  margin: "6px 0 0",
-  fontSize: "var(--dg-fs-footnote)",
-  color: "var(--dg-color-danger)",
-};

@@ -322,7 +322,7 @@ describe("productive typography contract", () => {
 
     const requestDemoHeadings = requestDemoPage.match(/<h1\b/g) ?? [];
     const brandedRequestDemoHeadings =
-      requestDemoPage.match(/<h1\s+className="dg-font-brand-heading"/g) ?? [];
+      requestDemoPage.match(/<h1\s+className="dg-font-brand-heading\b/g) ?? [];
     expect(brandedRequestDemoHeadings).toHaveLength(requestDemoHeadings.length);
   });
 
@@ -576,8 +576,10 @@ describe("productive typography contract", () => {
     expect(globalsCss).toMatch(
       /\.dg-auth-field-label\s*\{[\s\S]*?font-size:\s*var\(--dg-fs-label\);[\s\S]*?font-weight:\s*var\(--dg-type-field-title-weight\);[\s\S]*?color:\s*var\(--dg-color-text-label\);/,
     );
-    expect(requestDemoPage).toContain('fontWeight: "var(--dg-type-field-title-weight)"');
-    expect(requestDemoPage).toContain('color: "var(--dg-color-text-label)"');
+    // The demo form shares the auth surface's field labels outright rather
+    // than restating their size, weight and color inline.
+    expect(requestDemoPage).toContain('className="dg-auth-field-label"');
+    expect(requestDemoPage).not.toMatch(/fontWeight:\s*"var\(--dg-type-field-title-weight\)"/);
     expect(cookiePolicyPage).toContain('fontWeight: "var(--dg-type-table-heading-weight)"');
     expect(cookiePolicyPage).toContain('fontSize: "var(--dg-fs-label)"');
     expect(cookiePolicyPage).toContain('color: "var(--dg-color-text-label)"');

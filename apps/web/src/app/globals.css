@@ -223,6 +223,14 @@
   --dg-fs-heading: 18px;
   --dg-fs-title: 16px;
   --dg-fs-body: 15px;
+  /* Height of a text field on the auth surface, so a control that cannot
+     derive it from padding (a select) lines up with the fields beside it. */
+  --dg-auth-control-h: 54px;
+  /* Every card on the auth surface, sign-in and the demo request form alike. */
+  --dg-auth-card-w: 560px;
+  /* Sign-in keeps the field measure it had on the narrower card: a wider card
+     should not stretch an email and a password across the whole surface. */
+  --dg-auth-field-w: 352px;
   --dg-fs-body-sm: 14px;
   --dg-fs-label: 13px;
   --dg-fs-caption: 12px;
@@ -4429,6 +4437,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 
 .dg-auth-input {
   width: 100%;
+  min-height: var(--dg-auth-control-h);
   padding: 14px 16px;
   border: 1.5px solid var(--dg-color-border);
   border-radius: var(--dg-radius-md);
@@ -4442,6 +4451,25 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   transition:
     border-color 150ms ease,
     box-shadow 150ms ease;
+}
+
+.dg-auth-textarea {
+  min-height: 92px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+/* The Employee count select, wearing the text fields' chrome. CustomSelect
+   writes its trigger's border, radius and padding as inline styles, which a
+   class cannot otherwise outrank. */
+.dg-auth-select button {
+  border-width: 1.5px !important;
+  border-radius: var(--dg-radius-md) !important;
+  padding-left: 16px !important;
+}
+
+.dg-auth-required {
+  color: var(--dg-color-danger);
 }
 
 .dg-auth-input::placeholder {
@@ -4583,6 +4611,12 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.dg-auth-form--narrow {
+  width: 100%;
+  max-width: var(--dg-auth-field-w);
+  margin-inline: auto;
 }
 
 .dg-auth-forgot {
@@ -5015,7 +5049,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 .dg-auth-card {
   padding: 48px 44px 44px;
   width: 100%;
-  max-width: 440px;
+  max-width: var(--dg-auth-card-w);
   background: var(--dg-color-surface);
   border-radius: var(--dg-radius-xl);
   box-shadow: var(--dg-shadow-auth-card);
@@ -5023,7 +5057,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 
 .dg-auth-organization-login {
   width: 100%;
-  max-width: 440px;
+  max-width: var(--dg-auth-card-w);
 }
 
 /* ── Responsive: Tablet ────────────────────────────────── */
