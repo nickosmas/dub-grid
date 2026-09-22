@@ -54,3 +54,19 @@
 **Why it matters:** `create-checkout` and `billing-portal` call `forbidIfSandboxCookie` and answer a sandboxed caller with a clear refusal. `checkout-complete` relies on `syncCheckoutSessionToDb` rejecting the organization mismatch instead, so the same caller gets a generic "Checkout session organization mismatch" error. Safe, but inconsistent and harder to support.
 **Suggested fix:** Add the same `forbidIfSandboxCookie` guard at the top of the handler and a route test for it.
 **Resolution:**
+
+### F-21 [P3] open - The editing_cell handler lost its explanatory comment
+
+**File:** apps/web/src/app/(app)/schedule/SchedulePageClient.tsx:1976
+**Found:** 2026-09-22 by /audit (scope: current; lens: quality)
+**Why it matters:** Moving the `draft_changed` handler off the shared channel (commit 02ae73cc) also removed the four comment lines that introduced the `editing_cell` handler ("Sent by peers as they move around the grid. Informational only..."), so the handler that follows now has no explanation of why a dropped marker is acceptable.
+**Suggested fix:** Restore the comment above the `editing_cell` `.on(...)` in the shared channel setup.
+**Resolution:**
+
+### F-22 [P3] open - Note-only editors receive draft shift diffs the read path withholds
+
+**File:** supabase/migrations/035_draft_state_editor_only.sql:63; apps/web/src/app/api/schedule/manage/route.ts:750
+**Found:** 2026-09-22 by /audit (scope: current; lens: security)
+**Why it matters:** The draft topic admits `canEditNotes` (matching the 013 send policy), so a member who may edit notes but not shifts receives `draft_changed` diffs of draft cells and the client applies them to the grid, while `fetchShifts` redacts draft cells for that same member (`isScheduler = canEditShifts`) and the 035 snapshot policy refuses them. Not a regression (every member received the diffs before), but the two paths disagree for this one permission mix.
+**Suggested fix:** Decide whether a note editor may see draft shifts. If yes, extend `redactDraftForViewer`'s gate and the snapshot policy to `canEditNotes`; if no, drop `canEditNotes` from the two draft-topic policies and send note diffs on the shared channel with a published-only projection.
+**Resolution:**
