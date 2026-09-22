@@ -928,7 +928,7 @@ export default function ShiftDetailScreen() {
     setPendingConfirmation({
       title: "Submit this call-off?",
       body: `${indefiniteArticle(absenceTypeLabel) === "an" ? "An" : "A"} ${absenceTypeLabel} absence will be submitted for your ${shiftLabel} shift on ${shiftDateLabel}.${
-        canApproveShiftRequests ? " As an approver, it goes on the schedule right away." : ""
+        canApproveShiftRequests ? " As an admin, it goes on the schedule right away." : ""
       }`,
       confirmLabel: "Submit Call-off",
       confirmTone: "danger",

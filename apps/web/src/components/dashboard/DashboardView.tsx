@@ -50,6 +50,7 @@ import {
   computeShiftBreakdown,
   buildActivityFeed,
 } from "@/lib/dashboard-stats";
+import { hasEffectiveCoverageRequirements } from "@dubgrid/schedule-core";
 import { getScheduleStartForSpan, realignTwoWeekScheduleStart } from "@/lib/schedule-view";
 import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
 import { formatDateKey } from "@/lib/utils";
@@ -554,16 +555,18 @@ export default function DashboardView({
     () => buildPublishedDateSet(publishedDateRanges),
     [publishedDateRanges],
   );
+  const hasCoverageRequirements = useMemo(
+    () => hasEffectiveCoverageRequirements(coverageRequirements, assignments),
+    [coverageRequirements, assignments],
+  );
   const publishedWindowState = useMemo<PublishedWindowState>(
     () => getPublishedWindowState(periodDates, publishedDateSet),
     [periodDates, publishedDateSet],
   );
   const publishedPeriodDates = useMemo(
     () =>
-      coverageRequirements.length === 0
-        ? periodDates
-        : filterPublishedDates(periodDates, publishedDateSet),
-    [coverageRequirements.length, periodDates, publishedDateSet],
+      hasCoverageRequirements ? filterPublishedDates(periodDates, publishedDateSet) : periodDates,
+    [hasCoverageRequirements, periodDates, publishedDateSet],
   );
   const prevPeriodDatesRange = useMemo(
     () => getDatesInRange(prevPeriodStart, periodDays),
@@ -574,10 +577,10 @@ export default function DashboardView({
   // filter as the current period instead of comparing filtered vs unfiltered.
   const publishedPrevPeriodDates = useMemo(
     () =>
-      coverageRequirements.length === 0
-        ? prevPeriodDatesRange
-        : filterPublishedDates(prevPeriodDatesRange, publishedDateSet),
-    [coverageRequirements.length, prevPeriodDatesRange, publishedDateSet],
+      hasCoverageRequirements
+        ? filterPublishedDates(prevPeriodDatesRange, publishedDateSet)
+        : prevPeriodDatesRange,
+    [hasCoverageRequirements, prevPeriodDatesRange, publishedDateSet],
   );
 
   // ─── Computations ───────────────────────────────────────
@@ -887,7 +890,6 @@ export default function DashboardView({
   const coveragePct = periodStats.coverage?.pct ?? 100;
   const isCoverageUnpublished = publishedWindowState === "unpublished";
   const isCoveragePartial = publishedWindowState === "partial";
-  const hasCoverageRequirements = coverageRequirements.length > 0;
   const showOT = permissions.canEditShifts;
   const heroSummary = useMemo(() => {
     if (urgentGapCount > 0) {
@@ -1077,6 +1079,7 @@ export default function DashboardView({
     shiftCategories,
     jobs,
     coverageRequirements,
+    hasCoverageRequirements,
     assignmentLabelMap,
     assignmentNameMap,
     assignmentById,
@@ -1244,7 +1247,7 @@ export default function DashboardView({
             sections={sectionCoverage}
             focusAreas={focusAreas}
             focusAreaLabel={org.focusAreaLabel || "section"}
-            hasRequirements={coverageRequirements.length > 0}
+            hasRequirements={hasCoverageRequirements}
             publishedWindowState={publishedWindowState}
             onClose={closeExpanded}
           />

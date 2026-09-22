@@ -33,6 +33,8 @@ export interface DashboardContentProps {
   shiftCategories: ShiftCategory[];
   jobs: JobDefinition[];
   coverageRequirements: CoverageRequirement[];
+  /** At least one requirement asks for staff and maps to an active assignment. */
+  hasCoverageRequirements: boolean;
   assignmentLabelMap: Map<number, string>;
   assignmentNameMap: Map<number, string>;
   assignmentById: Map<number, AssignmentDefinition>;

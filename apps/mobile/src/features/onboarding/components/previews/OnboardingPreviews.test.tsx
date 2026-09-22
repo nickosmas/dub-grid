@@ -109,7 +109,9 @@ describe("CoverShiftsPreview", () => {
     expect(screen.getByText("Day Shift")).toBeInTheDocument();
     expect(screen.getByText("Skilled Nursing")).toBeInTheDocument();
     expect(screen.getByText("1 teammate needed")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Claim" })).toBeInTheDocument();
+    // The stage is decorative and hidden from assistive tech, so the role
+    // query has to look past `aria-hidden`.
+    expect(screen.getByRole("button", { name: "Claim", hidden: true })).toBeInTheDocument();
   });
 
   it("leaves the page title and tab strip behind", () => {

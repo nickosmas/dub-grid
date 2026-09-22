@@ -17,6 +17,7 @@ import { withThemeParam } from "@/lib/theme-preference";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
 import { LandingScreenshot, landingScreenshots } from "@/components/landing/LandingScreenshot";
 import { LandingPhone } from "@/components/landing/LandingPhone";
+import { LandingPhoneCarousel } from "@/components/landing/LandingPhoneCarousel";
 import {
   BellRing,
   CalendarDays,
@@ -529,11 +530,7 @@ export default function RootPage() {
               and Android.
             </p>
           </div>
-          <div className="flex flex-wrap justify-center gap-8">
-            <LandingPhone screen="home" />
-            <LandingPhone screen="schedule" />
-            <LandingPhone screen="requests" />
-          </div>
+          <LandingPhoneCarousel />
         </div>
       </RevealSection>
 

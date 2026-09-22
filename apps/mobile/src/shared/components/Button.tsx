@@ -1,13 +1,15 @@
 import type { PropsWithChildren, ReactNode } from "react";
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
   StyleSheet,
   View,
   type GestureResponderEvent,
+  type LayoutChangeEvent,
 } from "react-native";
 import { Text } from "./Text";
+import { FitText } from "./FitText";
 import Animated from "react-native-reanimated";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useAsyncAction } from "../hooks/useAsyncAction";
@@ -183,6 +185,12 @@ export function Button({
   });
 
   const content = children ?? label;
+  // The label re-measures from full size whenever the button gets wider, so
+  // a label shrunk in a narrow slot grows back after a rotation or a resize.
+  const [contentWidth, setContentWidth] = useState<number | undefined>(undefined);
+  const onContentLayout = useCallback((event: LayoutChangeEvent) => {
+    setContentWidth(Math.round(event.nativeEvent.layout.width));
+  }, []);
   const iconNode = icon ? (
     <Ionicons color={labelColor} name={icon} size={metrics.icon} />
   ) : (
@@ -224,30 +232,39 @@ export function Button({
         animatedStyle,
       ]}
     >
-      <View style={[styles.content, { gap: iconOnly ? 0 : metrics.gap }]}>
+      <View
+        onLayout={isLink || iconOnly ? undefined : onContentLayout}
+        style={[styles.content, { gap: iconOnly ? 0 : metrics.gap }]}
+      >
         {/* The spinner stands in for the icon while the button works. The
             action label stays unchanged; an icon-only button is spinner-only. */}
         {isBusy ? <ActivityIndicator color={labelColor} size="small" /> : null}
         {!isBusy && (iconOnly || iconPosition === "leading") ? iconNode : null}
-        {!iconOnly && content ? (
+        {!iconOnly && content && isLink ? (
+          // A link is a sentence, not a control label: it keeps the full
+          // multiplier and two lines, since a one-line link ate its own
+          // question at accessibility sizes ("Need help with your subdom…").
           <Text
             ellipsizeMode="tail"
-            // A filled label is compact text: one line, scaling capped at the
-            // compact ceiling, truncation when the slot is too narrow. It
-            // used to shrink to fit first, but the new architecture fits
-            // against the button's default-size height as well as its width
-            // and has no floor, so a raised text size left "Cancel" at three
-            // quarters of the base beside a sentence at one and a half. A
-            // link is a sentence, not a control label: it keeps the full
-            // multiplier and two lines, since a one-line link ate its own
-            // question at accessibility sizes ("Need help with your subdom…").
-            fit={isLink ? undefined : "compact"}
             maxFontSizeMultiplier={MAX_FONT_SCALE}
             numberOfLines={2}
             style={[mobileText[LABEL_VARIANT[resolvedSize]], styles.label, { color: labelColor }]}
           >
             {content}
           </Text>
+        ) : null}
+        {!iconOnly && content && !isLink ? (
+          // A filled label is one line and fits its slot: the font shrinks by
+          // measurement (never wraps, never ellipsizes at ordinary lengths)
+          // and scaling is capped at the compact ceiling.
+          <FitText
+            ellipsizeMode="tail"
+            maxFontSizeMultiplier={MAX_FONT_SCALE}
+            containerWidth={contentWidth}
+            style={[mobileText[LABEL_VARIANT[resolvedSize]], styles.label, { color: labelColor }]}
+          >
+            {content}
+          </FitText>
         ) : null}
         {!isBusy && !iconOnly && iconPosition === "trailing" ? iconNode : null}
         {!iconOnly ? trailingAccessory : null}

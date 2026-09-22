@@ -21,7 +21,7 @@ export const landingPhoneScreens: Record<
     dark: "/landing/screenshots/mobile-home-dark.png",
   },
   schedule: {
-    alt: "The DubGrid mobile Schedule tab showing a staff member's upcoming shifts",
+    alt: "The DubGrid mobile Schedule tab showing who is on the Day Shift in Skilled Nursing",
     light: "/landing/screenshots/mobile-schedule.png",
     dark: "/landing/screenshots/mobile-schedule-dark.png",
   },

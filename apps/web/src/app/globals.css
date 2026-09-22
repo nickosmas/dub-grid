@@ -1112,6 +1112,65 @@ button {
   border-radius: 36px;
 }
 
+/* Desktop: three phones side by side. */
+.landing-phone-track {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2rem;
+}
+
+.landing-phone-slot {
+  flex: 0 0 auto;
+  transition:
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 320ms ease;
+}
+
+/* Phones: one horizontal snap scroller, the centred phone at full size. The
+   negative margin lets the track bleed to the viewport edges past the section's
+   16px gutter; scroll-padding keeps the first and last phone centre-able. */
+@media (max-width: 767px) {
+  .landing-phone-track {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    gap: 0.75rem;
+    margin: 0 -1.5rem;
+    padding: 24px calc(50vw - 120px) 40px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .landing-phone-track::-webkit-scrollbar {
+    display: none;
+  }
+
+  .landing-phone-slot {
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
+    transform: scale(0.84);
+    opacity: 0.55;
+  }
+
+  .landing-phone-slot[data-active="true"] {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  .landing-phone-slot .landing-phone {
+    width: 240px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-phone-slot {
+    transition: none;
+  }
+}
+
 @media (max-width: 640px) {
   .landing-screenshot {
     border-width: 5px;

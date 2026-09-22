@@ -25,6 +25,7 @@ function makeProps(overrides: Partial<DashboardContentProps> = {}): DashboardCon
     absenceTypeById: new Map(),
     assignmentById: new Map(),
     coverageRequirements: [{ id: 1 }],
+    hasCoverageRequirements: true,
     currentEmpId: "emp-1",
     currentPeriodShifts: {},
     periodDates: [new Date("2026-05-11T00:00:00")],
@@ -181,6 +182,7 @@ describe("AdminDashboard", () => {
       <AdminDashboard
         {...makeProps({
           coverageRequirements: [],
+          hasCoverageRequirements: false,
           sectionCoverage: [],
           permissions: {
             ...buildPerms("admin", "org-1", false),
@@ -204,6 +206,7 @@ describe("AdminDashboard", () => {
       <AdminDashboard
         {...makeProps({
           coverageRequirements: [],
+          hasCoverageRequirements: false,
           sectionCoverage: [],
           permissions: {
             ...buildPerms("admin", "org-1", false),

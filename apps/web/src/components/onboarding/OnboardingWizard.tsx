@@ -134,8 +134,6 @@ export default function OnboardingWizard({
     }
   }
 
-  const hideStepper = currentStep.id === "welcome" || currentStep.id === "completion";
-
   // Skip only escapes the per-user orientation phase. During org-config
   // (isOrgSetup === false) the gate re-triggers on reload because the
   // org-wide completeness check still fails, so the button would loop.
@@ -146,7 +144,7 @@ export default function OnboardingWizard({
       <WizardShell
         steps={steps}
         currentStepIndex={currentStepIndex}
-        hideStepper={hideStepper}
+        stepsComplete={currentStep.id === "completion"}
         onSkip={canSkip ? () => setShowSkipConfirm(true) : undefined}
         skipLoading={skipLoading}
         centerContent={isFirstStep || currentStep.id === "completion"}

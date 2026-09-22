@@ -10,7 +10,7 @@ import StaffHoursCard from "./StaffHoursCard";
 export default function AdminDashboard(props: DashboardContentProps) {
   const {
     org,
-    coverageRequirements,
+    hasCoverageRequirements,
     permissions,
     sectionCoverage,
     openShifts,
@@ -120,7 +120,7 @@ export default function AdminDashboard(props: DashboardContentProps) {
             sections={actionableCoverageSections}
             focusAreaLabel={org.focusAreaLabel || "section"}
             isMobile={isMobile}
-            hasRequirements={coverageRequirements.length > 0}
+            hasRequirements={hasCoverageRequirements}
             canManageCoverageRequirements={permissions.canManageCoverageRequirements}
             publishedWindowState={publishedWindowState}
             publishHistory={publishHistory}

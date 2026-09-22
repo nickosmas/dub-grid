@@ -12,14 +12,14 @@ describe("getMobileRequestActionFeedback", () => {
     );
     expect(
       getMobileRequestActionFeedback({ requestId: "r1", body, viewerCanApprove: true }).message,
-    ).toBe("Claim this open shift? As an approver, it goes on the schedule right away.");
+    ).toBe("Claim this open shift? As an admin, it goes on the schedule right away.");
     expect(
       getMobileRequestActionFeedback({
         requestId: "r1",
         body: { action: "volunteer_open_shift" },
         viewerCanApprove: true,
       }).message,
-    ).toBe("Claim this open shift? As an approver, it goes on the schedule right away.");
+    ).toBe("Claim this open shift? As an admin, it goes on the schedule right away.");
   });
 });
 

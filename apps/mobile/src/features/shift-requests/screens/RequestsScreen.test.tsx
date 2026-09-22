@@ -429,9 +429,7 @@ describe("RequestsScreen", () => {
     expect(screen.getByText("Claim this shift?")).toBeInTheDocument();
     // This viewer can approve, so the claim lands on the schedule at once.
     expect(
-      screen.getByText(
-        "Claim this open shift? As an approver, it goes on the schedule right away.",
-      ),
+      screen.getByText("Claim this open shift? As an admin, it goes on the schedule right away."),
     ).toBeInTheDocument();
     expect(mutate).not.toHaveBeenCalled();
     fireEvent.click(

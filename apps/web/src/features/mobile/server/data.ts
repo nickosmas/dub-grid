@@ -84,6 +84,7 @@ import {
   assembleDashboardCoverage,
   classifyOpenShiftUrgency,
   formatLocalDateKey,
+  hasEffectiveCoverageRequirements,
   hasShiftStartedAtTimeRanges,
   parseLocalDateKey,
   summarizeCoverageDailyForFocusArea,
@@ -1586,7 +1587,10 @@ export async function fetchMobileCoverageSummary(
   input: MobileOpenShiftInput,
 ): Promise<MobileCoverageSummary> {
   const inputs = await buildMobileCoverageEngineInputs(serviceClient, input);
-  const hasCoverageRequirements = inputs.context.coverageRequirements.length > 0;
+  const hasCoverageRequirements = hasEffectiveCoverageRequirements(
+    inputs.context.coverageRequirements,
+    inputs.context.assignments,
+  );
 
   if (inputs.dates.length === 0) {
     return {
