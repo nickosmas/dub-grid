@@ -8,6 +8,7 @@ import { TOOLTIP_DELAY_MS } from "@/lib/constants";
 import OnboardingGate from "@/components/onboarding/OnboardingGate";
 import PostHogProvider from "@/components/PostHogProvider";
 import { isFeatureEnabled } from "@/lib/feature-flags";
+import "../app-ui.css";
 
 /**
  * Everything the authenticated app needs, and nothing the marketing pages do.

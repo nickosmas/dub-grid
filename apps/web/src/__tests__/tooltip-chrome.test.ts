@@ -17,7 +17,9 @@ function resolveWebSource(path: string): string {
 }
 
 const tooltipPrimitive = readFileSync(resolveWebSource("components/ui/tooltip.tsx"), "utf-8");
-const globalsCss = readFileSync(resolveWebSource("app/globals.css"), "utf-8");
+const globalsCss =
+  readFileSync(resolveWebSource("app/globals.css"), "utf-8") +
+  readFileSync(resolveWebSource("app/app-ui.css"), "utf-8");
 const chartTooltipStyles = readFileSync(
   resolveWebSource("components/dashboard/chartTooltipStyles.ts"),
   "utf-8",

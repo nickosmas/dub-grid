@@ -60,7 +60,9 @@ describe("ActivityDetailsDialog", () => {
   });
 
   it("binds the hierarchy to shared type roles and keeps narrow layouts readable", () => {
-    const css = readFileSync(path.resolve(__dirname, "../../../app/globals.css"), "utf8");
+    const css =
+      readFileSync(path.resolve(__dirname, "../../../app/globals.css"), "utf8") +
+      readFileSync(path.resolve(__dirname, "../../../app/app-ui.css"), "utf8");
 
     expect(css).toMatch(/\.dg-activity-details-summary\s*\{[\s\S]*?align-items:\s*flex-start;/);
     expect(css).toMatch(

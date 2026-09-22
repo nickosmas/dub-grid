@@ -257,25 +257,25 @@ export default function RequestDemoPage() {
             <label htmlFor="demo-org-size" className="dg-auth-field-label">
               Employee count <RequiredMark />
             </label>
-            {/* CustomSelect puts its `style` on the wrapper, not the trigger,
-                so the trigger's chrome is matched to the text fields from CSS
-                (see .dg-auth-select). */}
-            <div className="dg-auth-select">
-              <CustomSelect
-                id="demo-org-size"
-                ariaLabel="Employee count"
-                value={orgSize || ""}
-                options={[
-                  { value: "", label: "Select range" },
-                  ...ORG_SIZE_OPTIONS.map((opt) => ({ value: opt, label: opt })),
-                ]}
-                onChange={setOrgSize}
-                height="var(--dg-auth-control-h)"
-                fontSize="var(--dg-fs-body)"
-                fontWeight="var(--dg-type-control-weight)"
-                style={{ width: "100%" }}
-              />
-            </div>
+            <CustomSelect
+              id="demo-org-size"
+              ariaLabel="Employee count"
+              value={orgSize || ""}
+              options={[
+                { value: "", label: "Select range" },
+                ...ORG_SIZE_OPTIONS.map((opt) => ({ value: opt, label: opt })),
+              ]}
+              onChange={setOrgSize}
+              height="var(--dg-auth-control-h)"
+              fontSize="var(--dg-fs-body)"
+              fontWeight="var(--dg-type-control-weight)"
+              style={{ width: "100%" }}
+              triggerStyle={{
+                border: "1.5px solid var(--dg-color-border)",
+                borderRadius: "var(--dg-radius-md)",
+                padding: "0 12px 0 16px",
+              }}
+            />
           </div>
           <div>
             <label htmlFor="demo-industry" className="dg-auth-field-label">

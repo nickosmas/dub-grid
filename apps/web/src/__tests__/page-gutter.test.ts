@@ -46,7 +46,9 @@ function toRelative(filePath: string): string {
 
 describe("canonical page gutter", () => {
   it("defines --dg-page-gutter exactly once", () => {
-    const globals = readFileSync(path.join(webSrc, "app", "globals.css"), "utf8");
+    const globals =
+      readFileSync(path.join(webSrc, "app", "globals.css"), "utf8") +
+      readFileSync(path.join(webSrc, "app", "app-ui.css"), "utf8");
     const definitions = globals.match(/--dg-page-gutter\s*:/g) ?? [];
 
     expect(definitions).toHaveLength(1);
@@ -61,7 +63,8 @@ describe("canonical page gutter", () => {
 
   it("hides the desktop header at the mobile breakpoint before media-query hydration", () => {
     const header = readFileSync(path.join(webSrc, "components", "Header.tsx"), "utf8");
-    const globals = readFileSync(path.join(webSrc, "app", "globals.css"), "utf8");
+    // The rule lives in the app-only stylesheet: the header is app chrome.
+    const globals = readFileSync(path.join(webSrc, "app", "app-ui.css"), "utf8");
 
     expect(header).toContain('className="dg-app-header-desktop"');
     expect(globals).toMatch(

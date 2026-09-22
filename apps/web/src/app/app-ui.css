@@ -1,0 +1,2948 @@
+/* Application UI, loaded only inside the authenticated app.
+   Public routes (landing, request demo, legal pages) render from
+   globals.css alone and must not need anything here. */
+
+.dg-pill-display {
+  max-inline-size: 100%;
+  min-inline-size: 0;
+  block-size: auto;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.dg-pill-action {
+  max-inline-size: 100%;
+  min-inline-size: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.dg-pill-action-label {
+  display: block;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dg-tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+.dg-type-attention-primary {
+  color: var(--dg-type-attention-primary-color);
+}
+.dg-type-attention-secondary {
+  color: var(--dg-type-attention-secondary-color);
+}
+.dg-type-attention-muted {
+  color: var(--dg-type-attention-muted-color);
+}
+.dg-type-page-title {
+  color: var(--dg-type-page-title-color);
+  font-size: var(--dg-type-page-title-size);
+  font-weight: var(--dg-type-page-title-weight);
+  letter-spacing: var(--dg-type-page-title-letter-spacing);
+  line-height: var(--dg-type-page-title-line-height);
+}
+.dg-type-section-title {
+  color: var(--dg-type-section-title-color);
+  font-size: var(--dg-type-section-title-size);
+  font-weight: var(--dg-type-section-title-weight);
+  letter-spacing: var(--dg-type-section-title-letter-spacing);
+  line-height: var(--dg-type-section-title-line-height);
+}
+.dg-type-component-heading {
+  color: var(--dg-type-component-heading-color);
+  font-size: var(--dg-type-component-heading-size);
+  font-weight: var(--dg-type-component-heading-weight);
+  letter-spacing: var(--dg-type-component-heading-letter-spacing);
+  line-height: var(--dg-type-component-heading-line-height);
+}
+.dg-type-content-group-heading {
+  color: var(--dg-type-content-group-heading-color);
+  font-size: var(--dg-type-content-group-heading-size);
+  font-weight: var(--dg-type-content-group-heading-weight);
+  letter-spacing: var(--dg-type-content-group-heading-letter-spacing);
+  line-height: var(--dg-type-content-group-heading-line-height);
+}
+.dg-type-body {
+  color: var(--dg-type-body-color);
+  font-size: var(--dg-type-body-size);
+  font-weight: var(--dg-type-body-weight);
+  letter-spacing: var(--dg-type-body-letter-spacing);
+  line-height: var(--dg-type-body-line-height);
+}
+.dg-type-navigation {
+  color: var(--dg-type-navigation-color);
+  font-size: var(--dg-type-navigation-size);
+  font-weight: var(--dg-type-navigation-weight);
+  letter-spacing: var(--dg-type-navigation-letter-spacing);
+  line-height: var(--dg-type-navigation-line-height);
+}
+.dg-type-navigation-section {
+  color: var(--dg-type-navigation-section-color);
+  font-size: var(--dg-type-navigation-section-size);
+  font-weight: var(--dg-type-navigation-section-weight);
+  letter-spacing: var(--dg-type-navigation-section-letter-spacing);
+  line-height: var(--dg-type-navigation-section-line-height);
+}
+.dg-type-control {
+  color: var(--dg-type-control-color);
+  font-size: var(--dg-type-control-size);
+  font-weight: var(--dg-type-control-weight);
+  letter-spacing: var(--dg-type-control-letter-spacing);
+  line-height: var(--dg-type-control-line-height);
+}
+.dg-type-field-title {
+  color: var(--dg-type-field-title-color);
+  font-size: var(--dg-type-field-title-size);
+  font-weight: var(--dg-type-field-title-weight);
+  letter-spacing: var(--dg-type-field-title-letter-spacing);
+  line-height: var(--dg-type-field-title-line-height);
+  text-transform: var(--dg-type-field-title-transform);
+}
+.dg-type-table-heading {
+  color: var(--dg-type-table-heading-color);
+  font-size: var(--dg-type-table-heading-size);
+  font-weight: var(--dg-type-table-heading-weight);
+  letter-spacing: var(--dg-type-table-heading-letter-spacing);
+  line-height: var(--dg-type-table-heading-line-height);
+  text-transform: var(--dg-type-table-heading-transform);
+}
+.dg-type-metadata {
+  color: var(--dg-type-metadata-color);
+  font-size: var(--dg-type-metadata-size);
+  font-weight: var(--dg-type-metadata-weight);
+  letter-spacing: var(--dg-type-metadata-letter-spacing);
+  line-height: var(--dg-type-metadata-line-height);
+}
+.dg-type-badge {
+  color: var(--dg-type-badge-color);
+  font-size: var(--dg-type-badge-size);
+  font-weight: var(--dg-type-badge-weight);
+  letter-spacing: var(--dg-type-badge-letter-spacing);
+  line-height: var(--dg-type-badge-line-height);
+}
+/* Danger */
+.dg-btn-danger {
+  background: var(--dg-color-danger-bg);
+  color: var(--dg-color-danger-text);
+  border: 1px solid var(--dg-color-danger-border);
+}
+.dg-btn-danger:hover {
+  background: var(--dg-color-danger-border);
+}
+.dg-btn-danger:active {
+  background: var(--dg-color-danger-border);
+}
+/* Danger filled (destructive confirm) */
+.dg-btn-danger-filled {
+  background: var(--dg-color-danger);
+  color: var(--dg-color-text-inverse);
+  border: 1px solid var(--dg-color-danger);
+}
+.dg-btn-danger-filled:hover {
+  background: color-mix(in srgb, var(--dg-color-danger) 95%, black);
+}
+.dg-btn-danger-filled:active {
+  background: color-mix(in srgb, var(--dg-color-danger) 90%, black);
+}
+/* Solid, not tinted: this is the affirmative action on a staff record, and the
+   pale fill read as disabled. */
+.dg-btn-success {
+  background: var(--dg-color-success-solid);
+  color: var(--dg-color-on-success-text);
+  border: 1px solid var(--dg-color-success-solid);
+}
+.dg-btn-success:hover {
+  background: color-mix(in srgb, var(--dg-color-success-solid) 95%, black);
+}
+.dg-btn-success:active {
+  background: color-mix(in srgb, var(--dg-color-success-solid) 90%, black);
+}
+/* Info (soft, for a secondary button in its toggled-on state) */
+.dg-btn-info {
+  background: var(--dg-color-info-bg);
+  color: var(--dg-color-accent-text);
+  border: 1px solid var(--dg-color-info-border);
+}
+.dg-btn-info:hover {
+  background: var(--dg-color-info-border);
+}
+.dg-btn-info:active {
+  background: var(--dg-color-info-border);
+}
+/* Buttons that sit ON a solid danger surface (e.g. the sandbox banner).
+   Solid = filled inverse with danger text; outline = inverse border/text. */
+.dg-btn-on-danger-solid {
+  background: var(--dg-color-text-inverse);
+  color: var(--dg-color-danger);
+  border: 1px solid var(--dg-color-text-inverse);
+}
+.dg-btn-on-danger-solid:hover {
+  background: color-mix(in srgb, var(--dg-color-text-inverse) 92%, black);
+}
+.dg-btn-on-danger-solid:active {
+  background: color-mix(in srgb, var(--dg-color-text-inverse) 85%, black);
+}
+.dg-btn-on-danger-outline {
+  background: transparent;
+  color: var(--dg-color-text-inverse);
+  border: 1px solid var(--dg-color-text-inverse);
+}
+.dg-btn-on-danger-outline:hover {
+  background: color-mix(in srgb, var(--dg-color-text-inverse) 18%, transparent);
+}
+.dg-btn-on-danger-outline:active {
+  background: color-mix(in srgb, var(--dg-color-text-inverse) 28%, transparent);
+}
+/* Buttons that sit ON a solid brand surface (e.g. the landing page closing CTA).
+   Uses --color-on-brand-surface (fixed white in both themes), not --color-surface
+   — the latter inverts to near-black in dark mode, which would kill contrast
+   against the still-blue CTA backdrop the button sits on. */
+.dg-btn-on-brand-solid {
+  background: var(--dg-color-on-brand-surface);
+  color: var(--dg-color-brand);
+  border: 1px solid var(--dg-color-on-brand-surface);
+}
+.dg-btn-on-brand-solid:hover {
+  background: color-mix(in srgb, var(--dg-color-on-brand-surface) 92%, black);
+}
+.dg-btn-on-brand-solid:active {
+  background: color-mix(in srgb, var(--dg-color-on-brand-surface) 85%, black);
+}
+/* Warning filled (bench/attention CTA) */
+.dg-btn-warning-filled {
+  background: var(--dg-color-warning);
+  color: var(--dg-color-on-warning-text);
+  border: 1px solid var(--dg-color-warning);
+}
+.dg-btn-warning-filled:hover {
+  background: color-mix(in srgb, var(--dg-color-warning) 95%, black);
+}
+.dg-btn-warning-filled:active {
+  background: color-mix(in srgb, var(--dg-color-warning) 90%, black);
+}
+/* Dashed outline (add item) */
+.dg-btn-dashed {
+  background: transparent;
+  color: var(--dg-type-control-color);
+  border: 1px solid var(--dg-color-border);
+}
+.dg-btn-dashed:hover {
+  background: var(--dg-color-bg-secondary);
+}
+/* Toggled-on state for a button whose menu or overlay is open. A class rather
+   than an inline background, because an inline one outranks every :hover rule
+   above and leaves the button dead under the cursor. Placed last so it wins
+   over the variant it modifies. */
+.dg-btn-toggled {
+  background: var(--dg-color-brand-bg);
+  border-color: var(--dg-color-brand-border);
+  color: var(--dg-color-brand);
+}
+.dg-btn-toggled:hover {
+  background: var(--dg-color-brand-border);
+}
+/* Small variant */
+.dg-btn-sm {
+  font-size: var(--dg-type-field-title-size);
+  height: var(--dg-btn-h-sm);
+  min-height: var(--dg-btn-h-sm);
+  padding: 0 var(--dg-btn-px-sm);
+}
+/* Extra small variant */
+.dg-btn-xs {
+  font-size: var(--dg-type-field-title-size);
+  height: var(--dg-btn-h-xs);
+  min-height: var(--dg-btn-h-xs);
+  padding: 0 var(--dg-btn-px-xs);
+  gap: 6px;
+}
+/* Icon-only button: square, so a lone glyph isn't stranded in text padding.
+   Declared after the size modifiers so its zero padding wins, and the width
+   follows whichever size the button is wearing. */
+.dg-btn-icon {
+  width: var(--dg-btn-h);
+  padding: 0;
+}
+.dg-btn-icon.dg-btn-sm {
+  width: var(--dg-btn-h-sm);
+}
+.dg-btn-icon.dg-btn-xs {
+  width: var(--dg-btn-h-xs);
+}
+/* Hover row (settings list items) */
+.dg-hover-row:hover {
+  background: var(--dg-color-bg-secondary);
+}
+.dg-input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  height: var(--dg-toolbar-h);
+  padding: 0 12px;
+  border: 1px solid var(--dg-color-border);
+  border-radius: var(--dg-btn-radius);
+  font-size: var(--dg-type-control-size);
+  font-weight: var(--dg-type-control-weight);
+  font-family: inherit;
+  color: var(--dg-type-control-color);
+  background: var(--dg-color-surface);
+  outline: none;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+.dg-input::placeholder {
+  color: var(--dg-color-text-faint);
+}
+.dg-input:focus {
+  border-color: var(--dg-color-border-focus);
+  box-shadow: 0 0 0 3px var(--dg-focus-ring);
+}
+.dg-input:disabled {
+  background: var(--dg-color-bg);
+  color: var(--dg-color-text-subtle);
+  cursor: not-allowed;
+}
+/* Read-only is not disabled. The value still has to read and copy cleanly, so
+   it keeps full text color and a text cursor; the recessed fill is the cue
+   that it cannot be edited. This carries the signal for a removed employee's
+   record, which used to be a blanket 50% dim over the whole card. */
+.dg-input[readonly] {
+  background: var(--dg-color-bg);
+}
+.dg-input-error {
+  border-color: var(--dg-color-danger);
+  box-shadow: 0 0 0 3px var(--dg-danger-ring);
+}
+/* Integer entry (NumberField): a minus, the value, a plus, in one bordered
+   box with the same corner as every other input. The box is the input's
+   chrome (border, radius, focus ring), the value is centred between the two
+   buttons, and the wheel never steps it. Width is the caller's, set on the
+   box; the minimum leaves room for three digits. */
+.dg-number-field {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 112px;
+  height: var(--dg-toolbar-h);
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--dg-color-border);
+  border-radius: var(--dg-btn-radius);
+  background: var(--dg-color-surface);
+  vertical-align: middle;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+.dg-number-field:focus-within {
+  border-color: var(--dg-color-border-focus);
+  box-shadow: 0 0 0 3px var(--dg-focus-ring);
+}
+.dg-number-field-disabled,
+.dg-number-field-readonly {
+  background: var(--dg-color-bg);
+}
+.dg-number-field-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 4px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  text-align: center;
+  font-size: var(--dg-type-control-size);
+  font-weight: var(--dg-type-control-weight);
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  color: var(--dg-type-control-color);
+}
+.dg-number-field-input:disabled {
+  color: var(--dg-color-text-subtle);
+  cursor: not-allowed;
+}
+/* Inset from the box: a button that ran to the edge read as part of the
+   border. The rounded square inside the field is the target. */
+.dg-number-field-step {
+  flex: 0 0 auto;
+  align-self: stretch;
+  width: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 0;
+  border-radius: calc(var(--dg-btn-radius) - 2px);
+  background: transparent;
+  color: var(--dg-color-text-muted);
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+.dg-number-field-step:hover:not(:disabled) {
+  background: var(--dg-color-bg-secondary);
+  color: var(--dg-color-text-primary);
+}
+.dg-number-field-step:active:not(:disabled) {
+  background: var(--dg-color-border-light);
+}
+.dg-number-field-step:disabled {
+  color: var(--dg-color-text-faint);
+  cursor: default;
+}
+.dg-number-field-sm {
+  min-width: 92px;
+  height: 30px;
+  padding: 2px;
+}
+.dg-number-field-sm .dg-number-field-step {
+  width: 24px;
+}
+.dg-number-field-sm .dg-number-field-input {
+  font-size: var(--dg-fs-caption);
+}
+.dg-label {
+  font-size: var(--dg-type-field-title-size);
+  font-weight: var(--dg-type-field-title-weight);
+  color: var(--dg-type-field-title-color);
+  letter-spacing: var(--dg-type-field-title-letter-spacing);
+  line-height: var(--dg-type-field-title-line-height);
+  text-transform: var(--dg-type-field-title-transform);
+  display: block;
+  margin-bottom: 5px;
+}
+.dg-segment {
+  display: flex;
+  height: var(--dg-toolbar-h);
+  background: var(--dg-color-surface);
+  border-radius: var(--dg-btn-radius);
+  border: 1px solid var(--dg-color-border);
+  overflow: hidden;
+}
+.dg-segment-btn {
+  background: transparent;
+  border: none;
+  color: var(--dg-type-navigation-color);
+  padding: 0 14px;
+  font-size: var(--dg-type-navigation-size);
+  font-weight: var(--dg-type-navigation-weight);
+  letter-spacing: var(--dg-type-navigation-letter-spacing);
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    color 150ms ease;
+  font-family: inherit;
+  line-height: 1;
+  height: 100%;
+}
+.dg-segment-btn + .dg-segment-btn {
+  border-left: 1px solid var(--dg-color-border);
+}
+.dg-segment-btn:hover {
+  background: var(--dg-color-border-light);
+}
+.dg-segment-btn:focus-visible {
+  outline: 2px solid var(--dg-color-border-focus);
+  outline-offset: -2px;
+}
+.dg-span-tabs {
+  display: flex;
+  align-items: stretch;
+  height: var(--dg-toolbar-h);
+  background: var(--dg-color-dark);
+  border-radius: var(--dg-tab-shell-radius);
+  padding: var(--dg-tab-shell-pad);
+  gap: var(--dg-tab-shell-pad);
+}
+.dg-span-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--dg-on-dark-muted);
+  padding: 0 16px;
+  font-size: var(--dg-type-navigation-size);
+  font-weight: var(--dg-type-navigation-weight);
+  letter-spacing: var(--dg-type-navigation-letter-spacing);
+  cursor: pointer;
+  height: 100%;
+  border-radius: var(--dg-tab-inner-radius);
+  font-family: inherit;
+  line-height: 1;
+  white-space: nowrap;
+  transition:
+    color 200ms ease,
+    background 200ms ease;
+  flex: 1 0 auto;
+}
+/* Light variant — white container, dark active pill */
+.dg-span-tabs--light {
+  background: var(--dg-color-surface);
+  border: 1px solid var(--dg-color-border);
+}
+.dg-span-tabs--light .dg-span-tab {
+  color: var(--dg-type-navigation-color);
+  border-radius: var(--dg-tab-inner-radius);
+}
+.dg-scrollable-tabs {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: stretch;
+}
+.dg-scroll-inner {
+  display: flex;
+  align-items: stretch;
+  flex: 1;
+  height: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+.dg-scroll-inner::-webkit-scrollbar {
+  display: none;
+}
+/* Hide scrollbars while keeping scroll behaviour (Firefox, IE, WebKit) */
+.dg-no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.dg-no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+/* Fade overlays — hidden by default, shown via .visible */
+.dg-scroll-fade {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+.dg-scroll-fade--left {
+  left: 0;
+  justify-content: flex-start;
+  background: linear-gradient(
+    to right,
+    var(--scrollable-bg, var(--dg-color-surface)) 30%,
+    transparent
+  );
+  padding-left: 2px;
+}
+.dg-scroll-fade--right {
+  right: 0;
+  justify-content: flex-end;
+  background: linear-gradient(
+    to left,
+    var(--scrollable-bg, var(--dg-color-surface)) 30%,
+    transparent
+  );
+  padding-right: 2px;
+}
+/* Chevron button */
+.dg-scroll-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--dg-toolbar-h) - 10px);
+  height: calc(var(--dg-toolbar-h) - 10px);
+  border-radius: var(--dg-btn-radius);
+  border: none;
+  background: transparent;
+  color: var(--dg-color-text-muted);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition:
+    color 150ms ease,
+    background 150ms ease;
+}
+.dg-scroll-chevron:hover {
+  color: var(--dg-color-text-primary);
+  background: var(--dg-color-bg-secondary);
+}
+.dg-scroll-chevron:focus-visible {
+  outline: 2px solid var(--dg-color-border-focus);
+  outline-offset: 1px;
+}
+/* Dark variant — adjust gradient + chevron bg */
+.dg-span-tabs:not(.dg-span-tabs--light) .dg-scroll-fade--left {
+  background: linear-gradient(to right, var(--dg-color-dark) 30%, transparent);
+}
+.dg-span-tabs:not(.dg-span-tabs--light) .dg-scroll-fade--right {
+  background: linear-gradient(to left, var(--dg-color-dark) 30%, transparent);
+}
+.dg-span-tabs:not(.dg-span-tabs--light) .dg-scroll-chevron {
+  background: var(--dg-color-dark);
+  color: var(--dg-on-dark-subtle);
+}
+.dg-span-tabs:not(.dg-span-tabs--light) .dg-scroll-chevron:hover {
+  color: var(--dg-color-text-inverse);
+  background: var(--dg-color-dark-elevated);
+}
+.dg-nav-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--dg-toolbar-h);
+  padding: 0 14px;
+  font-size: var(--dg-type-navigation-size);
+  font-weight: var(--dg-type-navigation-weight);
+  letter-spacing: var(--dg-type-navigation-letter-spacing);
+  border-radius: var(--dg-btn-radius);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--dg-type-navigation-color);
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+  font-family: inherit;
+}
+.dg-nav-tab:hover {
+  background: var(--dg-color-bg-secondary);
+}
+.dg-nav-tab:focus-visible {
+  outline: 2px solid var(--dg-color-border-focus);
+  outline-offset: 2px;
+}
+.dg-sub-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--dg-toolbar-h);
+  padding: 0 16px;
+  font-size: var(--dg-type-navigation-size);
+  font-weight: var(--dg-type-navigation-weight);
+  letter-spacing: var(--dg-type-navigation-letter-spacing);
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: var(--dg-btn-radius) var(--dg-btn-radius) 0 0;
+  background: transparent;
+  color: var(--dg-type-navigation-color);
+  cursor: pointer;
+  transition:
+    color 150ms ease,
+    border-color 150ms ease;
+  font-family: inherit;
+  margin-bottom: -1px;
+}
+.dg-sub-tab:hover {
+  color: var(--dg-color-text-secondary);
+}
+.dg-sub-tab:focus-visible {
+  outline: 2px solid var(--dg-color-border-focus);
+  outline-offset: -2px;
+}
+/* Navbar and page-toolbar labels share the same quiet reference typography. */
+.dg-toolbar-type {
+  color: var(--dg-type-navigation-color);
+  font-size: var(--dg-type-navigation-size);
+  font-weight: var(--dg-type-navigation-weight);
+  letter-spacing: var(--dg-type-navigation-letter-spacing);
+}
+.dg-toolbar-type .dg-input {
+  color: inherit;
+}
+.dg-panel {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  width: min(480px, calc(100vw - 24px));
+  background: var(--dg-color-surface);
+  z-index: 10001;
+  box-shadow: var(--shadow-panel);
+  border: 1px solid var(--dg-color-border);
+  border-radius: var(--dg-radius-lg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: panel-in var(--dg-duration-standard) ease-out;
+  /* On the base rule so shrinking back animates as well as growing. */
+  transition: width var(--dg-duration-standard) ease;
+}
+.dg-panel-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--dg-overlay);
+  backdrop-filter: blur(var(--dg-overlay-blur));
+  -webkit-backdrop-filter: blur(var(--dg-overlay-blur));
+  z-index: 10000;
+  animation: fade-in var(--dg-duration-standard) ease;
+}
+@media (min-width: 768px) {
+  .dg-panel--wide {
+    width: min(560px, calc(100vw - 24px));
+  }
+  .dg-panel--x-wide {
+    width: min(640px, calc(100vw - 24px));
+  }
+  /* Content-driven widths for a review surface: the panel opens at the
+     standard width and grows leftwards, one card column at a time, when the
+     tab in front has more to show. The transition is what makes that read as
+     the same panel making room rather than a new one opening. */
+  .dg-panel--cols-2 {
+    width: min(760px, calc(100vw - 24px));
+  }
+  .dg-panel--max {
+    width: min(1200px, calc(100vw - 24px));
+  }
+}
+.dg-page-enter {
+  animation: dg-enter var(--dg-duration-standard) ease-out both;
+}
+.dg-card-enter {
+  animation: dg-enter-scale var(--dg-duration-standard) ease-out both;
+}
+.dg-row-enter {
+  animation: dg-enter 200ms ease-out both;
+}
+.dg-staff-directory-header,
+.dg-staff-directory-row {
+  display: grid;
+  grid-template-columns:
+    100px minmax(180px, 2fr) 110px 110px minmax(140px, 1fr) minmax(120px, 0.8fr)
+    minmax(140px, 1fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) 140px 40px;
+  align-items: stretch;
+}
+@media (min-width: 768px) {
+  .dg-staff-directory-header,
+  .dg-staff-directory-row {
+    grid-template-columns:
+      100px minmax(180px, 2fr) 110px 110px minmax(140px, 1fr) minmax(120px, 0.8fr)
+      minmax(140px, 1fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) 140px 40px;
+  }
+}
+@media (min-width: 1024px) {
+  .dg-staff-directory-header,
+  .dg-staff-directory-row {
+    grid-template-columns:
+      100px minmax(180px, 2fr) 110px 110px minmax(140px, 1fr) minmax(120px, 0.8fr)
+      minmax(140px, 1fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) 140px 40px;
+  }
+}
+.dg-staff-directory-header {
+  min-height: 40px;
+  border-bottom: 1px solid var(--dg-color-border-light);
+}
+.dg-staff-directory-head-cell {
+  align-items: center;
+  min-width: 0;
+  padding-block: 10px;
+  color: var(--dg-type-table-heading-color);
+  font-size: var(--dg-type-table-heading-size);
+  font-weight: var(--dg-type-table-heading-weight);
+  letter-spacing: var(--dg-type-table-heading-letter-spacing);
+  line-height: var(--dg-type-table-heading-line-height);
+  text-transform: var(--dg-type-table-heading-transform);
+}
+.dg-staff-directory-row {
+  background: var(--dg-color-surface);
+  position: relative;
+  z-index: 1;
+  transform: translate3d(0, 0, 0);
+  transition: transform 220ms cubic-bezier(0.2, 0, 0, 1);
+  border-bottom: 1px solid var(--dg-color-border-light);
+  will-change: transform;
+}
+.dg-staff-directory-row:last-child {
+  border-bottom: 0;
+}
+.dg-staff-directory-row {
+  touch-action: none;
+  user-select: none;
+}
+.dg-staff-directory-row[data-dragging="true"] {
+  z-index: 5;
+  cursor: grabbing;
+  box-shadow: var(--shadow-drag);
+}
+.dg-staff-directory-row[data-dragging="true"][data-drag-phase="dragging"] {
+  transition: none;
+}
+.dg-staff-directory-row[data-dragging="true"][data-drag-phase="settling"] {
+  transition: transform 220ms cubic-bezier(0.2, 0, 0, 1);
+}
+.dg-staff-directory-row[data-moving="true"] {
+  z-index: 3;
+}
+.dg-staff-directory-cell {
+  align-items: center;
+  min-width: 0;
+  padding-inline: 16px;
+}
+/* Headers share the cell padding so column labels line up with cell content. */
+.dg-staff-directory-head-cell {
+  padding-inline: 16px;
+}
+/* Vertical dividers between visible columns. The rightmost data cell at
+   each breakpoint drops its right border so the row doesn't end with a
+   hanging line before the empty chevron / utility column. */
+.dg-staff-directory-head-cell:not(:last-child),
+.dg-staff-directory-cell:not(:last-child) {
+  border-right: 1px solid var(--dg-color-border-light);
+}
+/* Base (<md): Status (col 4) is the rightmost visible data column. */
+.dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(4),
+.dg-staff-directory-row > .dg-staff-directory-cell:nth-child(4) {
+  border-right: none;
+}
+@media (min-width: 768px) {
+  /* md: Status regains its divider; Certification (col 6) is now rightmost. */
+  .dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(4),
+  .dg-staff-directory-row > .dg-staff-directory-cell:nth-child(4) {
+    border-right: 1px solid var(--dg-color-border-light);
+  }
+  .dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(6),
+  .dg-staff-directory-row > .dg-staff-directory-cell:nth-child(6) {
+    border-right: none;
+  }
+}
+@media (min-width: 1024px) {
+  /* lg: Certification regains its divider; Date Joined (col 10) is the rightmost. */
+  .dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(6),
+  .dg-staff-directory-row > .dg-staff-directory-cell:nth-child(6) {
+    border-right: 1px solid var(--dg-color-border-light);
+  }
+  .dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(10),
+  .dg-staff-directory-row > .dg-staff-directory-cell:nth-child(10) {
+    border-right: none;
+  }
+}
+/* Outer column gutters (24px) match the table-mode `pl-6` / `pr-6` so reorder mode aligns with normal mode. */
+.dg-staff-directory-cell--rank,
+.dg-staff-directory-head-cell:first-child {
+  padding-left: 24px;
+}
+.dg-staff-directory-cell--chevron,
+.dg-staff-directory-head-cell:last-child {
+  padding-right: 24px;
+}
+.dg-staff-directory-cell--rank {
+  width: 100px;
+}
+.dg-staff-directory-cell--employment {
+  width: 110px;
+}
+.dg-staff-directory-cell--status {
+  width: 110px;
+}
+/* Reordering is available only in the Active tab, where a status column would
+   repeat information the selected tab already provides. */
+.dg-staff-directory-table--without-status .dg-staff-directory-header,
+.dg-staff-directory-table--without-status .dg-staff-directory-row {
+  grid-template-columns:
+    100px minmax(180px, 2fr) 110px minmax(140px, 1fr) minmax(120px, 0.8fr)
+    minmax(140px, 1fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) 140px 40px;
+}
+.dg-staff-directory-table--without-status
+  .dg-staff-directory-header
+  > .dg-staff-directory-head-cell:nth-child(3),
+.dg-staff-directory-table--without-status
+  .dg-staff-directory-row
+  > .dg-staff-directory-cell:nth-child(3) {
+  border-right: none;
+}
+@media (min-width: 768px) {
+  .dg-staff-directory-table--without-status .dg-staff-directory-header,
+  .dg-staff-directory-table--without-status .dg-staff-directory-row {
+    grid-template-columns:
+      100px minmax(180px, 2fr) 110px minmax(140px, 1fr) minmax(120px, 0.8fr)
+      minmax(140px, 1fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) 140px 40px;
+  }
+  .dg-staff-directory-table--without-status
+    .dg-staff-directory-header
+    > .dg-staff-directory-head-cell:nth-child(3),
+  .dg-staff-directory-table--without-status
+    .dg-staff-directory-row
+    > .dg-staff-directory-cell:nth-child(3),
+  .dg-staff-directory-table--without-status
+    .dg-staff-directory-header
+    > .dg-staff-directory-head-cell:nth-child(4),
+  .dg-staff-directory-table--without-status
+    .dg-staff-directory-row
+    > .dg-staff-directory-cell:nth-child(4) {
+    border-right: 1px solid var(--dg-color-border-light);
+  }
+  .dg-staff-directory-table--without-status
+    .dg-staff-directory-header
+    > .dg-staff-directory-head-cell:nth-child(5),
+  .dg-staff-directory-table--without-status
+    .dg-staff-directory-row
+    > .dg-staff-directory-cell:nth-child(5) {
+    border-right: none;
+  }
+}
+@media (min-width: 1024px) {
+  .dg-staff-directory-table--without-status .dg-staff-directory-header,
+  .dg-staff-directory-table--without-status .dg-staff-directory-row {
+    grid-template-columns:
+      100px minmax(180px, 2fr) 110px minmax(140px, 1fr) minmax(120px, 0.8fr)
+      minmax(140px, 1fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) 140px 40px;
+  }
+  .dg-staff-directory-table--without-status
+    .dg-staff-directory-header
+    > .dg-staff-directory-head-cell:nth-child(5),
+  .dg-staff-directory-table--without-status
+    .dg-staff-directory-row
+    > .dg-staff-directory-cell:nth-child(5) {
+    border-right: 1px solid var(--dg-color-border-light);
+  }
+  .dg-staff-directory-table--without-status
+    .dg-staff-directory-header
+    > .dg-staff-directory-head-cell:nth-child(9),
+  .dg-staff-directory-table--without-status
+    .dg-staff-directory-row
+    > .dg-staff-directory-cell:nth-child(9) {
+    border-right: none;
+  }
+}
+/* Every directory column stays in the stable-width horizontal table at every
+   viewport. Breakpoints no longer remove data; the outer container scrolls. */
+.dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(4),
+.dg-staff-directory-row > .dg-staff-directory-cell:nth-child(4),
+.dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(6),
+.dg-staff-directory-row > .dg-staff-directory-cell:nth-child(6) {
+  border-right: 1px solid var(--dg-color-border-light);
+}
+.dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(10),
+.dg-staff-directory-row > .dg-staff-directory-cell:nth-child(10) {
+  border-right: none;
+}
+.dg-staff-directory-table--without-status
+  .dg-staff-directory-header
+  > .dg-staff-directory-head-cell:nth-child(3),
+.dg-staff-directory-table--without-status
+  .dg-staff-directory-row
+  > .dg-staff-directory-cell:nth-child(3),
+.dg-staff-directory-table--without-status
+  .dg-staff-directory-header
+  > .dg-staff-directory-head-cell:nth-child(5),
+.dg-staff-directory-table--without-status
+  .dg-staff-directory-row
+  > .dg-staff-directory-cell:nth-child(5) {
+  border-right: 1px solid var(--dg-color-border-light);
+}
+.dg-staff-directory-table--without-status
+  .dg-staff-directory-header
+  > .dg-staff-directory-head-cell:nth-child(9),
+.dg-staff-directory-table--without-status
+  .dg-staff-directory-row
+  > .dg-staff-directory-cell:nth-child(9) {
+  border-right: none;
+}
+.dg-staff-directory-cell--date-joined {
+  width: 140px;
+}
+.dg-staff-directory-cell--name {
+  min-width: 0;
+}
+.dg-staff-directory-cell--chevron {
+  justify-content: flex-end;
+}
+.dg-settings-reorder-item,
+.dg-settings-reorder-group,
+.dg-settings-reorder-subitem {
+  position: relative;
+  z-index: 1;
+  transform: translate3d(0, var(--dg-settings-reorder-offset, 0px), 0);
+  transition:
+    transform 180ms cubic-bezier(0.2, 0, 0, 1),
+    background 150ms ease;
+  will-change: transform;
+}
+.dg-settings-reorder-item,
+.dg-settings-reorder-subitem {
+  align-items: center;
+}
+.dg-settings-reorder-item[data-dragging="true"],
+.dg-settings-reorder-group[data-dragging="true"],
+.dg-settings-reorder-subitem[data-dragging="true"] {
+  z-index: 5;
+  background: var(--dg-color-surface);
+  box-shadow: var(--shadow-drag);
+  cursor: grabbing;
+}
+.dg-settings-reorder-item[data-dragging="true"][data-drag-phase="dragging"],
+.dg-settings-reorder-group[data-dragging="true"][data-drag-phase="dragging"],
+.dg-settings-reorder-subitem[data-dragging="true"][data-drag-phase="dragging"] {
+  transition: none;
+}
+.dg-settings-reorder-item[data-dragging="true"][data-drag-phase="settling"],
+.dg-settings-reorder-group[data-dragging="true"][data-drag-phase="settling"],
+.dg-settings-reorder-subitem[data-dragging="true"][data-drag-phase="settling"] {
+  transition:
+    transform 180ms cubic-bezier(0.2, 0, 0, 1),
+    background 150ms ease;
+}
+.dg-settings-reorder-item[data-moving="true"],
+.dg-settings-reorder-group[data-moving="true"],
+.dg-settings-reorder-subitem[data-moving="true"] {
+  z-index: 3;
+}
+.dg-settings-reorder-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--dg-color-text-faint);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.dg-settings-reorder-handle:active {
+  cursor: grabbing;
+}
+.dg-profile-menu {
+  min-width: 224px;
+}
+.dg-menu-item--danger {
+  color: var(--dg-color-danger);
+}
+.dg-menu-item--danger:hover {
+  background: var(--dg-color-danger-bg);
+}
+.dg-menu-item--accent {
+  color: var(--dg-color-link);
+}
+.dg-menu-item--accent:hover {
+  background: var(--dg-color-bg-secondary);
+}
+.dg-menu-divider {
+  height: 1px;
+  background: var(--dg-color-border-light);
+  margin: 4px 0;
+}
+.dg-address-autocomplete {
+  position: relative;
+}
+.dg-address-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--dg-color-border);
+  border-radius: var(--dg-radius-lg);
+  background: var(--dg-color-surface);
+  box-shadow: var(--shadow-menu);
+}
+.dg-address-panel-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px;
+  scrollbar-width: none;
+}
+.dg-address-panel-list::-webkit-scrollbar {
+  display: none;
+}
+.dg-address-item {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border: none;
+  border-radius: var(--dg-radius-sm);
+  background: transparent;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.dg-address-item:hover,
+.dg-address-item[aria-selected="true"] {
+  background: var(--dg-color-bg-secondary);
+}
+.dg-address-item:focus-visible {
+  outline: 2px solid var(--dg-color-border-focus);
+  outline-offset: -2px;
+}
+.dg-address-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--dg-color-text-faint);
+  margin-top: 1px;
+}
+.dg-address-item-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+.dg-address-item-title {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--dg-color-text-primary);
+}
+.dg-address-item-subtitle {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--dg-color-text-muted);
+}
+.dg-address-match {
+  color: var(--dg-color-text-primary);
+  font-weight: 600;
+}
+.dg-address-state {
+  padding: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--dg-color-text-muted);
+}
+.dg-address-panel-foot {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 8px 12px;
+  border-top: 1px solid var(--dg-color-border-light);
+}
+.dg-address-panel-attribution {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--dg-type-metadata-size);
+  font-weight: var(--dg-type-metadata-weight);
+  line-height: var(--dg-type-metadata-line-height);
+  color: var(--dg-color-text-faint);
+}
+.dg-app-shell-header {
+  position: sticky;
+  top: 0;
+  z-index: 9999;
+}
+.dg-app-shell-header-surface {
+  background: var(--dg-color-bg);
+}
+.dg-modal {
+  position: relative;
+  background: var(--dg-color-surface);
+  border-radius: var(--dg-radius-xl);
+  padding: 28px 32px;
+  min-width: 320px;
+  max-width: 480px;
+  max-height: calc(100vh - 48px);
+  width: 100%;
+  box-shadow: var(--shadow-modal);
+  border: 1px solid var(--dg-color-border);
+  outline: none;
+  animation: modal-in var(--dg-duration-standard) ease-out;
+  display: flex;
+  flex-direction: column;
+}
+.dg-scroll-overflow-marker {
+  display: none;
+}
+.dg-modal-scroll-region {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* A pinned action row keeps 16px on both sides of its buttons, so the modal's
+   own bottom padding tightens to match instead of stacking underneath. */
+.dg-modal-footer {
+  flex: 0 0 auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--dg-color-border-light);
+}
+.dg-modal.dg-modal--with-footer {
+  padding-bottom: 16px;
+}
+.dg-scroll-overflow-cue {
+  position: absolute;
+  left: 50%;
+  z-index: 6;
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  padding: 0;
+  color: var(--dg-color-text-primary);
+  background: var(--dg-color-surface);
+  border: 1px solid var(--dg-color-border);
+  border-radius: 9999px;
+  box-shadow: var(--shadow-raised);
+  cursor: pointer;
+  transform: translateX(-50%);
+  transition:
+    background-color var(--dg-duration-fast) ease,
+    border-color var(--dg-duration-fast) ease,
+    transform var(--dg-duration-fast) ease;
+}
+.dg-scroll-overflow-cue:hover {
+  background: var(--dg-color-bg-secondary);
+}
+.dg-scroll-overflow-cue:active {
+  transform: translateX(-50%) scale(0.96);
+}
+.dg-scroll-overflow-cue:focus-visible {
+  outline: 2px solid var(--dg-color-brand);
+  outline-offset: 2px;
+}
+.dg-scroll-overflow-cue--viewport {
+  position: fixed;
+  bottom: 20px;
+  z-index: 100;
+}
+/* Modal sub-elements */
+.dg-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+.dg-modal-title {
+  font-size: var(--dg-fs-title);
+  font-weight: 700;
+  color: var(--dg-color-text-primary);
+}
+.dg-modal--auth-help {
+  max-width: 360px;
+}
+.dg-modal--account-disabled {
+  max-width: 400px;
+}
+/* Activity details keeps context quiet so the event and changed values lead. */
+.dg-activity-details-modal {
+  max-width: 520px;
+  width: min(520px, calc(100vw - 32px));
+}
+.dg-activity-details-modal .dg-modal-header {
+  margin-bottom: 18px;
+}
+/* For a body that opens on a filled notice: 24px under a 16px title leaves
+   the banner floating, so the header holds the same 12px the banner keeps
+   inside its own edge. */
+.dg-modal--tight-header .dg-modal-header {
+  margin-bottom: 12px;
+}
+.dg-activity-details-modal .dg-modal-title {
+  color: var(--dg-type-content-group-heading-color);
+  font-size: var(--dg-type-content-group-heading-size);
+  font-weight: var(--dg-type-content-group-heading-weight);
+  line-height: var(--dg-type-content-group-heading-line-height);
+}
+.dg-activity-details {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.dg-activity-details-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.dg-activity-details-headline {
+  color: var(--dg-type-component-heading-color);
+  font-size: var(--dg-type-component-heading-size);
+  font-weight: var(--dg-type-component-heading-weight);
+  letter-spacing: var(--dg-type-component-heading-letter-spacing);
+  line-height: var(--dg-type-component-heading-line-height);
+}
+.dg-activity-details-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+}
+.dg-activity-details-row {
+  display: grid;
+  grid-template-columns: minmax(116px, 128px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.dg-activity-details-label {
+  color: var(--dg-type-field-title-color);
+  font-size: var(--dg-type-field-title-size);
+  font-weight: var(--dg-type-field-title-weight);
+  line-height: var(--dg-type-field-title-line-height);
+}
+.dg-activity-details-value {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--dg-type-body-color);
+  font-size: var(--dg-type-body-size);
+  font-weight: var(--dg-type-body-weight);
+  line-height: var(--dg-type-body-line-height);
+}
+.dg-activity-details-identity,
+.dg-activity-details-identity-primary,
+.dg-activity-details-identity-secondary {
+  display: block;
+}
+.dg-activity-details-identity-primary {
+  color: var(--dg-color-text-primary);
+  font-weight: 500;
+}
+.dg-activity-details-identity-secondary {
+  margin-top: 2px;
+  color: var(--dg-type-metadata-color);
+  font-size: var(--dg-type-metadata-size);
+  font-weight: var(--dg-type-metadata-weight);
+  line-height: var(--dg-type-metadata-line-height);
+}
+.dg-activity-details-changes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--dg-color-border-light);
+}
+.dg-activity-details-empty {
+  color: var(--dg-type-metadata-color);
+  font-size: var(--dg-type-metadata-size);
+  font-weight: var(--dg-type-metadata-weight);
+  line-height: var(--dg-type-metadata-line-height);
+}
+.dg-activity-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-bottom: 12px;
+}
+/* The filters move as one cluster: either they sit beside the navigation or
+   they take their own row, never split with the select stranded below. */
+.dg-activity-toolbar-filters {
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+}
+.dg-activity-search {
+  position: relative;
+  flex: 1 1 auto;
+}
+.dg-activity-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  pointer-events: none;
+  color: var(--dg-color-text-faint);
+}
+.dg-activity-search .dg-input {
+  width: 100%;
+  padding-left: 32px;
+  padding-right: 30px;
+}
+.dg-activity-navigator {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+/* The arrows and the period they move stay together when the toolbar wraps. */
+.dg-activity-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+/* Content-sized: the period label is never clipped. */
+.dg-activity-period-label {
+  width: auto;
+  flex: 0 0 auto;
+}
+.dg-activity-today {
+  height: var(--dg-toolbar-h);
+  padding: 0 14px;
+  flex-shrink: 0;
+}
+.dg-activity-zone-note {
+  font-size: var(--dg-fs-footnote);
+  color: var(--dg-color-text-muted);
+}
+@media (max-width: 640px) {
+  .dg-activity-navigator,
+  .dg-activity-stepper {
+    width: 100%;
+  }
+  .dg-activity-period-label {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
+  .dg-activity-navigator .dg-span-tabs {
+    flex: 1 1 auto;
+  }
+}
+@media (max-width: 520px) {
+  .dg-activity-toolbar-filters {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .dg-activity-search {
+    flex: 1 1 150px;
+  }
+}
+.dg-activity-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 12px 0;
+}
+.dg-activity-summary-meta {
+  font-size: var(--dg-fs-body-sm);
+  color: var(--dg-color-text-muted);
+}
+.dg-activity-summary-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.dg-activity-chip-button {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  border-radius: 4px;
+}
+.dg-activity-chip-button:focus-visible {
+  outline: 2px solid var(--dg-color-border-focus);
+  outline-offset: 2px;
+}
+.dg-activity-chip-button[aria-pressed="true"] {
+  box-shadow: 0 0 0 1px var(--dg-color-brand);
+  border-radius: 4px;
+}
+/* `clip` rather than `hidden`: `hidden` makes a scroll container, which would
+   become the containing block for the sticky day headings inside. */
+.dg-activity-table-shell {
+  overflow: clip;
+  border: 1px solid var(--dg-color-border-light);
+  border-radius: var(--dg-radius-md);
+  background: var(--dg-color-surface);
+}
+/* Separate borders keep the day headings' background painted while stuck;
+   collapsed borders detach from a sticky cell in Chromium. */
+.dg-activity-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.dg-activity-day-heading {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--dg-color-bg);
+  padding: 10px 24px;
+  text-align: left;
+  border-bottom: 1px solid var(--dg-color-border-light);
+}
+.dg-activity-day-heading-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.dg-activity-day-label {
+  font-size: var(--dg-type-content-group-heading-size);
+  font-weight: var(--dg-type-content-group-heading-weight);
+  line-height: var(--dg-type-content-group-heading-line-height);
+  color: var(--dg-type-content-group-heading-color);
+}
+.dg-activity-day-date {
+  font-size: var(--dg-fs-footnote);
+  color: var(--dg-color-text-muted);
+}
+.dg-activity-row {
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.dg-activity-row:hover,
+.dg-activity-row:focus-visible {
+  background: var(--dg-color-row-alt);
+}
+.dg-activity-row:focus-visible {
+  outline: 2px solid var(--dg-color-border-focus);
+  outline-offset: -2px;
+}
+.dg-activity-cell {
+  padding: 14px 12px;
+  vertical-align: top;
+  font-size: var(--dg-fs-body-sm);
+  color: var(--dg-color-text-primary);
+  border-bottom: 1px solid var(--dg-color-border-light);
+  border-right: 1px solid var(--dg-color-border-light);
+}
+.dg-activity-cell:first-child {
+  padding-left: 24px;
+}
+.dg-activity-cell:last-child {
+  padding-right: 24px;
+  border-right: 0;
+}
+.dg-activity-cell--when,
+.dg-activity-cell--type,
+.dg-activity-cell--identity {
+  white-space: nowrap;
+}
+.dg-activity-time {
+  font-weight: 500;
+  color: var(--dg-color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.dg-activity-identity {
+  min-width: 0;
+  max-width: 220px;
+}
+.dg-activity-identity-primary {
+  font-weight: 500;
+  color: var(--dg-color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dg-activity-identity-secondary {
+  font-size: var(--dg-fs-footnote);
+  color: var(--dg-color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dg-activity-description {
+  font-weight: 500;
+  color: var(--dg-color-text-primary);
+}
+.dg-activity-detail-list {
+  margin-top: 2px;
+  font-size: var(--dg-fs-footnote);
+  color: var(--dg-color-text-muted);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.dg-activity-detail-key {
+  font-weight: 600;
+}
+.dg-activity-context {
+  margin-top: 4px;
+  font-size: var(--dg-fs-footnote);
+  color: var(--dg-color-text-muted);
+}
+.dg-activity-cell--chevron {
+  width: 40px;
+  text-align: right;
+  vertical-align: middle;
+  color: var(--dg-color-text-faint);
+}
+.dg-activity-skeleton-row {
+  display: flex;
+  gap: 16px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--dg-color-border-light);
+}
+.dg-activity-skeleton-row:last-child {
+  border-bottom: 0;
+}
+.dg-role-department-edit-pills,
+.dg-role-requirement-edit-pills,
+.dg-role-requirement-pills {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dg-role-requirement-pills--view {
+  flex-wrap: wrap;
+}
+.dg-role-requirement-cell {
+  position: relative;
+  min-width: 0;
+}
+.dg-role-requirement-view-pill {
+  flex: 0 1 auto;
+  max-width: 100%;
+}
+.dg-role-requirement-overflow-trigger {
+  min-width: max-content;
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: help;
+  font: inherit;
+}
+.dg-role-requirement-overflow-trigger:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--dg-color-border-focus);
+  outline-offset: 2px;
+}
+.dg-role-requirement-pill-label {
+  display: block;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.dg-role-requirement-measurer {
+  position: absolute;
+  width: max-content;
+  visibility: hidden;
+  pointer-events: none;
+}
+.dg-role-requirement-measurer .dg-role-requirement-pill-label {
+  white-space: nowrap;
+}
+@media (max-width: 480px) {
+  .dg-activity-details-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}
+.dg-modal-section {
+  margin-bottom: 20px;
+}
+.dg-modal-section-label {
+  font-size: var(--dg-fs-footnote);
+  font-weight: 700;
+  color: var(--dg-color-text-subtle);
+  letter-spacing: 0.07em;
+  margin-bottom: 8px;
+}
+.dg-modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.dg-open-shift-staffing-modal {
+  width: min(560px, calc(100vw - 32px));
+}
+.dg-open-shift-staffing-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--dg-color-border-light);
+  border-radius: var(--dg-btn-radius);
+  background: var(--dg-color-bg-secondary);
+  color: var(--dg-color-text-secondary);
+  font-size: var(--dg-fs-caption);
+}
+.dg-open-shift-staffing-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-top: 16px;
+}
+.dg-open-shift-staffing-search .dg-input {
+  width: 100%;
+  padding-left: 39px;
+}
+.dg-open-shift-staffing-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.dg-open-shift-staffing-person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 60px;
+  padding: 10px 12px;
+  border: 1px solid var(--dg-color-border);
+  border-radius: var(--dg-btn-radius);
+  background: var(--dg-color-surface);
+  color: var(--dg-color-text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+.dg-open-shift-staffing-person:hover,
+.dg-open-shift-staffing-person[aria-checked="true"] {
+  border-color: var(--dg-color-brand);
+  background: var(--dg-color-brand-bg);
+}
+.dg-open-shift-staffing-radio {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  border: 2px solid var(--dg-color-border-strong);
+  border-radius: 50%;
+  background: var(--dg-color-surface);
+  box-shadow: inset 0 0 0 4px var(--dg-color-surface);
+}
+.dg-open-shift-staffing-person[aria-checked="true"] .dg-open-shift-staffing-radio {
+  border-color: var(--dg-color-brand);
+  background: var(--dg-color-brand);
+}
+.dg-open-shift-staffing-person-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+.dg-open-shift-staffing-assignment {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+}
+.dg-open-shift-staffing-empty {
+  display: flex;
+  min-height: 150px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 24px;
+  color: var(--dg-color-text-muted);
+  text-align: center;
+}
+.dg-open-shift-staffing-actions {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+/* Custom checkbox — replaces native checkboxes for brand consistency */
+.dg-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--dg-color-text-muted);
+  background: var(--dg-color-surface);
+  cursor: pointer;
+  flex-shrink: 0;
+  position: relative;
+  transition:
+    background var(--dg-duration-fast) ease,
+    border-color var(--dg-duration-fast) ease;
+}
+.dg-checkbox:hover:not(:checked):not(:disabled) {
+  border-color: var(--dg-color-text-secondary);
+}
+.dg-checkbox:checked {
+  background: var(--dg-color-brand);
+  border-color: var(--dg-color-brand);
+}
+.dg-checkbox:checked::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 5px;
+  height: 9px;
+  border: solid var(--dg-color-on-brand-text);
+  border-width: 0 2px 2px 0;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+.dg-checkbox:focus-visible {
+  outline: 2px solid var(--dg-color-brand);
+  outline-offset: 2px;
+}
+.dg-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: var(--dg-fs-label);
+  color: var(--dg-color-text-secondary);
+  border-bottom: 1px solid var(--dg-color-border-light);
+}
+.dg-checkbox-row:last-child {
+  border-bottom: none;
+}
+.dg-checkbox-row--header {
+  background: var(--dg-color-bg-secondary);
+  border-bottom: 1px solid var(--dg-color-border);
+  font-weight: 600;
+}
+.dg-checklist {
+  border: 1px solid var(--dg-color-border);
+  border-radius: var(--dg-radius-md);
+  overflow: hidden;
+}
+.dg-sidebar {
+  transition:
+    width 220ms ease,
+    padding 220ms ease,
+    opacity 180ms ease;
+  overflow: hidden;
+  position: relative;
+}
+.dg-sidebar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid var(--dg-color-border);
+  background: var(--dg-color-surface);
+  cursor: pointer;
+  color: var(--dg-color-text-muted);
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+  flex-shrink: 0;
+  padding: 0;
+}
+.dg-sidebar-toggle:hover {
+  background: var(--dg-color-bg-secondary);
+  color: var(--dg-color-text-primary);
+}
+.dg-sidebar-toggle:focus-visible {
+  outline: 2px solid var(--dg-color-border-focus);
+  outline-offset: 2px;
+}
+.dg-sidebar-expand {
+  position: absolute;
+  top: 12px;
+  left: 8px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--dg-color-border);
+  background: var(--dg-color-surface);
+  cursor: pointer;
+  color: var(--dg-color-text-muted);
+  box-shadow: var(--dg-shadow-sidebar-toggle);
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+  padding: 0;
+}
+.dg-sidebar-expand:hover {
+  background: var(--dg-color-bg-secondary);
+  color: var(--dg-color-text-primary);
+}
+.dg-sidebar-expand:focus-visible {
+  outline: 2px solid var(--dg-color-border-focus);
+  outline-offset: 2px;
+}
+.dg-table-row {
+  transition: background 150ms ease;
+}
+.dg-table-row:hover {
+  background: var(--dg-color-row-alt);
+}
+/* Div-based "table" lists (settings panels: AbsenceTypeRow, CoverageOptionRow,
+   IndicatorRow, JobRow, ActivityLog skeleton). Each row component renders its
+   own outer <div> with inline borderBottom; this strips the divider on the
+   last (or only) row. */
+.dg-list-row:last-child {
+  border-bottom: 0 !important;
+}
+.dg-grid-slot,
+.dg-grid-cell {
+  position: relative;
+  transition:
+    background 100ms ease,
+    box-shadow 100ms ease;
+}
+.dg-grid-slot[data-today="true"],
+.dg-grid-cell[data-today="true"] {
+  background: var(--dg-color-today-bg);
+}
+.dg-grid-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Change chips intentionally rise above their pills. They must be allowed
+     to clear a neighbouring cell instead of being cropped at the cell edge. */
+  overflow: visible;
+}
+.dg-grid-cell__content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: stretch;
+  justify-content: center;
+}
+.dg-grid-slot > :not(.dg-grid-slot__chrome),
+.dg-grid-cell > :not(.dg-grid-cell__chrome) {
+  position: relative;
+  z-index: 1;
+}
+.dg-grid-slot__chrome,
+.dg-grid-cell__chrome {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+.dg-grid-slot[data-leading-divider="light"] .dg-grid-slot__chrome::before,
+.dg-grid-cell[data-leading-divider="light"] .dg-grid-cell__chrome::before,
+.dg-grid-slot[data-leading-divider="split"] .dg-grid-slot__chrome::before,
+.dg-grid-cell[data-leading-divider="split"] .dg-grid-cell__chrome::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+}
+.dg-grid-slot[data-leading-divider="light"] .dg-grid-slot__chrome::before,
+.dg-grid-cell[data-leading-divider="light"] .dg-grid-cell__chrome::before {
+  border-left: 1px solid var(--dg-color-border-light);
+}
+.dg-grid-slot[data-leading-divider="split"] .dg-grid-slot__chrome::before,
+.dg-grid-cell[data-leading-divider="split"] .dg-grid-cell__chrome::before {
+  border-left: 1px solid var(--dg-color-grid-divider-strong);
+}
+.dg-grid-cell[data-top-divider] .dg-grid-cell__chrome,
+.dg-grid-slot[data-bottom-divider] .dg-grid-slot__chrome {
+  --dg-grid-divider-inset: 0px;
+}
+.dg-grid-cell[data-week-split-start="true"][data-top-divider] .dg-grid-cell__chrome,
+.dg-grid-slot[data-week-split-start="true"][data-bottom-divider] .dg-grid-slot__chrome {
+  --dg-grid-divider-inset: 1px;
+}
+.dg-grid-cell[data-top-divider="light"] .dg-grid-cell__chrome {
+  background-image: linear-gradient(
+    to right,
+    var(--dg-color-border-light),
+    var(--dg-color-border-light)
+  );
+  background-position: var(--dg-grid-divider-inset) 0;
+  background-repeat: no-repeat;
+  background-size: calc(100% - var(--dg-grid-divider-inset)) 1px;
+}
+.dg-grid-cell[data-top-divider="dark"] .dg-grid-cell__chrome {
+  background-image: linear-gradient(to right, var(--dg-color-dark), var(--dg-color-dark));
+  background-position: var(--dg-grid-divider-inset) 0;
+  background-repeat: no-repeat;
+  background-size: calc(100% - var(--dg-grid-divider-inset)) 1px;
+}
+.dg-grid-cell[data-top-divider="warning"] .dg-grid-cell__chrome {
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--dg-color-warning-border) 0 6px,
+    transparent 6px 10px
+  );
+  background-position: var(--dg-grid-divider-inset) 0;
+  background-repeat: no-repeat;
+  background-size: calc(100% - var(--dg-grid-divider-inset)) 2px;
+}
+.dg-grid-slot[data-bottom-divider="light"] .dg-grid-slot__chrome {
+  background-image: linear-gradient(
+    to right,
+    var(--dg-color-border-light),
+    var(--dg-color-border-light)
+  );
+  background-position: var(--dg-grid-divider-inset) 100%;
+  background-repeat: no-repeat;
+  background-size: calc(100% - var(--dg-grid-divider-inset)) 1px;
+}
+.dg-grid-slot[data-bottom-divider="warning"] .dg-grid-slot__chrome {
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--dg-color-warning-border) 0 6px,
+    transparent 6px 10px
+  );
+  background-position: var(--dg-grid-divider-inset) 100%;
+  background-repeat: no-repeat;
+  background-size: calc(100% - var(--dg-grid-divider-inset)) 2px;
+}
+.dg-grid-cell[data-locked="true"] {
+  background: var(--dg-locked-bg);
+}
+.dg-grid-cell[data-drop-target="true"] {
+  z-index: 4;
+  background: var(--dg-color-bg-secondary) !important;
+}
+.dg-grid-cell[data-active="true"] {
+  background: var(--dg-color-bg-secondary) !important;
+}
+.dg-grid-cell[data-bulk-mode="true"] {
+  cursor: default;
+}
+.dg-grid-cell[data-bulk-mode="true"][data-bulk-selectable="true"] {
+  cursor: pointer;
+}
+.dg-grid-cell[data-bulk-mode="true"][data-bulk-selected="true"] {
+  background: var(--dg-color-brand-bg) !important;
+}
+.dg-grid-cell__bulk-selection-ring {
+  position: absolute;
+  z-index: 7;
+  pointer-events: none;
+  border: 2px solid var(--dg-color-danger);
+  box-shadow: 0 0 0 1px var(--dg-color-surface);
+}
+.dg-grid-cell__bulk-selected-indicator {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  z-index: 8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--dg-color-danger);
+  color: var(--dg-color-surface);
+  border: 2px solid var(--dg-color-surface);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
+  font-size: var(--dg-type-badge-size);
+  font-weight: 600;
+  line-height: 1;
+  pointer-events: none;
+}
+.dg-grid-cell:focus-visible .dg-grid-cell__chrome::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 0;
+}
+.dg-grid-cell[data-week-split-start="true"]:focus-visible .dg-grid-cell__chrome::after {
+  left: 1px;
+}
+/* The focus-area label and the date row pin as one native sticky group beneath
+   the app header and the schedule toolbar. It only layers above the rows while
+   it is actually stuck: at rest the first staff row's change chip must keep
+   hanging over the header cap the way chips hang into the row above everywhere
+   else. The group is opaque so nothing scrolls through the label. */
+.dg-grid-sticky-group {
+  position: sticky;
+  top: calc(var(--dg-app-shell-header-height, 56px) + var(--dg-schedule-chrome-height, 0px));
+  background: var(--dg-color-bg);
+}
+.dg-grid-sticky-group[data-stuck="true"] {
+  z-index: 11;
+}
+@media print {
+  .dg-grid-sticky-group {
+    position: static;
+  }
+}
+.dg-grid-active-outline {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px solid var(--dg-color-primary);
+  pointer-events: none;
+  z-index: 6;
+}
+.dg-grid-cell[data-interactive="true"]:not([data-locked="true"]):hover {
+  background: var(--dg-color-bg-secondary) !important;
+}
+.dg-grid-cell[data-interactive="true"]:not([data-locked="true"]) {
+  cursor: pointer;
+}
+.dg-grid-cell[data-locked="true"] {
+  cursor: not-allowed;
+}
+.dg-grid-cell:focus-visible {
+  outline: none;
+  z-index: 5;
+}
+.dg-grid-cell:focus-visible .dg-grid-cell__chrome::after {
+  box-shadow:
+    inset 0 0 0 1px var(--dg-color-border-focus),
+    1px 0 0 0 var(--dg-color-border-focus),
+    0 1px 0 0 var(--dg-color-border-focus);
+}
+.dg-open-shift-btn {
+  transition:
+    filter 100ms ease,
+    border-color 100ms ease,
+    box-shadow 100ms ease;
+}
+.dg-open-shift-btn:hover {
+  filter: brightness(0.93);
+}
+.dg-open-shift-btn:focus-visible {
+  outline: 2px solid var(--dg-color-border-focus);
+  outline-offset: -2px;
+}
+.dg-shift-pill {
+  transition:
+    transform 150ms ease,
+    opacity 150ms ease;
+}
+.dg-draggable-shift.dg-snap-back {
+  animation: dg-snap-back 200ms ease-out;
+}
+.dg-grid-cell[data-interactive="true"][data-empty="true"]:not([data-locked="true"]):hover::after {
+  content: "+";
+  position: absolute;
+  font-size: 25px;
+  font-weight: 400;
+  color: var(--dg-color-text-faint);
+  opacity: 0.6;
+  pointer-events: none;
+}
+.dg-draft-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 8px 16px;
+  margin: 8px 16px;
+  background: var(--dg-color-warning-bg);
+  border: 1px solid var(--dg-color-warning-border);
+  border-radius: var(--dg-radius-md);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dg-color-warning-text);
+}
+.dg-draft-banner-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dg-color-warning);
+  flex-shrink: 0;
+}
+.dg-draft-banner-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+/* Draft breakdown chips */
+.dg-draft-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--dg-radius-md);
+}
+.dg-draft-chip--new {
+  background: var(--dg-color-success-bg);
+  color: var(--dg-color-success-text);
+}
+/* Amber, not brand: this chip keys the grid's own "edited" tone, and a
+   brand-tinted chip next to an amber cell reads as a different thing. */
+.dg-draft-chip--modified {
+  background: var(--dg-color-warning-bg);
+  color: var(--dg-color-warning-text);
+}
+.dg-draft-chip--deleted {
+  background: var(--dg-color-danger-bg);
+  color: var(--dg-color-danger);
+}
+.dg-draft-chip--notes {
+  background: var(--dg-color-brand-bg);
+  color: var(--dg-color-brand);
+}
+.dg-card {
+  --dg-card-padding-x: 18px;
+  background: var(--dg-color-surface);
+  border: 1px solid var(--dg-color-border);
+  border-radius: var(--dg-radius-md);
+  overflow: hidden;
+  animation: dg-enter-scale var(--dg-duration-standard) ease-out both;
+}
+.dg-card-header {
+  padding: 14px var(--dg-card-padding-x);
+  border-bottom: 1px solid var(--dg-color-border-light);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.dg-card-title {
+  font-size: var(--dg-fs-label);
+  font-weight: 600;
+  color: var(--dg-color-text-primary);
+}
+.dg-card-subtitle {
+  font-size: var(--dg-fs-footnote);
+  color: var(--dg-color-text-subtle);
+  margin-top: 1px;
+}
+.dg-card-body {
+  padding: 16px var(--dg-card-padding-x);
+}
+/* Side padding only, for an embedded editor that brings its own vertical rhythm. */
+.dg-card-body-sides {
+  padding-left: var(--dg-card-padding-x);
+  padding-right: var(--dg-card-padding-x);
+}
+.dg-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.dg-form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.dg-form-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 767px) {
+  .dg-form-grid-2,
+  .dg-form-grid-3 {
+    grid-template-columns: 1fr;
+  }
+}
+.dg-form-hint {
+  font-size: var(--dg-fs-footnote);
+  color: var(--dg-color-text-muted);
+  margin: 4px 0 0;
+}
+.dg-form-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.dg-save-badge {
+  font-size: var(--dg-fs-label);
+  color: var(--dg-color-success);
+  font-weight: 600;
+}
+/*
+  Four sanctioned loading patterns:
+  1. Page-level:   <ProgressBar loading={bool} />      — thin bar at top of viewport
+  2. Button-level: <ButtonLoading loading={bool}>      — spinner overlay preserving button size
+  3. Skeleton:     .dg-skeleton + size variants below  — shimmer placeholder while content loads
+  4. Spinner:      <ButtonSpinner>                     — shared native activity indicator
+*/
+:where(.dg-skeleton) {
+  position: relative;
+  overflow: hidden;
+  background: var(--dg-color-bg-secondary);
+  border-radius: var(--dg-radius-sm);
+}
+:where(.dg-skeleton)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.62), transparent);
+  animation: dg-shimmer 1.5s linear infinite;
+}
+.dg-skeleton--text {
+  height: 14px;
+  width: 60%;
+}
+.dg-skeleton--heading {
+  height: 22px;
+  width: 40%;
+}
+.dg-skeleton--avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+}
+.dg-skeleton--card {
+  height: 120px;
+  border-radius: var(--dg-radius-md);
+}
+.dg-auth-loading {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dg-auth-logo-block--compact {
+  gap: 8px;
+}
+.dg-auth-input--readonly {
+  background: var(--dg-color-bg-secondary);
+  color: var(--dg-color-text-subtle);
+}
+/* Workspace pill (slug.basedomain) shown on org login + MFA screens */
+.dg-auth-badge {
+  display: inline-block;
+  background: var(--dg-color-brand-bg);
+  color: var(--dg-color-brand);
+  border: 1px solid var(--dg-color-brand-border);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: var(--dg-fs-label);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.dg-auth-badge-wrap {
+  margin-bottom: 28px;
+  text-align: center;
+}
+.dg-auth-badge-wrap--compact {
+  margin-bottom: 20px;
+}
+.dg-auth-form--narrow {
+  width: 100%;
+  max-width: var(--dg-auth-field-w);
+  margin-inline: auto;
+}
+.dg-auth-forgot {
+  margin-top: 2px;
+  text-align: right;
+}
+.dg-auth-progress {
+  margin: 0;
+  text-align: center;
+}
+.dg-auth-resend {
+  width: 100%;
+  margin-bottom: 16px;
+}
+.dg-auth-footnote {
+  margin: 0 0 16px;
+  color: var(--dg-color-text-subtle);
+  font-size: var(--dg-fs-caption);
+  text-align: center;
+}
+.dg-auth-centered {
+  text-align: center;
+}
+.dg-auth-portal-label {
+  color: var(--dg-color-text-label);
+  font-size: var(--dg-fs-label);
+  font-weight: var(--dg-type-field-title-weight);
+}
+.dg-auth-login-navigation,
+.dg-auth-selector-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.dg-auth-login-navigation {
+  gap: 10px;
+  margin-top: 20px;
+}
+.dg-auth-org-prefix {
+  margin: 0 0 4px;
+  color: var(--dg-color-text-secondary);
+  font-size: var(--dg-fs-body);
+  font-weight: 500;
+  text-align: center;
+}
+.dg-auth-org-navigation {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+.dg-auth-selector-description {
+  margin: 0 0 28px;
+  color: var(--dg-color-text-secondary);
+  font-size: var(--dg-fs-body);
+  font-weight: 500;
+  text-align: center;
+}
+.dg-auth-selector-actions {
+  gap: 12px;
+}
+.dg-auth-help-link {
+  font-size: var(--dg-fs-body-sm);
+}
+.dg-auth-modal-copy {
+  margin: 0 0 20px;
+  color: var(--dg-color-text-secondary);
+  font-size: var(--dg-fs-body-sm);
+  line-height: 1.5;
+}
+.dg-auth-agreement {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--dg-color-text-secondary);
+  cursor: pointer;
+  font-size: var(--dg-fs-body-sm);
+}
+.dg-auth-agreement-checkbox {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: var(--dg-color-brand);
+  cursor: pointer;
+}
+.dg-auth-policy-link {
+  color: var(--dg-color-brand);
+  text-decoration: underline;
+}
+.dg-auth-policy-link:hover {
+  color: var(--dg-color-brand-light);
+}
+.dg-terms-acceptance {
+  display: flex;
+  width: 100%;
+  max-width: 960px;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--dg-radius-xl);
+  background: var(--dg-color-surface);
+  box-shadow: var(--dg-shadow-auth-card);
+}
+.dg-terms-acceptance__header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 32px 32px 16px;
+  text-align: center;
+}
+.dg-terms-acceptance__title {
+  margin: 0;
+  color: var(--dg-color-text-primary);
+  font-size: var(--dg-fs-heading);
+  font-weight: 700;
+}
+.dg-terms-acceptance__intro {
+  max-width: 520px;
+  margin: 0;
+  color: var(--dg-color-text-secondary);
+  font-size: var(--dg-fs-body-sm);
+  line-height: 1.6;
+}
+.dg-terms-acceptance__content {
+  max-height: min(65vh, 640px);
+  margin: 0 32px;
+  padding: 16px 24px;
+  overflow-y: auto;
+  border: 1px solid var(--dg-color-border-light);
+  border-radius: var(--dg-radius-lg);
+  background: var(--dg-color-bg-secondary);
+  font-family: var(--font-sans);
+}
+.dg-terms-acceptance__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 32px 28px;
+}
+.dg-terms-acceptance__scroll-hint {
+  min-height: 1.2em;
+  margin: 0;
+  color: var(--dg-color-text-label);
+  font-size: var(--dg-fs-label);
+  text-align: center;
+  transition: color 150ms ease;
+}
+.dg-terms-acceptance__button {
+  width: 100%;
+  padding: 12px 16px;
+}
+.dg-terms-acceptance__meta {
+  margin: 0;
+  color: var(--dg-color-text-faint);
+  font-size: var(--dg-fs-caption);
+  text-align: center;
+}
+.dg-auth-state-secondary {
+  margin-top: 16px;
+  text-align: center;
+}
+.dg-auth-gate-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dg-password-input {
+  position: relative;
+}
+.dg-password-input__field {
+  padding-right: 48px;
+}
+.dg-password-input__toggle {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border: 0;
+  background: none;
+  color: var(--dg-color-text-subtle);
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition: color 150ms ease;
+}
+.dg-password-input__toggle:hover {
+  color: var(--dg-color-text-primary);
+}
+.dg-subdomain-field {
+  margin-bottom: 24px;
+}
+.dg-subdomain-field--has-hint {
+  margin-bottom: 8px;
+}
+.dg-subdomain-field__control {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  border: 1.5px solid var(--dg-color-brand);
+  border-radius: var(--dg-radius-md);
+  background: var(--dg-color-surface);
+}
+.dg-subdomain-field__control--error {
+  border-color: var(--dg-color-danger);
+}
+.dg-subdomain-field__input {
+  min-width: 0;
+  flex: 1;
+  padding: 14px 14px 14px 16px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--dg-color-text-primary);
+  font-size: var(--dg-fs-body);
+}
+.dg-subdomain-field__suffix {
+  flex-shrink: 0;
+  padding: 14px 16px;
+  border-left: 1px solid var(--dg-color-border-light);
+  background: var(--dg-color-bg);
+  color: var(--dg-color-text-subtle);
+  font-size: var(--dg-fs-body);
+  white-space: nowrap;
+}
+.dg-subdomain-field__hint {
+  margin: 8px 0 16px;
+  color: var(--dg-color-text-subtle);
+  font-size: var(--dg-fs-label);
+}
+.dg-subdomain-field__hint--error {
+  color: var(--dg-color-danger);
+}
+.dg-password-strength {
+  margin-top: 8px;
+}
+.dg-password-strength__meter {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.dg-password-strength__bar {
+  height: 4px;
+  flex: 1;
+  border-radius: 2px;
+  background: var(--dg-color-border-light);
+  transition: background 150ms ease;
+}
+.dg-password-strength__label {
+  color: var(--dg-color-text-muted);
+  font-size: var(--dg-fs-caption);
+  font-weight: 500;
+}
+.dg-password-strength__hints {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.dg-password-strength__hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--dg-color-text-muted);
+  font-size: var(--dg-fs-caption);
+}
+.dg-password-strength__hint-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 999px;
+  background: var(--dg-color-border);
+}
+.dg-auth-organization-login {
+  width: 100%;
+  max-width: var(--dg-auth-card-w);
+}
+@media (max-width: 767px) {
+  .dg-app-header-desktop {
+    display: none !important;
+  }
+  .dg-input {
+    padding: 10px 12px;
+    font-size: 16px; /* Prevents iOS auto-zoom on focus */
+    min-height: 44px;
+  }
+  .dg-segment-btn {
+    padding: 10px 12px;
+    font-size: 13px;
+    min-height: 44px;
+  }
+  .dg-span-tabs {
+    height: var(--dg-toolbar-h);
+  }
+  .dg-span-tab {
+    padding: 0 8px;
+  }
+  .dg-nav-tab {
+    padding: 10px 16px;
+    font-size: var(--dg-fs-navigation-item);
+    min-height: 44px;
+  }
+  .dg-sub-tab {
+    padding: 12px 16px;
+    font-size: var(--dg-fs-navigation-item);
+    min-height: 44px;
+  }
+  /* Panels — full-screen on mobile */
+  .dg-panel {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100vw;
+    border-radius: 0;
+    border: none;
+  }
+  /* Modals — nearly full-width */
+  .dg-modal {
+    max-width: 100vw;
+    min-width: unset;
+    width: calc(100vw - 32px);
+    max-height: calc(100dvh - 32px);
+    border-radius: 12px;
+    padding: 20px 16px;
+  }
+  /* Draft banner — allow wrapping */
+  .dg-draft-banner {
+    flex-wrap: wrap;
+    padding: 10px 12px;
+    margin: 8px 8px;
+  }
+  .dg-draft-banner-actions {
+    width: 100%;
+    margin-left: 0;
+    margin-top: 8px;
+  }
+  /* Mobile nav drawer */
+  .dg-mobile-drawer-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--dg-overlay);
+    backdrop-filter: blur(var(--dg-overlay-blur));
+    z-index: 10000;
+    animation: fade-in var(--dg-duration-standard) ease;
+  }
+  .dg-mobile-drawer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(300px, calc(100vw - 56px));
+    background: var(--dg-color-surface);
+    z-index: 10001;
+    box-shadow: var(--shadow-panel);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    animation: drawer-in var(--dg-duration-standard) ease-out;
+  }
+  /* Mobile section selector (for sidebar replacement) */
+  .dg-mobile-section-bar {
+    display: flex;
+    gap: 6px;
+    padding: 8px 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    border-bottom: 1px solid var(--dg-color-border-light);
+    background: var(--dg-color-surface);
+    position: sticky;
+    top: var(--dg-app-shell-header-height);
+    z-index: 50;
+  }
+  .dg-mobile-section-bar::-webkit-scrollbar {
+    display: none;
+  }
+  .dg-mobile-section-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 14px;
+    border-radius: 20px;
+    font-size: var(--dg-fs-navigation-item);
+    font-weight: var(--dg-type-navigation-weight);
+    letter-spacing: normal;
+    color: var(--dg-type-navigation-color);
+    background: var(--dg-color-bg-secondary);
+    border: 1px solid var(--dg-color-border-light);
+    cursor: pointer;
+    flex-shrink: 0;
+    min-height: 44px;
+    white-space: nowrap;
+    transition:
+      background 150ms ease,
+      border-color 150ms ease,
+      color 150ms ease;
+  }
+  .dg-bottom-sheet-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--dg-overlay);
+    backdrop-filter: blur(var(--dg-overlay-blur));
+    -webkit-backdrop-filter: blur(var(--dg-overlay-blur));
+    z-index: 10000;
+    animation: fade-in var(--dg-duration-standard) ease;
+  }
+  .dg-bottom-sheet {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--dg-color-bg);
+    border-radius: 12px 12px 0 0;
+    z-index: 10001;
+    max-height: 85dvh;
+    overflow-y: auto;
+    animation: sheet-up var(--dg-duration-standard) cubic-bezier(0.32, 0.72, 0, 1);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    display: flex;
+    flex-direction: column;
+  }
+  .dg-bottom-sheet-handle {
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--dg-color-border);
+    margin: 8px auto 4px;
+    flex-shrink: 0;
+  }
+  /* Top section — main navigation (floating card) */
+  .dg-bottom-sheet-top {
+    display: flex;
+    flex-direction: column;
+    margin: 8px 12px;
+    background: var(--dg-color-surface);
+    border-radius: 12px;
+    border: 1px solid var(--dg-color-border-light);
+    overflow: hidden;
+  }
+  .dg-bottom-sheet-main-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    font-size: var(--dg-fs-navigation-item);
+    font-weight: var(--dg-type-navigation-weight);
+    letter-spacing: normal;
+    color: var(--dg-type-navigation-color);
+    background: transparent;
+    border: none;
+    border-top: 1px solid var(--dg-color-border-light);
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+    min-height: 48px;
+    transition: background 120ms ease;
+  }
+  .dg-bottom-sheet-main-item:first-child {
+    border-top: none;
+  }
+  .dg-bottom-sheet-main-item:active {
+    background: var(--dg-color-bg-secondary);
+  }
+  .dg-bottom-sheet-main-item--gridmaster {
+    color: var(--dg-color-brand);
+  }
+  /* Chevron indicator on main items */
+  .dg-bottom-sheet-chevron {
+    display: flex;
+    align-items: center;
+    color: var(--dg-color-text-muted);
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  /* Drill-down header — back button + title */
+  .dg-bottom-sheet-drill-header {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px 8px;
+    position: relative;
+  }
+  .dg-bottom-sheet-drill-back {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--dg-color-text-secondary);
+    padding: 0;
+    flex-shrink: 0;
+    transition: background 120ms ease;
+  }
+  .dg-bottom-sheet-drill-back:active {
+    background: var(--dg-color-bg-secondary);
+  }
+  .dg-bottom-sheet-drill-title {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: var(--dg-fs-navigation-item);
+    font-weight: var(--dg-type-navigation-weight);
+    letter-spacing: normal;
+    color: var(--dg-color-text-primary);
+  }
+  /* Drill-down sub-item list — no card, no dividers */
+  .dg-bottom-sheet-drill-list {
+    display: flex;
+    flex-direction: column;
+    padding: 4px 12px 16px;
+  }
+  .dg-bottom-sheet-drill-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    font-size: var(--dg-fs-navigation-item);
+    font-weight: var(--dg-type-navigation-weight);
+    letter-spacing: normal;
+    color: var(--dg-color-text-secondary);
+    background: transparent;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+    min-height: 44px;
+    transition: background 120ms ease;
+  }
+  /* Same reason as .dg-menu-item: a pressed row must not fuse with the
+     current one next to it. Group labels already separate their own runs. */
+  .dg-bottom-sheet-drill-item + .dg-bottom-sheet-drill-item {
+    margin-top: 2px;
+  }
+  .dg-bottom-sheet-drill-item:active {
+    background: var(--dg-color-bg-secondary);
+  }
+  .dg-bottom-sheet-group-label {
+    padding: 10px 16px 4px;
+    font-size: var(--dg-type-navigation-section-size);
+    font-weight: var(--dg-type-navigation-section-weight);
+    letter-spacing: var(--dg-type-navigation-section-letter-spacing);
+    color: var(--dg-type-navigation-section-color);
+    border-top: 1px solid var(--dg-color-border-light);
+  }
+  .dg-bottom-sheet-group-label:first-child {
+    border-top: none;
+  }
+  /* Shared item utilities */
+  .dg-bottom-sheet-item-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+  .dg-bottom-sheet-item-label {
+    flex: 1;
+  }
+  /* Footer — user info + actions */
+  .dg-bottom-sheet-footer {
+    margin: 4px 12px 12px;
+    background: var(--dg-color-surface);
+    border-radius: 12px;
+    border: 1px solid var(--dg-color-border-light);
+    overflow: hidden;
+  }
+  .dg-bottom-sheet-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--dg-color-border-light);
+  }
+  /* Colors come from the shared avatar palette, applied inline by the caller. */
+  .dg-bottom-sheet-avatar {
+    width: 32px;
+    height: 32px;
+    box-sizing: border-box;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .dg-bottom-sheet-user-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--dg-color-text-primary);
+    line-height: 1.3;
+  }
+  .dg-bottom-sheet-user-role {
+    font-size: 12px;
+    color: var(--dg-color-text-muted);
+    line-height: 1.3;
+  }
+  .dg-bottom-sheet-footer-actions {
+    display: flex;
+    flex-direction: column;
+  }
+  .dg-bottom-sheet-footer-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    font-size: var(--dg-fs-navigation-item);
+    font-weight: var(--dg-type-navigation-weight);
+    letter-spacing: normal;
+    color: var(--dg-type-navigation-color);
+    background: transparent;
+    border: none;
+    border-top: 1px solid var(--dg-color-border-light);
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+    min-height: 44px;
+  }
+  .dg-bottom-sheet-footer-btn:first-child {
+    border-top: none;
+  }
+  .dg-bottom-sheet-footer-btn:active {
+    background: var(--dg-color-bg-secondary);
+  }
+  .dg-bottom-sheet-footer-btn--danger {
+    color: var(--dg-color-danger);
+  }
+}

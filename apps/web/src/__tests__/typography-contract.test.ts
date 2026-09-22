@@ -212,7 +212,9 @@ const documentedOpacityTextCounts = {
   "components/staff/RecurringScheduleSection.tsx": 2,
 };
 
-const globalsCss = readFileSync(path.resolve(webSource, "app/globals.css"), "utf8");
+const globalsCss =
+  readFileSync(path.resolve(webSource, "app/globals.css"), "utf8") +
+  readFileSync(path.resolve(webSource, "app/app-ui.css"), "utf8");
 const rootLayout = readFileSync(path.resolve(webSource, "app/layout.tsx"), "utf8");
 const landingPage = readFileSync(path.resolve(webSource, "app/page.tsx"), "utf8");
 const logo = readFileSync(path.resolve(webSource, "components/Logo.tsx"), "utf8");
