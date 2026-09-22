@@ -64,3 +64,22 @@ export function withThemeParam(url: string, preference: string | undefined): str
   const separator = url.includes("?") ? "&" : "?";
   return `${url}${separator}${THEME_PARAM}=${preference}`;
 }
+
+/**
+ * The preference a request arrived with, in the order the pre-paint seed
+ * script applies it: a `?theme=` param wins over the `dg-theme` cookie, and
+ * anything unrecognised is ignored.
+ *
+ * Lets a Server Component build a cross-origin link that already carries the
+ * theme. next-themes cannot report one until it has mounted, so a client
+ * component that reads `useTheme()` during render produces different hrefs on
+ * the server and on its first client pass, and React flags the mismatch.
+ */
+export function resolveRequestTheme(
+  param: string | string[] | undefined,
+  cookie: string | undefined,
+): ThemePreference | undefined {
+  const fromParam = Array.isArray(param) ? param[0] : param;
+  if (isThemePreference(fromParam)) return fromParam;
+  return isThemePreference(cookie) ? cookie : undefined;
+}

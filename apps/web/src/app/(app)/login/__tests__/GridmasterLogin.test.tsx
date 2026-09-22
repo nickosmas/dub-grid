@@ -1,4 +1,6 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { hydrateRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import GridmasterLogin from "../GridmasterLogin";
 import { RequestTimeoutError } from "@/lib/fetch-with-timeout";
@@ -140,6 +142,44 @@ describe("GridmasterLogin card and theme handover", () => {
     expect(screen.getByRole("link", { name: "Back to home" })).toHaveAttribute(
       "href",
       "http://localhost/",
+    );
+  });
+
+  // next-themes has no theme on the server but reads localStorage on the
+  // client's very first render, so an href built from it alone differs
+  // between the two and React reports a hydration mismatch. The server page
+  // resolves the theme from the request instead and hands it down.
+  it("builds the same apex links on the server and on hydration", async () => {
+    mockTheme = undefined;
+    const serverHtml = renderToString(<GridmasterLogin initialTheme="dark" />);
+    expect(serverHtml).toContain('href="http://localhost/login?theme=dark"');
+    expect(serverHtml).toContain('href="http://localhost/?theme=dark"');
+
+    mockTheme = "dark";
+    const container = document.body.appendChild(document.createElement("div"));
+    container.innerHTML = serverHtml;
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    let root: ReturnType<typeof hydrateRoot> | undefined;
+    await act(async () => {
+      root = hydrateRoot(container, <GridmasterLogin initialTheme="dark" />);
+    });
+
+    expect(consoleError).not.toHaveBeenCalled();
+    expect(screen.getByRole("link", { name: "Back to standard login" })).toHaveAttribute(
+      "href",
+      "http://localhost/login?theme=dark",
+    );
+    consoleError.mockRestore();
+    await act(async () => root?.unmount());
+    container.remove();
+  });
+
+  it("switches to the live preference once next-themes has mounted", () => {
+    mockTheme = "light";
+    render(<GridmasterLogin initialTheme="dark" />);
+    expect(screen.getByRole("link", { name: "Back to home" })).toHaveAttribute(
+      "href",
+      "http://localhost/?theme=light",
     );
   });
 });

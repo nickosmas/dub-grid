@@ -12,6 +12,7 @@ import {
   THEME_STORAGE_KEY,
   isThemePreference,
   readThemeCookie,
+  resolveRequestTheme,
   withThemeParam,
   writeThemeCookie,
 } from "@/lib/theme-preference";
@@ -145,5 +146,26 @@ describe("external theme seed", () => {
 
     expect(() => run(themeSeedScript)).not.toThrow();
     spy.mockRestore();
+  });
+});
+
+describe("resolveRequestTheme", () => {
+  // Same order as the seed script: the param is what the user just brought
+  // across the origin boundary, the cookie is what this origin last saw.
+  it("lets the param win over the cookie", () => {
+    expect(resolveRequestTheme("dark", "light")).toBe("dark");
+  });
+
+  it("falls back to the cookie when there is no param", () => {
+    expect(resolveRequestTheme(undefined, "system")).toBe("system");
+  });
+
+  it("reads the first value of a repeated param", () => {
+    expect(resolveRequestTheme(["light", "dark"], undefined)).toBe("light");
+  });
+
+  it("ignores an invalid param and an invalid cookie", () => {
+    expect(resolveRequestTheme("neon", "neon")).toBeUndefined();
+    expect(resolveRequestTheme(undefined, undefined)).toBeUndefined();
   });
 });

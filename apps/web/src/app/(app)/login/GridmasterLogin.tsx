@@ -24,9 +24,14 @@ import {
 } from "./shared";
 import { fetchWithTimeout, settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
 import { getWebAuthRecoveryMessage } from "@/lib/auth-recovery";
-import { withThemeParam } from "@/lib/theme-preference";
+import { withThemeParam, type ThemePreference } from "@/lib/theme-preference";
 
-export default function GridmasterLogin() {
+export default function GridmasterLogin({
+  initialTheme,
+}: {
+  /** The theme the request arrived with, resolved by the server page. */
+  initialTheme?: ThemePreference;
+}) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -47,10 +52,14 @@ export default function GridmasterLogin() {
   const { parsed, protocol } = useClientHost();
   // The apex is a separate origin with its own localStorage, so every link
   // back to it hands the theme over, the way the domain selector does on the
-  // way in.
+  // way in. next-themes reads localStorage synchronously on the client but
+  // has nothing on the server, so its value only takes over once hydration
+  // has finished; until then the server-resolved theme keeps both renders
+  // building the same href.
+  const handoverTheme = isHydrated ? theme : initialTheme;
   const apexOrigin = `${protocol}//${parsed?.rootDomain ?? "localhost"}${parsed?.port ?? ""}`;
-  const landingUrl = withThemeParam(`${apexOrigin}/`, theme);
-  const apexLoginUrl = withThemeParam(`${apexOrigin}/login`, theme);
+  const landingUrl = withThemeParam(`${apexOrigin}/`, handoverTheme);
+  const apexLoginUrl = withThemeParam(`${apexOrigin}/login`, handoverTheme);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
