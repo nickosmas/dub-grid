@@ -6,6 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getSandboxFromCookie } from "@/lib/sandbox-cookie";
 import { endImpersonationOnEscape, verifyImpersonationSession } from "@/lib/impersonation-server";
 import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
+import { requiresMfaChallenge } from "@dubgrid/authz";
 import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
 import { THEME_COOKIE_NAME, withThemeParam } from "@/lib/theme-preference";
 import { cacheSet, cacheThrough, CacheKey, TTL } from "@/lib/cache";
@@ -116,6 +117,8 @@ interface JWTClaims {
   org_role?: string;
   org_id?: string;
   org_slug?: string;
+  aal?: string;
+  mfa_enrolled?: boolean;
 }
 
 /**
@@ -332,6 +335,16 @@ export async function proxy(req: NextRequest) {
   if (claims.platform_role === "gridmaster" && !claimsVerified) {
     const loginUrl = new URL("/login", req.url);
     loginUrl.searchParams.set("error", "session_invalid");
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // An enrolled account that has not answered its challenge goes back to the
+  // login screen, which runs the challenge and hands the session on. The API
+  // refuses the same token (api-auth), so this only decides whether the shell
+  // renders before the user is told to finish signing in.
+  if (claimsVerified && requiresMfaChallenge(claims)) {
+    const loginUrl = new URL("/login", req.url);
+    loginUrl.searchParams.set("error", "mfa_required");
     return NextResponse.redirect(loginUrl);
   }
 

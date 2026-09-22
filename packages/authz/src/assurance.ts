@@ -49,6 +49,21 @@ export interface EvaluateSensitiveActionAssuranceInput {
   futureSkewSeconds?: number;
 }
 
+/**
+ * True when this session belongs to an account with a verified TOTP factor
+ * but has not answered a challenge, which every access path must refuse.
+ *
+ * `mfa_enrolled` is set by the access token hook from `auth.mfa_factors` on
+ * every mint and refresh (migration 037), so enrolling or unenrolling heals
+ * on the next token. A token minted before that migration carries no claim
+ * and is treated as not enrolled, which is what keeps the rollout from
+ * logging everyone out; the sensitive-action gate still checks live factor
+ * state for the actions that matter most.
+ */
+export function requiresMfaChallenge(claims: { aal?: unknown; mfa_enrolled?: unknown }): boolean {
+  return claims.mfa_enrolled === true && claims.aal !== "aal2";
+}
+
 export function createSensitiveActionStepUpRequired(
   method: SensitiveActionAuthenticationMethod,
 ): SensitiveActionStepUpRequired {

@@ -368,6 +368,58 @@ describe("middleware: JWT verification", () => {
   });
 });
 
+describe("middleware: MFA challenge", () => {
+  it("sends an enrolled session that never answered its challenge back to login", async () => {
+    mockSessionWithClaims({
+      platform_role: "none",
+      org_role: "admin",
+      org_id: "org-1",
+      org_slug: "acme",
+      sub: "user-1",
+      mfa_enrolled: true,
+      aal: "aal1",
+    });
+    const req = makeNextRequest("http://acme.localhost:3000/schedule", {
+      host: "acme.localhost:3000",
+    });
+    const res = await runMiddleware(req);
+    expect((res as { _type: string })._type).toBe("redirect");
+    expect((res as { _redirectUrl: string })._redirectUrl).toContain("/login?error=mfa_required");
+  });
+
+  it("lets the same account through at aal2", async () => {
+    mockSessionWithClaims({
+      platform_role: "none",
+      org_role: "admin",
+      org_id: "org-1",
+      org_slug: "acme",
+      sub: "user-1",
+      mfa_enrolled: true,
+      aal: "aal2",
+    });
+    const req = makeNextRequest("http://acme.localhost:3000/schedule", {
+      host: "acme.localhost:3000",
+    });
+    expect(((await runMiddleware(req)) as { _type: string })._type).toBe("next");
+  });
+
+  it("leaves an account with no factor alone", async () => {
+    mockSessionWithClaims({
+      platform_role: "none",
+      org_role: "admin",
+      org_id: "org-1",
+      org_slug: "acme",
+      sub: "user-1",
+      mfa_enrolled: false,
+      aal: "aal1",
+    });
+    const req = makeNextRequest("http://acme.localhost:3000/schedule", {
+      host: "acme.localhost:3000",
+    });
+    expect(((await runMiddleware(req)) as { _type: string })._type).toBe("next");
+  });
+});
+
 describe("middleware: Content-Security-Policy", () => {
   function scriptSrcOf(res: unknown): string {
     const csp = (res as { headers: Headers }).headers.get("Content-Security-Policy") ?? "";

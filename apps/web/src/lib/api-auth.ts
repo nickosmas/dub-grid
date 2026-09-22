@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import {
   createSensitiveActionStepUpRequired,
+  requiresMfaChallenge,
   evaluateSensitiveActionAssurance,
   resolveVerifiedTotpFactorPresence,
 } from "@dubgrid/authz";
@@ -161,6 +162,18 @@ async function authenticateRequest(
         { error: "This session is no longer valid. Sign in again." },
         { status: 401 },
       ),
+    };
+  }
+
+  // An account with a verified TOTP factor must answer a challenge before
+  // anything else. The login screen gates the UI, but a caller holding the
+  // password can mint an aal1 token straight from the auth endpoint, and
+  // before this every Route Handler accepted it. The claim comes from the
+  // access token hook (migration 037) and is recomputed on refresh, so an
+  // answered challenge stays answered and an unenrolment heals itself.
+  if (requiresMfaChallenge(verified.claims)) {
+    return {
+      response: NextResponse.json(createSensitiveActionStepUpRequired("totp"), { status: 403 }),
     };
   }
 
