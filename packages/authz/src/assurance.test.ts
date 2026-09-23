@@ -9,7 +9,7 @@ import {
   evaluateSensitiveActionAssurance,
   resolveVerifiedTotpFactorPresence,
   type AuthenticationAssuranceClaims,
-  requiresMfaChallenge,
+  evaluateMfaClaimState,
 } from "./assurance";
 
 const NOW = 1_789_064_802;
@@ -217,23 +217,37 @@ describe("sensitive-action server contract", () => {
   });
 });
 
-describe("requiresMfaChallenge", () => {
-  it("refuses an enrolled account that has not answered a challenge", () => {
-    expect(requiresMfaChallenge({ mfa_enrolled: true, aal: "aal1" })).toBe(true);
-    expect(requiresMfaChallenge({ mfa_enrolled: true })).toBe(true);
+describe("evaluateMfaClaimState", () => {
+  it("passes an account the hook reported as having no factor", () => {
+    expect(evaluateMfaClaimState({ mfa_enrolled: false, aal: "aal1" })).toBe("satisfied");
   });
 
-  it("accepts an enrolled account at aal2", () => {
-    expect(requiresMfaChallenge({ mfa_enrolled: true, aal: "aal2" })).toBe(false);
+  it("passes anyone who already answered a challenge, claim or no claim", () => {
+    expect(evaluateMfaClaimState({ mfa_enrolled: true, aal: "aal2" })).toBe("satisfied");
+    expect(evaluateMfaClaimState({ aal: "aal2" })).toBe("satisfied");
   });
 
-  it("accepts an account with no factor, and a token minted before the claim existed", () => {
-    expect(requiresMfaChallenge({ mfa_enrolled: false, aal: "aal1" })).toBe(false);
-    expect(requiresMfaChallenge({ aal: "aal1" })).toBe(false);
-    expect(requiresMfaChallenge({})).toBe(false);
+  it("asks an enrolled account below aal2 to answer one", () => {
+    expect(evaluateMfaClaimState({ mfa_enrolled: true, aal: "aal1" })).toBe("challenge-required");
+    expect(evaluateMfaClaimState({ mfa_enrolled: true })).toBe("challenge-required");
   });
 
-  it("ignores a client-supplied string, which is not the hook's boolean", () => {
-    expect(requiresMfaChallenge({ mfa_enrolled: "true", aal: "aal1" })).toBe(false);
+  it("fails closed when the claim is absent, so a hook that stopped minting it is not a bypass", () => {
+    // Finding F-01. This returned "not enrolled" until migration 041.
+    expect(evaluateMfaClaimState({ aal: "aal1" })).toBe("claim-unusable");
+    expect(evaluateMfaClaimState({})).toBe("claim-unusable");
+  });
+
+  it("fails closed on a value of the wrong type rather than reading it as a boolean", () => {
+    expect(evaluateMfaClaimState({ mfa_enrolled: "true", aal: "aal1" })).toBe("claim-unusable");
+    expect(evaluateMfaClaimState({ mfa_enrolled: "false", aal: "aal1" })).toBe("claim-unusable");
+    expect(evaluateMfaClaimState({ mfa_enrolled: 1, aal: "aal1" })).toBe("claim-unusable");
+    expect(evaluateMfaClaimState({ mfa_enrolled: null, aal: "aal1" })).toBe("claim-unusable");
+  });
+
+  it("separates the two refusals, because a challenge cannot supply a missing claim", () => {
+    expect(evaluateMfaClaimState({ mfa_enrolled: true, aal: "aal1" })).not.toBe(
+      evaluateMfaClaimState({ aal: "aal1" }),
+    );
   });
 });

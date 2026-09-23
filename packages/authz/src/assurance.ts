@@ -50,18 +50,30 @@ export interface EvaluateSensitiveActionAssuranceInput {
 }
 
 /**
- * True when this session belongs to an account with a verified TOTP factor
- * but has not answered a challenge, which every access path must refuse.
+ * What a token's MFA claims say about this session.
  *
- * `mfa_enrolled` is set by the access token hook from `auth.mfa_factors` on
- * every mint and refresh (migration 037), so enrolling or unenrolling heals
- * on the next token. A token minted before that migration carries no claim
- * and is treated as not enrolled, which is what keeps the rollout from
- * logging everyone out; the sensitive-action gate still checks live factor
- * state for the actions that matter most.
+ * - `satisfied`: the access token hook reported no verified factor, or the
+ *   caller already answered a challenge (aal2). Nothing to do.
+ * - `challenge-required`: enrolled and below aal2. The caller can fix this
+ *   themselves by completing the challenge, so sending them to the login
+ *   screen terminates.
+ * - `claim-unusable`: the claim is absent or malformed, so enrolment is
+ *   unknown. Finding F-01: this used to be read as "not enrolled", which made
+ *   a hook that stopped minting the claim disable enforcement in silence.
+ *   It now fails closed. It is kept distinct from `challenge-required`
+ *   because a challenge cannot supply a missing claim, so a caller must not
+ *   be bounced to the login screen over it.
  */
-export function requiresMfaChallenge(claims: { aal?: unknown; mfa_enrolled?: unknown }): boolean {
-  return claims.mfa_enrolled === true && claims.aal !== "aal2";
+export type MfaClaimState = "satisfied" | "challenge-required" | "claim-unusable";
+
+export function evaluateMfaClaimState(claims: {
+  aal?: unknown;
+  mfa_enrolled?: unknown;
+}): MfaClaimState {
+  if (claims.mfa_enrolled === false) return "satisfied";
+  if (claims.aal === "aal2") return "satisfied";
+  if (claims.mfa_enrolled === true) return "challenge-required";
+  return "claim-unusable";
 }
 
 export function createSensitiveActionStepUpRequired(

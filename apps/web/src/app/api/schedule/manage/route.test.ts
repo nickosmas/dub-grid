@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MAX_SERIES_OCCURRENCES } from "@/lib/constants";
 
 const requireOrgPermissions = vi.fn();
 const userRpc = vi.fn();
@@ -90,6 +91,59 @@ function makeRequest(body: Record<string, unknown>) {
 }
 
 describe("POST /api/schedule/manage", () => {
+  const seriesRequest = {
+    action: "createShiftSeries",
+    orgId: "11111111-1111-4111-8111-111111111111",
+    employeeId: "22222222-2222-4222-8222-222222222222",
+    input: { kind: "absence", segments: [], absenceTypeId: 7 },
+    shiftLabel: "Vacation",
+    frequency: "daily",
+    daysOfWeek: null,
+    startDate: "2026-09-23",
+    endDate: null,
+    maxOccurrences: null,
+  };
+
+  function seriesEndDate(days: number) {
+    return new Date(Date.parse(seriesRequest.startDate) + days * 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+  }
+
+  it.each([
+    { maxOccurrences: MAX_SERIES_OCCURRENCES + 1 },
+    { maxOccurrences: 100_000, endDate: "2099-12-31" },
+    { endDate: seriesEndDate(MAX_SERIES_OCCURRENCES * 14 + 1) },
+    { endDate: seriesEndDate(-1) },
+    { maxOccurrences: 0 },
+    { maxOccurrences: -1 },
+  ])("rejects invalid series bounds before permissions or writes: %j", async (bounds) => {
+    const response = await POST(makeRequest({ ...seriesRequest, ...bounds }));
+    expect(response.status).toBe(400);
+    expect(requireOrgPermissions).not.toHaveBeenCalled();
+    expect(userRpc).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { maxOccurrences: MAX_SERIES_OCCURRENCES },
+    { maxOccurrences: 1 },
+    { endDate: seriesEndDate(0) },
+    { frequency: "biweekly", endDate: seriesEndDate(MAX_SERIES_OCCURRENCES * 14) },
+    {},
+  ])("accepts supported series bounds: %j", async (bounds) => {
+    const request = { ...seriesRequest, ...bounds };
+    const response = await POST(makeRequest(request));
+    expect(response.status).toBe(200);
+    expect(userRpc).toHaveBeenCalledWith(
+      "create_shift_series",
+      expect.objectContaining({
+        p_start_date: request.startDate,
+        p_end_date: request.endDate,
+        p_max_occurrences: request.maxOccurrences,
+      }),
+    );
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     userRpc.mockResolvedValue({ data: 0, error: null });

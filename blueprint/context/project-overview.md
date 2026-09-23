@@ -31,8 +31,8 @@ facilities.
 
 ## Features
 
-Everything below is already shipped except item 28, the final production
-migration gate.
+Everything below is shipped. Item 28, the final production migration gate,
+closed on 2026-09-23 when migrations 026 to 040 were applied to production.
 
 1. **Multi-tenant organizations** - subdomain-isolated tenants with their
    own settings and terminology overrides.

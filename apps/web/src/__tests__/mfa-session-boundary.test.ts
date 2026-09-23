@@ -68,16 +68,35 @@ describe("MFA challenge at the session boundary", () => {
     expect("response" in result).toBe(false);
   });
 
-  it("accepts an account with no factor and a token minted before the claim existed", async () => {
+  it("accepts an account the hook reported as having no factor", async () => {
     mocks.verify.mockResolvedValue(verifiedWith({ mfa_enrolled: false, aal: "aal1" }));
-    expect("response" in (await requireAuthenticatedSession(request()))).toBe(false);
-
-    mocks.verify.mockResolvedValue(verifiedWith({ aal: "aal1" }));
     expect("response" in (await requireAuthenticatedSession(request()))).toBe(false);
   });
 
-  it("does not take the claim from a caller-supplied string", async () => {
+  it("refuses a token with no claim as a stale session, not a step-up", async () => {
+    // Finding F-01: this used to be accepted, which meant a hook that stopped
+    // minting the claim silently disabled the gate. A challenge cannot supply
+    // a claim the token never carried, so the answer is to sign in again.
+    mocks.verify.mockResolvedValue(verifiedWith({ aal: "aal1" }));
+    const result = await requireAuthenticatedSession(request());
+    expect("response" in result).toBe(true);
+    const response = (result as { response: Response }).response;
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      error: "This session is no longer valid. Sign in again.",
+    });
+  });
+
+  it("refuses a claim of the wrong type rather than reading it as a boolean", async () => {
     mocks.verify.mockResolvedValue(verifiedWith({ mfa_enrolled: "true", aal: "aal1" }));
+    expect("response" in (await requireAuthenticatedSession(request()))).toBe(true);
+
+    mocks.verify.mockResolvedValue(verifiedWith({ mfa_enrolled: "false", aal: "aal1" }));
+    expect("response" in (await requireAuthenticatedSession(request()))).toBe(true);
+  });
+
+  it("accepts a claimless token that already answered a challenge", async () => {
+    mocks.verify.mockResolvedValue(verifiedWith({ aal: "aal2" }));
     expect("response" in (await requireAuthenticatedSession(request()))).toBe(false);
   });
 });

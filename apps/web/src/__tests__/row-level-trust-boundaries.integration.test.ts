@@ -75,6 +75,7 @@ async function asUser(member: Member, orgId: string): Promise<void> {
   const claims = JSON.stringify({
     sub: member.userId,
     role: "authenticated",
+    mfa_enrolled: false,
     org_id: orgId,
     org_role: member.orgRole,
     platform_role: "none",

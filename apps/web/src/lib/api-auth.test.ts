@@ -102,6 +102,10 @@ async function signToken(options: TokenOptions = {}): Promise<string> {
     email: "user@example.com",
     role: "authenticated",
     platform_role: "none",
+    // The access token hook stamps this on every mint (migration 037); an
+    // absent claim fails closed since 041, so the default here mirrors a real
+    // token rather than a pre-037 one.
+    mfa_enrolled: false,
     ...(options.sessionId === null ? {} : { session_id: options.sessionId ?? SESSION_ID }),
     ...options.claims,
   };

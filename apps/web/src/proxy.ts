@@ -6,7 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getSandboxFromCookie } from "@/lib/sandbox-cookie";
 import { endImpersonationOnEscape, verifyImpersonationSession } from "@/lib/impersonation-server";
 import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
-import { requiresMfaChallenge } from "@dubgrid/authz";
+import { evaluateMfaClaimState } from "@dubgrid/authz";
 import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
 import { THEME_COOKIE_NAME, withThemeParam } from "@/lib/theme-preference";
 import { cacheSet, cacheThrough, CacheKey, TTL } from "@/lib/cache";
@@ -342,7 +342,11 @@ export async function proxy(req: NextRequest) {
   // login screen, which runs the challenge and hands the session on. The API
   // refuses the same token (api-auth), so this only decides whether the shell
   // renders before the user is told to finish signing in.
-  if (claimsVerified && requiresMfaChallenge(claims)) {
+  // Only the actionable state redirects. An absent claim cannot be answered by
+  // a challenge, so bouncing it here would loop; it falls through to the
+  // missing-claims path below, and migration 041 denies its data at the
+  // policy layer regardless of what this shell renders.
+  if (claimsVerified && evaluateMfaClaimState(claims) === "challenge-required") {
     const loginUrl = new URL("/login", req.url);
     loginUrl.searchParams.set("error", "mfa_required");
     return NextResponse.redirect(loginUrl);

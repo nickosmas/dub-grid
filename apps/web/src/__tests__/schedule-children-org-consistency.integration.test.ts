@@ -85,6 +85,7 @@ async function asAdmin(fx: Fixture): Promise<void> {
   const claims = JSON.stringify({
     sub: fx.adminUserId,
     role: "authenticated",
+    mfa_enrolled: false,
     org_id: fx.orgId,
     org_role: "super_admin",
     platform_role: "none",

@@ -28,6 +28,7 @@ The workflow is defined by the local skills and context files below.
 - `blueprint/context/coding-standards.md` - conventions to follow
 - `blueprint/context/ai-interaction.md` - how to work with the user on this project
 - `blueprint/context/current-feature.md` - the one feature, fix, or rollback being built right now
+- `blueprint/context/findings.md` - open review findings; P0 and P1 entries block `complete` until fixed or explicitly accepted
 
 ## Project configuration
 

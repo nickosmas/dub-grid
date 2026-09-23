@@ -8,6 +8,7 @@ import type {
   DbShiftRequest,
 } from "@dubgrid/db-types";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import { MAX_SERIES_OCCURRENCES } from "@/lib/constants";
 import { scheduleCellStateSchema } from "@dubgrid/contracts";
 import { requireOrgPermissions, resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
@@ -96,7 +97,7 @@ const cellEchoSchema = z.object({
   absenceTypeLabels: mapEntrySchema.optional(),
 });
 
-const requestSchema = z.discriminatedUnion("action", [
+const requestActionSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("fetchShifts"),
     orgId: z.string().uuid(),
@@ -197,7 +198,7 @@ const requestSchema = z.discriminatedUnion("action", [
     daysOfWeek: z.array(z.number().int().min(0).max(6)).nullable(),
     startDate: z.string().date(),
     endDate: z.string().date().nullable(),
-    maxOccurrences: z.number().int().positive().nullable(),
+    maxOccurrences: z.number().int().positive().max(MAX_SERIES_OCCURRENCES).nullable(),
   }),
   z.object({
     action: z.literal("updateSeriesAllShifts"),
@@ -239,6 +240,16 @@ const requestSchema = z.discriminatedUnion("action", [
     existingStatus: noteStatusSchema.optional(),
   }),
 ]);
+
+const requestSchema = requestActionSchema.refine(
+  (data) => {
+    if (data.action !== "createShiftSeries" || data.endDate === null) return true;
+    const days = (Date.parse(data.endDate) - Date.parse(data.startDate)) / 86_400_000;
+    // Allow the slowest supported cadence, one occurrence every two weeks.
+    return days >= 0 && days <= MAX_SERIES_OCCURRENCES * 14;
+  },
+  { path: ["endDate"], message: "Series date range exceeds the supported limit" },
+);
 
 const MAX_RANGE_DAYS = 366;
 
