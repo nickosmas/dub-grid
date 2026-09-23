@@ -21,7 +21,8 @@ describe("MFA enforced in the policy helpers (migration 038)", () => {
     );
     expect(helper).toContain("auth.jwt() ->> 'mfa_enrolled'");
     expect(helper).toContain("auth.jwt() ->> 'aal'");
-    // A token minted before migration 037 has no claim and must pass.
+    // 038's rollout default: a pre-037 token had no claim and had to pass.
+    // Superseded by 041, which fails closed. See mfa-claim-fails-closed-sql.
     expect(helper).toContain("COALESCE((auth.jwt() ->> 'mfa_enrolled')::BOOLEAN, FALSE)");
     expect(helper).toContain("LANGUAGE SQL STABLE");
     expect(migration).toContain(

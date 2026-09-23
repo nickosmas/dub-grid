@@ -403,6 +403,25 @@ describe("middleware: MFA challenge", () => {
     expect(((await runMiddleware(req)) as { _type: string })._type).toBe("next");
   });
 
+  it("does not bounce a token with no claim, which could not answer the challenge", async () => {
+    // Finding F-01 fails this state closed, but the login screen cannot mint a
+    // claim, so redirecting here would loop forever. The shell renders and
+    // migration 041 denies the data instead.
+    mockSessionWithClaims({
+      platform_role: "none",
+      org_role: "admin",
+      org_id: "org-1",
+      org_slug: "acme",
+      sub: "user-1",
+      aal: "aal1",
+    });
+    const req = makeNextRequest("http://acme.localhost:3000/schedule", {
+      host: "acme.localhost:3000",
+    });
+    const res = await runMiddleware(req);
+    expect((res as { _redirectUrl?: string })._redirectUrl ?? "").not.toContain("mfa_required");
+  });
+
   it("leaves an account with no factor alone", async () => {
     mockSessionWithClaims({
       platform_role: "none",

@@ -9,6 +9,7 @@ import {
   evaluateSensitiveActionAssurance,
   resolveVerifiedTotpFactorPresence,
   type AuthenticationAssuranceClaims,
+  evaluateMfaClaimState,
   requiresMfaChallenge,
 } from "./assurance";
 
@@ -217,23 +218,50 @@ describe("sensitive-action server contract", () => {
   });
 });
 
+describe("evaluateMfaClaimState", () => {
+  it("passes an account the hook reported as having no factor", () => {
+    expect(evaluateMfaClaimState({ mfa_enrolled: false, aal: "aal1" })).toBe("satisfied");
+  });
+
+  it("passes anyone who already answered a challenge, claim or no claim", () => {
+    expect(evaluateMfaClaimState({ mfa_enrolled: true, aal: "aal2" })).toBe("satisfied");
+    expect(evaluateMfaClaimState({ aal: "aal2" })).toBe("satisfied");
+  });
+
+  it("asks an enrolled account below aal2 to answer one", () => {
+    expect(evaluateMfaClaimState({ mfa_enrolled: true, aal: "aal1" })).toBe("challenge-required");
+    expect(evaluateMfaClaimState({ mfa_enrolled: true })).toBe("challenge-required");
+  });
+
+  it("fails closed when the claim is absent, so a hook that stopped minting it is not a bypass", () => {
+    // Finding F-01. This returned "not enrolled" until migration 041.
+    expect(evaluateMfaClaimState({ aal: "aal1" })).toBe("claim-unusable");
+    expect(evaluateMfaClaimState({})).toBe("claim-unusable");
+  });
+
+  it("fails closed on a value of the wrong type rather than reading it as a boolean", () => {
+    expect(evaluateMfaClaimState({ mfa_enrolled: "true", aal: "aal1" })).toBe("claim-unusable");
+    expect(evaluateMfaClaimState({ mfa_enrolled: "false", aal: "aal1" })).toBe("claim-unusable");
+    expect(evaluateMfaClaimState({ mfa_enrolled: 1, aal: "aal1" })).toBe("claim-unusable");
+    expect(evaluateMfaClaimState({ mfa_enrolled: null, aal: "aal1" })).toBe("claim-unusable");
+  });
+
+  it("separates the two refusals, because a challenge cannot supply a missing claim", () => {
+    expect(evaluateMfaClaimState({ mfa_enrolled: true, aal: "aal1" })).not.toBe(
+      evaluateMfaClaimState({ aal: "aal1" }),
+    );
+  });
+});
+
 describe("requiresMfaChallenge", () => {
-  it("refuses an enrolled account that has not answered a challenge", () => {
+  it("is true for every state that is not satisfied", () => {
     expect(requiresMfaChallenge({ mfa_enrolled: true, aal: "aal1" })).toBe(true);
-    expect(requiresMfaChallenge({ mfa_enrolled: true })).toBe(true);
+    expect(requiresMfaChallenge({ aal: "aal1" })).toBe(true);
+    expect(requiresMfaChallenge({})).toBe(true);
   });
 
-  it("accepts an enrolled account at aal2", () => {
-    expect(requiresMfaChallenge({ mfa_enrolled: true, aal: "aal2" })).toBe(false);
-  });
-
-  it("accepts an account with no factor, and a token minted before the claim existed", () => {
+  it("is false once the claim clears the session", () => {
     expect(requiresMfaChallenge({ mfa_enrolled: false, aal: "aal1" })).toBe(false);
-    expect(requiresMfaChallenge({ aal: "aal1" })).toBe(false);
-    expect(requiresMfaChallenge({})).toBe(false);
-  });
-
-  it("ignores a client-supplied string, which is not the hook's boolean", () => {
-    expect(requiresMfaChallenge({ mfa_enrolled: "true", aal: "aal1" })).toBe(false);
+    expect(requiresMfaChallenge({ mfa_enrolled: true, aal: "aal2" })).toBe(false);
   });
 });

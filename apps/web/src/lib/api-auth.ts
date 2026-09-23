@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import {
   createSensitiveActionStepUpRequired,
-  requiresMfaChallenge,
+  evaluateMfaClaimState,
   evaluateSensitiveActionAssurance,
   resolveVerifiedTotpFactorPresence,
 } from "@dubgrid/authz";
@@ -171,9 +171,22 @@ async function authenticateRequest(
   // before this every Route Handler accepted it. The claim comes from the
   // access token hook (migration 037) and is recomputed on refresh, so an
   // answered challenge stays answered and an unenrolment heals itself.
-  if (requiresMfaChallenge(verified.claims)) {
+  const mfaClaimState = evaluateMfaClaimState(verified.claims);
+  if (mfaClaimState === "challenge-required") {
     return {
       response: NextResponse.json(createSensitiveActionStepUpRequired("totp"), { status: 403 }),
+    };
+  }
+  // Finding F-01: an absent or malformed claim no longer reads as "not
+  // enrolled". A challenge cannot supply a claim the token never carried, so
+  // this is a stale session rather than a step-up, and a fresh sign-in mints a
+  // token the hook has stamped.
+  if (mfaClaimState === "claim-unusable") {
+    return {
+      response: NextResponse.json(
+        { error: "This session is no longer valid. Sign in again." },
+        { status: 401 },
+      ),
     };
   }
 

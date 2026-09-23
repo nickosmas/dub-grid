@@ -143,6 +143,7 @@ async function asUser(
   const claims = JSON.stringify({
     sub: userId,
     role: "authenticated",
+    mfa_enrolled: false,
     org_id: orgId,
     org_role: orgRole,
     platform_role: "none",

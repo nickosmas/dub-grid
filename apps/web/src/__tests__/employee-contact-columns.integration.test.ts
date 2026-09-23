@@ -59,6 +59,7 @@ async function asUser(member: Member): Promise<void> {
   const claims = JSON.stringify({
     sub: rows[0].id,
     role: "authenticated",
+    mfa_enrolled: false,
     org_id: orgId,
     org_role: member.orgRole,
     platform_role: "none",
