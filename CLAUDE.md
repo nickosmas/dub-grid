@@ -9,3 +9,4 @@ tools), imported below along with the context files Claude Code keeps loaded.
 @blueprint/context/coding-standards.md
 @blueprint/context/ai-interaction.md
 @blueprint/context/current-feature.md
+@blueprint/context/findings.md
