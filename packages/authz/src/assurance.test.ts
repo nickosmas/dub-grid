@@ -10,7 +10,6 @@ import {
   resolveVerifiedTotpFactorPresence,
   type AuthenticationAssuranceClaims,
   evaluateMfaClaimState,
-  requiresMfaChallenge,
 } from "./assurance";
 
 const NOW = 1_789_064_802;
@@ -250,18 +249,5 @@ describe("evaluateMfaClaimState", () => {
     expect(evaluateMfaClaimState({ mfa_enrolled: true, aal: "aal1" })).not.toBe(
       evaluateMfaClaimState({ aal: "aal1" }),
     );
-  });
-});
-
-describe("requiresMfaChallenge", () => {
-  it("is true for every state that is not satisfied", () => {
-    expect(requiresMfaChallenge({ mfa_enrolled: true, aal: "aal1" })).toBe(true);
-    expect(requiresMfaChallenge({ aal: "aal1" })).toBe(true);
-    expect(requiresMfaChallenge({})).toBe(true);
-  });
-
-  it("is false once the claim clears the session", () => {
-    expect(requiresMfaChallenge({ mfa_enrolled: false, aal: "aal1" })).toBe(false);
-    expect(requiresMfaChallenge({ mfa_enrolled: true, aal: "aal2" })).toBe(false);
   });
 });

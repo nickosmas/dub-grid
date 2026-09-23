@@ -76,15 +76,6 @@ export function evaluateMfaClaimState(claims: {
   return "claim-unusable";
 }
 
-/**
- * True when this session must not proceed on its MFA claims alone. Mirrors
- * `public.caller_mfa_challenge_pending()` (migration 041), which is the
- * boundary that actually holds; this is the application's matching answer.
- */
-export function requiresMfaChallenge(claims: { aal?: unknown; mfa_enrolled?: unknown }): boolean {
-  return evaluateMfaClaimState(claims) !== "satisfied";
-}
-
 export function createSensitiveActionStepUpRequired(
   method: SensitiveActionAuthenticationMethod,
 ): SensitiveActionStepUpRequired {
