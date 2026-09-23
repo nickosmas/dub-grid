@@ -1756,21 +1756,26 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   line-height: 1.6;
   text-align: center;
 }
-.dg-password-strength--level-0 .dg-password-strength__bar.is-active,
-.dg-password-strength--level-0 .dg-password-strength__label.is-active {
+/* Only the meter segments take a fill. The label is text: giving it the same
+   background painted a second, wordless bar under the meter. */
+.dg-password-strength--level-0 .dg-password-strength__bar.is-active {
   background: var(--dg-color-danger);
-  color: var(--dg-color-danger);
 }
 .dg-password-strength--level-1 .dg-password-strength__bar.is-active,
-.dg-password-strength--level-1 .dg-password-strength__label.is-active,
-.dg-password-strength--level-2 .dg-password-strength__bar.is-active,
-.dg-password-strength--level-2 .dg-password-strength__label.is-active {
+.dg-password-strength--level-2 .dg-password-strength__bar.is-active {
   background: var(--dg-color-warning);
+}
+.dg-password-strength--level-3 .dg-password-strength__bar.is-active {
+  background: var(--dg-color-success);
+}
+.dg-password-strength--level-0 .dg-password-strength__label.is-active {
+  color: var(--dg-color-danger);
+}
+.dg-password-strength--level-1 .dg-password-strength__label.is-active,
+.dg-password-strength--level-2 .dg-password-strength__label.is-active {
   color: var(--dg-color-warning);
 }
-.dg-password-strength--level-3 .dg-password-strength__bar.is-active,
 .dg-password-strength--level-3 .dg-password-strength__label.is-active {
-  background: var(--dg-color-success);
   color: var(--dg-color-success);
 }
 .dg-password-strength__hint.is-met {
