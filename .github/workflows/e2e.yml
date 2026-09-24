@@ -91,6 +91,13 @@ jobs:
             echo "E2E-only Upstash Redis credentials are required; production credentials are never used." >&2
             exit 1
           }
+          upstash_url="${E2E_UPSTASH_REDIS_REST_URL%/}"
+          curl --fail --silent --show-error --max-time 10 \
+            -H "Authorization: Bearer $E2E_UPSTASH_REDIS_REST_TOKEN" \
+            "$upstash_url/ping" | grep -q "PONG" || {
+              echo "The dedicated E2E Upstash Redis instance is unreachable or rejected its credentials." >&2
+              exit 1
+            }
 
       - name: Build Next.js
         run: npm run build
@@ -117,8 +124,16 @@ jobs:
       - name: Wait for server
         run: timeout 60 bash -c 'until curl -s http://localhost:3000 > /dev/null 2>&1; do sleep 1; done'
 
+      # Fail in seconds if the production-mode local server cannot hydrate a
+      # login screen (for example, a CSP upgrade redirects HTTP assets to an
+      # unavailable local HTTPS origin). This is intentionally separate from
+      # the full suite so one infrastructure fault cannot consume every test
+      # timeout and obscure the actual cause.
+      - name: Verify login hydration
+        run: npx playwright test e2e/auth-hydration-preflight.spec.ts --project=${{ matrix.browser }} --retries=0
+
       - name: Run Playwright tests
-        run: npx playwright test --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/4
+        run: npx playwright test --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/4 --grep-invert=@preflight
 
       - name: Upload Playwright report
         if: always()
