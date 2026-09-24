@@ -1,7 +1,7 @@
 # Feature: Atomic rotation and recoverable delivery
 
 **From build-plan:** feature 41a2
-**Status:** in progress - the rotation contract is settled and a revocation defect found on the way
+**Status:** steps 1, 2, 3, 5 and 6 verified; step 4 is code-complete and owes browser evidence
 
 ## Goal
 
@@ -95,6 +95,12 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
       revokes asks once and names the consequence, no surface acts
       unconfirmed, and there is browser evidence: a screenshot of the
       confirmation and of the result on each surface, with no console errors.
+      Code complete, evidence outstanding. One shared confirmation
+      (`useInvitationActionConfirm`) is wired in, and the copy that described
+      the old revoke-and-replace behaviour is corrected, since rotation revokes
+      nothing. The gate is tested at the hook, where the contract lives. The
+      per-surface browser evidence this step asks for cannot be produced in the
+      cloud container, so per 41d it stays a blocker rather than a pass.
 - [x] **Step 5 - a TOTP-enrolled invitee can accept** - establish what happens
       today when an invitee already has a DubGrid account with TOTP enrolled,
       then make acceptance work without offering them a password-set flow and
@@ -199,6 +205,26 @@ confirm the old link stops working while the new one arrives.
 
 Commands: `npm run type-check`, `npm run test:web`, `npm run lint`,
 `npm run db:migrations:check`, and `npm run test:e2e` for Step 4.
+
+## The local Postgres rig, and the trap in it
+
+Steps 2, 3 and 5 were verified against a real database, built directly in the
+container because there is no Docker daemon or Supabase CLI: a Postgres 16
+cluster on port 54322 with a small stand-in for the Supabase surface the
+migrations use. It is worth having; it is how the rotation, the inviter checks
+and the enrolled-invitee case were proven on real SQL rather than mocks.
+
+**Stop it before any full-suite run.** The pre-existing `*.integration.test.ts`
+files probe that port and skip when nothing answers, which is what they do in
+CI. With the rig up they execute instead, against a shim that is unseeded and
+not a Supabase replica, and they fail for environmental reasons. That produced
+three full-suite results today that were not comparable to each other, visible
+in the skip counts: 3 skipped with the rig up against 17 with it down. Only the
+rig-down run means anything, and it passed: 20/20 tasks, 4202 tests, no
+failures.
+
+    pg_ctl -D /var/lib/postgresql/verify stop   # before npm run test:web
+    pg_ctl -D /var/lib/postgresql/verify -o '-p 54322' start   # for the rig
 
 ## Raised for 41b, not fixed here
 
