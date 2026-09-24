@@ -188,29 +188,28 @@ beforeEach(() => {
 });
 
 describe("POST /api/organizations/invitations", () => {
-  const replacementId = "33333333-3333-4333-8333-333333333333";
   const pendingInvitation = {
     ...CURRENT_INVITATION_ROW,
     expires_at: "2099-02-01T00:00:00.000Z",
   };
-  const replacementInvitation = {
+  const rotatedInvitation = {
     ...pendingInvitation,
-    id: replacementId,
     role_to_assign: "admin",
-    token: "replacement-token",
+    token: "rotated-token",
     updated_at: "2026-01-01T00:00:01.000Z",
   };
 
-  it("revokes the old invite, creates a replacement, and sends its token", async () => {
+  it("rotates the invitation in place and sends its new token", async () => {
     invitationSelectMaybeSingle
       .mockResolvedValueOnce({ data: pendingInvitation, error: null })
-      .mockResolvedValueOnce({ data: replacementInvitation, error: null });
+      .mockResolvedValueOnce({ data: rotatedInvitation, error: null });
     serviceRpc.mockResolvedValue({
       data: {
-        previous_invitation_id: INVITATION_ID,
-        invitation_id: replacementId,
-        token: "replacement-token",
+        invitation_id: INVITATION_ID,
+        token: "rotated-token",
         expires_at: "2099-02-01T00:00:00.000Z",
+        previous_token: "original-token",
+        previous_expires_at: "2099-01-01T00:00:00.000Z",
       },
       error: null,
     });
@@ -238,28 +237,29 @@ describe("POST /api/organizations/invitations", () => {
     expect(sendInvitationEmail).toHaveBeenCalledWith(
       expect.objectContaining({
         email: "old@test.com",
-        token: "replacement-token",
+        token: "rotated-token",
       }),
     );
-    expect(payload.previousInvitationId).toBe(INVITATION_ID);
-    expect(payload.invitation.id).toBe(replacementId);
+    // One invitation, one identity: re-issuing does not mint a successor.
+    expect(payload.invitation.id).toBe(INVITATION_ID);
   });
 
   it("restores the old invite when the replacement email cannot be sent", async () => {
     invitationSelectMaybeSingle
       .mockResolvedValueOnce({ data: pendingInvitation, error: null })
-      .mockResolvedValueOnce({ data: replacementInvitation, error: null });
+      .mockResolvedValueOnce({ data: rotatedInvitation, error: null });
     serviceRpc
       .mockResolvedValueOnce({
         data: {
-          previous_invitation_id: INVITATION_ID,
-          invitation_id: replacementId,
-          token: "replacement-token",
+          invitation_id: INVITATION_ID,
+          token: "rotated-token",
           expires_at: "2099-02-01T00:00:00.000Z",
+          previous_token: "original-token",
+          previous_expires_at: "2099-01-01T00:00:00.000Z",
         },
         error: null,
       })
-      .mockResolvedValueOnce({ data: true, error: null });
+      .mockResolvedValueOnce({ data: { restored: true }, error: null });
     sendInvitationEmail.mockRejectedValue(new Error("provider down"));
 
     const { POST } = await importRoute();
@@ -274,13 +274,17 @@ describe("POST /api/organizations/invitations", () => {
     );
 
     expect(response.status).toBe(502);
+    // Restoring means putting the previous link back on the same row, and only
+    // while it still carries the token this rotation issued.
     expect(serviceRpc).toHaveBeenNthCalledWith(
       2,
       "rollback_pending_invitation_access_replacement",
       {
         p_org_id: ORG_ID,
-        p_previous_invitation_id: INVITATION_ID,
-        p_replacement_invitation_id: replacementId,
+        p_invitation_id: INVITATION_ID,
+        p_rotated_token: "rotated-token",
+        p_previous_token: "original-token",
+        p_previous_expires_at: "2099-01-01T00:00:00.000Z",
       },
     );
   });
@@ -635,19 +639,19 @@ describe("POST /api/organizations/invitations - replace_access tier ceiling", ()
   });
 
   it("lets a caller who may assign super_admin replace access", async () => {
-    const replacementId = "44444444-4444-4444-8444-444444444444";
     invitationSelectMaybeSingle
       .mockResolvedValueOnce({ data: pendingInvitation, error: null })
       .mockResolvedValueOnce({
-        data: { ...pendingInvitation, id: replacementId, role_to_assign: "super_admin" },
+        data: { ...pendingInvitation, role_to_assign: "super_admin", token: "rotated-token" },
         error: null,
       });
     serviceRpc.mockResolvedValue({
       data: {
-        previous_invitation_id: INVITATION_ID,
-        invitation_id: replacementId,
-        token: "replacement-token",
+        invitation_id: INVITATION_ID,
+        token: "rotated-token",
         expires_at: "2099-02-01T00:00:00.000Z",
+        previous_token: "original-token",
+        previous_expires_at: "2099-01-01T00:00:00.000Z",
       },
       error: null,
     });
@@ -699,5 +703,48 @@ describe("POST /api/organizations/invitations - resend and revocation", () => {
     expect(response.status).toBe(409);
     expect(sendInvitationEmail).not.toHaveBeenCalled();
     expect(invitationUpdateOperations).toHaveLength(0);
+  });
+});
+
+describe("POST /api/organizations/invitations - throttling", () => {
+  it("answers a throttled caller with 429 and a Retry-After in seconds", async () => {
+    checkRateLimit.mockResolvedValue({
+      limited: true,
+      misconfigured: false,
+      reset: Date.now() + 45_000,
+    });
+
+    const { POST } = await importRoute();
+    const response = await POST(
+      makePostRequest({
+        action: "resend",
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+      }),
+    );
+
+    expect(response.status).toBe(429);
+    const retryAfter = Number(response.headers.get("Retry-After"));
+    expect(Number.isInteger(retryAfter)).toBe(true);
+    expect(retryAfter).toBeGreaterThan(0);
+    expect(sendInvitationEmail).not.toHaveBeenCalled();
+  });
+
+  it("treats a limiter that cannot answer as unavailable, not throttled", async () => {
+    checkRateLimit.mockResolvedValue({ limited: false, misconfigured: true });
+
+    const { POST } = await importRoute();
+    const response = await POST(
+      makePostRequest({
+        action: "resend",
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+      }),
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("Retry-After")).toBeNull();
   });
 });

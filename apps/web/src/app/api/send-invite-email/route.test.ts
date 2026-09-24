@@ -169,3 +169,38 @@ describe("POST /api/send-invite-email", () => {
     expect(sendResendEmail).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("POST /api/send-invite-email - throttling", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    requireAuthenticatedUserWithClaims.mockResolvedValue({
+      user: { id: "user-1" },
+      claims: { org_role: "super_admin", org_id: ORG_ID },
+    });
+  });
+
+  it("answers a throttled caller with 429 and a Retry-After in seconds", async () => {
+    checkRateLimit.mockResolvedValue({
+      limited: true,
+      misconfigured: false,
+      reset: Date.now() + 20_000,
+    });
+
+    const response = await POST(makeRequest(BODY));
+
+    expect(response.status).toBe(429);
+    const retryAfter = Number(response.headers.get("Retry-After"));
+    expect(Number.isInteger(retryAfter)).toBe(true);
+    expect(retryAfter).toBeGreaterThan(0);
+    expect(sendResendEmail).not.toHaveBeenCalled();
+  });
+
+  it("treats a limiter that cannot answer as unavailable, not throttled", async () => {
+    checkRateLimit.mockResolvedValue({ limited: false, misconfigured: true });
+
+    const response = await POST(makeRequest(BODY));
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("Retry-After")).toBeNull();
+  });
+});

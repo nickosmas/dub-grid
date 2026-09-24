@@ -113,11 +113,19 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
       What was missing was a regression test for the middle one: nothing stopped
       a later migration gating acceptance behind AAL2 and silently breaking
       every enrolled invitee. That test now exists.
-- [ ] **Step 6 - correct and consistent retry semantics** - audit every
+- [x] **Step 6 - correct and consistent retry semantics** - audit every
       invitation endpoint's throttled and unavailable responses. _Done when:_
       each returns the right status, every 429 carries a `Retry-After` in
       seconds, no 429 is returned for a non-throttling failure, and passing
       tests assert the header per endpoint.
+      Outcome: one real defect. `/api/invitations/lookup` is unauthenticated
+      and answers with organization context, and the abuse-boundary contract
+      declares it source-limited, but the route had no limit and nothing
+      enforced the contract. It has one now. Everything else was already
+      correct: each 429 carried a `Retry-After`, and a limiter that cannot
+      answer returns 503 rather than pretending to be a throttle. What was
+      missing was assertions, so the invitations route and `send-invite-email`
+      now have throttle tests too.
 
 ## Files / areas
 
