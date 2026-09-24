@@ -27,7 +27,10 @@ test("measures cold and warm web authentication entry", async ({ browser, baseUR
 
   const samples: AuthEntrySample[] = [];
   for (let index = 0; index < SAMPLE_COUNT; index += 1) {
-    const context = await browser.newContext({ baseURL: origin });
+    const context = await browser.newContext({
+      baseURL: origin,
+      extraHTTPHeaders: testInfo.project.use.extraHTTPHeaders,
+    });
     const page = await context.newPage();
 
     await page.goto("/login");
@@ -65,7 +68,10 @@ test("measures cold and warm web authentication entry", async ({ browser, baseUR
 });
 
 async function prepareMeasurementAccount(browser: Browser, origin: string): Promise<void> {
-  const context = await browser.newContext({ baseURL: origin });
+  const context = await browser.newContext({
+    baseURL: origin,
+    extraHTTPHeaders: test.info().project.use.extraHTTPHeaders,
+  });
   const page = await context.newPage();
   await loginAsQaSuperAdmin(page, origin);
   await context.close();
