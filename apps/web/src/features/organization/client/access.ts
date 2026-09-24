@@ -10,6 +10,7 @@ import type {
 } from "@/types";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import type { OrganizationSettingsEditable } from "@/lib/organization-settings";
+import { OrganizationRequestError } from "./api";
 
 export interface UpdateOrganizationSettingsInput extends Partial<OrganizationSettingsEditable> {
   orgId: string;
@@ -126,7 +127,12 @@ async function requestOrganizationJson<T>(input: string, init?: RequestInit): Pr
     : null;
 
   if (!response.ok) {
-    throw new Error(formatClientErrorMessage(body?.error, "Organization request failed."));
+    throw new OrganizationRequestError(
+      formatClientErrorMessage(body?.error, "Organization request failed."),
+      response.status,
+      null,
+      typeof body?.code === "string" ? body.code : null,
+    );
   }
 
   return body as T;

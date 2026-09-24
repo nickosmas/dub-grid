@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
+import { DEAD_INVITATION_CODE, DEAD_INVITATION_MESSAGE } from "./dead-invitation";
 
+export { DEAD_INVITATION_CODE, DEAD_INVITATION_MESSAGE };
 export const INVITATION_LIFETIME_MS = 72 * 60 * 60 * 1000;
-export const DEAD_INVITATION_MESSAGE =
-  "This invitation is no longer valid. Ask your administrator for a new one.";
-export const DEAD_INVITATION_CODE = "INVITATION_INVALID";
 
 export function deadInvitationResponse(): NextResponse {
   return NextResponse.json(
