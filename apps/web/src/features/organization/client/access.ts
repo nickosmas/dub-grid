@@ -24,7 +24,6 @@ interface ErrorBody {
   invitation?: Invitation;
   token?: string;
   expiresAt?: string;
-  previousInvitationId?: string;
 }
 
 export class OrganizationAccessConflictError extends Error {
