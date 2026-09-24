@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const registerPushToken = vi.fn();
+const signOutMobileSessions = vi.fn();
 const loadStoredPushDevice = vi.fn();
 const getSession = vi.fn();
 const signOut = vi.fn();
@@ -18,6 +19,7 @@ vi.mock("../providers/AuthSessionProvider", () => ({
 
 vi.mock("./api", () => ({
   registerPushToken: (...args: unknown[]) => registerPushToken(...args),
+  signOutMobileSessions: (...args: unknown[]) => signOutMobileSessions(...args),
 }));
 
 vi.mock("./query-client", () => ({
@@ -52,6 +54,7 @@ describe("auth-reset", () => {
     loadStoredPushDevice.mockResolvedValue(DEVICE);
     registerPushToken.mockResolvedValue(undefined);
     signOut.mockResolvedValue({ error: null });
+    signOutMobileSessions.mockResolvedValue({ success: true });
   });
 
   describe("disablePushForCurrentDevice", () => {
@@ -92,6 +95,24 @@ describe("auth-reset", () => {
       expect(queryClientClear).toHaveBeenCalled();
       expect(signOut).toHaveBeenCalledWith({ scope: "local" });
       expect(replaceAuthSession).toHaveBeenCalledWith(null);
+      expect(routerReplace).toHaveBeenCalledWith("/(auth)/login");
+    });
+
+    it("records the revocation in DubGrid before the device drops its token", async () => {
+      await handleExpiredMobileSession();
+
+      expect(signOutMobileSessions).toHaveBeenCalledWith("token-123", { scope: "local" });
+      expect(signOutMobileSessions.mock.invocationCallOrder[0]).toBeLessThan(
+        signOut.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("still signs out locally when DubGrid can't be reached", async () => {
+      signOutMobileSessions.mockRejectedValue(new Error("offline"));
+
+      await handleExpiredMobileSession();
+
+      expect(signOut).toHaveBeenCalledWith({ scope: "local" });
       expect(routerReplace).toHaveBeenCalledWith("/(auth)/login");
     });
 

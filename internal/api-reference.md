@@ -264,6 +264,7 @@ The mobile app (Expo) communicates exclusively with these endpoints. All routes 
 | ------ | -------------------------------------- | ----------------------------------------------------------------------------------------- |
 | POST   | `/api/mobile/v1/auth/login`            | Email/password login, returns session token (or a required-MFA challenge)                 |
 | POST   | `/api/mobile/v1/auth/recovery-request` | Request a password-recovery email (same handler and limits as the web route)              |
+| POST   | `/api/mobile/v1/auth/sign-out`         | Bearer twin of `/api/auth/sign-out`: local writes the marker; bulk needs fresh assurance  |
 | GET    | `/api/mobile/v1/auth/organization`     | Get the caller's current org context                                                      |
 | GET    | `/api/mobile/v1/bootstrap`             | Load all data required on app launch (permissions, terminology, `acceptedCurrentTerms`)   |
 | GET    | `/api/mobile/v1/org-status`            | Why the organization is unavailable; detail only for roles that own billing or the tenant |

@@ -36,6 +36,8 @@ const SERVICE_ACCESS_FILES: Record<string, string> = {
     "Public credential exchange verifies credentials and reconciles a live organization membership.",
   "apps/web/src/features/mobile/server/routes/auth-organization.ts":
     "Public organization discovery exposes only bounded workspace metadata.",
+  "apps/web/src/features/mobile/server/routes/auth-sign-out.ts":
+    "Sign-out revokes only the bearer's own sessions: bulk scopes need sensitive assurance, recovery needs a verified, unrevoked, live user with fresh OTP proof.",
   "apps/web/src/features/mobile/server/routes/org-status.ts":
     "Recovery route performs its own verified-token, revocation, live-role, and membership checks.",
 };

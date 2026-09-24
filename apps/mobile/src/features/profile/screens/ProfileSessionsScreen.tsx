@@ -14,13 +14,17 @@ import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useModalHandoff } from "../../../shared/hooks/useModalHandoff";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
-import { getProfileSessions, revokeProfileSession } from "../../../shared/lib/api";
+import {
+  getProfileSessions,
+  requireMobileCredentialAssurance,
+  revokeProfileSession,
+  signOutMobileSessions,
+} from "../../../shared/lib/api";
 import {
   disablePushForCurrentDevice,
   handleExpiredMobileSession,
 } from "../../../shared/lib/auth-reset";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
-import { getSupabaseClient } from "../../../shared/lib/supabase";
 import { Collapsible } from "../../../shared/motion/Collapsible";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
@@ -120,24 +124,21 @@ export default function ProfileSessionsScreen() {
 
     setSessionScopeLoading(scope);
     try {
-      if (scope === "global") {
-        // This device is about to lose its session too, so stop its pushes
-        // while the token is still valid.
-        await disablePushForCurrentDevice();
-      }
-
-      const result = await getSupabaseClient().auth.signOut({ scope });
-      if (result.error) {
-        pushClientFriendlyErrorToast(pushToast, {
-          error: result.error,
-          title: "Could not update sessions",
-          fallbackMessage: "We couldn't update your sessions right now.",
-        });
-        return;
-      }
+      const completed = await stepUp.run(async (actionAccessToken) => {
+        // Fresh proof first, so a cancelled confirmation changes nothing.
+        await requireMobileCredentialAssurance(actionAccessToken);
+        if (scope === "global") {
+          // This device is about to lose its session too, so stop its pushes
+          // while the token is still valid.
+          await disablePushForCurrentDevice();
+        }
+        await signOutMobileSessions(actionAccessToken, { scope });
+      });
+      if (!completed) return;
 
       if (scope === "global") {
-        await handleExpiredMobileSession({ skipSignOut: true });
+        // Every session is already revoked; this only clears the device.
+        await handleExpiredMobileSession();
       } else {
         await sessionsQuery.refetch();
       }

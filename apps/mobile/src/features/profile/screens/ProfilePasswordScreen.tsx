@@ -18,7 +18,11 @@ import { ConfirmationModal } from "../../../shared/components/ConfirmationModal"
 import { InlineError } from "../../../shared/components/InlineError";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
-import { getProfile, requireMobileCredentialAssurance } from "../../../shared/lib/api";
+import {
+  getProfile,
+  requireMobileCredentialAssurance,
+  signOutMobileSessions,
+} from "../../../shared/lib/api";
 import {
   disablePushForCurrentDevice,
   handleExpiredMobileSession,
@@ -225,6 +229,7 @@ export default function ProfilePasswordScreen() {
     }
 
     try {
+      let assuredAccessToken: string | null = null;
       const completed = await stepUp.run(async (actionAccessToken) => {
         // The preflight must finish before calling Supabase's public mutation.
         // The mutation is never replayed after an ambiguous provider failure.
@@ -235,6 +240,7 @@ export default function ProfilePasswordScreen() {
         if (updateResult.error) {
           throw updateResult.error;
         }
+        assuredAccessToken = actionAccessToken;
       });
       if (!completed) {
         identityCancelled = true;
@@ -244,16 +250,17 @@ export default function ProfilePasswordScreen() {
       // Before the sign-out, while this device's token is still valid.
       await disablePushForCurrentDevice();
 
-      const signOutResult = await getSupabaseClient().auth.signOut({
-        scope: "global",
-      });
-      if (signOutResult.error) {
-        fail(signOutResult.error, "Your password changed, but we couldn't sign out every session.");
+      try {
+        if (!assuredAccessToken) throw new Error("Missing assured session");
+        await signOutMobileSessions(assuredAccessToken, { scope: "global" });
+      } catch (error) {
+        fail(error, "Your password changed, but we couldn't sign out every session.");
         return;
       }
 
       isRedirecting = true;
-      await handleExpiredMobileSession({ skipSignOut: true });
+      // Every session is already revoked; this only clears the device.
+      await handleExpiredMobileSession();
     } catch (error) {
       isRedirecting = false;
       fail(error, "We couldn't update your password right now.");

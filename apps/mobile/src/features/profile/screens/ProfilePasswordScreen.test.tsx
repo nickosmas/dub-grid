@@ -14,6 +14,7 @@ const handleExpiredMobileSession = vi.fn();
 const disablePushForCurrentDevice = vi.fn();
 const pushToast = vi.fn();
 const requireMobileCredentialAssurance = vi.fn();
+const signOutMobileSessions = vi.fn();
 const stepUpRun = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
@@ -41,6 +42,7 @@ vi.mock("../../../shared/lib/api", () => ({
   getProfile: vi.fn(),
   requireMobileCredentialAssurance: (...args: unknown[]) =>
     requireMobileCredentialAssurance(...args),
+  signOutMobileSessions: (...args: unknown[]) => signOutMobileSessions(...args),
 }));
 
 vi.mock("../../../shared/lib/env", () => ({
@@ -94,6 +96,7 @@ describe("ProfilePasswordScreen", () => {
     disablePushForCurrentDevice.mockResolvedValue(undefined);
     pushToast.mockReset();
     requireMobileCredentialAssurance.mockReset().mockResolvedValue({ success: true });
+    signOutMobileSessions.mockReset().mockResolvedValue({ success: true });
     stepUpRun.mockReset().mockImplementation(async (action) => {
       await action("fresh-token");
       return true;
@@ -146,9 +149,29 @@ describe("ProfilePasswordScreen", () => {
       expect(updateUser).toHaveBeenCalledWith({ password: "New-password-123" });
       // Pushes off before the token dies, not after.
       expect(disablePushForCurrentDevice).toHaveBeenCalled();
-      expect(signOut).toHaveBeenCalledWith({ scope: "global" });
-      expect(handleExpiredMobileSession).toHaveBeenCalledWith({ skipSignOut: true });
+      expect(signOutMobileSessions).toHaveBeenCalledWith("fresh-token", { scope: "global" });
+      expect(handleExpiredMobileSession).toHaveBeenCalledWith();
     });
+    expect(signOut).not.toHaveBeenCalled();
+  });
+
+  it("stays put and says so when the other sessions can't be signed out", async () => {
+    getSupabaseClient.mockReturnValue({
+      auth: { updateUser: vi.fn().mockResolvedValue({ error: null }) },
+    } as never);
+    signOutMobileSessions.mockRejectedValue(new Error("revocation unavailable"));
+
+    render(<ProfilePasswordScreen />);
+    fillValidPassword();
+    fireEvent.click(screen.getByRole("button", { name: "Update password" }));
+    await act(async () => {
+      fireEvent.click(
+        within(screen.getByRole("alert")).getByRole("button", { name: "Update and sign out" }),
+      );
+    });
+
+    await waitFor(() => expect(signOutMobileSessions).toHaveBeenCalled());
+    expect(handleExpiredMobileSession).not.toHaveBeenCalled();
   });
 
   it("masks each field until its own toggle is pressed, and shows the strength rules", () => {

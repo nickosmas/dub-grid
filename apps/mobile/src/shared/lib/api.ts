@@ -510,6 +510,33 @@ export function requireMobileCredentialAssurance(accessToken: string) {
   );
 }
 
+export type MobileSignOutScope = "local" | "others" | "global";
+
+/**
+ * Records the revocation in DubGrid before the device drops its tokens: API
+ * routes verify tokens locally, so a provider sign-out alone leaves a copied
+ * access token working until it expires. A 401 here never starts a session
+ * teardown, because the caller is already signing out.
+ */
+export function signOutMobileSessions(
+  accessToken: string,
+  body: { scope: MobileSignOutScope; reason?: "password_recovery" },
+) {
+  const init: RequestInit = { method: "POST", body: JSON.stringify(body) };
+  return mobileRequest(
+    "/api/mobile/v1/auth/sign-out",
+    {
+      ...init,
+      headers: createHeaders(init, {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      }),
+    },
+    (value) => mfaMutationResponseSchema.parse(value),
+    null,
+  );
+}
+
 export function getProfileChangeRequests(accessToken: string, signal?: AbortSignal) {
   return mobileApiRequest(
     "/api/mobile/v1/profile/change-requests",
