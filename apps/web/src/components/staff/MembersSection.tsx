@@ -2568,12 +2568,15 @@ export function MembersSection({
           onRevokeInvitation={
             canManageManagementAccess && orgId
               ? async (invitationId) => {
-                  if (!(await askToConfirm("revoke", inviteeEmailFor(invitationId)))) return;
+                  if (!(await askToConfirm("revoke", inviteeEmailFor(invitationId)))) {
+                    return false;
+                  }
                   await revokeInvitation(invitationId, orgId);
                   void queryClient.invalidateQueries({
                     queryKey: queryKeys.org.directory(orgId),
                   });
                   toast.success("Invitation revoked");
+                  return true;
                 }
               : undefined
           }
