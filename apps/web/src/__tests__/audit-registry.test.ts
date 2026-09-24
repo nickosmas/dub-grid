@@ -435,6 +435,16 @@ describe("audience", () => {
       orgName: null,
     });
     expect(login).toBe("Sign-in rejected: wrong password");
+    const challenged = describeAction({
+      action: "security.auth.login",
+      details: { outcome: "challenged", reason: "second_factor_required", surface: "web" },
+      resourceId: null,
+      resourceType: "user",
+      targetLabel: null,
+      targetEmail: null,
+      orgName: null,
+    });
+    expect(challenged).toBe("Sign-in awaiting two-factor code");
     const loginRows = formatDetails({
       action: "security.auth.login",
       details: { outcome: "succeeded", reason: "accepted", surface: "mobile", targetHash: hash },

@@ -21,6 +21,7 @@ const loginToOrganization = vi.fn();
 const lookupOrganization = vi.fn();
 const registerMobileSessionPresence = vi.fn();
 const verifyMobileTotpFactor = vi.fn();
+const recordMobileSignInCompleted = vi.fn();
 const loadLastOrg = vi.fn();
 const saveLastOrg = vi.fn();
 const pushToast = vi.fn();
@@ -57,6 +58,7 @@ vi.mock("../../../shared/lib/api", () => ({
   getBootstrap,
   loginToOrganization,
   lookupOrganization,
+  recordMobileSignInCompleted,
   registerMobileSessionPresence,
   verifyMobileTotpFactor,
 }));
@@ -95,6 +97,7 @@ describe("LoginScreen", () => {
     lookupOrganization.mockReset();
     registerMobileSessionPresence.mockReset();
     verifyMobileTotpFactor.mockReset();
+    recordMobileSignInCompleted.mockReset().mockResolvedValue(undefined);
     loadLastOrg.mockReset();
     saveLastOrg.mockReset();
     pushToast.mockReset();
@@ -670,6 +673,8 @@ describe("LoginScreen", () => {
     });
     expect(registerMobileSessionPresence).not.toHaveBeenCalled();
     expect(routerReplace).toHaveBeenCalledWith("/(tabs)/home");
+    // The password step was only challenged; the verified session records success.
+    expect(recordMobileSignInCompleted).toHaveBeenCalledWith("verified-token");
   });
 
   it("keeps the pending session out of storage when MFA verification fails", async () => {

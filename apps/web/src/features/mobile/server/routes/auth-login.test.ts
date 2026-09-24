@@ -444,6 +444,13 @@ describe("mobile auth login route", () => {
         slug: "dubgrid-health",
       },
     });
+    expect(writeSecurityAuditEvent).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        event: "security.auth.login",
+        outcome: "challenged",
+        reason: "second_factor_required",
+      }),
+    );
   });
 
   it("never invokes auth methods on the shared service client (poisoning regression guard)", async () => {

@@ -30,12 +30,14 @@ const mockSignOut = vi.fn();
 const mockStartTrial = vi.fn();
 const mockSwitchOrganization = vi.fn();
 const mockMfaFailure = vi.fn();
+const mockRecordSignInCompleted = vi.fn();
 vi.mock("@/features/account/client", () => ({
   clearBrowserAuthState: (...args: unknown[]) => mockClearAuthState(...args),
   exitSandbox: (...args: unknown[]) => mockExitSandbox(...args),
   fetchAccessibleOrganizations: (...args: unknown[]) => mockFetchOrganizations(...args),
   fetchTermsAcceptanceStatus: (...args: unknown[]) => mockFetchTerms(...args),
   getBrowserAuthSession: (...args: unknown[]) => mockGetSession(...args),
+  recordBrowserSignInCompleted: (...args: unknown[]) => mockRecordSignInCompleted(...args),
   refreshBrowserSession: (...args: unknown[]) => mockRefreshSession(...args),
   setBrowserSession: (...args: unknown[]) => mockSetSession(...args),
   signOutFromBrowser: (...args: unknown[]) => mockSignOut(...args),
@@ -398,6 +400,11 @@ describe("OrgLogin submit states", () => {
     finishRefresh(browserSession("user-1", TARGET_ORG_ID, "calmhaven"));
     await waitFor(() => expect(window.location.replace).toHaveBeenCalledWith("/dashboard"));
     expect(mockRefreshSession).toHaveBeenCalledTimes(1);
+    // The sign-in is recorded as complete once, in the organization it ended in.
+    expect(mockRecordSignInCompleted).toHaveBeenCalledTimes(1);
+    expect(mockSwitchOrganization.mock.invocationCallOrder[0]).toBeLessThan(
+      mockRecordSignInCompleted.mock.invocationCallOrder[0]!,
+    );
   });
 
   it("fails closed when MFA switching succeeds but refresh does not", async () => {

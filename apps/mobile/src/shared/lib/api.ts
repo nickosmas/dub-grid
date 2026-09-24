@@ -755,6 +755,24 @@ export async function verifyMobileTotpFactor(input: {
   return mapSupabaseSessionToMobileAuthSession(refreshData.session);
 }
 
+/**
+ * Records that a two-factor sign-in finished. Best-effort, and a 401 never
+ * starts a teardown: the sign-in itself has already succeeded.
+ */
+export async function recordMobileSignInCompleted(accessToken: string): Promise<void> {
+  const init: RequestInit = { method: "POST" };
+  try {
+    await mobileRequest(
+      "/api/mobile/v1/auth/sign-in-complete",
+      { ...init, headers: createHeaders(init, { Authorization: `Bearer ${accessToken}` }) },
+      (value) => mfaMutationResponseSchema.parse(value),
+      null,
+    );
+  } catch {
+    // Audit only.
+  }
+}
+
 export function registerMobileSessionPresence(accessToken: string): Promise<{ success: true }> {
   const platform = getNativeSessionPlatform();
   if (!platform) {

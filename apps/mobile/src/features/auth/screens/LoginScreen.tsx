@@ -23,6 +23,7 @@ import {
   getBootstrap,
   loginToOrganization,
   lookupOrganization,
+  recordMobileSignInCompleted,
   verifyMobileTotpFactor,
 } from "../../../shared/lib/api";
 import { buildBootstrapQueryKey } from "../hooks/useBootstrap";
@@ -337,6 +338,7 @@ export default function LoginScreen() {
         }),
       );
 
+      await recordMobileSignInCompleted(verifiedSession.accessToken);
       await finishLogin(pendingMfaLogin, verifiedSession);
     } catch (mfaError) {
       const nextError = getInlineErrorMessageOrToast(pushToast, {

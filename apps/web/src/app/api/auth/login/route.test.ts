@@ -57,6 +57,7 @@ vi.mock("@/lib/sentry", () => ({
 vi.mock("@/lib/auth/security-audit", () => ({ writeSecurityAuditEvent: vi.fn() }));
 
 import { POST } from "@/app/api/auth/login/route";
+import { writeSecurityAuditEvent } from "@/lib/auth/security-audit";
 import { SANDBOX_COOKIE_NAME } from "@/lib/sandbox-cookie";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
@@ -246,6 +247,14 @@ describe("POST /api/auth/login", () => {
     expect(body.destination).toBeNull();
     expect(rpc).not.toHaveBeenCalled();
     expect(fetchTermsAcceptanceStatus).not.toHaveBeenCalled();
+    // A password alone is not a sign-in: the step is challenged, not succeeded.
+    expect(writeSecurityAuditEvent).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        event: "security.auth.login",
+        outcome: "challenged",
+        reason: "second_factor_required",
+      }),
+    );
   });
 
   it("rejects a gridmaster on an organization login before returning tokens", async () => {
@@ -415,6 +424,10 @@ describe("POST /api/auth/login", () => {
     expect(body.session.access_token).toBe(switched.access_token);
     expect(rpc).toHaveBeenCalledWith("switch_org", { target_org_id: ORG_ID });
     expect(res.cookies.get(SANDBOX_COOKIE_NAME)?.value).toBe("");
+    // Attributed to the organization the session ended in, not the one it began in.
+    expect(writeSecurityAuditEvent).toHaveBeenLastCalledWith(
+      expect.objectContaining({ outcome: "succeeded", orgId: ORG_ID }),
+    );
   });
 
   it("does not return the pre-switch session when host organization refresh fails", async () => {

@@ -498,3 +498,15 @@ export function registerInvitedUser(input: {
     body: JSON.stringify(input),
   });
 }
+
+/**
+ * Records that a two-factor sign-in finished, once the session is in its
+ * organization. Best-effort: an audit write must never hold up signing in.
+ */
+export async function recordBrowserSignInCompleted(): Promise<void> {
+  try {
+    await fetchWithTimeout("/api/auth/login/complete", { method: "POST" });
+  } catch {
+    // The sign-in itself has already succeeded.
+  }
+}

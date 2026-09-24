@@ -485,12 +485,16 @@ export async function POST(req: NextRequest) {
     res.cookies.set(SANDBOX_COOKIE_NAME, "", { path: "/", maxAge: 0 });
   }
   timer.applyTo(res.headers);
+  // A password alone is not a sign-in when a second factor is enrolled: that
+  // step is challenged, and /api/auth/login/complete records the success. The
+  // organization is the one the session ended in, after any switch.
+  const signedInClaims = didSwitchOrg ? decodeJwt(session.access_token) : claims;
   await writeSecurityAuditEvent({
     event: "security.auth.login",
-    outcome: "succeeded",
-    reason: "accepted",
+    outcome: mfaRequired ? "challenged" : "succeeded",
+    reason: mfaRequired ? "second_factor_required" : "accepted",
     actorId: data.user.id,
-    orgId: typeof claims.org_id === "string" ? claims.org_id : null,
+    orgId: typeof signedInClaims.org_id === "string" ? signedInClaims.org_id : null,
     metadata: { targetHash: emailHash, surface: "web" },
   });
   return res;

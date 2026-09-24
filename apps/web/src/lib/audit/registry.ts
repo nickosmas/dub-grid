@@ -349,6 +349,7 @@ function securityHeadline(d: AuditDetails, succeeded: string, noun: string): str
   const outcome = d.text("outcome");
   const surface = d.text("surface") === "mobile" ? " from the mobile app" : "";
   if (outcome === "succeeded") return `${succeeded}${surface}`;
+  if (outcome === "challenged") return `${noun} awaiting two-factor code${surface}`;
   const reason = d.text("reason");
   const why =
     reason === "invalid_credentials"

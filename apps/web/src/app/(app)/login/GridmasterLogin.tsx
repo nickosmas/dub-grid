@@ -12,6 +12,7 @@ import { PageShell, Card } from "@/components/auth/AuthCard";
 import { EmailPasswordForm } from "@/components/auth/EmailPasswordForm";
 import { MFAVerify } from "@/components/profile/MFAVerify";
 import {
+  recordBrowserSignInCompleted,
   refreshBrowserSession,
   setBrowserSession,
   signOutFromBrowser,
@@ -142,6 +143,7 @@ export default function GridmasterLogin({
     // refresh failure (network/token hiccup) — otherwise the MFA screen hangs
     // forever with an unhandled rejection. Mirrors the org-login path. (H-3)
     await settleWithRequestTimeout(refreshBrowserSession());
+    await recordBrowserSignInCompleted();
     markAuthTransition();
     router.replace(await settleWithRequestTimeout(resolvePostLoginDestination()));
   }

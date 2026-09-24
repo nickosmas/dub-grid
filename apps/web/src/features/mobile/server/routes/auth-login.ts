@@ -113,10 +113,12 @@ async function handlePOST(req: NextRequest, timer: Timer) {
       }),
     );
 
+    // With a second factor enrolled the password step is only challenged;
+    // /api/mobile/v1/auth/sign-in-complete records the success.
     await writeSecurityAuditEvent({
       event: "security.auth.login",
-      outcome: "succeeded",
-      reason: "accepted",
+      outcome: payload.mfaRequired ? "challenged" : "succeeded",
+      reason: payload.mfaRequired ? "second_factor_required" : "accepted",
       actorId: payload.user.id,
       orgId: payload.organization.id,
       metadata: { targetHash: emailHash, sourceHash, surface: "mobile" },

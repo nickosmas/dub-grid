@@ -20,18 +20,19 @@ The mobile API (`/api/mobile/v1/*`) uses a Bearer token in the `Authorization` h
 
 ### Public
 
-| Method | Path                         | Purpose                                                                       | Rate Limit                                                                                           |
-| ------ | ---------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| GET    | `/api/health`                | Health check (DB reachability)                                                | None                                                                                                 |
-| GET    | `/api/validate-domain`       | Check whether an org subdomain slug exists (Redis-cached)                     | IP-based (`apiLimiter`)                                                                              |
-| POST   | `/api/request-demo`          | Demo request form submission (landing page)                                   | `demoLimiter` (3/hr per IP)                                                                          |
-| POST   | `/api/auth/login`            | Email/password login; consolidates the org switch and trial start server-side | `loginLimiter` per email hash + `loginIpLimiter` per IP + `loginSurgeLimiter` global                 |
-| POST   | `/api/auth/recovery-request` | Request a password-recovery email (generic response, security-audited)        | `apiLimiter` per source IP + `passwordResetLimiter` per target email + `recoverySurgeLimiter` global |
-| POST   | `/api/consent`               | Record cookie consent preference                                              | None                                                                                                 |
-| GET    | `/api/invitations/lookup`    | Look up a live invitation by token (uniform 404 for any dead token)           | None                                                                                                 |
-| POST   | `/api/invitations/register`  | Create the invitee's pre-confirmed auth account (token is the credential)     | `apiLimiter` per IP + `emailTargetLimiter` per address                                               |
-| POST   | `/api/users/check-email`     | Check email availability for supported public flows                           | `apiLimiter` per IP                                                                                  |
-| POST   | `/api/stripe/webhook`        | Stripe webhook handler (signature-verified, replay-idempotent)                | None                                                                                                 |
+| Method | Path                         | Purpose                                                                                 | Rate Limit                                                                                           |
+| ------ | ---------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| GET    | `/api/health`                | Health check (DB reachability)                                                          | None                                                                                                 |
+| GET    | `/api/validate-domain`       | Check whether an org subdomain slug exists (Redis-cached)                               | IP-based (`apiLimiter`)                                                                              |
+| POST   | `/api/request-demo`          | Demo request form submission (landing page)                                             | `demoLimiter` (3/hr per IP)                                                                          |
+| POST   | `/api/auth/login`            | Email/password login; consolidates the org switch and trial start server-side           | `loginLimiter` per email hash + `loginIpLimiter` per IP + `loginSurgeLimiter` global                 |
+| POST   | `/api/auth/login/complete`   | Records a two-factor sign-in as succeeded; needs a freshly verified TOTP (aal2) session | `apiLimiter` per user                                                                                |
+| POST   | `/api/auth/recovery-request` | Request a password-recovery email (generic response, security-audited)                  | `apiLimiter` per source IP + `passwordResetLimiter` per target email + `recoverySurgeLimiter` global |
+| POST   | `/api/consent`               | Record cookie consent preference                                                        | None                                                                                                 |
+| GET    | `/api/invitations/lookup`    | Look up a live invitation by token (uniform 404 for any dead token)                     | None                                                                                                 |
+| POST   | `/api/invitations/register`  | Create the invitee's pre-confirmed auth account (token is the credential)               | `apiLimiter` per IP + `emailTargetLimiter` per address                                               |
+| POST   | `/api/users/check-email`     | Check email availability for supported public flows                                     | `apiLimiter` per IP                                                                                  |
+| POST   | `/api/stripe/webhook`        | Stripe webhook handler (signature-verified, replay-idempotent)                          | None                                                                                                 |
 
 ### Scheduled jobs (`Authorization: Bearer $CRON_SECRET`)
 
@@ -265,6 +266,7 @@ The mobile app (Expo) communicates exclusively with these endpoints. All routes 
 | POST   | `/api/mobile/v1/auth/login`            | Email/password login, returns session token (or a required-MFA challenge)                 |
 | POST   | `/api/mobile/v1/auth/recovery-request` | Request a password-recovery email (same handler and limits as the web route)              |
 | POST   | `/api/mobile/v1/auth/sign-out`         | Bearer twin of `/api/auth/sign-out`: local writes the marker; bulk needs fresh assurance  |
+| POST   | `/api/mobile/v1/auth/sign-in-complete` | Mobile twin of `/api/auth/login/complete`                                                 |
 | GET    | `/api/mobile/v1/auth/organization`     | Get the caller's current org context                                                      |
 | GET    | `/api/mobile/v1/bootstrap`             | Load all data required on app launch (permissions, terminology, `acceptedCurrentTerms`)   |
 | GET    | `/api/mobile/v1/org-status`            | Why the organization is unavailable; detail only for roles that own billing or the tenant |
