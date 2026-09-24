@@ -12,6 +12,7 @@ import { forbidIfSandboxCookie, requireAuthenticatedUser } from "@/lib/api-auth"
 import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { getServiceClient } from "@/lib/supabase-service";
 import { canAssignOrgRole } from "@/app/api/employees/shared";
+import { writeInvitationAuditEntry } from "@/lib/audit/invitation";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { buildInvitationChanges, buildInvitationRevocationChanges } from "@/lib/access-management";
@@ -186,34 +187,12 @@ async function writeAuditEntry(input: {
   req: NextRequest;
   relatedInvitationId?: string;
 }) {
-  const serviceClient = getServiceClient();
-  const { error } = await serviceClient.from("audit_log").insert({
-    org_id: input.orgId,
-    actor_id: input.actorId,
-    actor_email: input.actorEmail,
-    action: input.action,
-    resource_type: "invitation",
-    resource_id: input.resourceId,
-    details: {
-      changedFields: input.changes.map((change) => change.key),
-      changes: input.changes.map((change) => ({
-        field: change.key,
-        label: change.label,
-        from: change.previousValue,
-        to: change.nextValue,
-      })),
-      ...(input.relatedInvitationId ? { replacementInvitationId: input.relatedInvitationId } : {}),
-    },
-    ip_address: getRequestIp(input.req),
-    user_agent: input.req.headers.get("user-agent"),
+  const { req, ...rest } = input;
+  await writeInvitationAuditEntry({
+    ...rest,
+    ipAddress: getRequestIp(req),
+    userAgent: req.headers.get("user-agent"),
   });
-
-  if (error) {
-    logger.error(
-      { error, orgId: input.orgId, resourceId: input.resourceId },
-      "Invitation audit log write failed",
-    );
-  }
 }
 
 async function checkInvitationEmailLimit(email: string) {

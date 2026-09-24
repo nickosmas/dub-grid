@@ -152,6 +152,57 @@ describe("POST /api/organizations/invitations/create", () => {
     return chain;
   }
 
+  it("audits the creation with the acting user, the invitee and the tier", async () => {
+    const rpc = vi.fn(async () => ({
+      data: { invitation_id: "inv-9", token: "tok-9", expires_at: "2026-01-01T00:00:00Z" },
+      error: null,
+    }));
+    const auditInsert = vi.fn(async () => ({ error: null }));
+    const from = vi.fn((table: string) =>
+      table === "audit_log"
+        ? { insert: auditInsert }
+        : makeRefreshChain({ data: null, error: null }),
+    );
+    getServiceClient.mockReturnValue({ rpc, from });
+
+    const res = await (
+      await importRoute()
+    ).POST(makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "admin" }));
+
+    expect(res.status).toBe(200);
+    expect(from).toHaveBeenCalledWith("audit_log");
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        org_id: ORG_ID,
+        actor_id: "actor-1",
+        action: "invitation.created",
+        resource_type: "invitation",
+        resource_id: "inv-9",
+        details: expect.objectContaining({ email: "new@test.com", role: "admin" }),
+      }),
+    );
+  });
+
+  it("still returns the invitation when the audit write fails", async () => {
+    const rpc = vi.fn(async () => ({
+      data: { invitation_id: "inv-10", token: "tok-10", expires_at: "2026-01-01T00:00:00Z" },
+      error: null,
+    }));
+    const from = vi.fn((table: string) => {
+      if (table === "audit_log") throw new Error("audit unavailable");
+      return makeRefreshChain({ data: null, error: null });
+    });
+    getServiceClient.mockReturnValue({ rpc, from });
+
+    const res = await (
+      await importRoute()
+    ).POST(makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "admin" }));
+
+    // The invitation exists by now, so losing its record must not turn a
+    // successful create into a 500 the caller would retry.
+    expect(res.status).toBe(200);
+  });
+
   it("refreshes an orphaned pending invite (from a failed first send) instead of 409", async () => {
     const rpc = vi.fn(async () => ({
       data: null,
