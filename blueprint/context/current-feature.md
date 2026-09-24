@@ -242,6 +242,22 @@ Evidence for steps 3 and 4:
 First local run needs `npm ci` and `npm run build:packages` before any test, or
 consumers fail to resolve `@dubgrid/*`.
 
+One gate is outstanding and is deliberately not claimed: `npm run build`. No
+`Verify` command is declared, so the fallback gate is the build plus the tests.
+The tests pass; the build cannot run here. `apps/web/src/app/logo-grid.tsx`
+fetches the DM Sans TTFs from `cdn.jsdelivr.net` at build time to prerender
+`/opengraph-image`, and this environment's network policy refuses that host, so
+the build fails for a reason unrelated to this feature. The user is running it
+on their machine (agreed 2026-09-24). `/complete` should not log 41a1 until that
+build is green.
+
+Two container-specific notes, in case this recurs: the proxy's CA must be
+trusted through `NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt`, and Turborepo's
+strict env mode filters that variable out of task environments, so a build that
+needs it has to run through the workspace directly rather than through turbo.
+
+Landed for review as PR #104 from `claude/lucid-hopper-exfpqt` into `dev`.
+
 ## Notes for the AI
 
 - Settled 2026-09-24 by the user: super_admin invitations sent from the web do
