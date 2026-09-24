@@ -202,9 +202,21 @@ pass.
 
 Manual path for step 4. Branch `claude/lucid-hopper-exfpqt`, head `f69abb5c`.
 
-    npm ci && npm run build:packages    # first run only
-    npm run db:reset                    # seeded local Supabase
-    npm run dev                         # http://localhost:3000
+First run only, to install and build the shared packages:
+
+    npm ci
+    npm run build:packages
+
+Then reset to a seeded local Supabase (required: migration 044 changes both
+invitation RPCs, so an older local database tests the old code path), and start
+the app on http://localhost:3000:
+
+    npm run db:reset
+    npm run dev
+
+No trailing comments on those lines. Interactive zsh does not treat `#` as a
+comment unless `interactive_comments` is set, so a pasted `npm run dev # url`
+hands the url to turbo as a task name and fails.
 
 Invite someone in People, keep their invite link, then exercise each surface
 that offers these actions and confirm it asks before acting:
