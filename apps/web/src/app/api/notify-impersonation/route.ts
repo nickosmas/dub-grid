@@ -15,12 +15,11 @@ import { API_ERRORS } from "@dubgrid/client-errors";
 import { getServiceClient } from "@/lib/supabase-service";
 import { serverEnv } from "@/lib/env.server";
 
+// Only the session and the event. Who receives the notice and what it says are
+// read from that session, never from the request (finding F-25).
 const bodySchema = z.object({
-  targetEmail: z.string().email(),
-  targetOrgName: z.string().trim().max(200).optional(),
   type: z.enum(["start", "end"]),
   sessionId: z.string().uuid(),
-  justification: z.string().trim().max(500).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -74,9 +73,64 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
-  const { targetEmail, targetOrgName, type, justification } = parsed.data;
-
+  const { type, sessionId } = parsed.data;
   const isStart = type === "start";
+
+  // The browser used to name the recipient, the organization and the reason,
+  // so a stale cookie or a crafted request could mail a DubGrid "account
+  // access" notice to any address. Everything now comes from this
+  // Gridmaster's own session, for the device that started it.
+  const serviceClient = getServiceClient();
+  const { data: session, error: sessionError } = await serviceClient
+    .from("impersonation_sessions")
+    .select("target_user_id, target_org_id, justification, ended_at, expires_at")
+    .eq("session_id", sessionId)
+    .eq("gridmaster_id", user.id)
+    .eq("auth_session_id", auth.sessionId)
+    .maybeSingle();
+  if (sessionError) {
+    logger.error({ err: sessionError }, "Failed to load impersonation session for notice");
+    return NextResponse.json(
+      { success: false, error: "We couldn't send that email. Try again." },
+      { status: 500 },
+    );
+  }
+  if (!session) {
+    return NextResponse.json(
+      { success: false, error: "Impersonation session not found" },
+      { status: 404 },
+    );
+  }
+  const live = session.ended_at === null && new Date(session.expires_at).getTime() > Date.now();
+  if (isStart !== live) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: isStart
+          ? "This impersonation session is no longer active."
+          : "This impersonation session has not ended.",
+      },
+      { status: 409 },
+    );
+  }
+
+  const { data: target, error: targetError } = await serviceClient.auth.admin.getUserById(
+    session.target_user_id,
+  );
+  const targetEmail = target?.user?.email;
+  if (targetError || !targetEmail) {
+    return NextResponse.json(
+      { success: false, error: "That account has no email address to notify." },
+      { status: 404 },
+    );
+  }
+  const { data: organization } = await serviceClient
+    .from("organizations")
+    .select("name")
+    .eq("id", session.target_org_id)
+    .maybeSingle();
+  const targetOrgName = (organization?.name as string | null | undefined) || undefined;
+  const justification = (session.justification as string | null) || undefined;
   const subject = isStart
     ? `Account access notice: ${targetOrgName || "DubGrid"}`
     : `Account access ended: ${targetOrgName || "DubGrid"}`;
@@ -106,10 +160,10 @@ export async function POST(req: NextRequest) {
       const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
       if (ip) {
         try {
-          await getServiceClient()
+          await serviceClient
             .from("impersonation_sessions")
             .update({ ip_address: ip })
-            .eq("session_id", parsed.data.sessionId)
+            .eq("session_id", sessionId)
             .eq("gridmaster_id", user.id)
             .eq("auth_session_id", auth.sessionId);
         } catch {

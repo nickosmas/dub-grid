@@ -147,13 +147,7 @@ export default function EnhancedImpersonation({
       fetch("/api/notify-impersonation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          targetEmail: selectedUser.email,
-          targetOrgName: selectedOrg.name,
-          type: "start",
-          sessionId: result.sessionId,
-          justification: trimmedJustification,
-        }),
+        body: JSON.stringify({ type: "start", sessionId: result.sessionId }),
       }).catch(() => {});
       toast.success(`Impersonating ${selectedUser.email} in ${selectedOrg.name}. Redirecting.`);
       // Same order as the banner's End Session (F-73): mark the transition

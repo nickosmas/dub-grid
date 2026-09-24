@@ -78,12 +78,7 @@ export default function ImpersonationBanner() {
       fetch("/api/notify-impersonation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          targetEmail: imp.targetEmail,
-          targetOrgName: imp.targetOrgName,
-          type: "end",
-          sessionId: imp.sessionId,
-        }),
+        body: JSON.stringify({ type: "end", sessionId: imp.sessionId }),
       }).catch(() => {});
     } catch {
       // Best-effort — cookie clear + redirect is what matters
