@@ -18,7 +18,10 @@ async function openViews(page: Page, views: ViewExpectation[]) {
   // says which view is up.
   const content = page.getByLabel("Gridmaster content");
   for (const view of views) {
-    await page.getByRole("button", { name: view.item, exact: true }).click();
+    await page
+      .locator('[data-sidebar="sidebar"]')
+      .getByRole("button", { name: view.item, exact: true })
+      .click();
     // Views are next/dynamic chunks: the first open of each pays a load.
     await expect(view.marker(content).first(), view.item).toBeVisible({ timeout: 20_000 });
   }
@@ -179,6 +182,13 @@ test.describe("gridmaster portal states", () => {
     await expect(page.getByText("This page could not be found.")).toBeVisible();
     await expect(page.getByRole("link", { name: "Go Home" })).toBeVisible();
     await expect(page.getByText("Back to Gridmaster")).toHaveCount(0);
+
+    // This crosses origins. An RSC prefetch/client transition would violate
+    // connect-src; a document navigation must reach the canonical apex.
+    await page.getByRole("link", { name: "Go Home" }).click();
+    const apex = new URL(QA_GRIDMASTER_ORIGIN);
+    apex.hostname = apex.hostname.replace(/^gridmaster\./, "");
+    await expect(page).toHaveURL(apex.href);
 
     // The 404 document itself is the state under test, not a failure.
     const unexpected = failures.filter(

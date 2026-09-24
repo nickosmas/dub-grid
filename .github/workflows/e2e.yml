@@ -1,17 +1,15 @@
 # End-to-end tests using Playwright against a local Supabase instance.
-# Runs on every PR targeting main, and can also be triggered manually.
+# Runs the complete Chromium, Firefox, and WebKit qualification on every PR
+# targeting main, and can also be triggered manually.
 
 name: E2E Tests
 
 on:
   workflow_dispatch:
-    inputs:
-      all_browsers:
-        description: "Run all browsers (chromium, firefox, webkit)? Default: chromium only."
-        type: boolean
-        default: false
   pull_request:
     branches: [main]
+  schedule:
+    - cron: "30 2 * * *"
 
 permissions:
   contents: read
@@ -25,9 +23,17 @@ env:
 
 jobs:
   e2e:
-    name: Playwright
+    name: Playwright (${{ matrix.browser }}, shard ${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Setup consumes roughly six minutes before the Chromium suite begins. Leave
+    # enough headroom for the full release suite rather than cancelling it at
+    # the job-wide thirty-minute limit.
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+        shard: [1, 2, 3, 4]
     env:
       TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
       TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
@@ -39,6 +45,9 @@ jobs:
       NEXT_PUBLIC_SITE_URL: http://localhost:3000
       NEXT_PUBLIC_BASE_DOMAIN: localhost
       CI: true
+      # Model separate clients against the shared E2E Redis database. Otherwise
+      # all twelve local servers charge public lookups to the same unknown IP.
+      E2E_CLIENT_IP: 198.18.${{ strategy.job-index }}.1
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -51,12 +60,7 @@ jobs:
       - run: npm run deps:rebuild
 
       - name: Install Playwright browsers
-        run: |
-          if [ "${{ inputs.all_browsers }}" = "true" ]; then
-            npx playwright install --with-deps chromium firefox webkit
-          else
-            npx playwright install --with-deps chromium
-          fi
+        run: npx playwright install --with-deps ${{ matrix.browser }}
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1 # v1.7.1
@@ -75,50 +79,70 @@ jobs:
       # without these, checkRateLimit() fails closed on every call (see
       # apps/web/src/lib/rate-limit.ts) and login 503s for every Playwright spec.
       #
-      # Prefers a CI-only Upstash database (E2E_UPSTASH_REDIS_REST_*) so repeated/retried
-      # test runs don't share rate-limit state (or Sentry/monitoring noise) with real
-      # production traffic against the same account. Falls back to the production
-      # credentials if the CI-only secrets haven't been created yet, so this doesn't break
-      # CI in the meantime — create a separate free-tier Upstash database and add
-      # E2E_UPSTASH_REDIS_REST_URL / E2E_UPSTASH_REDIS_REST_TOKEN as repo secrets to switch
-      # over.
-      #
-      # Scoped to the two steps that need them rather than to the whole job:
-      # that fallback can resolve to production Upstash credentials, which must
-      # not sit in the environment while `npm ci` unpacks third-party packages.
+      # Browser qualification uses a dedicated Upstash database: repeated/retried
+      # seeded-account logins must never share state or monitoring noise with
+      # production. The job fails explicitly until these E2E-only secrets exist;
+      # it must not fall back to production credentials.
+      # Scoped to the two steps that need them, so secrets never sit in the
+      # environment while `npm ci` unpacks third-party packages.
+      - name: Verify dedicated rate-limit credentials
+        env:
+          E2E_UPSTASH_REDIS_REST_URL: ${{ secrets.E2E_UPSTASH_REDIS_REST_URL }}
+          E2E_UPSTASH_REDIS_REST_TOKEN: ${{ secrets.E2E_UPSTASH_REDIS_REST_TOKEN }}
+        run: |
+          test -n "$E2E_UPSTASH_REDIS_REST_URL" && test -n "$E2E_UPSTASH_REDIS_REST_TOKEN" || {
+            echo "E2E-only Upstash Redis credentials are required; production credentials are never used." >&2
+            exit 1
+          }
+          upstash_url="${E2E_UPSTASH_REDIS_REST_URL%/}"
+          curl --fail --silent --show-error --max-time 10 \
+            -H "Authorization: Bearer $E2E_UPSTASH_REDIS_REST_TOKEN" \
+            "$upstash_url/ping" | grep -q "PONG" || {
+              echo "The dedicated E2E Upstash Redis instance is unreachable or rejected its credentials." >&2
+              exit 1
+            }
+
       - name: Build Next.js
         run: npm run build
         env:
-          UPSTASH_REDIS_REST_URL: ${{ secrets.E2E_UPSTASH_REDIS_REST_URL || secrets.UPSTASH_REDIS_REST_URL }}
-          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.E2E_UPSTASH_REDIS_REST_TOKEN || secrets.UPSTASH_REDIS_REST_TOKEN }}
+          UPSTASH_REDIS_REST_URL: ${{ secrets.E2E_UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.E2E_UPSTASH_REDIS_REST_TOKEN }}
 
       - name: Start server
         run: npm run start > server.log 2>&1 &
         env:
-          UPSTASH_REDIS_REST_URL: ${{ secrets.E2E_UPSTASH_REDIS_REST_URL || secrets.UPSTASH_REDIS_REST_URL }}
-          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.E2E_UPSTASH_REDIS_REST_TOKEN || secrets.UPSTASH_REDIS_REST_TOKEN }}
-          # The suite logs in as the same handful of seeded QA accounts from
-          # 10+ spec files against a real (non in-memory) Upstash instance;
-          # the production default of 15 per 15 minutes is well below a full
-          # run's real login volume, especially with retries.
-          LOGIN_EMAIL_LIMIT_PER_15_MIN: "200"
+          UPSTASH_REDIS_REST_URL: ${{ secrets.E2E_UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.E2E_UPSTASH_REDIS_REST_TOKEN }}
+          # Each shard runs an isolated local app server, but all of them use
+          # the dedicated E2E Redis database. Local requests have no forwarded
+          # IP, so without E2E-only headroom every shard shares the "unknown"
+          # IP key and can throttle another shard's seeded-account logins.
+          # These values apply only to the dedicated test database, never to
+          # production, and keep the test suite's retries observable instead
+          # of turning them into cross-job rate-limit failures.
+          LOGIN_EMAIL_LIMIT_PER_15_MIN: "1000"
+          LOGIN_IP_LIMIT_PER_MINUTE: "1000"
+          LOGIN_GLOBAL_LIMIT_PER_10_SECONDS: "1000"
 
       - name: Wait for server
         run: timeout 60 bash -c 'until curl -s http://localhost:3000 > /dev/null 2>&1; do sleep 1; done'
 
+      # Fail in seconds if the production-mode local server cannot hydrate a
+      # login screen (for example, a CSP upgrade redirects HTTP assets to an
+      # unavailable local HTTPS origin). This is intentionally separate from
+      # the full suite so one infrastructure fault cannot consume every test
+      # timeout and obscure the actual cause.
+      - name: Verify login hydration
+        run: npx playwright test e2e/auth-hydration-preflight.spec.ts --project=${{ matrix.browser }} --retries=0
+
       - name: Run Playwright tests
-        run: |
-          if [ "${{ inputs.all_browsers }}" = "true" ]; then
-            npx playwright test
-          else
-            npx playwright test --project=chromium
-          fi
+        run: npx playwright test --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/4 --grep-invert=@preflight
 
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.browser }}-shard-${{ matrix.shard }}-of-4
           path: playwright-report/
           retention-days: 14
 
@@ -126,7 +150,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: playwright-test-results
+          name: playwright-test-results-${{ matrix.browser }}-shard-${{ matrix.shard }}-of-4
           path: test-results/
           retention-days: 7
 
@@ -134,6 +158,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: server-log
+          name: server-log-${{ matrix.browser }}-shard-${{ matrix.shard }}-of-4
           path: server.log
           retention-days: 7

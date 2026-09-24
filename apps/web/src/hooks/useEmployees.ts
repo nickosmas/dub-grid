@@ -31,7 +31,7 @@ export interface EmployeesData {
   handleAddEmployee: (
     dataList: Omit<Employee, "id" | "seniority">[],
   ) => Promise<Employee[] | undefined>;
-  handleSaveEmployee: (emp: Employee) => Promise<void>;
+  handleSaveEmployee: (emp: Employee) => Promise<boolean>;
   /** Saves an employee whose email just changed while a pending invitation
    *  exists, then creates and sends a replacement invitation at the new
    *  address (reusing the old invitation's role/departments). `orgName`
@@ -40,7 +40,7 @@ export interface EmployeesData {
     emp: Employee,
     oldInvitation: Invitation,
     orgName: string,
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   handleRemoveEmployee: (empId: string, note?: string) => Promise<void>;
   handleDeactivateEmployee: (empId: string, note?: string) => Promise<void>;
   handleActivateEmployee: (empId: string) => Promise<void>;
@@ -133,7 +133,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
 
   const handleSaveEmployee = useCallback(
     async (emp: Employee) => {
-      if (!orgId) return;
+      if (!orgId) return false;
       // Read the pre-update snapshot from the ref (synchronous, updated
       // during render) rather than capturing it inside the optimistic
       // setAllLocal's updater closure below — that updater isn't guaranteed
@@ -149,6 +149,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
         );
         toast.success("Employee saved");
         invalidateEmployees();
+        return true;
       } catch (err) {
         // On version conflict, swap in the server's latest copy instead of
         // rolling back to pre-edit state — that way the user sees what
@@ -158,11 +159,12 @@ export function useEmployees(orgId: string | null): EmployeesData {
             prev.map((employee) => (employee.id === emp.id ? err.latestEmployee : employee)),
           );
           toast.error("Employee changed elsewhere. Review the latest values and try again.");
-          return;
+          return false;
         }
         setAllLocal(prevAll);
         toast.error(formatClientErrorMessage(err, "We couldn't save employee. Try again."));
         Sentry.captureException(err);
+        return false;
       }
     },
     [orgId, invalidateEmployees],
@@ -170,7 +172,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
 
   const handleSaveEmployeeWithReinvite = useCallback(
     async (emp: Employee, oldInvitation: Invitation, orgName: string) => {
-      if (!orgId) return;
+      if (!orgId) return false;
       const prevAll = allEmployeesRef.current;
       setAllLocal((prev) => prev.map((e) => (e.id === emp.id ? emp : e)));
 
@@ -187,12 +189,12 @@ export function useEmployees(orgId: string | null): EmployeesData {
             prev.map((employee) => (employee.id === emp.id ? err.latestEmployee : employee)),
           );
           toast.error("Employee changed elsewhere. Review the latest values and try again.");
-          return;
+          return false;
         }
         setAllLocal(prevAll);
         toast.error(formatClientErrorMessage(err, "We couldn't save employee. Try again."));
         Sentry.captureException(err);
-        return;
+        return false;
       }
 
       // The identity save already succeeded at this point, so a failure past
@@ -238,6 +240,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
       } finally {
         invalidateEmployees();
       }
+      return true;
     },
     [orgId, invalidateEmployees],
   );

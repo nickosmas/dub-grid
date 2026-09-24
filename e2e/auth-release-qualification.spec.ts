@@ -145,8 +145,18 @@ test.describe("authentication release qualification", () => {
     } finally {
       await setLocalOrganizationSubscription("calmhaven", previousStatus);
       // Do not leak the held access answer into the next matrix row when an
-      // assertion above fails before the manual recheck can refresh it.
-      await page.goto(`${QA_CALM_HAVEN_ORIGIN}/billing-required`).catch(() => undefined);
+      // assertion above fails before the manual recheck can refresh it. The
+      // status endpoint updates the shared cache, then the gate navigation
+      // replaces proxy.ts's in-process memo. Assert both parts rather than
+      // swallowing a failed navigation and leaving a later browser row on the
+      // billing-recovery route.
+      const restoredStatus = await page.evaluate(async () => {
+        const response = await fetch("/api/organization/access-status", { cache: "no-store" });
+        return response.json() as Promise<{ available: boolean; state: string }>;
+      });
+      expect(restoredStatus.available).toBe(true);
+      await page.goto(`${QA_CALM_HAVEN_ORIGIN}/billing-required`);
+      await expect(page).toHaveURL(/\/schedule/);
     }
 
     expect(failures).toEqual([]);

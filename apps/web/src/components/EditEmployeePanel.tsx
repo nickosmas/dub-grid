@@ -1,6 +1,14 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect, forwardRef, useImperativeHandle } from "react";
+import {
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  useId,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
 import { Employee, FocusArea, NamedItem, Invitation } from "@/types";
 import { Button } from "@/components/Button";
 import CustomSelect from "@/components/CustomSelect";
@@ -56,7 +64,10 @@ export interface EditEmployeePanelProps {
    *  somewhere those are already editable elsewhere (the self-profile page's
    *  own Account details section), so they aren't shown twice. */
   hideIdentityFields?: boolean;
-  onSave: (updatedEmployee: Employee) => void | Promise<void>;
+  onSave: (updatedEmployee: Employee) => boolean | void | Promise<boolean | void>;
+  /** Called after the primary employee save succeeds. Slideover hosts use
+   *  this to dismiss after either the ordinary save or Save & send path. */
+  onSaveCompleted?: () => void;
   onCancel: () => void;
   onDirtyChange?: (hasUnsavedChanges: boolean) => void;
   /** Reports whether any current form value blocks saving. Hosts using
@@ -81,7 +92,7 @@ export interface EditEmployeePanelProps {
   onSaveWithReinvite?: (
     updatedEmployee: Employee,
     oldInvitation: Invitation,
-  ) => void | Promise<void>;
+  ) => boolean | void | Promise<boolean | void>;
   /** When true, render no Close/Save row — the host renders its own footer and
    *  drives save/dismiss through the ref handle. */
   hideActions?: boolean;
@@ -139,6 +150,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       isManagementUser = false,
       hideIdentityFields = false,
       onSave,
+      onSaveCompleted,
       onCancel,
       onDirtyChange,
       onSaveBlockedChange,
@@ -157,6 +169,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
     const isInSandbox = useIsInSandbox();
     const stepUp = useStepUpAction();
     const stepUpRef = useLatestRef(stepUp);
+    const identityFieldIdPrefix = useId();
     // Set while the "changing this email will revoke the pending invitation"
     // confirm dialog is open — holds the already-validated employee payload
     // handleSave built, so onConfirm/onCancel don't need to redo validation.
@@ -353,18 +366,24 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       // sensitive action, so confirm the manager's identity the way the
       // profile's own email change does before the save goes out.
       if (emailChanged && employee.userId) {
-        return stepUpRef.current.run(async (accessToken) => {
+        let saved = false;
+        const completed = await stepUpRef.current.run(async (accessToken) => {
           await requireCredentialAssurance(accessToken);
-          await onSave(nextEmployee);
+          saved = (await onSave(nextEmployee)) !== false;
         });
+        if (completed && saved) onSaveCompleted?.();
+        return completed && saved;
       }
 
-      await onSave(nextEmployee);
+      const saved = (await onSave(nextEmployee)) !== false;
+      if (!saved) return false;
+      onSaveCompleted?.();
       return true;
     }, [
       form,
       employee,
       onSave,
+      onSaveCompleted,
       onSaveWithReinvite,
       pendingInvitation,
       stepUpRef,
@@ -491,10 +510,13 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                     }}
                   >
                     <div>
-                      <label style={fieldLabel}>
+                      <label htmlFor={`${identityFieldIdPrefix}-first-name`} style={fieldLabel}>
                         First name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                       </label>
                       <input
+                        id={`${identityFieldIdPrefix}-first-name`}
+                        name="staff-first-name"
+                        autoComplete="section-staff-editor given-name"
                         className="dg-input"
                         value={form.firstName}
                         onChange={(e) => setForm((p) => ({ ...p, firstName: e.target.value }))}
@@ -521,10 +543,13 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                       )}
                     </div>
                     <div>
-                      <label style={fieldLabel}>
+                      <label htmlFor={`${identityFieldIdPrefix}-last-name`} style={fieldLabel}>
                         Last name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                       </label>
                       <input
+                        id={`${identityFieldIdPrefix}-last-name`}
+                        name="staff-last-name"
+                        autoComplete="section-staff-editor family-name"
                         className="dg-input"
                         value={form.lastName}
                         onChange={(e) => setForm((p) => ({ ...p, lastName: e.target.value }))}
@@ -583,8 +608,13 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                     }}
                   >
                     <div>
-                      <label style={fieldLabel}>Phone</label>
+                      <label htmlFor={`${identityFieldIdPrefix}-phone`} style={fieldLabel}>
+                        Phone
+                      </label>
                       <input
+                        id={`${identityFieldIdPrefix}-phone`}
+                        name="staff-phone"
+                        autoComplete="section-staff-editor tel"
                         className="dg-input"
                         type="tel"
                         value={form.phone}
@@ -618,8 +648,13 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                       )}
                     </div>
                     <div>
-                      <label style={fieldLabel}>Email</label>
+                      <label htmlFor={`${identityFieldIdPrefix}-email`} style={fieldLabel}>
+                        Email
+                      </label>
                       <input
+                        id={`${identityFieldIdPrefix}-email`}
+                        name="staff-email"
+                        autoComplete="section-staff-editor email"
                         className="dg-input"
                         type="email"
                         value={form.email}
@@ -913,8 +948,11 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
             variant="warning"
             onCancel={() => setPendingReinviteSave(null)}
             onConfirm={async () => {
-              await onSaveWithReinvite(pendingReinviteSave, pendingInvitation);
+              const saved =
+                (await onSaveWithReinvite(pendingReinviteSave, pendingInvitation)) !== false;
+              if (!saved) return;
               setPendingReinviteSave(null);
+              onSaveCompleted?.();
             }}
           />
         )}

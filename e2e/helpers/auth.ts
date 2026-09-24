@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 // Seeded by seed.ts (run in CI via `npx tsx seed.ts`, see .github/workflows/e2e.yml)
@@ -67,15 +67,20 @@ export async function clearBlockingOverlays(page: Page): Promise<void> {
  * keeps form interactions from landing on inert server-rendered markup in
  * WebKit.
  */
-export async function waitForClientHydration(page: Page): Promise<void> {
-  // .first(): navigating back to /login from an authenticated page can leave
-  // two login roots mounted for a moment (seen on Firefox); both carry the
-  // marker once the client has taken over.
-  await expect(page.getByTestId("organization-login").first()).toHaveAttribute(
-    "data-hydrated",
-    "true",
-    { timeout: 15_000 },
-  );
+async function waitForHydratedLogin(
+  page: Page,
+  testId: "organization-login" | "gridmaster-login",
+): Promise<Locator> {
+  // A route transition can briefly leave an unhydrated server-rendered login
+  // root alongside the hydrated client root. Filter before `.first()` so form
+  // interactions always target the usable client form once its bundle loads.
+  const loginRoot = page.locator(`[data-testid="${testId}"][data-hydrated="true"]`).first();
+  await expect(loginRoot).toBeVisible({ timeout: 15_000 });
+  return loginRoot;
+}
+
+export async function waitForClientHydration(page: Page): Promise<Locator> {
+  return waitForHydratedLogin(page, "organization-login");
 }
 
 /** A timeout of 0 means the run has no limit, so it is never lowered. */
@@ -98,14 +103,14 @@ export async function loginAsQaAccount(page: Page, email: string, origin: string
   }
 
   await page.goto(`${origin}/login`);
-  await waitForClientHydration(page);
+  const loginRoot = await waitForClientHydration(page);
 
-  await page.getByLabel("Email").fill(email);
+  await loginRoot.getByLabel("Email").fill(email);
   // Plain getByLabel("Password") is ambiguous here — it also matches the
   // adjacent "Show password" toggle button. The role-scoped variant only
   // matches the text input.
-  await page.getByRole("textbox", { name: "Password" }).fill(QA_SUPER_ADMIN_PASSWORD);
-  await page.getByRole("button", { name: "Sign In" }).click();
+  await loginRoot.getByRole("textbox", { name: "Password" }).fill(QA_SUPER_ADMIN_PASSWORD);
+  await loginRoot.getByRole("button", { name: "Sign In" }).click();
 
   // A never-before-logged-in account (true of any freshly seeded CI database)
   // is redirected to a one-time Terms interstitial before its real
@@ -183,17 +188,11 @@ export async function loginAsQaGridmaster(page: Page): Promise<void> {
   }
 
   await page.goto(`${QA_GRIDMASTER_ORIGIN}/login`);
-  // .first(): a route transition can briefly leave two copies mounted; the
-  // marker flips on both once the client has taken over.
-  await expect(page.getByTestId("gridmaster-login").first()).toHaveAttribute(
-    "data-hydrated",
-    "true",
-    { timeout: 15_000 },
-  );
+  const loginRoot = await waitForHydratedLogin(page, "gridmaster-login");
 
-  await page.getByLabel("Email").fill(QA_GRIDMASTER_EMAIL);
-  await page.getByRole("textbox", { name: "Password" }).fill(QA_SUPER_ADMIN_PASSWORD);
-  await page.getByRole("button", { name: "Access Portal" }).click();
+  await loginRoot.getByLabel("Email").fill(QA_GRIDMASTER_EMAIL);
+  await loginRoot.getByRole("textbox", { name: "Password" }).fill(QA_SUPER_ADMIN_PASSWORD);
+  await loginRoot.getByRole("button", { name: "Access Portal" }).click();
 
   // Same one-time Terms interstitial as org accounts on a fresh seed.
   const termsHeading = page.getByRole("heading", { name: "Updated Terms of Service" });

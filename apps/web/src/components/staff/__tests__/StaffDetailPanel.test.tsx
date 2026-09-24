@@ -1,4 +1,5 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { StaffDetailPanel } from "@/components/staff/StaffDetailPanel";
 import type { Employee, Invitation } from "@/types";
@@ -25,9 +26,35 @@ vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock("@/components/EditEmployeePanel", () => ({
-  default: () => <div data-testid="edit-employee-panel" />,
-}));
+const editorHarness = vi.hoisted(() => ({ saveResult: true }));
+
+vi.mock("@/components/EditEmployeePanel", async () => {
+  const React = await import("react");
+  return {
+    default: React.forwardRef(
+      (
+        props: {
+          onDirtyChange?: (dirty: boolean) => void;
+          onSaveCompleted?: () => void;
+        },
+        ref: React.ForwardedRef<{ save: () => Promise<boolean>; requestDismiss: () => void }>,
+      ) => {
+        React.useImperativeHandle(ref, () => ({
+          save: async () => {
+            if (editorHarness.saveResult) props.onSaveCompleted?.();
+            return editorHarness.saveResult;
+          },
+          requestDismiss: () => undefined,
+        }));
+        return (
+          <div data-testid="edit-employee-panel">
+            <button onClick={() => props.onDirtyChange?.(true)}>Modify employee</button>
+          </div>
+        );
+      },
+    ),
+  };
+});
 
 vi.mock("@/components/staff-detail/EmployeeStatusActions", () => ({
   EmployeeStatusActions: () => <div data-testid="employee-status-actions" />,
@@ -100,6 +127,31 @@ function getPanelStructureContract() {
 }
 
 describe("StaffDetailPanel access controls", () => {
+  it("closes after the embedded editor reports a successful save", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    editorHarness.saveResult = true;
+    renderPanel({ onClose });
+
+    await user.click(screen.getByRole("button", { name: "Modify employee" }));
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+  });
+
+  it("stays open when the embedded editor reports a failed save", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    editorHarness.saveResult = false;
+    renderPanel({ onClose });
+
+    await user.click(screen.getByRole("button", { name: "Modify employee" }));
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    expect(onClose).not.toHaveBeenCalled();
+    editorHarness.saveResult = true;
+  });
+
   it("renders an editable role dropdown when the viewer can change access", () => {
     renderPanel({ orgRole: "user", onRoleChange: vi.fn() });
 

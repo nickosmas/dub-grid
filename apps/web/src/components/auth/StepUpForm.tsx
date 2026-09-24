@@ -61,6 +61,7 @@ export function StepUpForm({
   return (
     <form
       className="flex flex-col gap-4"
+      data-dg-client-form="true"
       onSubmit={(event) => {
         event.preventDefault();
         return submit();

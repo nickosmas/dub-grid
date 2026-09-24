@@ -130,11 +130,15 @@ const pendingInvitation: Invitation = {
 
 function renderPanel(
   overrides: Partial<{
-    onSave: (e: Employee) => void;
+    onSave: (e: Employee) => boolean | void | Promise<boolean | void>;
+    onSaveCompleted: () => void;
     onCancel: () => void;
     isManagementUser: boolean;
     pendingInvitation: Invitation;
-    onSaveWithReinvite: (updated: Employee, oldInvitation: Invitation) => void | Promise<void>;
+    onSaveWithReinvite: (
+      updated: Employee,
+      oldInvitation: Invitation,
+    ) => boolean | void | Promise<boolean | void>;
     orgId: string;
     onEmailConflictChange: (hasConflict: boolean) => void;
     onSaveBlockedChange: (isBlocked: boolean) => void;
@@ -156,6 +160,7 @@ function renderPanel(
       roles={overrides.roles ?? [...ROLES]}
       isManagementUser={overrides.isManagementUser}
       onSave={onSave}
+      onSaveCompleted={overrides.onSaveCompleted}
       onCancel={onCancel}
       pendingInvitation={overrides.pendingInvitation}
       onSaveWithReinvite={overrides.onSaveWithReinvite}
@@ -177,6 +182,32 @@ describe("EditEmployeePanel", () => {
   // Pre-population
   // -------------------------------------------------------------------------
   describe("Pre-population", () => {
+    it("scopes identity fields to explicit contact autofill tokens", () => {
+      renderPanel();
+
+      expect(screen.getByLabelText(/^First name/)).toHaveAttribute(
+        "autocomplete",
+        "section-staff-editor given-name",
+      );
+      expect(screen.getByLabelText(/^Last name/)).toHaveAttribute(
+        "autocomplete",
+        "section-staff-editor family-name",
+      );
+      expect(screen.getByLabelText("Phone")).toHaveAttribute(
+        "autocomplete",
+        "section-staff-editor tel",
+      );
+      expect(screen.getByLabelText("Email")).toHaveAttribute(
+        "autocomplete",
+        "section-staff-editor email",
+      );
+
+      expect(screen.getByLabelText(/^First name/)).toHaveAttribute("name", "staff-first-name");
+      expect(screen.getByLabelText(/^Last name/)).toHaveAttribute("name", "staff-last-name");
+      expect(screen.getByLabelText("Phone")).toHaveAttribute("name", "staff-phone");
+      expect(screen.getByLabelText("Email")).toHaveAttribute("name", "staff-email");
+    });
+
     it("name inputs are pre-populated with employee firstName and lastName", () => {
       renderPanel();
       expect(screen.getByDisplayValue("Alice")).toBeInTheDocument();
@@ -421,6 +452,24 @@ describe("EditEmployeePanel", () => {
       );
     });
 
+    it("reports completion only when the primary save succeeds", async () => {
+      const user = userEvent.setup();
+      const onSaveCompleted = vi.fn();
+      const onSave = vi.fn().mockResolvedValue(false);
+      renderPanel({ onSave, onSaveCompleted });
+
+      const firstNameInput = screen.getByDisplayValue("Alice");
+      await user.clear(firstNameInput);
+      await user.type(firstNameInput, "Bob");
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(onSaveCompleted).not.toHaveBeenCalled();
+
+      onSave.mockResolvedValueOnce(true);
+      await user.click(screen.getByRole("button", { name: "Save" }));
+      expect(onSaveCompleted).toHaveBeenCalledOnce();
+    });
+
     it("shows an inline error when last name is left blank", async () => {
       const user = userEvent.setup();
       renderPanel();
@@ -646,6 +695,26 @@ describe("EditEmployeePanel", () => {
         pendingInvitation,
       );
       expect(onSave).not.toHaveBeenCalled();
+    });
+
+    it("reports Save & send completion only after the employee save succeeds", async () => {
+      const user = userEvent.setup();
+      const onSaveCompleted = vi.fn();
+      const onSaveWithReinvite = vi.fn().mockResolvedValue(false);
+      renderPanel({
+        pendingInvitation,
+        onSaveWithReinvite,
+        onSaveCompleted,
+      });
+
+      await changeEmail(user);
+      await user.click(screen.getByRole("button", { name: "Save" }));
+      await user.click(screen.getByRole("button", { name: "Save & send" }));
+      expect(onSaveCompleted).not.toHaveBeenCalled();
+
+      onSaveWithReinvite.mockResolvedValueOnce(true);
+      await user.click(screen.getByRole("button", { name: "Save & send" }));
+      expect(onSaveCompleted).toHaveBeenCalledOnce();
     });
 
     beforeEach(() => {

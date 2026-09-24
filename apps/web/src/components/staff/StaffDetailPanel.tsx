@@ -41,13 +41,13 @@ interface StaffDetailPanelProps {
   canManageEmployees: boolean;
   orgId?: string;
   pendingInviteByEmployeeId: Map<string, Invitation>;
-  onSave: (emp: Employee) => void;
+  onSave: (emp: Employee) => boolean | Promise<boolean>;
   /** Called instead of `onSave` when the admin confirms changing the email
    *  while a pending invitation exists — see EditEmployeePanel. */
   onSaveWithReinvite?: (
     updatedEmployee: Employee,
     oldInvitation: Invitation,
-  ) => void | Promise<void>;
+  ) => boolean | Promise<boolean>;
   onRemove: (empId: string, note?: string) => void;
   onDeactivate: (empId: string, note?: string) => void;
   onActivate: (empId: string) => void;
@@ -339,6 +339,7 @@ export function StaffDetailPanel({
             ref={editorRef}
             hideActions
             onSave={onSave}
+            onSaveCompleted={closePanel}
             onCancel={handleRequestClose}
             onDirtyChange={setHasUnsavedChanges}
             onSaveBlockedChange={setIsEditorSaveBlocked}

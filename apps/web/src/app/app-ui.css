@@ -730,13 +730,16 @@
   }
 }
 .dg-page-enter {
-  animation: dg-enter var(--dg-duration-standard) ease-out both;
+  /* Route content needs one stable first paint. Applying a mount animation to
+     both the page wrapper and its cards made every navigation briefly render
+     transparent twice, which reads as a drop/flash on slower browsers. */
+  animation: none;
 }
 .dg-card-enter {
-  animation: dg-enter-scale var(--dg-duration-standard) ease-out both;
+  animation: none;
 }
 .dg-row-enter {
-  animation: dg-enter 200ms ease-out both;
+  animation: none;
 }
 .dg-staff-directory-header,
 .dg-staff-directory-row {
@@ -2211,7 +2214,9 @@
   border: 1px solid var(--dg-color-border);
   border-radius: var(--dg-radius-md);
   overflow: hidden;
-  animation: dg-enter-scale var(--dg-duration-standard) ease-out both;
+  /* Cards frequently mount beneath .dg-page-enter. Keep their initial paint
+     final so a route transition never compounds into a second flash. */
+  animation: none;
 }
 .dg-card-header {
   padding: 14px var(--dg-card-padding-x);
