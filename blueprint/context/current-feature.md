@@ -200,48 +200,117 @@ in the cloud container, which has no Supabase stack: that evidence comes from a
 local run or CI, and per 41d an absent runtime check is a blocker rather than a
 pass.
 
-Manual path for step 4. Branch `claude/lucid-hopper-exfpqt`, head `f69abb5c`.
+## Step 4 test script
 
-First run only, to install and build the shared packages:
+Follow it in order. Each step says what to do, what to expect, and what a
+failure means. Branch `claude/lucid-hopper-exfpqt`.
 
+### 0. Start the stack
+
+    git fetch origin
+    git checkout claude/lucid-hopper-exfpqt
     npm ci
     npm run build:packages
-
-Then reset to a seeded local Supabase (required: migration 044 changes both
-invitation RPCs, so an older local database tests the old code path), and start
-the app on http://localhost:3000:
-
     npm run db:reset
     npm run dev
 
-No trailing comments on those lines. Interactive zsh does not treat `#` as a
+No trailing comments on those lines: interactive zsh does not treat `#` as a
 comment unless `interactive_comments` is set, so a pasted `npm run dev # url`
 hands the url to turbo as a task name and fails.
 
-Invite someone in People, keep their invite link, then exercise each surface
-that offers these actions and confirm it asks before acting:
+`db:reset` is not optional. Migration 044 changes both invitation RPCs, so an
+older local database silently tests the old code path.
 
-1. People, management panel: **Resend** on a pending row. Expect "Reissue
-   Invitation?" and "Their current link stops working immediately".
-2. Same panel: **Revoke**. Expect "Revoke Invitation?" and "resending later
-   will not restore it".
-3. The person's detail page: **Revoke** there too.
-4. The pending-invitation banner: **Reinvite** and **Revoke**.
-5. A pending row's role select: change the role. Expect "Change invitation
-   access?", the confirm button reading "Change and resend", and the message
-   naming the address the new link goes to.
+Three local URLs matter:
 
-Then the two behaviours the copy now promises:
+| What                                      | Where                  |
+| ----------------------------------------- | ---------------------- |
+| The app                                   | http://localhost:3000  |
+| Supabase Studio                           | http://127.0.0.1:54323 |
+| Inbucket, which catches every local email | http://127.0.0.1:54324 |
 
-- After a reissue, the link captured earlier must be dead, and the new one must
-  work. This is the rotation: same invitation, new token.
-- After a revoke, a resend must not bring the invitation back. This is the
-  durability fix, and it was the defect worth having found.
+This helper prints the state that matters after each step. Keep it to hand:
 
-Wrong would be: any of those five acting without asking, a dialog still saying
-the invitation will be "revoked and replaced", an old link that still accepts
-after a reissue, or a revoked invitation that a resend revives. Console errors
-count as wrong too.
+    alias inv='psql postgres://postgres:postgres@127.0.0.1:54322/postgres -x -c "select id, email, role_to_assign, token, expires_at, revoked_at, accepted_at from invitations order by updated_at desc limit 3;"'
+
+### 1. Create the invitation under test
+
+Sign in as a super admin, go to People, and invite a new address. Open
+Inbucket, open the invitation email, and **copy the accept link**. Keep it: most
+of what follows is about whether that link still works.
+
+Run `inv`. Expect one pending row: your address, `revoked_at` and `accepted_at`
+both null. Note its `id` and `token`.
+
+### 2. Each surface must ask before it acts
+
+Five places offer these actions. For each: click, read the dialog, then
+**cancel**, and confirm nothing happened.
+
+1. People, management panel, **Resend** on the pending row. Expect "Reissue
+   Invitation?" saying their current link stops working immediately.
+2. Same panel, **Revoke**. Expect "Revoke Invitation?" saying resending later
+   will not restore it.
+3. The person's detail page, **Revoke**.
+4. The pending-invitation banner, **Reinvite**, then **Revoke**.
+5. The pending row's role select: pick a different role. Expect "Change
+   invitation access?", a confirm button reading "Change and resend", and the
+   message naming the address the new link goes to.
+
+After cancelling each one, run `inv`. The `token` must be unchanged every time.
+A changed token means the surface acted before asking, which is the defect this
+step exists to close.
+
+### 3. Reissuing kills the old link
+
+Reissue for real: confirm the dialog at surface 1. Then
+
+- run `inv`: same `id` as step 1, a **different** `token`, `expires_at` about 72
+  hours out, `revoked_at` still null. Same invitation, new link.
+- open Inbucket: a new email with a new link.
+- paste the **step 1** link into a browser. It must be refused as no longer
+  valid.
+- follow the **new** link. It must reach the accept page.
+
+A working old link means rotation did not take effect, and the most likely
+cause is a database that was not reset.
+
+### 4. Revoking holds
+
+Do not accept the invitation. Revoke it from surface 2, confirming the dialog.
+Then
+
+- run `inv`: `revoked_at` is set.
+- try **Resend** on that person, if the control is still offered. It must
+  refuse, and `inv` must still show `revoked_at` set with the same `token`.
+- paste the most recent link. It must be refused.
+
+A resend that clears `revoked_at` or issues a fresh token is the revival defect
+returning, and it is the one worth catching here.
+
+### 5. Change access, and read the trail
+
+Invite a second address. From the role select, change its role and confirm.
+Then
+
+- run `inv`: same `id`, new `token`, and the new `role_to_assign`.
+- in Studio's SQL editor:
+
+      select action, resource_id, details, created_at
+      from audit_log
+      where resource_type = 'invitation'
+      order by created_at desc
+      limit 10;
+
+Expect **one** `invitation.access_replaced` row for that change, against the
+same invitation id. Two rows, a revoke plus a create, would mean the old
+two-row behaviour is still live.
+
+### 6. Report
+
+Keep the browser console open throughout: any error counts as a failure. Tell
+me which numbered step failed and what you saw, and I will fix it. If all six
+pass, step 4 is done and 41a2 is complete.
 
 Commands: `npm run type-check`, `npm run test:web`, `npm run lint`,
 `npm run db:migrations:check`, and `npm run test:e2e` for Step 4.
