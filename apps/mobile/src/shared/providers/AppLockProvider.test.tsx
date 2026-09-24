@@ -29,12 +29,20 @@ let appLockEnabled = false;
 const loadAppLockEnabled = vi.fn(async () => appLockEnabled);
 const getAppLockEnabledSnapshot = vi.fn(() => appLockEnabled);
 const subscribeAppLockEnabled = vi.fn((_callback: () => void) => () => {});
+let lockStateOverride: string | null = null;
+const getAppLockStateSnapshot = () =>
+  lockStateOverride ?? (appLockEnabled ? "enabled" : "disabled");
 
 vi.mock("../lib/app-lock", () => ({
   appLockUnsupported: false,
   loadAppLockEnabled: () => loadAppLockEnabled(),
   getAppLockEnabledSnapshot: () => getAppLockEnabledSnapshot(),
+  getAppLockStateSnapshot: () => getAppLockStateSnapshot(),
+  appLockRequired: (state: string) => state === "enabled" || state === "unreadable",
   subscribeAppLockEnabled: (callback: () => void) => subscribeAppLockEnabled(callback),
+}));
+vi.mock("../components/AppSplashScreen", () => ({
+  AppSplashScreen: () => <div>splash</div>,
 }));
 
 import { AppLockProvider } from "./AppLockProvider";
@@ -45,6 +53,7 @@ describe("AppLockProvider", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     appLockEnabled = false;
+    lockStateOverride = null;
     appStateListener = null;
     useSessionState.mockReturnValue({ accessToken: "token-123", isLoading: false });
     hasHardwareAsync.mockResolvedValue(true);
@@ -188,6 +197,31 @@ describe("AppLockProvider", () => {
     await waitFor(() => {
       expect(authenticateAsync).toHaveBeenCalled();
       expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+    });
+  });
+
+  it("keeps the app covered until the stored setting has loaded", async () => {
+    lockStateOverride = "loading";
+    render(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+
+    expect(screen.getByTestId("app-lock-hydrating")).toBeInTheDocument();
+    expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+  });
+
+  it("locks when the stored setting cannot be read", async () => {
+    lockStateOverride = "unreadable";
+    render(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("App locked")).toBeInTheDocument();
     });
   });
 });
