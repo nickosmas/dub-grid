@@ -533,6 +533,21 @@ describe("PATCH /api/organizations/invitations - super_admin tier ceiling", () =
       "super_admin",
     );
     expect(invitationUpdateOperations).toHaveLength(0);
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        org_id: ORG_ID,
+        actor_id: "actor-1",
+        action: "invitation.access_denied",
+        resource_id: INVITATION_ID,
+        details: expect.objectContaining({
+          requestedRole: "super_admin",
+          currentRole: "user",
+          outcome: "rejected",
+          reason: "policy_denied",
+          path: "edit",
+        }),
+      }),
+    );
   });
 
   it("lets a caller who may assign super_admin through", async () => {
@@ -604,6 +619,12 @@ describe("POST /api/organizations/invitations - replace_access tier ceiling", ()
     // what keeps a lower tier from writing an inviter that outranks them.
     expect(serviceRpc).not.toHaveBeenCalled();
     expect(sendInvitationEmail).not.toHaveBeenCalled();
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "invitation.access_denied",
+        details: expect.objectContaining({ requestedRole: "super_admin", path: "replace_access" }),
+      }),
+    );
   });
 
   it("lets a caller who may assign super_admin replace access", async () => {
@@ -642,4 +663,3 @@ describe("POST /api/organizations/invitations - replace_access tier ceiling", ()
     );
   });
 });
-

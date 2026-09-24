@@ -141,6 +141,24 @@ export async function POST(req: NextRequest) {
 
     // Regular admins with canManageEmployees can still invite admin/user.
     if (!(await canAssignOrgRole(serviceClient, user.id, orgId, role))) {
+      // No invitation exists to hang this on, so the refusal is recorded
+      // against the organization with the address that was attempted.
+      await writeInvitationAuditEntry({
+        orgId,
+        actorId: user.id,
+        actorEmail: user.email ?? null,
+        action: "invitation.access_denied",
+        resourceId: orgId,
+        details: {
+          email: normalizeRequiredStaffEmail(email),
+          requestedRole: role,
+          outcome: "rejected",
+          reason: "policy_denied",
+          path: "create",
+        },
+        ipAddress: getRequestIp(req),
+        userAgent: req.headers.get("user-agent"),
+      });
       return NextResponse.json({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN }, { status: 403 });
     }
 

@@ -105,7 +105,8 @@ describe("POST /api/organizations/invitations/create", () => {
 
   it("rejects super_admin role when caller is not super_admin/gridmaster", async () => {
     const rpc = vi.fn();
-    getServiceClient.mockReturnValue({ rpc });
+    const auditInsert = vi.fn(async () => ({ error: null }));
+    getServiceClient.mockReturnValue({ rpc, from: () => ({ insert: auditInsert }) });
     isOrgSuperAdminOrGridmaster.mockResolvedValue(false);
 
     const { POST } = await importRoute();
@@ -115,6 +116,21 @@ describe("POST /api/organizations/invitations/create", () => {
 
     expect(res.status).toBe(403);
     expect(rpc).not.toHaveBeenCalled();
+    // No invitation row exists to hang the refusal on, so it is recorded
+    // against the organization with the address that was attempted.
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "invitation.access_denied",
+        resource_id: ORG_ID,
+        details: expect.objectContaining({
+          email: "new@test.com",
+          requestedRole: "super_admin",
+          outcome: "rejected",
+          reason: "policy_denied",
+          path: "create",
+        }),
+      }),
+    );
   });
 
   it("allows super_admin role when caller is super_admin or gridmaster", async () => {

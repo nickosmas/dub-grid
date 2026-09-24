@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { resolveAuditActionScope } from "./audience";
-import { AUDIT_ACTIONS, ORG_AUDIENCE_ACTIONS } from "./registry";
+import { AUDIT_ACTIONS, ORG_AUDIENCE_ACTIONS, isVisibleToAudience } from "./registry";
 
 describe("resolveAuditActionScope", () => {
   it("passes a platform reader's prefixes through untouched", () => {
@@ -38,6 +38,16 @@ describe("resolveAuditActionScope", () => {
       kind: "allowlist",
       actions: [],
     });
+  });
+
+  it("shows every invitation authorization event to an organization and to platform staff", () => {
+    // A refusal is only useful if the people who govern access can read it, and
+    // an org reader sees an explicit allowlist rather than everything.
+    for (const action of ["invitation.created", "invitation.access_denied"]) {
+      expect(ORG_AUDIENCE_ACTIONS, `${action} unreadable by an organization`).toContain(action);
+      expect(isVisibleToAudience(action, "org")).toBe(true);
+      expect(isVisibleToAudience(action, "platform")).toBe(true);
+    }
   });
 
   it("never lets an allowlisted name act as a prefix of a platform-only action", () => {

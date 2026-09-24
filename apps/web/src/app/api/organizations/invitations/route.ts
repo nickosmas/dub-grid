@@ -334,6 +334,23 @@ export async function PATCH(req: NextRequest) {
       fields.roleToAssign !== undefined &&
       !(await canAssignOrgRole(getServiceClient(), user.id, orgId, fields.roleToAssign))
     ) {
+      await writeInvitationAuditEntry({
+        orgId,
+        actorId: user.id,
+        actorEmail: user.email ?? null,
+        action: "invitation.access_denied",
+        resourceId: invitationId,
+        details: {
+          email: currentInvitation.email,
+          requestedRole: fields.roleToAssign,
+          currentRole: currentInvitation.roleToAssign,
+          outcome: "rejected",
+          reason: "policy_denied",
+          path: "edit",
+        },
+        ipAddress: getRequestIp(req),
+        userAgent: req.headers.get("user-agent"),
+      });
       return NextResponse.json({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN }, { status: 403 });
     }
 
@@ -614,6 +631,23 @@ export async function POST(req: NextRequest) {
       }
 
       if (!(await canAssignOrgRole(serviceClient, user.id, orgId, parsed.data.roleToAssign))) {
+        await writeInvitationAuditEntry({
+          orgId,
+          actorId: user.id,
+          actorEmail: user.email ?? null,
+          action: "invitation.access_denied",
+          resourceId: invitationId,
+          details: {
+            email: currentInvitation.email,
+            requestedRole: parsed.data.roleToAssign,
+            currentRole: currentInvitation.roleToAssign,
+            outcome: "rejected",
+            reason: "policy_denied",
+            path: "replace_access",
+          },
+          ipAddress: getRequestIp(req),
+          userAgent: req.headers.get("user-agent"),
+        });
         return NextResponse.json({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN }, { status: 403 });
       }
 

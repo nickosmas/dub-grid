@@ -1,7 +1,7 @@
 # Feature: Invitation authorization and inviter attribution
 
 **From build-plan:** feature 41a1
-**Status:** in progress - steps 1, 2 and 5 done; steps 3, 4 and 6 next
+**Status:** in progress - steps 1, 2, 5 and 6 done; steps 3 and 4 need a database
 
 ## Goal
 
@@ -115,7 +115,7 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
       `canManageEmployees` can send an invitation for their own organization, is
       still refused for any other organization, and a passing test covers both.
 
-- [ ] **Step 6 - audit every invitation authorization event** - every create,
+- [x] **Step 6 - audit every invitation authorization event** - every create,
       role change, replace, resend, revoke and refusal writes an audit entry
       naming the real actor, and each is readable by a super admin in the
       organization's audit log and by a gridmaster in the platform log. Creation
