@@ -3,12 +3,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const requireMobileAuth = vi.fn();
 const requireMobileSensitiveActionAuth = vi.fn();
 const updateUserById = vi.fn();
+const followUpLinkedLoginEmailChange = vi.fn();
 const fetchMobileEmployeeRowById = vi.fn();
 const fetchMobileManagementMembershipRowsByUserIds = vi.fn();
 const fetchMobilePendingInvitationRowByEmployeeId = vi.fn();
 const updateMobileEmployeeDetailsRow = vi.fn();
 const rowToEmployee = vi.fn();
 const validateStaffOrgReferences = vi.fn();
+
+vi.mock("@/features/employees/server/login-email-follow-up", () => ({
+  followUpLinkedLoginEmailChange: (...args: unknown[]) => followUpLinkedLoginEmailChange(...args),
+}));
 
 vi.mock("@/features/mobile/server", () => ({
   requireMobileAuth,
@@ -43,6 +48,7 @@ function makeAuth(overrides?: { canManageEmployees?: boolean; canViewStaff?: boo
     user: {
       id: VIEWER_USER_ID,
     },
+    claims: { session_id: "viewer-session" },
     permissions: {
       canManageEmployees: overrides?.canManageEmployees ?? true,
       canViewStaff: overrides?.canViewStaff ?? true,
@@ -409,6 +415,15 @@ describe("mobile person route", () => {
           audit: { details?: { to: Record<string, unknown> } };
         };
         expect(input.audit.details?.to.loginEmail).toBe("new@dubgrid.com");
+        // Sessions under the old identity end, and both addresses hear why.
+        expect(followUpLinkedLoginEmailChange).toHaveBeenCalledWith(
+          expect.objectContaining({
+            userId: PERSON_USER_ID,
+            newEmail: "new@dubgrid.com",
+            actorId: VIEWER_USER_ID,
+            actorSessionId: "viewer-session",
+          }),
+        );
       });
 
       it("returns the step-up challenge without touching the account", async () => {

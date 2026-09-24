@@ -12,6 +12,7 @@ const rowToEmployee = vi.fn();
 const forbidIfSandboxCookie = vi.fn();
 const requireSensitiveActionAuth = vi.fn();
 const updateUserById = vi.fn();
+const followUpLinkedLoginEmailChange = vi.fn();
 const employeeUpdatePayloads: unknown[] = [];
 
 vi.mock("@/lib/csrf", () => ({
@@ -27,6 +28,10 @@ vi.mock("@/lib/api-auth", () => ({
   requireAuthenticatedUser: (...args: unknown[]) => requireAuthenticatedUser(...args),
   forbidIfSandboxCookie: (...args: unknown[]) => forbidIfSandboxCookie(...args),
   requireSensitiveActionAuth: (...args: unknown[]) => requireSensitiveActionAuth(...args),
+}));
+
+vi.mock("@/features/employees/server/login-email-follow-up", () => ({
+  followUpLinkedLoginEmailChange: (...args: unknown[]) => followUpLinkedLoginEmailChange(...args),
 }));
 
 vi.mock("@/app/api/shared/schedule", () => ({
@@ -345,6 +350,17 @@ describe("POST /api/employees/manage", () => {
         });
         expect(rowsWrittenWhenAccountChanged).toBe(0);
         expect(employeeUpdatePayloads).toContainEqual(expect.objectContaining({ version: 1 }));
+        // Sessions under the old identity end, and both addresses hear why.
+        expect(followUpLinkedLoginEmailChange).toHaveBeenCalledWith(
+          expect.objectContaining({
+            userId: PERSON_USER_ID,
+            newEmail: "new@dubgrid.com",
+            actorId: VIEWER_USER_ID,
+          }),
+        );
+        expect(updateUserById.mock.invocationCallOrder[0]).toBeLessThan(
+          followUpLinkedLoginEmailChange.mock.invocationCallOrder[0]!,
+        );
       });
 
       it("returns the step-up challenge without touching the account", async () => {

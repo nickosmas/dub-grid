@@ -154,7 +154,8 @@ export async function revokeSession(sessionId: string): Promise<void> {
  *
  * For changes where letting an existing token keep working would be a real
  * access-control failure: account deactivated, membership removed or archived,
- * org role changed, account deleted. Not needed for ordinary profile edits.
+ * org role changed, sign-in email changed by an administrator, account deleted.
+ * Not needed for ordinary profile edits.
  */
 export async function revokeAllUserSessions(userId: string): Promise<void> {
   forgetMemoizedUser(userId);
