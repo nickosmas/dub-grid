@@ -19,6 +19,8 @@ type AuthSessionContextValue = {
   isLoading: boolean;
   restoreError: boolean;
   retryRestore: () => Promise<void>;
+  /** Drops the stored session so the user can sign in afresh. Always ends signed out. */
+  clearSessionAndSignIn: () => Promise<void>;
 };
 
 const AuthSessionContext = createContext<AuthSessionContextValue | null>(null);
@@ -37,22 +39,51 @@ export function replaceAuthSession(session: Session | null): boolean {
   return true;
 }
 
-function shouldClearLocalAuthForRestoreError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
+const LOCAL_SIGN_OUT_TIMEOUT_MS = 5_000;
 
-  return /invalid refresh token|refresh token not found/i.test(message);
+const STALE_SESSION_CODES = new Set([
+  "refresh_token_not_found",
+  "refresh_token_already_used",
+  "session_not_found",
+  "session_expired",
+  "bad_jwt",
+  "user_not_found",
+]);
+
+/**
+ * Whether a restore failure says the stored session is dead rather than that
+ * the network is. A dead session can never succeed on retry, so it is cleared
+ * and the user signs in again; only a transport or provider outage keeps the
+ * retry screen.
+ */
+export function shouldClearLocalAuthForRestoreError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/invalid refresh token|refresh token not found|invalid jwt|malformed/i.test(message)) {
+    return true;
+  }
+  if (!error || typeof error !== "object") return false;
+  const { code, status, name } = error as { code?: unknown; status?: unknown; name?: unknown };
+  if (typeof code === "string" && STALE_SESSION_CODES.has(code)) return true;
+  if (name === "AuthRetryableFetchError") return false;
+  return (
+    typeof status === "number" && status >= 400 && status < 500 && status !== 408 && status !== 429
+  );
 }
 
 export function AuthSessionProvider({ children }: PropsWithChildren) {
-  const [value, setValue] = useState<Omit<AuthSessionContextValue, "retryRestore">>({
+  const [value, setValue] = useState<
+    Omit<AuthSessionContextValue, "retryRestore" | "clearSessionAndSignIn">
+  >({
     session: null,
     isLoading: true,
     restoreError: false,
   });
   const lastTrackedAccessTokenRef = useRef<string | null>(null);
   const retryRestoreRef = useRef<() => Promise<void>>(async () => undefined);
+  const clearSessionRef = useRef<() => Promise<void>>(async () => undefined);
   const supabase = getSupabaseClient();
   const retryRestore = useCallback(() => retryRestoreRef.current(), []);
+  const clearSessionAndSignIn = useCallback(() => clearSessionRef.current(), []);
 
   useEffect(() => {
     let isMounted = true;
@@ -60,6 +91,16 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
     let restoreInFlight: Promise<void> | null = null;
     let cancelRestore: (() => void) | null = null;
     let committedIdentity = getMobileAuthIdentity(null);
+
+    // Settles even when storage or the provider never answers, so leaving is
+    // always possible.
+    const clearStoredSession = () =>
+      Promise.race([
+        Promise.resolve()
+          .then(() => supabase.auth.signOut({ scope: "local" }))
+          .catch(() => undefined),
+        new Promise<void>((resolve) => setTimeout(resolve, LOCAL_SIGN_OUT_TIMEOUT_MS)),
+      ]);
 
     const writeSession = (session: Session | null) => {
       const nextIdentity = getMobileAuthIdentity(session?.access_token ?? null);
@@ -70,11 +111,14 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
         nextIdentity.kind !== "unreadable";
 
       if (nextIdentity.kind === "unreadable") {
+        // A token that cannot be read will not become readable on retry, so
+        // the stored copy goes too, or every launch would replay it.
         void queryClient.cancelQueries();
         queryClient.clear();
-        committedIdentity = nextIdentity;
+        committedIdentity = getMobileAuthIdentity(null);
         lastTrackedAccessTokenRef.current = null;
-        setValue({ session: null, isLoading: false, restoreError: true });
+        void clearStoredSession();
+        setValue({ session: null, isLoading: false, restoreError: false });
         return;
       }
 
@@ -159,7 +203,7 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
               finishSessionRestore();
               authEntryRecorder.cancel("warm_restore");
               if (shouldClearLocalAuthForRestoreError(error)) {
-                void supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+                void clearStoredSession();
                 writeSession(null);
                 return;
               }
@@ -179,6 +223,12 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
     };
 
     retryRestoreRef.current = restoreSession;
+    clearSessionRef.current = async () => {
+      restoreGeneration += 1;
+      cancelRestore?.();
+      await clearStoredSession();
+      if (isMounted) writeSession(null);
+    };
     void restoreSession();
 
     const {
@@ -193,13 +243,14 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
         activeSessionWriter = null;
       }
       retryRestoreRef.current = async () => undefined;
+      clearSessionRef.current = async () => undefined;
       cancelRestore?.();
       subscription.unsubscribe();
     };
   }, []);
 
   return (
-    <AuthSessionContext.Provider value={{ ...value, retryRestore }}>
+    <AuthSessionContext.Provider value={{ ...value, retryRestore, clearSessionAndSignIn }}>
       {children}
     </AuthSessionContext.Provider>
   );

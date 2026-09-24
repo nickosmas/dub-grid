@@ -77,7 +77,8 @@ function getOrgSuffixLabel(apiBaseUrl: string) {
 export default function LoginScreen() {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-  const { accessToken, isLoading, restoreError, retryRestore } = useSessionState();
+  const { accessToken, isLoading, restoreError, retryRestore, clearSessionAndSignIn } =
+    useSessionState();
   // A protected route that sent us here names itself in `next`.
   const { next } = useLocalSearchParams<{ next?: string }>();
   const postLoginDestination = resolvePostLoginDestination(next);
@@ -192,6 +193,7 @@ export default function LoginScreen() {
             setRestoringSession(false);
           }
         }}
+        onSignInAgain={() => clearSessionAndSignIn()}
       />
     );
   }
