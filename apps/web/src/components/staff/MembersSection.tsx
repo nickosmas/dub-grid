@@ -903,9 +903,11 @@ export function MembersSection({
       .catch(() => {});
   }
 
+  // Not wrapped in a confirmation: its only caller is the pending-invitation
+  // banner, which asks first, and the banner's reinvite calls it again inside
+  // an already-confirmed flow. Asking here produced two dialogs for one click.
   async function handleRevokeInvitation(invitationId: string): Promise<boolean> {
     if (!orgId) return false;
-    if (!(await askToConfirm("revoke", inviteeEmailFor(invitationId)))) return false;
     setRevokingId(invitationId);
 
     try {

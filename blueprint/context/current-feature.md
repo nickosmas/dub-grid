@@ -335,6 +335,28 @@ failures.
     pg_ctl -D /var/lib/postgresql/verify stop   # before npm run test:web
     pg_ctl -D /var/lib/postgresql/verify -o '-p 54322' start   # for the rig
 
+## Found in the step 4 walkthrough
+
+**Two dialogs for one click, on the detail panel's Reinvite.** Reported from
+step 7 of the script. The banner asks "Reissue Invitation?", then calls
+`handleReinvite`, which calls `onRevoke` to clear the old invitation, and that
+function had been wrapped in the shared confirmation, so it asked again. Fixed
+by not wrapping it: the banner is its only caller and the banner already asks.
+The wrapper stays on the management panel's revoke and resend, which have no
+dialog of their own.
+
+**The detail panel's Reinvite is still revoke-then-create, not rotation.** Open,
+and the more interesting finding. `StaffDetailPanel.handleReinvite`
+(`StaffDetailPanel.tsx:152`) revokes the pending invitation and then opens the
+invite modal to create a new one, so on that surface a reissue still mints a
+second invitation rather than rotating the first. That is the exact flow the
+plan called "revoke-first", which earlier reading of the code had missed
+because the revoke and the create are two calls in a handler rather than one
+dialog naming both. Rotation should be reachable from here too, which means
+pointing this handler at the resend path instead of revoke-plus-invite. It is a
+behavioural change on a surface the script is still walking, so it is recorded
+rather than done in the middle of a test run.
+
 ## Raised for 41b, not fixed here
 
 Accepting an organization invitation needs only the invitee's password, never
