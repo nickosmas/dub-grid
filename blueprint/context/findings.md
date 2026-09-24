@@ -151,29 +151,29 @@
 **Suggested fix:** Revoke all target sessions after the identity change, send durable notices to both addresses naming the organization and actor/action context, and define compensation for any partial failure. Add target-session and both-recipient notification tests.
 **Resolution:** Fixed on `dev` in `6af4dc71`. After a committed change, the web and mobile staff routes revoke the person's sessions (only the other sessions when someone edits their own record) and email both addresses. The previous address learns the new one and the organization. The admin-typed new address learns only the organization, per the misaddressed-email rule. The change has already committed, so each step fails independently and is reported to Sentry and the log rather than failing the save. Notices are sent directly, not through a durable outbox. Boundary tests require the follow-up after both sync calls.
 
-### F-22 [P2] open - Auth and security emails lose organization context and use ambiguous account wording
+### F-22 [P2] fixed - Auth and security emails lose organization context and use ambiguous account wording
 
 **File:** `apps/web/src/features/notifications/server/sender.ts:209`; `apps/web/src/emails/auth/PasswordChangedEmail.tsx:9`
 **Found:** 2026-09-24 by `/audit` (scope: authentication emails; lens: quality and security)
 **Why it matters:** `sendNotification` receives `orgId` but renders only a generic title/message, so "New sign-in on your account" omits the organization even though the route also captured browser, location, and time-capable metadata. Organization-scoped notification mail has the same central loss. Conversely, password/email/MFA/recovery templates describe the account generically and direct users to "your administrator" even though credentials are account-global and an org admin may not control them. Recovery omits the configured one-hour code expiry, and the reauthentication template says an unsolicited sensitive-action code can simply be ignored. The custom invitation email is the positive exception: it correctly names the organization and says 72 hours.
 **Suggested fix:** Make optional organization context first-class in notification subjects/templates and include device, browser, location, and explicit event time for sign-ins. Phrase credential mail as "your DubGrid sign-in account"; when a verified initiating organization is available, name it as context (for example, "while signed in to {organization}"), but never imply it owns the credential or disclose organization counts/memberships. Route suspicious activity to session review/password reset/support, state code expiry, and keep the unused generic Supabase invite template disabled unless it can receive a verified org name.
-**Resolution:**
+**Resolution:** Fixed on `dev` in `a30e3270` and `39a387fd`. The Supabase credential emails now describe "your DubGrid sign-in" and no longer send anyone to "your administrator". A change you didn't make routes to a password reset, session review and support@dubgrid.com. Recovery states its 1-hour expiry. An unrequested identity code now warns that someone may know your password. Supabase sends these templates and cannot be given a verified organization, so they name none. App notification emails carry the organization in the subject and above the heading. Security alerts name it only as "While signed in to {organization}" and keep it out of the subject. The new sign-in alert states device, browser, approximate location and an explicit UTC time. The drift check (F-26) pins the wording rules and checks the expiry against `config.toml`. It also asserts nothing sends Supabase's generic invite, which cannot name an organization, so that template stays unused.
 
-### F-23 [P2] open - Login audit records can claim success before MFA and name the wrong organization
+### F-23 [P2] fixed - Login audit records can claim success before MFA and name the wrong organization
 
 **File:** `apps/web/src/app/api/auth/login/route.ts:415`
 **Found:** 2026-09-24 by `/audit` (scope: sign-in; lens: security observability)
 **Why it matters:** An MFA-required password login skips post-sign-in orchestration but is still written as `outcome: "succeeded"` before the TOTP challenge completes. When orchestration switches organizations, the audit entry uses the original token's `claims.org_id` rather than the computed effective claims. Abandoned MFA challenges look like successful sign-ins and multi-org events can be attributed to the wrong tenant.
 **Suggested fix:** Record a challenged/pending outcome after password verification, write success only after MFA completion, and pass the effective post-switch org ID into the audit event. Add abandoned-MFA and cross-org attribution tests.
-**Resolution:**
+**Resolution:** Fixed on `dev` in `d5b28904`. On web and mobile, the password step of a two-factor sign-in is recorded as `challenged` (`second_factor_required`). `POST /api/auth/login/complete` and `/api/mobile/v1/auth/sign-in-complete` record `succeeded`, but only for a session carrying a TOTP proof from the last ten minutes, against the organization the session ended in. The login pages call them once sign-in finishes. Web records a switched sign-in against the effective organization. Route, page and helper tests cover abandoned challenges, completion and cross-org attribution.
 
-### F-24 [P2] open - Corrupt persisted mobile auth can trap the user in a retry-only recovery loop
+### F-24 [P2] fixed - Corrupt persisted mobile auth can trap the user in a retry-only recovery loop
 
 **File:** `apps/mobile/src/shared/providers/AuthSessionProvider.tsx:72`
 **Found:** 2026-09-24 by `/audit` (scope: mobile session restoration; lens: resilience)
 **Why it matters:** An unreadable access token clears query state and sets `restoreError`, but does not clear Supabase persistence. Other restore errors are only cleared for two exact refresh-token strings. The recovery screen labels the state as connectivity and offers only "Try again", so structurally corrupt storage can replay the same failure indefinitely until the user clears app data or reinstalls.
 **Suggested fix:** Clear structurally unreadable auth automatically, broaden safe stale-token classification, or provide "Clear session and sign in again" alongside retry. Add malformed storage and non-matching provider-error tests.
-**Resolution:**
+**Resolution:** Fixed on `dev` in `7710b1ec`. An unreadable stored token now clears the stored session and goes to sign-in instead of the retry screen. Any 4xx or known stale-session code from the provider does the same, while transport failures, 5xx, 408 and 429 keep the retry. The recovery screen gains "Sign in again", which always ends signed out, even when storage never answers (5-second bound). Provider tests cover malformed storage, stale-session codes, network failure and a hung sign-out.
 
 ### F-25 [P2] fixed - Impersonation notices trust recipient and organization wording supplied by the browser
 
@@ -183,13 +183,13 @@
 **Suggested fix:** Resolve recipient, organization, actor, justification, and session state from the authenticated Gridmaster-owned impersonation record before rendering or sending, and reject mismatched/closed sessions. Add tampered recipient/org tests.
 **Resolution:** Fixed on `dev` in `5d88533d`. The browser sends only the event and session id. The route loads the session only for this Gridmaster on this device, requires it live for a start notice and ended for an end notice, and reads the recipient from the target account and the organization and reason from the database. Route tests cover a spoofed recipient, a foreign session and mismatched session states. The same email review removed the inviter's identity from invitation emails (`5aeb7911`).
 
-### F-26 [P3] open - Auth-email source and deployable HTML can drift without CI noticing
+### F-26 [P3] fixed - Auth-email source and deployable HTML can drift without CI noticing
 
 **File:** `apps/web/scripts/generate-auth-email-templates.test.mts:1`
 **Found:** 2026-09-24 by `/audit` (scope: authentication emails; lens: tests)
 **Why it matters:** The React email generator writes `supabase/templates` in place and is outside the normal web test target; CI runs the `src` suite, while production sync reads the committed HTML. A wording, expiry, or security-link correction can therefore pass CI but leave the template that is actually pushed to Supabase unchanged.
 **Suggested fix:** Add a non-mutating render-and-compare drift test to the normal verification path, covering all template bodies, subjects, and required Supabase placeholders. Keep the existing write mode as an explicit regeneration command.
-**Resolution:**
+**Resolution:** Fixed on `dev` in `6a527925`. The template list lives in `src/emails/auth/supabase-templates.ts`, shared by `npm run email:build` and a new check in the normal suite. The check renders and formats each template as the generator does, without writing, and compares it with the committed HTML. It was proven to fail on a one-word source change. It also asserts every placeholder, the `config.toml` subject and path for each template, and that the push script syncs exactly the rendered set.
 
 ### F-27 [P3] fixed - Several auth and invitation rate limits return an epoch as Retry-After
 
