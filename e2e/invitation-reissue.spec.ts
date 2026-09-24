@@ -49,8 +49,8 @@ async function removeFixtures(emails: string[]): Promise<void> {
   });
 }
 
-/** An on-schedule employee with a pending `user` invitation from the QA super admin. */
-async function createEmployeeInvitation(email: string, lastName: string) {
+/** An on-schedule employee with no invitation yet. */
+async function createEmployee(email: string, lastName: string): Promise<string> {
   return withDatabase(async (db) => {
     const employee = await db.query<{ id: string }>(
       `INSERT INTO public.employees
@@ -71,6 +71,14 @@ async function createEmployeeInvitation(email: string, lastName: string) {
     );
     const employeeId = employee.rows[0]?.id;
     if (!employeeId) throw new Error("Could not create the fixture employee");
+    return employeeId;
+  });
+}
+
+/** An on-schedule employee with a pending `user` invitation from the QA super admin. */
+async function createEmployeeInvitation(email: string, lastName: string) {
+  const employeeId = await createEmployee(email, lastName);
+  return withDatabase(async (db) => {
     const sent = await db.query<{ result: { invitation_id: string } }>(
       `SELECT public.send_invitation(
          $1, 'user', o.id, $2, 'Reissue', $3, NULL, '{}'::bigint[], '{}'::bigint[],
@@ -499,6 +507,45 @@ test.describe("invitation reissue and revoke", () => {
         // Delivery failed, so the previous link and access are restored.
         expect(after.role_to_assign).toBe("user");
         expect(after.token).toBe(before.token);
+      }
+    } finally {
+      await removeFixtures([email]);
+    }
+  });
+
+  test("sending an invitation creates and emails it in one step", async ({ page }, testInfo) => {
+    const email = fixtureEmail("send", testInfo);
+    await removeFixtures([email]);
+    const lastName = `Send ${testInfo.project.name}`;
+    await createEmployee(email, lastName);
+
+    try {
+      await loginAsQaAccount(page, QA_SUPER_ADMIN_EMAIL, QA_CALM_HAVEN_ORIGIN);
+      await openPeople(page, "Reissue Send");
+      const row = rowFor(page, `Reissue ${lastName}`);
+      await row.waitFor({ timeout: 60_000 });
+      await row.getByRole("cell", { name: "Full-time" }).click();
+      await page.getByRole("button", { name: "Send invitation" }).click();
+
+      const invite = page.getByRole("dialog", { name: /^Invite / });
+      const create = page.waitForResponse(
+        (response) =>
+          response.url().endsWith("/api/organizations/invitations/create") &&
+          response.request().method() === "POST",
+      );
+      await invite.getByRole("button", { name: "Send Invitation" }).click();
+      const delivered = (await create).ok();
+      await evidence(page, testInfo, "send-invitation-result");
+
+      // The email and the invitation succeed or fail together: never a live
+      // invitation whose link nobody received (finding F-10).
+      const rows = await readInvitations(email);
+      if (delivered) {
+        expect(rows).toHaveLength(1);
+        expect(await linkIsLive(page, rows[0]!.token)).toBe(true);
+      } else {
+        expect(rows).toHaveLength(0);
+        await expect(invite.getByText(/couldn't send|not configured/i)).toBeVisible();
       }
     } finally {
       await removeFixtures([email]);
