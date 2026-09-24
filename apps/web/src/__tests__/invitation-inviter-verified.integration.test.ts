@@ -207,9 +207,9 @@ describe.skipIf(!reachable)("invitation inviter verification (migration 043, liv
     const after = await db.query(
       `SELECT id, token, email, role_to_assign, revoked_at, department_ids,
               expires_at > NOW() + INTERVAL '71 hours' AS fresh_expiry,
-              (SELECT count(*) FROM invitations) AS row_count
+              (SELECT count(*) FROM invitations WHERE org_id = $2) AS row_count
          FROM invitations WHERE id = $1`,
-      [invitationId],
+      [invitationId, ORG],
     );
 
     // One invitation, one identity: re-issuing does not mint a successor.
@@ -279,6 +279,56 @@ describe.skipIf(!reachable)("invitation inviter verification (migration 043, liv
     const after = await db.query(`SELECT token FROM invitations WHERE id = $1`, [invitationId]);
     // The invitee's original link works again rather than being stranded.
     expect(after.rows[0].token).toBe(before.rows[0].token);
+  });
+
+  it("restores the previous access, not just the link, when a dispatch fails", async () => {
+    await asServiceRole();
+    const invitationId = await sendInvitation("user", SUPER_ADMIN);
+    await asSuperuser();
+    const before = await db.query(
+      `SELECT token, role_to_assign::TEXT AS role, invited_by, updated_at::TEXT AS updated_at
+         FROM invitations WHERE id = $1`,
+      [invitationId],
+    );
+
+    // An admin raises it to their own tier, which records them as inviter.
+    await asServiceRole();
+    const rotated = await db.query(
+      `SELECT replace_pending_invitation_access($1,$2,$3::TIMESTAMPTZ,'admin',$4,NULL,NULL) AS result`,
+      [ORG, invitationId, before.rows[0].updated_at, ADMIN],
+    );
+    const result = rotated.rows[0].result;
+    expect(result.previous_role).toBe("user");
+    expect(result.previous_invited_by).toBe(SUPER_ADMIN);
+
+    const restored = await db.query(
+      `SELECT rollback_pending_invitation_access_replacement(
+         $1,$2,$3,$4,$5::TIMESTAMPTZ,$6,$7,$8::BIGINT[],$9::BIGINT[]) AS result`,
+      [
+        ORG,
+        invitationId,
+        result.token,
+        result.previous_token,
+        result.previous_expires_at,
+        result.previous_role,
+        result.previous_invited_by,
+        result.previous_department_ids,
+        result.previous_dept_admin_ids,
+      ],
+    );
+    expect(restored.rows[0].result.restored).toBe(true);
+
+    await asSuperuser();
+    const after = await db.query(
+      `SELECT token, role_to_assign::TEXT AS role, invited_by FROM invitations WHERE id = $1`,
+      [invitationId],
+    );
+    // The link the invitee holds works again, and grants what it did before.
+    expect(after.rows[0]).toEqual({
+      token: before.rows[0].token,
+      role: "user",
+      invited_by: SUPER_ADMIN,
+    });
   });
 
   it("will not restore over a later rotation", async () => {

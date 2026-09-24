@@ -256,6 +256,10 @@ describe("POST /api/organizations/invitations", () => {
           expires_at: "2099-02-01T00:00:00.000Z",
           previous_token: "original-token",
           previous_expires_at: "2099-01-01T00:00:00.000Z",
+          previous_role: "user",
+          previous_invited_by: "original-inviter",
+          previous_department_ids: [3],
+          previous_dept_admin_ids: [],
         },
         error: null,
       })
@@ -285,6 +289,12 @@ describe("POST /api/organizations/invitations", () => {
         p_rotated_token: "rotated-token",
         p_previous_token: "original-token",
         p_previous_expires_at: "2099-01-01T00:00:00.000Z",
+        // The access goes back with the link: a surviving old link must not
+        // carry the role the failed change asked for.
+        p_previous_role: "user",
+        p_previous_invited_by: "original-inviter",
+        p_previous_department_ids: [3],
+        p_previous_dept_admin_ids: [],
       },
     );
   });

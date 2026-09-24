@@ -15,6 +15,7 @@ import {
   revokeMobileEmployeeInvitationRow,
   updateMobileInvitationAssignmentsRow,
   updateMobileMembershipAccessRow,
+  type MobileInvitationRotation,
 } from "@dubgrid/data-access";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -210,12 +211,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
 
   let invitation;
   let createdInvitation = false;
-  let rotation: {
-    invitationId: string;
-    rotatedToken: string;
-    previousToken: string;
-    previousExpiresAt: string;
-  } | null = null;
+  let rotation: ({ invitationId: string } & MobileInvitationRotation) | null = null;
   if (loaded.pendingInvitation) {
     if ((loaded.pendingInvitation.updated_at ?? null) !== parsed.data.expectedInvitationUpdatedAt) {
       return conflictResponse(loaded.person);

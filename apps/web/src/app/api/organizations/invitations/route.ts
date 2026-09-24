@@ -679,13 +679,17 @@ export async function POST(req: NextRequest) {
       }
 
       // Rotation keeps the row, so there is no successor id: the previous
-      // token and expiry come back instead, for the restore below.
+      // token, expiry and grant come back instead, for the restore below.
       const replacement = replacementData as {
         invitation_id?: string;
         token?: string;
         expires_at?: string;
         previous_token?: string;
         previous_expires_at?: string;
+        previous_role?: string | null;
+        previous_invited_by?: string | null;
+        previous_department_ids?: number[] | null;
+        previous_dept_admin_ids?: number[] | null;
       } | null;
       if (
         !replacement?.invitation_id ||
@@ -718,6 +722,12 @@ export async function POST(req: NextRequest) {
             p_rotated_token: replacement.token,
             p_previous_token: replacement.previous_token,
             p_previous_expires_at: replacement.previous_expires_at,
+            // Without these the old link survives the failure with the new
+            // access attached, while the admin is told nothing changed.
+            p_previous_role: replacement.previous_role ?? null,
+            p_previous_invited_by: replacement.previous_invited_by ?? null,
+            p_previous_department_ids: replacement.previous_department_ids ?? null,
+            p_previous_dept_admin_ids: replacement.previous_dept_admin_ids ?? null,
           },
         );
         // The restore is refused rather than applied when the row moved on, so
