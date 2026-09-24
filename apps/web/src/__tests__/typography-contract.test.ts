@@ -288,12 +288,12 @@ describe("productive typography contract", () => {
     expect(rootLayout).toContain(
       'className={cn(inter.variable, dmSans.variable, dmMono.variable, "font-sans")}',
     );
-    expect(globalsCss).toContain('--font-sans: var(--font-inter), "Inter", system-ui, sans-serif;');
+    expect(globalsCss).toContain('--font-sans: var(--font-inter, "Inter"), system-ui, sans-serif;');
     expect(globalsCss).toContain(
       '--font-brand: var(--font-dm-sans), "DM Sans", system-ui, sans-serif;',
     );
     expect(globalsCss).toMatch(
-      /html,\s*body\s*\{[\s\S]*?font-family:\s*var\(--font-inter\), "Inter", system-ui, sans-serif;/,
+      /html,\s*body\s*\{[\s\S]*?font-family:\s*var\(--font-inter, "Inter"\), system-ui, sans-serif;/,
     );
     expect(globalsCss).toMatch(/html,\s*body\s*\{[\s\S]*?font-optical-sizing:\s*auto;/);
   });

@@ -23,7 +23,7 @@ env:
 
 jobs:
   e2e:
-    name: Playwright (shard ${{ matrix.shard }}/4)
+    name: Playwright (${{ matrix.browser }}, shard ${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     # Setup consumes roughly six minutes before the Chromium suite begins. Leave
     # enough headroom for the full release suite rather than cancelling it at
@@ -32,6 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        browser: [chromium, firefox, webkit]
         shard: [1, 2, 3, 4]
     env:
       TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
@@ -56,7 +57,7 @@ jobs:
       - run: npm run deps:rebuild
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium firefox webkit
+        run: npx playwright install --with-deps ${{ matrix.browser }}
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1 # v1.7.1
@@ -117,13 +118,13 @@ jobs:
         run: timeout 60 bash -c 'until curl -s http://localhost:3000 > /dev/null 2>&1; do sleep 1; done'
 
       - name: Run Playwright tests
-        run: npx playwright test --shard=${{ matrix.shard }}/4
+        run: npx playwright test --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/4
 
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: playwright-report-shard-${{ matrix.shard }}-of-4
+          name: playwright-report-${{ matrix.browser }}-shard-${{ matrix.shard }}-of-4
           path: playwright-report/
           retention-days: 14
 
@@ -131,7 +132,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: playwright-test-results-shard-${{ matrix.shard }}-of-4
+          name: playwright-test-results-${{ matrix.browser }}-shard-${{ matrix.shard }}-of-4
           path: test-results/
           retention-days: 7
 
@@ -139,6 +140,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: server-log-shard-${{ matrix.shard }}-of-4
+          name: server-log-${{ matrix.browser }}-shard-${{ matrix.shard }}-of-4
           path: server.log
           retention-days: 7

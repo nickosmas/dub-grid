@@ -27,7 +27,7 @@
   └────────────────────────────────────────────────────────────────────┘
 */
 @theme inline {
-  --font-sans: var(--font-inter), "Inter", system-ui, sans-serif;
+  --font-sans: var(--font-inter, "Inter"), system-ui, sans-serif;
   --font-brand: var(--font-dm-sans), "DM Sans", system-ui, sans-serif;
   --font-mono: var(--font-dm-mono), "DM Mono", monospace;
 
@@ -527,7 +527,7 @@ body {
   min-height: 100dvh;
   background: var(--dg-color-bg);
   background-attachment: fixed;
-  font-family: var(--font-inter), "Inter", system-ui, sans-serif;
+  font-family: var(--font-inter, "Inter"), system-ui, sans-serif;
   font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

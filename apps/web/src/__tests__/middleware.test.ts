@@ -463,6 +463,24 @@ describe("middleware: Content-Security-Policy", () => {
     expect(scriptSrc).toContain("https://maps.googleapis.com");
   });
 
+  it("does not upgrade HTTP assets on local production-mode hosts", async () => {
+    const req = makeNextRequest("http://gridmaster.localhost:3000/login", {
+      host: "gridmaster.localhost:3000",
+    });
+    const res = await runMiddleware(req);
+    const csp = (res as { headers: Headers }).headers.get("Content-Security-Policy") ?? "";
+    expect(csp).not.toContain("upgrade-insecure-requests");
+  });
+
+  it("keeps HTTPS upgrades enabled on deployed hosts", async () => {
+    const req = makeNextRequest("https://app.dubgrid.com/login", {
+      host: "app.dubgrid.com",
+    });
+    const res = await runMiddleware(req);
+    const csp = (res as { headers: Headers }).headers.get("Content-Security-Policy") ?? "";
+    expect(csp).toContain("upgrade-insecure-requests");
+  });
+
   it("uses a per-request nonce + strict-dynamic and drops 'unsafe-inline' for the authenticated app", async () => {
     mockSessionWithClaims({
       platform_role: "none",
