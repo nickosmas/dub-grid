@@ -200,8 +200,36 @@ in the cloud container, which has no Supabase stack: that evidence comes from a
 local run or CI, and per 41d an absent runtime check is a blocker rather than a
 pass.
 
-Manual path: open a pending invitation in People, re-issue its access, and
-confirm the old link stops working while the new one arrives.
+Manual path for step 4. Branch `claude/lucid-hopper-exfpqt`, head `f69abb5c`.
+
+    npm ci && npm run build:packages    # first run only
+    npm run db:reset                    # seeded local Supabase
+    npm run dev                         # http://localhost:3000
+
+Invite someone in People, keep their invite link, then exercise each surface
+that offers these actions and confirm it asks before acting:
+
+1. People, management panel: **Resend** on a pending row. Expect "Reissue
+   Invitation?" and "Their current link stops working immediately".
+2. Same panel: **Revoke**. Expect "Revoke Invitation?" and "resending later
+   will not restore it".
+3. The person's detail page: **Revoke** there too.
+4. The pending-invitation banner: **Reinvite** and **Revoke**.
+5. A pending row's role select: change the role. Expect "Change invitation
+   access?", the confirm button reading "Change and resend", and the message
+   naming the address the new link goes to.
+
+Then the two behaviours the copy now promises:
+
+- After a reissue, the link captured earlier must be dead, and the new one must
+  work. This is the rotation: same invitation, new token.
+- After a revoke, a resend must not bring the invitation back. This is the
+  durability fix, and it was the defect worth having found.
+
+Wrong would be: any of those five acting without asking, a dialog still saying
+the invitation will be "revoked and replaced", an old link that still accepts
+after a reissue, or a revoked invitation that a resend revives. Console errors
+count as wrong too.
 
 Commands: `npm run type-check`, `npm run test:web`, `npm run lint`,
 `npm run db:migrations:check`, and `npm run test:e2e` for Step 4.
