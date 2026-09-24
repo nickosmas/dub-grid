@@ -378,6 +378,12 @@ test.describe("invitation reissue and revoke", () => {
       expect(after.token).toBe(before.token);
       expect(await linkIsLive(page, after.token)).toBe(false);
       expect(consoleErrors).toEqual([]);
+
+      // The revoked link lands on the dead-link state and never on the form.
+      await page.goto(`${QA_CALM_HAVEN_ORIGIN}/accept-invite?token=${after.token}`);
+      await expect(page.getByRole("heading", { name: "Invitation no longer valid" })).toBeVisible();
+      await expect(page.getByLabel("Password", { exact: true })).toHaveCount(0);
+      await evidence(page, testInfo, "revoked-link-accept-page");
     } finally {
       await removeFixtures([email]);
     }
@@ -430,6 +436,11 @@ test.describe("invitation reissue and revoke", () => {
           expect(after.token).toBe(before.token);
         }
         expect(await linkIsLive(page, after.token)).toBe(true);
+
+        // The live link still reaches the form, named for its organization.
+        await page.goto(`${QA_CALM_HAVEN_ORIGIN}/accept-invite?token=${after.token}`);
+        await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
+        await expect(page.getByText("Calm Haven").first()).toBeVisible();
       } finally {
         await removeFixtures([email]);
       }

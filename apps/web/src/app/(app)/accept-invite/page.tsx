@@ -26,7 +26,7 @@ import {
 import { acceptInvitation } from "@/features/organization/client";
 import { scrubBrowserSecretQuery } from "@/lib/auth/browser-secret-query";
 
-type PageState = "loading" | "no-token" | "form" | "processing" | "mfa" | "success";
+type PageState = "loading" | "no-token" | "invalid" | "form" | "processing" | "mfa" | "success";
 
 function AcceptInviteContent() {
   const [state, setState] = useState<PageState>("loading");
@@ -68,14 +68,17 @@ function AcceptInviteContent() {
         setEmail(emailParam);
         setEmailFromUrl(true);
       }
-      setState("form");
-      // Fetch org name for context (best-effort)
+      // Wait for the lookup before showing anything: a dead link must never
+      // reach the form (finding F-07). Only the opaque dead-token response
+      // closes the page. An outage or a throttle still shows the form, since
+      // acceptance checks the token again on submit.
       fetchInvitationLookup(t)
         .then(({ orgName: name }) => {
           if (name) setOrgName(name);
+          setState("form");
         })
-        .catch(() => {
-          /* best-effort */
+        .catch((lookupError: unknown) => {
+          setState(classifyAcceptFailure(lookupError) === "dead" ? "invalid" : "form");
         });
     }
   }, []);
@@ -252,6 +255,14 @@ function AcceptInviteContent() {
                 : "Loading"
             }
             message="Please wait while we process your invitation."
+          />
+        ) : state === "invalid" ? (
+          // One message for accepted, expired, revoked and unknown links, so the
+          // page never reveals which it was.
+          <AuthStateCard
+            heading="Invitation no longer valid"
+            message="This invitation link has expired or is no longer active. If you've already accepted it, sign in. Otherwise, ask your administrator for a new one."
+            primaryCta={{ label: "Go to login", href: "/login" }}
           />
         ) : state === "no-token" ? (
           <AuthStateCard

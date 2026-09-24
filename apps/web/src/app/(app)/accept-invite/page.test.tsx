@@ -263,4 +263,36 @@ describe("AcceptInvitePage", () => {
     expect(await screen.findByText(/invitation is no longer valid/i)).toBeVisible();
     expect(screen.queryByText(/account was created/i)).not.toBeInTheDocument();
   });
+
+  it("never shows the form for a dead link", async () => {
+    setLocation("?token=dead-token&email=someone%40example.com");
+    mocks.fetchInvitationLookup.mockRejectedValue(requestError(404, "INVITATION_INVALID"));
+    render(<AcceptInvitePage />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Invitation no longer valid" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Go to login" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+  });
+
+  it("holds the form back until the lookup has answered", async () => {
+    setLocation("?token=invite-token&email=new.user%40example.com");
+    mocks.fetchInvitationLookup.mockReturnValue(new Promise(() => undefined));
+    render(<AcceptInvitePage />);
+
+    expect(await screen.findByRole("heading", { name: "Loading" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+  });
+
+  it("still shows the form when the lookup itself fails", async () => {
+    setLocation("?token=invite-token&email=new.user%40example.com");
+    mocks.fetchInvitationLookup.mockRejectedValue(requestError(503, null));
+    render(<AcceptInvitePage />);
+
+    expect(await screen.findByLabelText("Password")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Invitation no longer valid" }),
+    ).not.toBeInTheDocument();
+  });
 });
