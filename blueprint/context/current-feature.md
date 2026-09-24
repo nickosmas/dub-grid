@@ -1,7 +1,7 @@
 # Feature: Invitation authorization and inviter attribution
 
 **From build-plan:** feature 41a1
-**Status:** not started
+**Status:** in progress - steps 1 and 2 done, step 3 next
 
 ## Goal
 
@@ -67,13 +67,13 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
 
 ## Build steps
 
-- [ ] **Step 1 - tier ceiling on the edit path** - extract the create route's
+- [x] **Step 1 - tier ceiling on the edit path** - extract the create route's
       super_admin check into one shared helper and apply it in `PATCH` before
       the invitation update. _Done when:_ an admin holding `canManageEmployees`
       who PATCHes `roleToAssign: "super_admin"` gets 403
       `CANNOT_ASSIGN_SUPER_ADMIN` and the row is unchanged; a super admin doing
       the same succeeds; a passing test covers both.
-- [ ] **Step 2 - tier ceiling on the replace-access path** - apply the same
+- [x] **Step 2 - tier ceiling on the replace-access path** - apply the same
       helper to `POST action: "replace_access"`. _Done when:_ the same admin is
       refused with the same status and error, a super admin still succeeds, and
       a passing test covers both.
@@ -149,6 +149,27 @@ a super admin, expect it to succeed.
 Commands: `npm run type-check`, `npm run test:web`, `npm run lint`, and
 `npm run db:migrations:check` for the migration steps. No single `Verify`
 command is declared in `AGENTS.md`.
+
+## Progress and handoff
+
+Steps 1 and 2 are done, committed and pushed on `claude/lucid-hopper-exfpqt`:
+
+- `1f648ec5` - the shared `canAssignOrgRole` ceiling, applied in `PATCH`, and
+  the create route switched to the same helper.
+- `efb29875` - the same ceiling on the replace-access path, applied before the
+  RPC so a lower tier cannot record an inviter.
+
+Evidence: 16 tests pass in `invitations/route.test.ts` and 10 in
+`create/route.test.ts`; `npm run type-check` and ESLint are clean. Each guard
+was confirmed to fail its test when removed, so the tests prove the guards.
+
+Steps 3 and 4 need a real database and were not attempted in the cloud
+container, which has no Docker daemon and no Supabase CLI. They resume in a
+local checkout, where `npm run db:migrations:check` and the row-level
+integration tests can actually run. Nothing about their scope changed.
+
+First local run needs `npm ci` and `npm run build:packages` before any test, or
+consumers fail to resolve `@dubgrid/*`.
 
 ## Notes for the AI
 
