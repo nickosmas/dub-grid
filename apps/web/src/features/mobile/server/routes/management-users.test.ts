@@ -287,7 +287,11 @@ describe("mobile management-users routes", () => {
 
     it("revokes and replaces a pending invitation when its role changes", async () => {
       replaceMobilePendingInvitationAccessRow.mockResolvedValue({
-        previousInvitationId: INVITATION_ID,
+        rotation: {
+          rotatedToken: "rotated-token",
+          previousToken: "original-token",
+          previousExpiresAt: "2099-01-01T00:00:00.000Z",
+        },
         invitation: makeInvitationRow({
           id: "99999999-9999-4999-8999-999999999999",
           role_to_assign: "super_admin",
@@ -322,7 +326,11 @@ describe("mobile management-users routes", () => {
 
     it("restores the old management invitation when replacement delivery fails", async () => {
       replaceMobilePendingInvitationAccessRow.mockResolvedValue({
-        previousInvitationId: INVITATION_ID,
+        rotation: {
+          rotatedToken: "rotated-token",
+          previousToken: "original-token",
+          previousExpiresAt: "2099-01-01T00:00:00.000Z",
+        },
         invitation: makeInvitationRow({
           id: "99999999-9999-4999-8999-999999999999",
           role_to_assign: "super_admin",
@@ -347,11 +355,10 @@ describe("mobile management-users routes", () => {
       expect(response.status).toBe(502);
       expect(rollbackMobilePendingInvitationAccessReplacement).toHaveBeenCalledWith(
         {},
-        {
-          orgId: "44444444-4444-4444-8444-444444444444",
-          previousInvitationId: INVITATION_ID,
-          replacementInvitationId: "99999999-9999-4999-8999-999999999999",
-        },
+        expect.objectContaining({
+          rotatedToken: "rotated-token",
+          previousToken: "original-token",
+        }),
       );
     });
 

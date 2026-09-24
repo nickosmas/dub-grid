@@ -152,7 +152,11 @@ describe("mobile person org-role route", () => {
     rollbackMobilePendingInvitationAccessReplacement.mockResolvedValue(true);
     changeMobileMembershipOrgRole.mockResolvedValue({ status: "changed" });
     replaceMobilePendingInvitationAccessRow.mockResolvedValue({
-      previousInvitationId: INVITATION_ID,
+      rotation: {
+        rotatedToken: "rotated-token",
+        previousToken: "original-token",
+        previousExpiresAt: "2099-01-01T00:00:00.000Z",
+      },
       invitation: {
         id: REPLACEMENT_ID,
         token: "invite-token",
@@ -351,8 +355,8 @@ describe("mobile person org-role route", () => {
     expect(rollbackMobilePendingInvitationAccessReplacement).toHaveBeenCalledWith(
       {},
       expect.objectContaining({
-        previousInvitationId: INVITATION_ID,
-        replacementInvitationId: REPLACEMENT_ID,
+        rotatedToken: "rotated-token",
+        previousToken: "original-token",
       }),
     );
     expect(insertMobileAuditLogEntry).not.toHaveBeenCalled();
