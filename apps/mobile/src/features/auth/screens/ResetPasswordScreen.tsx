@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { mayHavePasswordUpdateCommitted } from "@dubgrid/client-errors";
 import {
   PASSWORD_MISMATCH_MESSAGE,
   getPasswordMismatchError,
@@ -10,6 +11,7 @@ import type { TextInput } from "react-native";
 import { AppText } from "../../../shared/components/AppText";
 import { Button } from "../../../shared/components/Button";
 import { useKeyboardDoneAccessory } from "../../../shared/components/KeyboardDoneAccessory";
+import { signOutMobileSessions } from "../../../shared/lib/api";
 import { createEphemeralSupabaseClient } from "../../../shared/lib/supabase";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { AuthActions, AuthFields, AuthHeader, AuthShell, AuthStage } from "../components/AuthShell";
@@ -41,6 +43,9 @@ export default function ResetPasswordScreen() {
   const codeInputRef = useRef<TextInput>(null);
   const passwordInputRef = useRef<TextInput>(null);
   const confirmPasswordInputRef = useRef<TextInput>(null);
+  // Held from the verification itself: a timed-out update can still hold the
+  // client's auth lock, and reading the session back would wait behind it.
+  const recoveryAccessTokenRef = useRef<string | null>(null);
   const { inputAccessoryViewID, keyboardDoneAccessory } = useKeyboardDoneAccessory({
     always: true,
   });
@@ -79,7 +84,7 @@ export default function ResetPasswordScreen() {
     setError(null);
     setSubmitting(true);
     try {
-      const { error: verifyError } = await settleMobileAuthAction(
+      const { data, error: verifyError } = await settleMobileAuthAction(
         supabase.auth.verifyOtp({
           email,
           token: code,
@@ -87,6 +92,7 @@ export default function ResetPasswordScreen() {
         }),
       );
       if (verifyError) throw verifyError;
+      recoveryAccessTokenRef.current = data?.session?.access_token ?? null;
 
       setStage("password");
       setTimeout(() => passwordInputRef.current?.focus(), 0);
@@ -133,40 +139,63 @@ export default function ResetPasswordScreen() {
 
     setError(null);
     setSubmitting(true);
-    let passwordUpdated = false;
+    let confirmed: boolean;
     try {
       const { error: updateError } = await settleMobileAuthAction(
         supabase.auth.updateUser({ password }),
       );
       if (updateError) throw updateError;
-      passwordUpdated = true;
-
-      // Revoke everywhere: a password reset usually means the old one was
-      // compromised, so any session still holding it has to go. Same posture as
-      // the in-app password change.
-      const { error: signOutError } = await settleMobileAuthAction(
-        supabase.auth.signOut({ scope: "global" }),
-      );
-      if (signOutError) throw signOutError;
-
-      pushToast({ message: "Password updated. Sign in with your new password!", tone: "success" });
-      router.replace("/(auth)/login");
+      confirmed = true;
     } catch (caught) {
-      if (passwordUpdated) {
-        await settleMobileAuthAction(supabase.auth.signOut({ scope: "local" })).catch(
-          () => undefined,
-        );
-        pushToast({
-          message: "Password updated. Sign in and review your active sessions.",
-          tone: "info",
-        });
-        router.replace("/(auth)/login");
+      if (!mayHavePasswordUpdateCommitted(caught)) {
+        setError(getRecoveryErrorMessage(caught));
+        setSubmitting(false);
         return;
       }
-      setError(getRecoveryErrorMessage(caught));
-    } finally {
-      setSubmitting(false);
+      // The provider may have applied it after the deadline or before the
+      // response was lost. A retry would replay a change that may be done, so
+      // the flow finishes as if it were, and never re-enables the submit.
+      confirmed = false;
     }
+    await finishRecovery(confirmed);
+  }
+
+  /**
+   * Revoke everywhere: a password reset usually means the old one was
+   * compromised, so any session still holding it has to go. DubGrid records the
+   * revocation too, or a copied access token keeps working until it expires.
+   */
+  async function finishRecovery(confirmed: boolean) {
+    let revoked = false;
+    try {
+      const accessToken = recoveryAccessTokenRef.current;
+      if (accessToken) {
+        await signOutMobileSessions(accessToken, {
+          scope: "global",
+          reason: "password_recovery",
+        });
+        revoked = true;
+      }
+    } catch {
+      revoked = false;
+    }
+    await settleMobileAuthAction(supabase.auth.signOut({ scope: "local" })).catch(() => undefined);
+
+    if (!confirmed) {
+      pushToast({
+        message:
+          "We couldn't confirm your new password. Try signing in with it. If it doesn't work, request a new code.",
+        tone: "info",
+      });
+    } else if (revoked) {
+      pushToast({ message: "Password updated. Sign in with your new password!", tone: "success" });
+    } else {
+      pushToast({
+        message: "Password updated. Sign in and review your active sessions.",
+        tone: "info",
+      });
+    }
+    router.replace("/(auth)/login");
   }
 
   return (

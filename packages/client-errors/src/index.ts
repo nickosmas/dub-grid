@@ -381,6 +381,23 @@ export function isRetryableAuthRecoveryError(error: unknown): boolean {
   );
 }
 
+/**
+ * Whether a failed password update may still have been applied. A deadline, a
+ * lost response or a provider-side failure says nothing about what the
+ * provider committed, so the update must be treated as possibly done and never
+ * offered as a retry. Only a definite rejection (a weak or reused password, an
+ * expired session) proves nothing changed.
+ */
+export function mayHavePasswordUpdateCommitted(error: unknown): boolean {
+  if (isAuthRecoveryCancellation(error)) return false;
+  if (isAuthRecoveryTimeout(error)) return true;
+  const shape = getRecoveryErrorShape(error);
+  const status = shape?.status;
+  if (typeof status === "number") return status === 0 || status >= 500;
+  const code = (shape as { code?: unknown } | null)?.code;
+  return typeof code !== "string" || code === "";
+}
+
 /** Parse an HTTP Retry-After value into milliseconds from now. */
 export function parseRetryAfterMs(
   value: string | null | undefined,

@@ -17,7 +17,10 @@ import { extractErrorMessage } from "@/lib/error-handling";
 import { settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
 import { getWebAuthRecoveryMessage } from "@/lib/auth-recovery";
 import { ACTION_SIGN_IN } from "@/lib/action-copy";
-import { isRetryableAuthRecoveryError } from "@dubgrid/client-errors";
+import {
+  isRetryableAuthRecoveryError,
+  mayHavePasswordUpdateCommitted,
+} from "@dubgrid/client-errors";
 import {
   exchangeBrowserCodeForSession,
   completeBrowserPasswordRecovery,
@@ -31,6 +34,27 @@ import {
 
 type PageState = "loading" | "form" | "success" | "error" | "recovery";
 
+/** Once the password has or may have changed, the form never comes back. */
+type RecoveryOutcome = "updated" | "updated-unrevoked" | "unconfirmed";
+
+const OUTCOME_MESSAGES: Record<RecoveryOutcome, { heading: string; message: string }> = {
+  updated: {
+    heading: "Password updated",
+    message:
+      "Your password has been successfully reset. You can now sign in with your new password.",
+  },
+  "updated-unrevoked": {
+    heading: "Password updated",
+    message:
+      "Your password has been reset, but we couldn't sign out your other devices. Sign in with your new password and review your active sessions.",
+  },
+  unconfirmed: {
+    heading: "Check your new password",
+    message:
+      "We couldn't confirm your new password. Try signing in with it. If it doesn't work, request a new reset link.",
+  },
+};
+
 function ResetPasswordContent() {
   const [state, setState] = useState<PageState>("loading");
   const stateRef = useRef<PageState>("loading");
@@ -39,6 +63,7 @@ function ResetPasswordContent() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [outcome, setOutcome] = useState<RecoveryOutcome>("updated");
   const firstFieldRef = useRef<HTMLInputElement>(null);
   const recoveryCodeRef = useRef<string | null>(null);
   const submittingRef = useRef(false);
@@ -165,28 +190,47 @@ function ResetPasswordContent() {
     submittingRef.current = true;
     setLoading(true);
 
+    let confirmed: boolean;
     try {
       await settleWithRequestTimeout(updateBrowserUserPassword(password));
-
-      // Sign out so user re-authenticates with fresh credentials
-      await settleWithRequestTimeout(completeBrowserPasswordRecovery());
-
-      setState("success");
-      stateRef.current = "success";
+      confirmed = true;
     } catch (err: unknown) {
-      const msg = extractErrorMessage(err, "").toLowerCase();
-      if (msg.includes("same password") || msg.includes("different")) {
-        setFormError("New password must be different from your current password.");
-      } else if (msg.includes("weak") || msg.includes("short")) {
-        setFormError("Password is too weak. Please choose a stronger password.");
-      } else if (isRetryableAuthRecoveryError(err)) {
-        toast.error(getWebAuthRecoveryMessage(err, "We couldn't update your password. Try again."));
-      } else {
-        toast.error("We couldn't update your password. Try again.");
+      if (!mayHavePasswordUpdateCommitted(err)) {
+        showRejectedUpdate(err);
+        submittingRef.current = false;
+        setLoading(false);
+        return;
       }
-    } finally {
-      submittingRef.current = false;
-      setLoading(false);
+      // The provider may have applied it after the deadline or before the
+      // response was lost. Offering the form again would invite a replay of a
+      // change that may be done, so the recovery finishes as if it were.
+      confirmed = false;
+    }
+
+    let revoked = true;
+    try {
+      // Revokes every session, then signs this browser out even on failure.
+      await settleWithRequestTimeout(completeBrowserPasswordRecovery());
+    } catch {
+      revoked = false;
+    }
+    setOutcome(!confirmed ? "unconfirmed" : revoked ? "updated" : "updated-unrevoked");
+    setState("success");
+    stateRef.current = "success";
+    submittingRef.current = false;
+    setLoading(false);
+  }
+
+  function showRejectedUpdate(err: unknown) {
+    const msg = extractErrorMessage(err, "").toLowerCase();
+    if (msg.includes("same password") || msg.includes("different")) {
+      setFormError("New password must be different from your current password.");
+    } else if (msg.includes("weak") || msg.includes("short")) {
+      setFormError("Password is too weak. Please choose a stronger password.");
+    } else if (isRetryableAuthRecoveryError(err)) {
+      toast.error(getWebAuthRecoveryMessage(err, "We couldn't update your password. Try again."));
+    } else {
+      toast.error("We couldn't update your password. Try again.");
     }
   }
 
@@ -222,8 +266,8 @@ function ResetPasswordContent() {
         ) : state === "success" ? (
           <AuthStateCard
             icon="check"
-            heading="Password updated"
-            message="Your password has been successfully reset. You can now sign in with your new password."
+            heading={OUTCOME_MESSAGES[outcome].heading}
+            message={OUTCOME_MESSAGES[outcome].message}
             primaryCta={{ label: ACTION_SIGN_IN, href: "/login" }}
           />
         ) : (

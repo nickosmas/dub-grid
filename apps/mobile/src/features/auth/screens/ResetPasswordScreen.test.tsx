@@ -11,6 +11,7 @@ const signOut = vi.fn();
 const resetPasswordForEmail = vi.fn();
 const createEphemeralSupabaseClient = vi.fn();
 const getSupabaseClient = vi.fn();
+const signOutMobileSessions = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
@@ -26,6 +27,10 @@ vi.mock("expo-router", async () => {
 vi.mock("../../../shared/lib/supabase", () => ({
   createEphemeralSupabaseClient: () => createEphemeralSupabaseClient(),
   getSupabaseClient: () => getSupabaseClient(),
+}));
+
+vi.mock("../../../shared/lib/api", () => ({
+  signOutMobileSessions: (...args: unknown[]) => signOutMobileSessions(...args),
 }));
 
 vi.mock("../../../shared/providers/ToastProvider", () => ({
@@ -45,7 +50,11 @@ beforeAll(async () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  verifyOtp.mockResolvedValue({ error: null });
+  verifyOtp.mockResolvedValue({
+    data: { session: { access_token: "recovery-token" } },
+    error: null,
+  });
+  signOutMobileSessions.mockResolvedValue({ success: true });
   updateUser.mockResolvedValue({ error: null });
   signOut.mockResolvedValue({ error: null });
   resetPasswordForEmail.mockResolvedValue({ error: null });
@@ -188,15 +197,21 @@ describe("ResetPasswordScreen", () => {
 
     expect(updateUser).toHaveBeenCalledWith({ password: "Str0ng!Passphrase" });
     // Global, not local: a reset usually means the old password leaked, so any
-    // session still holding it has to go.
-    expect(signOut).toHaveBeenCalledWith({ scope: "global" });
+    // session still holding it has to go, in DubGrid as well as the provider.
+    expect(signOutMobileSessions).toHaveBeenCalledWith("recovery-token", {
+      scope: "global",
+      reason: "password_recovery",
+    });
+    expect(signOut).toHaveBeenCalledWith({ scope: "local" });
+    expect(pushToast).toHaveBeenCalledWith({
+      message: "Password updated. Sign in with your new password!",
+      tone: "success",
+    });
     expect(routerReplace).toHaveBeenCalledWith("/(auth)/login");
   });
 
   it("clears the ephemeral session and returns to sign in when global revocation fails", async () => {
-    signOut
-      .mockResolvedValueOnce({ error: { code: "provider_error", message: "private" } })
-      .mockResolvedValueOnce({ error: null });
+    signOutMobileSessions.mockRejectedValue(new Error("private"));
     render(<ResetPasswordScreen />);
     await enterCode();
 
@@ -208,8 +223,7 @@ describe("ResetPasswordScreen", () => {
     });
     await act(async () => fireEvent.click(screen.getByText("Update password")));
 
-    expect(signOut).toHaveBeenNthCalledWith(1, { scope: "global" });
-    expect(signOut).toHaveBeenNthCalledWith(2, { scope: "local" });
+    expect(signOut).toHaveBeenCalledWith({ scope: "local" });
     expect(pushToast).toHaveBeenCalledWith({
       message: "Password updated. Sign in and review your active sessions.",
       tone: "info",
@@ -236,10 +250,13 @@ describe("ResetPasswordScreen", () => {
 
     expect(screen.getAllByText("Choose a password you haven't used before.")).toHaveLength(2);
     expect(signOut).not.toHaveBeenCalled();
+    expect(signOutMobileSessions).not.toHaveBeenCalled();
     expect(routerReplace).not.toHaveBeenCalled();
   });
 
-  it("preserves both password fields when the update reaches its deadline", async () => {
+  // A late provider success used to change the password with no revocation
+  // behind it, while the screen offered a retry of a change that had landed.
+  it("finishes the recovery instead of offering a retry when the update times out", async () => {
     vi.useFakeTimers();
     updateUser.mockReturnValue(new Promise(() => undefined));
     render(<ResetPasswordScreen />);
@@ -254,10 +271,36 @@ describe("ResetPasswordScreen", () => {
     fireEvent.click(screen.getByText("Update password"));
     await act(async () => vi.advanceTimersByTimeAsync(15_000));
 
-    expect(screen.getByPlaceholderText("New password")).toHaveValue("Str0ng!Passphrase");
-    expect(screen.getByPlaceholderText("Confirm password")).toHaveValue("Str0ng!Passphrase");
-    expect(screen.getByRole("button", { name: "Update password" })).toBeEnabled();
-    expect(screen.getByText(/taking longer than expected/i)).toBeInTheDocument();
+    expect(updateUser).toHaveBeenCalledTimes(1);
+    expect(signOutMobileSessions).toHaveBeenCalledWith("recovery-token", {
+      scope: "global",
+      reason: "password_recovery",
+    });
+    expect(pushToast).toHaveBeenCalledWith({
+      message:
+        "We couldn't confirm your new password. Try signing in with it. If it doesn't work, request a new code.",
+      tone: "info",
+    });
+    expect(routerReplace).toHaveBeenCalledWith("/(auth)/login");
+    vi.useRealTimers();
+  });
+
+  it("treats a lost response as a password change that may have landed", async () => {
+    updateUser.mockRejectedValue(new TypeError("Network request failed"));
+    render(<ResetPasswordScreen />);
+    await enterCode();
+
+    fireEvent.change(screen.getByPlaceholderText("New password"), {
+      target: { value: "Str0ng!Passphrase" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Confirm password"), {
+      target: { value: "Str0ng!Passphrase" },
+    });
+    await act(async () => fireEvent.click(screen.getByText("Update password")));
+
+    expect(signOutMobileSessions).toHaveBeenCalled();
+    expect(routerReplace).toHaveBeenCalledWith("/(auth)/login");
+    expect(screen.queryByText(/couldn't connect/i)).not.toBeInTheDocument();
   });
 
   // The warning has to land while typing. Previously it only appeared after
