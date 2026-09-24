@@ -18,7 +18,10 @@ async function openViews(page: Page, views: ViewExpectation[]) {
   // says which view is up.
   const content = page.getByLabel("Gridmaster content");
   for (const view of views) {
-    await page.getByRole("button", { name: view.item, exact: true }).click();
+    await page
+      .locator('[data-sidebar="sidebar"]')
+      .getByRole("button", { name: view.item, exact: true })
+      .click();
     // Views are next/dynamic chunks: the first open of each pays a load.
     await expect(view.marker(content).first(), view.item).toBeVisible({ timeout: 20_000 });
   }

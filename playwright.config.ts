@@ -16,6 +16,10 @@ export default defineConfig({
   reporter: "html",
   use: {
     baseURL,
+    extraHTTPHeaders:
+      process.env.CI && process.env.E2E_CLIENT_IP
+        ? { "x-forwarded-for": process.env.E2E_CLIENT_IP }
+        : undefined,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },

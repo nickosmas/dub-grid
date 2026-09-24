@@ -8,16 +8,17 @@ interface RuntimeFailures {
 }
 
 /**
- * Reads the dashboard mount fires that can still be in flight when the other
+ * Requests the dashboard mount fires that can still be in flight when the other
  * tab signs out. A 401 on one of these is the boundary working, not a defect.
  */
-const SESSION_SCOPED_DASHBOARD_READS = new Set([
+const SESSION_SCOPED_DASHBOARD_REQUESTS = new Set([
   "/api/organization/bootstrap",
   "/api/trial-welcome",
   "/api/account/identity",
+  "/api/auth/track-session",
 ]);
 
-function collectRuntimeFailures(page: Page): RuntimeFailures {
+function collectRuntimeFailures(page: Page, isSigningOut: () => boolean): RuntimeFailures {
   const failures: RuntimeFailures = { unexpected: [], authBoundaryRejections: [] };
 
   page.on("console", (message) => {
@@ -39,7 +40,11 @@ function collectRuntimeFailures(page: Page): RuntimeFailures {
       // and only resolves inside a real Vercel runtime.
       return;
     }
-    if (response.status() === 401 && SESSION_SCOPED_DASHBOARD_READS.has(path)) {
+    if (
+      response.status() === 401 &&
+      isSigningOut() &&
+      SESSION_SCOPED_DASHBOARD_REQUESTS.has(path)
+    ) {
       // A request already accepted by the browser can reach the server after
       // the sibling tab revokes the shared session. The boundary still aborts
       // the client work and redirects before that response can render data.
@@ -65,10 +70,11 @@ test("a Calm Haven sign-out propagates to another authenticated tab", async ({
   expect(new URL(origin).hostname.startsWith("calmhaven.")).toBe(true);
 
   await loginAsQaSuperAdmin(page, origin);
-  const firstTabFailures = collectRuntimeFailures(page);
+  let signingOut = false;
+  const firstTabFailures = collectRuntimeFailures(page, () => signingOut);
 
   const secondPage = await context.newPage();
-  const secondTabFailures = collectRuntimeFailures(secondPage);
+  const secondTabFailures = collectRuntimeFailures(secondPage, () => signingOut);
   await secondPage.goto(`${origin}/dashboard`);
   await expect(secondPage.getByRole("link", { name: "Dashboard" })).toBeVisible();
   await secondPage.waitForLoadState("networkidle");
@@ -76,6 +82,7 @@ test("a Calm Haven sign-out propagates to another authenticated tab", async ({
   await page.getByRole("button", { name: "Account menu" }).click();
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   const confirmation = page.getByRole("dialog", { name: "Sign out" });
+  signingOut = true;
   await confirmation.getByRole("button", { name: "Sign out", exact: true }).click();
 
   await expect(page).toHaveURL(/\/goodbye/);
@@ -87,7 +94,7 @@ test("a Calm Haven sign-out propagates to another authenticated tab", async ({
   expect(secondTabFailures.unexpected).toEqual([]);
   expect(
     secondTabFailures.authBoundaryRejections.every((path) =>
-      SESSION_SCOPED_DASHBOARD_READS.has(path),
+      SESSION_SCOPED_DASHBOARD_REQUESTS.has(path),
     ),
   ).toBe(true);
 });

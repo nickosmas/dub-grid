@@ -4,6 +4,12 @@ import { loginAsQaSuperAdmin } from "./helpers/auth";
 const BOOTSTRAP_PATH = "/api/organization/bootstrap";
 
 test.describe("degraded-network authentication recovery", () => {
+  test.afterEach(async ({ page }) => {
+    // Finish intercepted responses before Playwright closes the page. The
+    // recovered dashboard may still have a bootstrap request in flight.
+    await page.unrouteAll({ behavior: "wait" });
+  });
+
   test("Calm Haven cold login completes after a delayed bootstrap", async ({ page, baseURL }) => {
     test.setTimeout(90_000);
     const origin = requireCalmHavenOrigin(baseURL);

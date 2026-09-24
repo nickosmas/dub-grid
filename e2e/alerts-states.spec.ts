@@ -117,7 +117,9 @@ test.describe("alerts from the header bell", () => {
     await page.getByRole("button", { name: /^Alerts/ }).click();
     const popover = page.getByRole("region", { name: "Alerts" });
     await expect(popover).toBeVisible();
-    const row = popover.locator("a[href]").first();
+    // The footer link exists while rows are loading. Pin the seeded alert so
+    // this locator cannot switch from "View all" to a row between reads.
+    const row = popover.getByRole("link", { name: /^Trial started:/ });
     await expect(row).toBeVisible({ timeout: 15_000 });
 
     const href = (await row.getAttribute("href")) ?? "";

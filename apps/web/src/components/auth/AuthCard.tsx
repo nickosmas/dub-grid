@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { openConsentPreferences } from "@/components/CookieConsent";
 import { Button } from "@/components/Button";
 
@@ -18,58 +17,60 @@ export function PageShell({
     <div className="dg-auth-shell">
       {children}
 
+      {/* Legal documents open in a new tab and may redirect to the apex.
+          Native links avoid cross-origin RSC prefetches from login pages. */}
       <footer className="dg-auth-footer">
         <div className="dg-auth-footer-content">
           {signInDisclaimer ? (
             <span>
               By continuing, I agree to DubGrid&apos;s{" "}
-              <Link
+              <a
                 href="/terms"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="dg-auth-sentence-link"
               >
                 Terms of Service
-              </Link>
+              </a>
               ,{" "}
-              <Link
+              <a
                 href="/privacy"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="dg-auth-sentence-link"
               >
                 Privacy Policy
-              </Link>
+              </a>
               , and{" "}
-              <Link
+              <a
                 href="/cookie-policy"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="dg-auth-sentence-link"
               >
                 Cookie Policy
-              </Link>
+              </a>
               .
             </span>
           ) : (
             <>
-              <Link
+              <a
                 href="/privacy"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="dg-auth-footer-link"
               >
                 Privacy Policy
-              </Link>
+              </a>
               <span className="dg-auth-footer-separator">·</span>
-              <Link
+              <a
                 href="/terms"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="dg-auth-footer-link"
               >
                 Terms of Service
-              </Link>
+              </a>
               <span className="dg-auth-footer-separator">·</span>
               <Button
                 type="button"
