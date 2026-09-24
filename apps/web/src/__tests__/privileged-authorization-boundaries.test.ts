@@ -92,6 +92,8 @@ const DELEGATED_SERVICE_HELPERS: Record<string, string> = {
     "Server-only best-effort writer accepts only the closed, secret-free security event contract.",
   "apps/web/src/lib/audit/authorize.ts":
     "Delegates to canonical organization or Gridmaster authorization.",
+  "apps/web/src/lib/audit/invitation.ts":
+    "Writes an invitation audit row for an org and actor the calling route has already authorized.",
   "apps/web/src/lib/feature-flags.ts":
     "Resolves global flags for a verified user or public default.",
   "apps/web/src/lib/org-lookup.ts":
