@@ -564,7 +564,10 @@
           absolute expiry, replacement behavior, and organization context
           clear to recipients in the invitation email and the accept-invite
           landing, so a replaced link and a still-valid one are tellable
-          apart.
+          apart. Also correct the joined-date semantics this flow feeds: record
+          date joined as the date the person accepted their invitation, and
+          rename the existing admin-created date to date added, including the
+          not-yet-accepted case where there is no joined date.
   - [ ] 41b. **Credential, session, and recovery integrity** - require the
         same fresh-assurance and session-revocation guarantees on web and
         mobile for password, sign-in email, MFA, recovery, account deletion,

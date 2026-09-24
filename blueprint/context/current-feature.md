@@ -37,6 +37,11 @@ a granted one. Guards land first.
   invitation may also send it.
 - Regression coverage proving the refusal on every path, including the mobile
   endpoints.
+- Every invitation tier works end to end, not only super_admin: a `user`, an
+  `admin` and a `super_admin` invitation must each be creatable, deliverable and
+  acceptable. The acceptance-time tier check only reads `super_admin`, so the
+  other two are expected to work already; that expectation is verified rather
+  than assumed, and any tier that cannot be accepted is repaired here.
 
 ## Out of scope
 
@@ -84,7 +89,9 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
       and pass the authenticated caller from the create route. _Done when:_ an
       invitation created through the route has `invited_by` equal to the caller,
       a direct authenticated call still records `auth.uid()`, and a passing test
-      asserts both.
+      asserts both. Additionally a `user`, an `admin` and a `super_admin`
+      invitation each accept successfully, proven per tier, so no tier is left
+      broken.
 - [ ] **Step 5 - align the resend permission with the sender** - `send-invite-email`
       requires super admin or gridmaster (`route.ts:73-75`) while creation
       requires `canManageEmployees`, so an admin can create an invitation they
@@ -145,11 +152,12 @@ command is declared in `AGENTS.md`.
 
 ## Notes for the AI
 
-- Runtime question to settle before Step 4: if `invited_by` really is NULL for
-  every web-created invitation, legitimate super_admin invitations should also be
-  failing at acceptance. If they succeed in practice, some path already records
-  an inviter and the escalation is live rather than latent. Establish which
-  before changing attribution.
+- Settled 2026-09-24 by the user: super_admin invitations sent from the web do
+  not work at all. That confirms the mechanism. `invited_by` is NULL on
+  web-created invitations, the acceptance-time tier check fails closed, and the
+  invitee is refused. So Step 4 is not only hardening: it repairs a feature that
+  is broken in production today. Step 1 through Step 3 must still land first,
+  because Step 4 is what makes that check able to pass.
 - One live escalation path is already reachable without any attribution change:
   `replace_pending_invitation_access` sets `invited_by` to the caller
   (`route.ts:636`), so a pending invitation that a super admin has put through
