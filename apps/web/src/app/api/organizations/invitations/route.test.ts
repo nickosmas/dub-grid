@@ -670,3 +670,34 @@ describe("POST /api/organizations/invitations - replace_access tier ceiling", ()
     );
   });
 });
+
+describe("POST /api/organizations/invitations - resend and revocation", () => {
+  it("does not revive a revoked invitation", async () => {
+    const revoked = {
+      ...CURRENT_INVITATION_ROW,
+      revoked_at: "2026-01-02T00:00:00.000Z",
+      expires_at: "2099-02-01T00:00:00.000Z",
+    };
+    invitationSelectMaybeSingle.mockResolvedValue({ data: revoked, error: null });
+    invitationUpdateMaybeSingle.mockResolvedValue({
+      data: { ...revoked, revoked_at: null, token: "fresh-token" },
+      error: null,
+    });
+
+    const { POST } = await importRoute();
+    const response = await POST(
+      makePostRequest({
+        action: "resend",
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+      }),
+    );
+
+    // Revocation has to be durable: a resend must not hand the invitee a
+    // working link again.
+    expect(response.status).toBe(409);
+    expect(sendInvitationEmail).not.toHaveBeenCalled();
+    expect(invitationUpdateOperations).toHaveLength(0);
+  });
+});

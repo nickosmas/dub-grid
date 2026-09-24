@@ -780,6 +780,17 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Revocation is durable: a resend rotates the token on a pending row, it
+    // does not bring a revoked or accepted invitation back. The update below
+    // clears revoked_at, so without this a revoked invitation could be revived
+    // from any surface that offers a resend.
+    if (currentInvitation.revokedAt || currentInvitation.acceptedAt) {
+      return NextResponse.json(
+        { error: "This invitation is no longer pending. It was revoked or already accepted." },
+        { status: 409 },
+      );
+    }
+
     const token = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + INVITATION_LIFETIME_MS).toISOString();
 

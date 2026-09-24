@@ -1,7 +1,7 @@
 # Feature: Atomic rotation and recoverable delivery
 
 **From build-plan:** feature 41a2
-**Status:** not started
+**Status:** in progress - the rotation contract is settled and a revocation defect found on the way
 
 ## Goal
 
@@ -29,6 +29,11 @@ when the email cannot be delivered.
   being offered a password-set flow and without weakening their second factor.
 - Retry semantics are correct and consistent across every invitation endpoint:
   the right status code, and a `Retry-After` a client can act on.
+- Revocation is durable. Found while settling the rotation contract: the resend
+  path guarded nothing and cleared `revoked_at`, so resending a revoked
+  invitation revived it with a fresh token and a fresh 72 hours. Proven with a
+  failing test, then fixed. It matters more than the rotation itself, because
+  three of the four surfaces that can resend do so without asking.
 
 ## Out of scope
 
@@ -54,7 +59,7 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
 
 ## Build steps
 
-- [ ] **Step 1 - decide the rotation contract before changing it** - write down
+- [x] **Step 1 - decide the rotation contract before changing it** - write down
       what in-place rotation does to the three things that currently depend on
       two rows: the `previous_invitation_id` the replace path returns, the
       `rollback_pending_invitation_access_replacement` RPC that restores the
@@ -124,9 +129,26 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
 
 ## Data / contracts
 
+**The settled contract.** Rotation is not a new mechanism: the resend path
+already rotates in place, updating `token` and `expires_at` on the same row
+under an optimistic `updated_at` check, and restoring the previous pair when
+dispatch fails. Replace-access adopts that same shape and adds the role change,
+so there is one way to re-issue an invitation rather than two.
+
+It keeps going through `replace_pending_invitation_access` rather than becoming
+a direct update, because that RPC is where 41a1 put the inviter verification and
+the tier ceiling. A direct update would move a role change outside the database
+check that refuses a lower tier, which this feature must not do.
+
 - `invitations.token`, `expires_at` and `role_to_assign` become mutable on a
   pending row, where today a re-issue replaces the row. The row id becomes
   stable across a re-issue, which is the point: one invitation, one identity.
+- `previous_invitation_id` goes away rather than returning the row's own id: it
+  would be a lie with one row, and the route only uses it to relate the audit
+  entry to a successor that no longer exists.
+- The rollback RPC restores the previous token and expiry on the same row,
+  matching what the resend failure path already does, instead of un-revoking an
+  original and revoking a successor.
 - `replace_pending_invitation_access` keeps its signature. Its returned
   `previous_invitation_id` has no meaning once nothing is replaced, so Step 1
   decides whether it goes or returns the same id.
