@@ -186,7 +186,8 @@ const REISSUE = {
 };
 const REVOKE = {
   title: "Revoke Invitation?",
-  consequence: /stops working immediately, and resending later will not restore it/,
+  consequence:
+    /stops working right away\. If you change your mind, you can send them a new invitation\./,
   confirmLabel: "Revoke",
 };
 

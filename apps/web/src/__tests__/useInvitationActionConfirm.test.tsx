@@ -54,15 +54,15 @@ describe("useInvitationActionConfirm", () => {
     expect(onAnswer).toHaveBeenCalledWith(true);
   });
 
-  it("names the consequence of revoking, including that a resend will not undo it", async () => {
+  it("says revoking kills the link but leaves inviting them again open", async () => {
     const user = userEvent.setup();
     render(<Harness onAnswer={vi.fn()} />);
 
     await user.click(screen.getByRole("button", { name: "revoke" }));
 
     expect(screen.getByText(/mina@example.com/)).toBeInTheDocument();
-    expect(screen.getByText(/stops working immediately/i)).toBeInTheDocument();
-    expect(screen.getByText(/resending later will not restore it/i)).toBeInTheDocument();
+    expect(screen.getByText(/invite link stops working right away/i)).toBeInTheDocument();
+    expect(screen.getByText(/you can send them a new invitation/i)).toBeInTheDocument();
   });
 
   it("tells the invitee's holder that reissuing kills the link they already have", async () => {

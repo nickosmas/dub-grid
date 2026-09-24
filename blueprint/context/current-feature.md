@@ -284,8 +284,8 @@ Five places offer these actions. For each: click, read the dialog, then
 
 1. People, management panel, **Resend** on the pending row. Expect "Reissue
    Invitation?" saying their current link stops working immediately.
-2. Same panel, **Revoke**. Expect "Revoke Invitation?" saying resending later
-   will not restore it.
+2. Same panel, **Revoke**. Expect "Revoke Invitation?" saying the link stops
+   working and that a new invitation can be sent later.
 3. The person's detail page, **Revoke**.
 4. The pending-invitation banner, **Reinvite**, then **Revoke**.
 5. The pending row's role select: pick a different role. Expect "Change

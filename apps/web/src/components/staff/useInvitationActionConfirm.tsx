@@ -11,7 +11,7 @@ type Pending = {
   resolve: (confirmed: boolean) => void;
 };
 
-const COPY: Record<
+export const INVITATION_ACTION_COPY: Record<
   InvitationActionKind,
   {
     title: string;
@@ -24,9 +24,11 @@ const COPY: Record<
     title: "Revoke Invitation?",
     confirmLabel: "Revoke",
     variant: "danger",
-    // Revoking is durable now: a later resend will not bring the link back.
+    // The revoked link never comes back, but inviting the person again is
+    // always open and issues a new one. Saying only the first half read as
+    // though they could never be invited again.
     message: (who) =>
-      `Revoke the pending invitation for ${who}? Their current invite link stops working immediately, and resending later will not restore it.`,
+      `Revoke the invitation for ${who}? Their invite link stops working right away. If you change your mind, you can send them a new invitation.`,
   },
   resend: {
     title: "Reissue Invitation?",
@@ -61,7 +63,7 @@ export function useInvitationActionConfirm(): {
     setPending(null);
   }
 
-  const copy = pending ? COPY[pending.kind] : null;
+  const copy = pending ? INVITATION_ACTION_COPY[pending.kind] : null;
 
   return {
     askToConfirm,
