@@ -85,9 +85,11 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ personI
     departmentIds.includes(id),
   );
 
-  let replacementIds: {
-    previousInvitationId: string;
-    replacementInvitationId: string;
+  let rotation: {
+    invitationId: string;
+    rotatedToken: string;
+    previousToken: string;
+    previousExpiresAt: string;
   } | null = null;
 
   if (managementUser.source === "member" && managementUser.userId) {
@@ -114,10 +116,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ personI
         departmentIds,
         deptAdminIds: keptDeptAdminIds,
       });
-      replacementIds = {
-        previousInvitationId: replacement.previousInvitationId,
-        replacementInvitationId: replacement.invitation.id,
-      };
+      rotation = { invitationId: replacement.invitation.id, ...replacement.rotation };
 
       try {
         await sendInvitationEmail({
@@ -130,11 +129,11 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ personI
       } catch (error) {
         await rollbackMobilePendingInvitationAccessReplacement(auth.serviceClient, {
           orgId: auth.currentOrg.id,
-          previousInvitationId: replacement.previousInvitationId,
-          replacementInvitationId: replacement.invitation.id,
+          invitationId: replacement.invitation.id,
+          ...replacement.rotation,
         }).catch((rollbackError) => {
           logger.error(
-            { err: rollbackError, personId, ...replacementIds },
+            { err: rollbackError, personId, invitationId: replacement.invitation.id },
             "Failed to roll back management-roster invitation replacement",
           );
         });
@@ -170,7 +169,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ personI
     action:
       managementUser.source === "member"
         ? "membership.updated"
-        : replacementIds
+        : rotation
           ? "invitation.access_replaced"
           : "invitation.updated",
     resource_type: managementUser.source === "member" ? "organization_membership" : "invitation",
@@ -179,7 +178,6 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ personI
       changedFields: ["orgRole", "departmentIds"],
       orgRole: parsed.data.orgRole,
       departmentIds,
-      ...(replacementIds ?? {}),
     },
     ip_address: getRequestIp(req),
     user_agent: req.headers?.get("user-agent") ?? null,

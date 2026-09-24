@@ -210,9 +210,11 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
 
   let invitation;
   let createdInvitation = false;
-  let replacementIds: {
-    previousInvitationId: string;
-    replacementInvitationId: string;
+  let rotation: {
+    invitationId: string;
+    rotatedToken: string;
+    previousToken: string;
+    previousExpiresAt: string;
   } | null = null;
   if (loaded.pendingInvitation) {
     if ((loaded.pendingInvitation.updated_at ?? null) !== parsed.data.expectedInvitationUpdatedAt) {
@@ -232,10 +234,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
         ),
       });
       invitation = replacement.invitation;
-      replacementIds = {
-        previousInvitationId: replacement.previousInvitationId,
-        replacementInvitationId: replacement.invitation.id,
-      };
+      rotation = { invitationId: replacement.invitation.id, ...replacement.rotation };
     } else {
       const reassigned = await updateMobileInvitationAssignmentsRow(auth.serviceClient, {
         orgId: auth.currentOrg.id,
@@ -295,14 +294,13 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
     // Only a row this request brought into existence gets rolled back. An
     // invitation that already existed stays put: revoking it would take away
     // access the failed email never had anything to do with.
-    if (replacementIds) {
+    if (rotation) {
       await rollbackMobilePendingInvitationAccessReplacement(auth.serviceClient, {
         orgId: auth.currentOrg.id,
-        previousInvitationId: replacementIds.previousInvitationId,
-        replacementInvitationId: replacementIds.replacementInvitationId,
+        ...rotation,
       }).catch((rollbackError) => {
         logger.error(
-          { err: rollbackError, employeeId: id, ...replacementIds },
+          { err: rollbackError, employeeId: id, invitationId: rotation.invitationId },
           "Failed to roll back mobile invitation access replacement after email failure",
         );
       });
@@ -330,7 +328,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
     actor_email: auth.user.email ?? null,
     action: createdInvitation
       ? "invitation.created"
-      : replacementIds
+      : rotation
         ? "invitation.access_replaced"
         : "invitation.updated",
     resource_type: "invitation",
@@ -341,7 +339,6 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
       employeeId: id,
       roleToAssign: parsed.data.orgRole,
       departmentIds,
-      ...(replacementIds ?? {}),
     },
     ip_address: getRequestIp(req),
     user_agent: req.headers?.get("user-agent") ?? null,

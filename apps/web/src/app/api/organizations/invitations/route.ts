@@ -679,24 +679,28 @@ export async function POST(req: NextRequest) {
         throw replacementError;
       }
 
+      // Rotation keeps the row, so there is no successor id: the previous
+      // token and expiry come back instead, for the restore below.
       const replacement = replacementData as {
-        previous_invitation_id?: string;
         invitation_id?: string;
         token?: string;
         expires_at?: string;
+        previous_token?: string;
+        previous_expires_at?: string;
       } | null;
       if (
-        !replacement?.previous_invitation_id ||
-        !replacement.invitation_id ||
+        !replacement?.invitation_id ||
         !replacement.token ||
-        !replacement.expires_at
+        !replacement.expires_at ||
+        !replacement.previous_token ||
+        !replacement.previous_expires_at
       ) {
-        throw new Error("Invitation replacement did not return complete data.");
+        throw new Error("Invitation rotation did not return complete data.");
       }
 
       const replacementInvitation = await fetchInvitation(orgId, replacement.invitation_id);
       if (!replacementInvitation) {
-        throw new Error("Replacement invitation could not be loaded.");
+        throw new Error("Rotated invitation could not be loaded.");
       }
 
       try {
@@ -711,19 +715,18 @@ export async function POST(req: NextRequest) {
           "rollback_pending_invitation_access_replacement",
           {
             p_org_id: orgId,
-            p_previous_invitation_id: replacement.previous_invitation_id,
-            p_replacement_invitation_id: replacement.invitation_id,
+            p_invitation_id: replacement.invitation_id,
+            p_rotated_token: replacement.token,
+            p_previous_token: replacement.previous_token,
+            p_previous_expires_at: replacement.previous_expires_at,
           },
         );
-        if (rollbackError || rolledBack !== true) {
+        // The restore is refused rather than applied when the row moved on, so
+        // a false here is a real failure to report, not a no-op.
+        if (rollbackError || (rolledBack as { restored?: boolean } | null)?.restored !== true) {
           logger.error(
-            {
-              error: rollbackError,
-              orgId,
-              invitationId,
-              replacementInvitationId: replacement.invitation_id,
-            },
-            "Failed to roll back invitation access replacement after email failure",
+            { error: rollbackError, orgId, invitationId },
+            "Failed to restore the previous invitation link after email failure",
           );
         }
         Sentry.captureException(emailError, {
@@ -773,7 +776,6 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        previousInvitationId: replacement.previous_invitation_id,
         invitation: replacementInvitation,
         token: replacement.token,
         expiresAt: replacement.expires_at,

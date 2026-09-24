@@ -187,6 +187,135 @@ describe.skipIf(!reachable)("invitation inviter verification (migration 043, liv
     expect(replaced.rows[0].result.invitation_id).toBeTruthy();
   });
 
+  it("rotates in place: same row, new token, old token dead", async () => {
+    await asServiceRole();
+    const invitationId = await sendInvitation("user", SUPER_ADMIN);
+    await asSuperuser();
+    const before = await db.query(
+      `SELECT token, updated_at::TEXT AS updated_at, department_ids FROM invitations WHERE id = $1`,
+      [invitationId],
+    );
+
+    await asServiceRole();
+    const rotated = await db.query(
+      `SELECT replace_pending_invitation_access($1,$2,$3::TIMESTAMPTZ,'admin',$4,NULL,NULL) AS result`,
+      [ORG, invitationId, before.rows[0].updated_at, SUPER_ADMIN],
+    );
+    const result = rotated.rows[0].result;
+
+    await asSuperuser();
+    const after = await db.query(
+      `SELECT id, token, email, role_to_assign, revoked_at, department_ids,
+              expires_at > NOW() + INTERVAL '71 hours' AS fresh_expiry,
+              (SELECT count(*) FROM invitations) AS row_count
+         FROM invitations WHERE id = $1`,
+      [invitationId],
+    );
+
+    // One invitation, one identity: re-issuing does not mint a successor.
+    expect(Number(after.rows[0].row_count)).toBe(1);
+    expect(after.rows[0].id).toBe(invitationId);
+    expect(result.invitation_id).toBe(invitationId);
+    expect(after.rows[0].token).not.toBe(before.rows[0].token);
+    expect(after.rows[0].email).toBe("invitee41@test.com");
+    expect(after.rows[0].role_to_assign).toBe("admin");
+    expect(after.rows[0].revoked_at).toBeNull();
+    expect(after.rows[0].fresh_expiry).toBe(true);
+    expect(after.rows[0].department_ids).toEqual(before.rows[0].department_ids);
+    // The previous pair travels back so a failed dispatch can restore it.
+    expect(result.previous_token).toBe(before.rows[0].token);
+    expect(result.previous_expires_at).toBeTruthy();
+  });
+
+  it("leaves the old token unable to accept once rotated", async () => {
+    await asServiceRole();
+    const invitationId = await sendInvitation("user", SUPER_ADMIN);
+    await asSuperuser();
+    const before = await db.query(
+      `SELECT token, updated_at::TEXT AS updated_at FROM invitations WHERE id = $1`,
+      [invitationId],
+    );
+
+    await asServiceRole();
+    await db.query(
+      `SELECT replace_pending_invitation_access($1,$2,$3::TIMESTAMPTZ,'user',$4,NULL,NULL)`,
+      [ORG, invitationId, before.rows[0].updated_at, SUPER_ADMIN],
+    );
+
+    await asSuperuser();
+    await db.query(`SET LOCAL ROLE authenticated`);
+    await db.query(
+      `SET LOCAL request.jwt.claims = '{"sub":"${INVITEE}","role":"authenticated","platform_role":"none","mfa_enrolled":false}'`,
+    );
+    await expect(db.query(`SELECT accept_invitation($1)`, [before.rows[0].token])).rejects.toThrow(
+      /INVITATION_INVALID/,
+    );
+  });
+
+  it("restores the previous link when a dispatch fails after rotation", async () => {
+    await asServiceRole();
+    const invitationId = await sendInvitation("user", SUPER_ADMIN);
+    await asSuperuser();
+    const before = await db.query(
+      `SELECT token, expires_at::TEXT AS expires_at, updated_at::TEXT AS updated_at
+         FROM invitations WHERE id = $1`,
+      [invitationId],
+    );
+
+    await asServiceRole();
+    const rotated = await db.query(
+      `SELECT replace_pending_invitation_access($1,$2,$3::TIMESTAMPTZ,'admin',$4,NULL,NULL) AS result`,
+      [ORG, invitationId, before.rows[0].updated_at, SUPER_ADMIN],
+    );
+    const result = rotated.rows[0].result;
+
+    const restored = await db.query(
+      `SELECT rollback_pending_invitation_access_replacement($1,$2,$3,$4,$5::TIMESTAMPTZ) AS result`,
+      [ORG, invitationId, result.token, result.previous_token, result.previous_expires_at],
+    );
+    expect(restored.rows[0].result.restored).toBe(true);
+
+    await asSuperuser();
+    const after = await db.query(`SELECT token FROM invitations WHERE id = $1`, [invitationId]);
+    // The invitee's original link works again rather than being stranded.
+    expect(after.rows[0].token).toBe(before.rows[0].token);
+  });
+
+  it("will not restore over a later rotation", async () => {
+    await asServiceRole();
+    const invitationId = await sendInvitation("user", SUPER_ADMIN);
+    await asSuperuser();
+    const first = await db.query(
+      `SELECT token, updated_at::TEXT AS updated_at FROM invitations WHERE id = $1`,
+      [invitationId],
+    );
+
+    await asServiceRole();
+    const rotated = await db.query(
+      `SELECT replace_pending_invitation_access($1,$2,$3::TIMESTAMPTZ,'admin',$4,NULL,NULL) AS result`,
+      [ORG, invitationId, first.rows[0].updated_at, SUPER_ADMIN],
+    );
+    const result = rotated.rows[0].result;
+
+    await asSuperuser();
+    const second = await db.query(
+      `SELECT updated_at::TEXT AS updated_at FROM invitations WHERE id = $1`,
+      [invitationId],
+    );
+    await asServiceRole();
+    await db.query(
+      `SELECT replace_pending_invitation_access($1,$2,$3::TIMESTAMPTZ,'user',$4,NULL,NULL)`,
+      [ORG, invitationId, second.rows[0].updated_at, SUPER_ADMIN],
+    );
+
+    // A late rollback from the first rotation must not undo the second one.
+    const late = await db.query(
+      `SELECT rollback_pending_invitation_access_replacement($1,$2,$3,$4,$5::TIMESTAMPTZ) AS result`,
+      [ORG, invitationId, result.token, result.previous_token, result.previous_expires_at],
+    );
+    expect(late.rows[0].result.restored).toBe(false);
+  });
+
   it("accepts every tier, not only super_admin", async () => {
     for (const role of ["user", "admin", "super_admin"]) {
       await db.query("SAVEPOINT tier");

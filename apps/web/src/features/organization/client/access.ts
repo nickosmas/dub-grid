@@ -388,10 +388,7 @@ export async function replaceOrganizationInvitationAccessGuarded(input: {
   invitationId: string;
   expectedUpdatedAt: string;
   roleToAssign: OrganizationRole;
-}): Promise<{
-  previousInvitationId: string;
-  invitation: Invitation;
-}> {
+}): Promise<{ invitation: Invitation }> {
   const response = await fetch(resolveClientUrl("/api/organizations/invitations"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -404,14 +401,11 @@ export async function replaceOrganizationInvitationAccessGuarded(input: {
     throw new InvitationAccessConflictError(body.invitation);
   }
 
-  if (!response.ok || !body?.invitation || !body.previousInvitationId) {
+  if (!response.ok || !body?.invitation) {
     throw new Error(getErrorMessage(body, "We couldn't replace that invitation. Try again."));
   }
 
-  return {
-    previousInvitationId: body.previousInvitationId,
-    invitation: body.invitation,
-  };
+  return { invitation: body.invitation };
 }
 
 export async function revokeInvitation(invitationId: string, orgId: string): Promise<void> {

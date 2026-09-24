@@ -1555,7 +1555,7 @@ export async function replaceMobilePendingInvitationAccessRow(
     deptAdminIds?: number[];
   },
 ): Promise<{
-  previousInvitationId: string;
+  rotation: { rotatedToken: string; previousToken: string; previousExpiresAt: string };
   invitation: MobileInvitationRow;
 }> {
   const { data, error } = await serviceClient.rpc("replace_pending_invitation_access", {
@@ -1569,12 +1569,21 @@ export async function replaceMobilePendingInvitationAccessRow(
   });
   if (error) throw error;
 
+  // Rotation keeps the row, so what comes back is the previous token and
+  // expiry to restore, not a predecessor id.
   const result = data as {
-    previous_invitation_id?: string;
     invitation_id?: string;
+    token?: string;
+    previous_token?: string;
+    previous_expires_at?: string;
   } | null;
-  if (!result?.previous_invitation_id || !result.invitation_id) {
-    throw new Error("Invitation replacement did not return an invitation.");
+  if (
+    !result?.invitation_id ||
+    !result.token ||
+    !result.previous_token ||
+    !result.previous_expires_at
+  ) {
+    throw new Error("Invitation rotation did not return an invitation.");
   }
 
   const { data: invitation, error: invitationError } = await serviceClient
@@ -1586,7 +1595,11 @@ export async function replaceMobilePendingInvitationAccessRow(
   if (invitationError) throw invitationError;
 
   return {
-    previousInvitationId: result.previous_invitation_id,
+    rotation: {
+      rotatedToken: result.token,
+      previousToken: result.previous_token,
+      previousExpiresAt: result.previous_expires_at,
+    },
     invitation: invitation as MobileInvitationRow,
   };
 }
@@ -1595,20 +1608,26 @@ export async function rollbackMobilePendingInvitationAccessReplacement(
   serviceClient: SupabaseClient,
   input: {
     orgId: string;
-    previousInvitationId: string;
-    replacementInvitationId: string;
+    invitationId: string;
+    rotatedToken: string;
+    previousToken: string;
+    previousExpiresAt: string;
   },
 ): Promise<boolean> {
   const { data, error } = await serviceClient.rpc(
     "rollback_pending_invitation_access_replacement",
     {
       p_org_id: input.orgId,
-      p_previous_invitation_id: input.previousInvitationId,
-      p_replacement_invitation_id: input.replacementInvitationId,
+      p_invitation_id: input.invitationId,
+      p_rotated_token: input.rotatedToken,
+      p_previous_token: input.previousToken,
+      p_previous_expires_at: input.previousExpiresAt,
     },
   );
   if (error) throw error;
-  return data === true;
+  // The restore is refused when the row has moved on, so an unrestored result
+  // is a real failure for the caller to log.
+  return (data as { restored?: boolean } | null)?.restored === true;
 }
 
 /**

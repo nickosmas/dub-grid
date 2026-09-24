@@ -751,7 +751,6 @@ describe("MembersSection — pending invitation access", () => {
     vi.mocked(replaceOrganizationInvitationAccessGuarded).mockReset();
     vi.mocked(replaceOrganizationInvitationAccessGuarded).mockResolvedValueOnce({
       invitation: replacement,
-      previousInvitationId: invitation.id,
     });
     mockDirectory = [
       makePerson({
