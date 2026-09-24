@@ -923,6 +923,21 @@ export function MembersSection({
     }
   }
 
+  // Unconfirmed for the same reason as revoke: the banner asks first. It
+  // rotates the token on the same invitation rather than minting a new one.
+  async function handleResendInvitation(invitationId: string): Promise<boolean> {
+    if (!orgId) return false;
+    try {
+      await resendInvitation(invitationId, orgId);
+      refreshInvitations();
+      toast.success("Invitation resent");
+      return true;
+    } catch (err) {
+      toast.error(formatClientErrorMessage(err, "We couldn't resend that invitation. Try again."));
+      return false;
+    }
+  }
+
   const handleSave = useCallback((employee: Employee) => onSave(employee), [onSave]);
 
   const hasExportableStaffRows = employees.length > 0;
@@ -2352,6 +2367,7 @@ export function MembersSection({
             canManageManagementAccess ? openManagementAccessPopup : undefined
           }
           onRevoke={handleRevokeInvitation}
+          onResend={handleResendInvitation}
         />
       )}
 

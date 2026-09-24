@@ -59,6 +59,7 @@ import { fetchRecurringShifts } from "@/features/schedule/client";
 import {
   createOrganizationInvitation,
   replaceOrganizationInvitationAccessGuarded,
+  resendInvitation,
   revokeInvitation,
   updateOrganizationMembershipGuarded,
 } from "@/features/organization/client";
@@ -660,6 +661,27 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     [orgId, refreshDirectory, refreshInvitations],
   );
 
+  // Reinvite rotates the token on the same pending invitation. Revoking it and
+  // opening the invite modal instead minted a second invitation for one click.
+  const handleResendInvitation = useCallback(
+    async (invitationId: string) => {
+      if (!orgId) return false;
+      try {
+        await resendInvitation(invitationId, orgId);
+        await refreshInvitations();
+        refreshDirectory();
+        toast.success("Invitation resent");
+        return true;
+      } catch (err) {
+        toast.error(
+          formatClientErrorMessage(err, "We couldn't resend that invitation. Try again."),
+        );
+        return false;
+      }
+    },
+    [orgId, refreshDirectory, refreshInvitations],
+  );
+
   const handlePermissionsChange = useCallback(
     async (perms: AdminPermissions) => {
       if (!orgId || !directoryPerson?.userId || !directoryPerson?.membershipUpdatedAt) return;
@@ -762,10 +784,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
               {perms.canManageEmployees && pendingInvite && (
                 <PendingInvitationBanner
                   pendingInvitation={pendingInvite}
-                  onReinvite={async () => {
-                    const ok = await handleRevokeInvitation(pendingInvite.id);
-                    if (ok !== false) setShowInviteModal(true);
-                  }}
+                  onReinvite={() => handleResendInvitation(pendingInvite.id)}
                   onRevoke={handleRevokeInvitation}
                 />
               )}
