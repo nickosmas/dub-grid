@@ -1,6 +1,7 @@
 # Feature: Invitation authorization and inviter attribution
 
-**From build-plan:** feature 41a1
+**From build-plan:** feature 41a1 (see the note below: the plan item was
+reverted upstream while this was being built)
 **Status:** all six steps done and verified; ready for review
 
 ## Goal
@@ -257,6 +258,18 @@ strict env mode filters that variable out of task environments, so a build that
 needs it has to run through the workspace directly rather than through turbo.
 
 Landed for review as PR #104 from `claude/lucid-hopper-exfpqt` into `dev`.
+
+The build-plan item this spec was written against no longer exists on `dev`:
+`0a7eb2e0` reverted `f7145a6e`, removing items 40 and 41 two minutes before the
+PR was opened. The conflict that caused was resolved in `dev`'s favour, because
+undoing a deliberate revert from a side branch would have made the plan
+reappear silently. Nothing about the code depends on the plan text, and the
+conflict was documentation-only.
+
+So there is currently no item to check off. If item 41 is re-added, the
+41a1-41a3 split goes back with it and `/complete` can check off 41a1 as a
+feature; the exact text is preserved in `f7145a6e` and in this branch's history.
+Until then `/complete` would archive this as a fix.
 
 ## Notes for the AI
 
