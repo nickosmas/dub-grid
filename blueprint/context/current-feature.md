@@ -37,6 +37,9 @@ a granted one. Guards land first.
   invitation may also send it.
 - Regression coverage proving the refusal on every path, including the mobile
   endpoints.
+- Audit coverage for every invitation authorization event, granted or refused,
+  readable by super admins for their organization and by gridmasters across the
+  platform.
 - Every invitation tier works end to end, not only super_admin: a `user`, an
   `admin` and a `super_admin` invitation must each be creatable, deliverable and
   acceptable. The acceptance-time tier check only reads `super_admin`, so the
@@ -100,6 +103,18 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
       `canManageEmployees` can send an invitation for their own organization, is
       still refused for any other organization, and a passing test covers both.
 
+- [ ] **Step 6 - audit every invitation authorization event** - every create,
+      role change, replace, resend, revoke and refusal writes an audit entry
+      naming the real actor, and each is readable by a super admin in the
+      organization's audit log and by a gridmaster in the platform log. Creation
+      writes no `audit_log` entry today (the create route only dispatches a
+      notification), and no refused escalation is recorded anywhere, so a
+      rejected attempt to raise an invitation to super_admin currently leaves no
+      trace. _Done when:_ each of those six events produces an entry with the
+      acting user, the organization, the invitation and the tier involved; a
+      refused attempt is recorded as a refusal rather than silently dropped; and
+      a passing test asserts an entry per event.
+
 ## Files / areas
 
 - `apps/web/src/app/api/organizations/invitations/route.ts` - the `PATCH` and
@@ -119,9 +134,14 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
 - `invitations.role_to_assign` and `invitations.invited_by` are the load-bearing
   columns: acceptance reads both, so their meaning is fixed by this feature.
   `invited_by` becomes a dependable identity rather than an optimistic one.
-- `send_invitation` gains an inviter parameter. It is a signature change on a
-  function the create route and any direct authenticated caller both use, so it
-  ships as a new forward migration, never an edit to an applied file.
+- `send_invitation` gains an explicit inviter parameter. Decided by the user on
+  2026-09-24, over the alternative of calling the RPC with the user client so
+  `auth.uid()` populates naturally. The service-role path stays, and the caller
+  states who the inviter is. It is a signature change on a function the create
+  route and any direct authenticated caller both use, so it ships as a new
+  forward migration, never an edit to an applied file. The parameter is trusted
+  only because the route authorizes the caller first, so it is passed from the
+  authenticated session and never from the request body.
 - `replace_pending_invitation_access` keeps its signature; only its body gains
   the tier check.
 - Schema changes are new numbered forward migrations with the hash locked in
