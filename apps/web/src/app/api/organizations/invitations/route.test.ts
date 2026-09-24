@@ -576,3 +576,70 @@ describe("PATCH /api/organizations/invitations - super_admin tier ceiling", () =
     expect(canAssignOrgRole).not.toHaveBeenCalled();
   });
 });
+
+describe("POST /api/organizations/invitations - replace_access tier ceiling", () => {
+  const pendingInvitation = {
+    ...CURRENT_INVITATION_ROW,
+    expires_at: "2099-02-01T00:00:00.000Z",
+  };
+
+  it("refuses an admin raising a pending invitation to super_admin", async () => {
+    invitationSelectMaybeSingle.mockResolvedValue({ data: pendingInvitation, error: null });
+    canAssignOrgRole.mockResolvedValue(false);
+
+    const { POST } = await importRoute();
+    const response = await POST(
+      makePostRequest({
+        action: "replace_access",
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+        roleToAssign: "super_admin",
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN });
+    // The RPC stamps invited_by with the caller, so refusing before it runs is
+    // what keeps a lower tier from writing an inviter that outranks them.
+    expect(serviceRpc).not.toHaveBeenCalled();
+    expect(sendInvitationEmail).not.toHaveBeenCalled();
+  });
+
+  it("lets a caller who may assign super_admin replace access", async () => {
+    const replacementId = "44444444-4444-4444-8444-444444444444";
+    invitationSelectMaybeSingle
+      .mockResolvedValueOnce({ data: pendingInvitation, error: null })
+      .mockResolvedValueOnce({
+        data: { ...pendingInvitation, id: replacementId, role_to_assign: "super_admin" },
+        error: null,
+      });
+    serviceRpc.mockResolvedValue({
+      data: {
+        previous_invitation_id: INVITATION_ID,
+        invitation_id: replacementId,
+        token: "replacement-token",
+        expires_at: "2099-02-01T00:00:00.000Z",
+      },
+      error: null,
+    });
+
+    const { POST } = await importRoute();
+    const response = await POST(
+      makePostRequest({
+        action: "replace_access",
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+        roleToAssign: "super_admin",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(serviceRpc).toHaveBeenCalledWith(
+      "replace_pending_invitation_access",
+      expect.objectContaining({ p_role: "super_admin", p_invited_by: "actor-1" }),
+    );
+  });
+});
+

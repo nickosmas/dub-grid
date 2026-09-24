@@ -634,6 +634,10 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true, invitation: currentInvitation });
       }
 
+      if (!(await canAssignOrgRole(serviceClient, user.id, orgId, parsed.data.roleToAssign))) {
+        return NextResponse.json({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN }, { status: 403 });
+      }
+
       const { data: replacementData, error: replacementError } = await serviceClient.rpc(
         "replace_pending_invitation_access",
         {
