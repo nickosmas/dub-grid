@@ -1,15 +1,11 @@
 # End-to-end tests using Playwright against a local Supabase instance.
-# Runs on every PR targeting main, and can also be triggered manually.
+# Runs the complete Chromium, Firefox, and WebKit qualification on every PR
+# targeting main, and can also be triggered manually.
 
 name: E2E Tests
 
 on:
   workflow_dispatch:
-    inputs:
-      all_browsers:
-        description: "Run all browsers (chromium, firefox, webkit)? Default: chromium only."
-        type: boolean
-        default: false
   pull_request:
     branches: [main]
   schedule:
@@ -27,7 +23,7 @@ env:
 
 jobs:
   e2e:
-    name: Playwright (${{ matrix.shard }})
+    name: Playwright (shard ${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     # Setup consumes roughly six minutes before the Chromium suite begins. Leave
     # enough headroom for the full release suite rather than cancelling it at
@@ -36,7 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1/4, 2/4, 3/4, 4/4]
+        shard: [1, 2, 3, 4]
     env:
       TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
       TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
@@ -60,12 +56,7 @@ jobs:
       - run: npm run deps:rebuild
 
       - name: Install Playwright browsers
-        run: |
-          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.all_browsers }}" = "true" ]; then
-            npx playwright install --with-deps chromium firefox webkit
-          else
-            npx playwright install --with-deps chromium
-          fi
+        run: npx playwright install --with-deps chromium firefox webkit
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1 # v1.7.1
@@ -111,36 +102,28 @@ jobs:
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.E2E_UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.E2E_UPSTASH_REDIS_REST_TOKEN }}
-          # The suite logs in as the same handful of seeded QA accounts from
-          # 10+ spec files against a real (non in-memory) Upstash instance;
-          # the production default of 15 per 15 minutes is well below a full
-          # run's real login volume, especially with retries.
-          LOGIN_EMAIL_LIMIT_PER_15_MIN: "200"
+          # Each shard runs an isolated local app server, but all of them use
+          # the dedicated E2E Redis database. Local requests have no forwarded
+          # IP, so without E2E-only headroom every shard shares the "unknown"
+          # IP key and can throttle another shard's seeded-account logins.
+          # These values apply only to the dedicated test database, never to
+          # production, and keep the test suite's retries observable instead
+          # of turning them into cross-job rate-limit failures.
+          LOGIN_EMAIL_LIMIT_PER_15_MIN: "1000"
+          LOGIN_IP_LIMIT_PER_MINUTE: "1000"
+          LOGIN_GLOBAL_LIMIT_PER_10_SECONDS: "1000"
 
       - name: Wait for server
         run: timeout 60 bash -c 'until curl -s http://localhost:3000 > /dev/null 2>&1; do sleep 1; done'
 
       - name: Run Playwright tests
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            npx playwright test \
-              e2e/landing.spec.ts \
-              e2e/login.spec.ts \
-              e2e/auth-release-qualification.spec.ts \
-              e2e/interactive-states.spec.ts \
-              e2e/people-states.spec.ts \
-              e2e/schedule-states.spec.ts \
-              --project=chromium \
-              --shard=${{ matrix.shard }}
-          else
-            npx playwright test --shard=${{ matrix.shard }}
-          fi
+        run: npx playwright test --shard=${{ matrix.shard }}/4
 
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: playwright-report-${{ matrix.shard }}
+          name: playwright-report-shard-${{ matrix.shard }}-of-4
           path: playwright-report/
           retention-days: 14
 
@@ -148,7 +131,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: playwright-test-results-${{ matrix.shard }}
+          name: playwright-test-results-shard-${{ matrix.shard }}-of-4
           path: test-results/
           retention-days: 7
 
@@ -156,6 +139,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: server-log-${{ matrix.shard }}
+          name: server-log-shard-${{ matrix.shard }}-of-4
           path: server.log
           retention-days: 7
