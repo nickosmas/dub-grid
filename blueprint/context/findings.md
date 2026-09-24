@@ -79,77 +79,77 @@
 **Suggested fix:** Reuse the normal login MFA challenge, preserve the invitation token through the handoff, continue acceptance only with the promoted session, and distinguish policy/network failures from the opaque dead-token contract. Add an existing-MFA-account end-to-end case.
 **Resolution:** Fixed in 41a2 on `claude/lucid-hopper-exfpqt` (`7891f0a0`). The accept page hands a `STEP_UP_REQUIRED` refusal to the login page's `MFAVerify` and resumes acceptance on the promoted session. Backing out signs the password-only session out. Only the dead-token response is described as a dead link. Page, classifier, and three-browser E2E runs cover it; an existing-MFA-account browser case against a real factor remains for 41d.
 
-### F-13 [P1] open - Mobile session termination bypasses DubGrid revocation and bulk assurance
+### F-13 [P1] fixed - Mobile session termination bypasses DubGrid revocation and bulk assurance
 
 **File:** `apps/mobile/src/features/profile/screens/ProfileSessionsScreen.tsx:116`
 **Found:** 2026-09-24 by `/audit` (scope: mobile authentication; lens: security)
 **Why it matters:** Mobile logout, other/all-device sign-out, password change, password recovery, and forced teardown call the Supabase SDK directly. DubGrid verifies mobile JWTs locally and therefore relies on application revocation markers (`apps/web/src/features/mobile/server/auth.ts:63`); the web sign-out route explicitly documents that provider sign-out alone leaves copied access tokens valid until expiry (`apps/web/src/app/api/auth/sign-out/route.ts:41`). Mobile's bulk actions also skip the step-up used by per-device revoke. The UI can claim devices are signed out while their JWTs and `user_sessions` rows remain accepted, and a stolen unlocked session can trigger bulk sign-out without fresh proof.
 **Suggested fix:** Add a bearer-authenticated mobile equivalent of `/api/auth/sign-out` for local/others/global scopes, write the app revocation markers before client cleanup, retain fresh assurance for bulk scopes, and allow the existing recovery-proof exception only for password recovery completion.
-**Resolution:**
+**Resolution:** Fixed on `dev` in `d2e760fc`. `POST /api/mobile/v1/auth/sign-out` is the bearer twin of the web route and shares its revocation logic (`lib/auth/session-sign-out.ts`). Mobile logout, forced teardown, other-device and every-device sign-out, and the password change now write DubGrid's revocation markers before the device drops its tokens. Bulk scopes require the step-up and credential-assurance preflight, so a cancelled confirmation changes nothing. Only a password-recovery completion may use a fresh OTP proof instead, checked against a live, unrevoked user. Route, screen and teardown-order tests cover each path, and both boundary inventories classify the endpoint.
 
-### F-14 [P1] open - Mobile sign-in email changes bypass fresh credential assurance
+### F-14 [P1] fixed - Mobile sign-in email changes bypass fresh credential assurance
 
 **File:** `apps/mobile/src/features/profile/screens/ProfileWorkScreen.tsx:353`
 **Found:** 2026-09-24 by `/audit` (scope: mobile authentication; lens: security)
 **Why it matters:** Mobile calls `auth.updateUser({ email })` directly and can persist related name/work edits first. Web correctly runs the equivalent account-wide mutation through step-up and the five-minute credential-assurance preflight (`apps/web/src/components/account/ProfilePanel.tsx:485`). Anyone holding an unlocked mobile session can initiate a global sign-in-email change without password/TOTP confirmation, and the current-organization profile screen does not explain that the change affects every organization.
 **Suggested fix:** Gate the whole email-changing save with `useMobileStepUpAction` and `requireMobileCredentialAssurance` before any write, then make the confirmation copy explicitly say it changes the DubGrid account across all organizations.
-**Resolution:**
+**Resolution:** Fixed on `dev` in `227e5e02`. An email-changing save runs through `useMobileStepUpAction`, and `requireMobileCredentialAssurance` runs before any write, including the name and work edits. The confirmation now says the change applies to every organization. Tests prove that a refused identity check writes nothing and that the assurance runs first. They fail on the old screen.
 
-### F-15 [P1] open - Password-reset partial failures lose the mutation commit state
+### F-15 [P1] fixed - Password-reset partial failures lose the mutation commit state
 
 **File:** `apps/mobile/src/features/auth/screens/ResetPasswordScreen.tsx:136`; `apps/web/src/app/(app)/reset-password/page.tsx:168`
 **Found:** 2026-09-24 by `/audit` (scope: password recovery; lens: security and quality)
 **Why it matters:** Mobile races the provider password update against a non-cancelling 15-second deadline, sets `passwordUpdated` only when the race resolves, and revokes sessions afterward. A late provider success therefore changes the password but skips revocation and re-enables a blind retry. Web changes the password first, then performs global recovery completion in the same `try`; if revocation fails, it falsely says the password could not be updated even though `completeBrowserPasswordRecovery` has already cleared the local recovery session. Both flows lose the point at which the irreversible mutation may have committed.
 **Suggested fix:** Move recovery completion behind an idempotent server operation/state machine or explicitly reconcile ambiguous late settlement. Once a password update has or may have committed, never show a password-update retry; complete/best-effort revocation, sign out locally, and tell the user to sign in with the new password and review sessions. Add late-settlement and post-update revocation-failure tests.
-**Resolution:**
+**Resolution:** Fixed on `dev` in `9cc98d9f`. Web and mobile share `mayHavePasswordUpdateCommitted` (`@dubgrid/client-errors`): a deadline, lost response or provider failure counts as possibly applied. Either way the flow finishes: best-effort global revocation, local sign-out, and a message to sign in with the new password. Only a definite rejection keeps the form. A web revocation failure now reports a changed password rather than a failed update. Mobile recovery revocation goes through the DubGrid sign-out endpoint, using the token from the OTP verification.
 
-### F-16 [P1] open - Auth deletion failure leaves self-delete and GDPR erasure non-retryable
+### F-16 [P1] fixed - Auth deletion failure leaves self-delete and GDPR erasure non-retryable
 
 **File:** `apps/web/src/app/api/auth/delete-account/route.ts:125`; `apps/web/src/app/api/auth/gdpr-erase/route.ts:105`
 **Found:** 2026-09-24 by `/audit` (scope: account lifecycle; lens: security and privacy)
 **Why it matters:** Both endpoints remove memberships/application data before `auth.admin.deleteUser`. If the final Auth deletion transiently fails, the identity remains but its membership has gone; the next request fails the live `canDeleteAccountDirectly` check before it can retry the Auth deletion. The user is left with a valid identity that cannot complete its own deletion, after destructive cleanup has already occurred.
 **Suggested fix:** Use an idempotent deletion saga with a durable retry record created before cleanup, or a carefully designed auth-first/tombstone flow that guarantees remaining cleanup can resume. Add failure injection followed by a successful retry for both endpoints.
-**Resolution:**
+**Resolution:** Fixed on `dev` in `1bbf4abd`. After every gate passes, each route writes a durable `account.deletion_started` or `gdpr.erasure_started` audit record, and refuses to start if it can't. A retry by the same user resumes from that record without the membership-based permission check. The confirmation, the Gridmaster block and the sole-super-admin guard are still re-checked. Both cleanup sequences are idempotent. The tests inject the Auth failure and resume after the membership is gone, and they fail on the old routes. Not covered: an abandoned partial deletion has no automatic sweep, so it waits for the user's retry.
 
-### F-17 [P1] open - Mobile app lock fails open while SecureStore hydrates
+### F-17 [P1] fixed - Mobile app lock fails open while SecureStore hydrates
 
 **File:** `apps/mobile/src/shared/providers/AppLockProvider.tsx:89`
 **Found:** 2026-09-24 by `/audit` (scope: mobile authentication; lens: security)
 **Why it matters:** The persisted lock snapshot starts as `false`, hydration is asynchronous, the provider starts unlocked, and protected children always render. Startup readiness does not wait for lock hydration. A delayed, hung, or rejected SecureStore read can therefore lift the splash and expose authenticated content even though the user enabled app lock.
 **Suggested fix:** Model the setting as `loading | enabled | disabled`, keep an opaque authenticated gate up until hydration resolves, handle read failure explicitly, and include lock readiness in startup release. Add delayed/rejected SecureStore cold-start tests and native-device snapshot checks.
-**Resolution:**
+**Resolution:** Fixed on `dev` in `4f6fdabe`. The lock setting is `loading | enabled | disabled | unreadable`, with a 5-second read deadline. The lock screen shows while loading and on an unreadable setting. Startup waits for the lock state while signed in. Tests cover delayed, rejected and hung SecureStore reads.
 
-### F-18 [P1] open - A stale mobile request can sign out a newer valid session
+### F-18 [P1] fixed - A stale mobile request can sign out a newer valid session
 
 **File:** `apps/mobile/src/shared/lib/api.ts:126`
 **Found:** 2026-09-24 by `/audit` (scope: mobile authentication; lens: concurrency)
 **Why it matters:** Each request captures a bearer token, but any later 401 invokes a callback that discards the originating token and calls global auth teardown. Same-identity refresh deliberately leaves in-flight requests mounted, so a delayed 401 for token A after token B has been installed signs out whichever session is current, clears app state, and routes a valid user to login.
 **Suggested fix:** Carry the request token/session identity into the failure handler, re-read the live session, and tear down only if it still matches. A stale request should fail locally without clearing newer auth state. Add refresh/org-switch races where the old request returns 401 last.
-**Resolution:**
+**Resolution:** Fixed on `dev` in `aeb6aed4`. Each request carries its bearer into the failure handler. `handleRejectedMobileToken` tears down only when the rejected token is still the live session's, so a stale request's late 401 fails on its own.
 
-### F-19 [P1] open - New-sign-in and MFA security alerts can be systematically missed
+### F-19 [P1] fixed - New-sign-in and MFA security alerts can be systematically missed
 
 **File:** `apps/web/src/app/api/auth/track-session/route.ts:47`
 **Found:** 2026-09-24 by `/audit` (scope: authentication notifications; lens: security)
 **Why it matters:** Web decides "new device" using only `(user_id, platform, device_label)`, but common labels collapse every Mac to `Macintosh` and every Windows device to `Windows PC`, so later machines do not alert. Mobile session presence never performs detection or dispatch at all. Web and MFA routes discard the async notification promise at the response boundary, while the sender applies one shared ten-email hourly cap across security and unrelated mail. Legitimate new sign-ins and MFA changes can therefore produce no out-of-band warning through four independent paths.
 **Suggested fix:** Key a sign-in on the authenticated Supabase session ID before upsert, add mobile parity, enqueue alerts durably (or use a response-lifetime primitive), and reserve a security-alert budget with event-specific deduplication. Add same-label/different-session, mobile, response-completion, and mixed-volume throttle tests.
-**Resolution:**
+**Resolution:** Fixed on `dev` in `6b14e5ef`. A sign-in is new when its authenticated Supabase session has not been seen, on web (`track-session`) and mobile (`session-presence`) alike. Mobile two-factor changes now alert as web's do. Every alert is scheduled with `after()` so it outlives the response. Security email has its own hourly budget (20, separate from the 10 for other mail). Each sign-in alert is deduplicated by session. Tests fail on the old sender and routes. This is a response-lifetime primitive, not a durable outbox. F-22 (organization context in these emails) remains open.
 
-### F-20 [P1] open - Web logout can hang before revoking the session
+### F-20 [P1] fixed - Web logout can hang before revoking the session
 
 **File:** `apps/web/src/app/(app)/goodbye/RunLogoutTeardown.tsx:77`
 **Found:** 2026-09-24 by `/audit` (scope: sign-out and sessions; lens: security and reliability)
 **Why it matters:** Logout awaits authenticated cleanup before it calls the server-backed sign-out, but `clearLogoutCleanup` uses an unbounded fetch (`apps/web/src/features/account/client/api.ts:175`). A half-open cleanup request leaves the CTA disabled and the access token unrevoked; on inactivity the page can already claim the user was signed out while teardown is still pending.
 **Suggested fix:** Give cleanup a short hard deadline and move revocation/sign-out into a guaranteed continuation/finally path. Add a never-settling cleanup test proving local and server revocation still run.
-**Resolution:**
+**Resolution:** Fixed on `dev` in `97d455fd`. Pre-sign-out cleanup and realtime teardown are bounded at 3 seconds, and the server-backed sign-out always runs afterwards. Tests cover a never-settling cleanup.
 
-### F-21 [P1] open - Manager-driven login-email changes leave the target's sessions and notices unmanaged
+### F-21 [P1] fixed - Manager-driven login-email changes leave the target's sessions and notices unmanaged
 
 **File:** `apps/web/src/app/api/employees/manage/route.ts:719`
 **Found:** 2026-09-24 by `/audit` (scope: account email changes; lens: security)
 **Why it matters:** After step-up for the acting manager, the route changes a linked user's Auth email through `auth.admin.updateUserById` but does not revoke that target's existing DubGrid sessions or send application-controlled notices to the old and new addresses. A displaced or compromised session therefore retains access after an administrator changes its login identity, and the affected person receives no guaranteed organization-specific explanation from the app. Provider-native behavior was not treated as a substitute because it was not verified in this audit.
 **Suggested fix:** Revoke all target sessions after the identity change, send durable notices to both addresses naming the organization and actor/action context, and define compensation for any partial failure. Add target-session and both-recipient notification tests.
-**Resolution:**
+**Resolution:** Fixed on `dev` in `6af4dc71`. After a committed change, the web and mobile staff routes revoke the person's sessions (only the other sessions when someone edits their own record) and email both addresses. The previous address learns the new one and the organization. The admin-typed new address learns only the organization, per the misaddressed-email rule. The change has already committed, so each step fails independently and is reported to Sentry and the log rather than failing the save. Notices are sent directly, not through a durable outbox. Boundary tests require the follow-up after both sync calls.
 
 ### F-22 [P2] open - Auth and security emails lose organization context and use ambiguous account wording
 
