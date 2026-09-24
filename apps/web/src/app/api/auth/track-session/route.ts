@@ -72,6 +72,10 @@ export async function POST(req: NextRequest) {
         platform,
         deviceLabel,
         ipAddress: ip,
+        browserName: browserName ?? null,
+        locationCity: location.city,
+        locationCountry: location.country,
+        occurredAt: new Date().toISOString(),
       });
     }
 

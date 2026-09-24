@@ -232,11 +232,13 @@ export async function sendNotification(
   }
 
   try {
+    const context = await getEmailContext(supabase, orgId, category);
     const html = await render(
       createElement(NotificationEmail, {
         title,
         message,
         logoUrl: emailBaseUrl(),
+        context: context?.line,
       }),
     );
 
@@ -244,7 +246,7 @@ export async function sendNotification(
       apiKey: resendKey,
       from: "DubGrid <notifications@dubgrid.com>",
       to: email,
-      subject: title,
+      subject: context?.subjectPrefix ? `${context.subjectPrefix}: ${title}` : title,
       html,
     });
 
@@ -272,4 +274,27 @@ export async function sendNotification(
   } catch (err) {
     logger.error({ error: err, userId, type }, "Failed to send email notification");
   }
+}
+
+/**
+ * Names the organization a notification came from. Security alerts are about
+ * the DubGrid sign-in, which no organization owns, so they name it only as
+ * where the user was signed in, and keep it out of the subject.
+ */
+async function getEmailContext(
+  supabase: ReturnType<typeof getServiceClient>,
+  orgId: string | null,
+  category: string,
+): Promise<{ line: string; subjectPrefix: string | null } | null> {
+  if (!orgId) return null;
+  const { data } = await supabase
+    .from("organizations")
+    .select("name")
+    .eq("id", orgId)
+    .maybeSingle();
+  const orgName = typeof data?.name === "string" && data.name.trim() ? data.name.trim() : null;
+  if (!orgName) return null;
+  return category === "security"
+    ? { line: `While signed in to ${orgName}`, subjectPrefix: null }
+    : { line: orgName, subjectPrefix: orgName };
 }

@@ -7,12 +7,15 @@ export type NotificationEmailProps = {
   title: string;
   message: string;
   logoUrl: string;
+  /** The organization the notification came from, shown above the heading. */
+  context?: string;
 };
 
 /** Generic in-app notification delivered over email. */
-export function NotificationEmail({ title, message, logoUrl }: NotificationEmailProps) {
+export function NotificationEmail({ title, message, logoUrl, context }: NotificationEmailProps) {
   return (
-    <EmailLayout logoUrl={logoUrl} preview={title}>
+    <EmailLayout logoUrl={logoUrl} preview={context ? `${context}: ${title}` : title}>
+      {context ? <Text style={{ ...styles.fine, margin: "0 0 8px" }}>{context}</Text> : null}
       <Text style={styles.heading}>{title}</Text>
       <Text style={styles.paragraph}>{message}</Text>
       <Hr style={styles.divider} />
@@ -27,6 +30,7 @@ NotificationEmail.PreviewProps = {
   title: "Your shift was updated",
   message: "Your Tuesday shift now starts at 7:00 AM instead of 8:00 AM.",
   logoUrl: PREVIEW_LOGO_URL,
+  context: "Calm Haven",
 } satisfies NotificationEmailProps;
 
 export default NotificationEmail;

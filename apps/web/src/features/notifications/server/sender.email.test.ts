@@ -2,7 +2,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const sendResendEmail = vi.fn();
-const state = { securityEmailsThisHour: 0, otherEmailsThisHour: 0, dedupeHits: 0 };
+const state = {
+  securityEmailsThisHour: 0,
+  otherEmailsThisHour: 0,
+  dedupeHits: 0,
+  orgName: null as string | null,
+};
 
 type Op = [string, ...unknown[]];
 
@@ -17,6 +22,9 @@ function resolve(table: string, ops: Op[]) {
         ? state.securityEmailsThisHour
         : state.otherEmailsThisHour,
     };
+  }
+  if (table === "organizations") {
+    return { data: state.orgName ? { name: state.orgName } : null, error: null };
   }
   if (table === "notifications" && has(ops, "eq", "metadata->>dedupe_key")) {
     return { data: Array.from({ length: state.dedupeHits }, (_, id) => ({ id })) };
@@ -77,12 +85,13 @@ function send(type: string, dedupeKey?: string) {
   );
 }
 
-describe("sendNotification email budgets", () => {
+describe("sendNotification email", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     state.securityEmailsThisHour = 0;
     state.otherEmailsThisHour = 0;
     state.dedupeHits = 0;
+    state.orgName = null;
     sendResendEmail.mockResolvedValue({ id: "email-1" });
   });
 
@@ -117,5 +126,26 @@ describe("sendNotification email budgets", () => {
     await send("security_new_device", "security_new_device:session-1");
 
     expect(sendResendEmail).not.toHaveBeenCalled();
+  });
+
+  it("names the organization in an organization notification's subject and body", async () => {
+    state.orgName = "Calm Haven";
+
+    await send("billing_payment_failed");
+
+    const message = sendResendEmail.mock.calls[0]?.[0] as { subject: string; html: string };
+    expect(message.subject).toBe("Calm Haven: Title");
+    expect(message.html).toContain("Calm Haven");
+  });
+
+  // A security alert is about the sign-in, which the organization does not own.
+  it("names the organization only as where a security alert's user was signed in", async () => {
+    state.orgName = "Calm Haven";
+
+    await send("security_new_device");
+
+    const message = sendResendEmail.mock.calls[0]?.[0] as { subject: string; html: string };
+    expect(message.subject).toBe("Title");
+    expect(message.html).toContain("While signed in to Calm Haven");
   });
 });

@@ -134,6 +134,11 @@ export type NotificationEvent =
       platform: "web" | "ios" | "android";
       deviceLabel: string | null;
       ipAddress: string | null;
+      browserName?: string | null;
+      locationCity?: string | null;
+      locationCountry?: string | null;
+      /** ISO timestamp of the sign-in, stated explicitly in the alert. */
+      occurredAt: string;
     }
   | {
       action: "security_mfa_changed";
@@ -1058,17 +1063,24 @@ async function dispatchNotificationEventInternal(
 
     case "security_new_device": {
       const platformLabel = formatPlatformLabel(event.platform);
-      const where = event.deviceLabel ? `${event.deviceLabel} (${platformLabel})` : platformLabel;
+      const device = event.deviceLabel ? `${event.deviceLabel} (${platformLabel})` : platformLabel;
+      const browser = event.browserName ? `, using ${event.browserName}` : "";
+      const place = [event.locationCity, event.locationCountry].filter(Boolean).join(", ");
+      const near = place ? `, near ${place}` : "";
       await sendNotification(
         event.targetUserId,
         event.orgId,
         "security_new_device" as NotificationType,
-        "New sign-in on your account",
-        `Your account was just signed in on ${where}. If this wasn't you, change your password and review your active sessions.`,
+        "New sign-in to your DubGrid account",
+        `Your DubGrid sign-in was used on ${device}${browser}${near}, on ${formatEventTime(event.occurredAt)}. If this wasn't you, change your password and review your active sessions.`,
         {
           platform: event.platform,
           deviceLabel: event.deviceLabel,
           ipAddress: event.ipAddress,
+          browserName: event.browserName ?? null,
+          locationCity: event.locationCity ?? null,
+          locationCountry: event.locationCountry ?? null,
+          occurredAt: event.occurredAt,
         },
         { writeInApp: false, dedupeKey: `security_new_device:${event.supabaseSessionId}` },
       );
@@ -1082,8 +1094,8 @@ async function dispatchNotificationEventInternal(
         "security_mfa_changed" as NotificationType,
         event.enabled ? "Two-factor authentication enabled" : "Two-factor authentication disabled",
         event.enabled
-          ? "Two-factor authentication was turned on for your account."
-          : "Two-factor authentication was turned off for your account. If this wasn't you, re-enable it and change your password.",
+          ? "Two-factor authentication was turned on for your DubGrid sign-in."
+          : "Two-factor authentication was turned off for your DubGrid sign-in. If this wasn't you, change your password, turn it back on, and review your active sessions.",
         { enabled: event.enabled },
         { writeInApp: false },
       );
@@ -1281,6 +1293,21 @@ function formatPlatformLabel(platform: "web" | "ios" | "android"): string {
   if (platform === "ios") return "iOS device";
   if (platform === "android") return "Android device";
   return "browser";
+}
+
+/** An explicit, zone-qualified time, since the reader may be anywhere. */
+function formatEventTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return `${date.toLocaleString("en-US", {
+    timeZone: "UTC",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })} UTC`;
 }
 
 function formatTrialDate(iso: string): string {

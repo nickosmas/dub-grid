@@ -326,6 +326,9 @@ describe("dispatchNotificationEvent", () => {
       platform: "ios",
       deviceLabel: "Pixel 8",
       ipAddress: "1.2.3.4",
+      locationCity: "Nairobi",
+      locationCountry: "Kenya",
+      occurredAt: "2026-09-24T21:42:00.000Z",
     });
 
     expect(sendNotification).toHaveBeenCalledTimes(1);
@@ -333,8 +336,9 @@ describe("dispatchNotificationEvent", () => {
       "user-1",
       "org-1",
       "security_new_device",
-      "New sign-in on your account",
-      expect.stringContaining("Pixel 8"),
+      "New sign-in to your DubGrid account",
+      // Where and when, stated outright, so the reader can tell whether it was them.
+      "Your DubGrid sign-in was used on Pixel 8 (iOS device), near Nairobi, Kenya, on September 24, 2026 at 21:42 UTC. If this wasn't you, change your password and review your active sessions.",
       expect.objectContaining({
         platform: "ios",
         deviceLabel: "Pixel 8",

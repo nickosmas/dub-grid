@@ -163,6 +163,10 @@ describe("POST /api/auth/track-session", () => {
       platform: "web",
       deviceLabel: "Chrome on macOS",
       ipAddress: null,
+      browserName: null,
+      locationCity: null,
+      locationCountry: null,
+      occurredAt: expect.any(String),
     });
   });
 
