@@ -12,6 +12,8 @@ on:
         default: false
   pull_request:
     branches: [main]
+  schedule:
+    - cron: "30 2 * * *"
 
 permissions:
   contents: read
@@ -25,12 +27,16 @@ env:
 
 jobs:
   e2e:
-    name: Playwright
+    name: Playwright (${{ matrix.shard }})
     runs-on: ubuntu-latest
     # Setup consumes roughly six minutes before the Chromium suite begins. Leave
     # enough headroom for the full release suite rather than cancelling it at
     # the job-wide thirty-minute limit.
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1/4, 2/4, 3/4, 4/4]
     env:
       TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
       TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
@@ -55,7 +61,7 @@ jobs:
 
       - name: Install Playwright browsers
         run: |
-          if [ "${{ inputs.all_browsers }}" = "true" ]; then
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.all_browsers }}" = "true" ]; then
             npx playwright install --with-deps chromium firefox webkit
           else
             npx playwright install --with-deps chromium
@@ -116,17 +122,25 @@ jobs:
 
       - name: Run Playwright tests
         run: |
-          if [ "${{ inputs.all_browsers }}" = "true" ]; then
-            npx playwright test
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            npx playwright test \
+              e2e/landing.spec.ts \
+              e2e/login.spec.ts \
+              e2e/auth-release-qualification.spec.ts \
+              e2e/interactive-states.spec.ts \
+              e2e/people-states.spec.ts \
+              e2e/schedule-states.spec.ts \
+              --project=chromium \
+              --shard=${{ matrix.shard }}
           else
-            npx playwright test --project=chromium
+            npx playwright test --shard=${{ matrix.shard }}
           fi
 
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: playwright-report/
           retention-days: 14
 
@@ -134,7 +148,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: playwright-test-results
+          name: playwright-test-results-${{ matrix.shard }}
           path: test-results/
           retention-days: 7
 
@@ -142,6 +156,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: server-log
+          name: server-log-${{ matrix.shard }}
           path: server.log
           retention-days: 7
