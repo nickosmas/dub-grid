@@ -83,6 +83,8 @@ const DELEGATED_SERVICE_HELPERS: Record<string, string> = {
     "Receives an authenticated actor and event-owned organization identifiers.",
   "apps/web/src/features/notifications/server/sender.ts":
     "Internal notification delivery receives already-authorized recipients and events.",
+  "apps/web/src/features/organization/server/invitation-delivery.ts":
+    "Reads the organization name for an invitation the calling route has already authorized.",
   "apps/web/src/lib/analytics.ts":
     "Called after organization authorization with an effective org ID.",
   "apps/web/src/lib/api-auth.ts": "Owns verified request and live Gridmaster authorization.",
