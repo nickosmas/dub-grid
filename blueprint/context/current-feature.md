@@ -68,7 +68,7 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
       _Done when:_ the contract is written into this spec's Data section and you
       have agreed it, because it changes what the audit log shows for a
       re-issue.
-- [ ] **Step 2 - rotate in place at the database layer** - one forward
+- [x] **Step 2 - rotate in place at the database layer** - one forward
       migration restating `replace_pending_invitation_access` to update the
       existing row's token, expiry and role rather than revoke and insert, and
       restating the rollback RPC to match. Keep the 41a1 inviter check and the
@@ -77,7 +77,7 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
       against the live database proves the row keeps its id, email and
       departments, takes the new role, carries a different token, and that the
       old token no longer accepts.
-- [ ] **Step 3 - carry the route and its restore path onto the rotated row** -
+- [x] **Step 3 - carry the route and its restore path onto the rotated row** -
       update the replace-access route and its failure path to the new contract,
       including what it returns to the client. _Done when:_ a successful
       re-issue returns the same invitation id with a new token; a failed
@@ -95,13 +95,24 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
       revokes asks once and names the consequence, no surface acts
       unconfirmed, and there is browser evidence: a screenshot of the
       confirmation and of the result on each surface, with no console errors.
-- [ ] **Step 5 - a TOTP-enrolled invitee can accept** - establish what happens
+- [x] **Step 5 - a TOTP-enrolled invitee can accept** - establish what happens
       today when an invitee already has a DubGrid account with TOTP enrolled,
       then make acceptance work without offering them a password-set flow and
       without bypassing their factor. _Done when:_ the behaviour before and
       after is recorded, an enrolled invitee can accept, the accept path never
       sets a password for an account that already has one, and a passing test
       covers the branch.
+      Outcome: no code change was needed, and the reason is recorded rather
+      than assumed. Three things already hold. The register route returns
+      `existing` for a confirmed account and never touches its password, which
+      `register/route.test.ts` already asserts. Acceptance works for an enrolled
+      caller whose challenge is still pending, proven against the live database.
+      And the accept flow ends in a global sign-out, so the invitee
+      re-authenticates through the login screen, which is the only place
+      `MFAVerify` is rendered; `page.test.tsx` already asserts that sign-out.
+      What was missing was a regression test for the middle one: nothing stopped
+      a later migration gating acceptance behind AAL2 and silently breaking
+      every enrolled invitee. That test now exists.
 - [ ] **Step 6 - correct and consistent retry semantics** - audit every
       invitation endpoint's throttled and unavailable responses. _Done when:_
       each returns the right status, every 429 carries a `Retry-After` in
@@ -180,6 +191,17 @@ confirm the old link stops working while the new one arrives.
 
 Commands: `npm run type-check`, `npm run test:web`, `npm run lint`,
 `npm run db:migrations:check`, and `npm run test:e2e` for Step 4.
+
+## Raised for 41b, not fixed here
+
+Accepting an organization invitation needs only the invitee's password, never
+their second factor, even when they have TOTP enrolled. That is a deliberate
+consequence of the flow above and it is not a defect in 41a2's terms, but
+joining an organization is a privilege grant, and 41b is the item about
+requiring fresh assurance for sensitive actions. Whether acceptance should
+demand AAL2 from an enrolled user is a decision for that item, with the
+trade-off that demanding it inside this flow means presenting a challenge the
+page does not have today.
 
 ## Notes for the AI
 

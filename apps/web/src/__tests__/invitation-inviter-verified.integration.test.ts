@@ -316,6 +316,29 @@ describe.skipIf(!reachable)("invitation inviter verification (migration 043, liv
     expect(late.rows[0].result.restored).toBe(false);
   });
 
+  it("lets an invitee with TOTP enrolled accept while their challenge is pending", async () => {
+    await asServiceRole();
+    const invitationId = await sendInvitation("user", SUPER_ADMIN);
+    await asSuperuser();
+    const { rows } = await db.query(`SELECT token FROM invitations WHERE id = $1`, [invitationId]);
+
+    await db.query(`SET LOCAL ROLE authenticated`);
+    // mfa_enrolled true with the challenge not yet completed is what a
+    // password sign-in gives an enrolled user. Acceptance must still work:
+    // the invite flow signs them out afterwards so they re-authenticate
+    // through the login screen, which is where the TOTP challenge lives.
+    await db.query(
+      `SET LOCAL request.jwt.claims = '{"sub":"${INVITEE}","role":"authenticated","platform_role":"none","mfa_enrolled":true}'`,
+    );
+    const accepted = await db.query(`SELECT accept_invitation($1) AS result`, [rows[0].token]);
+    expect(accepted.rows[0].result.status).toBe("accepted");
+
+    // Their organization stays invisible until the challenge is done, which is
+    // the point of the gate rather than a failure of acceptance.
+    const scoped = await db.query(`SELECT caller_org_id() IS NULL AS hidden`);
+    expect(scoped.rows[0].hidden).toBe(true);
+  });
+
   it("accepts every tier, not only super_admin", async () => {
     for (const role of ["user", "admin", "super_admin"]) {
       await db.query("SAVEPOINT tier");
