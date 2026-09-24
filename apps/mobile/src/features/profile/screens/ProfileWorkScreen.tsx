@@ -33,6 +33,7 @@ import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesG
 import {
   createProfileChangeRequest,
   getProfile,
+  requireMobileCredentialAssurance,
   updateMobilePerson,
   updateProfileAccount,
   updateProfilePhone,
@@ -66,6 +67,8 @@ import {
 } from "../components/ProfilePrimitives";
 import { isRoleCertificationBlocked } from "../lib/role-certification";
 import { ProfileSkeleton } from "../components/ProfileSkeleton";
+import { useMobileStepUpAction } from "../hooks/useMobileStepUpAction";
+import { getMobileStepUpMethod } from "../lib/step-up";
 
 const PENDING_PROFILE_CHANGE_MESSAGE = "A profile change request is pending admin review.";
 
@@ -196,6 +199,7 @@ export default function ProfileWorkScreen() {
   // which has to answer to back navigation as well as to the Cancel button.
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const stepUp = useMobileStepUpAction();
   const profileQuery = useQuery({
     queryKey: mobileQueryKeys.profile(accessToken),
     queryFn: ({ signal }) => getProfile(accessToken!, signal),
@@ -277,7 +281,7 @@ export default function ProfileWorkScreen() {
   }, [accessToken, profile, linkedEmployee]);
 
   const saveMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (actionAccessToken: string | null) => {
       if (!accessToken || !profile || !draft) {
         throw new Error("Profile unavailable");
       }
@@ -301,6 +305,15 @@ export default function ProfileWorkScreen() {
           !arrayEqual(draft.focusAreaIds, linkedEmployee?.focusAreaIds ?? []) ||
           !arrayEqual(draft.roleIds, linkedEmployee?.roleIds ?? []) ||
           draft.contactNotes.trim() !== (linkedEmployee?.contactNotes ?? "").trim());
+
+      // The sign-in email is account-wide, so nothing in this save is written
+      // until the caller has freshly confirmed their identity.
+      if (emailChanged) {
+        if (!actionAccessToken) {
+          throw new Error("Confirm your identity before changing your sign-in email.");
+        }
+        await requireMobileCredentialAssurance(actionAccessToken);
+      }
 
       if (canEditProfileDirectly) {
         if (nameChanged) {
@@ -372,6 +385,7 @@ export default function ProfileWorkScreen() {
     },
     onMutate: () => setSaveError(null),
     onError: (error) => {
+      if (getMobileStepUpMethod(error)) return;
       setSaveError(
         getClientFriendlyErrorMessage(error, "We couldn't save your profile right now."),
       );
@@ -468,7 +482,7 @@ export default function ProfileWorkScreen() {
       setShowSaveConfirmation(true);
       return;
     }
-    return saveMutation.mutateAsync();
+    return saveMutation.mutateAsync(null);
   }
 
   const footer =
@@ -632,7 +646,7 @@ export default function ProfileWorkScreen() {
               : "Your new name will be sent to an admin for review."
             : null,
           hasEmailChange
-            ? `Request a sign-in email change to ${draft?.email.trim()}. Check your email to confirm the change.`
+            ? `Change the email you use to sign in to DubGrid to ${draft?.email.trim()}. This changes it for every organization you belong to, not just this one. You'll confirm it's you first, then check your email to finish.`
             : null,
         ]
           .filter(Boolean)
@@ -644,10 +658,15 @@ export default function ProfileWorkScreen() {
           setSaveError(null);
           setShowSaveConfirmation(false);
         }}
-        onConfirm={() => saveMutation.mutateAsync()}
+        onConfirm={() =>
+          hasEmailChange
+            ? stepUp.run((actionAccessToken) => saveMutation.mutateAsync(actionAccessToken))
+            : saveMutation.mutateAsync(null)
+        }
         title={hasEmailChange ? "Change your sign-in email?" : "Send name change request?"}
-        visible={showSaveConfirmation}
+        visible={showSaveConfirmation && !stepUp.active}
       />
+      {stepUp.sheet}
       <ConfirmationModal {...guard.confirmationProps} />
       {canManageManagementAccess && managementSubject ? (
         <ManagementAccessSheet

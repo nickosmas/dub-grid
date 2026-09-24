@@ -15,6 +15,9 @@ const updateMobilePerson = vi.fn();
 const updateProfileAccount = vi.fn();
 const pushToast = vi.fn();
 const routerBack = vi.fn();
+const requireMobileCredentialAssurance = vi.fn();
+const updateUser = vi.fn();
+const stepUpRun = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
@@ -52,6 +55,7 @@ vi.mock("../../auth/hooks/useBootstrap", () => ({
 vi.mock("../../../shared/lib/api", () => ({
   createProfileChangeRequest: vi.fn(),
   getProfile: vi.fn(),
+  requireMobileCredentialAssurance,
   updateMobilePerson,
   updateProfileAccount,
   updateProfilePhone: vi.fn(),
@@ -60,9 +64,13 @@ vi.mock("../../../shared/lib/api", () => ({
 vi.mock("../../../shared/lib/supabase", () => ({
   getSupabaseClient: vi.fn(() => ({
     auth: {
-      updateUser: vi.fn().mockResolvedValue({ error: null }),
+      updateUser,
     },
   })),
+}));
+
+vi.mock("../hooks/useMobileStepUpAction", () => ({
+  useMobileStepUpAction: () => ({ run: stepUpRun, active: false, sheet: null }),
 }));
 
 vi.mock("../../../shared/lib/query-client", () => ({
@@ -148,6 +156,14 @@ describe("ProfileWorkScreen", () => {
     updateProfileAccount.mockReset();
     pushToast.mockReset();
     routerBack.mockReset();
+    requireMobileCredentialAssurance.mockReset().mockResolvedValue(undefined);
+    updateUser.mockReset().mockResolvedValue({ error: null });
+    stepUpRun
+      .mockReset()
+      .mockImplementation(async (action: (token: string) => Promise<unknown>) => {
+        await action("step-up-token");
+        return true;
+      });
 
     useAccessToken.mockReturnValue("token-123");
     useQuery.mockReturnValue({
@@ -185,12 +201,14 @@ describe("ProfileWorkScreen", () => {
       isLoading: false,
       refetch: vi.fn(),
     });
-    useMutation.mockImplementation((options: { mutationFn: () => unknown }) => ({
+    useMutation.mockImplementation((options: { mutationFn: (variables?: unknown) => unknown }) => ({
       isPending: false,
-      mutate: vi.fn(() => options.mutationFn()),
+      mutate: vi.fn((variables?: unknown) => options.mutationFn(variables)),
       // The screen confirms through `mutateAsync`, so the sheet's latch has a
       // promise to hold and a second confirm can't fire the save again.
-      mutateAsync: vi.fn(() => Promise.resolve(options.mutationFn())),
+      mutateAsync: vi.fn((variables?: unknown) =>
+        Promise.resolve().then(() => options.mutationFn(variables)),
+      ),
     }));
     updateMobilePerson.mockResolvedValue({
       success: true,
@@ -406,6 +424,61 @@ describe("ProfileWorkScreen", () => {
     fireEvent.click(within(confirmation).getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.getByLabelText("Email")).toHaveValue("new@example.com");
+  });
+
+  it("says a sign-in email change applies to every organization", () => {
+    render(<ProfileWorkScreen />);
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "This changes it for every organization you belong to",
+    );
+  });
+
+  it("confirms identity before writing any part of an email-changing save", async () => {
+    const calls: string[] = [];
+    requireMobileCredentialAssurance.mockImplementation(async () => {
+      calls.push("assurance");
+    });
+    updateProfileAccount.mockImplementation(async () => {
+      calls.push("profile");
+      return { success: true };
+    });
+    updateUser.mockImplementation(async () => {
+      calls.push("email");
+      return { error: null };
+    });
+
+    render(<ProfileWorkScreen />);
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Mia" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    fireEvent.click(
+      within(screen.getByRole("alert")).getByRole("button", { name: "Request changes" }),
+    );
+
+    await waitFor(() => expect(updateUser).toHaveBeenCalledWith({ email: "new@example.com" }));
+    expect(stepUpRun).toHaveBeenCalledTimes(1);
+    expect(requireMobileCredentialAssurance).toHaveBeenCalledWith("step-up-token");
+    expect(calls[0]).toBe("assurance");
+  });
+
+  it("writes nothing when the identity check refuses an email change", async () => {
+    requireMobileCredentialAssurance.mockRejectedValue(new Error("STEP_UP_REQUIRED"));
+
+    render(<ProfileWorkScreen />);
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Mia" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    fireEvent.click(
+      within(screen.getByRole("alert")).getByRole("button", { name: "Request changes" }),
+    );
+
+    await waitFor(() => expect(requireMobileCredentialAssurance).toHaveBeenCalled());
+    await act(async () => {});
+    expect(updateProfileAccount).not.toHaveBeenCalled();
+    expect(updateMobilePerson).not.toHaveBeenCalled();
+    expect(updateUser).not.toHaveBeenCalled();
   });
 
   it("leaves the screen when Cancel is pressed on a clean draft", () => {
