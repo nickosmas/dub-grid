@@ -46,7 +46,7 @@ const baseProps = {
   departmentLabel: "Departments",
   canManageScheduleEmployees: false,
   onClose: vi.fn(),
-  onSave: vi.fn(async () => {}),
+  onSave: vi.fn(async () => true),
 };
 
 describe("ManagementStaffPanel access gating", () => {

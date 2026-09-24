@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, createEvent, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { useState } from "react";
 
@@ -281,6 +281,23 @@ describe("Button", () => {
 });
 
 describe("Form", () => {
+  it("prevents native submission before delegating to the supplied handler", () => {
+    const onSubmit = vi.fn();
+    render(
+      <Form onSubmit={onSubmit}>
+        <input aria-label="Organization subdomain" />
+        <button type="submit">Continue</button>
+      </Form>,
+    );
+
+    const form = screen.getByRole("button", { name: "Continue" }).closest("form")!;
+    const submit = createEvent.submit(form);
+    fireEvent(form, submit);
+
+    expect(submit.defaultPrevented).toBe(true);
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
   it("submits once when submitted twice", async () => {
     let resolve!: () => void;
     const gate = new Promise<void>((r) => {

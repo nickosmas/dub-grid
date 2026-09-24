@@ -2,7 +2,13 @@ import { expect, test } from "@playwright/test";
 import { loginAsQaSuperAdmin, QA_CALM_HAVEN_ORIGIN } from "./helpers/auth";
 
 test.describe("schedule states", () => {
-  test("shows the top progress bar while navigating to Schedule client-side", async ({ page }) => {
+  test("shows the top progress bar while navigating to Schedule client-side", async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "chromium",
+      "Next's client-router loading fallback is only observable with Chromium's CDP throttle.",
+    );
     test.setTimeout(60_000);
 
     // loading.tsx (the route's Suspense fallback) only shows during a
@@ -19,9 +25,9 @@ test.describe("schedule states", () => {
     // or the click) happens to run first "uses up" a route handler, and the
     // other is served from that in-memory cache with no new network
     // activity to intercept - flaky depending on timing (confirmed: 2 of 3
-    // manual runs failed with that approach). Throttling the whole
-    // connection via CDP instead keeps the prefetch itself slow enough that
-    // it hasn't resolved by the time of the click either way.
+    // manual runs failed with that approach). Throttling the whole connection
+    // via Chromium's CDP keeps the prefetch slow enough that it has not
+    // resolved by the time of the click either way.
     const cdpSession = await page.context().newCDPSession(page);
     await cdpSession.send("Network.enable");
     await cdpSession.send("Network.emulateNetworkConditions", {

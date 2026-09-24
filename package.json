@@ -32,6 +32,7 @@
     "test:web": "turbo run test --filter=@dubgrid/web",
     "test:mobile": "turbo run test --filter=@dubgrid/mobile --filter=@dubgrid/contracts --filter=@dubgrid/schedule-core",
     "test:e2e": "playwright test",
+    "test:e2e:production": "node scripts/run-production-e2e.mjs",
     "test:e2e:ui": "playwright test --ui",
     "measure:auth:web": "AUTH_ENTRY_MEASUREMENT=1 PORT=3101 PERF_TIMING=1 NEXT_PUBLIC_PERF_TIMING=1 playwright test e2e/auth-entry-performance.spec.ts --project=chromium --workers=1 --reporter=line",
     "measure:auth:mobile": "npx tsx scripts/summarize-mobile-auth-entry.ts",

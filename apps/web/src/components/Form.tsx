@@ -29,8 +29,16 @@ export function Form({
 }) {
   const action = useAsyncAction(onSubmit ?? (() => {}));
 
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    // A handler may validate synchronously before returning its promise. Cancel
+    // the browser default first so an Enter keypress can never reload the page
+    // and discard the controlled fields while that work starts.
+    event.preventDefault();
+    action.run(event);
+  }
+
   return (
-    <form {...rest} onSubmit={action.run}>
+    <form {...rest} data-dg-client-form="true" onSubmit={handleSubmit}>
       {children}
     </form>
   );

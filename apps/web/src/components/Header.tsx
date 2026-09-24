@@ -691,7 +691,10 @@ export default function Header({ orgName }: HeaderProps) {
               background: menuOpen ? "var(--dg-color-bg-secondary)" : "transparent",
               border: "1px solid " + (menuOpen ? "var(--dg-color-border)" : "transparent"),
               borderRadius: "var(--dg-btn-radius)",
-              padding: isTablet ? 4 : "4px 8px 4px 4px",
+              // At 125% zoom a normal desktop becomes the narrow-header
+              // layout. Match the billing-notice compaction above so the
+              // account text cannot force a horizontal page overflow.
+              padding: isTablet || isHeaderNarrow ? 4 : "4px 8px 4px 4px",
               minHeight: 44,
               cursor: "pointer",
               fontFamily: "inherit",
@@ -728,7 +731,7 @@ export default function Header({ orgName }: HeaderProps) {
             >
               {initials}
             </div>
-            {!isTablet && (
+            {!isTablet && !isHeaderNarrow && (
               <>
                 <div style={{ textAlign: "left", maxWidth: 120 }}>
                   <div

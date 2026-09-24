@@ -269,4 +269,35 @@ describe("browser auth helpers", () => {
     expect(window.sessionStorage.getItem("sb-test-code-verifier")).toBeNull();
     expect(document.cookie).not.toContain("sb-test-auth-token=");
   });
+
+  it.each([
+    ["http://localhost:3000", []],
+    ["http://calmhaven.localhost:3000", []],
+    ["http://127.0.0.1:3000", []],
+    ["http://[::1]:3000", []],
+    [
+      "https://acme.dubgrid.com",
+      ["acme.dubgrid.com", ".acme.dubgrid.com", "dubgrid.com", ".dubgrid.com"],
+    ],
+    ["https://dubgrid.com", ["dubgrid.com", ".dubgrid.com"]],
+    ["https://preview.vercel.app", ["preview.vercel.app", ".preview.vercel.app"]],
+  ])("only attempts valid auth-cookie deletion scopes on %s", (href, domains) => {
+    const originalLocation = window.location;
+    Object.defineProperty(window, "location", { value: new URL(href), configurable: true });
+    const readCookie = vi
+      .spyOn(document, "cookie", "get")
+      .mockReturnValue("sb-test-auth-token=secret; preference=keep");
+    const writeCookie = vi.spyOn(document, "cookie", "set").mockImplementation(() => {});
+    try {
+      clearSupabaseBrowserAuthState();
+      expect(writeCookie.mock.calls.map(([value]) => value)).toEqual([
+        "sb-test-auth-token=; Max-Age=0; path=/",
+        ...domains.map((domain) => `sb-test-auth-token=; Max-Age=0; path=/; domain=${domain}`),
+      ]);
+    } finally {
+      readCookie.mockRestore();
+      writeCookie.mockRestore();
+      Object.defineProperty(window, "location", { value: originalLocation, configurable: true });
+    }
+  });
 });

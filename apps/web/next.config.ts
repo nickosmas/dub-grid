@@ -85,7 +85,15 @@ const nextConfig: NextConfig = {
     ],
   },
   async headers() {
-    return [{ source: "/(.*)", headers: securityHeaders }];
+    return [
+      { source: "/(.*)", headers: securityHeaders },
+      {
+        // Vendored font filenames are content-addressed. Never replace a font
+        // in place; a font update must introduce a new filename.
+        source: "/fonts/:file(.*\\.woff2)",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
+    ];
   },
   async redirects() {
     return [

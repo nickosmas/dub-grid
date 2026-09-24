@@ -47,7 +47,13 @@ import { CacheKey, cacheThrough, TTL } from "@/lib/cache";
 import { withTimeoutOrThrow } from "@/lib/with-timeout";
 import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
 
-const BOOTSTRAP_DEADLINE_MS = 4_500;
+// The bootstrap fan-out is the authenticated shell's only blocking request.
+// Four and a half seconds was short enough for a cold WebKit/Firefox navigation
+// to turn a still-progressing database read into a 500, leaving the user at the
+// recovery screen even though the organization was available. Keep a firm bound
+// (so a genuinely stalled dependency still recovers) while allowing one normal
+// slow browser navigation to finish.
+const BOOTSTRAP_DEADLINE_MS = 10_000;
 
 function timeBootstrapStage<T>(
   timer: Timer,

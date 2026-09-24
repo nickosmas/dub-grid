@@ -283,17 +283,15 @@ const productiveRoles = [
 
 describe("productive typography contract", () => {
   it("separates the Inter product family from the DM Sans brand family", () => {
-    expect(rootLayout).toContain('import { DM_Sans, DM_Mono, Inter } from "next/font/google";');
-    expect(rootLayout).toContain('variable: "--font-inter"');
-    expect(rootLayout).toContain(
-      'className={cn(inter.variable, dmSans.variable, dmMono.variable, "font-sans")}',
-    );
-    expect(globalsCss).toContain('--font-sans: var(--font-inter), "Inter", system-ui, sans-serif;');
+    expect(rootLayout).toContain('import "./fonts.css";');
+    expect(rootLayout).not.toContain("next/font/google");
+    expect(rootLayout).toContain('className="font-sans"');
+    expect(globalsCss).toContain('--font-sans: var(--font-inter, "Inter"), system-ui, sans-serif;');
     expect(globalsCss).toContain(
       '--font-brand: var(--font-dm-sans), "DM Sans", system-ui, sans-serif;',
     );
     expect(globalsCss).toMatch(
-      /html,\s*body\s*\{[\s\S]*?font-family:\s*var\(--font-inter\), "Inter", system-ui, sans-serif;/,
+      /html,\s*body\s*\{[\s\S]*?font-family:\s*var\(--font-inter, "Inter"\), system-ui, sans-serif;/,
     );
     expect(globalsCss).toMatch(/html,\s*body\s*\{[\s\S]*?font-optical-sizing:\s*auto;/);
   });
@@ -310,6 +308,7 @@ describe("productive typography contract", () => {
     expect(
       collectUnexpectedMatchCounts(/(?:var\(--font-dm-sans\)|["']DM Sans["'])/g, {
         "app/globals.css": 4,
+        "app/fonts.css": 1,
         "app/logo-grid.tsx": 2,
         "app/opengraph-image.tsx": 1,
         "app/twitter-image.tsx": 1,
@@ -489,8 +488,10 @@ describe("productive typography contract", () => {
   });
 
   it("rejects unsupported thin weights and opacity-dimmed supporting text", () => {
+    // A variable font's supported range (100 900) declares available faces;
+    // it does not apply a thin weight to any rendered element.
     const thinWeightViolations = collectViolations(
-      /(?:fontWeight\s*:\s*["']?(?:100|200|300)\b|font-weight\s*:\s*(?:100|200|300)\b|font-(?:thin|extralight|light)\b|font-\[(?:100|200|300)\])/,
+      /(?:fontWeight\s*:\s*["']?(?:100|200|300)\b|font-weight\s*:\s*(?:100|200|300)\b(?!\s+\d)|font-(?:thin|extralight|light)\b|font-\[(?:100|200|300)\])/,
     );
     const opacityTextViolations = collectUnexpectedMatchCounts(
       /<(?:span|p|label|button|a|h[1-6]|div)\b[^>]*style=\{\{[^}]*?opacity:\s*0\.(?:[1-9]\d*)[^}]*?\}\}/g,

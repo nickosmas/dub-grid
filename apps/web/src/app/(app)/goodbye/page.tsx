@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { PageShell } from "@/components/auth/AuthCard";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { RunLogoutTeardown, type LogoutScope } from "./RunLogoutTeardown";
@@ -83,7 +82,10 @@ export default async function GoodbyePage({
           padding: "64px 56px 56px",
         }}
       >
-        <Link
+        {/* Home redirects to the apex on organization hosts: this must be a
+            document navigation, not a cross-origin RSC request. */}
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+        <a
           href="/"
           className="dg-auth-logo-block"
           style={{
@@ -94,7 +96,7 @@ export default async function GoodbyePage({
         >
           <DubGridLogo size={72} />
           <DubGridWordmark />
-        </Link>
+        </a>
 
         <h1
           style={{

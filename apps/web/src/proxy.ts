@@ -142,6 +142,17 @@ export async function proxy(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
   const parsedHost = parseHost(host);
   const subdomain = parsedHost.subdomain;
+  // `upgrade-insecure-requests` is correct for real deployments, but a
+  // production-mode local server (`next start`) deliberately speaks HTTP.
+  // WebKit honors the directive for `*.localhost`, upgrades every relative
+  // CSS/JS request to HTTPS, and therefore prevents the client from
+  // hydrating. Keep the protection everywhere else while allowing the local
+  // browser-qualification environment to load its own HTTP assets.
+  const isLoopbackHost =
+    parsedHost.hostname === "localhost" ||
+    parsedHost.hostname.endsWith(".localhost") ||
+    parsedHost.hostname === "127.0.0.1" ||
+    parsedHost.hostname === "::1";
 
   // CSP. Two script-src policies (SECURITY_AUDIT.md F-4):
   //  - Static/public pages (marketing, login, auth flows) are pre-rendered and
@@ -197,7 +208,7 @@ export async function proxy(req: NextRequest) {
     object-src 'none';
     base-uri 'none';
     form-action 'self';
-    ${isDev ? "" : "upgrade-insecure-requests;"}
+    ${isDev || isLoopbackHost ? "" : "upgrade-insecure-requests;"}
   `
       .replace(/\s{2,}/g, " ")
       .trim();

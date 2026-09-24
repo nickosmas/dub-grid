@@ -21,6 +21,7 @@ test-results/
 /.next/
 .next/
 apps/web/.next-auth-entry/
+apps/web/.next-e2e-prod/
 /out/
 /.turbo/
 .turbo/
