@@ -5,6 +5,7 @@ const requireAuthenticatedUserWithClaims = vi.fn();
 const checkRateLimit = vi.fn();
 const maybeSingle = vi.fn();
 const sendResendEmail = vi.fn();
+const canManageEmployees = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
   forbidIfSandboxCookie: () => null,
@@ -30,6 +31,9 @@ vi.mock("@/lib/supabase-service", () => ({
       return query;
     },
   }),
+}));
+vi.mock("@/app/api/employees/shared", () => ({
+  canManageEmployees: (...args: unknown[]) => canManageEmployees(...args),
 }));
 vi.mock("@/lib/resend", () => ({
   sendResendEmail: (...args: unknown[]) => sendResendEmail(...args),
@@ -81,6 +85,7 @@ describe("POST /api/send-invite-email", () => {
       error: null,
     });
     sendResendEmail.mockResolvedValue(undefined);
+    canManageEmployees.mockResolvedValue(true);
   });
 
   it("sends the invitation with the organization name from the row, not the body", async () => {
@@ -104,6 +109,47 @@ describe("POST /api/send-invite-email", () => {
   it("refuses when the address does not match the invitation", async () => {
     const response = await POST(makeRequest({ ...BODY, email: "someone-else@example.com" }));
     expect(response.status).toBe(404);
+    expect(sendResendEmail).not.toHaveBeenCalled();
+  });
+
+  it("lets an admin who may manage employees send the invitation", async () => {
+    requireAuthenticatedUserWithClaims.mockResolvedValue({
+      user: { id: "admin-1" },
+      claims: { org_role: "admin", org_id: ORG_ID },
+    });
+
+    const response = await POST(makeRequest(BODY));
+
+    expect(response.status).toBe(200);
+    // Resolved against the invitation's organization, not the caller's claim.
+    expect(canManageEmployees).toHaveBeenCalledWith(expect.anything(), "admin-1", ORG_ID);
+    expect(sendResendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses an admin who may not manage employees", async () => {
+    requireAuthenticatedUserWithClaims.mockResolvedValue({
+      user: { id: "admin-2" },
+      claims: { org_role: "admin", org_id: ORG_ID },
+    });
+    canManageEmployees.mockResolvedValue(false);
+
+    const response = await POST(makeRequest(BODY));
+
+    expect(response.status).toBe(403);
+    expect(sendResendEmail).not.toHaveBeenCalled();
+  });
+
+  it("refuses a regular user before spending a lookup", async () => {
+    requireAuthenticatedUserWithClaims.mockResolvedValue({
+      user: { id: "user-2" },
+      claims: { org_role: "user", org_id: ORG_ID },
+    });
+
+    const response = await POST(makeRequest(BODY));
+
+    expect(response.status).toBe(403);
+    expect(maybeSingle).not.toHaveBeenCalled();
+    expect(canManageEmployees).not.toHaveBeenCalled();
     expect(sendResendEmail).not.toHaveBeenCalled();
   });
 

@@ -1,7 +1,7 @@
 # Feature: Invitation authorization and inviter attribution
 
 **From build-plan:** feature 41a1
-**Status:** in progress - steps 1 and 2 done, step 3 next
+**Status:** in progress - steps 1, 2 and 5 done; steps 3, 4 and 6 next
 
 ## Goal
 
@@ -107,7 +107,7 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
       naming someone else. _Also done when:_ a call naming an inviter who lacks
       the tier is refused at the database with the routes bypassed, and a
       passing test proves it.
-- [ ] **Step 5 - align the resend permission with the sender** - `send-invite-email`
+- [x] **Step 5 - align the resend permission with the sender** - `send-invite-email`
       requires super admin or gridmaster (`route.ts:73-75`) while creation
       requires `canManageEmployees`, so an admin can create an invitation they
       cannot send. Align the gate on the create route's rule, keeping the

@@ -6,6 +6,7 @@ import { inviteLimiter, emailTargetLimiter, checkRateLimit, hashEmail } from "@/
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { forbidIfSandboxCookie, requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
+import { canManageEmployees } from "@/app/api/employees/shared";
 import { sanitizeHeaderValue, emailBaseUrl } from "@/lib/email";
 import { InviteEmail } from "@/emails/InviteEmail";
 import logger from "@/lib/logger";
@@ -69,12 +70,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ── Authorization check — only super_admin / gridmaster can send invites ──
+  // ── Authorization check ─────────────────────────────────────────────
+  // Whoever may create an invitation may send it: an admin holding
+  // canManageEmployees could previously create one it could not deliver. The
+  // claim decides only whether to spend a lookup; the invitation's own
+  // organization is what the capability is resolved against, below.
   const isGridmaster = claims.platform_role === "gridmaster";
-  const isSuperAdmin = claims.org_role === "super_admin";
-  if (!isGridmaster && !isSuperAdmin) {
+  const claimedRole = claims.org_role;
+  if (!isGridmaster && claimedRole !== "super_admin" && claimedRole !== "admin") {
     return NextResponse.json(
-      { success: false, error: API_ERRORS.SUPER_ADMIN_OR_GRIDMASTER_ONLY },
+      { success: false, error: API_ERRORS.CANNOT_MANAGE_EMPLOYEES },
       { status: 403 },
     );
   }
@@ -126,6 +131,16 @@ export async function POST(req: NextRequest) {
     );
   }
   const orgName = invitation.orgName;
+
+  // Resolved against the invitation's organization, not the caller's claim, and
+  // authoritative: it reads the admin_permissions blob a claim cannot carry, and
+  // refuses a billing-locked organization or an inactive caller.
+  if (!(await canManageEmployees(getServiceClient(), user.id, invitation.orgId))) {
+    return NextResponse.json(
+      { success: false, error: API_ERRORS.CANNOT_MANAGE_EMPLOYEES },
+      { status: 403 },
+    );
+  }
 
   // ── Per-target-email rate limit ───────────────────────────────────────
   // The per-actor limit above doesn't stop one sender from flooding a single
