@@ -183,6 +183,13 @@ test.describe("gridmaster portal states", () => {
     await expect(page.getByRole("link", { name: "Go Home" })).toBeVisible();
     await expect(page.getByText("Back to Gridmaster")).toHaveCount(0);
 
+    // This crosses origins. An RSC prefetch/client transition would violate
+    // connect-src; a document navigation must reach the canonical apex.
+    await page.getByRole("link", { name: "Go Home" }).click();
+    const apex = new URL(QA_GRIDMASTER_ORIGIN);
+    apex.hostname = apex.hostname.replace(/^gridmaster\./, "");
+    await expect(page).toHaveURL(apex.href);
+
     // The 404 document itself is the state under test, not a failure.
     const unexpected = failures.filter(
       (failure) => !/responded with a status of 404/.test(failure),

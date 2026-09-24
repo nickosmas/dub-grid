@@ -34,4 +34,36 @@ test.describe("@preflight production login hydration", () => {
     const loginRoot = await waitForClientHydration(page);
     await expect(loginRoot.getByRole("button", { name: "Sign In" })).toBeEnabled();
   });
+
+  test("loads the pinned product, brand, and monospace fonts on the local origin", async ({
+    page,
+  }) => {
+    await page.goto("/login");
+    const faces = await page.evaluate(async () => {
+      const descriptors = ["400 16px Inter", '600 16px "DM Sans"', '400 16px "DM Mono"'];
+      return Promise.all(
+        descriptors.map(async (descriptor) => {
+          const loaded = await document.fonts.load(descriptor, "DubGrid");
+          return { descriptor, statuses: loaded.map((font) => font.status) };
+        }),
+      );
+    });
+    for (const face of faces) {
+      expect(face.statuses, face.descriptor).not.toHaveLength(0);
+      expect(
+        face.statuses.every((status) => status === "loaded"),
+        face.descriptor,
+      ).toBe(true);
+    }
+    const preloads = page.locator('link[rel="preload"][as="font"]');
+    await expect(preloads).toHaveCount(4);
+    for (const href of await preloads.evaluateAll((links) =>
+      links.map((link) => (link as HTMLLinkElement).href),
+    )) {
+      expect(new URL(href).origin).toBe(new URL(page.url()).origin);
+      const response = await page.request.get(href);
+      expect(response.status()).toBe(200);
+      expect(response.headers()["cache-control"]).toContain("immutable");
+    }
+  });
 });

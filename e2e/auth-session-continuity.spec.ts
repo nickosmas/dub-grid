@@ -15,6 +15,7 @@ const SESSION_SCOPED_DASHBOARD_REQUESTS = new Set([
   "/api/organization/bootstrap",
   "/api/trial-welcome",
   "/api/account/identity",
+  "/api/account/permissions",
   "/api/auth/track-session",
 ]);
 

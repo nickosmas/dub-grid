@@ -1,29 +1,10 @@
 import type { Metadata } from "next";
-import { DM_Sans, DM_Mono, Inter } from "next/font/google";
 import Script from "next/script";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
+import "./fonts.css";
 import "@/lib/env.server";
 import { clientEnv } from "@/lib/env";
-
-// Brand headings only ever render at semibold or heavier, so lighter faces
-// would preload on every page without being drawn.
-const dmSans = DM_Sans({
-  subsets: ["latin"],
-  variable: "--font-dm-sans",
-  weight: ["600", "700"],
-});
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-});
-
-const dmMono = DM_Mono({
-  subsets: ["latin"],
-  variable: "--font-dm-mono",
-  weight: ["400", "500"],
-});
 
 export const metadata: Metadata = {
   metadataBase: new URL(clientEnv?.NEXT_PUBLIC_SITE_URL ?? "https://dubgrid.com"),
@@ -42,7 +23,6 @@ export const metadata: Metadata = {
 };
 
 import ConsentGatedAnalytics from "@/components/ConsentGatedAnalytics";
-import { cn } from "@/lib/utils";
 import CookieConsent from "@/components/CookieConsent";
 
 import AppToaster from "@/components/AppToaster";
@@ -51,12 +31,25 @@ import ThemeProvider from "@/components/ThemeProvider";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html
-      lang="en"
-      suppressHydrationWarning
-      className={cn(inter.variable, dmSans.variable, dmMono.variable, "font-sans")}
-    >
+    <html lang="en" suppressHydrationWarning className="font-sans">
       <head>
+        {/* The same four Latin files next/font previously preloaded. Other
+            character subsets remain on-demand through fonts.css. */}
+        {[
+          "5c285b27cdda1fe8-s.p.2_mbdogr7ni8i.woff2",
+          "83afe278b6a6bb3c-s.p.2bn3s6zvc0dyp.woff2",
+          "36363bfb06833f56-s.p.38hmww4cj4vme.woff2",
+          "a73419dd2ba2d841-s.p.2yee423r7ahpo.woff2",
+        ].map((file) => (
+          <link
+            key={file}
+            rel="preload"
+            href={`/fonts/${file}`}
+            as="font"
+            type="font/woff2"
+            crossOrigin="anonymous"
+          />
+        ))}
         {/* Adopts a theme handed over from the other origin (apex ↔ org
             subdomain) before next-themes' own script reads localStorage.
             This is an external, cacheable first-party asset rather than an

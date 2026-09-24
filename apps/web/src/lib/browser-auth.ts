@@ -1,6 +1,7 @@
 import type { Session, User } from "@supabase/supabase-js";
 import { captureMessage, setTag } from "@/lib/sentry";
 import { supabase } from "@/lib/supabase";
+import { parseHost } from "@/lib/subdomain";
 
 function isMissingSessionError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
@@ -121,8 +122,24 @@ export function clearSupabaseBrowserAuthState(): void {
 
   const hostname = window.location.hostname;
   const domainParts = hostname.split(".").filter(Boolean);
-  const candidateDomains = new Set<string>([""]);
-  for (let index = 0; index < domainParts.length; index += 1) {
+  // Local auth cookies are host-only. Firefox rejects attempts to delete a
+  // parent `localhost` cookie, just as it rejects public suffixes such as com.
+  // On deployments retain legacy domain-cookie cleanup, bounded by the same
+  // application root used for subdomain routing (including preview hosts).
+  const hostOnly =
+    hostname === "localhost" ||
+    hostname.endsWith(".localhost") ||
+    /^\d+\.\d+\.\d+\.\d+$/.test(hostname) ||
+    hostname.includes(":");
+  const rootParts = hostOnly
+    ? domainParts.length
+    : parseHost(hostname).rootDomain.split(".").length;
+  const candidateDomains = new Set<string>();
+  for (
+    let index = 0;
+    !hostOnly && index <= domainParts.length - Math.max(2, rootParts);
+    index += 1
+  ) {
     const domain = domainParts.slice(index).join(".");
     candidateDomains.add(domain);
     candidateDomains.add(`.${domain}`);
@@ -131,7 +148,6 @@ export function clearSupabaseBrowserAuthState(): void {
   for (const cookieName of cookieNames) {
     document.cookie = `${cookieName}=; Max-Age=0; path=/`;
     for (const domain of candidateDomains) {
-      if (!domain) continue;
       document.cookie = `${cookieName}=; Max-Age=0; path=/; domain=${domain}`;
     }
   }

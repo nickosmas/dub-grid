@@ -72,14 +72,17 @@ export function NotFoundBoundary({
   backHref?: string;
   backLabel?: string;
 }) {
+  // Home is canonical on the apex, so it can cross origins from an app
+  // subdomain. Navigate as a document instead of prefetching it as RSC.
+  const BackLink = backHref === "/" ? "a" : Link;
   return (
     <div style={shellStyle}>
       <DubGridLogo size={48} />
       <p style={titleStyle}>{title}</p>
       <p style={bodyStyle}>{message ?? "The page you're looking for doesn't exist."}</p>
-      <Link href={backHref} className="dg-btn dg-btn-primary" style={{ marginTop: 8 }}>
+      <BackLink href={backHref} className="dg-btn dg-btn-primary" style={{ marginTop: 8 }}>
         {backLabel}
-      </Link>
+      </BackLink>
     </div>
   );
 }
