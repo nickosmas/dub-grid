@@ -1,7 +1,7 @@
 # Feature: Atomic rotation and recoverable delivery
 
 **From build-plan:** feature 41a2
-**Status:** steps 1, 2, 3, 5 and 6 verified; step 4 is code-complete and owes browser evidence
+**Status:** all six steps verified, step 4 in three browsers; ready for review
 
 ## Goal
 
@@ -83,7 +83,7 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
       re-issue returns the same invitation id with a new token; a failed
       dispatch leaves the invitation pending on its previous usable token; and
       passing tests cover both.
-- [ ] **Step 4 - one guarded confirmation wherever an invitation is re-issued
+- [x] **Step 4 - one guarded confirmation wherever an invitation is re-issued
       or revoked** - the plan describes replacing a revoke-first, second-modal
       flow. That is not what the code does. `PendingInvitationBanner` already
       asks once ("Reissue Invitation?" / "Revoke Invitation?"), while
@@ -101,6 +101,15 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
       nothing. The gate is tested at the hook, where the contract lives. The
       per-surface browser evidence this step asks for cannot be produced in the
       cloud container, so per 41d it stays a blocker rather than a pass.
+      Evidence, 2026-09-24, local: `e2e/invitation-reissue.spec.ts` passes
+      15/15 in Chromium, Firefox and WebKit against this branch and migrations
+      043 to 045. All five surfaces ask once, name the consequence, and change
+      nothing when cancelled, with a screenshot of each confirmation and result
+      and no console errors. The run found four defects, all fixed here (see
+      "Found in the step 4 walkthrough"). The server ran without a Resend key,
+      so a confirmed reissue exercised the failed-delivery restore. The
+      delivered path is proven by the route and live-database tests; its
+      browser and provider rehearsal belongs to 41d.
 - [x] **Step 5 - a TOTP-enrolled invitee can accept** - establish what happens
       today when an invitee already has a DubGrid account with TOTP enrolled,
       then make acceptance work without offering them a password-set flow and
@@ -119,6 +128,14 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
       What was missing was a regression test for the middle one: nothing stopped
       a later migration gating acceptance behind AAL2 and silently breaking
       every enrolled invitee. That test now exists.
+      Corrected 2026-09-24 (finding F-12): the database accepts, but the route
+      never lets the call reach it. `requireAuthenticatedUser` refuses an
+      enrolled aal1 token with `STEP_UP_REQUIRED`, and the page signs such an
+      invitee in with the password alone, then reported the refusal as a dead
+      link. The page now hands a step-up refusal to the login page's
+      `MFAVerify` and resumes acceptance on the promoted session, and only the
+      dead-token response is described as a dead link. Page and classifier
+      tests cover it.
 - [x] **Step 6 - correct and consistent retry semantics** - audit every
       invitation endpoint's throttled and unavailable responses. _Done when:_
       each returns the right status, every 429 carries a `Retry-After` in
@@ -132,11 +149,19 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
       answer returns 503 rather than pretending to be a throttle. What was
       missing was assertions, so the invitations route and `send-invite-email`
       now have throttle tests too.
+      Corrected 2026-09-24 (finding F-27): not everything was correct. Most
+      routes sent `Math.ceil(reset / 1000)`, and `reset` is an epoch in
+      milliseconds, so a 429 advertised a wait of about 56 years. The tests
+      asserted only a positive integer, which the epoch satisfies. One
+      `retryAfterSeconds` helper now serves all 33 routes, and the throttle
+      tests bound the value by the window.
 
 ## Files / areas
 
 - `supabase/migrations/044_*.sql` (next free number; 043 is taken) plus
   `supabase/migrations/checksums.sha256`.
+- `supabase/migrations/045_invitation_rollback_restores_access.sql`: the
+  restore puts back the whole previous grant, not only the link.
 - `apps/web/src/app/api/organizations/invitations/route.ts` - the replace-access
   path, its restore path, and the throttled responses.
 - `apps/web/src/components/staff/PendingInvitationBanner.tsx` - the one surface
@@ -201,6 +226,16 @@ local run or CI, and per 41d an absent runtime check is a blocker rather than a
 pass.
 
 ## Step 4 test script
+
+Now automated as `e2e/invitation-reissue.spec.ts`; the manual script stays for
+a human walkthrough. Two corrections, found running it locally:
+
+- Invitation emails are sent through Resend, not caught by Inbucket. With a
+  `RESEND_API_KEY` set, every reissue sends real mail; without one, delivery
+  fails and the previous link must stay live. Use an address you own, or run
+  without the key to walk the failure path.
+- `npx supabase migration up --local` applies 043 to 045 without wiping local
+  data; `db:reset` also works but reseeds everything.
 
 Follow it in order. Each step says what to do, what to expect, and what a
 failure means. Branch `claude/lucid-hopper-exfpqt`.
@@ -345,7 +380,10 @@ by not wrapping it: the banner is its only caller and the banner already asks.
 The wrapper stays on the management panel's revoke and resend, which have no
 dialog of their own.
 
-**The detail panel's Reinvite is still revoke-then-create, not rotation.** Open,
+**The detail panel's Reinvite is still revoke-then-create, not rotation.** Fixed
+2026-09-24: the same handler lived on three surfaces (the detail slideover, the
+full detail page, and an unreachable copy in `EditEmployeePanel`), and all three
+now call the resend path. The original note, for the record: open,
 and the more interesting finding. `StaffDetailPanel.handleReinvite`
 (`StaffDetailPanel.tsx:152`) revokes the pending invitation and then opens the
 invite modal to create a new one, so on that surface a reissue still mints a
@@ -357,7 +395,29 @@ pointing this handler at the resend path instead of revoke-plus-invite. It is a
 behavioural change on a surface the script is still walking, so it is recorded
 rather than done in the middle of a test run.
 
+**The management panel asked twice to revoke.** Fixed 2026-09-24. Its inline
+"Revoke this invitation?" strip ran before the shared dialog, so one revoke
+took two prompts, and the strip did not say a resend will not restore the link.
+The panel now hands straight to the shared dialog, and cancelling it no longer
+closes the panel. Inline confirmations are not used anywhere on web.
+
+**A failed access change kept the new access.** Fixed 2026-09-24 in migration 045. 044's restore put back only the token and expiry, so when the replacement
+email failed, the invitee's still-valid old link carried the new role, inviter
+and departments while the admin was told nothing changed. The two-row design
+had restored everything by un-revoking the original. The rotation now returns
+the whole previous grant and the restore applies it, on web and in the three
+mobile routes.
+
+**A live-database test assumed an empty table.** "rotates in place" counted
+every invitation, which holds only on the unseeded rig and fails on any seeded
+database, including CI's integration job. It now counts its own organization's.
+
 ## Raised for 41b, not fixed here
+
+Superseded 2026-09-24: this reading was wrong. The route already demands the
+second factor from an enrolled invitee (see the Step 5 correction), and the page
+now presents the challenge, so there is nothing left to decide here for 41b.
+The original note follows.
 
 Accepting an organization invitation needs only the invitee's password, never
 their second factor, even when they have TOTP enrolled. That is a deliberate
