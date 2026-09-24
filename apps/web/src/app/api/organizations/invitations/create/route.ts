@@ -260,6 +260,23 @@ export async function POST(req: NextRequest) {
           employeeId ?? null,
         );
         if (refreshed) {
+          // This rotates the token on a pending row and the caller sends it
+          // again, so it is a re-invite and belongs in the log next to the
+          // resend action and the mobile resend, which both record one.
+          await writeInvitationAuditEntry({
+            orgId,
+            actorId: user.id,
+            actorEmail: user.email ?? null,
+            action: "invitation.resent",
+            resourceId: refreshed.invitationId,
+            details: {
+              email: normalizeRequiredStaffEmail(email),
+              role,
+              reason: "refreshed_orphaned_pending",
+            },
+            ipAddress: getRequestIp(req),
+            userAgent: req.headers.get("user-agent"),
+          });
           return NextResponse.json({ ...refreshed, resent: true });
         }
       } catch (refreshError) {

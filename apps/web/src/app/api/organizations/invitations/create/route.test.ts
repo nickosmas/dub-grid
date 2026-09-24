@@ -231,11 +231,14 @@ describe("POST /api/organizations/invitations/create", () => {
       data: null,
       error: { message: "An active invitation already exists for this email" },
     }));
-    const from = vi.fn(() =>
-      makeRefreshChain({
-        data: { id: "inv-orphan", token: "fresh-tok", expires_at: "2026-02-02T00:00:00Z" },
-        error: null,
-      }),
+    const auditInsert = vi.fn(async () => ({ error: null }));
+    const from = vi.fn((table: string) =>
+      table === "audit_log"
+        ? { insert: auditInsert }
+        : makeRefreshChain({
+            data: { id: "inv-orphan", token: "fresh-tok", expires_at: "2026-02-02T00:00:00Z" },
+            error: null,
+          }),
     );
     getServiceClient.mockReturnValue({ rpc, from });
 
@@ -250,6 +253,18 @@ describe("POST /api/organizations/invitations/create", () => {
       resent: true,
     });
     expect(from).toHaveBeenCalledWith("invitations");
+    // Rotating the token and sending it again is a re-invite, so it is logged.
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "invitation.resent",
+        resource_id: "inv-orphan",
+        actor_id: "actor-1",
+        details: expect.objectContaining({
+          email: "orphan@test.com",
+          reason: "refreshed_orphaned_pending",
+        }),
+      }),
+    );
   });
 
   it("still 409s when the guard fires but no pending row can be refreshed", async () => {

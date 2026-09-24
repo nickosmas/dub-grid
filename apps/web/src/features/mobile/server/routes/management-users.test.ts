@@ -476,6 +476,10 @@ describe("mobile management-users routes", () => {
       expect(sendInvitationEmail).toHaveBeenCalledWith(
         expect.objectContaining({ token: "fresh-token" }),
       );
+      expect(insertMobileAuditLogEntry).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ action: "invitation.resent", resource_type: "invitation" }),
+      );
     });
 
     it("revokes without sending anything", async () => {

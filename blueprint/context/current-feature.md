@@ -135,6 +135,11 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
       acting user, the organization, the invitation and the tier involved; a
       refused attempt is recorded as a refusal rather than silently dropped; and
       a passing test asserts an entry per event.
+      Re-invites are covered on all three paths that issue one: the web resend
+      action, the mobile management-user resend, and the create route's
+      orphan-refresh retry, which rotates the token on a pending row and
+      returns `resent: true`. The first two already wrote an entry but nothing
+      asserted it; the third wrote none at all.
 
 ## Files / areas
 

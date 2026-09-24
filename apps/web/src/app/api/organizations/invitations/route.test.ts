@@ -306,6 +306,13 @@ describe("POST /api/organizations/invitations", () => {
     expect(sendInvitationEmail).toHaveBeenCalledWith(
       expect.objectContaining({ token: expect.any(String), email: "old@test.com" }),
     );
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "invitation.resent",
+        resource_id: INVITATION_ID,
+        actor_id: "actor-1",
+      }),
+    );
   });
 
   it("restores the previous token and expiry when a resend email cannot be delivered", async () => {
