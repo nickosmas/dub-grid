@@ -1,61 +1,49 @@
-# Feature: Invitation authorization and inviter attribution
+# Feature: Atomic rotation and recoverable delivery
 
-**From build-plan:** feature 41a1 (see the note below: the plan item was
-reverted upstream while this was being built)
-**Status:** all six steps done and verified; ready for review
+**From build-plan:** feature 41a2
+**Status:** all six steps verified, step 4 in three browsers; ready for review
 
 ## Goal
 
-A regular admin must never be able to hand out the super_admin tier, whether
-by creating an invitation or by editing a pending one. The create route already
-enforces that ceiling; the edit path, the replace-access path, and the row-level
-layer do not. Close those, and record verifiable inviter attribution on every
-server-created invitation so the acceptance-time tier check has a real identity
-to test instead of a NULL.
-
-The two halves are coupled and the order is load-bearing. Acceptance refuses a
-super_admin invitation unless `invited_by` still holds that tier
-(`033_row_level_trust_boundaries.sql:152`). Today invitations created through the
-web route carry `invited_by = NULL`, because the route calls `send_invitation`
-with the service client and the function reads `auth.uid()`
-(`002_functions_triggers.sql:79`), so the check fails closed. Filling in
-attribution first, without the edit-path ceiling, would make that check pass for
-an invitation whose inviter is a super admin and turn a refused escalation into
-a granted one. Guards land first.
+Re-issuing an invitation should be one deliberate act with one outcome. Today
+changing a pending invitation's access revokes the row and inserts a
+replacement, so the invitation changes identity mid-life, and the web surface
+reaches that behaviour through a revoke-then-act path rather than a single
+guarded confirmation. Rotate the token on the same pending invitation instead,
+keep its email, role and departments, and keep the invitee from being stranded
+when the email cannot be delivered.
 
 ## In scope
 
-- Tier ceiling on the invitation edit path (`PATCH`) and the replace-access path
-  (`POST action: "replace_access"`): refuse `super_admin` unless the caller is a
-  super admin of that organization or a gridmaster, matching
-  `create/route.ts:142-147`.
-- The same ceiling at the row level: an UPDATE policy mirroring the INSERT
-  ceiling added in `033`, and the ceiling inside
-  `replace_pending_invitation_access`, which today accepts `super_admin` with no
-  tier check at all (`012_replace_pending_invitation_access.sql:17`).
-- Verifiable inviter attribution on every server-created invitation.
-- Align create, resend, and replace permissions so an admin who may create an
-  invitation may also send it.
-- Regression coverage proving the refusal on every path, including the mobile
-  endpoints.
-- Audit coverage for every invitation authorization event, granted or refused,
-  readable by super admins for their organization and by gridmasters across the
-  platform.
-- Every invitation tier works end to end, not only super_admin: a `user`, an
-  `admin` and a `super_admin` invitation must each be creatable, deliverable and
-  acceptable. The acceptance-time tier check only reads `super_admin`, so the
-  other two are expected to work already; that expectation is verified rather
-  than assumed, and any tier that cannot be accepted is repaired here.
+- Rotate in place: `replace_pending_invitation_access` keeps the same
+  `invitations` row, issuing a fresh token and expiry rather than revoking the
+  row and inserting a successor. The row keeps its email and departments, and
+  takes the new role when one is asked for.
+- One guarded confirmation for re-issuing or revoking an invitation, on every
+  web surface that offers either, stating plainly that the existing link stops
+  working immediately. `PendingInvitationBanner` already confirms both; the
+  other three surfaces fire immediately, which is the real defect here.
+- Delivery failure leaves a usable link. The existing restore path is kept
+  working against the rotated row rather than a successor row.
+- An invitee who already has an account with TOTP enrolled can accept without
+  being offered a password-set flow and without weakening their second factor.
+- Retry semantics are correct and consistent across every invitation endpoint:
+  the right status code, and a `Retry-After` a client can act on.
+- Revocation is durable. Found while settling the rotation contract: the resend
+  path guarded nothing and cleared `revoked_at`, so resending a revoked
+  invitation revived it with a fresh token and a fresh 72 hours. Proven with a
+  failing test, then fixed. It matters more than the rotation itself, because
+  three of the four surfaces that can resend do so without asking.
 
 ## Out of scope
 
-- Token rotation, transactional dispatch, and delivery-failure recovery (41a2).
-- Recipient-facing expiry, replacement, and organization-context copy (41a3).
-- The `invited_by` backfill for invitations already in the database. Historic
-  rows keep failing closed, which is the safe direction; a backfill decision
-  belongs with 41a3's release rehearsal.
-- Changing who may create an invitation. The `canManageEmployees` gate on
-  creation stays as it is.
+- Recipient-facing copy for expiry, replacement and organization context (41a3),
+  and the joined-date correction that rides with it.
+- The authorization work finished in 41a1. The tier ceiling and inviter
+  verification stay exactly as they are; this feature must not loosen either.
+- Changing the fixed 72-hour absolute expiry. Rotation issues a fresh 72 hours
+  from the moment of rotation, which is what the current replacement already
+  does; the ceiling itself is not up for revision here.
 
 ## Build loop
 
@@ -71,109 +59,155 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
 
 ## Build steps
 
-- [x] **Step 1 - tier ceiling on the edit path** - extract the create route's
-      super_admin check into one shared helper and apply it in `PATCH` before
-      the invitation update. _Done when:_ an admin holding `canManageEmployees`
-      who PATCHes `roleToAssign: "super_admin"` gets 403
-      `CANNOT_ASSIGN_SUPER_ADMIN` and the row is unchanged; a super admin doing
-      the same succeeds; a passing test covers both.
-- [x] **Step 2 - tier ceiling on the replace-access path** - apply the same
-      helper to `POST action: "replace_access"`. _Done when:_ the same admin is
-      refused with the same status and error, a super admin still succeeds, and
-      a passing test covers both.
-- [x] **Step 3 - the ceiling at the row level** - one forward migration adding
-      the tier check inside `replace_pending_invitation_access`, so the RPC
-      refuses `super_admin` from a lower-tier inviter rather than trusting its
-      caller. Lock the hash in `checksums.sha256`. _Done when:_
-      `npm run db:migrations:check` passes and an integration test proves the
-      RPC refuses the escalation with the routes bypassed.
-      Corrected while building: this step planned an `invitations_update` policy
-      mirroring the INSERT ceiling from `033`, on the belief that no update
-      ceiling existed. The live policies say otherwise. The UPDATE policy is
-      `invitations_revoke`, whose check is `(revoked_at IS NOT NULL)`, so an
-      authenticated org caller can only ever update an invitation into a revoked
-      state. That is stricter than the planned ceiling, and adding a broader
-      policy would have widened what an admin may write. A direct data-API
-      escalation was already impossible; the reachable path was through the
-      routes, which use the service client and bypass RLS entirely. No policy
-      was added, and a test asserts none is.
-- [x] **Step 4 - inviter attribution on create** - same migration series: give
-      `send_invitation` an explicit inviter parameter for the service-role path,
-      and pass the authenticated caller from the create route. _Done when:_ an
-      invitation created through the route has `invited_by` equal to the caller,
-      a direct authenticated call still records `auth.uid()`, and a passing test
-      asserts both. Additionally a `user`, an `admin` and a `super_admin`
-      invitation each accept successfully, proven per tier, so no tier is left
-      broken.
-      The stated inviter is verified, not trusted: both RPCs that accept one
-      (`send_invitation` and `replace_pending_invitation_access`, which
-      `COALESCE`s its `p_invited_by` over the existing value) must refuse unless
-      that user holds an active, unarchived membership in the target
-      organization, and, for a `super_admin` invitation, unless they hold
-      `super_admin` there or are an active gridmaster. This is the same rule
-      `033` applies at acceptance, moved to the moment the row is written.
-      Without it the parameter is forgeable by any service-role caller, so a
-      future route could manufacture a super-admin-authorized invitation by
-      naming someone else. _Also done when:_ a call naming an inviter who lacks
-      the tier is refused at the database with the routes bypassed, and a
-      passing test proves it.
-- [x] **Step 5 - align the resend permission with the sender** - `send-invite-email`
-      requires super admin or gridmaster (`route.ts:73-75`) while creation
-      requires `canManageEmployees`, so an admin can create an invitation they
-      cannot send. Align the gate on the create route's rule, keeping the
-      existing organization-scope check. _Done when:_ an admin with
-      `canManageEmployees` can send an invitation for their own organization, is
-      still refused for any other organization, and a passing test covers both.
-
-- [x] **Step 6 - audit every invitation authorization event** - every create,
-      role change, replace, resend, revoke and refusal writes an audit entry
-      naming the real actor, and each is readable by a super admin in the
-      organization's audit log and by a gridmaster in the platform log. Creation
-      writes no `audit_log` entry today (the create route only dispatches a
-      notification), and no refused escalation is recorded anywhere, so a
-      rejected attempt to raise an invitation to super_admin currently leaves no
-      trace. _Done when:_ each of those six events produces an entry with the
-      acting user, the organization, the invitation and the tier involved; a
-      refused attempt is recorded as a refusal rather than silently dropped; and
-      a passing test asserts an entry per event.
-      Re-invites are covered on all three paths that issue one: the web resend
-      action, the mobile management-user resend, and the create route's
-      orphan-refresh retry, which rotates the token on a pending row and
-      returns `resent: true`. The first two already wrote an entry but nothing
-      asserted it; the third wrote none at all.
+- [x] **Step 1 - decide the rotation contract before changing it** - write down
+      what in-place rotation does to the three things that currently depend on
+      two rows: the `previous_invitation_id` the replace path returns, the
+      `rollback_pending_invitation_access_replacement` RPC that restores the
+      original by un-revoking it, and the audit trail, which today records a
+      revoke and a create and would become one rotation against one resource id.
+      _Done when:_ the contract is written into this spec's Data section and you
+      have agreed it, because it changes what the audit log shows for a
+      re-issue.
+- [x] **Step 2 - rotate in place at the database layer** - one forward
+      migration restating `replace_pending_invitation_access` to update the
+      existing row's token, expiry and role rather than revoke and insert, and
+      restating the rollback RPC to match. Keep the 41a1 inviter check and the
+      tier ceiling exactly as they are. Lock the hash in `checksums.sha256`.
+      _Done when:_ `npm run db:migrations:check` passes, and an integration test
+      against the live database proves the row keeps its id, email and
+      departments, takes the new role, carries a different token, and that the
+      old token no longer accepts.
+- [x] **Step 3 - carry the route and its restore path onto the rotated row** -
+      update the replace-access route and its failure path to the new contract,
+      including what it returns to the client. _Done when:_ a successful
+      re-issue returns the same invitation id with a new token; a failed
+      dispatch leaves the invitation pending on its previous usable token; and
+      passing tests cover both.
+- [x] **Step 4 - one guarded confirmation wherever an invitation is re-issued
+      or revoked** - the plan describes replacing a revoke-first, second-modal
+      flow. That is not what the code does. `PendingInvitationBanner` already
+      asks once ("Reissue Invitation?" / "Revoke Invitation?"), while
+      `MembersSection`, `ManagementStaffPanel` and `StaffDetailPage` each fire
+      revoke or resend with no confirmation at all, and a pending invitation's
+      role is replaced inline from a select with none either. So the work is to
+      make the confirmed path the only path, reusing the banner's dialog rather
+      than adding a second one. _Done when:_ every surface that re-issues or
+      revokes asks once and names the consequence, no surface acts
+      unconfirmed, and there is browser evidence: a screenshot of the
+      confirmation and of the result on each surface, with no console errors.
+      Code complete, evidence outstanding. One shared confirmation
+      (`useInvitationActionConfirm`) is wired in, and the copy that described
+      the old revoke-and-replace behaviour is corrected, since rotation revokes
+      nothing. The gate is tested at the hook, where the contract lives. The
+      per-surface browser evidence this step asks for cannot be produced in the
+      cloud container, so per 41d it stays a blocker rather than a pass.
+      Evidence, 2026-09-24, local: `e2e/invitation-reissue.spec.ts` passes
+      15/15 in Chromium, Firefox and WebKit against this branch and migrations
+      043 to 045. All five surfaces ask once, name the consequence, and change
+      nothing when cancelled, with a screenshot of each confirmation and result
+      and no console errors. The run found four defects, all fixed here (see
+      "Found in the step 4 walkthrough"). The server ran without a Resend key,
+      so a confirmed reissue exercised the failed-delivery restore. The
+      delivered path is proven by the route and live-database tests; its
+      browser and provider rehearsal belongs to 41d.
+- [x] **Step 5 - a TOTP-enrolled invitee can accept** - establish what happens
+      today when an invitee already has a DubGrid account with TOTP enrolled,
+      then make acceptance work without offering them a password-set flow and
+      without bypassing their factor. _Done when:_ the behaviour before and
+      after is recorded, an enrolled invitee can accept, the accept path never
+      sets a password for an account that already has one, and a passing test
+      covers the branch.
+      Outcome: no code change was needed, and the reason is recorded rather
+      than assumed. Three things already hold. The register route returns
+      `existing` for a confirmed account and never touches its password, which
+      `register/route.test.ts` already asserts. Acceptance works for an enrolled
+      caller whose challenge is still pending, proven against the live database.
+      And the accept flow ends in a global sign-out, so the invitee
+      re-authenticates through the login screen, which is the only place
+      `MFAVerify` is rendered; `page.test.tsx` already asserts that sign-out.
+      What was missing was a regression test for the middle one: nothing stopped
+      a later migration gating acceptance behind AAL2 and silently breaking
+      every enrolled invitee. That test now exists.
+      Corrected 2026-09-24 (finding F-12): the database accepts, but the route
+      never lets the call reach it. `requireAuthenticatedUser` refuses an
+      enrolled aal1 token with `STEP_UP_REQUIRED`, and the page signs such an
+      invitee in with the password alone, then reported the refusal as a dead
+      link. The page now hands a step-up refusal to the login page's
+      `MFAVerify` and resumes acceptance on the promoted session, and only the
+      dead-token response is described as a dead link. Page and classifier
+      tests cover it.
+- [x] **Step 6 - correct and consistent retry semantics** - audit every
+      invitation endpoint's throttled and unavailable responses. _Done when:_
+      each returns the right status, every 429 carries a `Retry-After` in
+      seconds, no 429 is returned for a non-throttling failure, and passing
+      tests assert the header per endpoint.
+      Outcome: one real defect. `/api/invitations/lookup` is unauthenticated
+      and answers with organization context, and the abuse-boundary contract
+      declares it source-limited, but the route had no limit and nothing
+      enforced the contract. It has one now. Everything else was already
+      correct: each 429 carried a `Retry-After`, and a limiter that cannot
+      answer returns 503 rather than pretending to be a throttle. What was
+      missing was assertions, so the invitations route and `send-invite-email`
+      now have throttle tests too.
+      Corrected 2026-09-24 (finding F-27): not everything was correct. Most
+      routes sent `Math.ceil(reset / 1000)`, and `reset` is an epoch in
+      milliseconds, so a 429 advertised a wait of about 56 years. The tests
+      asserted only a positive integer, which the epoch satisfies. One
+      `retryAfterSeconds` helper now serves all 33 routes, and the throttle
+      tests bound the value by the window.
 
 ## Files / areas
 
-- `apps/web/src/app/api/organizations/invitations/route.ts` - the `PATCH` and
-  `POST` guards.
-- `apps/web/src/app/api/employees/shared.ts` - home for the shared tier helper
-  (`isOrgSuperAdminOrGridmaster` already lives here).
-- `apps/web/src/app/api/organizations/invitations/create/route.ts` - pass the
-  inviter; adopt the shared helper.
-- `apps/web/src/app/api/send-invite-email/route.ts` - the resend gate.
-- `supabase/migrations/043_invitation_tier_ceiling.sql` (next free number; 042 is
-  taken) plus `supabase/migrations/checksums.sha256`.
-- Tests beside each route, plus an integration test under
-  `apps/web/src/__tests__/` for the row-level refusals.
+- `supabase/migrations/044_*.sql` (next free number; 043 is taken) plus
+  `supabase/migrations/checksums.sha256`.
+- `supabase/migrations/045_invitation_rollback_restores_access.sql`: the
+  restore puts back the whole previous grant, not only the link.
+- `apps/web/src/app/api/organizations/invitations/route.ts` - the replace-access
+  path, its restore path, and the throttled responses.
+- `apps/web/src/components/staff/PendingInvitationBanner.tsx` - the one surface
+  that already confirms; its dialog is the pattern the others adopt.
+- `apps/web/src/components/staff/MembersSection.tsx`,
+  `apps/web/src/components/staff/ManagementStaffPanel.tsx` and
+  `apps/web/src/components/staff-detail/StaffDetailPage.tsx` - the surfaces that
+  revoke or resend without asking.
+- `apps/web/src/features/organization/client/access.ts` - the client call.
+- `apps/web/src/app/api/invitations/register/route.ts` and the accept-invite
+  page - the TOTP branch.
+- Tests beside each route, plus
+  `apps/web/src/__tests__/invitation-inviter-verified.integration.test.ts` or a
+  sibling for the rotation behaviour.
 
 ## Data / contracts
 
-- `invitations.role_to_assign` and `invitations.invited_by` are the load-bearing
-  columns: acceptance reads both, so their meaning is fixed by this feature.
-  `invited_by` becomes a dependable identity rather than an optimistic one.
-- `send_invitation` gains an explicit inviter parameter. Decided by the user on
-  2026-09-24, over the alternative of calling the RPC with the user client so
-  `auth.uid()` populates naturally. The service-role path stays, and the caller
-  states who the inviter is. It is a signature change on a function the create
-  route and any direct authenticated caller both use, so it ships as a new
-  forward migration, never an edit to an applied file. The parameter is trusted
-  only because the route authorizes the caller first, so it is passed from the
-  authenticated session and never from the request body, and because the
-  function verifies it rather than taking it on faith (see Step 4). A parameter
-  the database checks is as strong as an identity it derives, which is what
-  keeps this equivalent to the user-client alternative that was not taken.
-- `replace_pending_invitation_access` keeps its signature; only its body gains
-  the tier check.
+**The settled contract.** Rotation is not a new mechanism: the resend path
+already rotates in place, updating `token` and `expires_at` on the same row
+under an optimistic `updated_at` check, and restoring the previous pair when
+dispatch fails. Replace-access adopts that same shape and adds the role change,
+so there is one way to re-issue an invitation rather than two.
+
+It keeps going through `replace_pending_invitation_access` rather than becoming
+a direct update, because that RPC is where 41a1 put the inviter verification and
+the tier ceiling. A direct update would move a role change outside the database
+check that refuses a lower tier, which this feature must not do.
+
+- `invitations.token`, `expires_at` and `role_to_assign` become mutable on a
+  pending row, where today a re-issue replaces the row. The row id becomes
+  stable across a re-issue, which is the point: one invitation, one identity.
+- `previous_invitation_id` goes away rather than returning the row's own id: it
+  would be a lie with one row, and the route only uses it to relate the audit
+  entry to a successor that no longer exists.
+- The rollback RPC restores the previous token and expiry on the same row,
+  matching what the resend failure path already does, instead of un-revoking an
+  original and revoking a successor.
+- `replace_pending_invitation_access` keeps its signature. Its returned
+  `previous_invitation_id` has no meaning once nothing is replaced, so Step 1
+  decides whether it goes or returns the same id.
+- `rollback_pending_invitation_access_replacement` currently un-revokes the
+  original and revokes the successor. With one row it restores the previous
+  token and expiry instead, so it needs restating in the same migration.
+- The audit trail for a re-issue becomes one `invitation.access_replaced` entry
+  against a stable resource id, where today it is a revoke plus a create. This
+  is a visible change to what an administrator reads in the log.
 - Schema changes are new numbered forward migrations with the hash locked in
   `checksums.sha256`.
 
@@ -182,124 +216,232 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
 Vitest and Playwright are configured, so the testing gate is on: every step
 above ships a passing test in the same diff.
 
-Logic that needs a test: the shared tier helper, the `PATCH` guard, the
-`replace_access` guard, the create route's attribution, the `send-invite-email`
-gate, and the row-level refusals with the routes bypassed. Route handlers count
-as in-scope logic under `coding-standards.md`.
+Logic that needs a test: the rotation RPC and the rollback RPC with the routes
+bypassed, the replace-access route and its failure path, the TOTP accept branch,
+and the `Retry-After` on each throttled endpoint.
 
-Add a regression test asserting the mobile endpoints cannot reach the
-super_admin tier. They are role-locked today - `person-invitation.ts:332,373`
-hardcodes `roleToAssign: "user"` and `management-user-invitation.ts` takes no
-role - so this locks in behavior rather than changing it.
+Step 4 is the only step whose done-when needs a running app. It cannot be proven
+in the cloud container, which has no Supabase stack: that evidence comes from a
+local run or CI, and per 41d an absent runtime check is a blocker rather than a
+pass.
 
-Manual path: as an admin with `canManageEmployees`, open a pending invitation in
-People, try to change its access to super admin, and expect a clear refusal; as
-a super admin, expect it to succeed.
+## Step 4 test script
 
-Commands: `npm run type-check`, `npm run test:web`, `npm run lint`, and
-`npm run db:migrations:check` for the migration steps. No single `Verify`
-command is declared in `AGENTS.md`.
+Now automated as `e2e/invitation-reissue.spec.ts`; the manual script stays for
+a human walkthrough. Two corrections, found running it locally:
 
-## Progress and handoff
+- Invitation emails are sent through Resend, not caught by Inbucket. With a
+  `RESEND_API_KEY` set, every reissue sends real mail; without one, delivery
+  fails and the previous link must stay live. Use an address you own, or run
+  without the key to walk the failure path.
+- `npx supabase migration up --local` applies 043 to 045 without wiping local
+  data; `db:reset` also works but reseeds everything.
 
-Steps 1 and 2 are done, committed and pushed on `claude/lucid-hopper-exfpqt`:
+Follow it in order. Each step says what to do, what to expect, and what a
+failure means. Branch `claude/lucid-hopper-exfpqt`.
 
-- `1f648ec5` - the shared `canAssignOrgRole` ceiling, applied in `PATCH`, and
-  the create route switched to the same helper.
-- `efb29875` - the same ceiling on the replace-access path, applied before the
-  RPC so a lower tier cannot record an inviter.
+### 0. Start the stack
 
-Evidence: 16 tests pass in `invitations/route.test.ts` and 10 in
-`create/route.test.ts`; `npm run type-check` and ESLint are clean. Each guard
-was confirmed to fail its test when removed, so the tests prove the guards.
+    git fetch origin
+    git checkout claude/lucid-hopper-exfpqt
+    npm ci
+    npm run build:packages
+    npm run db:reset
+    npm run dev
 
-Steps 3 and 4 were verified after all, on a real database. The container has no
-Docker daemon and no Supabase CLI, but it does have a Postgres 16 server, so the
-cluster was created directly, given a small stand-in for the Supabase surface
-the migrations use (five roles, `auth.uid/jwt/users/sessions/mfa_factors`,
-`realtime.messages`), and all 43 migrations applied to it. The behaviour below
-was then reproduced before the fix and proven after it, with the routes
-bypassed.
+No trailing comments on those lines: interactive zsh does not treat `#` as a
+comment unless `interactive_comments` is set, so a pasted `npm run dev # url`
+hands the url to turbo as a task name and fails.
 
-Two limits of that rig, for anyone repeating this: it is not a Supabase replica,
-and it cannot be seeded, because `npm run seed` and the gridmaster seed need the
-auth admin API. So the pre-existing `*.integration.test.ts` files that depend on
-seed data fail against it rather than skipping, which is why the new integration
-test builds its own fixture and needs no seed.
+`db:reset` is not optional. Migration 044 changes both invitation RPCs, so an
+older local database silently tests the old code path.
 
-Evidence for steps 3 and 4:
+Three local URLs matter:
 
-- Before 043, a service-role `send_invitation` recorded `invited_by` as NULL and
-  the invitee's `accept_invitation` raised `INVITATION_INVALID`. That is the
-  reported production breakage, reproduced.
-- After 043, the same invitation is accepted and the membership is granted at
-  `super_admin`.
-- An admin named as inviter is refused `super_admin` and still allowed `admin`.
-- The replace path is refused when handed an under-tiered inviter, and the
-  original invitation is left pending because the guard runs before the revoke.
-- `user`, `admin` and `super_admin` each accept end to end.
-- `npm run db:migrations:check` passes with 043's hash locked.
+| What                                      | Where                  |
+| ----------------------------------------- | ---------------------- |
+| The app                                   | http://localhost:3000  |
+| Supabase Studio                           | http://127.0.0.1:54323 |
+| Inbucket, which catches every local email | http://127.0.0.1:54324 |
 
-First local run needs `npm ci` and `npm run build:packages` before any test, or
-consumers fail to resolve `@dubgrid/*`.
+This helper prints the state that matters after each step. Keep it to hand:
 
-One gate is outstanding and is deliberately not claimed: `npm run build`. No
-`Verify` command is declared, so the fallback gate is the build plus the tests.
-The tests pass; the build cannot run here. `apps/web/src/app/logo-grid.tsx`
-fetches the DM Sans TTFs from `cdn.jsdelivr.net` at build time to prerender
-`/opengraph-image`, and this environment's network policy refuses that host, so
-the build fails for a reason unrelated to this feature. The user is running it
-on their machine (agreed 2026-09-24). `/complete` should not log 41a1 until that
-build is green.
+    alias inv='psql postgres://postgres:postgres@127.0.0.1:54322/postgres -x -c "select id, email, role_to_assign, token, expires_at, revoked_at, accepted_at from invitations order by updated_at desc limit 3;"'
 
-Two container-specific notes, in case this recurs: the proxy's CA must be
-trusted through `NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt`, and Turborepo's
-strict env mode filters that variable out of task environments, so a build that
-needs it has to run through the workspace directly rather than through turbo.
+### 1. Create the invitation under test
 
-Landed for review as PR #104 from `claude/lucid-hopper-exfpqt` into `dev`.
+Sign in as a super admin, go to People, and invite a new address. Open
+Inbucket, open the invitation email, and **copy the accept link**. Keep it: most
+of what follows is about whether that link still works.
 
-The build-plan item this spec was written against no longer exists on `dev`:
-`0a7eb2e0` reverted `f7145a6e`, removing items 40 and 41 two minutes before the
-PR was opened. The conflict that caused was resolved in `dev`'s favour, because
-undoing a deliberate revert from a side branch would have made the plan
-reappear silently. Nothing about the code depends on the plan text, and the
-conflict was documentation-only.
+Run `inv`. Expect one pending row: your address, `revoked_at` and `accepted_at`
+both null. Note its `id` and `token`.
 
-So there is currently no item to check off. If item 41 is re-added, the
-41a1-41a3 split goes back with it and `/complete` can check off 41a1 as a
-feature; the exact text is preserved in `f7145a6e` and in this branch's history.
-Until then `/complete` would archive this as a fix.
+### 2. Each surface must ask before it acts
+
+Five places offer these actions. For each: click, read the dialog, then
+**cancel**, and confirm nothing happened.
+
+1. People, management panel, **Resend** on the pending row. Expect "Reissue
+   Invitation?" saying their current link stops working immediately.
+2. Same panel, **Revoke**. Expect "Revoke Invitation?" saying the link stops
+   working and that a new invitation can be sent later.
+3. The person's detail page, **Revoke**.
+4. The pending-invitation banner, **Reinvite**, then **Revoke**.
+5. The pending row's role select: pick a different role. Expect "Change
+   invitation access?", a confirm button reading "Change and resend", and the
+   message naming the address the new link goes to.
+
+After cancelling each one, run `inv`. The `token` must be unchanged every time.
+A changed token means the surface acted before asking, which is the defect this
+step exists to close.
+
+### 3. Reissuing kills the old link
+
+Reissue for real: confirm the dialog at surface 1. Then
+
+- run `inv`: same `id` as step 1, a **different** `token`, `expires_at` about 72
+  hours out, `revoked_at` still null. Same invitation, new link.
+- open Inbucket: a new email with a new link.
+- paste the **step 1** link into a browser. It must be refused as no longer
+  valid.
+- follow the **new** link. It must reach the accept page.
+
+A working old link means rotation did not take effect, and the most likely
+cause is a database that was not reset.
+
+### 4. Revoking holds
+
+Do not accept the invitation. Revoke it from surface 2, confirming the dialog.
+Then
+
+- run `inv`: `revoked_at` is set.
+- try **Resend** on that person, if the control is still offered. It must
+  refuse, and `inv` must still show `revoked_at` set with the same `token`.
+- paste the most recent link. It must be refused.
+
+A resend that clears `revoked_at` or issues a fresh token is the revival defect
+returning, and it is the one worth catching here.
+
+### 5. Change access, and read the trail
+
+Invite a second address. From the role select, change its role and confirm.
+Then
+
+- run `inv`: same `id`, new `token`, and the new `role_to_assign`.
+- in Studio's SQL editor:
+
+      select action, resource_id, details, created_at
+      from audit_log
+      where resource_type = 'invitation'
+      order by created_at desc
+      limit 10;
+
+Expect **one** `invitation.access_replaced` row for that change, against the
+same invitation id. Two rows, a revoke plus a create, would mean the old
+two-row behaviour is still live.
+
+### 6. Report
+
+Keep the browser console open throughout: any error counts as a failure. Tell
+me which numbered step failed and what you saw, and I will fix it. If all six
+pass, step 4 is done and 41a2 is complete.
+
+Commands: `npm run type-check`, `npm run test:web`, `npm run lint`,
+`npm run db:migrations:check`, and `npm run test:e2e` for Step 4.
+
+## The local Postgres rig, and the trap in it
+
+Steps 2, 3 and 5 were verified against a real database, built directly in the
+container because there is no Docker daemon or Supabase CLI: a Postgres 16
+cluster on port 54322 with a small stand-in for the Supabase surface the
+migrations use. It is worth having; it is how the rotation, the inviter checks
+and the enrolled-invitee case were proven on real SQL rather than mocks.
+
+**Stop it before any full-suite run.** The pre-existing `*.integration.test.ts`
+files probe that port and skip when nothing answers, which is what they do in
+CI. With the rig up they execute instead, against a shim that is unseeded and
+not a Supabase replica, and they fail for environmental reasons. That produced
+three full-suite results today that were not comparable to each other, visible
+in the skip counts: 3 skipped with the rig up against 17 with it down. Only the
+rig-down run means anything, and it passed: 20/20 tasks, 4202 tests, no
+failures.
+
+    pg_ctl -D /var/lib/postgresql/verify stop   # before npm run test:web
+    pg_ctl -D /var/lib/postgresql/verify -o '-p 54322' start   # for the rig
+
+## Found in the step 4 walkthrough
+
+**Two dialogs for one click, on the detail panel's Reinvite.** Reported from
+step 7 of the script. The banner asks "Reissue Invitation?", then calls
+`handleReinvite`, which calls `onRevoke` to clear the old invitation, and that
+function had been wrapped in the shared confirmation, so it asked again. Fixed
+by not wrapping it: the banner is its only caller and the banner already asks.
+The wrapper stays on the management panel's revoke and resend, which have no
+dialog of their own.
+
+**The detail panel's Reinvite is still revoke-then-create, not rotation.** Fixed
+2026-09-24: the same handler lived on three surfaces (the detail slideover, the
+full detail page, and an unreachable copy in `EditEmployeePanel`), and all three
+now call the resend path. The original note, for the record: open,
+and the more interesting finding. `StaffDetailPanel.handleReinvite`
+(`StaffDetailPanel.tsx:152`) revokes the pending invitation and then opens the
+invite modal to create a new one, so on that surface a reissue still mints a
+second invitation rather than rotating the first. That is the exact flow the
+plan called "revoke-first", which earlier reading of the code had missed
+because the revoke and the create are two calls in a handler rather than one
+dialog naming both. Rotation should be reachable from here too, which means
+pointing this handler at the resend path instead of revoke-plus-invite. It is a
+behavioural change on a surface the script is still walking, so it is recorded
+rather than done in the middle of a test run.
+
+**The management panel asked twice to revoke.** Fixed 2026-09-24. Its inline
+"Revoke this invitation?" strip ran before the shared dialog, so one revoke
+took two prompts, and the strip did not say a resend will not restore the link.
+The panel now hands straight to the shared dialog, and cancelling it no longer
+closes the panel. Inline confirmations are not used anywhere on web.
+
+**A failed access change kept the new access.** Fixed 2026-09-24 in migration 045. 044's restore put back only the token and expiry, so when the replacement
+email failed, the invitee's still-valid old link carried the new role, inviter
+and departments while the admin was told nothing changed. The two-row design
+had restored everything by un-revoking the original. The rotation now returns
+the whole previous grant and the restore applies it, on web and in the three
+mobile routes.
+
+**A live-database test assumed an empty table.** "rotates in place" counted
+every invitation, which holds only on the unseeded rig and fails on any seeded
+database, including CI's integration job. It now counts its own organization's.
+
+## Raised for 41b, not fixed here
+
+Superseded 2026-09-24: this reading was wrong. The route already demands the
+second factor from an enrolled invitee (see the Step 5 correction), and the page
+now presents the challenge, so there is nothing left to decide here for 41b.
+The original note follows.
+
+Accepting an organization invitation needs only the invitee's password, never
+their second factor, even when they have TOTP enrolled. That is a deliberate
+consequence of the flow above and it is not a defect in 41a2's terms, but
+joining an organization is a privilege grant, and 41b is the item about
+requiring fresh assurance for sensitive actions. Whether acceptance should
+demand AAL2 from an enrolled user is a decision for that item, with the
+trade-off that demanding it inside this flow means presenting a challenge the
+page does not have today.
 
 ## Notes for the AI
 
-- Settled 2026-09-24 by the user: super_admin invitations sent from the web do
-  not work at all. That confirms the mechanism. `invited_by` is NULL on
-  web-created invitations, the acceptance-time tier check fails closed, and the
-  invitee is refused. So Step 4 is not only hardening: it repairs a feature that
-  is broken in production today. Step 1 through Step 3 must still land first,
-  because Step 4 is what makes that check able to pass.
-- One live escalation path is already reachable without any attribution change:
-  `replace_pending_invitation_access` sets `invited_by` to the caller
-  (`route.ts:636`), so a pending invitation that a super admin has put through
-  replace-access carries a super-admin inviter. A junior admin can then PATCH it
-  to `super_admin` and acceptance passes. Step 1 closes it.
-- A second live source of the same precondition: the mobile person-invitation
-  route already records a real inviter (`person-invitation.ts:330`,
-  `invitedBy: loaded.auth.user.id`). Its own role is locked to `user`, so it
-  cannot escalate by itself, but an invitation a super admin creates on mobile
-  carries a super-admin inviter that the web PATCH can then raise. It also shows
-  attribution is already expected on this table, so Step 4 restores a convention
-  rather than inventing one.
-- Every guard belongs at both layers. The routes call these RPCs with the
-  service client, where `auth.uid()` is NULL and RLS does not apply, so a route
-  check alone leaves the database trusting its caller. This is the F-06 pattern
-  already in the findings ledger.
-- Keep `getServiceClient()` for the writes themselves; authorize the caller
-  before it, as the surrounding routes do.
-- Scope every read and write by the effective sandbox-aware `orgId`, never a
-  client-supplied one.
-- Reuse `API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN`; do not invent a second message
-  for the same refusal.
-- Do not edit an applied migration. Add a forward migration and lock its hash.
+- The restore-on-failure behaviour 41a2 asks for already exists and is tested
+  (`route.test.ts`: "restores the old invite when the replacement email cannot
+  be sent" and "restores the previous token and expiry when a resend email
+  cannot be delivered"). This feature moves it onto the rotated row; it does not
+  build it from nothing.
+- Do not loosen anything 41a1 established. `inviter_may_grant` and the
+  `canAssignOrgRole` ceiling must still refuse a lower tier, and the rotation
+  migration restates functions that carry those checks, so they must be carried
+  forward verbatim.
+- The rotation is the same class of change as the one 41a1 made to
+  `send_invitation`: restate the function in a new forward migration, never edit
+  an applied file, and lock the hash.
+- Keep `getServiceClient()` for the writes; authorize the caller first.
+- Scope every read and write by the effective sandbox-aware `orgId`.
 - No em dashes in code, comments, or commit messages.

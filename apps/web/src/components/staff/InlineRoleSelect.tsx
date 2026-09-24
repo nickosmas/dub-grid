@@ -79,13 +79,13 @@ export function InlineRoleSelect({
       />
       {pending && (
         <ConfirmDialog
-          title={pendingInvitationEmail ? "Replace invitation access?" : "Change role"}
+          title={pendingInvitationEmail ? "Change invitation access?" : "Change role"}
           message={
             pendingInvitationEmail
-              ? `Change access from ${ORG_ROLE_LABELS[orgRole]} to ${ORG_ROLE_LABELS[pending]}? The current invitation will be revoked and a replacement will be sent to ${pendingInvitationEmail}.`
+              ? `Change access from ${ORG_ROLE_LABELS[orgRole]} to ${ORG_ROLE_LABELS[pending]}? Their current invite link stops working immediately, and a new one is sent to ${pendingInvitationEmail}.`
               : `Change this person's role to ${ORG_ROLE_LABELS[pending]}? Their access updates immediately.`
           }
-          confirmLabel={pendingInvitationEmail ? "Revoke and resend" : "Change role"}
+          confirmLabel={pendingInvitationEmail ? "Change and resend" : "Change role"}
           variant="warning"
           isLoading={saving}
           onCancel={() => {

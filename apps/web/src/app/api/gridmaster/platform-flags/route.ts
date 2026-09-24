@@ -5,6 +5,7 @@ import { API_ERRORS } from "@dubgrid/client-errors";
 import { requireGridmasterSession } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { retryAfterSeconds } from "@/lib/retry-after";
 import { getServiceClient } from "@/lib/supabase-service";
 import { invalidatePlatformFlagsCache, PLATFORM_FLAGS_TAG } from "@/lib/feature-flags";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
@@ -98,7 +99,7 @@ export async function POST(req: NextRequest) {
   if (limited) {
     return NextResponse.json(
       { error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+      { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
     );
   }
 
@@ -196,7 +197,7 @@ export async function PUT(req: NextRequest) {
   if (limited) {
     return NextResponse.json(
       { error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+      { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
     );
   }
 

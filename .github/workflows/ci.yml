@@ -1,13 +1,15 @@
 # Core CI pipeline: lint, type-check, unit tests, and build verification.
-# Runs on every PR targeting main and on pushes to main.
+# Runs on every PR targeting main or dev and on pushes to either. dev is where
+# all work lands, directly or through a claude/* pull request, so gating only
+# main let broken commits sit on dev until the next release PR.
 
 name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
-    branches: [main]
+    branches: [main, dev]
 
 # Read-only by default. Nothing in this pipeline writes to the repo, and a
 # dependency executing during install should never inherit a token that can.

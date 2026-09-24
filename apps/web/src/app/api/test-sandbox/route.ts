@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { retryAfterSeconds } from "@/lib/retry-after";
 import { getServiceClient } from "@/lib/supabase-service";
 import { SANDBOX_COOKIE_NAME, encodeSandboxCookieValue } from "@/lib/sandbox-cookie";
 import {
@@ -83,7 +84,7 @@ export async function POST(req: NextRequest) {
         { error: "Too many requests" },
         {
           status: 429,
-          headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) },
+          headers: { "Retry-After": String(retryAfterSeconds(reset)) },
         },
       );
     }

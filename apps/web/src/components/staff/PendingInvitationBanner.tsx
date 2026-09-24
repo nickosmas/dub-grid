@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import type { Invitation } from "@/types";
+import { INVITATION_ACTION_COPY } from "./useInvitationActionConfirm";
 
 interface PendingInvitationBannerProps {
   pendingInvitation: Invitation;
@@ -27,6 +28,8 @@ export function PendingInvitationBanner({
 }: PendingInvitationBannerProps) {
   const [pendingAction, setPendingAction] = useState<"reinvite" | "revoke" | null>(null);
   const [busy, setBusy] = useState(false);
+  // One wording for these actions wherever they are offered.
+  const copy = INVITATION_ACTION_COPY[pendingAction === "revoke" ? "revoke" : "resend"];
 
   async function handleConfirm() {
     if (!pendingAction) return;
@@ -122,14 +125,10 @@ export function PendingInvitationBanner({
       </div>
       {pendingAction && (
         <ConfirmDialog
-          title={pendingAction === "reinvite" ? "Reissue Invitation?" : "Revoke Invitation?"}
-          message={
-            pendingAction === "reinvite"
-              ? `Revoke the existing invitation for ${pendingInvitation.email} and create a new one?`
-              : `Revoke the pending invitation for ${pendingInvitation.email}? The current invite link will stop working.`
-          }
-          confirmLabel={pendingAction === "reinvite" ? "Reissue" : "Revoke"}
-          variant={pendingAction === "reinvite" ? "warning" : "danger"}
+          title={copy.title}
+          message={copy.message(pendingInvitation.email)}
+          confirmLabel={copy.confirmLabel}
+          variant={copy.variant}
           isLoading={busy}
           onConfirm={handleConfirm}
           onCancel={() => {

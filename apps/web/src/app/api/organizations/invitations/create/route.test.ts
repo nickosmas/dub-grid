@@ -8,6 +8,7 @@ const getServiceClient = vi.fn();
 const canManageEmployees = vi.fn();
 const isOrgSuperAdminOrGridmaster = vi.fn();
 const dispatchNotificationEvent = vi.fn();
+const checkRateLimit = vi.fn();
 
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
@@ -28,6 +29,10 @@ vi.mock("@/app/api/employees/shared", () => ({
     role !== "super_admin"
       ? Promise.resolve(true)
       : Promise.resolve(isOrgSuperAdminOrGridmaster(client, actorId, orgId)),
+}));
+vi.mock("@/lib/rate-limit", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/rate-limit")>()),
+  checkRateLimit: (...args: unknown[]) => checkRateLimit(...args),
 }));
 vi.mock("@/features/notifications/server/events", () => ({
   dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
@@ -62,6 +67,7 @@ beforeEach(() => {
   requireAuthenticatedUser.mockResolvedValue({ user: { id: "actor-1" } });
   canManageEmployees.mockResolvedValue(true);
   isOrgSuperAdminOrGridmaster.mockResolvedValue(false);
+  checkRateLimit.mockResolvedValue({ limited: false });
 });
 
 describe("POST /api/organizations/invitations/create", () => {
@@ -74,6 +80,19 @@ describe("POST /api/organizations/invitations/create", () => {
     expect(res.status).toBe(403);
     // Hard 403 before auth/service-client: no invitation is ever created.
     expect(requireAuthenticatedUser).not.toHaveBeenCalled();
+    expect(getServiceClient).not.toHaveBeenCalled();
+  });
+
+  it("answers a throttled caller with the seconds left in the window", async () => {
+    checkRateLimit.mockResolvedValue({ limited: true, reset: Date.now() + 30_000 });
+
+    const { POST } = await importRoute();
+    const res = await POST(makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "user" }));
+
+    expect(res.status).toBe(429);
+    const retryAfter = Number(res.headers.get("Retry-After"));
+    expect(retryAfter).toBeGreaterThan(0);
+    expect(retryAfter).toBeLessThanOrEqual(30);
     expect(getServiceClient).not.toHaveBeenCalled();
   });
 

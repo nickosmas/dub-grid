@@ -259,7 +259,9 @@ export default function InviteEmployeeModal({
         body: JSON.stringify({ token, email: trimmedEmail, orgName }),
       });
       if (!res.ok) {
-        // Invitation was saved to DB but email failed — tell the user clearly
+        // Invitation was saved to DB but email failed — tell the user clearly.
+        // The detail is a whole sentence from the server, so it follows ours
+        // rather than being spliced into it ("created, but We couldn't...").
         const text = await res.text().catch(() => "");
         let detail = "We couldn't send the invitation email.";
         try {
@@ -270,7 +272,7 @@ export default function InviteEmployeeModal({
         } catch {
           /* non-JSON response */
         }
-        throw new Error(`Invitation was created, but ${detail}`);
+        throw new Error(`The invitation is saved. ${detail}`);
       }
       const data = await res.json();
       if (!data.success) {

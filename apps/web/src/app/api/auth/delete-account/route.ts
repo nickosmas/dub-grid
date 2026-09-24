@@ -4,6 +4,7 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { canDeleteAccountDirectly } from "@/features/account/server";
 import { forbidIfSandboxCookie, requireSensitiveActionAuth } from "@/lib/api-auth";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { retryAfterSeconds } from "@/lib/retry-after";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { API_ERRORS } from "@dubgrid/client-errors";
@@ -41,7 +42,7 @@ export async function DELETE(req: NextRequest) {
         { error: "Too many requests" },
         {
           status: 429,
-          headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) },
+          headers: { "Retry-After": String(retryAfterSeconds(reset)) },
         },
       );
     }

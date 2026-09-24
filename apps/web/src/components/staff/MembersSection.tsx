@@ -55,6 +55,7 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { useInvitationActionConfirm } from "./useInvitationActionConfirm";
 import CustomSelect from "@/components/CustomSelect";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { MaybeHint } from "@/components/ui/hint";
@@ -218,6 +219,11 @@ export function MembersSection({
   const [filterOpen, setFilterOpen] = useState(false);
   const filterBtnRef = useRef<HTMLButtonElement>(null);
   const [pendingInvitations, setPendingInvitations] = useState<Invitation[]>([]);
+  // Revoking or reissuing kills the link the invitee already holds, so both ask
+  // first, with the same wording wherever they are offered.
+  const { askToConfirm, confirmDialog: invitationConfirmDialog } = useInvitationActionConfirm();
+  const inviteeEmailFor = (invitationId: string): string | null =>
+    pendingInvitations.find((invitation) => invitation.id === invitationId)?.email ?? null;
   const loadedInvitationsForOrgIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -897,6 +903,9 @@ export function MembersSection({
       .catch(() => {});
   }
 
+  // Not wrapped in a confirmation: its only caller is the pending-invitation
+  // banner, which asks first, and the banner's reinvite calls it again inside
+  // an already-confirmed flow. Asking here produced two dialogs for one click.
   async function handleRevokeInvitation(invitationId: string): Promise<boolean> {
     if (!orgId) return false;
     setRevokingId(invitationId);
@@ -911,6 +920,21 @@ export function MembersSection({
       return false;
     } finally {
       setRevokingId(null);
+    }
+  }
+
+  // Unconfirmed for the same reason as revoke: the banner asks first. It
+  // rotates the token on the same invitation rather than minting a new one.
+  async function handleResendInvitation(invitationId: string): Promise<boolean> {
+    if (!orgId) return false;
+    try {
+      await resendInvitation(invitationId, orgId);
+      refreshInvitations();
+      toast.success("Invitation resent");
+      return true;
+    } catch (err) {
+      toast.error(formatClientErrorMessage(err, "We couldn't resend that invitation. Try again."));
+      return false;
     }
   }
 
@@ -2343,6 +2367,7 @@ export function MembersSection({
             canManageManagementAccess ? openManagementAccessPopup : undefined
           }
           onRevoke={handleRevokeInvitation}
+          onResend={handleResendInvitation}
         />
       )}
 
@@ -2543,17 +2568,22 @@ export function MembersSection({
           onRevokeInvitation={
             canManageManagementAccess && orgId
               ? async (invitationId) => {
+                  if (!(await askToConfirm("revoke", inviteeEmailFor(invitationId)))) {
+                    return false;
+                  }
                   await revokeInvitation(invitationId, orgId);
                   void queryClient.invalidateQueries({
                     queryKey: queryKeys.org.directory(orgId),
                   });
                   toast.success("Invitation revoked");
+                  return true;
                 }
               : undefined
           }
           onResendInvitation={
             canManageManagementAccess && orgId
               ? async (invitationId) => {
+                  if (!(await askToConfirm("resend", inviteeEmailFor(invitationId)))) return;
                   await resendInvitation(invitationId, orgId);
                   void queryClient.invalidateQueries({
                     queryKey: queryKeys.org.directory(orgId),
@@ -2680,6 +2710,7 @@ export function MembersSection({
           onCancel={() => setExportConfirm(false)}
         />
       ) : null}
+      {invitationConfirmDialog}
     </>
   );
 }

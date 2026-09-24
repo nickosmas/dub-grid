@@ -83,6 +83,7 @@ export interface EditEmployeePanelProps {
   onInvite?: (emp: Employee) => void;
   pendingInvitation?: Invitation;
   onRevoke?: (invitationId: string) => Promise<boolean> | boolean | void;
+  onResend?: (invitationId: string) => Promise<boolean> | boolean | void;
   /** Called instead of `onSave` when the admin confirms changing the email
    *  while a pending invitation exists — saves the identity change (which
    *  auto-revokes the old invitation) and sends a fresh one to the new
@@ -158,6 +159,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       onInvite,
       pendingInvitation,
       onRevoke,
+      onResend,
       onSaveWithReinvite,
       hideActions,
       persistent = false,
@@ -843,15 +845,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                 {pendingInvitation && onRevoke ? (
                   <PendingInvitationBanner
                     pendingInvitation={pendingInvitation}
-                    onReinvite={
-                      onInvite
-                        ? async () => {
-                            const result = await onRevoke(pendingInvitation.id);
-                            if (result === false) return;
-                            onInvite(employee);
-                          }
-                        : undefined
-                    }
+                    onReinvite={onResend ? () => onResend(pendingInvitation.id) : undefined}
                     onRevoke={onRevoke}
                     isInSandbox={isInSandbox}
                   />

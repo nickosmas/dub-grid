@@ -93,7 +93,8 @@ interface ManagementStaffPanelProps {
     phone: string;
     managementDepartmentIds: number[];
   }) => Promise<boolean>;
-  onRevokeInvitation?: (invitationId: string) => Promise<void>;
+  /** Resolves false when the revoke did not go ahead, so the panel stays open. */
+  onRevokeInvitation?: (invitationId: string) => Promise<boolean | void>;
   onResendInvitation?: (invitationId: string) => Promise<void>;
   /** Change the linked member's org role. Provided only when the viewer may
    *  manage access and the person has an editable membership. */
@@ -146,7 +147,6 @@ export function ManagementStaffPanel({
   const [saving, setSaving] = useState(false);
   const [revoking, setRevoking] = useState(false);
   const [resending, setResending] = useState(false);
-  const [showRevokeConfirm, setShowRevokeConfirm] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const personDraft = useMemo(
     () =>
@@ -174,7 +174,6 @@ export function ManagementStaffPanel({
     setPhone(personDraft.phone);
     setDeptIds([...personDraft.managementDepartmentIds]);
     setSavedDraft(personDraft);
-    setShowRevokeConfirm(false);
     setTouched({});
   }, [person.personId, personDraft]);
 
@@ -368,8 +367,8 @@ export function ManagementStaffPanel({
     setRevoking(true);
     try {
       // person.personId is "inv:<uuid>" — extract the uuid
-      await onRevokeInvitation(person.personId.replace("inv:", ""));
-      closePanel();
+      const revoked = await onRevokeInvitation(person.personId.replace("inv:", ""));
+      if (revoked !== false) closePanel();
     } finally {
       setRevoking(false);
     }
@@ -1078,56 +1077,18 @@ export function ManagementStaffPanel({
                   </Button>
                 )}
 
-                {showRevokeInvitationAction &&
-                  (!showRevokeConfirm ? (
-                    <Button
-                      onClick={() => setShowRevokeConfirm(true)}
-                      className="dg-btn dg-btn-ghost"
-                      style={{ width: "100%", color: "var(--dg-color-danger)" }}
-                    >
+                {showRevokeInvitationAction && (
+                  <Button
+                    onClick={handleRevoke}
+                    disabled={revoking}
+                    className="dg-btn dg-btn-ghost"
+                    style={{ width: "100%", color: "var(--dg-color-danger)" }}
+                  >
+                    <ButtonLoading loading={revoking} spinnerSize={14}>
                       Revoke Invitation
-                    </Button>
-                  ) : (
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 10,
-                        background: "var(--dg-color-danger-bg)",
-                        padding: "14px 16px",
-                        borderRadius: "var(--dg-radius-lg)",
-                        border: "1px solid var(--dg-color-danger-border)",
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: "var(--dg-fs-label)",
-                          fontWeight: 600,
-                          color: "var(--dg-color-danger-text)",
-                          lineHeight: 1.4,
-                        }}
-                      >
-                        Revoke this invitation? The link will no longer work.
-                      </span>
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <Button
-                          onClick={() => setShowRevokeConfirm(false)}
-                          className="dg-btn dg-btn-secondary"
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          onClick={handleRevoke}
-                          disabled={revoking}
-                          className="dg-btn dg-btn-danger-filled"
-                        >
-                          <ButtonLoading loading={revoking} spinnerSize={14}>
-                            Confirm
-                          </ButtonLoading>
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    </ButtonLoading>
+                  </Button>
+                )}
               </div>
             ) : undefined
           }

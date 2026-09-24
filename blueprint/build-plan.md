@@ -519,3 +519,72 @@
       item must remain last and does not itself authorize production changes.
       Local safety tooling and qualification are preserved in checkpoint
       `ee4207e0`.
+- [ ] 41. **Authentication security and invitation resilience** - remediate the
+      documented authentication and invitation failure modes across web,
+      mobile, database, email, and operational flows. Preserve the fixed
+      72-hour, absolute invitation expiry; make reissue and delivery behavior
+      intelligible and atomic; enforce the right authorization and assurance
+      boundary for every credential, session, recovery, and membership action;
+      and qualify the repaired journeys in real clients and providers. This
+      hardening milestone authorizes no production migration, deployment, or
+      invitation reissue without separate reviewed release approval.
+  - [ ] 41a. **Invitation authorization, attribution, and reliable delivery** -
+        close the pending-invitation privilege-escalation path; ensure every
+        server-created invitation has verifiable inviter attribution; align
+        create and resend permissions with the sender; make token rotation and
+        email dispatch transactional or safely recoverable; correctly handle
+        TOTP-enrolled invitees; return valid retry semantics; and make the
+        invitation's 72-hour absolute expiry, replacement behavior, and
+        organization context clear to recipients. Replace the web's current
+        revoke-first, second-modal flow with one explicit guarded confirmation:
+        it immediately invalidates the current link, rotates the token on the
+        same pending invitation while preserving its email, role, and
+        departments, and sends the replacement. If delivery fails, restore the
+        previous usable link rather than leaving the invitee stranded.
+    - [x] 41a1. **Invitation authorization and inviter attribution** - a
+          regular admin must never hand out the super_admin tier, at creation
+          or by editing a pending invitation: apply the create route's tier
+          ceiling to the edit and replace paths and to the mobile invitation
+          endpoints, and record verifiable inviter attribution on every
+          server-created invitation. Attribution and the edit-path guard ship
+          together, guard first: filling in the inviter makes the
+          acceptance-time tier check live, which would otherwise turn a
+          refused escalation into a granted one. Align create, resend, and
+          replace permissions so an admin who can create an invitation can
+          also send it.
+    - [ ] 41a2. **Atomic rotation and recoverable delivery** - replace the
+          revoke-first, second-modal web flow with one guarded confirmation
+          that invalidates the current link and rotates the token on the same
+          pending invitation, preserving its email, role, and departments.
+          Make rotation and dispatch transactional or safely recoverable:
+          restore the previous usable link when delivery fails rather than
+          stranding the invitee. Handle TOTP-enrolled invitees and return
+          valid retry semantics.
+    - [ ] 41a3. **Recipient-facing invitation clarity** - make the 72-hour
+          absolute expiry, replacement behavior, and organization context
+          clear to recipients in the invitation email and the accept-invite
+          landing, so a replaced link and a still-valid one are tellable
+          apart.
+  - [ ] 41b. **Credential, session, and recovery integrity** - require the
+        same fresh-assurance and session-revocation guarantees on web and
+        mobile for password, sign-in email, MFA, recovery, account deletion,
+        remote session termination, and manager-initiated credential changes.
+        Repair partial-failure, stale-session, app-lock, logout-timeout, and
+        corrupt-auth-state paths so security state remains recoverable,
+        fail-closed where appropriate, and auditable.
+  - [ ] 41c. **Security notices, audit attribution, and account-global email
+        context** - deliver security alerts reliably with useful device and
+        event context; record successful authentication only after all gates
+        and against the actual organization; authenticate impersonation notice
+        routing; and normalize all auth email copy. Account-global actions
+        (password, sign-in email, MFA, recovery) must identify the user's
+        DubGrid sign-in account and may name only a verified initiating
+        organization as context, never imply that an organization owns the
+        credential or disclose membership counts.
+  - [ ] 41d. **Auth resilience and release qualification** - remove remaining
+        retry-loop and source/template drift hazards; add focused regression
+        coverage for every repaired path; and perform browser, native-app,
+        email-provider, and migration/reissue rehearsals with explicit
+        production checks before remediation closure. Record unavailable
+        environment evidence as a release blocker rather than treating static
+        tests as runtime proof.

@@ -8,6 +8,7 @@ import { z } from "zod";
 import { createElement } from "react";
 import { render } from "@react-email/components";
 import { demoLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { retryAfterSeconds } from "@/lib/retry-after";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { sanitizeHeaderValue, emailBaseUrl } from "@/lib/email";
 import { DemoRequestEmail } from "@/emails/DemoRequestEmail";
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
     );
   }
   if (limited) {
-    const retryAfter = reset ? Math.ceil((reset - Date.now()) / 1000) : 60;
+    const retryAfter = retryAfterSeconds(reset);
     return NextResponse.json(
       { success: false, error: "Too many requests" },
       { status: 429, headers: { "Retry-After": String(retryAfter) } },

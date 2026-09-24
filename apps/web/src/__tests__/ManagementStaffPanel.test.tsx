@@ -55,6 +55,7 @@ function renderPanel(
       | "onAddToSchedule"
       | "onRoleChange"
       | "onSave"
+      | "onRevokeInvitation"
     >
   > = {},
 ) {
@@ -261,5 +262,40 @@ describe("ManagementStaffPanel", () => {
     expect(headerAccess).toContainElement(screen.getByText("Admin"));
     expect(headerAccess).not.toHaveTextContent("Role");
     expect(document.querySelector('[data-slot="management-body-access"]')).toBeNull();
+  });
+
+  describe("revoking a pending invitation", () => {
+    const pending = {
+      personId: "inv:invite-1",
+      source: "pending_invite" as const,
+      userId: null,
+      hasAppAccess: false,
+      lastSignInAt: null,
+      invitationStatus: "pending" as const,
+    };
+
+    it("hands straight to the caller's confirmation instead of asking inline first", async () => {
+      const user = userEvent.setup();
+      const onRevokeInvitation = vi.fn().mockResolvedValue(true);
+      const { onClose } = renderPanel(pending, undefined, null, { onRevokeInvitation });
+
+      await user.click(screen.getByRole("button", { name: "Revoke Invitation" }));
+
+      expect(onRevokeInvitation).toHaveBeenCalledWith("invite-1");
+      expect(screen.queryByText(/Revoke this invitation\?/)).not.toBeInTheDocument();
+      await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    });
+
+    it("stays open when the revoke is cancelled", async () => {
+      const user = userEvent.setup();
+      const onRevokeInvitation = vi.fn().mockResolvedValue(false);
+      const { onClose } = renderPanel(pending, undefined, null, { onRevokeInvitation });
+
+      await user.click(screen.getByRole("button", { name: "Revoke Invitation" }));
+
+      await waitFor(() => expect(onRevokeInvitation).toHaveBeenCalledOnce());
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: "Revoke Invitation" })).toBeEnabled();
+    });
   });
 });

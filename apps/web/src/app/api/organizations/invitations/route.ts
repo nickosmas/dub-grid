@@ -6,6 +6,7 @@ import {
 } from "@dubgrid/contracts";
 import { z } from "zod";
 import { apiLimiter, checkRateLimit, emailTargetLimiter, hashEmail } from "@/lib/rate-limit";
+import { retryAfterSeconds } from "@/lib/retry-after";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { forbidIfSandboxCookie, requireAuthenticatedUser } from "@/lib/api-auth";
@@ -283,7 +284,7 @@ export async function PATCH(req: NextRequest) {
   if (limited) {
     return NextResponse.json(
       { error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+      { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
     );
   }
 
@@ -466,7 +467,7 @@ export async function DELETE(req: NextRequest) {
   if (limited) {
     return NextResponse.json(
       { error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+      { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
     );
   }
 
@@ -563,7 +564,7 @@ export async function POST(req: NextRequest) {
   if (limited) {
     return NextResponse.json(
       { error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+      { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
     );
   }
 
@@ -602,9 +603,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
     }
     if (targetLimit.limited) {
-      const retryAfter = targetLimit.reset
-        ? Math.ceil((targetLimit.reset - Date.now()) / 1000)
-        : 60;
+      const retryAfter = retryAfterSeconds(targetLimit.reset);
       return NextResponse.json(
         {
           error:
@@ -679,24 +678,32 @@ export async function POST(req: NextRequest) {
         throw replacementError;
       }
 
+      // Rotation keeps the row, so there is no successor id: the previous
+      // token, expiry and grant come back instead, for the restore below.
       const replacement = replacementData as {
-        previous_invitation_id?: string;
         invitation_id?: string;
         token?: string;
         expires_at?: string;
+        previous_token?: string;
+        previous_expires_at?: string;
+        previous_role?: string | null;
+        previous_invited_by?: string | null;
+        previous_department_ids?: number[] | null;
+        previous_dept_admin_ids?: number[] | null;
       } | null;
       if (
-        !replacement?.previous_invitation_id ||
-        !replacement.invitation_id ||
+        !replacement?.invitation_id ||
         !replacement.token ||
-        !replacement.expires_at
+        !replacement.expires_at ||
+        !replacement.previous_token ||
+        !replacement.previous_expires_at
       ) {
-        throw new Error("Invitation replacement did not return complete data.");
+        throw new Error("Invitation rotation did not return complete data.");
       }
 
       const replacementInvitation = await fetchInvitation(orgId, replacement.invitation_id);
       if (!replacementInvitation) {
-        throw new Error("Replacement invitation could not be loaded.");
+        throw new Error("Rotated invitation could not be loaded.");
       }
 
       try {
@@ -711,19 +718,24 @@ export async function POST(req: NextRequest) {
           "rollback_pending_invitation_access_replacement",
           {
             p_org_id: orgId,
-            p_previous_invitation_id: replacement.previous_invitation_id,
-            p_replacement_invitation_id: replacement.invitation_id,
+            p_invitation_id: replacement.invitation_id,
+            p_rotated_token: replacement.token,
+            p_previous_token: replacement.previous_token,
+            p_previous_expires_at: replacement.previous_expires_at,
+            // Without these the old link survives the failure with the new
+            // access attached, while the admin is told nothing changed.
+            p_previous_role: replacement.previous_role ?? null,
+            p_previous_invited_by: replacement.previous_invited_by ?? null,
+            p_previous_department_ids: replacement.previous_department_ids ?? null,
+            p_previous_dept_admin_ids: replacement.previous_dept_admin_ids ?? null,
           },
         );
-        if (rollbackError || rolledBack !== true) {
+        // The restore is refused rather than applied when the row moved on, so
+        // a false here is a real failure to report, not a no-op.
+        if (rollbackError || (rolledBack as { restored?: boolean } | null)?.restored !== true) {
           logger.error(
-            {
-              error: rollbackError,
-              orgId,
-              invitationId,
-              replacementInvitationId: replacement.invitation_id,
-            },
-            "Failed to roll back invitation access replacement after email failure",
+            { error: rollbackError, orgId, invitationId },
+            "Failed to restore the previous invitation link after email failure",
           );
         }
         Sentry.captureException(emailError, {
@@ -773,11 +785,21 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        previousInvitationId: replacement.previous_invitation_id,
         invitation: replacementInvitation,
         token: replacement.token,
         expiresAt: replacement.expires_at,
       });
+    }
+
+    // Revocation is durable: a resend rotates the token on a pending row, it
+    // does not bring a revoked or accepted invitation back. The update below
+    // clears revoked_at, so without this a revoked invitation could be revived
+    // from any surface that offers a resend.
+    if (currentInvitation.revokedAt || currentInvitation.acceptedAt) {
+      return NextResponse.json(
+        { error: "This invitation is no longer pending. It was revoked or already accepted." },
+        { status: 409 },
+      );
     }
 
     const token = crypto.randomUUID();

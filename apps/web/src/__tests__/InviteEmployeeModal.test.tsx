@@ -462,4 +462,37 @@ describe("InviteEmployeeModal", () => {
       });
     });
   });
+
+  it("keeps the server's sentence whole when the invitation saves but its email fails", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        text: async () =>
+          JSON.stringify({
+            error: "We couldn't send that invitation email. Try again in a moment.",
+          }),
+      }),
+    );
+
+    render(
+      <InviteEmployeeModal
+        employee={employee}
+        orgId="org-1"
+        orgName="Test Org"
+        onClose={vi.fn()}
+        onInvited={vi.fn()}
+      />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: /send invitation/i }));
+
+    expect(
+      await screen.findByText(
+        "The invitation is saved. We couldn't send that invitation email. Try again in a moment.",
+      ),
+    ).toBeInTheDocument();
+  });
 });

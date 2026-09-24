@@ -187,6 +187,208 @@ describe.skipIf(!reachable)("invitation inviter verification (migration 043, liv
     expect(replaced.rows[0].result.invitation_id).toBeTruthy();
   });
 
+  it("rotates in place: same row, new token, old token dead", async () => {
+    await asServiceRole();
+    const invitationId = await sendInvitation("user", SUPER_ADMIN);
+    await asSuperuser();
+    const before = await db.query(
+      `SELECT token, updated_at::TEXT AS updated_at, department_ids FROM invitations WHERE id = $1`,
+      [invitationId],
+    );
+
+    await asServiceRole();
+    const rotated = await db.query(
+      `SELECT replace_pending_invitation_access($1,$2,$3::TIMESTAMPTZ,'admin',$4,NULL,NULL) AS result`,
+      [ORG, invitationId, before.rows[0].updated_at, SUPER_ADMIN],
+    );
+    const result = rotated.rows[0].result;
+
+    await asSuperuser();
+    const after = await db.query(
+      `SELECT id, token, email, role_to_assign, revoked_at, department_ids,
+              expires_at > NOW() + INTERVAL '71 hours' AS fresh_expiry,
+              (SELECT count(*) FROM invitations WHERE org_id = $2) AS row_count
+         FROM invitations WHERE id = $1`,
+      [invitationId, ORG],
+    );
+
+    // One invitation, one identity: re-issuing does not mint a successor.
+    expect(Number(after.rows[0].row_count)).toBe(1);
+    expect(after.rows[0].id).toBe(invitationId);
+    expect(result.invitation_id).toBe(invitationId);
+    expect(after.rows[0].token).not.toBe(before.rows[0].token);
+    expect(after.rows[0].email).toBe("invitee41@test.com");
+    expect(after.rows[0].role_to_assign).toBe("admin");
+    expect(after.rows[0].revoked_at).toBeNull();
+    expect(after.rows[0].fresh_expiry).toBe(true);
+    expect(after.rows[0].department_ids).toEqual(before.rows[0].department_ids);
+    // The previous pair travels back so a failed dispatch can restore it.
+    expect(result.previous_token).toBe(before.rows[0].token);
+    expect(result.previous_expires_at).toBeTruthy();
+  });
+
+  it("leaves the old token unable to accept once rotated", async () => {
+    await asServiceRole();
+    const invitationId = await sendInvitation("user", SUPER_ADMIN);
+    await asSuperuser();
+    const before = await db.query(
+      `SELECT token, updated_at::TEXT AS updated_at FROM invitations WHERE id = $1`,
+      [invitationId],
+    );
+
+    await asServiceRole();
+    await db.query(
+      `SELECT replace_pending_invitation_access($1,$2,$3::TIMESTAMPTZ,'user',$4,NULL,NULL)`,
+      [ORG, invitationId, before.rows[0].updated_at, SUPER_ADMIN],
+    );
+
+    await asSuperuser();
+    await db.query(`SET LOCAL ROLE authenticated`);
+    await db.query(
+      `SET LOCAL request.jwt.claims = '{"sub":"${INVITEE}","role":"authenticated","platform_role":"none","mfa_enrolled":false}'`,
+    );
+    await expect(db.query(`SELECT accept_invitation($1)`, [before.rows[0].token])).rejects.toThrow(
+      /INVITATION_INVALID/,
+    );
+  });
+
+  it("restores the previous link when a dispatch fails after rotation", async () => {
+    await asServiceRole();
+    const invitationId = await sendInvitation("user", SUPER_ADMIN);
+    await asSuperuser();
+    const before = await db.query(
+      `SELECT token, expires_at::TEXT AS expires_at, updated_at::TEXT AS updated_at
+         FROM invitations WHERE id = $1`,
+      [invitationId],
+    );
+
+    await asServiceRole();
+    const rotated = await db.query(
+      `SELECT replace_pending_invitation_access($1,$2,$3::TIMESTAMPTZ,'admin',$4,NULL,NULL) AS result`,
+      [ORG, invitationId, before.rows[0].updated_at, SUPER_ADMIN],
+    );
+    const result = rotated.rows[0].result;
+
+    const restored = await db.query(
+      `SELECT rollback_pending_invitation_access_replacement($1,$2,$3,$4,$5::TIMESTAMPTZ) AS result`,
+      [ORG, invitationId, result.token, result.previous_token, result.previous_expires_at],
+    );
+    expect(restored.rows[0].result.restored).toBe(true);
+
+    await asSuperuser();
+    const after = await db.query(`SELECT token FROM invitations WHERE id = $1`, [invitationId]);
+    // The invitee's original link works again rather than being stranded.
+    expect(after.rows[0].token).toBe(before.rows[0].token);
+  });
+
+  it("restores the previous access, not just the link, when a dispatch fails", async () => {
+    await asServiceRole();
+    const invitationId = await sendInvitation("user", SUPER_ADMIN);
+    await asSuperuser();
+    const before = await db.query(
+      `SELECT token, role_to_assign::TEXT AS role, invited_by, updated_at::TEXT AS updated_at
+         FROM invitations WHERE id = $1`,
+      [invitationId],
+    );
+
+    // An admin raises it to their own tier, which records them as inviter.
+    await asServiceRole();
+    const rotated = await db.query(
+      `SELECT replace_pending_invitation_access($1,$2,$3::TIMESTAMPTZ,'admin',$4,NULL,NULL) AS result`,
+      [ORG, invitationId, before.rows[0].updated_at, ADMIN],
+    );
+    const result = rotated.rows[0].result;
+    expect(result.previous_role).toBe("user");
+    expect(result.previous_invited_by).toBe(SUPER_ADMIN);
+
+    const restored = await db.query(
+      `SELECT rollback_pending_invitation_access_replacement(
+         $1,$2,$3,$4,$5::TIMESTAMPTZ,$6,$7,$8::BIGINT[],$9::BIGINT[]) AS result`,
+      [
+        ORG,
+        invitationId,
+        result.token,
+        result.previous_token,
+        result.previous_expires_at,
+        result.previous_role,
+        result.previous_invited_by,
+        result.previous_department_ids,
+        result.previous_dept_admin_ids,
+      ],
+    );
+    expect(restored.rows[0].result.restored).toBe(true);
+
+    await asSuperuser();
+    const after = await db.query(
+      `SELECT token, role_to_assign::TEXT AS role, invited_by FROM invitations WHERE id = $1`,
+      [invitationId],
+    );
+    // The link the invitee holds works again, and grants what it did before.
+    expect(after.rows[0]).toEqual({
+      token: before.rows[0].token,
+      role: "user",
+      invited_by: SUPER_ADMIN,
+    });
+  });
+
+  it("will not restore over a later rotation", async () => {
+    await asServiceRole();
+    const invitationId = await sendInvitation("user", SUPER_ADMIN);
+    await asSuperuser();
+    const first = await db.query(
+      `SELECT token, updated_at::TEXT AS updated_at FROM invitations WHERE id = $1`,
+      [invitationId],
+    );
+
+    await asServiceRole();
+    const rotated = await db.query(
+      `SELECT replace_pending_invitation_access($1,$2,$3::TIMESTAMPTZ,'admin',$4,NULL,NULL) AS result`,
+      [ORG, invitationId, first.rows[0].updated_at, SUPER_ADMIN],
+    );
+    const result = rotated.rows[0].result;
+
+    await asSuperuser();
+    const second = await db.query(
+      `SELECT updated_at::TEXT AS updated_at FROM invitations WHERE id = $1`,
+      [invitationId],
+    );
+    await asServiceRole();
+    await db.query(
+      `SELECT replace_pending_invitation_access($1,$2,$3::TIMESTAMPTZ,'user',$4,NULL,NULL)`,
+      [ORG, invitationId, second.rows[0].updated_at, SUPER_ADMIN],
+    );
+
+    // A late rollback from the first rotation must not undo the second one.
+    const late = await db.query(
+      `SELECT rollback_pending_invitation_access_replacement($1,$2,$3,$4,$5::TIMESTAMPTZ) AS result`,
+      [ORG, invitationId, result.token, result.previous_token, result.previous_expires_at],
+    );
+    expect(late.rows[0].result.restored).toBe(false);
+  });
+
+  it("lets an invitee with TOTP enrolled accept while their challenge is pending", async () => {
+    await asServiceRole();
+    const invitationId = await sendInvitation("user", SUPER_ADMIN);
+    await asSuperuser();
+    const { rows } = await db.query(`SELECT token FROM invitations WHERE id = $1`, [invitationId]);
+
+    await db.query(`SET LOCAL ROLE authenticated`);
+    // mfa_enrolled true with the challenge not yet completed is what a
+    // password sign-in gives an enrolled user. Acceptance must still work:
+    // the invite flow signs them out afterwards so they re-authenticate
+    // through the login screen, which is where the TOTP challenge lives.
+    await db.query(
+      `SET LOCAL request.jwt.claims = '{"sub":"${INVITEE}","role":"authenticated","platform_role":"none","mfa_enrolled":true}'`,
+    );
+    const accepted = await db.query(`SELECT accept_invitation($1) AS result`, [rows[0].token]);
+    expect(accepted.rows[0].result.status).toBe("accepted");
+
+    // Their organization stays invisible until the challenge is done, which is
+    // the point of the gate rather than a failure of acceptance.
+    const scoped = await db.query(`SELECT caller_org_id() IS NULL AS hidden`);
+    expect(scoped.rows[0].hidden).toBe(true);
+  });
+
   it("accepts every tier, not only super_admin", async () => {
     for (const role of ["user", "admin", "super_admin"]) {
       await db.query("SAVEPOINT tier");
