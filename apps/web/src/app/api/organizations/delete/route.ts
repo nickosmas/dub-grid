@@ -4,6 +4,7 @@ import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { forbidIfSandboxCookie, requireSensitiveActionAuth } from "@/lib/api-auth";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { retryAfterSeconds } from "@/lib/retry-after";
 import { cancelSubscription } from "@/lib/stripe";
 import { cacheDel, CacheKey } from "@/lib/cache";
 import logger from "@/lib/logger";
@@ -69,7 +70,7 @@ export async function POST(req: NextRequest) {
   if (limited) {
     return NextResponse.json(
       { error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+      { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
     );
   }
 

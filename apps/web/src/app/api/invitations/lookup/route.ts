@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { retryAfterSeconds } from "@/lib/retry-after";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { deadInvitationResponse } from "@/lib/auth/invitation-capability";
 
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
     }
     if (limited) {
-      const retryAfter = reset ? Math.ceil((reset - Date.now()) / 1000) : 60;
+      const retryAfter = retryAfterSeconds(reset);
       return NextResponse.json(
         { error: "Too many requests" },
         { status: 429, headers: { "Retry-After": String(retryAfter) } },

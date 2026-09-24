@@ -7,6 +7,7 @@ import {
   isAccountDisabledMessage,
 } from "@dubgrid/domain";
 import { checkRateLimit, loginIpLimiter, loginLimiter, loginSurgeLimiter } from "@/lib/rate-limit";
+import { retryAfterSeconds } from "@/lib/retry-after";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { createAnonClient, createTokenScopedClient } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
@@ -326,10 +327,7 @@ export async function POST(req: NextRequest) {
 
   const limited = limits.filter((limit) => limit.limited);
   if (limited.length > 0) {
-    const retryAfter = Math.max(
-      1,
-      ...limited.map((limit) => (limit.reset ? Math.ceil((limit.reset - Date.now()) / 1000) : 60)),
-    );
+    const retryAfter = Math.max(1, ...limited.map((limit) => retryAfterSeconds(limit.reset)));
     logger.warn(
       { emailHash, path: "/api/auth/login", limitCount: limited.length },
       "Login rate limited",

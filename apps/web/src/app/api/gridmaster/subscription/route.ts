@@ -5,6 +5,7 @@ import { DEFAULT_TRIAL_DAYS } from "@dubgrid/domain";
 import { requireGridmasterSession } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { retryAfterSeconds } from "@/lib/retry-after";
 import {
   cancelSubscription,
   extendTrial,
@@ -97,9 +98,7 @@ export async function POST(req: NextRequest) {
       {
         status: 429,
         headers: {
-          "Retry-After": String(
-            Math.max(1, Math.ceil(((reset ?? Date.now()) - Date.now()) / 1000)),
-          ),
+          "Retry-After": String(retryAfterSeconds(reset)),
         },
       },
     );

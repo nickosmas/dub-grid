@@ -728,6 +728,7 @@ describe("POST /api/organizations/invitations - throttling", () => {
     const retryAfter = Number(response.headers.get("Retry-After"));
     expect(Number.isInteger(retryAfter)).toBe(true);
     expect(retryAfter).toBeGreaterThan(0);
+    expect(retryAfter).toBeLessThanOrEqual(45);
     expect(sendInvitationEmail).not.toHaveBeenCalled();
   });
 

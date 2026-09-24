@@ -6,6 +6,7 @@ import {
   renderPublishedEmployeeCalendar,
 } from "@/features/account/server";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { retryAfterSeconds } from "@/lib/retry-after";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { API_ERRORS } from "@dubgrid/client-errors";
@@ -34,7 +35,7 @@ export async function GET(req: NextRequest) {
     if (limited) {
       return NextResponse.json(
         { error: "Too many requests" },
-        { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+        { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
       );
     }
 

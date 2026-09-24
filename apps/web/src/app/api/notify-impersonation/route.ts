@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createElement } from "react";
 import { render } from "@react-email/components";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { retryAfterSeconds } from "@/lib/retry-after";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireGridmasterSession } from "@/lib/api-auth";
 import { sanitizeHeaderValue, emailBaseUrl } from "@/lib/email";
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
     );
   }
   if (limited) {
-    const retryAfter = reset ? Math.ceil((reset - Date.now()) / 1000) : 60;
+    const retryAfter = retryAfterSeconds(reset);
     return NextResponse.json(
       { success: false, error: "Too many requests" },
       {

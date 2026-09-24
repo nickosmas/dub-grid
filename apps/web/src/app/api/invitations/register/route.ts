@@ -6,6 +6,7 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
 import { findAuthUserByEmail } from "@/lib/supabase-admin-users";
 import { apiLimiter, emailTargetLimiter, checkRateLimit, hashEmail } from "@/lib/rate-limit";
+import { retryAfterSeconds } from "@/lib/retry-after";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { deadInvitationResponse } from "@/lib/auth/invitation-capability";
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
   }
   if (perIp.limited) {
-    const retryAfter = perIp.reset ? Math.ceil((perIp.reset - Date.now()) / 1000) : 60;
+    const retryAfter = retryAfterSeconds(perIp.reset);
     return NextResponse.json(
       { error: "Too many requests" },
       { status: 429, headers: { "Retry-After": String(retryAfter) } },
@@ -80,7 +81,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
   }
   if (perEmail.limited) {
-    const retryAfter = perEmail.reset ? Math.ceil((perEmail.reset - Date.now()) / 1000) : 60;
+    const retryAfter = retryAfterSeconds(perEmail.reset);
     return NextResponse.json(
       { error: "Too many attempts for that address. Wait a few minutes and try again." },
       { status: 429, headers: { "Retry-After": String(retryAfter) } },

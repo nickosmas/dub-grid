@@ -6,6 +6,7 @@ import {
 } from "@dubgrid/contracts";
 import { z } from "zod";
 import { apiLimiter, checkRateLimit, emailTargetLimiter, hashEmail } from "@/lib/rate-limit";
+import { retryAfterSeconds } from "@/lib/retry-after";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { forbidIfSandboxCookie, requireAuthenticatedUser } from "@/lib/api-auth";
@@ -283,7 +284,7 @@ export async function PATCH(req: NextRequest) {
   if (limited) {
     return NextResponse.json(
       { error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+      { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
     );
   }
 
@@ -466,7 +467,7 @@ export async function DELETE(req: NextRequest) {
   if (limited) {
     return NextResponse.json(
       { error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+      { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
     );
   }
 
@@ -563,7 +564,7 @@ export async function POST(req: NextRequest) {
   if (limited) {
     return NextResponse.json(
       { error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+      { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
     );
   }
 
@@ -602,9 +603,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
     }
     if (targetLimit.limited) {
-      const retryAfter = targetLimit.reset
-        ? Math.ceil((targetLimit.reset - Date.now()) / 1000)
-        : 60;
+      const retryAfter = retryAfterSeconds(targetLimit.reset);
       return NextResponse.json(
         {
           error:
