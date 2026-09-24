@@ -23,10 +23,7 @@ import type { Invitation } from "@/types";
 import { buildStaffValidationErrorResponse, getStaffFieldErrors } from "@/lib/staff-validation";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import { API_ERRORS } from "@dubgrid/client-errors";
-import {
-  getInvitationEmailConfig,
-  sendInvitationEmail,
-} from "@/features/mobile/server/invitation-email";
+import { sendPendingInvitationEmail } from "@/features/organization/server/invitation-delivery";
 import { INVITATION_LIFETIME_MS } from "@/lib/auth/invitation-capability";
 
 export const dynamic = "force-dynamic";
@@ -198,28 +195,6 @@ async function writeAuditEntry(input: {
 
 async function checkInvitationEmailLimit(email: string) {
   return checkRateLimit(emailTargetLimiter, `invite-email:${hashEmail(email)}`);
-}
-
-async function sendPendingInvitationEmail(input: { orgId: string; token: string; email: string }) {
-  const config = getInvitationEmailConfig();
-  if (!config) {
-    throw new Error("Email service not configured");
-  }
-
-  const serviceClient = getServiceClient();
-  const { data: organization, error } = await serviceClient
-    .from("organizations")
-    .select("name")
-    .eq("id", input.orgId)
-    .maybeSingle();
-  if (error) throw error;
-
-  await sendInvitationEmail({
-    config,
-    token: input.token,
-    email: input.email,
-    orgName: (organization?.name as string | null) || "your organization",
-  });
 }
 
 export async function GET(req: NextRequest) {

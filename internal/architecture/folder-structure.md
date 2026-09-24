@@ -36,7 +36,7 @@ apps/web/
 │   │   │   ├── auth/ account/ organizations/ organization/ onboarding/
 │   │   │   ├── employees/ people/ import/ invitations/ users/
 │   │   │   ├── schedule/ shifts/ export/ calendar/ reports/ dashboard/
-│   │   │   ├── notifications/ send-notification/ send-invite-email/
+│   │   │   ├── notifications/ send-notification/
 │   │   │   ├── billing/ stripe/ trial-welcome/ settings/ feature-flags/
 │   │   │   ├── cron/           # expire-requests, trial-expiry, sandbox-cleanup
 │   │   │   ├── gridmaster/     # Gridmaster-only endpoints

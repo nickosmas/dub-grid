@@ -129,7 +129,6 @@ export interface MembersSectionProps {
   certificationLabel: string;
   roleLabel: string;
   orgId?: string;
-  orgName?: string;
   isSuperAdmin?: boolean;
   isGridmaster?: boolean;
   // Self signal: the viewer's own employees row has management department
@@ -161,7 +160,6 @@ export function MembersSection({
   certificationLabel,
   roleLabel,
   orgId,
-  orgName,
   isSuperAdmin,
   isGridmaster,
   isManagementUser,
@@ -2271,7 +2269,6 @@ export function MembersSection({
         <InviteEmployeeModal
           employee={inviteEmployee}
           orgId={orgId}
-          orgName={orgName || "your organization"}
           pendingInvitation={pendingInviteByEmployeeId.get(inviteEmployee.id)}
           onClose={() => {
             setInviteEmployee(null);
@@ -2302,7 +2299,6 @@ export function MembersSection({
         <InviteEmployeeModal
           employee={null}
           orgId={orgId}
-          orgName={orgName || "your organization"}
           departments={departmentItems}
           onClose={() => setShowManagementInvite(false)}
           onInvited={() => {
@@ -2387,7 +2383,6 @@ export function MembersSection({
           <EmployeeManagementAccessEditor
             employee={managementAccessEmployee}
             orgId={orgId}
-            orgName={orgName || "your organization"}
             managementDepartments={managementDepts}
             directoryPerson={selectedEmployeeDirectoryPerson}
             pendingInvitation={pendingInviteByEmployeeId.get(managementAccessEmployee.id)}

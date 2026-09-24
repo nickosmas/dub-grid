@@ -95,7 +95,6 @@ describe("InviteEmployeeModal", () => {
     useIsInSandboxMock.mockReturnValue(false);
     createOrganizationInvitationMock.mockResolvedValue({
       invitationId: "invite-1",
-      token: "invite-token",
       expiresAt: "2026-12-31T00:00:00.000Z",
     });
     checkEmployeePhoneConflictMock.mockResolvedValue({
@@ -122,13 +121,7 @@ describe("InviteEmployeeModal", () => {
 
   it("uses the outlined secondary treatment for Close", () => {
     render(
-      <InviteEmployeeModal
-        employee={null}
-        orgId="org-1"
-        orgName="Test Org"
-        onClose={vi.fn()}
-        onInvited={vi.fn()}
-      />,
+      <InviteEmployeeModal employee={null} orgId="org-1" onClose={vi.fn()} onInvited={vi.fn()} />,
     );
 
     const closeButton = screen.getByRole("button", { name: "Close" });
@@ -140,13 +133,7 @@ describe("InviteEmployeeModal", () => {
     const user = userEvent.setup();
 
     render(
-      <InviteEmployeeModal
-        employee={null}
-        orgId="org-1"
-        orgName="Test Org"
-        onClose={vi.fn()}
-        onInvited={vi.fn()}
-      />,
+      <InviteEmployeeModal employee={null} orgId="org-1" onClose={vi.fn()} onInvited={vi.fn()} />,
     );
 
     const sendButton = await screen.findByRole("button", {
@@ -179,13 +166,7 @@ describe("InviteEmployeeModal", () => {
     useIsInSandboxMock.mockReturnValue(true);
 
     render(
-      <InviteEmployeeModal
-        employee={null}
-        orgId="org-1"
-        orgName="Test Org"
-        onClose={vi.fn()}
-        onInvited={vi.fn()}
-      />,
+      <InviteEmployeeModal employee={null} orgId="org-1" onClose={vi.fn()} onInvited={vi.fn()} />,
     );
 
     const sendButton = await screen.findByRole("button", {
@@ -208,13 +189,7 @@ describe("InviteEmployeeModal", () => {
     const onClose = vi.fn();
 
     render(
-      <InviteEmployeeModal
-        employee={null}
-        orgId="org-1"
-        orgName="Test Org"
-        onClose={onClose}
-        onInvited={onInvited}
-      />,
+      <InviteEmployeeModal employee={null} orgId="org-1" onClose={onClose} onInvited={onInvited} />,
     );
 
     const sendButton = await screen.findByRole("button", {
@@ -252,7 +227,6 @@ describe("InviteEmployeeModal", () => {
       <InviteEmployeeModal
         employee={null}
         orgId="org-1"
-        orgName="Test Org"
         departments={managementDepartments}
         onClose={vi.fn()}
         onInvited={vi.fn()}
@@ -296,13 +270,7 @@ describe("InviteEmployeeModal", () => {
     const user = userEvent.setup();
 
     render(
-      <InviteEmployeeModal
-        employee={null}
-        orgId="org-1"
-        orgName="Test Org"
-        onClose={vi.fn()}
-        onInvited={vi.fn()}
-      />,
+      <InviteEmployeeModal employee={null} orgId="org-1" onClose={vi.fn()} onInvited={vi.fn()} />,
     );
 
     await user.type(screen.getByPlaceholderText("Jane"), "Jordan");
@@ -321,7 +289,6 @@ describe("InviteEmployeeModal", () => {
       <InviteEmployeeModal
         employee={{ ...employee, email: "" }}
         orgId="org-1"
-        orgName="Test Org"
         pendingInvitation={{
           id: "inv-1",
           orgId: "org-1",
@@ -350,7 +317,6 @@ describe("InviteEmployeeModal", () => {
       <InviteEmployeeModal
         employee={{ ...employee, email: "" }}
         orgId="org-1"
-        orgName="Test Org"
         onClose={vi.fn()}
         onInvited={vi.fn()}
       />,
@@ -366,7 +332,6 @@ describe("InviteEmployeeModal", () => {
       <InviteEmployeeModal
         employee={employee}
         orgId="org-1"
-        orgName="Test Org"
         onClose={vi.fn()}
         onInvited={vi.fn()}
       />,
@@ -381,13 +346,7 @@ describe("InviteEmployeeModal", () => {
     const user = userEvent.setup();
 
     render(
-      <InviteEmployeeModal
-        employee={null}
-        orgId="org-1"
-        orgName="Test Org"
-        onClose={vi.fn()}
-        onInvited={vi.fn()}
-      />,
+      <InviteEmployeeModal employee={null} orgId="org-1" onClose={vi.fn()} onInvited={vi.fn()} />,
     );
 
     await user.type(screen.getByPlaceholderText("Jane"), "Jordan");
@@ -408,13 +367,7 @@ describe("InviteEmployeeModal", () => {
     });
 
     render(
-      <InviteEmployeeModal
-        employee={null}
-        orgId="org-1"
-        orgName="Test Org"
-        onClose={vi.fn()}
-        onInvited={vi.fn()}
-      />,
+      <InviteEmployeeModal employee={null} orgId="org-1" onClose={vi.fn()} onInvited={vi.fn()} />,
     );
 
     await user.type(screen.getByPlaceholderText("Jane"), "Jordan");
@@ -434,7 +387,6 @@ describe("InviteEmployeeModal", () => {
       <InviteEmployeeModal
         employee={employee}
         orgId="org-1"
-        orgName="Test Org"
         onClose={vi.fn()}
         onInvited={vi.fn()}
       />,
@@ -463,25 +415,18 @@ describe("InviteEmployeeModal", () => {
     });
   });
 
-  it("keeps the server's sentence whole when the invitation saves but its email fails", async () => {
+  it("sends in one request and shows the server's reason when it could not", async () => {
     const user = userEvent.setup();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 503,
-        text: async () =>
-          JSON.stringify({
-            error: "We couldn't send that invitation email. Try again in a moment.",
-          }),
-      }),
+    createOrganizationInvitationMock.mockRejectedValue(
+      new Error(
+        "We couldn't send the invitation email, so the invitation wasn't created. Try again in a moment.",
+      ),
     );
 
     render(
       <InviteEmployeeModal
         employee={employee}
         orgId="org-1"
-        orgName="Test Org"
         onClose={vi.fn()}
         onInvited={vi.fn()}
       />,
@@ -491,8 +436,10 @@ describe("InviteEmployeeModal", () => {
 
     expect(
       await screen.findByText(
-        "The invitation is saved. We couldn't send that invitation email. Try again in a moment.",
+        "We couldn't send the invitation email, so the invitation wasn't created. Try again in a moment.",
       ),
     ).toBeInTheDocument();
+    // No second call: creating the invitation is what sends its email.
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

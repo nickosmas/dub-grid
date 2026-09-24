@@ -71,7 +71,6 @@ const BROWSER_MUTATION_ROUTES = [
   "apps/web/src/app/api/schedule/manage/route.ts",
   "apps/web/src/app/api/schedule/recurring/route.ts",
   "apps/web/src/app/api/schedule/requests/route.ts",
-  "apps/web/src/app/api/send-invite-email/route.ts",
   "apps/web/src/app/api/send-notification/route.ts",
   "apps/web/src/app/api/settings/config/route.ts",
   "apps/web/src/app/api/shifts/discard/route.ts",

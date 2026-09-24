@@ -644,7 +644,6 @@ describe("StaffDetailPage", () => {
   it("saving with the reinvite confirmation creates and sends a new invitation with the old one's role and departments", async () => {
     mockedCreateOrganizationInvitation.mockResolvedValue({
       invitationId: "invite-2",
-      token: "fresh-token",
       expiresAt: "2099-01-01T00:00:00.000Z",
     });
     vi.stubGlobal(

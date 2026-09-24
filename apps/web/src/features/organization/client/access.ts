@@ -184,7 +184,9 @@ export async function createOrganizationInvitation(input: {
   phone?: string;
   departmentIds?: number[];
   deptAdminIds?: number[];
-}): Promise<{ invitationId: string; token: string; expiresAt: string }> {
+}): Promise<{ invitationId: string; expiresAt: string; resent?: boolean }> {
+  // Creates the invitation and sends its email in one request; a failed send
+  // throws, and nothing is left behind.
   return requestOrganizationJson("/api/organizations/invitations/create", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

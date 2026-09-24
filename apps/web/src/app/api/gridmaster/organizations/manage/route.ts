@@ -8,6 +8,10 @@ import { composeOrganizationAddress } from "@/lib/organization-profile";
 import { rowToOrganization } from "@/lib/db/mappers";
 import { ORGANIZATION_WITH_BILLING_COLS } from "@/lib/db/shared";
 import { getServiceClient } from "@/lib/supabase-service";
+import {
+  isEmailNotConfigured,
+  sendPendingInvitationEmail,
+} from "@/features/organization/server/invitation-delivery";
 import { cacheDel, CacheKey } from "@/lib/cache";
 import { cancelSubscription } from "@/lib/stripe";
 import logger from "@/lib/logger";
@@ -450,15 +454,28 @@ export async function POST(req: NextRequest) {
             });
 
             if (!inviteResult.error) {
-              superAdmin = {
-                kind: "pending-invite",
-                displayName,
-                pendingInvite: {
-                  token: inviteResult.data.token as string,
-                  email,
-                  name: displayName,
-                },
-              };
+              // Sent here, not on a later click: an invitation whose email
+              // never went out is removed rather than left live (F-10).
+              const invitationId = inviteResult.data.invitation_id as string;
+              const token = inviteResult.data.token as string;
+              try {
+                await sendPendingInvitationEmail({ orgId: org.id, token, email });
+                superAdmin = { kind: "invited", displayName };
+              } catch (sendError) {
+                await serviceClient
+                  .from("invitations")
+                  .delete()
+                  .eq("id", invitationId)
+                  .eq("token", token)
+                  .is("accepted_at", null);
+                superAdmin = {
+                  kind: "invite-error",
+                  displayName,
+                  message: isEmailNotConfigured(sendError)
+                    ? "Email service not configured"
+                    : `We couldn't send ${displayName}'s invitation email. Invite them again from People.`,
+                };
+              }
             } else {
               superAdmin = {
                 kind: "invite-error",
@@ -481,9 +498,6 @@ export async function POST(req: NextRequest) {
           orgId: org.id,
           details: {
             name: org.name,
-            // The pending-invite token is a credential (it is what
-            // /api/invitations/register accepts), so it goes to the response
-            // for "Send Email" only and never into the audit row.
             super_admin: {
               kind: superAdmin.kind,
               displayName: superAdmin.displayName ?? null,

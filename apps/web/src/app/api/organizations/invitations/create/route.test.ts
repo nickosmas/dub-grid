@@ -9,6 +9,8 @@ const canManageEmployees = vi.fn();
 const isOrgSuperAdminOrGridmaster = vi.fn();
 const dispatchNotificationEvent = vi.fn();
 const checkRateLimit = vi.fn();
+const sendPendingInvitationEmail = vi.fn();
+const getInvitationEmailConfig = vi.fn();
 
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
@@ -33,6 +35,16 @@ vi.mock("@/app/api/employees/shared", () => ({
 vi.mock("@/lib/rate-limit", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/rate-limit")>()),
   checkRateLimit: (...args: unknown[]) => checkRateLimit(...args),
+}));
+vi.mock("@/features/mobile/server/invitation-email", () => ({
+  getInvitationEmailConfig: () => getInvitationEmailConfig(),
+  createInvitationEmailUnavailableResponse: () =>
+    NextResponse.json({ error: "Email service not configured" }, { status: 503 }),
+}));
+vi.mock("@/features/organization/server/invitation-delivery", () => ({
+  sendPendingInvitationEmail: (...args: unknown[]) => sendPendingInvitationEmail(...args),
+  isEmailNotConfigured: (error: unknown) =>
+    error instanceof Error && error.message.startsWith("Email service not configured"),
 }));
 vi.mock("@/features/notifications/server/events", () => ({
   dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
@@ -68,6 +80,8 @@ beforeEach(() => {
   canManageEmployees.mockResolvedValue(true);
   isOrgSuperAdminOrGridmaster.mockResolvedValue(false);
   checkRateLimit.mockResolvedValue({ limited: false });
+  getInvitationEmailConfig.mockReturnValue({ apiKey: "re_test", from: "DubGrid <t@test>" });
+  sendPendingInvitationEmail.mockResolvedValue(undefined);
 });
 
 describe("POST /api/organizations/invitations/create", () => {
@@ -111,10 +125,15 @@ describe("POST /api/organizations/invitations/create", () => {
     const res = await POST(makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "admin" }));
 
     expect(res.status).toBe(200);
+    // The token is emailed, never returned: the browser has no use for it.
     await expect(res.json()).resolves.toEqual({
       invitationId: "inv-1",
-      token: "tok-1",
       expiresAt: "2026-01-01T00:00:00Z",
+    });
+    expect(sendPendingInvitationEmail).toHaveBeenCalledWith({
+      orgId: ORG_ID,
+      token: "tok-1",
+      email: "new@test.com",
     });
     expect(rpc).toHaveBeenCalledWith(
       "send_invitation",
@@ -187,7 +206,7 @@ describe("POST /api/organizations/invitations/create", () => {
   // .is().is().gte().select().maybeSingle()
   function makeRefreshChain(result: { data: unknown; error: unknown }) {
     const chain: Record<string, unknown> = {};
-    for (const method of ["update", "eq", "ilike", "is", "gte", "select"]) {
+    for (const method of ["update", "delete", "eq", "ilike", "is", "gte", "select"]) {
       chain[method] = () => chain;
     }
     chain.maybeSingle = async () => result;
@@ -267,10 +286,12 @@ describe("POST /api/organizations/invitations/create", () => {
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
       invitationId: "inv-orphan",
-      token: "fresh-tok",
       expiresAt: "2026-02-02T00:00:00Z",
       resent: true,
     });
+    expect(sendPendingInvitationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ token: "fresh-tok", email: "orphan@test.com" }),
+    );
     expect(from).toHaveBeenCalledWith("invitations");
     // Rotating the token and sending it again is a re-invite, so it is logged.
     expect(auditInsert).toHaveBeenCalledWith(
@@ -308,6 +329,7 @@ describe("POST /api/organizations/invitations/create", () => {
     rowsByEmployeeKey: Record<string, { id: string; token: string; expires_at: string }>,
   ) {
     let scopeKey: string | null = null;
+    let byId: string | null = null;
     const chain: Record<string, unknown> = {
       update: () => chain,
       ilike: () => chain,
@@ -315,6 +337,8 @@ describe("POST /api/organizations/invitations/create", () => {
       select: () => chain,
       eq: (column: string, value: unknown) => {
         if (column === "employee_id") scopeKey = String(value);
+        // The rotation after the read targets the row it found by id.
+        if (column === "id") byId = String(value);
         return chain;
       },
       is: (column: string, value: unknown) => {
@@ -323,7 +347,11 @@ describe("POST /api/organizations/invitations/create", () => {
       },
     };
     chain.maybeSingle = async () => ({
-      data: scopeKey !== null ? (rowsByEmployeeKey[scopeKey] ?? null) : null,
+      data: byId
+        ? (Object.values(rowsByEmployeeKey).find((row) => row.id === byId) ?? null)
+        : scopeKey !== null
+          ? (rowsByEmployeeKey[scopeKey] ?? null)
+          : null,
       error: null,
     });
     return chain;
@@ -388,7 +416,6 @@ describe("POST /api/organizations/invitations/create", () => {
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
       invitationId: "inv-a",
-      token: "fresh-tok",
       expiresAt: "2026-02-02T00:00:00Z",
       resent: true,
     });
@@ -434,5 +461,119 @@ describe("POST /api/organizations/invitations/create", () => {
 
     expect(res.status).toBe(409);
     expect(from).not.toHaveBeenCalled();
+  });
+
+  describe("the invitation and its email are one operation", () => {
+    function createdRpc() {
+      return vi.fn(async () => ({
+        data: { invitation_id: "inv-1", token: "tok-1", expires_at: "2026-01-01T00:00:00Z" },
+        error: null,
+      }));
+    }
+
+    it("removes a new invitation whose email cannot be sent", async () => {
+      const deleteEq = vi.fn();
+      const auditInsert = vi.fn(async () => ({ error: null }));
+      const from = vi.fn((table: string) => {
+        if (table === "audit_log") return { insert: auditInsert };
+        const chain = {
+          delete: () => chain,
+          eq: (...args: unknown[]) => {
+            deleteEq(...args);
+            return chain;
+          },
+          is: async () => ({ error: null }),
+        };
+        return chain;
+      });
+      getServiceClient.mockReturnValue({ rpc: createdRpc(), from });
+      sendPendingInvitationEmail.mockRejectedValue(new Error("Resend email failed (500)"));
+
+      const { POST } = await importRoute();
+      const res = await POST(makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "user" }));
+
+      expect(res.status).toBe(502);
+      await expect(res.json()).resolves.toEqual({
+        error: expect.stringMatching(/wasn't created/),
+      });
+      expect(deleteEq).toHaveBeenCalledWith("id", "inv-1");
+      expect(deleteEq).toHaveBeenCalledWith("token", "tok-1");
+      expect(auditInsert).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: "invitation.created" }),
+      );
+    });
+
+    it("restores a refreshed invitation's previous link when its email fails", async () => {
+      const rpc = vi.fn(async () => ({
+        data: null,
+        error: { message: "An active invitation already exists for this email" },
+      }));
+      const updates: unknown[] = [];
+      let reads = 0;
+      const from = vi.fn(() => {
+        const chain: Record<string, unknown> = {
+          select: () => chain,
+          ilike: () => chain,
+          gte: () => chain,
+          is: () => chain,
+          eq: () => chain,
+          update: (values: unknown) => {
+            updates.push(values);
+            return chain;
+          },
+          maybeSingle: async () =>
+            reads++ === 0
+              ? {
+                  data: { id: "inv-7", token: "old-tok", expires_at: "2026-01-01T00:00:00Z" },
+                  error: null,
+                }
+              : {
+                  data: { id: "inv-7", token: "new-tok", expires_at: "2026-02-01T00:00:00Z" },
+                  error: null,
+                },
+        };
+        chain.then = undefined;
+        return chain;
+      });
+      getServiceClient.mockReturnValue({ rpc, from });
+      sendPendingInvitationEmail.mockRejectedValue(new Error("Resend email failed (500)"));
+
+      const { POST } = await importRoute();
+      const res = await POST(makeRequest({ orgId: ORG_ID, email: "again@test.com", role: "user" }));
+
+      expect(res.status).toBe(502);
+      await expect(res.json()).resolves.toEqual({
+        error: expect.stringMatching(/existing invitation is unchanged/),
+      });
+      expect(updates.at(-1)).toEqual({ token: "old-tok", expires_at: "2026-01-01T00:00:00Z" });
+    });
+
+    it("creates nothing when there is no email service", async () => {
+      const rpc = createdRpc();
+      getServiceClient.mockReturnValue({ rpc });
+      getInvitationEmailConfig.mockReturnValue(null);
+
+      const { POST } = await importRoute();
+      const res = await POST(makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "user" }));
+
+      expect(res.status).toBe(503);
+      expect(rpc).not.toHaveBeenCalled();
+    });
+
+    it("limits invitations to one inbox, as the separate email route did", async () => {
+      const rpc = createdRpc();
+      getServiceClient.mockReturnValue({ rpc });
+      checkRateLimit.mockImplementation(async (_limiter: unknown, key: string) =>
+        key.startsWith("invite-email:")
+          ? { limited: true, reset: Date.now() + 60_000 }
+          : { limited: false },
+      );
+
+      const { POST } = await importRoute();
+      const res = await POST(makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "user" }));
+
+      expect(res.status).toBe(429);
+      expect(rpc).not.toHaveBeenCalled();
+    });
   });
 });

@@ -108,7 +108,7 @@ Each cron is also behind a `platform_feature_flags` kill switch (`cron_expire_re
 | POST   | `/api/organizations/invitations`        | Create an invitation                                                                       |
 | PATCH  | `/api/organizations/invitations`        | Update an invitation (access changes replace the token atomically)                         |
 | DELETE | `/api/organizations/invitations`        | Revoke an invitation                                                                       |
-| POST   | `/api/organizations/invitations/create` | Create and optionally send an invitation                                                   |
+| POST   | `/api/organizations/invitations/create` | Create an invitation and email its link; a failed send creates nothing                     |
 | POST   | `/api/organizations/role-change`        | Change a member's org role                                                                 |
 | PUT    | `/api/organizations/settings`           | Update org settings                                                                        |
 | GET    | `/api/onboarding`                       | Get onboarding state                                                                       |
@@ -189,10 +189,9 @@ Each cron is also behind a `platform_feature_flags` kill switch (`cron_expire_re
 
 ### Invitations and Email
 
-| Method | Path                        | Purpose                                                                     |
-| ------ | --------------------------- | --------------------------------------------------------------------------- |
-| POST   | `/api/send-invite-email`    | Send invitation email via Resend (rate-limited per actor and per recipient) |
-| POST   | `/api/notify-impersonation` | Log impersonation start/end events                                          |
+| Method | Path                        | Purpose                            |
+| ------ | --------------------------- | ---------------------------------- |
+| POST   | `/api/notify-impersonation` | Log impersonation start/end events |
 
 ---
 
@@ -465,7 +464,7 @@ Rate limits are enforced via Upstash Redis sliding windows. The limiters are def
 | `passwordResetLimiter`  | Per target email hash        | 15 min | 5 requests                                | Recovery requests, gridmaster password reset           |
 | `recoverySurgeLimiter`  | Global                       | 10 sec | 100 requests                              | Recovery requests                                      |
 | `demoLimiter`           | Per IP                       | 1 hour | 3 requests                                | `/api/request-demo`                                    |
-| `inviteLimiter`         | Per acting user              | 1 hour | 100 requests                              | `/api/send-invite-email`                               |
+| `inviteLimiter`         | Per acting user              | 1 hour | 100 requests                              | `/api/organizations/invitations/create`                |
 | `emailTargetLimiter`    | Per recipient address        | 1 hour | 5 requests                                | Email-sending routes                                   |
 | `scheduleReviewLimiter` | Per user                     | 10 sec | 60 requests                               | Schedule review endpoints                              |
 | `apiLimiter`            | Per user (or IP when public) | 10 sec | 10 requests                               | General authenticated and public routes, MFA lifecycle |

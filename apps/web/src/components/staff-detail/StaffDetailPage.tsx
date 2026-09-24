@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import * as Sentry from "@/lib/sentry";
 import { ChevronLeft } from "lucide-react";
 import ProgressBar from "@/components/ProgressBar";
 import { Button } from "@/components/Button";
@@ -420,7 +421,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       // here must not read as the whole action failing — the employee record
       // is correctly saved either way.
       try {
-        const created = await createOrganizationInvitation({
+        await createOrganizationInvitation({
           email: savedEmployee.email,
           role: oldInvitation.roleToAssign,
           orgId,
@@ -432,33 +433,13 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           deptAdminIds: oldInvitation.deptAdminIds,
         });
 
-        const response = await fetch("/api/send-invite-email", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            token: created.token,
-            email: savedEmployee.email,
-            orgName: org?.name || "your organization",
-          }),
-        });
-        if (!response.ok) {
-          const body = await response.text().catch(() => "");
-          let detail = "we couldn't send the invitation email.";
-          try {
-            detail = formatClientErrorMessage(JSON.parse(body).error, detail).toLowerCase();
-          } catch {
-            /* non-JSON response */
-          }
-          throw new Error(`Employee saved, but ${detail}`);
-        }
-
         toast.success(`Employee saved. A new invitation was sent to ${savedEmployee.email}.`);
       } catch (err) {
+        // Saving the new address revoked the old invitation, and a failed send
+        // leaves no new one, so point at the one action that recovers.
+        Sentry.captureException(err);
         toast.error(
-          formatClientErrorMessage(
-            err,
-            "Employee saved, but we couldn't send the new invitation. Try Reinvite from the banner.",
-          ),
+          "Employee saved, but we couldn't send the new invitation. Use Send invitation to try again.",
         );
       } finally {
         refreshDirectory();
@@ -1070,7 +1051,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           <EmployeeManagementAccessEditor
             employee={employee}
             orgId={orgId}
-            orgName={org.name || "your organization"}
             managementDepartments={(departments ?? []).filter(
               (department) => department.type === "management",
             )}
@@ -1095,7 +1075,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         <InviteEmployeeModal
           employee={employee}
           orgId={orgId}
-          orgName={org.name || "your organization"}
           pendingInvitation={pendingInvite ?? undefined}
           onClose={() => setShowInviteModal(false)}
           onInvited={async (updatedEmployee) => {

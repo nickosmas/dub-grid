@@ -34,13 +34,8 @@ export interface EmployeesData {
   handleSaveEmployee: (emp: Employee) => Promise<boolean>;
   /** Saves an employee whose email just changed while a pending invitation
    *  exists, then creates and sends a replacement invitation at the new
-   *  address (reusing the old invitation's role/departments). `orgName`
-   *  isn't otherwise known to this hook, so callers pass it through. */
-  handleSaveEmployeeWithReinvite: (
-    emp: Employee,
-    oldInvitation: Invitation,
-    orgName: string,
-  ) => Promise<boolean>;
+   *  address (reusing the old invitation's role/departments). */
+  handleSaveEmployeeWithReinvite: (emp: Employee, oldInvitation: Invitation) => Promise<boolean>;
   handleRemoveEmployee: (empId: string, note?: string) => Promise<void>;
   handleDeactivateEmployee: (empId: string, note?: string) => Promise<void>;
   handleActivateEmployee: (empId: string) => Promise<void>;
@@ -171,7 +166,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
   );
 
   const handleSaveEmployeeWithReinvite = useCallback(
-    async (emp: Employee, oldInvitation: Invitation, orgName: string) => {
+    async (emp: Employee, oldInvitation: Invitation) => {
       if (!orgId) return false;
       const prevAll = allEmployeesRef.current;
       setAllLocal((prev) => prev.map((e) => (e.id === emp.id ? emp : e)));
@@ -201,7 +196,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
       // here must not read as the whole action failing — the employee record
       // is correctly saved either way.
       try {
-        const created = await createOrganizationInvitation({
+        await createOrganizationInvitation({
           email: savedEmployee.email,
           role: oldInvitation.roleToAssign,
           orgId,
@@ -213,29 +208,13 @@ export function useEmployees(orgId: string | null): EmployeesData {
           deptAdminIds: oldInvitation.deptAdminIds,
         });
 
-        const response = await fetch("/api/send-invite-email", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: created.token, email: savedEmployee.email, orgName }),
-        });
-        if (!response.ok) {
-          const body = await response.text().catch(() => "");
-          let detail = "we couldn't send the invitation email.";
-          try {
-            detail = formatClientErrorMessage(JSON.parse(body).error, detail).toLowerCase();
-          } catch {
-            /* non-JSON response */
-          }
-          throw new Error(`Employee saved, but ${detail}`);
-        }
-
         toast.success(`Employee saved. A new invitation was sent to ${savedEmployee.email}.`);
       } catch (err) {
+        // Saving the new address revoked the old invitation, and a failed send
+        // leaves no new one, so point at the one action that recovers.
+        Sentry.captureException(err);
         toast.error(
-          formatClientErrorMessage(
-            err,
-            "Employee saved, but we couldn't send the new invitation. Try Reinvite from the banner.",
-          ),
+          "Employee saved, but we couldn't send the new invitation. Use Send invitation to try again.",
         );
       } finally {
         invalidateEmployees();

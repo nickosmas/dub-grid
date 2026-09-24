@@ -11,7 +11,13 @@ const organizationInsert = vi.fn();
 const organizationEq = vi.fn();
 const auditInsert = vi.fn();
 const organizationWorkspaceKindMaybeSingle = vi.fn();
+const sendPendingInvitationEmail = vi.fn();
+const invitationDeleteEq = vi.fn();
 
+vi.mock("@/features/organization/server/invitation-delivery", () => ({
+  sendPendingInvitationEmail: (...args: unknown[]) => sendPendingInvitationEmail(...args),
+  isEmailNotConfigured: () => false,
+}));
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
 }));
@@ -113,6 +119,7 @@ describe("POST /api/gridmaster/organizations/manage", () => {
     });
     requestRpc.mockResolvedValue({ error: null });
     auditInsert.mockResolvedValue({ error: null });
+    sendPendingInvitationEmail.mockResolvedValue(undefined);
     // Every action targeting an existing org id is preceded by a
     // workspace_kind guard (sandbox orgs aren't managed here). Default to a
     // real org so the existing action-specific tests are unaffected.
@@ -143,6 +150,16 @@ describe("POST /api/gridmaster/organizations/manage", () => {
       }
       if (table === "audit_log") {
         return { insert: auditInsert };
+      }
+      if (table === "invitations") {
+        const chain = {
+          eq: (...args: unknown[]) => {
+            invitationDeleteEq(...args);
+            return chain;
+          },
+          is: () => chain,
+        };
+        return { delete: () => chain };
       }
       if (table === "subscriptions") {
         return {
@@ -338,53 +355,74 @@ describe("POST /api/gridmaster/organizations/manage", () => {
     expect(organizationInsert.mock.calls[0][0]).not.toHaveProperty("trial_ends_at");
   });
 
-  it("keeps the super admin's invitation token out of the org.created audit row", async () => {
+  const SETUP_WITH_NEW_SUPER_ADMIN = {
+    action: "createOrganizationSetup",
+    input: {
+      name: "Acme Health",
+      addressLine1: "",
+      addressLine2: "",
+      addressCity: "",
+      addressState: "",
+      addressPostalCode: "",
+      addressCountry: "",
+      phone: "",
+      timezone: "America/Los_Angeles",
+      focusAreaLabel: "",
+      certificationLabel: "",
+      roleLabel: "",
+      shiftDisplayMode: "code",
+      superAdminFirstName: "Ada",
+      superAdminLastName: "Lovelace",
+      superAdminEmail: "ada@example.com",
+      superAdminPhone: "",
+    },
+  };
+
+  function inviteInsteadOfAssign() {
     requestRpc.mockImplementation(async (fn: string) => {
       if (fn === "assign_org_role_by_email") {
         return { error: { code: "P0002", message: "no account" } };
       }
       if (fn === "send_invitation") {
-        return { data: { token: "raw-invite-token" }, error: null };
+        return { data: { invitation_id: "invite-1", token: "raw-invite-token" }, error: null };
       }
       return { error: null };
     });
+  }
 
-    const response = await POST(
-      makeRequest({
-        action: "createOrganizationSetup",
-        input: {
-          name: "Acme Health",
-          addressLine1: "",
-          addressLine2: "",
-          addressCity: "",
-          addressState: "",
-          addressPostalCode: "",
-          addressCountry: "",
-          phone: "",
-          timezone: "America/Los_Angeles",
-          focusAreaLabel: "",
-          certificationLabel: "",
-          roleLabel: "",
-          shiftDisplayMode: "code",
-          superAdminFirstName: "Ada",
-          superAdminLastName: "Lovelace",
-          superAdminEmail: "ada@example.com",
-          superAdminPhone: "",
-        },
-      }),
-    );
+  it("emails the super admin's invitation as part of setup and keeps the token private", async () => {
+    inviteInsteadOfAssign();
+
+    const response = await POST(makeRequest(SETUP_WITH_NEW_SUPER_ADMIN));
 
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.superAdmin.pendingInvite.token).toBe("raw-invite-token");
+    expect(body.superAdmin).toEqual({ kind: "invited", displayName: "Ada Lovelace" });
+    expect(JSON.stringify(body)).not.toContain("raw-invite-token");
+    expect(sendPendingInvitationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ token: "raw-invite-token", email: "ada@example.com" }),
+    );
 
     const auditRow = auditInsert.mock.calls.find(([row]) => row.action === "org.created")?.[0];
     expect(auditRow.details.super_admin).toEqual({
-      kind: "pending-invite",
+      kind: "invited",
       displayName: "Ada Lovelace",
       email: "ada@example.com",
     });
     expect(JSON.stringify(auditRow)).not.toContain("raw-invite-token");
+  });
+
+  it("removes the super admin's invitation when its email cannot be sent", async () => {
+    inviteInsteadOfAssign();
+    sendPendingInvitationEmail.mockRejectedValue(new Error("Resend email failed (500)"));
+
+    const response = await POST(makeRequest(SETUP_WITH_NEW_SUPER_ADMIN));
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.superAdmin.kind).toBe("invite-error");
+    expect(invitationDeleteEq).toHaveBeenCalledWith("id", "invite-1");
+    expect(invitationDeleteEq).toHaveBeenCalledWith("token", "raw-invite-token");
   });
 
   it("leaves the time zone to the database default when the gridmaster skips it", async () => {

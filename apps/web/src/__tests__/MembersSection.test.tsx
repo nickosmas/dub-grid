@@ -243,7 +243,6 @@ const baseProps: Omit<MembersSectionProps, "canManageEmployees" | "isManagementU
   roleLabel: "Roles",
   useCompactRoleCertificationLabels: true,
   orgId: "org-1",
-  orgName: "Acme",
   isSuperAdmin: false,
   isGridmaster: false,
   departments: [

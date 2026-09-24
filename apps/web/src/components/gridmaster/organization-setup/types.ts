@@ -59,9 +59,3 @@ export interface InvitationRow {
   selected: boolean;
   role: AssignableOrganizationRole;
 }
-
-export interface PendingInvite {
-  token: string;
-  email: string;
-  name: string;
-}
