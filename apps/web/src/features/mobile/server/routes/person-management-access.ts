@@ -10,6 +10,7 @@ import {
   fetchMobileDepartmentRows,
   insertMobileAuditLogEntry,
   refreshMobileEmployeeInvitationRow,
+  restoreMobileEmployeeInvitationRow,
   replaceMobilePendingInvitationAccessRow,
   rollbackMobilePendingInvitationAccessReplacement,
   revokeMobileEmployeeInvitationRow,
@@ -212,6 +213,14 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
   let invitation;
   let createdInvitation = false;
   let rotation: ({ invitationId: string } & MobileInvitationRotation) | null = null;
+  let refreshed: {
+    invitationId: string;
+    rotatedToken: string;
+    previousToken: string;
+    previousExpiresAt: string;
+    previousDepartmentIds: number[];
+    previousDeptAdminIds: number[];
+  } | null = null;
   if (loaded.pendingInvitation) {
     if ((loaded.pendingInvitation.updated_at ?? null) !== parsed.data.expectedInvitationUpdatedAt) {
       return conflictResponse(loaded.person);
@@ -248,15 +257,26 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
       }
 
       // A fresh token and expiry, so the emailed link is the one that works.
-      invitation = await refreshMobileEmployeeInvitationRow(auth.serviceClient, {
+      const refresh = await refreshMobileEmployeeInvitationRow(auth.serviceClient, {
         orgId: auth.currentOrg.id,
         invitationId: reassigned.id,
         expectedUpdatedAt: reassigned.updated_at ?? null,
       });
-      if (!invitation) {
+      if (!refresh) {
         const latest = await loadMobilePersonWithAccess(auth.serviceClient, auth.currentOrg.id, id);
         return conflictResponse(latest?.person ?? loaded.person);
       }
+      invitation = refresh.invitation;
+      // A failed send puts the link and the departments back as they were,
+      // so the old link never carries access the admin was told failed.
+      refreshed = {
+        invitationId: refresh.invitation.id,
+        rotatedToken: refresh.invitation.token,
+        previousToken: refresh.previousToken,
+        previousExpiresAt: refresh.previousExpiresAt,
+        previousDepartmentIds: loaded.pendingInvitation.department_ids ?? [],
+        previousDeptAdminIds: loaded.pendingInvitation.dept_admin_ids ?? [],
+      };
     }
   } else {
     invitation = await createMobileEmployeeInvitationRow(auth.serviceClient, {
@@ -286,9 +306,10 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
       { err: error, employeeId: id, invitationId: invitation.id },
       "Failed to send mobile management invitation email",
     );
-    // Only a row this request brought into existence gets rolled back. An
-    // invitation that already existed stays put: revoking it would take away
-    // access the failed email never had anything to do with.
+    // Whatever this request changed is undone: a new row is revoked, and an
+    // invitation that already existed gets its previous link and access back
+    // rather than being revoked, which would take away access the failed email
+    // never had anything to do with.
     if (rotation) {
       await rollbackMobilePendingInvitationAccessReplacement(auth.serviceClient, {
         orgId: auth.currentOrg.id,
@@ -297,6 +318,17 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
         logger.error(
           { err: rollbackError, employeeId: id, invitationId: rotation.invitationId },
           "Failed to roll back mobile invitation access replacement after email failure",
+        );
+      });
+    } else if (refreshed) {
+      const restore = refreshed;
+      await restoreMobileEmployeeInvitationRow(auth.serviceClient, {
+        orgId: auth.currentOrg.id,
+        ...restore,
+      }).catch((restoreError) => {
+        logger.error(
+          { err: restoreError, employeeId: id, invitationId: restore.invitationId },
+          "Failed to restore mobile management invitation after email failure",
         );
       });
     } else if (createdInvitation) {

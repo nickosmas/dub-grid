@@ -6,6 +6,7 @@ import {
 import {
   insertMobileAuditLogEntry,
   refreshMobileEmployeeInvitationRow,
+  restoreMobileEmployeeInvitationRow,
   revokeMobileEmployeeInvitationRow,
 } from "@dubgrid/data-access";
 import {
@@ -81,15 +82,16 @@ export async function POST(req: NextRequest, context: { params: Promise<{ person
     return createInvitationEmailUnavailableResponse();
   }
 
-  // Refreshed first so the emailed link is the token that is actually stored.
-  // A send failure leaves a valid, un-emailed invitation rather than a revoked
-  // one — the person keeps whatever access they already had, and a retry works.
-  const refreshed = await refreshMobileEmployeeInvitationRow(auth.serviceClient, {
+  // Refreshed first so the emailed link is the token that is actually stored,
+  // and restored if the send fails: a new token nobody received used to
+  // replace the link the person already had (finding F-10).
+  const refresh = await refreshMobileEmployeeInvitationRow(auth.serviceClient, {
     orgId: auth.currentOrg.id,
     invitationId: managementUser.invitationId,
     expectedUpdatedAt: parsed.data.expectedUpdatedAt,
   });
-  if (!refreshed) return managementConflictResponse();
+  if (!refresh) return managementConflictResponse();
+  const refreshed = refresh.invitation;
 
   try {
     await sendInvitationEmail({
@@ -103,6 +105,18 @@ export async function POST(req: NextRequest, context: { params: Promise<{ person
       { err: error, invitationId: refreshed.id },
       "Failed to resend mobile management invitation email",
     );
+    await restoreMobileEmployeeInvitationRow(auth.serviceClient, {
+      orgId: auth.currentOrg.id,
+      invitationId: refreshed.id,
+      rotatedToken: refreshed.token,
+      previousToken: refresh.previousToken,
+      previousExpiresAt: refresh.previousExpiresAt,
+    }).catch((restoreError) => {
+      logger.error(
+        { err: restoreError, invitationId: refreshed.id },
+        "Failed to restore the previous management invitation link",
+      );
+    });
     return NextResponse.json(
       { error: "We couldn't send that invitation email. Try again in a moment." },
       { status: 502 },

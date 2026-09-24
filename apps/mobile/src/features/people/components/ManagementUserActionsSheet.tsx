@@ -177,6 +177,9 @@ export function ManagementUserActionsSheet({
           "We couldn't update that invitation right now.",
         ),
       );
+      // A failed send restores the previous link and changes the row's
+      // version, so refresh before the next attempt checks it.
+      void invalidateRoster();
     },
     onMutate: () => setError(null),
     onSuccess: async (result) => {

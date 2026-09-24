@@ -9,6 +9,7 @@ import {
   fetchMobilePendingInvitationRowByEmployeeId,
   insertMobileAuditLogEntry,
   refreshMobileEmployeeInvitationRow,
+  restoreMobileEmployeeInvitationRow,
   revokeMobileEmployeeInvitationRow,
 } from "@dubgrid/data-access";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -405,10 +406,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     return createInvitationEmailUnavailableResponse();
   }
 
-  // Read (don't yet mutate) the pending invite, and run the optimistic-concurrency check
-  // against it. The row is only refreshed AFTER the email succeeds (below) so a failed
-  // send leaves it untouched — otherwise the client's now-stale expectedUpdatedAt would
-  // make the retry fail this same check with a confusing "changed elsewhere" 409.
+  // Read the pending invite and run the optimistic check before anything changes.
   const existing = await fetchMobilePendingInvitationRowByEmployeeId(
     loaded.auth.serviceClient,
     loaded.auth.currentOrg.id,
@@ -443,15 +441,27 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     });
   }
 
-  // Rotate the token in memory, email it, and only persist it once the email has actually
-  // been sent — so the emailed link and the committed row always match, and a send failure
-  // is a true no-op the client can safely retry.
-  const nextToken = crypto.randomUUID();
+  // Stored first, then sent, and restored if the send fails. Sending first
+  // could email a token that a concurrent change then kept from ever being
+  // stored (finding F-10). The client refetches after a failure, so its next
+  // attempt carries the restored row's version.
+  const refresh = await refreshMobileEmployeeInvitationRow(loaded.auth.serviceClient, {
+    orgId: loaded.auth.currentOrg.id,
+    invitationId: parsed.data.invitationId,
+    expectedUpdatedAt: parsed.data.expectedUpdatedAt,
+  });
+  if (!refresh || refresh.invitation.employee_id !== id) {
+    return NextResponse.json(
+      { error: "Invitation changed elsewhere. Refresh and try again." },
+      { status: 409 },
+    );
+  }
+
   try {
     await sendInvitationEmail({
       config: emailConfig,
-      token: nextToken,
-      email: existing.email,
+      token: refresh.invitation.token,
+      email: refresh.invitation.email,
       orgName: loaded.auth.currentOrg.name || "your organization",
     });
   } catch (error) {
@@ -459,22 +469,21 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       { err: error, employeeId: id, invitationId: existing.id },
       "Failed to resend mobile invitation email",
     );
+    await restoreMobileEmployeeInvitationRow(loaded.auth.serviceClient, {
+      orgId: loaded.auth.currentOrg.id,
+      invitationId: refresh.invitation.id,
+      rotatedToken: refresh.invitation.token,
+      previousToken: refresh.previousToken,
+      previousExpiresAt: refresh.previousExpiresAt,
+    }).catch((restoreError) => {
+      logger.error(
+        { err: restoreError, employeeId: id, invitationId: existing.id },
+        "Failed to restore the previous invitation link after a resend email failed",
+      );
+    });
     return NextResponse.json(
       { error: "We couldn't send that invitation email. Try again in a moment." },
       { status: 502 },
-    );
-  }
-
-  const invitation = await refreshMobileEmployeeInvitationRow(loaded.auth.serviceClient, {
-    orgId: loaded.auth.currentOrg.id,
-    invitationId: parsed.data.invitationId,
-    expectedUpdatedAt: parsed.data.expectedUpdatedAt,
-    token: nextToken,
-  });
-  if (!invitation || invitation.employee_id !== id) {
-    return NextResponse.json(
-      { error: "Invitation changed elsewhere. Refresh and try again." },
-      { status: 409 },
     );
   }
 

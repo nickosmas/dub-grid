@@ -5,6 +5,7 @@ const fetchMobileEmployeeRowById = vi.fn();
 const fetchMobilePendingInvitationRowByEmployeeId = vi.fn();
 const createMobileEmployeeInvitationRow = vi.fn();
 const refreshMobileEmployeeInvitationRow = vi.fn();
+const restoreMobileEmployeeInvitationRow = vi.fn();
 const revokeMobileEmployeeInvitationRow = vi.fn();
 const insertMobileAuditLogEntry = vi.fn();
 const rowToEmployee = vi.fn();
@@ -22,6 +23,7 @@ vi.mock("@dubgrid/data-access", () => ({
   fetchMobilePendingInvitationRowByEmployeeId,
   insertMobileAuditLogEntry,
   refreshMobileEmployeeInvitationRow,
+  restoreMobileEmployeeInvitationRow,
   revokeMobileEmployeeInvitationRow,
 }));
 
@@ -566,9 +568,23 @@ describe("mobile person invitation route", () => {
     return serviceClient;
   }
 
-  it("does NOT mutate the invitation row when a resend email fails (retry stays clean)", async () => {
+  function rotated() {
+    return {
+      invitation: {
+        ...PENDING_ROW,
+        token: "rotated-token",
+        updated_at: "2026-05-02T22:00:00.000Z",
+      },
+      previousToken: "previous-token",
+      previousExpiresAt: PENDING_ROW.expires_at,
+    };
+  }
+
+  it("restores the previous link when a resend email fails", async () => {
     setupResendAuth();
     fetchMobilePendingInvitationRowByEmployeeId.mockResolvedValue(PENDING_ROW);
+    refreshMobileEmployeeInvitationRow.mockResolvedValue(rotated());
+    restoreMobileEmployeeInvitationRow.mockResolvedValue(true);
     sendResendEmail.mockRejectedValue(new Error("Resend unavailable"));
 
     const { PATCH } = await import("./person-invitation");
@@ -581,20 +597,22 @@ describe("mobile person invitation route", () => {
     );
 
     expect(response.status).toBe(502);
-    // The row is only committed AFTER a successful send — so a failed send leaves it
-    // untouched and the client's expectedUpdatedAt stays valid for a clean retry.
-    expect(refreshMobileEmployeeInvitationRow).not.toHaveBeenCalled();
+    expect(restoreMobileEmployeeInvitationRow).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        invitationId: PENDING_ROW.id,
+        rotatedToken: "rotated-token",
+        previousToken: "previous-token",
+        previousExpiresAt: PENDING_ROW.expires_at,
+      }),
+    );
   });
 
-  it("commits the exact token it emailed once the resend succeeds", async () => {
+  it("emails only a token it has already stored", async () => {
     setupResendAuth();
     fetchMobilePendingInvitationRowByEmployeeId.mockResolvedValue(PENDING_ROW);
+    refreshMobileEmployeeInvitationRow.mockResolvedValue(rotated());
     sendResendEmail.mockResolvedValue(undefined);
-    refreshMobileEmployeeInvitationRow.mockResolvedValue({
-      ...PENDING_ROW,
-      token: "committed-token",
-      updated_at: "2026-05-02T22:00:00.000Z",
-    });
 
     const { PATCH } = await import("./person-invitation");
     const response = await PATCH(
@@ -606,14 +624,14 @@ describe("mobile person invitation route", () => {
     );
 
     expect(response.status).toBe(200);
-    // The token committed to the row must be the exact one embedded in the emailed link,
-    // proving we emailed first and persisted that same token (not a separately-rotated one).
-    const refreshArg = refreshMobileEmployeeInvitationRow.mock.calls[0][1];
-    expect(refreshArg.invitationId).toBe(PENDING_ROW.id);
-    expect(typeof refreshArg.token).toBe("string");
-    expect(refreshArg.token.length).toBeGreaterThan(0);
+    // Stored before it is sent, so a concurrent change cannot leave the
+    // invitee holding a link that was never saved (finding F-10).
+    expect(refreshMobileEmployeeInvitationRow.mock.invocationCallOrder[0]).toBeLessThan(
+      sendResendEmail.mock.invocationCallOrder[0]!,
+    );
     const emailedHtml = sendResendEmail.mock.calls[0][0].html as string;
-    expect(emailedHtml).toContain(refreshArg.token);
+    expect(emailedHtml).toContain("rotated-token");
+    expect(restoreMobileEmployeeInvitationRow).not.toHaveBeenCalled();
   });
 
   it("409s a stale resend without emailing or mutating", async () => {

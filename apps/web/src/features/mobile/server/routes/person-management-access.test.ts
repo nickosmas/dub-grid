@@ -5,6 +5,7 @@ const loadMobilePersonWithAccess = vi.fn();
 const fetchMobileDepartmentRows = vi.fn();
 const createMobileEmployeeInvitationRow = vi.fn();
 const refreshMobileEmployeeInvitationRow = vi.fn();
+const restoreMobileEmployeeInvitationRow = vi.fn();
 const revokeMobileEmployeeInvitationRow = vi.fn();
 const replaceMobilePendingInvitationAccessRow = vi.fn();
 const rollbackMobilePendingInvitationAccessReplacement = vi.fn();
@@ -26,6 +27,7 @@ vi.mock("@dubgrid/data-access", () => ({
   fetchMobileDepartmentRows,
   insertMobileAuditLogEntry,
   refreshMobileEmployeeInvitationRow,
+  restoreMobileEmployeeInvitationRow,
   replaceMobilePendingInvitationAccessRow,
   revokeMobileEmployeeInvitationRow,
   rollbackMobilePendingInvitationAccessReplacement,
@@ -536,10 +538,14 @@ describe("mobile person management-access route", () => {
       updated_at: "2026-05-01T00:00:01Z",
     });
     refreshMobileEmployeeInvitationRow.mockResolvedValue({
-      id: INVITATION_ID,
-      token: "fresh-token",
-      email: "mina@example.com",
-      updated_at: "2026-05-01T00:00:02Z",
+      invitation: {
+        id: INVITATION_ID,
+        token: "fresh-token",
+        email: "mina@example.com",
+        updated_at: "2026-05-01T00:00:02Z",
+      },
+      previousToken: "old-token",
+      previousExpiresAt: "2026-05-04T00:00:00Z",
     });
 
     const { PUT } = await import("./person-management-access");
@@ -555,6 +561,59 @@ describe("mobile person management-access route", () => {
     expect(response.status).toBe(200);
     expect(updateMobileInvitationAssignmentsRow).toHaveBeenCalled();
     expect(replaceMobilePendingInvitationAccessRow).not.toHaveBeenCalled();
+  });
+
+  it("puts the link and departments back when a department-only change fails to send", async () => {
+    loadMobilePersonWithAccess.mockResolvedValue({
+      person: makePerson(),
+      userId: null,
+      membership: null,
+      pendingInvitation: {
+        id: INVITATION_ID,
+        email: "mina@example.com",
+        role_to_assign: "user",
+        department_ids: [3],
+        dept_admin_ids: [],
+        updated_at: "2026-05-01T00:00:00Z",
+      },
+    });
+    updateMobileInvitationAssignmentsRow.mockResolvedValue({
+      id: INVITATION_ID,
+      updated_at: "2026-05-01T00:00:01Z",
+    });
+    refreshMobileEmployeeInvitationRow.mockResolvedValue({
+      invitation: {
+        id: INVITATION_ID,
+        token: "fresh-token",
+        email: "mina@example.com",
+        updated_at: "2026-05-01T00:00:02Z",
+      },
+      previousToken: "old-token",
+      previousExpiresAt: "2026-05-04T00:00:00Z",
+    });
+    restoreMobileEmployeeInvitationRow.mockResolvedValue(true);
+    sendInvitationEmail.mockRejectedValue(new Error("resend down"));
+
+    const { PUT } = await import("./person-management-access");
+    const response = await PUT(
+      makeRequest({
+        orgRole: "user",
+        managementDepartmentIds: [9],
+        expectedInvitationUpdatedAt: "2026-05-01T00:00:00Z",
+      }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(502);
+    expect(restoreMobileEmployeeInvitationRow).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        rotatedToken: "fresh-token",
+        previousToken: "old-token",
+        previousDepartmentIds: [3],
+        previousDeptAdminIds: [],
+      }),
+    );
   });
 
   it("clears the management departments on DELETE without touching the staff profile", async () => {

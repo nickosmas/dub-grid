@@ -1820,38 +1820,103 @@ export async function updateMobileMembershipAccessRow(
   };
 }
 
+/** A rotated invitation and the link it replaced, so a failed send can restore it. */
+export interface MobileInvitationRefresh {
+  invitation: MobileInvitationRow & { token: string };
+  previousToken: string;
+  previousExpiresAt: string;
+}
+
+/**
+ * Issue a fresh token and 72 hours on a pending invitation, under the caller's
+ * optimistic check. Callers send the new link afterwards and restore the
+ * previous one with `restoreMobileEmployeeInvitationRow` if the send fails, so
+ * every emailed link was stored and a failed send strands nobody (F-10).
+ * A revoked invitation is never revived here.
+ */
 export async function refreshMobileEmployeeInvitationRow(
   serviceClient: SupabaseClient,
   input: {
     orgId: string;
     invitationId: string;
     expectedUpdatedAt: string | null;
-    // When provided, persist this exact token (the caller has already emailed it, so the
-    // committed row and the emailed link stay in sync). Omitted → generate a fresh token.
-    token?: string;
   },
-): Promise<MobileInvitationRow | null> {
-  let query = serviceClient
+): Promise<MobileInvitationRefresh | null> {
+  let current = serviceClient
+    .from("invitations")
+    .select("token, expires_at")
+    .eq("org_id", input.orgId)
+    .eq("id", input.invitationId)
+    .is("accepted_at", null)
+    .is("revoked_at", null);
+  current = input.expectedUpdatedAt
+    ? current.eq("updated_at", input.expectedUpdatedAt)
+    : current.is("updated_at", null);
+  const { data: before, error: readError } = await current.maybeSingle();
+  if (readError) throw readError;
+  if (!before) return null;
+
+  // Swapped only while the row still carries the token just read, so a
+  // concurrent change wins rather than being overwritten.
+  const { data, error } = await serviceClient
     .from("invitations")
     .update({
-      token: input.token ?? crypto.randomUUID(),
+      token: crypto.randomUUID(),
       expires_at: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString(),
-      revoked_at: null,
-      updated_at: new Date().toISOString(),
     })
     .eq("org_id", input.orgId)
     .eq("id", input.invitationId)
-    .is("accepted_at", null);
-
-  query = input.expectedUpdatedAt
-    ? query.eq("updated_at", input.expectedUpdatedAt)
-    : query.is("updated_at", null);
-
-  const { data, error } = await query.select(INVITATION_COLS).maybeSingle();
-
+    .eq("token", before.token)
+    .is("accepted_at", null)
+    .is("revoked_at", null)
+    .select(INVITATION_COLS)
+    .maybeSingle();
   if (error) throw error;
+  if (!data) return null;
 
-  return (data as MobileInvitationRow | null | undefined) ?? null;
+  return {
+    invitation: data as MobileInvitationRow & { token: string },
+    previousToken: before.token as string,
+    previousExpiresAt: before.expires_at as string,
+  };
+}
+
+/**
+ * Put back the link a refresh replaced, and any departments the same request
+ * changed, while the row still carries the rotated token. Returns false when
+ * the row has moved on, which the caller should log.
+ */
+export async function restoreMobileEmployeeInvitationRow(
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    invitationId: string;
+    rotatedToken: string;
+    previousToken: string;
+    previousExpiresAt: string;
+    previousDepartmentIds?: number[];
+    previousDeptAdminIds?: number[];
+  },
+): Promise<boolean> {
+  const values: Record<string, unknown> = {
+    token: input.previousToken,
+    expires_at: input.previousExpiresAt,
+  };
+  if (input.previousDepartmentIds) values.department_ids = input.previousDepartmentIds;
+  if (input.previousDeptAdminIds) values.dept_admin_ids = input.previousDeptAdminIds;
+
+  const { data, error } = await serviceClient
+    .from("invitations")
+    .update(values)
+    .eq("org_id", input.orgId)
+    .eq("id", input.invitationId)
+    .eq("token", input.rotatedToken)
+    .is("accepted_at", null)
+    .is("revoked_at", null)
+    .select("id")
+    .maybeSingle();
+  if (error) throw error;
+  return data !== null;
 }
 
 export async function revokeMobileEmployeeInvitationRow(

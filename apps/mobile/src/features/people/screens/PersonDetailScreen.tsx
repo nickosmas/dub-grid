@@ -537,6 +537,9 @@ export default function PersonDetailScreen() {
       setInvitationError(
         getClientFriendlyErrorMessage(error, "We couldn't update that invitation right now."),
       );
+      // A failed send restores the previous link, which changes the row's
+      // version, so refetch before the next attempt checks it.
+      void personQuery.refetch();
     },
     onSuccess: async (result, variables) => {
       updateCachedPerson(result.person);

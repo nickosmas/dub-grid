@@ -5,6 +5,7 @@ const fetchMobileManagementRosterRows = vi.fn();
 const fetchMobileDepartmentRows = vi.fn();
 const createMobileEmployeeInvitationRow = vi.fn();
 const refreshMobileEmployeeInvitationRow = vi.fn();
+const restoreMobileEmployeeInvitationRow = vi.fn();
 const revokeMobileEmployeeInvitationRow = vi.fn();
 const replaceMobilePendingInvitationAccessRow = vi.fn();
 const rollbackMobilePendingInvitationAccessReplacement = vi.fn();
@@ -22,6 +23,7 @@ vi.mock("@dubgrid/data-access", () => ({
   fetchMobileManagementRosterRows,
   insertMobileAuditLogEntry,
   refreshMobileEmployeeInvitationRow,
+  restoreMobileEmployeeInvitationRow,
   replaceMobilePendingInvitationAccessRow,
   revokeMobileEmployeeInvitationRow,
   rollbackMobilePendingInvitationAccessReplacement,
@@ -466,10 +468,34 @@ describe("mobile management-users routes", () => {
       });
     });
 
-    it("refreshes the token and emails it on resend", async () => {
-      refreshMobileEmployeeInvitationRow.mockResolvedValue(
-        makeInvitationRow({ token: "fresh-token" }),
+    it("restores the previous link when the resend email fails", async () => {
+      refreshMobileEmployeeInvitationRow.mockResolvedValue({
+        invitation: makeInvitationRow({ token: "fresh-token" }),
+        previousToken: "old-token",
+        previousExpiresAt: "2026-05-04T00:00:00Z",
+      });
+      restoreMobileEmployeeInvitationRow.mockResolvedValue(true);
+      sendInvitationEmail.mockRejectedValueOnce(new Error("resend down"));
+
+      const { POST } = await import("./management-user-invitation");
+      const response = await POST(
+        makeRequest({ action: "resend", expectedUpdatedAt: "2026-05-01T00:00:00Z" }, "POST"),
+        makeContext(`inv:${INVITATION_ID}`),
       );
+
+      expect(response.status).toBe(502);
+      expect(restoreMobileEmployeeInvitationRow).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ rotatedToken: "fresh-token", previousToken: "old-token" }),
+      );
+    });
+
+    it("refreshes the token and emails it on resend", async () => {
+      refreshMobileEmployeeInvitationRow.mockResolvedValue({
+        invitation: makeInvitationRow({ token: "fresh-token" }),
+        previousToken: "old-token",
+        previousExpiresAt: "2026-05-04T00:00:00Z",
+      });
 
       const { POST } = await import("./management-user-invitation");
       const response = await POST(
