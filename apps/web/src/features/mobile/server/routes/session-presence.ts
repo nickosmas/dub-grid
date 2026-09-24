@@ -5,6 +5,10 @@ import { requireMobileAuth } from "@/features/mobile/server";
 import logger from "@/lib/logger";
 import { createMobileOptionsHandler, withMobileCors } from "./cors";
 import { getSessionLocation } from "@/features/account/server/session-location";
+import {
+  isNewSignInSession,
+  scheduleSecurityAlert,
+} from "@/features/account/server/security-alerts";
 
 const CORS_METHODS = ["POST", "OPTIONS"] as const;
 
@@ -49,6 +53,9 @@ export async function POST(req: NextRequest) {
     null;
   const location = getSessionLocation(req.headers);
 
+  // Before the upsert, which records this session as seen.
+  const isNewSignIn = await isNewSignInSession(auth.user.id, supabaseSessionId);
+
   try {
     await trackUserSessionForUser({
       userId: auth.user.id,
@@ -64,6 +71,18 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     logger.error({ error }, "mobile session-presence upsert failed");
     return json({ error: "We couldn't record this device. Try again." }, { status: 500 });
+  }
+
+  if (isNewSignIn) {
+    scheduleSecurityAlert(auth.user.id, {
+      action: "security_new_device",
+      orgId: auth.currentOrg.id,
+      targetUserId: auth.user.id,
+      supabaseSessionId,
+      platform: parsed.data.platform,
+      deviceLabel: parsed.data.deviceLabel,
+      ipAddress: ip,
+    });
   }
 
   return json({ success: true });

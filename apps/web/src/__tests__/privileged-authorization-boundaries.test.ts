@@ -50,8 +50,6 @@ const AUTHENTICATED_SCOPED_ROUTES: Record<string, string> = {
     "Fresh authentication and the authenticated user ID scope account deletion.",
   "apps/web/src/app/api/auth/gdpr-erase/route.ts":
     "Fresh authentication and the authenticated user ID scope erasure.",
-  "apps/web/src/app/api/auth/track-session/route.ts":
-    "The verified token session ID and authenticated user ID own the session record.",
   "apps/web/src/app/api/calendar/route.ts":
     "The linked-calendar helper rechecks live user, org, membership, and employee ownership.",
   "apps/web/src/app/api/organization/access-status/route.ts":
@@ -75,6 +73,8 @@ const DELEGATED_SERVICE_HELPERS: Record<string, string> = {
     "Scopes preferences to the authenticated user ID.",
   "apps/web/src/features/account/server/profile.ts":
     "Scopes profile operations to the authenticated user ID.",
+  "apps/web/src/features/account/server/security-alerts.ts":
+    "Reads only the authenticated user's own session rows by the verified session ID.",
   "apps/web/src/features/account/server/sessions.ts":
     "Scopes session operations to the authenticated user ID.",
   "apps/web/src/features/account/server/terms.ts":

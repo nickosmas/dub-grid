@@ -129,6 +129,8 @@ export type NotificationEvent =
       action: "security_new_device";
       orgId: string | null;
       targetUserId: string;
+      /** The authenticated Supabase session this sign-in opened. */
+      supabaseSessionId: string;
       platform: "web" | "ios" | "android";
       deviceLabel: string | null;
       ipAddress: string | null;
@@ -1062,13 +1064,13 @@ async function dispatchNotificationEventInternal(
         event.orgId,
         "security_new_device" as NotificationType,
         "New sign-in on your account",
-        `Your account was just signed in from a new ${where}. If this wasn't you, change your password and review your active sessions.`,
+        `Your account was just signed in on ${where}. If this wasn't you, change your password and review your active sessions.`,
         {
           platform: event.platform,
           deviceLabel: event.deviceLabel,
           ipAddress: event.ipAddress,
         },
-        { writeInApp: false },
+        { writeInApp: false, dedupeKey: `security_new_device:${event.supabaseSessionId}` },
       );
       return;
     }

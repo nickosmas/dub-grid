@@ -4,8 +4,10 @@ import { z } from "zod";
 import { trackUserSessionForUser } from "@/features/account/server";
 import { requireAuthenticatedSession } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
-import { dispatchNotificationEvent } from "@/features/notifications/server/events";
-import { getServiceClient } from "@/lib/supabase-service";
+import {
+  isNewSignInSession,
+  scheduleSecurityAlert,
+} from "@/features/account/server/security-alerts";
 import logger from "@/lib/logger";
 import { getSessionLocation } from "@/features/account/server/session-location";
 
@@ -44,15 +46,8 @@ export async function POST(req: NextRequest) {
       null;
     const location = getSessionLocation(req.headers);
 
-    // Detect a previously-unseen device before the upsert. "New" = no prior
-    // user_sessions row for (user_id, platform, device_label) — not "no row
-    // other than the current session's", which would refire on every refresh
-    // within the same session.
-    const isNewDevice = await isNewDeviceForUser({
-      userId: auth.user.id,
-      platform,
-      deviceLabel,
-    });
+    // Before the upsert, which records this session as seen.
+    const isNewSignIn = await isNewSignInSession(auth.user.id, sessionClaims.supabaseSessionId);
 
     await trackUserSessionForUser({
       userId: auth.user.id,
@@ -68,12 +63,12 @@ export async function POST(req: NextRequest) {
       locationCountry: location.country,
     });
 
-    if (isNewDevice) {
-      // Fire-and-forget — a notification failure must not block sign-in.
-      void dispatchNotificationEvent(auth.user.id, {
+    if (isNewSignIn) {
+      scheduleSecurityAlert(auth.user.id, {
         action: "security_new_device",
         orgId: sessionClaims.orgId,
         targetUserId: auth.user.id,
+        supabaseSessionId: sessionClaims.supabaseSessionId,
         platform,
         deviceLabel,
         ipAddress: ip,
@@ -123,27 +118,4 @@ function isSupabaseErrorCode(error: unknown, code: string): boolean {
     "code" in error &&
     (error as { code?: unknown }).code === code
   );
-}
-
-async function isNewDeviceForUser(input: {
-  userId: string;
-  platform: "web" | "ios" | "android";
-  deviceLabel: string;
-}): Promise<boolean> {
-  try {
-    const { data, error } = await getServiceClient()
-      .from("user_sessions")
-      .select("id")
-      .eq("user_id", input.userId)
-      .eq("platform", input.platform)
-      .eq("device_label", input.deviceLabel)
-      .limit(1);
-    if (error) throw error;
-    return (data ?? []).length === 0;
-  } catch (err) {
-    // Detection is best-effort — never block sign-in over a notification
-    // false-negative. Treat lookup failures as "not new".
-    logger.warn({ err, userId: input.userId }, "new-device detection failed");
-    return false;
-  }
 }

@@ -322,6 +322,7 @@ describe("dispatchNotificationEvent", () => {
       action: "security_new_device",
       orgId: "org-1",
       targetUserId: "user-1",
+      supabaseSessionId: "session-9",
       platform: "ios",
       deviceLabel: "Pixel 8",
       ipAddress: "1.2.3.4",
@@ -339,7 +340,8 @@ describe("dispatchNotificationEvent", () => {
         deviceLabel: "Pixel 8",
         ipAddress: "1.2.3.4",
       }),
-      { writeInApp: false },
+      // One alert per sign-in, however many times that sign-in is reported.
+      { writeInApp: false, dedupeKey: "security_new_device:session-9" },
     );
   });
 

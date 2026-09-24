@@ -87,6 +87,11 @@ const DEFAULT_EMAIL_ENABLED: Record<string, boolean> = {
 
 /** Max emails per user per hour (throttle) */
 const MAX_EMAILS_PER_HOUR = 10;
+/**
+ * Security alerts draw on their own hourly budget, so a burst of schedule or
+ * request mail can never suppress a sign-in or two-factor warning.
+ */
+const MAX_SECURITY_EMAILS_PER_HOUR = 20;
 
 function getServiceClient() {
   const url = getSupabaseUrl();
@@ -107,6 +112,11 @@ export interface SendNotificationOptions {
    * channels) continue to fire.
    */
   writeInApp?: boolean;
+  /**
+   * One email per key. Set for alerts about a single event that can be
+   * reported more than once, such as two concurrent reports of one sign-in.
+   */
+  dedupeKey?: string;
 }
 
 /**
@@ -181,17 +191,32 @@ export async function sendNotification(
   // but pinning the contract here means a future change to also record
   // failed attempts won't silently poison the throttle.
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-  const { count } = await supabase
+  const isSecurity = category === "security";
+  const sentThisHour = supabase
     .from("notifications")
     .select("*", { count: "exact", head: true })
     .eq("user_id", userId)
     .eq("channel", "email")
     .eq("metadata->>email_sent", "true")
     .gte("created_at", oneHourAgo);
+  const { count } = await (isSecurity
+    ? sentThisHour.eq("category", "security")
+    : sentThisHour.neq("category", "security"));
 
-  if ((count ?? 0) >= MAX_EMAILS_PER_HOUR) {
+  if ((count ?? 0) >= (isSecurity ? MAX_SECURITY_EMAILS_PER_HOUR : MAX_EMAILS_PER_HOUR)) {
     logger.info({ userId, type }, "Email throttled — max hourly limit reached");
     return;
+  }
+
+  if (options.dedupeKey) {
+    const { data: alreadySent } = await supabase
+      .from("notifications")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("channel", "email")
+      .eq("metadata->>dedupe_key", options.dedupeKey)
+      .limit(1);
+    if ((alreadySent ?? []).length > 0) return;
   }
 
   // 4. Get user email
@@ -236,7 +261,11 @@ export async function sendNotification(
       category,
       title,
       message,
-      metadata: { ...metadata, email_sent: true },
+      metadata: {
+        ...metadata,
+        email_sent: true,
+        ...(options.dedupeKey ? { dedupe_key: options.dedupeKey } : {}),
+      },
       read_at: nowIso,
       archived_at: nowIso,
     });

@@ -8,6 +8,12 @@ const dispatchNotificationEvent = vi.fn();
 const profileSnapshot = vi.fn();
 const getUser = vi.fn();
 const createRequestSupabaseClient = vi.fn();
+const after = vi.fn((task: () => unknown) => void task());
+
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (task: () => unknown) => after(task),
+}));
 
 vi.mock("@/lib/api-auth", () => ({
   requireAuthenticatedUser: (req: NextRequest) => requireAuthenticatedUser(req),
@@ -109,6 +115,8 @@ describe("POST /api/account/mfa-status", () => {
   it("dispatches security_mfa_changed when the value actually changes", async () => {
     const res = await POST(post({ enabled: true }));
     expect(res.status).toBe(200);
+    // Kept alive past the response, which a bare promise was not.
+    expect(after).toHaveBeenCalledTimes(1);
     expect(dispatchNotificationEvent).toHaveBeenCalledWith("user-1", {
       action: "security_mfa_changed",
       orgId: "org-1",

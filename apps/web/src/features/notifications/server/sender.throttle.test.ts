@@ -1,0 +1,121 @@
+// @vitest-environment node
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const sendResendEmail = vi.fn();
+const state = { securityEmailsThisHour: 0, otherEmailsThisHour: 0, dedupeHits: 0 };
+
+type Op = [string, ...unknown[]];
+
+function has(ops: Op[], ...op: unknown[]) {
+  return ops.some((entry) => op.every((value, index) => entry[index] === value));
+}
+
+function resolve(table: string, ops: Op[]) {
+  if (table === "notifications" && has(ops, "select", "*")) {
+    return {
+      count: has(ops, "eq", "category", "security")
+        ? state.securityEmailsThisHour
+        : state.otherEmailsThisHour,
+    };
+  }
+  if (table === "notifications" && has(ops, "eq", "metadata->>dedupe_key")) {
+    return { data: Array.from({ length: state.dedupeHits }, (_, id) => ({ id })) };
+  }
+  return { data: null, error: null };
+}
+
+function builder(table: string) {
+  const ops: Op[] = [];
+  const chain: Record<string, unknown> = {};
+  for (const name of ["select", "eq", "neq", "gte", "limit", "insert"]) {
+    chain[name] = (...args: unknown[]) => {
+      ops.push([name, ...args]);
+      return chain;
+    };
+  }
+  chain.maybeSingle = async () => resolve(table, ops);
+  chain.then = (onFulfilled: (value: unknown) => unknown) =>
+    Promise.resolve(resolve(table, ops)).then(onFulfilled);
+  return chain;
+}
+
+vi.mock("@supabase/supabase-js", () => ({
+  createClient: () => ({
+    from: (table: string) => builder(table),
+    auth: { admin: { getUserById: async () => ({ data: { user: { email: "u@x.test" } } }) } },
+  }),
+}));
+vi.mock("@/lib/supabase-keys", () => ({
+  getSupabaseUrl: () => "http://supabase.test",
+  getSupabaseSecretKey: () => "secret",
+}));
+vi.mock("@/lib/env.server", () => ({ serverEnv: { RESEND_API_KEY: "key" } }));
+vi.mock("@/lib/email", () => ({ emailBaseUrl: () => "https://app.test" }));
+vi.mock("@/lib/resend", () => ({
+  sendResendEmail: (...args: unknown[]) => sendResendEmail(...args),
+}));
+vi.mock("@/features/mobile/server", () => ({
+  isPushEligibleNotificationType: () => false,
+  sendMobilePushNotifications: vi.fn(),
+}));
+vi.mock("@/lib/logger", () => ({ default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
+
+import { sendNotification } from "./sender";
+
+function send(type: string, dedupeKey?: string) {
+  return sendNotification(
+    "user-1",
+    "org-1",
+    type as never,
+    "Title",
+    "Message",
+    {},
+    {
+      writeInApp: false,
+      dedupeKey,
+    },
+  );
+}
+
+describe("sendNotification email budgets", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    state.securityEmailsThisHour = 0;
+    state.otherEmailsThisHour = 0;
+    state.dedupeHits = 0;
+    sendResendEmail.mockResolvedValue({ id: "email-1" });
+  });
+
+  // Ten unrelated emails in an hour used to suppress a sign-in warning.
+  it("still sends a security alert after a burst of ordinary mail", async () => {
+    state.otherEmailsThisHour = 10;
+
+    await send("security_new_device");
+
+    expect(sendResendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("still throttles ordinary mail at its own limit", async () => {
+    state.otherEmailsThisHour = 10;
+
+    await send("billing_payment_failed");
+
+    expect(sendResendEmail).not.toHaveBeenCalled();
+  });
+
+  it("caps security alerts on their own budget", async () => {
+    state.securityEmailsThisHour = 20;
+
+    await send("security_mfa_changed");
+
+    expect(sendResendEmail).not.toHaveBeenCalled();
+  });
+
+  it("sends one email per dedupe key", async () => {
+    state.dedupeHits = 1;
+
+    await send("security_new_device", "security_new_device:session-1");
+
+    expect(sendResendEmail).not.toHaveBeenCalled();
+  });
+});
