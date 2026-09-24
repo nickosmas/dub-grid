@@ -7,6 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import * as Sentry from "@/lib/sentry";
 import { clearImpersonationCookie } from "@/lib/impersonation";
+import { settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
 import {
   clearLogoutCleanup,
   getBrowserRealtimeChannels,
@@ -15,6 +16,8 @@ import {
   untrackBrowserRealtimeChannel,
 } from "@/features/account/client";
 
+// Short, because the user is waiting on a sign-out screen for these.
+const PRE_SIGN_OUT_DEADLINE_MS = 3_000;
 export type LogoutScope = "local" | "global";
 
 interface RunLogoutTeardownProps {
@@ -75,14 +78,20 @@ export function RunLogoutTeardown({ scope, reason = null }: RunLogoutTeardownPro
     if (scope === null) return;
 
     void (async () => {
+      // Cleanup needs the session, so it runs first, but it can never hold
+      // revocation back: a stalled request used to leave sign-out waiting
+      // forever with the access token still live (finding F-20).
       try {
         queryClient.clear();
         clearImpersonationCookie();
-        // Auth-required cleanup MUST run before signOut clears the session.
-        await clearLogoutCleanup().catch(() => {
+        await settleWithRequestTimeout(clearLogoutCleanup(), PRE_SIGN_OUT_DEADLINE_MS).catch(() => {
           // Best-effort; sessions auto-expire after 30 min server-side.
         });
-        await clearRealtimeChannels();
+        await settleWithRequestTimeout(clearRealtimeChannels(), PRE_SIGN_OUT_DEADLINE_MS);
+      } catch (err) {
+        Sentry.captureException(err);
+      }
+      try {
         await signOutFromBrowser(scope);
       } catch (err) {
         Sentry.captureException(err);
