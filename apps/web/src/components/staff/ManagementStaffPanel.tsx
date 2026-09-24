@@ -3,6 +3,7 @@ import { ChevronRight, Clock } from "lucide-react";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSlideoverClose, useSlideoverEscape } from "@/hooks/useSlideoverClose";
+import { useInvitationActionConfirm } from "./useInvitationActionConfirm";
 import { Button } from "@/components/Button";
 import { useTheme } from "next-themes";
 import { createPortal } from "react-dom";
@@ -93,7 +94,7 @@ interface ManagementStaffPanelProps {
     phone: string;
     managementDepartmentIds: number[];
   }) => Promise<boolean>;
-  /** Resolves false when the revoke did not go ahead, so the panel stays open. */
+  /** Called once the panel has confirmed; resolves false when the revoke failed. */
   onRevokeInvitation?: (invitationId: string) => Promise<boolean | void>;
   onResendInvitation?: (invitationId: string) => Promise<void>;
   /** Change the linked member's org role. Provided only when the viewer may
@@ -126,6 +127,9 @@ export function ManagementStaffPanel({
 }: ManagementStaffPanelProps) {
   const { resolvedTheme } = useTheme();
   const { closing, close: closePanel } = useSlideoverClose(onClose, { escape: false });
+  // The panel asks before revoking or reissuing, so its buttons show a spinner
+  // only once the action is confirmed and actually running.
+  const { askToConfirm, confirmDialog } = useInvitationActionConfirm();
 
   // employees.email (when present) is the single source of truth — it
   // overrides person.email, which falls back to a linked auth user's or a
@@ -364,6 +368,7 @@ export function ManagementStaffPanel({
 
   const handleRevoke = async () => {
     if (!isPending || !onRevokeInvitation) return;
+    if (!(await askToConfirm("revoke", person.email || null))) return;
     setRevoking(true);
     try {
       // person.personId is "inv:<uuid>" — extract the uuid
@@ -376,6 +381,7 @@ export function ManagementStaffPanel({
 
   const handleResend = async () => {
     if (!onResendInvitation) return;
+    if (!(await askToConfirm("resend", person.email || null))) return;
     setResending(true);
     try {
       await onResendInvitation(person.personId.replace("inv:", ""));
@@ -1127,6 +1133,7 @@ export function ManagementStaffPanel({
         />
 
         {unsavedChangesDialog}
+        {confirmDialog}
         <ScrollOverflowCue />
       </div>
     </>,
