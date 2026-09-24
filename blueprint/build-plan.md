@@ -541,6 +541,30 @@
         same pending invitation while preserving its email, role, and
         departments, and sends the replacement. If delivery fails, restore the
         previous usable link rather than leaving the invitee stranded.
+    - [ ] 41a1. **Invitation authorization and inviter attribution** - a
+          regular admin must never hand out the super_admin tier, at creation
+          or by editing a pending invitation: apply the create route's tier
+          ceiling to the edit and replace paths and to the mobile invitation
+          endpoints, and record verifiable inviter attribution on every
+          server-created invitation. Attribution and the edit-path guard ship
+          together, guard first: filling in the inviter makes the
+          acceptance-time tier check live, which would otherwise turn a
+          refused escalation into a granted one. Align create, resend, and
+          replace permissions so an admin who can create an invitation can
+          also send it.
+    - [ ] 41a2. **Atomic rotation and recoverable delivery** - replace the
+          revoke-first, second-modal web flow with one guarded confirmation
+          that invalidates the current link and rotates the token on the same
+          pending invitation, preserving its email, role, and departments.
+          Make rotation and dispatch transactional or safely recoverable:
+          restore the previous usable link when delivery fails rather than
+          stranding the invitee. Handle TOTP-enrolled invitees and return
+          valid retry semantics.
+    - [ ] 41a3. **Recipient-facing invitation clarity** - make the 72-hour
+          absolute expiry, replacement behavior, and organization context
+          clear to recipients in the invitation email and the accept-invite
+          landing, so a replaced link and a still-valid one are tellable
+          apart.
   - [ ] 41b. **Credential, session, and recovery integrity** - require the
         same fresh-assurance and session-revocation guarantees on web and
         mobile for password, sign-in email, MFA, recovery, account deletion,
