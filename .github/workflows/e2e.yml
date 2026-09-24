@@ -27,7 +27,10 @@ jobs:
   e2e:
     name: Playwright
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Setup consumes roughly six minutes before the Chromium suite begins. Leave
+    # enough headroom for the full release suite rather than cancelling it at
+    # the job-wide thirty-minute limit.
+    timeout-minutes: 60
     env:
       TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
       TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
