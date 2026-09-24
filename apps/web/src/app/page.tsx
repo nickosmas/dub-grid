@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useTheme } from "next-themes";
@@ -138,28 +138,6 @@ const NAV_SECTIONS = [
   { id: "security", label: "Security" },
 ] as const;
 
-/* ─── Scroll Reveal Hook ──────────────────────────────── */
-
-function useScrollReveal() {
-  const ref = useRef<HTMLDivElement>(null);
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) setIsVisible(true);
-      },
-      { threshold: 0.1, rootMargin: "0px 0px -60px 0px" },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  return { ref, isVisible };
-}
-
 /* ─── Section Wrapper ─────────────────────────────────── */
 
 function RevealSection({
@@ -171,20 +149,8 @@ function RevealSection({
   className?: string;
   id?: string;
 }) {
-  const { ref, isVisible } = useScrollReveal();
   return (
-    <section
-      ref={ref}
-      id={id}
-      className={`scroll-mt-14 ${
-        isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-      } ${className}`}
-      style={{
-        transition:
-          "opacity 700ms ease-out, transform 700ms ease-out, " +
-          "background-color var(--dg-duration-fast) ease, color var(--dg-duration-fast) ease",
-      }}
-    >
+    <section id={id} className={`scroll-mt-14 ${className}`}>
       {children}
     </section>
   );

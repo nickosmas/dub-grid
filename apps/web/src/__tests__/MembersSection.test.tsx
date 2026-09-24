@@ -121,7 +121,7 @@ let lastManagementStaffPanelSave:
       email: string;
       phone: string;
       managementDepartmentIds: number[];
-    }) => Promise<void>)
+    }) => Promise<boolean>)
   | null = null;
 let lastStaffDetailPanelProps: {
   employee: Employee;
@@ -143,7 +143,7 @@ vi.mock("@/components/staff/ManagementStaffPanel", () => ({
       email: string;
       phone: string;
       managementDepartmentIds: number[];
-    }) => Promise<void>;
+    }) => Promise<boolean>;
   }) => {
     lastManagementStaffPanelSave = props.onSave;
     return (
@@ -276,6 +276,21 @@ async function settleInvitations() {
     await Promise.resolve();
   });
 }
+
+describe("MembersSection - People search autofill isolation", () => {
+  it("identifies the People filter as a non-autofill search field", async () => {
+    const user = userEvent.setup();
+    renderMembersSection();
+
+    const search = screen.getByRole("searchbox", { name: "Search people" });
+    expect(search).toHaveAttribute("id", "people-search-input");
+    expect(search).toHaveAttribute("name", "people-search");
+    expect(search).toHaveAttribute("autocomplete", "off");
+
+    await user.type(search, "Jamie");
+    expect(search).toHaveValue("Jamie");
+  });
+});
 
 describe("MembersSection — management-only view access", () => {
   it("lets a self-management-only, non-admin viewer see (but not edit) other management users", async () => {
@@ -588,8 +603,9 @@ describe("MembersSection — ManagementStaffPanel email/invitation wiring", () =
     if (!lastManagementStaffPanelSave) {
       throw new Error("Expected ManagementStaffPanel to receive onSave");
     }
+    let saved = false;
     await act(async () => {
-      await lastManagementStaffPanelSave!({
+      saved = await lastManagementStaffPanelSave!({
         firstName: "Jamie",
         lastName: "Rivera",
         email: "new.address@example.com",
@@ -598,6 +614,7 @@ describe("MembersSection — ManagementStaffPanel email/invitation wiring", () =
       });
     });
 
+    expect(saved).toBe(true);
     expect(updateEmployeeIdentityMock).toHaveBeenCalledWith(
       expect.objectContaining({ employeeId: "emp-1", email: "new.address@example.com" }),
     );
@@ -634,8 +651,9 @@ describe("MembersSection — ManagementStaffPanel email/invitation wiring", () =
     if (!lastManagementStaffPanelSave) {
       throw new Error("Expected ManagementStaffPanel to receive onSave");
     }
+    let saved = true;
     await act(async () => {
-      await lastManagementStaffPanelSave!({
+      saved = await lastManagementStaffPanelSave!({
         firstName: "Jamie",
         lastName: "Rivera",
         email: "existing@example.com",
@@ -644,6 +662,7 @@ describe("MembersSection — ManagementStaffPanel email/invitation wiring", () =
       });
     });
 
+    expect(saved).toBe(false);
     expect(vi.mocked(toast.error)).toHaveBeenCalled();
   });
 });

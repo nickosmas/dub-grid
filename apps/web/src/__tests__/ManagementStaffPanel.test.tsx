@@ -54,10 +54,11 @@ function renderPanel(
       | "canManageManagementAccess"
       | "onAddToSchedule"
       | "onRoleChange"
+      | "onSave"
     >
   > = {},
 ) {
-  const onSave = vi.fn().mockResolvedValue(undefined);
+  const onSave = panelOverrides.onSave ?? vi.fn().mockResolvedValue(true);
   const onClose = vi.fn();
 
   render(
@@ -82,9 +83,9 @@ function renderPanel(
 }
 
 describe("ManagementStaffPanel", () => {
-  it("shows Save immediately but disables it until the draft changes, then disables it again after save", async () => {
+  it("closes after a successful save", async () => {
     const user = userEvent.setup();
-    const { onSave } = renderPanel();
+    const { onSave, onClose } = renderPanel();
 
     const saveButton = await screen.findByRole("button", { name: /^save$/i });
     expect(saveButton).toBeDisabled();
@@ -105,7 +106,24 @@ describe("ManagementStaffPanel", () => {
         managementDepartmentIds: [10],
       });
       expect(saveButton).toBeDisabled();
+      expect(onClose).toHaveBeenCalledOnce();
     });
+  });
+
+  it("stays open with the draft intact when saving fails", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn().mockResolvedValue(false);
+    const { onClose } = renderPanel({}, undefined, null, { onSave });
+
+    const firstNameInput = screen.getByDisplayValue("Jordan");
+    await user.clear(firstNameInput);
+    await user.type(firstNameInput, "Jordyn");
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledOnce());
+    expect(onClose).not.toHaveBeenCalled();
+    expect(firstNameInput).toHaveValue("Jordyn");
+    expect(screen.getByRole("button", { name: /^save$/i })).toBeEnabled();
   });
 
   it("requires a first name before enabling save", async () => {

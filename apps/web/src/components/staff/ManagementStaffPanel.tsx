@@ -92,7 +92,7 @@ interface ManagementStaffPanelProps {
     email: string;
     phone: string;
     managementDepartmentIds: number[];
-  }) => Promise<void>;
+  }) => Promise<boolean>;
   onRevokeInvitation?: (invitationId: string) => Promise<void>;
   onResendInvitation?: (invitationId: string) => Promise<void>;
   /** Change the linked member's org role. Provided only when the viewer may
@@ -349,13 +349,15 @@ export function ManagementStaffPanel({
     }
     setSaving(true);
     try {
-      await onSave(nextDraft);
+      const saved = await onSave(nextDraft);
+      if (!saved) return;
       setFirstName(nextDraft.firstName);
       setLastName(nextDraft.lastName);
       setEmail(nextDraft.email);
       setPhone(nextDraft.phone);
       setDeptIds([...nextDraft.managementDepartmentIds]);
       setSavedDraft(nextDraft);
+      closePanel();
     } finally {
       setSaving(false);
     }

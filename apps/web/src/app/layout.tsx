@@ -62,6 +62,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             This is an external, cacheable first-party asset rather than an
             inline runtime string. */}
         <Script id="dg-theme-seed" src="/dg-theme-seed.js" strategy="beforeInteractive" />
+        <Script
+          id="dg-form-submit-guard"
+          src="/dg-form-submit-guard.js"
+          strategy="beforeInteractive"
+        />
       </head>
       <body
         suppressHydrationWarning

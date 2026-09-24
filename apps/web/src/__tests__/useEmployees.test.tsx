@@ -123,11 +123,17 @@ describe("useEmployees — handleSaveEmployeeWithReinvite", () => {
   it("saves the identity change, then creates and sends a new invitation reusing the old role/departments", async () => {
     const result = await renderReady();
     const updated = { ...EMPLOYEE, email: "new@example.com" };
+    let saved = false;
 
     await act(async () => {
-      await result.current.handleSaveEmployeeWithReinvite(updated, OLD_INVITATION, "Acme Org");
+      saved = await result.current.handleSaveEmployeeWithReinvite(
+        updated,
+        OLD_INVITATION,
+        "Acme Org",
+      );
     });
 
+    expect(saved).toBe(true);
     expect(mockUpdateEmployee).toHaveBeenCalledWith(updated, "org-1", updated.version);
     expect(mockCreateOrganizationInvitation).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -153,11 +159,17 @@ describe("useEmployees — handleSaveEmployeeWithReinvite", () => {
     );
     const result = await renderReady();
     const updated = { ...EMPLOYEE, email: "new@example.com" };
+    let saved = false;
 
     await act(async () => {
-      await result.current.handleSaveEmployeeWithReinvite(updated, OLD_INVITATION, "Acme Org");
+      saved = await result.current.handleSaveEmployeeWithReinvite(
+        updated,
+        OLD_INVITATION,
+        "Acme Org",
+      );
     });
 
+    expect(saved).toBe(true);
     expect(mockUpdateEmployee).toHaveBeenCalled();
     expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining("Employee saved"));
     expect(mockToastSuccess).not.toHaveBeenCalled();
@@ -170,11 +182,17 @@ describe("useEmployees — handleSaveEmployeeWithReinvite", () => {
     mockUpdateEmployee.mockRejectedValueOnce(new Error("db unavailable"));
     const result = await renderReady();
     const updated = { ...EMPLOYEE, email: "new@example.com" };
+    let saved = true;
 
     await act(async () => {
-      await result.current.handleSaveEmployeeWithReinvite(updated, OLD_INVITATION, "Acme Org");
+      saved = await result.current.handleSaveEmployeeWithReinvite(
+        updated,
+        OLD_INVITATION,
+        "Acme Org",
+      );
     });
 
+    expect(saved).toBe(false);
     expect(mockCreateOrganizationInvitation).not.toHaveBeenCalled();
     expect(mockToastError).toHaveBeenCalledWith("db unavailable");
     expect(result.current.employees.find((e) => e.id === "emp-1")?.email).toBe("old@example.com");
@@ -199,10 +217,15 @@ describe("useEmployees — rollback keeps the full list on failure (not just the
     mockUpdateEmployee.mockRejectedValueOnce(new Error("db unavailable"));
     const result = await renderReady();
 
+    let saved = true;
     await act(async () => {
-      await result.current.handleSaveEmployee({ ...EMPLOYEE, email: "new@example.com" });
+      saved = await result.current.handleSaveEmployee({
+        ...EMPLOYEE,
+        email: "new@example.com",
+      });
     });
 
+    expect(saved).toBe(false);
     expect(result.current.employees).toEqual([EMPLOYEE]);
   });
 

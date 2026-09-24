@@ -110,14 +110,14 @@ export interface MembersSectionProps {
   certifications: NamedItem[];
   roles: NamedItem[];
   useCompactRoleCertificationLabels?: boolean;
-  onSave: (emp: Employee) => void;
+  onSave: (emp: Employee) => boolean | Promise<boolean>;
   /** Called instead of `onSave` when the admin confirms changing an
    *  on-schedule employee's email while a pending invitation exists — see
    *  EditEmployeePanel. */
   onSaveWithReinvite?: (
     updatedEmployee: Employee,
     oldInvitation: Invitation,
-  ) => void | Promise<void>;
+  ) => boolean | Promise<boolean>;
   onRemove: (empId: string, note?: string) => void;
   onDeactivate: (empId: string, note?: string) => void;
   onActivate: (empId: string) => void;
@@ -914,12 +914,7 @@ export function MembersSection({
     }
   }
 
-  const handleSave = useCallback(
-    (employee: Employee) => {
-      onSave(employee);
-    },
-    [onSave],
-  );
+  const handleSave = useCallback((employee: Employee) => onSave(employee), [onSave]);
 
   const hasExportableStaffRows = employees.length > 0;
   const canShowReorder =
@@ -1485,6 +1480,11 @@ export function MembersSection({
                   style={{ left: 12 }}
                 />
                 <input
+                  id="people-search-input"
+                  name="people-search"
+                  type="search"
+                  autoComplete="off"
+                  aria-label="Search people"
                   className="dg-input w-full"
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
@@ -2449,7 +2449,7 @@ export function MembersSection({
           }
           onClose={() => setExpandedPersonId(null)}
           onSave={async (data) => {
-            if (!orgId) return;
+            if (!orgId) return false;
 
             try {
               let updatedEmployee: Employee | null = null;
@@ -2459,7 +2459,7 @@ export function MembersSection({
                 const currentEmployee = findEmployeeById(selectedPerson.employeeId);
                 if (!currentEmployee) {
                   toast.error("Could not load the latest employee record. Refresh and try again.");
-                  return;
+                  return false;
                 }
                 const emailChanged = (currentEmployee.email || "") !== (data.email || "");
                 const identityResult = await updateEmployeeIdentity({
@@ -2534,8 +2534,10 @@ export function MembersSection({
                   ? `Changes saved. Their pending invitation to ${revokedInvitationEmail} was revoked.`
                   : "Changes saved",
               );
+              return true;
             } catch (err) {
               toast.error(formatClientErrorMessage(err, "We couldn't save those changes."));
+              return false;
             }
           }}
           onRevokeInvitation={

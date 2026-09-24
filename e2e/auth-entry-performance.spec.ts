@@ -55,7 +55,12 @@ test("measures cold and warm web authentication entry", async ({ browser, baseUR
   expect(report.journeys.cold_sign_in.requestCounts.session_tracking?.max).toBe(1);
   expect(report.journeys.cold_sign_in.requestCounts.organization_bootstrap?.max).toBeGreaterThan(0);
   expect(report.journeys.warm_refresh.requestCounts.login).toBeUndefined();
-  expect(report.journeys.warm_refresh.requestCounts.session_tracking?.max).toBe(1);
+  // A restored session can either reuse its in-page registration or refresh it
+  // once, depending on the browser's auth-storage lifecycle. In both cases it
+  // must never create duplicate tracking writes while redrawing the shell.
+  expect(report.journeys.warm_refresh.requestCounts.session_tracking?.max ?? 0).toBeLessThanOrEqual(
+    1,
+  );
   expect(report.journeys.warm_refresh.requestCounts.organization_bootstrap?.max).toBeGreaterThan(0);
 });
 

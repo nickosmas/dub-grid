@@ -972,23 +972,6 @@ button {
     opacity: 1;
   }
 }
-/* ── Entrance Animations ──────────────────────────────── */
-@keyframes dg-enter {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-@keyframes dg-enter-scale {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
 /* ── Dropdown Menu ─────────────────────────────────────── */
 .dg-menu {
   background: var(--dg-color-surface);
