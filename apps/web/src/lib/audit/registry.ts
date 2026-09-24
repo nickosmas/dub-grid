@@ -1104,6 +1104,20 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     severity: "delete",
     headline: (d, ctx) => `Erased the personal data for ${who(d, ctx, "a team member")}`,
   },
+  "account.deletion_started": {
+    audience: "platform",
+    category: "data",
+    severity: "delete",
+    headline: () => "Started deleting their own account",
+    details: () => [],
+  },
+  "gdpr.erasure_started": {
+    audience: "platform",
+    category: "data",
+    severity: "delete",
+    headline: () => "Started erasing their own personal data",
+    details: () => [],
+  },
 
   // ── Security (platform-only evidence) ──────────────────────────────────────
   "security.auth.login": {

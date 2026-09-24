@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase-service";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { canDeleteAccountDirectly } from "@/features/account/server";
+import {
+  hasStartedSelfDeletion,
+  recordSelfDeletionStarted,
+} from "@/features/account/server/self-deletion";
 import { forbidIfSandboxCookie, requireSensitiveActionAuth } from "@/lib/api-auth";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { retryAfterSeconds } from "@/lib/retry-after";
@@ -47,13 +51,19 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    const canDeleteDirectly = orgId
-      ? await canDeleteAccountDirectly({
-          serviceClient: getServiceClient(),
-          actorId: user.id,
-          orgId,
-        })
-      : false;
+    const serviceClient = getServiceClient();
+    // A retry after a partial failure has already lost the membership that
+    // granted the permission, so only a deletion this user began may skip it.
+    const resuming = await hasStartedSelfDeletion(serviceClient, user.id, "account");
+    const canDeleteDirectly =
+      resuming ||
+      (orgId
+        ? await canDeleteAccountDirectly({
+            serviceClient,
+            actorId: user.id,
+            orgId,
+          })
+        : false);
 
     if (!canDeleteDirectly) {
       return NextResponse.json(
@@ -81,7 +91,6 @@ export async function DELETE(req: NextRequest) {
     }
 
     const userId = user.id;
-    const serviceClient = getServiceClient();
 
     // Prevent gridmasters from deleting their account via this endpoint
     const { data: profile } = await serviceClient
@@ -123,11 +132,20 @@ export async function DELETE(req: NextRequest) {
       }
     }
 
+    if (!resuming) {
+      await recordSelfDeletionStarted(serviceClient, {
+        userId,
+        email: user.email ?? null,
+        orgId,
+        kind: "account",
+      });
+    }
+
     // App-data cleanup runs BEFORE auth.admin.deleteUser. If any step throws,
     // we abort with 500 and the auth user is preserved so the caller can retry.
-    // If cleanup succeeds but auth-delete fails, we land in a "data gone, auth
-    // lingers" state which is recoverable on next signin (vs. the previous
-    // "auth gone, data orphaned" which was irrecoverable).
+    // If cleanup succeeds but auth-delete fails, the started record lets the
+    // same user retry the whole idempotent sequence (vs. the previous "auth
+    // gone, data orphaned" which was irrecoverable).
     //
     // Order respects FK direction: memberships first (FK→profiles), employees
     // nullified (FK→profiles via user_id), then profiles, then leaf tables.
