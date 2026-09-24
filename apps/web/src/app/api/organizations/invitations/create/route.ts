@@ -192,6 +192,9 @@ export async function POST(req: NextRequest) {
       p_phone: typeof phone === "string" ? normalizeOptionalUsPhone(phone) || null : null,
       p_department_ids: departmentIds ?? [],
       p_dept_admin_ids: deptAdminIds ?? [],
+      // The service client has no auth.uid(), so the inviter is stated from
+      // the authenticated session. The function verifies it holds the tier.
+      p_invited_by: user.id,
     });
     if (error) throw error;
 

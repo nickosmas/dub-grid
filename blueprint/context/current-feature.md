@@ -1,7 +1,7 @@
 # Feature: Invitation authorization and inviter attribution
 
 **From build-plan:** feature 41a1
-**Status:** in progress - steps 1, 2, 5 and 6 done; steps 3 and 4 need a database
+**Status:** all six steps done and verified; ready for review
 
 ## Goal
 
@@ -80,14 +80,23 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
       helper to `POST action: "replace_access"`. _Done when:_ the same admin is
       refused with the same status and error, a super admin still succeeds, and
       a passing test covers both.
-- [ ] **Step 3 - the ceiling at the row level** - one forward migration:
-      an `invitations_update` policy carrying the INSERT ceiling from `033`, and
-      the tier check inside `replace_pending_invitation_access` so the RPC
+- [x] **Step 3 - the ceiling at the row level** - one forward migration adding
+      the tier check inside `replace_pending_invitation_access`, so the RPC
       refuses `super_admin` from a lower-tier inviter rather than trusting its
       caller. Lock the hash in `checksums.sha256`. _Done when:_
       `npm run db:migrations:check` passes and an integration test proves the
-      policy and the RPC each refuse the escalation with the routes bypassed.
-- [ ] **Step 4 - inviter attribution on create** - same migration series: give
+      RPC refuses the escalation with the routes bypassed.
+      Corrected while building: this step planned an `invitations_update` policy
+      mirroring the INSERT ceiling from `033`, on the belief that no update
+      ceiling existed. The live policies say otherwise. The UPDATE policy is
+      `invitations_revoke`, whose check is `(revoked_at IS NOT NULL)`, so an
+      authenticated org caller can only ever update an invitation into a revoked
+      state. That is stricter than the planned ceiling, and adding a broader
+      policy would have widened what an admin may write. A direct data-API
+      escalation was already impossible; the reachable path was through the
+      routes, which use the service client and bypass RLS entirely. No policy
+      was added, and a test asserts none is.
+- [x] **Step 4 - inviter attribution on create** - same migration series: give
       `send_invitation` an explicit inviter parameter for the service-role path,
       and pass the authenticated caller from the create route. _Done when:_ an
       invitation created through the route has `invited_by` equal to the caller,
@@ -198,10 +207,32 @@ Evidence: 16 tests pass in `invitations/route.test.ts` and 10 in
 `create/route.test.ts`; `npm run type-check` and ESLint are clean. Each guard
 was confirmed to fail its test when removed, so the tests prove the guards.
 
-Steps 3 and 4 need a real database and were not attempted in the cloud
-container, which has no Docker daemon and no Supabase CLI. They resume in a
-local checkout, where `npm run db:migrations:check` and the row-level
-integration tests can actually run. Nothing about their scope changed.
+Steps 3 and 4 were verified after all, on a real database. The container has no
+Docker daemon and no Supabase CLI, but it does have a Postgres 16 server, so the
+cluster was created directly, given a small stand-in for the Supabase surface
+the migrations use (five roles, `auth.uid/jwt/users/sessions/mfa_factors`,
+`realtime.messages`), and all 43 migrations applied to it. The behaviour below
+was then reproduced before the fix and proven after it, with the routes
+bypassed.
+
+Two limits of that rig, for anyone repeating this: it is not a Supabase replica,
+and it cannot be seeded, because `npm run seed` and the gridmaster seed need the
+auth admin API. So the pre-existing `*.integration.test.ts` files that depend on
+seed data fail against it rather than skipping, which is why the new integration
+test builds its own fixture and needs no seed.
+
+Evidence for steps 3 and 4:
+
+- Before 043, a service-role `send_invitation` recorded `invited_by` as NULL and
+  the invitee's `accept_invitation` raised `INVITATION_INVALID`. That is the
+  reported production breakage, reproduced.
+- After 043, the same invitation is accepted and the membership is granted at
+  `super_admin`.
+- An admin named as inviter is refused `super_admin` and still allowed `admin`.
+- The replace path is refused when handed an under-tiered inviter, and the
+  original invitation is left pending because the guard runs before the revoke.
+- `user`, `admin` and `super_admin` each accept end to end.
+- `npm run db:migrations:check` passes with 043's hash locked.
 
 First local run needs `npm ci` and `npm run build:packages` before any test, or
 consumers fail to resolve `@dubgrid/*`.

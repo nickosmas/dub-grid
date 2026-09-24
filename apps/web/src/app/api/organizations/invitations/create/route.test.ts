@@ -101,6 +101,13 @@ describe("POST /api/organizations/invitations/create", () => {
       "send_invitation",
       expect.objectContaining({ p_org_id: ORG_ID }),
     );
+    // The service client has no auth.uid(), so the inviter has to be stated
+    // from the session or the invitation is created with none and cannot be
+    // accepted at the super_admin tier.
+    expect(rpc).toHaveBeenCalledWith(
+      "send_invitation",
+      expect.objectContaining({ p_invited_by: "actor-1" }),
+    );
   });
 
   it("rejects super_admin role when caller is not super_admin/gridmaster", async () => {
