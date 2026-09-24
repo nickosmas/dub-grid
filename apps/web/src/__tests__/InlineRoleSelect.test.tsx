@@ -31,11 +31,11 @@ describe("InlineRoleSelect self-guard", () => {
     fireEvent.click(screen.getByRole("button", { expanded: false }));
     fireEvent.click(screen.getByRole("option", { name: "Admin" }));
 
-    expect(screen.getByText("Replace invitation access?")).toBeTruthy();
-    expect(screen.getByText(/current invitation will be revoked/i)).toBeTruthy();
+    expect(screen.getByText("Change invitation access?")).toBeTruthy();
+    expect(screen.getByText(/current invite link stops working immediately/i)).toBeTruthy();
     expect(onChange).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Revoke and resend" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change and resend" }));
     await waitFor(() => expect(onChange).toHaveBeenCalledWith("admin"));
   });
 });
