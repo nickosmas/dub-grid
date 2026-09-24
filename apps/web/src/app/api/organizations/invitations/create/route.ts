@@ -9,7 +9,7 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { forbidIfSandboxCookie, requireAuthenticatedUser } from "@/lib/api-auth";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { getServiceClient } from "@/lib/supabase-service";
-import { canManageEmployees, isOrgSuperAdminOrGridmaster } from "@/app/api/employees/shared";
+import { canAssignOrgRole, canManageEmployees } from "@/app/api/employees/shared";
 import type { AssignableOrganizationRole } from "@/types";
 import { buildStaffValidationErrorResponse, getStaffFieldErrors } from "@/lib/staff-validation";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
@@ -137,13 +137,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: API_ERRORS.CANNOT_MANAGE_EMPLOYEES }, { status: 403 });
     }
 
-    // Tier guard: only super_admin or gridmaster can hand out the super_admin
-    // role. Regular admins with canManageEmployees can still invite admin/user.
-    if (role === "super_admin") {
-      const allowed = await isOrgSuperAdminOrGridmaster(serviceClient, user.id, orgId);
-      if (!allowed) {
-        return NextResponse.json({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN }, { status: 403 });
-      }
+    // Regular admins with canManageEmployees can still invite admin/user.
+    if (!(await canAssignOrgRole(serviceClient, user.id, orgId, role))) {
+      return NextResponse.json({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN }, { status: 403 });
     }
 
     const fieldErrors = getStaffFieldErrors({

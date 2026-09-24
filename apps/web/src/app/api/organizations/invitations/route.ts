@@ -11,6 +11,7 @@ import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { forbidIfSandboxCookie, requireAuthenticatedUser } from "@/lib/api-auth";
 import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { getServiceClient } from "@/lib/supabase-service";
+import { canAssignOrgRole } from "@/app/api/employees/shared";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { buildInvitationChanges, buildInvitationRevocationChanges } from "@/lib/access-management";
@@ -348,6 +349,13 @@ export async function PATCH(req: NextRequest) {
 
     if (!timestampsMatch(currentInvitation.updatedAt, expectedUpdatedAt)) {
       return buildConflictResponse(currentInvitation);
+    }
+
+    if (
+      fields.roleToAssign !== undefined &&
+      !(await canAssignOrgRole(getServiceClient(), user.id, orgId, fields.roleToAssign))
+    ) {
+      return NextResponse.json({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN }, { status: 403 });
     }
 
     const nextInvitation: Partial<Invitation> = {

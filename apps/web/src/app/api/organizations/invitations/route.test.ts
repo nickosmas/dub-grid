@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 const validateCsrfOrigin = vi.fn();
 const forbidIfSandboxCookie = vi.fn();
 const requireAuthenticatedUser = vi.fn();
 const checkRateLimit = vi.fn();
 const requireOrgPermissions = vi.fn();
+const canAssignOrgRole = vi.fn();
 const resolveEffectiveOrgId = vi.fn();
 const dispatchNotificationEvent = vi.fn();
 const buildInvitationChanges = vi.fn();
@@ -38,6 +40,9 @@ vi.mock("@/lib/rate-limit", () => ({
 vi.mock("@/app/api/shared/permissions", () => ({
   requireOrgPermissions: (...args: unknown[]) => requireOrgPermissions(...args),
   resolveEffectiveOrgId: (...args: unknown[]) => resolveEffectiveOrgId(...args),
+}));
+vi.mock("@/app/api/employees/shared", () => ({
+  canAssignOrgRole: (...args: unknown[]) => canAssignOrgRole(...args),
 }));
 vi.mock("@/lib/logger", () => ({ default: { error: vi.fn() } }));
 vi.mock("@/lib/sentry", () => ({ captureException: vi.fn() }));
@@ -171,6 +176,7 @@ beforeEach(() => {
   requireAuthenticatedUser.mockResolvedValue({ user: { id: "actor-1", email: "actor@test.com" } });
   checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
   requireOrgPermissions.mockResolvedValue({ ok: true });
+  canAssignOrgRole.mockResolvedValue(true);
   buildInvitationChanges.mockReturnValue([
     { key: "email", label: "Email", previousValue: "old@test.com", nextValue: "new@test.com" },
   ]);
@@ -501,5 +507,72 @@ describe("GET /api/organizations/invitations", () => {
     const res = await GET(makeGetRequest());
 
     expect(res.status).toBe(403);
+  });
+});
+
+describe("PATCH /api/organizations/invitations - super_admin tier ceiling", () => {
+  it("refuses an admin who cannot assign super_admin, leaving the row untouched", async () => {
+    canAssignOrgRole.mockResolvedValue(false);
+
+    const { PATCH } = await importRoute();
+    const response = await PATCH(
+      makePatchRequest({
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+        roleToAssign: "super_admin",
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN });
+    expect(canAssignOrgRole).toHaveBeenCalledWith(
+      expect.anything(),
+      "actor-1",
+      ORG_ID,
+      "super_admin",
+    );
+    expect(invitationUpdateOperations).toHaveLength(0);
+  });
+
+  it("lets a caller who may assign super_admin through", async () => {
+    invitationUpdateMaybeSingle.mockResolvedValue({
+      data: { ...CURRENT_INVITATION_ROW, role_to_assign: "super_admin" },
+      error: null,
+    });
+
+    const { PATCH } = await importRoute();
+    const response = await PATCH(
+      makePatchRequest({
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+        roleToAssign: "super_admin",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(invitationUpdateOperations).toHaveLength(1);
+    expect(invitationUpdateOperations[0]?.values.role_to_assign).toBe("super_admin");
+  });
+
+  it("does not consult the tier ceiling when the role is not being changed", async () => {
+    invitationUpdateMaybeSingle.mockResolvedValue({
+      data: CURRENT_INVITATION_ROW,
+      error: null,
+    });
+
+    const { PATCH } = await importRoute();
+    const response = await PATCH(
+      makePatchRequest({
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+        email: "new@test.com",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(canAssignOrgRole).not.toHaveBeenCalled();
   });
 });

@@ -22,6 +22,12 @@ vi.mock("@/lib/supabase-service", () => ({
 vi.mock("@/app/api/employees/shared", () => ({
   canManageEmployees: (...args: unknown[]) => canManageEmployees(...args),
   isOrgSuperAdminOrGridmaster: (...args: unknown[]) => isOrgSuperAdminOrGridmaster(...args),
+  // The route now asks the shared ceiling helper, which defers to the tier
+  // check these cases already drive.
+  canAssignOrgRole: (client: unknown, actorId: unknown, orgId: unknown, role: unknown) =>
+    role !== "super_admin"
+      ? Promise.resolve(true)
+      : Promise.resolve(isOrgSuperAdminOrGridmaster(client, actorId, orgId)),
 }));
 vi.mock("@/features/notifications/server/events", () => ({
   dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),

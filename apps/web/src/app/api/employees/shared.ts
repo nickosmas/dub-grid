@@ -26,6 +26,21 @@ export async function isOrgSuperAdminOrGridmaster(
   return profile?.platform_role === "gridmaster" || membership?.org_role === "super_admin";
 }
 
+// The super_admin tier is handed out only by a super admin of that
+// organization or a gridmaster. Creation, editing and replacement of an
+// invitation all apply it, so the rule lives in one place: a pending
+// invitation raised to super_admin after the fact is the same escalation as
+// one created that way.
+export async function canAssignOrgRole(
+  serviceClient: ServiceClient,
+  actorId: string,
+  orgId: string,
+  role: string,
+): Promise<boolean> {
+  if (role !== "super_admin") return true;
+  return isOrgSuperAdminOrGridmaster(serviceClient, actorId, orgId);
+}
+
 export async function canManageEmployees(
   serviceClient: ServiceClient,
   actorId: string,
