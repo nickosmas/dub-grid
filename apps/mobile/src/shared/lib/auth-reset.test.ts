@@ -37,7 +37,11 @@ vi.mock("./supabase", () => ({
   }),
 }));
 
-import { disablePushForCurrentDevice, handleExpiredMobileSession } from "./auth-reset";
+import {
+  disablePushForCurrentDevice,
+  handleExpiredMobileSession,
+  handleRejectedMobileToken,
+} from "./auth-reset";
 
 const DEVICE = { expoPushToken: "ExponentPushToken[abc]", platform: "ios" as const };
 
@@ -132,6 +136,26 @@ describe("auth-reset", () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+  });
+
+  describe("handleRejectedMobileToken", () => {
+    it("leaves a newer session alone when a stale request is rejected", async () => {
+      getSession.mockResolvedValue({ data: { session: { access_token: "token-new" } } });
+
+      await handleRejectedMobileToken("token-old");
+
+      expect(signOut).not.toHaveBeenCalled();
+      expect(queryClientClear).not.toHaveBeenCalled();
+      expect(routerReplace).not.toHaveBeenCalled();
+    });
+
+    it("tears down when the rejected token is the live one", async () => {
+      getSession.mockResolvedValue({ data: { session: { access_token: "token-123" } } });
+
+      await handleRejectedMobileToken("token-123");
+
+      expect(queryClientClear).toHaveBeenCalled();
     });
   });
 });

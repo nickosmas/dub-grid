@@ -141,7 +141,7 @@ export async function mobileApiRequest<T>(
       headers,
     },
     parse,
-    true,
+    accessToken,
   );
 }
 
@@ -161,16 +161,18 @@ async function mobilePublicApiRequest<T>(
       headers,
     },
     parse,
-    false,
+    null,
   );
 }
 
+/** `requestToken` is the bearer this request carried, or null for a public call. */
 async function mobileRequest<T>(
   path: string,
   init: RequestInit,
   parse: (value: unknown) => T,
-  handleAuthFailure: boolean,
+  requestToken: string | null,
 ): Promise<T> {
+  const handleAuthFailure = requestToken !== null;
   const measurementRequestKind = getAuthEntryRequestKind(path);
   const measurementStartedAt = globalThis.performance?.now() ?? Date.now();
   let serverTiming: string | null = null;
@@ -198,8 +200,9 @@ async function mobileRequest<T>(
       parse,
       handleAuthFailure,
       onAuthFailure: async () => {
-        const { handleExpiredMobileSession } = await import("./auth-reset");
-        await handleExpiredMobileSession();
+        if (!requestToken) return;
+        const { handleRejectedMobileToken } = await import("./auth-reset");
+        await handleRejectedMobileToken(requestToken);
       },
       onTransportErrorMessage: createMobileTransportErrorMessage,
       onNonJsonErrorMessage: createNonJsonApiErrorMessage,

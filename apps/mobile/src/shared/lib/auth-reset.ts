@@ -42,6 +42,27 @@ export async function disablePushForCurrentDevice(): Promise<void> {
   }
 }
 
+/**
+ * Tear down for a 401 only when the rejected token is still the one in use.
+ * A request can outlive a refresh or an organization switch, and its late 401
+ * used to sign out whichever session had replaced it (finding F-18). A stale
+ * request now fails on its own; the live session stays.
+ */
+export async function handleRejectedMobileToken(rejectedToken: string): Promise<void> {
+  let liveToken: string | null = null;
+  try {
+    const result = await Promise.race([
+      getSupabaseClient().auth.getSession(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), LOCAL_RESET_STEP_TIMEOUT_MS)),
+    ]);
+    liveToken = result?.data.session?.access_token ?? null;
+  } catch {
+    liveToken = null;
+  }
+  if (liveToken && liveToken !== rejectedToken) return;
+  await handleExpiredMobileSession();
+}
+
 export async function handleExpiredMobileSession(options?: {
   skipSignOut?: boolean;
 }): Promise<void> {
