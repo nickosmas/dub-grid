@@ -11,8 +11,8 @@ export function MfaFactorUnenrolledEmail({ logoUrl }: { logoUrl?: string } = {})
   return (
     <SecurityNotificationEmail
       heading="A sign-in verification method was removed"
-      body="The TOTP (Time-based One-time Password) verification method was removed from your account."
-      footer="If you made this change, no further action is required. If you didn't, secure your account and contact your administrator or support@dubgrid.com immediately."
+      body="An authenticator app was removed as a verification method for your DubGrid sign-in."
+      footer="If this was you, there's nothing to do. If it wasn't, reset your password from the DubGrid sign-in page right away, turn two-factor authentication back on, and review your active sessions in your profile. Contact support@dubgrid.com if you can't sign in."
       logoUrl={logoUrl}
     />
   );
