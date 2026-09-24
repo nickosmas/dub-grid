@@ -337,7 +337,6 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       token: invitation.token,
       email: invitation.email,
       orgName: loaded.auth.currentOrg.name || "your organization",
-      inviterName: loaded.auth.user.email ?? null,
     });
   } catch (error) {
     logger.error(
@@ -454,7 +453,6 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       token: nextToken,
       email: existing.email,
       orgName: loaded.auth.currentOrg.name || "your organization",
-      inviterName: loaded.auth.user.email ?? null,
     });
   } catch (error) {
     logger.error(

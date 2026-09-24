@@ -6,27 +6,23 @@ import { styles, PREVIEW_LOGO_URL } from "./components/theme";
 
 export type InviteEmailProps = {
   orgName: string;
-  inviterName?: string | null;
   acceptUrl: string;
   logoUrl: string;
 };
 
-/** Invitation to join an organization. Used by web + mobile invite flows. */
-export function InviteEmail({ orgName, inviterName, acceptUrl, logoUrl }: InviteEmailProps) {
+/**
+ * Invitation to join an organization. Used by web + mobile invite flows.
+ *
+ * It names the organization and nobody in it. The address is typed by an
+ * admin, so a mistyped or reassigned one reaches a stranger, who must not learn
+ * who sent it or that person's email.
+ */
+export function InviteEmail({ orgName, acceptUrl, logoUrl }: InviteEmailProps) {
   return (
     <EmailLayout logoUrl={logoUrl} preview={`You're invited to join ${orgName} on DubGrid`}>
       <Text style={styles.heading}>You&apos;re invited</Text>
       <Text style={styles.paragraph}>
-        {inviterName ? (
-          <>
-            <strong>{inviterName}</strong> has invited you to join <strong>{orgName}</strong> on
-            DubGrid.
-          </>
-        ) : (
-          <>
-            You&apos;ve been invited to join <strong>{orgName}</strong> on DubGrid.
-          </>
-        )}
+        You&apos;ve been invited to join <strong>{orgName}</strong> on DubGrid.
       </Text>
       <Text style={{ ...styles.paragraph, fontSize: "15px" }}>
         Click the button below to set your password and accept your invitation.
@@ -47,7 +43,6 @@ export function InviteEmail({ orgName, inviterName, acceptUrl, logoUrl }: Invite
 
 InviteEmail.PreviewProps = {
   orgName: "Acme Health",
-  inviterName: "Jane Doe",
   acceptUrl: "https://app.dubgrid.com/accept-invite?token=demo-token&email=you%40example.com",
   logoUrl: PREVIEW_LOGO_URL,
 } satisfies InviteEmailProps;

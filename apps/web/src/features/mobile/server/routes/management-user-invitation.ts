@@ -97,7 +97,6 @@ export async function POST(req: NextRequest, context: { params: Promise<{ person
       token: refreshed.token,
       email: refreshed.email,
       orgName: auth.currentOrg.name || "your organization",
-      inviterName: auth.user.email ?? null,
     });
   } catch (error) {
     logger.error(

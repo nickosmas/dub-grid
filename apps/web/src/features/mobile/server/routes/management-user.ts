@@ -124,7 +124,6 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ personI
           token: replacement.invitation.token,
           email: replacement.invitation.email,
           orgName: auth.currentOrg.name || "your organization",
-          inviterName: auth.user.email ?? null,
         });
       } catch (error) {
         await rollbackMobilePendingInvitationAccessReplacement(auth.serviceClient, {

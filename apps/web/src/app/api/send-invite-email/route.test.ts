@@ -69,7 +69,6 @@ const BODY = {
   token: "live-token",
   email: "invitee@example.com",
   orgName: "Spoofed Name",
-  inviterName: "Ada",
 };
 
 describe("POST /api/send-invite-email", () => {

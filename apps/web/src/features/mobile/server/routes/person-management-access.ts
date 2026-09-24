@@ -280,7 +280,6 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
       token: invitation.token,
       email: invitation.email,
       orgName: auth.currentOrg.name || "your organization",
-      inviterName: auth.user.email ?? null,
     });
   } catch (error) {
     logger.error(

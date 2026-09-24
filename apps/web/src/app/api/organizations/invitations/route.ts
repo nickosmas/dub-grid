@@ -200,12 +200,7 @@ async function checkInvitationEmailLimit(email: string) {
   return checkRateLimit(emailTargetLimiter, `invite-email:${hashEmail(email)}`);
 }
 
-async function sendPendingInvitationEmail(input: {
-  orgId: string;
-  token: string;
-  email: string;
-  inviterName: string | null;
-}) {
+async function sendPendingInvitationEmail(input: { orgId: string; token: string; email: string }) {
   const config = getInvitationEmailConfig();
   if (!config) {
     throw new Error("Email service not configured");
@@ -224,7 +219,6 @@ async function sendPendingInvitationEmail(input: {
     token: input.token,
     email: input.email,
     orgName: (organization?.name as string | null) || "your organization",
-    inviterName: input.inviterName,
   });
 }
 
@@ -711,7 +705,6 @@ export async function POST(req: NextRequest) {
           orgId,
           token: replacement.token,
           email: replacementInvitation.email,
-          inviterName: user.email ?? null,
         });
       } catch (emailError) {
         const { data: rolledBack, error: rollbackError } = await serviceClient.rpc(
@@ -836,7 +829,6 @@ export async function POST(req: NextRequest) {
         orgId,
         token,
         email: latestInvitation.email,
-        inviterName: user.email ?? null,
       });
     } catch (emailError) {
       const { data: restoredInvitation, error: rollbackError } = await serviceClient

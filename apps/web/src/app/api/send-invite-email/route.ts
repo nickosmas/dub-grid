@@ -21,7 +21,6 @@ const bodySchema = z.object({
   token: z.string().min(1),
   email: z.string().email(),
   orgName: z.string().trim().min(1).max(200),
-  inviterName: z.string().trim().max(200).optional(),
 });
 
 async function lookupPendingInvitation(
@@ -112,7 +111,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
-  const { token, email, inviterName } = parsed.data;
+  const { token, email } = parsed.data;
 
   // ── The token must be a live invitation for this address, in an
   // organization the caller may act for. Body copy is not trusted: the
@@ -180,7 +179,6 @@ export async function POST(req: NextRequest) {
   const html = await render(
     createElement(InviteEmail, {
       orgName,
-      inviterName,
       acceptUrl,
       logoUrl: baseUrl,
     }),
