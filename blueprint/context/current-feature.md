@@ -95,6 +95,18 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
       asserts both. Additionally a `user`, an `admin` and a `super_admin`
       invitation each accept successfully, proven per tier, so no tier is left
       broken.
+      The stated inviter is verified, not trusted: both RPCs that accept one
+      (`send_invitation` and `replace_pending_invitation_access`, which
+      `COALESCE`s its `p_invited_by` over the existing value) must refuse unless
+      that user holds an active, unarchived membership in the target
+      organization, and, for a `super_admin` invitation, unless they hold
+      `super_admin` there or are an active gridmaster. This is the same rule
+      `033` applies at acceptance, moved to the moment the row is written.
+      Without it the parameter is forgeable by any service-role caller, so a
+      future route could manufacture a super-admin-authorized invitation by
+      naming someone else. _Also done when:_ a call naming an inviter who lacks
+      the tier is refused at the database with the routes bypassed, and a
+      passing test proves it.
 - [ ] **Step 5 - align the resend permission with the sender** - `send-invite-email`
       requires super admin or gridmaster (`route.ts:73-75`) while creation
       requires `canManageEmployees`, so an admin can create an invitation they
@@ -141,7 +153,10 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
   route and any direct authenticated caller both use, so it ships as a new
   forward migration, never an edit to an applied file. The parameter is trusted
   only because the route authorizes the caller first, so it is passed from the
-  authenticated session and never from the request body.
+  authenticated session and never from the request body, and because the
+  function verifies it rather than taking it on faith (see Step 4). A parameter
+  the database checks is as strong as an identity it derives, which is what
+  keeps this equivalent to the user-client alternative that was not taken.
 - `replace_pending_invitation_access` keeps its signature; only its body gains
   the tier check.
 - Schema changes are new numbered forward migrations with the hash locked in
