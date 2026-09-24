@@ -723,6 +723,20 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     },
   },
 
+  "invitation.access_denied": {
+    category: "invitations",
+    severity: "warning",
+    headline: (d, ctx) => {
+      const target = d.text("email") ?? ctx.targetEmail ?? ctx.targetLabel;
+      const role = d.text("requestedRole");
+      const tier = role === "super_admin" ? "super admin" : role;
+      if (!tier) return "Was refused an invitation change";
+      return target
+        ? `Was refused ${tier} access for ${target}`
+        : `Was refused ${tier} access on an invitation`;
+    },
+  },
+
   "invitation.auto_revoked": {
     category: "invitations",
     severity: "warning",

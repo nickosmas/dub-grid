@@ -11,6 +11,8 @@ import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { forbidIfSandboxCookie, requireAuthenticatedUser } from "@/lib/api-auth";
 import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { getServiceClient } from "@/lib/supabase-service";
+import { canAssignOrgRole } from "@/app/api/employees/shared";
+import { writeInvitationAuditEntry } from "@/lib/audit/invitation";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { buildInvitationChanges, buildInvitationRevocationChanges } from "@/lib/access-management";
@@ -185,34 +187,12 @@ async function writeAuditEntry(input: {
   req: NextRequest;
   relatedInvitationId?: string;
 }) {
-  const serviceClient = getServiceClient();
-  const { error } = await serviceClient.from("audit_log").insert({
-    org_id: input.orgId,
-    actor_id: input.actorId,
-    actor_email: input.actorEmail,
-    action: input.action,
-    resource_type: "invitation",
-    resource_id: input.resourceId,
-    details: {
-      changedFields: input.changes.map((change) => change.key),
-      changes: input.changes.map((change) => ({
-        field: change.key,
-        label: change.label,
-        from: change.previousValue,
-        to: change.nextValue,
-      })),
-      ...(input.relatedInvitationId ? { replacementInvitationId: input.relatedInvitationId } : {}),
-    },
-    ip_address: getRequestIp(input.req),
-    user_agent: input.req.headers.get("user-agent"),
+  const { req, ...rest } = input;
+  await writeInvitationAuditEntry({
+    ...rest,
+    ipAddress: getRequestIp(req),
+    userAgent: req.headers.get("user-agent"),
   });
-
-  if (error) {
-    logger.error(
-      { error, orgId: input.orgId, resourceId: input.resourceId },
-      "Invitation audit log write failed",
-    );
-  }
 }
 
 async function checkInvitationEmailLimit(email: string) {
@@ -348,6 +328,30 @@ export async function PATCH(req: NextRequest) {
 
     if (!timestampsMatch(currentInvitation.updatedAt, expectedUpdatedAt)) {
       return buildConflictResponse(currentInvitation);
+    }
+
+    if (
+      fields.roleToAssign !== undefined &&
+      !(await canAssignOrgRole(getServiceClient(), user.id, orgId, fields.roleToAssign))
+    ) {
+      await writeInvitationAuditEntry({
+        orgId,
+        actorId: user.id,
+        actorEmail: user.email ?? null,
+        action: "invitation.access_denied",
+        resourceId: invitationId,
+        details: {
+          email: currentInvitation.email,
+          requestedRole: fields.roleToAssign,
+          currentRole: currentInvitation.roleToAssign,
+          outcome: "rejected",
+          reason: "policy_denied",
+          path: "edit",
+        },
+        ipAddress: getRequestIp(req),
+        userAgent: req.headers.get("user-agent"),
+      });
+      return NextResponse.json({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN }, { status: 403 });
     }
 
     const nextInvitation: Partial<Invitation> = {
@@ -624,6 +628,27 @@ export async function POST(req: NextRequest) {
 
       if (currentInvitation.roleToAssign === parsed.data.roleToAssign) {
         return NextResponse.json({ success: true, invitation: currentInvitation });
+      }
+
+      if (!(await canAssignOrgRole(serviceClient, user.id, orgId, parsed.data.roleToAssign))) {
+        await writeInvitationAuditEntry({
+          orgId,
+          actorId: user.id,
+          actorEmail: user.email ?? null,
+          action: "invitation.access_denied",
+          resourceId: invitationId,
+          details: {
+            email: currentInvitation.email,
+            requestedRole: parsed.data.roleToAssign,
+            currentRole: currentInvitation.roleToAssign,
+            outcome: "rejected",
+            reason: "policy_denied",
+            path: "replace_access",
+          },
+          ipAddress: getRequestIp(req),
+          userAgent: req.headers.get("user-agent"),
+        });
+        return NextResponse.json({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN }, { status: 403 });
       }
 
       const { data: replacementData, error: replacementError } = await serviceClient.rpc(

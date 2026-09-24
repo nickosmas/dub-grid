@@ -9,7 +9,9 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { forbidIfSandboxCookie, requireAuthenticatedUser } from "@/lib/api-auth";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { getServiceClient } from "@/lib/supabase-service";
-import { canManageEmployees, isOrgSuperAdminOrGridmaster } from "@/app/api/employees/shared";
+import { canAssignOrgRole, canManageEmployees } from "@/app/api/employees/shared";
+import { writeInvitationAuditEntry } from "@/lib/audit/invitation";
+import { getRequestIp } from "@/features/mobile/server/management-roster";
 import type { AssignableOrganizationRole } from "@/types";
 import { buildStaffValidationErrorResponse, getStaffFieldErrors } from "@/lib/staff-validation";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
@@ -137,13 +139,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: API_ERRORS.CANNOT_MANAGE_EMPLOYEES }, { status: 403 });
     }
 
-    // Tier guard: only super_admin or gridmaster can hand out the super_admin
-    // role. Regular admins with canManageEmployees can still invite admin/user.
-    if (role === "super_admin") {
-      const allowed = await isOrgSuperAdminOrGridmaster(serviceClient, user.id, orgId);
-      if (!allowed) {
-        return NextResponse.json({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN }, { status: 403 });
-      }
+    // Regular admins with canManageEmployees can still invite admin/user.
+    if (!(await canAssignOrgRole(serviceClient, user.id, orgId, role))) {
+      // No invitation exists to hang this on, so the refusal is recorded
+      // against the organization with the address that was attempted.
+      await writeInvitationAuditEntry({
+        orgId,
+        actorId: user.id,
+        actorEmail: user.email ?? null,
+        action: "invitation.access_denied",
+        resourceId: orgId,
+        details: {
+          email: normalizeRequiredStaffEmail(email),
+          requestedRole: role,
+          outcome: "rejected",
+          reason: "policy_denied",
+          path: "create",
+        },
+        ipAddress: getRequestIp(req),
+        userAgent: req.headers.get("user-agent"),
+      });
+      return NextResponse.json({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN }, { status: 403 });
     }
 
     const fieldErrors = getStaffFieldErrors({
@@ -176,18 +192,39 @@ export async function POST(req: NextRequest) {
       p_phone: typeof phone === "string" ? normalizeOptionalUsPhone(phone) || null : null,
       p_department_ids: departmentIds ?? [],
       p_dept_admin_ids: deptAdminIds ?? [],
+      // The service client has no auth.uid(), so the inviter is stated from
+      // the authenticated session. The function verifies it holds the tier.
+      p_invited_by: user.id,
     });
     if (error) throw error;
+
+    const invitationId = data.invitation_id as string;
+    // The registry has carried invitation.created and the employee activity
+    // view has de-duplicated against it since before any route wrote one, so
+    // creation was the one invitation event with no audit trail of its own.
+    await writeInvitationAuditEntry({
+      orgId,
+      actorId: user.id,
+      actorEmail: user.email ?? null,
+      action: "invitation.created",
+      resourceId: invitationId,
+      details: {
+        email: normalizeRequiredStaffEmail(email),
+        role,
+      },
+      ipAddress: getRequestIp(req),
+      userAgent: req.headers.get("user-agent"),
+    });
 
     void dispatchNotificationEvent(user.id, {
       action: "invitation_created",
       orgId,
-      invitationId: data.invitation_id as string,
+      invitationId,
       inviteeEmail: normalizeRequiredStaffEmail(email),
     });
 
     return NextResponse.json({
-      invitationId: data.invitation_id as string,
+      invitationId,
       token: data.token as string,
       expiresAt: data.expires_at as string,
     });
@@ -223,6 +260,23 @@ export async function POST(req: NextRequest) {
           employeeId ?? null,
         );
         if (refreshed) {
+          // This rotates the token on a pending row and the caller sends it
+          // again, so it is a re-invite and belongs in the log next to the
+          // resend action and the mobile resend, which both record one.
+          await writeInvitationAuditEntry({
+            orgId,
+            actorId: user.id,
+            actorEmail: user.email ?? null,
+            action: "invitation.resent",
+            resourceId: refreshed.invitationId,
+            details: {
+              email: normalizeRequiredStaffEmail(email),
+              role,
+              reason: "refreshed_orphaned_pending",
+            },
+            ipAddress: getRequestIp(req),
+            userAgent: req.headers.get("user-agent"),
+          });
           return NextResponse.json({ ...refreshed, resent: true });
         }
       } catch (refreshError) {

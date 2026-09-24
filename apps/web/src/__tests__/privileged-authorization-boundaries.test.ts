@@ -58,8 +58,6 @@ const AUTHENTICATED_SCOPED_ROUTES: Record<string, string> = {
     "The recovery endpoint returns only the caller's current organization gate state.",
   "apps/web/src/app/api/organizations/role-change/route.ts":
     "The user-scoped RPC enforces live authorization; service access only records its successful result.",
-  "apps/web/src/app/api/send-invite-email/route.ts":
-    "The service read resolves the token to a live invitation whose organization must match the caller's org claim, or the caller is a gridmaster.",
   "apps/web/src/app/api/test-sandbox/route.ts":
     "Live source membership and server-side sandbox ownership authorize cloning and cleanup.",
 };
@@ -94,6 +92,8 @@ const DELEGATED_SERVICE_HELPERS: Record<string, string> = {
     "Server-only best-effort writer accepts only the closed, secret-free security event contract.",
   "apps/web/src/lib/audit/authorize.ts":
     "Delegates to canonical organization or Gridmaster authorization.",
+  "apps/web/src/lib/audit/invitation.ts":
+    "Writes an invitation audit row for an org and actor the calling route has already authorized.",
   "apps/web/src/lib/feature-flags.ts":
     "Resolves global flags for a verified user or public default.",
   "apps/web/src/lib/org-lookup.ts":

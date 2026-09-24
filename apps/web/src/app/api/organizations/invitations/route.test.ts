@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 const validateCsrfOrigin = vi.fn();
 const forbidIfSandboxCookie = vi.fn();
 const requireAuthenticatedUser = vi.fn();
 const checkRateLimit = vi.fn();
 const requireOrgPermissions = vi.fn();
+const canAssignOrgRole = vi.fn();
 const resolveEffectiveOrgId = vi.fn();
 const dispatchNotificationEvent = vi.fn();
 const buildInvitationChanges = vi.fn();
@@ -38,6 +40,9 @@ vi.mock("@/lib/rate-limit", () => ({
 vi.mock("@/app/api/shared/permissions", () => ({
   requireOrgPermissions: (...args: unknown[]) => requireOrgPermissions(...args),
   resolveEffectiveOrgId: (...args: unknown[]) => resolveEffectiveOrgId(...args),
+}));
+vi.mock("@/app/api/employees/shared", () => ({
+  canAssignOrgRole: (...args: unknown[]) => canAssignOrgRole(...args),
 }));
 vi.mock("@/lib/logger", () => ({ default: { error: vi.fn() } }));
 vi.mock("@/lib/sentry", () => ({ captureException: vi.fn() }));
@@ -171,6 +176,7 @@ beforeEach(() => {
   requireAuthenticatedUser.mockResolvedValue({ user: { id: "actor-1", email: "actor@test.com" } });
   checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
   requireOrgPermissions.mockResolvedValue({ ok: true });
+  canAssignOrgRole.mockResolvedValue(true);
   buildInvitationChanges.mockReturnValue([
     { key: "email", label: "Email", previousValue: "old@test.com", nextValue: "new@test.com" },
   ]);
@@ -299,6 +305,13 @@ describe("POST /api/organizations/invitations", () => {
     expect(response.status).toBe(200);
     expect(sendInvitationEmail).toHaveBeenCalledWith(
       expect.objectContaining({ token: expect.any(String), email: "old@test.com" }),
+    );
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "invitation.resent",
+        resource_id: INVITATION_ID,
+        actor_id: "actor-1",
+      }),
     );
   });
 
@@ -501,5 +514,159 @@ describe("GET /api/organizations/invitations", () => {
     const res = await GET(makeGetRequest());
 
     expect(res.status).toBe(403);
+  });
+});
+
+describe("PATCH /api/organizations/invitations - super_admin tier ceiling", () => {
+  it("refuses an admin who cannot assign super_admin, leaving the row untouched", async () => {
+    canAssignOrgRole.mockResolvedValue(false);
+
+    const { PATCH } = await importRoute();
+    const response = await PATCH(
+      makePatchRequest({
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+        roleToAssign: "super_admin",
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN });
+    expect(canAssignOrgRole).toHaveBeenCalledWith(
+      expect.anything(),
+      "actor-1",
+      ORG_ID,
+      "super_admin",
+    );
+    expect(invitationUpdateOperations).toHaveLength(0);
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        org_id: ORG_ID,
+        actor_id: "actor-1",
+        action: "invitation.access_denied",
+        resource_id: INVITATION_ID,
+        details: expect.objectContaining({
+          requestedRole: "super_admin",
+          currentRole: "user",
+          outcome: "rejected",
+          reason: "policy_denied",
+          path: "edit",
+        }),
+      }),
+    );
+  });
+
+  it("lets a caller who may assign super_admin through", async () => {
+    invitationUpdateMaybeSingle.mockResolvedValue({
+      data: { ...CURRENT_INVITATION_ROW, role_to_assign: "super_admin" },
+      error: null,
+    });
+
+    const { PATCH } = await importRoute();
+    const response = await PATCH(
+      makePatchRequest({
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+        roleToAssign: "super_admin",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(invitationUpdateOperations).toHaveLength(1);
+    expect(invitationUpdateOperations[0]?.values.role_to_assign).toBe("super_admin");
+  });
+
+  it("does not consult the tier ceiling when the role is not being changed", async () => {
+    invitationUpdateMaybeSingle.mockResolvedValue({
+      data: CURRENT_INVITATION_ROW,
+      error: null,
+    });
+
+    const { PATCH } = await importRoute();
+    const response = await PATCH(
+      makePatchRequest({
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+        email: "new@test.com",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(canAssignOrgRole).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/organizations/invitations - replace_access tier ceiling", () => {
+  const pendingInvitation = {
+    ...CURRENT_INVITATION_ROW,
+    expires_at: "2099-02-01T00:00:00.000Z",
+  };
+
+  it("refuses an admin raising a pending invitation to super_admin", async () => {
+    invitationSelectMaybeSingle.mockResolvedValue({ data: pendingInvitation, error: null });
+    canAssignOrgRole.mockResolvedValue(false);
+
+    const { POST } = await importRoute();
+    const response = await POST(
+      makePostRequest({
+        action: "replace_access",
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+        roleToAssign: "super_admin",
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN });
+    // The RPC stamps invited_by with the caller, so refusing before it runs is
+    // what keeps a lower tier from writing an inviter that outranks them.
+    expect(serviceRpc).not.toHaveBeenCalled();
+    expect(sendInvitationEmail).not.toHaveBeenCalled();
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "invitation.access_denied",
+        details: expect.objectContaining({ requestedRole: "super_admin", path: "replace_access" }),
+      }),
+    );
+  });
+
+  it("lets a caller who may assign super_admin replace access", async () => {
+    const replacementId = "44444444-4444-4444-8444-444444444444";
+    invitationSelectMaybeSingle
+      .mockResolvedValueOnce({ data: pendingInvitation, error: null })
+      .mockResolvedValueOnce({
+        data: { ...pendingInvitation, id: replacementId, role_to_assign: "super_admin" },
+        error: null,
+      });
+    serviceRpc.mockResolvedValue({
+      data: {
+        previous_invitation_id: INVITATION_ID,
+        invitation_id: replacementId,
+        token: "replacement-token",
+        expires_at: "2099-02-01T00:00:00.000Z",
+      },
+      error: null,
+    });
+
+    const { POST } = await importRoute();
+    const response = await POST(
+      makePostRequest({
+        action: "replace_access",
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+        roleToAssign: "super_admin",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(serviceRpc).toHaveBeenCalledWith(
+      "replace_pending_invitation_access",
+      expect.objectContaining({ p_role: "super_admin", p_invited_by: "actor-1" }),
+    );
   });
 });
