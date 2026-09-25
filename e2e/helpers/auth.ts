@@ -27,7 +27,7 @@ export const QA_CALM_HAVEN_ORIGIN = `http://calmhaven.${BASE_DOMAIN}:${PORT}`;
 export const QA_GRIDMASTER_ORIGIN = `http://gridmaster.${BASE_DOMAIN}:${PORT}`;
 
 /**
- * Clears dismissible overlays (cookie consent, an MFA nag banner, etc.) that
+ * Clears dismissible overlays (cookie consent, the trial welcome, etc.) that
  * can block clicks on the nav underneath. These don't all render on the same
  * tick — the cookie dialog and MFA banner both decide whether to show inside
  * a post-mount effect — so this doesn't gate on first detecting an overlay
@@ -37,7 +37,6 @@ export const QA_GRIDMASTER_ORIGIN = `http://gridmaster.${BASE_DOMAIN}:${PORT}`;
 export async function clearBlockingOverlays(page: Page): Promise<void> {
   const dismissControls = [
     page.getByRole("button", { name: "Essential only" }), // cookie consent banner
-    page.getByRole("button", { name: "Dismiss" }), // MFA nag banner
     // The shared <Modal> primitive's close button (Modal.tsx) — covers any
     // Modal-based interstitial, e.g. TrialWelcomeModal on a first-ever login
     // for a fresh org, without needing to special-case each one by title.

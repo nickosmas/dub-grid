@@ -22,14 +22,12 @@ import type { Permissions } from "./shared";
 export interface WebPermissions extends Permissions {
   isOnSchedule: boolean;
   isManagementUser: boolean;
-  mfaNagRequired: boolean;
 }
 
 const LOADING_PERMS: WebPermissions = {
   ...buildPerms("user", null, true),
   isOnSchedule: false,
   isManagementUser: false,
-  mfaNagRequired: false,
 };
 LOADING_PERMS.isLoading = true;
 
@@ -37,7 +35,6 @@ const NO_PERMS: WebPermissions = {
   ...buildPerms("user", null, false),
   isOnSchedule: false,
   isManagementUser: false,
-  mfaNagRequired: false,
 };
 
 const NO_CLAIMS = { effectiveRole: "user", orgId: null as string | null };
@@ -155,7 +152,6 @@ export function usePermissions(): WebPermissions {
         ...query.data.permissions,
         isOnSchedule: query.data.isOnSchedule ?? false,
         isManagementUser: query.data.isManagementUser ?? false,
-        mfaNagRequired: query.data.mfaNagRequired ?? false,
       };
     }
 
@@ -166,7 +162,6 @@ export function usePermissions(): WebPermissions {
         ...buildPerms(claims.effectiveRole, claims.orgId, false),
         isOnSchedule: false,
         isManagementUser: false,
-        mfaNagRequired: false,
       };
     }
 
@@ -264,7 +259,6 @@ export function usePermissions(): WebPermissions {
       canConfigureAdminPermissions: false,
       isOnSchedule: perms.isOnSchedule,
       isManagementUser: perms.isManagementUser,
-      mfaNagRequired: perms.mfaNagRequired,
       atLeast: (r: string) => 0 >= (ROLE_LEVEL[r] ?? 0),
     };
   }
