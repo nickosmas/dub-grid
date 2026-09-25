@@ -407,6 +407,26 @@ describe("OrgLogin submit states", () => {
     );
   });
 
+  it("refetches what the shell loaded before the second factor, then navigates", async () => {
+    mockGetSession.mockResolvedValue(browserSession("user-1", TARGET_ORG_ID, "calmhaven"));
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      loginResponse({ mfa_required: true, didSwitchOrg: false, destination: null }),
+    );
+
+    const { container, client } = renderWithQueryClient(
+      <OrgLogin orgSlug="calmhaven" seed={{ status: "found", name: "Calm Haven" }} />,
+    );
+    const resetQueries = vi.spyOn(client, "resetQueries");
+    submitForm(container);
+    fireEvent.click(await screen.findByRole("button", { name: "Complete MFA" }));
+
+    await waitFor(() => expect(mockRouterReplace).toHaveBeenCalled());
+    expect(resetQueries).toHaveBeenCalledTimes(1);
+    expect(resetQueries.mock.invocationCallOrder[0]).toBeLessThan(
+      mockRouterReplace.mock.invocationCallOrder[0]!,
+    );
+  });
+
   it("fails closed when MFA switching succeeds but refresh does not", async () => {
     mockGetSession.mockResolvedValue(browserSession("user-1", "org-old", "other"));
     mockFetchOrganizations.mockResolvedValue({

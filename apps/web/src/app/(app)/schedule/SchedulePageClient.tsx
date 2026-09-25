@@ -7459,7 +7459,7 @@ function SchedulerContent({
                     Claim <strong>{pendingCoverageGapVolunteer.assignmentLabel}</strong> on{" "}
                     <strong>{pendingCoverageGapVolunteer.date}</strong>?{" "}
                     {canApproveShiftRequests
-                      ? "You can approve requests, so it goes on the schedule right away."
+                      ? "As an admin, this goes on the schedule right away."
                       : "This will be sent to your admin for approval."}
                   </>
                 }
@@ -7508,7 +7508,7 @@ function SchedulerContent({
                     )}
                     <br />
                     {canApproveShiftRequests
-                      ? "You can approve requests, so it goes on the schedule right away."
+                      ? "As an admin, this goes on the schedule right away."
                       : "We'll send this to your admin for approval."}
                   </>
                 }

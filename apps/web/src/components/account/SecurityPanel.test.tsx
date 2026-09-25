@@ -5,13 +5,11 @@ import type { User } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SecurityPanel } from "@/components/account/SecurityPanel";
 import { queryKeys } from "@/lib/query-keys";
-import MfaNagBanner from "@/components/MfaNagBanner";
 
 const mockSignOut = vi.fn();
 const signOutAccountSessions = vi.fn();
 const requireCredentialAssurance = vi.fn();
 const updateBrowserUserPassword = vi.fn();
-let reconciledMfaEnabled = false;
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/profile",
@@ -101,7 +99,7 @@ vi.mock("@/hooks", () => ({
   usePermissions: () => {
     const { data } = useQuery({
       queryKey: queryKeys.account.permissions("user-1", "org-1"),
-      queryFn: async () => ({ mfaNagRequired: !reconciledMfaEnabled }),
+      queryFn: async () => ({}),
       staleTime: Infinity,
     });
     return { ...data, isSuperAdmin: true, orgId: "org-1" };
@@ -130,28 +128,11 @@ describe("SecurityPanel session actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
-    reconciledMfaEnabled = false;
     signOutAccountSessions.mockReset().mockResolvedValue({ success: true });
     requireCredentialAssurance.mockReset().mockResolvedValue({ success: true });
     updateBrowserUserPassword.mockReset().mockResolvedValue(undefined);
     stepUpMocks.context.mockResolvedValue({ key: "account-org", accessToken: "old-token" });
     stepUpMocks.confirm.mockReset().mockResolvedValue("fresh-token");
-  });
-
-  it("removes the mounted banner after successful MFA reconciliation without reloading", async () => {
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <MfaNagBanner />
-        <SecurityPanel user={{ id: "user-1" } as User} profile={null} setProfile={vi.fn()} />
-      </QueryClientProvider>,
-    );
-    expect(await screen.findByRole("status")).toHaveTextContent("two-factor");
-
-    reconciledMfaEnabled = true;
-    fireEvent.click(screen.getByRole("button", { name: "Confirm MFA enabled" }));
-
-    await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
-    expect(sessionStorage.getItem("dg_mfa_nag_dismissed")).toBeNull();
   });
 
   it("changes a password once after server-selected TOTP step-up", async () => {

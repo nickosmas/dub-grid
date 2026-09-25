@@ -5,11 +5,6 @@ const requireAuthenticatedUserWithClaims = vi.fn();
 const getImpersonationFromCookie = vi.fn();
 const verifyImpersonationSession = vi.fn();
 const serviceFrom = vi.fn();
-const fetchSelfProfileSnapshot = vi.fn();
-
-vi.mock("@/features/account/server/profile", () => ({
-  fetchSelfProfileSnapshot: (...args: unknown[]) => fetchSelfProfileSnapshot(...args),
-}));
 
 vi.mock("@/lib/api-auth", () => ({
   requireAuthenticatedUserWithClaims: (req: NextRequest) => requireAuthenticatedUserWithClaims(req),
@@ -88,7 +83,6 @@ function makeAuth(opts?: {
 describe("GET /api/account/permissions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    fetchSelfProfileSnapshot.mockResolvedValue({ mfaEnabled: false });
     tableResults.clear();
     requireAuthenticatedUserWithClaims.mockResolvedValue(makeAuth());
     getImpersonationFromCookie.mockReturnValue(null);
@@ -181,7 +175,6 @@ describe("GET /api/account/permissions", () => {
     expect(body.permissions.role).toBe("super_admin");
     expect(body.permissions.isSuperAdmin).toBe(true);
     expect(body.permissions.orgId).toBe(ORG_ID);
-    expect(body.mfaNagRequired).toBe(true);
   });
 
   it("keeps a promoted-but-inactive member read-only", async () => {
@@ -362,83 +355,8 @@ describe("GET /api/account/permissions", () => {
     expect(body.isManagementUser).toBe(false);
   });
 
-  describe("mfaNagRequired", () => {
-    it("does not claim MFA is disabled when the reconciled profile is unavailable", async () => {
-      fetchSelfProfileSnapshot.mockResolvedValue(null);
-      requireAuthenticatedUserWithClaims.mockResolvedValue(
-        makeAuth({ orgId: ORG_ID, orgRole: "super_admin" }),
-      );
-      const response = await request();
-      expect((await response.json()).mfaNagRequired).toBe(false);
-    });
-
-    it("nags a super_admin with no verified TOTP factor", async () => {
-      requireAuthenticatedUserWithClaims.mockResolvedValue(
-        makeAuth({ orgId: ORG_ID, orgRole: "super_admin" }),
-      );
-
-      const response = await request();
-
-      const body = await response.json();
-      expect(body.mfaNagRequired).toBe(true);
-    });
-
-    it("does not nag an enrolled super_admin even when the JWT user has no factors", async () => {
-      fetchSelfProfileSnapshot.mockResolvedValue({ mfaEnabled: true });
-      requireAuthenticatedUserWithClaims.mockResolvedValue(
-        makeAuth({
-          orgId: ORG_ID,
-          orgRole: "super_admin",
-        }),
-      );
-
-      const response = await request();
-
-      const body = await response.json();
-      expect(body.mfaNagRequired).toBe(false);
-      expect(fetchSelfProfileSnapshot).toHaveBeenCalledExactlyOnceWith(USER_ID);
-    });
-
-    it("still nags when enrollment has not been reconciled as enabled", async () => {
-      requireAuthenticatedUserWithClaims.mockResolvedValue(
-        makeAuth({
-          orgId: ORG_ID,
-          orgRole: "super_admin",
-          factors: [{ factor_type: "totp", status: "unverified" }],
-        }),
-      );
-
-      const response = await request();
-
-      const body = await response.json();
-      expect(body.mfaNagRequired).toBe(true);
-    });
-
-    it("does not nag a regular user without MFA", async () => {
-      requireAuthenticatedUserWithClaims.mockResolvedValue(
-        makeAuth({ orgId: ORG_ID, orgRole: "user" }),
-      );
-      enqueue("profiles", { data: { org_id: null, platform_role: "none" } });
-
-      const response = await request();
-
-      const body = await response.json();
-      expect(body.mfaNagRequired).toBe(false);
-    });
-
-    it("nags a gridmaster with no verified TOTP factor", async () => {
-      requireAuthenticatedUserWithClaims.mockResolvedValue(
-        makeAuth({ orgId: ORG_ID, platformRole: "gridmaster" }),
-      );
-
-      const response = await request();
-
-      const body = await response.json();
-      expect(body.mfaNagRequired).toBe(true);
-    });
-
-    it("reflects the impersonating gridmaster's own MFA status, not the target's", async () => {
-      fetchSelfProfileSnapshot.mockResolvedValue({ mfaEnabled: true });
+  describe("impersonation", () => {
+    it("verifies the impersonation cookie against the caller's own auth session", async () => {
       getImpersonationFromCookie.mockReturnValue({
         sessionId: "session-1",
         targetOrgId: ORG_ID,
@@ -462,8 +380,7 @@ describe("GET /api/account/permissions", () => {
 
       const response = await request();
 
-      const body = await response.json();
-      expect(body.mfaNagRequired).toBe(false);
+      expect(response.status).toBe(200);
       expect(verifyImpersonationSession).toHaveBeenCalledWith(
         expect.anything(),
         "session-1",

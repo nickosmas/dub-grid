@@ -1458,9 +1458,10 @@ records the hosted-provider qualification and the accepted limit that direct cal
 Supabase's own factor-removal endpoint follow the provider's AAL2 rule, not DubGrid's
 five-minute window.
 
-What remains advisory: gridmaster/super_admin/admin accounts without a verified factor
-get a dismissible in-app nag (`MfaNagBanner`), not a hard block (see §13.1), a
-deliberate choice to avoid locking out existing admins.
+What remains optional: enrolling a factor is never required and never prompted. An
+account without one sees no banner or reminder; anyone who wants a second factor enables
+it under Profile > Security. Not a hard block either (see §13.1), a deliberate choice to
+avoid locking out existing admins.
 
 ---
 

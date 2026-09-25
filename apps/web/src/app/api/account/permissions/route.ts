@@ -9,7 +9,6 @@ import { verifyImpersonationSession } from "@/lib/impersonation-server";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
 import { isCallerInactive } from "@/app/api/shared/permissions";
-import { fetchSelfProfileSnapshot } from "@/features/account/server/profile";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -34,11 +33,6 @@ const NO_SELF_EMPLOYMENT_FLAGS: SelfEmploymentFlags = {
   isOnSchedule: false,
   isManagementUser: false,
 };
-
-// Roles nagged to enroll in MFA. Advisory only — see RBAC_SYSTEM_DESIGN.md
-// §13.1: a dismissible in-app nag, not a hard block, to avoid locking out
-// existing admin/gridmaster accounts that haven't enrolled yet.
-const MFA_NAGGED_ROLES = new Set(["admin", "super_admin", "gridmaster"]);
 
 async function getSelfEmploymentFlags(
   serviceClient: SupabaseClient,
@@ -84,12 +78,6 @@ async function handleGET(req: NextRequest, timer: Timer) {
     const claimOrgRole = (auth.claims.org_role as string) || "user";
     const effectiveRole = auth.claims.platform_role === "gridmaster" ? "gridmaster" : claimOrgRole;
     const orgId = claimOrgId;
-    // Locally verified JWT users have no factor list. This advisory display
-    // uses the profile reconciled by the MFA lifecycle, never to grant access.
-    const profileSnapshot = await fetchSelfProfileSnapshot(auth.user.id);
-    const mfaNagFor = (role: string) =>
-      MFA_NAGGED_ROLES.has(role) && profileSnapshot?.mfaEnabled === false;
-    const mfaNagRequired = mfaNagFor(effectiveRole);
 
     if (impersonation && auth.claims.platform_role === "gridmaster") {
       // The cookie is client-writable — cross-check its sessionId against
@@ -120,7 +108,6 @@ async function handleGET(req: NextRequest, timer: Timer) {
             (targetMembership?.admin_permissions as AdminPermissions | null) ?? null,
             true,
           ),
-          mfaNagRequired,
         });
       }
       // No matching active session — fall through and report the caller's
@@ -132,7 +119,6 @@ async function handleGET(req: NextRequest, timer: Timer) {
     if (effectiveRole === "gridmaster") {
       return NextResponse.json({
         permissions: buildPerms(effectiveRole, orgId, false),
-        mfaNagRequired,
       });
     }
 
@@ -145,7 +131,6 @@ async function handleGET(req: NextRequest, timer: Timer) {
       return NextResponse.json({
         permissions: buildPerms(effectiveRole, orgId, false),
         ...(await getSelfEmploymentFlags(serviceClient, auth.user.id, orgId)),
-        mfaNagRequired,
       });
     }
 
@@ -187,7 +172,6 @@ async function handleGET(req: NextRequest, timer: Timer) {
           dbRole === "super_admin" ? false : inactive,
         ),
         ...employmentFlags,
-        mfaNagRequired: mfaNagFor(dbRole),
       });
     }
 
@@ -200,7 +184,6 @@ async function handleGET(req: NextRequest, timer: Timer) {
     if (profile?.platform_role === "gridmaster") {
       return NextResponse.json({
         permissions: buildPerms("gridmaster", profile.org_id ?? null, false),
-        mfaNagRequired,
       });
     }
 
@@ -230,7 +213,6 @@ async function handleGET(req: NextRequest, timer: Timer) {
             profileInactive,
           ),
           ...profileEmploymentFlags,
-          mfaNagRequired,
         });
       }
     }
@@ -238,7 +220,6 @@ async function handleGET(req: NextRequest, timer: Timer) {
     return NextResponse.json({
       permissions: buildPerms(effectiveRole, orgId, false, null, false, inactive),
       ...employmentFlags,
-      mfaNagRequired,
     });
   } catch (error) {
     logger.error({ error }, "account permissions GET failed");

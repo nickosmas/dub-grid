@@ -679,7 +679,7 @@ export default function ShiftRequestBoard({
                   Claim <strong>{requesterFullLabel}</strong> on{" "}
                   <strong>{formatShiftDate(req.requesterShiftDate)}</strong>?{" "}
                   {canApprove
-                    ? "You can approve requests, so it goes on the schedule right away."
+                    ? "As an admin, this goes on the schedule right away."
                     : "This will be sent for manager approval."}
                 </>
               ),

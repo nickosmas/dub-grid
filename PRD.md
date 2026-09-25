@@ -578,7 +578,7 @@ Route files stay thin; the components below live under `apps/web/src/components/
 ├── AppShell.tsx (sidebar, header, navigation; hides trial chrome during setup)
 │   ├── Header.tsx / MobileNavSheet.tsx / MobileSubNavContext.tsx
 │   ├── NotificationBell.tsx (bell popup; rows go to their subject)
-│   ├── ImpersonationBanner.tsx / UserViewBanner.tsx / InactiveAccountBanner.tsx / MfaNagBanner.tsx
+│   ├── ImpersonationBanner.tsx / UserViewBanner.tsx / InactiveAccountBanner.tsx
 │   ├── TrialWelcomeModal.tsx (held until onboarding completes)
 │   └── InactivityGuard.tsx, AuthenticatedCacheBoundary.tsx
 ├── onboarding/OnboardingGate.tsx (bootstrap wait → billing lock → onboarding → org setup)
