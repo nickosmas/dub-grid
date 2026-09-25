@@ -1230,22 +1230,6 @@ export function RecurringScheduleSection({
                       }}
                     >
                       {getEmployeeDisplayName(employee)}
-                      {isCurrentUser && (
-                        <span
-                          style={{
-                            fontSize: "var(--dg-fs-micro)",
-                            fontWeight: 700,
-                            padding: "1px 5px",
-                            borderRadius: "var(--dg-radius-lg)",
-                            background: "var(--dg-color-brand-bg)",
-                            color: "var(--dg-color-brand)",
-                            whiteSpace: "nowrap",
-                            flexShrink: 0,
-                          }}
-                        >
-                          You
-                        </span>
-                      )}
                     </div>
                   </div>
                   {certAbbr && designationColors && (

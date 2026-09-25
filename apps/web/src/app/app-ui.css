@@ -984,6 +984,22 @@
 .dg-staff-directory-cell--chevron {
   justify-content: flex-end;
 }
+/* The header and every row share one column grid through subgrid, so columns
+   size to their widest content like the normal roster table instead of
+   letting long labels spill into the next column. */
+.dg-staff-directory-table--without-status {
+  display: grid;
+  grid-template-columns: 100px repeat(8, minmax(max-content, auto)) 40px;
+}
+.dg-staff-directory-table--without-status .dg-staff-directory-body {
+  display: grid;
+}
+.dg-staff-directory-table--without-status .dg-staff-directory-body,
+.dg-staff-directory-table--without-status .dg-staff-directory-header,
+.dg-staff-directory-table--without-status .dg-staff-directory-row {
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+}
 .dg-settings-reorder-item,
 .dg-settings-reorder-group,
 .dg-settings-reorder-subitem {
