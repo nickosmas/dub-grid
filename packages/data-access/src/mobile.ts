@@ -1,3 +1,4 @@
+import { INVITATION_LIFETIME_MS } from "@dubgrid/domain";
 import type {
   MobileNotification,
   MobileNotificationPriority,
@@ -1861,7 +1862,7 @@ export async function refreshMobileEmployeeInvitationRow(
     .from("invitations")
     .update({
       token: crypto.randomUUID(),
-      expires_at: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString(),
+      expires_at: new Date(Date.now() + INVITATION_LIFETIME_MS).toISOString(),
     })
     .eq("org_id", input.orgId)
     .eq("id", input.invitationId)

@@ -1,6 +1,7 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 /**
  * Syncs the auth-email half of `supabase/config.toml` to the linked remote
@@ -23,7 +24,6 @@ import { resolve } from "node:path";
  *   npx tsx --env-file=.env.remote scripts/push-auth-templates.ts --apply
  */
 
-const CONFIG_PATH = resolve("supabase/config.toml");
 const TEMPLATE_KEYS = [
   "confirmation",
   "invite",
@@ -50,8 +50,8 @@ const NOTIFICATION_SUFFIX = "_notification";
  * place these are declared. A hand-rolled reader rather than a TOML
  * dependency: the shapes involved are two flat key/value forms.
  */
-function readConfig() {
-  const toml = readFileSync(CONFIG_PATH, "utf-8");
+export function readConfig(root = process.cwd()) {
+  const toml = readFileSync(resolve(root, "supabase/config.toml"), "utf-8");
 
   const section = (name: string): string => {
     const start = toml.indexOf(`[${name}]`);
@@ -85,7 +85,9 @@ function readConfig() {
     }
     // The CLI reads a notification's path relative to supabase/, a template's
     // relative to the repository root.
-    const contentFile = notificationType ? resolve("supabase", contentPath) : resolve(contentPath);
+    const contentFile = notificationType
+      ? resolve(root, "supabase", contentPath)
+      : resolve(root, contentPath);
     return {
       key,
       subject,
@@ -145,7 +147,7 @@ function summarize(field: string, value: string): string {
   return field.endsWith("_content") ? `${value.length} bytes` : value;
 }
 
-function diff(
+export function diff(
   live: Record<string, unknown>,
   config: ReturnType<typeof readConfig>,
 ): { changes: Change[]; payload: Record<string, string | number | boolean> } {
@@ -177,7 +179,7 @@ function diff(
   compare(
     "mailer_otp_length",
     config.otpLength,
-    "mobile ResetPasswordScreen hard-codes a 6-character code (CODE_LENGTH)",
+    "must equal EMAIL_OTP_LENGTH in @dubgrid/domain, which the mobile recovery screen uses",
   );
   // The API names this one `_exp`, not `_expiry` like config.toml does.
   compare("mailer_otp_exp", config.otpExpiry);
@@ -230,7 +232,29 @@ async function main() {
   console.log(`\nUpdated ${changes.length} field(s) on ${ref}.`);
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+/**
+ * Whether this file was started as the script, so tests can import `readConfig`
+ * and `diff` (41d2). Real paths on both sides, so a symlinked worktree path
+ * still counts.
+ */
+function runAsScript(): boolean {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  const self = realpathSync(fileURLToPath(import.meta.url));
+  // tsx also accepts the path without its extension.
+  for (const candidate of [entry, `${entry}.ts`]) {
+    try {
+      if (realpathSync(candidate) === self) return true;
+    } catch {
+      // Not a file; try the next spelling.
+    }
+  }
+  return false;
+}
+
+if (runAsScript()) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  });
+}

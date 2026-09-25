@@ -1,6 +1,6 @@
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { cpSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { connectSqlClient } from "../../../../scripts/lib/db-client";
@@ -10,6 +10,7 @@ import {
   assertSafeForwardLedger,
   compareMigrationLedger,
   loadMigrationInventory,
+  migrationDirectory,
   projectRefFromUrl,
   protectedProductionRefs,
   type MigrationFile,
@@ -20,7 +21,49 @@ function migration(version: string, name: string): MigrationFile {
   return { version, name, file: `${version}_${name}.sql`, sha256: "a".repeat(64) };
 }
 
+// `db:migrations:check` ran only by hand, so an edited, already-locked
+// migration passed CI (41d2). The real files are checked on every test run.
+describe("the committed migrations", () => {
+  const repoRoot = resolve(process.cwd(), "..", "..");
+  const manifest = resolve(repoRoot, "supabase/migrations/checksums.sha256");
+
+  it("match their locked checksums", () => {
+    const inventory = loadMigrationInventory(migrationDirectory(repoRoot));
+
+    expect(inventory.length).toBeGreaterThan(40);
+    expect(() => assertMigrationChecksumManifest(inventory, manifest)).not.toThrow();
+  });
+
+  it("fail the check when a locked migration's bytes change", () => {
+    const copy = mkdtempSync(join(tmpdir(), "dg-migrations-"));
+    try {
+      cpSync(migrationDirectory(repoRoot), copy, { recursive: true });
+      const [first] = loadMigrationInventory(copy);
+      const path = join(copy, first!.file);
+      writeFileSync(path, `${readFileSync(path, "utf8")}\n-- edited\n`);
+
+      expect(() => assertMigrationChecksumManifest(loadMigrationInventory(copy), manifest)).toThrow(
+        /changed after checksum lock/,
+      );
+    } finally {
+      rmSync(copy, { recursive: true, force: true });
+    }
+  });
+});
+
+/** A scratch directory that is removed after each test. */
+const tempDirs: string[] = [];
+function tempDir(prefix: string): string {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  tempDirs.push(dir);
+  return dir;
+}
+
 describe("production migration readiness", () => {
+  afterEach(() => {
+    for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  });
+
   const originalTransport = process.env.SUPABASE_DB_TRANSPORT;
   const originalToken = process.env.SUPABASE_ACCESS_TOKEN;
 
@@ -41,7 +84,7 @@ describe("production migration readiness", () => {
   });
 
   it("loads only a contiguous, canonical migration sequence", () => {
-    const root = mkdtempSync(join(tmpdir(), "dubgrid-migrations-"));
+    const root = tempDir("dubgrid-migrations-");
     writeFileSync(join(root, "001_schema.sql"), "SELECT 1;");
     writeFileSync(join(root, "002_functions.sql"), "SELECT 2;");
     expect(loadMigrationInventory(root).map((entry) => entry.version)).toEqual(["001", "002"]);
@@ -78,7 +121,7 @@ describe("production migration readiness", () => {
   });
 
   it("requires a disposition for every historical patch", () => {
-    const root = mkdtempSync(join(tmpdir(), "dubgrid-patches-"));
+    const root = tempDir("dubgrid-patches-");
     const patches = join(root, "patches");
     mkdirSync(patches);
     writeFileSync(join(patches, "legacy.sql"), "SELECT 1;");
@@ -90,7 +133,7 @@ describe("production migration readiness", () => {
   });
 
   it("fails when a locked migration is edited or the checksum manifest drifts", () => {
-    const root = mkdtempSync(join(tmpdir(), "dubgrid-checksums-"));
+    const root = tempDir("dubgrid-checksums-");
     const entry = migration("001", "schema");
     const manifest = join(root, "checksums.sha256");
     writeFileSync(manifest, `${entry.sha256}  ${entry.file}\n`);

@@ -3,7 +3,9 @@ import { router, useLocalSearchParams } from "expo-router";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { mayHavePasswordUpdateCommitted } from "@dubgrid/client-errors";
 import {
+  EMAIL_OTP_LENGTH,
   PASSWORD_MISMATCH_MESSAGE,
+  TOTP_CODE_LENGTH,
   getPasswordMismatchError,
   isPasswordAcceptable,
 } from "@dubgrid/domain";
@@ -20,7 +22,6 @@ import { PasswordStrengthHints } from "../components/PasswordStrengthHints";
 import { getRecoveryErrorMessage } from "../lib/recovery-errors";
 import { settleMobileAuthAction } from "../lib/request-deadline";
 
-const CODE_LENGTH = 6;
 const RESEND_COOLDOWN_SECONDS = 60;
 
 type Stage = "code" | "factor" | "no-factor" | "password";
@@ -84,8 +85,8 @@ export default function ResetPasswordScreen() {
   async function verifyCode() {
     if (submitting) return;
 
-    if (code.length !== CODE_LENGTH) {
-      setError(`Enter the ${CODE_LENGTH}-digit code from your email.`);
+    if (code.length !== EMAIL_OTP_LENGTH) {
+      setError(`Enter the ${EMAIL_OTP_LENGTH}-digit code from your email.`);
       return;
     }
 
@@ -151,8 +152,8 @@ export default function ResetPasswordScreen() {
     if (submitting) return;
     const factorId = factorIdRef.current;
     if (!factorId) return;
-    if (factorCode.length !== CODE_LENGTH) {
-      setError(`Enter the ${CODE_LENGTH}-digit code from your authenticator app.`);
+    if (factorCode.length !== TOTP_CODE_LENGTH) {
+      setError(`Enter the ${TOTP_CODE_LENGTH}-digit code from your authenticator app.`);
       return;
     }
 
@@ -295,7 +296,9 @@ export default function ResetPasswordScreen() {
           <AuthHeader
             subtitle={
               <AppText tone="muted">
-                {email ? `We sent a 6-digit code to ${email}.` : "Enter the code from your email."}
+                {email
+                  ? `We sent a ${EMAIL_OTP_LENGTH}-digit code to ${email}.`
+                  : "Enter the code from your email."}
               </AppText>
             }
             title={<AppText variant="heroMetric">Enter your code</AppText>}
@@ -308,7 +311,7 @@ export default function ResetPasswordScreen() {
               hasError={Boolean(error)}
               inputAccessoryViewID={inputAccessoryViewID}
               keyboardType="number-pad"
-              maxLength={CODE_LENGTH}
+              maxLength={EMAIL_OTP_LENGTH}
               onChangeText={(value) => {
                 setCode(value.replace(/\D/g, ""));
                 if (error) setError(null);
@@ -365,8 +368,8 @@ export default function ResetPasswordScreen() {
           <AuthHeader
             subtitle={
               <AppText tone="muted">
-                Your account uses two-step verification. Enter the 6-digit code from your
-                authenticator app.
+                Your account uses two-step verification. Enter the {TOTP_CODE_LENGTH}-digit code
+                from your authenticator app.
               </AppText>
             }
             title={<AppText variant="heroMetric">Enter your authenticator code</AppText>}
@@ -379,7 +382,7 @@ export default function ResetPasswordScreen() {
               hasError={Boolean(error)}
               inputAccessoryViewID={inputAccessoryViewID}
               keyboardType="number-pad"
-              maxLength={CODE_LENGTH}
+              maxLength={TOTP_CODE_LENGTH}
               onChangeText={(value) => {
                 setFactorCode(value.replace(/\D/g, ""));
                 if (error) setError(null);

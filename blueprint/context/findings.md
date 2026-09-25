@@ -55,14 +55,6 @@
 **Suggested fix:** Merge inside the database (`prefs = notification_preferences.prefs || excluded.prefs` in an RPC), which needs a migration.
 **Resolution:**
 
-### F-22 [P3] open - 41c1 test gaps: the remove-then-reconcile sequence and the push script's compare
-
-**File:** `apps/web/src/__tests__/mfa-lifecycle.test.ts`; `scripts/push-auth-templates.ts:155`
-**Found:** 2026-09-25 by `/audit` (scope: current, 0d010ca0..4d2b515c; all lenses)
-**Why it matters:** Each half of "a later reconcile sends nothing" is tested separately, not the sequence, and the script's boolean compare runs only in production use; a source-text check stands in for it.
-**Suggested fix:** A test that removes the last factor and then reconciles; export the script's `diff` behind a main guard and test it.
-**Resolution:**
-
 ### F-25 [P3] open - The once-per-session sign-in record is not atomic
 
 **File:** `apps/web/src/lib/auth/sign-in-completion.ts:61`
@@ -151,3 +143,27 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Why it matters:** `claimNewSignIn` catches a database error and returns no claim, and the route still answers 200, so the client never retries and the alert is gone.
 **Suggested fix:** Answer 5xx when detection fails so the client retries, or record the failure for a later sweep.
 **Resolution:**
+
+### F-47 [P2] open - The app's password rule accepts passwords Supabase's rule refuses
+
+**File:** `packages/domain/src/password.ts`; `supabase/config.toml` (`password_requirements = "letters_digits"`)
+**Found:** 2026-09-25 during 41d2 (drift review; recorded, not built)
+**Why it matters:** `isPasswordAcceptable` wants 10 characters and two of uppercase, digit or symbol, so `Abcdefghij!` passes both apps and the register route, but Supabase requires a digit and refuses it at sign-up or reset. Production's setting is unverified.
+**Suggested fix:** A policy decision: require a letter and a digit in the app rule (and its hints and copy on web and mobile), or relax Supabase's requirement to match the app. Then add a test that parses `config.toml` and holds the two together.
+**Resolution:**
+
+### F-50 [P3] open - Remaining drift-guard gaps
+
+**File:** `apps/web/src/__tests__/invitation-sql-contract.test.ts:41`; `access-token-hook-claims.test.ts`; `apps/web/src/emails/InviteEmail.tsx:72`; `apps/web/src/app/page.tsx:93`; `apps/web/src/__tests__/push-auth-templates.test.ts`
+**Found:** 2026-09-25 by `/audit` (scope: current, a4fa18a7..395a6e57; all lenses)
+**Why it matters:** The SQL messages are copied into the test rather than read from the route; `VerifiedClaims` and the api-auth `Claims` (which add `in_sandbox`) are not in the claim check; the 72 hours in invite and landing copy is not tied to `INVITATION_LIFETIME_HOURS`; the new tests assume they run from `apps/web`; and the push test mirrors the script's Management API field names, so a wrong name would pass.
+**Suggested fix:** Read the matched strings from the route; add `VerifiedClaims` with an `in_sandbox` allowance; derive the copy from the constant; use `supabaseMigrationsDir()`-style root resolution; check field names against the Management API schema in 41d3.
+**Resolution:**
+
+### F-54 [P3] fixed - The web test cache hashed the Supabase CLI's gitignored state
+
+**File:** `turbo.json` (`@dubgrid/web#test`)
+**Found:** 2026-09-25 by `/audit` re-review of cd8758d8
+**Why it matters:** Turbo's explicit input globs ignore `.gitignore`, so `supabase/.temp/**` (rewritten by the CLI on update checks, `link` and `start`) caused cache misses with no source change, and local hashes differed from CI's. Never a wrongly replayed pass.
+**Suggested fix:** Exclude `supabase/.temp` and `supabase/.branches`.
+**Resolution:** Both are negated in the inputs; a dry run shows no `.temp` file.

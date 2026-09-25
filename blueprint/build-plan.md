@@ -630,7 +630,7 @@
           on itself or repeats after it finished, an accepted invitation stays
           accepted when its sign-out fails, and the app lock does not relock
           on the system prompt's own inactive state.
-    - [ ] 41d2. **Source and template drift guards** - migration checksums,
+    - [x] 41d2. **Source and template drift guards** - migration checksums,
           the password rule against Supabase's, code lengths against
           `otp_length`, the push script's comparison, the invitation lifetime,
           the SQL messages the routes match, and the claim names are each

@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { EMAIL_OTP_LENGTH } from "@dubgrid/domain";
 import { router, useLocalSearchParams } from "expo-router";
 import type { TextInput } from "react-native";
 import { AppText } from "../../../shared/components/AppText";
@@ -65,7 +66,7 @@ export default function ForgotPasswordScreen() {
         <AuthHeader
           subtitle={
             <AppText tone="muted">
-              Enter your email and we'll send you a 6-digit code to reset it.
+              Enter your email and we'll send you a {EMAIL_OTP_LENGTH}-digit code to reset it.
             </AppText>
           }
           title={<AppText variant="heroMetric">Forgot your password?</AppText>}

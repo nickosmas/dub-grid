@@ -52,6 +52,22 @@
       "dependsOn": ["^build", "^test"],
       "outputs": []
     },
+    "@dubgrid/web#test": {
+      "dependsOn": ["^build", "^test"],
+      "outputs": [],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "../../supabase/**",
+        "!../../supabase/.temp/**",
+        "!../../supabase/.branches/**",
+        "../../README.md",
+        "../../scripts/**",
+        "../../eslint-rules/**",
+        "../../packages/*/src/**",
+        "../mobile/src/**",
+        "../mobile/app/**"
+      ]
+    },
     "dev": {
       "cache": false,
       "persistent": true
