@@ -552,7 +552,7 @@
           refused escalation into a granted one. Align create, resend, and
           replace permissions so an admin who can create an invitation can
           also send it.
-    - [ ] 41a2. **Atomic rotation and recoverable delivery** - replace the
+    - [x] 41a2. **Atomic rotation and recoverable delivery** - replace the
           revoke-first, second-modal web flow with one guarded confirmation
           that invalidates the current link and rotates the token on the same
           pending invitation, preserving its email, role, and departments.

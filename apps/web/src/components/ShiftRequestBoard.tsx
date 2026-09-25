@@ -677,8 +677,10 @@ export default function ShiftRequestBoard({
               message: (
                 <>
                   Claim <strong>{requesterFullLabel}</strong> on{" "}
-                  <strong>{formatShiftDate(req.requesterShiftDate)}</strong>? This will be sent for
-                  manager approval.
+                  <strong>{formatShiftDate(req.requesterShiftDate)}</strong>?{" "}
+                  {canApprove
+                    ? "You can approve requests, so it goes on the schedule right away."
+                    : "This will be sent for manager approval."}
                 </>
               ),
               onConfirm: () => onClaim(req.id),

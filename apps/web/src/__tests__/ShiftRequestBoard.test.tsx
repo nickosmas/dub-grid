@@ -167,6 +167,23 @@ describe("ShiftRequestBoard", () => {
     expect(onClaim).toHaveBeenCalledWith("req-1");
   });
 
+  it("tells a claimant their claim goes to a manager", async () => {
+    const user = userEvent.setup();
+    renderBoard({ openPickups: [makeRequest()] });
+
+    await user.click(screen.getByRole("button", { name: "Claim" }));
+    expect(screen.getByText(/sent for manager approval/)).toBeInTheDocument();
+  });
+
+  it("tells an approver their claim goes straight on the schedule", async () => {
+    const user = userEvent.setup();
+    renderBoard({ openPickups: [makeRequest()], canApprove: true });
+
+    await user.click(screen.getByRole("button", { name: "Claim" }));
+    expect(screen.getByText(/goes on the schedule right away/)).toBeInTheDocument();
+    expect(screen.queryByText(/manager approval/)).not.toBeInTheDocument();
+  });
+
   it("lets the targeted employee accept or decline a swap request", async () => {
     const user = userEvent.setup();
     const request = makeRequest({
