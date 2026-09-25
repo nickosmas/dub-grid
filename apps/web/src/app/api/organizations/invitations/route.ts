@@ -23,7 +23,10 @@ import type { Invitation } from "@/types";
 import { buildStaffValidationErrorResponse, getStaffFieldErrors } from "@/lib/staff-validation";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import { API_ERRORS } from "@dubgrid/client-errors";
-import { sendPendingInvitationEmail } from "@/features/organization/server/invitation-delivery";
+import {
+  isEmailNotConfigured,
+  sendPendingInvitationEmail,
+} from "@/features/organization/server/invitation-delivery";
 import { INVITATION_LIFETIME_MS } from "@/lib/auth/invitation-capability";
 
 export const dynamic = "force-dynamic";
@@ -711,16 +714,12 @@ export async function POST(req: NextRequest) {
         });
         return NextResponse.json(
           {
-            error:
-              emailError instanceof Error && emailError.message === "Email service not configured"
-                ? "Email service not configured"
-                : "We couldn't send the replacement invitation. The original invitation is still active.",
+            error: isEmailNotConfigured(emailError)
+              ? "Email service not configured"
+              : "We couldn't send the replacement invitation. The original invitation is still active.",
           },
           {
-            status:
-              emailError instanceof Error && emailError.message === "Email service not configured"
-                ? 503
-                : 502,
+            status: isEmailNotConfigured(emailError) ? 503 : 502,
           },
         );
       }
@@ -827,16 +826,12 @@ export async function POST(req: NextRequest) {
       });
       return NextResponse.json(
         {
-          error:
-            emailError instanceof Error && emailError.message === "Email service not configured"
-              ? "Email service not configured"
-              : "We couldn't send that invitation email. Try again.",
+          error: isEmailNotConfigured(emailError)
+            ? "Email service not configured"
+            : "We couldn't send that invitation email. Try again.",
         },
         {
-          status:
-            emailError instanceof Error && emailError.message === "Email service not configured"
-              ? 503
-              : 502,
+          status: isEmailNotConfigured(emailError) ? 503 : 502,
         },
       );
     }

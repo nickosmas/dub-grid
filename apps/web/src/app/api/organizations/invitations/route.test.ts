@@ -335,6 +335,38 @@ describe("POST /api/organizations/invitations", () => {
     );
   });
 
+  // A retry cannot succeed while the platform kill switch is off, so it must
+  // read as unavailable, as create reports it, not as a failed send.
+  it("reports the email kill switch as unavailable, not as a failed send", async () => {
+    invitationSelectMaybeSingle.mockResolvedValue({ data: pendingInvitation, error: null });
+    invitationUpdateMaybeSingle
+      .mockResolvedValueOnce({
+        data: {
+          ...pendingInvitation,
+          token: "fresh-token",
+          updated_at: "2026-01-01T00:01:00.000Z",
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: { id: INVITATION_ID }, error: null });
+    sendInvitationEmail.mockRejectedValue(
+      new Error("Email service not configured: sending is disabled by a platform kill switch"),
+    );
+
+    const { POST } = await importRoute();
+    const response = await POST(
+      makePostRequest({
+        action: "resend",
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+      }),
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({ error: "Email service not configured" });
+  });
+
   it("restores the previous token and expiry when a resend email cannot be delivered", async () => {
     const refreshedAt = "2026-01-01T00:01:00.000Z";
     invitationSelectMaybeSingle.mockResolvedValue({ data: pendingInvitation, error: null });
