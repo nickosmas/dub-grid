@@ -7457,8 +7457,10 @@ function SchedulerContent({
                 message={
                   <>
                     Claim <strong>{pendingCoverageGapVolunteer.assignmentLabel}</strong> on{" "}
-                    <strong>{pendingCoverageGapVolunteer.date}</strong>? This will be sent to your
-                    admin for approval.
+                    <strong>{pendingCoverageGapVolunteer.date}</strong>?{" "}
+                    {canApproveShiftRequests
+                      ? "You can approve requests, so it goes on the schedule right away."
+                      : "This will be sent to your admin for approval."}
                   </>
                 }
                 title="Claim this shift?"
@@ -7505,7 +7507,9 @@ function SchedulerContent({
                       <> (called off by {pendingClaimShift.calledOffBy})</>
                     )}
                     <br />
-                    We'll send this to your admin for approval.
+                    {canApproveShiftRequests
+                      ? "You can approve requests, so it goes on the schedule right away."
+                      : "We'll send this to your admin for approval."}
                   </>
                 }
                 confirmLabel="Claim"
