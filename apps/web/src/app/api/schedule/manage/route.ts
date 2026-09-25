@@ -1490,15 +1490,19 @@ export async function POST(req: NextRequest) {
 
         // Read the series' cells before the RPC removes the rows that identify
         // them, so their notes can be cleared afterwards. delete_shift_series
-        // returns only a count, and the echo covers a single cell.
-        const { data: seriesCells, error: seriesCellsError } = await auth.serviceClient
-          .from("schedule_cells")
-          .select("emp_id, date")
-          .eq("org_id", data.orgId)
-          .eq("series_id", data.seriesId);
-        if (seriesCellsError) {
-          throw seriesCellsError;
-        }
+        // returns only a count, and the echo covers a single cell. Paged: an
+        // unpaged read stops at max_rows, which applies to the service role
+        // too, and would leave notes on every cell past it.
+        const seriesCells = await fetchAllRows<{ emp_id: string; date: string }>((from, to) =>
+          auth.serviceClient
+            .from("schedule_cells")
+            .select("emp_id, date")
+            .eq("org_id", data.orgId)
+            .eq("series_id", data.seriesId)
+            .order("date", { ascending: true })
+            .order("id", { ascending: true })
+            .range(from, to),
+        );
 
         const { data: deletedCount, error } = await auth.userClient.rpc("delete_shift_series", {
           p_series_id: data.seriesId,
@@ -1511,7 +1515,7 @@ export async function POST(req: NextRequest) {
         await clearScheduleNotesForCells(
           auth.serviceClient,
           data.orgId,
-          ((seriesCells ?? []) as Array<{ emp_id: string; date: string }>).map((cell) => ({
+          seriesCells.map((cell) => ({
             employeeId: cell.emp_id,
             date: cell.date,
           })),
