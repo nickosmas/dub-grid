@@ -204,7 +204,6 @@ interface LegacyScheduleGridProps {
     perPill?: { start: string; end: string }[];
   } | null;
   draftKindForKey?: (empId: string, date: Date) => DraftKind;
-  fromRecurringForKey?: (empId: string, date: Date) => boolean;
   showPublishDiffOverlay?: boolean;
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
   publishedAssignmentIdsForKey?: (empId: string, date: Date) => number[];
@@ -313,7 +312,6 @@ interface SectionBlockProps {
     perPill?: { start: string; end: string }[];
   } | null;
   draftKindForKey?: (empId: string, date: Date) => DraftKind;
-  fromRecurringForKey?: (empId: string, date: Date) => boolean;
   showPublishDiffOverlay?: boolean;
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
   publishedAssignmentIdsForKey?: (empId: string, date: Date) => number[];
@@ -809,7 +807,6 @@ const SectionBlock = memo(function SectionBlock({
   getCustomShiftTimes,
   getPublishedCustomShiftTimes,
   draftKindForKey,
-  fromRecurringForKey,
   showPublishDiffOverlay,
   publishedLabelForKey,
   publishedAssignmentIdsForKey,
@@ -1901,7 +1898,6 @@ const SectionBlock = memo(function SectionBlock({
                       const cellCodeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
                       const cellSegments = segmentsForKey?.(emp.id, date) ?? [];
                       const draftKind = draftKindForKey?.(emp.id, date) ?? null;
-                      const fromRecurring = fromRecurringForKey?.(emp.id, date) ?? false;
                       const publishDiff = publishDiffForKey?.(emp.id, date) ?? null;
                       const publishedMetadata =
                         publishedMetadataForKey?.(emp.id, date) ??
@@ -3644,25 +3640,6 @@ const SectionBlock = memo(function SectionBlock({
                                 </span>
                               </MaybeHint>
                             )}
-                            {fromRecurring && shiftLabel && shiftLabel !== "OFF" && (
-                              <MaybeHint content="From recurring schedule" side="top">
-                                <span
-                                  aria-label="From recurring schedule"
-                                  style={{
-                                    position: "absolute",
-                                    bottom: 1,
-                                    right: 2,
-                                    fontSize: "var(--dg-type-badge-size)",
-                                    lineHeight: 1,
-                                    color: "var(--dg-color-text-muted)",
-                                    zIndex: 2,
-                                    pointerEvents: "auto",
-                                  }}
-                                >
-                                  ↻
-                                </span>
-                              </MaybeHint>
-                            )}
                           </div>
                           <div className="dg-grid-cell__chrome" aria-hidden="true" />
                         </DroppableCell>
@@ -3836,7 +3813,6 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   getCustomShiftTimes,
   getPublishedCustomShiftTimes,
   draftKindForKey,
-  fromRecurringForKey,
   showPublishDiffOverlay,
   publishedLabelForKey,
   publishedAssignmentIdsForKey,
@@ -4202,7 +4178,6 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                     getCustomShiftTimes={getCustomShiftTimes}
                     getPublishedCustomShiftTimes={getPublishedCustomShiftTimes}
                     draftKindForKey={draftKindForKey}
-                    fromRecurringForKey={fromRecurringForKey}
                     showPublishDiffOverlay={showPublishDiffOverlay}
                     publishedLabelForKey={publishedLabelForKey}
                     publishedAssignmentIdsForKey={publishedAssignmentIdsForKey}
@@ -4426,7 +4401,6 @@ const ScheduleGrid = memo(function ScheduleGrid({
           getCustomShiftTimes={model.accessors.getCustomShiftTimes}
           getPublishedCustomShiftTimes={model.accessors.getPublishedCustomShiftTimes}
           draftKindForKey={model.accessors.draftKindForKey}
-          fromRecurringForKey={model.accessors.fromRecurringForKey}
           showPublishDiffOverlay={model.options.showPublishDiffOverlay}
           publishedLabelForKey={model.accessors.publishedLabelForKey}
           publishedAssignmentIdsForKey={model.accessors.publishedAssignmentIdsForKey}
