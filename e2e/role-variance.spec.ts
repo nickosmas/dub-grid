@@ -123,16 +123,20 @@ async function expectBootstrapStates(page: Page, path: string) {
     })
     .toBeNull();
 
+  // Held until the bar has been seen rather than delayed by a fixed timer: goto
+  // waits for the load event, which on a slow runner can arrive after a timed
+  // delay has already run out and the bar has gone.
+  let releaseBootstrap!: () => void;
+  const bootstrapReleased = new Promise<void>((resolve) => (releaseBootstrap = resolve));
   await page.route(`**${BOOTSTRAP_PATH}`, async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 1_500));
-    // The page fires the bootstrap more than once on load; any copy still in
-    // this delay when the next goto starts is aborted by the navigation.
+    await bootstrapReleased;
     await route.continue().catch(() => undefined);
   });
   await page.goto(`${QA_CALM_HAVEN_ORIGIN}${path}`);
   await expect(page.locator("[data-progress-bar]"), `${path} loading`).toBeVisible({
     timeout: 15_000,
   });
+  releaseBootstrap();
   await expect(page.locator("[data-progress-bar]"), `${path} loaded`).toHaveCount(0, {
     timeout: 15_000,
   });

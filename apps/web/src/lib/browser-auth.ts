@@ -176,11 +176,33 @@ async function readSessionOnce(): Promise<Session | null> {
   return session;
 }
 
+// A request that never reached the auth server (supabase-js reports status 0)
+// says nothing about the session. Firefox cancels a page's in-flight requests
+// the moment a navigation away from it starts, and reading that as signed-out
+// sent ProtectedRoute's redirect to /login over the top of the navigation. A
+// page that is leaving is gone long before these retries run out.
+const NETWORK_RETRY_DELAYS_MS = [500, 1_000, 2_000];
+
+function isAuthNetworkError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  return (error as { name?: string }).name === "AuthRetryableFetchError";
+}
+
+async function getUserRetryingNetworkFailures() {
+  let result = await supabase.auth.getUser();
+  for (const delayMs of NETWORK_RETRY_DELAYS_MS) {
+    if (!isAuthNetworkError(result.error)) break;
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    result = await supabase.auth.getUser();
+  }
+  return result;
+}
+
 async function readUserOnce(): Promise<User | null> {
   const {
     data: { user },
     error,
-  } = await supabase.auth.getUser();
+  } = await getUserRetryingNetworkFailures();
 
   if (error) {
     if (isAuthLockContentionError(error)) {
