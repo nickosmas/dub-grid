@@ -256,6 +256,12 @@ export const mobileProfileResponseSchema = z.object({
    * management departments with the same sheet a manager uses on a teammate.
    */
   membershipUpdatedAt: z.string().nullable().default(null),
+  /**
+   * When this account joined the current organization, which for an invited
+   * person is the day they accepted. Not `user.createdAt`, the account's own
+   * age, which predates a second organization. Null with no membership.
+   */
+  joinedAt: z.string().nullable().default(null),
   pendingProfileChangeRequest: z.boolean().default(false),
   pendingAccountDeletionRequest: z.boolean().default(false),
 });

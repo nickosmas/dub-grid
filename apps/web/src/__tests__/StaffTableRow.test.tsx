@@ -376,3 +376,54 @@ describe("StaffTableRow column gating", () => {
     ).not.toBeNull();
   });
 });
+
+describe("StaffReorderListRow date joined", () => {
+  // Noon UTC, so the local calendar day is the same in every test zone.
+  const JOINED = "2026-03-05T12:00:00.000Z";
+  const ADDED = "2026-01-09T12:00:00.000Z";
+
+  function dateCell(employee: Employee) {
+    const { container } = render(
+      <StaffReorderListRow
+        emp={employee}
+        globalIndex={0}
+        isExpanded={false}
+        isReordering={false}
+        isDragging={false}
+        canManageEmployees
+        canViewEmployeeDetails
+        showStatusColumn={false}
+        canNavigateToDetailsPage
+        isSelected={false}
+        focusAreas={[]}
+        certifications={[]}
+        roles={[]}
+        pendingInviteByEmployeeId={new Map()}
+        onToggleSelect={vi.fn()}
+        onRowClick={vi.fn()}
+      />,
+    );
+    return container.querySelector(".dg-staff-directory-cell--date-joined")?.textContent;
+  }
+
+  function shortDate(iso: string) {
+    return new Date(iso).toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  }
+
+  it("shows when the person accepted, not when their record was added", () => {
+    const cell = dateCell(makeEmployee({ userId: "user-1", createdAt: ADDED, joinedAt: JOINED }));
+
+    expect(cell).toBe(shortDate(JOINED));
+    expect(cell).not.toBe(shortDate(ADDED));
+  });
+
+  it("shows no date for someone who has not joined", () => {
+    expect(dateCell(makeEmployee({ userId: null, createdAt: ADDED, joinedAt: null }))).toBe(
+      "\u2014",
+    );
+  });
+});

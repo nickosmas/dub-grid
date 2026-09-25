@@ -154,6 +154,8 @@ const profileData = {
       departmentId: 7,
     },
   ],
+  // Noon UTC, so the formatted day is the same in every runner's zone.
+  joinedAt: "2026-03-05T12:00:00.000Z",
   pendingProfileChangeRequest: false,
   pendingAccountDeletionRequest: false,
 };
@@ -349,6 +351,25 @@ describe("ProfileScreen", () => {
     // The org's own label for the scheduled kind — this fixture's is
     // "Department", singular — never appears as a row of its own.
     expect(screen.queryByText("Department")).not.toBeInTheDocument();
+  });
+
+  // The account predates this organization when someone belongs to two, so the
+  // line reads the membership, never the account's own creation date.
+  it("dates Joined by the membership, not the account", () => {
+    mockQueries(profileData);
+
+    render(<ProfileScreen />);
+
+    expect(screen.getByText("Joined Mar 5, 2026")).toBeInTheDocument();
+    expect(screen.queryByText(/^Joined .*(2023|2024)$/)).not.toBeInTheDocument();
+  });
+
+  it("leaves the Joined line off without a membership date", () => {
+    mockQueries({ ...profileData, joinedAt: null });
+
+    render(<ProfileScreen />);
+
+    expect(screen.queryByText(/^Joined /)).not.toBeInTheDocument();
   });
 
   it("leaves the management section off for someone who manages nothing", () => {

@@ -20,6 +20,7 @@ import { broadcastInvalidation } from "@/lib/cache-broadcast";
 import { useOrgRealtimeInvalidation } from "@/hooks/useOrgRealtimeInvalidation";
 import { useLatestRef } from "@/hooks/useLatestRef";
 import type { Employee, Invitation } from "@/types";
+import { replaceEmployeeRow } from "./employee-rows";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -136,12 +137,10 @@ export function useEmployees(orgId: string | null): EmployeesData {
       // rollback could fire with the closure variable still at its initial
       // value and wipe the list instead of restoring it.
       const prevAll = allEmployeesRef.current;
-      setAllLocal((prev) => prev.map((e) => (e.id === emp.id ? emp : e)));
+      setAllLocal((prev) => replaceEmployeeRow(prev, emp));
       try {
         const savedEmployee = await updateEmployee(emp, orgId, emp.version);
-        setAllLocal((prev) =>
-          prev.map((employee) => (employee.id === emp.id ? savedEmployee : employee)),
-        );
+        setAllLocal((prev) => replaceEmployeeRow(prev, savedEmployee));
         toast.success("Employee saved");
         invalidateEmployees();
         return true;
@@ -150,9 +149,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
         // rolling back to pre-edit state — that way the user sees what
         // actually exists and can re-edit from the real current row.
         if (err instanceof EmployeeProfileConflictError) {
-          setAllLocal((prev) =>
-            prev.map((employee) => (employee.id === emp.id ? err.latestEmployee : employee)),
-          );
+          setAllLocal((prev) => replaceEmployeeRow(prev, err.latestEmployee));
           toast.error("Employee changed elsewhere. Review the latest values and try again.");
           return false;
         }
@@ -169,20 +166,16 @@ export function useEmployees(orgId: string | null): EmployeesData {
     async (emp: Employee, oldInvitation: Invitation) => {
       if (!orgId) return false;
       const prevAll = allEmployeesRef.current;
-      setAllLocal((prev) => prev.map((e) => (e.id === emp.id ? emp : e)));
+      setAllLocal((prev) => replaceEmployeeRow(prev, emp));
 
       let savedEmployee: Employee;
       try {
         savedEmployee = await updateEmployee(emp, orgId, emp.version);
-        setAllLocal((prev) =>
-          prev.map((employee) => (employee.id === emp.id ? savedEmployee : employee)),
-        );
+        setAllLocal((prev) => replaceEmployeeRow(prev, savedEmployee));
         invalidateEmployees();
       } catch (err) {
         if (err instanceof EmployeeProfileConflictError) {
-          setAllLocal((prev) =>
-            prev.map((employee) => (employee.id === emp.id ? err.latestEmployee : employee)),
-          );
+          setAllLocal((prev) => replaceEmployeeRow(prev, err.latestEmployee));
           toast.error("Employee changed elsewhere. Review the latest values and try again.");
           return false;
         }
@@ -238,16 +231,12 @@ export function useEmployees(orgId: string | null): EmployeesData {
       );
       try {
         const updatedEmployee = await removeEmployee(empId, orgId, targetEmployee.version, note);
-        setAllLocal((prev) =>
-          prev.map((employee) => (employee.id === empId ? updatedEmployee : employee)),
-        );
+        setAllLocal((prev) => replaceEmployeeRow(prev, updatedEmployee));
         toast.success("Employee removed");
         invalidateEmployees();
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
-          setAllLocal((prev) =>
-            prev.map((employee) => (employee.id === empId ? err.latestEmployee : employee)),
-          );
+          setAllLocal((prev) => replaceEmployeeRow(prev, err.latestEmployee));
           toast.error("Employee status changed elsewhere. Review the latest values and try again.");
           return;
         }
@@ -288,16 +277,12 @@ export function useEmployees(orgId: string | null): EmployeesData {
           orgId,
           targetEmployee.version,
         );
-        setAllLocal((prev) =>
-          prev.map((employee) => (employee.id === empId ? updatedEmployee : employee)),
-        );
+        setAllLocal((prev) => replaceEmployeeRow(prev, updatedEmployee));
         toast.success("Employee marked inactive");
         invalidateEmployees();
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
-          setAllLocal((prev) =>
-            prev.map((employee) => (employee.id === empId ? err.latestEmployee : employee)),
-          );
+          setAllLocal((prev) => replaceEmployeeRow(prev, err.latestEmployee));
           toast.error("Employee status changed elsewhere. Review the latest values and try again.");
           return;
         }
@@ -329,16 +314,12 @@ export function useEmployees(orgId: string | null): EmployeesData {
       );
       try {
         const updatedEmployee = await activateEmployee(empId, orgId, targetEmployee.version);
-        setAllLocal((prev) =>
-          prev.map((employee) => (employee.id === empId ? updatedEmployee : employee)),
-        );
+        setAllLocal((prev) => replaceEmployeeRow(prev, updatedEmployee));
         toast.success("Employee activated");
         invalidateEmployees();
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
-          setAllLocal((prev) =>
-            prev.map((employee) => (employee.id === empId ? err.latestEmployee : employee)),
-          );
+          setAllLocal((prev) => replaceEmployeeRow(prev, err.latestEmployee));
           toast.error("Employee status changed elsewhere. Review the latest values and try again.");
           return;
         }

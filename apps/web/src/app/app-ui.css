@@ -843,7 +843,7 @@
   }
 }
 @media (min-width: 1024px) {
-  /* lg: Certification regains its divider; Date Joined (col 10) is the rightmost. */
+  /* lg: Certification regains its divider; Date joined (col 10) is the rightmost. */
   .dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(6),
   .dg-staff-directory-row > .dg-staff-directory-cell:nth-child(6) {
     border-right: 1px solid var(--dg-color-border-light);

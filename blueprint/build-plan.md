@@ -528,7 +528,7 @@
       and qualify the repaired journeys in real clients and providers. This
       hardening milestone authorizes no production migration, deployment, or
       invitation reissue without separate reviewed release approval.
-  - [ ] 41a. **Invitation authorization, attribution, and reliable delivery** -
+  - [x] 41a. **Invitation authorization, attribution, and reliable delivery** -
         close the pending-invitation privilege-escalation path; ensure every
         server-created invitation has verifiable inviter attribution; align
         create and resend permissions with the sender; make token rotation and
@@ -565,7 +565,7 @@
           clear to recipients in the invitation email and the accept-invite
           landing, so a replaced link and a still-valid one are tellable
           apart.
-    - [ ] 41a4. **Joined date means acceptance** - show "Date joined" as the
+    - [x] 41a4. **Joined date means acceptance** - show "Date joined" as the
           date the person accepted their invitation, rename the staff record's
           creation date "Date added", and show no joined date for someone who
           has not accepted.

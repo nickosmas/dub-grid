@@ -587,3 +587,100 @@ describe("POST /api/employees/manage", () => {
     });
   });
 });
+
+describe("POST /api/employees/manage fetchEmployees joined dates", () => {
+  const OTHER_USER_ID = "0b6e2a4c-1d3f-4e5a-8b7c-9d0e1f2a3b4c";
+  const membershipFilters: Array<[string, unknown]> = [];
+
+  const employeeRows = [
+    { id: "emp-joined", user_id: PERSON_USER_ID },
+    { id: "emp-self", user_id: VIEWER_USER_ID },
+    { id: "emp-unlinked", user_id: null },
+  ];
+  // What the organization's membership read returns: a member for each linked
+  // row, plus one whose employee is not on this list.
+  const membershipRows = [
+    { user_id: PERSON_USER_ID, joined_at: "2026-03-05T14:00:00.000Z" },
+    { user_id: VIEWER_USER_ID, joined_at: "2026-02-01T09:30:00.000Z" },
+    { user_id: OTHER_USER_ID, joined_at: "2026-01-01T00:00:00.000Z" },
+  ];
+
+  function makeListClient() {
+    return {
+      from: vi.fn((table: string) => {
+        const rows = table === "organization_memberships" ? membershipRows : employeeRows;
+        const chain: Record<string, unknown> = {};
+        for (const method of ["select", "is", "in", "order"]) {
+          chain[method] = vi.fn(() => chain);
+        }
+        chain.eq = vi.fn((column: string, value: unknown) => {
+          if (table === "organization_memberships") membershipFilters.push([column, value]);
+          return chain;
+        });
+        chain.range = vi.fn(() => Promise.resolve({ data: rows, error: null }));
+        return chain;
+      }),
+    };
+  }
+
+  function fetchEmployeesRequest() {
+    return new NextRequest("http://localhost/api/employees/manage", {
+      method: "POST",
+      body: JSON.stringify({ action: "fetchEmployees", orgId: ORG_ID }),
+    });
+  }
+
+  async function listAs(permissions: Record<string, boolean>) {
+    requireOrgPermissions.mockResolvedValue({
+      permissions: {
+        isGridmaster: false,
+        isSuperAdmin: false,
+        canViewStaff: true,
+        canViewEmployeeDetails: false,
+        canManageEmployees: false,
+        ...permissions,
+      },
+      serviceClient: makeListClient(),
+      actor: { id: VIEWER_USER_ID },
+    });
+    const response = await POST(fetchEmployeesRequest());
+    expect(response.status).toBe(200);
+    const { employees } = (await response.json()) as {
+      employees: Array<{ id: string; joinedAt: string | null }>;
+    };
+    return new Map(employees.map((employee) => [employee.id, employee.joinedAt]));
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    membershipFilters.length = 0;
+    validateCsrfOrigin.mockReturnValue(null);
+    requireAuthenticatedUser.mockResolvedValue({ user: { id: VIEWER_USER_ID } });
+    resolveEffectiveOrgId.mockResolvedValue(ORG_ID);
+    rowToEmployee.mockImplementation((row: { id: string; user_id: string | null }) =>
+      makeEmployee({ id: row.id, userId: row.user_id }),
+    );
+  });
+
+  it("dates each linked person by their membership and leaves the rest empty", async () => {
+    const joined = await listAs({ canManageEmployees: true });
+
+    expect(joined.get("emp-joined")).toBe("2026-03-05T14:00:00.000Z");
+    expect(joined.get("emp-self")).toBe("2026-02-01T09:30:00.000Z");
+    // No account, or an invitation not yet accepted: no membership, no date.
+    expect(joined.get("emp-unlinked")).toBeNull();
+  });
+
+  it("reads memberships from the organization the employees came from", async () => {
+    await listAs({ canManageEmployees: true });
+
+    expect(membershipFilters).toEqual([["org_id", ORG_ID]]);
+  });
+
+  it("withholds a coworker's joined date from a view-only caller, but not their own", async () => {
+    const joined = await listAs({});
+
+    expect(joined.get("emp-joined")).toBeNull();
+    expect(joined.get("emp-self")).toBe("2026-02-01T09:30:00.000Z");
+  });
+});

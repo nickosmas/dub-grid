@@ -174,8 +174,8 @@ function StaffRowCells({
   const employmentLabel = emp.employmentType === "part_time" ? "Part-time" : "Full-time";
   const statusLabel =
     emp.status === "inactive" ? "Inactive" : emp.status === "removed" ? "Removed" : "Active";
-  const joinedLabel = emp.createdAt
-    ? new Date(emp.createdAt).toLocaleDateString(undefined, {
+  const joinedLabel = emp.joinedAt
+    ? new Date(emp.joinedAt).toLocaleDateString(undefined, {
         year: "numeric",
         month: "short",
         day: "numeric",
@@ -442,14 +442,15 @@ function StaffRowCells({
         </StaffCell>
       )}
 
-      {/* Date Joined — admin/HR detail; rightmost data column at lg+. */}
+      {/* Date joined: when they accepted, empty until then. Admin/HR detail;
+          rightmost data column at lg+. */}
       {canViewEmployeeDetails && (
         <StaffCell
           variant={variant}
           tableClassName="table-cell py-4 w-[140px]"
           gridClassName="dg-staff-directory-cell dg-staff-directory-cell--date-joined flex py-4"
         >
-          <MaybeHint content={emp.createdAt}>
+          <MaybeHint content={emp.joinedAt}>
             <span className="text-[12px] tabular-nums whitespace-nowrap text-[var(--dg-color-text-primary)]">
               {joinedLabel}
             </span>

@@ -126,6 +126,15 @@ export function OverviewTab({
     ? certifications.find((item) => item.id === employee.certificationId)?.name
     : null;
   const employmentLabel = employee.employmentType === "part_time" ? "Part-time" : "Full-time";
+  // When the staff record was created. The People table's "Date joined" is a
+  // different fact: when they accepted their invitation.
+  const dateAdded = employee.createdAt
+    ? new Date(employee.createdAt).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    : null;
   const assignedFocusAreaNames = employee.focusAreaIds
     .map((id) => focusAreas.find((item) => item.id === id)?.name)
     .filter(Boolean) as string[];
@@ -245,6 +254,14 @@ export function OverviewTab({
                     {employmentLabel}
                   </dd>
                 </div>
+                {dateAdded && (
+                  <div>
+                    <dt className="dg-type-field-title mb-0.5">Date added</dt>
+                    <dd className="dg-tabular-nums text-[13px] text-[var(--dg-color-text-primary)]">
+                      {dateAdded}
+                    </dd>
+                  </div>
+                )}
                 {assignedFocusAreaNames.length > 0 && (
                   <div>
                     <dt className="dg-type-field-title mb-0.5">{focusAreaLabel}</dt>

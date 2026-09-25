@@ -274,6 +274,7 @@ describe("mobile auth server boundaries", () => {
       expect(result.currentOrg.id).toBe(ORG_ID);
       expect(result.permissions.orgId).toBe(ORG_ID);
       expect(result.membership?.orgRole).toBe(orgRole);
+      expect(result.membership?.joinedAt).toBe("2026-01-01T00:00:00.000Z");
     },
   );
 

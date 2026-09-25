@@ -244,6 +244,51 @@ describe("mobile contracts", () => {
     });
 
     expect(result.success).toBe(true);
+    // A server from before the joined date existed omits it; the app still parses.
+    expect(result.success ? result.data.joinedAt : "missing").toBeNull();
+  });
+
+  it("carries the joined date separately from the account's creation date", () => {
+    const base = mobileProfileResponseSchema.parse({
+      user: {
+        id: "11111111-1111-4111-8111-111111111111",
+        email: "alex@example.com",
+        firstName: "Alex",
+        lastName: "North",
+        createdAt: "2024-01-01T00:00:00.000Z",
+        lastSignInAt: null,
+        mfaEnabled: false,
+      },
+      currentOrg: {
+        id: "22222222-2222-4222-8222-222222222222",
+        name: "Acme Care",
+        slug: "acme",
+        timezone: "America/Los_Angeles",
+        shiftDisplayMode: "code",
+        labels: {
+          focusArea: "Focus Areas",
+          certification: "Certifications",
+          role: "Roles",
+          department: "Departments",
+        },
+        featureFlags: {},
+      },
+      currentMembership: {
+        id: "22222222-2222-4222-8222-222222222222",
+        name: "Acme Care",
+        slug: "acme",
+        orgRole: "user",
+        platformRole: "none",
+        isCurrent: true,
+      },
+      effectiveRole: "user",
+      linkedEmployee: null,
+      focusAreas: [],
+      joinedAt: "2026-03-05T14:00:00.000Z",
+    });
+
+    expect(base.joinedAt).toBe("2026-03-05T14:00:00.000Z");
+    expect(base.user.createdAt).toBe("2024-01-01T00:00:00.000Z");
   });
 
   it("validates and normalizes optional US staff phone numbers", () => {
