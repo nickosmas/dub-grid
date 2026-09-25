@@ -9,7 +9,7 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
-import { dispatchNotificationEvent } from "@/features/notifications/server/events";
+import { scheduleSecurityAlert } from "@/features/account/server/security-alerts";
 import { endUserSessions } from "@/lib/auth/revocation";
 
 const paramsSchema = z.object({
@@ -81,19 +81,13 @@ export async function POST(req: NextRequest, context: { params: Promise<{ userId
       request: req,
     });
 
-    // Resolve the target's default org so the notification is org-scoped
-    // (its bell + inbox is filtered by current org context). Falls back to
-    // null when the target has no membership — the alert still reaches them
-    // as a platform-scoped row.
-    const { data: targetProfile } = await serviceClient
-      .from("profiles")
-      .select("org_id")
-      .eq("id", parsed.data.userId)
-      .maybeSingle();
-
-    void dispatchNotificationEvent(auth.user.id, {
+    // No organization: a Gridmaster ended every session on the sign-in, not a
+    // session in one organization, so the alert is a platform row every inbox
+    // shows and names no organization. Scheduled past the response, which a
+    // bare promise was not.
+    scheduleSecurityAlert(auth.user.id, {
       action: "security_session_revoked",
-      orgId: (targetProfile?.org_id as string | null) ?? null,
+      orgId: null,
       targetUserId: parsed.data.userId,
       initiatedBy: "gridmaster",
       deviceLabel: null,

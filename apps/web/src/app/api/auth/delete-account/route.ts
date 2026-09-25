@@ -6,6 +6,7 @@ import {
   hasStartedSelfDeletion,
   recordSelfDeletionStarted,
 } from "@/features/account/server/self-deletion";
+import { scheduleAccountDeletedNotice } from "@/features/account/server/account-deleted-notice";
 import { rejectDeletedAccountTokens } from "@/features/account/server/account-deletion";
 import { forbidIfSandboxCookie, requireSensitiveActionAuth } from "@/lib/api-auth";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
@@ -217,6 +218,7 @@ export async function DELETE(req: NextRequest) {
       );
     }
     await rejectDeletedAccountTokens(userId, "self-deletion-token-revocation");
+    scheduleAccountDeletedNotice(user.email);
 
     try {
       await serviceClient.from("audit_log").insert({

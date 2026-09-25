@@ -398,6 +398,18 @@ export const mobileNotificationPreferencesUpdateBodySchema = z.object({
   prefs: mobileNotificationPreferencesSchema,
 });
 
+/**
+ * Web shows three more categories than mobile. Security is absent on purpose:
+ * security alerts are always on, so a stored preference for them means nothing.
+ */
+export const webNotificationPreferencesUpdateBodySchema = z.object({
+  prefs: mobileNotificationPreferencesSchema.extend({
+    membership: mobileNotificationPreferenceChannelsSchema.optional(),
+    account: mobileNotificationPreferenceChannelsSchema.optional(),
+    billing: mobileNotificationPreferenceChannelsSchema.optional(),
+  }),
+});
+
 export const mobileProfileSessionSchema = z.object({
   id: z.string().uuid(),
   platform: z.enum(["web", "ios", "android"]).nullable(),

@@ -10,6 +10,9 @@ import { createAnonClient, createTokenScopedClient } from "@/lib/api-auth";
 import { verifyAccessToken } from "@/lib/auth/verify-token";
 import { apiLimiter, checkRateLimit, loginLimiter } from "@/lib/rate-limit";
 import { writeSecurityAuditEvent } from "@/lib/auth/security-audit";
+import logger from "@/lib/logger";
+import { recordSelfMfaOff } from "./profile";
+import { scheduleSecurityAlert } from "./security-alerts";
 
 type LifecycleIdentity = {
   accessToken: string;
@@ -20,6 +23,28 @@ type Gate = (req: NextRequest) => Promise<LifecycleIdentity | { response: NextRe
 
 function reply(body: unknown, status = 200) {
   return NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
+}
+
+/**
+ * Removing the last verified factor turns two-factor off, and the person hears
+ * about it from here rather than from a second request the client may never
+ * make. The stored flag is updated first, so the client's later reconcile
+ * finds nothing changed and does not alert again. The factor is already gone,
+ * so a failure here is logged and left to that reconcile.
+ */
+async function settleTwoFactorOff(userId: string, orgId: string | null): Promise<void> {
+  try {
+    if (await recordSelfMfaOff(userId)) {
+      scheduleSecurityAlert(userId, {
+        action: "security_mfa_changed",
+        orgId,
+        targetUserId: userId,
+        enabled: false,
+      });
+    }
+  } catch (error) {
+    logger.error({ error, userId }, "two-factor removal follow-up failed");
+  }
 }
 
 /** User-scoped provider mutations, never Auth Admin mutations. Both transports
@@ -150,14 +175,24 @@ export function createMfaLifecycleHandler(options: {
           { error: "We couldn't remove this authenticator. Check its status before retrying." },
           502,
         );
+      const orgId = typeof auth.claims.org_id === "string" ? auth.claims.org_id : null;
       await writeSecurityAuditEvent({
         event: "security.auth.mfa",
         outcome: "succeeded",
         reason: "factor_removed",
         actorId: auth.user.id,
-        orgId: typeof auth.claims.org_id === "string" ? auth.claims.org_id : null,
+        orgId,
         metadata: { surface: options.surface, method: "totp" },
       });
+      const stillProtected = (auth.user.factors ?? []).some(
+        (candidate) =>
+          candidate.id !== factor.id &&
+          candidate.factor_type === "totp" &&
+          candidate.status === "verified",
+      );
+      if (factor.status === "verified" && !stillProtected) {
+        await settleTwoFactorOff(auth.user.id, orgId);
+      }
       return reply({ success: true });
     } catch {
       // Do not log provider errors: enrollment replies and credentials are sensitive.

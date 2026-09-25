@@ -31,6 +31,10 @@ vi.mock("@/features/account/server", () => ({
 vi.mock("@/lib/sentry", () => ({
   captureException: (...args: unknown[]) => captureException(...args),
 }));
+const scheduleAccountDeletedNotice = vi.fn();
+vi.mock("@/features/account/server/account-deleted-notice", () => ({
+  scheduleAccountDeletedNotice: (...args: unknown[]) => scheduleAccountDeletedNotice(...args),
+}));
 const rejectDeletedAccountTokens = vi.fn();
 vi.mock("@/features/account/server/account-deletion", () => ({
   rejectDeletedAccountTokens: (...args: unknown[]) => rejectDeletedAccountTokens(...args),
@@ -267,6 +271,7 @@ describe("DELETE /api/auth/delete-account", () => {
     );
     // The account still exists, so its tokens are left alone for the retry.
     expect(rejectDeletedAccountTokens).not.toHaveBeenCalled();
+    expect(scheduleAccountDeletedNotice).not.toHaveBeenCalled();
     expect(captureException).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
@@ -292,6 +297,10 @@ describe("DELETE /api/auth/delete-account", () => {
     );
     expect(authDeleteUser.mock.invocationCallOrder[0]).toBeLessThan(
       rejectDeletedAccountTokens.mock.invocationCallOrder[0],
+    );
+    expect(scheduleAccountDeletedNotice).toHaveBeenCalledExactlyOnceWith("u@test.com");
+    expect(authDeleteUser.mock.invocationCallOrder[0]).toBeLessThan(
+      scheduleAccountDeletedNotice.mock.invocationCallOrder[0],
     );
     expect(auditInsert).toHaveBeenCalledWith(
       expect.objectContaining({ action: "account.deleted" }),

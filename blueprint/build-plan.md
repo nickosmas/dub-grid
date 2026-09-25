@@ -603,6 +603,21 @@
         DubGrid sign-in account and may name only a verified initiating
         organization as context, never imply that an organization owns the
         credential or disclose membership counts.
+    - [x] 41c1. **Security alert delivery** - a claimed new sign-in always
+          alerts, removing two-factor alerts from the server, a force-logout
+          alert survives the response, security pushes reach every device on
+          the account, an account deletion sends a notice, Supabase's own
+          password and email change notices are declared and enabled, and the
+          security-alert settings say truthfully that they are always on.
+    - [ ] 41c2. **Audit attribution** - record web sign-in denials, audit an
+          invitation acceptance's sign-in, record a completed sign-in once
+          per session, and take the organization of an ended impersonation
+          from the session rather than the request.
+    - [ ] 41c3. **Impersonation notices and auth email copy** - send
+          impersonation notices from the server with deduplication, correct
+          the impersonation email copy, and add the missing expiry and
+          "wasn't you" lines to the auth emails, with the template drift
+          check extended to app-sent auth mail.
   - [ ] 41d. **Auth resilience and release qualification** - remove remaining
         retry-loop and source/template drift hazards; add focused regression
         coverage for every repaired path; and perform browser, native-app,

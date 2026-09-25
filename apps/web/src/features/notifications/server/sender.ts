@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { emailBaseUrl } from "@/lib/email";
 import { NotificationEmail } from "@/emails/NotificationEmail";
 import {
+  isAccountWidePushType,
   isPushEligibleNotificationType,
   sendMobilePushNotifications,
 } from "@/features/mobile/server";
@@ -161,15 +162,20 @@ export async function sendNotification(
   }
 
   if (isPushEligibleNotificationType(type)) {
-    await sendMobilePushNotifications(userId, orgId, {
-      title,
-      body: message,
-      data: {
-        notificationId: insertedNotificationId,
-        type,
-        ...metadata,
+    await sendMobilePushNotifications(
+      userId,
+      orgId,
+      {
+        title,
+        body: message,
+        data: {
+          notificationId: insertedNotificationId,
+          type,
+          ...metadata,
+        },
       },
-    });
+      { accountWide: isAccountWidePushType(type) },
+    );
   }
 
   // 2. Check user preferences for email
@@ -180,7 +186,10 @@ export async function sendNotification(
     .maybeSingle();
 
   const userPrefs = prefs?.prefs as Record<string, { in_app?: boolean; email?: boolean }> | null;
-  const emailEnabled = userPrefs?.[category]?.email ?? DEFAULT_EMAIL_ENABLED[category] ?? false;
+  // Security alerts are always on, whatever an older save may have stored.
+  const emailEnabled =
+    category === "security" ||
+    (userPrefs?.[category]?.email ?? DEFAULT_EMAIL_ENABLED[category] ?? false);
 
   if (!emailEnabled) return;
 

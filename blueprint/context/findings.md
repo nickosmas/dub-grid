@@ -20,7 +20,7 @@
 **File:** `apps/web/src/features/account/client/auth.ts:86`; `apps/mobile/src/features/profile/screens/ProfilePasswordScreen.tsx:248`; `apps/web/src/features/account/server/mfa-lifecycle.ts:114`
 **Found:** 2026-09-25 by `/audit` (scope: current, 3c8b690c..3b6d908b; all lenses)
 **Why it matters:** Password and sign-in email changes are direct Supabase calls, and the factor endpoints DubGrid proxies stay reachable with the same JWT, so the assurance is a client preflight. A stolen access token can change the password (Supabase still requires aal2 when a factor exists) or, on an account with no factor, enroll an attacker's authenticator and lock the owner out, skipping DubGrid's audit. Moving the calls into DubGrid routes would not close it.
-**Suggested fix:** A decision for the owner: database triggers on `auth.users` and `auth.mfa_factors` that audit, revoke or alert on credential changes, and/or a shorter `jwt_expiry`. Out of 41b2's scope by design.
+**Suggested fix:** A decision for the owner: database triggers on `auth.users` and `auth.mfa_factors` that audit, revoke or alert on credential changes, and/or a shorter `jwt_expiry`. Out of 41b2's scope by design. A third option since 41c1: turn on Supabase's own MFA factor notices (declared in `config.toml`, currently `enabled = false` because DubGrid's alert covers normal flows), which alert the owner of any enrollment or removal, including one made with a stolen token, at the cost of a duplicate email on an ordinary change.
 **Resolution:**
 
 ### F-16 [P2] open - Gridmaster organization-role grants run without fresh assurance
@@ -45,4 +45,20 @@
 **Found:** 2026-09-25 during 41b3's final gate (full `npm run test`)
 **Why it matters:** The challenge verify returned no session once in a full run and passed in isolation (1/1). A TOTP window rollover or local Auth rate limit under parallel live tests are the likely causes; unproven.
 **Suggested fix:** Generate the code for the verify moment and retry once on a window edge, or run the live tests serially.
+**Resolution:**
+
+### F-20 [P3] open - Saving notification preferences can lose a concurrent save
+
+**File:** `apps/web/src/features/account/server/preferences.ts:31`
+**Found:** 2026-09-25 by `/audit` (scope: current, 0d010ca0..4d2b515c; all lenses)
+**Why it matters:** The save reads, merges and upserts in three steps, so a mobile save and a web save at the same moment can drop one another's change. Before 41c1 a mobile save erased the web categories every time.
+**Suggested fix:** Merge inside the database (`prefs = notification_preferences.prefs || excluded.prefs` in an RPC), which needs a migration.
+**Resolution:**
+
+### F-22 [P3] open - 41c1 test gaps: the remove-then-reconcile sequence and the push script's compare
+
+**File:** `apps/web/src/__tests__/mfa-lifecycle.test.ts`; `scripts/push-auth-templates.ts:155`
+**Found:** 2026-09-25 by `/audit` (scope: current, 0d010ca0..4d2b515c; all lenses)
+**Why it matters:** Each half of "a later reconcile sends nothing" is tested separately, not the sequence, and the script's boolean compare runs only in production use; a source-text check stands in for it.
+**Suggested fix:** A test that removes the last factor and then reconciles; export the script's `diff` behind a main guard and test it.
 **Resolution:**

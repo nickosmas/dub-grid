@@ -8,9 +8,14 @@ const requestRpc = vi.fn();
 const serviceRpc = vi.fn();
 const serviceFrom = vi.fn();
 const auditInsert = vi.fn();
-const profileSnapshot = vi.fn();
 const dispatchNotificationEvent = vi.fn();
 const endUserSessions = vi.fn();
+const after = vi.fn((task: () => unknown) => void task());
+
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (task: () => unknown) => after(task),
+}));
 
 vi.mock("@/lib/api-auth", () => ({
   createRequestSupabaseClient: () => ({
@@ -72,21 +77,9 @@ describe("POST /api/gridmaster/users/[userId]/force-logout", () => {
     auditInsert.mockResolvedValue({ error: null });
     dispatchNotificationEvent.mockResolvedValue({ success: true });
     endUserSessions.mockResolvedValue(undefined);
-    profileSnapshot.mockResolvedValue({
-      data: { org_id: "target-org-id" },
-    });
     serviceFrom.mockImplementation((table: string) => {
       if (table === "audit_log") {
         return { insert: auditInsert };
-      }
-      if (table === "profiles") {
-        return {
-          select: () => ({
-            eq: () => ({
-              maybeSingle: () => profileSnapshot(),
-            }),
-          }),
-        };
       }
       throw new Error(`Unexpected table: ${table}`);
     });
@@ -226,9 +219,12 @@ describe("POST /api/gridmaster/users/[userId]/force-logout", () => {
         }),
       }),
     );
+    // Kept alive past the response, and about the sign-in rather than the
+    // organization the target last switched to.
+    expect(after).toHaveBeenCalledTimes(1);
     expect(dispatchNotificationEvent).toHaveBeenCalledWith("gridmaster-user", {
       action: "security_session_revoked",
-      orgId: "target-org-id",
+      orgId: null,
       targetUserId: USER_ID,
       initiatedBy: "gridmaster",
       deviceLabel: null,

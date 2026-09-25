@@ -26,8 +26,7 @@ function formatLikeTheGenerator(html: string, target: string): string {
   });
 }
 
-function configBlock(key: string): string {
-  const header = `[auth.email.template.${key}]`;
+function configBlock(header: string): string {
   const start = configToml.indexOf(header);
   if (start === -1) return "";
   const rest = configToml.slice(start + header.length);
@@ -65,12 +64,27 @@ describe("Supabase auth email templates", () => {
     },
   );
 
-  it.each(SUPABASE_AUTH_TEMPLATES)("$key is wired into config.toml with a subject", ({ key }) => {
-    const block = configBlock(key);
-    expect(block, `config.toml has no [auth.email.template.${key}]`).not.toBe("");
-    expect(block).toMatch(/^subject\s*=\s*"[^"]+"/m);
-    expect(block).toContain(`content_path = "./supabase/templates/${key}.html"`);
-  });
+  // The CLI reads security notices only from `[auth.email.notification.*]`;
+  // declared as templates they were silently ignored (41c1).
+  it.each(SUPABASE_AUTH_TEMPLATES)(
+    "$key is wired into config.toml with a subject",
+    ({ key, notification }) => {
+      const header = notification
+        ? `[auth.email.notification.${notification.type}]`
+        : `[auth.email.template.${key}]`;
+      const block = configBlock(header);
+      expect(block, `config.toml has no ${header}`).not.toBe("");
+      expect(block).toMatch(/^subject\s*=\s*"[^"]+"/m);
+      // The CLI resolves a notification's path from supabase/, a template's
+      // from the repository root.
+      const templatePath = notification ? "./templates" : "./supabase/templates";
+      expect(block).toContain(`content_path = "${templatePath}/${key}.html"`);
+      if (notification) {
+        expect(block).toMatch(new RegExp(`^enabled = ${notification.enabled}$`, "m"));
+        expect(configToml).not.toContain(`[auth.email.template.${key}]`);
+      }
+    },
+  );
 
   it("pushes exactly the templates it renders", () => {
     const pushScript = readFileSync(
@@ -81,6 +95,19 @@ describe("Supabase auth email templates", () => {
     const pushed = [...keysBlock.matchAll(/"([a-z_]+)"/g)].map((match) => match[1]).sort();
 
     expect(pushed).toEqual(SUPABASE_AUTH_TEMPLATES.map(({ key }) => key).sort());
+  });
+
+  it("syncs each security notice's enabled flag from its notification section", () => {
+    const pushScript = readFileSync(
+      path.join(repoRoot, "scripts", "push-auth-templates.ts"),
+      "utf8",
+    );
+
+    expect(pushScript).toContain("auth.email.notification.${notificationType}");
+    expect(pushScript).toContain("mailer_notifications_${notification.type}_enabled");
+    for (const { key, notification } of SUPABASE_AUTH_TEMPLATES) {
+      if (notification) expect(key).toBe(`${notification.type}_notification`);
+    }
   });
 
   // These go to a DubGrid sign-in, which no organization controls, so they must

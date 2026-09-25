@@ -50,13 +50,30 @@ export async function POST(req: NextRequest) {
     null;
   const location = getSessionLocation(req.headers);
 
-  // Before the upsert, which fills in the platform this claim keys on.
-  const isNewSignIn = await claimNewSignIn({
+  // Before the upsert, which fills in the platform this claim keys on. A
+  // claimed row alerts at once, since a failed upsert's retry would find the
+  // claim spent; a session with no row yet alerts only once its row lands.
+  const claim = await claimNewSignIn({
     userId: auth.user.id,
     supabaseSessionId,
     platform: parsed.data.platform,
     claims: auth.claims,
   });
+
+  const alertNewSignIn = () =>
+    scheduleSecurityAlert(auth.user.id, {
+      action: "security_new_device",
+      orgId: auth.currentOrg.id,
+      targetUserId: auth.user.id,
+      supabaseSessionId,
+      platform: parsed.data.platform,
+      deviceLabel: parsed.data.deviceLabel,
+      ipAddress: ip,
+      locationCity: location.city,
+      locationCountry: location.country,
+      occurredAt: new Date().toISOString(),
+    });
+  if (claim === "claimed") alertNewSignIn();
 
   try {
     await trackUserSessionForUser({
@@ -75,20 +92,7 @@ export async function POST(req: NextRequest) {
     return json({ error: "We couldn't record this device. Try again." }, { status: 500 });
   }
 
-  if (isNewSignIn) {
-    scheduleSecurityAlert(auth.user.id, {
-      action: "security_new_device",
-      orgId: auth.currentOrg.id,
-      targetUserId: auth.user.id,
-      supabaseSessionId,
-      platform: parsed.data.platform,
-      deviceLabel: parsed.data.deviceLabel,
-      ipAddress: ip,
-      locationCity: location.city,
-      locationCountry: location.country,
-      occurredAt: new Date().toISOString(),
-    });
-  }
+  if (claim === "unrecorded") alertNewSignIn();
 
   return json({ success: true });
 }

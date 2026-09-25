@@ -59,7 +59,7 @@ describe("POST /api/auth/track-session", () => {
     trackUserSessionForUser.mockResolvedValue(undefined);
     dispatchNotificationEvent.mockResolvedValue({ success: true });
     // Default: this session was already reported, so it is not a new sign-in.
-    claimNewSignIn.mockResolvedValue(false);
+    claimNewSignIn.mockResolvedValue(null);
   });
 
   it("rejects unauthenticated requests", async () => {
@@ -126,7 +126,7 @@ describe("POST /api/auth/track-session", () => {
   });
 
   it("alerts, after the response, on a sign-in session not seen before", async () => {
-    claimNewSignIn.mockResolvedValueOnce(true);
+    claimNewSignIn.mockResolvedValueOnce("claimed");
 
     await POST(
       new NextRequest("http://localhost/api/auth/track-session", {
@@ -208,6 +208,47 @@ describe("POST /api/auth/track-session", () => {
     expect(claimNewSignIn.mock.invocationCallOrder[0]).toBeLessThan(
       trackUserSessionForUser.mock.invocationCallOrder[0]!,
     );
+  });
+
+  // The claim is spent once it wins, so an alert held back until after the
+  // write would be lost for good when the write failed and the client retried.
+  it("still alerts when recording the session fails after the claim", async () => {
+    claimNewSignIn.mockResolvedValueOnce("claimed");
+    trackUserSessionForUser.mockRejectedValueOnce(new Error("write failed"));
+
+    const response = await POST(
+      new NextRequest("http://localhost/api/auth/track-session", {
+        method: "POST",
+        headers: { origin: "http://localhost:3000" },
+        body: JSON.stringify({ platform: "web", deviceLabel: "Chrome on macOS" }),
+      }),
+    );
+
+    expect(response.status).toBe(500);
+    expect(dispatchNotificationEvent).toHaveBeenCalledOnce();
+    expect(dispatchNotificationEvent).toHaveBeenCalledWith(
+      "session-user",
+      expect.objectContaining({ action: "security_new_device", supabaseSessionId: "session-id-1" }),
+    );
+  });
+
+  it("alerts a session with no row only once its write lands", async () => {
+    claimNewSignIn.mockResolvedValue("unrecorded");
+    trackUserSessionForUser.mockRejectedValueOnce(new Error("write failed"));
+    const report = () =>
+      POST(
+        new NextRequest("http://localhost/api/auth/track-session", {
+          method: "POST",
+          headers: { origin: "http://localhost:3000" },
+          body: JSON.stringify({ platform: "web", deviceLabel: "Chrome on macOS" }),
+        }),
+      );
+
+    expect((await report()).status).toBe(500);
+    expect(dispatchNotificationEvent).not.toHaveBeenCalled();
+
+    expect((await report()).status).toBe(200);
+    expect(dispatchNotificationEvent).toHaveBeenCalledOnce();
   });
 
   it("stays quiet when the same session reports again", async () => {

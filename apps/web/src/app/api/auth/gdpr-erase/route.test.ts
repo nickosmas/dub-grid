@@ -26,6 +26,10 @@ vi.mock("@/lib/logger", () => ({
   default: { error: vi.fn(), info: vi.fn() },
 }));
 vi.mock("@/lib/sentry", () => ({ captureException: vi.fn() }));
+const scheduleAccountDeletedNotice = vi.fn();
+vi.mock("@/features/account/server/account-deleted-notice", () => ({
+  scheduleAccountDeletedNotice: (...args: unknown[]) => scheduleAccountDeletedNotice(...args),
+}));
 const rejectDeletedAccountTokens = vi.fn();
 vi.mock("@/features/account/server/account-deletion", () => ({
   rejectDeletedAccountTokens: (...args: unknown[]) => rejectDeletedAccountTokens(...args),
@@ -145,6 +149,7 @@ describe("POST /api/auth/gdpr-erase", () => {
         USER_ID,
         "gdpr-erase-token-revocation",
       );
+      expect(scheduleAccountDeletedNotice).toHaveBeenCalledExactlyOnceWith("u@test.com");
     });
 
     it("leaves the tokens alone when the account itself could not be deleted", async () => {
@@ -160,6 +165,7 @@ describe("POST /api/auth/gdpr-erase", () => {
 
       expect(response.status).toBe(500);
       expect(rejectDeletedAccountTokens).not.toHaveBeenCalled();
+      expect(scheduleAccountDeletedNotice).not.toHaveBeenCalled();
     });
 
     it("still refuses someone without permission who never began an erasure", async () => {

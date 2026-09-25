@@ -29,9 +29,11 @@ const DEFAULT_PREFS: AllPrefs = {
   membership: { in_app: true, email: false },
   account: { in_app: true, email: false },
   billing: { in_app: true, email: true },
-  security: { in_app: true, email: true },
   system: { in_app: true, email: false },
 };
+
+/** Security alerts cannot be turned off, so they are shown but never saved. */
+const ALWAYS_ON_CATEGORY = "security";
 
 const CATEGORY_LABELS: Record<string, string> = {
   schedule: "Schedule Changes",
@@ -121,6 +123,7 @@ function NotificationPreferencesSkeleton({ rowCount }: { rowCount: number }) {
 
 function normalizePrefs(nextPrefs: AllPrefs): AllPrefs {
   const merged = { ...DEFAULT_PREFS, ...nextPrefs };
+  delete merged[ALWAYS_ON_CATEGORY];
   return Object.fromEntries(
     Object.keys(merged)
       .sort()
@@ -315,20 +318,35 @@ export function NotificationPreferences({
                   {CATEGORY_DESCRIPTIONS[category]}
                 </span>
               </div>
-              <div style={centeredChannelCellStyle}>
-                <Switch
-                  checked={prefs[category]?.in_app ?? true}
-                  onChange={() => toggle(category, "in_app")}
-                  ariaLabel={`${label} in-app notifications`}
-                />
-              </div>
-              <div style={centeredChannelCellStyle}>
-                <Switch
-                  checked={prefs[category]?.email ?? false}
-                  onChange={() => toggle(category, "email")}
-                  ariaLabel={`${label} email notifications`}
-                />
-              </div>
+              {category === ALWAYS_ON_CATEGORY ? (
+                <span
+                  style={{
+                    ...centeredChannelCellStyle,
+                    gridColumn: "2 / 4",
+                    fontSize: "var(--dg-fs-footnote)",
+                    color: "var(--dg-color-text-muted)",
+                  }}
+                >
+                  Always on
+                </span>
+              ) : (
+                <>
+                  <div style={centeredChannelCellStyle}>
+                    <Switch
+                      checked={prefs[category]?.in_app ?? true}
+                      onChange={() => toggle(category, "in_app")}
+                      ariaLabel={`${label} in-app notifications`}
+                    />
+                  </div>
+                  <div style={centeredChannelCellStyle}>
+                    <Switch
+                      checked={prefs[category]?.email ?? false}
+                      onChange={() => toggle(category, "email")}
+                      ariaLabel={`${label} email notifications`}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           ))}
       </div>

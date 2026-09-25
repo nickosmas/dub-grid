@@ -2068,15 +2068,19 @@ export async function fetchActiveMobilePushTokenRows(
   serviceClient: SupabaseClient,
   input: {
     userId: string;
-    orgId: string;
+    /** Null reads the user's tokens across every organization. */
+    orgId: string | null;
   },
 ): Promise<MobilePushTokenRow[]> {
-  const { data, error } = await serviceClient
+  let query = serviceClient
     .from("mobile_device_tokens")
     .select("expo_push_token")
     .eq("user_id", input.userId)
-    .eq("org_id", input.orgId)
     .is("disabled_at", null);
+  if (input.orgId) {
+    query = query.eq("org_id", input.orgId);
+  }
+  const { data, error } = await query;
 
   if (error) {
     throw error;

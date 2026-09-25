@@ -60,18 +60,20 @@ describe("claimNewSignIn", () => {
       return { data: [{ id: "row" }], error: null };
     });
 
-    await expect(claim()).resolves.toBe(true);
+    await expect(claim()).resolves.toBe("claimed");
     expect(updates).toEqual([{ platform: "web" }]);
   });
 
   it("stays quiet when the session was already reported", async () => {
-    await expect(claim()).resolves.toBe(false);
+    await expect(claim()).resolves.toBeNull();
   });
 
-  it("treats a session with no row at all as new", async () => {
+  // Nothing was written, so the claim holds only once the report's own write
+  // lands; the caller alerts after it.
+  it("treats a session with no row at all as new but not yet recorded", async () => {
     existingResult.mockResolvedValue({ data: [], error: null });
 
-    await expect(claim()).resolves.toBe(true);
+    await expect(claim()).resolves.toBe("unrecorded");
   });
 
   it("stays quiet for an old session whose row was recreated by a refresh", async () => {
@@ -79,14 +81,14 @@ describe("claimNewSignIn", () => {
 
     await expect(
       claim({ amr: [{ method: "password", timestamp: now() - 3 * 3600 }] }),
-    ).resolves.toBe(false);
+    ).resolves.toBeNull();
     expect(updates).toEqual([]);
   });
 
   it("never blocks sign-in when detection fails", async () => {
     claimResult.mockResolvedValue({ data: null, error: new Error("db down") });
 
-    await expect(claim()).resolves.toBe(false);
+    await expect(claim()).resolves.toBeNull();
   });
 });
 

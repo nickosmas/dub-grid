@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { revokeAllUserSessions } from "@/lib/auth/revocation";
+import { scheduleAccountDeletedNotice } from "./account-deleted-notice";
 
 export interface DeleteUserAccountInput {
   serviceClient: SupabaseClient;
@@ -87,6 +88,7 @@ export async function deleteUserAccountWithCleanup({
     throw deleteError;
   }
   await rejectDeletedAccountTokens(userId, "account-deletion-token-revocation");
+  scheduleAccountDeletedNotice(targetEmail);
 
   const cleanupFailures: string[] = [];
   async function runCleanupStep(

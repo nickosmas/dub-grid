@@ -12,6 +12,10 @@ vi.mock("@/lib/sentry", () => ({
   captureException: (...args: unknown[]) => captureException(...args),
 }));
 vi.mock("@/lib/logger", () => ({ default: { error: vi.fn(), info: vi.fn() } }));
+const scheduleAccountDeletedNotice = vi.fn();
+vi.mock("./account-deleted-notice", () => ({
+  scheduleAccountDeletedNotice: (...args: unknown[]) => scheduleAccountDeletedNotice(...args),
+}));
 
 import { deleteUserAccountWithCleanup, rejectDeletedAccountTokens } from "./account-deletion";
 
@@ -81,6 +85,7 @@ describe("deleteUserAccountWithCleanup", () => {
     expect(deleteUser.mock.invocationCallOrder[0]).toBeLessThan(
       revokeAllUserSessions.mock.invocationCallOrder[0],
     );
+    expect(scheduleAccountDeletedNotice).toHaveBeenCalledExactlyOnceWith("u@test.com");
   });
 
   it("leaves the tokens alone when the account could not be deleted", async () => {
@@ -88,5 +93,6 @@ describe("deleteUserAccountWithCleanup", () => {
 
     await expect(run(client)).rejects.toThrow("auth down");
     expect(revokeAllUserSessions).not.toHaveBeenCalled();
+    expect(scheduleAccountDeletedNotice).not.toHaveBeenCalled();
   });
 });

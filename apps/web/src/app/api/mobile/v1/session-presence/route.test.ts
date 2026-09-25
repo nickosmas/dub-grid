@@ -33,12 +33,12 @@ describe("POST /api/mobile/v1/session-presence", () => {
       },
     });
     trackUserSessionForUser.mockResolvedValue(undefined);
-    claimNewSignIn.mockResolvedValue(false);
+    claimNewSignIn.mockResolvedValue(null);
   });
 
   // Mobile sign-ins used to raise no out-of-band alert at all.
   it("alerts on a mobile sign-in session not seen before", async () => {
-    claimNewSignIn.mockResolvedValueOnce(true);
+    claimNewSignIn.mockResolvedValueOnce("claimed");
     const { POST } = await import("./route");
     await POST(
       new Request("http://localhost/api/mobile/v1/session-presence", {
@@ -65,6 +65,40 @@ describe("POST /api/mobile/v1/session-presence", () => {
         deviceLabel: "Pixel 8",
       }),
     );
+  });
+
+  it("still alerts when recording the device fails after the claim", async () => {
+    claimNewSignIn.mockResolvedValueOnce("claimed");
+    trackUserSessionForUser.mockRejectedValueOnce(new Error("write failed"));
+    const { POST } = await import("./route");
+    const response = await POST(
+      new Request("http://localhost/api/mobile/v1/session-presence", {
+        method: "POST",
+        body: JSON.stringify({ platform: "ios", deviceLabel: "iPhone" }),
+      }) as never,
+    );
+
+    expect(response.status).toBe(500);
+    expect(scheduleSecurityAlert).toHaveBeenCalledOnce();
+  });
+
+  it("alerts a device with no session row only once its write lands", async () => {
+    claimNewSignIn.mockResolvedValue("unrecorded");
+    trackUserSessionForUser.mockRejectedValueOnce(new Error("write failed"));
+    const { POST } = await import("./route");
+    const report = () =>
+      POST(
+        new Request("http://localhost/api/mobile/v1/session-presence", {
+          method: "POST",
+          body: JSON.stringify({ platform: "ios", deviceLabel: "iPhone" }),
+        }) as never,
+      );
+
+    expect((await report()).status).toBe(500);
+    expect(scheduleSecurityAlert).not.toHaveBeenCalled();
+
+    expect((await report()).status).toBe(200);
+    expect(scheduleSecurityAlert).toHaveBeenCalledOnce();
   });
 
   it("stays quiet when the same mobile session reports again", async () => {

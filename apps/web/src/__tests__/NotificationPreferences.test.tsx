@@ -7,11 +7,11 @@ import { NotificationsPanel } from "@/components/account/NotificationsPanel";
 const mockFetchNotificationPreferences = vi.fn();
 const mockSaveNotificationPreferences = vi.fn();
 
+// One object for every render, as the real provider gives: a fresh user each
+// render re-runs the load effect and resets unsaved changes.
+const authState = vi.hoisted(() => ({ user: { id: "user-1" }, isLoading: false }));
 vi.mock("@/components/AuthProvider", () => ({
-  useAuth: () => ({
-    user: { id: "user-1" },
-    isLoading: false,
-  }),
+  useAuth: () => authState,
 }));
 
 vi.mock("@/features/account/client", () => ({
@@ -64,6 +64,33 @@ describe("NotificationPreferences", () => {
     await waitFor(() => {
       expect(saveButton).toBeDisabled();
     });
+  });
+
+  it("shows security alerts as always on and never saves a preference for them", async () => {
+    const user = userEvent.setup();
+    mockFetchNotificationPreferences.mockResolvedValueOnce({
+      prefs: {
+        schedule: { in_app: true, email: false },
+        shift_requests: { in_app: true, email: false },
+        system: { in_app: true, email: false },
+        security: { in_app: false, email: false },
+      },
+    });
+
+    render(<NotificationPreferences />);
+
+    expect(await screen.findByText("Always on")).toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: /security alerts/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole("switch")[0]);
+    const saveButton = screen.getByRole("button", { name: /save preferences/i });
+    await waitFor(() => expect(saveButton).toBeEnabled());
+    await user.click(saveButton);
+
+    await waitFor(() => expect(mockSaveNotificationPreferences).toHaveBeenCalledOnce());
+    const saved = mockSaveNotificationPreferences.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(saved).not.toHaveProperty("security");
+    expect(saved).toHaveProperty("membership");
   });
 
   it("shows a layout skeleton while notification preferences load", () => {

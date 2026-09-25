@@ -60,33 +60,49 @@ export function isPushEligibleNotificationType(type: string): boolean {
   return PUSH_ELIGIBLE_TYPES.has(type);
 }
 
+/**
+ * Security alerts are about the sign-in, not one organization, so they go to
+ * every device the account registered, whichever organization it registered
+ * under, and even when the event has no organization at all.
+ */
+export function isAccountWidePushType(type: string): boolean {
+  return type.startsWith("security_");
+}
+
 export async function deliverMobilePushNotifications(
   input: {
     userId: string;
     orgId: string | null;
     payload: MobilePushPayload;
+    accountWide?: boolean;
   },
   deps: {
-    fetchPushTokens: (input: { userId: string; orgId: string }) => Promise<MobilePushToken[]>;
+    /** A null `orgId` reads the user's tokens across every organization. */
+    fetchPushTokens: (input: {
+      userId: string;
+      orgId: string | null;
+    }) => Promise<MobilePushToken[]>;
     sendMessages: (
       messages: MobileExpoPushMessage[],
     ) => Promise<{ ok: boolean; status?: number | null }>;
   },
 ): Promise<void> {
-  if (!input.orgId) {
+  if (!input.accountWide && !input.orgId) {
     return;
   }
 
-  const tokens = await deps.fetchPushTokens({
+  const rows = await deps.fetchPushTokens({
     userId: input.userId,
-    orgId: input.orgId,
+    orgId: input.accountWide ? null : input.orgId,
   });
+  // Defensive: a token is unique today, but a repeat would mean a double alert.
+  const tokens = [...new Set(rows.map((row) => row.expo_push_token))];
   if (tokens.length === 0) {
     return;
   }
 
-  const messages = tokens.map((row) => ({
-    to: row.expo_push_token,
+  const messages = tokens.map((token) => ({
+    to: token,
     sound: "default" as const,
     title: input.payload.title,
     body: input.payload.body,

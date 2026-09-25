@@ -6,7 +6,8 @@ import { resolve } from "node:path";
  * Syncs the auth-email half of `supabase/config.toml` to the linked remote
  * Supabase project: the compiled templates in `supabase/templates/` (the six
  * auth-action emails plus four security-notification emails), their subject
- * lines, and the OTP length/expiry those emails are written around.
+ * lines, whether each security notification is enabled, and the OTP
+ * length/expiry those emails are written around.
  *
  * Why this and not `supabase config push`: that command pushes the *entire*
  * `[auth]` block, and ours holds local-dev values — `site_url` of 127.0.0.1, a
@@ -40,10 +41,13 @@ type TemplateKey = (typeof TEMPLATE_KEYS)[number];
 
 type Change = { field: string; from: string; to: string; note?: string };
 
+const NOTIFICATION_SUFFIX = "_notification";
+
 /**
  * Reads `subject` and `content_path` out of each `[auth.email.template.*]`
- * block, plus the `otp_*` values from `[auth.email]`, so config.toml stays the
- * one place these are declared. A hand-rolled reader rather than a TOML
+ * block, and `enabled` too from each `[auth.email.notification.*]` block,
+ * plus the `otp_*` values from `[auth.email]`, so config.toml stays the one
+ * place these are declared. A hand-rolled reader rather than a TOML
  * dependency: the shapes involved are two flat key/value forms.
  */
 function readConfig() {
@@ -63,13 +67,33 @@ function readConfig() {
   };
 
   const templates = TEMPLATE_KEYS.map((key) => {
-    const body = section(`auth.email.template.${key}`);
+    const notificationType = key.endsWith(NOTIFICATION_SUFFIX)
+      ? key.slice(0, -NOTIFICATION_SUFFIX.length)
+      : null;
+    const name = notificationType
+      ? `auth.email.notification.${notificationType}`
+      : `auth.email.template.${key}`;
+    const body = section(name);
     const subject = value(body, "subject");
     const contentPath = value(body, "content_path");
     if (!subject || !contentPath) {
-      throw new Error(`[auth.email.template.${key}] is missing subject or content_path`);
+      throw new Error(`[${name}] is missing subject or content_path`);
     }
-    return { key, subject, content: readFileSync(resolve(contentPath), "utf-8") };
+    const enabled = notificationType ? value(body, "enabled") : null;
+    if (notificationType && enabled !== "true" && enabled !== "false") {
+      throw new Error(`[${name}] must set enabled = true or false`);
+    }
+    // The CLI reads a notification's path relative to supabase/, a template's
+    // relative to the repository root.
+    const contentFile = notificationType ? resolve("supabase", contentPath) : resolve(contentPath);
+    return {
+      key,
+      subject,
+      content: readFileSync(contentFile, "utf-8"),
+      notification: notificationType
+        ? { type: notificationType, enabled: enabled === "true" }
+        : null,
+    };
   });
 
   const email = section("auth.email");
@@ -124,14 +148,14 @@ function summarize(field: string, value: string): string {
 function diff(
   live: Record<string, unknown>,
   config: ReturnType<typeof readConfig>,
-): { changes: Change[]; payload: Record<string, string | number> } {
+): { changes: Change[]; payload: Record<string, string | number | boolean> } {
   const changes: Change[] = [];
-  const payload: Record<string, string | number> = {};
+  const payload: Record<string, string | number | boolean> = {};
 
-  const compare = (field: string, next: string | number, note?: string) => {
+  const compare = (field: string, next: string | number | boolean, note?: string) => {
     const current = live[field];
     const same =
-      typeof next === "number" ? current === next : String(current ?? "").trim() === next.trim();
+      typeof next === "string" ? String(current ?? "").trim() === next.trim() : current === next;
     if (same) return;
     payload[field] = next;
     changes.push({
@@ -142,9 +166,12 @@ function diff(
     });
   };
 
-  for (const { key, subject, content } of config.templates) {
+  for (const { key, subject, content, notification } of config.templates) {
     compare(`mailer_templates_${key}_content`, content);
     compare(`mailer_subjects_${key}`, subject);
+    if (notification) {
+      compare(`mailer_notifications_${notification.type}_enabled`, notification.enabled);
+    }
   }
 
   compare(

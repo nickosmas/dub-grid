@@ -6,6 +6,7 @@ import {
   hasStartedSelfDeletion,
   recordSelfDeletionStarted,
 } from "@/features/account/server/self-deletion";
+import { scheduleAccountDeletedNotice } from "@/features/account/server/account-deleted-notice";
 import { rejectDeletedAccountTokens } from "@/features/account/server/account-deletion";
 import { forbidIfSandboxCookie, requireSensitiveActionAuth } from "@/lib/api-auth";
 import logger from "@/lib/logger";
@@ -145,6 +146,7 @@ export async function POST(req: NextRequest) {
       );
     }
     await rejectDeletedAccountTokens(userId, "gdpr-erase-token-revocation");
+    scheduleAccountDeletedNotice(user.email);
 
     try {
       await serviceClient.from("audit_log").insert({
