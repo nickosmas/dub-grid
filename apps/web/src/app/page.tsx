@@ -599,7 +599,7 @@ export default function RootPage() {
               &copy; {new Date().getFullYear()} DubGrid
             </span>
           </a>
-          <div className="flex gap-6">
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 whitespace-nowrap">
             <Link
               href="/privacy"
               className="text-xs font-medium text-[var(--dg-color-text-label)] hover:text-[var(--dg-color-text-primary)] transition-colors"

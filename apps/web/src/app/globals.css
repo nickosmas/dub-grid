@@ -647,9 +647,13 @@ button {
 }
 /* Success (soft affirmative, e.g. reactivating a staff member) */
 /* Landing page: the brand field belongs to the header and hero; content settles
- * onto the same white and soft-blue surfaces used by onboarding. */
+ * onto the same white and soft-blue surfaces used by onboarding. The page is
+ * isolated so the fixed-height gradient can sit at z-index -1: on narrow
+ * screens it runs past the hero, and above z-index 0 it painted over the
+ * features heading. */
 .landing-page {
   position: relative;
+  isolation: isolate;
   background: #ffffff;
 }
 .dark .landing-page {
@@ -657,7 +661,7 @@ button {
 }
 .landing-hero-gradient {
   position: absolute;
-  z-index: 0;
+  z-index: -1;
   top: 0;
   right: 0;
   left: 0;
