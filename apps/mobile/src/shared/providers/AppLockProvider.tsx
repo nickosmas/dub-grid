@@ -25,6 +25,7 @@ import {
   subscribeAppLockEnabled,
   type AppLockState,
 } from "../lib/app-lock";
+import { getUserIdFromAccessToken } from "../lib/access-token";
 import { useSessionState } from "./AuthSessionProvider";
 
 /**
@@ -62,13 +63,21 @@ export function AppLockProvider({ children }: PropsWithChildren) {
   const { accessToken } = useSessionState();
   const lockState = useAppLockState();
   const required = appLockRequired(lockState);
-  const [locked, setLocked] = useState(false);
+  // Keyed on the account rather than the token: the token rotates on refresh,
+  // which can land while the system prompt is up, and a passed check must
+  // still unlock.
+  const lockIdentity = getUserIdFromAccessToken(accessToken) ?? accessToken;
+  // The account the person last unlocked. The lock is derived from it during
+  // render rather than set in an effect, which left one frame of content
+  // showing between the setting loading and the lock taking hold (41b3).
+  // Another account signing in, or leaving the foreground, clears it.
+  const [unlockedFor, setUnlockedFor] = useState<string | null>(null);
   const [authenticating, setAuthenticating] = useState(false);
   // Whether this lock has already raised the system prompt on its own. Without
   // it, cancelling Face ID put the effect below straight back into
-  // `attemptUnlock` — `locked` was still true and `authenticating` had just
-  // gone false — so the prompt reappeared the instant it was dismissed, forever,
-  // with the sheet's own Unlock button unreachable underneath it.
+  // `attemptUnlock` (the lock was still showing and `authenticating` had just
+  // gone false), so the prompt reappeared the instant it was dismissed,
+  // forever, with the sheet's own Unlock button unreachable underneath it.
   const hasPromptedRef = useRef(false);
 
   const attemptUnlock = useCallback(async () => {
@@ -79,8 +88,8 @@ export function AppLockProvider({ children }: PropsWithChildren) {
         LocalAuthentication.isEnrolledAsync(),
       ]);
       if (!hasHardware || !isEnrolled) {
-        // Device can't satisfy the lock — don't strand the user behind it.
-        setLocked(false);
+        // Device can't satisfy the lock, so don't strand the user behind it.
+        setUnlockedFor(lockIdentity);
         return;
       }
 
@@ -88,7 +97,7 @@ export function AppLockProvider({ children }: PropsWithChildren) {
         promptMessage: "Unlock the app",
       });
       if (result.success) {
-        setLocked(false);
+        setUnlockedFor(lockIdentity);
       }
     } catch {
       // `authenticateAsync` rejects rather than resolving `{ success: false }`
@@ -98,14 +107,7 @@ export function AppLockProvider({ children }: PropsWithChildren) {
     } finally {
       setAuthenticating(false);
     }
-  }, []);
-
-  // Lock on cold start, and on a new session, once the setting is known to
-  // require it. Until then the cover below keeps the app off the screen.
-  useEffect(() => {
-    if (appLockUnsupported || !accessToken || !required) return;
-    setLocked(true);
-  }, [accessToken, required]);
+  }, [lockIdentity]);
 
   // Lock whenever the app leaves the foreground.
   useEffect(() => {
@@ -113,7 +115,7 @@ export function AppLockProvider({ children }: PropsWithChildren) {
 
     const subscription = AppState.addEventListener("change", (state) => {
       if (state !== "active") {
-        setLocked(true);
+        setUnlockedFor(null);
       }
     });
 
@@ -122,10 +124,13 @@ export function AppLockProvider({ children }: PropsWithChildren) {
     };
   }, [accessToken, required]);
 
+  const showLock =
+    !appLockUnsupported && Boolean(lockIdentity) && required && unlockedFor !== lockIdentity;
+
   // Raise the system prompt once per lock. Every retry after that is the user
   // pressing Unlock, which is what keeps a declined check from becoming a loop.
   useEffect(() => {
-    if (!locked) {
+    if (!showLock) {
       hasPromptedRef.current = false;
       return;
     }
@@ -134,16 +139,16 @@ export function AppLockProvider({ children }: PropsWithChildren) {
 
     hasPromptedRef.current = true;
     void attemptUnlock();
-  }, [locked, attemptUnlock]);
-
-  const showLock = !appLockUnsupported && Boolean(accessToken) && required && locked;
+  }, [showLock, attemptUnlock]);
   const hydrating = !appLockUnsupported && Boolean(accessToken) && lockState === "loading";
 
   return (
     <>
       {children}
-      {hydrating ? (
-        <View style={StyleSheet.absoluteFill} testID="app-lock-hydrating">
+      {/* Stays up under the lock too: the lock is a native modal that fades
+          in, and content must not show through while it does. */}
+      {hydrating || showLock ? (
+        <View style={StyleSheet.absoluteFill} testID="app-lock-cover">
           <AppSplashScreen />
         </View>
       ) : null}

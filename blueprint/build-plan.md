@@ -569,7 +569,7 @@
           date the person accepted their invitation, rename the staff record's
           creation date "Date added", and show no joined date for someone who
           has not accepted.
-  - [ ] 41b. **Credential, session, and recovery integrity** - require the
+  - [x] 41b. **Credential, session, and recovery integrity** - require the
         same fresh-assurance and session-revocation guarantees on web and
         mobile for password, sign-in email, MFA, recovery, account deletion,
         remote session termination, and manager-initiated credential changes.
@@ -590,7 +590,7 @@
           the sign-out instead of repeating the change. A manager's sign-in
           email change checks the record's version and contact conflicts
           before it touches the sign-in, and a password change is audited.
-    - [ ] 41b3. **Assurance coverage** - every credential-changing route,
+    - [x] 41b3. **Assurance coverage** - every credential-changing route,
           including the Gridmaster password-reset and account routes, requires
           fresh assurance and is held by the sensitive-action inventory; close
           the app lock's one-frame gap between loading and locked.

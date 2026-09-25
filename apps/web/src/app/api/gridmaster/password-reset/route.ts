@@ -8,7 +8,11 @@ import {
   hashEmail,
 } from "@/lib/rate-limit";
 import { retryAfterSeconds } from "@/lib/retry-after";
-import { createAnonClient, requireGridmasterSession } from "@/lib/api-auth";
+import {
+  createAnonClient,
+  requireGridmasterSession,
+  requireSensitiveActionAuth,
+} from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
@@ -26,6 +30,11 @@ export async function POST(req: NextRequest) {
   const auth = await requireGridmasterSession(req);
   if ("response" in auth) return auth.response;
   const { user } = auth;
+
+  // Sending a reset to any account is a platform credential action, so it
+  // needs fresh proof like force-logout (41b3).
+  const assurance = await requireSensitiveActionAuth(req);
+  if ("response" in assurance) return assurance.response;
 
   // ── Rate limit by user ID ────────────────────────────────────────────
   const { limited, reset, misconfigured } = await checkRateLimit(passwordResetLimiter, user.id);

@@ -4,6 +4,16 @@ import { describe, expect, it } from "vitest";
 
 const repoRoot = path.resolve(process.cwd(), "..", "..");
 const apiRoot = path.join(repoRoot, "apps", "web", "src", "app", "api");
+const mobileRoutesRoot = path.join(
+  repoRoot,
+  "apps",
+  "web",
+  "src",
+  "features",
+  "mobile",
+  "server",
+  "routes",
+);
 
 type Boundary = {
   policy:
@@ -58,6 +68,18 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
       /\brequireAuthenticatedUser\s*\(/,
       /\bcanManageEmployees\s*\(/,
       /action === "remove" \|\| action === "deactivate"[\s\S]*?revokeAllUserSessions/,
+    ],
+  },
+  "apps/web/src/app/api/gridmaster/accounts/route.ts": {
+    policy: "sensitive",
+    assertions: [
+      /export async function POST[\s\S]*?\brequireGridmasterSession\s*\([\s\S]*?\brequireSensitiveActionAuth\s*\([\s\S]*?\.rpc\("promote_gridmaster_by_email"[\s\S]*?\.rpc\("demote_gridmaster_account"[\s\S]*?\.rpc\("set_gridmaster_account_deactivated"/,
+    ],
+  },
+  "apps/web/src/app/api/gridmaster/password-reset/route.ts": {
+    policy: "sensitive",
+    assertions: [
+      /\brequireGridmasterSession\s*\([\s\S]*?\brequireSensitiveActionAuth\s*\([\s\S]*?\.resetPasswordForEmail\(/,
     ],
   },
   "apps/web/src/app/api/gridmaster/users/[userId]/force-logout/route.ts": {
@@ -164,13 +186,23 @@ const MOBILE_DELEGATES: Record<string, RegExp[]> = {
   "apps/web/src/features/mobile/server/routes/mfa-lifecycle.ts": [
     /sensitiveAuth:\s*\(req\) => requireMobileSensitiveActionAuth\(req\)/,
   ],
+  // Approving an account deletion ends a sign-in, so the approval needs proof.
+  "apps/web/src/features/mobile/server/routes/profile-change-requests.ts": [
+    /pending\.type === "account_deletion"[\s\S]*?if \(parsed\.data\.action === "approve"\) \{\s*const assurance = await requireMobileSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;/,
+  ],
   "apps/web/src/features/mobile/server/routes/profile-sessions.ts": [
     /export async function DELETE[\s\S]*?\brequireMobileSensitiveActionAuth\s*\(/,
   ],
 };
 
+// Also catches a file by what it changes, not only by the gate it calls, so a
+// credential or authority change without a gate is found rather than missed:
+// password-reset sends, Gridmaster role changes, provider-session endings and
+// the account-deletion and sign-in-email helpers (41b3). It reads route files
+// and mobile handlers only, so a new helper that makes such a change belongs
+// in this list.
 const sensitiveSourceMarker =
-  /\b(?:requireSensitiveActionAuth|requireMobileSensitiveActionAuth|revokeAllUserSessions|revokeOtherUserSessions|revokeUserSessionForUser)\s*\(|auth\.admin\.(?:createUser|updateUserById|deleteUser|signOut)\s*\(|gdpr_erase_user_data|force_logout_user/;
+  /\b(?:requireSensitiveActionAuth|requireMobileSensitiveActionAuth|revokeAllUserSessions|revokeOtherUserSessions|revokeUserSessionForUser|endUserSessions?|resetPasswordForEmail|deleteUserAccountWithCleanup|syncLinkedLoginEmail)\s*\(|auth\.admin\.(?:createUser|updateUserById|deleteUser|signOut)\s*\(|gdpr_erase_user_data|force_logout_user|promote_gridmaster_by_email|demote_gridmaster_account|set_gridmaster_account_deactivated/;
 const delegatedSensitivePath =
   /\/(?:(?:account|mobile\/v1\/profile)\/(?:credential-assurance|mfa-lifecycle|sessions)|mobile\/v1\/auth\/sign-out)\/route\.ts$/;
 
@@ -210,6 +242,18 @@ describe("sensitive action authorization boundaries", () => {
     });
 
     expect(failures).toEqual([]);
+  });
+
+  it("classifies every mobile handler that makes such a change", () => {
+    const handlers = readdirSync(mobileRoutesRoot)
+      .filter((entry) => entry.endsWith(".ts") && !entry.endsWith(".test.ts"))
+      .map((entry) => relativePath(path.join(mobileRoutesRoot, entry)))
+      .filter((filePath) =>
+        sensitiveSourceMarker.test(readFileSync(path.join(repoRoot, filePath), "utf8")),
+      )
+      .sort();
+
+    expect(handlers).toEqual(Object.keys(MOBILE_DELEGATES).sort());
   });
 
   it("keeps mobile re-exports delegated to handlers with equivalent assurance", () => {

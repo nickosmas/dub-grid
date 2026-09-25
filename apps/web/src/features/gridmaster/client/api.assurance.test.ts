@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { forceLogoutGridmasterUser } from "./api";
+import { forceLogoutGridmasterUser, sendGridmasterPasswordReset } from "./api";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -40,5 +40,15 @@ describe("Gridmaster sensitive-action transport", () => {
       code: "STEP_UP_REQUIRED",
       method: "totp",
     });
+  });
+
+  it("names the password reset when the failure has no readable message", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("upstream error", { status: 502, headers: { "content-type": "text/plain" } }),
+    );
+
+    await expect(sendGridmasterPasswordReset("person@example.com", "token")).rejects.toThrow(
+      "We couldn't send that password reset.",
+    );
   });
 });

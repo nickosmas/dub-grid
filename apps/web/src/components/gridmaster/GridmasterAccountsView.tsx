@@ -15,6 +15,7 @@ import {
   demoteGridmasterAccount,
   fetchGridmasterAccounts,
   forceLogoutGridmasterUser,
+  sendGridmasterPasswordReset,
   promoteGridmasterAccount,
   updateGridmasterAccountActivation,
 } from "@/features/gridmaster/client";
@@ -144,7 +145,12 @@ export default function GridmasterAccountsView({
     if (!promoteConfirmEmail) return;
     setPromoteLoading(true);
     try {
-      await promoteGridmasterAccount(promoteConfirmEmail);
+      const email = promoteConfirmEmail;
+      const completed = await stepUp.run(async (accessToken) => {
+        await requireCredentialAssurance(accessToken);
+        await promoteGridmasterAccount(email, accessToken);
+      });
+      if (!completed) return;
       toast.success("Gridmaster account promoted");
       setPromoteEmail("");
       setPromoteConfirmEmail(null);
@@ -160,11 +166,12 @@ export default function GridmasterAccountsView({
     if (!demoteTarget || !demoteOrgId) return;
     setActionLoading(demoteTarget.id);
     try {
-      await demoteGridmasterAccount({
-        userId: demoteTarget.id,
-        orgId: demoteOrgId,
-        orgRole: demoteOrgRole,
+      const input = { userId: demoteTarget.id, orgId: demoteOrgId, orgRole: demoteOrgRole };
+      const completed = await stepUp.run(async (accessToken) => {
+        await requireCredentialAssurance(accessToken);
+        await demoteGridmasterAccount(input, accessToken);
       });
+      if (!completed) return;
       toast.success("Gridmaster account demoted");
       setDemoteTarget(null);
       invalidateGridmasterQueries(demoteOrgId);
@@ -179,7 +186,11 @@ export default function GridmasterAccountsView({
     setActionLoading(account.id);
     const deactivate = !account.deactivatedAt;
     try {
-      await updateGridmasterAccountActivation({ userId: account.id, deactivate });
+      const completed = await stepUp.run(async (accessToken) => {
+        await requireCredentialAssurance(accessToken);
+        await updateGridmasterAccountActivation({ userId: account.id, deactivate }, accessToken);
+      });
+      if (!completed) return;
       toast.success(
         deactivate ? "Gridmaster account deactivated" : "Gridmaster account reactivated",
       );
@@ -213,17 +224,12 @@ export default function GridmasterAccountsView({
     if (!account.email) return;
     setActionLoading(account.id);
     try {
-      const res = await fetch("/api/gridmaster/password-reset", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: account.email }),
+      const email = account.email;
+      const completed = await stepUp.run(async (accessToken) => {
+        await requireCredentialAssurance(accessToken);
+        await sendGridmasterPasswordReset(email, accessToken);
       });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(
-          formatClientErrorMessage(body.error, "We couldn't send that password reset."),
-        );
-      }
+      if (!completed) return;
       toast.success(`Password reset email sent to ${account.email}`);
       setResetConfirm(null);
     } catch (err: unknown) {
@@ -508,7 +514,7 @@ export default function GridmasterAccountsView({
         />
       )}
 
-      {activationConfirm && (
+      {activationConfirm && !stepUp.dialog && (
         <ConfirmDialog
           title={
             activationConfirm.deactivatedAt ? "Reactivate Gridmaster" : "Deactivate Gridmaster"
@@ -539,7 +545,7 @@ export default function GridmasterAccountsView({
       )}
       {stepUp.dialog}
 
-      {resetConfirm && (
+      {resetConfirm && !stepUp.dialog && (
         <ConfirmDialog
           title="Send Password Reset"
           message={`Send a password reset email to "${resetConfirm.email}"?`}
@@ -551,7 +557,7 @@ export default function GridmasterAccountsView({
         />
       )}
 
-      {promoteConfirmEmail && (
+      {promoteConfirmEmail && !stepUp.dialog && (
         <ConfirmDialog
           title="Promote Gridmaster"
           message={`Promote "${promoteConfirmEmail}" to platform gridmaster? This grants access to gridmaster oversight tools.`}
@@ -563,7 +569,7 @@ export default function GridmasterAccountsView({
         />
       )}
 
-      {demoteTarget && (
+      {demoteTarget && !stepUp.dialog && (
         <Modal
           title="Demote Gridmaster"
           onClose={() => setDemoteTarget(null)}

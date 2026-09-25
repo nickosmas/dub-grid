@@ -22,3 +22,27 @@
 **Why it matters:** Password and sign-in email changes are direct Supabase calls, and the factor endpoints DubGrid proxies stay reachable with the same JWT, so the assurance is a client preflight. A stolen access token can change the password (Supabase still requires aal2 when a factor exists) or, on an account with no factor, enroll an attacker's authenticator and lock the owner out, skipping DubGrid's audit. Moving the calls into DubGrid routes would not close it.
 **Suggested fix:** A decision for the owner: database triggers on `auth.users` and `auth.mfa_factors` that audit, revoke or alert on credential changes, and/or a shorter `jwt_expiry`. Out of 41b2's scope by design.
 **Resolution:**
+
+### F-16 [P2] open - Gridmaster organization-role grants run without fresh assurance
+
+**File:** `apps/web/src/app/api/gridmaster/organizations/manage/route.ts:291`
+**Found:** 2026-09-25 by `/audit` (scope: current, 2f001cb4..e24134f8; all lenses)
+**Why it matters:** `assignOrgRoleByEmail` can grant Super Admin of any organization to any account on the Gridmaster session alone. It predates 41b3 and is organization rather than platform authority, so it sits outside 41b3's wording but close to its goal.
+**Suggested fix:** Gate that action with `requireSensitiveActionAuth` and run it through step-up, and classify the route in the inventory. Needs a scope call.
+**Resolution:**
+
+### F-17 [P3] open - Gridmaster audit-log export runs without fresh assurance
+
+**File:** `apps/web/src/app/api/gridmaster/audit-log/export/route.ts:24`
+**Found:** 2026-09-25 by `/audit` (scope: current, 2f001cb4..e24134f8; all lenses)
+**Why it matters:** The coding standards list export as a sensitive action; this export predates 41b3 and needs only the Gridmaster session.
+**Suggested fix:** Gate with `requireSensitiveActionAuth` and step-up, or record why a platform audit export is exempt.
+**Resolution:**
+
+### F-18 [P3] unverified - The live MFA-policy integration test can lose its verified session under full-suite load
+
+**File:** `apps/web/src/__tests__/mfa-enforced-in-policies.integration.test.ts:110`
+**Found:** 2026-09-25 during 41b3's final gate (full `npm run test`)
+**Why it matters:** The challenge verify returned no session once in a full run and passed in isolation (1/1). A TOTP window rollover or local Auth rate limit under parallel live tests are the likely causes; unproven.
+**Suggested fix:** Generate the code for the verify moment and retry once on a window edge, or run the live tests serially.
+**Resolution:**
