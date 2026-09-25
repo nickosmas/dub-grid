@@ -8,6 +8,11 @@ const fetchUserSessionOverviewForUser = vi.fn();
 const revokeUserSessionForUser = vi.fn();
 const dispatchNotificationEvent = vi.fn();
 const sessionRowSnapshot = vi.fn();
+const writeSecurityAuditEvent = vi.fn();
+
+vi.mock("@/lib/auth/security-audit", () => ({
+  writeSecurityAuditEvent: (...args: unknown[]) => writeSecurityAuditEvent(...args),
+}));
 
 vi.mock("@/lib/api-auth", () => ({
   requireSensitiveActionAuth: (req: NextRequest) => requireSensitiveActionAuth(req),
@@ -51,13 +56,14 @@ describe("/api/account/sessions", () => {
     validateCsrfOrigin.mockReturnValue(null);
     requireSensitiveActionAuth.mockResolvedValue({
       user: { id: "user-id" },
+      claims: { org_id: "caller-org" },
     });
     requireAuthenticatedUserWithClaims.mockResolvedValue({
       user: { id: "user-id" },
       claims: { session_id: "current-session-id" },
     });
     fetchUserSessionOverviewForUser.mockResolvedValue({ active: [], stale: [] });
-    revokeUserSessionForUser.mockResolvedValue(undefined);
+    revokeUserSessionForUser.mockResolvedValue(true);
     dispatchNotificationEvent.mockResolvedValue({ success: true });
     sessionRowSnapshot.mockResolvedValue({
       data: { org_id: "org-1", device_label: "Chrome on macOS" },
@@ -96,6 +102,29 @@ describe("/api/account/sessions", () => {
     expect(response.status).toBe(200);
     expect(revokeUserSessionForUser).toHaveBeenCalledWith("user-id", "hash");
     expect(requireSensitiveActionAuth).toHaveBeenCalledOnce();
+    expect(writeSecurityAuditEvent).toHaveBeenCalledWith({
+      event: "security.auth.session",
+      outcome: "succeeded",
+      reason: "session_revoked",
+      actorId: "user-id",
+      // The caller's organization, as mobile and the bulk sign-out record it.
+      orgId: "caller-org",
+      metadata: { surface: "web", scope: "device" },
+    });
+  });
+
+  it("records no revoke when the hash matched no session", async () => {
+    revokeUserSessionForUser.mockResolvedValueOnce(false);
+
+    const response = await DELETE(
+      new NextRequest("http://localhost/api/account/sessions", {
+        method: "DELETE",
+        body: JSON.stringify({ refreshTokenHash: "unknown" }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(writeSecurityAuditEvent).not.toHaveBeenCalled();
   });
 
   it.each(["password", "totp"])(
@@ -185,5 +214,6 @@ describe("/api/account/sessions", () => {
       error: "We couldn't sign out that device. Try again.",
     });
     expect(dispatchNotificationEvent).not.toHaveBeenCalled();
+    expect(writeSecurityAuditEvent).not.toHaveBeenCalled();
   });
 });

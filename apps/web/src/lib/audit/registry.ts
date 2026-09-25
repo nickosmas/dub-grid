@@ -1157,6 +1157,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
       const scope = d.text("scope");
       if (scope === "others") return "Signed out their other devices";
       if (scope === "global") return "Signed out everywhere";
+      if (scope === "device") return "Signed out one of their devices";
       return "Signed out";
     },
     details: () => [],

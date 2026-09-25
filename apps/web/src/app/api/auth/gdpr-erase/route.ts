@@ -6,6 +6,7 @@ import {
   hasStartedSelfDeletion,
   recordSelfDeletionStarted,
 } from "@/features/account/server/self-deletion";
+import { rejectDeletedAccountTokens } from "@/features/account/server/account-deletion";
 import { forbidIfSandboxCookie, requireSensitiveActionAuth } from "@/lib/api-auth";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
@@ -143,6 +144,7 @@ export async function POST(req: NextRequest) {
         { status: 500 },
       );
     }
+    await rejectDeletedAccountTokens(userId, "gdpr-erase-token-revocation");
 
     try {
       await serviceClient.from("audit_log").insert({

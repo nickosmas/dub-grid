@@ -576,6 +576,23 @@
         Repair partial-failure, stale-session, app-lock, logout-timeout, and
         corrupt-auth-state paths so security state remains recoverable,
         fail-closed where appropriate, and auditable.
+    - [x] 41b1. **Session revocation that holds** - revoking one session,
+          a Gridmaster force-logout, and every account deletion end the
+          session for good rather than for an hour or five minutes: end the
+          provider session and its refresh token, not only DubGrid's marker.
+          Give mobile single-session revocation the web path's error handling,
+          and audit single-session revocation on both platforms.
+    - [ ] 41b2. **Credential change completion** - a signed-in password
+          change treats an unclear outcome as possibly applied, as recovery
+          already does, and a mobile retry after a failed revocation finishes
+          the sign-out instead of repeating the change. Web recovery completes
+          for a two-factor account. A manager's sign-in email change checks
+          the record's version before it touches the sign-in, and password
+          and email changes are audited.
+    - [ ] 41b3. **Assurance coverage** - every credential-changing route,
+          including the Gridmaster password-reset and account routes, requires
+          fresh assurance and is held by the sensitive-action inventory; close
+          the app lock's one-frame gap between loading and locked.
   - [ ] 41c. **Security notices, audit attribution, and account-global email
         context** - deliver security alerts reliably with useful device and
         event context; record successful authentication only after all gates

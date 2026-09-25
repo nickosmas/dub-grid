@@ -31,6 +31,11 @@ vi.mock("@/features/account/server", () => ({
 vi.mock("@/lib/sentry", () => ({
   captureException: (...args: unknown[]) => captureException(...args),
 }));
+const rejectDeletedAccountTokens = vi.fn();
+vi.mock("@/features/account/server/account-deletion", () => ({
+  rejectDeletedAccountTokens: (...args: unknown[]) => rejectDeletedAccountTokens(...args),
+}));
+
 vi.mock("@/lib/logger", () => ({
   default: {
     error: (...args: unknown[]) => loggerError(...args),
@@ -260,6 +265,8 @@ describe("DELETE /api/auth/delete-account", () => {
     expect(auditInsert).not.toHaveBeenCalledWith(
       expect.objectContaining({ action: "account.deleted" }),
     );
+    // The account still exists, so its tokens are left alone for the retry.
+    expect(rejectDeletedAccountTokens).not.toHaveBeenCalled();
     expect(captureException).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
@@ -277,6 +284,15 @@ describe("DELETE /api/auth/delete-account", () => {
     const res = await DELETE(makeRequest({ confirmation: "DELETE MY ACCOUNT" }));
     expect(res.status).toBe(200);
     expect(authDeleteUser).toHaveBeenCalledWith(USER_ID);
+    // Web verifies tokens locally, so a deleted account's tokens are rejected
+    // once the account is gone (41b1).
+    expect(rejectDeletedAccountTokens).toHaveBeenCalledWith(
+      USER_ID,
+      "self-deletion-token-revocation",
+    );
+    expect(authDeleteUser.mock.invocationCallOrder[0]).toBeLessThan(
+      rejectDeletedAccountTokens.mock.invocationCallOrder[0],
+    );
     expect(auditInsert).toHaveBeenCalledWith(
       expect.objectContaining({ action: "account.deleted" }),
     );

@@ -24,7 +24,7 @@ export type SecurityEventMetadata = {
   targetHash?: string;
   sourceHash?: string;
   surface?: "web" | "mobile";
-  scope?: "local" | "others" | "global";
+  scope?: "local" | "others" | "global" | "device";
   method?: "password" | "totp" | "otp";
 };
 

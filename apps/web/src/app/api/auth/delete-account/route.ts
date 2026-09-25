@@ -6,6 +6,7 @@ import {
   hasStartedSelfDeletion,
   recordSelfDeletionStarted,
 } from "@/features/account/server/self-deletion";
+import { rejectDeletedAccountTokens } from "@/features/account/server/account-deletion";
 import { forbidIfSandboxCookie, requireSensitiveActionAuth } from "@/lib/api-auth";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { retryAfterSeconds } from "@/lib/retry-after";
@@ -215,6 +216,7 @@ export async function DELETE(req: NextRequest) {
         { status: 500 },
       );
     }
+    await rejectDeletedAccountTokens(userId, "self-deletion-token-revocation");
 
     try {
       await serviceClient.from("audit_log").insert({

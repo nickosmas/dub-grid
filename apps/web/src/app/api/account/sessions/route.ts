@@ -10,6 +10,7 @@ import logger from "@/lib/logger";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import { getServiceClient } from "@/lib/supabase-service";
+import { writeSecurityAuditEvent } from "@/lib/auth/security-audit";
 
 const revokeSessionSchema = z.object({
   refreshTokenHash: z.string().min(1),
@@ -69,7 +70,17 @@ export async function DELETE(req: NextRequest) {
       .eq("refresh_token_hash", parsed.data.refreshTokenHash)
       .maybeSingle();
 
-    await revokeUserSessionForUser(auth.user.id, parsed.data.refreshTokenHash);
+    const revoked = await revokeUserSessionForUser(auth.user.id, parsed.data.refreshTokenHash);
+    if (revoked) {
+      await writeSecurityAuditEvent({
+        event: "security.auth.session",
+        outcome: "succeeded",
+        reason: "session_revoked",
+        actorId: auth.user.id,
+        orgId: typeof auth.claims?.org_id === "string" ? auth.claims.org_id : null,
+        metadata: { surface: "web", scope: "device" },
+      });
+    }
 
     if (priorRow) {
       void dispatchNotificationEvent(auth.user.id, {

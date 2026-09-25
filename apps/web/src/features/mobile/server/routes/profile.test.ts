@@ -17,6 +17,11 @@ const revokeUserSessionForUser = vi.fn();
 const fetchMobileManagementMembershipRowsByUserIds = vi.fn();
 const scheduleSecurityAlert = vi.fn();
 const priorMfaProfile = vi.fn();
+const writeSecurityAuditEvent = vi.fn();
+
+vi.mock("@/lib/auth/security-audit", () => ({
+  writeSecurityAuditEvent: (...args: unknown[]) => writeSecurityAuditEvent(...args),
+}));
 
 const serviceClient = {
   from: () => ({
@@ -523,6 +528,7 @@ describe("mobile profile preference and session routes", () => {
   });
 
   it("loads and revokes user-scoped sessions, marking the caller's own session current", async () => {
+    revokeUserSessionForUser.mockResolvedValueOnce(true);
     fetchUserSessionOverviewForUser.mockResolvedValue({
       active: [
         {
@@ -589,6 +595,49 @@ describe("mobile profile preference and session routes", () => {
       "hash",
     );
     expect(requireMobileSensitiveActionAuth).toHaveBeenCalledTimes(1);
+    expect(writeSecurityAuditEvent).toHaveBeenCalledWith({
+      event: "security.auth.session",
+      outcome: "succeeded",
+      reason: "session_revoked",
+      actorId: "8af6f242-c060-4920-a7db-91b4cb66fd26",
+      orgId: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+      metadata: { surface: "mobile", scope: "device" },
+    });
+  });
+
+  it("records no revoke when the hash matched no session", async () => {
+    revokeUserSessionForUser.mockResolvedValueOnce(false);
+    const { DELETE } = await import("./profile-sessions");
+
+    const response = await DELETE(
+      new Request("http://localhost/api/mobile/v1/profile/sessions", {
+        method: "DELETE",
+        body: JSON.stringify({ refreshTokenHash: "unknown" }),
+      }) as never,
+    );
+
+    expect(response.status).toBe(200);
+    expect(writeSecurityAuditEvent).not.toHaveBeenCalled();
+  });
+
+  // Web answered a failed revoke with a recoverable error; mobile threw, which
+  // reached the device as an unexplained failure and wrote no record.
+  it("answers a failed revoke with a recoverable error and records nothing", async () => {
+    revokeUserSessionForUser.mockRejectedValueOnce(new Error("database unavailable"));
+    const { DELETE } = await import("./profile-sessions");
+
+    const response = await DELETE(
+      new Request("http://localhost/api/mobile/v1/profile/sessions", {
+        method: "DELETE",
+        body: JSON.stringify({ refreshTokenHash: "hash" }),
+      }) as never,
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      error: "We couldn't sign out that device. Try again.",
+    });
+    expect(writeSecurityAuditEvent).not.toHaveBeenCalled();
   });
 
   it("does not reach session revocation when recent identity proof is required", async () => {

@@ -5,6 +5,7 @@ import {
   AUDIT_ACTIONS,
   AUDIT_CATEGORY_LABELS,
   AUDIT_CATEGORY_OPTIONS,
+  describeAuditAction,
   getAuditCategoryLabel,
   getAuditCategoryOptions,
   getResourceTypeLabel,
@@ -392,6 +393,13 @@ describe("audience", () => {
       expect(isVisibleToAudience(action, "org"), action).toBe(true);
       expect(ORG_AUDIENCE_ACTIONS).toContain(action);
     }
+  });
+
+  it("names a single-device sign-out rather than a plain sign-out", () => {
+    expect(describeAuditAction("security.auth.session", { scope: "device" })).toBe(
+      "Signed out one of their devices",
+    );
+    expect(describeAuditAction("security.auth.session", {})).toBe("Signed out");
   });
 
   it("never shows an organization copy the registry did not write", () => {

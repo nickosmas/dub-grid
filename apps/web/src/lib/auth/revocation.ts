@@ -189,6 +189,23 @@ export async function endUserSessions(
   if (error) throw error;
 }
 
+/**
+ * Signs one session out for good: its issued tokens are rejected and the
+ * provider session is deleted with its refresh tokens (migration 047), so the
+ * device cannot refresh back in once the marker expires.
+ */
+export async function endUserSession(userId: string, sessionId: string): Promise<void> {
+  // Provider first: the marker also deletes DubGrid's row, and without the row
+  // a retry after a failed provider call would find nothing left to end.
+  const { error } = await getServiceClient().rpc("end_user_auth_session", {
+    p_user_id: userId,
+    p_session_id: sessionId,
+  });
+  if (error) throw error;
+
+  await revokeSession(sessionId);
+}
+
 /** Revoke tracked peers without applying the watermark that would revoke this device too. */
 export async function revokeOtherUserSessions(
   userId: string,

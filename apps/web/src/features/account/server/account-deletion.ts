@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+import { revokeAllUserSessions } from "@/lib/auth/revocation";
 
 export interface DeleteUserAccountInput {
   serviceClient: SupabaseClient;
@@ -17,6 +18,22 @@ export interface DeleteUserAccountResult {
   success: true;
   cleanupPending: boolean;
   cleanupFailures: string[];
+}
+
+/**
+ * Rejects a deleted account's access tokens, which web accepts until they
+ * expire because it verifies them locally. It runs only after the deletion
+ * succeeded, so a failed deletion keeps working tokens for its retry. The
+ * watermark write never throws (the cache swallows its own failures); the
+ * session-row delete can, and is reported rather than failing the deletion.
+ */
+export async function rejectDeletedAccountTokens(userId: string, context: string): Promise<void> {
+  try {
+    await revokeAllUserSessions(userId);
+  } catch (error) {
+    Sentry.captureException(error, { extra: { userId, context } });
+    logger.error({ error, userId, context }, "Failed to reject a deleted account's tokens");
+  }
 }
 
 export async function deleteUserAccountWithCleanup({
@@ -69,6 +86,7 @@ export async function deleteUserAccountWithCleanup({
   if (deleteError) {
     throw deleteError;
   }
+  await rejectDeletedAccountTokens(userId, "account-deletion-token-revocation");
 
   const cleanupFailures: string[] = [];
   async function runCleanupStep(

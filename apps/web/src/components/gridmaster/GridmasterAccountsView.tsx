@@ -434,7 +434,7 @@ export default function GridmasterAccountsView({
                             className="dg-btn dg-btn-secondary"
                             style={{ fontSize: "var(--dg-fs-caption)" }}
                             onClick={() => setForceLogoutConfirm(account)}
-                            disabled={isLoading}
+                            disabled={isSelf || isLoading}
                           >
                             Force Logout
                           </Button>
