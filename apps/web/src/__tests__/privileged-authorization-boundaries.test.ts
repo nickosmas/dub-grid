@@ -71,6 +71,8 @@ const DELEGATED_SERVICE_HELPERS: Record<string, string> = {
     "Receives the authorized org and service client from routes.",
   "apps/web/src/features/account/server/calendar-subscription.ts":
     "Rechecks live user, org, membership, employee, and token ownership.",
+  "apps/web/src/features/account/server/known-devices.ts":
+    "Reads and writes only the authenticated user's own known-device rows, keyed by the verified user ID.",
   "apps/web/src/features/account/server/preferences.ts":
     "Scopes preferences to the authenticated user ID.",
   "apps/web/src/features/account/server/profile.ts":

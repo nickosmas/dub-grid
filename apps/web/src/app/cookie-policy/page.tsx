@@ -81,7 +81,7 @@ export default function CookiePolicyPage() {
             marginBottom: "40px",
           }}
         >
-          Last updated: May 2026
+          Last updated: September 2026
         </p>
 
         {/* Introduction */}
@@ -140,6 +140,17 @@ export default function CookiePolicyPage() {
                     role and organization context.
                   </td>
                   <td style={tableCell}>Session / auto-refreshed</td>
+                </tr>
+                <tr>
+                  <td style={tableCell}>
+                    <code>dg_device</code>
+                  </td>
+                  <td style={tableCell}>
+                    A random ID that recognizes a browser you&apos;ve signed in from before, so we
+                    only email you about sign-ins from a new device. We keep only a scrambled copy
+                    of it, and changing your password makes us forget every device.
+                  </td>
+                  <td style={tableCell}>400 days, renewed each time you sign in</td>
                 </tr>
                 <tr>
                   <td style={tableCell}>

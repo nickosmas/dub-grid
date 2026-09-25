@@ -522,6 +522,75 @@ describe("mobileApiRequest", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("reads the device id the server issues with session presence", async () => {
+    const { parseSessionPresenceResponse } = await import("./api");
+
+    expect(parseSessionPresenceResponse({ success: true, deviceId: "device-1" })).toEqual({
+      success: true,
+      deviceId: "device-1",
+    });
+    expect(parseSessionPresenceResponse({ success: true })).toEqual({
+      success: true,
+      deviceId: null,
+    });
+    expect(() => parseSessionPresenceResponse({ error: "no" })).toThrow();
+  });
+
+  describe("session presence on a native device", () => {
+    const getStoredValue = vi.fn();
+    const setStoredValue = vi.fn();
+
+    async function registerOnIos(response: Record<string, unknown>) {
+      vi.resetModules();
+      vi.doMock("react-native", () => ({ Platform: { OS: "ios" } }));
+      vi.doMock("./local-storage", () => ({
+        getStoredValue: (...args: unknown[]) => getStoredValue(...args),
+        setStoredValue: (...args: unknown[]) => setStoredValue(...args),
+      }));
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => response,
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      const { registerMobileSessionPresence } = await import("./api");
+      await expect(registerMobileSessionPresence("token-123")).resolves.toEqual({
+        success: true,
+      });
+      const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+      return JSON.parse(String(request.body)) as Record<string, unknown>;
+    }
+
+    beforeEach(() => {
+      getStoredValue.mockReset();
+      setStoredValue.mockReset().mockResolvedValue(undefined);
+    });
+
+    afterEach(() => {
+      vi.doUnmock("react-native");
+      vi.doUnmock("./local-storage");
+      vi.resetModules();
+    });
+
+    it("sends back this install's device id so a known phone is not reported as new", async () => {
+      getStoredValue.mockResolvedValue("stored-device");
+
+      const body = await registerOnIos({ success: true, deviceId: "stored-device" });
+
+      expect(getStoredValue).toHaveBeenCalledWith("dg_device_id");
+      expect(body.deviceId).toBe("stored-device");
+      expect(setStoredValue).not.toHaveBeenCalled();
+    });
+
+    it("keeps the device id the server issues on this install's first sign-in", async () => {
+      getStoredValue.mockResolvedValue(null);
+
+      const body = await registerOnIos({ success: true, deviceId: "issued-device" });
+
+      expect(body).not.toHaveProperty("deviceId");
+      expect(setStoredValue).toHaveBeenCalledWith("dg_device_id", "issued-device");
+    });
+  });
+
   it("uses the native model and app version, with safe platform fallbacks", async () => {
     const { getNativeSessionMetadata } = await import("./api");
 
