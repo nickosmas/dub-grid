@@ -124,15 +124,17 @@ async function expectBootstrapStates(page: Page, path: string) {
     })
     .toBeNull();
 
+  // People shows its own progress bar while the bootstrap is in flight; the
+  // dashboard sits behind SetupGuard, which shows the workspace splash.
+  const loadingState =
+    path === "/dashboard"
+      ? page.getByRole("heading", { name: "Loading your workspace" })
+      : page.locator("[data-progress-bar]");
   const releaseBootstrap = await holdRequests(page, `**${BOOTSTRAP_PATH}`);
   await page.goto(`${QA_CALM_HAVEN_ORIGIN}${path}`);
-  await expect(page.locator("[data-progress-bar]"), `${path} loading`).toBeVisible({
-    timeout: 15_000,
-  });
+  await expect(loadingState, `${path} loading`).toBeVisible({ timeout: 15_000 });
   releaseBootstrap();
-  await expect(page.locator("[data-progress-bar]"), `${path} loaded`).toHaveCount(0, {
-    timeout: 15_000,
-  });
+  await expect(loadingState, `${path} loaded`).toHaveCount(0, { timeout: 15_000 });
   await page.unroute(`**${BOOTSTRAP_PATH}`);
 
   await page.route(`**${BOOTSTRAP_PATH}`, async (route) => {
