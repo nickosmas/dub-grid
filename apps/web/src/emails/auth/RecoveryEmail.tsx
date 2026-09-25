@@ -2,7 +2,7 @@ import * as React from "react";
 import { AuthActionEmail } from "./AuthActionEmail";
 import { PREVIEW_LOGO_URL, RECOVERY_VERIFICATION_URL } from "./placeholders";
 
-/** Supabase: recovery.html — password reset. */
+/** Supabase: recovery.html - password reset. */
 export function RecoveryEmail({ logoUrl }: { logoUrl?: string } = {}) {
   return (
     <AuthActionEmail

@@ -64,6 +64,8 @@ const DELEGATED_SERVICE_HELPERS: Record<string, string> = {
   "apps/web/src/app/api/employees/shared.ts": "Central live employee-management authorization.",
   "apps/web/src/app/api/gridmaster/_lib/audit.ts":
     "Called only after Gridmaster route authorization.",
+  "apps/web/src/app/api/gridmaster/_lib/impersonation-notice.ts":
+    "Called only after Gridmaster route authorization, for the caller's own session row.",
   "apps/web/src/app/api/shared/permissions.ts": "Central live organization authorization.",
   "apps/web/src/app/api/shared/schedule.ts":
     "Receives the authorized org and service client from routes.",

@@ -143,6 +143,18 @@ describe("sendNotification email", () => {
     expect(sendResendEmail).toHaveBeenCalledTimes(1);
   });
 
+  it("tells the reader a security alert is always on, and others how to change them", async () => {
+    await send("security_new_device");
+    await send("billing_payment_failed");
+
+    const [security, billing] = sendResendEmail.mock.calls.map(
+      (call) => (call[0] as { html: string }).html,
+    );
+    expect(security).toContain("Security alerts are always on");
+    expect(security).not.toContain("manage your notification preferences");
+    expect(billing).toContain("manage your notification preferences");
+  });
+
   it("still honors an email preference for other categories", async () => {
     state.prefs = { billing: { in_app: true, email: false } };
 

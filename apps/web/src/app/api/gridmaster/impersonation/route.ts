@@ -5,6 +5,7 @@ import { createRequestSupabaseClient, requireGridmasterSession } from "@/lib/api
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
+import { scheduleImpersonationNotice } from "@/app/api/gridmaster/_lib/impersonation-notice";
 import logger from "@/lib/logger";
 
 const historyQuerySchema = z.object({
@@ -38,15 +39,18 @@ async function readOwnImpersonation(
   service: ReturnType<typeof getServiceClient>,
   sessionId: string,
   gridmasterId: string,
-): Promise<{ target_org_id: string; ended_at: string | null } | null> {
+): Promise<{ target_user_id: string; target_org_id: string; ended_at: string | null } | null> {
   const { data, error } = await service
     .from("impersonation_sessions")
-    .select("target_org_id, ended_at")
+    .select("target_user_id, target_org_id, ended_at")
     .eq("session_id", sessionId)
     .eq("gridmaster_id", gridmasterId)
     .maybeSingle();
   if (error) throw error;
-  return (data as { target_org_id: string; ended_at: string | null } | null) ?? null;
+  return (
+    (data as { target_user_id: string; target_org_id: string; ended_at: string | null } | null) ??
+    null
+  );
 }
 
 // start_impersonation raises these for caller mistakes, not outages. Answer
@@ -181,6 +185,15 @@ export async function POST(req: NextRequest) {
           return null;
         },
       );
+      // Before the audit write, which throws on failure: the session is
+      // running either way, and the person must hear about it.
+      scheduleImpersonationNotice({
+        kind: "start",
+        targetUserId: parsed.data.targetUserId,
+        targetOrgId: started?.target_org_id ?? null,
+        expiresAt: result.expires_at,
+      });
+
       await writeGridmasterAuditLog({
         serviceClient: service,
         actor: auth.user,
@@ -224,6 +237,14 @@ export async function POST(req: NextRequest) {
       if (error) {
         throw error;
       }
+
+      // Before the audit write: a retry after a failed write finds the
+      // session ended and would never send this.
+      scheduleImpersonationNotice({
+        kind: "end",
+        targetUserId: session.target_user_id,
+        targetOrgId: session.target_org_id,
+      });
 
       await writeGridmasterAuditLog({
         serviceClient: service,

@@ -248,6 +248,7 @@ export async function sendNotification(
         message,
         logoUrl: emailBaseUrl(),
         context: context?.line,
+        alwaysOn: category === "security",
       }),
     );
 

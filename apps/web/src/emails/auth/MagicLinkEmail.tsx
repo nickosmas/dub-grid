@@ -3,7 +3,7 @@ import { AuthActionEmail } from "./AuthActionEmail";
 import { PREVIEW_LOGO_URL } from "./placeholders";
 import { ACTION_SIGN_IN } from "@/lib/action-copy";
 
-/** Supabase: magic_link.html — passwordless sign-in. */
+/** Supabase: magic_link.html - passwordless sign-in. */
 export function MagicLinkEmail({ logoUrl }: { logoUrl?: string } = {}) {
   return (
     <AuthActionEmail

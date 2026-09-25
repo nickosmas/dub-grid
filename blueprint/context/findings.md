@@ -76,6 +76,7 @@
 **File:** `apps/web/src/app/api/gridmaster/impersonation/route.ts:205`
 **Found:** 2026-09-25 by `/audit` (scope: current, bdbbd4cc..8246596c; all lenses)
 **Why it matters:** The row is read before `end_impersonation`, whose second call is a silent no-op, so both requests write `impersonation.ended`.
+Since 41c3 the route also sends the end notice, so a concurrent pair sends two emails as well.
 **Suggested fix:** Have the RPC return whether it ended a row (migration).
 **Resolution:**
 
@@ -109,4 +110,28 @@
 **Found:** 2026-09-25 by `/audit` (scope: current, bdbbd4cc..8246596c; all lenses)
 **Why it matters:** Visiting `/gridmaster` while impersonating ends the row with reason `navigation` and records nothing. Kept out of 41c2 so the middleware gains no service-role write.
 **Suggested fix:** Record it from a route or a job (the 41c3 notice work may carry it).
+**Resolution:**
+
+### F-35 [P3] open - A Gridmaster sign-out ends an impersonation with no end notice
+
+**File:** `apps/web/src/app/api/account/logout-cleanup/route.ts:24`; `apps/web/src/features/account/server/sessions.ts:47`
+**Found:** 2026-09-25 by `/audit` (scope: current, 262cddb3..1ddf878f; all lenses)
+**Why it matters:** Sign-out deletes the Gridmaster's impersonation rows, live ones included: no end email, no in-app notice, and the history is gone.
+**Suggested fix:** End live sessions through `end_impersonation` and send the end notice before deleting, or keep the rows.
+**Resolution:**
+
+### F-38 [P3] open - In-app impersonation notices still say a platform administrator is reviewing the account
+
+**File:** `supabase/migrations/002_functions_triggers.sql` (`start_impersonation`, `end_impersonation`)
+**Found:** 2026-09-25 by `/audit` (scope: current, 262cddb3..1ddf878f; all lenses)
+**Why it matters:** The same event reads as "DubGrid support is using your account" by email and as "A platform administrator is currently reviewing your account" in the app.
+**Suggested fix:** A forward migration rewording the two RPCs' notification text.
+**Resolution:**
+
+### F-41 [P3] open - Stale references to the retired notify route, and no rate limit on impersonation notices
+
+**File:** `apps/web/e2e/role-variance-impersonation.spec.ts:101`; `internal/api-reference.md:195`
+**Found:** 2026-09-25 by `/audit` (scope: current, 262cddb3..1ddf878f; all lenses)
+**Why it matters:** The e2e spec and the API reference still describe `/api/notify-impersonation`, and the old route's `apiLimiter` has no counterpart, so repeated start and end cycles email the person each time (each still needs a justification and writes an audit row).
+**Suggested fix:** Update the two references when the documentation work lands; consider a per-target limit on starts.
 **Resolution:**

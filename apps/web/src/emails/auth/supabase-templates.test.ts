@@ -119,9 +119,21 @@ describe("Supabase auth email templates", () => {
     },
   );
 
-  it("states the recovery expiry that config.toml actually sets", () => {
-    expect(templateText("recovery.html")).toContain("expire in 1 hour");
+  // Every emailed link and code shares otp_expiry (41c3 added the last two).
+  it.each([
+    ["recovery.html", "expire in 1 hour"],
+    ["email_change.html", "The link expires in 1 hour."],
+    ["reauthentication.html", "It expires in 1 hour."],
+  ])("%s states the expiry that config.toml actually sets", (file, line) => {
+    expect(templateText(file)).toContain(line);
     expect(configToml).toMatch(/^otp_expiry = 3600$/m);
+  });
+
+  // A reset would ask for the new authenticator, which may be someone else's.
+  it("sends someone who did not add an authenticator to support, not to a reset", () => {
+    const text = templateText("mfa_factor_enrolled_notification.html");
+    expect(text).toContain("contact support@dubgrid.com right away");
+    expect(text).not.toMatch(/reset it/i);
   });
 
   it("never tells someone to ignore an identity code they did not request", () => {

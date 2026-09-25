@@ -1072,7 +1072,7 @@ async function dispatchNotificationEventInternal(
         event.orgId,
         "security_new_device" as NotificationType,
         "New sign-in to your DubGrid account",
-        `Your DubGrid sign-in was used on ${device}${browser}${near}, on ${formatEventTime(event.occurredAt)}. If this wasn't you, change your password and review your active sessions.`,
+        `Your DubGrid sign-in was used on ${device}${browser}${near}, on ${formatEventTime(event.occurredAt)}. If this wasn't you, change your password, review your active sessions, and contact support@dubgrid.com.`,
         {
           platform: event.platform,
           deviceLabel: event.deviceLabel,
@@ -1094,8 +1094,10 @@ async function dispatchNotificationEventInternal(
         "security_mfa_changed" as NotificationType,
         event.enabled ? "Two-factor authentication enabled" : "Two-factor authentication disabled",
         event.enabled
-          ? "Two-factor authentication was turned on for your DubGrid sign-in."
-          : "Two-factor authentication was turned off for your DubGrid sign-in. If this wasn't you, change your password, turn it back on, and review your active sessions.",
+          ? // A reset would ask for the new authenticator, which may be someone
+            // else's, so the owner's only useful step is support.
+            "Two-factor authentication was turned on for your DubGrid sign-in. If this wasn't you, contact support@dubgrid.com right away."
+          : "Two-factor authentication was turned off for your DubGrid sign-in. If this wasn't you, change your password, turn it back on, review your active sessions, and contact support@dubgrid.com.",
         { enabled: event.enabled },
         { writeInApp: false },
       );
@@ -1277,8 +1279,8 @@ async function dispatchNotificationEventInternal(
         event.targetUserId,
         event.orgId,
         "security_session_revoked" as NotificationType,
-        "You were signed out by an administrator",
-        `A platform administrator ended your session${where}. Sign in again to continue.`,
+        "DubGrid support signed you out",
+        `DubGrid support ended your sessions${where}. Sign in again to continue. If you weren't expecting this, contact support@dubgrid.com.`,
         {
           initiatedBy: event.initiatedBy,
           deviceLabel: event.deviceLabel ?? null,

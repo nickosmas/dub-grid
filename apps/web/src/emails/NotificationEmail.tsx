@@ -9,10 +9,18 @@ export type NotificationEmailProps = {
   logoUrl: string;
   /** The organization the notification came from, shown above the heading. */
   context?: string;
+  /** A security alert, which no preference turns off. */
+  alwaysOn?: boolean;
 };
 
 /** Generic in-app notification delivered over email. */
-export function NotificationEmail({ title, message, logoUrl, context }: NotificationEmailProps) {
+export function NotificationEmail({
+  title,
+  message,
+  logoUrl,
+  context,
+  alwaysOn = false,
+}: NotificationEmailProps) {
   return (
     <EmailLayout logoUrl={logoUrl} preview={context ? `${context}: ${title}` : title}>
       {context ? <Text style={{ ...styles.fine, margin: "0 0 8px" }}>{context}</Text> : null}
@@ -20,7 +28,9 @@ export function NotificationEmail({ title, message, logoUrl, context }: Notifica
       <Text style={styles.paragraph}>{message}</Text>
       <Hr style={styles.divider} />
       <Text style={styles.fine}>
-        You can manage your notification preferences in your DubGrid profile settings.
+        {alwaysOn
+          ? "Security alerts are always on, so they reach you whatever your notification settings."
+          : "You can manage your notification preferences in your DubGrid profile settings."}
       </Text>
     </EmailLayout>
   );

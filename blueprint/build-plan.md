@@ -594,7 +594,7 @@
           including the Gridmaster password-reset and account routes, requires
           fresh assurance and is held by the sensitive-action inventory; close
           the app lock's one-frame gap between loading and locked.
-  - [ ] 41c. **Security notices, audit attribution, and account-global email
+  - [x] 41c. **Security notices, audit attribution, and account-global email
         context** - deliver security alerts reliably with useful device and
         event context; record successful authentication only after all gates
         and against the actual organization; authenticate impersonation notice
@@ -613,7 +613,7 @@
           invitation acceptance's sign-in, record a completed sign-in once
           per session, and take the organization of an ended impersonation
           from the session rather than the request.
-    - [ ] 41c3. **Impersonation notices and auth email copy** - send
+    - [x] 41c3. **Impersonation notices and auth email copy** - send
           impersonation notices from the server with deduplication, correct
           the impersonation email copy, and add the missing expiry and
           "wasn't you" lines to the auth emails, with the template drift
