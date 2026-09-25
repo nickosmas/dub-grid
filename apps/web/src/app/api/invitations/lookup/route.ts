@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
     // value and lets expired tokens still surface org details.
     const { data, error } = await getServiceClient()
       .from("invitations")
-      .select("organizations!inner(name, slug, archived_at)")
+      .select("expires_at, organizations!inner(name, slug, archived_at)")
       .eq("token", parsed.data.token)
       .gt("expires_at", new Date().toISOString())
       .is("accepted_at", null)
@@ -75,6 +75,9 @@ export async function GET(req: NextRequest) {
         typeof organization.slug === "string" && organization.slug.length > 0
           ? organization.slug
           : null,
+      // Only a live invitation reaches here, so the deadline reveals nothing
+      // about a dead one.
+      expiresAt: typeof data?.expires_at === "string" ? data.expires_at : null,
     });
   } catch (error) {
     logger.error({ error }, "invitation lookup GET failed");

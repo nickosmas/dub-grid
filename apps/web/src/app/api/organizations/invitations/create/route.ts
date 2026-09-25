@@ -305,7 +305,13 @@ export async function POST(req: NextRequest) {
     const invitationId = data.invitation_id as string;
     const token = data.token as string;
     try {
-      await sendPendingInvitationEmail({ orgId, token, email: inviteeEmail });
+      await sendPendingInvitationEmail({
+        orgId,
+        token,
+        email: inviteeEmail,
+        expiresAt: data.expires_at as string,
+        kind: "new",
+      });
     } catch (sendError) {
       // Nobody received this link, so it must not stay live.
       const { error: removeError } = await serviceClient
@@ -393,6 +399,8 @@ export async function POST(req: NextRequest) {
               orgId,
               token: refreshed.token,
               email: inviteeEmail,
+              expiresAt: refreshed.expiresAt,
+              kind: "reissue",
             });
           } catch (sendError) {
             await restoreRefreshedInvitation(serviceClient, refreshed);

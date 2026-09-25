@@ -99,6 +99,9 @@ export async function POST(req: NextRequest, context: { params: Promise<{ person
       token: refreshed.token,
       email: refreshed.email,
       orgName: auth.currentOrg.name || "your organization",
+      expiresAt: refreshed.expires_at,
+      timeZone: auth.currentOrg.timezone ?? null,
+      kind: "reissue",
     });
   } catch (error) {
     logger.error(

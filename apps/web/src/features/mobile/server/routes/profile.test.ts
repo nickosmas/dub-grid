@@ -77,6 +77,7 @@ function mockAuth() {
     membership: {
       orgRole: "admin",
       adminPermissions: null,
+      joinedAt: "2026-03-05T14:00:00.000Z",
     },
     permissions: {
       role: "admin",
@@ -167,6 +168,18 @@ describe("mobile profile routes", () => {
       pendingProfileChangeRequest: false,
       pendingAccountDeletionRequest: false,
     });
+    // The day they joined this organization, not the account's 2024 creation.
+    expect(payload.joinedAt).toBe("2026-03-05T14:00:00.000Z");
+  });
+
+  it("returns no joined date for a caller with no membership", async () => {
+    requireMobileAuth.mockResolvedValue({ ...mockAuth(), membership: null });
+
+    const { GET } = await import("./profile");
+    const response = await GET(new Request("http://localhost/api/mobile/v1/profile") as never);
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).joinedAt).toBeNull();
   });
 
   // The profile screen says whether you are a management user, and the only

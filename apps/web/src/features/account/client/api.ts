@@ -125,6 +125,8 @@ export interface AccessibleOrganization {
 export interface InvitationLookup {
   orgName: string | null;
   orgSlug: string | null;
+  /** ISO timestamp. Only a live invitation has one; a dead token gets no body fields. */
+  expiresAt: string | null;
 }
 
 /**

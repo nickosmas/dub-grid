@@ -338,6 +338,9 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       token: invitation.token,
       email: invitation.email,
       orgName: loaded.auth.currentOrg.name || "your organization",
+      expiresAt: invitation.expires_at,
+      timeZone: loaded.auth.currentOrg.timezone ?? null,
+      kind: "new",
     });
   } catch (error) {
     logger.error(
@@ -463,6 +466,9 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       token: refresh.invitation.token,
       email: refresh.invitation.email,
       orgName: loaded.auth.currentOrg.name || "your organization",
+      expiresAt: refresh.invitation.expires_at,
+      timeZone: loaded.auth.currentOrg.timezone ?? null,
+      kind: "reissue",
     });
   } catch (error) {
     logger.error(

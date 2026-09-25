@@ -218,6 +218,36 @@ const requestSchema = z.discriminatedUnion("action", [
 
 const MAX_RANGE_DAYS = 366;
 
+/**
+ * A person joined on the day their membership was created, which for an
+ * invited person is the day they accepted. Read by organization rather than by
+ * an in() list of user ids, which a large roster would push past URL limits.
+ */
+async function attachJoinedDates(
+  serviceClient: SupabaseClient,
+  orgId: string,
+  employees: Employee[],
+): Promise<Employee[]> {
+  const joinedByUserId = new Map<string, string>();
+  if (employees.some((employee) => employee.userId)) {
+    const memberships = await fetchAllRows<{ user_id: string; joined_at: string }>((from, to) =>
+      serviceClient
+        .from("organization_memberships")
+        .select("user_id, joined_at")
+        .eq("org_id", orgId)
+        .order("user_id")
+        .range(from, to),
+    );
+    for (const membership of memberships) {
+      joinedByUserId.set(membership.user_id, membership.joined_at);
+    }
+  }
+  return employees.map((employee) => ({
+    ...employee,
+    joinedAt: (employee.userId && joinedByUserId.get(employee.userId)) || null,
+  }));
+}
+
 // View-only callers (canViewStaff but neither canViewEmployeeDetails nor
 // canManageEmployees, and not super_admin/gridmaster) get the same masked
 // payload the mobile person endpoint returns to non-managers.
@@ -287,6 +317,9 @@ function maskEmployeeForViewer(employee: Employee, callerUserId: string): Employ
     // row keeps them, for the same reason userId survives above.
     email: isSelf ? employee.email : "",
     phone: isSelf ? employee.phone : "",
+    // A joined date says the person has an account, which the nulled userId
+    // above exists to withhold.
+    joinedAt: isSelf ? employee.joinedAt : null,
   };
 }
 
@@ -570,7 +603,11 @@ export async function POST(req: NextRequest) {
 
         const rows = await fetchAllRows<DbEmployee>(buildPage);
 
-        const mapped = rows.map(rowToEmployee);
+        const mapped = await attachJoinedDates(
+          auth.serviceClient,
+          data.orgId,
+          rows.map(rowToEmployee),
+        );
         return NextResponse.json({
           employees: isManager
             ? mapped

@@ -492,9 +492,11 @@ export default function ProfileScreen() {
                 phone number lives on "Profile details", so the grid was mostly
                 restating things the page says better further down — and a
                 stat strip is the wrong weight for a heading anyway. */}
-            <AppText align="center" tone="subtle" variant="meta">
-              {`Joined ${formatDate(profile.user.createdAt)}`}
-            </AppText>
+            {profile.joinedAt ? (
+              <AppText align="center" tone="subtle" variant="meta">
+                {`Joined ${formatDate(profile.joinedAt)}`}
+              </AppText>
+            ) : null}
           </ProfileHero>
 
           <PendingRequestsCard

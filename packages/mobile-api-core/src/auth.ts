@@ -70,6 +70,8 @@ export interface ResolvedMobileAuthContext<
   membership: {
     orgRole: string;
     adminPermissions: AdminPermissions | null;
+    /** When this membership was created: the day the person joined the organization. */
+    joinedAt: string | null;
   } | null;
   memberships: Array<{
     orgId: string;
@@ -488,6 +490,7 @@ export async function resolveMobileAuthContext<
     membership: {
       orgRole,
       adminPermissions,
+      joinedAt: currentMembership.joined_at ?? null,
     },
     memberships: membershipRows.map((membership) => ({
       orgId: membership.organization.id,

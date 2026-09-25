@@ -101,6 +101,9 @@ export async function POST(req: NextRequest) {
       token: invitation.token,
       email: invitation.email,
       orgName: auth.currentOrg.name || "your organization",
+      expiresAt: invitation.expires_at,
+      timeZone: auth.currentOrg.timezone ?? null,
+      kind: "new",
     });
   } catch (error) {
     logger.error(

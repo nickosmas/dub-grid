@@ -130,6 +130,57 @@ describe("browser auth helpers", () => {
     expect(mockGetSession).toHaveBeenCalledTimes(2);
   });
 
+  it("retries a getUser request that never reached the auth server", async () => {
+    vi.useFakeTimers();
+    try {
+      const networkFailure = {
+        data: { user: null },
+        error: { name: "AuthRetryableFetchError", message: "NetworkError", status: 0 },
+      };
+      mockGetUser
+        .mockResolvedValueOnce(networkFailure)
+        .mockResolvedValueOnce(networkFailure)
+        .mockResolvedValueOnce({ data: { user: { id: "u-1" } }, error: null });
+
+      const result = getVerifiedBrowserUser();
+      await vi.runAllTimersAsync();
+
+      await expect(result).resolves.toEqual({ id: "u-1" });
+      expect(mockGetUser).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("still fails when the auth server stays unreachable", async () => {
+    vi.useFakeTimers();
+    try {
+      mockGetUser.mockResolvedValue({
+        data: { user: null },
+        error: { name: "AuthRetryableFetchError", message: "NetworkError", status: 0 },
+      });
+
+      const result = getVerifiedBrowserUser();
+      const settled = expect(result).rejects.toMatchObject({ name: "AuthRetryableFetchError" });
+      await vi.runAllTimersAsync();
+
+      await settled;
+      expect(mockGetUser).toHaveBeenCalledTimes(4);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not retry an answer from the auth server", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: null },
+      error: { name: "AuthApiError", message: "invalid JWT", status: 401 },
+    });
+
+    await expect(getVerifiedBrowserUser()).rejects.toMatchObject({ status: 401 });
+    expect(mockGetUser).toHaveBeenCalledTimes(1);
+  });
+
   it("recovers from 'Lock broken with steal option' AbortError on getUser", async () => {
     mockGetUser
       .mockResolvedValueOnce({

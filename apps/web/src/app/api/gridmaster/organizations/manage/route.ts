@@ -459,7 +459,13 @@ export async function POST(req: NextRequest) {
               const invitationId = inviteResult.data.invitation_id as string;
               const token = inviteResult.data.token as string;
               try {
-                await sendPendingInvitationEmail({ orgId: org.id, token, email });
+                await sendPendingInvitationEmail({
+                  orgId: org.id,
+                  token,
+                  email,
+                  expiresAt: inviteResult.data.expires_at as string,
+                  kind: "new",
+                });
                 superAdmin = { kind: "invited", displayName };
               } catch (sendError) {
                 await serviceClient

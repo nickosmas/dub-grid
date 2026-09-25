@@ -53,6 +53,7 @@ const serverSchema = z
     DEMO_RECIPIENT_EMAIL: z.string().optional(),
     LOG_LEVEL: z.string().optional(),
     RATE_LIMIT_IN_DEV: z.string().optional(),
+    CACHE_KEY_PREFIX: z.string().optional(),
     PERF_TIMING: z.string().optional(),
   })
   .superRefine((env, ctx) => {

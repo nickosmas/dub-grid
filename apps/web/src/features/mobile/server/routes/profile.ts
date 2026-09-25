@@ -96,6 +96,7 @@ async function buildMobileProfilePayload(auth: Awaited<ReturnType<typeof require
       platformRole: "none" as const,
       isCurrent: true,
     },
+    joinedAt: auth.membership?.joinedAt ?? null,
     effectiveRole: getEffectiveMobileRole(auth.permissions.role),
     linkedEmployee: linkedEmployee
       ? {

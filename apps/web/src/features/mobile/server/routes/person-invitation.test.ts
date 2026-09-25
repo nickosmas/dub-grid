@@ -172,6 +172,7 @@ describe("mobile person invitation route", () => {
       id: "22222222-2222-4222-8222-222222222222",
       token: "invite-token",
       email: "mina@example.com",
+      expires_at: "2026-09-28T22:04:00.000Z",
       updated_at: null,
     });
     revokeMobileEmployeeInvitationRow.mockResolvedValue(null);
@@ -400,6 +401,7 @@ describe("mobile person invitation route", () => {
       currentOrg: {
         id: "44444444-4444-4444-8444-444444444444",
         name: "Calm Haven",
+        timezone: "America/Los_Angeles",
       },
       permissions: { canManageEmployees: true },
       serviceClient,
@@ -456,7 +458,12 @@ describe("mobile person invitation route", () => {
       expect.objectContaining({
         apiKey: "resend-test-key",
         to: "mina@example.com",
+        subject: "You're invited to join Calm Haven on DubGrid",
       }),
+    );
+    // The deadline the row stored, in the organization's timezone.
+    expect(sendResendEmail.mock.calls[0][0].html).toContain(
+      "Monday, September 28, 2026 at 3:04 PM Pacific Daylight Time",
     );
     expect(insertMobileAuditLogEntry).toHaveBeenCalledWith(
       serviceClient,
@@ -560,7 +567,11 @@ describe("mobile person invitation route", () => {
   function setupResendAuth() {
     const serviceClient = makeServiceClient({ existingMemberUserId: null });
     requireMobileAuth.mockResolvedValue({
-      currentOrg: { id: "44444444-4444-4444-8444-444444444444", name: "Calm Haven" },
+      currentOrg: {
+        id: "44444444-4444-4444-8444-444444444444",
+        name: "Calm Haven",
+        timezone: "America/Los_Angeles",
+      },
       permissions: { canManageEmployees: true },
       serviceClient,
       user: { id: "55555555-5555-4555-8555-555555555555", email: "admin@example.com" },
@@ -573,6 +584,7 @@ describe("mobile person invitation route", () => {
       invitation: {
         ...PENDING_ROW,
         token: "rotated-token",
+        expires_at: "2026-09-28T22:04:00.000Z",
         updated_at: "2026-05-02T22:00:00.000Z",
       },
       previousToken: "previous-token",
@@ -631,6 +643,12 @@ describe("mobile person invitation route", () => {
     );
     const emailedHtml = sendResendEmail.mock.calls[0][0].html as string;
     expect(emailedHtml).toContain("rotated-token");
+    // A resend kills the earlier link, so it goes out as the replacement,
+    // stating the rotated row's deadline.
+    expect(sendResendEmail.mock.calls[0][0].subject).toBe(
+      "Your new invitation to join Calm Haven on DubGrid",
+    );
+    expect(emailedHtml).toContain("Monday, September 28, 2026 at 3:04 PM Pacific Daylight Time");
     expect(restoreMobileEmployeeInvitationRow).not.toHaveBeenCalled();
   });
 

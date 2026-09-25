@@ -181,7 +181,10 @@ beforeEach(() => {
     { key: "email", label: "Email", previousValue: "old@test.com", nextValue: "new@test.com" },
   ]);
   invitationSelectMaybeSingle.mockResolvedValue({ data: CURRENT_INVITATION_ROW, error: null });
-  organizationMaybeSingle.mockResolvedValue({ data: { name: "Calm Haven" }, error: null });
+  organizationMaybeSingle.mockResolvedValue({
+    data: { name: "Calm Haven", timezone: "America/Los_Angeles" },
+    error: null,
+  });
   getInvitationEmailConfig.mockReturnValue({ apiKey: "key", from: "DubGrid <a@b.c>" });
   sendInvitationEmail.mockResolvedValue(undefined);
   auditInsert.mockResolvedValue({ error: null });
@@ -234,10 +237,16 @@ describe("POST /api/organizations/invitations", () => {
       p_role: "admin",
       p_invited_by: "actor-1",
     });
+    // The same invitation with a new link: the email says it replaces the
+    // earlier one and states the deadline the rotation just stored.
     expect(sendInvitationEmail).toHaveBeenCalledWith(
       expect.objectContaining({
         email: "old@test.com",
         token: "rotated-token",
+        orgName: "Calm Haven",
+        expiresAt: "2099-02-01T00:00:00.000Z",
+        timeZone: "America/Los_Angeles",
+        kind: "reissue",
       }),
     );
     // One invitation, one identity: re-issuing does not mint a successor.
@@ -323,8 +332,17 @@ describe("POST /api/organizations/invitations", () => {
     );
 
     expect(response.status).toBe(200);
+    // The deadline the email states is the one the resend stored.
+    const expiresAt = invitationUpdateOperations[0]?.values.expires_at;
+    expect(expiresAt).toEqual(expect.any(String));
     expect(sendInvitationEmail).toHaveBeenCalledWith(
-      expect.objectContaining({ token: expect.any(String), email: "old@test.com" }),
+      expect.objectContaining({
+        token: expect.any(String),
+        email: "old@test.com",
+        expiresAt,
+        timeZone: "America/Los_Angeles",
+        kind: "reissue",
+      }),
     );
     expect(auditInsert).toHaveBeenCalledWith(
       expect.objectContaining({

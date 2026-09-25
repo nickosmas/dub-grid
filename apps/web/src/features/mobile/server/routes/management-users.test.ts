@@ -88,7 +88,11 @@ function makeInvitationRow(overrides: Record<string, unknown> = {}) {
 
 function mockAuth(overrides: Record<string, unknown> = {}) {
   requireMobileAuth.mockResolvedValue({
-    currentOrg: { id: "44444444-4444-4444-8444-444444444444", name: "Calm Haven" },
+    currentOrg: {
+      id: "44444444-4444-4444-8444-444444444444",
+      name: "Calm Haven",
+      timezone: "America/Chicago",
+    },
     permissions: { canManageUsers: true, canManageEmployees: true },
     serviceClient: {},
     user: { id: ACTOR_ID, email: "admin@example.com" },
@@ -201,7 +205,13 @@ describe("mobile management-users routes", () => {
           departmentIds: [9],
         }),
       );
-      expect(sendInvitationEmail).toHaveBeenCalled();
+      expect(sendInvitationEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          expiresAt: "2026-06-01T00:00:00Z",
+          timeZone: "America/Chicago",
+          kind: "new",
+        }),
+      );
     });
 
     it("refuses a second invitation for someone already on the roster", async () => {
@@ -287,7 +297,7 @@ describe("mobile management-users routes", () => {
       );
     });
 
-    it("revokes and replaces a pending invitation when its role changes", async () => {
+    it("rotates a pending invitation when its role changes", async () => {
       replaceMobilePendingInvitationAccessRow.mockResolvedValue({
         rotation: {
           rotatedToken: "rotated-token",
@@ -298,6 +308,7 @@ describe("mobile management-users routes", () => {
           id: "99999999-9999-4999-8999-999999999999",
           role_to_assign: "super_admin",
           token: "replacement-token",
+          expires_at: "2026-06-04T00:00:00Z",
         }),
       });
 
@@ -322,7 +333,12 @@ describe("mobile management-users routes", () => {
       expect(updateMobileInvitationAssignmentsRow).not.toHaveBeenCalled();
       expect(updateMobileMembershipAccessRow).not.toHaveBeenCalled();
       expect(sendInvitationEmail).toHaveBeenCalledWith(
-        expect.objectContaining({ token: "replacement-token" }),
+        expect.objectContaining({
+          token: "replacement-token",
+          expiresAt: "2026-06-04T00:00:00Z",
+          timeZone: "America/Chicago",
+          kind: "reissue",
+        }),
       );
     });
 
@@ -492,7 +508,7 @@ describe("mobile management-users routes", () => {
 
     it("refreshes the token and emails it on resend", async () => {
       refreshMobileEmployeeInvitationRow.mockResolvedValue({
-        invitation: makeInvitationRow({ token: "fresh-token" }),
+        invitation: makeInvitationRow({ token: "fresh-token", expires_at: "2026-06-07T00:00:00Z" }),
         previousToken: "old-token",
         previousExpiresAt: "2026-05-04T00:00:00Z",
       });
@@ -507,7 +523,12 @@ describe("mobile management-users routes", () => {
       expect(response.status).toBe(200);
       expect(payload.result).toBe("invitation_resent");
       expect(sendInvitationEmail).toHaveBeenCalledWith(
-        expect.objectContaining({ token: "fresh-token" }),
+        expect.objectContaining({
+          token: "fresh-token",
+          expiresAt: "2026-06-07T00:00:00Z",
+          timeZone: "America/Chicago",
+          kind: "reissue",
+        }),
       );
       expect(insertMobileAuditLogEntry).toHaveBeenCalledWith(
         expect.anything(),

@@ -23,8 +23,14 @@ export interface Employee {
   departmentIds: number[];
   deptAdminIds: number[];
   version: number;
-  /** When the employee row was created. Surfaced as "Date Joined" in the People table. Optional on input shapes where the value isn't known yet. */
+  /** When the employee row was created: the person's "Date added". Optional on input shapes where the value isn't known yet. */
   createdAt?: string | null;
+  /**
+   * When the linked account's organization membership was created, which for
+   * an invited person is the day they accepted: the People table's "Date
+   * joined". Null with no linked account, and absent where it isn't read.
+   */
+  joinedAt?: string | null;
 }
 
 export interface StaffCredentialSummary {
