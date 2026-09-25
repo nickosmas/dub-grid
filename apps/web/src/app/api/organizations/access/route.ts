@@ -74,7 +74,9 @@ function getRequestIp(req: NextRequest): string | null {
 async function requirePrivilegedActor(
   req: NextRequest,
   orgId: string,
-): Promise<{ ok: true; orgId: string } | { ok: false; response: NextResponse }> {
+): Promise<
+  { ok: true; orgId: string; userClient: RoleChangeClient } | { ok: false; response: NextResponse }
+> {
   const auth = await requireOrgPermissions(
     req,
     orgId,
@@ -87,8 +89,13 @@ async function requirePrivilegedActor(
   // Return the EFFECTIVE org (sandbox-redirected). Callers must mutate this org,
   // not the raw client-supplied orgId — otherwise a sandbox user passes the gate
   // against their sandbox but writes the real org. See SECURITY_AUDIT / H-1.
-  return { ok: true, orgId: auth.orgId };
+  return { ok: true, orgId: auth.orgId, userClient: auth.userClient };
 }
+
+type RoleChangeClient = Extract<
+  Awaited<ReturnType<typeof requireOrgPermissions>>,
+  { userClient: unknown }
+>["userClient"];
 
 async function fetchOrganizationUser(
   orgId: string,
@@ -274,7 +281,9 @@ export async function PATCH(req: NextRequest) {
 
     const roleChanged = currentUser.orgRole !== nextRole;
     if (roleChanged) {
-      const { error } = await serviceClient.rpc("change_user_role", {
+      // As the caller, so the RPC's own identity and tier guards run too. Under
+      // the service role auth.uid() is null and they passed vacuously.
+      const { error } = await allowed.userClient.rpc("change_user_role", {
         p_target_user_id: userId,
         p_new_role: nextRole,
         p_changed_by_id: user.id,

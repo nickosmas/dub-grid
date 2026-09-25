@@ -1713,14 +1713,13 @@ export type MobileRoleChangeOutcome =
  * that lifts the trigger, takes an advisory lock so two callers cannot race, and
  * keeps the last-super-admin guard.
  *
- * Note the RPC gates its own callers on `auth.uid()`, which is NULL under the
- * service role, so those checks quietly pass here: callers must do their own
- * permission check first. The guards that do not read `auth.uid()` — the
- * expected-updated-at check, the self-action check, and the last-super-admin
- * check — still apply.
+ * Pass the caller's own client, never the service client. The RPC checks the
+ * caller's identity, membership and tier against `auth.uid()`, which is NULL
+ * under the service role, so those guards would pass vacuously and only the
+ * route's gate would stand between a drifted route and a privileged change.
  */
 export async function changeMobileMembershipOrgRole(
-  serviceClient: SupabaseClient,
+  userClient: SupabaseClient,
   input: {
     orgId: string;
     targetUserId: string;
@@ -1729,7 +1728,7 @@ export async function changeMobileMembershipOrgRole(
     expectedUpdatedAt: string | null;
   },
 ): Promise<MobileRoleChangeOutcome> {
-  const { data, error } = await serviceClient.rpc("change_user_role", {
+  const { data, error } = await userClient.rpc("change_user_role", {
     p_target_user_id: input.targetUserId,
     p_new_role: input.orgRole,
     p_changed_by_id: input.actorUserId,

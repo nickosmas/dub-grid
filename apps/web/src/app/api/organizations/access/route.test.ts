@@ -17,6 +17,8 @@ const buildMembershipAccessChanges = vi.fn(
   (..._args: unknown[]) => [] as Array<{ key: string; label: string }>,
 );
 const rpc = vi.fn();
+const userRpc = vi.fn();
+const userClient = { rpc: (...args: unknown[]) => userRpc(...args) };
 
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
@@ -144,7 +146,7 @@ describe("DELETE /api/organizations/access", () => {
   it("mutates the effective (sandbox-redirected) org and revokes the removed user's sessions", async () => {
     // requireOrgPermissions redirects: caller's request carries the REAL org,
     // but a sandbox cookie is active, so the effective org is the sandbox.
-    requireOrgPermissions.mockResolvedValue({ orgId: SANDBOX_ORG_ID });
+    requireOrgPermissions.mockResolvedValue({ orgId: SANDBOX_ORG_ID, userClient });
 
     const membershipRow = {
       user_id: TARGET_USER_ID,
@@ -197,7 +199,7 @@ describe("PATCH /api/organizations/access notifications", () => {
     validateCsrfOrigin.mockReturnValue(null);
     requireAuthenticatedUser.mockResolvedValue({ user: { id: ACTOR_ID, email: "actor@test.com" } });
     checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
-    requireOrgPermissions.mockResolvedValue({ orgId: REQUESTED_ORG_ID });
+    requireOrgPermissions.mockResolvedValue({ orgId: REQUESTED_ORG_ID, userClient });
     profileMaybeSingle.mockResolvedValue({
       data: { first_name: "Target", last_name: "User", platform_role: "none", created_at: null },
       error: null,
@@ -206,6 +208,7 @@ describe("PATCH /api/organizations/access notifications", () => {
     auditInsert.mockResolvedValue({ error: null });
     membershipUpdateEq3.mockResolvedValue({ data: { id: "m-1" }, error: null });
     rpc.mockResolvedValue({ error: null });
+    userRpc.mockResolvedValue({ error: null });
     buildMembershipAccessChanges.mockReturnValue([{ key: "orgRole", label: "Role" }]);
   });
 
@@ -225,6 +228,12 @@ describe("PATCH /api/organizations/access notifications", () => {
     const res = await PATCH(makePatchRequest({ orgRole: "super_admin" }));
 
     expect(res.status).toBe(200);
+    // As the caller, so the RPC's own identity and tier guards run as well.
+    expect(userRpc).toHaveBeenCalledWith(
+      "change_user_role",
+      expect.objectContaining({ p_new_role: "super_admin", p_changed_by_id: ACTOR_ID }),
+    );
+    expect(rpc).not.toHaveBeenCalledWith("change_user_role", expect.anything());
     expect(dispatchNotificationEvent).toHaveBeenCalledTimes(1);
     expect(dispatchNotificationEvent).toHaveBeenCalledWith(
       ACTOR_ID,

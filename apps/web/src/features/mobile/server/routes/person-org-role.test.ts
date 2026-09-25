@@ -121,11 +121,15 @@ function loadedInvitee(overrides: Record<string, unknown> = {}) {
   };
 }
 
+const SERVICE_CLIENT = { name: "service" };
+const USER_CLIENT = { name: "user" };
+
 function mockAuth(overrides: Record<string, unknown> = {}) {
   requireMobileAuth.mockResolvedValue({
     currentOrg: { id: "44444444-4444-4444-8444-444444444444", name: "Calm Haven" },
     permissions: { canManageUsers: true, canManageEmployees: true },
-    serviceClient: {},
+    serviceClient: SERVICE_CLIENT,
+    userClient: USER_CLIENT,
     user: { id: ACTOR_ID, email: "admin@example.com" },
     ...overrides,
   });
@@ -228,16 +232,14 @@ describe("mobile person org-role route", () => {
 
     expect(response.status).toBe(200);
     expect(payload.result).toBe("membership_updated");
-    expect(changeMobileMembershipOrgRole).toHaveBeenCalledWith(
-      {},
-      {
-        orgId: "44444444-4444-4444-8444-444444444444",
-        targetUserId: MEMBER_USER_ID,
-        actorUserId: ACTOR_ID,
-        orgRole: "admin",
-        expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
-      },
-    );
+    // The caller's client, so the RPC's own guards run; never the service role.
+    expect(changeMobileMembershipOrgRole).toHaveBeenCalledWith(USER_CLIENT, {
+      orgId: "44444444-4444-4444-8444-444444444444",
+      targetUserId: MEMBER_USER_ID,
+      actorUserId: ACTOR_ID,
+      orgRole: "admin",
+      expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
+    });
     // The RPC touches only org_role, so management departments survive by
     // construction rather than by being handed back in.
     expect(updateMobileMembershipAccessRow).not.toHaveBeenCalled();
@@ -331,7 +333,7 @@ describe("mobile person org-role route", () => {
     expect(response.status).toBe(200);
     expect(payload.result).toBe("invitation_replaced");
     expect(replaceMobilePendingInvitationAccessRow).toHaveBeenCalledWith(
-      {},
+      SERVICE_CLIENT,
       expect.objectContaining({
         roleToAssign: "admin",
         departmentIds: [9],
@@ -353,7 +355,7 @@ describe("mobile person org-role route", () => {
 
     expect(response.status).toBe(502);
     expect(rollbackMobilePendingInvitationAccessReplacement).toHaveBeenCalledWith(
-      {},
+      SERVICE_CLIENT,
       expect.objectContaining({
         rotatedToken: "rotated-token",
         previousToken: "original-token",

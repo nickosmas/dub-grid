@@ -121,7 +121,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
     // direct column write is rejected by `guard_org_role_change`. The role goes
     // through the RPC first, and the departments through the row update after.
     if (loaded.membership.org_role !== parsed.data.orgRole) {
-      const outcome = await changeMobileMembershipOrgRole(auth.serviceClient, {
+      const outcome = await changeMobileMembershipOrgRole(auth.userClient, {
         orgId: auth.currentOrg.id,
         targetUserId: loaded.userId,
         actorUserId: auth.user.id,

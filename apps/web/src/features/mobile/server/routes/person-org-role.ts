@@ -88,7 +88,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     // Through the RPC, not a direct column write: `guard_org_role_change`
     // rejects the latter outright. It touches only `org_role`, so this person's
     // management departments are untouched by construction.
-    const outcome = await changeMobileMembershipOrgRole(auth.serviceClient, {
+    const outcome = await changeMobileMembershipOrgRole(auth.userClient, {
       orgId: auth.currentOrg.id,
       targetUserId: loaded.userId,
       actorUserId: auth.user.id,

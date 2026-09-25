@@ -82,11 +82,15 @@ function makePerson(overrides: Record<string, unknown> = {}) {
   };
 }
 
+const SERVICE_CLIENT = { name: "service" };
+const USER_CLIENT = { name: "user" };
+
 function mockAuth(overrides: Record<string, unknown> = {}) {
   requireMobileAuth.mockResolvedValue({
     currentOrg: { id: "44444444-4444-4444-8444-444444444444", name: "Calm Haven" },
     permissions: { canManageUsers: true, canManageEmployees: true },
-    serviceClient: {},
+    serviceClient: SERVICE_CLIENT,
+    userClient: USER_CLIENT,
     user: { id: ACTOR_ID, email: "admin@example.com" },
     ...overrides,
   });
@@ -293,12 +297,13 @@ describe("mobile person management-access route", () => {
     // Two writes: the database rejects a direct `org_role` column write
     // (guard_org_role_change), so the role goes through the RPC and only the
     // departments travel with the row update.
+    // The caller's client, so the RPC's own guards run; never the service role.
     expect(changeMobileMembershipOrgRole).toHaveBeenCalledWith(
-      {},
+      USER_CLIENT,
       expect.objectContaining({ targetUserId: MEMBER_USER_ID, orgRole: "admin" }),
     );
     expect(updateMobileMembershipAccessRow).toHaveBeenCalledWith(
-      {},
+      SERVICE_CLIENT,
       expect.objectContaining({
         userId: MEMBER_USER_ID,
         departmentIds: [9],
@@ -383,7 +388,7 @@ describe("mobile person management-access route", () => {
     expect(response.status).toBe(200);
     expect(payload.result).toBe("invitation_sent");
     expect(createMobileEmployeeInvitationRow).toHaveBeenCalledWith(
-      {},
+      SERVICE_CLIENT,
       expect.objectContaining({
         employeeId: EMPLOYEE_ID,
         email: "mina@example.com",
@@ -407,7 +412,7 @@ describe("mobile person management-access route", () => {
 
     expect(response.status).toBe(502);
     expect(revokeMobileEmployeeInvitationRow).toHaveBeenCalledWith(
-      {},
+      SERVICE_CLIENT,
       expect.objectContaining({ invitationId: INVITATION_ID }),
     );
   });
@@ -459,7 +464,7 @@ describe("mobile person management-access route", () => {
 
     expect(response.status).toBe(200);
     expect(replaceMobilePendingInvitationAccessRow).toHaveBeenCalledWith(
-      {},
+      SERVICE_CLIENT,
       expect.objectContaining({
         invitationId: INVITATION_ID,
         roleToAssign: "admin",
@@ -511,7 +516,7 @@ describe("mobile person management-access route", () => {
 
     expect(response.status).toBe(502);
     expect(rollbackMobilePendingInvitationAccessReplacement).toHaveBeenCalledWith(
-      {},
+      SERVICE_CLIENT,
       expect.objectContaining({
         rotatedToken: "rotated-token",
         previousToken: "original-token",
@@ -645,7 +650,7 @@ describe("mobile person management-access route", () => {
     expect(response.status).toBe(200);
     expect(payload.result).toBe("access_removed");
     expect(updateMobileMembershipAccessRow).toHaveBeenCalledWith(
-      {},
+      SERVICE_CLIENT,
       expect.objectContaining({ departmentIds: [], deptAdminIds: [] }),
     );
     // The org role is deliberately left as it was — role changes go through PUT.
