@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const registerPushToken = vi.fn();
+const disablePushToken = vi.fn();
 const signOutMobileSessions = vi.fn();
 const loadStoredPushDevice = vi.fn();
 const getSession = vi.fn();
@@ -18,7 +18,7 @@ vi.mock("../providers/AuthSessionProvider", () => ({
 }));
 
 vi.mock("./api", () => ({
-  registerPushToken: (...args: unknown[]) => registerPushToken(...args),
+  disablePushToken: (...args: unknown[]) => disablePushToken(...args),
   signOutMobileSessions: (...args: unknown[]) => signOutMobileSessions(...args),
 }));
 
@@ -52,7 +52,7 @@ describe("auth-reset", () => {
     vi.clearAllMocks();
     getSession.mockResolvedValue({ data: { session: { access_token: "token-123" } } });
     loadStoredPushDevice.mockResolvedValue(DEVICE);
-    registerPushToken.mockResolvedValue(undefined);
+    disablePushToken.mockResolvedValue(undefined);
     signOut.mockResolvedValue({ error: null });
     signOutMobileSessions.mockResolvedValue({ success: true });
   });
@@ -61,7 +61,7 @@ describe("auth-reset", () => {
     it("revokes the stored device so a signed-out phone stops receiving pushes", async () => {
       await disablePushForCurrentDevice();
 
-      expect(registerPushToken).toHaveBeenCalledWith("token-123", { ...DEVICE, disabled: true });
+      expect(disablePushToken).toHaveBeenCalledWith("token-123", DEVICE);
     });
 
     it("no-ops when the session is already gone", async () => {
@@ -69,7 +69,7 @@ describe("auth-reset", () => {
 
       await disablePushForCurrentDevice();
 
-      expect(registerPushToken).not.toHaveBeenCalled();
+      expect(disablePushToken).not.toHaveBeenCalled();
     });
 
     it("no-ops when this device never registered for push", async () => {
@@ -77,11 +77,11 @@ describe("auth-reset", () => {
 
       await disablePushForCurrentDevice();
 
-      expect(registerPushToken).not.toHaveBeenCalled();
+      expect(disablePushToken).not.toHaveBeenCalled();
     });
 
     it("swallows a failing revoke so it can never block sign-out", async () => {
-      registerPushToken.mockRejectedValue(new Error("offline"));
+      disablePushToken.mockRejectedValue(new Error("offline"));
 
       await expect(disablePushForCurrentDevice()).resolves.toBeUndefined();
     });
@@ -91,7 +91,7 @@ describe("auth-reset", () => {
     it("revokes push, clears the cache, signs out and returns to login", async () => {
       await handleExpiredMobileSession();
 
-      expect(registerPushToken).toHaveBeenCalled();
+      expect(disablePushToken).toHaveBeenCalled();
       expect(queryClientClear).toHaveBeenCalled();
       expect(signOut).toHaveBeenCalledWith({ scope: "local" });
       expect(replaceAuthSession).toHaveBeenCalledWith(null);
@@ -122,7 +122,7 @@ describe("auth-reset", () => {
       await handleExpiredMobileSession({ skipSignOut: true });
 
       expect(signOut).not.toHaveBeenCalled();
-      expect(registerPushToken).not.toHaveBeenCalled();
+      expect(disablePushToken).not.toHaveBeenCalled();
       expect(queryClientClear).toHaveBeenCalled();
       expect(routerReplace).toHaveBeenCalledWith("/(auth)/login");
     });
@@ -169,6 +169,26 @@ describe("auth-reset", () => {
       expect(signOut).not.toHaveBeenCalled();
       expect(queryClientClear).not.toHaveBeenCalled();
       expect(routerReplace).not.toHaveBeenCalled();
+    });
+
+    // A teardown already finished; a request that outlived it used to run
+    // another and reset a login form the person had started (41d1).
+    it("does nothing when no session remains", async () => {
+      getSession.mockResolvedValue({ data: { session: null } });
+
+      await handleRejectedMobileToken("token-123");
+
+      expect(signOut).not.toHaveBeenCalled();
+      expect(queryClientClear).not.toHaveBeenCalled();
+      expect(routerReplace).not.toHaveBeenCalled();
+    });
+
+    it("still tears down when the session lookup itself failed", async () => {
+      getSession.mockResolvedValue({ data: { session: null }, error: new Error("refresh failed") });
+
+      await handleRejectedMobileToken("token-123");
+
+      expect(queryClientClear).toHaveBeenCalled();
     });
 
     it("tears down when the rejected token is the live one", async () => {

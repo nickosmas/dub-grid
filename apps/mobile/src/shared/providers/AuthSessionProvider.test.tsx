@@ -119,6 +119,30 @@ describe("AuthSessionProvider", () => {
     expect(clearQueryClient).not.toHaveBeenCalled();
   });
 
+  // A refused report used to be remembered as sent until the next token (41d1).
+  it("reports a token again after its report was refused", async () => {
+    const session = sessionFor("user-1", "org-1", "v1");
+    getSession.mockResolvedValueOnce({ data: { session } });
+    registerMobileSessionPresence.mockRejectedValueOnce(
+      Object.assign(new Error("unauthorized"), { status: 401 }),
+    );
+
+    render(
+      <AuthSessionProvider>
+        <SessionProbe />
+      </AuthSessionProvider>,
+    );
+    await waitFor(() => expect(registerMobileSessionPresence).toHaveBeenCalledTimes(1));
+
+    const authStateCallback = onAuthStateChange.mock.calls[0]?.[0];
+    await waitFor(() => {
+      act(() => {
+        authStateCallback?.("TOKEN_REFRESHED", session);
+      });
+      expect(registerMobileSessionPresence).toHaveBeenCalledTimes(2);
+    });
+  });
+
   it("registers a newly observed token after the session changes", async () => {
     const firstSession = sessionFor("user-1", "org-1", "v1");
     const refreshedSession = sessionFor("user-1", "org-1", "v2");

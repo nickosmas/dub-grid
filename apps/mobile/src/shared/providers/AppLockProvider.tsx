@@ -73,6 +73,10 @@ export function AppLockProvider({ children }: PropsWithChildren) {
   // Another account signing in, or leaving the foreground, clears it.
   const [unlockedFor, setUnlockedFor] = useState<string | null>(null);
   const [authenticating, setAuthenticating] = useState(false);
+  // iOS reports `inactive` in the app switcher, and takes the switcher's
+  // snapshot soon after: content is covered then without locking, which the
+  // system prompt's own `inactive` must not do.
+  const [obscured, setObscured] = useState(false);
   // Whether this lock has already raised the system prompt on its own. Without
   // it, cancelling Face ID put the effect below straight back into
   // `attemptUnlock` (the lock was still showing and `authenticating` had just
@@ -113,14 +117,21 @@ export function AppLockProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     if (appLockUnsupported || !accessToken || !required) return;
 
+    // Only leaving for the background arms the lock. iOS also reports
+    // `inactive` while the system Face ID prompt is up, so treating that as
+    // leaving relocked the app the moment the check passed (41d1).
     const subscription = AppState.addEventListener("change", (state) => {
-      if (state !== "active") {
+      setObscured(state !== "active");
+      if (state === "background") {
         setUnlockedFor(null);
       }
     });
 
     return () => {
       subscription.remove();
+      // Nothing hears the return to `active` once unsubscribed (a sign-out
+      // while the app was covered), so the cover must not outlive it.
+      setObscured(false);
     };
   }, [accessToken, required]);
 
@@ -147,7 +158,7 @@ export function AppLockProvider({ children }: PropsWithChildren) {
       {children}
       {/* Stays up under the lock too: the lock is a native modal that fades
           in, and content must not show through while it does. */}
-      {hydrating || showLock ? (
+      {hydrating || showLock || (obscured && required && Boolean(accessToken)) ? (
         <View style={StyleSheet.absoluteFill} testID="app-lock-cover">
           <AppSplashScreen />
         </View>

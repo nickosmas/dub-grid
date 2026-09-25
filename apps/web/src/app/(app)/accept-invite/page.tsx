@@ -216,8 +216,11 @@ function AcceptInviteContent() {
 
     // 4. Sign out so user re-authenticates with fresh JWT claims.
     // Use global scope to revoke the server-side refresh token too,
-    // otherwise the login page will find a stale token in cookies.
-    await signOutFromBrowser("global");
+    // otherwise the login page will find a stale token in cookies. The
+    // invitation is already accepted, so a failed sign-out is not an error
+    // whose retry would find the link spent (41d1). The global sign-out still
+    // clears this browser's session when it fails.
+    await signOutFromBrowser("global").catch(() => {});
 
     setOrgSlug(slug);
     setState("success");

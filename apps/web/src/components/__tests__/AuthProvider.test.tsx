@@ -26,7 +26,8 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
 
-import AuthProvider, { useAuth } from "@/components/AuthProvider";
+import AuthProvider, { sendSessionRegistration, useAuth } from "@/components/AuthProvider";
+import { SessionRegistrationError } from "@/features/account/client/session-registration";
 
 // ─── Test consumers ──────────────────────────────────────────────────────────
 
@@ -388,5 +389,26 @@ describe("AuthProvider — subscription cleanup", () => {
     unmount();
 
     expect(unsubscribe).toHaveBeenCalled();
+  });
+});
+
+// A refused report used to count as sent (41d1).
+describe("sendSessionRegistration", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("fails on a refused report so it can be retried", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 409 }));
+
+    await expect(sendSessionRegistration()).rejects.toMatchObject({
+      name: "SessionRegistrationError",
+      retryable: true,
+    });
+  });
+
+  it("resolves when the report lands", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 200 }));
+
+    await expect(sendSessionRegistration()).resolves.toBeUndefined();
+    expect(SessionRegistrationError).toBeDefined();
   });
 });

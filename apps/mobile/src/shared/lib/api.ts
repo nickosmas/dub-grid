@@ -1294,6 +1294,33 @@ export function updateMobileManagementUserInvitation(
   );
 }
 
+/**
+ * Stops pushes to this device during a teardown. A 401 here never starts a
+ * teardown: the caller is the teardown, and re-entering it used to stall every
+ * forced sign-out for five seconds while it waited on itself (41d1).
+ */
+export function disablePushToken(
+  accessToken: string,
+  device: { platform: "ios" | "android"; expoPushToken: string },
+) {
+  const init: RequestInit = {
+    method: "POST",
+    body: JSON.stringify({ ...device, disabled: true }),
+  };
+  return mobileRequest(
+    "/api/mobile/v1/push-tokens",
+    {
+      ...init,
+      headers: createHeaders(init, {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      }),
+    },
+    (value) => mobilePushTokenResponseSchema.parse(value),
+    null,
+  );
+}
+
 export function registerPushToken(
   accessToken: string,
   body: {

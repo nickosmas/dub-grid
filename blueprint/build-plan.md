@@ -625,3 +625,17 @@
         production checks before remediation closure. Record unavailable
         environment evidence as a release blocker rather than treating static
         tests as runtime proof.
+    - [x] 41d1. **Retry and teardown resilience** - a failed session report
+          is retried while it can still alert, a mobile teardown never waits
+          on itself or repeats after it finished, an accepted invitation stays
+          accepted when its sign-out fails, and the app lock does not relock
+          on the system prompt's own inactive state.
+    - [ ] 41d2. **Source and template drift guards** - migration checksums,
+          the password rule against Supabase's, code lengths against
+          `otp_length`, the push script's comparison, the invitation lifetime,
+          the SQL messages the routes match, and the claim names are each
+          held by a test that fails when the two sides diverge.
+    - [ ] 41d3. **Release qualification** - browser, native-app,
+          email-provider and migration/reissue rehearsals with explicit
+          production checks; unavailable environment evidence is recorded as
+          a release blocker.

@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const createEphemeralSupabaseClient = vi.hoisted(() => vi.fn());
+const handleRejectedMobileToken = vi.hoisted(() => vi.fn());
 
 vi.mock("./supabase", () => ({
   createEphemeralSupabaseClient,
 }));
+vi.mock("./auth-reset", () => ({ handleRejectedMobileToken }));
 
 describe("mobileApiRequest", () => {
   beforeEach(() => {
@@ -18,6 +20,27 @@ describe("mobileApiRequest", () => {
     vi.useRealTimers();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
+  });
+
+  // The teardown disables push itself, so a 401 there must not start another
+  // teardown and wait on it (41d1). An ordinary push call still does.
+  it("never re-enters the teardown when disabling push is refused", async () => {
+    const unauthorized = {
+      ok: false,
+      status: 401,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({ error: "Unauthorized" }),
+    };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(unauthorized));
+    handleRejectedMobileToken.mockResolvedValue(undefined);
+    const { disablePushToken, registerPushToken } = await import("./api");
+    const device = { platform: "ios" as const, expoPushToken: "ExponentPushToken[x]" };
+
+    await expect(disablePushToken("token-123", device)).rejects.toBeDefined();
+    expect(handleRejectedMobileToken).not.toHaveBeenCalled();
+
+    await expect(registerPushToken("token-123", device)).rejects.toBeDefined();
+    expect(handleRejectedMobileToken).toHaveBeenCalledWith("token-123");
   });
 
   it("adds bearer auth and parses a successful payload", async () => {

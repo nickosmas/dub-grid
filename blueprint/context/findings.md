@@ -135,3 +135,19 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Why it matters:** The e2e spec and the API reference still describe `/api/notify-impersonation`, and the old route's `apiLimiter` has no counterpart, so repeated start and end cycles email the person each time (each still needs a justification and writes an audit row).
 **Suggested fix:** Update the two references when the documentation work lands; consider a per-target limit on starts.
 **Resolution:**
+
+### F-42 [P2] open - Arming the app lock only on background could leave content in the iOS app switcher
+
+**File:** `apps/mobile/src/shared/providers/AppLockProvider.tsx:119`
+**Found:** 2026-09-25 by `/audit` (scope: current, b3848e11..46bda2bb; all lenses)
+**Why it matters:** iOS goes inactive in the app switcher and snapshots soon after; with only `background` arming the lock, the cover could arrive after the snapshot, showing schedule and people data. Not verified on a device.
+**Suggested fix:** Cover the app on `inactive` without locking or prompting.
+**Resolution:** `inactive` raises the privacy cover (no lock, no prompt); `active` lowers it; `background` still locks. A provider test covers it. The switcher snapshot needs the 41d3 device rehearsal. Re-review (d4a48aa5): kept open, since the cover could stay up after a sign-out while covered; the effect's cleanup now lowers it, with a test that fails without it. iOS only: Android reports no `inactive`, and its recents snapshot stays unprotected (that needs `FLAG_SECURE`). Second re-review (fe8c51ee): kept open at the repair limit (two attempts). The cleanup that lowers the cover also runs when the token rotates while the app is inactive, so a manual refresh already in flight when the switcher opens drops the cover until `background`. Suggested next fix: key the effect on `Boolean(accessToken)` instead of the token, with a test that rotates the token after `inactive`.
+
+### F-46 [P3] open - A detection error in the new-sign-in claim loses the alert without a retry
+
+**File:** `apps/web/src/features/account/server/security-alerts.ts:74`
+**Found:** 2026-09-25 by `/audit` (scope: current, b3848e11..46bda2bb; all lenses)
+**Why it matters:** `claimNewSignIn` catches a database error and returns no claim, and the route still answers 200, so the client never retries and the alert is gone.
+**Suggested fix:** Answer 5xx when detection fails so the client retries, or record the failure for a later sweep.
+**Resolution:**

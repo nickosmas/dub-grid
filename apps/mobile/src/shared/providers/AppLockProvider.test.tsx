@@ -176,6 +176,66 @@ describe("AppLockProvider", () => {
     expect(screen.getByText("App locked")).toBeInTheDocument();
   });
 
+  it("stays unlocked through the inactive state the system prompt causes", async () => {
+    appLockEnabled = true;
+
+    render(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+    await waitFor(() => {
+      expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+    });
+    authenticateAsync.mockClear();
+
+    act(() => {
+      appStateListener?.("inactive");
+    });
+    // Covered for the app switcher's snapshot, but not locked.
+    expect(screen.getByTestId("app-lock-cover")).toBeInTheDocument();
+    expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+
+    act(() => {
+      appStateListener?.("active");
+    });
+
+    expect(screen.queryByTestId("app-lock-cover")).not.toBeInTheDocument();
+    expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+    expect(authenticateAsync).not.toHaveBeenCalled();
+  });
+
+  it("never leaves the privacy cover up after a sign-out while covered", async () => {
+    appLockEnabled = true;
+    const view = render(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+    await waitFor(() => {
+      expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+    });
+
+    act(() => {
+      appStateListener?.("inactive");
+    });
+    useSessionState.mockReturnValue({ accessToken: null, isLoading: false });
+    view.rerender(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+    useSessionState.mockReturnValue({ accessToken: "token-123", isLoading: false });
+    view.rerender(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+
+    expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("app-lock-cover")).not.toBeInTheDocument();
+  });
+
   it("locks again when the app returns from the background", async () => {
     appLockEnabled = true;
 

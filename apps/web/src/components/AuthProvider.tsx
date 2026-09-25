@@ -14,7 +14,10 @@ import {
   subscribeToBrowserAuthChanges,
 } from "@/features/account/client";
 import { getWebSessionMetadata } from "@/features/account/client/session-metadata";
-import { createSessionRegistration } from "@/features/account/client/session-registration";
+import {
+  createSessionRegistration,
+  SessionRegistrationError,
+} from "@/features/account/client/session-registration";
 import { listenForBrowserSignOut } from "@/lib/auth-boundary-broadcast";
 
 /**
@@ -22,14 +25,17 @@ import { listenForBrowserSignOut } from "@/lib/auth-boundary-broadcast";
  * The server keys the row by the Supabase auth session_id claim so web and
  * mobile sessions share the same registry.
  */
-async function sendSessionRegistration() {
+export async function sendSessionRegistration() {
   const { deviceLabel, browserName, browserVersion } = getWebSessionMetadata(navigator.userAgent);
 
-  await fetch("/api/auth/track-session", {
+  const response = await fetch("/api/auth/track-session", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ platform: "web", deviceLabel, browserName, browserVersion }),
   });
+  // A refused report used to count as sent, so a sign-in whose write failed
+  // was not reported again until the next token, too late to alert (41d1).
+  if (!response.ok) throw new SessionRegistrationError(response.status);
 }
 
 const trackSession = createSessionRegistration(sendSessionRegistration);

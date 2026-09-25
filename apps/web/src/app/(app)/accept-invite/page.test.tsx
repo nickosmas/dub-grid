@@ -204,6 +204,20 @@ describe("AcceptInvitePage", () => {
     );
   });
 
+  it("still shows success when the sign-out after acceptance fails", async () => {
+    setLocation("?token=invite-token&email=new.user%40example.com");
+    mocks.signOutFromBrowser.mockImplementation(async (scope: string) => {
+      if (scope === "global") throw new Error("network unavailable");
+    });
+    render(<AcceptInvitePage />);
+
+    await submitNewPassword();
+
+    expect(await screen.findByRole("heading", { name: "You're all set" })).toBeInTheDocument();
+    expect(mocks.signOutFromBrowser).toHaveBeenCalledWith("global");
+    expect(mocks.captureException).not.toHaveBeenCalled();
+  });
+
   it("records no sign-in when the password is refused", async () => {
     setLocation("?token=invite-token&email=new.user%40example.com");
     mocks.registerInvitedUser.mockResolvedValue({ status: "existing" });
