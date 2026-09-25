@@ -64,7 +64,7 @@ export function getMobileRequestActionFeedback({
 }): MobileRequestActionFeedback {
   const key = getMobileRequestActionKey(requestId, body);
   const claimMessage = viewerCanApprove
-    ? "Claim this open shift? As an admin, it goes on the schedule right away."
+    ? "Claim this open shift? As an admin, this goes on the schedule right away."
     : "Claim this open shift? We'll send it to your admin for approval.";
 
   switch (getActionVariant(body)) {

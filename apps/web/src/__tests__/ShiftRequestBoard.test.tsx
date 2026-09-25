@@ -180,7 +180,9 @@ describe("ShiftRequestBoard", () => {
     renderBoard({ openPickups: [makeRequest()], canApprove: true });
 
     await user.click(screen.getByRole("button", { name: "Claim" }));
-    expect(screen.getByText(/goes on the schedule right away/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/As an admin, this goes on the schedule right away\./),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/manager approval/)).not.toBeInTheDocument();
   });
 
