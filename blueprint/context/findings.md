@@ -231,10 +231,10 @@
 **Suggested fix:** Bound the resume window (for example the record must be under 7 days old), or require that the user now holds no active membership, which is the state a partial failure leaves.
 **Resolution:** Fixed on `dev` in `5d74a0a0`. Only a started record from the last seven days (`SELF_DELETION_RESUME_WINDOW_MS`) allows resuming without the permission check. The helper test pins the window. **Closed:** Audit 2026-09-25, second pass (scope: current, 9e4b15cd..36d81952 plus the files of findings still `fixed`; all lenses): `hasStartedSelfDeletion` filters to records under seven days old, pinned by the helper test. No new defect.
 
-### F-32 [P1] unverified - Production may not let migration 046 delete provider sessions
+### F-32 [P1] invalid - Production may not let migration 046 delete provider sessions
 
 **File:** `supabase/migrations/046_end_user_auth_sessions.sql:28`
 **Found:** 2026-09-25 by `/audit` (scope: current; lens: security)
 **Why it matters:** `end_user_auth_sessions` deletes from `auth.sessions` as its owner, `postgres`. Locally `postgres` is not a superuser but holds DELETE on `auth.sessions` by grant from `supabase_auth_admin`, which is Supabase's standard setup, and the live-database test passes. Hosted Supabase has been narrowing what `postgres` may do in the `auth` schema, and the linked project was not inspected. If the grant is missing there, `endUserSessions` throws after the watermark, the failure is reported, and an administrator's email change again leaves the person's sessions refreshable.
 **Suggested fix:** Before releasing 046, check `has_table_privilege('postgres', 'auth.sessions', 'DELETE')` on the linked project (read-only) or rehearse the migration on a scratch project. If it is refused, fall back to the Auth admin API: sign out with each tracked session's JWT, or use the `jwt_refresh_locks` refusal.
-**Resolution:**
+**Resolution:** Invalid, 2026-09-25: checked on the production project (`xpoylacxkbphnudsupuu`) in a read-only transaction that was rolled back. Connected as `postgres`: `has_table_privilege('postgres', 'auth.sessions', 'DELETE')` returned `t`, granted by `supabase_auth_admin`, the same as the local stack. `postgres` is not a superuser there. Migration 046 will be able to end provider sessions in production. The same check found production's migration ledger at `042`, not `040`, so only `043` to `046` remain to apply.
