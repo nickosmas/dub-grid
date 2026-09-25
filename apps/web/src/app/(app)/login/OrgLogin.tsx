@@ -499,6 +499,13 @@ export default function OrgLogin({
       if (!isCurrentFlow(generation)) return;
 
       await recordBrowserSignInCompleted();
+      // What the shell fetched while this page waited for the code was
+      // answered for the password-only session, and the organization bootstrap
+      // refuses that as a step-up. Its retries run out long before a person has
+      // typed a code, and the refusal stayed cached, so the dashboard opened on
+      // its recovery screen until "Try again". The session now carries the
+      // second factor, so ask again.
+      void queryClient.resetQueries();
       markAuthTransition();
       navigateToDashboard(destination, didSwitchOrg);
     }
