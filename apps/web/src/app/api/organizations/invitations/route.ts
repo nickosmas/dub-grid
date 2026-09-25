@@ -738,16 +738,12 @@ export async function POST(req: NextRequest) {
         req,
       });
 
+      // One invitation, reissued with new access: nothing was revoked or
+      // created, so the old pair told super admins it had been canceled.
       void dispatchNotificationEvent(user.id, {
-        action: "invitation_revoked",
+        action: "invitation_resent",
         orgId,
         invitationId,
-        inviteeEmail: currentInvitation.email,
-      });
-      void dispatchNotificationEvent(user.id, {
-        action: "invitation_created",
-        orgId,
-        invitationId: replacement.invitation_id,
         inviteeEmail: replacementInvitation.email,
       });
 

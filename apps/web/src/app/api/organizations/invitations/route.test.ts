@@ -242,6 +242,12 @@ describe("POST /api/organizations/invitations", () => {
     );
     // One invitation, one identity: re-issuing does not mint a successor.
     expect(payload.invitation.id).toBe(INVITATION_ID);
+    // Nothing was canceled, so super admins must not be told it was.
+    expect(dispatchNotificationEvent).toHaveBeenCalledTimes(1);
+    expect(dispatchNotificationEvent).toHaveBeenCalledWith(
+      "actor-1",
+      expect.objectContaining({ action: "invitation_resent", invitationId: INVITATION_ID }),
+    );
   });
 
   it("restores the old invite when the replacement email cannot be sent", async () => {
