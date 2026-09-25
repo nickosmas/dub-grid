@@ -87,16 +87,22 @@ function deliveryFailedResponse(error: unknown, existing: boolean) {
  * fresh one — the caller believes it just invited person A, but the row (and whoever
  * accepts it) is actually still person B. Returns null if no matching pending row is found
  * (let the original "already exists" error surface instead).
+ *
+ * Refreshed only when it grants the access asked for. Otherwise a request to
+ * invite someone as a User would re-send a pending Super Admin link and
+ * report success (finding F-30); "different-access" sends the caller to the
+ * existing invitation instead.
  */
 async function refreshPendingInvitation(
   serviceClient: ReturnType<typeof getServiceClient>,
   orgId: string,
   email: string,
   employeeId: string | null,
-): Promise<RefreshedInvitation | null> {
+  requested: { role: string; departmentIds: number[]; deptAdminIds: number[] },
+): Promise<RefreshedInvitation | "different-access" | null> {
   const pending = serviceClient
     .from("invitations")
-    .select("id, token, expires_at")
+    .select("id, token, expires_at, role_to_assign, department_ids, dept_admin_ids")
     .eq("org_id", orgId)
     .ilike("email", email)
     .is("accepted_at", null)
@@ -107,6 +113,13 @@ async function refreshPendingInvitation(
   ).maybeSingle();
   if (currentError) throw currentError;
   if (!current) return null;
+  if (
+    current.role_to_assign !== requested.role ||
+    !sameIds(current.department_ids as number[] | null, requested.departmentIds) ||
+    !sameIds(current.dept_admin_ids as number[] | null, requested.deptAdminIds)
+  ) {
+    return "different-access";
+  }
 
   // Rotated only while it still carries the token just read, so a concurrent
   // change wins, and the previous pair comes back for a failed send to restore.
@@ -132,6 +145,12 @@ async function refreshPendingInvitation(
     previousToken: current.token as string,
     previousExpiresAt: current.expires_at as string,
   };
+}
+
+function sameIds(stored: number[] | null, requested: number[]): boolean {
+  const a = [...new Set((stored ?? []).map(Number))].sort((x, y) => x - y);
+  const b = [...new Set(requested)].sort((x, y) => x - y);
+  return a.length === b.length && a.every((id, index) => id === b[index]);
 }
 
 async function restoreRefreshedInvitation(
@@ -357,7 +376,17 @@ export async function POST(req: NextRequest) {
           orgId,
           inviteeEmail,
           employeeId ?? null,
+          { role, departmentIds: departmentIds ?? [], deptAdminIds: deptAdminIds ?? [] },
         );
+        if (refreshed === "different-access") {
+          return NextResponse.json(
+            {
+              error:
+                "An invitation with different access is already pending for that email. Change its access from their record, or revoke it and invite them again.",
+            },
+            { status: 409 },
+          );
+        }
         if (refreshed) {
           try {
             await sendPendingInvitationEmail({

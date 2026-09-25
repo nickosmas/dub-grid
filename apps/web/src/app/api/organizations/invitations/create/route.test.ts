@@ -202,6 +202,9 @@ describe("POST /api/organizations/invitations/create", () => {
     );
   });
 
+  // A pending row granting exactly what the "admin" requests below ask for.
+  const SAME_ACCESS_AS_ADMIN = { role_to_assign: "admin", department_ids: [], dept_admin_ids: [] };
+
   // Chainable stub for the refreshPendingInvitation update: .update().eq().ilike()
   // .is().is().gte().select().maybeSingle()
   function makeRefreshChain(result: { data: unknown; error: unknown }) {
@@ -274,7 +277,12 @@ describe("POST /api/organizations/invitations/create", () => {
       table === "audit_log"
         ? { insert: auditInsert }
         : makeRefreshChain({
-            data: { id: "inv-orphan", token: "fresh-tok", expires_at: "2026-02-02T00:00:00Z" },
+            data: {
+              id: "inv-orphan",
+              token: "fresh-tok",
+              expires_at: "2026-02-02T00:00:00Z",
+              ...SAME_ACCESS_AS_ADMIN,
+            },
             error: null,
           }),
     );
@@ -305,6 +313,44 @@ describe("POST /api/organizations/invitations/create", () => {
         }),
       }),
     );
+  });
+
+  // Inviting someone as an Admin must not re-send a pending Super Admin link
+  // and report success (F-30): only an invitation granting the same access is
+  // refreshed.
+  it("refuses to refresh a pending invitation that grants different access", async () => {
+    const rpc = vi.fn(async () => ({
+      data: null,
+      error: { message: "An active invitation already exists for this email" },
+    }));
+    const updates: unknown[] = [];
+    const chain: Record<string, unknown> = {};
+    for (const method of ["delete", "eq", "ilike", "is", "gte", "select"]) {
+      chain[method] = () => chain;
+    }
+    chain.update = (values: unknown) => (updates.push(values), chain);
+    chain.maybeSingle = async () => ({
+      data: {
+        id: "inv-owner",
+        token: "owner-tok",
+        expires_at: "2026-02-02T00:00:00Z",
+        role_to_assign: "super_admin",
+        department_ids: [],
+        dept_admin_ids: [],
+      },
+      error: null,
+    });
+    getServiceClient.mockReturnValue({ rpc, from: vi.fn(() => chain) });
+
+    const { POST } = await importRoute();
+    const res = await POST(makeRequest({ orgId: ORG_ID, email: "owner@test.com", role: "admin" }));
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toEqual({
+      error: expect.stringContaining("different access"),
+    });
+    expect(updates).toEqual([]);
+    expect(sendPendingInvitationEmail).not.toHaveBeenCalled();
   });
 
   it("still 409s when the guard fires but no pending row can be refreshed", async () => {
@@ -367,7 +413,12 @@ describe("POST /api/organizations/invitations/create", () => {
     // A live pending row exists for employee A only.
     const from = vi.fn(() =>
       makeEmployeeScopedRefreshChain({
-        [EMPLOYEE_A]: { id: "inv-a", token: "fresh-tok", expires_at: "2026-02-02T00:00:00Z" },
+        [EMPLOYEE_A]: {
+          id: "inv-a",
+          token: "fresh-tok",
+          expires_at: "2026-02-02T00:00:00Z",
+          ...SAME_ACCESS_AS_ADMIN,
+        },
       }),
     );
     getServiceClient.mockReturnValue({ rpc, from });
@@ -398,7 +449,12 @@ describe("POST /api/organizations/invitations/create", () => {
     }));
     const from = vi.fn(() =>
       makeEmployeeScopedRefreshChain({
-        [EMPLOYEE_A]: { id: "inv-a", token: "fresh-tok", expires_at: "2026-02-02T00:00:00Z" },
+        [EMPLOYEE_A]: {
+          id: "inv-a",
+          token: "fresh-tok",
+          expires_at: "2026-02-02T00:00:00Z",
+          ...SAME_ACCESS_AS_ADMIN,
+        },
       }),
     );
     getServiceClient.mockReturnValue({ rpc, from });
@@ -524,7 +580,14 @@ describe("POST /api/organizations/invitations/create", () => {
           maybeSingle: async () =>
             reads++ === 0
               ? {
-                  data: { id: "inv-7", token: "old-tok", expires_at: "2026-01-01T00:00:00Z" },
+                  data: {
+                    id: "inv-7",
+                    token: "old-tok",
+                    expires_at: "2026-01-01T00:00:00Z",
+                    role_to_assign: "user",
+                    department_ids: [],
+                    dept_admin_ids: [],
+                  },
                   error: null,
                 }
               : {
