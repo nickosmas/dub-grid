@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
-import { CacheKey, cacheSet, TTL } from "@/lib/cache";
+import { CacheKey, cacheDel, cacheSet, TTL } from "@/lib/cache";
 import * as Sentry from "@/lib/sentry";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +10,9 @@ export const dynamic = "force-dynamic";
 // Same columns and cache key as the org-access read in proxy.ts. Unlike normal
 // navigation, this recovery check deliberately reads the source of truth and
 // replaces the cached answer before telling the browser to try the gate again.
+// The organization row is also cached inside the bootstrap, whose billing lock
+// sends a super admin to billing recovery, so that copy is dropped too:
+// otherwise a cleared hold kept redirecting them for up to its TTL.
 type OrgAccessRow = {
   suspended_at: string | null;
   archived_at: string | null;
@@ -70,7 +73,10 @@ export async function GET(req: NextRequest) {
       .maybeSingle();
     if (error) throw error;
     org = (data as OrgAccessRow) ?? null;
-    await cacheSet(CacheKey.mwOrgAccess(orgId), org, TTL.MIDDLEWARE);
+    await Promise.all([
+      cacheSet(CacheKey.mwOrgAccess(orgId), org, TTL.MIDDLEWARE),
+      cacheDel(CacheKey.organization(orgId)),
+    ]);
   } catch (error) {
     Sentry.captureException(error, { extra: { context: "organization-access-status" } });
     // A cache or database blip must never read as "your organization is open" —

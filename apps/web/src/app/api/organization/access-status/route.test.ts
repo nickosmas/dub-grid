@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const requireAuthenticatedUserWithClaims = vi.fn();
 const serviceFrom = vi.fn();
 const cacheSet = vi.fn();
+const cacheDel = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
   requireAuthenticatedUserWithClaims: (req: NextRequest) => requireAuthenticatedUserWithClaims(req),
@@ -20,6 +21,7 @@ vi.mock("@/lib/cache", async (importOriginal) => {
   return {
     ...actual,
     cacheSet: (key: string, value: unknown, ttl: number) => cacheSet(key, value, ttl),
+    cacheDel: (...keys: string[]) => cacheDel(...keys),
   };
 });
 
@@ -85,6 +87,7 @@ describe("GET /api/organization/access-status", () => {
     vi.clearAllMocks();
     requireAuthenticatedUserWithClaims.mockResolvedValue(auth());
     cacheSet.mockResolvedValue(undefined);
+    cacheDel.mockResolvedValue(undefined);
     currentOrgRow = null;
     currentOrgError = null;
     currentMembership = { org_role: "user" };
@@ -129,6 +132,14 @@ describe("GET /api/organization/access-status", () => {
 
     expect(serviceFrom).toHaveBeenCalledWith("organizations");
     expect(cacheSet).toHaveBeenCalledWith(CacheKey.mwOrgAccess(ORG_ID), row, TTL.MIDDLEWARE);
+  });
+
+  it("drops the cached organization row the bootstrap derives its billing lock from", async () => {
+    respondWith(orgRow({ subscription_status: "active" }));
+
+    await GET(request());
+
+    expect(cacheDel).toHaveBeenCalledWith(CacheKey.organization(ORG_ID));
   });
 
   it("holds a regular user while the trial clock has not started", async () => {
