@@ -32,7 +32,6 @@ import type {
 interface EmployeeManagementAccessEditorProps {
   employee: Employee;
   orgId: string;
-  orgName: string;
   managementDepartments: Department[];
   directoryPerson?: DirectoryPerson | null;
   pendingInvitation?: Invitation;
@@ -69,7 +68,6 @@ export const EmployeeManagementAccessEditor = forwardRef<
   {
     employee,
     orgId,
-    orgName,
     managementDepartments,
     directoryPerson,
     pendingInvitation,
@@ -223,25 +221,6 @@ export const EmployeeManagementAccessEditor = forwardRef<
     );
   }
 
-  async function sendInviteEmail(token: string, targetEmail: string) {
-    const response = await fetch("/api/send-invite-email", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, email: targetEmail, orgName }),
-    });
-    const body = await response.text().catch(() => "");
-    if (!response.ok) {
-      try {
-        const parsed = JSON.parse(body) as { error?: string };
-        throw new Error(
-          formatClientErrorMessage(parsed.error, "We couldn't send the invitation email."),
-        );
-      } catch {
-        throw new Error("We couldn't send the invitation email.");
-      }
-    }
-  }
-
   async function applyMatchedUserAccess(): Promise<Employee | null> {
     // matchedUser only fires when employee.userId is already set (linkedUser)
     // — account linking has been removed, so we no longer link a new user to
@@ -319,7 +298,7 @@ export const EmployeeManagementAccessEditor = forwardRef<
         toast.success("Invitation updated");
         await onCompleted(null);
       } else {
-        const created = await createOrganizationInvitation({
+        await createOrganizationInvitation({
           email: effectiveEmail.trim(),
           role,
           orgId,
@@ -329,7 +308,6 @@ export const EmployeeManagementAccessEditor = forwardRef<
           phone: employee.phone || undefined,
           departmentIds: managementDepartmentIds,
         });
-        await sendInviteEmail(created.token, effectiveEmail.trim());
         toast.success(`Management invitation sent to ${effectiveEmail.trim()}`);
         await onCompleted(null);
       }

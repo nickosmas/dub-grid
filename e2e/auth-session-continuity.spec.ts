@@ -28,7 +28,11 @@ function collectRuntimeFailures(page: Page, isSigningOut: () => boolean): Runtim
       !/Failed to load resource: the server responded with a status of (?:401|403)/.test(
         message.text(),
       ) &&
-      !/WebSocket connection to 'ws:\/\/127\.0\.0\.1:54321\/realtime\/v1\//.test(message.text()) &&
+      // The local realtime socket failing or closing before it connects, as
+      // sign-out tears it down: Chromium's wording, then Firefox's.
+      !/(?:WebSocket connection to '|can.t establish a connection to the server at )ws:\/\/127\.0\.0\.1:54321\/realtime\/v1\//.test(
+        message.text(),
+      ) &&
       !isKnownBenignConsoleNoise(message.text())
     ) {
       failures.unexpected.push(`console:${message.text()}`);

@@ -10,11 +10,13 @@ import {
   fetchMobileDepartmentRows,
   insertMobileAuditLogEntry,
   refreshMobileEmployeeInvitationRow,
+  restoreMobileEmployeeInvitationRow,
   replaceMobilePendingInvitationAccessRow,
   rollbackMobilePendingInvitationAccessReplacement,
   revokeMobileEmployeeInvitationRow,
   updateMobileInvitationAssignmentsRow,
   updateMobileMembershipAccessRow,
+  type MobileInvitationRotation,
 } from "@dubgrid/data-access";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -119,7 +121,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
     // direct column write is rejected by `guard_org_role_change`. The role goes
     // through the RPC first, and the departments through the row update after.
     if (loaded.membership.org_role !== parsed.data.orgRole) {
-      const outcome = await changeMobileMembershipOrgRole(auth.serviceClient, {
+      const outcome = await changeMobileMembershipOrgRole(auth.userClient, {
         orgId: auth.currentOrg.id,
         targetUserId: loaded.userId,
         actorUserId: auth.user.id,
@@ -210,9 +212,14 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
 
   let invitation;
   let createdInvitation = false;
-  let replacementIds: {
-    previousInvitationId: string;
-    replacementInvitationId: string;
+  let rotation: ({ invitationId: string } & MobileInvitationRotation) | null = null;
+  let refreshed: {
+    invitationId: string;
+    rotatedToken: string;
+    previousToken: string;
+    previousExpiresAt: string;
+    previousDepartmentIds: number[];
+    previousDeptAdminIds: number[];
   } | null = null;
   if (loaded.pendingInvitation) {
     if ((loaded.pendingInvitation.updated_at ?? null) !== parsed.data.expectedInvitationUpdatedAt) {
@@ -232,10 +239,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
         ),
       });
       invitation = replacement.invitation;
-      replacementIds = {
-        previousInvitationId: replacement.previousInvitationId,
-        replacementInvitationId: replacement.invitation.id,
-      };
+      rotation = { invitationId: replacement.invitation.id, ...replacement.rotation };
     } else {
       const reassigned = await updateMobileInvitationAssignmentsRow(auth.serviceClient, {
         orgId: auth.currentOrg.id,
@@ -253,15 +257,26 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
       }
 
       // A fresh token and expiry, so the emailed link is the one that works.
-      invitation = await refreshMobileEmployeeInvitationRow(auth.serviceClient, {
+      const refresh = await refreshMobileEmployeeInvitationRow(auth.serviceClient, {
         orgId: auth.currentOrg.id,
         invitationId: reassigned.id,
         expectedUpdatedAt: reassigned.updated_at ?? null,
       });
-      if (!invitation) {
+      if (!refresh) {
         const latest = await loadMobilePersonWithAccess(auth.serviceClient, auth.currentOrg.id, id);
         return conflictResponse(latest?.person ?? loaded.person);
       }
+      invitation = refresh.invitation;
+      // A failed send puts the link and the departments back as they were,
+      // so the old link never carries access the admin was told failed.
+      refreshed = {
+        invitationId: refresh.invitation.id,
+        rotatedToken: refresh.invitation.token,
+        previousToken: refresh.previousToken,
+        previousExpiresAt: refresh.previousExpiresAt,
+        previousDepartmentIds: loaded.pendingInvitation.department_ids ?? [],
+        previousDeptAdminIds: loaded.pendingInvitation.dept_admin_ids ?? [],
+      };
     }
   } else {
     invitation = await createMobileEmployeeInvitationRow(auth.serviceClient, {
@@ -285,25 +300,35 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
       token: invitation.token,
       email: invitation.email,
       orgName: auth.currentOrg.name || "your organization",
-      inviterName: auth.user.email ?? null,
     });
   } catch (error) {
     logger.error(
       { err: error, employeeId: id, invitationId: invitation.id },
       "Failed to send mobile management invitation email",
     );
-    // Only a row this request brought into existence gets rolled back. An
-    // invitation that already existed stays put: revoking it would take away
-    // access the failed email never had anything to do with.
-    if (replacementIds) {
+    // Whatever this request changed is undone: a new row is revoked, and an
+    // invitation that already existed gets its previous link and access back
+    // rather than being revoked, which would take away access the failed email
+    // never had anything to do with.
+    if (rotation) {
       await rollbackMobilePendingInvitationAccessReplacement(auth.serviceClient, {
         orgId: auth.currentOrg.id,
-        previousInvitationId: replacementIds.previousInvitationId,
-        replacementInvitationId: replacementIds.replacementInvitationId,
+        ...rotation,
       }).catch((rollbackError) => {
         logger.error(
-          { err: rollbackError, employeeId: id, ...replacementIds },
+          { err: rollbackError, employeeId: id, invitationId: rotation.invitationId },
           "Failed to roll back mobile invitation access replacement after email failure",
+        );
+      });
+    } else if (refreshed) {
+      const restore = refreshed;
+      await restoreMobileEmployeeInvitationRow(auth.serviceClient, {
+        orgId: auth.currentOrg.id,
+        ...restore,
+      }).catch((restoreError) => {
+        logger.error(
+          { err: restoreError, employeeId: id, invitationId: restore.invitationId },
+          "Failed to restore mobile management invitation after email failure",
         );
       });
     } else if (createdInvitation) {
@@ -330,7 +355,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
     actor_email: auth.user.email ?? null,
     action: createdInvitation
       ? "invitation.created"
-      : replacementIds
+      : rotation
         ? "invitation.access_replaced"
         : "invitation.updated",
     resource_type: "invitation",
@@ -341,7 +366,6 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
       employeeId: id,
       roleToAssign: parsed.data.orgRole,
       departmentIds,
-      ...(replacementIds ?? {}),
     },
     ip_address: getRequestIp(req),
     user_agent: req.headers?.get("user-agent") ?? null,

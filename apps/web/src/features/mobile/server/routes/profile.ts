@@ -28,6 +28,7 @@ import {
   requireMobileAuth,
 } from "@/features/mobile/server";
 import { getEffectiveMobileRole } from "@dubgrid/mobile-api-core";
+import { scheduleSecurityAlert } from "@/features/account/server/security-alerts";
 import {
   buildStaffValidationErrorResponse,
   getStaffFieldErrorsFromZod,
@@ -258,7 +259,25 @@ export async function PATCHMfaStatus(req: NextRequest) {
   if (enabled === null) {
     return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
   }
+  // Alert only on an actual change, as the web route does. A save may repeat
+  // the current state.
+  const { data: priorProfile, error: priorError } = await auth.serviceClient
+    .from("profiles")
+    .select("mfa_enabled")
+    .eq("id", auth.user.id)
+    .maybeSingle();
+  if (priorError) {
+    return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
+  }
   await updateSelfMfaStatus(auth.user.id, enabled);
+  if ((priorProfile?.mfa_enabled === true) !== enabled) {
+    scheduleSecurityAlert(auth.user.id, {
+      action: "security_mfa_changed",
+      orgId: auth.currentOrg.id,
+      targetUserId: auth.user.id,
+      enabled,
+    });
+  }
 
   const payload = await buildMobileProfilePayload(auth);
   if ("response" in payload) {

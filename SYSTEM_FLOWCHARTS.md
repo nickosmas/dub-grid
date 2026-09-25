@@ -1226,7 +1226,7 @@ flowchart LR
 ```mermaid
 flowchart TD
     INVITE["Super Admin sends invitation\n(employee_id + email + role)"]
-    EMAIL["Invitation email sent\nvia /api/send-invite-email"]
+    EMAIL["Invitation email sent in the\nsame request that creates it"]
     ACCEPT["User clicks link →\n/accept-invite?token=uuid"]
     VALIDATE{"Token valid?\nNot expired? Not accepted?"}
     CREATE["Create Supabase auth user\nSet employees.user_id\nCreate organization_membership"]

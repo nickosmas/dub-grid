@@ -13,6 +13,7 @@ import {
   LoginEmailConflictError,
   syncLinkedLoginEmail,
 } from "@/features/employees/server/login-email";
+import { followUpLinkedLoginEmailChange } from "@/features/employees/server/login-email-follow-up";
 import { loadMobilePersonWithAccess } from "@/features/mobile/server/person-access";
 import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
 import {
@@ -297,6 +298,16 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       }
       throw error;
     }
+    const actorSessionId = assurance.claims.session_id;
+    await followUpLinkedLoginEmailChange({
+      serviceClient: auth.serviceClient,
+      userId: currentPerson.userId,
+      previousEmail: currentPerson.email ?? null,
+      newEmail: loginEmailChange,
+      orgId: auth.currentOrg.id,
+      actorId: assurance.user.id,
+      actorSessionId: typeof actorSessionId === "string" ? actorSessionId : null,
+    });
     auditDetails.to.loginEmail = loginEmailChange;
   }
 

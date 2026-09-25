@@ -113,11 +113,7 @@ export interface GridmasterOrganizationSetupInput {
 export type GridmasterSuperAdminSetupResult =
   | { kind: "none" }
   | { kind: "assigned"; displayName: string }
-  | {
-      kind: "pending-invite";
-      displayName: string;
-      pendingInvite: { token: string; email: string; name: string };
-    }
+  | { kind: "invited"; displayName: string }
   | { kind: "invite-error"; displayName: string; message: string };
 
 function resolveClientUrl(path: string): string {

@@ -48,6 +48,7 @@ type ServiceOpts = {
   cleanupFailures?: Set<string>;
   authDeleteError?: { message: string } | null;
   auditError?: { message: string } | null;
+  deletionStarted?: boolean;
 };
 
 function buildServiceClient(opts: ServiceOpts) {
@@ -125,7 +126,14 @@ function buildServiceClient(opts: ServiceOpts) {
         return { delete: vi.fn(() => ({ eq: deleteEq })) };
       }
       if (table === "audit_log") {
-        return { insert: auditInsert };
+        const limit = vi.fn(async () => ({
+          data: opts.deletionStarted ? [{ id: 1 }] : [],
+          error: null,
+        }));
+        const eq3 = vi.fn(() => ({ gte: vi.fn(() => ({ limit })) }));
+        const eq2 = vi.fn(() => ({ eq: eq3 }));
+        const eq1 = vi.fn(() => ({ eq: eq2 }));
+        return { insert: auditInsert, select: vi.fn(() => ({ eq: eq1 })) };
       }
       throw new Error(`Unexpected table: ${table}`);
     },
@@ -234,7 +242,9 @@ describe("DELETE /api/auth/delete-account", () => {
     const res = await DELETE(makeRequest({ confirmation: "DELETE MY ACCOUNT" }));
     expect(res.status).toBe(500);
     expect(authDeleteUser).not.toHaveBeenCalled();
-    expect(auditInsert).not.toHaveBeenCalled();
+    expect(auditInsert).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: "account.deleted" }),
+    );
     expect(captureException).toHaveBeenCalled();
   });
 
@@ -247,7 +257,9 @@ describe("DELETE /api/auth/delete-account", () => {
     const res = await DELETE(makeRequest({ confirmation: "DELETE MY ACCOUNT" }));
     expect(res.status).toBe(500);
     expect(authDeleteUser).toHaveBeenCalled();
-    expect(auditInsert).not.toHaveBeenCalled();
+    expect(auditInsert).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: "account.deleted" }),
+    );
     expect(captureException).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
@@ -268,11 +280,80 @@ describe("DELETE /api/auth/delete-account", () => {
     expect(auditInsert).toHaveBeenCalledWith(
       expect.objectContaining({ action: "account.deleted" }),
     );
-    const audited = (auditInsert.mock.calls[0] as unknown[])[0] as {
-      details: Record<string, unknown>;
-    };
+    const audited = (auditInsert.mock.calls as unknown[][])
+      .map((call) => call[0] as { action: string; details: Record<string, unknown> })
+      .find((row) => row.action === "account.deleted")!;
     // cleanupFailures should no longer be part of the audit details
     expect(audited.details).not.toHaveProperty("cleanupFailures");
     await expect(res.json()).resolves.toEqual({ success: true });
+  });
+
+  it("records that the deletion began before removing anything", async () => {
+    const { client, auditInsert, authDeleteUser } = buildServiceClient({});
+    getServiceClient.mockReturnValue(client);
+    const { DELETE } = await importRoute();
+    await DELETE(makeRequest({ confirmation: "DELETE MY ACCOUNT" }));
+    expect(auditInsert).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        action: "account.deletion_started",
+        resource_type: "user",
+        resource_id: USER_ID,
+      }),
+    );
+    expect(auditInsert.mock.invocationCallOrder[0]).toBeLessThan(
+      authDeleteUser.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("does not start deleting when the started record can't be written", async () => {
+    const { client, authDeleteUser } = buildServiceClient({
+      auditError: { message: "audit down" },
+    });
+    getServiceClient.mockReturnValue(client);
+    const { DELETE } = await importRoute();
+    const res = await DELETE(makeRequest({ confirmation: "DELETE MY ACCOUNT" }));
+    expect(res.status).toBe(500);
+    expect(authDeleteUser).not.toHaveBeenCalled();
+  });
+
+  // The first attempt removed the membership that granted the permission, then
+  // Auth failed. The retry used to fail the live permission check forever.
+  it("lets the same user finish a deletion they began after the membership is gone", async () => {
+    canDeleteAccountDirectly.mockResolvedValue(false);
+    const { client, authDeleteUser, auditInsert } = buildServiceClient({
+      deletionStarted: true,
+    });
+    getServiceClient.mockReturnValue(client);
+    const { DELETE } = await importRoute();
+    const res = await DELETE(makeRequest({ confirmation: "DELETE MY ACCOUNT" }));
+    expect(res.status).toBe(200);
+    expect(authDeleteUser).toHaveBeenCalledWith(USER_ID);
+    expect(auditInsert).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: "account.deletion_started" }),
+    );
+  });
+
+  it("still re-checks the sole super admin guard when resuming", async () => {
+    const { client, authDeleteUser } = buildServiceClient({
+      deletionStarted: true,
+      memberships: [{ org_id: ORG_ID, org_role: "super_admin" }],
+      superAdminCountByOrg: { [ORG_ID]: 1 },
+    });
+    getServiceClient.mockReturnValue(client);
+    const { DELETE } = await importRoute();
+    const res = await DELETE(makeRequest({ confirmation: "DELETE MY ACCOUNT" }));
+    expect(res.status).toBe(409);
+    expect(authDeleteUser).not.toHaveBeenCalled();
+  });
+
+  it("still refuses someone without permission who never began a deletion", async () => {
+    canDeleteAccountDirectly.mockResolvedValue(false);
+    const { client, authDeleteUser } = buildServiceClient({});
+    getServiceClient.mockReturnValue(client);
+    const { DELETE } = await importRoute();
+    const res = await DELETE(makeRequest({ confirmation: "DELETE MY ACCOUNT" }));
+    expect(res.status).toBe(403);
+    expect(authDeleteUser).not.toHaveBeenCalled();
   });
 });

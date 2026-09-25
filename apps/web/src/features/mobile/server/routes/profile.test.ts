@@ -15,6 +15,18 @@ const saveNotificationPreferences = vi.fn();
 const fetchUserSessionOverviewForUser = vi.fn();
 const revokeUserSessionForUser = vi.fn();
 const fetchMobileManagementMembershipRowsByUserIds = vi.fn();
+const scheduleSecurityAlert = vi.fn();
+const priorMfaProfile = vi.fn();
+
+const serviceClient = {
+  from: () => ({
+    select: () => ({ eq: () => ({ maybeSingle: () => priorMfaProfile() }) }),
+  }),
+};
+
+vi.mock("@/features/account/server/security-alerts", () => ({
+  scheduleSecurityAlert: (...args: unknown[]) => scheduleSecurityAlert(...args),
+}));
 
 vi.mock("@dubgrid/data-access", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@dubgrid/data-access")>()),
@@ -70,7 +82,7 @@ function mockAuth() {
       role: "admin",
       canManageEmployees: false,
     },
-    serviceClient: {},
+    serviceClient,
   };
 }
 
@@ -79,6 +91,7 @@ describe("mobile profile routes", () => {
     vi.clearAllMocks();
     requireMobileAuth.mockResolvedValue(mockAuth());
     requireMobileSensitiveActionAuth.mockResolvedValue(mockAuth());
+    priorMfaProfile.mockResolvedValue({ data: { mfa_enabled: false }, error: null });
     fetchSelfProfileSnapshot.mockResolvedValue({
       firstName: "Mina",
       lastName: "Diaz",
@@ -127,7 +140,7 @@ describe("mobile profile routes", () => {
 
     expect(response.status).toBe(200);
     expect(fetchLinkedEmployeeForUser).toHaveBeenCalledWith(
-      {},
+      serviceClient,
       "577a93d3-8f6a-4b45-a93d-b9731122ce11",
       "8af6f242-c060-4920-a7db-91b4cb66fd26",
     );
@@ -182,7 +195,7 @@ describe("mobile profile routes", () => {
     const payload = await response.json();
 
     expect(fetchMobileManagementMembershipRowsByUserIds).toHaveBeenCalledWith(
-      {},
+      serviceClient,
       "577a93d3-8f6a-4b45-a93d-b9731122ce11",
       ["8af6f242-c060-4920-a7db-91b4cb66fd26"],
     );
@@ -344,6 +357,37 @@ describe("mobile profile routes", () => {
     expect(response.status).toBe(200);
     expect(updateSelfMfaStatus).toHaveBeenCalledWith("8af6f242-c060-4920-a7db-91b4cb66fd26", true);
     expect(payload.user.mfaEnabled).toBe(true);
+  });
+
+  // Mobile enrollment used to change two-factor with no out-of-band alert.
+  it("alerts out of band when two-factor changes from mobile", async () => {
+    const { PATCHMfaStatus } = await import("./profile");
+    await PATCHMfaStatus(
+      new Request("http://localhost/api/mobile/v1/profile/mfa-status", {
+        method: "PATCH",
+        body: JSON.stringify({}),
+      }) as never,
+    );
+
+    expect(scheduleSecurityAlert).toHaveBeenCalledWith("8af6f242-c060-4920-a7db-91b4cb66fd26", {
+      action: "security_mfa_changed",
+      orgId: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+      targetUserId: "8af6f242-c060-4920-a7db-91b4cb66fd26",
+      enabled: true,
+    });
+  });
+
+  it("stays quiet when a mobile save repeats the current two-factor state", async () => {
+    priorMfaProfile.mockResolvedValueOnce({ data: { mfa_enabled: true }, error: null });
+    const { PATCHMfaStatus } = await import("./profile");
+    await PATCHMfaStatus(
+      new Request("http://localhost/api/mobile/v1/profile/mfa-status", {
+        method: "PATCH",
+        body: JSON.stringify({}),
+      }) as never,
+    );
+
+    expect(scheduleSecurityAlert).not.toHaveBeenCalled();
   });
 
   it.each([

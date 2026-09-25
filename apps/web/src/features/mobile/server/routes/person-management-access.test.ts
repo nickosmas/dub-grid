@@ -5,6 +5,7 @@ const loadMobilePersonWithAccess = vi.fn();
 const fetchMobileDepartmentRows = vi.fn();
 const createMobileEmployeeInvitationRow = vi.fn();
 const refreshMobileEmployeeInvitationRow = vi.fn();
+const restoreMobileEmployeeInvitationRow = vi.fn();
 const revokeMobileEmployeeInvitationRow = vi.fn();
 const replaceMobilePendingInvitationAccessRow = vi.fn();
 const rollbackMobilePendingInvitationAccessReplacement = vi.fn();
@@ -26,6 +27,7 @@ vi.mock("@dubgrid/data-access", () => ({
   fetchMobileDepartmentRows,
   insertMobileAuditLogEntry,
   refreshMobileEmployeeInvitationRow,
+  restoreMobileEmployeeInvitationRow,
   replaceMobilePendingInvitationAccessRow,
   revokeMobileEmployeeInvitationRow,
   rollbackMobilePendingInvitationAccessReplacement,
@@ -80,11 +82,15 @@ function makePerson(overrides: Record<string, unknown> = {}) {
   };
 }
 
+const SERVICE_CLIENT = { name: "service" };
+const USER_CLIENT = { name: "user" };
+
 function mockAuth(overrides: Record<string, unknown> = {}) {
   requireMobileAuth.mockResolvedValue({
     currentOrg: { id: "44444444-4444-4444-8444-444444444444", name: "Calm Haven" },
     permissions: { canManageUsers: true, canManageEmployees: true },
-    serviceClient: {},
+    serviceClient: SERVICE_CLIENT,
+    userClient: USER_CLIENT,
     user: { id: ACTOR_ID, email: "admin@example.com" },
     ...overrides,
   });
@@ -291,12 +297,13 @@ describe("mobile person management-access route", () => {
     // Two writes: the database rejects a direct `org_role` column write
     // (guard_org_role_change), so the role goes through the RPC and only the
     // departments travel with the row update.
+    // The caller's client, so the RPC's own guards run; never the service role.
     expect(changeMobileMembershipOrgRole).toHaveBeenCalledWith(
-      {},
+      USER_CLIENT,
       expect.objectContaining({ targetUserId: MEMBER_USER_ID, orgRole: "admin" }),
     );
     expect(updateMobileMembershipAccessRow).toHaveBeenCalledWith(
-      {},
+      SERVICE_CLIENT,
       expect.objectContaining({
         userId: MEMBER_USER_ID,
         departmentIds: [9],
@@ -381,7 +388,7 @@ describe("mobile person management-access route", () => {
     expect(response.status).toBe(200);
     expect(payload.result).toBe("invitation_sent");
     expect(createMobileEmployeeInvitationRow).toHaveBeenCalledWith(
-      {},
+      SERVICE_CLIENT,
       expect.objectContaining({
         employeeId: EMPLOYEE_ID,
         email: "mina@example.com",
@@ -405,7 +412,7 @@ describe("mobile person management-access route", () => {
 
     expect(response.status).toBe(502);
     expect(revokeMobileEmployeeInvitationRow).toHaveBeenCalledWith(
-      {},
+      SERVICE_CLIENT,
       expect.objectContaining({ invitationId: INVITATION_ID }),
     );
   });
@@ -432,7 +439,11 @@ describe("mobile person management-access route", () => {
       },
     });
     replaceMobilePendingInvitationAccessRow.mockResolvedValue({
-      previousInvitationId: INVITATION_ID,
+      rotation: {
+        rotatedToken: "rotated-token",
+        previousToken: "original-token",
+        previousExpiresAt: "2099-01-01T00:00:00.000Z",
+      },
       invitation: {
         id: "99999999-9999-4999-8999-999999999999",
         token: "replacement-token",
@@ -453,7 +464,7 @@ describe("mobile person management-access route", () => {
 
     expect(response.status).toBe(200);
     expect(replaceMobilePendingInvitationAccessRow).toHaveBeenCalledWith(
-      {},
+      SERVICE_CLIENT,
       expect.objectContaining({
         invitationId: INVITATION_ID,
         roleToAssign: "admin",
@@ -479,7 +490,11 @@ describe("mobile person management-access route", () => {
       },
     });
     replaceMobilePendingInvitationAccessRow.mockResolvedValue({
-      previousInvitationId: INVITATION_ID,
+      rotation: {
+        rotatedToken: "rotated-token",
+        previousToken: "original-token",
+        previousExpiresAt: "2099-01-01T00:00:00.000Z",
+      },
       invitation: {
         id: "99999999-9999-4999-8999-999999999999",
         token: "replacement-token",
@@ -501,12 +516,11 @@ describe("mobile person management-access route", () => {
 
     expect(response.status).toBe(502);
     expect(rollbackMobilePendingInvitationAccessReplacement).toHaveBeenCalledWith(
-      {},
-      {
-        orgId: "44444444-4444-4444-8444-444444444444",
-        previousInvitationId: INVITATION_ID,
-        replacementInvitationId: "99999999-9999-4999-8999-999999999999",
-      },
+      SERVICE_CLIENT,
+      expect.objectContaining({
+        rotatedToken: "rotated-token",
+        previousToken: "original-token",
+      }),
     );
     expect(revokeMobileEmployeeInvitationRow).not.toHaveBeenCalled();
   });
@@ -529,10 +543,14 @@ describe("mobile person management-access route", () => {
       updated_at: "2026-05-01T00:00:01Z",
     });
     refreshMobileEmployeeInvitationRow.mockResolvedValue({
-      id: INVITATION_ID,
-      token: "fresh-token",
-      email: "mina@example.com",
-      updated_at: "2026-05-01T00:00:02Z",
+      invitation: {
+        id: INVITATION_ID,
+        token: "fresh-token",
+        email: "mina@example.com",
+        updated_at: "2026-05-01T00:00:02Z",
+      },
+      previousToken: "old-token",
+      previousExpiresAt: "2026-05-04T00:00:00Z",
     });
 
     const { PUT } = await import("./person-management-access");
@@ -548,6 +566,59 @@ describe("mobile person management-access route", () => {
     expect(response.status).toBe(200);
     expect(updateMobileInvitationAssignmentsRow).toHaveBeenCalled();
     expect(replaceMobilePendingInvitationAccessRow).not.toHaveBeenCalled();
+  });
+
+  it("puts the link and departments back when a department-only change fails to send", async () => {
+    loadMobilePersonWithAccess.mockResolvedValue({
+      person: makePerson(),
+      userId: null,
+      membership: null,
+      pendingInvitation: {
+        id: INVITATION_ID,
+        email: "mina@example.com",
+        role_to_assign: "user",
+        department_ids: [3],
+        dept_admin_ids: [],
+        updated_at: "2026-05-01T00:00:00Z",
+      },
+    });
+    updateMobileInvitationAssignmentsRow.mockResolvedValue({
+      id: INVITATION_ID,
+      updated_at: "2026-05-01T00:00:01Z",
+    });
+    refreshMobileEmployeeInvitationRow.mockResolvedValue({
+      invitation: {
+        id: INVITATION_ID,
+        token: "fresh-token",
+        email: "mina@example.com",
+        updated_at: "2026-05-01T00:00:02Z",
+      },
+      previousToken: "old-token",
+      previousExpiresAt: "2026-05-04T00:00:00Z",
+    });
+    restoreMobileEmployeeInvitationRow.mockResolvedValue(true);
+    sendInvitationEmail.mockRejectedValue(new Error("resend down"));
+
+    const { PUT } = await import("./person-management-access");
+    const response = await PUT(
+      makeRequest({
+        orgRole: "user",
+        managementDepartmentIds: [9],
+        expectedInvitationUpdatedAt: "2026-05-01T00:00:00Z",
+      }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(502);
+    expect(restoreMobileEmployeeInvitationRow).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        rotatedToken: "fresh-token",
+        previousToken: "old-token",
+        previousDepartmentIds: [3],
+        previousDeptAdminIds: [],
+      }),
+    );
   });
 
   it("clears the management departments on DELETE without touching the staff profile", async () => {
@@ -579,7 +650,7 @@ describe("mobile person management-access route", () => {
     expect(response.status).toBe(200);
     expect(payload.result).toBe("access_removed");
     expect(updateMobileMembershipAccessRow).toHaveBeenCalledWith(
-      {},
+      SERVICE_CLIENT,
       expect.objectContaining({ departmentIds: [], deptAdminIds: [] }),
     );
     // The org role is deliberately left as it was — role changes go through PUT.

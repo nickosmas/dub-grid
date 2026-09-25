@@ -18,7 +18,6 @@ import {
   createOrganizationEmployees,
   createOrganizationSetup,
   saveOrganizationSetupConfig,
-  sendInvitationEmail,
   sendOrganizationInvitations,
 } from "./organization-setup/persistence";
 import {
@@ -28,7 +27,6 @@ import {
   type InvitationRow,
   type JobRow,
   type NamedItemRow,
-  type PendingInvite,
   type ShiftCatRow,
 } from "./organization-setup/types";
 import { WizardStepper } from "./organization-setup/WizardStepper";
@@ -85,8 +83,6 @@ export default function OrganizationSetupWizard({
   const [superAdminLastName, setSuperAdminLastName] = useState("");
   const [superAdminEmail, setSuperAdminEmail] = useState("");
   const [superAdminPhone, setSuperAdminPhone] = useState("");
-  const [pendingInvite, setPendingInvite] = useState<PendingInvite | null>(null);
-  const [sendingEmail, setSendingEmail] = useState(false);
 
   // ── Step 3: Config ────────────────────────────────────────────────────────
   const [shiftDisplayMode, setShiftDisplayMode] = useState<"code" | "name">("code");
@@ -181,10 +177,8 @@ export default function OrganizationSetupWizard({
       setCreatedOrg(org);
       if (superAdmin.kind === "assigned") {
         toast.success(`Organization created & ${superAdmin.displayName} assigned as super admin`);
-      } else if (superAdmin.kind === "pending-invite") {
-        setPendingInvite(superAdmin.pendingInvite);
-        toast.success("Organization created & invitation ready");
-        toast.info("Send the invitation email from the next screen.");
+      } else if (superAdmin.kind === "invited") {
+        toast.success(`Organization created & invitation sent to ${superAdmin.displayName}`);
       } else if (superAdmin.kind === "invite-error") {
         toast.success("Organization created");
         toast.error(formatClientErrorMessage(superAdmin.message, "Failed to create invitation"));
@@ -808,24 +802,6 @@ export default function OrganizationSetupWizard({
 
   // ── Render: Decision Point ────────────────────────────────────────────────
 
-  async function handleSendPendingEmail() {
-    if (!pendingInvite || !createdOrg) return;
-    setSendingEmail(true);
-    try {
-      await sendInvitationEmail({
-        token: pendingInvite.token,
-        email: pendingInvite.email,
-        orgName: createdOrg.name,
-      });
-      toast.success(`Invitation email sent to ${pendingInvite.name}`);
-      setPendingInvite(null);
-    } catch (err: unknown) {
-      toast.error(formatClientErrorMessage(err, "Failed to send email"));
-    } finally {
-      setSendingEmail(false);
-    }
-  }
-
   function renderDecision() {
     const handoffName = superAdminFirstName.trim() || "the super admin";
     return (
@@ -875,56 +851,6 @@ export default function OrganizationSetupWizard({
             {createdOrg?.name} is ready.
           </p>
         </div>
-
-        {/* Pending invitation email prompt */}
-        {pendingInvite && (
-          <div
-            style={{
-              ...sectionStyle,
-              marginBottom: 24,
-              border: "1px solid var(--dg-color-warning)",
-            }}
-          >
-            <div
-              style={{
-                ...sectionBodyStyle,
-                display: "flex",
-                alignItems: "center",
-                gap: 16,
-              }}
-            >
-              <div style={{ flex: 1 }}>
-                <div
-                  style={{
-                    fontSize: "var(--dg-fs-body-sm)",
-                    fontWeight: 600,
-                    color: "var(--dg-color-text-primary)",
-                    marginBottom: 4,
-                  }}
-                >
-                  Invitation ready for {pendingInvite.name} ({pendingInvite.email})
-                </div>
-                <div
-                  style={{
-                    fontSize: "var(--dg-fs-label)",
-                    color: "var(--dg-color-text-muted)",
-                  }}
-                >
-                  They will join as the super admin of this organization as soon as they accept.
-                </div>
-              </div>
-              <Button
-                type="button"
-                className="dg-btn dg-btn-primary"
-                disabled={sendingEmail}
-                onClick={handleSendPendingEmail}
-                style={{ whiteSpace: "nowrap" }}
-              >
-                <ButtonLoading loading={sendingEmail}>Send Email</ButtonLoading>
-              </Button>
-            </div>
-          </div>
-        )}
 
         <div style={{ textAlign: "center" }}>
           <p

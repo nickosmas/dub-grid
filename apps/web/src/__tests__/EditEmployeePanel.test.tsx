@@ -619,20 +619,22 @@ describe("EditEmployeePanel", () => {
       fireEvent.change(emailInput, { target: { value: "taken@example.com" } });
       await screen.findByText(/already used by another person on your team/i);
 
-      expect(onEmailConflictChange).toHaveBeenLastCalledWith(true);
+      // The callback fires from an effect after the render that shows the
+      // warning, so it is awaited rather than read in the same tick: under a
+      // loaded CI runner the effect had not run yet and the check went red.
+      await waitFor(() => expect(onEmailConflictChange).toHaveBeenLastCalledWith(true));
 
       checkEmployeeEmailConflictMock.mockResolvedValue({
         conflict: false,
         conflictingEmployeeId: null,
       });
       fireEvent.change(emailInput, { target: { value: "free@example.com" } });
-      await waitFor(() =>
+      await waitFor(() => {
         expect(
           screen.queryByText(/already used by another person on your team/i),
-        ).not.toBeInTheDocument(),
-      );
-
-      expect(onEmailConflictChange).toHaveBeenLastCalledWith(false);
+        ).not.toBeInTheDocument();
+        expect(onEmailConflictChange).toHaveBeenLastCalledWith(false);
+      });
     });
   });
 

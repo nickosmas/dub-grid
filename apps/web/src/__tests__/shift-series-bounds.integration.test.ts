@@ -2,6 +2,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Client } from "pg";
+import { actAsAuthenticated } from "./helpers/simulated-jwt";
 import { MAX_SERIES_OCCURRENCES } from "@/lib/constants";
 
 // These write tests only ever target the local development database.
@@ -52,17 +53,13 @@ describe.runIf(reachable)("shift series bounds against the local database", () =
         LIMIT 1
       `);
         if (!fixture) throw new Error("Local QA fixtures missing; run npm run db:reset");
-        await db.query("SELECT set_config('request.jwt.claims', $1, true)", [
-          JSON.stringify({
-            sub: fixture.user_id,
-            role: "authenticated",
-            org_id: fixture.org_id,
-            org_role: "super_admin",
-            platform_role: "none",
-            mfa_enrolled: false,
-          }),
-        ]);
-        await db.query("SET LOCAL ROLE authenticated");
+        await actAsAuthenticated(db, {
+          sub: fixture.user_id,
+          role: "authenticated",
+          org_id: fixture.org_id,
+          org_role: "super_admin",
+          platform_role: "none",
+        });
         const seriesId = randomUUID();
         await db.query(
           `

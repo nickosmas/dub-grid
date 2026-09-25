@@ -1543,6 +1543,20 @@ export async function createMobileEmployeeInvitationRow(
   return data as MobileInvitationRow;
 }
 
+/**
+ * What a rotation replaced, so a failed dispatch can put the invitation back
+ * exactly: the link and everything it grants, not the link alone.
+ */
+export interface MobileInvitationRotation {
+  rotatedToken: string;
+  previousToken: string;
+  previousExpiresAt: string;
+  previousRole: string | null;
+  previousInvitedBy: string | null;
+  previousDepartmentIds: number[] | null;
+  previousDeptAdminIds: number[] | null;
+}
+
 export async function replaceMobilePendingInvitationAccessRow(
   serviceClient: SupabaseClient,
   input: {
@@ -1555,7 +1569,7 @@ export async function replaceMobilePendingInvitationAccessRow(
     deptAdminIds?: number[];
   },
 ): Promise<{
-  previousInvitationId: string;
+  rotation: MobileInvitationRotation;
   invitation: MobileInvitationRow;
 }> {
   const { data, error } = await serviceClient.rpc("replace_pending_invitation_access", {
@@ -1569,12 +1583,25 @@ export async function replaceMobilePendingInvitationAccessRow(
   });
   if (error) throw error;
 
+  // Rotation keeps the row, so what comes back is the previous link and grant
+  // to restore, not a predecessor id.
   const result = data as {
-    previous_invitation_id?: string;
     invitation_id?: string;
+    token?: string;
+    previous_token?: string;
+    previous_expires_at?: string;
+    previous_role?: string | null;
+    previous_invited_by?: string | null;
+    previous_department_ids?: number[] | null;
+    previous_dept_admin_ids?: number[] | null;
   } | null;
-  if (!result?.previous_invitation_id || !result.invitation_id) {
-    throw new Error("Invitation replacement did not return an invitation.");
+  if (
+    !result?.invitation_id ||
+    !result.token ||
+    !result.previous_token ||
+    !result.previous_expires_at
+  ) {
+    throw new Error("Invitation rotation did not return an invitation.");
   }
 
   const { data: invitation, error: invitationError } = await serviceClient
@@ -1586,29 +1613,41 @@ export async function replaceMobilePendingInvitationAccessRow(
   if (invitationError) throw invitationError;
 
   return {
-    previousInvitationId: result.previous_invitation_id,
+    rotation: {
+      rotatedToken: result.token,
+      previousToken: result.previous_token,
+      previousExpiresAt: result.previous_expires_at,
+      previousRole: result.previous_role ?? null,
+      previousInvitedBy: result.previous_invited_by ?? null,
+      previousDepartmentIds: result.previous_department_ids ?? null,
+      previousDeptAdminIds: result.previous_dept_admin_ids ?? null,
+    },
     invitation: invitation as MobileInvitationRow,
   };
 }
 
 export async function rollbackMobilePendingInvitationAccessReplacement(
   serviceClient: SupabaseClient,
-  input: {
-    orgId: string;
-    previousInvitationId: string;
-    replacementInvitationId: string;
-  },
+  input: { orgId: string; invitationId: string } & MobileInvitationRotation,
 ): Promise<boolean> {
   const { data, error } = await serviceClient.rpc(
     "rollback_pending_invitation_access_replacement",
     {
       p_org_id: input.orgId,
-      p_previous_invitation_id: input.previousInvitationId,
-      p_replacement_invitation_id: input.replacementInvitationId,
+      p_invitation_id: input.invitationId,
+      p_rotated_token: input.rotatedToken,
+      p_previous_token: input.previousToken,
+      p_previous_expires_at: input.previousExpiresAt,
+      p_previous_role: input.previousRole,
+      p_previous_invited_by: input.previousInvitedBy,
+      p_previous_department_ids: input.previousDepartmentIds,
+      p_previous_dept_admin_ids: input.previousDeptAdminIds,
     },
   );
   if (error) throw error;
-  return data === true;
+  // The restore is refused when the row has moved on, so an unrestored result
+  // is a real failure for the caller to log.
+  return (data as { restored?: boolean } | null)?.restored === true;
 }
 
 /**
@@ -1674,14 +1713,13 @@ export type MobileRoleChangeOutcome =
  * that lifts the trigger, takes an advisory lock so two callers cannot race, and
  * keeps the last-super-admin guard.
  *
- * Note the RPC gates its own callers on `auth.uid()`, which is NULL under the
- * service role, so those checks quietly pass here: callers must do their own
- * permission check first. The guards that do not read `auth.uid()` — the
- * expected-updated-at check, the self-action check, and the last-super-admin
- * check — still apply.
+ * Pass the caller's own client, never the service client. The RPC checks the
+ * caller's identity, membership and tier against `auth.uid()`, which is NULL
+ * under the service role, so those guards would pass vacuously and only the
+ * route's gate would stand between a drifted route and a privileged change.
  */
 export async function changeMobileMembershipOrgRole(
-  serviceClient: SupabaseClient,
+  userClient: SupabaseClient,
   input: {
     orgId: string;
     targetUserId: string;
@@ -1690,7 +1728,7 @@ export async function changeMobileMembershipOrgRole(
     expectedUpdatedAt: string | null;
   },
 ): Promise<MobileRoleChangeOutcome> {
-  const { data, error } = await serviceClient.rpc("change_user_role", {
+  const { data, error } = await userClient.rpc("change_user_role", {
     p_target_user_id: input.targetUserId,
     p_new_role: input.orgRole,
     p_changed_by_id: input.actorUserId,
@@ -1781,38 +1819,103 @@ export async function updateMobileMembershipAccessRow(
   };
 }
 
+/** A rotated invitation and the link it replaced, so a failed send can restore it. */
+export interface MobileInvitationRefresh {
+  invitation: MobileInvitationRow & { token: string };
+  previousToken: string;
+  previousExpiresAt: string;
+}
+
+/**
+ * Issue a fresh token and 72 hours on a pending invitation, under the caller's
+ * optimistic check. Callers send the new link afterwards and restore the
+ * previous one with `restoreMobileEmployeeInvitationRow` if the send fails, so
+ * every emailed link was stored and a failed send strands nobody (F-10).
+ * A revoked invitation is never revived here.
+ */
 export async function refreshMobileEmployeeInvitationRow(
   serviceClient: SupabaseClient,
   input: {
     orgId: string;
     invitationId: string;
     expectedUpdatedAt: string | null;
-    // When provided, persist this exact token (the caller has already emailed it, so the
-    // committed row and the emailed link stay in sync). Omitted → generate a fresh token.
-    token?: string;
   },
-): Promise<MobileInvitationRow | null> {
-  let query = serviceClient
+): Promise<MobileInvitationRefresh | null> {
+  let current = serviceClient
+    .from("invitations")
+    .select("token, expires_at")
+    .eq("org_id", input.orgId)
+    .eq("id", input.invitationId)
+    .is("accepted_at", null)
+    .is("revoked_at", null);
+  current = input.expectedUpdatedAt
+    ? current.eq("updated_at", input.expectedUpdatedAt)
+    : current.is("updated_at", null);
+  const { data: before, error: readError } = await current.maybeSingle();
+  if (readError) throw readError;
+  if (!before) return null;
+
+  // Swapped only while the row still carries the token just read, so a
+  // concurrent change wins rather than being overwritten.
+  const { data, error } = await serviceClient
     .from("invitations")
     .update({
-      token: input.token ?? crypto.randomUUID(),
+      token: crypto.randomUUID(),
       expires_at: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString(),
-      revoked_at: null,
-      updated_at: new Date().toISOString(),
     })
     .eq("org_id", input.orgId)
     .eq("id", input.invitationId)
-    .is("accepted_at", null);
-
-  query = input.expectedUpdatedAt
-    ? query.eq("updated_at", input.expectedUpdatedAt)
-    : query.is("updated_at", null);
-
-  const { data, error } = await query.select(INVITATION_COLS).maybeSingle();
-
+    .eq("token", before.token)
+    .is("accepted_at", null)
+    .is("revoked_at", null)
+    .select(INVITATION_COLS)
+    .maybeSingle();
   if (error) throw error;
+  if (!data) return null;
 
-  return (data as MobileInvitationRow | null | undefined) ?? null;
+  return {
+    invitation: data as MobileInvitationRow & { token: string },
+    previousToken: before.token as string,
+    previousExpiresAt: before.expires_at as string,
+  };
+}
+
+/**
+ * Put back the link a refresh replaced, and any departments the same request
+ * changed, while the row still carries the rotated token. Returns false when
+ * the row has moved on, which the caller should log.
+ */
+export async function restoreMobileEmployeeInvitationRow(
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    invitationId: string;
+    rotatedToken: string;
+    previousToken: string;
+    previousExpiresAt: string;
+    previousDepartmentIds?: number[];
+    previousDeptAdminIds?: number[];
+  },
+): Promise<boolean> {
+  const values: Record<string, unknown> = {
+    token: input.previousToken,
+    expires_at: input.previousExpiresAt,
+  };
+  if (input.previousDepartmentIds) values.department_ids = input.previousDepartmentIds;
+  if (input.previousDeptAdminIds) values.dept_admin_ids = input.previousDeptAdminIds;
+
+  const { data, error } = await serviceClient
+    .from("invitations")
+    .update(values)
+    .eq("org_id", input.orgId)
+    .eq("id", input.invitationId)
+    .eq("token", input.rotatedToken)
+    .is("accepted_at", null)
+    .is("revoked_at", null)
+    .select("id")
+    .maybeSingle();
+  if (error) throw error;
+  return data !== null;
 }
 
 export async function revokeMobileEmployeeInvitationRow(

@@ -109,9 +109,7 @@ function PeopleContent() {
             certifications={certifications}
             roles={orgRoles}
             onSave={handleSaveEmployee}
-            onSaveWithReinvite={(emp, oldInvitation) =>
-              handleSaveEmployeeWithReinvite(emp, oldInvitation, org?.name || "your organization")
-            }
+            onSaveWithReinvite={handleSaveEmployeeWithReinvite}
             onRemove={handleRemoveEmployee}
             onDeactivate={handleDeactivateEmployee}
             onActivate={handleActivateEmployee}
@@ -136,7 +134,6 @@ function PeopleContent() {
             certificationLabel={org?.certificationLabel}
             roleLabel={org?.roleLabel}
             useCompactRoleCertificationLabels={org?.useCompactRoleCertificationLabels ?? false}
-            orgName={org?.name}
             shiftDisplayMode={org?.shiftDisplayMode}
             defaultShiftEnabled={org?.defaultShiftEnabled ?? true}
             setupIncomplete={!setupStatus.isComplete}

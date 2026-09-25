@@ -49,8 +49,7 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
     policy: "conditional-sensitive",
     assertions: [
       /if \(scope !== "local"\)[\s\S]*?\brequireSensitiveActionAuth\s*\(/,
-      /scope === "global"[\s\S]*?revokeAllUserSessions/,
-      /else await revokeOtherUserSessions/,
+      /recoveryCompletion && !hasFreshRecoveryProof\(auth\.claims\)[\s\S]*?\brevokeBulkSessions\s*\(/,
     ],
   },
   "apps/web/src/app/api/employees/status/route.ts": {
@@ -105,6 +104,10 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
       /if \(invitedEmail !== email\)/,
     ],
   },
+  "apps/web/src/app/api/mobile/v1/auth/sign-out/route.ts": {
+    policy: "delegated",
+    assertions: [/export \{ POST \} from "@\/features\/mobile\/server\/routes\/auth-sign-out"/],
+  },
   "apps/web/src/app/api/mobile/v1/profile/credential-assurance/route.ts": {
     policy: "delegated",
     assertions: [
@@ -135,7 +138,7 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
   "apps/web/src/app/api/employees/manage/route.ts": {
     policy: "conditional-sensitive",
     assertions: [
-      /if \(loginEmailChange && linkedUserId\) \{[\s\S]*?\bforbidIfSandboxCookie\s*\([\s\S]*?\brequireSensitiveActionAuth\s*\([\s\S]*?\bsyncLinkedLoginEmail\s*\(/,
+      /if \(loginEmailChange && linkedUserId\) \{[\s\S]*?\bforbidIfSandboxCookie\s*\([\s\S]*?\brequireSensitiveActionAuth\s*\([\s\S]*?\bsyncLinkedLoginEmail\s*\([\s\S]*?\bfollowUpLinkedLoginEmailChange\s*\(/,
     ],
   },
   "apps/web/src/app/api/people/change-requests/[id]/route.ts": {
@@ -148,7 +151,12 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
 
 const MOBILE_DELEGATES: Record<string, RegExp[]> = {
   "apps/web/src/features/mobile/server/routes/person.ts": [
-    /if \(loginEmailChange && currentPerson\.userId\) \{[\s\S]*?\brequireMobileSensitiveActionAuth\s*\([\s\S]*?\bsyncLinkedLoginEmail\s*\(/,
+    /if \(loginEmailChange && currentPerson\.userId\) \{[\s\S]*?\brequireMobileSensitiveActionAuth\s*\([\s\S]*?\bsyncLinkedLoginEmail\s*\([\s\S]*?\bfollowUpLinkedLoginEmailChange\s*\(/,
+  ],
+  "apps/web/src/features/mobile/server/routes/auth-sign-out.ts": [
+    /requireAssuredCaller[\s\S]*?\brequireMobileSensitiveActionAuth\s*\(/,
+    /recoveryCompletion\s*\?\s*await requireRecoveryCaller\(req\)\s*:\s*await requireAssuredCaller\(req\)/,
+    /!hasFreshRecoveryProof\(verified\.claims\)/,
   ],
   "apps/web/src/features/mobile/server/routes/credential-assurance.ts": [
     /\brequireMobileSensitiveActionAuth\s*\(/,
@@ -164,7 +172,7 @@ const MOBILE_DELEGATES: Record<string, RegExp[]> = {
 const sensitiveSourceMarker =
   /\b(?:requireSensitiveActionAuth|requireMobileSensitiveActionAuth|revokeAllUserSessions|revokeOtherUserSessions|revokeUserSessionForUser)\s*\(|auth\.admin\.(?:createUser|updateUserById|deleteUser|signOut)\s*\(|gdpr_erase_user_data|force_logout_user/;
 const delegatedSensitivePath =
-  /\/(?:account|mobile\/v1\/profile)\/(?:credential-assurance|mfa-lifecycle|sessions)\/route\.ts$/;
+  /\/(?:(?:account|mobile\/v1\/profile)\/(?:credential-assurance|mfa-lifecycle|sessions)|mobile\/v1\/auth\/sign-out)\/route\.ts$/;
 
 function collectRouteHandlers(root: string): string[] {
   const files: string[] = [];

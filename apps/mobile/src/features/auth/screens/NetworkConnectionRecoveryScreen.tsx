@@ -22,9 +22,12 @@ import {
 export function NetworkConnectionRecoveryScreen({
   isRetrying = false,
   onRetry,
+  onSignInAgain,
 }: {
   isRetrying?: boolean;
   onRetry: () => void | Promise<void>;
+  /** A way out when retrying can never work, such as unreadable stored sign-in data. */
+  onSignInAgain?: () => void | Promise<void>;
 }) {
   const colors = useMobileColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -45,6 +48,14 @@ export function NetworkConnectionRecoveryScreen({
         <Text style={styles.body}>{NETWORK_ERROR_MESSAGE}</Text>
         <View style={styles.actions}>
           <Button label="Try again" loading={isRetrying} onPress={onRetry} />
+          {onSignInAgain ? (
+            <Button
+              disabled={isRetrying}
+              label="Sign in again"
+              onPress={onSignInAgain}
+              tone="link"
+            />
+          ) : null}
         </View>
       </View>
     </SafeAreaView>

@@ -7,19 +7,23 @@ import {
   type PropsWithChildren,
 } from "react";
 import * as LocalAuthentication from "expo-local-authentication";
-import { AppState } from "react-native";
+import { AppState, StyleSheet, View } from "react-native";
 import {
   BottomSheetModal,
   SheetActions,
   SheetCopy,
   SheetHeader,
 } from "../components/BottomSheetModal";
+import { AppSplashScreen } from "../components/AppSplashScreen";
 import { Button } from "../components/Button";
 import {
+  appLockRequired,
   appLockUnsupported,
   getAppLockEnabledSnapshot,
+  getAppLockStateSnapshot,
   loadAppLockEnabled,
   subscribeAppLockEnabled,
+  type AppLockState,
 } from "../lib/app-lock";
 import { useSessionState } from "./AuthSessionProvider";
 
@@ -38,6 +42,15 @@ export function useAppLockEnabled(): boolean {
   return useSyncExternalStore(subscribeAppLockEnabled, getAppLockEnabledSnapshot, () => false);
 }
 
+/** The lock's stored state, loading it on first use. */
+export function useAppLockState(): AppLockState {
+  useEffect(() => {
+    void loadAppLockEnabled();
+  }, []);
+
+  return useSyncExternalStore(subscribeAppLockEnabled, getAppLockStateSnapshot, () => "loading");
+}
+
 /**
  * Opt-in device lock: arms when the app leaves the foreground and requires a
  * biometric/passcode check (via expo-local-authentication) on return, plus on
@@ -47,7 +60,8 @@ export function useAppLockEnabled(): boolean {
  */
 export function AppLockProvider({ children }: PropsWithChildren) {
   const { accessToken } = useSessionState();
-  const enabled = useAppLockEnabled();
+  const lockState = useAppLockState();
+  const required = appLockRequired(lockState);
   const [locked, setLocked] = useState(false);
   const [authenticating, setAuthenticating] = useState(false);
   // Whether this lock has already raised the system prompt on its own. Without
@@ -86,21 +100,16 @@ export function AppLockProvider({ children }: PropsWithChildren) {
     }
   }, []);
 
-  // Lock on cold start when the setting is already on.
+  // Lock on cold start, and on a new session, once the setting is known to
+  // require it. Until then the cover below keeps the app off the screen.
   useEffect(() => {
-    if (appLockUnsupported || !accessToken) return;
-    let active = true;
-    void loadAppLockEnabled().then((value) => {
-      if (active && value) setLocked(true);
-    });
-    return () => {
-      active = false;
-    };
-  }, [accessToken]);
+    if (appLockUnsupported || !accessToken || !required) return;
+    setLocked(true);
+  }, [accessToken, required]);
 
   // Lock whenever the app leaves the foreground.
   useEffect(() => {
-    if (appLockUnsupported || !accessToken || !enabled) return;
+    if (appLockUnsupported || !accessToken || !required) return;
 
     const subscription = AppState.addEventListener("change", (state) => {
       if (state !== "active") {
@@ -111,7 +120,7 @@ export function AppLockProvider({ children }: PropsWithChildren) {
     return () => {
       subscription.remove();
     };
-  }, [accessToken, enabled]);
+  }, [accessToken, required]);
 
   // Raise the system prompt once per lock. Every retry after that is the user
   // pressing Unlock, which is what keeps a declined check from becoming a loop.
@@ -127,11 +136,17 @@ export function AppLockProvider({ children }: PropsWithChildren) {
     void attemptUnlock();
   }, [locked, attemptUnlock]);
 
-  const showLock = !appLockUnsupported && Boolean(accessToken) && enabled && locked;
+  const showLock = !appLockUnsupported && Boolean(accessToken) && required && locked;
+  const hydrating = !appLockUnsupported && Boolean(accessToken) && lockState === "loading";
 
   return (
     <>
       {children}
+      {hydrating ? (
+        <View style={StyleSheet.absoluteFill} testID="app-lock-hydrating">
+          <AppSplashScreen />
+        </View>
+      ) : null}
       {/* `backdrop="cover"` is load-bearing, not cosmetic: the lock exists to
           keep the app's content off the screen, so the usual translucent scrim
           would defeat it. `dismissDisabled` is what makes the sheet blocking —

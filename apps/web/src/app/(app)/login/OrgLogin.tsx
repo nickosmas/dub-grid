@@ -22,6 +22,7 @@ import {
   clearBrowserAuthState,
   fetchAccessibleOrganizations,
   getBrowserAuthSession,
+  recordBrowserSignInCompleted,
   refreshBrowserSession,
   setBrowserSession,
   signOutFromBrowser,
@@ -497,6 +498,7 @@ export default function OrgLogin({
       const destination = await settleWithRequestTimeout(resolvePostLoginDestination());
       if (!isCurrentFlow(generation)) return;
 
+      await recordBrowserSignInCompleted();
       markAuthTransition();
       navigateToDashboard(destination, didSwitchOrg);
     }

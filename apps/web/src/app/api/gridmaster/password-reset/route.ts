@@ -7,6 +7,7 @@ import {
   checkRateLimit,
   hashEmail,
 } from "@/lib/rate-limit";
+import { retryAfterSeconds } from "@/lib/retry-after";
 import { createAnonClient, requireGridmasterSession } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
     );
   }
   if (limited) {
-    const retryAfter = reset ? Math.ceil((reset - Date.now()) / 1000) : 60;
+    const retryAfter = retryAfterSeconds(reset);
     return NextResponse.json(
       { success: false, error: "Too many requests" },
       {
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest) {
     );
   }
   if (target.limited) {
-    const retryAfter = target.reset ? Math.ceil((target.reset - Date.now()) / 1000) : 60;
+    const retryAfter = retryAfterSeconds(target.reset);
     return NextResponse.json(
       {
         success: false,

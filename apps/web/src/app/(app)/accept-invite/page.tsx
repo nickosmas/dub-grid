@@ -12,6 +12,8 @@ import { PasswordInput } from "@/components/auth/PasswordInput";
 import { PasswordStrength } from "@/components/auth/PasswordStrength";
 import { getPasswordMismatchError, isPasswordAcceptable } from "@dubgrid/domain";
 import { describeSignInFailure, EXISTING_ACCOUNT_MESSAGE } from "./signInFailure";
+import { classifyAcceptFailure, describeAcceptFailure } from "./acceptFailure";
+import { MFAVerify } from "@/components/profile/MFAVerify";
 import { parseHost, buildSubdomainHost } from "@/lib/subdomain";
 import * as Sentry from "@/lib/sentry";
 import {
@@ -24,7 +26,7 @@ import {
 import { acceptInvitation } from "@/features/organization/client";
 import { scrubBrowserSecretQuery } from "@/lib/auth/browser-secret-query";
 
-type PageState = "loading" | "no-token" | "form" | "processing" | "success";
+type PageState = "loading" | "no-token" | "invalid" | "form" | "processing" | "mfa" | "success";
 
 function AcceptInviteContent() {
   const [state, setState] = useState<PageState>("loading");
@@ -46,6 +48,9 @@ function AcceptInviteContent() {
   // it, someone whose password predates the current strength rules can never
   // satisfy `isPasswordAcceptable` and the invitation is a dead end.
   const [existingAccount, setExistingAccount] = useState(false);
+  // How the account step ended, kept across the second-factor handoff so a
+  // dead token is described the same way after the challenge as before it.
+  const registerStatusRef = useRef("existing");
   const capturedUrlSecrets = useRef(false);
 
   // Extract token and email from URL on mount
@@ -63,14 +68,17 @@ function AcceptInviteContent() {
         setEmail(emailParam);
         setEmailFromUrl(true);
       }
-      setState("form");
-      // Fetch org name for context (best-effort)
+      // Wait for the lookup before showing anything: a dead link must never
+      // reach the form (finding F-07). Only the opaque dead-token response
+      // closes the page. An outage or a throttle still shows the form, since
+      // acceptance checks the token again on submit.
       fetchInvitationLookup(t)
         .then(({ orgName: name }) => {
           if (name) setOrgName(name);
+          setState("form");
         })
-        .catch(() => {
-          /* best-effort */
+        .catch((lookupError: unknown) => {
+          setState(classifyAcceptFailure(lookupError) === "dead" ? "invalid" : "form");
         });
     }
   }, []);
@@ -120,6 +128,7 @@ function AcceptInviteContent() {
       const status = existingAccount
         ? "existing"
         : (await registerInvitedUser({ token: token!, email, password })).status;
+      registerStatusRef.current = status;
 
       // 2. Sign in. A new account takes the password just chosen; an address
       //    that already has one needs that account's existing password.
@@ -139,61 +148,91 @@ function AcceptInviteContent() {
       }
 
       // 3. Accept the invitation (now authenticated)
-      let slug: string | null = null;
-      try {
-        const result = await acceptInvitation(token!);
-        slug = result.orgSlug;
-      } catch (acceptErr: unknown) {
-        const msg: string =
-          (acceptErr instanceof Error ? acceptErr.message : String(acceptErr)) ?? "";
-        const code: string = (acceptErr as { code?: string })?.code ?? "";
-        // "Already accepted" is fine — just proceed to success.
-        // Match on Postgres error code P0001 (RAISE EXCEPTION) + message, or message alone as fallback.
-        const isAlreadyAccepted =
-          (code === "P0001" && msg.toLowerCase().includes("already")) ||
-          msg.toLowerCase().includes("already been accepted");
-        if (!isAlreadyAccepted) {
-          throw new Error(
-            "Your account was created, but this invitation is no longer valid. " +
-              "Please contact your organization administrator for a new invitation.",
-          );
-        }
-        // Try to look up the org slug for redirect
-        try {
-          const lookup = await fetchInvitationLookup(token!);
-          slug = lookup.orgSlug;
-        } catch {
-          // Best-effort
-        }
+      if ((await finishAcceptance()) === "needs-mfa") {
+        setState("mfa");
+        setLoading(false);
       }
-
-      // 3b. Record terms acceptance (best-effort — user is already authenticated)
-      try {
-        await recordCurrentTermsAcceptance();
-      } catch {
-        // Non-blocking — login will route the user through /accept-terms if
-        // this didn't persist for any reason.
-      }
-
-      // 4. Sign out so user re-authenticates with fresh JWT claims.
-      // Use global scope to revoke the server-side refresh token too,
-      // otherwise the login page will find a stale token in cookies.
-      await signOutFromBrowser("global");
-
-      setOrgSlug(slug);
-      setState("success");
     } catch (err: unknown) {
-      Sentry.captureException(err, {
-        extra: {
-          context: "accept-invite",
-          existingAccount,
-          cause: err instanceof Error ? (err.cause ?? null) : null,
-        },
-      });
-      setFormError(err instanceof Error ? err.message : "Something went wrong. Try again.");
-      setState("form");
-      setLoading(false);
+      failAcceptance(err);
     }
+  }
+
+  // Accept with whatever session the browser now holds. An account with a
+  // verified TOTP factor is refused until it answers a challenge, so that
+  // refusal hands over to the login page's MFAVerify screen and acceptance
+  // resumes on the promoted session rather than failing as a dead link.
+  async function finishAcceptance(): Promise<"accepted" | "needs-mfa"> {
+    let slug: string | null = null;
+    try {
+      const result = await acceptInvitation(token!);
+      slug = result.orgSlug;
+    } catch (acceptErr: unknown) {
+      const failure = classifyAcceptFailure(acceptErr);
+      if (failure === "step-up") return "needs-mfa";
+      if (failure !== "already-accepted") {
+        throw new Error(describeAcceptFailure(failure, registerStatusRef.current), {
+          cause: acceptErr,
+        });
+      }
+      try {
+        const lookup = await fetchInvitationLookup(token!);
+        slug = lookup.orgSlug;
+      } catch {
+        // Best-effort
+      }
+    }
+
+    // 3b. Record terms acceptance (best-effort: the user is already authenticated)
+    try {
+      await recordCurrentTermsAcceptance();
+    } catch {
+      // Non-blocking: login will route the user through /accept-terms if
+      // this didn't persist for any reason.
+    }
+
+    // 4. Sign out so user re-authenticates with fresh JWT claims.
+    // Use global scope to revoke the server-side refresh token too,
+    // otherwise the login page will find a stale token in cookies.
+    await signOutFromBrowser("global");
+
+    setOrgSlug(slug);
+    setState("success");
+    return "accepted";
+  }
+
+  function failAcceptance(err: unknown) {
+    Sentry.captureException(err, {
+      extra: {
+        context: "accept-invite",
+        existingAccount,
+        cause: err instanceof Error ? (err.cause ?? null) : null,
+      },
+    });
+    setFormError(err instanceof Error ? err.message : "Something went wrong. Try again.");
+    setState("form");
+    setLoading(false);
+  }
+
+  async function handleMfaVerified() {
+    setState("processing");
+    try {
+      if ((await finishAcceptance()) === "needs-mfa") {
+        throw new Error(describeAcceptFailure("step-up", registerStatusRef.current));
+      }
+    } catch (err: unknown) {
+      failAcceptance(err);
+    }
+  }
+
+  async function handleMfaCancel() {
+    // Leave no password-only session behind on an account that has a factor.
+    await signOutFromBrowser("local").catch(() => {});
+    setState("form");
+    setLoading(false);
+  }
+
+  if (state === "mfa") {
+    return <MFAVerify onVerified={handleMfaVerified} onCancel={handleMfaCancel} />;
   }
 
   return (
@@ -216,6 +255,14 @@ function AcceptInviteContent() {
                 : "Loading"
             }
             message="Please wait while we process your invitation."
+          />
+        ) : state === "invalid" ? (
+          // One message for accepted, expired, revoked and unknown links, so the
+          // page never reveals which it was.
+          <AuthStateCard
+            heading="Invitation no longer valid"
+            message="This invitation link has expired or is no longer active. If you've already accepted it, sign in. Otherwise, ask your administrator for a new one."
+            primaryCta={{ label: "Go to login", href: "/login" }}
           />
         ) : state === "no-token" ? (
           <AuthStateCard

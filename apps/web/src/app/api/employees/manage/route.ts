@@ -23,6 +23,7 @@ import {
   LoginEmailConflictError,
   syncLinkedLoginEmail,
 } from "@/features/employees/server/login-email";
+import { followUpLinkedLoginEmailChange } from "@/features/employees/server/login-email-follow-up";
 import { apiErrorResponse } from "@/lib/error-handling";
 import logger from "@/lib/logger";
 import {
@@ -732,6 +733,15 @@ export async function POST(req: NextRequest) {
             }
             throw error;
           }
+          await followUpLinkedLoginEmailChange({
+            serviceClient: auth.serviceClient,
+            userId: linkedUserId,
+            previousEmail: previousRow?.email ?? null,
+            newEmail: loginEmailChange,
+            orgId: data.orgId,
+            actorId: assurance.user.id,
+            actorSessionId: assurance.sessionId,
+          });
         }
         const referenceAuditValues =
           previousRow && changedProfileFields.length > 0

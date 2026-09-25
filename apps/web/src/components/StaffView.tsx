@@ -130,7 +130,6 @@ interface StaffViewProps {
   focusAreaLabel?: string;
   certificationLabel?: string;
   roleLabel?: string;
-  orgName?: string;
   shiftDisplayMode?: ShiftDisplayMode;
   defaultShiftEnabled?: boolean;
   setupIncomplete?: boolean;
@@ -168,7 +167,6 @@ export default function StaffView({
   focusAreaLabel = "Focus Areas",
   certificationLabel = "Certifications",
   roleLabel = "Roles",
-  orgName,
   shiftDisplayMode = "code",
   defaultShiftEnabled = true,
   useCompactRoleCertificationLabels = false,
@@ -349,7 +347,6 @@ export default function StaffView({
             certificationLabel={certificationLabel}
             roleLabel={roleLabel}
             orgId={orgId}
-            orgName={orgName}
             isSuperAdmin={isSuperAdmin}
             isGridmaster={isGridmaster}
             isManagementUser={isManagementUser}

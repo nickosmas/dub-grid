@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { retryAfterSeconds } from "@/lib/retry-after";
 import { lookupOrgBySlug } from "@/lib/org-lookup";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
@@ -14,7 +15,7 @@ export async function GET(req: NextRequest) {
     );
   }
   if (limited) {
-    const retryAfter = reset ? Math.ceil((reset - Date.now()) / 1000) : 60;
+    const retryAfter = retryAfterSeconds(reset);
     return NextResponse.json(
       { valid: false, error: "Too many requests" },
       {

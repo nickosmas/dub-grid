@@ -32,6 +32,7 @@ import {
 import {
   disablePushForCurrentDevice,
   handleExpiredMobileSession,
+  revokeCurrentMobileSession,
 } from "../../../shared/lib/auth-reset";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
@@ -196,6 +197,7 @@ export default function ProfileScreen() {
 
     try {
       await disablePushForCurrentDevice();
+      await revokeCurrentMobileSession();
 
       const { error } = await getSupabaseClient().auth.signOut({
         scope: "local",

@@ -50,16 +50,12 @@ const AUTHENTICATED_SCOPED_ROUTES: Record<string, string> = {
     "Fresh authentication and the authenticated user ID scope account deletion.",
   "apps/web/src/app/api/auth/gdpr-erase/route.ts":
     "Fresh authentication and the authenticated user ID scope erasure.",
-  "apps/web/src/app/api/auth/track-session/route.ts":
-    "The verified token session ID and authenticated user ID own the session record.",
   "apps/web/src/app/api/calendar/route.ts":
     "The linked-calendar helper rechecks live user, org, membership, and employee ownership.",
   "apps/web/src/app/api/organization/access-status/route.ts":
     "The recovery endpoint returns only the caller's current organization gate state.",
   "apps/web/src/app/api/organizations/role-change/route.ts":
     "The user-scoped RPC enforces live authorization; service access only records its successful result.",
-  "apps/web/src/app/api/send-invite-email/route.ts":
-    "The service read resolves the token to a live invitation whose organization must match the caller's org claim, or the caller is a gridmaster.",
   "apps/web/src/app/api/test-sandbox/route.ts":
     "Live source membership and server-side sandbox ownership authorize cloning and cleanup.",
 };
@@ -77,6 +73,8 @@ const DELEGATED_SERVICE_HELPERS: Record<string, string> = {
     "Scopes preferences to the authenticated user ID.",
   "apps/web/src/features/account/server/profile.ts":
     "Scopes profile operations to the authenticated user ID.",
+  "apps/web/src/features/account/server/security-alerts.ts":
+    "Reads only the authenticated user's own session rows by the verified session ID.",
   "apps/web/src/features/account/server/sessions.ts":
     "Scopes session operations to the authenticated user ID.",
   "apps/web/src/features/account/server/terms.ts":
@@ -85,6 +83,8 @@ const DELEGATED_SERVICE_HELPERS: Record<string, string> = {
     "Receives an authenticated actor and event-owned organization identifiers.",
   "apps/web/src/features/notifications/server/sender.ts":
     "Internal notification delivery receives already-authorized recipients and events.",
+  "apps/web/src/features/organization/server/invitation-delivery.ts":
+    "Reads the organization name for an invitation the calling route has already authorized.",
   "apps/web/src/lib/analytics.ts":
     "Called after organization authorization with an effective org ID.",
   "apps/web/src/lib/api-auth.ts": "Owns verified request and live Gridmaster authorization.",
@@ -94,6 +94,8 @@ const DELEGATED_SERVICE_HELPERS: Record<string, string> = {
     "Server-only best-effort writer accepts only the closed, secret-free security event contract.",
   "apps/web/src/lib/audit/authorize.ts":
     "Delegates to canonical organization or Gridmaster authorization.",
+  "apps/web/src/lib/audit/invitation.ts":
+    "Writes an invitation audit row for an org and actor the calling route has already authorized.",
   "apps/web/src/lib/feature-flags.ts":
     "Resolves global flags for a verified user or public default.",
   "apps/web/src/lib/org-lookup.ts":

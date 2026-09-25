@@ -1,13 +1,15 @@
 # End-to-end tests using Playwright against a local Supabase instance.
 # Runs the complete Chromium, Firefox, and WebKit qualification on every PR
-# targeting main, and can also be triggered manually.
+# targeting main or dev, and can also be triggered manually. Direct pushes to
+# dev are not run here: twelve browser jobs per push would cost more than the
+# release PR's full run, which still gates main.
 
 name: E2E Tests
 
 on:
   workflow_dispatch:
   pull_request:
-    branches: [main]
+    branches: [main, dev]
   schedule:
     - cron: "30 2 * * *"
 

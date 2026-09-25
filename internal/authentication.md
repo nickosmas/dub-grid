@@ -139,8 +139,8 @@ ALTER TABLE invitations ENABLE ROW LEVEL SECURITY;
 | Step | Actor       | Action                                                                                                                           |
 | ---- | ----------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | 1    | Super Admin | Fills "Invite User" form: selects employee, enters email + role                                                                  |
-| 2    | Server      | Inserts `invitations` row with `employee_id` FK, returns token                                                                   |
-| 3    | API Route   | `/api/send-invite-email` sends invitation via Resend                                                                             |
+| 2    | Server      | `/api/organizations/invitations/create` inserts the `invitations` row with `employee_id` FK                                      |
+| 3    | Server      | The same request emails the link via Resend; a failed send removes the row                                                       |
 | 4    | Invitee     | Clicks link → arrives at `/accept-invite?token=<uuid>`                                                                           |
 | 5    | Accept Flow | `/api/invitations/register` validates token, creates a **pre-confirmed** auth user; `accept_invitation` sets `employees.user_id` |
 | 6    | Auth Hook   | JWT issued with `platform_role`, `org_role`, `org_id`, `org_slug` claims                                                         |
@@ -321,7 +321,7 @@ All public-facing API routes are rate-limited via Upstash Redis (`apps/web/src/l
 | Limiter                 | Window    | Key                 | Applied To                                                                              |
 | ----------------------- | --------- | ------------------- | --------------------------------------------------------------------------------------- |
 | `apiLimiter`            | 10 / 10s  | user id (or IP)     | general protected mutations (org settings/access/role-change, etc.)                     |
-| `inviteLimiter`         | 100 / 1h  | user id (per-actor) | `/api/send-invite-email`                                                                |
+| `inviteLimiter`         | 100 / 1h  | user id (per-actor) | `/api/organizations/invitations/create`                                                 |
 | `emailTargetLimiter`    | 5 / 1h    | `hashEmail(target)` | layered onto invite + gridmaster password-reset so one actor can't email-bomb one inbox |
 | `demoLimiter`           | 3 / 1h    | IP                  | `/api/request-demo`                                                                     |
 | `passwordResetLimiter`  | 5 / 15m   | `hashEmail(email)`  | recovery requests (web + mobile) and gridmaster password reset, per target address      |
@@ -409,9 +409,19 @@ Instead, `lib/api-auth.ts`'s `authenticateRequest` does two things:
    trip. They **fail open** when Redis is unreachable — an Upstash outage must not sign
    everyone out.
 
+   The user watermark rejects tokens issued before it, but a refresh token still mints a
+   newer one. That is intended after a role change, where the session should pick up new
+   claims. To actually sign someone out, `endUserSessions` also deletes their provider
+   sessions and refresh tokens through `end_user_auth_sessions` (migration 046). An
+   administrator's sign-in email change uses it (finding F-21).
+
 This is why `POST /api/auth/sign-out` exists: sign-out used to be purely client-side,
 which clears the browser's tokens but leaves the access token valid until it expires.
-`signOutFromBrowser` now calls that route first. The same mechanism is what makes
+`signOutFromBrowser` now calls that route first. Mobile does the same through its bearer
+twin, `POST /api/mobile/v1/auth/sign-out`, before any local, other-device, every-device,
+password-change or password-recovery sign-out drops its tokens. Other-device and
+every-device scopes need fresh sensitive-action assurance on both platforms; only a
+password-recovery completion may substitute a fresh OTP proof. The same mechanism is what makes
 "revoke this device" real — it previously only deleted the `user_sessions` row and left
 the device fully working.
 

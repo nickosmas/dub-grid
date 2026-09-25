@@ -24,6 +24,7 @@ const getSupabaseClient = vi.fn();
 const registerPushToken = vi.fn();
 const loadStoredPushDevice = vi.fn();
 const handleExpiredMobileSession = vi.fn();
+const revokeCurrentMobileSession = vi.fn();
 const disablePushForCurrentDevice = vi.fn();
 const pushToast = vi.fn();
 // Every options object the screen hands the native header, in render order.
@@ -79,6 +80,7 @@ vi.mock("../../../shared/lib/api", () => ({
 vi.mock("../../../shared/lib/auth-reset", () => ({
   disablePushForCurrentDevice,
   handleExpiredMobileSession,
+  revokeCurrentMobileSession,
 }));
 
 vi.mock("../../../shared/providers/AuthSessionProvider", () => ({
@@ -249,6 +251,7 @@ describe("ProfileScreen", () => {
     registerPushToken.mockReset();
     loadStoredPushDevice.mockReset();
     handleExpiredMobileSession.mockReset();
+    revokeCurrentMobileSession.mockReset().mockResolvedValue(undefined);
     disablePushForCurrentDevice.mockReset();
     disablePushForCurrentDevice.mockResolvedValue(undefined);
     pushToast.mockReset();
@@ -672,6 +675,11 @@ describe("ProfileScreen", () => {
     // otherwise the device keeps receiving this user's notifications.
     expect(disablePushForCurrentDevice).toHaveBeenCalled();
     expect(disablePushForCurrentDevice.mock.invocationCallOrder[0]).toBeLessThan(
+      signOut.mock.invocationCallOrder[0],
+    );
+    // DubGrid records the revocation before the device drops its token, or a
+    // copy of that token keeps working until it expires.
+    expect(revokeCurrentMobileSession.mock.invocationCallOrder[0]).toBeLessThan(
       signOut.mock.invocationCallOrder[0],
     );
   });

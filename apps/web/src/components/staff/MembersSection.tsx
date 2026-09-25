@@ -128,7 +128,6 @@ export interface MembersSectionProps {
   certificationLabel: string;
   roleLabel: string;
   orgId?: string;
-  orgName?: string;
   isSuperAdmin?: boolean;
   isGridmaster?: boolean;
   // Self signal: the viewer's own employees row has management department
@@ -160,7 +159,6 @@ export function MembersSection({
   certificationLabel,
   roleLabel,
   orgId,
-  orgName,
   isSuperAdmin,
   isGridmaster,
   isManagementUser,
@@ -897,6 +895,9 @@ export function MembersSection({
       .catch(() => {});
   }
 
+  // Not wrapped in a confirmation: its only caller is the pending-invitation
+  // banner, which asks first, and the banner's reinvite calls it again inside
+  // an already-confirmed flow. Asking here produced two dialogs for one click.
   async function handleRevokeInvitation(invitationId: string): Promise<boolean> {
     if (!orgId) return false;
     setRevokingId(invitationId);
@@ -911,6 +912,21 @@ export function MembersSection({
       return false;
     } finally {
       setRevokingId(null);
+    }
+  }
+
+  // Unconfirmed for the same reason as revoke: the banner asks first. It
+  // rotates the token on the same invitation rather than minting a new one.
+  async function handleResendInvitation(invitationId: string): Promise<boolean> {
+    if (!orgId) return false;
+    try {
+      await resendInvitation(invitationId, orgId);
+      refreshInvitations();
+      toast.success("Invitation resent");
+      return true;
+    } catch (err) {
+      toast.error(formatClientErrorMessage(err, "We couldn't resend that invitation. Try again."));
+      return false;
     }
   }
 
@@ -2247,7 +2263,6 @@ export function MembersSection({
         <InviteEmployeeModal
           employee={inviteEmployee}
           orgId={orgId}
-          orgName={orgName || "your organization"}
           pendingInvitation={pendingInviteByEmployeeId.get(inviteEmployee.id)}
           onClose={() => {
             setInviteEmployee(null);
@@ -2278,7 +2293,6 @@ export function MembersSection({
         <InviteEmployeeModal
           employee={null}
           orgId={orgId}
-          orgName={orgName || "your organization"}
           departments={departmentItems}
           onClose={() => setShowManagementInvite(false)}
           onInvited={() => {
@@ -2343,6 +2357,7 @@ export function MembersSection({
             canManageManagementAccess ? openManagementAccessPopup : undefined
           }
           onRevoke={handleRevokeInvitation}
+          onResend={handleResendInvitation}
         />
       )}
 
@@ -2362,7 +2377,6 @@ export function MembersSection({
           <EmployeeManagementAccessEditor
             employee={managementAccessEmployee}
             orgId={orgId}
-            orgName={orgName || "your organization"}
             managementDepartments={managementDepts}
             directoryPerson={selectedEmployeeDirectoryPerson}
             pendingInvitation={pendingInviteByEmployeeId.get(managementAccessEmployee.id)}
@@ -2548,6 +2562,7 @@ export function MembersSection({
                     queryKey: queryKeys.org.directory(orgId),
                   });
                   toast.success("Invitation revoked");
+                  return true;
                 }
               : undefined
           }

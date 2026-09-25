@@ -22,6 +22,25 @@ function stubCellSnapshot(stateKind: "worked" | "absence" | "deleted" | null) {
  * Records the writes clearScheduleNotesForCells makes, so a test can assert
  * which cells were cleared without standing up a real query builder.
  */
+/** Serves a series' cells the way PostgREST does: windowed, and capped at max_rows. */
+function stubSeriesCells(cells: Array<{ emp_id: string; date: string }>) {
+  const MAX_ROWS = 1_000;
+  const previousFrom = serviceFrom.getMockImplementation()!;
+  serviceFrom.mockImplementation((table: string) => {
+    if (table !== "schedule_cells") return previousFrom(table);
+    const query = {
+      select: () => query,
+      eq: () => query,
+      order: () => query,
+      range: async (from: number, to: number) => ({
+        data: cells.slice(from, Math.min(to + 1, from + MAX_ROWS)),
+        error: null,
+      }),
+    };
+    return query;
+  });
+}
+
 function captureNoteClearing() {
   const deleted: Array<Record<string, unknown>> = [];
   const softDeleted: Array<Record<string, unknown>> = [];
@@ -1020,24 +1039,10 @@ describe("POST /api/schedule/manage permission gates", () => {
 
     const notes = captureNoteClearing();
     // schedule_cells is read before the RPC, since the delete clears the link.
-    const previousFrom = serviceFrom.getMockImplementation()!;
-    serviceFrom.mockImplementation((table: string) =>
-      table === "schedule_cells"
-        ? {
-            select: () => ({
-              eq: () => ({
-                eq: async () => ({
-                  data: [
-                    { emp_id: employeeId, date: "2026-08-03" },
-                    { emp_id: secondEmployeeId, date: "2026-08-10" },
-                  ],
-                  error: null,
-                }),
-              }),
-            }),
-          }
-        : previousFrom(table),
-    );
+    stubSeriesCells([
+      { emp_id: employeeId, date: "2026-08-03" },
+      { emp_id: secondEmployeeId, date: "2026-08-10" },
+    ]);
 
     const response = await POST(
       makeRequest({
@@ -1052,6 +1057,30 @@ describe("POST /api/schedule/manage permission gates", () => {
       `${employeeId}_2026-08-03`,
       `${secondEmployeeId}_2026-08-10`,
     ]);
+  });
+
+  // PostgREST's max_rows (1,000) applies to the service role too, so an
+  // unpaged read of a long series silently dropped every cell past it.
+  it("clears notes on every cell of a series longer than one page", async () => {
+    grant({ canEditShifts: true, canManageShiftSeries: true });
+    const notes = captureNoteClearing();
+    const cells = Array.from({ length: 1_203 }, (_, index) => ({
+      emp_id: employeeId,
+      date: new Date(Date.UTC(2026, 0, 1) + index * 86_400_000).toISOString().slice(0, 10),
+    }));
+    stubSeriesCells(cells);
+
+    const response = await POST(
+      makeRequest({
+        action: "deleteShiftSeries",
+        orgId,
+        seriesId: "33333333-3333-4333-8333-333333333333",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(notes.deleted).toHaveLength(1_203);
+    expect(notes.deleted.at(-1)?.date).toBe(cells.at(-1)?.date);
   });
 
   it("still admits the schedule editor who holds both halves of each pair", async () => {

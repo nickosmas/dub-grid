@@ -64,6 +64,7 @@ interface StaffDetailPanelProps {
   hasPendingManagementInvite?: boolean;
   onManageManagementAccess?: (emp: Employee) => void;
   onRevoke?: (invitationId: string) => Promise<boolean> | boolean | void;
+  onResend?: (invitationId: string) => Promise<boolean> | boolean | void;
 }
 
 export function StaffDetailPanel({
@@ -95,6 +96,7 @@ export function StaffDetailPanel({
   hasPendingManagementInvite,
   onManageManagementAccess,
   onRevoke,
+  onResend,
 }: StaffDetailPanelProps) {
   const { user: currentUser } = useAuth();
   const { resolvedTheme } = useTheme();
@@ -150,15 +152,7 @@ export function StaffDetailPanel({
   }, [closePanel, requestClose]);
 
   const handleReinvite =
-    onInvite && pendingInvitation
-      ? async () => {
-          if (onRevoke) {
-            const result = await onRevoke(pendingInvitation.id);
-            if (result === false) return;
-          }
-          onInvite(employee);
-        }
-      : undefined;
+    onResend && pendingInvitation ? () => onResend(pendingInvitation.id) : undefined;
 
   // Reset scroll when switching employees
   useEffect(() => {

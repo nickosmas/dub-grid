@@ -6,6 +6,7 @@ import {
   getAuthRecoveryRetryDelay,
   isAuthRecoveryCancellation,
   isRetryableAuthRecoveryError,
+  mayHavePasswordUpdateCommitted,
   parseRetryAfterMs,
   shouldRetryAuthRecovery,
 } from "./index";
@@ -119,5 +120,24 @@ describe("authentication recovery single flight", () => {
     await expect(run()).rejects.toThrow("offline");
     await expect(run()).resolves.toBeUndefined();
     expect(attempt).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("mayHavePasswordUpdateCommitted", () => {
+  it("treats a deadline, a lost response and a provider failure as possibly applied", () => {
+    expect(mayHavePasswordUpdateCommitted({ name: "RequestTimeoutError" })).toBe(true);
+    expect(mayHavePasswordUpdateCommitted(new TypeError("Network request failed"))).toBe(true);
+    expect(mayHavePasswordUpdateCommitted({ name: "AuthRetryableFetchError", status: 0 })).toBe(
+      true,
+    );
+    expect(mayHavePasswordUpdateCommitted({ code: "unexpected_failure", status: 500 })).toBe(true);
+  });
+
+  it("treats a definite rejection or a cancellation as nothing changed", () => {
+    expect(mayHavePasswordUpdateCommitted({ code: "same_password", status: 422 })).toBe(false);
+    expect(mayHavePasswordUpdateCommitted({ code: "weak_password", status: 422 })).toBe(false);
+    expect(mayHavePasswordUpdateCommitted({ code: "session_expired", status: 401 })).toBe(false);
+    expect(mayHavePasswordUpdateCommitted({ code: "same_password" })).toBe(false);
+    expect(mayHavePasswordUpdateCommitted({ name: "AbortError" })).toBe(false);
   });
 });

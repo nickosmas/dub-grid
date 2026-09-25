@@ -12,8 +12,8 @@ export function MfaFactorEnrolledEmail({ logoUrl }: { logoUrl?: string } = {}) {
   return (
     <SecurityNotificationEmail
       heading="A new sign-in verification method was added"
-      body="The TOTP (Time-based One-time Password) verification method was added to your account."
-      footer="If you made this change, no further action is required. If you didn't, contact your administrator or support@dubgrid.com immediately."
+      body="An authenticator app was added as a verification method for your DubGrid sign-in."
+      footer="If this was you, there's nothing to do. If it wasn't, someone may know your password: reset it from the DubGrid sign-in page, then review your active sessions and verification methods in your profile. Contact support@dubgrid.com if you can't sign in."
       logoUrl={logoUrl}
     />
   );

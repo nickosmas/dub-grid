@@ -114,6 +114,7 @@ vi.mock("../providers/AppLockProvider", async () => {
   return {
     AppLockProvider: ({ children }: { children: React.ReactNode }) =>
       React.createElement("div", { "data-testid": "app-lock-provider" }, children),
+    useAppLockState: () => "disabled",
   };
 });
 

@@ -11,6 +11,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Client } from "pg";
+import { actAsAuthenticated } from "./helpers/simulated-jwt";
 
 const DB_URL =
   process.env.LOCAL_SUPABASE_DB_URL ?? "postgres://postgres:postgres@127.0.0.1:54322/postgres";
@@ -71,17 +72,19 @@ async function loadFixture(): Promise<Fixture> {
   };
 }
 
-async function asUser(member: Member, orgId: string): Promise<void> {
-  const claims = JSON.stringify({
+async function asUser(
+  member: Member,
+  orgId: string,
+  claims: Record<string, unknown> = {},
+): Promise<void> {
+  await actAsAuthenticated(db, {
     sub: member.userId,
     role: "authenticated",
-    mfa_enrolled: false,
     org_id: orgId,
     org_role: member.orgRole,
     platform_role: "none",
+    ...claims,
   });
-  await db.query(`SET LOCAL ROLE authenticated`);
-  await db.query(`SET LOCAL request.jwt.claims = '${claims}'`);
 }
 
 async function asSuperuser(): Promise<void> {
@@ -289,6 +292,30 @@ describe.runIf(reachable)("profile lifecycle columns (F-05, live DB)", () => {
         [fx.member.userId],
       );
       expect(accepted).toEqual([{ terms_version: "live-test" }]);
+    } finally {
+      await db.query("ROLLBACK");
+    }
+  });
+});
+
+describe.runIf(reachable)("an enrolled member must answer the challenge (live DB)", () => {
+  it("withholds the organization's rows until the second factor is verified", async () => {
+    await db.query("BEGIN");
+    try {
+      const fx = await loadFixture();
+      const colleagues = async (claims: Record<string, unknown>) => {
+        await asUser(fx.member, fx.orgId, claims);
+        const { rows } = await db.query<{ count: string }>(
+          `SELECT count(*) FROM public.employees WHERE org_id = $1`,
+          [fx.orgId],
+        );
+        await asSuperuser();
+        return Number(rows[0].count);
+      };
+
+      expect(await colleagues({})).toBeGreaterThan(0);
+      expect(await colleagues({ mfa_enrolled: true, aal: "aal1" })).toBe(0);
+      expect(await colleagues({ mfa_enrolled: true, aal: "aal2" })).toBeGreaterThan(0);
     } finally {
       await db.query("ROLLBACK");
     }

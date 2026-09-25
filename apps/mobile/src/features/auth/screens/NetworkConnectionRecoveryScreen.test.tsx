@@ -29,6 +29,22 @@ describe("NetworkConnectionRecoveryScreen", () => {
     expect(screen.queryByText("Sign out")).not.toBeInTheDocument();
   });
 
+  it("offers a way to sign in again when retrying cannot help", () => {
+    const onSignInAgain = vi.fn();
+    render(<NetworkConnectionRecoveryScreen onRetry={onRetry} onSignInAgain={onSignInAgain} />);
+
+    fireEvent.click(screen.getByText("Sign in again"));
+
+    expect(onSignInAgain).toHaveBeenCalledOnce();
+    expect(onRetry).not.toHaveBeenCalled();
+  });
+
+  it("offers no sign-in exit where none was given", () => {
+    render(<NetworkConnectionRecoveryScreen onRetry={onRetry} />);
+
+    expect(screen.queryByText("Sign in again")).not.toBeInTheDocument();
+  });
+
   it("leaves automatic retry ownership to the bounded bootstrap query", async () => {
     vi.useFakeTimers();
     try {

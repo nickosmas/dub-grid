@@ -10,7 +10,7 @@ export function ReauthenticationEmail({ logoUrl = SUPABASE.siteUrl }: { logoUrl?
     <EmailLayout logoUrl={logoUrl} preview="Confirm your identity">
       <Text style={{ ...styles.heading, textAlign: "center" }}>Confirm your identity</Text>
       <Text style={{ ...styles.paragraph, textAlign: "center", fontSize: "15px" }}>
-        Enter this code to confirm it&apos;s really you.
+        Enter this code to confirm a sensitive change to your DubGrid sign-in.
       </Text>
       <Section style={{ textAlign: "center", margin: "0 0 32px" }}>
         <Text
@@ -33,7 +33,8 @@ export function ReauthenticationEmail({ logoUrl = SUPABASE.siteUrl }: { logoUrl?
       </Section>
       <Hr style={styles.divider} />
       <Text style={{ ...styles.fine, textAlign: "center" }}>
-        If you didn&apos;t request this code, you can safely ignore this email.
+        If you didn&apos;t request this code, someone may know your password. Reset it from the
+        DubGrid sign-in page and review your active sessions in your profile.
       </Text>
     </EmailLayout>
   );

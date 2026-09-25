@@ -25,7 +25,6 @@ import type {
   InvitationRow,
   JobRow,
   NamedItemRow,
-  PendingInvite,
   ShiftCatRow,
 } from "./types";
 
@@ -52,7 +51,7 @@ type CreateOrganizationSetupInput = {
 export type SuperAdminSetupResult =
   | { kind: "none" }
   | { kind: "assigned"; displayName: string }
-  | { kind: "pending-invite"; displayName: string; pendingInvite: PendingInvite }
+  | { kind: "invited"; displayName: string }
   | { kind: "invite-error"; displayName: string; message: string };
 
 export async function createOrganizationSetup(input: CreateOrganizationSetupInput): Promise<{
@@ -364,23 +363,6 @@ export async function createOrganizationEmployees(
   return created;
 }
 
-export async function sendInvitationEmail(input: {
-  token: string;
-  email: string;
-  orgName: string;
-}): Promise<void> {
-  const response = await fetch("/api/send-invite-email", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
-
-  if (!response.ok) {
-    const json = await response.json().catch(() => null);
-    throw new Error(formatClientErrorMessage(json?.error, "We couldn't send that email."));
-  }
-}
-
 export async function sendOrganizationInvitations(
   createdOrg: Organization,
   invitationRows: InvitationRow[],
@@ -389,22 +371,15 @@ export async function sendOrganizationInvitations(
   let failCount = 0;
 
   for (const invitationRow of invitationRows) {
+    // Counted as sent only once its email has gone out: the create call sends
+    // it, and a failed send leaves no invitation behind.
     try {
-      const result = await createOrganizationInvitation({
+      await createOrganizationInvitation({
         email: invitationRow.email,
         role: invitationRow.role as AssignableOrganizationRole,
         orgId: createdOrg.id,
         employeeId: invitationRow.employeeId,
       });
-      try {
-        await sendInvitationEmail({
-          token: result.token,
-          email: invitationRow.email,
-          orgName: createdOrg.name,
-        });
-      } catch {
-        // Invitation exists even if email delivery fails.
-      }
       sentCount += 1;
     } catch {
       failCount += 1;

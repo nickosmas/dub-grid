@@ -5,6 +5,7 @@ import {
   AuthSessionProvider,
   replaceAuthSession,
   SESSION_RESTORE_TIMEOUT_MS,
+  shouldClearLocalAuthForRestoreError,
   useSessionState,
 } from "./AuthSessionProvider";
 import type { Session } from "@supabase/supabase-js";
@@ -60,7 +61,8 @@ function sessionFor(userId: string, orgId: string, version: string): Session {
 }
 
 function SessionProbe() {
-  const { accessToken, isLoading, restoreError, retryRestore } = useSessionState();
+  const { accessToken, isLoading, restoreError, retryRestore, clearSessionAndSignIn } =
+    useSessionState();
 
   return (
     <div>
@@ -68,6 +70,7 @@ function SessionProbe() {
       <span data-testid="token">{accessToken ?? "none"}</span>
       <span data-testid="restore-error">{String(restoreError)}</span>
       <button onClick={() => void retryRestore()}>Retry restore</button>
+      <button onClick={() => void clearSessionAndSignIn()}>Sign in again</button>
     </div>
   );
 }
@@ -357,9 +360,82 @@ describe("AuthSessionProvider", () => {
     });
 
     expect(screen.getByTestId("token")).toHaveTextContent("none");
-    expect(screen.getByTestId("restore-error")).toHaveTextContent("true");
+    // Unreadable storage used to strand the user on a retry that replayed it
+    // forever. It is cleared, and the user goes to sign-in instead.
+    expect(screen.getByTestId("restore-error")).toHaveTextContent("false");
+    await waitFor(() => expect(signOut).toHaveBeenCalledWith({ scope: "local" }));
     expect(cancelQueries).toHaveBeenCalledTimes(1);
     expect(clearQueryClient).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears a stored session the provider rejects with any stale-session code", async () => {
+    getSession.mockRejectedValueOnce(
+      Object.assign(new Error("Refresh token already used"), {
+        code: "refresh_token_already_used",
+        status: 400,
+      }),
+    );
+    signOut.mockResolvedValueOnce({ error: null });
+
+    render(
+      <AuthSessionProvider>
+        <SessionProbe />
+      </AuthSessionProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("loading")).toHaveTextContent("false"));
+    expect(signOut).toHaveBeenCalledWith({ scope: "local" });
+    expect(screen.getByTestId("restore-error")).toHaveTextContent("false");
+  });
+
+  it("keeps a connection failure on the retry screen without discarding the session", async () => {
+    getSession.mockRejectedValueOnce(new TypeError("Network request failed"));
+
+    render(
+      <AuthSessionProvider>
+        <SessionProbe />
+      </AuthSessionProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("restore-error")).toHaveTextContent("true"));
+    expect(signOut).not.toHaveBeenCalled();
+  });
+
+  it("offers a way out of recovery that always ends signed out", async () => {
+    getSession.mockRejectedValueOnce(new TypeError("Network request failed"));
+    signOut.mockReturnValueOnce(new Promise(() => undefined));
+    vi.useFakeTimers();
+
+    render(
+      <AuthSessionProvider>
+        <SessionProbe />
+      </AuthSessionProvider>,
+    );
+    await act(async () => {});
+    expect(screen.getByTestId("restore-error")).toHaveTextContent("true");
+
+    fireEvent.click(screen.getByText("Sign in again"));
+    await act(async () => vi.advanceTimersByTimeAsync(5_000));
+
+    expect(signOut).toHaveBeenCalledWith({ scope: "local" });
+    expect(screen.getByTestId("restore-error")).toHaveTextContent("false");
+    expect(screen.getByTestId("token")).toHaveTextContent("none");
+    vi.useRealTimers();
+  });
+
+  it("tells a dead session from an unreachable provider", () => {
+    expect(shouldClearLocalAuthForRestoreError({ code: "session_not_found", status: 403 })).toBe(
+      true,
+    );
+    expect(shouldClearLocalAuthForRestoreError({ status: 400, message: "bad" })).toBe(true);
+    expect(
+      shouldClearLocalAuthForRestoreError({ name: "AuthRetryableFetchError", status: 0 }),
+    ).toBe(false);
+    expect(shouldClearLocalAuthForRestoreError({ status: 503 })).toBe(false);
+    expect(shouldClearLocalAuthForRestoreError({ status: 429 })).toBe(false);
+    expect(shouldClearLocalAuthForRestoreError(new TypeError("Network request failed"))).toBe(
+      false,
+    );
   });
 
   it("releases startup into recovery when the stored session restore hangs", async () => {

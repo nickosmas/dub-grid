@@ -7,9 +7,9 @@ export function EmailChangeEmail({ logoUrl }: { logoUrl?: string } = {}) {
   return (
     <AuthActionEmail
       heading="Confirm your email change"
-      intro="Click the button below to confirm the new email address for your account."
+      intro="Click the button below to confirm the new email address for your DubGrid sign-in."
       ctaLabel="Confirm change"
-      footer="If you didn't request this change, please contact your administrator."
+      footer="If you didn't request this change, don't confirm it. Contact support@dubgrid.com if you think someone else is using your sign-in."
       logoUrl={logoUrl}
     />
   );

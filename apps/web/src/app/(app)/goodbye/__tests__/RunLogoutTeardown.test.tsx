@@ -144,6 +144,29 @@ describe("RunLogoutTeardown", () => {
     expect(mockSignOutFromBrowser).toHaveBeenCalledOnce();
   });
 
+  it("still revokes the session when logout cleanup never settles", async () => {
+    vi.useFakeTimers();
+    try {
+      mockClearLogoutCleanup.mockReturnValue(new Promise(() => undefined));
+      renderWithClient(<RunLogoutTeardown scope="local" />);
+
+      await vi.advanceTimersByTimeAsync(3_100);
+
+      expect(mockSignOutFromBrowser).toHaveBeenCalledWith("local");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("still revokes the session when an earlier teardown step throws", async () => {
+    mockClearImpersonationCookie.mockImplementationOnce(() => {
+      throw new Error("cookie store unavailable");
+    });
+    renderWithClient(<RunLogoutTeardown scope="global" />);
+
+    await waitFor(() => expect(mockSignOutFromBrowser).toHaveBeenCalledWith("global"));
+  });
+
   it("short-circuits when scope is null (direct /goodbye visit)", async () => {
     renderWithClient(<RunLogoutTeardown scope={null} />);
 

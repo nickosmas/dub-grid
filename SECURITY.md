@@ -51,7 +51,7 @@ All limiters are Upstash Redis sliding-window, fail-closed in production. Define
 | `loginSurgeLimiter`     | 500   | 10 sec | global            | `/api/auth/login`, mobile login (load shedding)                 |
 | `passwordResetLimiter`  | 5     | 15 min | target email hash | `/api/auth/recovery-request`, mobile recovery, gridmaster reset |
 | `recoverySurgeLimiter`  | 100   | 10 sec | global            | recovery requests                                               |
-| `inviteLimiter`         | 100   | 1 hour | user ID           | `/api/send-invite-email`                                        |
+| `inviteLimiter`         | 100   | 1 hour | user ID           | `/api/organizations/invitations/create`                         |
 | `emailTargetLimiter`    | 5     | 1 hour | target email hash | invite + password-reset (per-recipient flooding guard)          |
 | `demoLimiter`           | 3     | 1 hour | IP                | `/api/request-demo`                                             |
 | `apiLimiter`            | 10    | 10 sec | user ID or IP     | most mutating API routes, MFA lifecycle                         |

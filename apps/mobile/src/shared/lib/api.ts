@@ -141,7 +141,7 @@ export async function mobileApiRequest<T>(
       headers,
     },
     parse,
-    true,
+    accessToken,
   );
 }
 
@@ -161,16 +161,18 @@ async function mobilePublicApiRequest<T>(
       headers,
     },
     parse,
-    false,
+    null,
   );
 }
 
+/** `requestToken` is the bearer this request carried, or null for a public call. */
 async function mobileRequest<T>(
   path: string,
   init: RequestInit,
   parse: (value: unknown) => T,
-  handleAuthFailure: boolean,
+  requestToken: string | null,
 ): Promise<T> {
+  const handleAuthFailure = requestToken !== null;
   const measurementRequestKind = getAuthEntryRequestKind(path);
   const measurementStartedAt = globalThis.performance?.now() ?? Date.now();
   let serverTiming: string | null = null;
@@ -198,8 +200,9 @@ async function mobileRequest<T>(
       parse,
       handleAuthFailure,
       onAuthFailure: async () => {
-        const { handleExpiredMobileSession } = await import("./auth-reset");
-        await handleExpiredMobileSession();
+        if (!requestToken) return;
+        const { handleRejectedMobileToken } = await import("./auth-reset");
+        await handleRejectedMobileToken(requestToken);
       },
       onTransportErrorMessage: createMobileTransportErrorMessage,
       onNonJsonErrorMessage: createNonJsonApiErrorMessage,
@@ -507,6 +510,33 @@ export function requireMobileCredentialAssurance(accessToken: string) {
   );
 }
 
+export type MobileSignOutScope = "local" | "others" | "global";
+
+/**
+ * Records the revocation in DubGrid before the device drops its tokens: API
+ * routes verify tokens locally, so a provider sign-out alone leaves a copied
+ * access token working until it expires. A 401 here never starts a session
+ * teardown, because the caller is already signing out.
+ */
+export function signOutMobileSessions(
+  accessToken: string,
+  body: { scope: MobileSignOutScope; reason?: "password_recovery" },
+) {
+  const init: RequestInit = { method: "POST", body: JSON.stringify(body) };
+  return mobileRequest(
+    "/api/mobile/v1/auth/sign-out",
+    {
+      ...init,
+      headers: createHeaders(init, {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      }),
+    },
+    (value) => mfaMutationResponseSchema.parse(value),
+    null,
+  );
+}
+
 export function getProfileChangeRequests(accessToken: string, signal?: AbortSignal) {
   return mobileApiRequest(
     "/api/mobile/v1/profile/change-requests",
@@ -723,6 +753,24 @@ export async function verifyMobileTotpFactor(input: {
   }
 
   return mapSupabaseSessionToMobileAuthSession(refreshData.session);
+}
+
+/**
+ * Records that a two-factor sign-in finished. Best-effort, and a 401 never
+ * starts a teardown: the sign-in itself has already succeeded.
+ */
+export async function recordMobileSignInCompleted(accessToken: string): Promise<void> {
+  const init: RequestInit = { method: "POST" };
+  try {
+    await mobileRequest(
+      "/api/mobile/v1/auth/sign-in-complete",
+      { ...init, headers: createHeaders(init, { Authorization: `Bearer ${accessToken}` }) },
+      (value) => mfaMutationResponseSchema.parse(value),
+      null,
+    );
+  } catch {
+    // Audit only.
+  }
 }
 
 export function registerMobileSessionPresence(accessToken: string): Promise<{ success: true }> {

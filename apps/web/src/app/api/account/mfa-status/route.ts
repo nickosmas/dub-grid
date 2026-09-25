@@ -6,7 +6,7 @@ import { createRequestSupabaseClient, requireAuthenticatedUser } from "@/lib/api
 import { validateCsrfOrigin } from "@/lib/csrf";
 import logger from "@/lib/logger";
 import { API_ERRORS } from "@dubgrid/client-errors";
-import { dispatchNotificationEvent } from "@/features/notifications/server/events";
+import { scheduleSecurityAlert } from "@/features/account/server/security-alerts";
 import { getServiceClient } from "@/lib/supabase-service";
 
 const mfaStatusSchema = z.object({
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     const profile = await updateSelfMfaStatus(auth.user.id, enabled);
 
     if (wasEnabled !== enabled) {
-      void dispatchNotificationEvent(auth.user.id, {
+      scheduleSecurityAlert(auth.user.id, {
         action: "security_mfa_changed",
         orgId: (priorProfile?.org_id as string | null) ?? null,
         targetUserId: auth.user.id,

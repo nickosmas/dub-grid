@@ -91,6 +91,29 @@ vi.mock("@/features/account/client", () => ({
   signOutFromBrowser: mocks.signOutFromBrowser,
 }));
 vi.mock("@/features/organization/client", () => ({ acceptInvitation: mocks.acceptInvitation }));
+vi.mock("@/components/profile/MFAVerify", () => ({
+  MFAVerify: ({ onVerified, onCancel }: { onVerified: () => void; onCancel: () => void }) => (
+    <section>
+      <h1>Two-factor verification</h1>
+      <button onClick={onVerified}>Verify code</button>
+      <button onClick={onCancel}>Back to sign in</button>
+    </section>
+  ),
+}));
+
+function requestError(status: number, code: string | null, message = "Request failed") {
+  return Object.assign(new Error(message), { status, code });
+}
+
+async function submitNewPassword() {
+  await screen.findByText("Calm Haven");
+  fireEvent.change(screen.getByLabelText("Password"), { target: { value: "strong-password" } });
+  fireEvent.change(screen.getByLabelText("Confirm password"), {
+    target: { value: "strong-password" },
+  });
+  fireEvent.click(screen.getByRole("checkbox"));
+  fireEvent.click(screen.getByRole("button", { name: "Set Password & Accept" }));
+}
 
 function setLocation(search: string) {
   Object.defineProperty(window, "location", {
@@ -168,7 +191,7 @@ describe("AcceptInvitePage", () => {
 
   it("returns to a usable form when invitation acceptance fails", async () => {
     setLocation("?token=invite-token&email=new.user%40example.com");
-    mocks.acceptInvitation.mockRejectedValue(new Error("Invitation expired"));
+    mocks.acceptInvitation.mockRejectedValue(requestError(404, "INVITATION_INVALID"));
     render(<AcceptInvitePage />);
 
     await screen.findByText("Calm Haven");
@@ -182,5 +205,94 @@ describe("AcceptInvitePage", () => {
     expect(await screen.findByText(/invitation is no longer valid/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Set Password & Accept" })).not.toBeDisabled();
     expect(mocks.signOutFromBrowser).not.toHaveBeenCalled();
+  });
+
+  it("challenges an account with a second factor, then accepts on the promoted session", async () => {
+    setLocation("?token=invite-token&email=enrolled%40example.com");
+    mocks.registerInvitedUser.mockResolvedValue({ status: "existing" });
+    mocks.acceptInvitation
+      .mockRejectedValueOnce(requestError(403, "STEP_UP_REQUIRED", "Confirm your identity"))
+      .mockResolvedValueOnce({ orgSlug: "calm-haven" });
+    render(<AcceptInvitePage />);
+
+    await submitNewPassword();
+
+    expect(await screen.findByRole("heading", { name: "Two-factor verification" })).toBeVisible();
+    expect(screen.queryByText(/no longer valid/i)).not.toBeInTheDocument();
+    expect(mocks.signOutFromBrowser).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Verify code" }));
+
+    expect(await screen.findByRole("heading", { name: "You're all set" })).toBeInTheDocument();
+    expect(mocks.acceptInvitation).toHaveBeenCalledTimes(2);
+    expect(mocks.signOutFromBrowser).toHaveBeenCalledWith("global");
+  });
+
+  it("drops the password-only session when the invitee backs out of the challenge", async () => {
+    setLocation("?token=invite-token&email=enrolled%40example.com");
+    mocks.registerInvitedUser.mockResolvedValue({ status: "existing" });
+    mocks.acceptInvitation.mockRejectedValue(requestError(403, "STEP_UP_REQUIRED"));
+    render(<AcceptInvitePage />);
+
+    await submitNewPassword();
+    fireEvent.click(await screen.findByRole("button", { name: "Back to sign in" }));
+
+    expect(await screen.findByRole("heading", { name: "Accept invitation" })).toBeInTheDocument();
+    expect(mocks.signOutFromBrowser).toHaveBeenCalledWith("local");
+  });
+
+  it("does not call a transient failure a dead invitation", async () => {
+    setLocation("?token=invite-token&email=new.user%40example.com");
+    mocks.acceptInvitation.mockRejectedValue(requestError(503, null));
+    render(<AcceptInvitePage />);
+
+    await submitNewPassword();
+
+    expect(await screen.findByText(/couldn't accept your invitation just now/i)).toBeVisible();
+    expect(screen.queryByText(/no longer valid/i)).not.toBeInTheDocument();
+  });
+
+  it("does not claim an account was created for an existing account's dead link", async () => {
+    setLocation("?token=invite-token&email=existing%40example.com");
+    mocks.registerInvitedUser.mockResolvedValue({ status: "existing" });
+    mocks.acceptInvitation.mockRejectedValue(requestError(404, "INVITATION_INVALID"));
+    render(<AcceptInvitePage />);
+
+    await submitNewPassword();
+
+    expect(await screen.findByText(/invitation is no longer valid/i)).toBeVisible();
+    expect(screen.queryByText(/account was created/i)).not.toBeInTheDocument();
+  });
+
+  it("never shows the form for a dead link", async () => {
+    setLocation("?token=dead-token&email=someone%40example.com");
+    mocks.fetchInvitationLookup.mockRejectedValue(requestError(404, "INVITATION_INVALID"));
+    render(<AcceptInvitePage />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Invitation no longer valid" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Go to login" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+  });
+
+  it("holds the form back until the lookup has answered", async () => {
+    setLocation("?token=invite-token&email=new.user%40example.com");
+    mocks.fetchInvitationLookup.mockReturnValue(new Promise(() => undefined));
+    render(<AcceptInvitePage />);
+
+    expect(await screen.findByRole("heading", { name: "Loading" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+  });
+
+  it("still shows the form when the lookup itself fails", async () => {
+    setLocation("?token=invite-token&email=new.user%40example.com");
+    mocks.fetchInvitationLookup.mockRejectedValue(requestError(503, null));
+    render(<AcceptInvitePage />);
+
+    expect(await screen.findByLabelText("Password")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Invitation no longer valid" }),
+    ).not.toBeInTheDocument();
   });
 });

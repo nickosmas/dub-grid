@@ -13,7 +13,11 @@ import {
   updateEmployee,
 } from "@/features/employees/client";
 import { toast } from "sonner";
-import { createOrganizationInvitation } from "@/features/organization/client";
+import {
+  createOrganizationInvitation,
+  resendInvitation,
+  revokeInvitation,
+} from "@/features/organization/client";
 import { fetchRecurringShifts } from "@/features/schedule/client";
 import { getProfileOverviewDateRange } from "@/features/account/shared/profile-schedule";
 
@@ -90,6 +94,7 @@ vi.mock("@/features/employees/client", () => {
 });
 
 vi.mock("@/features/organization/client", () => ({
+  resendInvitation: vi.fn(),
   revokeInvitation: vi.fn(),
   updateOrganizationMembershipGuarded: vi.fn(),
   createOrganizationInvitation: vi.fn(),
@@ -382,6 +387,24 @@ describe("StaffDetailPage", () => {
     expect(screen.queryByRole("button", { name: "Edit profile" })).not.toBeInTheDocument();
   });
 
+  it("reissues a pending invitation in place instead of revoking it and inviting again", async () => {
+    vi.mocked(resendInvitation).mockResolvedValue({
+      token: "rotated-token",
+      expiresAt: "2099-01-04T00:00:00.000Z",
+    });
+    render(<StaffDetailPage employeeId="emp-1" />);
+    await screen.findByText("Work details");
+
+    fireEvent.click(screen.getByRole("button", { name: "Reinvite" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Reissue" }));
+
+    await waitFor(() => {
+      expect(resendInvitation).toHaveBeenCalledWith("invite-1", "org-1");
+    });
+    expect(revokeInvitation).not.toHaveBeenCalled();
+    expect(screen.queryByText("Invite employee modal")).not.toBeInTheDocument();
+  });
+
   it("still exposes management tools for super admins", async () => {
     mockUsePermissions.mockReturnValue({
       canViewEmployeeDetails: true,
@@ -621,7 +644,6 @@ describe("StaffDetailPage", () => {
   it("saving with the reinvite confirmation creates and sends a new invitation with the old one's role and departments", async () => {
     mockedCreateOrganizationInvitation.mockResolvedValue({
       invitationId: "invite-2",
-      token: "fresh-token",
       expiresAt: "2099-01-01T00:00:00.000Z",
     });
     vi.stubGlobal(

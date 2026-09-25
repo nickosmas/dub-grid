@@ -8,6 +8,7 @@ import {
   EmployeeContactLookupError,
 } from "@/features/employees/server/contact-conflicts";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { retryAfterSeconds } from "@/lib/retry-after";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import logger from "@/lib/logger";
 import { validateCsrfOrigin } from "@/lib/csrf";
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
   if (limited) {
     return NextResponse.json(
       { error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+      { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
     );
   }
 

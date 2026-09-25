@@ -8,6 +8,7 @@ import {
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { retryAfterSeconds } from "@/lib/retry-after";
 import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { getServiceClient } from "@/lib/supabase-service";
 import { canManageEmployees } from "@/app/api/employees/shared";
@@ -68,7 +69,7 @@ export async function PATCH(req: NextRequest) {
   if (limited) {
     return NextResponse.json(
       { error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+      { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
     );
   }
 

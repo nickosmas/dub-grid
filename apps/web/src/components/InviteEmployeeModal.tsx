@@ -38,7 +38,6 @@ interface InviteEmployeeModalProps {
   /** Employee to invite. When null, operates in management staff mode (no employee link). */
   employee: Employee | null;
   orgId: string;
-  orgName: string;
   onClose: () => void;
   onInvited: (updatedEmployee?: Employee | null) => void | Promise<void>;
   /** Available departments (for management staff mode). Accepts NamedItem[] or Department[]. */
@@ -51,7 +50,6 @@ interface InviteEmployeeModalProps {
 export default function InviteEmployeeModal({
   employee,
   orgId,
-  orgName,
   onClose,
   onInvited,
   departments = [],
@@ -241,7 +239,8 @@ export default function InviteEmployeeModal({
     setError(null);
 
     try {
-      const { token } = await createOrganizationInvitation({
+      // Creates the invitation and sends its email in one request.
+      await createOrganizationInvitation({
         email: trimmedEmail,
         role,
         orgId,
@@ -251,33 +250,6 @@ export default function InviteEmployeeModal({
         phone: isManagementInvite ? normalizeOptionalUsPhone(phone) || undefined : undefined,
         departmentIds: isManagementInvite && departmentIds.length > 0 ? departmentIds : undefined,
       });
-
-      // Send the invitation email
-      const res = await fetch("/api/send-invite-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, email: trimmedEmail, orgName }),
-      });
-      if (!res.ok) {
-        // Invitation was saved to DB but email failed — tell the user clearly
-        const text = await res.text().catch(() => "");
-        let detail = "We couldn't send the invitation email.";
-        try {
-          detail = formatClientErrorMessage(
-            JSON.parse(text).error,
-            "We couldn't send the invitation email.",
-          );
-        } catch {
-          /* non-JSON response */
-        }
-        throw new Error(`Invitation was created, but ${detail}`);
-      }
-      const data = await res.json();
-      if (!data.success) {
-        throw new Error(
-          formatClientErrorMessage(data.error, "We couldn't send the invitation email."),
-        );
-      }
 
       toast.success(`Invitation email sent to ${trimmedEmail}`);
       setSent(true);

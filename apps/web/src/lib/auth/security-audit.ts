@@ -6,9 +6,10 @@ import { withTimeoutOrThrow } from "@/lib/with-timeout";
 export type SecurityEventName =
   "security.auth.login" | "security.auth.recovery" | "security.auth.mfa" | "security.auth.session";
 
-export type SecurityEventOutcome = "succeeded" | "rejected" | "throttled" | "failed";
+export type SecurityEventOutcome = "succeeded" | "challenged" | "rejected" | "throttled" | "failed";
 export type SecurityEventReason =
   | "accepted"
+  | "second_factor_required"
   | "invalid_credentials"
   | "policy_denied"
   | "rate_limited"

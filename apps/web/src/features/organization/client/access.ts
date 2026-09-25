@@ -10,6 +10,7 @@ import type {
 } from "@/types";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import type { OrganizationSettingsEditable } from "@/lib/organization-settings";
+import { OrganizationRequestError } from "./api";
 
 export interface UpdateOrganizationSettingsInput extends Partial<OrganizationSettingsEditable> {
   orgId: string;
@@ -23,7 +24,6 @@ interface ErrorBody {
   invitation?: Invitation;
   token?: string;
   expiresAt?: string;
-  previousInvitationId?: string;
 }
 
 export class OrganizationAccessConflictError extends Error {
@@ -126,7 +126,12 @@ async function requestOrganizationJson<T>(input: string, init?: RequestInit): Pr
     : null;
 
   if (!response.ok) {
-    throw new Error(formatClientErrorMessage(body?.error, "Organization request failed."));
+    throw new OrganizationRequestError(
+      formatClientErrorMessage(body?.error, "Organization request failed."),
+      response.status,
+      null,
+      typeof body?.code === "string" ? body.code : null,
+    );
   }
 
   return body as T;
@@ -179,7 +184,9 @@ export async function createOrganizationInvitation(input: {
   phone?: string;
   departmentIds?: number[];
   deptAdminIds?: number[];
-}): Promise<{ invitationId: string; token: string; expiresAt: string }> {
+}): Promise<{ invitationId: string; expiresAt: string; resent?: boolean }> {
+  // Creates the invitation and sends its email in one request; a failed send
+  // throws, and nothing is left behind.
   return requestOrganizationJson("/api/organizations/invitations/create", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -388,10 +395,7 @@ export async function replaceOrganizationInvitationAccessGuarded(input: {
   invitationId: string;
   expectedUpdatedAt: string;
   roleToAssign: OrganizationRole;
-}): Promise<{
-  previousInvitationId: string;
-  invitation: Invitation;
-}> {
+}): Promise<{ invitation: Invitation }> {
   const response = await fetch(resolveClientUrl("/api/organizations/invitations"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -404,14 +408,11 @@ export async function replaceOrganizationInvitationAccessGuarded(input: {
     throw new InvitationAccessConflictError(body.invitation);
   }
 
-  if (!response.ok || !body?.invitation || !body.previousInvitationId) {
+  if (!response.ok || !body?.invitation) {
     throw new Error(getErrorMessage(body, "We couldn't replace that invitation. Try again."));
   }
 
-  return {
-    previousInvitationId: body.previousInvitationId,
-    invitation: body.invitation,
-  };
+  return { invitation: body.invitation };
 }
 
 export async function revokeInvitation(invitationId: string, orgId: string): Promise<void> {

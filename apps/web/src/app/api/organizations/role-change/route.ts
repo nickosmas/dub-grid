@@ -6,6 +6,7 @@ import { getServiceClient } from "@/lib/supabase-service";
 import { isOrgSuperAdminOrGridmaster } from "@/app/api/employees/shared";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { retryAfterSeconds } from "@/lib/retry-after";
 import { apiErrorResponse } from "@/lib/error-handling";
 import { SELF_ACTION_FORBIDDEN_CODE, SELF_ACTION_FORBIDDEN_MESSAGE } from "@dubgrid/domain";
 import { API_ERRORS } from "@dubgrid/client-errors";
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
     if (limited) {
       return NextResponse.json(
         { error: "Too many requests" },
-        { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+        { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
       );
     }
 

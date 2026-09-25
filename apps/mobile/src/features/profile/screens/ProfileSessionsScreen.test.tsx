@@ -5,11 +5,12 @@ import { createReactNativeModule, createScreenModule } from "../../../test/nativ
 const useQuery = vi.fn();
 const useMutation = vi.fn();
 const useAccessToken = vi.fn();
-const getSupabaseClient = vi.fn();
 const handleExpiredMobileSession = vi.fn();
 const disablePushForCurrentDevice = vi.fn();
 const pushToast = vi.fn();
 const stepUpRun = vi.fn();
+const requireMobileCredentialAssurance = vi.fn();
+const signOutMobileSessions = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
@@ -35,17 +36,15 @@ vi.mock("../../auth/hooks/useAccessToken", () => ({
 
 vi.mock("../../../shared/lib/api", () => ({
   getProfileSessions: vi.fn(),
+  requireMobileCredentialAssurance,
   revokeProfileSession: vi.fn(),
+  signOutMobileSessions,
 }));
 
 vi.mock("../../../shared/lib/env", () => ({
   getMobileEnvConfig: () => ({
     apiBaseUrl: "https://app.dubgrid.com",
   }),
-}));
-
-vi.mock("../../../shared/lib/supabase", () => ({
-  getSupabaseClient,
 }));
 
 vi.mock("../../../shared/lib/auth-reset", () => ({
@@ -121,11 +120,12 @@ describe("ProfileSessionsScreen", () => {
     useQuery.mockReset();
     useMutation.mockReset();
     useAccessToken.mockReset();
-    getSupabaseClient.mockReset();
     handleExpiredMobileSession.mockReset();
     disablePushForCurrentDevice.mockReset();
     disablePushForCurrentDevice.mockResolvedValue(undefined);
     pushToast.mockReset();
+    requireMobileCredentialAssurance.mockReset().mockResolvedValue({ success: true });
+    signOutMobileSessions.mockReset().mockResolvedValue({ success: true });
     stepUpRun.mockReset().mockImplementation(async (action) => {
       await action("fresh-token");
       return true;
@@ -208,8 +208,6 @@ describe("ProfileSessionsScreen", () => {
   });
 
   it("puts the two bulk sign-outs in a sheet that explains the difference", async () => {
-    const signOut = vi.fn().mockResolvedValue({ error: null });
-    getSupabaseClient.mockReturnValue({ auth: { signOut } } as never);
     handleExpiredMobileSession.mockResolvedValue(undefined);
 
     render(<ProfileSessionsScreen />);
@@ -234,15 +232,14 @@ describe("ProfileSessionsScreen", () => {
     await waitFor(() => {
       // Pushes off first, while this device's token is still valid.
       expect(disablePushForCurrentDevice).toHaveBeenCalled();
-      expect(signOut).toHaveBeenCalledWith({ scope: "global" });
-      expect(handleExpiredMobileSession).toHaveBeenCalledWith({ skipSignOut: true });
+      expect(signOutMobileSessions).toHaveBeenCalledWith("fresh-token", { scope: "global" });
+      expect(handleExpiredMobileSession).toHaveBeenCalledWith();
     });
+    expect(requireMobileCredentialAssurance).toHaveBeenCalledWith("fresh-token");
+    expect(stepUpRun).toHaveBeenCalledTimes(1);
   });
 
   it("signs out other devices without tearing down this one", async () => {
-    const signOut = vi.fn().mockResolvedValue({ error: null });
-    getSupabaseClient.mockReturnValue({ auth: { signOut } } as never);
-
     render(<ProfileSessionsScreen />);
 
     fireEvent.click(screen.getByRole("button", { name: "Sign out devices" }));
@@ -253,8 +250,25 @@ describe("ProfileSessionsScreen", () => {
     });
 
     await waitFor(() => {
-      expect(signOut).toHaveBeenCalledWith({ scope: "others" });
+      expect(signOutMobileSessions).toHaveBeenCalledWith("fresh-token", { scope: "others" });
     });
+    expect(disablePushForCurrentDevice).not.toHaveBeenCalled();
+    expect(handleExpiredMobileSession).not.toHaveBeenCalled();
+  });
+
+  it("changes nothing when a bulk sign-out's identity confirmation is cancelled", async () => {
+    stepUpRun.mockResolvedValue(false);
+
+    render(<ProfileSessionsScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out devices" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign out everywhere" }));
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Sign out" }));
+    });
+
+    await waitFor(() => expect(stepUpRun).toHaveBeenCalled());
+    expect(signOutMobileSessions).not.toHaveBeenCalled();
     expect(disablePushForCurrentDevice).not.toHaveBeenCalled();
     expect(handleExpiredMobileSession).not.toHaveBeenCalled();
   });

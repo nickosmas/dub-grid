@@ -5,6 +5,8 @@ import { useBootstrap } from "../../features/auth/hooks/useBootstrap";
 import { authEntryRecorder } from "../../features/auth/lib/auth-entry-measurement";
 import { useHasSeenOnboarding } from "../../features/auth/hooks/useHasSeenOnboarding";
 import { useSessionState } from "../providers/AuthSessionProvider";
+import { useAppLockState } from "../providers/AppLockProvider";
+import { appLockUnsupported } from "../lib/app-lock";
 import { AppSplashScreen } from "./AppSplashScreen";
 
 /**
@@ -33,6 +35,7 @@ export function StartupSplashGate({ children }: PropsWithChildren) {
   const { accessToken, isLoading: isSessionLoading } = useSessionState();
   const bootstrapQuery = useBootstrap(accessToken);
   const onboardingQuery = useHasSeenOnboarding();
+  const lockState = useAppLockState();
   const [minimumElapsed, setMinimumElapsed] = useState(false);
   const [bootstrapBudgetElapsed, setBootstrapBudgetElapsed] = useState(false);
 
@@ -82,6 +85,8 @@ export function StartupSplashGate({ children }: PropsWithChildren) {
     minimumElapsed &&
     !isSessionLoading &&
     !onboardingQuery.isLoading &&
+    // The app lock's setting must be known before a signed-in app shows.
+    !(Boolean(accessToken) && !appLockUnsupported && lockState === "loading") &&
     !(
       Boolean(accessToken) &&
       bootstrapQuery.isLoading &&

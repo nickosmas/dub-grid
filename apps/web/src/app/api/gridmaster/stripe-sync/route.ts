@@ -4,6 +4,7 @@ import { API_ERRORS } from "@dubgrid/client-errors";
 import { requireGridmasterSession } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { retryAfterSeconds } from "@/lib/retry-after";
 import { syncSubscriptionToDb } from "@/lib/stripe";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
@@ -46,9 +47,7 @@ export async function POST(req: NextRequest) {
       {
         status: 429,
         headers: {
-          "Retry-After": String(
-            Math.max(1, Math.ceil(((reset ?? Date.now()) - Date.now()) / 1000)),
-          ),
+          "Retry-After": String(retryAfterSeconds(reset)),
         },
       },
     );

@@ -7,15 +7,32 @@ import {
 import { z } from "zod";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { forbidIfSandboxCookie, requireAuthenticatedUser } from "@/lib/api-auth";
-import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
+import {
+  apiLimiter,
+  checkRateLimit,
+  emailTargetLimiter,
+  hashEmail,
+  inviteLimiter,
+} from "@/lib/rate-limit";
+import { retryAfterSeconds } from "@/lib/retry-after";
 import { getServiceClient } from "@/lib/supabase-service";
-import { canManageEmployees, isOrgSuperAdminOrGridmaster } from "@/app/api/employees/shared";
+import { canAssignOrgRole, canManageEmployees } from "@/app/api/employees/shared";
+import { writeInvitationAuditEntry } from "@/lib/audit/invitation";
+import { getRequestIp } from "@/features/mobile/server/management-roster";
 import type { AssignableOrganizationRole } from "@/types";
 import { buildStaffValidationErrorResponse, getStaffFieldErrors } from "@/lib/staff-validation";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import logger from "@/lib/logger";
 import { INVITATION_LIFETIME_MS } from "@/lib/auth/invitation-capability";
+import {
+  createInvitationEmailUnavailableResponse,
+  getInvitationEmailConfig,
+} from "@/features/mobile/server/invitation-email";
+import {
+  isEmailNotConfigured,
+  sendPendingInvitationEmail,
+} from "@/features/organization/server/invitation-delivery";
 
 const postSchema = z.object({
   email: z.string().trim().email(),
@@ -33,7 +50,27 @@ type RefreshedInvitation = {
   invitationId: string;
   token: string;
   expiresAt: string;
+  previousToken: string;
+  previousExpiresAt: string;
 };
+
+// Creating an invitation and emailing it are one operation (finding F-10).
+// They used to be two calls from the browser, so a failed or abandoned second
+// call left a live invitation that nobody had received.
+function deliveryFailedResponse(error: unknown, existing: boolean) {
+  logger.error({ error }, "invitation email could not be sent");
+  if (isEmailNotConfigured(error)) {
+    return NextResponse.json({ error: "Email service not configured" }, { status: 503 });
+  }
+  return NextResponse.json(
+    {
+      error: existing
+        ? "We couldn't send the invitation email. Their existing invitation is unchanged. Try again in a moment."
+        : "We couldn't send the invitation email, so the invitation wasn't created. Try again in a moment.",
+    },
+    { status: 502 },
+  );
+}
 
 /**
  * When the RPC reports an already-pending invite for this email, the row is often an
@@ -50,29 +87,53 @@ type RefreshedInvitation = {
  * fresh one — the caller believes it just invited person A, but the row (and whoever
  * accepts it) is actually still person B. Returns null if no matching pending row is found
  * (let the original "already exists" error surface instead).
+ *
+ * Refreshed only when it grants the access asked for. Otherwise a request to
+ * invite someone as a User would re-send a pending Super Admin link and
+ * report success (finding F-30); "different-access" sends the caller to the
+ * existing invitation instead.
  */
 async function refreshPendingInvitation(
   serviceClient: ReturnType<typeof getServiceClient>,
   orgId: string,
   email: string,
   employeeId: string | null,
-): Promise<RefreshedInvitation | null> {
-  const token = crypto.randomUUID();
-  const expiresAt = new Date(Date.now() + INVITATION_LIFETIME_MS).toISOString();
-
-  const baseQuery = serviceClient
+  requested: { role: string; departmentIds: number[]; deptAdminIds: number[] },
+): Promise<RefreshedInvitation | "different-access" | null> {
+  const pending = serviceClient
     .from("invitations")
-    .update({ token, expires_at: expiresAt, revoked_at: null })
+    .select("id, token, expires_at, role_to_assign, department_ids, dept_admin_ids")
     .eq("org_id", orgId)
     .ilike("email", email)
     .is("accepted_at", null)
     .is("revoked_at", null)
     .gte("expires_at", new Date().toISOString());
-  const scopedQuery = employeeId
-    ? baseQuery.eq("employee_id", employeeId)
-    : baseQuery.is("employee_id", null);
+  const { data: current, error: currentError } = await (
+    employeeId ? pending.eq("employee_id", employeeId) : pending.is("employee_id", null)
+  ).maybeSingle();
+  if (currentError) throw currentError;
+  if (!current) return null;
+  if (
+    current.role_to_assign !== requested.role ||
+    !sameIds(current.department_ids as number[] | null, requested.departmentIds) ||
+    !sameIds(current.dept_admin_ids as number[] | null, requested.deptAdminIds)
+  ) {
+    return "different-access";
+  }
 
-  const { data, error } = await scopedQuery.select("id, token, expires_at").maybeSingle();
+  // Rotated only while it still carries the token just read, so a concurrent
+  // change wins, and the previous pair comes back for a failed send to restore.
+  const token = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + INVITATION_LIFETIME_MS).toISOString();
+  const { data, error } = await serviceClient
+    .from("invitations")
+    .update({ token, expires_at: expiresAt })
+    .eq("id", current.id)
+    .eq("token", current.token)
+    .is("accepted_at", null)
+    .is("revoked_at", null)
+    .select("id, token, expires_at")
+    .maybeSingle();
 
   if (error) throw error;
   if (!data) return null;
@@ -81,7 +142,29 @@ async function refreshPendingInvitation(
     invitationId: data.id as string,
     token: data.token as string,
     expiresAt: data.expires_at as string,
+    previousToken: current.token as string,
+    previousExpiresAt: current.expires_at as string,
   };
+}
+
+function sameIds(stored: number[] | null, requested: number[]): boolean {
+  const a = [...new Set((stored ?? []).map(Number))].sort((x, y) => x - y);
+  const b = [...new Set(requested)].sort((x, y) => x - y);
+  return a.length === b.length && a.every((id, index) => id === b[index]);
+}
+
+async function restoreRefreshedInvitation(
+  serviceClient: ReturnType<typeof getServiceClient>,
+  refreshed: RefreshedInvitation,
+) {
+  const { error } = await serviceClient
+    .from("invitations")
+    .update({ token: refreshed.previousToken, expires_at: refreshed.previousExpiresAt })
+    .eq("id", refreshed.invitationId)
+    .eq("token", refreshed.token);
+  if (error) {
+    logger.error({ error }, "failed to restore an invitation after its email failed");
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -102,7 +185,7 @@ export async function POST(req: NextRequest) {
   if (limited) {
     return NextResponse.json(
       { error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+      { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
     );
   }
 
@@ -130,6 +213,7 @@ export async function POST(req: NextRequest) {
     departmentIds,
     deptAdminIds,
   } = parsed.data;
+  const inviteeEmail = normalizeRequiredStaffEmail(email);
 
   try {
     const hasPermission = await canManageEmployees(serviceClient, user.id, orgId);
@@ -137,13 +221,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: API_ERRORS.CANNOT_MANAGE_EMPLOYEES }, { status: 403 });
     }
 
-    // Tier guard: only super_admin or gridmaster can hand out the super_admin
-    // role. Regular admins with canManageEmployees can still invite admin/user.
-    if (role === "super_admin") {
-      const allowed = await isOrgSuperAdminOrGridmaster(serviceClient, user.id, orgId);
-      if (!allowed) {
-        return NextResponse.json({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN }, { status: 403 });
-      }
+    // Regular admins with canManageEmployees can still invite admin/user.
+    if (!(await canAssignOrgRole(serviceClient, user.id, orgId, role))) {
+      // No invitation exists to hang this on, so the refusal is recorded
+      // against the organization with the address that was attempted.
+      await writeInvitationAuditEntry({
+        orgId,
+        actorId: user.id,
+        actorEmail: user.email ?? null,
+        action: "invitation.access_denied",
+        resourceId: orgId,
+        details: {
+          email: inviteeEmail,
+          requestedRole: role,
+          outcome: "rejected",
+          reason: "policy_denied",
+          path: "create",
+        },
+        ipAddress: getRequestIp(req),
+        userAgent: req.headers.get("user-agent"),
+      });
+      return NextResponse.json({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN }, { status: 403 });
     }
 
     const fieldErrors = getStaffFieldErrors({
@@ -156,8 +254,30 @@ export async function POST(req: NextRequest) {
       return buildStaffValidationErrorResponse(fieldErrors);
     }
 
+    // Nothing is created unless its email can go out.
+    if (!getInvitationEmailConfig()) {
+      return createInvitationEmailUnavailableResponse();
+    }
+    // The limits the separate email route used to apply: per sender, and per
+    // recipient so one inbox cannot be flooded, shared with resend.
+    for (const [limiter, key] of [
+      [inviteLimiter, user.id],
+      [emailTargetLimiter, `invite-email:${hashEmail(inviteeEmail)}`],
+    ] as const) {
+      const limit = await checkRateLimit(limiter, key);
+      if (limit.misconfigured) {
+        return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
+      }
+      if (limit.limited) {
+        return NextResponse.json(
+          { error: "Too many requests" },
+          { status: 429, headers: { "Retry-After": String(retryAfterSeconds(limit.reset)) } },
+        );
+      }
+    }
+
     const { data, error } = await serviceClient.rpc("send_invitation", {
-      p_email: normalizeRequiredStaffEmail(email),
+      p_email: inviteeEmail,
       p_role: role as AssignableOrganizationRole,
       p_org_id: orgId,
       p_employee_id: employeeId ?? null,
@@ -176,19 +296,56 @@ export async function POST(req: NextRequest) {
       p_phone: typeof phone === "string" ? normalizeOptionalUsPhone(phone) || null : null,
       p_department_ids: departmentIds ?? [],
       p_dept_admin_ids: deptAdminIds ?? [],
+      // The service client has no auth.uid(), so the inviter is stated from
+      // the authenticated session. The function verifies it holds the tier.
+      p_invited_by: user.id,
     });
     if (error) throw error;
+
+    const invitationId = data.invitation_id as string;
+    const token = data.token as string;
+    try {
+      await sendPendingInvitationEmail({ orgId, token, email: inviteeEmail });
+    } catch (sendError) {
+      // Nobody received this link, so it must not stay live.
+      const { error: removeError } = await serviceClient
+        .from("invitations")
+        .delete()
+        .eq("id", invitationId)
+        .eq("token", token)
+        .is("accepted_at", null);
+      if (removeError) {
+        logger.error({ error: removeError }, "failed to remove an invitation whose email failed");
+      }
+      return deliveryFailedResponse(sendError, false);
+    }
+
+    // The registry has carried invitation.created and the employee activity
+    // view has de-duplicated against it since before any route wrote one, so
+    // creation was the one invitation event with no audit trail of its own.
+    await writeInvitationAuditEntry({
+      orgId,
+      actorId: user.id,
+      actorEmail: user.email ?? null,
+      action: "invitation.created",
+      resourceId: invitationId,
+      details: {
+        email: inviteeEmail,
+        role,
+      },
+      ipAddress: getRequestIp(req),
+      userAgent: req.headers.get("user-agent"),
+    });
 
     void dispatchNotificationEvent(user.id, {
       action: "invitation_created",
       orgId,
-      invitationId: data.invitation_id as string,
-      inviteeEmail: normalizeRequiredStaffEmail(email),
+      invitationId,
+      inviteeEmail: inviteeEmail,
     });
 
     return NextResponse.json({
-      invitationId: data.invitation_id as string,
-      token: data.token as string,
+      invitationId,
       expiresAt: data.expires_at as string,
     });
   } catch (error) {
@@ -211,19 +368,58 @@ export async function POST(req: NextRequest) {
       );
     }
     if (text.includes("active invitation already exists")) {
-      // Don't dead-end on a still-pending row: refresh it and return it so the caller
-      // re-sends the email. This makes "retry with the same email" work after a first
-      // attempt whose email step failed (e.g. the resend_email kill switch) left an
-      // orphaned pending row behind. See refreshPendingInvitation above.
+      // Don't dead-end on a still-pending row: rotate it and send the new link,
+      // restoring the previous one if the email fails. See refreshPendingInvitation.
       try {
         const refreshed = await refreshPendingInvitation(
           serviceClient,
           orgId,
-          normalizeRequiredStaffEmail(email),
+          inviteeEmail,
           employeeId ?? null,
+          { role, departmentIds: departmentIds ?? [], deptAdminIds: deptAdminIds ?? [] },
         );
+        if (refreshed === "different-access") {
+          return NextResponse.json(
+            {
+              error:
+                "An invitation with different access is already pending for that email. Change its access from their record, or revoke it and invite them again.",
+            },
+            { status: 409 },
+          );
+        }
         if (refreshed) {
-          return NextResponse.json({ ...refreshed, resent: true });
+          try {
+            await sendPendingInvitationEmail({
+              orgId,
+              token: refreshed.token,
+              email: inviteeEmail,
+            });
+          } catch (sendError) {
+            await restoreRefreshedInvitation(serviceClient, refreshed);
+            return deliveryFailedResponse(sendError, true);
+          }
+          // This rotates the token on a pending row and the caller sends it
+          // again, so it is a re-invite and belongs in the log next to the
+          // resend action and the mobile resend, which both record one.
+          await writeInvitationAuditEntry({
+            orgId,
+            actorId: user.id,
+            actorEmail: user.email ?? null,
+            action: "invitation.resent",
+            resourceId: refreshed.invitationId,
+            details: {
+              email: inviteeEmail,
+              role,
+              reason: "refreshed_orphaned_pending",
+            },
+            ipAddress: getRequestIp(req),
+            userAgent: req.headers.get("user-agent"),
+          });
+          return NextResponse.json({
+            invitationId: refreshed.invitationId,
+            expiresAt: refreshed.expiresAt,
+            resent: true,
+          });
         }
       } catch (refreshError) {
         logger.error({ error: refreshError }, "failed to refresh pending invitation on retry");

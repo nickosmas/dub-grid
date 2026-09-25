@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ResetPasswordPage from "./page";
 
@@ -55,6 +55,50 @@ describe("ResetPasswordPage", () => {
     expect(await screen.findByRole("heading", { name: "Password updated" })).toBeInTheDocument();
   });
 
+  async function submitNewPassword() {
+    render(<ResetPasswordPage />);
+    expect(await screen.findByRole("heading", { name: "Set new password" })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("New password"), {
+      target: { value: "Str0ng!Passphrase" },
+    });
+    fireEvent.change(screen.getByLabelText("Confirm password"), {
+      target: { value: "Str0ng!Passphrase" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Reset Password" }));
+    });
+  }
+
+  // The recovery session is already cleared when revocation fails, so the old
+  // "couldn't update your password" retry could only fail again, and was false.
+  it("reports a changed password when only the revocation fails", async () => {
+    completeBrowserPasswordRecovery.mockRejectedValue(
+      new Error("Recovery session revocation failed"),
+    );
+
+    await submitNewPassword();
+
+    expect(await screen.findByRole("heading", { name: "Password updated" })).toBeInTheDocument();
+    expect(screen.getByText(/review your active sessions/i)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Set new password" })).not.toBeInTheDocument();
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("keeps the form for a definite rejection, with nothing revoked", async () => {
+    updateBrowserUserPassword.mockRejectedValue({
+      code: "same_password",
+      status: 422,
+      message: "New password should be different from the old password.",
+    });
+
+    await submitNewPassword();
+
+    expect(completeBrowserPasswordRecovery).not.toHaveBeenCalled();
+    expect(
+      screen.getByText("New password must be different from your current password."),
+    ).toBeInTheDocument();
+  });
+
   it("shows the recovery state without trying to restore a session for an invalid link", async () => {
     window.history.replaceState({}, "", "/reset-password?error=invalid_link");
 
@@ -98,7 +142,9 @@ describe("ResetPasswordPage", () => {
     expect(window.location.search).toBe("");
   });
 
-  it("settles a timed-out password update, preserves both fields, and prevents double activation", async () => {
+  // A late provider success used to leave the form up for a retry of a change
+  // that had landed, with no revocation behind it.
+  it("finishes a timed-out update once, without re-offering the form", async () => {
     let rejectUpdate: ((error: unknown) => void) | undefined;
     updateBrowserUserPassword.mockImplementation(
       () =>
@@ -122,13 +168,12 @@ describe("ResetPasswordPage", () => {
     expect(updateBrowserUserPassword).toHaveBeenCalledTimes(1);
     rejectUpdate?.(Object.assign(new Error("late"), { name: "RequestTimeoutError" }));
 
-    await waitFor(() => {
-      expect(toastError).toHaveBeenCalledWith(
-        "That took too long. Check your connection and try again.",
-      );
-    });
-    expect(screen.getByLabelText("New password")).toHaveValue("Str0ng!Passphrase");
-    expect(screen.getByLabelText("Confirm password")).toHaveValue("Str0ng!Passphrase");
-    expect(button).toBeEnabled();
+    expect(
+      await screen.findByRole("heading", { name: "Check your new password" }),
+    ).toBeInTheDocument();
+    expect(completeBrowserPasswordRecovery).toHaveBeenCalledOnce();
+    expect(updateBrowserUserPassword).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("heading", { name: "Set new password" })).not.toBeInTheDocument();
+    expect(toastError).not.toHaveBeenCalled();
   });
 });

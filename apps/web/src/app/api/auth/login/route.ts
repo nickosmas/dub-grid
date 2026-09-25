@@ -7,6 +7,7 @@ import {
   isAccountDisabledMessage,
 } from "@dubgrid/domain";
 import { checkRateLimit, loginIpLimiter, loginLimiter, loginSurgeLimiter } from "@/lib/rate-limit";
+import { retryAfterSeconds } from "@/lib/retry-after";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { createAnonClient, createTokenScopedClient } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
@@ -326,10 +327,7 @@ export async function POST(req: NextRequest) {
 
   const limited = limits.filter((limit) => limit.limited);
   if (limited.length > 0) {
-    const retryAfter = Math.max(
-      1,
-      ...limited.map((limit) => (limit.reset ? Math.ceil((limit.reset - Date.now()) / 1000) : 60)),
-    );
+    const retryAfter = Math.max(1, ...limited.map((limit) => retryAfterSeconds(limit.reset)));
     logger.warn(
       { emailHash, path: "/api/auth/login", limitCount: limited.length },
       "Login rate limited",
@@ -487,12 +485,16 @@ export async function POST(req: NextRequest) {
     res.cookies.set(SANDBOX_COOKIE_NAME, "", { path: "/", maxAge: 0 });
   }
   timer.applyTo(res.headers);
+  // A password alone is not a sign-in when a second factor is enrolled: that
+  // step is challenged, and /api/auth/login/complete records the success. The
+  // organization is the one the session ended in, after any switch.
+  const signedInClaims = didSwitchOrg ? decodeJwt(session.access_token) : claims;
   await writeSecurityAuditEvent({
     event: "security.auth.login",
-    outcome: "succeeded",
-    reason: "accepted",
+    outcome: mfaRequired ? "challenged" : "succeeded",
+    reason: mfaRequired ? "second_factor_required" : "accepted",
     actorId: data.user.id,
-    orgId: typeof claims.org_id === "string" ? claims.org_id : null,
+    orgId: typeof signedInClaims.org_id === "string" ? signedInClaims.org_id : null,
     metadata: { targetHash: emailHash, surface: "web" },
   });
   return res;

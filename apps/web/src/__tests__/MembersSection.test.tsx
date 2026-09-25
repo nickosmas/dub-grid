@@ -243,7 +243,6 @@ const baseProps: Omit<MembersSectionProps, "canManageEmployees" | "isManagementU
   roleLabel: "Roles",
   useCompactRoleCertificationLabels: true,
   orgId: "org-1",
-  orgName: "Acme",
   isSuperAdmin: false,
   isGridmaster: false,
   departments: [
@@ -751,7 +750,6 @@ describe("MembersSection — pending invitation access", () => {
     vi.mocked(replaceOrganizationInvitationAccessGuarded).mockReset();
     vi.mocked(replaceOrganizationInvitationAccessGuarded).mockResolvedValueOnce({
       invitation: replacement,
-      previousInvitationId: invitation.id,
     });
     mockDirectory = [
       makePerson({
@@ -783,10 +781,10 @@ describe("MembersSection — pending invitation access", () => {
     await user.click(within(row).getByRole("button", { name: "User" }));
     await user.click(screen.getByRole("option", { name: "Admin" }));
 
-    expect(screen.getByText("Replace invitation access?")).toBeInTheDocument();
+    expect(screen.getByText("Change invitation access?")).toBeInTheDocument();
     expect(replaceOrganizationInvitationAccessGuarded).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole("button", { name: "Revoke and resend" }));
+    await user.click(screen.getByRole("button", { name: "Change and resend" }));
     await waitFor(() =>
       expect(replaceOrganizationInvitationAccessGuarded).toHaveBeenCalledWith({
         orgId: "org-1",

@@ -88,7 +88,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     // Through the RPC, not a direct column write: `guard_org_role_change`
     // rejects the latter outright. It touches only `org_role`, so this person's
     // management departments are untouched by construction.
-    const outcome = await changeMobileMembershipOrgRole(auth.serviceClient, {
+    const outcome = await changeMobileMembershipOrgRole(auth.userClient, {
       orgId: auth.currentOrg.id,
       targetUserId: loaded.userId,
       actorUserId: auth.user.id,
@@ -182,7 +182,6 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       token: replacement.invitation.token,
       email: replacement.invitation.email,
       orgName: auth.currentOrg.name || "your organization",
-      inviterName: auth.user.email ?? null,
     });
   } catch (error) {
     logger.error(
@@ -191,8 +190,8 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     );
     await rollbackMobilePendingInvitationAccessReplacement(auth.serviceClient, {
       orgId: auth.currentOrg.id,
-      previousInvitationId: replacement.previousInvitationId,
-      replacementInvitationId: replacement.invitation.id,
+      invitationId: replacement.invitation.id,
+      ...replacement.rotation,
     }).catch((rollbackError) => {
       logger.error(
         { err: rollbackError, employeeId: id, invitationId: replacement.invitation.id },
@@ -218,8 +217,6 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       employeeId: id,
       fromRole: loaded.pendingInvitation.role_to_assign ?? "user",
       roleToAssign: orgRole,
-      previousInvitationId: replacement.previousInvitationId,
-      replacementInvitationId: replacement.invitation.id,
     },
     ip_address: getRequestIp(req),
     user_agent: req.headers?.get("user-agent") ?? null,

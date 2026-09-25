@@ -27,6 +27,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Client } from "pg";
+import { actAsAuthenticated } from "./helpers/simulated-jwt";
 
 const DB_URL =
   process.env.LOCAL_SUPABASE_DB_URL ?? "postgres://postgres:postgres@127.0.0.1:54322/postgres";
@@ -139,17 +140,16 @@ async function asUser(
   userId: string,
   orgId: string,
   orgRole: "admin" | "super_admin" | "user",
+  claims: Record<string, unknown> = {},
 ): Promise<void> {
-  const claims = JSON.stringify({
+  await actAsAuthenticated(db, {
     sub: userId,
     role: "authenticated",
-    mfa_enrolled: false,
     org_id: orgId,
     org_role: orgRole,
     platform_role: "none",
+    ...claims,
   });
-  await db.query(`SET LOCAL ROLE authenticated`);
-  await db.query(`SET LOCAL request.jwt.claims = '${claims}'`);
 }
 
 async function resetSession(): Promise<void> {

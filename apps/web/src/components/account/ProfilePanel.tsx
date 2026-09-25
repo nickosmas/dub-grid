@@ -903,7 +903,6 @@ export function ProfilePanel({
           <EmployeeManagementAccessEditor
             employee={employee}
             orgId={orgId}
-            orgName="your organization"
             managementDepartments={allManagementDepartments}
             directoryPerson={selfDirectoryPerson}
             onDirtyChange={setManagementAccessDirty}

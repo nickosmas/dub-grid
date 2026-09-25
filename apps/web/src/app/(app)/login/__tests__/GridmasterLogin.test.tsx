@@ -21,6 +21,7 @@ vi.mock("@/components/RouteGuards", () => ({
   PublicRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 vi.mock("@/features/account/client", () => ({
+  recordBrowserSignInCompleted: vi.fn().mockResolvedValue(undefined),
   refreshBrowserSession: vi.fn().mockResolvedValue(undefined),
   setBrowserSession: (...args: unknown[]) => setBrowserSession(...args),
   signOutFromBrowser: vi.fn().mockResolvedValue(undefined),

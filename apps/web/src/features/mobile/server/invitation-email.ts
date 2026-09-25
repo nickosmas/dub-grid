@@ -41,7 +41,6 @@ export async function sendInvitationEmail(input: {
   token: string | null | undefined;
   email: string;
   orgName: string;
-  inviterName?: string | null;
 }) {
   if (!input.token) {
     throw new Error("We couldn't create that invitation link. Try again.");
@@ -53,7 +52,6 @@ export async function sendInvitationEmail(input: {
   const html = await render(
     createElement(InviteEmail, {
       orgName: input.orgName,
-      inviterName: input.inviterName,
       acceptUrl,
       logoUrl: baseUrl,
     }),

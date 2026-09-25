@@ -130,52 +130,77 @@ describe.runIf(reachable)("invitation integrity (live DB)", () => {
     }
   });
 
-  it("rotates access atomically and restores only the original after delivery failure", async () => {
+  it("rotates access in place and restores the whole grant after delivery failure", async () => {
     await db.query("BEGIN");
     try {
-      const original = await db.query<{
+      // Since migration 043 the inviter is verified when the row is written,
+      // so the fixture names a real super admin of the organization.
+      const inviter = await db.query<{ user_id: string }>(
+        `SELECT user_id FROM public.organization_memberships
+          WHERE org_id = $1 AND org_role = 'super_admin' AND archived_at IS NULL
+          LIMIT 1`,
+        [orgId],
+      );
+      const inviterId = inviter.rows[0]?.user_id;
+      if (!inviterId) throw new Error("Local Supabase has no super admin to invite with");
+
+      const email = `replacement-${randomUUID()}@dubgrid.test`;
+      const original = await db.query<{ id: string; token: string; updated_at: string }>(
+        `INSERT INTO public.invitations
+           (org_id, email, role_to_assign, first_name, last_name, invited_by)
+         VALUES ($1, $2, 'user', 'Replacement', 'Invitee', $3)
+         RETURNING id, token, updated_at::text AS updated_at`,
+        [orgId, email, inviterId],
+      );
+      const row = original.rows[0]!;
+
+      const rotated = await db.query<{ result: Record<string, unknown> }>(
+        `SELECT public.replace_pending_invitation_access(
+           $1, $2, $3, 'admin', $4, NULL, NULL
+         ) AS result`,
+        [orgId, row.id, row.updated_at, inviterId],
+      );
+      const result = rotated.rows[0]!.result;
+
+      // One invitation, one identity: the row rotates rather than being replaced.
+      expect(result.invitation_id).toBe(row.id);
+      expect(result.token).not.toBe(row.token);
+      const oldTokenRows = await db.query<{ count: string }>(
+        "SELECT count(*) FROM public.invitations WHERE token = $1",
+        [row.token],
+      );
+      expect(oldTokenRows.rows[0]!.count).toBe("0");
+
+      const rollback = await db.query<{ result: { restored: boolean } }>(
+        `SELECT public.rollback_pending_invitation_access_replacement(
+           $1, $2, $3, $4, $5::timestamptz, $6, $7, $8::bigint[], $9::bigint[]
+         ) AS result`,
+        [
+          orgId,
+          row.id,
+          result.token,
+          result.previous_token,
+          result.previous_expires_at,
+          result.previous_role,
+          result.previous_invited_by,
+          result.previous_department_ids,
+          result.previous_dept_admin_ids,
+        ],
+      );
+      expect(rollback.rows[0]!.result.restored).toBe(true);
+
+      const after = await db.query<{
         id: string;
         token: string;
-        updated_at: string;
+        role: string;
+        live: boolean;
       }>(
-        `INSERT INTO public.invitations (org_id, email, role_to_assign, first_name, last_name)
-         VALUES ($1, $2, 'user', 'Replacement', 'Invitee')
-         RETURNING id, token, updated_at::text AS updated_at`,
-        [orgId, `replacement-${randomUUID()}@dubgrid.test`],
+        `SELECT id, token::text, role_to_assign::text AS role, revoked_at IS NULL AS live
+           FROM public.invitations WHERE email = $1`,
+        [email],
       );
-      const row = original.rows[0];
-      const replacement = await db.query<{ result: Record<string, string> }>(
-        `SELECT public.replace_pending_invitation_access(
-           $1, $2, $3, 'admin', NULL, NULL, NULL
-         ) AS result`,
-        [orgId, row.id, row.updated_at],
-      );
-      const replacementId = replacement.rows[0].result.invitation_id;
-
-      expect(replacement.rows[0].result.token).not.toBe(row.token);
-      const invitee = await connectAsInvitee();
-      try {
-        await expect(
-          invitee.query("SELECT public.accept_invitation($1::uuid)", [row.token]),
-        ).rejects.toThrow(/INVITATION_INVALID/);
-      } finally {
-        await invitee.end();
-      }
-
-      const rollback = await db.query<{ restored: boolean }>(
-        `SELECT public.rollback_pending_invitation_access_replacement($1, $2, $3) AS restored`,
-        [orgId, row.id, replacementId],
-      );
-      expect(rollback.rows[0].restored).toBe(true);
-
-      const states = await db.query<{ id: string; live: boolean }>(
-        `SELECT id, revoked_at IS NULL AS live
-         FROM public.invitations
-         WHERE id = ANY($1::uuid[])
-         ORDER BY id`,
-        [[row.id, replacementId]],
-      );
-      expect(states.rows.filter((state) => state.live).map((state) => state.id)).toEqual([row.id]);
+      // The invitee's original link works again and grants what it did before.
+      expect(after.rows).toEqual([{ id: row.id, token: row.token, role: "user", live: true }]);
     } finally {
       await db.query("ROLLBACK");
     }

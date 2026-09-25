@@ -114,13 +114,13 @@ export function MemberAccessControls({
           </div>
           {pendingRole && (
             <ConfirmDialog
-              title={pendingInvitationEmail ? "Replace invitation access?" : "Change role"}
+              title={pendingInvitationEmail ? "Change invitation access?" : "Change role"}
               message={
                 pendingInvitationEmail
-                  ? `Change access from ${ROLE_LABELS[orgRole] ?? orgRole} to ${ROLE_LABELS[pendingRole] ?? pendingRole}? The current invitation will be revoked and a replacement will be sent to ${pendingInvitationEmail}.`
+                  ? `Change access from ${ROLE_LABELS[orgRole] ?? orgRole} to ${ROLE_LABELS[pendingRole] ?? pendingRole}? Their current invite link stops working immediately, and a new one is sent to ${pendingInvitationEmail}.`
                   : `Change this person's role to ${ROLE_LABELS[pendingRole] ?? pendingRole}? Their access updates immediately.`
               }
-              confirmLabel={pendingInvitationEmail ? "Revoke and resend" : "Change role"}
+              confirmLabel={pendingInvitationEmail ? "Change and resend" : "Change role"}
               variant="warning"
               onCancel={() => setPendingRole(null)}
               // Awaited rather than fired into a `void` IIFE: the dialog stays

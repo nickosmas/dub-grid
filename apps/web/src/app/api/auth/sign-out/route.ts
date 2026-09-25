@@ -1,42 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateCsrfOrigin } from "@/lib/csrf";
-import { extractBearerToken, verifyAccessToken } from "@/lib/auth/verify-token";
-import {
-  revokeAllUserSessions,
-  revokeOtherUserSessions,
-  revokeSession,
-} from "@/lib/auth/revocation";
+import { extractBearerToken } from "@/lib/auth/verify-token";
 import {
   createRequestSupabaseClient,
-  createTokenScopedClient,
   requireLiveAuthenticatedSession,
   requireSensitiveActionAuth,
 } from "@/lib/api-auth";
-import * as Sentry from "@/lib/sentry";
 import { API_ERRORS } from "@dubgrid/client-errors";
-import { writeSecurityAuditEvent } from "@/lib/auth/security-audit";
+import {
+  BULK_SIGN_OUT_FAILURE_MESSAGE,
+  hasFreshRecoveryProof,
+  parseSignOutBody,
+  revokeBulkSessions,
+  revokeLocalSession,
+} from "@/lib/auth/session-sign-out";
 
 export const dynamic = "force-dynamic";
-
-const RECOVERY_PROOF_MAX_AGE_SECONDS = 15 * 60;
-
-function hasFreshRecoveryProof(claims: unknown): boolean {
-  if (!claims || typeof claims !== "object") return false;
-  const methods = (claims as { amr?: unknown }).amr;
-  if (!Array.isArray(methods)) return false;
-  const now = Math.floor(Date.now() / 1000);
-  return methods.some((entry) => {
-    if (!entry || typeof entry !== "object") return false;
-    const proof = entry as { method?: unknown; timestamp?: unknown };
-    return (
-      proof.method === "otp" &&
-      typeof proof.timestamp === "number" &&
-      Number.isSafeInteger(proof.timestamp) &&
-      proof.timestamp <= now + 60 &&
-      now - proof.timestamp <= RECOVERY_PROOF_MAX_AGE_SECONDS
-    );
-  });
-}
 
 /**
  * Marks the caller's session revoked on sign-out.
@@ -57,15 +36,13 @@ export async function POST(req: NextRequest) {
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) return csrfError;
 
-  let scope: "local" | "others" | "global" = "local";
-  let recoveryCompletion = false;
+  let body: unknown = null;
   try {
-    const body = await req.json();
-    if (body?.scope === "global" || body?.scope === "others") scope = body.scope;
-    recoveryCompletion = scope === "global" && body?.reason === "password_recovery";
+    body = await req.json();
   } catch {
     // No body is fine — "local" is the default.
   }
+  const { scope, recoveryCompletion } = parseSignOutBody(body);
 
   if (scope !== "local") {
     const auth = recoveryCompletion
@@ -82,34 +59,18 @@ export async function POST(req: NextRequest) {
       );
     }
     try {
-      // The SDK admin transport accepts the caller's JWT here, not a service
-      // credential. Use precisely the token whose assurance was just checked.
-      const token = auth.session.access_token;
-      const { error } = await createTokenScopedClient(token).auth.admin.signOut(token, scope);
-      if (error) throw new Error("Provider sign-out failed");
-      if (scope === "global") await revokeAllUserSessions(auth.user.id);
-      else await revokeOtherUserSessions(auth.user.id, auth.sessionId);
-      await writeSecurityAuditEvent({
-        event: recoveryCompletion ? "security.auth.recovery" : "security.auth.session",
-        outcome: "succeeded",
-        reason: recoveryCompletion ? "recovery_completed" : "session_revoked",
-        actorId: auth.user.id,
+      await revokeBulkSessions({
+        accessToken: auth.session.access_token,
+        userId: auth.user.id,
+        sessionId: auth.sessionId,
+        scope,
+        recoveryCompletion,
         orgId: auth.claims && typeof auth.claims.org_id === "string" ? auth.claims.org_id : null,
-        metadata: {
-          scope,
-          ...(recoveryCompletion ? { method: "otp" as const } : {}),
-        },
       });
       return NextResponse.json({ success: true }, { headers: { "Cache-Control": "no-store" } });
     } catch {
       // A partial failure is not success and must not trigger automatic replay.
-      return NextResponse.json(
-        {
-          error:
-            "We couldn't finish signing out those devices. Check your sessions before trying again.",
-        },
-        { status: 503 },
-      );
+      return NextResponse.json({ error: BULK_SIGN_OUT_FAILURE_MESSAGE }, { status: 503 });
     }
   }
 
@@ -128,18 +89,6 @@ export async function POST(req: NextRequest) {
       accessToken = null;
     }
   }
-  if (!accessToken) return NextResponse.json({ success: true });
-
-  const verified = await verifyAccessToken(accessToken);
-  if (!verified) return NextResponse.json({ success: true });
-
-  try {
-    if (verified.sessionId) {
-      await revokeSession(verified.sessionId);
-    }
-  } catch (err) {
-    Sentry.captureException(err, { extra: { context: "sign-out-revocation" } });
-  }
-
+  await revokeLocalSession(accessToken);
   return NextResponse.json({ success: true });
 }

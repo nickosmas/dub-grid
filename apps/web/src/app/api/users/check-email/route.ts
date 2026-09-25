@@ -5,6 +5,7 @@ import { getServiceClient } from "@/lib/supabase-service";
 import { findAuthUserByEmail } from "@/lib/supabase-admin-users";
 import { canManageEmployees } from "@/app/api/employees/shared";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { retryAfterSeconds } from "@/lib/retry-after";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { validateCsrfOrigin } from "@/lib/csrf";
 
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
       { error: "Too many requests" },
       {
         status: 429,
-        headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) },
+        headers: { "Retry-After": String(retryAfterSeconds(reset)) },
       },
     );
   }

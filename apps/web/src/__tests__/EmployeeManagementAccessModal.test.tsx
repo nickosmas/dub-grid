@@ -193,7 +193,6 @@ describe("EmployeeManagementAccessEditor", () => {
     updateOrganizationMembershipGuardedMock.mockResolvedValue(makeOrganizationUser());
     createOrganizationInvitationMock.mockResolvedValue({
       invitationId: "inv-1",
-      token: "token-1",
       expiresAt: "2026-12-31T00:00:00.000Z",
     });
     updateOrganizationInvitationGuardedMock.mockResolvedValue(
@@ -242,7 +241,6 @@ describe("EmployeeManagementAccessEditor", () => {
         ref={editorRef}
         employee={{ ...employee, userId: "user-1" }}
         orgId="org-1"
-        orgName="Test Org"
         managementDepartments={managementDepartments}
         onClose={onClose}
         onCompleted={onCompleted}
@@ -278,7 +276,6 @@ describe("EmployeeManagementAccessEditor", () => {
       <EmployeeManagementAccessEditor
         employee={employee}
         orgId="org-1"
-        orgName="Test Org"
         managementDepartments={managementDepartments}
         onClose={vi.fn()}
         onCompleted={vi.fn()}
@@ -302,7 +299,6 @@ describe("EmployeeManagementAccessEditor", () => {
         ref={editorRef}
         employee={employee}
         orgId="org-1"
-        orgName="Test Org"
         managementDepartments={managementDepartments}
         directoryPerson={makeDirectoryPerson({
           managementDepartmentIds: [10],
@@ -354,7 +350,6 @@ describe("EmployeeManagementAccessEditor", () => {
         ref={editorRef}
         employee={employee}
         orgId="org-1"
-        orgName="Test Org"
         managementDepartments={managementDepartments}
         directoryPerson={makeDirectoryPerson({
           managementDepartmentIds: [10],
@@ -408,7 +403,6 @@ describe("EmployeeManagementAccessEditor", () => {
         ref={editorRef}
         employee={employee}
         orgId="org-1"
-        orgName="Test Org"
         managementDepartments={managementDepartments}
         directoryPerson={makeDirectoryPerson({
           managementDepartmentIds: [10],
@@ -449,7 +443,6 @@ describe("EmployeeManagementAccessEditor", () => {
       <EmployeeManagementAccessEditor
         employee={employee}
         orgId="org-1"
-        orgName="Test Org"
         managementDepartments={managementDepartments}
         directoryPerson={makeDirectoryPerson({ managementDepartmentIds: [] })}
         onClose={vi.fn()}
@@ -479,7 +472,6 @@ describe("EmployeeManagementAccessEditor", () => {
       <EmployeeManagementAccessEditor
         employee={{ ...employee, email: "", userId: "user-1" }}
         orgId="org-1"
-        orgName="Test Org"
         managementDepartments={managementDepartments}
         onClose={vi.fn()}
         onCompleted={vi.fn()}
@@ -506,7 +498,6 @@ describe("EmployeeManagementAccessEditor", () => {
       <EmployeeManagementAccessEditor
         employee={{ ...employee, email: "" }}
         orgId="org-1"
-        orgName="Test Org"
         managementDepartments={managementDepartments}
         onClose={vi.fn()}
         onCompleted={vi.fn()}
@@ -545,7 +536,6 @@ describe("EmployeeManagementAccessEditor", () => {
       <EmployeeManagementAccessEditor
         employee={{ ...employee, userId: "user-1" }}
         orgId="org-1"
-        orgName="Test Org"
         managementDepartments={managementDepartments}
         directoryPerson={makeDirectoryPerson({
           userId: "user-1",
@@ -585,7 +575,6 @@ describe("EmployeeManagementAccessEditor", () => {
       <EmployeeManagementAccessEditor
         employee={{ ...employee, userId: "user-1" }}
         orgId="org-1"
-        orgName="Test Org"
         managementDepartments={managementDepartments}
         directoryPerson={makeDirectoryPerson({
           userId: "user-1",
@@ -616,7 +605,6 @@ describe("EmployeeManagementAccessEditor", () => {
         ref={editorRef}
         employee={employee}
         orgId="org-1"
-        orgName="Test Org"
         managementDepartments={managementDepartments}
         onClose={vi.fn()}
         onCompleted={vi.fn()}
@@ -651,7 +639,6 @@ describe("EmployeeManagementAccessEditor", () => {
         ref={editorRef}
         employee={employee}
         orgId="org-1"
-        orgName="Test Org"
         managementDepartments={managementDepartments}
         onClose={vi.fn()}
         onCompleted={onCompleted}
@@ -683,7 +670,6 @@ describe("EmployeeManagementAccessEditor", () => {
       <EmployeeManagementAccessEditor
         employee={employee}
         orgId="org-1"
-        orgName="Test Org"
         managementDepartments={managementDepartments}
         directoryPerson={makeDirectoryPerson({
           managementDepartmentIds: [10],
@@ -709,7 +695,6 @@ describe("EmployeeManagementAccessEditor", () => {
       <EmployeeManagementAccessEditor
         employee={employee}
         orgId="org-1"
-        orgName="Test Org"
         managementDepartments={managementDepartments}
         directoryPerson={makeDirectoryPerson({
           managementDepartmentIds: [10],
@@ -742,7 +727,6 @@ describe("EmployeeManagementAccessEditor", () => {
         ref={editorRef}
         employee={employee}
         orgId="org-1"
-        orgName="Test Org"
         managementDepartments={managementDepartments}
         directoryPerson={makeDirectoryPerson({
           managementDepartmentIds: [10],

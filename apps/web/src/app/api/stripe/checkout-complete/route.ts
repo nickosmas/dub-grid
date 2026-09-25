@@ -4,6 +4,7 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { forbidIfSandboxCookie } from "@/lib/api-auth";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { retryAfterSeconds } from "@/lib/retry-after";
 import { syncCheckoutSessionToDb, requireStripeEnabled } from "@/lib/stripe";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
@@ -58,9 +59,7 @@ export async function POST(req: NextRequest) {
         {
           status: 429,
           headers: {
-            "Retry-After": String(
-              Math.max(1, Math.ceil(((reset ?? Date.now()) - Date.now()) / 1000)),
-            ),
+            "Retry-After": String(retryAfterSeconds(reset)),
           },
         },
       );

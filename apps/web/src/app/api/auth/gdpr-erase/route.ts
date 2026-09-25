@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase-service";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { canDeleteAccountDirectly } from "@/features/account/server";
+import {
+  hasStartedSelfDeletion,
+  recordSelfDeletionStarted,
+} from "@/features/account/server/self-deletion";
 import { forbidIfSandboxCookie, requireSensitiveActionAuth } from "@/lib/api-auth";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
@@ -29,13 +33,20 @@ export async function POST(req: NextRequest) {
     const { user } = auth;
     const orgId = typeof auth.claims.org_id === "string" ? auth.claims.org_id : null;
 
-    const canEraseDirectly = orgId
-      ? await canDeleteAccountDirectly({
-          serviceClient: getServiceClient(),
-          actorId: user.id,
-          orgId,
-        })
-      : false;
+    const serviceClient = getServiceClient();
+    // Erasure removes the membership that granted the permission, so a retry
+    // after the Auth deletion failed may skip it only for an erasure this user
+    // already began.
+    const resuming = await hasStartedSelfDeletion(serviceClient, user.id, "gdpr");
+    const canEraseDirectly =
+      resuming ||
+      (orgId
+        ? await canDeleteAccountDirectly({
+            serviceClient,
+            actorId: user.id,
+            orgId,
+          })
+        : false);
 
     if (!canEraseDirectly) {
       return NextResponse.json(
@@ -61,7 +72,6 @@ export async function POST(req: NextRequest) {
     }
 
     const userId = user.id;
-    const serviceClient = getServiceClient();
 
     // Prevent gridmaster self-erasure
     const { data: profile } = await serviceClient
@@ -102,7 +112,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Call the GDPR erasure function
+    if (!resuming) {
+      await recordSelfDeletionStarted(serviceClient, {
+        userId,
+        email: user.email ?? null,
+        orgId,
+        kind: "gdpr",
+      });
+    }
+
+    // Idempotent, so a resumed erasure simply runs it again.
     const { data: result, error: rpcError } = await serviceClient.rpc("gdpr_erase_user_data", {
       p_user_id: userId,
     });

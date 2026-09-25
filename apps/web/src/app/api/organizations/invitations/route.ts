@@ -6,11 +6,14 @@ import {
 } from "@dubgrid/contracts";
 import { z } from "zod";
 import { apiLimiter, checkRateLimit, emailTargetLimiter, hashEmail } from "@/lib/rate-limit";
+import { retryAfterSeconds } from "@/lib/retry-after";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { forbidIfSandboxCookie, requireAuthenticatedUser } from "@/lib/api-auth";
 import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { getServiceClient } from "@/lib/supabase-service";
+import { canAssignOrgRole } from "@/app/api/employees/shared";
+import { writeInvitationAuditEntry } from "@/lib/audit/invitation";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { buildInvitationChanges, buildInvitationRevocationChanges } from "@/lib/access-management";
@@ -21,9 +24,9 @@ import { buildStaffValidationErrorResponse, getStaffFieldErrors } from "@/lib/st
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import {
-  getInvitationEmailConfig,
-  sendInvitationEmail,
-} from "@/features/mobile/server/invitation-email";
+  isEmailNotConfigured,
+  sendPendingInvitationEmail,
+} from "@/features/organization/server/invitation-delivery";
 import { INVITATION_LIFETIME_MS } from "@/lib/auth/invitation-capability";
 
 export const dynamic = "force-dynamic";
@@ -185,66 +188,16 @@ async function writeAuditEntry(input: {
   req: NextRequest;
   relatedInvitationId?: string;
 }) {
-  const serviceClient = getServiceClient();
-  const { error } = await serviceClient.from("audit_log").insert({
-    org_id: input.orgId,
-    actor_id: input.actorId,
-    actor_email: input.actorEmail,
-    action: input.action,
-    resource_type: "invitation",
-    resource_id: input.resourceId,
-    details: {
-      changedFields: input.changes.map((change) => change.key),
-      changes: input.changes.map((change) => ({
-        field: change.key,
-        label: change.label,
-        from: change.previousValue,
-        to: change.nextValue,
-      })),
-      ...(input.relatedInvitationId ? { replacementInvitationId: input.relatedInvitationId } : {}),
-    },
-    ip_address: getRequestIp(input.req),
-    user_agent: input.req.headers.get("user-agent"),
+  const { req, ...rest } = input;
+  await writeInvitationAuditEntry({
+    ...rest,
+    ipAddress: getRequestIp(req),
+    userAgent: req.headers.get("user-agent"),
   });
-
-  if (error) {
-    logger.error(
-      { error, orgId: input.orgId, resourceId: input.resourceId },
-      "Invitation audit log write failed",
-    );
-  }
 }
 
 async function checkInvitationEmailLimit(email: string) {
   return checkRateLimit(emailTargetLimiter, `invite-email:${hashEmail(email)}`);
-}
-
-async function sendPendingInvitationEmail(input: {
-  orgId: string;
-  token: string;
-  email: string;
-  inviterName: string | null;
-}) {
-  const config = getInvitationEmailConfig();
-  if (!config) {
-    throw new Error("Email service not configured");
-  }
-
-  const serviceClient = getServiceClient();
-  const { data: organization, error } = await serviceClient
-    .from("organizations")
-    .select("name")
-    .eq("id", input.orgId)
-    .maybeSingle();
-  if (error) throw error;
-
-  await sendInvitationEmail({
-    config,
-    token: input.token,
-    email: input.email,
-    orgName: (organization?.name as string | null) || "your organization",
-    inviterName: input.inviterName,
-  });
 }
 
 export async function GET(req: NextRequest) {
@@ -303,7 +256,7 @@ export async function PATCH(req: NextRequest) {
   if (limited) {
     return NextResponse.json(
       { error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+      { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
     );
   }
 
@@ -348,6 +301,30 @@ export async function PATCH(req: NextRequest) {
 
     if (!timestampsMatch(currentInvitation.updatedAt, expectedUpdatedAt)) {
       return buildConflictResponse(currentInvitation);
+    }
+
+    if (
+      fields.roleToAssign !== undefined &&
+      !(await canAssignOrgRole(getServiceClient(), user.id, orgId, fields.roleToAssign))
+    ) {
+      await writeInvitationAuditEntry({
+        orgId,
+        actorId: user.id,
+        actorEmail: user.email ?? null,
+        action: "invitation.access_denied",
+        resourceId: invitationId,
+        details: {
+          email: currentInvitation.email,
+          requestedRole: fields.roleToAssign,
+          currentRole: currentInvitation.roleToAssign,
+          outcome: "rejected",
+          reason: "policy_denied",
+          path: "edit",
+        },
+        ipAddress: getRequestIp(req),
+        userAgent: req.headers.get("user-agent"),
+      });
+      return NextResponse.json({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN }, { status: 403 });
     }
 
     const nextInvitation: Partial<Invitation> = {
@@ -462,7 +439,7 @@ export async function DELETE(req: NextRequest) {
   if (limited) {
     return NextResponse.json(
       { error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+      { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
     );
   }
 
@@ -559,7 +536,7 @@ export async function POST(req: NextRequest) {
   if (limited) {
     return NextResponse.json(
       { error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+      { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
     );
   }
 
@@ -598,9 +575,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
     }
     if (targetLimit.limited) {
-      const retryAfter = targetLimit.reset
-        ? Math.ceil((targetLimit.reset - Date.now()) / 1000)
-        : 60;
+      const retryAfter = retryAfterSeconds(targetLimit.reset);
       return NextResponse.json(
         {
           error:
@@ -624,6 +599,27 @@ export async function POST(req: NextRequest) {
 
       if (currentInvitation.roleToAssign === parsed.data.roleToAssign) {
         return NextResponse.json({ success: true, invitation: currentInvitation });
+      }
+
+      if (!(await canAssignOrgRole(serviceClient, user.id, orgId, parsed.data.roleToAssign))) {
+        await writeInvitationAuditEntry({
+          orgId,
+          actorId: user.id,
+          actorEmail: user.email ?? null,
+          action: "invitation.access_denied",
+          resourceId: invitationId,
+          details: {
+            email: currentInvitation.email,
+            requestedRole: parsed.data.roleToAssign,
+            currentRole: currentInvitation.roleToAssign,
+            outcome: "rejected",
+            reason: "policy_denied",
+            path: "replace_access",
+          },
+          ipAddress: getRequestIp(req),
+          userAgent: req.headers.get("user-agent"),
+        });
+        return NextResponse.json({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN }, { status: 403 });
       }
 
       const { data: replacementData, error: replacementError } = await serviceClient.rpc(
@@ -654,24 +650,32 @@ export async function POST(req: NextRequest) {
         throw replacementError;
       }
 
+      // Rotation keeps the row, so there is no successor id: the previous
+      // token, expiry and grant come back instead, for the restore below.
       const replacement = replacementData as {
-        previous_invitation_id?: string;
         invitation_id?: string;
         token?: string;
         expires_at?: string;
+        previous_token?: string;
+        previous_expires_at?: string;
+        previous_role?: string | null;
+        previous_invited_by?: string | null;
+        previous_department_ids?: number[] | null;
+        previous_dept_admin_ids?: number[] | null;
       } | null;
       if (
-        !replacement?.previous_invitation_id ||
-        !replacement.invitation_id ||
+        !replacement?.invitation_id ||
         !replacement.token ||
-        !replacement.expires_at
+        !replacement.expires_at ||
+        !replacement.previous_token ||
+        !replacement.previous_expires_at
       ) {
-        throw new Error("Invitation replacement did not return complete data.");
+        throw new Error("Invitation rotation did not return complete data.");
       }
 
       const replacementInvitation = await fetchInvitation(orgId, replacement.invitation_id);
       if (!replacementInvitation) {
-        throw new Error("Replacement invitation could not be loaded.");
+        throw new Error("Rotated invitation could not be loaded.");
       }
 
       try {
@@ -679,26 +683,30 @@ export async function POST(req: NextRequest) {
           orgId,
           token: replacement.token,
           email: replacementInvitation.email,
-          inviterName: user.email ?? null,
         });
       } catch (emailError) {
         const { data: rolledBack, error: rollbackError } = await serviceClient.rpc(
           "rollback_pending_invitation_access_replacement",
           {
             p_org_id: orgId,
-            p_previous_invitation_id: replacement.previous_invitation_id,
-            p_replacement_invitation_id: replacement.invitation_id,
+            p_invitation_id: replacement.invitation_id,
+            p_rotated_token: replacement.token,
+            p_previous_token: replacement.previous_token,
+            p_previous_expires_at: replacement.previous_expires_at,
+            // Without these the old link survives the failure with the new
+            // access attached, while the admin is told nothing changed.
+            p_previous_role: replacement.previous_role ?? null,
+            p_previous_invited_by: replacement.previous_invited_by ?? null,
+            p_previous_department_ids: replacement.previous_department_ids ?? null,
+            p_previous_dept_admin_ids: replacement.previous_dept_admin_ids ?? null,
           },
         );
-        if (rollbackError || rolledBack !== true) {
+        // The restore is refused rather than applied when the row moved on, so
+        // a false here is a real failure to report, not a no-op.
+        if (rollbackError || (rolledBack as { restored?: boolean } | null)?.restored !== true) {
           logger.error(
-            {
-              error: rollbackError,
-              orgId,
-              invitationId,
-              replacementInvitationId: replacement.invitation_id,
-            },
-            "Failed to roll back invitation access replacement after email failure",
+            { error: rollbackError, orgId, invitationId },
+            "Failed to restore the previous invitation link after email failure",
           );
         }
         Sentry.captureException(emailError, {
@@ -706,16 +714,12 @@ export async function POST(req: NextRequest) {
         });
         return NextResponse.json(
           {
-            error:
-              emailError instanceof Error && emailError.message === "Email service not configured"
-                ? "Email service not configured"
-                : "We couldn't send the replacement invitation. The original invitation is still active.",
+            error: isEmailNotConfigured(emailError)
+              ? "Email service not configured"
+              : "We couldn't send the replacement invitation. The original invitation is still active.",
           },
           {
-            status:
-              emailError instanceof Error && emailError.message === "Email service not configured"
-                ? 503
-                : 502,
+            status: isEmailNotConfigured(emailError) ? 503 : 502,
           },
         );
       }
@@ -733,26 +737,32 @@ export async function POST(req: NextRequest) {
         req,
       });
 
+      // One invitation, reissued with new access: nothing was revoked or
+      // created, so the old pair told super admins it had been canceled.
       void dispatchNotificationEvent(user.id, {
-        action: "invitation_revoked",
+        action: "invitation_resent",
         orgId,
         invitationId,
-        inviteeEmail: currentInvitation.email,
-      });
-      void dispatchNotificationEvent(user.id, {
-        action: "invitation_created",
-        orgId,
-        invitationId: replacement.invitation_id,
         inviteeEmail: replacementInvitation.email,
       });
 
       return NextResponse.json({
         success: true,
-        previousInvitationId: replacement.previous_invitation_id,
         invitation: replacementInvitation,
         token: replacement.token,
         expiresAt: replacement.expires_at,
       });
+    }
+
+    // Revocation is durable: a resend rotates the token on a pending row, it
+    // does not bring a revoked or accepted invitation back. The update below
+    // clears revoked_at, so without this a revoked invitation could be revived
+    // from any surface that offers a resend.
+    if (currentInvitation.revokedAt || currentInvitation.acceptedAt) {
+      return NextResponse.json(
+        { error: "This invitation is no longer pending. It was revoked or already accepted." },
+        { status: 409 },
+      );
     }
 
     const token = crypto.randomUUID();
@@ -789,7 +799,6 @@ export async function POST(req: NextRequest) {
         orgId,
         token,
         email: latestInvitation.email,
-        inviterName: user.email ?? null,
       });
     } catch (emailError) {
       const { data: restoredInvitation, error: rollbackError } = await serviceClient
@@ -817,16 +826,12 @@ export async function POST(req: NextRequest) {
       });
       return NextResponse.json(
         {
-          error:
-            emailError instanceof Error && emailError.message === "Email service not configured"
-              ? "Email service not configured"
-              : "We couldn't send that invitation email. Try again.",
+          error: isEmailNotConfigured(emailError)
+            ? "Email service not configured"
+            : "We couldn't send that invitation email. Try again.",
         },
         {
-          status:
-            emailError instanceof Error && emailError.message === "Email service not configured"
-              ? 503
-              : 502,
+          status: isEmailNotConfigured(emailError) ? 503 : 502,
         },
       );
     }

@@ -126,11 +126,7 @@ describe("useEmployees — handleSaveEmployeeWithReinvite", () => {
     let saved = false;
 
     await act(async () => {
-      saved = await result.current.handleSaveEmployeeWithReinvite(
-        updated,
-        OLD_INVITATION,
-        "Acme Org",
-      );
+      saved = await result.current.handleSaveEmployeeWithReinvite(updated, OLD_INVITATION);
     });
 
     expect(saved).toBe(true);
@@ -150,28 +146,23 @@ describe("useEmployees — handleSaveEmployeeWithReinvite", () => {
   });
 
   it("shows a distinct error but keeps the saved employee when the identity save succeeds but sending the new invite fails", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: false,
-        text: async () => JSON.stringify({ error: "delivery failed" }),
-      }),
+    // The create call sends the email itself now, so a failed send rejects it.
+    mockCreateOrganizationInvitation.mockRejectedValueOnce(
+      new Error("We couldn't send the invitation email, so the invitation wasn't created."),
     );
     const result = await renderReady();
     const updated = { ...EMPLOYEE, email: "new@example.com" };
     let saved = false;
 
     await act(async () => {
-      saved = await result.current.handleSaveEmployeeWithReinvite(
-        updated,
-        OLD_INVITATION,
-        "Acme Org",
-      );
+      saved = await result.current.handleSaveEmployeeWithReinvite(updated, OLD_INVITATION);
     });
 
     expect(saved).toBe(true);
     expect(mockUpdateEmployee).toHaveBeenCalled();
-    expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining("Employee saved"));
+    expect(mockToastError).toHaveBeenCalledWith(
+      "Employee saved, but we couldn't send the new invitation. Use Send invitation to try again.",
+    );
     expect(mockToastSuccess).not.toHaveBeenCalled();
     // The identity save already succeeded — must not roll back just because
     // the follow-up invite send failed.
@@ -185,11 +176,7 @@ describe("useEmployees — handleSaveEmployeeWithReinvite", () => {
     let saved = true;
 
     await act(async () => {
-      saved = await result.current.handleSaveEmployeeWithReinvite(
-        updated,
-        OLD_INVITATION,
-        "Acme Org",
-      );
+      saved = await result.current.handleSaveEmployeeWithReinvite(updated, OLD_INVITATION);
     });
 
     expect(saved).toBe(false);

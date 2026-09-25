@@ -20,18 +20,19 @@ The mobile API (`/api/mobile/v1/*`) uses a Bearer token in the `Authorization` h
 
 ### Public
 
-| Method | Path                         | Purpose                                                                       | Rate Limit                                                                                           |
-| ------ | ---------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| GET    | `/api/health`                | Health check (DB reachability)                                                | None                                                                                                 |
-| GET    | `/api/validate-domain`       | Check whether an org subdomain slug exists (Redis-cached)                     | IP-based (`apiLimiter`)                                                                              |
-| POST   | `/api/request-demo`          | Demo request form submission (landing page)                                   | `demoLimiter` (3/hr per IP)                                                                          |
-| POST   | `/api/auth/login`            | Email/password login; consolidates the org switch and trial start server-side | `loginLimiter` per email hash + `loginIpLimiter` per IP + `loginSurgeLimiter` global                 |
-| POST   | `/api/auth/recovery-request` | Request a password-recovery email (generic response, security-audited)        | `apiLimiter` per source IP + `passwordResetLimiter` per target email + `recoverySurgeLimiter` global |
-| POST   | `/api/consent`               | Record cookie consent preference                                              | None                                                                                                 |
-| GET    | `/api/invitations/lookup`    | Look up a live invitation by token (uniform 404 for any dead token)           | None                                                                                                 |
-| POST   | `/api/invitations/register`  | Create the invitee's pre-confirmed auth account (token is the credential)     | `apiLimiter` per IP + `emailTargetLimiter` per address                                               |
-| POST   | `/api/users/check-email`     | Check email availability for supported public flows                           | `apiLimiter` per IP                                                                                  |
-| POST   | `/api/stripe/webhook`        | Stripe webhook handler (signature-verified, replay-idempotent)                | None                                                                                                 |
+| Method | Path                         | Purpose                                                                                 | Rate Limit                                                                                           |
+| ------ | ---------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| GET    | `/api/health`                | Health check (DB reachability)                                                          | None                                                                                                 |
+| GET    | `/api/validate-domain`       | Check whether an org subdomain slug exists (Redis-cached)                               | IP-based (`apiLimiter`)                                                                              |
+| POST   | `/api/request-demo`          | Demo request form submission (landing page)                                             | `demoLimiter` (3/hr per IP)                                                                          |
+| POST   | `/api/auth/login`            | Email/password login; consolidates the org switch and trial start server-side           | `loginLimiter` per email hash + `loginIpLimiter` per IP + `loginSurgeLimiter` global                 |
+| POST   | `/api/auth/login/complete`   | Records a two-factor sign-in as succeeded; needs a freshly verified TOTP (aal2) session | `apiLimiter` per user                                                                                |
+| POST   | `/api/auth/recovery-request` | Request a password-recovery email (generic response, security-audited)                  | `apiLimiter` per source IP + `passwordResetLimiter` per target email + `recoverySurgeLimiter` global |
+| POST   | `/api/consent`               | Record cookie consent preference                                                        | None                                                                                                 |
+| GET    | `/api/invitations/lookup`    | Look up a live invitation by token (uniform 404 for any dead token)                     | None                                                                                                 |
+| POST   | `/api/invitations/register`  | Create the invitee's pre-confirmed auth account (token is the credential)               | `apiLimiter` per IP + `emailTargetLimiter` per address                                               |
+| POST   | `/api/users/check-email`     | Check email availability for supported public flows                                     | `apiLimiter` per IP                                                                                  |
+| POST   | `/api/stripe/webhook`        | Stripe webhook handler (signature-verified, replay-idempotent)                          | None                                                                                                 |
 
 ### Scheduled jobs (`Authorization: Bearer $CRON_SECRET`)
 
@@ -108,7 +109,7 @@ Each cron is also behind a `platform_feature_flags` kill switch (`cron_expire_re
 | POST   | `/api/organizations/invitations`        | Create an invitation                                                                       |
 | PATCH  | `/api/organizations/invitations`        | Update an invitation (access changes replace the token atomically)                         |
 | DELETE | `/api/organizations/invitations`        | Revoke an invitation                                                                       |
-| POST   | `/api/organizations/invitations/create` | Create and optionally send an invitation                                                   |
+| POST   | `/api/organizations/invitations/create` | Create an invitation and email its link; a failed send creates nothing                     |
 | POST   | `/api/organizations/role-change`        | Change a member's org role                                                                 |
 | PUT    | `/api/organizations/settings`           | Update org settings                                                                        |
 | GET    | `/api/onboarding`                       | Get onboarding state                                                                       |
@@ -189,10 +190,9 @@ Each cron is also behind a `platform_feature_flags` kill switch (`cron_expire_re
 
 ### Invitations and Email
 
-| Method | Path                        | Purpose                                                                     |
-| ------ | --------------------------- | --------------------------------------------------------------------------- |
-| POST   | `/api/send-invite-email`    | Send invitation email via Resend (rate-limited per actor and per recipient) |
-| POST   | `/api/notify-impersonation` | Log impersonation start/end events                                          |
+| Method | Path                        | Purpose                            |
+| ------ | --------------------------- | ---------------------------------- |
+| POST   | `/api/notify-impersonation` | Log impersonation start/end events |
 
 ---
 
@@ -265,6 +265,8 @@ The mobile app (Expo) communicates exclusively with these endpoints. All routes 
 | ------ | -------------------------------------- | ----------------------------------------------------------------------------------------- |
 | POST   | `/api/mobile/v1/auth/login`            | Email/password login, returns session token (or a required-MFA challenge)                 |
 | POST   | `/api/mobile/v1/auth/recovery-request` | Request a password-recovery email (same handler and limits as the web route)              |
+| POST   | `/api/mobile/v1/auth/sign-out`         | Bearer twin of `/api/auth/sign-out`: local writes the marker; bulk needs fresh assurance  |
+| POST   | `/api/mobile/v1/auth/sign-in-complete` | Mobile twin of `/api/auth/login/complete`                                                 |
 | GET    | `/api/mobile/v1/auth/organization`     | Get the caller's current org context                                                      |
 | GET    | `/api/mobile/v1/bootstrap`             | Load all data required on app launch (permissions, terminology, `acceptedCurrentTerms`)   |
 | GET    | `/api/mobile/v1/org-status`            | Why the organization is unavailable; detail only for roles that own billing or the tenant |
@@ -465,7 +467,7 @@ Rate limits are enforced via Upstash Redis sliding windows. The limiters are def
 | `passwordResetLimiter`  | Per target email hash        | 15 min | 5 requests                                | Recovery requests, gridmaster password reset           |
 | `recoverySurgeLimiter`  | Global                       | 10 sec | 100 requests                              | Recovery requests                                      |
 | `demoLimiter`           | Per IP                       | 1 hour | 3 requests                                | `/api/request-demo`                                    |
-| `inviteLimiter`         | Per acting user              | 1 hour | 100 requests                              | `/api/send-invite-email`                               |
+| `inviteLimiter`         | Per acting user              | 1 hour | 100 requests                              | `/api/organizations/invitations/create`                |
 | `emailTargetLimiter`    | Per recipient address        | 1 hour | 5 requests                                | Email-sending routes                                   |
 | `scheduleReviewLimiter` | Per user                     | 10 sec | 60 requests                               | Schedule review endpoints                              |
 | `apiLimiter`            | Per user (or IP when public) | 10 sec | 10 requests                               | General authenticated and public routes, MFA lifecycle |

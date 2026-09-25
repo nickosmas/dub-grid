@@ -11,6 +11,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Client } from "pg";
+import { actAsAuthenticated } from "./helpers/simulated-jwt";
 
 const DB_URL =
   process.env.LOCAL_SUPABASE_DB_URL ?? "postgres://postgres:postgres@127.0.0.1:54322/postgres";
@@ -81,17 +82,15 @@ async function loadFixture(): Promise<Fixture> {
   };
 }
 
-async function asAdmin(fx: Fixture): Promise<void> {
-  const claims = JSON.stringify({
+async function asAdmin(fx: Fixture, claims: Record<string, unknown> = {}): Promise<void> {
+  await actAsAuthenticated(db, {
     sub: fx.adminUserId,
     role: "authenticated",
-    mfa_enrolled: false,
     org_id: fx.orgId,
     org_role: "super_admin",
     platform_role: "none",
+    ...claims,
   });
-  await db.query(`SET LOCAL ROLE authenticated`);
-  await db.query(`SET LOCAL request.jwt.claims = '${claims}'`);
 }
 
 async function asSuperuser(): Promise<void> {

@@ -5,6 +5,7 @@ const fetchMobileManagementRosterRows = vi.fn();
 const fetchMobileDepartmentRows = vi.fn();
 const createMobileEmployeeInvitationRow = vi.fn();
 const refreshMobileEmployeeInvitationRow = vi.fn();
+const restoreMobileEmployeeInvitationRow = vi.fn();
 const revokeMobileEmployeeInvitationRow = vi.fn();
 const replaceMobilePendingInvitationAccessRow = vi.fn();
 const rollbackMobilePendingInvitationAccessReplacement = vi.fn();
@@ -22,6 +23,7 @@ vi.mock("@dubgrid/data-access", () => ({
   fetchMobileManagementRosterRows,
   insertMobileAuditLogEntry,
   refreshMobileEmployeeInvitationRow,
+  restoreMobileEmployeeInvitationRow,
   replaceMobilePendingInvitationAccessRow,
   revokeMobileEmployeeInvitationRow,
   rollbackMobilePendingInvitationAccessReplacement,
@@ -287,7 +289,11 @@ describe("mobile management-users routes", () => {
 
     it("revokes and replaces a pending invitation when its role changes", async () => {
       replaceMobilePendingInvitationAccessRow.mockResolvedValue({
-        previousInvitationId: INVITATION_ID,
+        rotation: {
+          rotatedToken: "rotated-token",
+          previousToken: "original-token",
+          previousExpiresAt: "2099-01-01T00:00:00.000Z",
+        },
         invitation: makeInvitationRow({
           id: "99999999-9999-4999-8999-999999999999",
           role_to_assign: "super_admin",
@@ -322,7 +328,11 @@ describe("mobile management-users routes", () => {
 
     it("restores the old management invitation when replacement delivery fails", async () => {
       replaceMobilePendingInvitationAccessRow.mockResolvedValue({
-        previousInvitationId: INVITATION_ID,
+        rotation: {
+          rotatedToken: "rotated-token",
+          previousToken: "original-token",
+          previousExpiresAt: "2099-01-01T00:00:00.000Z",
+        },
         invitation: makeInvitationRow({
           id: "99999999-9999-4999-8999-999999999999",
           role_to_assign: "super_admin",
@@ -347,11 +357,10 @@ describe("mobile management-users routes", () => {
       expect(response.status).toBe(502);
       expect(rollbackMobilePendingInvitationAccessReplacement).toHaveBeenCalledWith(
         {},
-        {
-          orgId: "44444444-4444-4444-8444-444444444444",
-          previousInvitationId: INVITATION_ID,
-          replacementInvitationId: "99999999-9999-4999-8999-999999999999",
-        },
+        expect.objectContaining({
+          rotatedToken: "rotated-token",
+          previousToken: "original-token",
+        }),
       );
     });
 
@@ -459,10 +468,34 @@ describe("mobile management-users routes", () => {
       });
     });
 
-    it("refreshes the token and emails it on resend", async () => {
-      refreshMobileEmployeeInvitationRow.mockResolvedValue(
-        makeInvitationRow({ token: "fresh-token" }),
+    it("restores the previous link when the resend email fails", async () => {
+      refreshMobileEmployeeInvitationRow.mockResolvedValue({
+        invitation: makeInvitationRow({ token: "fresh-token" }),
+        previousToken: "old-token",
+        previousExpiresAt: "2026-05-04T00:00:00Z",
+      });
+      restoreMobileEmployeeInvitationRow.mockResolvedValue(true);
+      sendInvitationEmail.mockRejectedValueOnce(new Error("resend down"));
+
+      const { POST } = await import("./management-user-invitation");
+      const response = await POST(
+        makeRequest({ action: "resend", expectedUpdatedAt: "2026-05-01T00:00:00Z" }, "POST"),
+        makeContext(`inv:${INVITATION_ID}`),
       );
+
+      expect(response.status).toBe(502);
+      expect(restoreMobileEmployeeInvitationRow).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ rotatedToken: "fresh-token", previousToken: "old-token" }),
+      );
+    });
+
+    it("refreshes the token and emails it on resend", async () => {
+      refreshMobileEmployeeInvitationRow.mockResolvedValue({
+        invitation: makeInvitationRow({ token: "fresh-token" }),
+        previousToken: "old-token",
+        previousExpiresAt: "2026-05-04T00:00:00Z",
+      });
 
       const { POST } = await import("./management-user-invitation");
       const response = await POST(
@@ -475,6 +508,10 @@ describe("mobile management-users routes", () => {
       expect(payload.result).toBe("invitation_resent");
       expect(sendInvitationEmail).toHaveBeenCalledWith(
         expect.objectContaining({ token: "fresh-token" }),
+      );
+      expect(insertMobileAuditLogEntry).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ action: "invitation.resent", resource_type: "invitation" }),
       );
     });
 

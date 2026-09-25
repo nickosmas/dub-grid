@@ -5,7 +5,13 @@ const requireAuthenticatedSession = vi.fn();
 const validateCsrfOrigin = vi.fn();
 const trackUserSessionForUser = vi.fn();
 const dispatchNotificationEvent = vi.fn();
-const newDeviceLookup = vi.fn();
+const claimNewSignIn = vi.fn();
+const after = vi.fn((task: () => unknown) => void task());
+
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (task: () => unknown) => after(task),
+}));
 
 vi.mock("@/lib/api-auth", () => ({
   requireAuthenticatedSession: (req: NextRequest) => requireAuthenticatedSession(req),
@@ -23,20 +29,9 @@ vi.mock("@/features/notifications/server/events", () => ({
   dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
 }));
 
-vi.mock("@/lib/supabase-service", () => ({
-  getServiceClient: () => ({
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          eq: () => ({
-            eq: () => ({
-              limit: () => newDeviceLookup(),
-            }),
-          }),
-        }),
-      }),
-    }),
-  }),
+vi.mock("@/features/account/server/security-alerts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/account/server/security-alerts")>()),
+  claimNewSignIn: (...args: unknown[]) => claimNewSignIn(...args),
 }));
 
 vi.mock("@/lib/logger", () => ({
@@ -63,8 +58,8 @@ describe("POST /api/auth/track-session", () => {
     });
     trackUserSessionForUser.mockResolvedValue(undefined);
     dispatchNotificationEvent.mockResolvedValue({ success: true });
-    // Default: an existing row matches this device → not a new device.
-    newDeviceLookup.mockResolvedValue({ data: [{ id: "existing-session" }] });
+    // Default: this session was already reported, so it is not a new sign-in.
+    claimNewSignIn.mockResolvedValue(false);
   });
 
   it("rejects unauthenticated requests", async () => {
@@ -130,8 +125,8 @@ describe("POST /api/auth/track-session", () => {
     expect(trackUserSessionForUser).not.toHaveBeenCalled();
   });
 
-  it("dispatches security_new_device when no prior session matches the device", async () => {
-    newDeviceLookup.mockResolvedValueOnce({ data: [] });
+  it("alerts, after the response, on a sign-in session not seen before", async () => {
+    claimNewSignIn.mockResolvedValueOnce(true);
 
     await POST(
       new NextRequest("http://localhost/api/auth/track-session", {
@@ -144,13 +139,19 @@ describe("POST /api/auth/track-session", () => {
       }),
     );
 
+    expect(after).toHaveBeenCalledTimes(1);
     expect(dispatchNotificationEvent).toHaveBeenCalledWith("session-user", {
       action: "security_new_device",
       orgId: "org-id-1",
       targetUserId: "session-user",
+      supabaseSessionId: "session-id-1",
       platform: "web",
       deviceLabel: "Chrome on macOS",
       ipAddress: null,
+      browserName: null,
+      locationCity: null,
+      locationCountry: null,
+      occurredAt: expect.any(String),
     });
   });
 
@@ -185,7 +186,31 @@ describe("POST /api/auth/track-session", () => {
     );
   });
 
-  it("skips new-device dispatch when a prior session for the device exists", async () => {
+  // Every Mac reports "Macintosh", so the claim keys on the session, and it
+  // runs before the upsert that fills in the platform it claims.
+  it("claims the sign-in by its session before recording it", async () => {
+    await POST(
+      new NextRequest("http://localhost/api/auth/track-session", {
+        method: "POST",
+        headers: { origin: "http://localhost:3000" },
+        body: JSON.stringify({ platform: "web", deviceLabel: "Macintosh" }),
+      }),
+    );
+
+    expect(claimNewSignIn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "session-user",
+        supabaseSessionId: "session-id-1",
+        platform: "web",
+        claims: expect.objectContaining({ session_id: "session-id-1" }),
+      }),
+    );
+    expect(claimNewSignIn.mock.invocationCallOrder[0]).toBeLessThan(
+      trackUserSessionForUser.mock.invocationCallOrder[0]!,
+    );
+  });
+
+  it("stays quiet when the same session reports again", async () => {
     await POST(
       new NextRequest("http://localhost/api/auth/track-session", {
         method: "POST",

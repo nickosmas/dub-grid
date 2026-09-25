@@ -55,6 +55,8 @@ function renderPanel(
       | "onAddToSchedule"
       | "onRoleChange"
       | "onSave"
+      | "onRevokeInvitation"
+      | "onResendInvitation"
     >
   > = {},
 ) {
@@ -261,5 +263,60 @@ describe("ManagementStaffPanel", () => {
     expect(headerAccess).toContainElement(screen.getByText("Admin"));
     expect(headerAccess).not.toHaveTextContent("Role");
     expect(document.querySelector('[data-slot="management-body-access"]')).toBeNull();
+  });
+
+  describe("revoking a pending invitation", () => {
+    const pending = {
+      personId: "inv:invite-1",
+      source: "pending_invite" as const,
+      userId: null,
+      hasAppAccess: false,
+      lastSignInAt: null,
+      invitationStatus: "pending" as const,
+    };
+
+    it("asks once in a dialog and only revokes once that is confirmed", async () => {
+      const user = userEvent.setup();
+      const onRevokeInvitation = vi.fn().mockResolvedValue(true);
+      const { onClose } = renderPanel(pending, undefined, null, { onRevokeInvitation });
+
+      await user.click(screen.getByRole("button", { name: "Revoke Invitation" }));
+
+      const dialog = await screen.findByRole("dialog", { name: "Revoke Invitation?" });
+      expect(onRevokeInvitation).not.toHaveBeenCalled();
+      expect(screen.queryByText(/Revoke this invitation\?/)).not.toBeInTheDocument();
+
+      await user.click(within(dialog).getByRole("button", { name: "Revoke" }));
+
+      expect(onRevokeInvitation).toHaveBeenCalledWith("invite-1");
+      await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    });
+
+    it("does nothing and stays open when the revoke is cancelled", async () => {
+      const user = userEvent.setup();
+      const onRevokeInvitation = vi.fn().mockResolvedValue(true);
+      const { onClose } = renderPanel(pending, undefined, null, { onRevokeInvitation });
+
+      await user.click(screen.getByRole("button", { name: "Revoke Invitation" }));
+      const dialog = await screen.findByRole("dialog", { name: "Revoke Invitation?" });
+      await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+      expect(onRevokeInvitation).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: "Revoke Invitation" })).toBeEnabled();
+    });
+
+    it("asks before reissuing, and resends only once confirmed", async () => {
+      const user = userEvent.setup();
+      const onResendInvitation = vi.fn().mockResolvedValue(undefined);
+      renderPanel(pending, undefined, null, { onResendInvitation });
+
+      await user.click(screen.getByRole("button", { name: "Resend Invitation" }));
+      const dialog = await screen.findByRole("dialog", { name: "Reissue Invitation?" });
+      expect(onResendInvitation).not.toHaveBeenCalled();
+
+      await user.click(within(dialog).getByRole("button", { name: "Reissue" }));
+      expect(onResendInvitation).toHaveBeenCalledWith("invite-1");
+    });
   });
 });

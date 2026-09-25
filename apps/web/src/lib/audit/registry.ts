@@ -349,6 +349,7 @@ function securityHeadline(d: AuditDetails, succeeded: string, noun: string): str
   const outcome = d.text("outcome");
   const surface = d.text("surface") === "mobile" ? " from the mobile app" : "";
   if (outcome === "succeeded") return `${succeeded}${surface}`;
+  if (outcome === "challenged") return `${noun} awaiting two-factor code${surface}`;
   const reason = d.text("reason");
   const why =
     reason === "invalid_credentials"
@@ -723,6 +724,20 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     },
   },
 
+  "invitation.access_denied": {
+    category: "invitations",
+    severity: "warning",
+    headline: (d, ctx) => {
+      const target = d.text("email") ?? ctx.targetEmail ?? ctx.targetLabel;
+      const role = d.text("requestedRole");
+      const tier = role === "super_admin" ? "super admin" : role;
+      if (!tier) return "Was refused an invitation change";
+      return target
+        ? `Was refused ${tier} access for ${target}`
+        : `Was refused ${tier} access on an invitation`;
+    },
+  },
+
   "invitation.auto_revoked": {
     category: "invitations",
     severity: "warning",
@@ -1089,6 +1104,20 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     category: "data",
     severity: "delete",
     headline: (d, ctx) => `Erased the personal data for ${who(d, ctx, "a team member")}`,
+  },
+  "account.deletion_started": {
+    audience: "platform",
+    category: "data",
+    severity: "delete",
+    headline: () => "Started deleting their own account",
+    details: () => [],
+  },
+  "gdpr.erasure_started": {
+    audience: "platform",
+    category: "data",
+    severity: "delete",
+    headline: () => "Started erasing their own personal data",
+    details: () => [],
   },
 
   // ── Security (platform-only evidence) ──────────────────────────────────────
