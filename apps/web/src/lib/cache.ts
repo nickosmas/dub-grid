@@ -42,6 +42,14 @@ function getRedis(): Redis | null {
   return redis;
 }
 
+// Every E2E job has its own database but shares one Redis, and each seeds the
+// same organization and user ids, so unprefixed entries crossed between jobs:
+// one job's billing hold sent another job's super admin to billing recovery.
+// Unset outside those jobs, where keys are exactly the builders below.
+function redisKey(key: string): string {
+  return `${serverEnv?.CACHE_KEY_PREFIX ?? ""}${key}`;
+}
+
 // ── Key Builders ───────────��────────────────────────────���───────────────
 export const CacheKey = {
   // Stable org config
@@ -128,7 +136,7 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
   const client = getRedis();
   if (!client) return null;
   try {
-    const raw = await withTimeout(client.get<T>(key), REDIS_TIMEOUT_MS, null);
+    const raw = await withTimeout(client.get<T>(redisKey(key)), REDIS_TIMEOUT_MS, null);
     return raw ?? null;
   } catch (err) {
     if (_debugMode) {
@@ -148,7 +156,7 @@ export async function cacheGetMany<T>(keys: string[]): Promise<(T | null)[]> {
   const client = getRedis();
   if (!client || keys.length === 0) return keys.map(() => null);
   try {
-    const raw = await withTimeout(client.mget<T[]>(...keys), REDIS_TIMEOUT_MS, null);
+    const raw = await withTimeout(client.mget<T[]>(...keys.map(redisKey)), REDIS_TIMEOUT_MS, null);
     return keys.map((_, i) => raw?.[i] ?? null);
   } catch (err) {
     if (_debugMode) {
@@ -165,7 +173,7 @@ export async function cacheSet<T>(key: string, value: T, ttlSeconds: number): Pr
   const client = getRedis();
   if (!client) return;
   try {
-    await withTimeout(client.set(key, value, { ex: ttlSeconds }), REDIS_TIMEOUT_MS, null);
+    await withTimeout(client.set(redisKey(key), value, { ex: ttlSeconds }), REDIS_TIMEOUT_MS, null);
   } catch (err) {
     if (_debugMode) {
       console.warn(`[cache] SET failed for ${key}:`, err instanceof Error ? err.message : err);
@@ -193,7 +201,7 @@ export async function cacheDel(...keys: string[]): Promise<void> {
   });
   const keysToDelete = [...new Set([...keys, ...bootstrapKeys])];
   try {
-    await withTimeout(client.del(...keysToDelete), REDIS_TIMEOUT_MS, null);
+    await withTimeout(client.del(...keysToDelete.map(redisKey)), REDIS_TIMEOUT_MS, null);
   } catch (err) {
     if (_debugMode) {
       console.warn(`[cache] DEL failed:`, err instanceof Error ? err.message : err);
