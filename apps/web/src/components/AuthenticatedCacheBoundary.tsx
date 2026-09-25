@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
+import AuthTransitionScreen from "@/components/AuthTransitionScreen";
 import { useAuth } from "@/components/AuthProvider";
 import {
   getBrowserRealtimeChannels,
@@ -16,6 +18,26 @@ import {
 } from "@/features/account/client/session-identity";
 import { reloadForWebAuthOrganizationChange } from "@/lib/auth-boundary-navigation";
 import { isAuthTransitionPending } from "@/lib/auth-transition";
+
+// The screens that establish a session. Changing identity is what they are for,
+// and they show no organization data, so they stay mounted across the change:
+// withholding them unmounted the form mid-sign-in (it came back empty and the
+// flow that owned the navigation was gone), and a changed organization claim
+// hard-reloaded the page under the person signing in.
+const SESSION_ENTRY_ROUTES = [
+  "/login",
+  "/accept-invite",
+  "/reset-password",
+  "/verify-email",
+  "/auth",
+];
+
+function isSessionEntryRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return SESSION_ENTRY_ROUTES.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`),
+  );
+}
 
 async function clearAuthenticatedBrowserState(queryClient: ReturnType<typeof useQueryClient>) {
   await queryClient.cancelQueries();
@@ -35,6 +57,7 @@ async function clearAuthenticatedBrowserState(queryClient: ReturnType<typeof use
 export default function AuthenticatedCacheBoundary({ children }: { children: React.ReactNode }) {
   const { session } = useAuth();
   const queryClient = useQueryClient();
+  const onSessionEntryRoute = isSessionEntryRoute(usePathname());
   const identity = useMemo(() => getWebAuthIdentity(session), [session]);
   const [settledIdentity, setSettledIdentity] = useState<WebAuthIdentity>(identity);
   const transitionGenerationRef = useRef(0);
@@ -43,10 +66,11 @@ export default function AuthenticatedCacheBoundary({ children }: { children: Rea
 
   const crossesDataBoundary = crossesWebAuthDataBoundary(settledIdentity, identity);
   const blocksNewIdentity =
-    identity.kind === "unreadable" ||
-    (crossesDataBoundary &&
-      identity.kind !== "anonymous" &&
-      !isSameWebAuthIdentity(settledIdentity, identity));
+    !onSessionEntryRoute &&
+    (identity.kind === "unreadable" ||
+      (crossesDataBoundary &&
+        identity.kind !== "anonymous" &&
+        !isSameWebAuthIdentity(settledIdentity, identity)));
 
   useEffect(() => {
     if (isSameWebAuthIdentity(settledIdentity, identity)) return;
@@ -56,7 +80,9 @@ export default function AuthenticatedCacheBoundary({ children }: { children: Rea
     // sessionStorage handoff marker, so a received organization claim still
     // hard-reloads them across the same cache boundary.
     const shouldReload =
-      changesWebAuthOrganization(settledIdentity, identity) && !isAuthTransitionPending();
+      changesWebAuthOrganization(settledIdentity, identity) &&
+      !isAuthTransitionPending() &&
+      !onSessionEntryRoute;
 
     if (!crossesDataBoundary) {
       setSettledIdentity(identity);
@@ -76,7 +102,7 @@ export default function AuthenticatedCacheBoundary({ children }: { children: Rea
       }
       setSettledIdentity(identity);
     });
-  }, [crossesDataBoundary, identity, queryClient, settledIdentity]);
+  }, [crossesDataBoundary, identity, onSessionEntryRoute, queryClient, settledIdentity]);
 
   useEffect(
     () => () => {
@@ -85,5 +111,8 @@ export default function AuthenticatedCacheBoundary({ children }: { children: Rea
     [],
   );
 
-  return blocksNewIdentity ? null : children;
+  if (!blocksNewIdentity) return children;
+  // A sign-in that reaches the app before the previous identity's data is gone
+  // waits here; say so rather than showing a blank page.
+  return isAuthTransitionPending() ? <AuthTransitionScreen phase="signing-in" /> : null;
 }

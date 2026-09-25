@@ -5,11 +5,21 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AuthenticatedCacheBoundary from "@/components/AuthenticatedCacheBoundary";
 import { AuthContext, type AuthContextType } from "@/lib/auth-context";
+import { consumeAuthTransition, markAuthTransition } from "@/lib/auth-transition";
 
 const mocks = vi.hoisted(() => ({
   getChannels: vi.fn(),
   removeChannel: vi.fn(),
   reloadOrganization: vi.fn(),
+  pathname: "/dashboard",
+}));
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => mocks.pathname,
+}));
+
+vi.mock("@/hooks/useLogout", () => ({
+  useLogout: () => ({ signOut: vi.fn() }),
 }));
 
 vi.mock("@/features/account/client", () => ({
@@ -61,6 +71,8 @@ function Harness({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.pathname = "/dashboard";
+  consumeAuthTransition();
   mocks.getChannels.mockReturnValue([]);
   mocks.removeChannel.mockResolvedValue(undefined);
 });
@@ -144,6 +156,79 @@ describe("AuthenticatedCacheBoundary", () => {
     expect(clear).toHaveBeenCalledTimes(1);
     expect(mocks.removeChannel).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("authenticated content")).not.toBeInTheDocument();
+  });
+
+  it("keeps the sign-in form mounted while another user's data is cleared", async () => {
+    mocks.pathname = "/login";
+    const client = new QueryClient();
+    const clear = vi.spyOn(client, "clear");
+    client.setQueryData(["tenant-data"], "old-user");
+
+    const view = render(
+      <Harness client={client} session={authSession("user-1", "org-1")}>
+        <input aria-label="Email" defaultValue="new@example.com" />
+      </Harness>,
+    );
+    const field = screen.getByLabelText("Email");
+
+    view.rerender(
+      <Harness client={client} session={authSession("user-2", "org-1")}>
+        <input aria-label="Email" defaultValue="new@example.com" />
+      </Harness>,
+    );
+
+    expect(screen.getByLabelText("Email")).toBe(field);
+    await waitFor(() => expect(clear).toHaveBeenCalledTimes(1));
+    expect(screen.getByLabelText("Email")).toBe(field);
+    expect(client.getQueryData(["tenant-data"])).toBeUndefined();
+  });
+
+  it("does not reload a sign-in screen when the new session is in another organization", async () => {
+    mocks.pathname = "/login";
+    const client = new QueryClient();
+    const clear = vi.spyOn(client, "clear");
+
+    const view = render(
+      <Harness client={client} session={authSession("user-1", "org-1")}>
+        <span>sign-in form</span>
+      </Harness>,
+    );
+    view.rerender(
+      <Harness client={client} session={authSession("user-1", "org-2")}>
+        <span>sign-in form</span>
+      </Harness>,
+    );
+
+    await waitFor(() => expect(clear).toHaveBeenCalledTimes(1));
+    expect(mocks.reloadOrganization).not.toHaveBeenCalled();
+    expect(screen.getByText("sign-in form")).toBeInTheDocument();
+  });
+
+  it("says a sign-in is in progress while the app waits for the old data to clear", async () => {
+    let finishCancel!: () => void;
+    const client = new QueryClient();
+    vi.spyOn(client, "cancelQueries").mockReturnValue(
+      new Promise<void>((resolve) => {
+        finishCancel = resolve;
+      }),
+    );
+
+    const view = render(
+      <Harness client={client} session={authSession("user-1", "org-1")}>
+        <span>authenticated content</span>
+      </Harness>,
+    );
+    markAuthTransition();
+    view.rerender(
+      <Harness client={client} session={authSession("user-2", "org-1")}>
+        <span>authenticated content</span>
+      </Harness>,
+    );
+
+    expect(screen.getByText("Signing you in")).toBeInTheDocument();
+    expect(screen.queryByText("authenticated content")).not.toBeInTheDocument();
+    await act(async () => finishCancel());
+    await waitFor(() => expect(screen.getByText("authenticated content")).toBeInTheDocument());
   });
 
   it("does not finish a stale organization reload after a newer sign-out", async () => {
