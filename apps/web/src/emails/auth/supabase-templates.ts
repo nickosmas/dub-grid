@@ -21,8 +21,9 @@ export interface SupabaseAuthTemplate {
   placeholders: readonly string[];
   /**
    * A security notice is declared in `[auth.email.notification.<type>]` and
-   * sends only when enabled. The MFA notices stay off because DubGrid's own
-   * two-factor alert covers them; nothing in DubGrid sends the other two.
+   * sends only when enabled. All four are on: nothing in DubGrid emails the
+   * password and email notices, and the MFA notices reach the owner even for a
+   * change made with a stolen token, so DubGrid's own alert pushes only.
    */
   notification?: { type: string; enabled: boolean };
 }
@@ -78,12 +79,12 @@ export const SUPABASE_AUTH_TEMPLATES: readonly SupabaseAuthTemplate[] = [
     key: "mfa_factor_enrolled_notification",
     Component: MfaFactorEnrolledEmail,
     placeholders: ["{{ .SiteURL }}"],
-    notification: { type: "mfa_factor_enrolled", enabled: false },
+    notification: { type: "mfa_factor_enrolled", enabled: true },
   },
   {
     key: "mfa_factor_unenrolled_notification",
     Component: MfaFactorUnenrolledEmail,
     placeholders: ["{{ .SiteURL }}"],
-    notification: { type: "mfa_factor_unenrolled", enabled: false },
+    notification: { type: "mfa_factor_unenrolled", enabled: true },
   },
 ];

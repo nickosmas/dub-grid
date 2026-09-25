@@ -205,6 +205,31 @@ describe("AppLockProvider", () => {
     expect(authenticateAsync).not.toHaveBeenCalled();
   });
 
+  it("keeps the privacy cover up when the token rotates while inactive", async () => {
+    appLockEnabled = true;
+    useSessionState.mockReturnValue({ accessToken: tokenFor("user-1", "a"), isLoading: false });
+    const view = render(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+    await waitFor(() => {
+      expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+    });
+
+    act(() => {
+      appStateListener?.("inactive");
+    });
+    useSessionState.mockReturnValue({ accessToken: tokenFor("user-1", "b"), isLoading: false });
+    view.rerender(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+
+    expect(screen.getByTestId("app-lock-cover")).toBeInTheDocument();
+  });
+
   it("never leaves the privacy cover up after a sign-out while covered", async () => {
     appLockEnabled = true;
     const view = render(

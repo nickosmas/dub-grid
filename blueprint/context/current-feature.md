@@ -36,11 +36,24 @@ Continuous Mode: they push, send, reach production or reseed shared state.
 
 ## Build steps
 
+- [x] **Step 0 - owner decisions** (delegated 2026-09-25) - F-08 (Supabase
+      MFA notices on, DubGrid's two-factor alert push-only), F-16 and F-17
+      (role grants and audit export require fresh proof), F-42 (the lock
+      effect keyed on having a session) and F-47 (the password rule requires
+      a letter and a number).
+
 - [ ] **Step 1 - local browser rehearsal** (approval and an isolated stack)
 - [ ] **Step 2 - native rehearsal** (device access)
 - [ ] **Step 3 - email provider rehearsal** (approval to send)
-- [ ] **Step 4 - production migration 047** (approval; runbook)
-- [ ] **Step 5 - production Auth settings** (approval; owner's token)
+- [x] **Step 4 - production migration 047** - applied 2026-09-25 19:17 UTC
+      by another session after a scratch rehearsal; the read-only inspector
+      reports 47 ledger entries, none missing, every invariant passing.
+      Latest backup before it: 2026-09-25 13:38:30 UTC (physical, completed).
+- [ ] **Step 5 - production Auth settings** (approval; owner's token) -
+      `.env.remote` has no `SUPABASE_ACCESS_TOKEN`, which the push script's
+      read-only comparison needs. Applying the templates and the four notice
+      flags (a separate approval) must happen before the release merges:
+      from F-08 on, DubGrid no longer emails two-factor changes itself.
 - [ ] **Step 6 - release PR green** (approval to push and open)
 
 ## Notes for the AI

@@ -251,9 +251,10 @@ subject = "Confirm your identity"
 content_path = "./supabase/templates/reauthentication.html"
 
 # Security notifications: after-the-fact alerts (no confirmation link) that
-# send only when enabled. Password and sign-in email changes are on because
-# nothing in DubGrid sends them; the MFA notices are declared but off because
-# DubGrid's own two-factor alert covers them. Phone number and identity
+# send only when enabled. All four are on: nothing in DubGrid emails password
+# or sign-in email changes, and the MFA notices reach the owner even when a
+# factor is changed with a stolen token that never passes through DubGrid
+# (whose own two-factor alert therefore pushes only). Phone number and identity
 # linked/unlinked notifications are skipped - this app doesn't enable phone
 # auth or external OAuth providers, so those could never fire. The CLI reads a
 # notification's content_path relative to this supabase/ directory, unlike a
@@ -270,12 +271,12 @@ subject = "Your email address was changed"
 content_path = "./templates/email_changed_notification.html"
 
 [auth.email.notification.mfa_factor_enrolled]
-enabled = false
+enabled = true
 subject = "A new sign-in verification method was added"
 content_path = "./templates/mfa_factor_enrolled_notification.html"
 
 [auth.email.notification.mfa_factor_unenrolled]
-enabled = false
+enabled = true
 subject = "A sign-in verification method was removed"
 content_path = "./templates/mfa_factor_unenrolled_notification.html"
 

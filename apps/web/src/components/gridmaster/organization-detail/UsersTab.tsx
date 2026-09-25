@@ -5,6 +5,8 @@ import { Form } from "@/components/Form";
 import { Button } from "@/components/Button";
 import PermissionsEditor from "@/components/PermissionsEditor";
 import { assignGridmasterOrgRoleByEmail } from "@/features/gridmaster/client";
+import { requireCredentialAssurance } from "@/features/account/client";
+import { useStepUpAction } from "@/hooks/useStepUpAction";
 import {
   OrganizationAccessConflictError,
   removeOrganizationMembershipGuarded,
@@ -56,6 +58,7 @@ export function UsersTab({
   onUsersChanged: () => void;
   onImpersonate?: (userId: string, orgId?: string) => void;
 }) {
+  const stepUp = useStepUpAction();
   const [changingRole, setChangingRole] = useState<string | null>(null);
   const [roleChangeConfirm, setRoleChangeConfirm] = useState<{
     user: OrganizationUser;
@@ -161,7 +164,12 @@ export function UsersTab({
     if (!addUserConfirm) return;
     setAdding(true);
     try {
-      await assignGridmasterOrgRoleByEmail(orgId, addUserConfirm.email, addUserConfirm.role);
+      const { email, role } = addUserConfirm;
+      const completed = await stepUp.run(async (accessToken) => {
+        await requireCredentialAssurance(accessToken);
+        await assignGridmasterOrgRoleByEmail(orgId, email, role, accessToken);
+      });
+      if (!completed) return;
       toast.success(`User added as ${formatOrganizationRoleLabel(addUserConfirm.role)}`);
       setAddEmail("");
       setAddUserConfirm(null);
@@ -515,7 +523,8 @@ export function UsersTab({
         />
       )}
 
-      {addUserConfirm && (
+      {stepUp.dialog}
+      {addUserConfirm && !stepUp.dialog && (
         <ConfirmDialog
           title="Add Organization User"
           message={`Add "${addUserConfirm.email}" as ${formatOrganizationRoleLabel(addUserConfirm.role)} for this organization?`}

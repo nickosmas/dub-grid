@@ -1099,7 +1099,10 @@ async function dispatchNotificationEventInternal(
             "Two-factor authentication was turned on for your DubGrid sign-in. If this wasn't you, contact support@dubgrid.com right away."
           : "Two-factor authentication was turned off for your DubGrid sign-in. If this wasn't you, change your password, turn it back on, review your active sessions, and contact support@dubgrid.com.",
         { enabled: event.enabled },
-        { writeInApp: false },
+        // Supabase's own factor notices email every enrollment and removal,
+        // including one made with a stolen token that never reaches DubGrid,
+        // so this alert pushes only (41d3, F-08).
+        { writeInApp: false, sendEmail: false },
       );
       return;
     }

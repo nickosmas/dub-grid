@@ -22,9 +22,11 @@ export const PASSWORD_STRENGTH_RULES = [
     isMet: (password: string) => /[A-Z]/.test(password),
   },
   {
+    // Supabase's `letters_digits` requirement refuses a password without both,
+    // so the app asks for them rather than accept what sign-up then rejects.
     id: "number",
-    label: "Number",
-    isMet: (password: string) => /[0-9]/.test(password),
+    label: "Letter and number",
+    isMet: (password: string) => /[A-Za-z]/.test(password) && /[0-9]/.test(password),
   },
   {
     id: "symbol",
@@ -66,9 +68,16 @@ export function getPasswordStrengthLevel(password: string): number {
   return 1;
 }
 
-/** The bar a new password has to clear before any form will submit. */
+/**
+ * The bar a new password has to clear before any form will submit: the length,
+ * a letter and a number (which Supabase also requires), and an uppercase
+ * letter or a symbol.
+ */
 export function isPasswordAcceptable(password: string): boolean {
-  return getPasswordStrengthLevel(password) >= 2;
+  const met = Object.fromEntries(
+    getPasswordStrengthHints(password).map((hint) => [hint.id, hint.met]),
+  );
+  return Boolean(met.length && met.number && (met.uppercase || met.symbol));
 }
 
 /** One wording everywhere. Mobile reset previously said "Those passwords don't match." */

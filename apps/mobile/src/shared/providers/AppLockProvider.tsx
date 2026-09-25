@@ -113,9 +113,14 @@ export function AppLockProvider({ children }: PropsWithChildren) {
     }
   }, [lockIdentity]);
 
+  // Keyed on having a session, not on the token: a token that rotates while
+  // the app switcher is open would otherwise re-run the cleanup below and drop
+  // the cover until `background` (F-42).
+  const hasSession = Boolean(accessToken);
+
   // Lock whenever the app leaves the foreground.
   useEffect(() => {
-    if (appLockUnsupported || !accessToken || !required) return;
+    if (appLockUnsupported || !hasSession || !required) return;
 
     // Only leaving for the background arms the lock. iOS also reports
     // `inactive` while the system Face ID prompt is up, so treating that as
@@ -133,7 +138,7 @@ export function AppLockProvider({ children }: PropsWithChildren) {
       // while the app was covered), so the cover must not outlive it.
       setObscured(false);
     };
-  }, [accessToken, required]);
+  }, [hasSession, required]);
 
   const showLock =
     !appLockUnsupported && Boolean(lockIdentity) && required && unlockedFor !== lockIdentity;

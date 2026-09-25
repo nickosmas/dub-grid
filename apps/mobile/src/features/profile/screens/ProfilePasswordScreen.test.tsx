@@ -300,7 +300,7 @@ describe("ProfilePasswordScreen", () => {
 
     expect(screen.getByText("At least 10 characters")).toBeInTheDocument();
     expect(screen.getByText("Uppercase letter")).toBeInTheDocument();
-    expect(screen.getByText("Number")).toBeInTheDocument();
+    expect(screen.getByText("Letter and number")).toBeInTheDocument();
     expect(screen.getByText("Symbol")).toBeInTheDocument();
     expect(screen.queryByText("Too short")).not.toBeInTheDocument();
 

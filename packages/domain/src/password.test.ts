@@ -43,9 +43,17 @@ describe("isPasswordAcceptable", () => {
     expect(isPasswordAcceptable("Aa1!")).toBe(false);
   });
 
-  it("accepts from strength level 2 upward", () => {
+  it("accepts a letter and a number with an uppercase letter or a symbol", () => {
     expect(isPasswordAcceptable("Aaaaaaaaa1")).toBe(true);
+    expect(isPasswordAcceptable("aaaaaaaa1!")).toBe(true);
     expect(isPasswordAcceptable("Aaaaaaaa1!")).toBe(true);
+  });
+
+  // Supabase requires a letter and a digit; these used to pass the app and
+  // then fail at sign-up (41d3, F-47).
+  it("refuses a password without a number or without a letter", () => {
+    expect(isPasswordAcceptable("Abcdefghij!")).toBe(false);
+    expect(isPasswordAcceptable("1234567890!")).toBe(false);
   });
 });
 

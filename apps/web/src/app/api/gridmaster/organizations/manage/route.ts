@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import type { DbOrganization } from "@dubgrid/db-types";
-import { createRequestSupabaseClient, requireGridmasterSession } from "@/lib/api-auth";
+import {
+  createRequestSupabaseClient,
+  requireGridmasterSession,
+  requireSensitiveActionAuth,
+} from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { composeOrganizationAddress } from "@/lib/organization-profile";
 import { rowToOrganization } from "@/lib/db/mappers";
@@ -155,6 +159,15 @@ export async function POST(req: NextRequest) {
   const parsed = requestSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
+  }
+
+  // Assigning a role can make any account Super Admin of any organization,
+  // so it needs fresh proof, as Gridmaster account changes do (41d3, F-16).
+  if (parsed.data.action === "assignOrgRoleByEmail") {
+    const assurance = await requireSensitiveActionAuth(req);
+    if ("response" in assurance) {
+      return assurance.response;
+    }
   }
 
   const requestClient = createRequestSupabaseClient(req);

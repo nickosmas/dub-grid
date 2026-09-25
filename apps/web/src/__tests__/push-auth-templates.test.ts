@@ -17,8 +17,8 @@ describe("push-auth-templates", () => {
     expect(notices.map((template) => template.notification)).toEqual([
       { type: "password_changed", enabled: true },
       { type: "email_changed", enabled: true },
-      { type: "mfa_factor_enrolled", enabled: false },
-      { type: "mfa_factor_unenrolled", enabled: false },
+      { type: "mfa_factor_enrolled", enabled: true },
+      { type: "mfa_factor_unenrolled", enabled: true },
     ]);
     expect(config.templates.every((template) => template.content.includes("<html"))).toBe(true);
     expect(config.otpLength).toBe(EMAIL_OTP_LENGTH);
@@ -51,9 +51,9 @@ describe("push-auth-templates", () => {
     );
   });
 
-  it("turns off a notice the repository declares off", () => {
-    const { payload } = diff({ mailer_notifications_mfa_factor_enrolled_enabled: true }, config);
+  it("turns on a notice the repository declares on", () => {
+    const { payload } = diff({ mailer_notifications_mfa_factor_enrolled_enabled: false }, config);
 
-    expect(payload.mailer_notifications_mfa_factor_enrolled_enabled).toBe(false);
+    expect(payload.mailer_notifications_mfa_factor_enrolled_enabled).toBe(true);
   });
 });
