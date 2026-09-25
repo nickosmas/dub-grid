@@ -338,7 +338,7 @@ describe("OnboardingGate setup lock", () => {
     renderGate();
 
     expect(await screen.findByText("Protected app")).toBeInTheDocument();
-    expect(screen.queryByText("Loading your organization")).not.toBeInTheDocument();
+    expect(screen.queryByText("Loading your workspace")).not.toBeInTheDocument();
   });
 
   it("waits for matching bootstrap data before applying another org's admission state", async () => {

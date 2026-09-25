@@ -85,7 +85,7 @@ test.describe("degraded-network authentication recovery", () => {
     const routeBeforeRecovery = new URL(page.url()).pathname;
     await page.reload();
 
-    await expect(page.getByRole("heading", { name: "Loading your organization" })).toBeVisible({
+    await expect(page.getByRole("heading", { name: "Loading your workspace" })).toBeVisible({
       timeout: 30_000,
     });
     // Up to eight automatic attempts may run first (asserted below), each a
@@ -116,7 +116,7 @@ test.describe("degraded-network authentication recovery", () => {
     await page.getByRole("button", { name: "Try again" }).click();
 
     await expect.poll(() => bootstrapStatuses.at(-1), { timeout: 30_000 }).toBe(200);
-    await expect(page.getByRole("heading", { name: "Loading your organization" })).toBeHidden({
+    await expect(page.getByRole("heading", { name: "Loading your workspace" })).toBeHidden({
       timeout: 30_000,
     });
     expect(new URL(page.url()).pathname).toBe(routeBeforeRecovery);

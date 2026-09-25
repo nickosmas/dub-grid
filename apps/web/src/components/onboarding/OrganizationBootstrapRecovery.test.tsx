@@ -20,9 +20,7 @@ describe("OrganizationBootstrapRecovery", () => {
     try {
       render(<OrganizationBootstrapRecovery automaticallyRetry={false} onRetry={onRetry} />);
 
-      expect(
-        screen.getByRole("heading", { name: "Loading your organization" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Loading your workspace" })).toBeInTheDocument();
       expect(
         screen.getByText("Just a moment while we prepare everything you need."),
       ).toBeInTheDocument();
