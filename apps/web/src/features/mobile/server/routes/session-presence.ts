@@ -5,10 +5,7 @@ import { requireMobileAuth } from "@/features/mobile/server";
 import logger from "@/lib/logger";
 import { createMobileOptionsHandler, withMobileCors } from "./cors";
 import { getSessionLocation } from "@/features/account/server/session-location";
-import {
-  isNewSignInSession,
-  scheduleSecurityAlert,
-} from "@/features/account/server/security-alerts";
+import { claimNewSignIn, scheduleSecurityAlert } from "@/features/account/server/security-alerts";
 
 const CORS_METHODS = ["POST", "OPTIONS"] as const;
 
@@ -53,8 +50,13 @@ export async function POST(req: NextRequest) {
     null;
   const location = getSessionLocation(req.headers);
 
-  // Before the upsert, which records this session as seen.
-  const isNewSignIn = await isNewSignInSession(auth.user.id, supabaseSessionId);
+  // Before the upsert, which fills in the platform this claim keys on.
+  const isNewSignIn = await claimNewSignIn({
+    userId: auth.user.id,
+    supabaseSessionId,
+    platform: parsed.data.platform,
+    claims: auth.claims,
+  });
 
   try {
     await trackUserSessionForUser({

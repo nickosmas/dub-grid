@@ -4,10 +4,7 @@ import { z } from "zod";
 import { trackUserSessionForUser } from "@/features/account/server";
 import { requireAuthenticatedSession } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
-import {
-  isNewSignInSession,
-  scheduleSecurityAlert,
-} from "@/features/account/server/security-alerts";
+import { claimNewSignIn, scheduleSecurityAlert } from "@/features/account/server/security-alerts";
 import logger from "@/lib/logger";
 import { getSessionLocation } from "@/features/account/server/session-location";
 
@@ -46,8 +43,13 @@ export async function POST(req: NextRequest) {
       null;
     const location = getSessionLocation(req.headers);
 
-    // Before the upsert, which records this session as seen.
-    const isNewSignIn = await isNewSignInSession(auth.user.id, sessionClaims.supabaseSessionId);
+    // Before the upsert, which fills in the platform this claim keys on.
+    const isNewSignIn = await claimNewSignIn({
+      userId: auth.user.id,
+      supabaseSessionId: sessionClaims.supabaseSessionId,
+      platform,
+      claims: sessionClaims.claims,
+    });
 
     await trackUserSessionForUser({
       userId: auth.user.id,
@@ -94,11 +96,12 @@ export async function POST(req: NextRequest) {
 function extractSupabaseSessionClaims(accessToken: string): {
   supabaseSessionId: string | null;
   orgId: string | null;
+  claims: Record<string, unknown> | null;
 } {
   try {
     const [, encodedPayload] = accessToken.split(".");
     if (!encodedPayload) {
-      return { supabaseSessionId: null, orgId: null };
+      return { supabaseSessionId: null, orgId: null, claims: null };
     }
 
     const normalized = encodedPayload.replace(/-/g, "+").replace(/_/g, "/");
@@ -109,9 +112,10 @@ function extractSupabaseSessionClaims(accessToken: string): {
     return {
       supabaseSessionId: typeof payload.session_id === "string" ? payload.session_id : null,
       orgId: typeof payload.org_id === "string" ? payload.org_id : null,
+      claims: payload,
     };
   } catch {
-    return { supabaseSessionId: null, orgId: null };
+    return { supabaseSessionId: null, orgId: null, claims: null };
   }
 }
 

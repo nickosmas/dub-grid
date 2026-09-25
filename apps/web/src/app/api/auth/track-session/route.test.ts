@@ -5,8 +5,7 @@ const requireAuthenticatedSession = vi.fn();
 const validateCsrfOrigin = vi.fn();
 const trackUserSessionForUser = vi.fn();
 const dispatchNotificationEvent = vi.fn();
-const newDeviceLookup = vi.fn();
-const lookupFilters: Array<[string, unknown]> = [];
+const claimNewSignIn = vi.fn();
 const after = vi.fn((task: () => unknown) => void task());
 
 vi.mock("next/server", async (importOriginal) => ({
@@ -30,22 +29,9 @@ vi.mock("@/features/notifications/server/events", () => ({
   dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
 }));
 
-vi.mock("@/lib/supabase-service", () => ({
-  getServiceClient: () => ({
-    from: () => ({
-      select: () => ({
-        eq: (column: string, value: unknown) => {
-          lookupFilters.push([column, value]);
-          return {
-            eq: (column2: string, value2: unknown) => {
-              lookupFilters.push([column2, value2]);
-              return { limit: () => newDeviceLookup() };
-            },
-          };
-        },
-      }),
-    }),
-  }),
+vi.mock("@/features/account/server/security-alerts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/account/server/security-alerts")>()),
+  claimNewSignIn: (...args: unknown[]) => claimNewSignIn(...args),
 }));
 
 vi.mock("@/lib/logger", () => ({
@@ -60,7 +46,6 @@ import { POST } from "@/app/api/auth/track-session/route";
 describe("POST /api/auth/track-session", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    lookupFilters.length = 0;
     validateCsrfOrigin.mockReturnValue(null);
     requireAuthenticatedSession.mockResolvedValue({
       session: {
@@ -73,8 +58,8 @@ describe("POST /api/auth/track-session", () => {
     });
     trackUserSessionForUser.mockResolvedValue(undefined);
     dispatchNotificationEvent.mockResolvedValue({ success: true });
-    // Default: this session was already recorded, so it is not a new sign-in.
-    newDeviceLookup.mockResolvedValue({ data: [{ id: "existing-session" }] });
+    // Default: this session was already reported, so it is not a new sign-in.
+    claimNewSignIn.mockResolvedValue(false);
   });
 
   it("rejects unauthenticated requests", async () => {
@@ -141,7 +126,7 @@ describe("POST /api/auth/track-session", () => {
   });
 
   it("alerts, after the response, on a sign-in session not seen before", async () => {
-    newDeviceLookup.mockResolvedValueOnce({ data: [] });
+    claimNewSignIn.mockResolvedValueOnce(true);
 
     await POST(
       new NextRequest("http://localhost/api/auth/track-session", {
@@ -201,10 +186,9 @@ describe("POST /api/auth/track-session", () => {
     );
   });
 
-  // Every Mac reports "Macintosh", so keying on the label hid a second Mac.
-  it("recognises a sign-in by its session, not its device label", async () => {
-    newDeviceLookup.mockResolvedValueOnce({ data: [] });
-
+  // Every Mac reports "Macintosh", so the claim keys on the session, and it
+  // runs before the upsert that fills in the platform it claims.
+  it("claims the sign-in by its session before recording it", async () => {
     await POST(
       new NextRequest("http://localhost/api/auth/track-session", {
         method: "POST",
@@ -213,10 +197,17 @@ describe("POST /api/auth/track-session", () => {
       }),
     );
 
-    expect(lookupFilters).toEqual([
-      ["user_id", "session-user"],
-      ["supabase_session_id", "session-id-1"],
-    ]);
+    expect(claimNewSignIn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "session-user",
+        supabaseSessionId: "session-id-1",
+        platform: "web",
+        claims: expect.objectContaining({ session_id: "session-id-1" }),
+      }),
+    );
+    expect(claimNewSignIn.mock.invocationCallOrder[0]).toBeLessThan(
+      trackUserSessionForUser.mock.invocationCallOrder[0]!,
+    );
   });
 
   it("stays quiet when the same session reports again", async () => {
