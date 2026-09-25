@@ -400,6 +400,9 @@ describe("audience", () => {
       "Signed out one of their devices",
     );
     expect(describeAuditAction("security.auth.session", {})).toBe("Signed out");
+    expect(
+      describeAuditAction("security.auth.session", { scope: "global", reason: "password_changed" }),
+    ).toBe("Changed their password and signed out everywhere");
   });
 
   it("never shows an organization copy the registry did not write", () => {

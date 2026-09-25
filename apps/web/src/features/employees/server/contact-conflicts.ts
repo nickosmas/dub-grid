@@ -9,6 +9,14 @@ export type EmployeeContactConflict = {
   reason?: EmployeeEmailConflictReason;
 };
 
+/**
+ * `ilike` reads `_` and `%` as wildcards, so `john_doe@x.com` would match
+ * `john.doe@x.com`, which the case-insensitive unique index accepts.
+ */
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, (character) => `\\${character}`);
+}
+
 /** Thrown so callers can answer with their own "we couldn't check that" copy. */
 export class EmployeeContactLookupError extends Error {
   constructor(
@@ -55,7 +63,7 @@ export async function checkEmployeeEmailConflict(
     .from("employees")
     .select("id")
     .eq("org_id", input.orgId)
-    .ilike("email", normalized)
+    .ilike("email", escapeLikePattern(normalized))
     .is("archived_at", null);
   if (input.excludeEmployeeId) {
     employeeQuery = employeeQuery.neq("id", input.excludeEmployeeId);

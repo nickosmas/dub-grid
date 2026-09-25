@@ -34,6 +34,7 @@ vi.mock("@/lib/api-auth", () => ({
 vi.mock("@/lib/sentry", () => ({ captureException: vi.fn() }));
 vi.mock("@/lib/auth/security-audit", () => ({ writeSecurityAuditEvent: vi.fn() }));
 
+import { writeSecurityAuditEvent } from "@/lib/auth/security-audit";
 import { POST } from "./route";
 
 function makeRequest(body?: unknown) {
@@ -99,6 +100,33 @@ describe("POST /api/auth/sign-out", () => {
     expect(revokeSession).not.toHaveBeenCalled();
     expect(createTokenScopedClient).toHaveBeenCalledWith("fresh-token");
     expect(providerSignOut).toHaveBeenCalledWith("fresh-token", "global");
+  });
+
+  // The password change itself is a direct Supabase call; the sign-out that
+  // follows is the server-side moment it can be recorded (41b2).
+  it("records a password change on the global sign-out that follows it", async () => {
+    const response = await POST(makeRequest({ scope: "global", reason: "password_change" }));
+
+    expect(response.status).toBe(200);
+    // Still the ordinary sensitive-action gate, not the recovery exception.
+    expect(requireSensitiveActionAuth).toHaveBeenCalledOnce();
+    expect(requireLiveAuthenticatedSession).not.toHaveBeenCalled();
+    expect(writeSecurityAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "security.auth.session",
+        reason: "password_changed",
+        metadata: { scope: "global" },
+      }),
+    );
+  });
+
+  it("does not label an other-devices sign-out as a password change", async () => {
+    const response = await POST(makeRequest({ scope: "others", reason: "password_change" }));
+
+    expect(response.status).toBe(200);
+    expect(writeSecurityAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: "session_revoked" }),
+    );
   });
 
   it("allows fresh recovery proof to revoke all prior sessions", async () => {

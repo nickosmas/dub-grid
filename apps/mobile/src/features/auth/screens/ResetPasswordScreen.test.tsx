@@ -12,6 +12,9 @@ const resetPasswordForEmail = vi.fn();
 const createEphemeralSupabaseClient = vi.fn();
 const getSupabaseClient = vi.fn();
 const signOutMobileSessions = vi.fn();
+const getAuthenticatorAssuranceLevel = vi.fn();
+const listFactors = vi.fn();
+const challengeAndVerify = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
@@ -58,10 +61,37 @@ beforeEach(() => {
   updateUser.mockResolvedValue({ error: null });
   signOut.mockResolvedValue({ error: null });
   resetPasswordForEmail.mockResolvedValue({ error: null });
+  getAuthenticatorAssuranceLevel.mockResolvedValue({
+    data: { currentLevel: "aal1", nextLevel: "aal1" },
+    error: null,
+  });
+  listFactors.mockResolvedValue({
+    data: { totp: [{ id: "factor-1", status: "verified" }] },
+    error: null,
+  });
+  challengeAndVerify.mockResolvedValue({ data: { access_token: "promoted-token" }, error: null });
   createEphemeralSupabaseClient.mockReturnValue({
-    auth: { verifyOtp, updateUser, signOut, resetPasswordForEmail },
+    auth: {
+      verifyOtp,
+      updateUser,
+      signOut,
+      resetPasswordForEmail,
+      mfa: { getAuthenticatorAssuranceLevel, listFactors, challengeAndVerify },
+    },
   });
 });
+
+async function setNewPassword() {
+  fireEvent.change(screen.getByPlaceholderText("New password"), {
+    target: { value: "Str0ng!Passphrase" },
+  });
+  fireEvent.change(screen.getByPlaceholderText("Confirm password"), {
+    target: { value: "Str0ng!Passphrase" },
+  });
+  await act(async () => {
+    fireEvent.click(screen.getByText("Update password"));
+  });
+}
 
 async function enterCode(value = "123456") {
   fireEvent.change(screen.getByPlaceholderText("000000"), { target: { value } });
@@ -426,5 +456,143 @@ describe("ResetPasswordScreen", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  // Supabase refuses a new password from a two-factor account's recovery
+  // session until its authenticator code promotes the session (41b2).
+  describe("a two-factor account", () => {
+    beforeEach(() => {
+      getAuthenticatorAssuranceLevel.mockResolvedValue({
+        data: { currentLevel: "aal1", nextLevel: "aal2" },
+        error: null,
+      });
+    });
+
+    async function enterFactorCode(value = "654321") {
+      fireEvent.change(screen.getByLabelText("Authenticator code"), { target: { value } });
+      await act(async () => {
+        fireEvent.click(screen.getByText("Verify authenticator code"));
+      });
+    }
+
+    it("asks for the authenticator code, then signs out with the promoted session", async () => {
+      render(<ResetPasswordScreen />);
+      await enterCode();
+
+      expect(await screen.findByText("Enter your authenticator code")).toBeInTheDocument();
+      expect(screen.queryByText("Set a new password")).not.toBeInTheDocument();
+
+      await enterFactorCode();
+      expect(challengeAndVerify).toHaveBeenCalledWith({ factorId: "factor-1", code: "654321" });
+      expect(await screen.findByText("Set a new password")).toBeInTheDocument();
+
+      await setNewPassword();
+      expect(signOutMobileSessions).toHaveBeenCalledWith("promoted-token", {
+        scope: "global",
+        reason: "password_recovery",
+      });
+    });
+
+    it("keeps the code step for a wrong authenticator code", async () => {
+      challengeAndVerify.mockResolvedValue({
+        data: null,
+        error: Object.assign(new Error("Invalid TOTP code entered"), { status: 422 }),
+      });
+      render(<ResetPasswordScreen />);
+      await enterCode();
+      await enterFactorCode();
+
+      expect(
+        await screen.findByText(
+          "That code didn't work. Check your authenticator app and try again.",
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Set a new password")).not.toBeInTheDocument();
+    });
+
+    it("points to support when the account has no usable authenticator", async () => {
+      listFactors.mockResolvedValue({ data: { totp: [] }, error: null });
+      render(<ResetPasswordScreen />);
+      await enterCode();
+
+      expect(
+        await screen.findByText(
+          "We couldn't find an authenticator app on this account. Contact support for help.",
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Set a new password")).not.toBeInTheDocument();
+    });
+
+    it("signs the recovery session out from the no-authenticator stage", async () => {
+      listFactors.mockResolvedValue({ data: { totp: [] }, error: null });
+      render(<ResetPasswordScreen />);
+      await enterCode();
+      await screen.findByText("We can't finish this reset");
+
+      await act(async () => {
+        fireEvent.click(screen.getByText("Back to sign in"));
+      });
+
+      expect(signOut).toHaveBeenCalledWith({ scope: "local" });
+      expect(routerReplace).toHaveBeenCalledWith("/(auth)/login");
+    });
+
+    // The emailed code is spent once it verifies, so a retry after a failed
+    // lookup must not send it again (F-03).
+    it("retries only the lookup when it fails after the code verified", async () => {
+      getAuthenticatorAssuranceLevel.mockRejectedValueOnce(new TypeError("Network request failed"));
+      render(<ResetPasswordScreen />);
+      await enterCode();
+      expect(screen.queryByText("Enter your authenticator code")).not.toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(screen.getByText("Verify code"));
+      });
+
+      expect(await screen.findByText("Enter your authenticator code")).toBeInTheDocument();
+      expect(verifyOtp).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves at once even when the recovery sign-out never settles", async () => {
+      signOut.mockReturnValue(new Promise(() => undefined));
+      render(<ResetPasswordScreen />);
+      await enterCode();
+      await screen.findByText("Enter your authenticator code");
+
+      await act(async () => {
+        fireEvent.click(screen.getByText("Back to sign in"));
+      });
+
+      expect(routerReplace).toHaveBeenCalledWith("/(auth)/login");
+    });
+
+    it("signs the recovery session out when the person backs out", async () => {
+      render(<ResetPasswordScreen />);
+      await enterCode();
+      await screen.findByText("Enter your authenticator code");
+
+      await act(async () => {
+        fireEvent.click(screen.getByText("Back to sign in"));
+      });
+
+      expect(signOut).toHaveBeenCalledWith({ scope: "local" });
+      expect(routerReplace).toHaveBeenCalledWith("/(auth)/login");
+      expect(updateUser).not.toHaveBeenCalled();
+    });
+  });
+
+  it("goes to the authenticator step when the update is refused for its assurance level", async () => {
+    updateUser.mockResolvedValue({
+      error: Object.assign(new Error("AAL2 session is required"), {
+        status: 401,
+        code: "insufficient_aal",
+      }),
+    });
+    render(<ResetPasswordScreen />);
+    await enterCode();
+    await setNewPassword();
+
+    expect(await screen.findByText("Enter your authenticator code")).toBeInTheDocument();
+    expect(signOutMobileSessions).not.toHaveBeenCalled();
   });
 });

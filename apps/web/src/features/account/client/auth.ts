@@ -15,12 +15,15 @@ import { requestMfaLifecycle, signOutAccountSessions } from "./api";
 
 export type BrowserRealtimeChannel = ReturnType<typeof supabase.channel>;
 
-export async function signOutFromBrowser(scope: "local" | "others" | "global"): Promise<void> {
+export async function signOutFromBrowser(
+  scope: "local" | "others" | "global",
+  reason?: "password_change",
+): Promise<void> {
   if (scope !== "local") {
     try {
       const session = await settleWithRequestTimeout(getBrowserSession());
       if (!session) throw new Error("Please sign in again before managing devices.");
-      await signOutAccountSessions(scope, session.access_token);
+      await signOutAccountSessions(scope, session.access_token, reason);
     } finally {
       // Legacy global callers still exit locally if fresh proof is unavailable,
       // but the rejection remains visible: do not claim every device signed out.
@@ -227,6 +230,12 @@ export async function verifyBrowserTotpEnrollment(input: { factorId: string; cod
   return settleWithRequestTimeout<Awaited<ReturnType<typeof supabase.auth.mfa.challengeAndVerify>>>(
     supabase.auth.mfa.challengeAndVerify(input),
   );
+}
+
+export async function getBrowserAssuranceLevel() {
+  return settleWithRequestTimeout<
+    Awaited<ReturnType<typeof supabase.auth.mfa.getAuthenticatorAssuranceLevel>>
+  >(supabase.auth.mfa.getAuthenticatorAssuranceLevel());
 }
 
 export async function listBrowserMfaFactors() {

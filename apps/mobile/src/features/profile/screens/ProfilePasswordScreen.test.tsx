@@ -149,7 +149,10 @@ describe("ProfilePasswordScreen", () => {
       expect(updateUser).toHaveBeenCalledWith({ password: "New-password-123" });
       // Pushes off before the token dies, not after.
       expect(disablePushForCurrentDevice).toHaveBeenCalled();
-      expect(signOutMobileSessions).toHaveBeenCalledWith("fresh-token", { scope: "global" });
+      expect(signOutMobileSessions).toHaveBeenCalledWith("fresh-token", {
+        scope: "global",
+        reason: "password_change",
+      });
       expect(handleExpiredMobileSession).toHaveBeenCalledWith();
     });
     expect(signOut).not.toHaveBeenCalled();
@@ -172,6 +175,112 @@ describe("ProfilePasswordScreen", () => {
 
     await waitFor(() => expect(signOutMobileSessions).toHaveBeenCalled());
     expect(handleExpiredMobileSession).not.toHaveBeenCalled();
+  });
+
+  async function confirmUpdate() {
+    render(<ProfilePasswordScreen />);
+    fillValidPassword();
+    fireEvent.click(screen.getByRole("button", { name: "Update password" }));
+    await act(async () => {
+      fireEvent.click(
+        within(screen.getByRole("alert")).getByRole("button", { name: "Update and sign out" }),
+      );
+    });
+  }
+
+  // A lost response may hide an applied change; treating it as a failure used
+  // to leave every old session signed in (41b2).
+  it("signs out everywhere when the update's outcome is unknown", async () => {
+    getSupabaseClient.mockReturnValue({
+      auth: { updateUser: vi.fn().mockRejectedValue(new TypeError("Network request failed")) },
+    } as never);
+    handleExpiredMobileSession.mockResolvedValue(undefined);
+
+    await confirmUpdate();
+
+    await waitFor(() => {
+      expect(signOutMobileSessions).toHaveBeenCalledWith("fresh-token", {
+        scope: "global",
+        reason: "password_change",
+      });
+      expect(handleExpiredMobileSession).toHaveBeenCalled();
+    });
+    expect(pushToast).toHaveBeenCalledWith({
+      message:
+        "We couldn't confirm your new password, so we signed you out everywhere. Sign in with your new password. If it doesn't work, use your previous one.",
+      tone: "info",
+    });
+  });
+
+  it("treats a deadline like a lost response", async () => {
+    getSupabaseClient.mockReturnValue({
+      auth: {
+        updateUser: vi
+          .fn()
+          .mockRejectedValue(
+            Object.assign(new Error("Request timed out"), { name: "RequestTimeoutError" }),
+          ),
+      },
+    } as never);
+    handleExpiredMobileSession.mockResolvedValue(undefined);
+
+    await confirmUpdate();
+
+    await waitFor(() => expect(handleExpiredMobileSession).toHaveBeenCalled());
+    expect(signOutMobileSessions).toHaveBeenCalledWith("fresh-token", {
+      scope: "global",
+      reason: "password_change",
+    });
+  });
+
+  it("signs nothing out when the update is definitely refused", async () => {
+    getSupabaseClient.mockReturnValue({
+      auth: {
+        updateUser: vi.fn().mockResolvedValue({
+          error: Object.assign(new Error("New password should be different"), {
+            status: 422,
+            code: "same_password",
+          }),
+        }),
+      },
+    } as never);
+
+    await confirmUpdate();
+
+    await waitFor(() => expect(stepUpRun).toHaveBeenCalled());
+    expect(signOutMobileSessions).not.toHaveBeenCalled();
+    expect(handleExpiredMobileSession).not.toHaveBeenCalled();
+  });
+
+  // The retry used to run the update again with the same password, which the
+  // provider refuses as unchanged, so the sign-out could never be finished.
+  // A network failure used to close the dialog with a generic toast, leaving
+  // editable fields and no sign the password had already changed (F-02).
+  it("finishes only the sign-out once the password has changed, and says so", async () => {
+    const updateUser = vi.fn().mockResolvedValue({ error: null });
+    getSupabaseClient.mockReturnValue({ auth: { updateUser } } as never);
+    signOutMobileSessions.mockRejectedValueOnce(new TypeError("Network request failed"));
+    handleExpiredMobileSession.mockResolvedValue(undefined);
+
+    await confirmUpdate();
+    await waitFor(() => expect(signOutMobileSessions).toHaveBeenCalledTimes(1));
+    expect(handleExpiredMobileSession).not.toHaveBeenCalled();
+
+    const dialog = screen.getByRole("alert");
+    expect(
+      within(dialog).getByText(
+        "Your password changed, but we couldn't sign out every session. Try again.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText("Finish signing out?")).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole("button", { name: "Sign out everywhere" }));
+    });
+
+    await waitFor(() => expect(handleExpiredMobileSession).toHaveBeenCalled());
+    expect(updateUser).toHaveBeenCalledTimes(1);
+    expect(signOutMobileSessions).toHaveBeenCalledTimes(2);
   });
 
   it("masks each field until its own toggle is pressed, and shows the strength rules", () => {
@@ -254,6 +363,29 @@ describe("ProfilePasswordScreen", () => {
     await waitFor(() => {
       expect(navigatedActions).toEqual([{ type: "GO_BACK" }]);
     });
+  });
+
+  // Once the change landed, "won't be saved" was false and leaving stranded
+  // the sign-out (F-09).
+  it("warns that the sign-out is unfinished when leaving after the change", async () => {
+    getSupabaseClient.mockReturnValue({
+      auth: { updateUser: vi.fn().mockResolvedValue({ error: null }) },
+    } as never);
+    signOutMobileSessions.mockRejectedValueOnce(new Error("revocation unavailable"));
+    await confirmUpdate();
+    await waitFor(() => expect(signOutMobileSessions).toHaveBeenCalled());
+    fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Cancel" }));
+
+    act(() => {
+      expect(pressBack()).toBe(true);
+    });
+
+    expect(await screen.findByText("Leave without signing out?")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Your password already changed, but your other sessions are still signed in. Stay to finish signing out.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("keeps what was typed when the back press is called off", () => {

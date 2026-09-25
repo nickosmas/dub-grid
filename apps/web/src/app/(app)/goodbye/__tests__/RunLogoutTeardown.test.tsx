@@ -124,6 +124,38 @@ describe("RunLogoutTeardown", () => {
     });
   });
 
+  it("labels a password change's global sign-out for the audit trail", async () => {
+    renderWithClient(<RunLogoutTeardown scope="global" reason="password-changed" />);
+
+    await waitFor(() => {
+      expect(mockSignOutFromBrowser).toHaveBeenCalledWith("global", "password_change");
+    });
+    expect(mockToastInfo).toHaveBeenCalledWith(
+      "Your password changed, so we signed you out everywhere. Sign in with your new password.",
+      { duration: Infinity },
+    );
+  });
+
+  it("holds a password notice back when the sign-out everywhere fails", async () => {
+    mockSignOutFromBrowser.mockRejectedValueOnce(new Error("revocation unavailable"));
+    renderWithClient(<RunLogoutTeardown scope="global" reason="password-changed" />);
+
+    await waitFor(() => expect(mockSignOutFromBrowser).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(mockToastError).toHaveBeenCalledWith(
+        "Your password changed, but we couldn't sign out every device. Sign in with your new password and review your sessions.",
+      ),
+    );
+    expect(mockToastInfo).not.toHaveBeenCalled();
+  });
+
+  it("shows no password notice for a local sign-out", async () => {
+    renderWithClient(<RunLogoutTeardown scope="local" reason="password-changed" />);
+
+    await waitFor(() => expect(mockSignOutFromBrowser).toHaveBeenCalledWith("local"));
+    expect(mockToastInfo).not.toHaveBeenCalled();
+  });
+
   it("passes scope='global' through to signOutFromBrowser", async () => {
     renderWithClient(<RunLogoutTeardown scope="global" />);
 
@@ -231,6 +263,16 @@ describe("RunLogoutTeardown", () => {
 
     expect(mockToastInfo).toHaveBeenCalledWith(
       "You were signed out after 30 minutes of inactivity.",
+      { duration: Infinity },
+    );
+  });
+
+  it("explains a sign-out after a password change that could not be confirmed", async () => {
+    renderWithClient(<RunLogoutTeardown scope="global" reason="password-unconfirmed" />);
+
+    await waitFor(() => expect(mockToastInfo).toHaveBeenCalled());
+    expect(mockToastInfo).toHaveBeenCalledWith(
+      "We couldn't confirm your new password, so we signed you out everywhere. Sign in with your new password. If it doesn't work, use your previous one.",
       { duration: Infinity },
     );
   });

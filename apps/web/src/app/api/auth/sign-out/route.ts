@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   } catch {
     // No body is fine — "local" is the default.
   }
-  const { scope, recoveryCompletion } = parseSignOutBody(body);
+  const { scope, recoveryCompletion, passwordChange } = parseSignOutBody(body);
 
   if (scope !== "local") {
     const auth = recoveryCompletion
@@ -65,6 +65,7 @@ export async function POST(req: NextRequest) {
         sessionId: auth.sessionId,
         scope,
         recoveryCompletion,
+        passwordChange,
         orgId: auth.claims && typeof auth.claims.org_id === "string" ? auth.claims.org_id : null,
       });
       return NextResponse.json({ success: true }, { headers: { "Cache-Control": "no-store" } });

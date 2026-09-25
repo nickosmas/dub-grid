@@ -520,7 +520,7 @@ export type MobileSignOutScope = "local" | "others" | "global";
  */
 export function signOutMobileSessions(
   accessToken: string,
-  body: { scope: MobileSignOutScope; reason?: "password_recovery" },
+  body: { scope: MobileSignOutScope; reason?: "password_recovery" | "password_change" },
 ) {
   const init: RequestInit = { method: "POST", body: JSON.stringify(body) };
   return mobileRequest(

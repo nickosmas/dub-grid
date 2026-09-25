@@ -31,6 +31,7 @@ vi.mock("@/lib/api-auth", () => ({
 vi.mock("@/lib/auth/security-audit", () => ({ writeSecurityAuditEvent: vi.fn() }));
 vi.mock("@/lib/sentry", () => ({ captureException: vi.fn() }));
 
+import { writeSecurityAuditEvent } from "@/lib/auth/security-audit";
 import { POST } from "./auth-sign-out";
 
 function request(body?: unknown, token: string | null = "mobile-token") {
@@ -90,6 +91,16 @@ describe("POST mobile sign-out", () => {
     expect(response.status).toBe(200);
     expect(providerSignOut).toHaveBeenCalledWith("assured-token", "others");
     expect(revokeOtherUserSessions).toHaveBeenCalledWith("user-1", "session-1");
+  });
+
+  it("records a password change on the global sign-out that follows it", async () => {
+    const response = await POST(request({ scope: "global", reason: "password_change" }));
+
+    expect(response.status).toBe(200);
+    expect(requireMobileSensitiveActionAuth).toHaveBeenCalledOnce();
+    expect(writeSecurityAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "security.auth.session", reason: "password_changed" }),
+    );
   });
 
   it("forwards a step-up challenge for a bulk sign-out without revoking anything", async () => {

@@ -1155,6 +1155,9 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     severity: "warning",
     headline: (d) => {
       const scope = d.text("scope");
+      if (d.text("reason") === "password_changed") {
+        return "Changed their password and signed out everywhere";
+      }
       if (scope === "others") return "Signed out their other devices";
       if (scope === "global") return "Signed out everywhere";
       if (scope === "device") return "Signed out one of their devices";

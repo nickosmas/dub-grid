@@ -23,7 +23,12 @@ import { settleMobileAuthAction } from "../lib/request-deadline";
 const CODE_LENGTH = 6;
 const RESEND_COOLDOWN_SECONDS = 60;
 
-type Stage = "code" | "password";
+type Stage = "code" | "factor" | "no-factor" | "password";
+
+const NO_FACTOR_MESSAGE =
+  "We couldn't find an authenticator app on this account. Contact support for help.";
+const WRONG_FACTOR_CODE_MESSAGE =
+  "That code didn't work. Check your authenticator app and try again.";
 
 export default function ResetPasswordScreen() {
   const params = useLocalSearchParams<{ email?: string }>();
@@ -32,6 +37,7 @@ export default function ResetPasswordScreen() {
 
   const [stage, setStage] = useState<Stage>("code");
   const [code, setCode] = useState("");
+  const [factorCode, setFactorCode] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -41,6 +47,8 @@ export default function ResetPasswordScreen() {
   const [cooldown, setCooldown] = useState(RESEND_COOLDOWN_SECONDS);
 
   const codeInputRef = useRef<TextInput>(null);
+  const factorInputRef = useRef<TextInput>(null);
+  const factorIdRef = useRef<string | null>(null);
   const passwordInputRef = useRef<TextInput>(null);
   const confirmPasswordInputRef = useRef<TextInput>(null);
   // Held from the verification itself: a timed-out update can still hold the
@@ -84,16 +92,24 @@ export default function ResetPasswordScreen() {
     setError(null);
     setSubmitting(true);
     try {
-      const { data, error: verifyError } = await settleMobileAuthAction(
-        supabase.auth.verifyOtp({
-          email,
-          token: code,
-          type: "recovery",
-        }),
-      );
-      if (verifyError) throw verifyError;
-      recoveryAccessTokenRef.current = data?.session?.access_token ?? null;
+      // The emailed code is single-use: once it has verified, a retry after a
+      // failed lookup below only repeats the lookup (41b2/F-03).
+      if (!recoveryAccessTokenRef.current) {
+        const { data, error: verifyError } = await settleMobileAuthAction(
+          supabase.auth.verifyOtp({
+            email,
+            token: code,
+            type: "recovery",
+          }),
+        );
+        if (verifyError) throw verifyError;
+        recoveryAccessTokenRef.current = data?.session?.access_token ?? null;
+      }
 
+      if (await needsSecondFactor()) {
+        await openFactorStage();
+        return;
+      }
       setStage("password");
       setTimeout(() => passwordInputRef.current?.focus(), 0);
     } catch (caught) {
@@ -101,6 +117,73 @@ export default function ResetPasswordScreen() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  // Supabase refuses a new password from a two-factor account's recovery
+  // session until its authenticator code promotes the session to aal2 (41b2).
+  async function needsSecondFactor(): Promise<boolean> {
+    const { data, error: levelError } = await settleMobileAuthAction(
+      supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
+    );
+    if (levelError) throw levelError;
+    return data?.currentLevel === "aal1" && data.nextLevel === "aal2";
+  }
+
+  async function openFactorStage() {
+    const { data, error: listError } = await settleMobileAuthAction(
+      supabase.auth.mfa.listFactors(),
+    );
+    if (listError) throw listError;
+    const factor = data?.totp.find((candidate) => candidate.status === "verified");
+    if (!factor) {
+      setError(null);
+      setStage("no-factor");
+      return;
+    }
+    factorIdRef.current = factor.id;
+    setFactorCode("");
+    setError(null);
+    setStage("factor");
+    setTimeout(() => factorInputRef.current?.focus(), 0);
+  }
+
+  async function verifyFactor() {
+    if (submitting) return;
+    const factorId = factorIdRef.current;
+    if (!factorId) return;
+    if (factorCode.length !== CODE_LENGTH) {
+      setError(`Enter the ${CODE_LENGTH}-digit code from your authenticator app.`);
+      return;
+    }
+
+    setError(null);
+    setSubmitting(true);
+    try {
+      const { data, error: verifyError } = await settleMobileAuthAction(
+        supabase.auth.mfa.challengeAndVerify({ factorId, code: factorCode }),
+      );
+      if (verifyError) throw verifyError;
+      // The promoted session is the one the recovery sign-out must present.
+      recoveryAccessTokenRef.current = data?.access_token ?? recoveryAccessTokenRef.current;
+      setStage("password");
+      setTimeout(() => passwordInputRef.current?.focus(), 0);
+    } catch (caught) {
+      const status = (caught as { status?: unknown } | null)?.status;
+      setError(
+        status === 400 || status === 422
+          ? WRONG_FACTOR_CODE_MESSAGE
+          : getRecoveryErrorMessage(caught),
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function leaveRecovery() {
+    // Not awaited: the ephemeral client may still hold its auth lock after a
+    // timed-out request, and leaving must never wait on it (41b2/F-11).
+    void settleMobileAuthAction(supabase.auth.signOut({ scope: "local" })).catch(() => undefined);
+    router.replace("/(auth)/login");
   }
 
   async function resendCode() {
@@ -147,6 +230,13 @@ export default function ResetPasswordScreen() {
       if (updateError) throw updateError;
       confirmed = true;
     } catch (caught) {
+      if ((caught as { code?: unknown } | null)?.code === "insufficient_aal") {
+        setSubmitting(false);
+        await openFactorStage().catch((factorError: unknown) =>
+          setError(getRecoveryErrorMessage(factorError)),
+        );
+        return;
+      }
       if (!mayHavePasswordUpdateCommitted(caught)) {
         setError(getRecoveryErrorMessage(caught));
         setSubmitting(false);
@@ -253,7 +343,71 @@ export default function ResetPasswordScreen() {
             <Button
               disabled={submitting}
               label="Back to sign in"
-              onPress={() => router.replace("/(auth)/login")}
+              onPress={() => leaveRecovery()}
+              tone="link"
+            />
+          </AuthActions>
+        </AuthStage>
+      ) : stage === "no-factor" ? (
+        <AuthStage>
+          <AuthHeader
+            subtitle={<AppText tone="muted">{NO_FACTOR_MESSAGE}</AppText>}
+            title={<AppText variant="heroMetric">We can't finish this reset</AppText>}
+          />
+          <AuthActions
+            primaryAction={
+              <Button label="Back to sign in" onPress={() => leaveRecovery()} size="lg" />
+            }
+          />
+        </AuthStage>
+      ) : stage === "factor" ? (
+        <AuthStage>
+          <AuthHeader
+            subtitle={
+              <AppText tone="muted">
+                Your account uses two-step verification. Enter the 6-digit code from your
+                authenticator app.
+              </AppText>
+            }
+            title={<AppText variant="heroMetric">Enter your authenticator code</AppText>}
+          />
+
+          <AuthFields>
+            <AuthField
+              accessibilityLabel="Authenticator code"
+              autoComplete="one-time-code"
+              hasError={Boolean(error)}
+              inputAccessoryViewID={inputAccessoryViewID}
+              keyboardType="number-pad"
+              maxLength={CODE_LENGTH}
+              onChangeText={(value) => {
+                setFactorCode(value.replace(/\D/g, ""));
+                if (error) setError(null);
+              }}
+              onSubmitEditing={() => void verifyFactor()}
+              placeholder="000000"
+              ref={factorInputRef}
+              returnKeyType="go"
+              value={factorCode}
+              variant="code"
+            />
+            {error ? <AuthFieldError message={error} /> : null}
+          </AuthFields>
+
+          <AuthActions
+            primaryAction={
+              <Button
+                label="Verify authenticator code"
+                loading={submitting}
+                onPress={() => verifyFactor()}
+                size="lg"
+              />
+            }
+          >
+            <Button
+              disabled={submitting}
+              label="Back to sign in"
+              onPress={() => leaveRecovery()}
               tone="link"
             />
           </AuthActions>

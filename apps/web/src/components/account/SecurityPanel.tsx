@@ -4,6 +4,7 @@ import { useCallback, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { getPasswordMismatchError, isPasswordAcceptable } from "@dubgrid/domain";
+import { mayHavePasswordUpdateCommitted } from "@dubgrid/client-errors";
 
 import { SectionCard } from "@/components/settings/shared";
 import { Form } from "@/components/Form";
@@ -16,6 +17,7 @@ import { MFASetup } from "@/components/profile/MFASetup";
 import { SessionList } from "@/components/profile/SessionList";
 import { getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { extractErrorMessage } from "@/lib/error-handling";
+import { settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
 import { useLogout } from "@/hooks";
 import { useStepUpAction } from "@/hooks/useStepUpAction";
 import { queryKeys } from "@/lib/query-keys";
@@ -102,18 +104,29 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
     setSaving(true);
     let passwordUpdated = false;
     let shouldRedirect = false;
+    let unconfirmed = false;
     try {
       const completed = await stepUp.run(async (accessToken) => {
         // The preflight must finish before calling Supabase's public mutation.
         // The mutation is never automatically replayed after an ambiguous error.
         await requireCredentialAssurance(accessToken);
-        await updateBrowserUserPassword(newPassword);
+        try {
+          await settleWithRequestTimeout(updateBrowserUserPassword(newPassword));
+        } catch (updateError) {
+          // A lost response or a deadline may hide an applied change, so it
+          // finishes as one: everywhere signed out, never a retry (41b2).
+          if (!mayHavePasswordUpdateCommitted(updateError)) throw updateError;
+          unconfirmed = true;
+        }
       });
       if (!completed) return;
       passwordUpdated = true;
       shouldRedirect = true;
       // Rotate session everywhere after a password change. /goodbye handles teardown.
-      signOut({ scope: "global" });
+      signOut({
+        scope: "global",
+        reason: unconfirmed ? "password-unconfirmed" : "password-changed",
+      });
     } catch (err) {
       const msg = extractErrorMessage(err, "").toLowerCase();
       if (msg.includes("same") || msg.includes("different")) {

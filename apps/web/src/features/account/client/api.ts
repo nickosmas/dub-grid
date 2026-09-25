@@ -407,13 +407,14 @@ export function fetchAccountSessions(): Promise<{
 export function signOutAccountSessions(
   scope: "others" | "global",
   accessToken: string,
+  reason?: "password_change",
 ): Promise<{ success: true }> {
   return requestJson(
     "/api/auth/sign-out",
     {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-      body: JSON.stringify({ scope }),
+      body: JSON.stringify(reason ? { scope, reason } : { scope }),
     },
     { deadline: true },
   );

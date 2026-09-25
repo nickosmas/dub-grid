@@ -18,7 +18,8 @@ export type SecurityEventReason =
   | "factor_enrollment_started"
   | "factor_removed"
   | "reauthenticated"
-  | "session_revoked";
+  | "session_revoked"
+  | "password_changed";
 
 export type SecurityEventMetadata = {
   targetHash?: string;

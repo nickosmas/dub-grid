@@ -34,6 +34,11 @@ vi.mock("@/features/employees/server/login-email-follow-up", () => ({
   followUpLinkedLoginEmailChange: (...args: unknown[]) => followUpLinkedLoginEmailChange(...args),
 }));
 
+const checkEmployeeEmailConflict = vi.fn();
+vi.mock("@/features/employees/server/contact-conflicts", () => ({
+  checkEmployeeEmailConflict: (...args: unknown[]) => checkEmployeeEmailConflict(...args),
+}));
+
 vi.mock("@/app/api/shared/schedule", () => ({
   fetchAssignmentIdByPairMap: vi.fn(),
 }));
@@ -91,6 +96,7 @@ function makeEmployee(overrides: Record<string, unknown> = {}) {
     departmentIds: [],
     deptAdminIds: [5],
     userId: PERSON_USER_ID,
+    version: 0,
     ...overrides,
   };
 }
@@ -160,6 +166,7 @@ describe("POST /api/employees/manage", () => {
     requireAuthenticatedUser.mockResolvedValue({ user: { id: VIEWER_USER_ID } });
     resolveEffectiveOrgId.mockResolvedValue(ORG_ID);
     rowToEmployee.mockReturnValue(makeEmployee());
+    checkEmployeeEmailConflict.mockResolvedValue({ conflict: false, conflictingEmployeeId: null });
     fetchMobileManagementMembershipRowsByUserIds.mockResolvedValue([]);
     fetchMobilePendingInvitationRowByEmployeeId.mockResolvedValue(null);
     forbidIfSandboxCookie.mockReturnValue(null);
@@ -403,6 +410,49 @@ describe("POST /api/employees/manage", () => {
           field: "email",
         });
         expect(employeeUpdatePayloads).toHaveLength(0);
+      });
+
+      // The sign-in, sessions and notices all change before the row, so a save
+      // the row would refuse is refused before any of them (41b2).
+      it("refuses a stale version before touching the sign-in", async () => {
+        linkedManagementUser();
+        rowToEmployee.mockReturnValue(makeEmployee({ version: 3 }));
+
+        const response = await POST(updateEmployeeRequest({ email: "new@dubgrid.com" }));
+
+        expect(response.status).toBe(409);
+        expect(await response.json()).toMatchObject({ code: "EMPLOYEE_CONFLICT" });
+        expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
+        expect(updateUserById).not.toHaveBeenCalled();
+        expect(followUpLinkedLoginEmailChange).not.toHaveBeenCalled();
+      });
+
+      it("refuses an email another person uses before touching the sign-in", async () => {
+        linkedManagementUser();
+        checkEmployeeEmailConflict.mockResolvedValue({
+          conflict: true,
+          conflictingEmployeeId: "other-employee",
+          reason: "employee_duplicate",
+        });
+
+        const response = await POST(updateEmployeeRequest({ email: "taken@dubgrid.com" }));
+
+        expect(response.status).toBe(409);
+        expect(await response.json()).toEqual({
+          code: "EMPLOYEE_CONTACT_CONFLICT",
+          error: "That email is already used by another person.",
+          field: "email",
+          message: "That email is already used by another person.",
+        });
+        expect(checkEmployeeEmailConflict).toHaveBeenCalledWith(expect.anything(), {
+          orgId: ORG_ID,
+          email: "taken@dubgrid.com",
+          excludeEmployeeId: EMPLOYEE_ID,
+          currentUserId: PERSON_USER_ID,
+        });
+        expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
+        expect(updateUserById).not.toHaveBeenCalled();
+        expect(followUpLinkedLoginEmailChange).not.toHaveBeenCalled();
       });
 
       it("rejects clearing the email of a linked account", async () => {

@@ -11,6 +11,11 @@ const updateMobileEmployeeDetailsRow = vi.fn();
 const rowToEmployee = vi.fn();
 const validateStaffOrgReferences = vi.fn();
 
+const checkEmployeeEmailConflict = vi.fn();
+vi.mock("@/features/employees/server/contact-conflicts", () => ({
+  checkEmployeeEmailConflict: (...args: unknown[]) => checkEmployeeEmailConflict(...args),
+}));
+
 vi.mock("@/features/employees/server/login-email-follow-up", () => ({
   followUpLinkedLoginEmailChange: (...args: unknown[]) => followUpLinkedLoginEmailChange(...args),
 }));
@@ -96,6 +101,7 @@ function makeEmployee(overrides: Record<string, unknown> = {}) {
 describe("mobile person route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    checkEmployeeEmailConflict.mockResolvedValue({ conflict: false, conflictingEmployeeId: null });
     fetchMobileEmployeeRowById.mockResolvedValue({
       id: "row-1",
       user_id: PERSON_USER_ID,
@@ -394,6 +400,39 @@ describe("mobile person route", () => {
 
     describe("login email", () => {
       const params = { params: Promise.resolve({ id: "d660d308-4e0d-4daf-84fd-6753405e6740" }) };
+
+      // The sign-in changes before the row, so an email the row would refuse
+      // is refused before the sign-in, sessions or notices change (41b2).
+      it("refuses an email another person uses before touching the sign-in", async () => {
+        requireMobileAuth.mockResolvedValue(makeAuth());
+        checkEmployeeEmailConflict.mockResolvedValue({
+          conflict: true,
+          conflictingEmployeeId: "other-employee",
+          reason: "employee_duplicate",
+        });
+
+        const { PATCH } = await import("./person");
+        const response = await PATCH(patchRequest({ email: "taken@dubgrid.com" }), params);
+
+        expect(response.status).toBe(409);
+        expect(await response.json()).toMatchObject({
+          code: "EMPLOYEE_CONTACT_CONFLICT",
+          field: "email",
+          message: "That email is already used by another person.",
+        });
+        expect(checkEmployeeEmailConflict).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            email: "taken@dubgrid.com",
+            excludeEmployeeId: "d660d308-4e0d-4daf-84fd-6753405e6740",
+            currentUserId: PERSON_USER_ID,
+          }),
+        );
+        expect(requireMobileSensitiveActionAuth).not.toHaveBeenCalled();
+        expect(updateUserById).not.toHaveBeenCalled();
+        expect(followUpLinkedLoginEmailChange).not.toHaveBeenCalled();
+        expect(updateMobileEmployeeDetailsRow).not.toHaveBeenCalled();
+      });
 
       it("changes the login email behind step-up before writing the row", async () => {
         requireMobileAuth.mockResolvedValue(makeAuth());

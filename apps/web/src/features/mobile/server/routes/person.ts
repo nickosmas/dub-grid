@@ -15,7 +15,8 @@ import {
 } from "@/features/employees/server/login-email";
 import { followUpLinkedLoginEmailChange } from "@/features/employees/server/login-email-follow-up";
 import { loadMobilePersonWithAccess } from "@/features/mobile/server/person-access";
-import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
+import { emailContactConflict, getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
+import { checkEmployeeEmailConflict } from "@/features/employees/server/contact-conflicts";
 import {
   buildStaffValidationErrorResponse,
   getStaffFieldErrorsFromZod,
@@ -285,6 +286,20 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     nextEmail: update.email,
   });
   if (loginEmailChange && currentPerson.userId) {
+    // The sign-in changes before the row is written, so a contact email the
+    // row would refuse is refused here first (41b2). The version is checked
+    // above.
+    const emailConflict = await checkEmployeeEmailConflict(auth.serviceClient, {
+      orgId: auth.currentOrg.id,
+      email: loginEmailChange,
+      excludeEmployeeId: id,
+      currentUserId: currentPerson.userId,
+    });
+    if (emailConflict.conflict) {
+      return NextResponse.json(emailContactConflict(emailConflict.reason ?? "employee_duplicate"), {
+        status: 409,
+      });
+    }
     const assurance = await requireMobileSensitiveActionAuth(req);
     if ("response" in assurance) return assurance.response;
     try {

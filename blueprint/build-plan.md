@@ -582,13 +582,14 @@
           provider session and its refresh token, not only DubGrid's marker.
           Give mobile single-session revocation the web path's error handling,
           and audit single-session revocation on both platforms.
-    - [ ] 41b2. **Credential change completion** - a signed-in password
+    - [x] 41b2. **Credential change completion** - password recovery
+          completes for a two-factor account on web and mobile by asking for
+          the authenticator code before the new password. A signed-in password
           change treats an unclear outcome as possibly applied, as recovery
           already does, and a mobile retry after a failed revocation finishes
-          the sign-out instead of repeating the change. Web recovery completes
-          for a two-factor account. A manager's sign-in email change checks
-          the record's version before it touches the sign-in, and password
-          and email changes are audited.
+          the sign-out instead of repeating the change. A manager's sign-in
+          email change checks the record's version and contact conflicts
+          before it touches the sign-in, and a password change is audited.
     - [ ] 41b3. **Assurance coverage** - every credential-changing route,
           including the Gridmaster password-reset and account routes, requires
           fresh assurance and is held by the sensitive-action inventory; close

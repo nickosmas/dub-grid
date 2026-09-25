@@ -18,6 +18,7 @@ const RECOVERY_PROOF_MAX_AGE_SECONDS = 15 * 60;
 export function parseSignOutBody(body: unknown): {
   scope: SignOutScope;
   recoveryCompletion: boolean;
+  passwordChange: boolean;
 } {
   const input = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
   const scope: SignOutScope =
@@ -25,6 +26,9 @@ export function parseSignOutBody(body: unknown): {
   return {
     scope,
     recoveryCompletion: scope === "global" && input.reason === "password_recovery",
+    // The client says why; it only relabels a sign-out the caller may already
+    // make, so the audit trail can tell a password change apart (41b2).
+    passwordChange: scope === "global" && input.reason === "password_change",
   };
 }
 
@@ -57,6 +61,7 @@ export async function revokeBulkSessions(input: {
   sessionId: string;
   scope: "others" | "global";
   recoveryCompletion: boolean;
+  passwordChange?: boolean;
   orgId: string | null;
 }): Promise<void> {
   // The SDK admin transport accepts the caller's JWT here, not a service
@@ -71,7 +76,11 @@ export async function revokeBulkSessions(input: {
   await writeSecurityAuditEvent({
     event: input.recoveryCompletion ? "security.auth.recovery" : "security.auth.session",
     outcome: "succeeded",
-    reason: input.recoveryCompletion ? "recovery_completed" : "session_revoked",
+    reason: input.recoveryCompletion
+      ? "recovery_completed"
+      : input.passwordChange
+        ? "password_changed"
+        : "session_revoked",
     actorId: input.userId,
     orgId: input.orgId,
     metadata: {

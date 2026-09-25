@@ -24,15 +24,18 @@ import {
 import {
   exchangeBrowserCodeForSession,
   completeBrowserPasswordRecovery,
+  getBrowserAssuranceLevel,
+  signOutFromBrowser,
   subscribeToBrowserAuthChanges,
   updateBrowserUserPassword,
 } from "@/features/account/client";
+import { MFAVerify } from "@/components/profile/MFAVerify";
 import {
   clearBrowserRecoveryVerification,
   consumeBrowserRecoveryVerification,
 } from "@/lib/auth/browser-recovery-capability";
 
-type PageState = "loading" | "form" | "success" | "error" | "recovery";
+type PageState = "loading" | "mfa" | "form" | "success" | "error" | "recovery";
 
 /** Once the password has or may have changed, the form never comes back. */
 type RecoveryOutcome = "updated" | "updated-unrevoked" | "unconfirmed";
@@ -68,48 +71,73 @@ function ResetPasswordContent() {
   const recoveryCodeRef = useRef<string | null>(null);
   const submittingRef = useRef(false);
   const checkingRef = useRef(false);
+  // Set once the link has produced a recovery session. The code or capability
+  // that produced it is spent, so a retry only repeats the assurance check.
+  const sessionReadyRef = useRef(false);
 
-  const checkRecoverySession = useCallback(async (finalAttempt: boolean) => {
-    if (checkingRef.current) return;
-    checkingRef.current = true;
-    setState("loading");
-    stateRef.current = "loading";
+  // Supabase refuses a new password from a two-factor account's recovery
+  // session until its code promotes the session to aal2, so that account is
+  // asked for the code before the form (41b2).
+  const openRecoveredSession = useCallback(async () => {
+    sessionReadyRef.current = true;
+    let next: PageState = "form";
     try {
-      const code = recoveryCodeRef.current;
-      if (code) {
-        const { error } = await settleWithRequestTimeout(exchangeBrowserCodeForSession(code));
-        if (error) throw error;
-        window.history.replaceState({}, "", window.location.pathname);
-        recoveryCodeRef.current = null;
-        setState("form");
-        stateRef.current = "form";
-        return;
-      }
-
-      if (stateRef.current !== "loading") return;
-      if (consumeBrowserRecoveryVerification()) {
-        setState("form");
-        stateRef.current = "form";
-      } else if (finalAttempt) {
-        setState("error");
-        stateRef.current = "error";
-      }
-    } catch (checkError) {
-      if (stateRef.current !== "loading") return;
-      if (isRetryableAuthRecoveryError(checkError)) {
-        setState("recovery");
-        stateRef.current = "recovery";
-      } else {
-        clearBrowserRecoveryVerification();
-        window.history.replaceState({}, "", window.location.pathname);
-        recoveryCodeRef.current = null;
-        setState("error");
-        stateRef.current = "error";
-      }
-    } finally {
-      checkingRef.current = false;
+      const { data, error } = await getBrowserAssuranceLevel();
+      if (error) throw error;
+      if (data?.currentLevel === "aal1" && data.nextLevel === "aal2") next = "mfa";
+    } catch {
+      next = "recovery";
     }
+    setState(next);
+    stateRef.current = next;
   }, []);
+
+  const checkRecoverySession = useCallback(
+    async (finalAttempt: boolean) => {
+      if (checkingRef.current) return;
+      checkingRef.current = true;
+      setState("loading");
+      stateRef.current = "loading";
+      try {
+        if (sessionReadyRef.current) {
+          await openRecoveredSession();
+          return;
+        }
+        const code = recoveryCodeRef.current;
+        if (code) {
+          const { error } = await settleWithRequestTimeout(exchangeBrowserCodeForSession(code));
+          if (error) throw error;
+          window.history.replaceState({}, "", window.location.pathname);
+          recoveryCodeRef.current = null;
+          await openRecoveredSession();
+          return;
+        }
+
+        if (stateRef.current !== "loading") return;
+        if (consumeBrowserRecoveryVerification()) {
+          await openRecoveredSession();
+        } else if (finalAttempt) {
+          setState("error");
+          stateRef.current = "error";
+        }
+      } catch (checkError) {
+        if (stateRef.current !== "loading") return;
+        if (isRetryableAuthRecoveryError(checkError)) {
+          setState("recovery");
+          stateRef.current = "recovery";
+        } else {
+          clearBrowserRecoveryVerification();
+          window.history.replaceState({}, "", window.location.pathname);
+          recoveryCodeRef.current = null;
+          setState("error");
+          stateRef.current = "error";
+        }
+      } finally {
+        checkingRef.current = false;
+      }
+    },
+    [openRecoveredSession],
+  );
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -143,8 +171,7 @@ function ResetPasswordContent() {
       data: { subscription },
     } = subscribeToBrowserAuthChanges((event: AuthChangeEvent) => {
       if (event === "PASSWORD_RECOVERY") {
-        setState("form");
-        stateRef.current = "form";
+        void openRecoveredSession();
       }
     });
 
@@ -161,7 +188,7 @@ function ResetPasswordContent() {
       subscription.unsubscribe();
       clearTimeout(timeout);
     };
-  }, [checkRecoverySession]);
+  }, [checkRecoverySession, openRecoveredSession]);
 
   // Focus the first password field once the form becomes available.
   useEffect(() => {
@@ -222,6 +249,13 @@ function ResetPasswordContent() {
   }
 
   function showRejectedUpdate(err: unknown) {
+    // The factor was added after the page opened, or the assurance check was
+    // wrong: the code step promotes the session and the form comes back.
+    if ((err as { code?: unknown } | null)?.code === "insufficient_aal") {
+      setState("mfa");
+      stateRef.current = "mfa";
+      return;
+    }
     const msg = extractErrorMessage(err, "").toLowerCase();
     if (msg.includes("same password") || msg.includes("different")) {
       setFormError("New password must be different from your current password.");
@@ -232,6 +266,24 @@ function ResetPasswordContent() {
     } else {
       toast.error("We couldn't update your password. Try again.");
     }
+  }
+
+  async function leaveRecovery() {
+    // Leave no recovery session behind for someone who could not finish.
+    await signOutFromBrowser("local").catch(() => undefined);
+    window.location.assign("/login");
+  }
+
+  if (state === "mfa") {
+    return (
+      <MFAVerify
+        onVerified={() => {
+          setState("form");
+          stateRef.current = "form";
+        }}
+        onCancel={() => void leaveRecovery()}
+      />
+    );
   }
 
   return (

@@ -9,6 +9,20 @@ export interface EmployeeContactConflict {
   message: string;
 }
 
+/** Why an email cannot be a person's contact or sign-in email. */
+export type EmailConflictReason = "employee_duplicate" | "gridmaster" | "other_account";
+
+/** The one conflict answer for an email, whether a pre-check or the database found it. */
+export function emailContactConflict(reason: EmailConflictReason): EmployeeContactConflict {
+  const message =
+    reason === "employee_duplicate"
+      ? "That email is already used by another person."
+      : reason === "gridmaster"
+        ? "That email address is reserved."
+        : "That email belongs to a different user account.";
+  return { code: EMPLOYEE_CONTACT_CONFLICT_CODE, error: message, field: "email", message };
+}
+
 export function getEmployeeContactConflict(error: unknown): EmployeeContactConflict | null {
   if (!error || typeof error !== "object") {
     return null;
@@ -29,12 +43,7 @@ export function getEmployeeContactConflict(error: unknown): EmployeeContactConfl
     .join(" ");
 
   if (text.includes("unique_active_employee_email_per_org")) {
-    return {
-      code: EMPLOYEE_CONTACT_CONFLICT_CODE,
-      error: "That email is already used by another person.",
-      field: "email",
-      message: "That email is already used by another person.",
-    };
+    return emailContactConflict("employee_duplicate");
   }
 
   if (text.includes("unique_active_employee_phone_per_org")) {
@@ -65,17 +74,9 @@ export function getEmployeeContactConflict(error: unknown): EmployeeContactConfl
     text.includes("employee_email_belongs_to_other_user") ||
     text.includes("employee_email_belongs_to_gridmaster")
   ) {
-    const gridmasterEmail = text.includes("employee_email_belongs_to_gridmaster");
-    return {
-      code: EMPLOYEE_CONTACT_CONFLICT_CODE,
-      error: gridmasterEmail
-        ? "That email address is reserved."
-        : "That email belongs to a different user account.",
-      field: "email",
-      message: gridmasterEmail
-        ? "That email address is reserved."
-        : "That email belongs to a different user account.",
-    };
+    return emailContactConflict(
+      text.includes("employee_email_belongs_to_gridmaster") ? "gridmaster" : "other_account",
+    );
   }
 
   return null;
