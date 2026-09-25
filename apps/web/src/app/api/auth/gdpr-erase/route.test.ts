@@ -84,7 +84,9 @@ describe("POST /api/auth/gdpr-erase", () => {
             });
             return {
               insert: auditInsert,
-              select: () => ({ eq: () => ({ eq: () => ({ eq: () => ({ limit }) }) }) }),
+              select: () => ({
+                eq: () => ({ eq: () => ({ eq: () => ({ gte: () => ({ limit }) }) }) }),
+              }),
             };
           }
           throw new Error(`Unexpected table: ${table}`);

@@ -130,7 +130,7 @@ function buildServiceClient(opts: ServiceOpts) {
           data: opts.deletionStarted ? [{ id: 1 }] : [],
           error: null,
         }));
-        const eq3 = vi.fn(() => ({ limit }));
+        const eq3 = vi.fn(() => ({ gte: vi.fn(() => ({ limit })) }));
         const eq2 = vi.fn(() => ({ eq: eq3 }));
         const eq1 = vi.fn(() => ({ eq: eq2 }));
         return { insert: auditInsert, select: vi.fn(() => ({ eq: eq1 })) };
