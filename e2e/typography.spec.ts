@@ -370,7 +370,7 @@ const themes = ["light", "dark"] as const;
 // dashboard paints its skeleton with no h1 at all, so a wait for "any h1"
 // can pass on the handoff and then measure the gap.
 const AUTH_TRANSITION_TITLES =
-  /^(Signing you in|Loading your organization|Preparing your organization)$/;
+  /^(Signing you in|Loading your workspace|Setting up your workspace)$/;
 
 test("productive typography keeps its hierarchy across routes, themes, widths, and zoom", async ({
   page,

@@ -14,11 +14,11 @@ const PHASE_COPY: Record<TransitionPhase, { title: string; detail: string }> = {
     detail: "Securing your session and getting things ready.",
   },
   workspace: {
-    title: "Loading your organization",
+    title: "Loading your workspace",
     detail: "Just a moment while we prepare everything you need.",
   },
   onboarding: {
-    title: "Preparing your organization",
+    title: "Setting up your workspace",
     detail: "We’re finishing a few things before you begin.",
   },
 };
