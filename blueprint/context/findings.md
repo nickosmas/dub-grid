@@ -23,13 +23,13 @@
 **Suggested fix:** A decision for the owner: database triggers on `auth.users` and `auth.mfa_factors` that audit, revoke or alert on credential changes, and/or a shorter `jwt_expiry`. Out of 41b2's scope by design. A third option since 41c1: turn on Supabase's own MFA factor notices (declared in `config.toml`, currently `enabled = false` because DubGrid's alert covers normal flows), which alert the owner of any enrollment or removal, including one made with a stolen token, at the cost of a duplicate email on an ordinary change.
 **Resolution:** Owner delegated the decision (2026-09-25); fixed in 41d3: Supabase's own MFA factor notices are enabled in `config.toml` (sent by Supabase, so a change made with a stolen token still reaches the owner), and DubGrid's two-factor alert pushes only (`sendEmail: false`) so an ordinary change sends one email. Production takes effect when the auth templates and flags are pushed, which must happen before the release merges. A shorter `jwt_expiry` was not chosen. Revised after audit (a6e3c15c): nothing yet shows Supabase sends the MFA notices, so DubGrid's own two-factor alert keeps emailing (the push-only change is reverted) and an ordinary change may send two emails until production is confirmed. Re-review (a6e3c15c..d6b802ca): closed.
 
-### F-16 [P2] fixed - Gridmaster organization-role grants run without fresh assurance
+### F-16 [P2] closed - Gridmaster organization-role grants run without fresh assurance
 
 **File:** `apps/web/src/app/api/gridmaster/organizations/manage/route.ts:291`
 **Found:** 2026-09-25 by `/audit` (scope: current, 2f001cb4..e24134f8; all lenses)
 **Why it matters:** `assignOrgRoleByEmail` can grant Super Admin of any organization to any account on the Gridmaster session alone. It predates 41b3 and is organization rather than platform authority, so it sits outside 41b3's wording but close to its goal.
 **Suggested fix:** Gate that action with `requireSensitiveActionAuth` and run it through step-up, and classify the route in the inventory. Needs a scope call.
-**Resolution:** Owner delegated the decision (2026-09-25); fixed in 41d3: `assignOrgRoleByEmail` requires `requireSensitiveActionAuth` before the RPC, the Users tab runs it through step-up with the credential preflight, and the inventory classifies the route `conditional-sensitive`. Audit (a6e3c15c) found the Users tab's role dropdown still reached `change_user_role` on the access route unguarded; a Gridmaster role change there now requires fresh proof too, through step-up, and the inventory pins it. Re-review (d6b802ca) kept it open: `/api/organizations/role-change` also calls `change_user_role` ungated. It now requires fresh proof for every caller (no screen calls it), the inventory marker includes `change_user_role`, and a test proves a stale session changes nothing.
+**Resolution:** Owner delegated the decision (2026-09-25); fixed in 41d3: `assignOrgRoleByEmail` requires `requireSensitiveActionAuth` before the RPC, the Users tab runs it through step-up with the credential preflight, and the inventory classifies the route `conditional-sensitive`. Audit (a6e3c15c) found the Users tab's role dropdown still reached `change_user_role` on the access route unguarded; a Gridmaster role change there now requires fresh proof too, through step-up, and the inventory pins it. Re-review (d6b802ca) kept it open: `/api/organizations/role-change` also calls `change_user_role` ungated. It now requires fresh proof for every caller (no screen calls it), the inventory marker includes `change_user_role`, and a test proves a stale session changes nothing. Re-review (7ba79e75): closed as scoped, direct role grants: `assignOrgRoleByEmail`, the access route for a Gridmaster and the role-change route all require fresh proof, and mobile refuses Gridmaster tokens outright. Grants through invitations and direct database access are recorded as F-59 and F-60.
 
 ### F-17 [P3] closed - Gridmaster audit-log export runs without fresh assurance
 
@@ -198,4 +198,28 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Found:** 2026-09-25 by `/audit` re-review of d6b802ca
 **Why it matters:** Impersonation uses the Gridmaster's own token, so the access route's Gridmaster gate applies, but these screens do not run through step-up: a stale session sees an error toast instead of a prompt. It fails safe.
 **Suggested fix:** Run those calls through `useStepUpAction` with the credential preflight.
+**Resolution:**
+
+### F-59 [P2] open - A Gridmaster can grant Super Admin through invitations without fresh proof
+
+**File:** `apps/web/src/app/api/organizations/invitations/create/route.ts:225`; `apps/web/src/app/api/organizations/invitations/route.ts:307`, `:604`; `apps/web/src/app/api/gridmaster/organizations/manage/route.ts:457`
+**Found:** 2026-09-25 by `/audit` re-review of 7ba79e75
+**Why it matters:** A Gridmaster passes `canManageEmployees` and `canAssignOrgRole`, so it can invite an address it controls as Super Admin to any organization, or redirect a pending invitation's role and email, and the invitee registers pre-confirmed: the F-16 outcome by another door.
+**Suggested fix:** Require fresh proof for a Gridmaster (or for any Super Admin grant) on invitation create, update and reissue, with step-up in the invitation UI; add `send_invitation` and `replace_pending_invitation_access` to the inventory marker.
+**Resolution:**
+
+### F-60 [P2] open - A Gridmaster token can change memberships and invitations directly in the database
+
+**File:** `supabase/migrations/003_rls_policies.sql:117`, `:751`; `016_harden_authorization_boundaries.sql:79`; `043_invitation_inviter_is_verified.sql:250`
+**Found:** 2026-09-25 by `/audit` re-review of 7ba79e75
+**Why it matters:** `change_user_role`, `assign_org_role_by_email` and `send_invitation` are executable by `authenticated`, and the `gridmaster_all_memberships` and `gridmaster_all_invitations` policies are FOR ALL, so a Gridmaster token can insert a Super Admin membership through PostgREST, skipping every route gate. The same class as F-08; `is_gridmaster()` needs aal2 but not a recent sign-in.
+**Suggested fix:** A decision with F-08: narrow the Gridmaster policies to SELECT and route writes through server-only functions, or require a recent authentication in the RPCs.
+**Resolution:**
+
+### F-61 [P3] open - Two smaller role-grant gaps
+
+**File:** `apps/web/src/lib/db/organizations.ts:391`; `apps/web/src/app/api/organizations/access/route.ts:335`
+**Found:** 2026-09-25 by `/audit` re-review of 7ba79e75
+**Why it matters:** `assignOrgRoleByEmail` in `lib/db` calls the RPC from the browser client; it has no callers but is still exported, inviting an ungated path back. A Gridmaster's permission-only change on the access route runs without fresh proof (a smaller grant: an Admin still cannot assign Admin or Super Admin).
+**Suggested fix:** Remove the dead helper; gate a Gridmaster's permission changes like role changes.
 **Resolution:**
