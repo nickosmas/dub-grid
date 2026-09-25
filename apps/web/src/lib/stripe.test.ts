@@ -16,6 +16,7 @@ const subscriptionUpdate = vi.fn();
 const subscriptionUpsert = vi.fn();
 const subscriptionMaybeSingle = vi.fn();
 const auditInsert = vi.fn();
+const cacheDel = vi.fn();
 
 vi.mock("stripe", () => ({
   default: stripeConstructor,
@@ -25,6 +26,13 @@ vi.mock("@supabase/supabase-js", () => ({
   createClient: (...args: unknown[]) => createClient(...args),
 }));
 
+// CacheKey stays real: clearing the exact entries the proxy and the bootstrap
+// read is the property the billing sync depends on.
+vi.mock("@/lib/cache", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/cache")>();
+  return { ...actual, cacheDel: (...keys: string[]) => cacheDel(...keys) };
+});
+
 vi.mock("@/lib/logger", () => ({
   default: {
     warn: vi.fn(),
@@ -33,6 +41,14 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
+
+async function expectBillingCacheCleared() {
+  const { CacheKey } = await import("@/lib/cache");
+  expect(cacheDel).toHaveBeenCalledWith(
+    CacheKey.mwOrgAccess(ORG_ID),
+    CacheKey.organization(ORG_ID),
+  );
+}
 const ORIGINAL_STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const ORIGINAL_STRIPE_PRICE_ID_MONTHLY = process.env.STRIPE_PRICE_ID_MONTHLY;
 const ORIGINAL_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -170,6 +186,7 @@ describe("syncSubscriptionToDb", () => {
         }),
       }),
     );
+    await expectBillingCacheCleared();
   });
 
   it("adds the checkout session placeholder to successful subscription checkout redirects", async () => {
@@ -278,6 +295,7 @@ describe("syncSubscriptionToDb", () => {
       trial_ends_at: null,
     });
     expect(organizationEq).toHaveBeenCalledWith("id", ORG_ID);
+    await expectBillingCacheCleared();
   });
 
   it("schedules a subscription cancellation at period end", async () => {

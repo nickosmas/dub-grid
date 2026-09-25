@@ -7,6 +7,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseSecretKey, getSupabaseUrl } from "@/lib/supabase-keys";
 import { serverEnv } from "@/lib/env.server";
+import { cacheDel, CacheKey } from "@/lib/cache";
 
 let _stripe: Stripe | null | undefined;
 
@@ -249,6 +250,15 @@ export async function getSubscription(subscriptionId: string): Promise<Stripe.Su
   return s.subscriptions.retrieve(subscriptionId);
 }
 
+// The proxy, the organization cache and the bootstrap each keep the billing
+// state for up to 30 seconds, and nothing else clears them when Stripe changes
+// it: a payment that unlocked the organization still sent people to billing
+// until those copies expired. Deleting the organization entry also drops the
+// bootstrap's copy.
+async function invalidateOrganizationBillingCache(orgId: string): Promise<void> {
+  await cacheDel(CacheKey.mwOrgAccess(orgId), CacheKey.organization(orgId));
+}
+
 export async function upsertStripeSubscriptionToDb(
   serviceClient: BillingSyncClient,
   sub: Stripe.Subscription,
@@ -312,6 +322,7 @@ export async function upsertStripeSubscriptionToDb(
     })
     .eq("id", orgId);
   if (orgError) throw orgError;
+  await invalidateOrganizationBillingCache(orgId);
 
   await writeStripeSubscriptionAuditLog(serviceClient, {
     orgId,
@@ -429,6 +440,7 @@ export async function syncSubscriptionToDb(orgId: string): Promise<void> {
       })
       .eq("id", orgId);
     if (orgUpdateError) throw orgUpdateError;
+    await invalidateOrganizationBillingCache(orgId);
     return;
   }
 
