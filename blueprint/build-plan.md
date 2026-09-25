@@ -560,11 +560,15 @@
           restore the previous usable link when delivery fails rather than
           stranding the invitee. Handle TOTP-enrolled invitees and return
           valid retry semantics.
-    - [ ] 41a3. **Recipient-facing invitation clarity** - make the 72-hour
+    - [x] 41a3. **Recipient-facing invitation clarity** - make the 72-hour
           absolute expiry, replacement behavior, and organization context
           clear to recipients in the invitation email and the accept-invite
           landing, so a replaced link and a still-valid one are tellable
           apart.
+    - [ ] 41a4. **Joined date means acceptance** - show "Date joined" as the
+          date the person accepted their invitation, rename the staff record's
+          creation date "Date added", and show no joined date for someone who
+          has not accepted.
   - [ ] 41b. **Credential, session, and recovery integrity** - require the
         same fresh-assurance and session-revocation guarantees on web and
         mobile for password, sign-in email, MFA, recovery, account deletion,

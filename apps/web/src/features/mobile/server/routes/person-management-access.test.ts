@@ -87,7 +87,11 @@ const USER_CLIENT = { name: "user" };
 
 function mockAuth(overrides: Record<string, unknown> = {}) {
   requireMobileAuth.mockResolvedValue({
-    currentOrg: { id: "44444444-4444-4444-8444-444444444444", name: "Calm Haven" },
+    currentOrg: {
+      id: "44444444-4444-4444-8444-444444444444",
+      name: "Calm Haven",
+      timezone: "America/Chicago",
+    },
     permissions: { canManageUsers: true, canManageEmployees: true },
     serviceClient: SERVICE_CLIENT,
     userClient: USER_CLIENT,
@@ -122,6 +126,7 @@ describe("mobile person management-access route", () => {
       id: INVITATION_ID,
       token: "invite-token",
       email: "mina@example.com",
+      expires_at: "2026-06-01T00:00:00Z",
       updated_at: null,
     });
     revokeMobileEmployeeInvitationRow.mockResolvedValue(null);
@@ -396,7 +401,14 @@ describe("mobile person management-access route", () => {
         departmentIds: [9],
       }),
     );
-    expect(sendInvitationEmail).toHaveBeenCalled();
+    // Nobody held a link before, so this is a first invitation.
+    expect(sendInvitationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expiresAt: "2026-06-01T00:00:00Z",
+        timeZone: "America/Chicago",
+        kind: "new",
+      }),
+    );
   });
 
   // Otherwise a failed send leaves a row that puts someone on the roster who
@@ -448,6 +460,7 @@ describe("mobile person management-access route", () => {
         id: "99999999-9999-4999-8999-999999999999",
         token: "replacement-token",
         email: "mina@example.com",
+        expires_at: "2026-06-04T00:00:00Z",
         updated_at: "2026-05-01T00:00:02Z",
       },
     });
@@ -471,8 +484,14 @@ describe("mobile person management-access route", () => {
       }),
     );
     expect(updateMobileInvitationAssignmentsRow).not.toHaveBeenCalled();
+    // The pending invitation was rotated, so its earlier link is dead.
     expect(sendInvitationEmail).toHaveBeenCalledWith(
-      expect.objectContaining({ token: "replacement-token" }),
+      expect.objectContaining({
+        token: "replacement-token",
+        expiresAt: "2026-06-04T00:00:00Z",
+        timeZone: "America/Chicago",
+        kind: "reissue",
+      }),
     );
   });
 
@@ -547,6 +566,7 @@ describe("mobile person management-access route", () => {
         id: INVITATION_ID,
         token: "fresh-token",
         email: "mina@example.com",
+        expires_at: "2026-06-07T00:00:00Z",
         updated_at: "2026-05-01T00:00:02Z",
       },
       previousToken: "old-token",
@@ -566,6 +586,14 @@ describe("mobile person management-access route", () => {
     expect(response.status).toBe(200);
     expect(updateMobileInvitationAssignmentsRow).toHaveBeenCalled();
     expect(replaceMobilePendingInvitationAccessRow).not.toHaveBeenCalled();
+    expect(sendInvitationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        token: "fresh-token",
+        expiresAt: "2026-06-07T00:00:00Z",
+        timeZone: "America/Chicago",
+        kind: "reissue",
+      }),
+    );
   });
 
   it("puts the link and departments back when a department-only change fails to send", async () => {

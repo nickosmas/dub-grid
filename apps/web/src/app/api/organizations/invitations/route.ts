@@ -683,6 +683,8 @@ export async function POST(req: NextRequest) {
           orgId,
           token: replacement.token,
           email: replacementInvitation.email,
+          expiresAt: replacement.expires_at,
+          kind: "reissue",
         });
       } catch (emailError) {
         const { data: rolledBack, error: rollbackError } = await serviceClient.rpc(
@@ -799,6 +801,8 @@ export async function POST(req: NextRequest) {
         orgId,
         token,
         email: latestInvitation.email,
+        expiresAt,
+        kind: "reissue",
       });
     } catch (emailError) {
       const { data: restoredInvitation, error: rollbackError } = await serviceClient

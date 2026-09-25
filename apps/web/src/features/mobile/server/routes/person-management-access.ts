@@ -300,6 +300,9 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
       token: invitation.token,
       email: invitation.email,
       orgName: auth.currentOrg.name || "your organization",
+      expiresAt: invitation.expires_at,
+      timeZone: auth.currentOrg.timezone ?? null,
+      kind: createdInvitation ? "new" : "reissue",
     });
   } catch (error) {
     logger.error(

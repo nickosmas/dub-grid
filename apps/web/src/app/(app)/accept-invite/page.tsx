@@ -12,7 +12,11 @@ import { PasswordInput } from "@/components/auth/PasswordInput";
 import { PasswordStrength } from "@/components/auth/PasswordStrength";
 import { getPasswordMismatchError, isPasswordAcceptable } from "@dubgrid/domain";
 import { describeSignInFailure, EXISTING_ACCOUNT_MESSAGE } from "./signInFailure";
-import { classifyAcceptFailure, describeAcceptFailure } from "./acceptFailure";
+import {
+  classifyAcceptFailure,
+  describeAcceptFailure,
+  describeDeadInvitation,
+} from "./acceptFailure";
 import { MFAVerify } from "@/components/profile/MFAVerify";
 import { parseHost, buildSubdomainHost } from "@/lib/subdomain";
 import * as Sentry from "@/lib/sentry";
@@ -25,6 +29,7 @@ import {
 } from "@/features/account/client";
 import { acceptInvitation } from "@/features/organization/client";
 import { scrubBrowserSecretQuery } from "@/lib/auth/browser-secret-query";
+import { formatInvitationExpiry } from "@/emails/invitation-expiry";
 
 type PageState = "loading" | "no-token" | "invalid" | "form" | "processing" | "mfa" | "success";
 
@@ -43,6 +48,7 @@ function AcceptInviteContent() {
   const [emailFromUrl, setEmailFromUrl] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [orgName, setOrgName] = useState<string | null>(null);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
   // Set once the server has confirmed this address already has an account. The
   // form then asks for that account's password instead of a new one — without
   // it, someone whose password predates the current strength rules can never
@@ -51,6 +57,10 @@ function AcceptInviteContent() {
   // How the account step ended, kept across the second-factor handoff so a
   // dead token is described the same way after the challenge as before it.
   const registerStatusRef = useRef("existing");
+  // Whether this attempt signed in, so a dead link signs out only the session
+  // it made and never one the browser already held.
+  const signedInRef = useRef(false);
+  const [accountCreated, setAccountCreated] = useState(false);
   const capturedUrlSecrets = useRef(false);
 
   // Extract token and email from URL on mount
@@ -73,8 +83,9 @@ function AcceptInviteContent() {
       // closes the page. An outage or a throttle still shows the form, since
       // acceptance checks the token again on submit.
       fetchInvitationLookup(t)
-        .then(({ orgName: name }) => {
+        .then(({ orgName: name, expiresAt: deadline }) => {
           if (name) setOrgName(name);
+          if (deadline) setExpiresAt(deadline);
           setState("form");
         })
         .catch((lookupError: unknown) => {
@@ -91,6 +102,13 @@ function AcceptInviteContent() {
     const host = buildSubdomainHost(slug, parsed);
     return `${window.location.protocol}//${host}/login`;
   }
+
+  // The viewer's own zone: the email states the organization's, since it has
+  // no viewer, but here the person reading it is known.
+  const expiryText = formatInvitationExpiry(
+    expiresAt,
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
+  );
 
   // Derived so the warning appears as the user types the confirmation.
   const mismatchError = existingAccount
@@ -146,6 +164,7 @@ function AcceptInviteContent() {
         // integration reports it alongside the sentence shown to the user.
         throw new Error(message, { cause: signInError });
       }
+      signedInRef.current = true;
 
       // 3. Accept the invitation (now authenticated)
       if ((await finishAcceptance()) === "needs-mfa") {
@@ -169,10 +188,10 @@ function AcceptInviteContent() {
     } catch (acceptErr: unknown) {
       const failure = classifyAcceptFailure(acceptErr);
       if (failure === "step-up") return "needs-mfa";
+      // Raw, so failAcceptance recognises the dead-token contract.
+      if (failure === "dead") throw acceptErr;
       if (failure !== "already-accepted") {
-        throw new Error(describeAcceptFailure(failure, registerStatusRef.current), {
-          cause: acceptErr,
-        });
+        throw new Error(describeAcceptFailure(failure), { cause: acceptErr });
       }
       try {
         const lookup = await fetchInvitationLookup(token!);
@@ -201,6 +220,13 @@ function AcceptInviteContent() {
   }
 
   function failAcceptance(err: unknown) {
+    // A link that died while the page was open (a reissue, a revoke, the
+    // deadline passing) goes to the same card as one that was dead on
+    // arrival, since retrying the form cannot succeed.
+    if (classifyAcceptFailure(err) === "dead") {
+      showDeadInvitation();
+      return;
+    }
     Sentry.captureException(err, {
       extra: {
         context: "accept-invite",
@@ -213,11 +239,21 @@ function AcceptInviteContent() {
     setLoading(false);
   }
 
+  function showDeadInvitation() {
+    setAccountCreated(registerStatusRef.current === "created");
+    setLoading(false);
+    setState("invalid");
+    if (signedInRef.current) {
+      signedInRef.current = false;
+      void signOutFromBrowser("local").catch(() => {});
+    }
+  }
+
   async function handleMfaVerified() {
     setState("processing");
     try {
       if ((await finishAcceptance()) === "needs-mfa") {
-        throw new Error(describeAcceptFailure("step-up", registerStatusRef.current));
+        throw new Error(describeAcceptFailure("step-up"));
       }
     } catch (err: unknown) {
       failAcceptance(err);
@@ -257,11 +293,11 @@ function AcceptInviteContent() {
             message="Please wait while we process your invitation."
           />
         ) : state === "invalid" ? (
-          // One message for accepted, expired, revoked and unknown links, so the
-          // page never reveals which it was.
+          // One message for accepted, expired, revoked, replaced and unknown
+          // links, so the page never reveals which it was.
           <AuthStateCard
             heading="Invitation no longer valid"
-            message="This invitation link has expired or is no longer active. If you've already accepted it, sign in. Otherwise, ask your administrator for a new one."
+            message={describeDeadInvitation(accountCreated)}
             primaryCta={{ label: "Go to login", href: "/login" }}
           />
         ) : state === "no-token" ? (
@@ -292,6 +328,9 @@ function AcceptInviteContent() {
                 "Set your password to join your organization on DubGrid."
               )}
             </p>
+            {expiryText && (
+              <p className="dg-auth-footnote">This invitation expires on {expiryText}.</p>
+            )}
 
             <Form onSubmit={handleSubmit} className="dg-auth-form">
               <div>

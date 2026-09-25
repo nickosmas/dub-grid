@@ -126,7 +126,11 @@ const USER_CLIENT = { name: "user" };
 
 function mockAuth(overrides: Record<string, unknown> = {}) {
   requireMobileAuth.mockResolvedValue({
-    currentOrg: { id: "44444444-4444-4444-8444-444444444444", name: "Calm Haven" },
+    currentOrg: {
+      id: "44444444-4444-4444-8444-444444444444",
+      name: "Calm Haven",
+      timezone: "America/Chicago",
+    },
     permissions: { canManageUsers: true, canManageEmployees: true },
     serviceClient: SERVICE_CLIENT,
     userClient: USER_CLIENT,
@@ -165,6 +169,7 @@ describe("mobile person org-role route", () => {
         id: REPLACEMENT_ID,
         token: "invite-token",
         email: "mina@example.com",
+        expires_at: "2026-06-04T00:00:00Z",
         updated_at: null,
       },
     });
@@ -320,7 +325,7 @@ describe("mobile person org-role route", () => {
     expect(changeMobileMembershipOrgRole).not.toHaveBeenCalled();
   });
 
-  it("replaces the invitation when the invitee has no account yet", async () => {
+  it("rotates the invitation when the invitee has no account yet", async () => {
     loadMobilePersonWithAccess.mockResolvedValue(loadedInvitee());
 
     const { PATCH } = await import("./person-org-role");
@@ -340,7 +345,13 @@ describe("mobile person org-role route", () => {
         deptAdminIds: [9],
       }),
     );
-    expect(sendInvitationEmail).toHaveBeenCalled();
+    expect(sendInvitationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expiresAt: "2026-06-04T00:00:00Z",
+        timeZone: "America/Chicago",
+        kind: "reissue",
+      }),
+    );
   });
 
   it("rolls the replacement back when the invitation email fails", async () => {

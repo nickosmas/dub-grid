@@ -163,9 +163,9 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     return createInvitationEmailUnavailableResponse();
   }
 
-  // The role is baked into the invitation, so changing it means a new row with a
-  // new token. Departments come across untouched for the same reason they do on
-  // the membership branch.
+  // Changing the role rotates the same invitation to a new token, so the
+  // earlier link stops working. Departments come across untouched for the same
+  // reason they do on the membership branch.
   const replacement = await replaceMobilePendingInvitationAccessRow(auth.serviceClient, {
     orgId: auth.currentOrg.id,
     invitationId: loaded.pendingInvitation.id,
@@ -182,6 +182,9 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       token: replacement.invitation.token,
       email: replacement.invitation.email,
       orgName: auth.currentOrg.name || "your organization",
+      expiresAt: replacement.invitation.expires_at,
+      timeZone: auth.currentOrg.timezone ?? null,
+      kind: "reissue",
     });
   } catch (error) {
     logger.error(

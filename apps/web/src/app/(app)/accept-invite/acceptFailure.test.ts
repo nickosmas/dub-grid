@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { STEP_UP_REQUIRED_CODE } from "@dubgrid/authz";
 import { DEAD_INVITATION_CODE, DEAD_INVITATION_MESSAGE } from "@/lib/auth/dead-invitation";
-import { classifyAcceptFailure, describeAcceptFailure } from "./acceptFailure";
+import {
+  classifyAcceptFailure,
+  describeAcceptFailure,
+  describeDeadInvitation,
+} from "./acceptFailure";
 
 function requestError(status: number, code: string | null, message = "Request failed") {
   return Object.assign(new Error(message), { status, code });
@@ -34,12 +38,28 @@ describe("classifyAcceptFailure", () => {
 });
 
 describe("describeAcceptFailure", () => {
-  it("only claims an account was created when one was", () => {
-    expect(describeAcceptFailure("dead", "created")).toMatch(/account was created/);
-    expect(describeAcceptFailure("dead", "existing")).toBe(DEAD_INVITATION_MESSAGE);
+  it("tells a transient failure to retry instead of asking for a new link", () => {
+    expect(describeAcceptFailure("unavailable")).toMatch(/try again/i);
+    expect(describeAcceptFailure("unavailable")).not.toMatch(/no longer works/);
+  });
+});
+
+describe("describeDeadInvitation", () => {
+  it("points to the newest email, since a reissue replaces the link", () => {
+    expect(DEAD_INVITATION_MESSAGE).toMatch(/replaces any earlier one/);
+    expect(DEAD_INVITATION_MESSAGE).toMatch(/more recent invitation email, use its link/);
+    expect(DEAD_INVITATION_MESSAGE).toMatch(/already accepted, sign in/);
   });
 
-  it("tells a transient failure to retry instead of asking for a new link", () => {
-    expect(describeAcceptFailure("unavailable", "existing")).not.toMatch(/no longer valid/);
+  // The message is the same for every reason, so it must not name one.
+  it("never says why the link is dead", () => {
+    for (const message of [describeDeadInvitation(false), describeDeadInvitation(true)]) {
+      expect(message).not.toMatch(/expired|revoked|cancel/i);
+    }
+  });
+
+  it("only claims an account was created when this attempt created one", () => {
+    expect(describeDeadInvitation(true)).toMatch(/^Your DubGrid account was created/);
+    expect(describeDeadInvitation(false)).toBe(DEAD_INVITATION_MESSAGE);
   });
 });

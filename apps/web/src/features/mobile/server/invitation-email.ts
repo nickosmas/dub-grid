@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createElement } from "react";
 import { render } from "@react-email/components";
-import { InviteEmail } from "@/emails/InviteEmail";
+import { InviteEmail, type InvitationEmailKind } from "@/emails/InviteEmail";
 import { sanitizeHeaderValue, emailBaseUrl } from "@/lib/email";
 import logger from "@/lib/logger";
 import { sendResendEmail } from "@/lib/resend";
@@ -41,6 +41,10 @@ export async function sendInvitationEmail(input: {
   token: string | null | undefined;
   email: string;
   orgName: string;
+  /** The expiry just stored on the row, so the email states the real deadline. */
+  expiresAt: string | null;
+  timeZone: string | null;
+  kind: InvitationEmailKind;
 }) {
   if (!input.token) {
     throw new Error("We couldn't create that invitation link. Try again.");
@@ -54,6 +58,9 @@ export async function sendInvitationEmail(input: {
       orgName: input.orgName,
       acceptUrl,
       logoUrl: baseUrl,
+      expiresAt: input.expiresAt,
+      timeZone: input.timeZone,
+      kind: input.kind,
     }),
   );
 
@@ -61,7 +68,13 @@ export async function sendInvitationEmail(input: {
     apiKey: input.config.apiKey,
     from: input.config.from,
     to: input.email,
-    subject: sanitizeHeaderValue(`You're invited to join ${input.orgName} on DubGrid`),
+    subject: sanitizeHeaderValue(invitationSubject(input.orgName, input.kind)),
     html,
   });
+}
+
+function invitationSubject(orgName: string, kind: InvitationEmailKind): string {
+  return kind === "reissue"
+    ? `Your new invitation to join ${orgName} on DubGrid`
+    : `You're invited to join ${orgName} on DubGrid`;
 }

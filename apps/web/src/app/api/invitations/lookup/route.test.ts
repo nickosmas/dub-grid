@@ -13,6 +13,7 @@ vi.mock("@/lib/rate-limit", () => ({
   checkRateLimit: (...args: unknown[]) => checkRateLimit(...args),
 }));
 
+import { DEAD_INVITATION_MESSAGE } from "@/lib/auth/dead-invitation";
 import { GET } from "./route";
 
 // Chainable query: select → eq → gt → is → is → maybeSingle (terminal).
@@ -38,30 +39,46 @@ describe("GET /api/invitations/lookup", () => {
     serviceFrom.mockImplementation(() => makeQuery());
   });
 
-  it("returns org metadata for a live invitation", async () => {
+  it("returns org metadata and the deadline for a live invitation", async () => {
     maybeSingle.mockResolvedValue({
-      data: { organizations: { name: "Acme", slug: "acme" } },
+      data: {
+        expires_at: "2026-09-28T22:04:00.000Z",
+        organizations: { name: "Acme", slug: "acme" },
+      },
       error: null,
     });
     const res = await GET(request());
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ orgName: "Acme", orgSlug: "acme" });
+    await expect(res.json()).resolves.toEqual({
+      orgName: "Acme",
+      orgSlug: "acme",
+      expiresAt: "2026-09-28T22:04:00.000Z",
+    });
   });
+
+  // Every dead response is the same two fields: nothing, the deadline
+  // included, tells an expired link from an accepted, revoked or unknown one.
+  const DEAD_BODY = { error: DEAD_INVITATION_MESSAGE, code: "INVITATION_INVALID" };
 
   it("returns 404 for an expired / accepted / revoked / unknown token (no org leak)", async () => {
     // The query's expiry/status filters mean no row comes back for a dead token.
     maybeSingle.mockResolvedValue({ data: null, error: null });
     const res = await GET(request("33333333-3333-3333-3333-333333333333"));
     expect(res.status).toBe(404);
-    const body = await res.json();
-    expect(body.orgName).toBeUndefined();
-    expect(body.orgSlug).toBeUndefined();
+    await expect(res.json()).resolves.toEqual(DEAD_BODY);
   });
 
   it("normalizes a missing token to the dead-invitation contract", async () => {
     const res = await GET(new NextRequest("http://localhost/api/invitations/lookup"));
     expect(res.status).toBe(404);
-    await expect(res.json()).resolves.toMatchObject({ code: "INVITATION_INVALID" });
+    await expect(res.json()).resolves.toEqual(DEAD_BODY);
+  });
+
+  it("normalizes a malformed token to the dead-invitation contract", async () => {
+    const res = await GET(request("not-a-token"));
+    expect(res.status).toBe(404);
+    await expect(res.json()).resolves.toEqual(DEAD_BODY);
+    expect(serviceFrom).not.toHaveBeenCalled();
   });
 });
 

@@ -134,6 +134,8 @@ describe("POST /api/organizations/invitations/create", () => {
       orgId: ORG_ID,
       token: "tok-1",
       email: "new@test.com",
+      expiresAt: "2026-01-01T00:00:00Z",
+      kind: "new",
     });
     expect(rpc).toHaveBeenCalledWith(
       "send_invitation",
@@ -297,8 +299,15 @@ describe("POST /api/organizations/invitations/create", () => {
       expiresAt: "2026-02-02T00:00:00Z",
       resent: true,
     });
+    // A refresh kills the link in the earlier email, so it goes out as a
+    // replacement carrying the refreshed deadline.
     expect(sendPendingInvitationEmail).toHaveBeenCalledWith(
-      expect.objectContaining({ token: "fresh-tok", email: "orphan@test.com" }),
+      expect.objectContaining({
+        token: "fresh-tok",
+        email: "orphan@test.com",
+        expiresAt: "2026-02-02T00:00:00Z",
+        kind: "reissue",
+      }),
     );
     expect(from).toHaveBeenCalledWith("invitations");
     // Rotating the token and sending it again is a re-invite, so it is logged.

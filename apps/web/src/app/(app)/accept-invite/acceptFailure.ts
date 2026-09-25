@@ -24,18 +24,20 @@ export function classifyAcceptFailure(error: unknown): AcceptFailure {
   return "unavailable";
 }
 
-export function describeAcceptFailure(
-  failure: Exclude<AcceptFailure, "already-accepted">,
-  registerStatus: string,
-): string {
-  if (failure === "dead") {
-    return registerStatus === "created"
-      ? "Your account was created, but this invitation is no longer valid. " +
-          "Please contact your organization administrator for a new invitation."
-      : DEAD_INVITATION_MESSAGE;
-  }
+export function describeAcceptFailure(failure: "step-up" | "unavailable"): string {
   if (failure === "step-up") {
     return "We couldn't confirm your authentication code. Try again.";
   }
   return "We couldn't accept your invitation just now. Try again in a moment.";
+}
+
+/**
+ * The dead-link card's message. It differs only when this attempt has just
+ * created the invitee's account, so they know it exists before being sent to
+ * find a newer link.
+ */
+export function describeDeadInvitation(accountCreated: boolean): string {
+  return accountCreated
+    ? "Your DubGrid account was created, but this invitation link no longer works. A new invitation replaces any earlier one, so if you have a more recent invitation email, use its link. Otherwise, ask the organization that invited you for a new invitation."
+    : DEAD_INVITATION_MESSAGE;
 }

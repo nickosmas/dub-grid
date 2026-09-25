@@ -124,6 +124,23 @@ async function readOnlyInvitation(email: string): Promise<InvitationRow> {
   return rows[0]!;
 }
 
+/**
+ * What a delivered reissue does to the row: a new token and deadline on the
+ * same invitation. E2E runs without a mail provider, where a reissue restores
+ * the old link instead, so the recipient cases rotate the row directly; the
+ * reissue itself is proven by the route and live-database tests.
+ */
+async function rotate(invitationId: string, expiresAt: string): Promise<string> {
+  return withDatabase(async (db) => {
+    const result = await db.query<{ token: string }>(
+      `UPDATE public.invitations SET token = gen_random_uuid(), expires_at = $2
+        WHERE id = $1 RETURNING token::text`,
+      [invitationId, expiresAt],
+    );
+    return result.rows[0]!.token;
+  });
+}
+
 async function auditActions(invitationId: string): Promise<string[]> {
   return withDatabase(async (db) => {
     const result = await db.query<{ action: string }>(
@@ -198,6 +215,10 @@ const REVOKE = {
     /stops working right away\. If you change your mind, you can send them a new invitation\./,
   confirmLabel: "Revoke",
 };
+
+// The dead-link card says the same thing for every reason, a revoke included.
+const REPLACEMENT_GUIDANCE =
+  /A new invitation replaces any earlier one, so if you have a more recent invitation email, use its link\./;
 
 async function openPeople(page: Page, search: string): Promise<void> {
   await page.goto(`${QA_CALM_HAVEN_ORIGIN}/people`);
@@ -390,6 +411,7 @@ test.describe("invitation reissue and revoke", () => {
       // The revoked link lands on the dead-link state and never on the form.
       await page.goto(`${QA_CALM_HAVEN_ORIGIN}/accept-invite?token=${after.token}`);
       await expect(page.getByRole("heading", { name: "Invitation no longer valid" })).toBeVisible();
+      await expect(page.getByText(REPLACEMENT_GUIDANCE)).toBeVisible();
       await expect(page.getByLabel("Password", { exact: true })).toHaveCount(0);
       await evidence(page, testInfo, "revoked-link-accept-page");
     } finally {
@@ -547,6 +569,67 @@ test.describe("invitation reissue and revoke", () => {
         expect(rows).toHaveLength(0);
         await expect(invite.getByText(/couldn't send|not configured/i)).toBeVisible();
       }
+    } finally {
+      await removeFixtures([email]);
+    }
+  });
+});
+
+test.describe("what the invitee sees", () => {
+  test.describe.configure({ timeout: 180_000 });
+  // Pinned so the deadline's wording is exact: the accept page states it in
+  // the viewer's own timezone.
+  test.use({ timezoneId: "America/Los_Angeles" });
+
+  const DEADLINE = "2030-01-15T18:30:00.000Z";
+  const DEADLINE_TEXT =
+    "This invitation expires on Tuesday, January 15, 2030 at 10:30 AM Pacific Standard Time.";
+
+  function acceptUrl(token: string, email: string): string {
+    return `${QA_CALM_HAVEN_ORIGIN}/accept-invite?token=${token}&email=${encodeURIComponent(email)}`;
+  }
+
+  async function expectDeadCard(page: Page): Promise<void> {
+    await expect(page.getByRole("heading", { name: "Invitation no longer valid" })).toBeVisible();
+    await expect(page.getByText(REPLACEMENT_GUIDANCE)).toBeVisible();
+    await expect(page.getByLabel("Password", { exact: true })).toHaveCount(0);
+  }
+
+  test("a replaced link points to the newest email, and the current one states its deadline", async ({
+    page,
+  }, testInfo) => {
+    const email = fixtureEmail("recipient", testInfo);
+    await removeFixtures([email]);
+    const { invitationId } = await createEmployeeInvitation(
+      email,
+      `Recipient ${testInfo.project.name}`,
+    );
+    const consoleErrors = watchConsole(page);
+
+    try {
+      const original = await readOnlyInvitation(email);
+      const current = await rotate(invitationId, DEADLINE);
+
+      await page.goto(acceptUrl(original.token, email));
+      await expectDeadCard(page);
+      await evidence(page, testInfo, "replaced-link-card");
+
+      await page.goto(acceptUrl(current, email));
+      await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
+      await expect(page.getByText(DEADLINE_TEXT)).toBeVisible();
+      await evidence(page, testInfo, "current-link-deadline");
+
+      // Another reissue lands while the form is open: submitting it reaches
+      // the same card, not a form error.
+      await rotate(invitationId, DEADLINE);
+      await page.getByLabel("Password", { exact: true }).fill("Violet-Harbor-Lantern-42");
+      await page.getByLabel("Confirm password").fill("Violet-Harbor-Lantern-42");
+      await page.getByRole("checkbox").check();
+      await page.getByRole("button", { name: "Set Password & Accept" }).click();
+      await expectDeadCard(page);
+      await evidence(page, testInfo, "died-mid-page-card");
+
+      expect(consoleErrors).toEqual([]);
     } finally {
       await removeFixtures([email]);
     }

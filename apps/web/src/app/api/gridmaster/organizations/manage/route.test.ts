@@ -384,7 +384,14 @@ describe("POST /api/gridmaster/organizations/manage", () => {
         return { error: { code: "P0002", message: "no account" } };
       }
       if (fn === "send_invitation") {
-        return { data: { invitation_id: "invite-1", token: "raw-invite-token" }, error: null };
+        return {
+          data: {
+            invitation_id: "invite-1",
+            token: "raw-invite-token",
+            expires_at: "2026-03-03T00:00:00Z",
+          },
+          error: null,
+        };
       }
       return { error: null };
     });
@@ -400,7 +407,12 @@ describe("POST /api/gridmaster/organizations/manage", () => {
     expect(body.superAdmin).toEqual({ kind: "invited", displayName: "Ada Lovelace" });
     expect(JSON.stringify(body)).not.toContain("raw-invite-token");
     expect(sendPendingInvitationEmail).toHaveBeenCalledWith(
-      expect.objectContaining({ token: "raw-invite-token", email: "ada@example.com" }),
+      expect.objectContaining({
+        token: "raw-invite-token",
+        email: "ada@example.com",
+        expiresAt: "2026-03-03T00:00:00Z",
+        kind: "new",
+      }),
     );
 
     const auditRow = auditInsert.mock.calls.find(([row]) => row.action === "org.created")?.[0];
