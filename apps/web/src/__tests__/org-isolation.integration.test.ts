@@ -17,6 +17,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Client } from "pg";
+import { actAsAuthenticated } from "./helpers/simulated-jwt";
 import { authenticatedSecurityDefinerAllowlist } from "./helpers/sql-inventory";
 
 const SUPABASE_URL = process.env.LOCAL_SUPABASE_URL ?? "http://127.0.0.1:54321";
@@ -245,11 +246,7 @@ async function pickSqlFixture(): Promise<{
 }
 
 async function setJwtClaims(claims: Record<string, unknown>): Promise<void> {
-  await sqlDb.query(`SET LOCAL ROLE authenticated`);
-  await sqlDb.query(`SELECT set_config('request.jwt.claims', $1::text, true)`, [
-    // Real tokens always carry the claim (migration 037); fail-closed since 041.
-    JSON.stringify({ mfa_enrolled: false, ...claims }),
-  ]);
+  await actAsAuthenticated(sqlDb, claims);
 }
 
 async function resetJwt(): Promise<void> {

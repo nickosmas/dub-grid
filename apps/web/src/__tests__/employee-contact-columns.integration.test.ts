@@ -11,6 +11,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Client } from "pg";
+import { actAsAuthenticated } from "./helpers/simulated-jwt";
 
 const DB_URL =
   process.env.LOCAL_SUPABASE_DB_URL ?? "postgres://postgres:postgres@127.0.0.1:54322/postgres";
@@ -51,21 +52,19 @@ const MEMBERS: Member[] = [
 let db: Client;
 let orgId: string;
 
-async function asUser(member: Member): Promise<void> {
+async function asUser(member: Member, claims: Record<string, unknown> = {}): Promise<void> {
   const { rows } = await db.query<{ id: string }>(`SELECT id FROM auth.users WHERE email = $1`, [
     member.email,
   ]);
   if (rows.length === 0) throw new Error(`Missing seeded account ${member.email}`);
-  const claims = JSON.stringify({
+  await actAsAuthenticated(db, {
     sub: rows[0].id,
     role: "authenticated",
-    mfa_enrolled: false,
     org_id: orgId,
     org_role: member.orgRole,
     platform_role: "none",
+    ...claims,
   });
-  await db.query(`SET LOCAL ROLE authenticated`);
-  await db.query(`SET LOCAL request.jwt.claims = '${claims}'`);
 }
 
 async function asSuperuser(): Promise<void> {
