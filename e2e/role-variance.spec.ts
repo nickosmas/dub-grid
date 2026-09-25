@@ -13,6 +13,7 @@ import {
   walkRoutes,
   warmUpAndCaptureEmployeeHref,
 } from "./helpers/role-variance";
+import { holdRequests } from "./helpers/held-requests";
 
 // 25d2b: the 25d1 route matrix as the non-admin fixtures. The shared walker,
 // collector and locators live in helpers/role-variance.ts.
@@ -123,15 +124,7 @@ async function expectBootstrapStates(page: Page, path: string) {
     })
     .toBeNull();
 
-  // Held until the bar has been seen rather than delayed by a fixed timer: goto
-  // waits for the load event, which on a slow runner can arrive after a timed
-  // delay has already run out and the bar has gone.
-  let releaseBootstrap!: () => void;
-  const bootstrapReleased = new Promise<void>((resolve) => (releaseBootstrap = resolve));
-  await page.route(`**${BOOTSTRAP_PATH}`, async (route) => {
-    await bootstrapReleased;
-    await route.continue().catch(() => undefined);
-  });
+  const releaseBootstrap = await holdRequests(page, `**${BOOTSTRAP_PATH}`);
   await page.goto(`${QA_CALM_HAVEN_ORIGIN}${path}`);
   await expect(page.locator("[data-progress-bar]"), `${path} loading`).toBeVisible({
     timeout: 15_000,

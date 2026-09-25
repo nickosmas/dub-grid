@@ -6,6 +6,7 @@ import {
   QA_SUPER_ADMIN_EMAIL,
   QA_SUPER_ADMIN_PASSWORD,
 } from "./helpers/auth";
+import { holdRequests } from "./helpers/held-requests";
 
 const BOOTSTRAP_PATH = "/api/organization/bootstrap";
 
@@ -15,14 +16,12 @@ test.describe("dashboard states", () => {
   }) => {
     test.setTimeout(60_000);
 
-    await page.route(`**${BOOTSTRAP_PATH}`, async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 1_500));
-      await route.continue();
-    });
+    const releaseBootstrap = await holdRequests(page, `**${BOOTSTRAP_PATH}`);
 
     const navigation = loginAsQaSuperAdmin(page, QA_CALM_HAVEN_ORIGIN);
 
     await expect(page.locator("[data-progress-bar]")).toBeVisible({ timeout: 15_000 });
+    releaseBootstrap();
 
     await navigation;
 

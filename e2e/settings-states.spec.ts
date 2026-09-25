@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { loginAsQaSuperAdmin, QA_CALM_HAVEN_ORIGIN } from "./helpers/auth";
+import { holdRequests } from "./helpers/held-requests";
 
 const BOOTSTRAP_PATH = "/api/organization/bootstrap";
 
@@ -11,10 +12,7 @@ test.describe("settings states", () => {
     await loginAsQaSuperAdmin(page, QA_CALM_HAVEN_ORIGIN);
     await page.waitForLoadState("networkidle");
 
-    await page.route(`**${BOOTSTRAP_PATH}`, async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 1_500));
-      await route.continue();
-    });
+    const releaseBootstrap = await holdRequests(page, `**${BOOTSTRAP_PATH}`);
 
     await page.goto(`${QA_CALM_HAVEN_ORIGIN}/settings`);
 
@@ -23,6 +21,7 @@ test.describe("settings states", () => {
     const skeleton = page.getByLabel("Loading settings");
     await expect(skeleton).toBeVisible({ timeout: 15_000 });
     await expect(page.locator("[data-progress-bar]")).toBeVisible();
+    releaseBootstrap();
 
     await expect(skeleton).toHaveCount(0, { timeout: 15_000 });
     await expect(page.locator("[data-progress-bar]")).toHaveCount(0, { timeout: 15_000 });
