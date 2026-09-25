@@ -23,7 +23,13 @@ import { Timer } from "@/lib/server-timing";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { getSupabasePublishableKey, getSupabaseUrl } from "@/lib/supabase-keys";
 import { POST_LOGIN_DESTINATION } from "@/lib/auth/integrity-contract";
-import { writeSecurityAuditEvent } from "@/lib/auth/security-audit";
+import {
+  writeSecurityAuditEvent,
+  type SecurityEventOutcome,
+  type SecurityEventReason,
+} from "@/lib/auth/security-audit";
+import { endUserSession } from "@/lib/auth/revocation";
+import { hashSessionId } from "@/lib/auth/sign-in-completion";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +57,18 @@ type OrchestrationOutcome =
        */
       didSwitchOrg: boolean;
     }
-  | { ok: false; status: number; code: string; error: string };
+  | Refusal;
+
+/** A sign-in refused after the password was accepted, and what to record. */
+type Refusal = {
+  ok: false;
+  status: number;
+  code: string;
+  error: string;
+  outcome: Extract<SecurityEventOutcome, "rejected" | "failed">;
+  reason: SecurityEventReason;
+  orgId: string | null;
+};
 
 /** Returned when the user cannot access the organization named by the host. */
 const ORG_ACCESS_DENIED_CODE = "ORG_ACCESS_DENIED";
@@ -90,10 +107,7 @@ async function isGridmasterAccount(
 async function switchSessionToHostOrganization(
   session: SessionTokens,
   hostSlug: string,
-): Promise<
-  | { ok: true; session: SessionTokens; claims: ReturnType<typeof decodeJwt> }
-  | { ok: false; status: number; code: string; error: string }
-> {
+): Promise<{ ok: true; session: SessionTokens; claims: ReturnType<typeof decodeJwt> } | Refusal> {
   // Reuses the same 24h Redis-cached lookup app/login/page.tsx already ran for
   // this host moments earlier server-side, instead of a fresh DB round trip.
   const orgLookup = await lookupOrgBySlug(hostSlug);
@@ -105,6 +119,22 @@ async function switchSessionToHostOrganization(
       status: 403,
       code: ORG_DELETED_CODE,
       error: "This organization has been deleted.",
+      outcome: "rejected",
+      reason: "organization_unavailable",
+      orgId: null,
+    };
+  }
+  // An outage is not a refusal: it is recorded as a failure, not as an
+  // organization that does not exist.
+  if (orgLookup.status === "error" || orgLookup.status === "unconfigured") {
+    return {
+      ok: false,
+      status: 403,
+      code: ORG_ACCESS_DENIED_CODE,
+      error: "Your account is not associated with this organization.",
+      outcome: "failed",
+      reason: "service_unavailable",
+      orgId: null,
     };
   }
   if (orgLookup.status !== "found") {
@@ -113,6 +143,9 @@ async function switchSessionToHostOrganization(
       status: 403,
       code: ORG_ACCESS_DENIED_CODE,
       error: "Your account is not associated with this organization.",
+      outcome: "rejected",
+      reason: "organization_unavailable",
+      orgId: null,
     };
   }
   if (orgLookup.org.suspendedAt) {
@@ -121,6 +154,11 @@ async function switchSessionToHostOrganization(
       status: 403,
       code: ORG_SUSPENDED_CODE,
       error: "This organization is suspended.",
+      outcome: "rejected",
+      reason: "organization_unavailable",
+      // Membership is unknown here, and an organization's log must not show
+      // a sign-in by someone who is not its member.
+      orgId: null,
     };
   }
 
@@ -134,6 +172,10 @@ async function switchSessionToHostOrganization(
       status: 403,
       code: ORG_ACCESS_DENIED_CODE,
       error: "Your account is not associated with this organization.",
+      outcome: "rejected",
+      reason: "organization_access_denied",
+      // Not a member, so this organization's log must not carry the row.
+      orgId: null,
     };
   }
 
@@ -146,6 +188,9 @@ async function switchSessionToHostOrganization(
       status: 401,
       code: "SESSION_REFRESH_FAILED",
       error: "We couldn't verify your session. Sign in again.",
+      outcome: "failed",
+      reason: "service_unavailable",
+      orgId: orgLookup.org.id,
     };
   }
 
@@ -195,6 +240,9 @@ async function orchestratePostSignIn(
         status: 401,
         code: "SESSION_REFRESH_FAILED",
         error: "We couldn't verify your session. Sign in again.",
+        outcome: "failed",
+        reason: "service_unavailable",
+        orgId: null,
       };
     }
     session = {
@@ -265,6 +313,34 @@ async function orchestratePostSignIn(
   }
 
   return { ok: true, session, destination, didSwitchOrg };
+}
+
+/**
+ * Records a sign-in refused after the password was accepted, and ends the Auth
+ * session that password just created: its tokens never reach the browser, so
+ * nothing else would end it. Ending it is best-effort and never changes the
+ * response.
+ */
+async function refuseSignIn(input: {
+  userId: string;
+  sessionId: string | null;
+  refusal: Pick<Refusal, "outcome" | "reason" | "orgId">;
+  emailHash: string;
+}): Promise<void> {
+  await writeSecurityAuditEvent({
+    event: "security.auth.login",
+    outcome: input.refusal.outcome,
+    reason: input.refusal.reason,
+    actorId: input.userId,
+    orgId: input.refusal.orgId,
+    metadata: { targetHash: input.emailHash, surface: "web" },
+  });
+  if (!input.sessionId) return;
+  try {
+    await endUserSession(input.userId, input.sessionId);
+  } catch (error) {
+    logger.error({ error, userId: input.userId }, "Ending a refused sign-in's session failed");
+  }
 }
 
 /**
@@ -438,7 +514,14 @@ export async function POST(req: NextRequest) {
   // A Gridmaster's tenant access always starts from the platform portal and a
   // verified impersonation session. Reject this before the browser receives
   // tokens, including for MFA-enrolled accounts.
+  const sessionId = typeof claims.session_id === "string" ? claims.session_id : null;
   if (isGridmaster && loginHost !== "gridmaster") {
+    await refuseSignIn({
+      userId: data.user.id,
+      sessionId,
+      refusal: { outcome: "rejected", reason: "gridmaster_portal_required", orgId: null },
+      emailHash,
+    });
     const res = NextResponse.json(
       {
         success: false,
@@ -456,6 +539,7 @@ export async function POST(req: NextRequest) {
       orchestratePostSignIn(session, claims, req, isGridmaster),
     );
     if (!outcome.ok) {
+      await refuseSignIn({ userId: data.user.id, sessionId, refusal: outcome, emailHash });
       const res = NextResponse.json(
         { success: false, code: outcome.code, error: outcome.error },
         { status: outcome.status },
@@ -485,17 +569,33 @@ export async function POST(req: NextRequest) {
     res.cookies.set(SANDBOX_COOKIE_NAME, "", { path: "/", maxAge: 0 });
   }
   timer.applyTo(res.headers);
-  // A password alone is not a sign-in when a second factor is enrolled: that
-  // step is challenged, and /api/auth/login/complete records the success. The
-  // organization is the one the session ended in, after any switch.
+  // A password alone is not a sign-in when a second factor is enrolled or the
+  // email is unconfirmed: that step is challenged, and only a completed sign-in
+  // records a success. A completed sign-in names the organization the session
+  // ended in, after any switch. A challenge happens before the switch, so it
+  // names the session's organization only when that is the one the host asked
+  // for; otherwise the person may not be a member, and no organization's log
+  // should carry it.
+  const challenge: SecurityEventReason | null = !emailConfirmed
+    ? "email_unconfirmed"
+    : mfaRequired
+      ? "second_factor_required"
+      : null;
   const signedInClaims = didSwitchOrg ? decodeJwt(session.access_token) : claims;
+  const sessionOrgId = typeof signedInClaims.org_id === "string" ? signedInClaims.org_id : null;
   await writeSecurityAuditEvent({
     event: "security.auth.login",
-    outcome: mfaRequired ? "challenged" : "succeeded",
-    reason: mfaRequired ? "second_factor_required" : "accepted",
+    outcome: challenge ? "challenged" : "succeeded",
+    reason: challenge ?? "accepted",
     actorId: data.user.id,
-    orgId: typeof signedInClaims.org_id === "string" ? signedInClaims.org_id : null,
-    metadata: { targetHash: emailHash, surface: "web" },
+    orgId: !challenge || !loginHost || claims.org_slug === loginHost ? sessionOrgId : null,
+    // A completed sign-in carries its session, so the completion endpoint
+    // never records the same sign-in a second time.
+    metadata: {
+      targetHash: emailHash,
+      surface: "web",
+      ...(!challenge && sessionId ? { sessionHash: hashSessionId(sessionId) } : {}),
+    },
   });
   return res;
 }

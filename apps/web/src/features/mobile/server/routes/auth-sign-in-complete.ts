@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { API_ERRORS } from "@dubgrid/client-errors";
-import { hasFreshSecondFactor, recordSecondFactorSignIn } from "@/lib/auth/sign-in-completion";
+import { hasFreshSecondFactor, recordCompletedSignIn } from "@/lib/auth/sign-in-completion";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { retryAfterSeconds } from "@/lib/retry-after";
 import { requireMobileAuth } from "../auth";
@@ -28,10 +28,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
   }
 
-  await recordSecondFactorSignIn({
+  await recordCompletedSignIn({
     userId: auth.user.id,
     orgId: auth.currentOrg.id,
     surface: "mobile",
+    method: "totp",
+    sessionId: typeof auth.claims.session_id === "string" ? auth.claims.session_id : null,
   });
   return NextResponse.json({ success: true }, { headers: { "Cache-Control": "no-store" } });
 }

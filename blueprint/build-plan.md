@@ -609,7 +609,7 @@
           the account, an account deletion sends a notice, Supabase's own
           password and email change notices are declared and enabled, and the
           security-alert settings say truthfully that they are always on.
-    - [ ] 41c2. **Audit attribution** - record web sign-in denials, audit an
+    - [x] 41c2. **Audit attribution** - record web sign-in denials, audit an
           invitation acceptance's sign-in, record a completed sign-in once
           per session, and take the organization of an ended impersonation
           from the session rather than the request.

@@ -7,6 +7,7 @@ const requestRpc = vi.fn();
 const serviceRpc = vi.fn();
 const serviceFrom = vi.fn();
 const auditInsert = vi.fn();
+const impersonationRow = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
   createRequestSupabaseClient: () => ({
@@ -130,9 +131,21 @@ describe("POST /api/gridmaster/impersonation", () => {
       session: { access_token: "token" },
     });
     auditInsert.mockResolvedValue({ error: null });
+    impersonationRow.mockResolvedValue({
+      data: { target_org_id: ORG_ID, ended_at: null },
+      error: null,
+    });
     serviceFrom.mockImplementation((table: string) => {
       if (table === "audit_log") {
         return { insert: auditInsert };
+      }
+      if (table === "impersonation_sessions") {
+        const query = {
+          select: () => query,
+          eq: () => query,
+          maybeSingle: () => impersonationRow(),
+        };
+        return query;
       }
       throw new Error(`Unexpected table: ${table}`);
     });
@@ -274,5 +287,75 @@ describe("POST /api/gridmaster/impersonation", () => {
       p_session_id: SESSION_ID,
       p_reason: "navigation",
     });
+  });
+
+  // The request used to name the organization (41c2).
+  it("records the end against the session's organization, not the request's", async () => {
+    requestRpc.mockResolvedValue({ data: null, error: null });
+
+    await POST(
+      makePostRequest({
+        action: "end",
+        sessionId: SESSION_ID,
+        targetOrgId: "99999999-9999-4999-8999-999999999999",
+      }),
+    );
+
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "impersonation.ended", org_id: ORG_ID }),
+    );
+  });
+
+  it.each([
+    ["already ended", { target_org_id: ORG_ID, ended_at: "2026-05-01T16:00:00.000Z" }],
+    ["not this Gridmaster's", null],
+  ])("records nothing for a session that is %s", async (_label, row) => {
+    impersonationRow.mockResolvedValue({ data: row, error: null });
+
+    const response = await POST(makePostRequest({ action: "end", sessionId: SESSION_ID }));
+
+    expect(response.status).toBe(404);
+    expect(requestRpc).not.toHaveBeenCalled();
+    expect(auditInsert).not.toHaveBeenCalled();
+  });
+
+  it("still starts when the session row cannot be read back", async () => {
+    requestRpc.mockResolvedValueOnce({
+      data: { session_id: SESSION_ID, expires_at: "2026-05-01T17:00:00.000Z" },
+      error: null,
+    });
+    impersonationRow.mockResolvedValueOnce({ data: null, error: new Error("read failed") });
+
+    const response = await POST(
+      makePostRequest({
+        action: "start",
+        targetUserId: TARGET_USER_ID,
+        justification: "Need support investigation",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "impersonation.started", org_id: null }),
+    );
+  });
+
+  it("records a start against the organization the session landed in", async () => {
+    requestRpc.mockResolvedValueOnce({
+      data: { session_id: SESSION_ID, expires_at: "2026-05-01T17:00:00.000Z" },
+      error: null,
+    });
+
+    await POST(
+      makePostRequest({
+        action: "start",
+        targetUserId: TARGET_USER_ID,
+        justification: "Need support investigation",
+      }),
+    );
+
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "impersonation.started", org_id: ORG_ID }),
+    );
   });
 });

@@ -62,3 +62,51 @@
 **Why it matters:** Each half of "a later reconcile sends nothing" is tested separately, not the sequence, and the script's boolean compare runs only in production use; a source-text check stands in for it.
 **Suggested fix:** A test that removes the last factor and then reconciles; export the script's `diff` behind a main guard and test it.
 **Resolution:**
+
+### F-25 [P3] open - The once-per-session sign-in record is not atomic
+
+**File:** `apps/web/src/lib/auth/sign-in-completion.ts:61`
+**Found:** 2026-09-25 by `/audit` (scope: current, bdbbd4cc..8246596c; all lenses)
+**Why it matters:** Two concurrent completion calls can both read nothing and both write. The app's clients guard concurrent calls.
+**Suggested fix:** A partial unique index on `(actor_id, details->>'sessionHash')` for successes, which needs a migration.
+**Resolution:**
+
+### F-26 [P3] open - Two concurrent impersonation ends can both be recorded
+
+**File:** `apps/web/src/app/api/gridmaster/impersonation/route.ts:205`
+**Found:** 2026-09-25 by `/audit` (scope: current, bdbbd4cc..8246596c; all lenses)
+**Why it matters:** The row is read before `end_impersonation`, whose second call is a silent no-op, so both requests write `impersonation.ended`.
+**Suggested fix:** Have the RPC return whether it ended a row (migration).
+**Resolution:**
+
+### F-28 [P3] open - A host-organization denial after the second factor is not recorded
+
+**File:** `apps/web/src/app/(app)/login/OrgLogin.tsx:236`
+**Found:** 2026-09-25 by `/audit` (scope: current, bdbbd4cc..8246596c; all lenses)
+**Why it matters:** On the web two-factor path the client finds no membership, signs out locally and shows a toast; the log ends at the challenge. Predates 41c2.
+**Suggested fix:** A server-side refusal record for this case, for example a denial reason on the local sign-out.
+**Resolution:**
+
+### F-29 [P3] open - A sign-in refused by the access-token hook writes no audit row
+
+**File:** `apps/web/src/app/api/auth/login/route.ts:445`
+**Found:** 2026-09-25 by `/audit` (scope: current, bdbbd4cc..8246596c; all lenses)
+**Why it matters:** The `ACCOUNT_DISABLED` branch returns 403 with no record although the password was correct. Predates 41c2.
+**Suggested fix:** Record it as `rejected` with a disabled-account reason (no session exists to end).
+**Resolution:**
+
+### F-32 [P3] open - Any signed-in user can insert audit rows as themselves
+
+**File:** `supabase/migrations/003_rls_policies.sql:1204`
+**Found:** 2026-09-25 by `/audit` (scope: current, bdbbd4cc..8246596c; all lenses)
+**Why it matters:** `authenticated_insert_audit_log` lets a user write any `action` and `details`, including a `security.auth.login` success with their own `sessionHash` that would suppress the real record. Predates 41c2.
+**Suggested fix:** Restrict inserts to server-written actions (a migration), or move security evidence to a table only the service role writes.
+**Resolution:**
+
+### F-33 [P3] open - The proxy's escape end of an impersonation is not audited
+
+**File:** `apps/web/src/proxy.ts:478`
+**Found:** 2026-09-25 by `/audit` (scope: current, bdbbd4cc..8246596c; all lenses)
+**Why it matters:** Visiting `/gridmaster` while impersonating ends the row with reason `navigation` and records nothing. Kept out of 41c2 so the middleware gains no service-role write.
+**Suggested fix:** Record it from a route or a job (the 41c3 notice work may carry it).
+**Resolution:**

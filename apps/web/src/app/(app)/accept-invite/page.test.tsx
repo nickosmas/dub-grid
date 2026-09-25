@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   registerInvitedUser: vi.fn(),
   signInBrowserWithPassword: vi.fn(),
   signOutFromBrowser: vi.fn(),
+  recordBrowserSignInCompleted: vi.fn(),
   captureException: vi.fn(),
 }));
 
@@ -92,6 +93,7 @@ vi.mock("@/features/account/client", () => ({
   registerInvitedUser: mocks.registerInvitedUser,
   signInBrowserWithPassword: mocks.signInBrowserWithPassword,
   signOutFromBrowser: mocks.signOutFromBrowser,
+  recordBrowserSignInCompleted: mocks.recordBrowserSignInCompleted,
 }));
 vi.mock("@/features/organization/client", () => ({ acceptInvitation: mocks.acceptInvitation }));
 vi.mock("@/components/profile/MFAVerify", () => ({
@@ -144,6 +146,7 @@ describe("AcceptInvitePage", () => {
     mocks.acceptInvitation.mockResolvedValue({ orgSlug: "calm-haven" });
     mocks.recordCurrentTermsAcceptance.mockResolvedValue(undefined);
     mocks.signOutFromBrowser.mockResolvedValue(undefined);
+    mocks.recordBrowserSignInCompleted.mockResolvedValue(undefined);
   });
 
   it("shows a recoverable login route when the link has no invitation token", async () => {
@@ -194,6 +197,26 @@ describe("AcceptInvitePage", () => {
     expect(await screen.findByRole("heading", { name: "You're all set" })).toBeInTheDocument();
     expect(mocks.recordCurrentTermsAcceptance).toHaveBeenCalledOnce();
     expect(mocks.signOutFromBrowser).toHaveBeenCalledWith("global");
+    // The acceptance's sign-in is recorded while its session still exists.
+    expect(mocks.recordBrowserSignInCompleted).toHaveBeenCalledOnce();
+    expect(mocks.recordBrowserSignInCompleted.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.signOutFromBrowser.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("records no sign-in when the password is refused", async () => {
+    setLocation("?token=invite-token&email=new.user%40example.com");
+    mocks.registerInvitedUser.mockResolvedValue({ status: "existing" });
+    mocks.signInBrowserWithPassword.mockResolvedValue({
+      error: Object.assign(new Error("Invalid login credentials"), { status: 400 }),
+    });
+    render(<AcceptInvitePage />);
+
+    await submitNewPassword();
+
+    await waitFor(() => expect(mocks.signInBrowserWithPassword).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByRole("button", { name: /accept/i })).toBeEnabled());
+    expect(mocks.recordBrowserSignInCompleted).not.toHaveBeenCalled();
   });
 
   it("returns to a usable form when acceptance fails in a way a retry can fix", async () => {
@@ -272,6 +295,9 @@ describe("AcceptInvitePage", () => {
 
     expect(await screen.findByRole("heading", { name: "You're all set" })).toBeInTheDocument();
     expect(mocks.acceptInvitation).toHaveBeenCalledTimes(2);
+    // Once after the password (which the server refuses for this account) and
+    // once after the code, which it records.
+    expect(mocks.recordBrowserSignInCompleted).toHaveBeenCalledTimes(2);
     expect(mocks.signOutFromBrowser).toHaveBeenCalledWith("global");
   });
 

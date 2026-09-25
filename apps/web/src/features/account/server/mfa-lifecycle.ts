@@ -11,6 +11,7 @@ import { verifyAccessToken } from "@/lib/auth/verify-token";
 import { apiLimiter, checkRateLimit, loginLimiter } from "@/lib/rate-limit";
 import { writeSecurityAuditEvent } from "@/lib/auth/security-audit";
 import logger from "@/lib/logger";
+import { hashSessionId } from "@/lib/auth/sign-in-completion";
 import { recordSelfMfaOff } from "./profile";
 import { scheduleSecurityAlert } from "./security-alerts";
 
@@ -123,7 +124,13 @@ export function createMfaLifecycleHandler(options: {
             reason: "reauthenticated",
             actorId: auth.user.id,
             orgId: typeof auth.claims.org_id === "string" ? auth.claims.org_id : null,
-            metadata: { surface: options.surface, method: "password" },
+            // Marks the replacement session, so it is never also recorded as
+            // a new sign-in.
+            metadata: {
+              surface: options.surface,
+              method: "password",
+              sessionHash: hashSessionId(verified.sessionId),
+            },
           });
           return reply({
             access_token: session.access_token,

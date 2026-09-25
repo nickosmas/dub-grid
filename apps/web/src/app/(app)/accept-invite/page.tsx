@@ -22,6 +22,7 @@ import { parseHost, buildSubdomainHost } from "@/lib/subdomain";
 import * as Sentry from "@/lib/sentry";
 import {
   fetchInvitationLookup,
+  recordBrowserSignInCompleted,
   recordCurrentTermsAcceptance,
   registerInvitedUser,
   signInBrowserWithPassword,
@@ -165,6 +166,10 @@ function AcceptInviteContent() {
         throw new Error(message, { cause: signInError });
       }
       signedInRef.current = true;
+      // Recorded before acceptance signs the session out. The server refuses
+      // a password alone on an account with a second factor, which records
+      // after the challenge instead.
+      await recordBrowserSignInCompleted();
 
       // 3. Accept the invitation (now authenticated)
       if ((await finishAcceptance()) === "needs-mfa") {
@@ -252,6 +257,7 @@ function AcceptInviteContent() {
   async function handleMfaVerified() {
     setState("processing");
     try {
+      await recordBrowserSignInCompleted();
       if ((await finishAcceptance()) === "needs-mfa") {
         throw new Error(describeAcceptFailure("step-up"));
       }

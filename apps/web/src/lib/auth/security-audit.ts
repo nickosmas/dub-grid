@@ -19,7 +19,11 @@ export type SecurityEventReason =
   | "factor_removed"
   | "reauthenticated"
   | "session_revoked"
-  | "password_changed";
+  | "password_changed"
+  | "organization_unavailable"
+  | "organization_access_denied"
+  | "gridmaster_portal_required"
+  | "email_unconfirmed";
 
 export type SecurityEventMetadata = {
   targetHash?: string;
@@ -27,6 +31,8 @@ export type SecurityEventMetadata = {
   surface?: "web" | "mobile";
   scope?: "local" | "others" | "global" | "device";
   method?: "password" | "totp" | "otp";
+  /** SHA-256 of the Auth session id, so a completed sign-in is recorded once. */
+  sessionHash?: string;
 };
 
 export type SecurityAuditEvent = {
@@ -62,5 +68,34 @@ export async function writeSecurityAuditEvent(input: SecurityAuditEvent): Promis
     if (error) throw error;
   } catch (error) {
     logger.error({ error, event: input.event }, "Security audit write failed");
+  }
+}
+
+/**
+ * Whether this Auth session already has its sign-in on record: a completed
+ * sign-in, or the replacement session a reauthentication issued. A failed
+ * read answers no: recording a sign-in twice beats losing it.
+ */
+export async function hasRecordedSignIn(input: {
+  actorId: string;
+  sessionHash: string;
+}): Promise<boolean> {
+  try {
+    const read = Promise.resolve(
+      getServiceClient()
+        .from("audit_log")
+        .select("id")
+        .in("action", ["security.auth.login", "security.auth.mfa"])
+        .eq("actor_id", input.actorId)
+        .eq("details->>outcome", "succeeded")
+        .eq("details->>sessionHash", input.sessionHash)
+        .limit(1),
+    );
+    const { data, error } = await withTimeoutOrThrow(read, 1_000, "security audit read");
+    if (error) throw error;
+    return (data ?? []).length > 0;
+  } catch (error) {
+    logger.error({ error }, "Security audit read failed");
+    return false;
   }
 }

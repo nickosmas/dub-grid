@@ -456,6 +456,30 @@ describe("audience", () => {
       orgName: null,
     });
     expect(challenged).toBe("Sign-in awaiting two-factor code");
+
+    const describeLogin = (details: Record<string, string>) =>
+      describeAction({
+        action: "security.auth.login",
+        details: { surface: "web", ...details },
+        resourceId: null,
+        resourceType: "user",
+        targetLabel: null,
+        targetEmail: null,
+        orgName: null,
+      });
+    expect(describeLogin({ outcome: "challenged", reason: "email_unconfirmed" })).toBe(
+      "Sign-in awaiting email confirmation",
+    );
+    expect(describeLogin({ outcome: "rejected", reason: "organization_unavailable" })).toBe(
+      "Sign-in rejected: organization unavailable",
+    );
+    expect(describeLogin({ outcome: "rejected", reason: "constructor" })).toBe("Sign-in rejected");
+    expect(describeLogin({ outcome: "rejected", reason: "organization_access_denied" })).toBe(
+      "Sign-in rejected: no access to this organization",
+    );
+    expect(describeLogin({ outcome: "rejected", reason: "gridmaster_portal_required" })).toBe(
+      "Sign-in rejected: Gridmaster accounts sign in through the platform portal",
+    );
     const loginRows = formatDetails({
       action: "security.auth.login",
       details: { outcome: "succeeded", reason: "accepted", surface: "mobile", targetHash: hash },

@@ -93,7 +93,11 @@ beforeEach(() => {
   mocks.refresh.mockResolvedValue({ data: { session }, error: null });
   mocks.signOut.mockResolvedValue({ error: null });
   mocks.rpc.mockResolvedValue({ error: null });
-  mocks.verify.mockResolvedValue({ userId: user.id, claims: { org_id: "org-1" } });
+  mocks.verify.mockResolvedValue({
+    userId: user.id,
+    sessionId: "replacement-session",
+    claims: { org_id: "org-1" },
+  });
 });
 
 describe.each([
@@ -205,6 +209,13 @@ describe.each([
     expect(mocks.signIn).toHaveBeenCalledWith({ email: user.email, password: "test-password" });
     expect(mocks.rpc).toHaveBeenCalledWith("switch_org", { target_org_id: "org-1" });
     expect(await response.json()).toEqual(session);
+    // The replacement session is marked, so it never also counts as a sign-in.
+    expect(mocks.audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reason: "reauthenticated",
+        metadata: expect.objectContaining({ sessionHash: expect.stringMatching(/^[0-9a-f]{64}$/) }),
+      }),
+    );
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(mocks.signOut).not.toHaveBeenCalled();
   });

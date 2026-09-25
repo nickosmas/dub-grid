@@ -1,12 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ insert: vi.fn(), loggerError: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  insert: vi.fn(),
+  loggerError: vi.fn(),
+  read: vi.fn(),
+  filters: [] as Array<[string, unknown]>,
+}));
 
 vi.mock("@/lib/supabase-service", () => ({
   getServiceClient: () => ({
     from: (table: string) => {
       expect(table).toBe("audit_log");
-      return { insert: mocks.insert };
+      const query = {
+        select: () => query,
+        eq: (column: string, value: unknown) => {
+          mocks.filters.push([column, value]);
+          return query;
+        },
+        in: (column: string, value: unknown) => {
+          mocks.filters.push([column, value]);
+          return query;
+        },
+        limit: () => mocks.read(),
+      };
+      return { insert: mocks.insert, select: query.select };
     },
   }),
 }));
@@ -14,7 +31,7 @@ vi.mock("@/lib/logger", () => ({
   default: { error: (...args: unknown[]) => mocks.loggerError(...args) },
 }));
 
-import { writeSecurityAuditEvent } from "./security-audit";
+import { hasRecordedSignIn, writeSecurityAuditEvent } from "./security-audit";
 
 describe("writeSecurityAuditEvent", () => {
   beforeEach(() => {
@@ -56,6 +73,34 @@ describe("writeSecurityAuditEvent", () => {
         reason: "service_unavailable",
       }),
     ).resolves.toBeUndefined();
+    expect(mocks.loggerError).toHaveBeenCalledOnce();
+  });
+});
+
+describe("hasRecordedSignIn", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.filters.length = 0;
+  });
+
+  it("looks for this person's completed sign-in with this session's hash", async () => {
+    mocks.read.mockResolvedValue({ data: [{ id: 1 }], error: null });
+
+    await expect(hasRecordedSignIn({ actorId: "user-1", sessionHash: "abc" })).resolves.toBe(true);
+    expect(mocks.filters).toEqual([
+      ["action", ["security.auth.login", "security.auth.mfa"]],
+      ["actor_id", "user-1"],
+      ["details->>outcome", "succeeded"],
+      ["details->>sessionHash", "abc"],
+    ]);
+  });
+
+  it("answers no when nothing matches or the read fails", async () => {
+    mocks.read.mockResolvedValueOnce({ data: [], error: null });
+    await expect(hasRecordedSignIn({ actorId: "user-1", sessionHash: "abc" })).resolves.toBe(false);
+
+    mocks.read.mockResolvedValueOnce({ data: null, error: new Error("down") });
+    await expect(hasRecordedSignIn({ actorId: "user-1", sessionHash: "abc" })).resolves.toBe(false);
     expect(mocks.loggerError).toHaveBeenCalledOnce();
   });
 });

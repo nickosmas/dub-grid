@@ -55,6 +55,18 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
     policy: "sensitive",
     assertions: [/\brequireSensitiveActionAuth\s*\(/],
   },
+  // The password check itself: it ends only the Auth session its own
+  // password just created, when that sign-in is then refused (41c2).
+  "apps/web/src/app/api/auth/login/route.ts": {
+    policy: "independent-credential",
+    assertions: [
+      /\bvalidateCsrfOrigin\s*\(/,
+      /checkRateLimit\(loginLimiter/,
+      /const sessionId = typeof claims\.session_id === "string" \? claims\.session_id : null;/,
+      /async function refuseSignIn[\s\S]*?await endUserSession\(input\.userId, input\.sessionId\)/,
+      /refuseSignIn\(\{\s*userId: data\.user\.id,\s*sessionId,/,
+    ],
+  },
   "apps/web/src/app/api/auth/sign-out/route.ts": {
     policy: "conditional-sensitive",
     assertions: [
