@@ -178,6 +178,12 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
       /roleChanged && allowed\.isGridmaster\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.rpc\("change_user_role"/,
     ],
   },
+  "apps/web/src/app/api/organizations/role-change/route.ts": {
+    policy: "sensitive",
+    assertions: [
+      /const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.rpc\("change_user_role"/,
+    ],
+  },
   "apps/web/src/app/api/organizations/delete/route.ts": {
     policy: "sensitive",
     assertions: [/\brequireOrgPermissions\s*\(/, /\brequireSensitiveActionAuth\s*\(/],
@@ -227,7 +233,7 @@ const MOBILE_DELEGATES: Record<string, RegExp[]> = {
 // and mobile handlers only, so a new helper that makes such a change belongs
 // in this list.
 const sensitiveSourceMarker =
-  /\b(?:requireSensitiveActionAuth|requireMobileSensitiveActionAuth|revokeAllUserSessions|revokeOtherUserSessions|revokeUserSessionForUser|endUserSessions?|resetPasswordForEmail|deleteUserAccountWithCleanup|syncLinkedLoginEmail)\s*\(|auth\.admin\.(?:createUser|updateUserById|deleteUser|signOut)\s*\(|gdpr_erase_user_data|force_logout_user|promote_gridmaster_by_email|demote_gridmaster_account|set_gridmaster_account_deactivated|assign_org_role_by_email/;
+  /\b(?:requireSensitiveActionAuth|requireMobileSensitiveActionAuth|revokeAllUserSessions|revokeOtherUserSessions|revokeUserSessionForUser|endUserSessions?|resetPasswordForEmail|deleteUserAccountWithCleanup|syncLinkedLoginEmail)\s*\(|auth\.admin\.(?:createUser|updateUserById|deleteUser|signOut)\s*\(|gdpr_erase_user_data|force_logout_user|promote_gridmaster_by_email|demote_gridmaster_account|set_gridmaster_account_deactivated|assign_org_role_by_email|change_user_role/;
 const delegatedSensitivePath =
   /\/(?:(?:account|mobile\/v1\/profile)\/(?:credential-assurance|mfa-lifecycle|sessions)|mobile\/v1\/auth\/sign-out)\/route\.ts$/;
 
