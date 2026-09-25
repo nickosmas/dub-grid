@@ -20,6 +20,7 @@ export interface UpdateOrganizationSettingsInput extends Partial<OrganizationSet
 interface ErrorBody {
   error?: string;
   code?: string;
+  method?: string;
   user?: OrganizationUser;
   invitation?: Invitation;
   token?: string;
@@ -259,16 +260,22 @@ export async function updateOrganizationSettings(
   return organization;
 }
 
-export async function updateOrganizationMembershipGuarded(input: {
-  orgId: string;
-  userId: string;
-  expectedUpdatedAt: string;
-  orgRole?: OrganizationRole;
-  adminPermissions?: AdminPermissions | null;
-}): Promise<OrganizationUser> {
+export async function updateOrganizationMembershipGuarded(
+  input: {
+    orgId: string;
+    userId: string;
+    expectedUpdatedAt: string;
+    orgRole?: OrganizationRole;
+    adminPermissions?: AdminPermissions | null;
+  },
+  accessToken?: string,
+): Promise<OrganizationUser> {
   const response = await fetch(resolveClientUrl("/api/organizations/access"), {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify(input),
   });
 
@@ -279,7 +286,11 @@ export async function updateOrganizationMembershipGuarded(input: {
   }
 
   if (!response.ok || !body?.user) {
-    throw new Error(getErrorMessage(body, "We couldn't update organization access. Try again."));
+    // Status, code and method let step-up recognize a request for fresh proof.
+    throw Object.assign(
+      new Error(getErrorMessage(body, "We couldn't update organization access. Try again.")),
+      { status: response.status, code: body?.code, method: body?.method },
+    );
   }
 
   return body.user;

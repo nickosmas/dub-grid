@@ -118,11 +118,6 @@ export interface SendNotificationOptions {
    * reported more than once, such as two concurrent reports of one sign-in.
    */
   dedupeKey?: string;
-  /**
-   * Whether to send an email. Default true. Set false when another sender
-   * already emails the same event, so the person gets one email, not two.
-   */
-  sendEmail?: boolean;
 }
 
 /**
@@ -182,8 +177,6 @@ export async function sendNotification(
       { accountWide: isAccountWidePushType(type) },
     );
   }
-
-  if (options.sendEmail === false) return;
 
   // 2. Check user preferences for email
   const { data: prefs } = await supabase

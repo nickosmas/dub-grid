@@ -51,6 +51,11 @@ describe("isPasswordAcceptable", () => {
 
   // Supabase requires a letter and a digit; these used to pass the app and
   // then fail at sign-up (41d3, F-47).
+  it("never rates a password the forms refuse above Weak", () => {
+    expect(getPasswordStrengthLevel("Abcdefghij!")).toBe(1);
+    expect(getPasswordStrengthLevel("Abcdefghi1")).toBe(2);
+  });
+
   it("refuses a password without a number or without a letter", () => {
     expect(isPasswordAcceptable("Abcdefghij!")).toBe(false);
     expect(isPasswordAcceptable("1234567890!")).toBe(false);

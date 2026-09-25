@@ -349,7 +349,7 @@ describe("dispatchNotificationEvent", () => {
     );
   });
 
-  it("dispatches security_mfa_changed as a push only, since Supabase emails the change", async () => {
+  it("dispatches security_mfa_changed with writeInApp:false (email + push only)", async () => {
     await dispatchNotificationEvent("user-1", {
       action: "security_mfa_changed",
       orgId: "org-1",
@@ -364,7 +364,7 @@ describe("dispatchNotificationEvent", () => {
       // Someone else's authenticator locks the owner out of a reset (41c3).
       expect.stringContaining("If this wasn't you, contact support@dubgrid.com right away."),
       { enabled: true },
-      { writeInApp: false, sendEmail: false },
+      { writeInApp: false },
     );
 
     await dispatchNotificationEvent("user-1", {
@@ -380,7 +380,7 @@ describe("dispatchNotificationEvent", () => {
       "Two-factor authentication disabled",
       expect.any(String),
       { enabled: false },
-      { writeInApp: false, sendEmail: false },
+      { writeInApp: false },
     );
   });
 

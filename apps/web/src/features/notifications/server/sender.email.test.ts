@@ -155,20 +155,6 @@ describe("sendNotification email", () => {
     expect(billing).toContain("manage your notification preferences");
   });
 
-  it("sends no email when the caller says another sender emails the event", async () => {
-    await sendNotification(
-      "user-1",
-      "org-1",
-      "security_mfa_changed" as never,
-      "Title",
-      "Message",
-      {},
-      { writeInApp: false, sendEmail: false },
-    );
-
-    expect(sendResendEmail).not.toHaveBeenCalled();
-  });
-
   it("still honors an email preference for other categories", async () => {
     state.prefs = { billing: { in_app: true, email: false } };
 

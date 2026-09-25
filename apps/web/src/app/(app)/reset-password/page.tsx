@@ -326,8 +326,8 @@ function ResetPasswordContent() {
           <>
             <h1 className="dg-auth-heading dg-auth-page-heading">Set new password</h1>
             <p className="dg-auth-description">
-              Choose a strong password: at least 10 characters, with a mix of uppercase letters,
-              numbers, and symbols.
+              Choose a strong password: at least 10 characters with a letter and a number, plus an
+              uppercase letter or a symbol.
             </p>
 
             <Form onSubmit={handleSubmit} className="dg-auth-form">

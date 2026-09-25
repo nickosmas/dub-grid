@@ -91,13 +91,13 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
   "apps/web/src/app/api/gridmaster/audit-log/export/route.ts": {
     policy: "sensitive",
     assertions: [
-      /\brequireGridmasterSession\s*\([\s\S]*?\brequireSensitiveActionAuth\s*\([\s\S]*?\bfetchFilteredAuditRows\s*\(/,
+      /\brequireGridmasterSession\s*\([\s\S]*?const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) \{\s*return assurance\.response;[\s\S]*?\bfetchFilteredAuditRows\s*\(/,
     ],
   },
   "apps/web/src/app/api/gridmaster/organizations/manage/route.ts": {
     policy: "conditional-sensitive",
     assertions: [
-      /parsed\.data\.action === "assignOrgRoleByEmail"\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);[\s\S]*?\.rpc\("assign_org_role_by_email"/,
+      /parsed\.data\.action === "assignOrgRoleByEmail"\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) \{\s*return assurance\.response;[\s\S]*?\.rpc\("assign_org_role_by_email"/,
     ],
   },
   "apps/web/src/app/api/gridmaster/password-reset/route.ts": {
@@ -175,6 +175,7 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
     assertions: [
       /export async function DELETE[\s\S]*?\brequirePrivilegedActor\s*\(/,
       /export async function DELETE[\s\S]*?revokeAllUserSessions/,
+      /roleChanged && allowed\.isGridmaster\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.rpc\("change_user_role"/,
     ],
   },
   "apps/web/src/app/api/organizations/delete/route.ts": {

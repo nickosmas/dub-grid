@@ -63,6 +63,8 @@ export function getPasswordStrengthLevel(password: string): number {
   const metCount = hints.filter((hint) => hint.met).length;
 
   if (!hints[0]?.met) return 0;
+  // Never "Fair" or better for a password the forms refuse (41d3, F-47).
+  if (!isPasswordAcceptable(password)) return 1;
   if (metCount === hints.length) return 3;
   if (metCount >= 3) return 2;
   return 1;

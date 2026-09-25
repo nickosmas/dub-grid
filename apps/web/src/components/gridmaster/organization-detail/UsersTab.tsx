@@ -104,13 +104,22 @@ export function UsersTab({
       // The access endpoint dispatches role_changed itself; queueing one here
       // too landed two identical "Your role changed" alerts in the target's
       // inbox.
-      await updateOrganizationMembershipGuarded({
-        orgId,
-        userId: target.id,
-        expectedUpdatedAt: target.updatedAt,
-        orgRole: newRole,
-        adminPermissions: newRole === "admin" ? target.adminPermissions : null,
+      const expectedUpdatedAt = target.updatedAt;
+      // A Gridmaster's role change needs fresh proof (41d3, F-16).
+      const completed = await stepUp.run(async (accessToken) => {
+        await requireCredentialAssurance(accessToken);
+        await updateOrganizationMembershipGuarded(
+          {
+            orgId,
+            userId: target.id,
+            expectedUpdatedAt,
+            orgRole: newRole,
+            adminPermissions: newRole === "admin" ? target.adminPermissions : null,
+          },
+          accessToken,
+        );
       });
+      if (!completed) return;
       toast.success("Role updated");
       setRoleChangeConfirm(null);
       onUsersChanged();
@@ -511,7 +520,7 @@ export function UsersTab({
         />
       )}
 
-      {roleChangeConfirm && (
+      {roleChangeConfirm && !stepUp.dialog && (
         <ConfirmDialog
           title="Change Organization Role"
           message={`Change ${roleChangeConfirm.user.email ?? "this user"} from ${formatOrganizationRoleLabel(roleChangeConfirm.user.orgRole)} to ${formatOrganizationRoleLabel(roleChangeConfirm.newRole)}?`}

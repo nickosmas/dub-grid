@@ -23,8 +23,10 @@ const userClient = { rpc: (...args: unknown[]) => userRpc(...args) };
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
 }));
+const requireSensitiveActionAuth = vi.fn();
 vi.mock("@/lib/api-auth", () => ({
   requireAuthenticatedUser: (req: NextRequest) => requireAuthenticatedUser(req),
+  requireSensitiveActionAuth: (req: NextRequest) => requireSensitiveActionAuth(req),
 }));
 vi.mock("@/lib/rate-limit", () => ({
   apiLimiter: {},
@@ -146,7 +148,11 @@ describe("DELETE /api/organizations/access", () => {
   it("mutates the effective (sandbox-redirected) org and revokes the removed user's sessions", async () => {
     // requireOrgPermissions redirects: caller's request carries the REAL org,
     // but a sandbox cookie is active, so the effective org is the sandbox.
-    requireOrgPermissions.mockResolvedValue({ orgId: SANDBOX_ORG_ID, userClient });
+    requireOrgPermissions.mockResolvedValue({
+      orgId: SANDBOX_ORG_ID,
+      userClient,
+      permissions: { isGridmaster: false },
+    });
 
     const membershipRow = {
       user_id: TARGET_USER_ID,
@@ -199,7 +205,11 @@ describe("PATCH /api/organizations/access notifications", () => {
     validateCsrfOrigin.mockReturnValue(null);
     requireAuthenticatedUser.mockResolvedValue({ user: { id: ACTOR_ID, email: "actor@test.com" } });
     checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
-    requireOrgPermissions.mockResolvedValue({ orgId: REQUESTED_ORG_ID, userClient });
+    requireOrgPermissions.mockResolvedValue({
+      orgId: REQUESTED_ORG_ID,
+      userClient,
+      permissions: { isGridmaster: false },
+    });
     profileMaybeSingle.mockResolvedValue({
       data: { first_name: "Target", last_name: "User", platform_role: "none", created_at: null },
       error: null,
@@ -239,6 +249,54 @@ describe("PATCH /api/organizations/access notifications", () => {
       ACTOR_ID,
       expect.objectContaining({ action: "role_changed", fromRole: "user", toRole: "super_admin" }),
     );
+  });
+
+  // A Gridmaster can raise anyone to Super Admin in any organization (41d3, F-16).
+  it("asks a Gridmaster for fresh proof before changing a role", async () => {
+    requireOrgPermissions.mockResolvedValue({
+      orgId: REQUESTED_ORG_ID,
+      userClient,
+      permissions: { isGridmaster: true },
+    });
+    requireSensitiveActionAuth.mockResolvedValueOnce({
+      response: new Response(JSON.stringify({ code: "STEP_UP_REQUIRED", method: "totp" }), {
+        status: 403,
+      }),
+    });
+    membershipSelectEq2.mockResolvedValue({
+      data: {
+        user_id: TARGET_USER_ID,
+        org_id: REQUESTED_ORG_ID,
+        org_role: "user",
+        admin_permissions: null,
+        updated_at: UPDATED_AT,
+      },
+      error: null,
+    });
+
+    const { PATCH } = await import("./route");
+    const res = await PATCH(makePatchRequest({ orgRole: "super_admin" }));
+
+    expect(res.status).toBe(403);
+    expect(userRpc).not.toHaveBeenCalled();
+  });
+
+  it("asks an organization's own Super Admin for no extra proof", async () => {
+    membershipSelectEq2.mockResolvedValue({
+      data: {
+        user_id: TARGET_USER_ID,
+        org_id: REQUESTED_ORG_ID,
+        org_role: "user",
+        admin_permissions: null,
+        updated_at: UPDATED_AT,
+      },
+      error: null,
+    });
+
+    const { PATCH } = await import("./route");
+    await PATCH(makePatchRequest({ orgRole: "admin" }));
+
+    expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
   });
 
   it("still spells out permission edits that leave the role alone", async () => {

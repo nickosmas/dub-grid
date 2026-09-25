@@ -23,7 +23,7 @@ export interface SupabaseAuthTemplate {
    * A security notice is declared in `[auth.email.notification.<type>]` and
    * sends only when enabled. All four are on: nothing in DubGrid emails the
    * password and email notices, and the MFA notices reach the owner even for a
-   * change made with a stolen token, so DubGrid's own alert pushes only.
+   * change made with a stolen token that never passes through DubGrid.
    */
   notification?: { type: string; enabled: boolean };
 }

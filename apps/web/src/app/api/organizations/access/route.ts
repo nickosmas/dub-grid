@@ -4,7 +4,7 @@ import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { retryAfterSeconds } from "@/lib/retry-after";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
-import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { requireAuthenticatedUser, requireSensitiveActionAuth } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
@@ -75,7 +75,8 @@ async function requirePrivilegedActor(
   req: NextRequest,
   orgId: string,
 ): Promise<
-  { ok: true; orgId: string; userClient: RoleChangeClient } | { ok: false; response: NextResponse }
+  | { ok: true; orgId: string; userClient: RoleChangeClient; isGridmaster: boolean }
+  | { ok: false; response: NextResponse }
 > {
   const auth = await requireOrgPermissions(
     req,
@@ -89,7 +90,12 @@ async function requirePrivilegedActor(
   // Return the EFFECTIVE org (sandbox-redirected). Callers must mutate this org,
   // not the raw client-supplied orgId — otherwise a sandbox user passes the gate
   // against their sandbox but writes the real org. See SECURITY_AUDIT / H-1.
-  return { ok: true, orgId: auth.orgId, userClient: auth.userClient };
+  return {
+    ok: true,
+    orgId: auth.orgId,
+    userClient: auth.userClient,
+    isGridmaster: auth.permissions.isGridmaster,
+  };
 }
 
 type RoleChangeClient = Extract<
@@ -280,6 +286,12 @@ export async function PATCH(req: NextRequest) {
     const serviceClient = getServiceClient();
 
     const roleChanged = currentUser.orgRole !== nextRole;
+    // A Gridmaster can change roles in any organization, up to Super Admin, so
+    // that needs fresh proof, as its role grant by email does (41d3, F-16).
+    if (roleChanged && allowed.isGridmaster) {
+      const assurance = await requireSensitiveActionAuth(req);
+      if ("response" in assurance) return assurance.response;
+    }
     if (roleChanged) {
       // As the caller, so the RPC's own identity and tier guards run too. Under
       // the service role auth.uid() is null and they passed vacuously.

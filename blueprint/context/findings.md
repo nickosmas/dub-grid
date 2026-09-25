@@ -21,7 +21,7 @@
 **Found:** 2026-09-25 by `/audit` (scope: current, 3c8b690c..3b6d908b; all lenses)
 **Why it matters:** Password and sign-in email changes are direct Supabase calls, and the factor endpoints DubGrid proxies stay reachable with the same JWT, so the assurance is a client preflight. A stolen access token can change the password (Supabase still requires aal2 when a factor exists) or, on an account with no factor, enroll an attacker's authenticator and lock the owner out, skipping DubGrid's audit. Moving the calls into DubGrid routes would not close it.
 **Suggested fix:** A decision for the owner: database triggers on `auth.users` and `auth.mfa_factors` that audit, revoke or alert on credential changes, and/or a shorter `jwt_expiry`. Out of 41b2's scope by design. A third option since 41c1: turn on Supabase's own MFA factor notices (declared in `config.toml`, currently `enabled = false` because DubGrid's alert covers normal flows), which alert the owner of any enrollment or removal, including one made with a stolen token, at the cost of a duplicate email on an ordinary change.
-**Resolution:** Owner delegated the decision (2026-09-25); fixed in 41d3: Supabase's own MFA factor notices are enabled in `config.toml` (sent by Supabase, so a change made with a stolen token still reaches the owner), and DubGrid's two-factor alert pushes only (`sendEmail: false`) so an ordinary change sends one email. Production takes effect when the auth templates and flags are pushed, which must happen before the release merges. A shorter `jwt_expiry` was not chosen.
+**Resolution:** Owner delegated the decision (2026-09-25); fixed in 41d3: Supabase's own MFA factor notices are enabled in `config.toml` (sent by Supabase, so a change made with a stolen token still reaches the owner), and DubGrid's two-factor alert pushes only (`sendEmail: false`) so an ordinary change sends one email. Production takes effect when the auth templates and flags are pushed, which must happen before the release merges. A shorter `jwt_expiry` was not chosen. Revised after audit (a6e3c15c): nothing yet shows Supabase sends the MFA notices, so DubGrid's own two-factor alert keeps emailing (the push-only change is reverted) and an ordinary change may send two emails until production is confirmed.
 
 ### F-16 [P2] fixed - Gridmaster organization-role grants run without fresh assurance
 
@@ -29,7 +29,7 @@
 **Found:** 2026-09-25 by `/audit` (scope: current, 2f001cb4..e24134f8; all lenses)
 **Why it matters:** `assignOrgRoleByEmail` can grant Super Admin of any organization to any account on the Gridmaster session alone. It predates 41b3 and is organization rather than platform authority, so it sits outside 41b3's wording but close to its goal.
 **Suggested fix:** Gate that action with `requireSensitiveActionAuth` and run it through step-up, and classify the route in the inventory. Needs a scope call.
-**Resolution:** Owner delegated the decision (2026-09-25); fixed in 41d3: `assignOrgRoleByEmail` requires `requireSensitiveActionAuth` before the RPC, the Users tab runs it through step-up with the credential preflight, and the inventory classifies the route `conditional-sensitive`.
+**Resolution:** Owner delegated the decision (2026-09-25); fixed in 41d3: `assignOrgRoleByEmail` requires `requireSensitiveActionAuth` before the RPC, the Users tab runs it through step-up with the credential preflight, and the inventory classifies the route `conditional-sensitive`. Audit (a6e3c15c) found the Users tab's role dropdown still reached `change_user_role` on the access route unguarded; a Gridmaster role change there now requires fresh proof too, through step-up, and the inventory pins it.
 
 ### F-17 [P3] fixed - Gridmaster audit-log export runs without fresh assurance
 
@@ -150,7 +150,7 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Found:** 2026-09-25 during 41d2 (drift review; recorded, not built)
 **Why it matters:** `isPasswordAcceptable` wants 10 characters and two of uppercase, digit or symbol, so `Abcdefghij!` passes both apps and the register route, but Supabase requires a digit and refuses it at sign-up or reset. Production's setting is unverified.
 **Suggested fix:** A policy decision: require a letter and a digit in the app rule (and its hints and copy on web and mobile), or relax Supabase's requirement to match the app. Then add a test that parses `config.toml` and holds the two together.
-**Resolution:** Owner delegated the decision (2026-09-25); fixed in 41d3: the app rule requires a letter and a number (the hint reads "Letter and number") plus an uppercase letter or a symbol, so it can never accept what `letters_digits` refuses; `password-policy.test.ts` holds it against `config.toml`.
+**Resolution:** Owner delegated the decision (2026-09-25); fixed in 41d3: the app rule requires a letter and a number (the hint reads "Letter and number") plus an uppercase letter or a symbol, so it can never accept what `letters_digits` refuses; `password-policy.test.ts` holds it against `config.toml`. Audit (a6e3c15c) found the meter still said "Fair" for refused passwords and the guidance copy omitted the number; the level is capped at Weak for any refused password and the copy names a letter and a number.
 
 ### F-50 [P3] open - Remaining drift-guard gaps
 
@@ -167,3 +167,27 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Why it matters:** Turbo's explicit input globs ignore `.gitignore`, so `supabase/.temp/**` (rewritten by the CLI on update checks, `link` and `start`) caused cache misses with no source change, and local hashes differed from CI's. Never a wrongly replayed pass.
 **Suggested fix:** Exclude `supabase/.temp` and `supabase/.branches`.
 **Resolution:** Both are negated in the inputs; a dry run shows no `.temp` file.
+
+### F-55 [P3] open - The organization-setup wizard assigns Super Admin without fresh proof
+
+**File:** `apps/web/src/app/api/gridmaster/organizations/manage/route.ts:445`
+**Found:** 2026-09-25 by `/audit` of a6e3c15c
+**Why it matters:** `createOrganizationSetup` calls `assign_org_role_by_email` with `super_admin` on the Gridmaster session alone. The organization is brand new and empty, so the reach is small.
+**Suggested fix:** Gate the setup when a Super Admin email is given, with step-up in the wizard, or record the exemption.
+**Resolution:**
+
+### F-56 [P3] open - No view tests for the 41d3 step-up wiring
+
+**File:** `apps/web/src/components/gridmaster/organization-detail/UsersTab.tsx`; `apps/web/src/components/gridmaster/GridmasterComplianceView.tsx`
+**Found:** 2026-09-25 by `/audit` of a6e3c15c
+**Why it matters:** Hiding the confirmations behind the step-up dialog, clearing loading on cancel, and downloading nothing without assurance are proven only by reading.
+**Suggested fix:** View tests in the pattern of `GridmasterAccountsView.test.tsx`.
+**Resolution:**
+
+### F-57 [P3] unverified - The app's password rule has no maximum where Supabase may refuse long passwords
+
+**File:** `packages/domain/src/password.ts`
+**Found:** 2026-09-25 by `/audit` of a6e3c15c
+**Why it matters:** Supabase Auth likely refuses passwords over 72 characters (bcrypt), which the app would accept, the same drift F-47 closed for character classes.
+**Suggested fix:** Confirm the limit and add it to the rule and the policy test.
+**Resolution:**

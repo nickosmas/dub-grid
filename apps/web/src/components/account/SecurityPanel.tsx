@@ -186,8 +186,8 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
                 Password
               </div>
               <p className="mb-0 mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
-                Choose a strong password: at least 10 characters, with a mix of uppercase letters,
-                numbers, and symbols.
+                Choose a strong password: at least 10 characters with a letter and a number, plus an
+                uppercase letter or a symbol.
               </p>
             </div>
             {!showPasswordForm && (

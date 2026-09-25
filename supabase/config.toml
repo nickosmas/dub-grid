@@ -253,8 +253,9 @@ content_path = "./supabase/templates/reauthentication.html"
 # Security notifications: after-the-fact alerts (no confirmation link) that
 # send only when enabled. All four are on: nothing in DubGrid emails password
 # or sign-in email changes, and the MFA notices reach the owner even when a
-# factor is changed with a stolen token that never passes through DubGrid
-# (whose own two-factor alert therefore pushes only). Phone number and identity
+# factor is changed with a stolen token that never passes through DubGrid.
+# DubGrid's own two-factor alert still emails until production is seen sending
+# these, so an ordinary change may send two emails. Phone number and identity
 # linked/unlinked notifications are skipped - this app doesn't enable phone
 # auth or external OAuth providers, so those could never fire. The CLI reads a
 # notification's content_path relative to this supabase/ directory, unlike a
