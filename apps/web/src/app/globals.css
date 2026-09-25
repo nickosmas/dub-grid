@@ -857,10 +857,12 @@ button {
     transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
     opacity 320ms ease;
 }
-/* Phones: one horizontal snap scroller, the centred phone at full size. The
-   negative margin lets the track bleed to the viewport edges past the section's
-   16px gutter; scroll-padding keeps the first and last phone centre-able. */
-@media (max-width: 767px) {
+/* Below the width that fits all three phones in a row (3 x 278px + gaps +
+   gutters), one horizontal snap scroller, the centred phone at full size;
+   otherwise tablets wrapped them two over one. The negative margin lets the
+   track bleed to the viewport edges past the section's gutter; the side
+   padding keeps the first and last phone centre-able. */
+@media (max-width: 959px) {
   .landing-phone-track {
     flex-wrap: nowrap;
     justify-content: flex-start;
