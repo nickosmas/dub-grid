@@ -1,16 +1,14 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const revokeAllUserSessions = vi.fn();
-const revokeOtherUserSessions = vi.fn();
+const endUserSessions = vi.fn();
 const sendResendEmail = vi.fn();
 const getInvitationEmailConfig = vi.fn();
 const captureException = vi.fn();
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/auth/revocation", () => ({
-  revokeAllUserSessions: (...args: unknown[]) => revokeAllUserSessions(...args),
-  revokeOtherUserSessions: (...args: unknown[]) => revokeOtherUserSessions(...args),
+  endUserSessions: (...args: unknown[]) => endUserSessions(...args),
 }));
 vi.mock("@/lib/resend", () => ({
   sendResendEmail: (...args: unknown[]) => sendResendEmail(...args),
@@ -59,8 +57,7 @@ function sentTo(address: string) {
 describe("followUpLinkedLoginEmailChange", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    revokeAllUserSessions.mockResolvedValue(undefined);
-    revokeOtherUserSessions.mockResolvedValue(undefined);
+    endUserSessions.mockResolvedValue(undefined);
     sendResendEmail.mockResolvedValue({ id: "email-1" });
     getInvitationEmailConfig.mockReturnValue({ apiKey: "key", from: "DubGrid <a@b.c>" });
   });
@@ -68,7 +65,8 @@ describe("followUpLinkedLoginEmailChange", () => {
   it("signs the member out everywhere and tells both addresses", async () => {
     await change();
 
-    expect(revokeAllUserSessions).toHaveBeenCalledWith("member-1");
+    // Ended, not just rejected: a refresh must not restore access.
+    expect(endUserSessions).toHaveBeenCalledWith("member-1", { keepSessionId: null });
     expect(sentTo("old@example.com")?.html).toContain("new@example.com");
     expect(sentTo("old@example.com")?.html).toContain("Calm Haven");
     expect(sentTo("new@example.com")?.html).toContain("Calm Haven");
@@ -86,12 +84,13 @@ describe("followUpLinkedLoginEmailChange", () => {
   it("keeps the acting session when someone changes their own sign-in email", async () => {
     await change({ userId: "manager-1" });
 
-    expect(revokeOtherUserSessions).toHaveBeenCalledWith("manager-1", "manager-session");
-    expect(revokeAllUserSessions).not.toHaveBeenCalled();
+    expect(endUserSessions).toHaveBeenCalledWith("manager-1", {
+      keepSessionId: "manager-session",
+    });
   });
 
   it("still sends both notices when revocation fails, and reports it", async () => {
-    revokeAllUserSessions.mockRejectedValue(new Error("redis down"));
+    endUserSessions.mockRejectedValue(new Error("redis down"));
 
     await expect(change()).resolves.toBeUndefined();
 
@@ -107,7 +106,7 @@ describe("followUpLinkedLoginEmailChange", () => {
 
     await expect(change()).resolves.toBeUndefined();
 
-    expect(revokeAllUserSessions).toHaveBeenCalled();
+    expect(endUserSessions).toHaveBeenCalled();
     expect(captureException).toHaveBeenCalledWith(
       expect.any(Error),
       expect.objectContaining({ extra: expect.objectContaining({ step: "notify" }) }),

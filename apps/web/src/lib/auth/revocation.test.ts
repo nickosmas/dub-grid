@@ -13,6 +13,7 @@ const serviceMocks = vi.hoisted(() => ({
   neq: vi.fn(),
   order: vi.fn(),
   range: vi.fn(),
+  rpc: vi.fn(),
 }));
 
 vi.mock("@/lib/cache", async (importOriginal) => {
@@ -21,10 +22,15 @@ vi.mock("@/lib/cache", async (importOriginal) => {
 });
 
 vi.mock("@/lib/supabase-service", () => ({
-  getServiceClient: () => ({ from: serviceMocks.from }),
+  getServiceClient: () => ({ from: serviceMocks.from, rpc: serviceMocks.rpc }),
 }));
 
-import { revokeAllUserSessions, revokeOtherUserSessions, revokeSession } from "./revocation";
+import {
+  endUserSessions,
+  revokeAllUserSessions,
+  revokeOtherUserSessions,
+  revokeSession,
+} from "./revocation";
 
 describe("session revocation persistence", () => {
   beforeEach(() => {
@@ -38,6 +44,35 @@ describe("session revocation persistence", () => {
     serviceMocks.neq.mockReturnValue({ order: serviceMocks.order });
     serviceMocks.order.mockReturnValue({ range: serviceMocks.range });
     serviceMocks.range.mockReset().mockResolvedValue({ data: [], error: null });
+    serviceMocks.rpc.mockResolvedValue({ data: 1, error: null });
+  });
+
+  // A watermark alone lets the refresh token mint a newer, accepted token, so
+  // ending someone's sessions must also delete them at the provider (F-21).
+  it("ends every provider session as well as rejecting current tokens", async () => {
+    await endUserSessions("user-1");
+
+    expect(cacheMocks.cacheSet).toHaveBeenCalledOnce();
+    expect(serviceMocks.rpc).toHaveBeenCalledWith("end_user_auth_sessions", {
+      p_user_id: "user-1",
+      p_keep_session_id: null,
+    });
+  });
+
+  it("spares the caller's own session when asked to", async () => {
+    await endUserSessions("user-1", { keepSessionId: "current" });
+
+    expect(serviceMocks.neq).toHaveBeenCalledWith("supabase_session_id", "current");
+    expect(serviceMocks.rpc).toHaveBeenCalledWith("end_user_auth_sessions", {
+      p_user_id: "user-1",
+      p_keep_session_id: "current",
+    });
+  });
+
+  it("reports a provider failure rather than claiming the sessions ended", async () => {
+    serviceMocks.rpc.mockResolvedValueOnce({ data: null, error: new Error("auth schema down") });
+
+    await expect(endUserSessions("user-1")).rejects.toThrow("auth schema down");
   });
 
   it("removes the tracked database session used by direct PostgREST RLS", async () => {

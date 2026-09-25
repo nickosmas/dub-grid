@@ -409,6 +409,12 @@ Instead, `lib/api-auth.ts`'s `authenticateRequest` does two things:
    trip. They **fail open** when Redis is unreachable — an Upstash outage must not sign
    everyone out.
 
+   The user watermark rejects tokens issued before it, but a refresh token still mints a
+   newer one. That is intended after a role change, where the session should pick up new
+   claims. To actually sign someone out, `endUserSessions` also deletes their provider
+   sessions and refresh tokens through `end_user_auth_sessions` (migration 046). An
+   administrator's sign-in email change uses it (finding F-21).
+
 This is why `POST /api/auth/sign-out` exists: sign-out used to be purely client-side,
 which clears the browser's tokens but leaves the access token valid until it expires.
 `signOutFromBrowser` now calls that route first. Mobile does the same through its bearer

@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { render } from "@react-email/components";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { LoginEmailChangedEmail } from "@/emails/LoginEmailChangedEmail";
-import { revokeAllUserSessions, revokeOtherUserSessions } from "@/lib/auth/revocation";
+import { endUserSessions } from "@/lib/auth/revocation";
 import { emailBaseUrl, sanitizeHeaderValue } from "@/lib/email";
 import { getInvitationEmailConfig } from "@/features/mobile/server/invitation-email";
 import logger from "@/lib/logger";
@@ -34,12 +34,11 @@ export async function followUpLinkedLoginEmailChange(
   input: LoginEmailChangeFollowUp,
 ): Promise<void> {
   try {
-    // Changing your own staff record keeps the session doing it.
-    if (input.userId === input.actorId && input.actorSessionId) {
-      await revokeOtherUserSessions(input.userId, input.actorSessionId);
-    } else {
-      await revokeAllUserSessions(input.userId);
-    }
+    // Ended at the provider too, or a refresh would restore access within the
+    // hour. Changing your own staff record keeps the session doing it.
+    await endUserSessions(input.userId, {
+      keepSessionId: input.userId === input.actorId ? input.actorSessionId : null,
+    });
   } catch (error) {
     report(error, input, "revoke-sessions");
   }

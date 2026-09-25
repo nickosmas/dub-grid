@@ -150,18 +150,42 @@ export async function revokeSession(sessionId: string): Promise<void> {
 }
 
 /**
- * Revokes every session this user currently holds.
+ * Rejects every access token this user currently holds.
  *
  * For changes where letting an existing token keep working would be a real
  * access-control failure: account deactivated, membership removed or archived,
- * org role changed, sign-in email changed by an administrator, account deleted.
- * Not needed for ordinary profile edits.
+ * org role changed, account deleted. Not needed for ordinary profile edits.
+ *
+ * It does not end the sessions: a refresh token still mints a new access
+ * token, issued after the watermark, which is what lets a role change take
+ * effect through fresh claims. To sign someone out, use `endUserSessions`.
  */
 export async function revokeAllUserSessions(userId: string): Promise<void> {
   forgetMemoizedUser(userId);
   await cacheSet(CacheKey.revokedAfter(userId), Date.now(), TTL.ACCESS_TOKEN);
 
   const { error } = await getServiceClient().from("user_sessions").delete().eq("user_id", userId);
+  if (error) throw error;
+}
+
+/**
+ * Signs the user out of their sessions, not just their current tokens: the
+ * provider sessions and their refresh tokens are deleted (migration 046), and
+ * the tokens already issued are rejected. `keepSessionId` spares one session,
+ * for someone acting on their own account.
+ */
+export async function endUserSessions(
+  userId: string,
+  options: { keepSessionId?: string | null } = {},
+): Promise<void> {
+  const keepSessionId = options.keepSessionId ?? null;
+  if (keepSessionId) await revokeOtherUserSessions(userId, keepSessionId);
+  else await revokeAllUserSessions(userId);
+
+  const { error } = await getServiceClient().rpc("end_user_auth_sessions", {
+    p_user_id: userId,
+    p_keep_session_id: keepSessionId,
+  });
   if (error) throw error;
 }
 
