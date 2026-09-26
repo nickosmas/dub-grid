@@ -59,7 +59,7 @@ committed as a local checkpoint.
       stale Gridmaster, a fresh one still works, and a Super Admin's
       `change_user_role` is unaffected; a static test pins the guard in each
       newest definition.
-- [ ] **Step 3 - memberships are written by the server only** - migration
+- [x] **Step 3 - memberships are written by the server only** - migration
       052 revokes the writes; the dead helper goes. _Done when:_ the live
       isolation test proves `authenticated` cannot insert, update or delete
       memberships, and the web suite passes.
