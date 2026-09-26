@@ -179,7 +179,14 @@ Out of scope, recorded as follow-ups:
   needed, layout shift 0. Waits in a row after the login went from 5 to 2.
   Server responses were two to four times slower than the morning baseline
   (likely cold functions about 20 minutes after the deploy), so total time did
-  not yet fall with them; a warm re-measure is still to do.
+  not yet fall with them.
+- **Warm re-measure, same day:** login 1,710; first-screen requests at 1,712;
+  shell with header at 3,271; content at 4,607 (5,322 before). From the login
+  response to content: 2.9s (4.4s before). No blank frame, layout shift 0.
+  The login request itself measured 1.3s and 1.7s after the release against
+  0.95s in the one run before it; the cookie write adds one in-region auth
+  call, so the rest is likely variance, unproven. If it persists, capture the
+  route's Server-Timing (`PERF_TIMING=1`).
 - **Production, organization-switch sign-in** (full reload): the seven
   requests start together 1.73s into the reloaded page, the dashboard data in
   one wave at 2.6s, content at 3.7s, layout shift 0.
