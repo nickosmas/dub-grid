@@ -3117,8 +3117,59 @@ export default function ShiftEditPanel({
     );
   }
 
+  /**
+   * The active indicators by name, for someone who can open the shift but not
+   * edit its indicators: the pill's dots alone did not say what they meant.
+   */
+  function renderReadOnlyIndicators(focusAreaId: number, compact = false) {
+    const activeIds = getActiveIndicatorIds ? getActiveIndicatorIds(focusAreaId) : [];
+    const active = indicatorTypes.filter((ind) => activeIds.includes(ind.id));
+    if (active.length === 0) return null;
+    return (
+      <div data-read-only-indicators={focusAreaId} style={compact ? { marginTop: 8 } : undefined}>
+        <div style={sectionLabel}>Indicators</div>
+        <ul
+          style={{
+            listStyle: "none",
+            margin: 0,
+            padding: 0,
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+          }}
+        >
+          {active.map(({ id, name, color }) => (
+            <li key={id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: "50%",
+                  background: isDarkTheme ? toDarkPillColors(color).bg : color,
+                  flexShrink: 0,
+                  border: "1px solid rgba(0,0,0,0.08)",
+                }}
+              />
+              <span
+                style={{
+                  fontSize: "var(--dg-fs-caption)",
+                  fontWeight: 600,
+                  color: "var(--dg-color-text-primary)",
+                }}
+              >
+                {name}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
   function renderInlineIndicators(focusAreaId: number) {
-    if (!canEditScheduleIndicators || indicatorTypes.length === 0) return null;
+    if (!canEditScheduleIndicators) return renderReadOnlyIndicators(focusAreaId, true);
+    if (indicatorTypes.length === 0) return null;
     return (
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, paddingTop: 6 }}>
         {indicatorTypes.map(({ id, name, color }) => {
@@ -3220,7 +3271,8 @@ export default function ShiftEditPanel({
   }
 
   function renderNotesSection() {
-    if (!canEditScheduleIndicators || indicatorTypes.length === 0) return null;
+    if (!canEditScheduleIndicators) return renderReadOnlyIndicators(activeTab);
+    if (indicatorTypes.length === 0) return null;
     return (
       <div>
         <div style={sectionLabel}>Indicators</div>

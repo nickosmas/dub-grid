@@ -737,6 +737,62 @@ describe("ShiftEditPanel", () => {
     });
   });
 
+  // 42a: people who can open a shift but not edit its indicators read them by name.
+  describe("Read-only indicators", () => {
+    it("lists a single shift's active indicators by name, without edit controls", () => {
+      renderPanel({
+        currentShift: "D",
+        currentAssignmentIds: [1],
+        allowShiftEdits: false,
+        indicatorTypesOverride: indicatorTypes,
+        canEditScheduleIndicators: false,
+        getActiveIndicatorIds: () => [80],
+      });
+
+      const list = document.body.querySelector<HTMLElement>("[data-read-only-indicators]");
+      expect(list).not.toBeNull();
+      expect(within(list!).getByText("Float")).toBeInTheDocument();
+      expect(within(list!).queryByText("Training")).toBeNull();
+      expect(screen.queryByRole("button", { name: /indicator$/ })).toBeNull();
+    });
+
+    it("lists each split card's own indicators", () => {
+      renderPanel({
+        currentShift: "D/E",
+        currentAssignmentIds: [1, 2],
+        currentSegments: [
+          { shiftId: 11, jobId: 102, position: 0, label: "D", isMentored: false },
+          { shiftId: 12, jobId: 102, position: 1, label: "E", isMentored: false },
+        ],
+        allowShiftEdits: false,
+        indicatorTypesOverride: indicatorTypes,
+        canEditScheduleIndicators: false,
+        getActiveIndicatorIds: (focusAreaId) => (focusAreaId === 1 ? [80] : [81]),
+      });
+
+      const lists = Array.from(
+        document.body.querySelectorAll<HTMLElement>("[data-read-only-indicators]"),
+      );
+      expect(lists.map((list) => list.textContent)).toEqual([
+        expect.stringContaining("Float"),
+        expect.stringContaining("Training"),
+      ]);
+    });
+
+    it("shows no list when no indicator is active", () => {
+      renderPanel({
+        currentShift: "D",
+        currentAssignmentIds: [1],
+        allowShiftEdits: false,
+        indicatorTypesOverride: indicatorTypes,
+        canEditScheduleIndicators: false,
+        getActiveIndicatorIds: () => [],
+      });
+
+      expect(document.body.querySelector("[data-read-only-indicators]")).toBeNull();
+    });
+  });
+
   describe("Focus area tabs", () => {
     it("renders all focus area tabs including home and other areas", () => {
       renderPanel();

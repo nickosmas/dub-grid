@@ -28,7 +28,8 @@ colour and the existing visibility rule.
   its employee and focus-area ids so its marks can be found.
 - **Shift slideover, read-only list.** Someone who can open a shift but
   cannot edit indicators sees an "Indicators" list of the active ones, each
-  with its colour and name, in place of today's unlabelled dots. Split shifts
+  with its colour and name, beside the pill's dots, which alone never said
+  what they meant. Split shifts
   list per card. Editors keep today's editor unchanged.
 - **Grid hover card.** The indicator line stays when a cell has change
   details (a draft, a publish difference or a request badge), including a
@@ -72,7 +73,7 @@ colour and the existing visibility rule.
       `indicatorTypes` and shows each row's marks inline. _Done when:_ a
       `MonthView` test opens a day and finds each person's indicator by name,
       looked up with the row's focus area.
-- [ ] **Step 3 - read-only indicator list in the slideover** -
+- [x] **Step 3 - read-only indicator list in the slideover** -
       `ShiftEditPanel` renders a labelled list (colour and name) of the
       active indicators when the viewer cannot edit indicators, per card for
       split shifts, and nothing when there are none; editors see no change.
