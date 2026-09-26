@@ -55,7 +55,7 @@ function existingWorkLabel(
     const label = assignmentLabelById.get(assignmentId) ?? "Unavailable assignment";
     return timeRange ? `${label}, ${fmt12h(timeRange.start)}–${fmt12h(timeRange.end)}` : label;
   });
-  return `Working: ${assignments.join("; ")}`;
+  return assignments.join("; ");
 }
 
 export function OpenShiftStaffingModal({
@@ -203,7 +203,6 @@ export function OpenShiftStaffingModal({
             const employee = candidate.employee;
             const selected = employee.id === selectedEmployeeId;
             const isCurrentEmployee = employee.id === currentEmployeeId;
-            const employment = employee.employmentType === "part_time" ? "Part-time" : "Full-time";
             return (
               <button
                 type="button"
@@ -220,7 +219,6 @@ export function OpenShiftStaffingModal({
                     {isCurrentEmployee ? " (You)" : ""}
                   </strong>
                   <span>
-                    {employment} ·{" "}
                     {existingWorkLabel(candidate, assignmentLabelById, absenceTypeLabelById)}
                   </span>
                 </span>

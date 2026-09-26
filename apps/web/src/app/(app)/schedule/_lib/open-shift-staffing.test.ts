@@ -207,6 +207,49 @@ describe("buildOpenShiftStaffingCandidates", () => {
     ]);
   });
 
+  it("excludes duration-only general work and checks general work that has times", () => {
+    const office: AssignmentDefinition = {
+      id: 102,
+      orgId: "org",
+      label: "O",
+      name: "Office",
+      color: "#fff",
+      border: "#ddd",
+      text: "#111",
+      shiftId: null,
+      categoryId: null,
+      jobId: 11,
+      isGeneral: true,
+      focusAreaId: null,
+      sortOrder: 2,
+      defaultDurationHours: 8,
+    };
+    const general = (start: string | null, end: string | null): StaffingScheduleState => ({
+      kind: "worked",
+      segments: [{ shiftId: null, jobId: 11, position: 0, isMentored: false }],
+      assignmentIds: [102],
+      absenceTypeId: null,
+      customStartTime: start,
+      customEndTime: end,
+    });
+    const candidates = buildOpenShiftStaffingCandidates({
+      ...baseContext,
+      assignments: [...assignments, office],
+      openShift: gap({ eligibleAssignmentDefinitionIds: [100] }),
+      employees: [
+        employee({ id: "duration-only" }),
+        employee({ id: "timed-overlap" }),
+        employee({ id: "timed-clear" }),
+      ],
+      scheduleByEmployeeId: new Map([
+        ["duration-only", general(null, null)],
+        ["timed-overlap", general("09:00", "13:00")],
+        ["timed-clear", general("16:00", "20:00")],
+      ]),
+    });
+    expect(candidates.map((candidate) => candidate.employee.id)).toEqual(["timed-clear"]);
+  });
+
   it("excludes previous-day and next-day overnight overlaps", () => {
     const state = (assignmentId: number, start: string, end: string): StaffingScheduleState => ({
       kind: "worked",

@@ -1469,7 +1469,7 @@ describe("UserDashboard", () => {
     expect(within(myWeek).queryAllByTestId("user-dashboard-week-pills")).toHaveLength(1);
   });
 
-  it("keeps every date visible as unscheduled in a brand-new published week", () => {
+  it("shows only the empty state in a brand-new published week", () => {
     const props = makeProps();
 
     render(
@@ -1506,9 +1506,8 @@ describe("UserDashboard", () => {
     expect(emptyState).not.toHaveTextContent("No Shift");
     expect(emptyState).not.toHaveTextContent("No shift scheduled");
     expect(emptyState).not.toHaveTextContent("Published shifts for this week will appear here.");
-    const myWeek = screen.getByTestId("user-dashboard-my-week");
-    expect(within(myWeek).getByText("Your Week")).toBeInTheDocument();
-    expect(within(myWeek).getAllByText("Unscheduled")).toHaveLength(props.periodDates.length);
+    expect(screen.queryByTestId("user-dashboard-my-week")).not.toBeInTheDocument();
+    expect(screen.queryByText("Unscheduled")).not.toBeInTheDocument();
     expect(screen.queryByText("No shifts this week")).not.toBeInTheDocument();
     expect(screen.queryByText("Published shifts will appear here.")).not.toBeInTheDocument();
   });

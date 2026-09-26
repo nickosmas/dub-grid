@@ -522,10 +522,7 @@ export default function UserDashboard(props: DashboardContentProps) {
       }
     >
       {!hasScheduleItems ? (
-        <>
-          <ScheduleEmptyState isMobile={isMobile} isTwoWeekView={isTwoWeekView} />
-          {myWeek}
-        </>
+        <ScheduleEmptyState isMobile={isMobile} isTwoWeekView={isTwoWeekView} />
       ) : stackLayout ? (
         <div
           data-testid="user-dashboard-content-grid"

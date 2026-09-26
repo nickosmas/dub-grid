@@ -1173,6 +1173,7 @@ button {
 }
 .dg-open-shift-staffing-person-copy span {
   color: var(--dg-color-text-muted);
+  white-space: normal;
   font-size: var(--dg-fs-footnote);
   line-height: 1.35;
   overflow-wrap: anywhere;

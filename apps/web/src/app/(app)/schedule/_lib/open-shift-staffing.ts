@@ -234,6 +234,9 @@ export function buildOpenShiftStaffingCandidates({
       const existingState = scheduleByEmployeeId.get(employee.id) ?? null;
       const existingRanges = getStaffingStateTimeRanges(existingState, context);
       const existingAlignedRanges = getStaffingStateAlignedTimeRanges(existingState, context);
+      // Work with only a duration (a shiftless job with no start and end) has
+      // no window to check against, so it cannot be shown as conflict-free.
+      if (existingAlignedRanges.some((range) => range == null)) return [];
       const qualifiedOptions = options.filter(
         (option) =>
           option.assignmentIds.every((assignmentId) => {

@@ -1580,6 +1580,9 @@ describe("ShiftEditPanel", () => {
               : [{ start: "07:00", end: "15:00" }],
         getShiftFocusAreaIds: (_, date) =>
           date.toISOString().startsWith("2037-05-05") ? [2] : [1],
+        getShiftSegments: () => [
+          { shiftId: 12, jobId: 102, label: "E", startTime: "15:00", endTime: "23:00" },
+        ],
       });
 
       expect(screen.getByRole("button", { name: "Swap" })).toBeInTheDocument();
@@ -1599,6 +1602,7 @@ describe("ShiftEditPanel", () => {
       const teammateRow = screen.getByRole("button", { name: /Bob Jones/i });
       expect(teammateRow).toHaveTextContent("Evening Shift · Supervisor");
       expect(teammateRow).toHaveTextContent("3:00 PM - 11:00 PM · South");
+      expect(teammateRow).not.toHaveTextContent(/Shift 1/);
       expect(screen.queryByText("Night")).not.toBeInTheDocument();
 
       await user.click(teammateRow);
@@ -1615,7 +1619,10 @@ describe("ShiftEditPanel", () => {
       });
       await user.click(within(dialog).getByRole("button", { name: "Submit swap" }));
 
-      expect(onSubmitSwap).toHaveBeenCalledWith("emp-2", "2037-05-05");
+      expect(onSubmitSwap).toHaveBeenCalledWith("emp-2", "2037-05-05", {
+        requesterSegmentIndex: undefined,
+        targetSegmentIndex: 0,
+      });
     });
 
     it("only navigates the swap chooser between weeks with eligible targets", async () => {

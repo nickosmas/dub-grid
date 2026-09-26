@@ -2374,27 +2374,27 @@ export default function ShiftEditPanel({
                   const dateObj = new Date(`${activeSwapViewDate}T00:00:00`);
                   const targetSegments = getShiftSegments?.(employee.id, dateObj) ?? [];
                   const targetSegmentOptions = getRequestSegmentOptions(targetSegments);
-                  const renderTargetOptions =
-                    targetSegmentOptions.length > 1
-                      ? targetSegmentOptions.filter(
-                          (option) =>
-                            !isShiftSegmentStarted?.(employee.id, dateObj, option.segmentIndex),
+                  const isSplitTarget = targetSegmentOptions.length > 1;
+                  const renderTargetOptions = isSplitTarget
+                    ? targetSegmentOptions.filter(
+                        (option) =>
+                          !isShiftSegmentStarted?.(employee.id, dateObj, option.segmentIndex),
+                      )
+                    : targetSegmentOptions[0]
+                      ? isShiftSegmentStarted?.(
+                          employee.id,
+                          dateObj,
+                          targetSegmentOptions[0].segmentIndex,
                         )
-                      : targetSegmentOptions[0]
-                        ? isShiftSegmentStarted?.(
-                            employee.id,
-                            dateObj,
-                            targetSegmentOptions[0].segmentIndex,
-                          )
-                          ? []
-                          : [targetSegmentOptions[0]]
-                        : [{ segment: null, segmentIndex: undefined }];
+                        ? []
+                        : [targetSegmentOptions[0]]
+                      : [{ segment: null, segmentIndex: undefined }];
                   const targetLabel = getSwapShiftLabel(employee.id, dateObj);
                   const timeLabel = getSwapTimeLabel(employee.id, dateObj);
                   const focusAreaLabel = getSwapFocusAreaLabel(employee.id, dateObj);
                   return renderTargetOptions.map((targetOption) => {
                     const optionLabel =
-                      targetOption.segmentIndex != null
+                      targetOption.segmentIndex != null && isSplitTarget
                         ? getRequestSegmentLabel(
                             targetSegments,
                             targetOption.segmentIndex,
@@ -2439,7 +2439,7 @@ export default function ShiftEditPanel({
                             fontWeight: 600,
                           }}
                         >
-                          {targetOption.segmentIndex != null
+                          {targetOption.segmentIndex != null && isSplitTarget
                             ? `Shift ${targetOption.segmentIndex + 1}: ${optionLabel}`
                             : optionLabel}
                         </span>
