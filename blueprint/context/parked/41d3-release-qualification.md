@@ -136,18 +136,27 @@ Continuous Mode: they push, send, reach production or reseed shared state.
       execute `caller_has_fresh_proof()`, and all five grant functions carry
       the guard.
 
-- [ ] **Release note from 41d6** - migration 054 goes to production by the
+- [x] **Release note from 41d6** - migration 054 goes to production by the
       runbook, after 051 to 053 (applied), before or after the release; its
       notifications bulk route change ships with the release, and until then
       a Gridmaster's inbox mark-read or archive changes nothing once their
       sign-in is over five minutes old, so apply 054 with or after that
       release. Needs the owner's approval.
 
-- [ ] **Release note from 41d7** - migration 055 goes to production by the
+- [x] **Release note from 41d7** - migration 055 goes to production by the
       runbook only after the release carrying the impersonation route's
       fresh-proof gate deploys (production's current route does not map the
       database refusal, so a stale Gridmaster's impersonation start would
       fail with a generic error until then). Needs the owner's approval.
+      Applied 2026-09-26 by the owner, after the release carrying both
+      (pull request 116, merge fb2ad5c0) deployed. Before: ledger at 053
+      with only 054 and 055 missing, every invariant passing, and the latest
+      backup 2026-09-26 13:40:45 UTC (physical, completed). A scratch
+      rehearsal from 053 applied both (ledger 53 to 55). After: 55 ledger
+      entries, none missing, health 200, a final dry run up to date;
+      read-only checks show restrictive policies on 36 tables,
+      `gridmaster_write_allowed()` executable by `authenticated`, and the
+      guard in `start_impersonation` and `force_logout_user`.
 
 ## Notes for the AI
 
