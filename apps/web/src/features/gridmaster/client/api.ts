@@ -205,14 +205,20 @@ export function updateGridmasterAccountActivation(
   });
 }
 
-export function updateGridmasterUserActivation(input: {
-  userId: string;
-  orgId: string;
-  deactivate: boolean;
-}): Promise<{ success: true }> {
+export function updateGridmasterUserActivation(
+  input: {
+    userId: string;
+    orgId: string;
+    deactivate: boolean;
+  },
+  accessToken?: string,
+): Promise<{ success: true }> {
   return requestGridmasterJson("/api/gridmaster/users", {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify(input),
   });
 }

@@ -129,6 +129,7 @@ export const queryKeys = {
     billing: () => ["gm", "billing"] as const,
     compliance: () => ["gm", "compliance"] as const,
     orgHealth: (orgId: string | null) => ["gm", "org-health", orgId ?? "all"] as const,
+    personAll: () => ["gm", "person"] as const,
     person: (kind: "user" | "staff", id: string) => ["gm", "person", kind, id] as const,
     staffSearch: (query: string) => ["gm", "staff-search", query] as const,
     tenantStats: () => ["gm", "tenantStats"] as const,

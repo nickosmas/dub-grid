@@ -156,23 +156,15 @@ export default function GridmasterPersonView({
     }
   }
 
-  async function handleDeactivate() {
-    if (!account || !primaryOrgId) return;
-    setBusy(true);
-    try {
-      await updateGridmasterUserActivation({
-        userId: account.userId,
-        orgId: primaryOrgId,
-        deactivate: !deactivated,
-      });
-      toast.success(deactivated ? "User reactivated" : "User deactivated");
-      setDialog(null);
-      refresh();
-    } catch (error: unknown) {
-      toast.error(formatClientErrorMessage(error, "Action failed"));
-    } finally {
-      setBusy(false);
-    }
+  function handleDeactivate() {
+    if (!primaryOrgId) return;
+    const orgId = primaryOrgId;
+    return runAssured(
+      (userId, accessToken) =>
+        updateGridmasterUserActivation({ userId, orgId, deactivate: !deactivated }, accessToken),
+      deactivated ? "User reactivated" : "User deactivated",
+      "Action failed",
+    );
   }
 
   function handleTerminate() {
@@ -349,7 +341,7 @@ export default function GridmasterPersonView({
         />
       ) : null}
 
-      {deactivateConfirm && (
+      {deactivateConfirm && !stepUp.dialog && (
         <ConfirmDialog
           title={deactivated ? "Reactivate user" : "Deactivate user"}
           message={

@@ -127,17 +127,25 @@ export function getGridmasterRealtimeInvalidationKeys(
         queryKeys.gridmaster.auditAll(),
         ...(orgId ? [queryKeys.gridmaster.orgAudit(orgId, 0, 50)] : []),
       ]);
+    // Open person pages show sessions, profiles, staff records and invitations,
+    // and are few, so any change to those refreshes them all (F-81).
     case "user_sessions":
-      return uniqueKeys([queryKeys.gridmaster.security(), queryKeys.gridmaster.compliance()]);
+      return uniqueKeys([
+        queryKeys.gridmaster.security(),
+        queryKeys.gridmaster.compliance(),
+        queryKeys.gridmaster.personAll(),
+      ]);
     case "profiles":
       return uniqueKeys([
         queryKeys.gridmaster.accounts(),
         queryKeys.gridmaster.allUsers(),
         ...platformSummaryKeys,
+        queryKeys.gridmaster.personAll(),
       ]);
     case "employees":
       return uniqueKeys([
         ...platformSummaryKeys,
+        queryKeys.gridmaster.personAll(),
         ...(orgId
           ? [
               queryKeys.gridmaster.org(orgId),
@@ -159,6 +167,7 @@ export function getGridmasterRealtimeInvalidationKeys(
       return uniqueKeys([
         ...platformSummaryKeys,
         queryKeys.gridmaster.auditAll(),
+        queryKeys.gridmaster.personAll(),
         ...(orgId
           ? [
               queryKeys.gridmaster.orgInvitations(orgId),

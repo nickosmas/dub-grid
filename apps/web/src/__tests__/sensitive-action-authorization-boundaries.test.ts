@@ -164,11 +164,13 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
     ],
   },
   "apps/web/src/app/api/gridmaster/users/route.ts": {
-    // Deactivation is reversible and already gated on a live gridmaster
-    // profile; it revokes the target's issued tokens the moment it lands.
-    policy: "authorized-target-revocation",
+    // Deactivation signs the person out everywhere, so it needs fresh proof
+    // like the other account actions (F-80), and refuses a Gridmaster target.
+    policy: "sensitive",
     assertions: [
       /\brequireGridmasterSession\s*\(/,
+      /\brequireSensitiveActionAuth\s*\(/,
+      /\bloadPersonTarget\s*\(/,
       /if \(deactivate\) \{[\s\S]*?revokeAllUserSessions\(userId\)/,
     ],
   },

@@ -96,7 +96,7 @@ proof) and F-81 (the page refreshes on more than membership changes).
       beside `TermsGate` sends the person to the two-factor screen. _Done
       when:_ contract and gate tests show it blocks, allows the two-factor
       screen and lifts.
-- [ ] **Step 8 - F-80 and F-81** - fresh proof and a Gridmaster-target
+- [x] **Step 8 - F-80 and F-81** - fresh proof and a Gridmaster-target
       refusal on the deactivate PATCH, step-up on the page, and wider
       realtime invalidation. _Done when:_ route and hook tests cover both.
 

@@ -737,4 +737,24 @@ describe("GridmasterPersonView", () => {
       "Two-factor reset. They set it up again at their next sign-in.",
     );
   });
+
+  it("deactivates through step-up in the person's organization (F-80)", async () => {
+    updateGridmasterUserActivation.mockResolvedValue({ success: true });
+    renderView(linkedRecord());
+
+    fireEvent.click(await screen.findByRole("button", { name: "Deactivate" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Deactivate user" })).getByRole("button", {
+        name: "Deactivate",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(updateGridmasterUserActivation).toHaveBeenCalledWith(
+        { userId: USER, orgId: ORG, deactivate: true },
+        "fresh-token",
+      ),
+    );
+    expect(requireCredentialAssurance).toHaveBeenCalled();
+  });
 });

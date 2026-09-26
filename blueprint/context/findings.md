@@ -200,18 +200,18 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** In a forward migration, set `ended_at = LEAST(now(), expires_at)` when `p_reason = 'expired'`.
 **Resolution:** Fixed: migration 058 redefines `end_impersonation` (from 057) so an `expired` end records `LEAST(now(), expires_at)` and every other reason still records `now()`; nothing else changes. A live test ends a session that timed out two days earlier as expired and reads its expiry back, and fails against 057; it also covers an expired end before the expiry and a manual end. Applied to production 2026-09-26 by the owner, after release pull request 118 (merge 1031b122) deployed and a scratch rehearsal from 057: 58 ledger entries, none missing, health 200, a final dry run up to date, and `end_impersonation` carries the expired end time with its wording, SECURITY DEFINER and grant unchanged. Re-review (d314d205): closed; 058's body differs from 057 only in the end time, grants and comment are kept, `LEAST` never gives a time later than now (so a live session cannot be backdated), no reader depends on the old end time, and the live test fails against 057.
 
-### F-80 [P3] open - A Gridmaster's deactivate and reactivate ask for no fresh proof
+### F-80 [P3] fixed - A Gridmaster's deactivate and reactivate ask for no fresh proof
 
 **File:** `apps/web/src/app/api/gridmaster/users/route.ts` (PATCH)
 **Found:** 2026-09-26 while building 43b
 **Why it matters:** Every other account action on the Gridmaster person page (terminate, reinstate, force logout, password reset, name and sign-in email changes) requires fresh proof; deactivating revokes every session and blocks sign-in on the Gridmaster session alone, and the route does not refuse a Gridmaster target.
 **Suggested fix:** Require `requireSensitiveActionAuth` on the PATCH, run the person page's Deactivate through step-up, refuse a Gridmaster target, and classify the route in the sensitive-action inventory.
-**Resolution:**
+**Resolution:** Fixed in 43c: the PATCH requires `requireSensitiveActionAuth` and refuses a Gridmaster target through `loadPersonTarget`; the person page runs Deactivate and Reactivate through step-up; the inventory classifies the route `sensitive`. Route and view tests cover a stale session, a Gridmaster target and the step-up.
 
-### F-81 [P3] open - The person page refreshes on membership changes only
+### F-81 [P3] fixed - The person page refreshes on membership changes only
 
 **File:** `apps/web/src/hooks/useGridmasterRealtimeInvalidation.ts`
 **Found:** 2026-09-26 by review of 43b
 **Why it matters:** A change to the person's staff record or invitations made elsewhere shows on the Gridmaster person page only after its 30-second stale time or a reload; the page's own actions refresh it.
 **Suggested fix:** Invalidate the `["gm", "person"]` prefix on `employees` and `invitations` events too.
-**Resolution:**
+**Resolution:** Fixed in 43c: `employees`, `invitations`, `user_sessions` and `profiles` events invalidate the `["gm", "person"]` prefix, so every open person page refreshes; memberships keep their exact key. Push devices, calendar feeds and known devices are not in the realtime publication, so the page refreshes itself after its own actions on them.

@@ -15,12 +15,19 @@ const membershipsIn = vi.fn();
 const forceLogoutOrder = vi.fn();
 const terminationsNot = vi.fn();
 const revokeAllUserSessions = vi.fn();
+const requireSensitiveActionAuth = vi.fn();
+const loadPersonTarget = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
   createRequestSupabaseClient: () => ({
     rpc: requestRpc,
   }),
   requireGridmasterSession: (req: NextRequest) => requireGridmasterSession(req),
+  requireSensitiveActionAuth: (req: NextRequest) => requireSensitiveActionAuth(req),
+}));
+
+vi.mock("@/features/gridmaster/server/person-target", () => ({
+  loadPersonTarget: (...args: unknown[]) => loadPersonTarget(...args),
 }));
 
 vi.mock("@/lib/csrf", () => ({
@@ -207,6 +214,11 @@ describe("PATCH /api/gridmaster/users", () => {
       user: { id: "gridmaster-user", email: "gm@example.com" },
       session: { access_token: "token" },
     });
+    requireSensitiveActionAuth.mockResolvedValue({
+      user: { id: "gridmaster-user" },
+      sessionId: "s",
+    });
+    loadPersonTarget.mockResolvedValue({ userId: USER_ID, email: "ada@example.com" });
     profileEq.mockResolvedValue({ error: null });
     profileUpdate.mockReturnValue({ eq: profileEq });
     auditInsert.mockResolvedValue({ error: null });
@@ -247,6 +259,27 @@ describe("PATCH /api/gridmaster/users", () => {
     expect(response.status).toBe(403);
     expect(profileUpdate).not.toHaveBeenCalled();
     expect(auditInsert).not.toHaveBeenCalled();
+  });
+
+  it("changes nothing on a stale session (F-80)", async () => {
+    requireSensitiveActionAuth.mockResolvedValueOnce({
+      response: NextResponse.json({ code: "STEP_UP_REQUIRED" }, { status: 403 }),
+    });
+    const response = await PATCH(
+      makePatchRequest({ userId: USER_ID, orgId: ORG_ID, deactivate: true }),
+    );
+    expect(response.status).toBe(403);
+    expect(profileUpdate).not.toHaveBeenCalled();
+    expect(revokeAllUserSessions).not.toHaveBeenCalled();
+  });
+
+  it("refuses a Gridmaster target (F-80)", async () => {
+    loadPersonTarget.mockResolvedValueOnce(null);
+    const response = await PATCH(
+      makePatchRequest({ userId: USER_ID, orgId: ORG_ID, deactivate: true }),
+    );
+    expect(response.status).toBe(404);
+    expect(profileUpdate).not.toHaveBeenCalled();
   });
 
   it("validates input before mutating", async () => {

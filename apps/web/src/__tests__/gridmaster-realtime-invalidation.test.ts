@@ -69,6 +69,7 @@ describe("getGridmasterRealtimeInvalidationKeys", () => {
     expect(getGridmasterRealtimeInvalidationKeys("user_sessions", orgId)).toEqual([
       queryKeys.gridmaster.security(),
       queryKeys.gridmaster.compliance(),
+      queryKeys.gridmaster.personAll(),
     ]);
   });
 
@@ -79,6 +80,7 @@ describe("getGridmasterRealtimeInvalidationKeys", () => {
       queryKeys.gridmaster.dashboard(),
       queryKeys.gridmaster.overview(),
       queryKeys.gridmaster.orgHealth(null),
+      queryKeys.gridmaster.personAll(),
     ]);
   });
 
@@ -103,6 +105,7 @@ describe("getGridmasterRealtimeInvalidationKeys", () => {
       queryKeys.gridmaster.overview(),
       queryKeys.gridmaster.orgHealth(null),
       queryKeys.gridmaster.auditAll(),
+      queryKeys.gridmaster.personAll(),
       queryKeys.gridmaster.orgInvitations(orgId),
       queryKeys.gridmaster.orgHealth(orgId),
       queryKeys.gridmaster.orgAudit(orgId, 0, 50),
@@ -174,5 +177,11 @@ describe("resolveGridmasterRealtimeUserId", () => {
         new: { user_id: userId },
       }),
     ).toBeNull();
+  });
+
+  it("refreshes open person pages when a staff record changes", () => {
+    expect(getGridmasterRealtimeInvalidationKeys("employees", orgId)).toContainEqual(
+      queryKeys.gridmaster.personAll(),
+    );
   });
 });
