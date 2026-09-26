@@ -30,6 +30,7 @@ import type {
   AssignmentDefinition,
   ShiftDisplayMode,
 } from "@/types";
+import type { StepUpRun } from "@/hooks/useStepUpAction";
 import { MembersSection } from "@/components/staff/MembersSection";
 import { ProfileChangeRequestQueue } from "@/components/staff/ProfileChangeRequestQueue";
 import { RecurringScheduleSection } from "@/components/staff/RecurringScheduleSection";
@@ -106,6 +107,7 @@ interface StaffViewProps {
   onSaveWithReinvite?: (
     updatedEmployee: Employee,
     oldInvitation: Invitation,
+    runStepUp: StepUpRun,
   ) => boolean | Promise<boolean>;
   onRemove: (empId: string, note?: string) => void;
   onDeactivate: (empId: string, note?: string) => void;

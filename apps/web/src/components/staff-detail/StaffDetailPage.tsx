@@ -17,6 +17,7 @@ import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-pro
 import { AddManagementUserToScheduleModal } from "@/components/staff/AddManagementUserToScheduleModal";
 import { useDirectory, useOrganizationData, usePermissions } from "@/hooks";
 import { useLatestRef } from "@/hooks/useLatestRef";
+import type { StepUpRun } from "@/hooks/useStepUpAction";
 import {
   isSelfAction,
   SELF_ACTION_FORBIDDEN_MESSAGE,
@@ -389,7 +390,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   // invitation as a side effect), then creates and sends a replacement
   // invitation at the new address, reusing the old one's role/departments.
   const handleSaveEmployeeWithReinvite = useCallback(
-    async (updatedEmployee: Employee, oldInvitation: Invitation) => {
+    async (updatedEmployee: Employee, oldInvitation: Invitation, runStepUp: StepUpRun) => {
       if (!orgId || !employee) return;
       const previousEmployee = employee;
       setEmployee(updatedEmployee);
@@ -421,17 +422,23 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       // here must not read as the whole action failing — the employee record
       // is correctly saved either way.
       try {
-        await createOrganizationInvitation({
-          email: savedEmployee.email,
-          role: oldInvitation.roleToAssign,
-          orgId,
-          employeeId: savedEmployee.id,
-          firstName: savedEmployee.firstName,
-          lastName: savedEmployee.lastName,
-          phone: savedEmployee.phone || undefined,
-          departmentIds: oldInvitation.departmentIds,
-          deptAdminIds: oldInvitation.deptAdminIds,
-        });
+        const completed = await runStepUp((accessToken) =>
+          createOrganizationInvitation(
+            {
+              email: savedEmployee.email,
+              role: oldInvitation.roleToAssign,
+              orgId,
+              employeeId: savedEmployee.id,
+              firstName: savedEmployee.firstName,
+              lastName: savedEmployee.lastName,
+              phone: savedEmployee.phone || undefined,
+              departmentIds: oldInvitation.departmentIds,
+              deptAdminIds: oldInvitation.deptAdminIds,
+            },
+            accessToken,
+          ),
+        );
+        if (!completed) return;
 
         toast.success(`Employee saved. A new invitation was sent to ${savedEmployee.email}.`);
       } catch (err) {
@@ -664,14 +671,17 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   );
 
   const handlePermissionsChange = useCallback(
-    async (perms: AdminPermissions) => {
+    async (perms: AdminPermissions, accessToken?: string) => {
       if (!orgId || !directoryPerson?.userId || !directoryPerson?.membershipUpdatedAt) return;
-      const updatedMembership = await updateOrganizationMembershipGuarded({
-        orgId,
-        userId: directoryPerson.userId,
-        expectedUpdatedAt: directoryPerson.membershipUpdatedAt,
-        adminPermissions: perms,
-      });
+      const updatedMembership = await updateOrganizationMembershipGuarded(
+        {
+          orgId,
+          userId: directoryPerson.userId,
+          expectedUpdatedAt: directoryPerson.membershipUpdatedAt,
+          adminPermissions: perms,
+        },
+        accessToken,
+      );
       syncDirectoryMembership(updatedMembership);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) }),
@@ -682,27 +692,33 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   );
 
   const handleRoleChange = useCallback(
-    async (role: OrganizationRole) => {
+    async (role: OrganizationRole, accessToken?: string) => {
       if (!orgId || !directoryPerson) return;
       if (!directoryPerson.userId) {
         if (!pendingInvite?.updatedAt) return;
-        await replaceOrganizationInvitationAccessGuarded({
-          orgId,
-          invitationId: pendingInvite.id,
-          expectedUpdatedAt: pendingInvite.updatedAt,
-          roleToAssign: role,
-        });
+        await replaceOrganizationInvitationAccessGuarded(
+          {
+            orgId,
+            invitationId: pendingInvite.id,
+            expectedUpdatedAt: pendingInvite.updatedAt,
+            roleToAssign: role,
+          },
+          accessToken,
+        );
         await refreshInvitations();
         refreshDirectory();
         return;
       }
       if (!directoryPerson.membershipUpdatedAt) return;
-      const updatedMembership = await updateOrganizationMembershipGuarded({
-        orgId,
-        userId: directoryPerson.userId,
-        expectedUpdatedAt: directoryPerson.membershipUpdatedAt,
-        orgRole: role,
-      });
+      const updatedMembership = await updateOrganizationMembershipGuarded(
+        {
+          orgId,
+          userId: directoryPerson.userId,
+          expectedUpdatedAt: directoryPerson.membershipUpdatedAt,
+          orgRole: role,
+        },
+        accessToken,
+      );
       syncDirectoryMembership(updatedMembership);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) }),

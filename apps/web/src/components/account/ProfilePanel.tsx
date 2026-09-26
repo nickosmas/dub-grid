@@ -320,28 +320,34 @@ export function ProfilePanel({
     // Unreachable through this page's UI - MemberAccessControls renders the
     // disabled, explained dropdown for isSelf and never calls this. Kept for
     // parity with the People panels and as defense in depth.
-    async (newRole: OrganizationRole) => {
+    async (newRole: OrganizationRole, accessToken?: string) => {
       if (!orgId || !user || !selfMembership?.updatedAt) return;
-      const updated = await updateOrganizationMembershipGuarded({
-        orgId,
-        userId: user.id,
-        expectedUpdatedAt: selfMembership.updatedAt,
-        orgRole: newRole,
-      });
+      const updated = await updateOrganizationMembershipGuarded(
+        {
+          orgId,
+          userId: user.id,
+          expectedUpdatedAt: selfMembership.updatedAt,
+          orgRole: newRole,
+        },
+        accessToken,
+      );
       setSelfMembership(updated);
     },
     [orgId, user, selfMembership],
   );
 
   const handlePermissionsChange = useCallback(
-    async (perms: AdminPermissions) => {
+    async (perms: AdminPermissions, accessToken?: string) => {
       if (!orgId || !user || !selfMembership?.updatedAt) return;
-      const updated = await updateOrganizationMembershipGuarded({
-        orgId,
-        userId: user.id,
-        expectedUpdatedAt: selfMembership.updatedAt,
-        adminPermissions: perms,
-      });
+      const updated = await updateOrganizationMembershipGuarded(
+        {
+          orgId,
+          userId: user.id,
+          expectedUpdatedAt: selfMembership.updatedAt,
+          adminPermissions: perms,
+        },
+        accessToken,
+      );
       setSelfMembership(updated);
     },
     [orgId, user, selfMembership],

@@ -328,21 +328,27 @@ export async function removeOrganizationMembershipGuarded(input: {
   }
 }
 
-export async function updateOrganizationInvitationGuarded(input: {
-  orgId: string;
-  invitationId: string;
-  expectedUpdatedAt: string;
-  email?: string;
-  roleToAssign?: OrganizationRole;
-  firstName?: string;
-  lastName?: string;
-  phone?: string;
-  departmentIds?: number[];
-  deptAdminIds?: number[];
-}): Promise<Invitation> {
+export async function updateOrganizationInvitationGuarded(
+  input: {
+    orgId: string;
+    invitationId: string;
+    expectedUpdatedAt: string;
+    email?: string;
+    roleToAssign?: OrganizationRole;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    departmentIds?: number[];
+    deptAdminIds?: number[];
+  },
+  accessToken?: string,
+): Promise<Invitation> {
   const response = await fetch(resolveClientUrl("/api/organizations/invitations"), {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify(input),
   });
 
@@ -353,7 +359,10 @@ export async function updateOrganizationInvitationGuarded(input: {
   }
 
   if (!response.ok || !body?.invitation) {
-    throw new Error(getErrorMessage(body, "We couldn't update invitation. Try again."));
+    throw Object.assign(
+      new Error(getErrorMessage(body, "We couldn't update invitation. Try again.")),
+      { status: response.status, code: body?.code, method: body?.method },
+    );
   }
 
   return body.invitation;
@@ -411,15 +420,21 @@ export async function resendOrganizationInvitationGuarded(input: {
   };
 }
 
-export async function replaceOrganizationInvitationAccessGuarded(input: {
-  orgId: string;
-  invitationId: string;
-  expectedUpdatedAt: string;
-  roleToAssign: OrganizationRole;
-}): Promise<{ invitation: Invitation }> {
+export async function replaceOrganizationInvitationAccessGuarded(
+  input: {
+    orgId: string;
+    invitationId: string;
+    expectedUpdatedAt: string;
+    roleToAssign: OrganizationRole;
+  },
+  accessToken?: string,
+): Promise<{ invitation: Invitation }> {
   const response = await fetch(resolveClientUrl("/api/organizations/invitations"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify({ ...input, action: "replace_access" }),
   });
 
@@ -430,7 +445,10 @@ export async function replaceOrganizationInvitationAccessGuarded(input: {
   }
 
   if (!response.ok || !body?.invitation) {
-    throw new Error(getErrorMessage(body, "We couldn't replace that invitation. Try again."));
+    throw Object.assign(
+      new Error(getErrorMessage(body, "We couldn't replace that invitation. Try again.")),
+      { status: response.status, code: body?.code, method: body?.method },
+    );
   }
 
   return { invitation: body.invitation };
@@ -495,6 +513,7 @@ export async function updatePendingInvitation(
     departmentIds?: number[];
     deptAdminIds?: number[];
   },
+  accessToken?: string,
 ): Promise<void> {
   const invitations = await fetchOrganizationInvitations(orgId);
   const invitation = invitations.find((item) => item.id === invitationId);
@@ -502,18 +521,21 @@ export async function updatePendingInvitation(
     throw new Error("Invitation data is out of date. Refresh and try again.");
   }
 
-  await updateOrganizationInvitationGuarded({
-    orgId,
-    invitationId,
-    expectedUpdatedAt: invitation.updatedAt,
-    firstName: data.firstName,
-    lastName: data.lastName,
-    phone: data.phone,
-    email: data.email?.toLowerCase(),
-    roleToAssign: data.roleToAssign,
-    departmentIds: data.departmentIds,
-    deptAdminIds: data.deptAdminIds,
-  });
+  await updateOrganizationInvitationGuarded(
+    {
+      orgId,
+      invitationId,
+      expectedUpdatedAt: invitation.updatedAt,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      phone: data.phone,
+      email: data.email?.toLowerCase(),
+      roleToAssign: data.roleToAssign,
+      departmentIds: data.departmentIds,
+      deptAdminIds: data.deptAdminIds,
+    },
+    accessToken,
+  );
 }
 
 export async function updateAppOnlyUser(

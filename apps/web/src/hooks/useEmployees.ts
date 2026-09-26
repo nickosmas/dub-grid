@@ -19,6 +19,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { broadcastInvalidation } from "@/lib/cache-broadcast";
 import { useOrgRealtimeInvalidation } from "@/hooks/useOrgRealtimeInvalidation";
 import { useLatestRef } from "@/hooks/useLatestRef";
+import type { StepUpRun } from "@/hooks/useStepUpAction";
 import type { Employee, Invitation } from "@/types";
 import { replaceEmployeeRow } from "./employee-rows";
 
@@ -36,7 +37,11 @@ export interface EmployeesData {
   /** Saves an employee whose email just changed while a pending invitation
    *  exists, then creates and sends a replacement invitation at the new
    *  address (reusing the old invitation's role/departments). */
-  handleSaveEmployeeWithReinvite: (emp: Employee, oldInvitation: Invitation) => Promise<boolean>;
+  handleSaveEmployeeWithReinvite: (
+    emp: Employee,
+    oldInvitation: Invitation,
+    runStepUp: StepUpRun,
+  ) => Promise<boolean>;
   handleRemoveEmployee: (empId: string, note?: string) => Promise<void>;
   handleDeactivateEmployee: (empId: string, note?: string) => Promise<void>;
   handleActivateEmployee: (empId: string) => Promise<void>;
@@ -163,7 +168,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
   );
 
   const handleSaveEmployeeWithReinvite = useCallback(
-    async (emp: Employee, oldInvitation: Invitation) => {
+    async (emp: Employee, oldInvitation: Invitation, runStepUp: StepUpRun) => {
       if (!orgId) return false;
       const prevAll = allEmployeesRef.current;
       setAllLocal((prev) => replaceEmployeeRow(prev, emp));
@@ -189,17 +194,23 @@ export function useEmployees(orgId: string | null): EmployeesData {
       // here must not read as the whole action failing — the employee record
       // is correctly saved either way.
       try {
-        await createOrganizationInvitation({
-          email: savedEmployee.email,
-          role: oldInvitation.roleToAssign,
-          orgId,
-          employeeId: savedEmployee.id,
-          firstName: savedEmployee.firstName,
-          lastName: savedEmployee.lastName,
-          phone: savedEmployee.phone || undefined,
-          departmentIds: oldInvitation.departmentIds,
-          deptAdminIds: oldInvitation.deptAdminIds,
-        });
+        const completed = await runStepUp((accessToken) =>
+          createOrganizationInvitation(
+            {
+              email: savedEmployee.email,
+              role: oldInvitation.roleToAssign,
+              orgId,
+              employeeId: savedEmployee.id,
+              firstName: savedEmployee.firstName,
+              lastName: savedEmployee.lastName,
+              phone: savedEmployee.phone || undefined,
+              departmentIds: oldInvitation.departmentIds,
+              deptAdminIds: oldInvitation.deptAdminIds,
+            },
+            accessToken,
+          ),
+        );
+        if (!completed) return true;
 
         toast.success(`Employee saved. A new invitation was sent to ${savedEmployee.email}.`);
       } catch (err) {

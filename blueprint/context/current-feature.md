@@ -73,10 +73,14 @@ committed as a local checkpoint.
       server's Super Admin grant gated; the wizard saves through step-up.
       _Done when:_ route tests prove a stale session grants nothing and the
       persistence runs its calls with the assured token.
-- [ ] **Step 4 - People screens** - the management editor offers Super Admin
+- [x] **Step 4 - People screens** - the management editor offers Super Admin
       to a caller who can grant it; a Gridmaster's People role changes and
       invitations run through step-up. _Done when:_ view tests show the
       option only for a Super Admin or Gridmaster and the step-up path.
+      The People screens run each grant inside step-up without the
+      credential preflight, so only the server's explicit request for a
+      Gridmaster prompts; the role controls that own the confirmation
+      (`InlineRoleSelect`, `MemberAccessControls`) own the step-up too.
 - [ ] **Step 5 - F-61 and the inventory** - dead helper removed, permission
       changes gated for a Gridmaster, inventory marker extended and routes
       classified. _Done when:_ the inventory test passes and fails if an

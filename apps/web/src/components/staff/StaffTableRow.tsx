@@ -98,7 +98,7 @@ interface StaffRowSharedProps {
   /** Access role (org_role) of the linked user, if any. Null for staff with no login. */
   orgRole?: OrganizationRole | null;
   /** Inline role-change handler. Omitted when the viewer can't manage access. */
-  onRoleChange?: (newRole: OrganizationRole) => Promise<void>;
+  onRoleChange?: (newRole: OrganizationRole, accessToken?: string) => Promise<void>;
   /** Whether the pending-invitation lookup has settled for this organization. */
   invitationStateReady?: boolean;
   pendingInviteByEmployeeId: Map<string, Invitation>;

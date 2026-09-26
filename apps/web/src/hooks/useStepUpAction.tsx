@@ -11,6 +11,7 @@ import {
 } from "@/features/account/client/step-up";
 
 type Action = (accessToken: string) => Promise<unknown>;
+export type StepUpRun = (action: Action) => Promise<boolean>;
 interface PendingAction {
   context: string;
   action: Action;

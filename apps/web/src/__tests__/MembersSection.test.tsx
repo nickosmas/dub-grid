@@ -40,6 +40,16 @@ vi.mock("@/lib/sentry", () => ({
   captureException: vi.fn(),
 }));
 
+const stepUpRun = vi.hoisted(() =>
+  vi.fn(async (action: (token: string) => Promise<unknown>) => {
+    await action("step-up-token");
+    return true;
+  }),
+);
+vi.mock("@/hooks/useStepUpAction", () => ({
+  useStepUpAction: () => ({ run: stepUpRun, dialog: null }),
+}));
+
 vi.mock("@/features/organization/client", () => ({
   fetchOrganizationInvitations: vi.fn().mockResolvedValue([]),
   replaceOrganizationInvitationAccessGuarded: vi.fn(),
@@ -786,12 +796,15 @@ describe("MembersSection — pending invitation access", () => {
 
     await user.click(screen.getByRole("button", { name: "Change and resend" }));
     await waitFor(() =>
-      expect(replaceOrganizationInvitationAccessGuarded).toHaveBeenCalledWith({
-        orgId: "org-1",
-        invitationId: "inv-pending",
-        expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
-        roleToAssign: "admin",
-      }),
+      expect(replaceOrganizationInvitationAccessGuarded).toHaveBeenCalledWith(
+        {
+          orgId: "org-1",
+          invitationId: "inv-pending",
+          expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
+          roleToAssign: "admin",
+        },
+        "step-up-token",
+      ),
     );
   });
 });
