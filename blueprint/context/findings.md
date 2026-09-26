@@ -192,10 +192,10 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** End the created session when the client has gone (for example, a short server-side deadline that signs the new session out), or let the next successful sign-in on that device replace the orphan.
 **Resolution:**
 
-### F-79 [P3] open - An impersonation ended as expired at sign-out records the sign-out as its end time
+### F-79 [P3] fixed - An impersonation ended as expired at sign-out records the sign-out as its end time
 
 **File:** `apps/web/src/app/api/account/logout-cleanup/route.ts:39`; `supabase/migrations/057_impersonation_notice_wording.sql` (`end_impersonation`, `ended_at = now()`)
 **Found:** 2026-09-26 by `/audit` re-review of F-76 (predates it)
 **Why it matters:** A session that timed out days earlier reads in history as lasting until the Gridmaster signed out, while the lazy cleanup in `002_functions_triggers.sql` records `ended_at = expires_at`. History only; no access is granted.
 **Suggested fix:** In a forward migration, set `ended_at = LEAST(now(), expires_at)` when `p_reason = 'expired'`.
-**Resolution:**
+**Resolution:** Fixed: migration 058 redefines `end_impersonation` (from 057) so an `expired` end records `LEAST(now(), expires_at)` and every other reason still records `now()`; nothing else changes. A live test ends a session that timed out two days earlier as expired and reads its expiry back, and fails against 057; it also covers an expired end before the expiry and a manual end.
