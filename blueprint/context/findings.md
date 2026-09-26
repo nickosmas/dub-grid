@@ -255,3 +255,11 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Why it matters:** A password of 25 emoji (100 bytes) is refused with "At most 72 characters".
 **Suggested fix:** Word the hint so accents and emoji make sense of it.
 **Resolution:** Fixed: the hint reads "At most 72 characters, fewer with accents or emoji", and the test pins it. Re-review (bbff3583): kept fixed, since the mobile reset screen's hint row could run past the card with the longer label; the hint text now shrinks and wraps, as the profile screen's does.
+
+### F-78 [P3] open - A mobile sign-in that outlives the app's request timeout leaves an orphan server session
+
+**File:** `apps/mobile` sign-in request (15 s client timeout); `apps/web/src/app/api/auth/login/route.ts`
+**Found:** 2026-09-26 during the 41d3 Android rehearsal
+**Why it matters:** On a slow server (18.6 s observed under load) the phone gives up while the server finishes, so a session is created that the phone never receives, and Security lists an extra signed-in device until it is revoked or expires.
+**Suggested fix:** End the created session when the client has gone (for example, a short server-side deadline that signs the new session out), or let the next successful sign-in on that device replace the orphan.
+**Resolution:**

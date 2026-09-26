@@ -54,6 +54,25 @@ Continuous Mode: they push, send, reach production or reseed shared state.
       simulator's dev build predates current native dependencies, only Xcode
       27 is installed (Expo 54 needs Xcode 26), no Android device or emulator
       is attached, and signing in needs the owner.
+      Android interim (2026-09-26, Pixel 7 Pro emulator, Android 13, dev
+      build of d9ef2a26 against local web and Supabase, a throwaway Calm
+      Haven user; host load 15 to 60, so durations are environment-bound): - Pass: presence retry. An injected 503 on session-presence was
+      retried about 4.9 s later and answered 200 for the same session. - Pass: session revocation holds. Revoked from the web, the phone's
+      next requests got 401, it signed out to the sign-in screen, and a
+      force-stop and relaunch stayed there. - Pass: two-factor recovery. The emailed code led to the
+      authenticator step, a wrong code was refused, the right one led to
+      a new password (updated at aal2), and recovery signed out. - Defect found and fixed: after the authenticator step the new
+      password field showed plain text on Android, because React reused
+      the number-pad field and Android dropped the password flag. Each
+      stage is now keyed (30bbebab, with a test); device re-check
+      pending. - Inconclusive: teardown without the 5 s stall. Sign-out completes,
+      but under this load the server's sign-out took 13 to 36 s, so the
+      client's time cannot be isolated; to re-time on a quiet machine. - Pending: sign-in with the new password and the authenticator code
+      (the emulator stopped responding before the code was entered). - Not exercisable: disabling push at teardown (the build has no
+      `google-services.json`, so no push token exists). - Notes: a login that outlives the app's 15 s timeout still creates a
+      server session the phone never receives (Security showed two
+      devices); Realtime join errors appear under this load; F-42 stays
+      with iOS.
 - [ ] **Step 3 - email provider rehearsal** (approved 2026-09-25) - seven
       app-sent emails (invitation, reissue, account deleted, impersonation
       start and end, new sign-in and two-factor alerts) delivered through
