@@ -74,9 +74,12 @@ Continuous Mode: they push, send, reach production or reseed shared state.
       is weaker than `config.toml` on settings the script does not push:
       minimum password length 6 (repo 10), no required characters (repo
       `letters_digits`), `secure_password_change` off (repo on), and no
-      session timebox or inactivity limit (repo 24h and 8h). Waiting on the
-      owner: the template apply (needed before merge), and separate
-      decisions on the password rules and `secure_password_change` (verify a
+      session timebox or inactivity limit (repo 24h and 8h). Templates
+      applied 2026-09-26 with the owner's approval (`--apply`, 3 fields); a
+      fresh diff reports production matches the repo. Password rules
+      (length 10, `letters_digits`) approved by the owner, not yet applied:
+      the agent's write was refused by its permission mode, so the owner
+      sets them. Still open: `secure_password_change` (verify a
       real password change with it on first). Session limits: owner decided
       (2026-09-26) mobile stays signed in until sign-out, so production keeps
       none and `config.toml` drops its 24h and 8h; the web app's 30-minute
