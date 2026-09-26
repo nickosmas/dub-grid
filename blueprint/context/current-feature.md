@@ -1,7 +1,7 @@
 # Fix: Web sign-in request waves and loading jitter
 
 **Type:** Fix
-**Status:** in progress
+**Status:** verified
 
 ## The problem
 
@@ -125,12 +125,19 @@ Out of scope, recorded as follow-ups:
     the gate's states and the flag is cleared on the Gridmaster path, and a
     Playwright trace of local sign-in shows no empty-body frame between the
     form and the dashboard.
-- [ ] **Step 4 - navigation prefetches once.**
+- [x] **Step 4 - navigation prefetches once.**
   - Find why the header's links prefetch twice (a header remount versus the
     router cache) and make each route prefetch at most once per sign-in,
     without dropping prefetch for later navigation.
-  - _Done when:_ a local sign-in's network log shows each navigation RSC
-    prefetch once.
+  - _Outcome (no code change):_ captured on production on 2026-09-26 with
+    the router's request headers. Neither cause applies: each link's pair is
+    Next 16's segment prefetch for a dynamic route, which fetches the route
+    tree (`Next-Router-Segment-Prefetch: /_tree`) and then the route's
+    prefetch data (`Next-Router-Prefetch: 1` with its own state tree, hence a
+    different `_rsc` per route). No route was prefetched a third time, and
+    the header's links remount only when the viewport crosses the mobile
+    breakpoint. Prefetch is production-only, so the dev server cannot show
+    this.
 - [x] **Step 5 - Gridmaster path.**
   - The login route skips the refresh when the token already carries
     `platform_role=gridmaster` (and keeps it when the claim is missing).
