@@ -12,8 +12,10 @@ import {
   AssignmentDefinition,
   FocusArea,
   DraftKind,
+  IndicatorType,
   ShiftDisplayMode,
 } from "@/types";
+import { NoteDots, type ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
 import { borderColor, DRAFT_BORDER_COLORS, resolveShiftPillColors } from "@/lib/colors";
 
 function pillText(label: string, max: number): string {
@@ -37,7 +39,19 @@ interface MonthViewProps {
   activeFocusArea?: number | null;
   draftKindForKey?: (empId: string, date: Date) => DraftKind;
   shiftDisplayMode?: ShiftDisplayMode;
+  /** The page's note marks, shown on each person's row in the day popover. */
+  noteMarksForKey?: (empId: string, date: Date, focusAreaId?: number) => ScheduleNoteMark[];
+  indicatorTypes?: IndicatorType[];
 }
+
+type DayRow = {
+  name: string;
+  shift: string;
+  style: AssignmentDefinition;
+  draftKind: DraftKind;
+  isHighlighted: boolean;
+  marks: ScheduleNoteMark[];
+};
 
 type DayCellData = {
   date: Date;
@@ -45,16 +59,7 @@ type DayCellData = {
   isToday: boolean;
   hasHighlightedEmployee: boolean;
   categoryCounts: Map<number, number>;
-  byFocusArea: Map<
-    string,
-    {
-      name: string;
-      shift: string;
-      style: AssignmentDefinition;
-      draftKind: DraftKind;
-      isHighlighted: boolean;
-    }[]
-  >;
+  byFocusArea: Map<string, DayRow[]>;
   activeCats: ShiftCategory[];
   focusAreaSections: string[];
 };
@@ -82,6 +87,8 @@ function shortName(name: string): string {
   return parts[0] + (parts[1] ? " " + parts[1][0] + "." : "");
 }
 
+const EMPTY_INDICATORS: IndicatorType[] = [];
+
 /* ── Day Popover (portal-based) ── */
 function DayPopover({
   anchorEl,
@@ -89,12 +96,14 @@ function DayPopover({
   onClose,
   isNameMode = false,
   hasHighlightedSearch = false,
+  indicatorTypes,
 }: {
   anchorEl: HTMLElement;
   data: DayCellData;
   onClose: () => void;
   isNameMode?: boolean;
   hasHighlightedSearch?: boolean;
+  indicatorTypes: IndicatorType[];
 }) {
   const { date, focusAreaSections, byFocusArea } = data;
   const { resolvedTheme } = useTheme();
@@ -191,7 +200,7 @@ function DayPopover({
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                       {workers.map(
-                        ({ name, shift, style: s0, draftKind: dk, isHighlighted }, ni) => {
+                        ({ name, shift, style: s0, draftKind: dk, isHighlighted, marks }, ni) => {
                           const s = resolveShiftPillColors(
                             { color: s0.color, text: s0.text, border: s0.border },
                             isDarkTheme,
@@ -253,6 +262,11 @@ function DayPopover({
                               >
                                 {shortName(name)}
                               </span>
+                              <NoteDots
+                                marks={marks}
+                                indicatorTypes={indicatorTypes}
+                                placement="inline"
+                              />
                             </div>
                           );
                         },
@@ -286,6 +300,8 @@ export default function MonthView({
   activeFocusArea = null,
   draftKindForKey,
   shiftDisplayMode = "code",
+  noteMarksForKey,
+  indicatorTypes = EMPTY_INDICATORS,
 }: MonthViewProps) {
   const isNameMode = shiftDisplayMode === "name";
   const cells = useMemo(() => buildMonthCells(monthStart), [monthStart]);
@@ -350,16 +366,16 @@ export default function MonthView({
 
       const categoryCounts = new Map<number, number>();
       let hasHighlightedEmployee = false;
-      const byFocusArea = new Map<
-        string,
-        {
-          name: string;
-          shift: string;
-          style: AssignmentDefinition;
-          draftKind: DraftKind;
-          isHighlighted: boolean;
-        }[]
-      >();
+      const byFocusArea = new Map<string, DayRow[]>();
+      // A person's indicators belong to their day in a focus area, not to each
+      // of their shift codes there, so they show on the first row only.
+      const markedRows = new Set<string>();
+      const marksFor = (empId: string, focusAreaId: number): ScheduleNoteMark[] => {
+        const rowKey = `${empId}_${focusAreaId}`;
+        if (!noteMarksForKey || markedRows.has(rowKey)) return [];
+        markedRows.add(rowKey);
+        return noteMarksForKey(empId, date, focusAreaId);
+      };
 
       filteredEmployees.forEach((emp) => {
         const combinedLabel = shiftForKey(emp.id, date);
@@ -398,6 +414,7 @@ export default function MonthView({
               style,
               draftKind: dk,
               isHighlighted,
+              marks: marksFor(emp.id, fa.id),
             });
             byFocusArea.set(fa.name, list);
           } else {
@@ -412,6 +429,7 @@ export default function MonthView({
                 style,
                 draftKind: dk,
                 isHighlighted,
+                marks: marksFor(emp.id, primaryFa.id),
               });
               byFocusArea.set(primaryFa.name, list);
             }
@@ -462,6 +480,7 @@ export default function MonthView({
     highlightEmpIds,
     draftKindForKey,
     shiftSortOrder,
+    noteMarksForKey,
   ]);
 
   const popoverData = popoverDateKey ? dayDataMap.get(popoverDateKey) : null;
@@ -673,6 +692,7 @@ export default function MonthView({
           onClose={closePopover}
           isNameMode={isNameMode}
           hasHighlightedSearch={hasHighlightedSearch}
+          indicatorTypes={indicatorTypes}
         />
       )}
     </div>

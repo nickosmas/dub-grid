@@ -7665,6 +7665,8 @@ function SchedulerContent({
                 shiftDisplayMode={org?.shiftDisplayMode}
                 highlightEmpIds={searchMatchedEmployeeIds}
                 highlightScrollKey={normalizedStaffSearch || undefined}
+                noteMarksForKey={noteMarksForKey}
+                indicatorTypes={indicatorTypes}
               />
             )}
           </div>

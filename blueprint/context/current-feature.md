@@ -67,7 +67,7 @@ colour and the existing visibility rule.
       `indicatorTypes`, drops `activeIndicatorIdsForKey` and the blue dot, and
       renders inline marks. _Done when:_ a
       `NoteDots` test shows inline placement is not absolutely positioned; a `MobileDayView` test shows a shift's named marks looked up with the section's focus area, a draft mark only when the marks carry it, and no dot without indicators.
-- [ ] **Step 2 - Month view day popover** - rows carry `empId` and
+- [x] **Step 2 - Month view day popover** - rows carry `empId` and
       `focusAreaId`; `MonthView` takes `noteMarksForKey` and
       `indicatorTypes` and shows each row's marks inline. _Done when:_ a
       `MonthView` test opens a day and finds each person's indicator by name,
