@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLatestRef } from "@/hooks/useLatestRef";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { getImpersonationFromCookie } from "@/lib/impersonation";
@@ -184,6 +184,19 @@ const INITIAL_CTX: OrgContext = {
  * Impersonation is different — its cookie *is* client-readable, so that case
  * short-circuits with no request at all, exactly as before.
  */
+/** Shared with the sign-in prefetch so both read one cache entry. */
+export function orgContextQueryOptions() {
+  return queryOptions({
+    queryKey: queryKeys.account.orgContext(),
+    queryFn: fetchAccountOrgContext,
+    // Only a sandbox enter/exit, an impersonation change or an org switch moves
+    // this, and each of those hard-reloads or clears the cache. Nothing is
+    // gained by re-asking during a session.
+    staleTime: Infinity,
+    retry: 1,
+  });
+}
+
 function useOrgContext(): OrgContext {
   // Read once on mount, like the effect this replaced. Entering or leaving
   // impersonation clears the whole query cache and re-renders from scratch.
@@ -191,16 +204,7 @@ function useOrgContext(): OrgContext {
     typeof document === "undefined" ? null : getImpersonationFromCookie(document.cookie),
   );
 
-  const query = useQuery({
-    queryKey: queryKeys.account.orgContext(),
-    queryFn: fetchAccountOrgContext,
-    enabled: !impersonation,
-    // Only a sandbox enter/exit, an impersonation change or an org switch moves
-    // this, and each of those hard-reloads or clears the cache. Nothing is
-    // gained by re-asking during a session.
-    staleTime: Infinity,
-    retry: 1,
-  });
+  const query = useQuery({ ...orgContextQueryOptions(), enabled: !impersonation });
 
   return useMemo(() => {
     if (impersonation) {

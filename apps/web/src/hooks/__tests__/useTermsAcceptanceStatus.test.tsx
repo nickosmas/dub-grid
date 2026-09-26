@@ -9,6 +9,7 @@ import { useTermsAcceptanceStatus } from "@/hooks/useTermsAcceptanceStatus";
 type QueryOpts = { queryKey: readonly unknown[]; enabled?: boolean; queryFn?: unknown };
 const useQuery = vi.fn((_opts: QueryOpts) => ({ data: undefined as unknown }));
 vi.mock("@tanstack/react-query", () => ({
+  queryOptions: (opts: QueryOpts) => opts,
   useQuery: (opts: QueryOpts) => useQuery(opts),
 }));
 

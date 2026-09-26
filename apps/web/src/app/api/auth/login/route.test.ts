@@ -864,6 +864,25 @@ describe("POST /api/auth/login", () => {
       expect(body.session.access_token).toEqual(expect.any(String));
     });
 
+    it("clears a leftover sandbox on any completed sign-in, not only a switch", async () => {
+      signIn({ org_id: ORG_ID, org_slug: "acme", org_role: "user" });
+
+      const res = await POST(makeRequest("acme.localhost"));
+
+      expect((await res.json()).didSwitchOrg).toBe(false);
+      expect(res.cookies.get(SANDBOX_COOKIE_NAME)?.value).toBe("");
+    });
+
+    it("leaves the sandbox cookie alone while a second factor is outstanding", async () => {
+      signIn({ org_id: ORG_ID, org_slug: "acme", org_role: "user" }, [
+        { factor_type: "totp", status: "verified" },
+      ]);
+
+      const res = await POST(makeRequest("acme.localhost"));
+
+      expect(res.cookies.get(SANDBOX_COOKIE_NAME)).toBeUndefined();
+    });
+
     it("writes no cookies for a refused sign-in", async () => {
       signIn({ org_id: OTHER_ORG_ID, org_role: "user" });
       stubOrgLookup(null);

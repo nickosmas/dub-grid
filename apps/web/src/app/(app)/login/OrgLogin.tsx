@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { PublicRoute } from "@/components/RouteGuards";
 import { useAuth } from "@/components/AuthProvider";
 import AuthTransitionScreen from "@/components/AuthTransitionScreen";
+import { primeSignInQueries } from "@/components/SignInPrefetch";
 import { Button } from "@/components/Button";
 import { ACCOUNT_DISABLED_CODE } from "@dubgrid/domain";
 import { withThemeParam } from "@/lib/theme-preference";
@@ -414,6 +415,7 @@ export default function OrgLogin({
           return;
         }
         void syncBrowserSessionInBackground(result.session);
+        primeSignInQueries(queryClient, result.session.access_token);
         void exitSandbox().catch(() => {});
         markAuthTransition();
         navigateToDashboard(result.destination, false);

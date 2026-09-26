@@ -47,6 +47,11 @@ vi.mock("@/features/account/client", () => ({
   syncBrowserSessionInBackground: (...args: unknown[]) => mockSyncSession(...args),
 }));
 
+const mockPrimeSignInQueries = vi.fn();
+vi.mock("@/components/SignInPrefetch", () => ({
+  primeSignInQueries: (...args: unknown[]) => mockPrimeSignInQueries(...args),
+}));
+
 let mockSignedInUser: { id: string } | null = null;
 vi.mock("@/components/AuthProvider", () => ({ useAuth: () => ({ user: mockSignedInUser }) }));
 
@@ -165,6 +170,7 @@ describe("OrgLogin submit states", () => {
     mockToastError.mockReset();
     mockRouterReplace.mockReset();
     mockSyncSession.mockReset().mockResolvedValue(undefined);
+    mockPrimeSignInQueries.mockReset();
     mockSignedInUser = null;
     sessionStorage.clear();
   });
@@ -195,6 +201,10 @@ describe("OrgLogin submit states", () => {
       });
       expect(mockSetSession).not.toHaveBeenCalled();
       expect(mockExitSandbox).toHaveBeenCalledTimes(1);
+      expect(mockPrimeSignInQueries).toHaveBeenCalledExactlyOnceWith(
+        expect.any(Object),
+        sessionToken("user-1", TARGET_ORG_ID, "calmhaven"),
+      );
     });
 
     it("hard-navigates a switched sign-in at once, leaving the new document to read the cookies", async () => {

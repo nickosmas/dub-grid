@@ -9,7 +9,7 @@ import UserViewBanner from "@/components/UserViewBanner";
 import InactiveAccountBanner from "@/components/InactiveAccountBanner";
 import TrialWelcomeModal from "@/components/TrialWelcomeModal";
 import InactivityGuard from "@/components/InactivityGuard";
-import { fetchOrganizationBilling } from "@/features/billing/client";
+import { organizationBillingQueryOptions } from "@/features/billing/queries";
 import {
   getOrganizationBootstrapQueryPolicy,
   type OrganizationBootstrap,
@@ -35,11 +35,9 @@ function isAppRoute(pathname: string): boolean {
 function AppHeader() {
   const perms = usePermissions();
   const { data: billing, isLoading: billingLoading } = useQuery({
-    queryKey: queryKeys.org.billing(perms.orgId!),
-    queryFn: () => fetchOrganizationBilling(perms.orgId!),
+    ...organizationBillingQueryOptions(perms.orgId!),
     enabled:
       Boolean(perms.orgId) && perms.isSuperAdmin && !perms.isGridmaster && !perms.isImpersonating,
-    staleTime: 30_000,
   });
   const shouldLoadOrgHeader =
     !perms.isSuperAdmin ||

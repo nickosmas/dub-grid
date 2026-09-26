@@ -582,7 +582,10 @@ export async function POST(req: NextRequest) {
   for (const cookie of sessionCookies ?? []) {
     res.cookies.set(cookie.name, cookie.value, cookie.options);
   }
-  if (didSwitchOrg) {
+  // A completed sign-in never resumes a sandbox, and clearing its cookie here
+  // means the requests that follow this response already see the real
+  // organization rather than racing the client's sandbox exit.
+  if (destination !== null) {
     res.cookies.set(SANDBOX_COOKIE_NAME, "", { path: "/", maxAge: 0 });
   }
   timer.applyTo(res.headers);

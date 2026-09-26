@@ -28,7 +28,7 @@ import {
 } from "@/hooks";
 import { useAuth } from "@/components/AuthProvider";
 import { fetchAccountIdentity } from "@/features/account/client";
-import { fetchOrganizationBilling } from "@/features/billing/client";
+import { organizationBillingQueryOptions } from "@/features/billing/queries";
 import MobileNavSheet from "@/components/MobileNavSheet";
 import { queryKeys } from "@/lib/query-keys";
 import { getAvatarInitials } from "@/lib/utils";
@@ -141,11 +141,7 @@ function formatHeaderBillingNotice(billing: OrganizationBillingSummary): Billing
 }
 
 function HeaderBillingNotice({ orgId, compact = false }: { orgId: string; compact?: boolean }) {
-  const billingQuery = useQuery({
-    queryKey: queryKeys.org.billing(orgId),
-    queryFn: () => fetchOrganizationBilling(orgId),
-    staleTime: 30_000,
-  });
+  const billingQuery = useQuery(organizationBillingQueryOptions(orgId));
   const notice = billingQuery.data ? formatHeaderBillingNotice(billingQuery.data) : null;
 
   if (!notice) return null;

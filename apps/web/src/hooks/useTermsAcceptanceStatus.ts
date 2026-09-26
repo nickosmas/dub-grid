@@ -1,5 +1,5 @@
 // src/hooks/useTermsAcceptanceStatus.ts
-import { useQuery, type UseQueryResult } from "@tanstack/react-query";
+import { queryOptions, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useAuth } from "@/components/AuthProvider";
 import { queryKeys } from "@/lib/query-keys";
 import { fetchTermsAcceptanceStatus, type TermsAcceptanceStatus } from "@/features/account/client";
@@ -16,9 +16,16 @@ import { fetchTermsAcceptanceStatus, type TermsAcceptanceStatus } from "@/featur
 export function useTermsAcceptanceStatus(): UseQueryResult<TermsAcceptanceStatus> {
   const { user, isLoading: authLoading } = useAuth();
   return useQuery({
-    queryKey: queryKeys.account.terms(user?.id ?? "anon"),
-    queryFn: fetchTermsAcceptanceStatus,
+    ...termsAcceptanceQueryOptions(user?.id ?? null),
     enabled: Boolean(user) && !authLoading,
+  });
+}
+
+/** Shared with the sign-in prefetch so both read one cache entry. */
+export function termsAcceptanceQueryOptions(userId: string | null) {
+  return queryOptions({
+    queryKey: queryKeys.account.terms(userId ?? "anon"),
+    queryFn: fetchTermsAcceptanceStatus,
     staleTime: 60_000,
   });
 }

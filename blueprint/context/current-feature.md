@@ -104,7 +104,7 @@ Out of scope, recorded as follow-ups:
     sign-in (organization and Gridmaster) makes no `/auth/v1/user` request
     between the login response and the `/dashboard` request, and the
     existing auth and per-session organization integration tests pass.
-- [ ] **Step 2 - dashboard data starts together.**
+- [x] **Step 2 - dashboard data starts together.**
   - Load org context with permissions and bootstrap as soon as the session
     exists, or derive it from them.
   - Employees and `DashboardView`'s queries no longer wait on billing,
