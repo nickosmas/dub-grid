@@ -84,6 +84,7 @@ export const queryKeys = {
      * whole cache (impersonation, org switch, logout).
      */
     orgContext: () => ["account", "orgContext"] as const,
+    mfaReenroll: (userId: string) => ["account", userId, "mfa-reenroll"] as const,
     /**
      * Keyed by org as well as user: one person can be an admin in one
      * organization and a plain member in another, so a user-only key served the

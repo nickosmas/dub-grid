@@ -87,7 +87,7 @@ proof) and F-81 (the page refreshes on more than membership changes).
       step-up. _Done when:_ route tests cover a missing reason, a stale
       session, a Gridmaster target and the order of effects; an email render
       test covers the notice.
-- [ ] **Step 6 - web re-enrollment** - `GET /api/account/mfa-status` reports
+- [x] **Step 6 - web re-enrollment** - `GET /api/account/mfa-status` reports
       the flag; a gate over app routes shows the enrollment screen until a
       factor is verified; `updateSelfMfaStatus(true)` clears the flag. _Done
       when:_ tests show the gate blocks and lifts, and the flag clears on

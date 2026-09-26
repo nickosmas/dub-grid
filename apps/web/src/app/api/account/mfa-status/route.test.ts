@@ -40,7 +40,7 @@ vi.mock("@/lib/supabase-service", () => ({
   }),
 }));
 
-import { POST } from "./route";
+import { GET, POST } from "./route";
 
 function post(body: unknown): NextRequest {
   return new NextRequest("http://localhost/api/account/mfa-status", {
@@ -198,5 +198,45 @@ describe("POST /api/account/mfa-status", () => {
     });
     expect((await POST(req)).status).toBe(200);
     expect(createRequestSupabaseClient).toHaveBeenCalledWith(req);
+  });
+});
+
+describe("GET /api/account/mfa-status", () => {
+  const get = () => GET(new NextRequest("http://localhost/api/account/mfa-status"));
+
+  it("asks for nothing when no reset is pending", async () => {
+    profileSnapshot.mockResolvedValueOnce({
+      data: { mfa_reenroll_required_at: null },
+      error: null,
+    });
+    const response = await get();
+    expect(await response.json()).toEqual({ reenrollRequired: false });
+    expect(getUser).not.toHaveBeenCalled();
+  });
+
+  it("requires enrollment after a reset with no verified factor", async () => {
+    profileSnapshot.mockResolvedValueOnce({
+      data: { mfa_reenroll_required_at: "2026-09-26T10:00:00.000Z" },
+      error: null,
+    });
+    getUser.mockResolvedValueOnce({ data: { user: { id: "user-1", factors: [] } }, error: null });
+    const response = await get();
+    expect(await response.json()).toEqual({ reenrollRequired: true });
+    expect(updateSelfMfaStatus).not.toHaveBeenCalled();
+  });
+
+  it("settles the reset when a verified factor already exists", async () => {
+    profileSnapshot.mockResolvedValueOnce({
+      data: { mfa_reenroll_required_at: "2026-09-26T10:00:00.000Z" },
+      error: null,
+    });
+    const response = await get();
+    expect(await response.json()).toEqual({ reenrollRequired: false });
+    expect(updateSelfMfaStatus).toHaveBeenCalledWith("user-1", true);
+  });
+
+  it("answers 503 rather than guessing when the read fails", async () => {
+    profileSnapshot.mockResolvedValueOnce({ data: null, error: { message: "down" } });
+    expect((await get()).status).toBe(503);
   });
 });

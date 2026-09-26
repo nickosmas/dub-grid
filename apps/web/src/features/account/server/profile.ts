@@ -530,6 +530,8 @@ export async function updateSelfMfaStatus(
     .from("profiles")
     .update({
       mfa_enabled: enabled,
+      // A verified factor answers a two-factor reset's re-enrollment (059).
+      ...(enabled ? { mfa_reenroll_required_at: null } : {}),
       updated_at: new Date().toISOString(),
     })
     .eq("id", userId);

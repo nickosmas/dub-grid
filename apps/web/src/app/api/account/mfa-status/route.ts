@@ -14,6 +14,43 @@ const mfaStatusSchema = z.object({
   enabled: z.boolean().optional(),
 });
 
+/**
+ * Whether a two-factor reset still requires this person to enroll again. A
+ * verified factor found here settles it, so enrolling any other way still lifts
+ * the gate.
+ */
+export async function GET(req: NextRequest) {
+  try {
+    const auth = await requireAuthenticatedUserWithClaims(req);
+    if ("response" in auth) return auth.response;
+
+    const { data: profile, error: profileError } = await getServiceClient()
+      .from("profiles")
+      .select("mfa_reenroll_required_at")
+      .eq("id", auth.user.id)
+      .maybeSingle();
+    if (profileError) {
+      return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
+    }
+    if (!profile?.mfa_reenroll_required_at) {
+      return NextResponse.json({ reenrollRequired: false });
+    }
+
+    const { data, error } = await createRequestSupabaseClient(req).auth.getUser();
+    if (error || !data.user || data.user.id !== auth.user.id) {
+      return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
+    }
+    if (resolveVerifiedTotpFactorPresence(data.user.factors) === true) {
+      await updateSelfMfaStatus(auth.user.id, true);
+      return NextResponse.json({ reenrollRequired: false });
+    }
+    return NextResponse.json({ reenrollRequired: true });
+  } catch (error) {
+    logger.error({ error }, "account mfa status GET failed");
+    return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
+  }
+}
+
 export async function POST(req: NextRequest) {
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) return csrfError;

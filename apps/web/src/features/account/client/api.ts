@@ -369,6 +369,10 @@ export function requestMfaLifecycle(body: MfaLifecycleRequest, accessToken?: str
   );
 }
 
+export function fetchMfaReenrollStatus(): Promise<{ reenrollRequired: boolean }> {
+  return requestJson("/api/account/mfa-status", { method: "GET" }, { deadline: true });
+}
+
 export function updateMfaStatus(accessToken?: string): Promise<{
   profile: SelfProfileRecord | null;
 }> {
