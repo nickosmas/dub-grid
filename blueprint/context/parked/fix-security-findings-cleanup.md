@@ -44,7 +44,9 @@ evidence the owner must supply.
 - [x] **Step 3 - F-57 password maximum**
 - [x] **Step 4 - F-38 impersonation notice wording** (migration 057)
 - [x] **Step 5 - F-41, F-72 and F-56 references, helper and tests**
-- [ ] **Step 6 - review and close**
+- [x] **Step 6 - review and close** - an independent re-review of
+      e1c83ac1..e9d49b20 closed F-29, F-32, F-35, F-38, F-41, F-46, F-56, F-57
+      and F-72, and raised F-76 and F-77, both repaired and awaiting review.
 
 ## Notes for the AI
 
