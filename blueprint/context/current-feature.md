@@ -1,101 +1,119 @@
-# Feature: Release qualification
+# Feature: Gridmaster grants with step-up
 
-**From build-plan:** feature 41d3
-**Status:** blocked - needs approvals
+**From build-plan:** feature 41d4
+**Status:** in progress
 
 ## Goal
 
-Item 41's repairs are proven by tests; before remediation closes, each must be
-seen working where it runs: in a browser, on a phone, through the email
-provider, and against production's database and Auth settings. Evidence that
-cannot be gathered is recorded as a release blocker, not replaced by a test.
+A Gridmaster can invite someone as Super Admin, and every grant a Gridmaster
+makes asks for fresh proof through the step-up prompt instead of failing.
+Today the server allows a Gridmaster Super Admin invitation, but no screen
+offers it: the Gridmaster portal's Add form offers User and Admin and only
+assigns existing accounts, the setup wizard's invitation step offers User and
+Admin, and the People management editor hard-codes User and Admin. The same
+grants run on the Gridmaster session alone (F-55, F-59), and the People
+screens show an error instead of a prompt when the access route asks for
+proof (F-58).
 
-## Rehearsals and what each needs
+## In scope
 
-| #   | Rehearsal                                              | Proves                                                                                                                                                                            | Needs                                                                                                           |
-| --- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| 1   | Local browser E2E (`npm run test:e2e`, three browsers) | invitation reissue and accept, sign-in refusal and completion, recovery with two-factor, impersonation start and end                                                              | A dedicated local stack or an agreed window: the E2E setup reseeds the shared local database other sessions use |
-| 2   | iOS simulator and an Android device or emulator        | recovery with two-factor, session revocation holding, the app-lock cover in the app switcher (F-42), teardown without the 5 s stall, presence retry                               | A dev build on the simulator and device access                                                                  |
-| 3   | Email provider                                         | invitation, reissue, account deleted, impersonation notices and security alerts arrive with the right copy; Supabase password and email-change notices after `supabase start`     | Sending real mail through Resend to an address the owner controls                                               |
-| 4   | Production migration 047                               | `end_user_auth_session` exists, locked and applied by the runbook, before the release PR merges                                                                                   | Approval to apply to production                                                                                 |
-| 5   | Production Auth settings                               | the push script's read-only diff: templates, subjects, OTP settings and the notice flags; plus hook, password requirements, `secure_password_change`, `jwt_expiry` and `site_url` | Approval and the owner's `.env.remote` token                                                                    |
-| 6   | Release PR                                             | every GitHub check green on the `dev` to `main` PR                                                                                                                                | Approval to push `dev` and open the PR                                                                          |
+- **Invitation routes gate a Gridmaster.** Invitation create, edit (a role or
+  email change) and access replacement call `requireSensitiveActionAuth`
+  when the caller is a Gridmaster, before any write. `INVITATION_TIER_DENIED`
+  answers 403 with a clear message instead of a generic 500. Raising an
+  invitation's role records the editor as its inviter, so acceptance checks
+  the person who granted it.
+- **Gridmaster portal invites.** The Users tab's Add form offers User, Admin
+  and Super Admin. An existing account is assigned as today; an address with
+  no account gets an invitation email. Both run through step-up.
+- **Setup wizard.** The invitation step offers Super Admin. The server's
+  Super Admin grant in `createOrganizationSetup` requires fresh proof, and
+  the wizard saves through step-up (F-55).
+- **People screens.** The management editor offers Super Admin to a caller
+  who can grant it (a Super Admin or a Gridmaster), as the invite modal
+  already does. A Gridmaster's role changes and invitations from People run
+  through step-up (F-58).
+- **Smaller grant gaps (F-61).** Remove the unused browser-side
+  `assignOrgRoleByEmail` helper; a Gridmaster's permission-only change on the
+  access route requires fresh proof like a role change.
+- **Inventory.** The sensitive-action marker also matches `send_invitation`
+  and `replace_pending_invitation_access`; each newly matched route is
+  classified, and the inventory fails if a gate is removed.
 
-## Evidence already gathered
+## Out of scope
 
-- Unit and integration suites green at each 41 sub-item's completion (web and
-  mobile), including live local-Supabase tests for recovery assurance and
-  provider-session ending.
-- Render tests for every app-sent sign-in email and Supabase template.
-- `supabase status` parses the notification sections.
+- Direct database writes by a Gridmaster token (F-60) stay a decision.
+- Impersonation keeps showing the impersonated person's permissions, so the
+  invite modal offers Super Admin under impersonation only when that person
+  could grant it.
+- Mobile: it refuses Gridmaster tokens outright.
 
-## Blockers until approved
+## Build loop
 
-Each row above is a blocker for closing item 41. None of them is run by
-Continuous Mode: they push, send, reach production or reseed shared state.
+Each step is implemented, verified and self-reviewed on `dev`, then
+committed as a local checkpoint.
 
 ## Build steps
 
-- [x] **Step 0 - owner decisions** (delegated 2026-09-25) - F-08 (Supabase
-      MFA notices on, DubGrid's two-factor alert still emails), F-16 and F-17
-      (role grants and audit export require fresh proof), F-42 (the lock
-      effect keyed on having a session) and F-47 (the password rule requires
-      a letter and a number).
+- [ ] **Step 1 - invitation routes gate a Gridmaster** - create, edit and
+      replace-access require fresh proof for a Gridmaster; tier denial maps to
+      403; a role raise records the editor as inviter. _Done when:_ route tests
+      prove a stale Gridmaster session writes nothing on each path, a fresh
+      one succeeds, a non-Gridmaster admin is unaffected, and tier denial
+      returns 403.
+- [ ] **Step 2 - Gridmaster portal invites a Super Admin** - the manage
+      route's `assignOrgRoleByEmail` answers `404 ACCOUNT_NOT_FOUND` for an
+      address with no account; the Users tab's Add form offers Super Admin and
+      sends an invitation when there is no account, all through step-up.
+      _Done when:_ route and view tests cover assign, invite-on-no-account,
+      Super Admin, and the step-up path.
+- [ ] **Step 3 - setup wizard** - Super Admin in the invitation step; the
+      server's Super Admin grant gated; the wizard saves through step-up.
+      _Done when:_ route tests prove a stale session grants nothing and the
+      persistence runs its calls with the assured token.
+- [ ] **Step 4 - People screens** - the management editor offers Super Admin
+      to a caller who can grant it; a Gridmaster's People role changes and
+      invitations run through step-up. _Done when:_ view tests show the
+      option only for a Super Admin or Gridmaster and the step-up path.
+- [ ] **Step 5 - F-61 and the inventory** - dead helper removed, permission
+      changes gated for a Gridmaster, inventory marker extended and routes
+      classified. _Done when:_ the inventory test passes and fails if an
+      invitation route loses its gate.
 
-- [x] **Step 1 - browser rehearsal** (approved 2026-09-25) - ran as the
-      release PR's Playwright shards against CI's own stack. Run
-      [36191730677](https://github.com/nickosmas/dub-grid/actions/runs/36191730677)
-      on 49d44ea8 (#113's head): 12 of 12 Playwright jobs passed across
-      chromium, firefox and webkit, and the shards running dashboard-states and
-      role-variance report no retries. If #113's head moves before merge, the
-      new head's run is the one that counts.
+## Files / areas
 
-- [ ] **Step 2 - native rehearsal** (approved 2026-09-25; blocked) - the
-      simulator's dev build predates current native dependencies, only Xcode
-      27 is installed (Expo 54 needs Xcode 26), no Android device or emulator
-      is attached, and signing in needs the owner.
-- [ ] **Step 3 - email provider rehearsal** (approved 2026-09-25) - seven
-      app-sent emails (invitation, reissue, account deleted, impersonation
-      start and end, new sign-in and two-factor alerts) delivered through
-      Resend to `delivered@resend.dev`. Open: Supabase's own password,
-      email-change and MFA notices, which need production's flags pushed.
-- [x] **Step 4 - production migration 047** - applied 2026-09-25 19:17 UTC
-      by another session after a scratch rehearsal; the read-only inspector
-      reports 47 ledger entries, none missing, every invariant passing.
-      Latest backup before it: 2026-09-25 13:38:30 UTC (physical, completed).
-      Migration 048 (`user_known_devices`) followed from another session; the
-      inspector reads 48 entries, none missing, every invariant passing
-      (2026-09-26).
-- [ ] **Step 5 - production Auth settings** (read-only diff run
-      2026-09-26) - the push script finds three templates behind the repo
-      (email change, reauthentication, MFA factor enrolled: the 41c3 copy);
-      subjects, OTP settings and all four notice flags already match. The
-      hook, `jwt_expiry` (3600), refresh rotation and MFA match. Production
-      is weaker than `config.toml` on settings the script does not push:
-      minimum password length 6 (repo 10), no required characters (repo
-      `letters_digits`), `secure_password_change` off (repo on), and no
-      session timebox or inactivity limit (repo 24h and 8h). Templates
-      applied 2026-09-26 with the owner's approval (`--apply`, 3 fields); a
-      fresh diff reports production matches the repo. Password rules
-      (length 10, `letters_digits`) approved by the owner and applied by the
-      owner 2026-09-26 (the agent's write was refused by its permission
-      mode); read back as 10 and letters plus digits. `secure_password_change` stays off in production: Supabase refuses
-      the change on a session over 24 hours old without a nonce, which the
-      authenticator-code step-up would hit (F-62). Session limits: owner decided
-      (2026-09-26) mobile stays signed in until sign-out, so production keeps
-      none and `config.toml` drops its 24h and 8h; the web app's 30-minute
-      idle sign-out is unchanged.
+- `apps/web/src/app/api/organizations/invitations/create/route.ts`,
+  `apps/web/src/app/api/organizations/invitations/route.ts`,
+  `apps/web/src/app/api/gridmaster/organizations/manage/route.ts`,
+  `apps/web/src/app/api/organizations/access/route.ts` and their tests.
+- `apps/web/src/components/gridmaster/organization-detail/UsersTab.tsx`,
+  `apps/web/src/components/gridmaster/OrganizationSetupWizard.tsx`,
+  `apps/web/src/components/gridmaster/organization-setup/persistence.ts`.
+- `apps/web/src/components/staff/EmployeeManagementAccessModal.tsx`,
+  `MembersSection.tsx`, `staff-detail/StaffDetailPage.tsx`, `ProfilePanel.tsx`.
+- `apps/web/src/features/organization/client/access.ts`,
+  `apps/web/src/features/gridmaster/client/api.ts`, `apps/web/src/lib/db/`.
+- `apps/web/src/__tests__/sensitive-action-authorization-boundaries.test.ts`.
 
-- [x] **Step 6 - release PR green** (approved 2026-09-25) - `dev` pushed and
-      [#113](https://github.com/nickosmas/dub-grid/pull/113) opened, marked
-      not to merge until Step 5's apply lands. Its live-database run caught
-      048's new service-role table missing from the isolation inventory
-      (fixed in 739fa577), and a held-bootstrap deadlock in the e2e specs was
-      fixed by its owning session (49d44ea8). All 27 checks green on
-      49d44ea8. Merging needs its own yes.
+## Data / contracts
+
+- No schema change. Gated routes return the standard `STEP_UP_REQUIRED` 403.
+- `assignOrgRoleByEmail` on the manage route: `404 { code: "ACCOUNT_NOT_FOUND" }`
+  when the address has no account (Gridmaster only, so no disclosure beyond
+  what the portal already shows).
+- Client helpers that call a gated route take an optional `accessToken` and
+  throw errors carrying `status`, `code` and `method` so step-up recognizes
+  them.
+
+## Testing
+
+- Route tests per gated path, view tests for the Users tab, the wizard's
+  persistence and the management editor, and the inventory test.
 
 ## Notes for the AI
 
-- Never handle token values; the owner places them in `.env.remote`.
-- Production changes follow the runbook; never `--auto` merge.
+- Follow the F-16 pattern: the session check, then `requireSensitiveActionAuth`
+  only for a Gridmaster; the client runs `requireCredentialAssurance` inside
+  `stepUp.run` and passes the assured token.
+- Confirmations hide while the step-up dialog shows.
 - No em dashes.
