@@ -1,8 +1,7 @@
 # Feature: Manager person detail completeness
 
 **From build-plan:** feature 43a
-**Status:** in progress - parked while 41d7 is built; Step 1's code is
-uncommitted in a local worktree and lands with Step 2 onwards
+**Status:** verified
 
 ## Goal
 
@@ -68,14 +67,14 @@ as a local checkpoint.
       person gets null and a view-only caller gets null for someone else; the
       list helper keeps a row's date through a save response (the on-screen
       check moves to Step 3, where the date first renders).
-- [ ] **Step 2 - account state helper** - a pure function in `lib/` takes the
+- [x] **Step 2 - account state helper** - a pure function in `lib/` takes the
       employee's `userId` and `email`, their invitations and the current time,
       and returns linked, pending (email, sent, expires), expired (email,
       sent, expired), not invited, or no email. Accepted and revoked
       invitations never count; the newest open invitation wins. _Done when:_
       unit tests cover each state, an invitation crossing its expiry, and a
       revoked invitation beside an expired one.
-- [ ] **Step 3 - Record card on Profile** - the card shows date added, date
+- [x] **Step 3 - Record card on Profile** - the card shows date added, date
       joined, status (label, since, note), account state from Step 2, and last
       active from the directory (the row is omitted when the directory carries
       no value). The page derives invitation state on a one-minute tick. The
@@ -83,15 +82,20 @@ as a local checkpoint.
       line. _Done when:_ page tests show each field for a linked person, "Not
       joined" and "Not invited" for an unlinked one, and "No email" when there
       is no address; a save keeps the date joined on screen; the Overview test
-      no longer expects the moved fields.
-- [ ] **Step 4 - invitation dates and expired invitations** - the pending
+      no longer expects the moved fields. _Built:_ the Overview tab is shared
+      with the signed-in person's own `/profile`, so that page shows the same
+      Record card (account linked, no last active), keeping the date added and
+      status it showed before; a joined date that was not loaded is left out
+      rather than read as "Not joined".
+- [x] **Step 4 - invitation dates and expired invitations** - the pending
       banner shows sent and expiry dates; an expired open invitation shows an
       expired banner with Reinvite and Revoke to staff managers, and hides
       "Send invitation" while it exists. _Done when:_ view tests show both
       banners' dates, Reinvite on an expired invitation calls resend with its
       id, and no "Send invitation" button renders beside an expired
-      invitation.
-- [ ] **Step 5 - management departments for staff managers** - the card
+      invitation. _Built:_ the banner is shared, so the People slide-over and the
+      edit panel show the dates too.
+- [x] **Step 5 - management departments for staff managers** - the card
       renders for a caller with manage-employees when the person is a
       management user or has a pending management invitation; Edit access
       renders only for Super Admins and Gridmasters. _Done when:_ page tests
@@ -115,8 +119,8 @@ as a local checkpoint.
   detail viewers; `Employee.joinedAt` already exists. View-only responses keep
   `joinedAt: null` except on the caller's own row.
 - Account state (load-bearing for 43b's organization cards, which can reuse
-  it): `{ kind: "linked" } | { kind: "pending" | "expired"; email; sentAt;
-expiresAt } | { kind: "not-invited" } | { kind: "no-email" }`.
+  it): `{ kind: "linked" } | { kind: "pending" | "expired"; invitationId; email;
+sentAt; expiresAt } | { kind: "not-invited" } | { kind: "no-email" }`.
 
 ## Testing
 

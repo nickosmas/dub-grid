@@ -342,7 +342,7 @@ describe("StaffDetailPage", () => {
     render(<StaffDetailPage employeeId="emp-1" />);
 
     expect(await screen.findByText("Work details")).toBeInTheDocument();
-    expect(screen.queryByText("Account")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Account" })).not.toBeInTheDocument();
     expect(screen.queryByText("My work")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute(
       "href",
@@ -386,7 +386,8 @@ describe("StaffDetailPage", () => {
 
     expect(screen.queryByRole("button", { name: "Actions" })).not.toBeInTheDocument();
     expect(screen.getByText("Edit details form")).toBeInTheDocument();
-    expect(screen.getByText("Invitation pending")).toBeInTheDocument();
+    // Once in the banner, once as the Record card's account state.
+    expect(screen.getAllByText("Invitation pending")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Reinvite" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Deactivate" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit profile" })).not.toBeInTheDocument();

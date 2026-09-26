@@ -8,20 +8,10 @@ import type {
   ShiftCategory,
   NamedItem,
   FocusArea,
-  Invitation,
 } from "@/types";
 import type { EmployeeHours } from "@/lib/dashboard-stats";
 import { useTheme } from "next-themes";
-import {
-  AlertTriangle,
-  BriefcaseBusiness,
-  CalendarDays,
-  Clock,
-  Layers,
-  Shield,
-  TrendingUp,
-  User,
-} from "lucide-react";
+import { AlertTriangle, CalendarDays, Clock, Layers, TrendingUp, User } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { toDarkPillColors } from "@/lib/colors";
@@ -47,7 +37,6 @@ interface OverviewTabProps {
   focusAreaLabel?: string;
   certifications: NamedItem[];
   orgRoles: NamedItem[];
-  pendingInvite: Invitation | null;
   thisWeekHours: EmployeeHours | null;
   scheduleOverview?: ReactNode;
   timeZone?: string | null;
@@ -62,7 +51,6 @@ export function OverviewTab({
   focusAreaLabel = "Focus Areas",
   certifications,
   orgRoles,
-  pendingInvite,
   thisWeekHours,
   scheduleOverview,
   timeZone,
@@ -126,15 +114,6 @@ export function OverviewTab({
     ? certifications.find((item) => item.id === employee.certificationId)?.name
     : null;
   const employmentLabel = employee.employmentType === "part_time" ? "Part-time" : "Full-time";
-  // When the staff record was created. The People table's "Date joined" is a
-  // different fact: when they accepted their invitation.
-  const dateAdded = employee.createdAt
-    ? new Date(employee.createdAt).toLocaleDateString(undefined, {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      })
-    : null;
   const assignedFocusAreaNames = employee.focusAreaIds
     .map((id) => focusAreas.find((item) => item.id === id)?.name)
     .filter(Boolean) as string[];
@@ -147,35 +126,6 @@ export function OverviewTab({
     !!certificationName ||
     roleNames.length > 0 ||
     !!employee.contactNotes;
-
-  const accountSummary = employee.userId
-    ? {
-        label: "Linked account",
-        detail: "Can sign in to DubGrid",
-        dotColor: "var(--dg-color-success)",
-      }
-    : pendingInvite
-      ? {
-          label: "Invitation pending",
-          detail: `Sent to ${pendingInvite.email}`,
-          dotColor: "var(--dg-color-warning)",
-        }
-      : { label: "No account", detail: "Not invited yet", dotColor: "var(--dg-color-text-faint)" };
-
-  const employmentSummary = {
-    label: employee.status.charAt(0).toUpperCase() + employee.status.slice(1),
-    detail: employee.statusChangedAt
-      ? `Since ${new Date(employee.statusChangedAt).toLocaleDateString()}`
-      : employee.status === "active"
-        ? "No recent status change recorded"
-        : "Status change date unavailable",
-    dotColor:
-      employee.status === "active"
-        ? "var(--dg-color-success)"
-        : employee.status === "inactive"
-          ? "var(--dg-color-warning)"
-          : "var(--dg-color-danger)",
-  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -214,24 +164,6 @@ export function OverviewTab({
 
       {scheduleOverview}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <StatusCard
-          title="Account"
-          label={accountSummary.label}
-          detail={accountSummary.detail}
-          icon={<Shield className="h-4 w-4 text-[var(--dg-color-text-muted)]" />}
-          dotColor={accountSummary.dotColor}
-        />
-        <StatusCard
-          title="Employment"
-          label={employmentSummary.label}
-          detail={employmentSummary.detail}
-          note={employee.statusNote || undefined}
-          icon={<BriefcaseBusiness className="h-4 w-4 text-[var(--dg-color-text-muted)]" />}
-          dotColor={employmentSummary.dotColor}
-        />
-      </div>
-
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {hasDetails && (
           <div className="dg-card">
@@ -254,14 +186,6 @@ export function OverviewTab({
                     {employmentLabel}
                   </dd>
                 </div>
-                {dateAdded && (
-                  <div>
-                    <dt className="dg-type-field-title mb-0.5">Date added</dt>
-                    <dd className="dg-tabular-nums text-[13px] text-[var(--dg-color-text-primary)]">
-                      {dateAdded}
-                    </dd>
-                  </div>
-                )}
                 {assignedFocusAreaNames.length > 0 && (
                   <div>
                     <dt className="dg-type-field-title mb-0.5">{focusAreaLabel}</dt>
@@ -429,48 +353,5 @@ function MetricCard({
         </div>
       </CardContent>
     </Card>
-  );
-}
-
-function StatusCard({
-  title,
-  label,
-  detail,
-  note,
-  icon,
-  dotColor,
-}: {
-  title: string;
-  label: string;
-  detail: string;
-  note?: string;
-  icon: ReactNode;
-  dotColor: string;
-}) {
-  return (
-    <div className="dg-card">
-      <div className="dg-card-header">
-        <div>
-          <div className="dg-card-title flex items-center gap-2">
-            {icon}
-            {title}
-          </div>
-        </div>
-      </div>
-      <div className="dg-card-body">
-        <div className="flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full" style={{ background: dotColor }} />
-          <div className="text-[15px] font-semibold text-[var(--dg-color-text-primary)]">
-            {label}
-          </div>
-        </div>
-        <div className="mt-1 text-[13px] text-[var(--dg-color-text-muted)]">{detail}</div>
-        {note ? (
-          <div className="mt-3 rounded-lg bg-[var(--dg-color-bg)] px-3 py-2 text-[12px] italic text-[var(--dg-color-text-muted)]">
-            {note}
-          </div>
-        ) : null}
-      </div>
-    </div>
   );
 }

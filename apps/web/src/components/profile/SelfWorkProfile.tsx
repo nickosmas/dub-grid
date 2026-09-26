@@ -4,6 +4,7 @@ import { useMemo } from "react";
 
 import { CalendarSubscriptionCard } from "@/components/profile/CalendarSubscriptionCard";
 import { RecurringScheduleCard } from "@/components/staff-detail/RecurringScheduleCard";
+import { PersonRecordCard } from "@/components/staff-detail/PersonRecordCard";
 import { OverviewTab } from "@/components/staff-detail/tabs/OverviewTab";
 import { computeEmployeeWeeklyHours } from "@/lib/dashboard-stats";
 import {
@@ -75,30 +76,32 @@ export function SelfWorkOverview({
   }, [assignmentById, categoryById, employee.id, overviewRange, shifts]);
 
   return (
-    <OverviewTab
-      employee={employee}
-      shifts={shifts}
-      assignmentById={assignmentById}
-      categoryById={categoryById}
-      focusAreas={focusAreas}
-      focusAreaLabel={focusAreaLabel}
-      certifications={certifications}
-      orgRoles={orgRoles}
-      pendingInvite={null}
-      thisWeekHours={thisWeekHours}
-      timeZone={timeZone}
-      scheduleOverview={
-        <div className="flex flex-col gap-4">
-          <CalendarSubscriptionCard />
-          <RecurringScheduleCard
-            recurringShifts={recurringShifts}
-            assignments={assignments}
-            absenceTypes={absenceTypes}
-            shiftCategories={shiftCategories}
-            jobs={jobs}
-          />
-        </div>
-      }
-    />
+    <div className="flex flex-col gap-4">
+      <OverviewTab
+        employee={employee}
+        shifts={shifts}
+        assignmentById={assignmentById}
+        categoryById={categoryById}
+        focusAreas={focusAreas}
+        focusAreaLabel={focusAreaLabel}
+        certifications={certifications}
+        orgRoles={orgRoles}
+        thisWeekHours={thisWeekHours}
+        timeZone={timeZone}
+        scheduleOverview={
+          <div className="flex flex-col gap-4">
+            <CalendarSubscriptionCard />
+            <RecurringScheduleCard
+              recurringShifts={recurringShifts}
+              assignments={assignments}
+              absenceTypes={absenceTypes}
+              shiftCategories={shiftCategories}
+              jobs={jobs}
+            />
+          </div>
+        }
+      />
+      <PersonRecordCard employee={employee} accountState={{ kind: "linked" }} />
+    </div>
   );
 }

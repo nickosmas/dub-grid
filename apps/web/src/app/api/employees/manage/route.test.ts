@@ -14,6 +14,8 @@ const requireSensitiveActionAuth = vi.fn();
 const updateUserById = vi.fn();
 const followUpLinkedLoginEmailChange = vi.fn();
 const employeeUpdatePayloads: unknown[] = [];
+const membershipReads: Array<Array<[string, unknown]>> = [];
+let membershipJoinedAt: string | null = null;
 
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
@@ -75,7 +77,30 @@ function makeServiceClient() {
   chain.maybeSingle = vi.fn(() =>
     Promise.resolve({ data: { id: EMPLOYEE_ID, user_id: PERSON_USER_ID }, error: null }),
   );
-  return { from: vi.fn(() => chain), auth: { admin: { updateUserById } } };
+  return {
+    from: vi.fn((table: string) =>
+      table === "organization_memberships" ? makeMembershipChain() : chain,
+    ),
+    auth: { admin: { updateUserById } },
+  };
+}
+
+function makeMembershipChain() {
+  const filters: Array<[string, unknown]> = [];
+  membershipReads.push(filters);
+  const chain: Record<string, unknown> = {};
+  chain.select = vi.fn(() => chain);
+  chain.eq = vi.fn((column: string, value: unknown) => {
+    filters.push([column, value]);
+    return chain;
+  });
+  chain.maybeSingle = vi.fn(() =>
+    Promise.resolve({
+      data: membershipJoinedAt ? { joined_at: membershipJoinedAt } : null,
+      error: null,
+    }),
+  );
+  return chain;
 }
 
 function makeEmployee(overrides: Record<string, unknown> = {}) {
@@ -162,6 +187,8 @@ describe("POST /api/employees/manage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     employeeUpdatePayloads.length = 0;
+    membershipReads.length = 0;
+    membershipJoinedAt = null;
     validateCsrfOrigin.mockReturnValue(null);
     requireAuthenticatedUser.mockResolvedValue({ user: { id: VIEWER_USER_ID } });
     resolveEffectiveOrgId.mockResolvedValue(ORG_ID);
@@ -270,6 +297,45 @@ describe("POST /api/employees/manage", () => {
         phone: "555-0100",
         userId: VIEWER_USER_ID,
       });
+    });
+
+    it("dates a linked person by their membership in this organization", async () => {
+      mockAuth({ canViewEmployeeDetails: true });
+      membershipJoinedAt = "2026-03-05T14:00:00.000Z";
+
+      const response = await POST(fetchEmployeeByIdRequest());
+      const payload = await response.json();
+
+      expect(payload.employee.joinedAt).toBe("2026-03-05T14:00:00.000Z");
+      expect(membershipReads).toEqual([
+        [
+          ["org_id", ORG_ID],
+          ["user_id", PERSON_USER_ID],
+        ],
+      ]);
+    });
+
+    it("gives an unlinked person no joined date without reading memberships", async () => {
+      mockAuth({ canViewEmployeeDetails: true });
+      rowToEmployee.mockReturnValue(makeEmployee({ userId: null }));
+      membershipJoinedAt = "2026-03-05T14:00:00.000Z";
+
+      const payload = await (await POST(fetchEmployeeByIdRequest())).json();
+
+      expect(payload.employee.joinedAt).toBeNull();
+      expect(membershipReads).toEqual([]);
+    });
+
+    it("withholds a coworker's joined date from a view-only caller, but not their own", async () => {
+      membershipJoinedAt = "2026-03-05T14:00:00.000Z";
+      mockAuth({});
+      const coworker = await (await POST(fetchEmployeeByIdRequest())).json();
+      expect(coworker.employee.joinedAt).toBeNull();
+
+      mockAuth({});
+      rowToEmployee.mockReturnValue(makeEmployee({ userId: VIEWER_USER_ID }));
+      const own = await (await POST(fetchEmployeeByIdRequest())).json();
+      expect(own.employee.joinedAt).toBe("2026-03-05T14:00:00.000Z");
     });
 
     it("hands contact details to a viewer granted canViewEmployeeDetails", async () => {
