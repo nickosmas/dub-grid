@@ -77,9 +77,10 @@ Continuous Mode: they push, send, reach production or reseed shared state.
       session timebox or inactivity limit (repo 24h and 8h). Templates
       applied 2026-09-26 with the owner's approval (`--apply`, 3 fields); a
       fresh diff reports production matches the repo. Password rules
-      (length 10, `letters_digits`) approved by the owner, not yet applied:
-      the agent's write was refused by its permission mode, so the owner
-      sets them. Still open: `secure_password_change` (verify a
+      (length 10, `letters_digits`) approved by the owner and applied by the
+      owner 2026-09-26 (the agent's write was refused by its permission
+      mode); read back as 10 and letters plus digits. Still open:
+      `secure_password_change` (verify a
       real password change with it on first). Session limits: owner decided
       (2026-09-26) mobile stays signed in until sign-out, so production keeps
       none and `config.toml` drops its 24h and 8h; the web app's 30-minute
