@@ -79,9 +79,9 @@ Continuous Mode: they push, send, reach production or reseed shared state.
       fresh diff reports production matches the repo. Password rules
       (length 10, `letters_digits`) approved by the owner and applied by the
       owner 2026-09-26 (the agent's write was refused by its permission
-      mode); read back as 10 and letters plus digits. Still open:
-      `secure_password_change` (verify a
-      real password change with it on first). Session limits: owner decided
+      mode); read back as 10 and letters plus digits. `secure_password_change` stays off in production: Supabase refuses
+      the change on a session over 24 hours old without a nonce, which the
+      authenticator-code step-up would hit (F-62). Session limits: owner decided
       (2026-09-26) mobile stays signed in until sign-out, so production keeps
       none and `config.toml` drops its 24h and 8h; the web app's 30-minute
       idle sign-out is unchanged.
