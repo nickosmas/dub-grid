@@ -109,12 +109,17 @@ Continuous Mode: they push, send, reach production or reseed shared state.
 - [x] **Repair F-71** - `send_invitation` is server-only (migration 050);
       the setup wizard's route calls it as the service role. _Done when:_ the
       live function-grant check and the route test pass.
-- [ ] **Release note: migration 050 goes after the deploy** - production's
-      released setup wizard still calls `send_invitation` as the signed-in
-      user, so apply 050 by the runbook right after the release that carries
-      the service-role call deploys, not before (the usual order is
-      reversed; before it, a Gridmaster's setup invitation would fail soft
-      with a toast).
+- [x] **Release note: migration 050 goes after the deploy** - release PR
+      #115 merged 2026-09-26 10:34 UTC (`b6f1ff56`, all 27 checks green) and
+      deployed (health 200). Migration 050 then applied by the runbook with
+      the owner's approval: production at 049 with only 050 missing and every
+      invariant passing; the dry run proposed exactly 050; a scratch stack at
+      049 took it and re-inspected complete; latest backup 2026-09-25
+      13:38:30 UTC. After the apply the inspector reads 50 entries, none
+      missing, health 200, the final dry run is up to date, and
+      `authenticated` can no longer execute `send_invitation` (the service
+      role still can). The nine reworded auth email templates were pushed the
+      same day (`--apply`, 9 fields), and a fresh diff matches the repo.
 - [x] **Repair F-68** - a Gridmaster's department-admin changes require fresh
       proof, with the prompt in the screens that make them.
 - [x] **Repair F-69** - the missing 41d4 view and route tests.
