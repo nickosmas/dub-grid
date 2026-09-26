@@ -15,16 +15,19 @@ const revokeOrganizationInvitationGuarded = vi.fn();
 
 const {
   EmployeeProfileConflictError,
+  EmployeeStatusConflictError,
   EmployeeContactConflictError,
   InvitationAccessConflictError,
 } = vi.hoisted(() => ({
   EmployeeProfileConflictError: class extends Error {},
+  EmployeeStatusConflictError: class extends Error {},
   EmployeeContactConflictError: class extends Error {},
   InvitationAccessConflictError: class extends Error {},
 }));
 
 vi.mock("@/features/employees/client", () => ({
   EmployeeProfileConflictError,
+  EmployeeStatusConflictError,
   EmployeeContactConflictError,
   activateEmployee: (...args: unknown[]) => activateEmployee(...args),
   deactivateEmployee: (...args: unknown[]) => deactivateEmployee(...args),
@@ -132,7 +135,7 @@ describe("PersonStaffActions", () => {
   });
 
   it("reloads and says so when the record changed elsewhere", async () => {
-    removeEmployee.mockRejectedValueOnce(new EmployeeProfileConflictError());
+    removeEmployee.mockRejectedValueOnce(new EmployeeStatusConflictError());
     const onChanged = vi.fn();
     render(<PersonStaffActions employee={staff()} onChanged={onChanged} />);
 

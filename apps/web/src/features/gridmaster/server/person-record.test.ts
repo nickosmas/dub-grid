@@ -18,10 +18,18 @@ function query(rows: Row[]) {
   let current = rows;
   let columns: string[] | null = null;
   const pick = (row: Row) =>
-    columns ? Object.fromEntries(columns.map((column) => [column, row[column]])) : row;
+    columns
+      ? Object.fromEntries(
+          columns.map((column) => {
+            // An embed such as `organizations!inner(workspace_kind)` reads its fixture key.
+            const key = column.split(/[!(]/)[0];
+            return [key, row[key]];
+          }),
+        )
+      : row;
   const builder = {
     select(list: string) {
-      columns = list.split(",").map((column) => column.trim());
+      columns = list.split(/,(?![^(]*\))/).map((column) => column.trim());
       return builder;
     },
     eq(column: string, value: unknown) {
@@ -90,6 +98,7 @@ function employee(overrides: Row): Row {
     created_by: ADMIN,
     updated_by: ADMIN,
     updated_at: "2026-02-01T00:00:00.000Z",
+    organizations: { workspace_kind: "real" },
     ...overrides,
   };
 }
@@ -270,14 +279,14 @@ const AUTH_USERS: Record<string, Row> = {
   [GRIDMASTER]: { id: GRIDMASTER, email: "gm@dubgrid.com" },
 };
 
-function fakeClient(tables = fixtures()) {
+function fakeClient(tables = fixtures(), authError: unknown = null) {
   return {
     from: (table: string) => query(tables[table] ?? []),
     auth: {
       admin: {
         getUserById: async (id: string) => ({
-          data: { user: AUTH_USERS[id] ?? null },
-          error: AUTH_USERS[id] ? null : { message: "User not found" },
+          data: { user: authError ? null : (AUTH_USERS[id] ?? null) },
+          error: authError ?? (AUTH_USERS[id] ? null : { message: "User not found", status: 404 }),
         }),
       },
     },
@@ -383,6 +392,12 @@ describe("buildPersonRecordForUser", () => {
     ).toBeNull();
   });
 
+  it("fails rather than reading an Auth outage as no account", async () => {
+    await expect(
+      buildPersonRecordForUser(fakeClient(fixtures(), { message: "timeout", status: 504 }), USER),
+    ).rejects.toMatchObject({ status: 504 });
+  });
+
   it("omits an ended impersonation", async () => {
     const tables = fixtures();
     tables.impersonation_sessions[0].ended_at = "2026-09-26T10:05:00.000Z";
@@ -407,6 +422,12 @@ describe("buildPersonRecordForStaff", () => {
   it("resolves a linked record to its account", async () => {
     const person = await buildPersonRecordForStaff(fakeClient(), STAFF_A);
     expect(person?.account?.userId).toBe(USER);
+  });
+
+  it("returns null for a Test Sandbox clone", async () => {
+    const tables = fixtures();
+    tables.employees[1].organizations = { workspace_kind: "sandbox" };
+    expect(await buildPersonRecordForStaff(fakeClient(tables), UNLINKED)).toBeNull();
   });
 
   it("returns null for an unknown record", async () => {

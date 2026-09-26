@@ -9,6 +9,7 @@ import {
   deactivateEmployee,
   EmployeeContactConflictError,
   EmployeeProfileConflictError,
+  EmployeeStatusConflictError,
   removeEmployee,
   updateEmployee,
 } from "@/features/employees/client";
@@ -72,7 +73,10 @@ export function PersonStaffActions({
   const linked = Boolean(employee.userId);
 
   function handleFailure(error: unknown, fallback: string) {
-    if (error instanceof EmployeeProfileConflictError) {
+    if (
+      error instanceof EmployeeProfileConflictError ||
+      error instanceof EmployeeStatusConflictError
+    ) {
       toast.error(CONFLICT_MESSAGE);
       onChanged();
       return;

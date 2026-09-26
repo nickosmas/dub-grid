@@ -3,11 +3,15 @@ import { describe, expect, it, vi } from "vitest";
 import { searchUnlinkedStaff, toSearchTerms } from "./staff-search";
 
 function fakeClient(rows: Record<string, unknown>[]) {
-  const calls = { is: [] as unknown[][], or: [] as string[], limit: 0 };
+  const calls = { is: [] as unknown[][], eq: [] as unknown[][], or: [] as string[], limit: 0 };
   const builder = {
     select: () => builder,
     is: (...args: unknown[]) => {
       calls.is.push(args);
+      return builder;
+    },
+    eq: (...args: unknown[]) => {
+      calls.eq.push(args);
       return builder;
     },
     or: (filter: string) => {
@@ -54,6 +58,7 @@ describe("searchUnlinkedStaff", () => {
     const results = await searchUnlinkedStaff(client, ["gra", "hop"]);
 
     expect(calls.is).toEqual([["user_id", null]]);
+    expect(calls.eq).toEqual([["organizations.workspace_kind", "real"]]);
     expect(calls.or).toEqual([
       "first_name.ilike.%gra%,last_name.ilike.%gra%,email.ilike.%gra%,phone.ilike.%gra%",
       "first_name.ilike.%hop%,last_name.ilike.%hop%,email.ilike.%hop%,phone.ilike.%hop%",

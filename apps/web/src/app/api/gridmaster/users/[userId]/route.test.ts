@@ -15,9 +15,11 @@ let profileRow: Record<string, unknown> | null;
 let staffRows: Record<string, unknown>[];
 let membershipRow: Record<string, unknown> | null;
 
-class LoginEmailConflictError extends Error {
-  readonly conflict = { code: "EMPLOYEE_CONTACT_CONFLICT", error: "taken", field: "email" };
-}
+const { LoginEmailConflictError } = vi.hoisted(() => ({
+  LoginEmailConflictError: class extends Error {
+    readonly conflict = { code: "EMPLOYEE_CONTACT_CONFLICT", error: "taken", field: "email" };
+  },
+}));
 
 vi.mock("@/lib/api-auth", () => ({
   requireGridmasterSession: (req: NextRequest) => requireGridmasterSession(req),
@@ -29,6 +31,9 @@ vi.mock("@/app/api/gridmaster/_lib/audit", () => ({
 }));
 vi.mock("@/features/gridmaster/server/person-record", () => ({
   buildPersonRecordForUser: (client: unknown, id: string) => buildRecord(client, id),
+  throwUnlessNotFound: (error: unknown) => {
+    if (error && (error as { status?: number }).status !== 404) throw error;
+  },
 }));
 vi.mock("@/features/employees/server/contact-conflicts", () => ({
   checkEmployeeEmailConflict: (...args: unknown[]) => checkEmployeeEmailConflict(...args),
@@ -240,6 +245,20 @@ describe("PATCH /api/gridmaster/users/[userId]", () => {
         },
       }),
     );
+  });
+
+  it("keeps a committed change when its audit write fails", async () => {
+    writeGridmasterAuditLog.mockRejectedValueOnce(new Error("audit down"));
+    const response = await patch({ action: "changeEmail", email: "augusta@example.com" });
+    expect(response.status).toBe(200);
+    expect(followUpLinkedLoginEmailChange).toHaveBeenCalled();
+  });
+
+  it("does not read an Auth outage as a missing account", async () => {
+    getUserById.mockResolvedValueOnce({ data: { user: null }, error: { status: 503 } });
+    const response = await patch({ action: "editName", firstName: "A", lastName: "B" });
+    expect(response.status).toBe(500);
+    expect(profileUpdate).not.toHaveBeenCalled();
   });
 
   it("names no organization in the notices when they have no membership", async () => {

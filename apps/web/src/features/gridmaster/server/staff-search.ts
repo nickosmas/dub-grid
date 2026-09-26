@@ -24,9 +24,11 @@ export async function searchUnlinkedStaff(
   let request = client
     .from("employees")
     .select(
-      "id, org_id, first_name, last_name, email, phone, status, archived_at, organizations(name)",
+      "id, org_id, first_name, last_name, email, phone, status, archived_at, organizations!inner(name, workspace_kind)",
     )
-    .is("user_id", null);
+    .is("user_id", null)
+    // A Test Sandbox clones staff without their accounts; those are not people.
+    .eq("organizations.workspace_kind", "real");
   for (const term of terms) {
     request = request.or(
       `first_name.ilike.%${term}%,last_name.ilike.%${term}%,email.ilike.%${term}%,phone.ilike.%${term}%`,

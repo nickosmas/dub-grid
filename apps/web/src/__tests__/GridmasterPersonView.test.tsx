@@ -229,7 +229,7 @@ describe("GridmasterPersonView", () => {
     expect(within(states).getByText("No platform role")).toBeInTheDocument();
     expect(within(states).getByText(/^Deactivated/)).toBeInTheDocument();
     expect(within(states).getByText(/^Deletion scheduled/)).toBeInTheDocument();
-    expect(within(states).getByText(/^Sign-in locked until/)).toBeInTheDocument();
+    expect(within(states).getByText("Sign-in locked")).toBeInTheDocument();
     expect(within(states).getByText("Being impersonated")).toBeInTheDocument();
     expect(screen.getByText(/by admin@example\.com/)).toBeInTheDocument();
   });

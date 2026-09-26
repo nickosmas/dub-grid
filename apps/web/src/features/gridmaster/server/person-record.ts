@@ -32,6 +32,13 @@ type EmployeeRow = DbEmployee & {
   updated_at: string | null;
 };
 
+/** A missing account is an answer; any other Auth failure is not "no account". */
+export function throwUnlessNotFound(error: unknown): void {
+  if (!error) return;
+  if ((error as { status?: number }).status === 404) return;
+  throw error;
+}
+
 function unwrap<T>(result: { data: T | null; error: unknown }): T {
   if (result.error) throw result.error;
   return result.data as T;
@@ -212,6 +219,7 @@ export async function buildPersonRecordForUser(
   ]);
   const profile = unwrap(profileRow) as Row | null;
   if (profile?.platform_role === "gridmaster") return null;
+  throwUnlessNotFound(authResult.error);
   const authUser = authResult.data?.user ?? null;
   if (!authUser && !profile) return null;
 
@@ -299,9 +307,14 @@ export async function buildPersonRecordForStaff(
   employeeId: string,
 ): Promise<GridmasterPersonRecord | null> {
   const row = unwrap(
-    await client.from("employees").select(EMPLOYEE_COLUMNS).eq("id", employeeId).maybeSingle(),
-  ) as EmployeeRow | null;
-  if (!row) return null;
+    await client
+      .from("employees")
+      .select(`${EMPLOYEE_COLUMNS}, organizations!inner(workspace_kind)`)
+      .eq("id", employeeId)
+      .maybeSingle(),
+  ) as (EmployeeRow & { organizations: { workspace_kind: string } | null }) | null;
+  // A Test Sandbox's staff are clones, not people.
+  if (!row || row.organizations?.workspace_kind !== "real") return null;
   if (row.user_id) return buildPersonRecordForUser(client, row.user_id);
 
   const staff = mapStaff(row);
