@@ -153,7 +153,7 @@ export function getGridmasterRealtimeInvalidationKeys(
         ...(orgId
           ? [queryKeys.gridmaster.orgUsers(orgId), queryKeys.gridmaster.orgHealth(orgId)]
           : []),
-        ...(userId ? [queryKeys.gridmaster.userMemberships(userId)] : []),
+        ...(userId ? [queryKeys.gridmaster.person("user", userId)] : []),
       ]);
     case "invitations":
       return uniqueKeys([
@@ -229,7 +229,7 @@ export function resolveGridmasterRealtimeOrgId(
 
 /** Resolves the affected user's id, for tables where invalidation targets a
  * per-user query (currently just `organization_memberships` →
- * `queryKeys.gridmaster.userMemberships(userId)`). */
+ * `queryKeys.gridmaster.person("user", userId)`). */
 export function resolveGridmasterRealtimeUserId(
   table: GridmasterRealtimeTable,
   payload: RealtimePayload,

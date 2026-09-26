@@ -80,13 +80,15 @@ throwaway worktree, then committed as a local checkpoint and pushed.
       is refused, a Gridmaster target is 404, secrets and IPs are absent from
       the response, archived memberships and accepted, revoked and expired
       invitations are present, and an unlinked record returns no account.
-- [ ] **Step 2 - the person view** - `components/gridmaster/person/` renders
-      the header and Account read-only; All Users opens it in place of the
-      slide-over, which is removed with its tests moved; Back returns to All
-      Users with its filters. Quick actions (impersonate, force logout,
-      password reset) move with their step-up. _Done when:_ a view test shows
-      each badge and Account field for a fixture record and the quick actions
-      run through step-up; the separation test reads the new file.
+- [x] **Step 2 - the person view** - `components/gridmaster/person/` renders
+      the header and Account; All Users opens it in place of the slide-over,
+      which is removed with the memberships route it alone used; Back returns
+      to All Users with its filters. Every account action moves with its
+      step-up: impersonate, force logout and password reset in the header,
+      deactivate or reactivate, terminate and reinstate on Account. _Done
+      when:_ a view test shows each badge and Account field for a fixture
+      record and the actions run through step-up; the separation test reads
+      the new file.
 - [ ] **Step 3 - organization cards** - one card per organization: membership
       (role, permissions, management departments, joined, onboarding, tours,
       schedule last viewed, archived and by whom), staff record (every field,
@@ -97,10 +99,9 @@ throwaway worktree, then committed as a local checkpoint and pushed.
 - [ ] **Step 4 - account actions** - `PATCH /api/gridmaster/users/[userId]`
       with `editName` and `changeEmail` (fresh proof, audit rows; the email
       change reuses `syncLinkedLoginEmail` and its follow-up); Account runs
-      them through step-up, and deactivate, terminate and reinstate move in.
-      _Done when:_ route tests cover a stale session, a conflicting email, a
-      Gridmaster target and each audit row; a view test shows a cancelled
-      step-up changes nothing.
+      them through step-up. _Done when:_ route tests cover a stale session, a
+      conflicting email, a Gridmaster target and each audit row; a view test
+      shows a cancelled step-up changes nothing.
 - [ ] **Step 5 - membership actions** - change role and edit permissions
       (the guarded access helpers and `PermissionsEditor`), remove membership.
       _Done when:_ view tests show each action calls its helper with the

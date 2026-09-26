@@ -82,7 +82,7 @@ describe("getGridmasterRealtimeInvalidationKeys", () => {
     ]);
   });
 
-  it("refreshes the affected user's membership drill-down when a userId is resolved", () => {
+  it("refreshes the affected person's record when a userId is resolved", () => {
     const userId = "22222222-2222-4222-8222-222222222222";
     expect(
       getGridmasterRealtimeInvalidationKeys("organization_memberships", orgId, userId),
@@ -93,7 +93,7 @@ describe("getGridmasterRealtimeInvalidationKeys", () => {
       queryKeys.gridmaster.orgHealth(null),
       queryKeys.gridmaster.orgUsers(orgId),
       queryKeys.gridmaster.orgHealth(orgId),
-      queryKeys.gridmaster.userMemberships(userId),
+      queryKeys.gridmaster.person("user", userId),
     ]);
   });
 

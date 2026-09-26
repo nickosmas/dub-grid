@@ -19,16 +19,20 @@ describe("Gridmaster AllUsersView account separation", () => {
     expect(source).toContain('u.platformRole === "gridmaster"');
   });
 
-  it("requires fresh proof before submitting force logout", () => {
+  it("requires fresh proof before any assured person action, force logout included", () => {
     const source = readFileSync(
-      resolve(resolveRepoRoot(), "apps/web/src/components/gridmaster/AllUsersView.tsx"),
+      resolve(
+        resolveRepoRoot(),
+        "apps/web/src/components/gridmaster/person/GridmasterPersonView.tsx",
+      ),
       "utf-8",
     );
 
     const assurance = source.indexOf("await requireCredentialAssurance(accessToken)");
-    const mutation = source.indexOf("await forceLogoutGridmasterUser(user.id, accessToken)");
+    const mutation = source.indexOf("await action(account.userId, accessToken)");
     expect(assurance).toBeGreaterThan(-1);
     expect(mutation).toBeGreaterThan(assurance);
+    expect(source).toContain("forceLogoutGridmasterUser(userId, accessToken)");
     expect(source).toContain("forceLogoutConfirm && !stepUp.dialog");
   });
 
@@ -36,7 +40,7 @@ describe("Gridmaster AllUsersView account separation", () => {
   // through step-up hides while the step-up dialog is showing.
   it.each([
     [
-      "AllUsersView",
+      "person/GridmasterPersonView",
       ["terminateConfirm", "reinstateConfirm", "forceLogoutConfirm", "resetConfirm"],
     ],
     [
