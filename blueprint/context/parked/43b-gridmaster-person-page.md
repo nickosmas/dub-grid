@@ -111,7 +111,7 @@ throwaway worktree, then committed as a local checkpoint and pushed.
       (with the record's version), invitation resend and revoke (guarded).
       _Done when:_ view tests cover each action, a version conflict shows the
       conflict message, and resend on an expired invitation passes its id.
-- [ ] **Step 7 - staff without an account** - `GET /api/gridmaster/staff?q=`
+- [x] **Step 7 - staff without an account** - `GET /api/gridmaster/staff?q=`
       searches unlinked staff across organizations by name, email or phone
       (two characters or more, 25 results); All Users gains the search and a
       result opens the person view. _Done when:_ route tests cover the

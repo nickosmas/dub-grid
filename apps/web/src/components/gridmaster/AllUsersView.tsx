@@ -17,6 +17,7 @@ import { fetchGridmasterUsers, type GridmasterPersonTarget } from "@/features/gr
 import { queryKeys } from "@/lib/query-keys";
 import { gmHeaderStyle, gmTableStyle, gmTdStyle } from "@/components/gridmaster/table-styles";
 import GridmasterPersonView from "@/components/gridmaster/person/GridmasterPersonView";
+import { StaffWithoutAccountSearch } from "@/components/gridmaster/person/StaffWithoutAccountSearch";
 import type { OrganizationDetailTab } from "@/components/gridmaster/OrganizationDetail";
 
 function RoleBadge({ role }: { role: string }) {
@@ -483,6 +484,11 @@ export default function AllUsersView({
           description="There are no matching users for these filters."
         />
       )}
+      <div className="mt-6">
+        <StaffWithoutAccountSearch
+          onOpen={(employeeId) => setOpenPerson({ kind: "staff", employeeId })}
+        />
+      </div>
     </>
   );
 }

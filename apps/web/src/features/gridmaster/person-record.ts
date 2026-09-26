@@ -108,3 +108,15 @@ export interface GridmasterPersonRecord {
   organizations: GridmasterPersonOrganization[];
   actors: Record<string, string>;
 }
+
+/** A staff record with no account, found by the cross-organization search. */
+export interface GridmasterStaffSearchResult {
+  employeeId: string;
+  orgId: string;
+  orgName: string;
+  name: string;
+  email: string;
+  phone: string;
+  status: string;
+  archivedAt: string | null;
+}

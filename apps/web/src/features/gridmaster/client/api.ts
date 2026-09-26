@@ -19,7 +19,7 @@ import type {
   PlatformUser,
 } from "@/types";
 import { formatClientErrorMessage } from "@/lib/client-facing";
-import type { GridmasterPersonRecord } from "../person-record";
+import type { GridmasterPersonRecord, GridmasterStaffSearchResult } from "../person-record";
 
 export interface GridmasterInvitationRecord {
   id: string;
@@ -286,6 +286,12 @@ function patchGridmasterPerson(
     },
     body: JSON.stringify(body),
   });
+}
+
+export function searchGridmasterStaff(
+  query: string,
+): Promise<{ staff: GridmasterStaffSearchResult[] }> {
+  return requestGridmasterJson(`/api/gridmaster/staff?q=${encodeURIComponent(query)}`);
 }
 
 export function updateGridmasterPersonName(
