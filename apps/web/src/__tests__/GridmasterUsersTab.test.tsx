@@ -9,8 +9,10 @@ const assignGridmasterOrgRoleByEmail = vi.fn();
 const createOrganizationInvitation = vi.fn();
 const updateOrganizationMembershipGuarded = vi.fn();
 
+let stepUpDialog: React.ReactNode = null;
+
 vi.mock("@/hooks/useStepUpAction", () => ({
-  useStepUpAction: () => ({ run: stepUpRun, dialog: null }),
+  useStepUpAction: () => ({ run: stepUpRun, dialog: stepUpDialog }),
 }));
 vi.mock("@/features/account/client", () => ({
   requireCredentialAssurance: (...args: unknown[]) => requireCredentialAssurance(...args),
@@ -222,5 +224,79 @@ describe("Gridmaster Users tab: permissions (41d4, F-61)", () => {
     await waitFor(() => expect(stepUpRun).toHaveBeenCalled());
     expect(updateOrganizationMembershipGuarded).not.toHaveBeenCalled();
     expect(toast.success).not.toHaveBeenCalled();
+  });
+});
+
+describe("Gridmaster Users tab: role change (41d3, F-16)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    stepUpDialog = null;
+    stepUpRun.mockImplementation(async (action: (token: string) => Promise<unknown>) => {
+      await action("fresh-token");
+      return true;
+    });
+    requireCredentialAssurance.mockResolvedValue({ success: true });
+    updateOrganizationMembershipGuarded.mockResolvedValue({});
+  });
+
+  const member = {
+    id: "user-2",
+    email: "member@example.com",
+    firstName: "Mo",
+    lastName: "Member",
+    orgRole: "user",
+    adminPermissions: null,
+    updatedAt: "2026-09-26T00:00:00.000Z",
+  } as unknown as React.ComponentProps<typeof UsersTab>["users"][number];
+
+  async function chooseAdminForMember() {
+    render(<UsersTab users={[member]} orgId={ORG_ID} onUsersChanged={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "User" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Admin" }));
+  }
+
+  it("changes the role with the assured token", async () => {
+    await chooseAdminForMember();
+    fireEvent.click(await screen.findByRole("button", { name: "Change role" }));
+
+    await waitFor(() =>
+      expect(updateOrganizationMembershipGuarded).toHaveBeenCalledWith(
+        {
+          orgId: ORG_ID,
+          userId: "user-2",
+          expectedUpdatedAt: "2026-09-26T00:00:00.000Z",
+          orgRole: "admin",
+          adminPermissions: null,
+        },
+        "fresh-token",
+      ),
+    );
+    expect(requireCredentialAssurance).toHaveBeenCalledWith("fresh-token");
+    expect(requireCredentialAssurance.mock.invocationCallOrder[0]).toBeLessThan(
+      updateOrganizationMembershipGuarded.mock.invocationCallOrder[0],
+    );
+    expect(toast.success).toHaveBeenCalledWith("Role updated");
+  });
+
+  it("changes nothing when step-up is cancelled, and clears the loading state", async () => {
+    stepUpRun.mockResolvedValue(false);
+
+    await chooseAdminForMember();
+    fireEvent.click(await screen.findByRole("button", { name: "Change role" }));
+
+    await waitFor(() => expect(stepUpRun).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Change role" })).toBeEnabled());
+    expect(updateOrganizationMembershipGuarded).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("hides the role confirmation while the step-up dialog shows", async () => {
+    stepUpDialog = <div role="dialog" aria-label="Confirm it's you" />;
+
+    await chooseAdminForMember();
+
+    expect(screen.getByRole("button", { name: "User" })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("dialog", { name: "Confirm it's you" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Change role" })).not.toBeInTheDocument();
   });
 });

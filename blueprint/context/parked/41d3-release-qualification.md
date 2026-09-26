@@ -54,6 +54,28 @@ Continuous Mode: they push, send, reach production or reseed shared state.
       simulator's dev build predates current native dependencies, only Xcode
       27 is installed (Expo 54 needs Xcode 26), no Android device or emulator
       is attached, and signing in needs the owner.
+      Android half passed (2026-09-26, Pixel 7 Pro emulator, Android 13,
+      dev build of d9ef2a26 against local web and Supabase, a throwaway Calm
+      Haven user). Presence retry: an injected 503 was retried about 4.9 s
+      later and answered 200 for the same session. Revocation holds: revoked
+      from the web, the phone got 401, signed out, and stayed signed out
+      after a force-stop and relaunch. Two-factor recovery: the emailed code
+      led to the authenticator step, a wrong code was refused, the right one
+      led to a new password (updated at aal2), and recovery signed out; the
+      new password and authenticator code then signed in to Home. Defect
+      found and fixed: the new password field showed plain text on Android
+      after the authenticator step, because React reused the number-pad
+      field and Android dropped the password flag; each stage is now keyed
+      (30bbebab, with a test) and a device re-check showed it masked.
+      Teardown without the 5 s stall, timed at host load 10 to 15 with
+      temporary logs in the rehearsal build only: server sign-out done at
+      +2.37 s, reset at +4.05 s, the login screen drawn at +3.57 s. Not
+      exercisable: disabling push at teardown, since the build has no
+      `google-services.json`. Notes: a login that outlives the app's 15 s
+      timeout leaves a server session the phone never receives (F-78); the
+      earlier emulator freeze and slow sign-outs were host load (up to 60),
+      not the app. The iOS half, including F-42's app-switcher cover, is
+      still to run.
 - [ ] **Step 3 - email provider rehearsal** (approved 2026-09-25) - seven
       app-sent emails (invitation, reissue, account deleted, impersonation
       start and end, new sign-in and two-factor alerts) delivered through
@@ -136,18 +158,27 @@ Continuous Mode: they push, send, reach production or reseed shared state.
       execute `caller_has_fresh_proof()`, and all five grant functions carry
       the guard.
 
-- [ ] **Release note from 41d6** - migration 054 goes to production by the
+- [x] **Release note from 41d6** - migration 054 goes to production by the
       runbook, after 051 to 053 (applied), before or after the release; its
       notifications bulk route change ships with the release, and until then
       a Gridmaster's inbox mark-read or archive changes nothing once their
       sign-in is over five minutes old, so apply 054 with or after that
       release. Needs the owner's approval.
 
-- [ ] **Release note from 41d7** - migration 055 goes to production by the
+- [x] **Release note from 41d7** - migration 055 goes to production by the
       runbook only after the release carrying the impersonation route's
       fresh-proof gate deploys (production's current route does not map the
       database refusal, so a stale Gridmaster's impersonation start would
       fail with a generic error until then). Needs the owner's approval.
+      Applied 2026-09-26 by the owner, after the release carrying both
+      (pull request 116, merge fb2ad5c0) deployed. Before: ledger at 053
+      with only 054 and 055 missing, every invariant passing, and the latest
+      backup 2026-09-26 13:40:45 UTC (physical, completed). A scratch
+      rehearsal from 053 applied both (ledger 53 to 55). After: 55 ledger
+      entries, none missing, health 200, a final dry run up to date;
+      read-only checks show restrictive policies on 36 tables,
+      `gridmaster_write_allowed()` executable by `authenticated`, and the
+      guard in `start_impersonation` and `force_logout_user`.
 
 ## Notes for the AI
 

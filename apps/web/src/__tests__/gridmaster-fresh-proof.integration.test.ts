@@ -51,7 +51,11 @@ let superAdmin: string;
 let regular: string;
 let calmHaven: string;
 
-const now = () => Math.floor(Date.now() / 1000);
+// The function measures age from `now()`, the transaction's start, so the
+// test does too: host time drifts past it by however long the migration and
+// earlier queries take, which under load turned 301 s into 300.
+let transactionStart = 0;
+const now = () => transactionStart;
 
 async function userId(email: string): Promise<string> {
   const { rows } = await db.query<{ id: string }>(`SELECT id FROM auth.users WHERE email = $1`, [
@@ -113,6 +117,10 @@ afterAll(async () => {
 describe.runIf(reachable)("fresh proof in the database (051, live DB)", () => {
   beforeEach(async () => {
     await db.query("BEGIN");
+    const { rows } = await db.query<{ at: string }>(
+      `SELECT floor(extract(epoch FROM now()))::bigint AS at`,
+    );
+    transactionStart = Number(rows[0]!.at);
     await db.query(MIGRATION);
   });
   afterEach(async () => {
@@ -121,8 +129,11 @@ describe.runIf(reachable)("fresh proof in the database (051, live DB)", () => {
 
   it("applies the routes' password rule", async () => {
     expect(await hasFreshProof({ sub: gridmaster, ...password(10) })).toBe(true);
-    expect(await hasFreshProof({ sub: gridmaster, ...password(299) })).toBe(true);
-    expect(await hasFreshProof({ sub: gridmaster, ...password(301) })).toBe(false);
+    // Ten seconds either side of the 300-second window: the proof is stamped
+    // on this clock and judged by the database's now() a round trip later,
+    // which a loaded suite stretched past one second.
+    expect(await hasFreshProof({ sub: gridmaster, ...password(290) })).toBe(true);
+    expect(await hasFreshProof({ sub: gridmaster, ...password(310) })).toBe(false);
     expect(await hasFreshProof({ sub: gridmaster, ...password(-20) })).toBe(true);
     expect(await hasFreshProof({ sub: gridmaster, ...password(-120) })).toBe(false);
     expect(await hasFreshProof({ sub: gridmaster, aal: "aal1" })).toBe(false);

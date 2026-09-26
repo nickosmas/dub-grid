@@ -30,6 +30,7 @@ import {
 } from "@/lib/auth/security-audit";
 import { endUserSession } from "@/lib/auth/revocation";
 import { hashSessionId } from "@/lib/auth/sign-in-completion";
+import { authCookiesForSession, type SessionCookie } from "@/lib/auth/session-cookies";
 
 export const dynamic = "force-dynamic";
 
@@ -448,6 +449,14 @@ export async function POST(req: NextRequest) {
     // login UI can show a friendly "account disabled" modal instead of the
     // generic invalid-credentials toast.
     if (isAccountDisabledMessage(error.message)) {
+      // The password was right; the hook refused the account (F-29). No
+      // session exists yet, so the attempt is recorded by the address hash.
+      await writeSecurityAuditEvent({
+        event: "security.auth.login",
+        outcome: "rejected",
+        reason: "account_disabled",
+        metadata: { targetHash: emailHash, surface: "web" },
+      });
       return NextResponse.json(
         {
           success: false,
@@ -500,6 +509,7 @@ export async function POST(req: NextRequest) {
   };
   let destination: string | null = null;
   let didSwitchOrg = false;
+  let sessionCookies: SessionCookie[] | null = null;
 
   // Email not yet confirmed: the client stops without ever calling
   // setBrowserSession, so orchestration (which assumes a fully-usable
@@ -550,9 +560,12 @@ export async function POST(req: NextRequest) {
     session = outcome.session;
     destination = outcome.destination;
     didSwitchOrg = outcome.didSwitchOrg;
+    sessionCookies = await timer.time("session_cookies", () => authCookiesForSession(req, session));
   }
 
-  // Return the session tokens so the client can set them
+  // The tokens still go to the client, which brings its auth client up to date
+  // with them; when the cookies are already set it does so without holding up
+  // the navigation.
   const res = NextResponse.json({
     success: true,
     session,
@@ -564,7 +577,11 @@ export async function POST(req: NextRequest) {
     mfa_required: mfaRequired,
     destination,
     didSwitchOrg,
+    sessionCookieSet: sessionCookies !== null,
   });
+  for (const cookie of sessionCookies ?? []) {
+    res.cookies.set(cookie.name, cookie.value, cookie.options);
+  }
   if (didSwitchOrg) {
     res.cookies.set(SANDBOX_COOKIE_NAME, "", { path: "/", maxAge: 0 });
   }

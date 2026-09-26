@@ -131,6 +131,23 @@ export async function setBrowserSession(input: {
   }
 }
 
+/**
+ * Brings the browser's auth client up to date with a session the login route
+ * has already written to the auth cookies. Not awaited before navigating: the
+ * cookies authenticate the next request, and ProtectedRoute holds the splash
+ * until the auth client's SIGNED_IN lands. If the auth client refuses the
+ * session, the browser signs out rather than keep cookies it will not use.
+ */
+export function syncBrowserSessionInBackground(input: {
+  access_token: string;
+  refresh_token: string;
+}): Promise<void> {
+  return settleWithRequestTimeout(setBrowserSession(input)).catch(() =>
+    // A sign-out that stalls has still cleared the browser's state.
+    signOutFromBrowser("local").catch(() => {}),
+  );
+}
+
 export async function refreshBrowserSession(): Promise<Session | null> {
   const { data, error } = await supabase.auth.refreshSession();
   if (error) {

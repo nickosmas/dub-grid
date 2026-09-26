@@ -65,12 +65,19 @@ export async function POST(req: NextRequest) {
   // Before the upsert, which fills in the platform this claim keys on. A
   // claimed row alerts at once, since a failed upsert's retry would find the
   // claim spent; a session with no row yet alerts only once its row lands.
-  const claim = await claimNewSignIn({
-    userId: auth.user.id,
-    supabaseSessionId,
-    platform: parsed.data.platform,
-    claims: auth.claims,
-  });
+  let claim: Awaited<ReturnType<typeof claimNewSignIn>>;
+  try {
+    claim = await claimNewSignIn({
+      userId: auth.user.id,
+      supabaseSessionId,
+      platform: parsed.data.platform,
+      claims: auth.claims,
+    });
+  } catch (error) {
+    // The client retries, so a failed detection delays the alert instead of losing it.
+    logger.error({ error }, "mobile new sign-in detection failed");
+    return json({ error: "We couldn't record this device. Try again." }, { status: 503 });
+  }
 
   const alertNewSignIn = () =>
     scheduleSecurityAlert(auth.user.id, {

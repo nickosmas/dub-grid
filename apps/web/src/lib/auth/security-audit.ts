@@ -23,7 +23,8 @@ export type SecurityEventReason =
   | "organization_unavailable"
   | "organization_access_denied"
   | "gridmaster_portal_required"
-  | "email_unconfirmed";
+  | "email_unconfirmed"
+  | "account_disabled";
 
 export type SecurityEventMetadata = {
   targetHash?: string;

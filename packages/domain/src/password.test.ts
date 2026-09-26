@@ -6,6 +6,7 @@ import {
   getPasswordStrengthHints,
   getPasswordStrengthLevel,
   isPasswordAcceptable,
+  passwordByteLength,
   passwordsMatch,
 } from "./password";
 
@@ -88,5 +89,32 @@ describe("passwordsMatch / getPasswordMismatchError", () => {
 
   it("clears once they agree", () => {
     expect(getPasswordMismatchError("Aaaaaaaa1!", "Aaaaaaaa1!")).toBeNull();
+  });
+});
+
+describe("the maximum Supabase accepts (F-57)", () => {
+  const base = "Abcdefgh1!";
+
+  it("accepts 72 bytes and refuses 73", () => {
+    expect(isPasswordAcceptable(base + "x".repeat(62))).toBe(true);
+    expect(isPasswordAcceptable(base + "x".repeat(63))).toBe(false);
+  });
+
+  it("counts UTF-8 bytes, as Supabase does, not characters", () => {
+    expect(passwordByteLength("é")).toBe(2);
+    expect(passwordByteLength("€")).toBe(3);
+    expect(passwordByteLength("😀")).toBe(4);
+    // 10 + 31 two-byte characters = 72 bytes, then one more crosses it.
+    expect(isPasswordAcceptable(base + "é".repeat(31))).toBe(true);
+    expect(isPasswordAcceptable(base + "é".repeat(31) + "x")).toBe(false);
+  });
+
+  it("names the limit only when it is broken", () => {
+    expect(getPasswordStrengthHints(base).map((hint) => hint.id)).not.toContain("maxLength");
+    expect(getPasswordStrengthHints(base + "x".repeat(63))).toContainEqual({
+      id: "maxLength",
+      label: "At most 72 characters, fewer with accents or emoji",
+      met: false,
+    });
   });
 });

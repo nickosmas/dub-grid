@@ -1,132 +1,155 @@
-# Feature: Manager person detail completeness
+# Fix: Web sign-in request waves and loading jitter
 
-**From build-plan:** feature 43a
-**Status:** spec - awaiting review
+**Type:** Fix
+**Status:** in progress
 
-## Goal
+## The problem
 
-A manager who opens a person on the People page sees every fact about them
-that they are allowed to see, on the Profile section that opens first. Today
-the date joined is missing from the page entirely (the single-person fetch
-never attaches it), the date added, status history and account state sit only
-on the Overview tab, last active is never shown, the invitation banner gives
-no dates, and an expired invitation reads as "Not invited yet" with no way to
-reinvite. Admins who manage employees also cannot see someone's management
-departments, which they already see in the Management list.
+Web sign-in in production is slow because the browser waits on one request
+after another, and each wait costs 0.4 to 1.1s for a user far from Oregon.
+Server work is small (database about 70ms, Redis about 5ms from `pdx1`). The
+same chain shows on screen as loading surfaces that mount more than once, a
+blank frame and late layout.
 
-## In scope
+Measured 2026-09-26 in production, ms from clicking Sign in:
 
-- **Date joined on the detail page.** The `fetchEmployeeById` action returns
-  `joinedAt` for detail viewers, read from that one person's membership.
-  View-only callers keep today's masking (their own row only). Saves, status
-  changes and conflict swap-ins on the page keep the known joined date, as the
-  People table already does.
-- **A Record card on Profile.** One card, below Work details, showing: date
-  added, date joined ("Not joined" when there is no account), status with the
-  date it last changed and its note, account state, and last active. The
-  Overview tab's Account and Employment status cards and its "Date added" line
-  move here rather than being duplicated.
-- **Account state from one helper.** Linked, invitation pending, invitation
-  expired, not invited, or no email, derived by one pure function that also
-  re-derives on a one-minute tick so an invitation that expires while the page
-  is open stops reading as pending.
-- **Invitation banner dates.** The pending banner shows when it was sent and
-  when it expires.
-- **Expired invitations.** An expired invitation that was neither accepted nor
-  revoked shows an expired banner with Reinvite (the resend route already
-  rotates an expired row) and Revoke, and "Send invitation" is hidden while it
-  exists, so one click never leaves two invitations.
-- **Management departments for staff managers.** The Management departments
-  card shows read-only to anyone with manage-employees; its Edit access button
-  stays with Super Admins and Gridmasters.
+| Wave | Organization sign-in (Super Admin, Calm Haven)           | Done | Gridmaster portal (no MFA)                | Done  |
+| ---- | -------------------------------------------------------- | ---- | ----------------------------------------- | ----- |
+| 1    | `POST /api/auth/login`                                   | 952  | `POST /api/auth/login`                    | 2603  |
+| 2    | browser `GET supabase /auth/v1/user` (from `setSession`) | 2071 | browser `GET /auth/v1/user`               | 4486  |
+| 3    | `/dashboard` RSC                                         | 3127 | `/dashboard` RSC                          | 6547  |
+| 4    | `/api/account/org-context`, alone                        | 3573 | chunks, then org-context and portal chunk | 7423  |
+| 5    | billing, employees, terms (trial-welcome after terms)    | 4201 | `/api/gridmaster/dashboard`               | 9345  |
+| 6    | dashboard and header data                                | 5281 | GridmasterDashboard chunk, then overview  | 11077 |
 
-## Out of scope
+On screen:
 
-- Mobile: the person screen and its contract are unchanged (decided
-  2026-09-26).
-- The Gridmaster person page and everything in 43b to 43e.
-- The Management list panel, which also hides Reinvite for an expired
-  invitation: noted, not changed here.
-- Date formatting stays the page's current locale formatting; no organization
-  time zone change.
+- **Organization:** the form's button spinner until 3.1s, "Loading your
+  workspace" until 3.6s, a blank screen until 4.2s, the shell with a layout
+  shift, then content at 5.3s.
+- **Gridmaster:** the button spinner until 6.7s, a blank screen until 9.5s, the
+  heading at 9.9s, then a 0.40 layout shift when the overview lands.
 
-## Build loop
+Causes, confirmed in code:
 
-Each step is implemented, verified and self-reviewed on `dev`, then committed
-as a local checkpoint.
+1. **`setSession` re-verifies tokens the server just issued.** auth-js
+   `_setSession` calls `_getUser` for any unexpired token
+   (`GoTrueClient.js:2820`). The navigation cannot start until it returns,
+   because the auth cookie is written only afterwards.
+2. **Dashboard data is chained.**
+   - `org-context` starts only once `/dashboard` mounts, and its own wave gates
+     `SetupGuard`.
+   - For Super Admins, employees waits on billing (`AppShell.tsx:37-43`).
+   - `DashboardView` waits on employees (`DashboardPageContent.tsx:83-85`).
+   - `TrialWelcomeModal` chains terms, then org data, then trial-welcome.
+3. **The loading surface is not one component.**
+   - "Signing you in" and "Loading your workspace" are separate instances.
+   - `OnboardingGate` returns a different tree per branch (`:80`, `:86-88`,
+     `:107`), so going from /login to /dashboard remounts the shell.
+   - `AppShell` renders no header until permissions, org data, employees and
+     (for Super Admins) billing load, then the header pushes content down.
+4. **Navigation links prefetch twice.** Schedule, People, Reports and Settings
+   RSC are each fetched twice during dashboard load, and the signed-in person's
+   own page three times. Each is a full server render.
+5. **Gridmaster extras.**
+   - The login route refreshes the session unconditionally (`route.ts:233`),
+     even when the token already carries `platform_role=gridmaster`.
+   - Gridmasters land on `/dashboard`, so the portal loads through
+     `DashboardPageContent` and extra lazy chunks rather than `/gridmaster`.
+   - `org-context` is fetched though a Gridmaster has no organization.
+   - The `dg_auth_transition` flag is never cleared on this path
+     (`OnboardingGate.tsx:243` clears it only for users with an organization).
+   - The overview does not reserve its space, which causes the 0.40 layout
+     shift.
+
+## The fix
+
+Remove waits from the critical path and give each sign-in one stable loading
+surface. Server authorization does not change.
+
+It must not break:
+
+- **Session and tenant boundaries:** the middleware's unverified-decode fallback
+  for non-Gridmasters, per-session organization isolation (`switch_org` stays
+  the authorization boundary) and session revocation.
+- **Navigation behavior:** the soft navigation after a same-organization
+  sign-in, and the hard navigation after an organization switch.
+- **Records and prompts:** the sign-in audit rows, the terms prompt and trial
+  activation.
+
+Out of scope, recorded as follow-ups:
+
+- the MFA paths (about 10 to 11 sequential waves after the code);
+- mobile sign-in (early navigation, duplicate `bootstrap` and
+  `session-presence`, sequential auth reads);
+- the 750 KB of JavaScript on `/login`;
+- the dark-mode flash on the subdomain;
+- the production security policy that blocks a background worker;
+- cold starts on rarely used Gridmaster functions (about 1s per route on first
+  hit).
 
 ## Build steps
 
-- [ ] **Step 1 - joined date reaches the detail page** - `fetchEmployeeById`
-      attaches `joinedAt` from the person's membership (one query by
-      `org_id` and `user_id`, null without a linked account) for detail
-      viewers; the view-only path is unchanged. Export the table's
-      known-joined-date merge from `hooks/employee-rows.ts` and use it wherever
-      the page replaces its employee after a save, status change or conflict.
-      _Done when:_ route tests show a detail viewer gets the date, an unlinked
-      person gets null and a view-only caller gets null for someone else; a
-      page test shows a save keeps the date on screen.
-- [ ] **Step 2 - account state helper** - a pure function in `lib/` takes the
-      employee's `userId` and `email`, their invitations and the current time,
-      and returns linked, pending (email, sent, expires), expired (email,
-      sent, expired), not invited, or no email. Accepted and revoked
-      invitations never count; the newest open invitation wins. _Done when:_
-      unit tests cover each state, an invitation crossing its expiry, and a
-      revoked invitation beside an expired one.
-- [ ] **Step 3 - Record card on Profile** - the card shows date added, date
-      joined, status (label, since, note), account state from Step 2, and last
-      active from the directory (the row is omitted when the directory carries
-      no value). The page derives invitation state on a one-minute tick. The
-      Overview tab drops its Account and Employment cards and its Date added
-      line. _Done when:_ page tests show each field for a linked person, "Not
-      joined" and "Not invited" for an unlinked one, and "No email" when there
-      is no address; the Overview test no longer expects the moved fields.
-- [ ] **Step 4 - invitation dates and expired invitations** - the pending
-      banner shows sent and expiry dates; an expired open invitation shows an
-      expired banner with Reinvite and Revoke to staff managers, and hides
-      "Send invitation" while it exists. _Done when:_ view tests show both
-      banners' dates, Reinvite on an expired invitation calls resend with its
-      id, and no "Send invitation" button renders beside an expired
-      invitation.
-- [ ] **Step 5 - management departments for staff managers** - the card
-      renders for a caller with manage-employees when the person is a
-      management user or has a pending management invitation; Edit access
-      renders only for Super Admins and Gridmasters. _Done when:_ page tests
-      show the card without Edit access for an Admin, with it for a Super
-      Admin, and no card for a caller without manage-employees.
+- [x] **Step 1 - the browser takes the server's session without re-fetching
+      the user.**
+  - Spike first, then pick one mechanism:
+    - the login route returns the full session with its user, and the
+      client stores it through the auth client and emits `SIGNED_IN`;
+    - or the login route writes the `@supabase/ssr` auth cookies on its
+      response and the client adopts them.
+  - Either way, the `/dashboard` request must carry the session cookie and
+    `AuthProvider` must see the user without another `/auth/v1/user`.
+  - Applies to the organization and Gridmaster forms, not the MFA paths.
+  - _Done when:_ a unit or route test shows the chosen path, a local
+    sign-in (organization and Gridmaster) makes no `/auth/v1/user` request
+    between the login response and the `/dashboard` request, and the
+    existing auth and per-session organization integration tests pass.
+- [ ] **Step 2 - dashboard data starts together.**
+  - Load org context with permissions and bootstrap as soon as the session
+    exists, or derive it from them.
+  - Employees and `DashboardView`'s queries no longer wait on billing,
+    org-context or employees when the organization id is already known from
+    the token.
+  - Terms comes from one source; trial-welcome starts alongside it.
+  - _Done when:_ tests show the queries are enabled from the token's
+    organization id, and a local sign-in shows them starting in one wave
+    after `/dashboard` commits.
+- [ ] **Step 3 - one loading surface, no blank frame.**
+  - One loading screen at a stable point in the tree, with a label that
+    never goes backwards.
+  - `OnboardingGate` keeps the same tree shape across its branches.
+  - The header area reserves its height while it loads.
+  - The auth-transition flag is cleared on every path that consumes it
+    (the Gridmaster portal and `/accept-terms`).
+  - _Done when:_ view tests show the loading screen is not remounted across
+    the gate's states and the flag is cleared on the Gridmaster path, and a
+    Playwright trace of local sign-in shows no empty-body frame between the
+    form and the dashboard.
+- [ ] **Step 4 - navigation prefetches once.**
+  - Find why the header's links prefetch twice (a header remount versus the
+    router cache) and make each route prefetch at most once per sign-in,
+    without dropping prefetch for later navigation.
+  - _Done when:_ a local sign-in's network log shows each navigation RSC
+    prefetch once.
+- [ ] **Step 5 - Gridmaster path.**
+  - The login route skips the refresh when the token already carries
+    `platform_role=gridmaster` (and keeps it when the claim is missing).
+  - Gridmasters land on `/gridmaster`.
+  - No `org-context` request for a Gridmaster.
+  - The portal's dashboard data and its lazy chunk load in parallel.
+  - The overview reserves its space.
+  - _Done when:_ route tests cover the refresh skip and the missing-claim
+    fallback, and a local Gridmaster sign-in reaches `/gridmaster` with no
+    `org-context` request.
 
-## Files / areas
+## Verify
 
-- `apps/web/src/app/api/employees/manage/route.ts` and `route.test.ts`.
-- `apps/web/src/hooks/employee-rows.ts` and its test.
-- `apps/web/src/lib/person-account-state.ts` (new) and its test.
-- `apps/web/src/components/staff-detail/StaffDetailPage.tsx` and its test.
-- `apps/web/src/components/staff-detail/tabs/OverviewTab.tsx` and
-  `apps/web/src/__tests__/OverviewTab.test.tsx`.
-- `apps/web/src/components/staff/PendingInvitationBanner.tsx`.
-
-## Data / contracts
-
-- No schema change and no new route.
-- `fetchEmployeeById` responses now carry `joinedAt` (string or null) for
-  detail viewers; `Employee.joinedAt` already exists. View-only responses keep
-  `joinedAt: null` except on the caller's own row.
-- Account state (load-bearing for 43b's organization cards, which can reuse
-  it): `{ kind: "linked" } | { kind: "pending" | "expired"; email; sentAt;
-expiresAt } | { kind: "not-invited" } | { kind: "no-email" }`.
-
-## Testing
-
-- Route tests for Step 1, unit tests for Step 2, and page or view tests for
-  Steps 3 to 5, following `StaffDetailPage.test.tsx`.
-- Final gate: `npm run type-check`, `npm run test:web`, `npm run lint`.
-
-## Notes for the AI
-
-- The directory already limits `lastSignInAt` to staff managers, Super Admins
-  and Gridmasters; the page must not widen that.
-- Organization terminology comes from settings; no hard-coded labels.
-- Confirmations are dialogs (the banner's existing Reinvite and Revoke
-  confirms stay).
-- Operational dates use `dg-tabular-nums`.
-- No em dashes.
+- **Tests:** `npm run type-check`, `npm run test:web`, `npm run lint`, plus the
+  auth e2e specs.
+- **Local:** run the sign-in on a local dev server and confirm the request
+  order for an organization sign-in, an organization-switch sign-in and a
+  Gridmaster sign-in.
+- **Production:** after release, repeat the browser-pane capture against the
+  table above. Success is the organization sign-in reaching content in four
+  waves or fewer, the Gridmaster portal in five or fewer, with no blank frame
+  and layout shift under 0.1.

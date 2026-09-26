@@ -38,6 +38,8 @@ const AUTHENTICATED_SCOPED_ROUTES: Record<string, string> = {
     "The authenticated user ID owns the account requests.",
   "apps/web/src/app/api/account/mfa-status/route.ts":
     "The authenticated user ID scopes the MFA status row.",
+  "apps/web/src/app/api/account/logout-cleanup/route.ts":
+    "Ends only the verified Gridmaster's own sessions through their own token; the service role writes the audit row.",
   "apps/web/src/app/api/notifications/bulk/route.ts":
     "The authenticated user ID and the verified token's organization scope the caller's own notifications.",
   "apps/web/src/app/api/account/permissions/route.ts":

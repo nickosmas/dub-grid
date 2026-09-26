@@ -34,7 +34,11 @@ export function PasswordStrengthHints({ password }: { password: string }) {
         {hints.map((hint) => (
           <View key={hint.id} style={styles.hintRow}>
             <View style={[styles.dot, hint.met && styles.dotMet]} />
-            <AppText tone={hint.met ? "secondary" : "subtle"} variant="caption">
+            <AppText
+              style={styles.hintText}
+              tone={hint.met ? "secondary" : "subtle"}
+              variant="caption"
+            >
               {hint.label}
             </AppText>
           </View>
@@ -65,6 +69,10 @@ const createStyles = (mobileColors: MobileColors) =>
       flexDirection: "row",
       alignItems: "center",
       gap: mobileSpace.sm,
+    },
+    // A long hint wraps within the card instead of sizing to the full row.
+    hintText: {
+      flexShrink: 1,
     },
     dot: {
       width: 6,

@@ -7,6 +7,8 @@ import { RequestTimeoutError } from "@/lib/fetch-with-timeout";
 
 const replace = vi.fn();
 const setBrowserSession = vi.fn();
+const syncBrowserSessionInBackground = vi.fn();
+let signedInUser: { id: string } | null = null;
 const toastError = vi.fn();
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace }) }));
@@ -17,6 +19,7 @@ let mockTheme: string | undefined;
 vi.mock("next-themes", () => ({
   useTheme: () => ({ theme: mockTheme, setTheme: vi.fn() }),
 }));
+vi.mock("@/components/AuthProvider", () => ({ useAuth: () => ({ user: signedInUser }) }));
 vi.mock("@/components/RouteGuards", () => ({
   PublicRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
@@ -25,6 +28,7 @@ vi.mock("@/features/account/client", () => ({
   refreshBrowserSession: vi.fn().mockResolvedValue(undefined),
   setBrowserSession: (...args: unknown[]) => setBrowserSession(...args),
   signOutFromBrowser: vi.fn().mockResolvedValue(undefined),
+  syncBrowserSessionInBackground: (...args: unknown[]) => syncBrowserSessionInBackground(...args),
 }));
 vi.mock("../shared", () => ({
   AccountDisabledModal: () => <div>Account disabled</div>,
@@ -112,6 +116,54 @@ describe("GridmasterLogin recovery", () => {
     });
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("provider detail")).not.toBeInTheDocument();
+  });
+});
+
+describe("GridmasterLogin with session cookies from the server", () => {
+  const SESSION = { access_token: "access", refresh_token: "refresh" };
+
+  function respondWithCookiesSet() {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          session: SESSION,
+          user: { id: "gridmaster-1" },
+          mfa_required: false,
+          destination: "/dashboard",
+          sessionCookieSet: true,
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+  }
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    replace.mockReset();
+    signedInUser = null;
+    setBrowserSession.mockReset().mockReturnValue(new Promise(() => {}));
+    syncBrowserSessionInBackground.mockReset().mockResolvedValue(undefined);
+  });
+
+  it("navigates without waiting for the browser's own session check", async () => {
+    respondWithCookiesSet();
+    render(<GridmasterLogin />);
+    submit();
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/dashboard"));
+    expect(syncBrowserSessionInBackground).toHaveBeenCalledExactlyOnceWith(SESSION);
+    expect(setBrowserSession).not.toHaveBeenCalled();
+  });
+
+  it("waits for the browser session when a different account is signed in here", async () => {
+    signedInUser = { id: "someone-else" };
+    respondWithCookiesSet();
+    render(<GridmasterLogin />);
+    submit();
+
+    await waitFor(() => expect(setBrowserSession).toHaveBeenCalledWith(SESSION));
+    expect(replace).not.toHaveBeenCalled();
+    expect(syncBrowserSessionInBackground).not.toHaveBeenCalled();
   });
 });
 

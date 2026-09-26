@@ -65,5 +65,18 @@ export function upsertEmployeeInList(employees: Employee[], employee: Employee):
     return [...employees, employee];
   }
 
-  return employees.map((current) => (current.id === employee.id ? employee : current));
+  return employees.map((current) =>
+    current.id === employee.id ? withKnownJoinedDate(current, employee) : current,
+  );
+}
+
+/**
+ * A single-employee response in place of the one it replaces. Those responses
+ * may carry no joined date, so it keeps the one it had while the account link
+ * is unchanged.
+ */
+export function withKnownJoinedDate(previous: Employee, next: Employee): Employee {
+  if (next.joinedAt !== undefined) return next;
+  const sameAccount = next.userId !== null && next.userId === previous.userId;
+  return { ...next, joinedAt: sameAccount ? (previous.joinedAt ?? null) : null };
 }
