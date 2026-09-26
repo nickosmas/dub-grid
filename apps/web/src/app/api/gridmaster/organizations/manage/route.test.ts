@@ -458,6 +458,9 @@ describe("POST /api/gridmaster/organizations/manage", () => {
       if (fn === "assign_org_role_by_email") {
         return { error: { code: "P0002", message: "no account" } };
       }
+      return { error: null };
+    });
+    serviceRpc.mockImplementation(async (fn: string) => {
       if (fn === "send_invitation") {
         return {
           data: {
@@ -480,6 +483,12 @@ describe("POST /api/gridmaster/organizations/manage", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.superAdmin).toEqual({ kind: "invited", displayName: "Ada Lovelace" });
+    // Only the service role may call it (050, F-71); the Gridmaster is the inviter.
+    expect(requestRpc).not.toHaveBeenCalledWith("send_invitation", expect.anything());
+    expect(serviceRpc).toHaveBeenCalledWith(
+      "send_invitation",
+      expect.objectContaining({ p_role: "super_admin", p_invited_by: expect.any(String) }),
+    );
     expect(JSON.stringify(body)).not.toContain("raw-invite-token");
     expect(sendPendingInvitationEmail).toHaveBeenCalledWith(
       expect.objectContaining({

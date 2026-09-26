@@ -106,6 +106,14 @@ Continuous Mode: they push, send, reach production or reseed shared state.
       every invariant passing and health 200; the final dry run is up to
       date; `authenticated` can no longer read the token or write the table.
 
+- [x] **Repair F-71** - `send_invitation` is server-only (migration 050);
+      the setup wizard's route calls it as the service role. _Done when:_ the
+      live function-grant check and the route test pass. Production needs 050
+      applied by the runbook.
+- [ ] **Repair F-68** - a Gridmaster's department-admin changes require fresh
+      proof, with the prompt in the screens that make them.
+- [ ] **Repair F-69** - the missing 41d4 view and route tests.
+
 ## Notes for the AI
 
 - Never handle token values; the owner places them in `.env.remote`.

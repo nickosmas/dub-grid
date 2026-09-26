@@ -53,7 +53,6 @@ const expectedAuthenticatedSecurityDefiners = [
   "remove_focus_area_from_employees",
   "resolve_shift_request",
   "respond_to_shift_request",
-  "send_invitation",
   "set_gridmaster_account_deactivated",
   "set_job_shift_overrides",
   "start_impersonation",
