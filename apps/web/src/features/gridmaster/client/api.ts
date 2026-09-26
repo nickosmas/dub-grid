@@ -19,7 +19,7 @@ import type {
   PlatformUser,
 } from "@/types";
 import { formatClientErrorMessage } from "@/lib/client-facing";
-import type { GridmasterPersonRecord } from "../person-record";
+import type { GridmasterPersonRecord, GridmasterStaffSearchResult } from "../person-record";
 
 export interface GridmasterInvitationRecord {
   id: string;
@@ -271,6 +271,43 @@ export function terminateGridmasterUser(
     },
     body: JSON.stringify({ reason }),
   });
+}
+
+function patchGridmasterPerson(
+  userId: string,
+  body: Record<string, unknown>,
+  accessToken?: string,
+): Promise<{ success: true }> {
+  return requestGridmasterJson(`/api/gridmaster/users/${encodeURIComponent(userId)}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+export function searchGridmasterStaff(
+  query: string,
+): Promise<{ staff: GridmasterStaffSearchResult[] }> {
+  return requestGridmasterJson(`/api/gridmaster/staff?q=${encodeURIComponent(query)}`);
+}
+
+export function updateGridmasterPersonName(
+  userId: string,
+  name: { firstName: string; lastName: string },
+  accessToken?: string,
+): Promise<{ success: true }> {
+  return patchGridmasterPerson(userId, { action: "editName", ...name }, accessToken);
+}
+
+export function changeGridmasterPersonEmail(
+  userId: string,
+  email: string,
+  accessToken?: string,
+): Promise<{ success: true }> {
+  return patchGridmasterPerson(userId, { action: "changeEmail", email }, accessToken);
 }
 
 export function reinstateGridmasterUser(

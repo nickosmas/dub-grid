@@ -108,7 +108,7 @@ export default function CustomSelect<T extends string | number>({
           gap: 8,
           width: "100%",
           height: height ?? "var(--dg-toolbar-h)",
-          background: disabled ? "var(--dg-color-bg)" : "var(--dg-color-surface)",
+          background: disabled ? "transparent" : "var(--dg-color-field)",
           border: "1px solid var(--dg-color-border)",
           borderRadius: "var(--dg-btn-radius)",
           padding: "0 10px 0 12px",

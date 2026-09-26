@@ -1,7 +1,7 @@
 # Fix: Web sign-in request waves and loading jitter
 
 **Type:** Fix
-**Status:** not started
+**Status:** in progress
 
 ## The problem
 
@@ -90,7 +90,7 @@ Out of scope, recorded as follow-ups:
 
 ## Build steps
 
-- [ ] **Step 1 - the browser takes the server's session without re-fetching
+- [x] **Step 1 - the browser takes the server's session without re-fetching
       the user.**
   - Spike first, then pick one mechanism:
     - the login route returns the full session with its user, and the
@@ -104,7 +104,7 @@ Out of scope, recorded as follow-ups:
     sign-in (organization and Gridmaster) makes no `/auth/v1/user` request
     between the login response and the `/dashboard` request, and the
     existing auth and per-session organization integration tests pass.
-- [ ] **Step 2 - dashboard data starts together.**
+- [x] **Step 2 - dashboard data starts together.**
   - Load org context with permissions and bootstrap as soon as the session
     exists, or derive it from them.
   - Employees and `DashboardView`'s queries no longer wait on billing,
@@ -114,7 +114,7 @@ Out of scope, recorded as follow-ups:
   - _Done when:_ tests show the queries are enabled from the token's
     organization id, and a local sign-in shows them starting in one wave
     after `/dashboard` commits.
-- [ ] **Step 3 - one loading surface, no blank frame.**
+- [x] **Step 3 - one loading surface, no blank frame.**
   - One loading screen at a stable point in the tree, with a label that
     never goes backwards.
   - `OnboardingGate` keeps the same tree shape across its branches.
@@ -131,7 +131,7 @@ Out of scope, recorded as follow-ups:
     without dropping prefetch for later navigation.
   - _Done when:_ a local sign-in's network log shows each navigation RSC
     prefetch once.
-- [ ] **Step 5 - Gridmaster path.**
+- [x] **Step 5 - Gridmaster path.**
   - The login route skips the refresh when the token already carries
     `platform_role=gridmaster` (and keeps it when the claim is missing).
   - Gridmasters land on `/gridmaster`.

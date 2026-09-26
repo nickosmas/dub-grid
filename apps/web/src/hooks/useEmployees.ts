@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   activateEmployee,
   deactivateEmployee,
@@ -49,6 +49,15 @@ export interface EmployeesData {
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
+/** Every employee of the organization; shared with the sign-in prefetch. */
+export function employeesQueryOptions(orgId: string) {
+  return queryOptions({
+    queryKey: queryKeys.employees.all(orgId),
+    queryFn: () => fetchEmployees(orgId, ["active", "inactive", "removed"]),
+    staleTime: 2 * 60_000, // 2 min — mutations invalidate immediately
+  });
+}
+
 export function useEmployees(orgId: string | null): EmployeesData {
   const queryClient = useQueryClient();
 
@@ -57,13 +66,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
   // hook's `employees.all` query and refetch automatically.
   useOrgRealtimeInvalidation({ orgId, queryClient });
 
-  // Fetch all employees via React Query
-  const employeesQuery = useQuery({
-    queryKey: queryKeys.employees.all(orgId!),
-    queryFn: () => fetchEmployees(orgId!, ["active", "inactive", "removed"]),
-    enabled: !!orgId,
-    staleTime: 2 * 60_000, // 2 min — mutations invalidate immediately
-  });
+  const employeesQuery = useQuery({ ...employeesQueryOptions(orgId!), enabled: !!orgId });
 
   // Single local state for optimistic updates. Synced from query data,
   // mutated optimistically by handlers, rolled back on error.

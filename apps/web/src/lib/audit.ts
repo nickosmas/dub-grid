@@ -40,6 +40,8 @@ export type AuditAction =
   | "user.deactivated"
   | "user.reactivated"
   | "user.force_logout"
+  | "user.name_changed"
+  | "user.email_changed"
   | "user.password_reset_sent"
   // Invitations
   | "invitation.sent"

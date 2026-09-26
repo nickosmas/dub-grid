@@ -7,7 +7,9 @@ import { decodeJwt } from "jose";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { PublicRoute } from "@/components/RouteGuards";
+import { useAuth } from "@/components/AuthProvider";
 import AuthTransitionScreen from "@/components/AuthTransitionScreen";
+import { primeSignInQueries } from "@/components/SignInPrefetch";
 import { Button } from "@/components/Button";
 import { ACCOUNT_DISABLED_CODE } from "@dubgrid/domain";
 import { withThemeParam } from "@/lib/theme-preference";
@@ -28,6 +30,7 @@ import {
   signOutFromBrowser,
   startBrowserTrial,
   switchBrowserOrganization,
+  syncBrowserSessionInBackground,
 } from "@/features/account/client";
 import { ORG_NOT_FOUND_PARAM } from "./constants";
 import {
@@ -90,6 +93,7 @@ export default function OrgLogin({
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { user: signedInUser } = useAuth();
   const [isHydrated, setIsHydrated] = useState(false);
   const submittingRef = useRef(false);
   const flowGenerationRef = useRef(0);
@@ -308,6 +312,7 @@ export default function OrgLogin({
     if (submittingRef.current) return;
     submittingRef.current = true;
     const generation = ++flowGenerationRef.current;
+    const priorUserId = signedInUser?.id ?? null;
     setLoading(true);
     setHandoffFailed(false);
     setGridmasterPortalRequired(false);
@@ -397,6 +402,24 @@ export default function OrgLogin({
           throw new Error("organization_session_mismatch");
         }
         beginOrganizationHandoff();
+      }
+
+      // The login route wrote the session cookies, so the navigation is already
+      // authenticated: a hard navigation loads a document that reads them, and
+      // a soft one syncs the auth client alongside the page load. Not when
+      // another account is signed in here, because ProtectedRoute would take
+      // that account's user as the arrival and render under it.
+      if (result.sessionCookieSet && (priorUserId === null || priorUserId === result.user.id)) {
+        if (result.didSwitchOrg) {
+          navigateToDashboard(result.destination, true);
+          return;
+        }
+        void syncBrowserSessionInBackground(result.session);
+        primeSignInQueries(queryClient, result.session.access_token);
+        void exitSandbox().catch(() => {});
+        markAuthTransition();
+        navigateToDashboard(result.destination, false);
+        return;
       }
 
       try {
@@ -545,8 +568,10 @@ export default function OrgLogin({
   const apexHref = parsed ? withThemeParam(`${apexOrigin}/`, theme) : `${apexOrigin}/`;
   const gridmasterPortalHref = `${protocol}//gridmaster.${baseDomain}${parsed?.port ?? ""}/login`;
 
+  // The same phase the next document opens on after the hard navigation, so
+  // the label never steps back.
   if (handoffActive) {
-    return <AuthTransitionScreen phase="workspace" />;
+    return <AuthTransitionScreen phase="signing-in" />;
   }
 
   if (mfaRequired) {

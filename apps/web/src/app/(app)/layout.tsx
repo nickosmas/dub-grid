@@ -6,6 +6,7 @@ import { NavigationGuardProvider } from "@/components/NavigationGuardProvider";
 import { TooltipProvider } from "@/components/ui/hint";
 import { TOOLTIP_DELAY_MS } from "@/lib/constants";
 import OnboardingGate from "@/components/onboarding/OnboardingGate";
+import SignInPrefetch from "@/components/SignInPrefetch";
 import PostHogProvider from "@/components/PostHogProvider";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import "../app-ui.css";
@@ -51,6 +52,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               no page content in it, and nothing could paint until the bundle
               had downloaded and hydrated. The gate now owns a tight boundary
               around only the part that reads them. */}
+          <SignInPrefetch />
           <OnboardingGate>
             <MobileSubNavProvider>
               <TooltipProvider delay={TOOLTIP_DELAY_MS}>

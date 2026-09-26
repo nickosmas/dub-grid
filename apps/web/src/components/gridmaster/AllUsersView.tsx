@@ -17,6 +17,8 @@ import { fetchGridmasterUsers, type GridmasterPersonTarget } from "@/features/gr
 import { queryKeys } from "@/lib/query-keys";
 import { gmHeaderStyle, gmTableStyle, gmTdStyle } from "@/components/gridmaster/table-styles";
 import GridmasterPersonView from "@/components/gridmaster/person/GridmasterPersonView";
+import { StaffWithoutAccountSearch } from "@/components/gridmaster/person/StaffWithoutAccountSearch";
+import type { OrganizationDetailTab } from "@/components/gridmaster/OrganizationDetail";
 
 function RoleBadge({ role }: { role: string }) {
   const { resolvedTheme } = useTheme();
@@ -94,7 +96,7 @@ export default function AllUsersView({
   onImpersonate,
 }: {
   organizations: Organization[];
-  onNavigateToOrg: (orgId: string) => void;
+  onNavigateToOrg: (orgId: string, tab?: OrganizationDetailTab) => void;
   onImpersonate: (userId: string, orgId?: string) => void;
 }) {
   const [search, setSearch] = useState("");
@@ -132,6 +134,7 @@ export default function AllUsersView({
         target={openPerson}
         onBack={() => setOpenPerson(null)}
         onImpersonate={onImpersonate}
+        onOpenOrganization={(orgId) => onNavigateToOrg(orgId, "employees")}
       />
     );
   }
@@ -198,7 +201,10 @@ export default function AllUsersView({
       )}
 
       {/* Toolbar */}
-      <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
+      <div
+        className="dg-field-raised"
+        style={{ display: "flex", alignItems: "center", marginBottom: 16 }}
+      >
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <span
             style={{
@@ -303,7 +309,6 @@ export default function AllUsersView({
                 paddingLeft: 32,
                 paddingRight: search ? 30 : 12,
                 fontSize: "var(--dg-fs-caption)",
-                background: "var(--dg-color-surface)",
                 border: "1px solid var(--dg-color-border-light)",
               }}
             />
@@ -481,6 +486,11 @@ export default function AllUsersView({
           description="There are no matching users for these filters."
         />
       )}
+      <div className="mt-6">
+        <StaffWithoutAccountSearch
+          onOpen={(employeeId) => setOpenPerson({ kind: "staff", employeeId })}
+        />
+      </div>
     </>
   );
 }

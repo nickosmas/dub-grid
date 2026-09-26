@@ -164,7 +164,7 @@ export default function AuditLogView({
         <h2 className="dg-type-page-title m-0">{title ?? "Audit log"}</h2>
       </div>
 
-      <div className="dg-activity-toolbar">
+      <div className="dg-activity-toolbar dg-field-raised">
         <PeriodNavigator
           unit={period.unit}
           label={period.label}

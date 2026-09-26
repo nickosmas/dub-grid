@@ -140,7 +140,7 @@ export default function ActivityLog({
 
   return (
     <div>
-      <div className="dg-activity-toolbar">
+      <div className="dg-activity-toolbar dg-field-raised">
         <PeriodNavigator
           unit={period.unit}
           label={period.label}

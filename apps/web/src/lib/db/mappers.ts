@@ -93,6 +93,26 @@ export function rowToDepartment(row: DbDepartment): Department {
   };
 }
 
+export type OrganizationTerminology = Pick<
+  Organization,
+  "focusAreaLabel" | "certificationLabel" | "roleLabel" | "departmentLabel"
+>;
+
+/** An organization's configurable labels, with the product defaults where it set none. */
+export function rowToOrganizationTerminology(
+  row: Pick<
+    DbOrganization,
+    "focus_area_label" | "certification_label" | "role_label" | "department_label"
+  >,
+): OrganizationTerminology {
+  return {
+    focusAreaLabel: row.focus_area_label ?? "Focus Areas",
+    certificationLabel: row.certification_label ?? "Certifications",
+    roleLabel: row.role_label ?? "Roles",
+    departmentLabel: row.department_label ?? "Scheduled Departments",
+  };
+}
+
 export function rowToOrganization(row: DbOrganization): Organization {
   const addressLine1 = row.address_line_1 || row.address || "";
   const addressLine2 = row.address_line_2 || "";
@@ -122,10 +142,7 @@ export function rowToOrganization(row: DbOrganization): Organization {
     addressCountry,
     phone: row.phone,
     employeeCount: row.employee_count,
-    focusAreaLabel: row.focus_area_label ?? "Focus Areas",
-    certificationLabel: row.certification_label ?? "Certifications",
-    roleLabel: row.role_label ?? "Roles",
-    departmentLabel: row.department_label ?? "Scheduled Departments",
+    ...rowToOrganizationTerminology(row),
     shiftDisplayMode: (row.shift_display_mode as ShiftDisplayMode) ?? "code",
     showShiftDetailHoverCards: row.show_shift_detail_hover_cards ?? true,
     useCompactRoleCertificationLabels: row.use_compact_role_certification_labels ?? false,

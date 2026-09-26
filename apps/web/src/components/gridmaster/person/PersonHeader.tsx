@@ -58,11 +58,20 @@ export function PersonHeader({
             </StatusPill>
           ) : null}
           {loginLock?.locked ? (
-            <StatusPill tone="danger" dot>
-              {loginLock.resetsAt
-                ? `Sign-in locked until ${formatMoment(loginLock.resetsAt)}`
-                : "Sign-in locked"}
-            </StatusPill>
+            // The sliding window can hold the lock past its reported reset.
+            <MaybeHint
+              content={
+                loginLock.resetsAt
+                  ? `Too many sign-in attempts. Clears no earlier than ${formatMoment(loginLock.resetsAt)}.`
+                  : "Too many sign-in attempts."
+              }
+            >
+              <span>
+                <StatusPill tone="danger" dot>
+                  Sign-in locked
+                </StatusPill>
+              </span>
+            </MaybeHint>
           ) : null}
           {liveImpersonation ? (
             <MaybeHint

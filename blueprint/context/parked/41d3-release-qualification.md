@@ -66,7 +66,7 @@ Continuous Mode: they push, send, reach production or reseed shared state.
       found and fixed: the new password field showed plain text on Android
       after the authenticator step, because React reused the number-pad
       field and Android dropped the password flag; each stage is now keyed
-      (30bbebab, with a test) and a device re-check showed it masked.
+      (439f1aac, with a test) and a device re-check showed it masked.
       Teardown without the 5 s stall, timed at host load 10 to 15 with
       temporary logs in the rehearsal build only: server sign-out done at
       +2.37 s, reset at +4.05 s, the login screen drawn at +3.57 s. Not
@@ -179,6 +179,15 @@ Continuous Mode: they push, send, reach production or reseed shared state.
       read-only checks show restrictive policies on 36 tables,
       `gridmaster_write_allowed()` executable by `authenticated`, and the
       guard in `start_impersonation` and `force_logout_user`.
+
+- [x] **Release note from the security findings cleanup** - migrations 056
+      (audit tables written by the server only) and 057 (impersonation
+      notice wording) applied 2026-09-26 by the owner, after release pull
+      request 117 (merge d64b31f1) deployed, following a scratch rehearsal
+      from 055. After: 57 ledger entries, none missing, health 200, a final
+      dry run up to date; `authenticated` can read but not write either
+      audit table, and both impersonation functions carry the new wording
+      with `start_impersonation`'s guard kept.
 
 ## Notes for the AI
 

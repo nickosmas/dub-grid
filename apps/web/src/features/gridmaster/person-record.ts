@@ -1,4 +1,5 @@
 import type { AdminPermissions } from "@dubgrid/domain";
+import type { OrganizationTerminology } from "@/lib/db/mappers";
 import type { Employee, Invitation, OrganizationRole } from "@/types";
 
 export interface GridmasterPersonAccount {
@@ -65,7 +66,7 @@ export interface GridmasterMembership {
   phone: string | null;
   onboardingCompletedAt: string | null;
   tooltipToursCompleted: Record<string, unknown>;
-  updatedAt: string | null;
+  updatedAt: string;
 }
 
 export type GridmasterStaffRecord = Employee & {
@@ -75,8 +76,18 @@ export type GridmasterStaffRecord = Employee & {
   updatedAt: string | null;
 };
 
+/** Names for the ids a membership or staff record carries, archived ones included. */
+export interface GridmasterOrganizationNames {
+  departments: Record<number, string>;
+  focusAreas: Record<number, string>;
+  roles: Record<number, string>;
+  certifications: Record<number, string>;
+}
+
 export interface GridmasterPersonOrganization {
   org: { id: string; name: string; slug: string | null };
+  terminology: OrganizationTerminology;
+  names: GridmasterOrganizationNames;
   membership: GridmasterMembership | null;
   employees: GridmasterStaffRecord[];
   invitations: Invitation[];
@@ -96,4 +107,16 @@ export interface GridmasterPersonRecord {
   loginLock: GridmasterLoginLock | null;
   organizations: GridmasterPersonOrganization[];
   actors: Record<string, string>;
+}
+
+/** A staff record with no account, found by the cross-organization search. */
+export interface GridmasterStaffSearchResult {
+  employeeId: string;
+  orgId: string;
+  orgName: string;
+  name: string;
+  email: string;
+  phone: string;
+  status: string;
+  archivedAt: string | null;
 }

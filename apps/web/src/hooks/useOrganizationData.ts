@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLatestRef } from "@/hooks/useLatestRef";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { getImpersonationFromCookie } from "@/lib/impersonation";
@@ -184,23 +184,27 @@ const INITIAL_CTX: OrgContext = {
  * Impersonation is different — its cookie *is* client-readable, so that case
  * short-circuits with no request at all, exactly as before.
  */
-function useOrgContext(): OrgContext {
-  // Read once on mount, like the effect this replaced. Entering or leaving
-  // impersonation clears the whole query cache and re-renders from scratch.
-  const [impersonation] = useState(() =>
-    typeof document === "undefined" ? null : getImpersonationFromCookie(document.cookie),
-  );
-
-  const query = useQuery({
+/** Shared with the sign-in prefetch so both read one cache entry. */
+export function orgContextQueryOptions() {
+  return queryOptions({
     queryKey: queryKeys.account.orgContext(),
     queryFn: fetchAccountOrgContext,
-    enabled: !impersonation,
     // Only a sandbox enter/exit, an impersonation change or an org switch moves
     // this, and each of those hard-reloads or clears the cache. Nothing is
     // gained by re-asking during a session.
     staleTime: Infinity,
     retry: 1,
   });
+}
+
+function useOrgContext(enabled: boolean): OrgContext {
+  // Read once on mount, like the effect this replaced. Entering or leaving
+  // impersonation clears the whole query cache and re-renders from scratch.
+  const [impersonation] = useState(() =>
+    typeof document === "undefined" ? null : getImpersonationFromCookie(document.cookie),
+  );
+
+  const query = useQuery({ ...orgContextQueryOptions(), enabled: enabled && !impersonation });
 
   return useMemo(() => {
     if (impersonation) {
@@ -228,10 +232,12 @@ function useOrgContext(): OrgContext {
 
 export function useOrganizationData(options?: UseOrganizationDataOptions): OrganizationData {
   const queryClient = useQueryClient();
-  const ctx = useOrgContext();
+  const enabled = options?.enabled ?? true;
+  // A disabled caller (the gate before it decides, a Gridmaster, a locked
+  // header) never reads the context, so it does not ask for it either.
+  const ctx = useOrgContext(enabled);
   const includeAssignmentDefinitionCompatibility =
     options?.includeAssignmentDefinitionCompatibility ?? true;
-  const enabled = options?.enabled ?? true;
   const bootstrapQueryKey = queryKeys.org.bootstrap();
 
   // Deliberately not gated on ctx.resolved. The request carries no org id —

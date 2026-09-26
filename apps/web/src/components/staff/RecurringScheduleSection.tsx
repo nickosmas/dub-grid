@@ -1013,6 +1013,7 @@ export function RecurringScheduleSection({
       </div>
 
       <div
+        className="dg-field-raised"
         style={{
           display: "flex",
           flexWrap: "wrap",
@@ -1053,7 +1054,7 @@ export function RecurringScheduleSection({
               fontSize: "var(--dg-fs-caption)",
               outline: "none",
               width: isMobile ? "100%" : 180,
-              background: "var(--dg-color-surface)",
+              background: "var(--dg-color-field)",
               fontFamily: "inherit",
               transition: "border-color 150ms ease",
             }}

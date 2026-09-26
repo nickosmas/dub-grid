@@ -1,7 +1,7 @@
 # Feature: Gridmaster person page: account and organizations
 
 **From build-plan:** feature 43b
-**Status:** in progress (built alongside the web sign-in fix, which holds
+**Status:** verified (built alongside the web sign-in fix, which held
 `current-feature.md` in another session)
 
 ## Goal
@@ -89,29 +89,29 @@ throwaway worktree, then committed as a local checkpoint and pushed.
       when:_ a view test shows each badge and Account field for a fixture
       record and the actions run through step-up; the separation test reads
       the new file.
-- [ ] **Step 3 - organization cards** - one card per organization: membership
+- [x] **Step 3 - organization cards** - one card per organization: membership
       (role, permissions, management departments, joined, onboarding, tours,
       schedule last viewed, archived and by whom), staff record (every field,
       created and updated by), invitation history (sent, expires, accepted,
       revoked, by whom, derived state), and a link to that organization's
       Employees tab. _Done when:_ a view test shows each field for a linked
       person in two organizations and for an unlinked record.
-- [ ] **Step 4 - account actions** - `PATCH /api/gridmaster/users/[userId]`
+- [x] **Step 4 - account actions** - `PATCH /api/gridmaster/users/[userId]`
       with `editName` and `changeEmail` (fresh proof, audit rows; the email
       change reuses `syncLinkedLoginEmail` and its follow-up); Account runs
       them through step-up. _Done when:_ route tests cover a stale session, a
       conflicting email, a Gridmaster target and each audit row; a view test
       shows a cancelled step-up changes nothing.
-- [ ] **Step 5 - membership actions** - change role and edit permissions
+- [x] **Step 5 - membership actions** - change role and edit permissions
       (the guarded access helpers and `PermissionsEditor`), remove membership.
       _Done when:_ view tests show each action calls its helper with the
       card's organization and refreshes the record, and a cancel changes
       nothing.
-- [ ] **Step 6 - staff and invitation actions** - staff status, record edits
+- [x] **Step 6 - staff and invitation actions** - staff status, record edits
       (with the record's version), invitation resend and revoke (guarded).
       _Done when:_ view tests cover each action, a version conflict shows the
       conflict message, and resend on an expired invitation passes its id.
-- [ ] **Step 7 - staff without an account** - `GET /api/gridmaster/staff?q=`
+- [x] **Step 7 - staff without an account** - `GET /api/gridmaster/staff?q=`
       searches unlinked staff across organizations by name, email or phone
       (two characters or more, 25 results); All Users gains the search and a
       result opens the person view. _Done when:_ route tests cover the
@@ -175,6 +175,8 @@ interface GridmasterPersonRecord {
   loginLock: null | { locked: boolean; resetsAt: string | null };
   organizations: {
     org: { id: string; name: string; slug: string | null };
+    terminology: OrganizationTerminology; // the organization's own labels
+    names: { departments; focusAreas; roles; certifications }; // id to name
     membership: GridmasterMembership | null; // every column, archived included
     employees: Employee[]; // every linked staff row there
     invitations: GridmasterInvitation[]; // every column except the token
@@ -199,3 +201,21 @@ Actor columns carry ids; the view resolves them through `actors`.
 - Organization terminology comes from each organization's settings.
 - Confirmations are dialogs; operational dates use `dg-tabular-nums`.
 - No em dashes.
+
+## Verification
+
+- Unit and route tests: the person record builder, the person, staff and
+  search routes (including a stale session, a Gridmaster target, both email
+  conflicts, an Auth outage and a failed audit write after a committed
+  change), and view tests for the person view, the membership, staff and
+  invitation actions, and opening a person from All Users and from the
+  search. All Gridmaster API and view tests pass (217 in the focused run);
+  type-check and lint are clean; `next build` passes.
+- Browser: signed in as the local QA Gridmaster on a worktree dev server,
+  opened a linked person (header, Account, one card per organization with
+  its own labels) and an unlinked staff record from the search; no console
+  errors.
+- Review: an independent pass found no access or secret leaks; its five
+  issues were fixed (status conflicts, Test Sandbox clones in the search,
+  Auth outages read as no account, audit failures after a committed change,
+  the lock time) and two follow-ups recorded as F-80 and F-81.

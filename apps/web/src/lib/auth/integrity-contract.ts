@@ -14,6 +14,9 @@ export type SupportedAuthAction = keyof typeof AUTH_ACTION_DESTINATIONS;
 
 export const POST_LOGIN_DESTINATION = "/dashboard";
 
+/** Where a Gridmaster's sign-in lands: the portal itself, not /dashboard's switch to it. */
+export const GRIDMASTER_POST_LOGIN_DESTINATION = "/gridmaster";
+
 const DESTINATION_BASE = "https://app.dubgrid.invalid";
 const CONTROL_CHARACTER = /[\u0000-\u001f\u007f-\u009f]/;
 

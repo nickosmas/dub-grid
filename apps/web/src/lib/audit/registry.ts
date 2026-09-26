@@ -662,6 +662,16 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     severity: "warning",
     headline: (d, ctx) => `Signed ${who(d, ctx, "a team member")} out of every device`,
   },
+  "user.name_changed": {
+    category: "access",
+    severity: "update",
+    headline: (d, ctx) => `Changed the account name of ${who(d, ctx, "an account")}`,
+  },
+  "user.email_changed": {
+    category: "access",
+    severity: "warning",
+    headline: (d, ctx) => `Changed the sign-in email of ${who(d, ctx, "an account")}`,
+  },
   "user.password_reset_sent": {
     category: "access",
     severity: "warning",

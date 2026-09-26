@@ -9,6 +9,33 @@ import {
   consumeAuthTransition,
 } from "@/lib/auth-transition";
 
+/** How long a sign-in may wait for its session before it goes back to /login. */
+export const SIGN_IN_SETTLE_DEADLINE_MS = 6000;
+
+/**
+ * Sends a sign-in whose session never arrives back to /login once
+ * SIGN_IN_SETTLE_DEADLINE_MS has passed since `waiting` first became true.
+ * For surfaces that hold the sign-in splash before ProtectedRoute mounts.
+ */
+export function useSignInSettleDeadline(waiting: boolean): void {
+  const deadlineRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!waiting) {
+      deadlineRef.current = null;
+      return;
+    }
+    deadlineRef.current ??= Date.now() + SIGN_IN_SETTLE_DEADLINE_MS;
+    const t = setTimeout(
+      () => {
+        consumeAuthTransition();
+        window.location.replace("/login");
+      },
+      Math.max(0, deadlineRef.current - Date.now()),
+    );
+    return () => clearTimeout(t);
+  }, [waiting]);
+}
+
 /**
  * Wraps public (unauthenticated) routes such as /login.
  * Renders children as-is; does NOT redirect authenticated users because
@@ -47,7 +74,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     // sign-out) redirect to the sign-in page immediately.
     if (isAuthTransitionPending()) {
       if (bounceDeadlineRef.current === null) {
-        bounceDeadlineRef.current = Date.now() + 6000;
+        bounceDeadlineRef.current = Date.now() + SIGN_IN_SETTLE_DEADLINE_MS;
       }
       const remaining = Math.max(0, bounceDeadlineRef.current - Date.now());
       const t = setTimeout(() => {

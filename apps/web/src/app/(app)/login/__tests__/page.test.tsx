@@ -31,6 +31,7 @@ const mockStartTrial = vi.fn();
 const mockSwitchOrganization = vi.fn();
 const mockMfaFailure = vi.fn();
 const mockRecordSignInCompleted = vi.fn();
+const mockSyncSession = vi.fn();
 vi.mock("@/features/account/client", () => ({
   clearBrowserAuthState: (...args: unknown[]) => mockClearAuthState(...args),
   exitSandbox: (...args: unknown[]) => mockExitSandbox(...args),
@@ -43,7 +44,16 @@ vi.mock("@/features/account/client", () => ({
   signOutFromBrowser: (...args: unknown[]) => mockSignOut(...args),
   startBrowserTrial: (...args: unknown[]) => mockStartTrial(...args),
   switchBrowserOrganization: (...args: unknown[]) => mockSwitchOrganization(...args),
+  syncBrowserSessionInBackground: (...args: unknown[]) => mockSyncSession(...args),
 }));
+
+const mockPrimeSignInQueries = vi.fn();
+vi.mock("@/components/SignInPrefetch", () => ({
+  primeSignInQueries: (...args: unknown[]) => mockPrimeSignInQueries(...args),
+}));
+
+let mockSignedInUser: { id: string } | null = null;
+vi.mock("@/components/AuthProvider", () => ({ useAuth: () => ({ user: mockSignedInUser }) }));
 
 vi.mock("@/components/profile/MFAVerify", () => ({
   MFAVerify: ({
@@ -159,7 +169,72 @@ describe("OrgLogin submit states", () => {
     mockMfaFailure.mockReset();
     mockToastError.mockReset();
     mockRouterReplace.mockReset();
+    mockSyncSession.mockReset().mockResolvedValue(undefined);
+    mockPrimeSignInQueries.mockReset();
+    mockSignedInUser = null;
     sessionStorage.clear();
+  });
+
+  describe("when the login route set the session cookies", () => {
+    const COOKIE_RESPONSE = {
+      user: { id: "user-1", email_confirmed_at: "2026-09-08T00:00:00Z" },
+      sessionCookieSet: true,
+    };
+
+    beforeEach(() => {
+      mockSetSession.mockReturnValue(new Promise(() => {}));
+    });
+
+    it("navigates a same-organization sign-in without waiting for the browser's session check", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        loginResponse({ ...COOKIE_RESPONSE, didSwitchOrg: false }),
+      );
+      const { container } = renderWithQueryClient(
+        <OrgLogin orgSlug="calmhaven" seed={{ status: "found", name: "Calm Haven" }} />,
+      );
+      submitForm(container);
+
+      await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith("/dashboard"));
+      expect(mockSyncSession).toHaveBeenCalledExactlyOnceWith({
+        access_token: sessionToken("user-1", TARGET_ORG_ID, "calmhaven"),
+        refresh_token: "refresh-token",
+      });
+      expect(mockSetSession).not.toHaveBeenCalled();
+      expect(mockExitSandbox).toHaveBeenCalledTimes(1);
+      expect(mockPrimeSignInQueries).toHaveBeenCalledExactlyOnceWith(
+        expect.any(Object),
+        sessionToken("user-1", TARGET_ORG_ID, "calmhaven"),
+      );
+    });
+
+    it("hard-navigates a switched sign-in at once, leaving the new document to read the cookies", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(loginResponse(COOKIE_RESPONSE));
+      const { container, client } = renderWithQueryClient(
+        <OrgLogin orgSlug="calmhaven" seed={{ status: "found", name: "Calm Haven" }} />,
+      );
+      client.setQueryData(["old-organization"], "must-clear");
+      submitForm(container);
+
+      await waitFor(() => expect(window.location.replace).toHaveBeenCalledWith("/dashboard"));
+      expect(client.getQueryData(["old-organization"])).toBeUndefined();
+      expect(mockSetSession).not.toHaveBeenCalled();
+      expect(mockSyncSession).not.toHaveBeenCalled();
+    });
+
+    it("waits for the browser session when a different account is signed in here", async () => {
+      mockSignedInUser = { id: "someone-else" };
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        loginResponse({ ...COOKIE_RESPONSE, didSwitchOrg: false }),
+      );
+      const { container } = renderWithQueryClient(
+        <OrgLogin orgSlug="calmhaven" seed={{ status: "found", name: "Calm Haven" }} />,
+      );
+      submitForm(container);
+
+      await waitFor(() => expect(mockSetSession).toHaveBeenCalledTimes(1));
+      expect(mockRouterReplace).not.toHaveBeenCalled();
+      expect(mockSyncSession).not.toHaveBeenCalled();
+    });
   });
 
   it("successful sign-in: button stays disabled and shows spinner", async () => {
@@ -335,7 +410,7 @@ describe("OrgLogin submit states", () => {
     client.setQueryData(["old-organization"], "must-clear");
     submitForm(container);
 
-    await waitFor(() => expect(screen.getByText("Loading your workspace")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Signing you in")).toBeInTheDocument());
     expect(client.getQueryData(["old-organization"])).toBeUndefined();
     expect(window.location.replace).not.toHaveBeenCalled();
 
@@ -393,7 +468,7 @@ describe("OrgLogin submit states", () => {
     fireEvent.click(complete);
     fireEvent.click(complete);
 
-    await waitFor(() => expect(screen.getByText("Loading your workspace")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Signing you in")).toBeInTheDocument());
     expect(mockSwitchOrganization).toHaveBeenCalledTimes(1);
     expect(window.location.replace).not.toHaveBeenCalled();
 
@@ -507,7 +582,7 @@ describe("OrgLogin submit states", () => {
       <OrgLogin orgSlug="calmhaven" seed={{ status: "found", name: "Calm Haven" }} />,
     );
     submitForm(container);
-    await waitFor(() => expect(screen.getByText("Loading your workspace")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Signing you in")).toBeInTheDocument());
 
     unmount();
     finishSetSession();

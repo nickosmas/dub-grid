@@ -113,6 +113,14 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
       /\brequireGridmasterSession\s*\([\s\S]*?\brequireSensitiveActionAuth\s*\([\s\S]*?\.resetPasswordForEmail\(/,
     ],
   },
+  "apps/web/src/app/api/gridmaster/users/[userId]/route.ts": {
+    policy: "sensitive",
+    assertions: [
+      /\brequireGridmasterSession\s*\(/,
+      /\brequireSensitiveActionAuth\s*\(/,
+      /\bsyncLinkedLoginEmail\s*\(/,
+    ],
+  },
   "apps/web/src/app/api/gridmaster/users/[userId]/force-logout/route.ts": {
     policy: "sensitive",
     assertions: [

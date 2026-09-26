@@ -1,10 +1,15 @@
 import { useEffect } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import OnboardingGate from "@/components/onboarding/OnboardingGate";
 import AppShell from "@/components/AppShell";
 import { fetchOrganizationBilling } from "@/features/billing/client";
+import {
+  consumeAuthTransition,
+  isAuthTransitionPending,
+  markAuthTransition,
+} from "@/lib/auth-transition";
 
 let mockPathname = "/dashboard";
 let mockSection: string | null = null;
@@ -13,7 +18,7 @@ const mockRouter = {
 };
 
 const mockAuth = {
-  user: { id: "user-1" },
+  user: { id: "user-1" } as { id: string } | null,
   isLoading: false,
 };
 
@@ -715,5 +720,154 @@ describe("OnboardingGate subtree stability", () => {
     result.rerender(tree());
     await screen.findByText("Protected app");
     expect(mounts).toBe(1);
+  });
+});
+
+describe("OnboardingGate sign-in handoff", () => {
+  function orgReady() {
+    mockOrganizationData.loading = false;
+    mockOrganizationData.entryGate = {
+      onboardingCompleted: true,
+      adminOnboardingCompleted: true,
+      billingLocked: false,
+    };
+    mockOrganizationData.setupStatus = {
+      isComplete: true,
+      missing: {
+        focusAreas: false,
+        scheduleDefinitions: false,
+        certifications: false,
+        orgRoles: false,
+      },
+    };
+  }
+
+  afterEach(() => {
+    consumeAuthTransition();
+    vi.useRealTimers();
+  });
+
+  it("keeps one splash, moving forward, from the session settling to the workspace", async () => {
+    markAuthTransition();
+    mockAuth.user = null;
+    mockOrganizationData.loading = true;
+    const { rerenderGate } = renderGate();
+    const splash = screen.getByRole("main");
+    expect(splash).toHaveTextContent("Signing you in");
+
+    mockAuth.user = { id: "user-1" };
+    mockPermissions.isLoading = true;
+    rerenderGate();
+    expect(screen.getByRole("main")).toBe(splash);
+    expect(splash).toHaveTextContent("Signing you in");
+
+    mockPermissions.isLoading = false;
+    rerenderGate();
+    expect(screen.getByRole("main")).toBe(splash);
+    expect(splash).toHaveTextContent("Loading your workspace");
+
+    orgReady();
+    rerenderGate();
+    await screen.findByText("Protected app");
+    expect(screen.queryByRole("main")).not.toBeInTheDocument();
+    expect(isAuthTransitionPending()).toBe(false);
+  });
+
+  it("does not end the handoff on cached organization data before the session exists", () => {
+    markAuthTransition();
+    mockAuth.user = null;
+    orgReady();
+
+    renderGate();
+
+    expect(screen.getByRole("main")).toHaveTextContent("Signing you in");
+    expect(screen.queryByText("Protected app")).not.toBeInTheDocument();
+    expect(isAuthTransitionPending()).toBe(true);
+  });
+
+  it("ends the handoff for a Gridmaster, whom the gate does not decide for", async () => {
+    markAuthTransition();
+    mockPermissions.isGridmaster = true;
+    mockPermissions.orgId = "";
+
+    renderGate();
+
+    await screen.findByText("Protected app");
+    await waitFor(() => expect(isAuthTransitionPending()).toBe(false));
+  });
+
+  it("sends a sign-in whose session never arrives back to /login", () => {
+    vi.useFakeTimers();
+    const replace = vi.fn();
+    const location = window.location;
+    Object.defineProperty(window, "location", {
+      value: {
+        href: location.href,
+        origin: location.origin,
+        host: location.host,
+        hostname: location.hostname,
+        protocol: location.protocol,
+        pathname: "/dashboard",
+        search: "",
+        replace,
+      },
+      writable: true,
+      configurable: true,
+    });
+    markAuthTransition();
+    mockAuth.user = null;
+    mockOrganizationData.loading = true;
+
+    renderGate();
+    expect(screen.getByRole("main")).toHaveTextContent("Signing you in");
+    act(() => {
+      vi.advanceTimersByTime(5_999);
+    });
+    expect(replace).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+
+    expect(replace).toHaveBeenCalledWith("/login");
+    expect(isAuthTransitionPending()).toBe(false);
+    Object.defineProperty(window, "location", {
+      value: location,
+      writable: true,
+      configurable: true,
+    });
+  });
+
+  it("leaves an ordinary signed-out load to the page's own guard", () => {
+    mockAuth.user = null;
+    renderGate();
+    expect(screen.getByText("Protected app")).toBeInTheDocument();
+  });
+});
+
+describe("AppShell header space", () => {
+  it("holds the header's height while its data loads", () => {
+    mockPathname = "/dashboard";
+    mockOrganizationData.loading = true;
+
+    const { container } = renderWithQueryClient(
+      <AppShell>
+        <div>Dashboard</div>
+      </AppShell>,
+    );
+
+    expect(container.querySelector(".dg-app-shell-header-placeholder")).toBeInTheDocument();
+    expect(screen.queryByLabelText("App header")).not.toBeInTheDocument();
+  });
+
+  it("leaves no space when setup keeps the header hidden", () => {
+    mockPathname = "/settings";
+
+    const { container } = renderWithQueryClient(
+      <AppShell>
+        <div>Settings page</div>
+      </AppShell>,
+    );
+
+    expect(container.querySelector(".dg-app-shell-header-placeholder")).not.toBeInTheDocument();
   });
 });

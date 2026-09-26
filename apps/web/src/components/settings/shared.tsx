@@ -30,7 +30,7 @@ export const inputStyle: React.CSSProperties = {
   fontWeight: "var(--dg-type-control-weight)",
   fontFamily: "inherit",
   color: "var(--dg-color-text-primary)",
-  background: "var(--dg-color-surface)",
+  background: "var(--dg-color-field)",
   outline: "none",
 };
 

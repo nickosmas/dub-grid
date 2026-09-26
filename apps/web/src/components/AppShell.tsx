@@ -9,7 +9,7 @@ import UserViewBanner from "@/components/UserViewBanner";
 import InactiveAccountBanner from "@/components/InactiveAccountBanner";
 import TrialWelcomeModal from "@/components/TrialWelcomeModal";
 import InactivityGuard from "@/components/InactivityGuard";
-import { fetchOrganizationBilling } from "@/features/billing/client";
+import { organizationBillingQueryOptions } from "@/features/billing/queries";
 import {
   getOrganizationBootstrapQueryPolicy,
   type OrganizationBootstrap,
@@ -35,11 +35,9 @@ function isAppRoute(pathname: string): boolean {
 function AppHeader() {
   const perms = usePermissions();
   const { data: billing, isLoading: billingLoading } = useQuery({
-    queryKey: queryKeys.org.billing(perms.orgId!),
-    queryFn: () => fetchOrganizationBilling(perms.orgId!),
+    ...organizationBillingQueryOptions(perms.orgId!),
     enabled:
       Boolean(perms.orgId) && perms.isSuperAdmin && !perms.isGridmaster && !perms.isImpersonating,
-    staleTime: 30_000,
   });
   const shouldLoadOrgHeader =
     !perms.isSuperAdmin ||
@@ -59,6 +57,8 @@ function AppHeader() {
     shouldLoadOrgHeader ? (perms.orgId ?? org?.id ?? null) : null,
   );
   const isOrgSetupComplete = setupStatus.isComplete && employees.length > 0;
+  const setupLoading = perms.isLoading || orgLoading || empLoading;
+  const billingLocked = billing?.billingAccess.isLocked === true;
   // The setup lock hides navigation for members OnboardingGate is holding
   // behind the wizard or the pending screen. It must release on the same
   // condition the gate does, or a member who has finished onboarding is left
@@ -67,13 +67,18 @@ function AppHeader() {
     !perms.isGridmaster &&
     !perms.isImpersonating &&
     entryGate?.onboardingCompleted !== true &&
-    (perms.isLoading || orgLoading || empLoading || !isOrgSetupComplete);
+    (setupLoading || !isOrgSetupComplete);
   const hideForBillingLock =
-    !perms.isGridmaster &&
-    !perms.isImpersonating &&
-    (billingLoading || billing?.billingAccess.isLocked === true);
+    !perms.isGridmaster && !perms.isImpersonating && (billingLoading || billingLocked);
 
-  if (hideForSetupLock || hideForBillingLock) return null;
+  if (hideForSetupLock || hideForBillingLock) {
+    // Still loading: hold the header's height so the page does not jump down
+    // when it arrives. A lock that keeps it hidden leaves no space.
+    const locked = (hideForSetupLock && !setupLoading) || (hideForBillingLock && !billingLoading);
+    return locked ? null : (
+      <div className="dg-app-shell-header-surface dg-app-shell-header-placeholder" aria-hidden />
+    );
+  }
 
   return (
     <div className="dg-app-shell-header-surface">
@@ -164,10 +169,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div key={effectiveOrgKey} className="contents">
         {children}
       </div>
-      {/* Authenticated app routes only. The modal reads organization data, and
-          useOrganizationData's org-context lookup is not covered by its own
-          `enabled` flag, so mounting this on the sign-in page put a 401 in the
-          console on every visit. */}
+      {/* Authenticated app routes only: the modal reads organization data,
+          which the sign-in page has none of. */}
       {isAppRoute(pathname) && Boolean(user) && !isGridmaster && <TrialWelcomeModal />}
       <InactivityGuard />
     </div>

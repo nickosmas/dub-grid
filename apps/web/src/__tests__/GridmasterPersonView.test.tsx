@@ -4,7 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
 import GridmasterPersonView from "@/components/gridmaster/person/GridmasterPersonView";
 import type { GridmasterPersonTarget } from "@/features/gridmaster/client";
-import type { GridmasterPersonRecord } from "@/features/gridmaster/person-record";
+import type {
+  GridmasterPersonRecord,
+  GridmasterStaffRecord,
+} from "@/features/gridmaster/person-record";
+import type { Invitation } from "@/types";
 
 const fetchGridmasterPerson = vi.fn();
 const forceLogoutGridmasterUser = vi.fn();
@@ -12,6 +16,8 @@ const sendGridmasterPasswordReset = vi.fn();
 const terminateGridmasterUser = vi.fn();
 const reinstateGridmasterUser = vi.fn();
 const updateGridmasterUserActivation = vi.fn();
+const updateGridmasterPersonName = vi.fn();
+const changeGridmasterPersonEmail = vi.fn();
 const requireCredentialAssurance = vi.fn();
 const stepUpRun = vi.fn();
 
@@ -22,6 +28,8 @@ vi.mock("@/features/gridmaster/client", () => ({
   terminateGridmasterUser: (...args: unknown[]) => terminateGridmasterUser(...args),
   reinstateGridmasterUser: (...args: unknown[]) => reinstateGridmasterUser(...args),
   updateGridmasterUserActivation: (...args: unknown[]) => updateGridmasterUserActivation(...args),
+  updateGridmasterPersonName: (...args: unknown[]) => updateGridmasterPersonName(...args),
+  changeGridmasterPersonEmail: (...args: unknown[]) => changeGridmasterPersonEmail(...args),
 }));
 vi.mock("@/hooks/useStepUpAction", () => ({
   useStepUpAction: () => ({ run: stepUpRun, dialog: null }),
@@ -36,6 +44,55 @@ const ADMIN = "22222222-2222-4222-8222-222222222222";
 const GRIDMASTER = "33333333-3333-4333-8333-333333333333";
 const ORG = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const FUTURE = "2099-01-01T12:00:00.000Z";
+const BIRCH = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+function staffRecord(overrides: Partial<GridmasterStaffRecord> = {}): GridmasterStaffRecord {
+  return {
+    id: "44444444-4444-4444-8444-444444444444",
+    orgId: ORG,
+    employeeNumber: 7,
+    firstName: "Ada",
+    lastName: "Lovelace",
+    employmentType: "part_time",
+    status: "inactive",
+    statusChangedAt: "2026-08-01T00:00:00.000Z",
+    statusNote: "On leave",
+    certificationId: 2,
+    roleIds: [8],
+    seniority: 3,
+    focusAreaIds: [5],
+    phone: "555-0100",
+    email: "ada@example.com",
+    contactNotes: "Prefers text",
+    archivedAt: null,
+    userId: USER,
+    departmentIds: [3],
+    deptAdminIds: [3],
+    version: 4,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    createdBy: ADMIN,
+    updatedBy: ADMIN,
+    updatedAt: "2026-02-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function invitationRecord(overrides: Partial<Invitation>): Invitation {
+  return {
+    id: "inv",
+    orgId: ORG,
+    invitedBy: ADMIN,
+    email: "ada@example.com",
+    roleToAssign: "user",
+    expiresAt: FUTURE,
+    acceptedAt: null,
+    revokedAt: null,
+    createdAt: "2026-01-02T00:00:00.000Z",
+    updatedAt: null,
+    employeeId: null,
+    ...overrides,
+  };
+}
 
 function linkedRecord(overrides: Partial<GridmasterPersonRecord> = {}): GridmasterPersonRecord {
   return {
@@ -79,6 +136,18 @@ function linkedRecord(overrides: Partial<GridmasterPersonRecord> = {}): Gridmast
     organizations: [
       {
         org: { id: ORG, name: "Calm Haven", slug: "calmhaven" },
+        terminology: {
+          focusAreaLabel: "Wings",
+          certificationLabel: "Skill Levels",
+          roleLabel: "Positions",
+          departmentLabel: "Units",
+        },
+        names: {
+          departments: { 3: "Nursing" },
+          focusAreas: { 5: "East Wing" },
+          roles: { 8: "Charge" },
+          certifications: { 2: "RN" },
+        },
         membership: {
           id: "m-1",
           orgRole: "admin",
@@ -92,7 +161,7 @@ function linkedRecord(overrides: Partial<GridmasterPersonRecord> = {}): Gridmast
           phone: null,
           onboardingCompletedAt: null,
           tooltipToursCompleted: {},
-          updatedAt: null,
+          updatedAt: "2026-01-03T00:00:00.000Z",
         },
         employees: [],
         invitations: [],
@@ -110,13 +179,19 @@ function renderView(
   fetchGridmasterPerson.mockResolvedValue({ person: record });
   const onBack = vi.fn();
   const onImpersonate = vi.fn();
+  const onOpenOrganization = vi.fn();
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={queryClient}>
-      <GridmasterPersonView target={target} onBack={onBack} onImpersonate={onImpersonate} />
+      <GridmasterPersonView
+        target={target}
+        onBack={onBack}
+        onImpersonate={onImpersonate}
+        onOpenOrganization={onOpenOrganization}
+      />
     </QueryClientProvider>,
   );
-  return { onBack, onImpersonate };
+  return { onBack, onImpersonate, onOpenOrganization };
 }
 
 describe("GridmasterPersonView", () => {
@@ -154,7 +229,7 @@ describe("GridmasterPersonView", () => {
     expect(within(states).getByText("No platform role")).toBeInTheDocument();
     expect(within(states).getByText(/^Deactivated/)).toBeInTheDocument();
     expect(within(states).getByText(/^Deletion scheduled/)).toBeInTheDocument();
-    expect(within(states).getByText(/^Sign-in locked until/)).toBeInTheDocument();
+    expect(within(states).getByText("Sign-in locked")).toBeInTheDocument();
     expect(within(states).getByText("Being impersonated")).toBeInTheDocument();
     expect(screen.getByText(/by admin@example\.com/)).toBeInTheDocument();
   });
@@ -251,5 +326,194 @@ describe("GridmasterPersonView", () => {
     expect(screen.queryByRole("button", { name: "Impersonate" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Terminate account" })).not.toBeInTheDocument();
     expect(screen.getByText("Fraud")).toBeInTheDocument();
+  });
+
+  it("shows one card per organization with its membership, staff record and invitations", async () => {
+    const base = linkedRecord();
+    const calm = base.organizations[0];
+    const { onOpenOrganization } = renderView(
+      linkedRecord({
+        organizations: [
+          {
+            ...calm,
+            membership: {
+              ...calm.membership!,
+              adminPermissions: { canManageEmployees: true } as never,
+              deptAdminIds: [3],
+              onboardingCompletedAt: "2026-01-04T00:00:00.000Z",
+              tooltipToursCompleted: { schedule: true },
+            },
+            employees: [staffRecord()],
+            invitations: [
+              invitationRecord({ id: "a", acceptedAt: "2026-01-03T00:00:00.000Z" }),
+              invitationRecord({ id: "r", revokedAt: "2025-12-20T00:00:00.000Z" }),
+              invitationRecord({ id: "e", expiresAt: "2025-06-04T00:00:00.000Z" }),
+              invitationRecord({ id: "p" }),
+            ],
+          },
+          {
+            ...calm,
+            org: { id: BIRCH, name: "Birch Court", slug: null },
+            membership: {
+              ...calm.membership!,
+              id: "m-2",
+              orgRole: "user",
+              archivedAt: "2026-03-01T00:00:00.000Z",
+              archivedBy: ADMIN,
+            },
+          },
+        ],
+      }),
+    );
+
+    const calmCard = (await screen.findByRole("heading", { name: "Calm Haven" })).closest(
+      "section",
+    ) as HTMLElement;
+    const card = within(calmCard);
+    expect(card.getByText("Admin")).toBeInTheDocument();
+    expect(card.getAllByText("Units")).toHaveLength(2);
+    expect(card.getByText("Wings")).toBeInTheDocument();
+    expect(card.getByText("East Wing")).toBeInTheDocument();
+    expect(card.getByText("Positions")).toBeInTheDocument();
+    expect(card.getByText("Charge")).toBeInTheDocument();
+    expect(card.getByText("Skill Levels")).toBeInTheDocument();
+    expect(card.getByText("RN")).toBeInTheDocument();
+    expect(card.getByText(/^Inactive since/)).toBeInTheDocument();
+    expect(card.getByText("On leave")).toBeInTheDocument();
+    expect(card.getByText("Part-time")).toBeInTheDocument();
+    expect(card.getByText("Prefers text")).toBeInTheDocument();
+    expect(card.getByText(/^Completed/)).toBeInTheDocument();
+    expect(card.getByText("schedule")).toBeInTheDocument();
+    expect(card.getAllByText(/by admin@example\.com/).length).toBeGreaterThan(1);
+    for (const state of ["Accepted", "Revoked", "Expired", "Pending"]) {
+      expect(card.getByText(state)).toBeInTheDocument();
+    }
+
+    const birchCard = screen
+      .getByRole("heading", { name: "Birch Court" })
+      .closest("section") as HTMLElement;
+    expect(within(birchCard).getByText(/by admin@example\.com/)).toBeInTheDocument();
+    expect(within(birchCard).getByText("No staff record.")).toBeInTheDocument();
+
+    fireEvent.click(card.getByRole("button", { name: "Open organization employees" }));
+    expect(onOpenOrganization).toHaveBeenCalledWith(ORG);
+  });
+
+  it("shows an unlinked staff record's organization without a membership", async () => {
+    const base = linkedRecord();
+    renderView(
+      linkedRecord({
+        account: null,
+        profile: null,
+        organizations: [
+          {
+            ...base.organizations[0],
+            membership: null,
+            employees: [staffRecord({ userId: null, firstName: "Grace" })],
+            invitations: [],
+          },
+        ],
+      }),
+      { kind: "staff", employeeId: "44444444-4444-4444-8444-444444444444" },
+    );
+
+    expect(await screen.findByText(/No membership/)).toBeInTheDocument();
+    expect(screen.getAllByText("Grace Lovelace").length).toBeGreaterThan(1);
+    expect(screen.getByText("No invitations sent.")).toBeInTheDocument();
+  });
+
+  it("saves the account name through step-up", async () => {
+    updateGridmasterPersonName.mockResolvedValue({ success: true });
+    renderView(linkedRecord());
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edit name" }));
+    const dialog = screen.getByRole("dialog", { name: "Edit name" });
+    fireEvent.change(within(dialog).getByLabelText("First name"), {
+      target: { value: " Augusta " },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save name" }));
+
+    await waitFor(() =>
+      expect(updateGridmasterPersonName).toHaveBeenCalledWith(
+        USER,
+        { firstName: "Augusta", lastName: "Lovelace" },
+        "fresh-token",
+      ),
+    );
+    expect(toast.success).toHaveBeenCalledWith("Name saved");
+  });
+
+  it("changes the sign-in email through step-up after the credential check", async () => {
+    changeGridmasterPersonEmail.mockResolvedValue({ success: true });
+    renderView(linkedRecord());
+
+    fireEvent.click(await screen.findByRole("button", { name: "Change sign-in email" }));
+    const dialog = screen.getByRole("dialog", { name: "Change sign-in email" });
+    fireEvent.change(within(dialog).getByLabelText("New sign-in email"), {
+      target: { value: "augusta@example.com" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Change email" }));
+
+    await waitFor(() =>
+      expect(changeGridmasterPersonEmail).toHaveBeenCalledWith(
+        USER,
+        "augusta@example.com",
+        "fresh-token",
+      ),
+    );
+    expect(requireCredentialAssurance.mock.invocationCallOrder[0]).toBeLessThan(
+      changeGridmasterPersonEmail.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("shows the server's reason when the email is taken", async () => {
+    changeGridmasterPersonEmail.mockRejectedValue(
+      new Error("That email belongs to a different user account."),
+    );
+    renderView(linkedRecord());
+
+    fireEvent.click(await screen.findByRole("button", { name: "Change sign-in email" }));
+    const dialog = screen.getByRole("dialog", { name: "Change sign-in email" });
+    fireEvent.change(within(dialog).getByLabelText("New sign-in email"), {
+      target: { value: "grace@example.com" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Change email" }));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("That email belongs to a different user account."),
+    );
+    expect(screen.getByRole("dialog", { name: "Change sign-in email" })).toBeInTheDocument();
+  });
+
+  it("changes no email when step-up is cancelled", async () => {
+    stepUpRun.mockResolvedValueOnce(false);
+    renderView(linkedRecord());
+
+    fireEvent.click(await screen.findByRole("button", { name: "Change sign-in email" }));
+    const dialog = screen.getByRole("dialog", { name: "Change sign-in email" });
+    fireEvent.change(within(dialog).getByLabelText("New sign-in email"), {
+      target: { value: "augusta@example.com" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Change email" }));
+
+    await waitFor(() => expect(stepUpRun).toHaveBeenCalled());
+    expect(changeGridmasterPersonEmail).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("shows the newest consent history first and the rest on request", async () => {
+    const consents = Array.from({ length: 5 }, (_, index) => ({
+      version: "1.2",
+      consent: { essential: true, analytics: index === 0 },
+      createdAt: `2026-09-2${index}T00:00:00.000Z`,
+      userAgent: null,
+    }));
+    renderView(linkedRecord({ cookieConsents: consents }));
+
+    expect(await screen.findAllByText(/^Cookies:/)).toHaveLength(3);
+    fireEvent.click(screen.getByRole("button", { name: "Show 2 earlier" }));
+    expect(screen.getAllByText(/^Cookies:/)).toHaveLength(5);
+    fireEvent.click(screen.getByRole("button", { name: "Show fewer" }));
+    expect(screen.getAllByText(/^Cookies:/)).toHaveLength(3);
   });
 });

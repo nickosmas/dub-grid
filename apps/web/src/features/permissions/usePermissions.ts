@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useSyncExternalStore } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import {
   createBrowserRealtimeChannel,
@@ -96,6 +96,18 @@ export function getUserViewActive(): boolean {
  * clearing for: a same-user org switch now lands on a different key instead of
  * serving the previous org's role for up to 10 seconds.
  */
+/** Shared with the sign-in prefetch so both read one cache entry. */
+export function accountPermissionsQueryOptions(userId: string | null, orgId: string | null) {
+  return queryOptions({
+    queryKey: queryKeys.account.permissions(userId, orgId),
+    queryFn: fetchAccountPermissions,
+    // Realtime below invalidates on the writes that actually move permissions,
+    // so this does not need to be short. The old hand-rolled TTL was 10s, which
+    // meant routine navigation refetched almost every time.
+    staleTime: 60_000,
+  });
+}
+
 export function usePermissions(): WebPermissions {
   // AuthProvider is the single source of truth for browser auth. usePermissions
   // used to call supabase.auth.getSession() + getUser() itself (up to 4 times
@@ -130,13 +142,8 @@ export function usePermissions(): WebPermissions {
   );
 
   const query = useQuery({
-    queryKey: permissionsKey,
-    queryFn: fetchAccountPermissions,
+    ...accountPermissionsQueryOptions(userId, claims.orgId),
     enabled: !authLoading && Boolean(accessToken) && Boolean(userId),
-    // Realtime below invalidates on the writes that actually move permissions,
-    // so this does not need to be short. The old hand-rolled TTL was 10s, which
-    // meant routine navigation refetched almost every time.
-    staleTime: 60_000,
   });
 
   useEffect(() => {

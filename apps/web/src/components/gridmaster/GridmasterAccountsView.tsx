@@ -299,6 +299,7 @@ export default function GridmasterAccountsView({
 
       <Form
         onSubmit={handlePromote}
+        className="dg-field-raised"
         style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}
       >
         <input

@@ -14,7 +14,7 @@ describe("People responsive layout", () => {
     );
 
     expect(members).toContain('data-testid="people-toolbar"');
-    expect(members).toContain('className="dg-toolbar-type"');
+    expect(members).toContain('className="dg-toolbar-type dg-field-raised"');
     expect(members).toContain(
       '{ display: "flex", flexDirection: "column", gap: 8, paddingBottom: 8 }',
     );

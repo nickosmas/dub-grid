@@ -55,6 +55,10 @@ vi.mock("@/lib/sentry", () => ({
 }));
 
 vi.mock("@/lib/auth/security-audit", () => ({ writeSecurityAuditEvent: vi.fn() }));
+const authCookiesForSession = vi.fn();
+vi.mock("@/lib/auth/session-cookies", () => ({
+  authCookiesForSession: (...args: unknown[]) => authCookiesForSession(...args),
+}));
 const endUserSession = vi.fn();
 vi.mock("@/lib/auth/revocation", () => ({
   endUserSession: (...args: unknown[]) => endUserSession(...args),
@@ -179,6 +183,7 @@ describe("POST /api/auth/login", () => {
     rpc.mockResolvedValue({ data: null, error: null });
     refreshSession.mockResolvedValue({ data: { session: null }, error: null });
     endUserSession.mockResolvedValue(undefined);
+    authCookiesForSession.mockResolvedValue(null);
   });
 
   it("returns 429 without attempting sign-in when rate limited", async () => {
@@ -673,10 +678,11 @@ describe("POST /api/auth/login", () => {
     expectRefusal("rejected", "organization_unavailable", null);
   });
 
-  it("gridmaster: always refreshes once and returns the resolved destination", async () => {
+  function signInGridmaster(claims: Record<string, unknown>) {
+    const session = makeSession(claims);
     signInWithPassword.mockResolvedValueOnce({
       data: {
-        session: makeSession({ platform_role: "gridmaster" }),
+        session,
         user: {
           id: USER_ID,
           email: "gm@example.com",
@@ -686,6 +692,34 @@ describe("POST /api/auth/login", () => {
       },
       error: null,
     });
+    return session;
+  }
+
+  function stubGridmasterProfile() {
+    serviceFrom.mockImplementation(() => ({
+      select: () => ({
+        eq: () => ({
+          maybeSingle: async () => ({ data: { platform_role: "gridmaster" }, error: null }),
+        }),
+      }),
+    }));
+  }
+
+  it("gridmaster: lands on the portal without a second mint when the token says Gridmaster", async () => {
+    const session = signInGridmaster({ platform_role: "gridmaster" });
+
+    const res = await POST(makeRequest("gridmaster.localhost"));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(refreshSession).not.toHaveBeenCalled();
+    expect(body.session.access_token).toBe(session.access_token);
+    expect(body.destination).toBe("/gridmaster");
+  });
+
+  it("gridmaster: refreshes once when the token predates the access-token hook", async () => {
+    signInGridmaster({});
+    stubGridmasterProfile();
     refreshSession.mockResolvedValueOnce({
       data: {
         session: makeSession({ platform_role: "gridmaster" }, { access_token: "gm-refreshed" }),
@@ -699,13 +733,26 @@ describe("POST /api/auth/login", () => {
     expect(res.status).toBe(200);
     expect(refreshSession).toHaveBeenCalledTimes(1);
     expect(body.session.access_token).toBe("gm-refreshed");
-    expect(body.destination).toBe("/dashboard");
+    expect(body.destination).toBe("/gridmaster");
+  });
+
+  it("gridmaster: sends the terms page back to the portal, not /dashboard", async () => {
+    signInGridmaster({ platform_role: "gridmaster" });
+    fetchTermsAcceptanceStatus.mockResolvedValueOnce({
+      acceptedCurrentTerms: false,
+      acceptedVersion: null,
+    });
+
+    const body = await (await POST(makeRequest("gridmaster.localhost"))).json();
+
+    expect(body.destination).toBe("/accept-terms?next=%2Fgridmaster");
   });
 
   it("gridmaster: returns SESSION_REFRESH_FAILED when the post-signin refresh fails", async () => {
+    stubGridmasterProfile();
     signInWithPassword.mockResolvedValueOnce({
       data: {
-        session: makeSession({ platform_role: "gridmaster" }),
+        session: makeSession({}),
         user: {
           id: USER_ID,
           email: "gm@example.com",
@@ -774,5 +821,118 @@ describe("POST /api/auth/login", () => {
     expect(writeSecurityAuditEvent).toHaveBeenLastCalledWith(
       expect.objectContaining({ outcome: "challenged", reason: "email_unconfirmed" }),
     );
+  });
+
+  describe("session cookies", () => {
+    const AUTH_COOKIE = {
+      name: "sb-example-auth-token",
+      value: "base64-session",
+      options: { path: "/", sameSite: "lax" as const, httpOnly: false, maxAge: 34_560_000 },
+    };
+
+    function signIn(claims: Record<string, unknown>, factors: unknown[] = []) {
+      const session = makeSession(claims);
+      signInWithPassword.mockResolvedValueOnce({
+        data: {
+          session,
+          user: {
+            id: USER_ID,
+            email: "user@example.com",
+            email_confirmed_at: "2026-01-01T00:00:00Z",
+            factors,
+          },
+        },
+        error: null,
+      });
+      return session;
+    }
+
+    it("writes the finished session's auth cookies on a completed sign-in", async () => {
+      const session = signIn({ org_id: ORG_ID, org_slug: "acme", org_role: "user" });
+      authCookiesForSession.mockResolvedValueOnce([AUTH_COOKIE]);
+
+      const res = await POST(makeRequest("acme.localhost"));
+      const body = await res.json();
+
+      expect(body.sessionCookieSet).toBe(true);
+      expect(authCookiesForSession).toHaveBeenCalledExactlyOnceWith(
+        expect.any(NextRequest),
+        expect.objectContaining({
+          access_token: session.access_token,
+          refresh_token: session.refresh_token,
+        }),
+      );
+      expect(res.cookies.get(AUTH_COOKIE.name)).toEqual(
+        expect.objectContaining({ value: AUTH_COOKIE.value, path: "/", sameSite: "lax" }),
+      );
+    });
+
+    it("writes the switched session, not the one the password created", async () => {
+      signIn({ org_id: OTHER_ORG_ID, org_role: "user" });
+      stubOrgLookup(ORG_ID);
+      const switched = makeSession({ org_id: ORG_ID, org_slug: "acme", org_role: "user" });
+      refreshSession.mockResolvedValueOnce({ data: { session: switched }, error: null });
+      authCookiesForSession.mockResolvedValueOnce([AUTH_COOKIE]);
+
+      await POST(makeRequest("acme.localhost"));
+
+      expect(authCookiesForSession).toHaveBeenCalledExactlyOnceWith(
+        expect.any(NextRequest),
+        expect.objectContaining({ access_token: switched.access_token }),
+      );
+    });
+
+    it("leaves the session to the browser while a second factor is outstanding", async () => {
+      signIn({ org_id: ORG_ID, org_slug: "acme", org_role: "user" }, [
+        { factor_type: "totp", status: "verified" },
+      ]);
+
+      const res = await POST(makeRequest("acme.localhost"));
+
+      expect((await res.json()).sessionCookieSet).toBe(false);
+      expect(authCookiesForSession).not.toHaveBeenCalled();
+      expect(res.cookies.get(AUTH_COOKIE.name)).toBeUndefined();
+    });
+
+    it("reports no cookies when they could not be written", async () => {
+      signIn({ org_id: ORG_ID, org_slug: "acme", org_role: "user" });
+      authCookiesForSession.mockResolvedValueOnce(null);
+
+      const res = await POST(makeRequest("acme.localhost"));
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.sessionCookieSet).toBe(false);
+      expect(body.session.access_token).toEqual(expect.any(String));
+    });
+
+    it("clears a leftover sandbox on any completed sign-in, not only a switch", async () => {
+      signIn({ org_id: ORG_ID, org_slug: "acme", org_role: "user" });
+
+      const res = await POST(makeRequest("acme.localhost"));
+
+      expect((await res.json()).didSwitchOrg).toBe(false);
+      expect(res.cookies.get(SANDBOX_COOKIE_NAME)?.value).toBe("");
+    });
+
+    it("leaves the sandbox cookie alone while a second factor is outstanding", async () => {
+      signIn({ org_id: ORG_ID, org_slug: "acme", org_role: "user" }, [
+        { factor_type: "totp", status: "verified" },
+      ]);
+
+      const res = await POST(makeRequest("acme.localhost"));
+
+      expect(res.cookies.get(SANDBOX_COOKIE_NAME)).toBeUndefined();
+    });
+
+    it("writes no cookies for a refused sign-in", async () => {
+      signIn({ org_id: OTHER_ORG_ID, org_role: "user" });
+      stubOrgLookup(null);
+
+      const res = await POST(makeRequest("missing.localhost"));
+
+      expect(res.status).toBe(403);
+      expect(authCookiesForSession).not.toHaveBeenCalled();
+    });
   });
 });

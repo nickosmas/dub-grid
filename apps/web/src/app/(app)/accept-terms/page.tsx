@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { PageShell } from "@/components/auth/AuthCard";
+import AuthTransitionScreen from "@/components/AuthTransitionScreen";
+import { useSignInSettleDeadline } from "@/components/RouteGuards";
 import TermsAcceptanceCard from "@/components/auth/TermsAcceptanceCard";
 import { useAuth } from "@/components/AuthProvider";
 import { useTermsAcceptanceStatus } from "@/hooks";
@@ -15,6 +17,11 @@ import { getWebAuthRecoveryMessage } from "@/lib/auth-recovery";
 import { isRetryableAuthRecoveryError } from "@dubgrid/client-errors";
 import { settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
 import { parseInternalDestination, POST_LOGIN_DESTINATION } from "@/lib/auth/integrity-contract";
+import {
+  consumeAuthTransition,
+  markAuthTransition,
+  useAuthTransitionPending,
+} from "@/lib/auth-transition";
 
 export default function AcceptTermsPage() {
   const router = useRouter();
@@ -23,15 +30,20 @@ export default function AcceptTermsPage() {
   const { user, isLoading: authLoading } = useAuth();
   const { data: terms, isLoading: termsLoading } = useTermsAcceptanceStatus();
   const acceptingRef = useRef(false);
+  const authTransitionPending = useAuthTransitionPending();
 
   const next = parseInternalDestination(searchParams.get("next"), POST_LOGIN_DESTINATION);
 
-  // Redirect unauth users to /login (preserving `next`).
+  // Redirect unauth users to /login (preserving `next`), but not while a
+  // sign-in's session is still settling: the browser syncs its auth client
+  // alongside this page's load. A session that never arrives goes back to
+  // /login on the same deadline as ProtectedRoute.
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (!authLoading && !user && !authTransitionPending) {
       router.replace(`/login?next=${encodeURIComponent(`/accept-terms?next=${next}`)}`);
     }
-  }, [authLoading, user, next, router]);
+  }, [authLoading, user, next, router, authTransitionPending]);
+  useSignInSettleDeadline(authTransitionPending && !authLoading && !user);
 
   // If terms are already accepted, jump straight to next — never flash the card.
   useEffect(() => {
@@ -49,6 +61,9 @@ export default function AcceptTermsPage() {
           acceptedVersion: CURRENT_TERMS_VERSION,
         });
       }
+      // A new handoff: the next screen shows the sign-in splash with its own
+      // timer rather than the one this sign-in started.
+      markAuthTransition();
       router.replace(next);
     },
     onError: async (err: unknown) => {
@@ -100,7 +115,14 @@ export default function AcceptTermsPage() {
     terms !== undefined &&
     terms.acceptedCurrentTerms === false;
 
-  if (!showCard) return null;
+  // The card ends the sign-in handoff.
+  useEffect(() => {
+    if (showCard) consumeAuthTransition();
+  }, [showCard]);
+
+  if (!showCard) {
+    return authTransitionPending ? <AuthTransitionScreen phase="signing-in" /> : null;
+  }
 
   return (
     <PageShell>

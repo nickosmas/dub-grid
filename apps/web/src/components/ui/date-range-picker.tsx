@@ -143,7 +143,7 @@ export default function DateRangePicker({
             width: "100%",
             minWidth: 0,
             minHeight: "var(--dg-toolbar-h)",
-            background: disabled ? "var(--dg-color-bg)" : "var(--dg-color-surface)",
+            background: disabled ? "transparent" : "var(--dg-color-field)",
             border: "1px solid var(--dg-color-border)",
             borderRadius: "var(--dg-btn-radius)",
             padding: "10px 12px",

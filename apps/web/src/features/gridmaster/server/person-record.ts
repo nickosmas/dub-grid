@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { DbEmployee, DbInvitation } from "@/lib/db/types";
-import { rowToEmployee, rowToInvitation } from "@/lib/db/mappers";
+import type { DbEmployee, DbInvitation, DbOrganization } from "@/lib/db/types";
+import { rowToEmployee, rowToInvitation, rowToOrganizationTerminology } from "@/lib/db/mappers";
 import { readLoginLock } from "@/lib/rate-limit";
 import type { Invitation, OrganizationRole } from "@/types";
 import type {
@@ -22,11 +22,22 @@ const INVITATION_COLUMNS =
   "id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids";
 
 type Row = Record<string, unknown>;
+type OrganizationLabelRow = Pick<
+  DbOrganization,
+  "focus_area_label" | "certification_label" | "role_label" | "department_label"
+>;
 type EmployeeRow = DbEmployee & {
   created_by: string | null;
   updated_by: string | null;
   updated_at: string | null;
 };
+
+/** A missing account is an answer; any other Auth failure is not "no account". */
+export function throwUnlessNotFound(error: unknown): void {
+  if (!error) return;
+  if ((error as { status?: number }).status === 404) return;
+  throw error;
+}
 
 function unwrap<T>(result: { data: T | null; error: unknown }): T {
   if (result.error) throw result.error;
@@ -67,7 +78,7 @@ function mapMembership(row: Row): GridmasterMembership {
     phone: (row.phone as string | null) ?? null,
     onboardingCompletedAt: (row.onboarding_completed_at as string | null) ?? null,
     tooltipToursCompleted: (row.tooltip_tours_completed as Record<string, unknown> | null) ?? {},
-    updatedAt: (row.updated_at as string | null) ?? null,
+    updatedAt: row.updated_at as string,
   };
 }
 
@@ -135,11 +146,29 @@ async function groupByOrganization(
     ]),
   ];
   if (orgIds.length === 0) return [];
-  const orgs = unwrap(
-    await client.from("organizations").select("id, name, slug").in("id", orgIds),
-  ) as { id: string; name: string; slug: string | null }[];
-  return orgs
-    .map((org) => {
+  const [orgRows, departments, focusAreas, roles, certifications] = await Promise.all([
+    client
+      .from("organizations")
+      .select("id, name, slug, department_label, focus_area_label, role_label, certification_label")
+      .in("id", orgIds),
+    client.from("departments").select("id, org_id, name").in("org_id", orgIds),
+    client.from("focus_areas").select("id, org_id, name").in("org_id", orgIds),
+    client.from("organization_roles").select("id, org_id, name").in("org_id", orgIds),
+    client.from("certifications").select("id, org_id, name").in("org_id", orgIds),
+  ]);
+  const namesFor = (result: { data: unknown; error: unknown }, orgId: string) =>
+    Object.fromEntries(
+      (unwrap(result) as { id: number; org_id: string; name: string }[])
+        .filter((row) => row.org_id === orgId)
+        .map((row) => [row.id, row.name]),
+    );
+  return (unwrap(orgRows) as Row[])
+    .map((row) => {
+      const org = {
+        id: row.id as string,
+        name: row.name as string,
+        slug: (row.slug as string | null) ?? null,
+      };
       const match = memberships.find((membership) => membership.orgId === org.id);
       let membership: GridmasterMembership | null = null;
       if (match) {
@@ -148,6 +177,13 @@ async function groupByOrganization(
       }
       return {
         org,
+        terminology: rowToOrganizationTerminology(row as OrganizationLabelRow),
+        names: {
+          departments: namesFor(departments, org.id),
+          focusAreas: namesFor(focusAreas, org.id),
+          roles: namesFor(roles, org.id),
+          certifications: namesFor(certifications, org.id),
+        },
         membership,
         employees: employees.filter((employee) => employee.orgId === org.id),
         invitations: invitations.filter((invitation) => invitation.orgId === org.id),
@@ -183,6 +219,7 @@ export async function buildPersonRecordForUser(
   ]);
   const profile = unwrap(profileRow) as Row | null;
   if (profile?.platform_role === "gridmaster") return null;
+  throwUnlessNotFound(authResult.error);
   const authUser = authResult.data?.user ?? null;
   if (!authUser && !profile) return null;
 
@@ -270,9 +307,14 @@ export async function buildPersonRecordForStaff(
   employeeId: string,
 ): Promise<GridmasterPersonRecord | null> {
   const row = unwrap(
-    await client.from("employees").select(EMPLOYEE_COLUMNS).eq("id", employeeId).maybeSingle(),
-  ) as EmployeeRow | null;
-  if (!row) return null;
+    await client
+      .from("employees")
+      .select(`${EMPLOYEE_COLUMNS}, organizations!inner(workspace_kind)`)
+      .eq("id", employeeId)
+      .maybeSingle(),
+  ) as (EmployeeRow & { organizations: { workspace_kind: string } | null }) | null;
+  // A Test Sandbox's staff are clones, not people.
+  if (!row || row.organizations?.workspace_kind !== "real") return null;
   if (row.user_id) return buildPersonRecordForUser(client, row.user_id);
 
   const staff = mapStaff(row);

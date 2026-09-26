@@ -455,7 +455,7 @@ export default function ShiftRequestBoard({
           fontSize: "var(--dg-fs-caption)",
           fontFamily: "inherit",
           color: "var(--dg-color-text-primary)",
-          background: "var(--dg-color-surface)",
+          background: "var(--dg-color-field)",
           resize: "vertical",
           outline: "none",
           boxSizing: "border-box",

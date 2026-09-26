@@ -22,7 +22,10 @@ import * as Sentry from "@/lib/sentry";
 import { Timer } from "@/lib/server-timing";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { getSupabasePublishableKey, getSupabaseUrl } from "@/lib/supabase-keys";
-import { POST_LOGIN_DESTINATION } from "@/lib/auth/integrity-contract";
+import {
+  GRIDMASTER_POST_LOGIN_DESTINATION,
+  POST_LOGIN_DESTINATION,
+} from "@/lib/auth/integrity-contract";
 import {
   writeSecurityAuditEvent,
   type SecurityEventOutcome,
@@ -30,6 +33,7 @@ import {
 } from "@/lib/auth/security-audit";
 import { endUserSession } from "@/lib/auth/revocation";
 import { hashSessionId } from "@/lib/auth/sign-in-completion";
+import { authCookiesForSession, type SessionCookie } from "@/lib/auth/session-cookies";
 
 export const dynamic = "force-dynamic";
 
@@ -203,6 +207,35 @@ async function switchSessionToHostOrganization(
   return { ok: true, session: next, claims: decodeJwt(next.access_token) };
 }
 
+async function refreshGridmasterSession(
+  session: SessionTokens,
+): Promise<{ ok: true; session: SessionTokens } | Refusal> {
+  const client = createTokenScopedClient(session.access_token);
+  const { data, error } = await client.auth.refreshSession({
+    refresh_token: session.refresh_token,
+  });
+  if (error || !data.session) {
+    return {
+      ok: false,
+      status: 401,
+      code: "SESSION_REFRESH_FAILED",
+      error: "We couldn't verify your session. Sign in again.",
+      outcome: "failed",
+      reason: "service_unavailable",
+      orgId: null,
+    };
+  }
+  return {
+    ok: true,
+    session: {
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+      expires_in: data.session.expires_in,
+      token_type: data.session.token_type,
+    },
+  };
+}
+
 /**
  * Everything that has to happen between a correct password and a usable
  * dashboard: host-selected organization context, trial activation, sandbox
@@ -228,29 +261,14 @@ async function orchestratePostSignIn(
   let trialPromise: Promise<unknown> = Promise.resolve();
 
   if (isGridmaster) {
-    // Always refresh once so custom_access_token_hook has a chance to bake
-    // platform_role=gridmaster into the new JWT before we navigate.
-    const client = createTokenScopedClient(session.access_token);
-    const { data, error } = await client.auth.refreshSession({
-      refresh_token: session.refresh_token,
-    });
-    if (error || !data.session) {
-      return {
-        ok: false,
-        status: 401,
-        code: "SESSION_REFRESH_FAILED",
-        error: "We couldn't verify your session. Sign in again.",
-        outcome: "failed",
-        reason: "service_unavailable",
-        orgId: null,
-      };
+    // The token predates the access-token hook (isGridmasterAccount fell back
+    // to the profile): refresh once so the hook stamps platform_role before we
+    // navigate. A token that already carries it needs no second mint.
+    if (claims.platform_role !== "gridmaster") {
+      const refreshed = await refreshGridmasterSession(session);
+      if (!refreshed.ok) return refreshed;
+      session = refreshed.session;
     }
-    session = {
-      access_token: data.session.access_token,
-      refresh_token: data.session.refresh_token,
-      expires_in: data.session.expires_in,
-      token_type: data.session.token_type,
-    };
   } else {
     const hostSlug = parseHost(req.headers.get("host") ?? "").subdomain;
     const userSlug = typeof claims.org_slug === "string" ? claims.org_slug : null;
@@ -300,7 +318,8 @@ async function orchestratePostSignIn(
       })()
     : Promise.resolve();
 
-  let destination = POST_LOGIN_DESTINATION;
+  const home = isGridmaster ? GRIDMASTER_POST_LOGIN_DESTINATION : POST_LOGIN_DESTINATION;
+  let destination: string = home;
   const [, , termsResult] = await Promise.allSettled([
     trialPromise,
     sandboxTeardown,
@@ -309,7 +328,7 @@ async function orchestratePostSignIn(
   // Best-effort: a rejection here means the user lands on the destination
   // without a ToS check this turn. They'll be re-checked next sign-in.
   if (termsResult.status === "fulfilled" && !termsResult.value.acceptedCurrentTerms) {
-    destination = `/accept-terms?next=${encodeURIComponent(POST_LOGIN_DESTINATION)}`;
+    destination = `/accept-terms?next=${encodeURIComponent(home)}`;
   }
 
   return { ok: true, session, destination, didSwitchOrg };
@@ -508,6 +527,7 @@ export async function POST(req: NextRequest) {
   };
   let destination: string | null = null;
   let didSwitchOrg = false;
+  let sessionCookies: SessionCookie[] | null = null;
 
   // Email not yet confirmed: the client stops without ever calling
   // setBrowserSession, so orchestration (which assumes a fully-usable
@@ -558,9 +578,12 @@ export async function POST(req: NextRequest) {
     session = outcome.session;
     destination = outcome.destination;
     didSwitchOrg = outcome.didSwitchOrg;
+    sessionCookies = await timer.time("session_cookies", () => authCookiesForSession(req, session));
   }
 
-  // Return the session tokens so the client can set them
+  // The tokens still go to the client, which brings its auth client up to date
+  // with them; when the cookies are already set it does so without holding up
+  // the navigation.
   const res = NextResponse.json({
     success: true,
     session,
@@ -572,8 +595,15 @@ export async function POST(req: NextRequest) {
     mfa_required: mfaRequired,
     destination,
     didSwitchOrg,
+    sessionCookieSet: sessionCookies !== null,
   });
-  if (didSwitchOrg) {
+  for (const cookie of sessionCookies ?? []) {
+    res.cookies.set(cookie.name, cookie.value, cookie.options);
+  }
+  // A completed sign-in never resumes a sandbox, and clearing its cookie here
+  // means the requests that follow this response already see the real
+  // organization rather than racing the client's sandbox exit.
+  if (destination !== null) {
     res.cookies.set(SANDBOX_COOKIE_NAME, "", { path: "/", maxAge: 0 });
   }
   timer.applyTo(res.headers);
