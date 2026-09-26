@@ -42,14 +42,14 @@ committed as a local checkpoint.
 
 ## Build steps
 
-- [ ] **Step 1 - helper and restrictive policies** - migration 054. _Done
+- [x] **Step 1 - helper and restrictive policies** - migration 054. _Done
       when:_ live tests prove a stale Gridmaster token cannot insert, update
       or delete on representative tables, a fresh one can, an ordinary
       member's own writes (notifications) still pass, and every table with a
       Gridmaster write policy carries the three restrictive policies.
-- [ ] **Step 2 - inventories and suites** - the SQL entry-point allowlist
+- [x] **Step 2 - inventories and suites** - the SQL entry-point allowlist
       includes the helper; the full web suite and every live test pass.
-- [ ] **Step 3 - record the remaining surface** - F-74 narrowed to the
+- [x] **Step 3 - record the remaining surface** - F-74 narrowed to the
       SECURITY DEFINER functions, with the trade-off stated.
 
 ## Files / areas

@@ -39,6 +39,7 @@ const expectedAuthenticatedSecurityDefiners = [
   "get_schedule_last_viewed",
   "get_tenant_stats",
   "get_unread_notification_count",
+  "gridmaster_write_allowed",
   "import_previous_schedule",
   "is_gridmaster",
   "is_own_sandbox_org",

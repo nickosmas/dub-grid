@@ -232,10 +232,18 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** Set `disable_signup: true` on production (dashboard or Management API). Only `/api/invitations/register` creates accounts, through `auth.admin.createUser`, which ignores the setting. Local `config.toml` stays open for the integration tests that call `signUp`. Consider having `auth:templates:check` report the setting so it cannot drift again.
 **Resolution:** Production set to `disable_signup: true` through the Management API on 2026-09-26 (read back true; email sign-in and confirmation unchanged). Local `config.toml` stays open for the integration tests. The drift check in `auth:templates:check` is not added yet.
 
-### F-74 [P3] open - A Gridmaster token can still write most organization data directly
+### F-74 [P3] fixed - A Gridmaster token can still write most organization data directly
 
 **File:** `supabase/migrations/003_rls_policies.sql` (the `gridmaster_all_*` FOR ALL policies)
 **Found:** 2026-09-26 while scoping 41d5
 **Why it matters:** Beyond grants (closed by 051 and 052), the Gridmaster policies are FOR ALL on nearly every organization table (schedules, employees, departments, settings, notifications, subscriptions, feature flags), and `authenticated` holds write privileges on them, so a stolen Gridmaster token could change or delete organization data through the data API without a recent sign-in. Grants of authority are no longer reachable this way (051 to 053). `impersonation_sessions` is among the writable tables, so a stale Gridmaster token could insert an impersonation session directly and skip the justification, the audit row and the notice.
 **Suggested fix:** A decision for the owner: narrow the Gridmaster policies to SELECT and route Gridmaster writes through the server, or require `caller_has_fresh_proof()` in those policies' write checks, or accept the risk.
+**Resolution:** Owner chose the recent-sign-in option (2026-09-26, 41d6). Migration 054 adds `gridmaster_write_allowed()` (true for anyone but a Gridmaster without `caller_has_fresh_proof()`, granted to `authenticated` because Postgres checks a policy function's EXECUTE for every caller) and restrictive INSERT, UPDATE and DELETE policies for `authenticated` on all 36 tables a Gridmaster policy lets it write, `impersonation_sessions` included. No application path writes these tables with a Gridmaster's own token, so nothing changes in use. Live tests prove a stale token changes nothing, a fresh one writes, an ordinary member's own writes pass, and every such table carries the three policies (failing if a table is added without them). The SECURITY DEFINER functions that authorize a Gridmaster in their bodies are F-75.
+
+### F-75 [P3] open - Database functions still let a stale Gridmaster token edit organization data
+
+**File:** `supabase/migrations` (`check_admin_permission_for_org`, `is_authorized_org`, `publish_schedule` and the schedule, recurring and request functions that use them)
+**Found:** 2026-09-26 while building 41d6
+**Why it matters:** These SECURITY DEFINER functions are granted to `authenticated` and authorize a Gridmaster with `is_gridmaster()` alone, so a stale or stolen Gridmaster token can still edit schedules, publish, and settle requests in any organization by calling them through the data API. They are also how impersonated edits work, through routes that do not ask for fresh proof.
+**Suggested fix:** A decision for the owner. Requiring `caller_has_fresh_proof()` for a Gridmaster in those checks closes it, but a Gridmaster editing schedules while impersonating would then be asked to confirm their identity every five minutes, and the schedule screens would need the step-up prompt wired in. Alternatively accept it: grants of authority and direct table writes are already closed (051 to 054).
 **Resolution:**
