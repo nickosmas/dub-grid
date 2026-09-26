@@ -680,3 +680,50 @@
         dashboard schedule rows, People person detail, shift-request
         snapshots, and calendar (.ics) event descriptions show indicators,
         then build only the approved ones.
+- [ ] 43. **Complete person records and Gridmaster account recovery** -
+      managers see every fact about a person they are allowed to see on the
+      People detail page, and a Gridmaster has one well-organized page that
+      holds absolutely everything about a person, with every action needed to
+      support them, including recovery from a two-factor lockout. Secrets
+      (refresh, push, calendar and invitation tokens, IP hashes) are never
+      shown: only that they exist and their dates.
+  - [ ] 43a. **Manager person detail completeness** - the People detail page
+        shows the date joined (the single-person fetch attaches it, masked for
+        view-only callers as the list is), and its Profile section shows the
+        date added, status with its date and note, account state, and last
+        active. The invitation banner shows sent and expiry dates, and an
+        expired invitation reads as expired with Reinvite rather than "Not
+        invited yet". Whether Admins see management departments, and whether
+        mobile gains date added and date joined, are decided in the spec.
+  - [ ] 43b. **Gridmaster person page: account and organizations** - the All
+        Users slide-over becomes a full person page. A header carries
+        identity, platform role, status badges (deactivated, terminated,
+        scheduled deletion, login lock, live impersonation) and quick actions.
+        Account shows the sign-in record, profile, deactivation and scheduled
+        deletion, terms acceptance and cookie consent, with change sign-in
+        email, edit name, deactivate, terminate and reinstate. One card per
+        organization shows the full membership (role, permissions, management
+        departments, joined, onboarding, tours, archived), the full staff
+        record, and the complete invitation history, with role, record,
+        status, membership and invitation actions and a link to that
+        organization's People page. Staff without an account are found by a
+        cross-organization search.
+  - [ ] 43c. **Security, sessions and two-factor recovery** - Security shows
+        two-factor state and each factor (type, name, enrolled, last used),
+        known devices and any login lock; Sessions and devices shows every
+        session, push device and calendar feed. A Gridmaster, and only a
+        Gridmaster, can reset someone's two-factor behind step-up with a
+        required reason: it removes the factors, ends every session, emails
+        the person, and makes them enroll again at their next sign-in (a
+        migration). Also: end one session, clear a login lock, forget a
+        device, disable a push device, revoke a calendar feed.
+  - [ ] 43d. **Schedule, requests and notifications** - per organization, the
+        person's recurring schedule and series, recent and upcoming shifts,
+        schedule notes, publish changes that affected them, shift requests on
+        either side, and profile change requests; their notification
+        preferences and recent inbox.
+  - [ ] 43e. **Combined history** - one filterable timeline of everything done
+        by or to the person across the audit log, role changes,
+        impersonations of them (who, justification, duration, how it ended)
+        and ended editor sessions, including sign-ins and credential changes,
+        with export.
