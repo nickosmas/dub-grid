@@ -754,9 +754,9 @@ function ShiftDetailHoverCard({
                     color: "var(--dg-color-text-muted)",
                   }}
                 >
-                  {changeDetails.length === 0 && indicators.length > 0 ? (
-                    <div>Indicators: {indicators.join(", ")}</div>
-                  ) : null}
+                  {/* An indicator describes the shift, not the change, so it stays
+                      beside a change's details rather than giving way to them. */}
+                  {indicators.length > 0 ? <div>Indicators: {indicators.join(", ")}</div> : null}
                   {changeDetails.length === 0 && requestLabel ? (
                     <div>Request: {requestLabel}</div>
                   ) : null}

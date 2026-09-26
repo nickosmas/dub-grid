@@ -3309,6 +3309,50 @@ describe("ScheduleGrid", () => {
     });
   });
 
+  // 42a: an indicator describes the shift, so a change's details no longer hide it.
+  it("keeps the indicator line on a changed cell's hover card", async () => {
+    renderGrid({
+      assignments: twoPillAssignmentDefinitions,
+      showShiftDetailHoverCards: true,
+      draftKindForKey: () => "modified",
+      publishedAssignmentIdsForKey: () => [2],
+      publishedLabelForKey: () => "N",
+      activeIndicatorIdsForKey: () => [1],
+    });
+
+    const pill = screen
+      .getAllByRole("gridcell")[0]
+      .querySelector("[data-shift-pill]") as HTMLElement;
+    fireEvent.mouseEnter(pill);
+
+    await waitFor(() => {
+      expect(screen.getByText("Indicators: Flag")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Was N.")).toBeInTheDocument();
+  });
+
+  it("keeps the indicator line on a deleted shift's hover card", async () => {
+    observedWidth = 1600;
+    renderGrid({
+      showShiftDetailHoverCards: true,
+      shiftForKey: () => null,
+      assignmentIdsForKey: () => [],
+      activeIndicatorIdsForKey: () => [1],
+      draftKindForKey: () => "deleted",
+      publishedAssignmentIdsForKey: () => [1],
+      publishedLabelForKey: () => "D",
+    });
+
+    const pill = screen
+      .getAllByRole("gridcell")[0]
+      .querySelector('[data-shift-pill="deleted"]') as HTMLElement;
+    fireEvent.mouseEnter(pill);
+
+    await waitFor(() => {
+      expect(screen.getByText("Indicators: Flag")).toBeInTheDocument();
+    });
+  });
+
   it("shows full qualifications when hovering a staff role or certification", async () => {
     renderGrid({
       filteredEmployees: [{ ...employees[0], certificationId: 7, roleIds: [8] }],

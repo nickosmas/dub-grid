@@ -80,7 +80,7 @@ colour and the existing visibility rule.
       _Done when:_ panel tests show the list for a viewer without
       `canEditScheduleIndicators`, per card on a split shift, no list when
       none are active, and the editor's add and remove controls unchanged.
-- [ ] **Step 4 - hover card keeps its indicator line** - the line renders
+- [x] **Step 4 - hover card keeps its indicator line** - the line renders
       whenever there are indicators, beside any change details. _Done when:_
       grid tests show the line on a draft-changed cell, a publish-diff cell
       and a deleted shift that keeps its indicators.
