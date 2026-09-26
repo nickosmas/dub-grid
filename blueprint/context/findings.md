@@ -88,13 +88,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** Record it as `rejected` with a disabled-account reason (no session exists to end).
 **Resolution:**
 
-### F-32 [P3] open - Any signed-in user can insert audit rows as themselves
+### F-32 [P3] fixed - Any signed-in user can insert audit rows as themselves
 
 **File:** `supabase/migrations/003_rls_policies.sql:1204`
 **Found:** 2026-09-25 by `/audit` (scope: current, bdbbd4cc..8246596c; all lenses)
 **Why it matters:** `authenticated_insert_audit_log` lets a user write any `action` and `details`, including a `security.auth.login` success with their own `sessionHash` that would suppress the real record. Predates 41c2.
 **Suggested fix:** Restrict inserts to server-written actions (a migration), or move security evidence to a table only the service role writes.
-**Resolution:**
+**Resolution:** Fixed in the security findings cleanup (Step 1): migration 056 revokes INSERT, UPDATE, DELETE and the rest of the writes on `audit_log` and `role_change_log` from `authenticated`; every app write already used the service role and every writing function is SECURITY DEFINER, so reads are unchanged. The live isolation test asserts the privileges. The browser-side `logAudit` in `lib/audit.ts` is reachable only from the unused `lib/db` helpers.
 
 ### F-33 [P3] open - The proxy's escape end of an impersonation is not audited
 
