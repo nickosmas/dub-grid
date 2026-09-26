@@ -20,6 +20,8 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import { CloseButton } from "@/components/ui/CloseButton";
 import * as Sentry from "@/lib/sentry";
 import { queryKeys } from "@/lib/query-keys";
+import { requireCredentialAssurance } from "@/features/account/client";
+import { useStepUpAction } from "@/hooks/useStepUpAction";
 
 export default function EnhancedImpersonation({
   organizations,
@@ -42,6 +44,8 @@ export default function EnhancedImpersonation({
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState<string | null>(null);
   const [startConfirm, setStartConfirm] = useState(false);
+  // Starting an impersonation needs a recent sign-in (41d7, F-75).
+  const stepUp = useStepUpAction();
   const [endConfirm, setEndConfirm] = useState(false);
 
   const selectedOrg = useMemo(
@@ -126,12 +130,25 @@ export default function EnhancedImpersonation({
     }
     setLoading(true);
     try {
-      const result = await startGridmasterImpersonation({
-        targetUserId: selectedUser.id,
-        justification: trimmedJustification,
-        userAgent: navigator.userAgent,
-        targetOrgId: selectedOrg.id,
+      const started: { value?: Awaited<ReturnType<typeof startGridmasterImpersonation>> } = {};
+      const completed = await stepUp.run(async (accessToken) => {
+        await requireCredentialAssurance(accessToken);
+        started.value = await startGridmasterImpersonation(
+          {
+            targetUserId: selectedUser.id,
+            justification: trimmedJustification,
+            userAgent: navigator.userAgent,
+            targetOrgId: selectedOrg.id,
+          },
+          accessToken,
+        );
       });
+      const result = started.value;
+      if (!completed || !result) {
+        setStartConfirm(false);
+        setLoading(false);
+        return;
+      }
       const effectiveRole = roleOverride || selectedUser.orgRole || "user";
       setImpersonationCookie({
         sessionId: result.sessionId,
@@ -787,7 +804,8 @@ export default function EnhancedImpersonation({
         </div>
       )}
 
-      {startConfirm && selectedUser && selectedOrg && (
+      {stepUp.dialog}
+      {startConfirm && !stepUp.dialog && selectedUser && selectedOrg && (
         <ConfirmDialog
           title="Start impersonation"
           message={`Start impersonating "${selectedUser.email}" in ${selectedOrg.name} as ${roleOverride || selectedUser.orgRole || "user"}?`}

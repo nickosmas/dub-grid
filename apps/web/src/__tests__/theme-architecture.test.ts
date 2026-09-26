@@ -62,7 +62,6 @@ const staticAuthRoots = [
   resolve(sourceRoot, "app/(app)/forgot-password"),
   resolve(sourceRoot, "app/(app)/reset-password"),
   resolve(sourceRoot, "app/(app)/accept-invite"),
-  resolve(sourceRoot, "app/(app)/verify-email"),
   resolve(sourceRoot, "app/(app)/auth/verify"),
 ];
 

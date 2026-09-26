@@ -7,7 +7,7 @@ export function RecoveryEmail({ logoUrl }: { logoUrl?: string } = {}) {
   return (
     <AuthActionEmail
       heading="Reset your password"
-      intro="We got a request to reset the password for your DubGrid sign-in. Use the button below to choose a new one. The link and code expire in 1 hour."
+      intro="We got a request to reset the password for your DubGrid account. Use the button below to choose a new one. The link and code expire in 1 hour."
       ctaLabel="Reset password"
       actionHref={RECOVERY_VERIFICATION_URL}
       // The mobile app resets in-app rather than opening this link, so the same

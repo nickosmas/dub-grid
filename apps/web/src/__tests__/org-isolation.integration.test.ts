@@ -339,6 +339,35 @@ describe.runIf(dbReachable)("caller_org_id / caller_org_role SQL layer", () => {
     });
   });
 
+  // A Gridmaster's token could insert a Super Admin membership through the
+  // data API; only the server writes memberships (migration 052, F-60).
+  it("keeps membership writes server-only", async () => {
+    const { rows } = await sqlDb.query<Record<string, boolean>>(`
+      SELECT
+        has_table_privilege('authenticated', 'public.organization_memberships', 'SELECT') AS can_read,
+        has_any_column_privilege('authenticated', 'public.organization_memberships', 'INSERT') AS can_insert,
+        has_any_column_privilege('authenticated', 'public.organization_memberships', 'UPDATE') AS can_update,
+        has_table_privilege('authenticated', 'public.organization_memberships', 'DELETE') AS can_delete
+    `);
+    expect(rows[0]).toEqual({
+      can_read: true,
+      can_insert: false,
+      can_update: false,
+      can_delete: false,
+    });
+  });
+
+  // A Gridmaster's token could delete a profile and re-insert it as a
+  // Gridmaster; only the server inserts or deletes profiles (053, F-60).
+  it("keeps profile inserts and deletes server-only", async () => {
+    const { rows } = await sqlDb.query<Record<string, boolean>>(`
+      SELECT
+        has_any_column_privilege('authenticated', 'public.profiles', 'INSERT') AS can_insert,
+        has_table_privilege('authenticated', 'public.profiles', 'DELETE') AS can_delete
+    `);
+    expect(rows[0]).toEqual({ can_insert: false, can_delete: false });
+  });
+
   // This test used to assert the opposite — that a claim-less JWT falls back to
   // profiles.org_id — and that fallback was a cross-tenant read leak, not a
   // feature. The access-token hook strips org_id precisely when the membership

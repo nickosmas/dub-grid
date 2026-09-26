@@ -17,6 +17,15 @@ vi.mock("@/lib/api-auth", () => ({
   }),
   requireGridmasterSession: (req: NextRequest) => requireGridmasterSession(req),
   requireSensitiveActionAuth: (req: NextRequest) => requireSensitiveActionAuth(req),
+  // As the real helper: a database STEP_UP_REQUIRED becomes the route's step-up answer.
+  stepUpResponseForRefusal: async (
+    req: NextRequest,
+    error: { message?: string; code?: string } | null,
+  ) => {
+    if (error?.message !== "STEP_UP_REQUIRED" || error.code !== "42501") return null;
+    const assurance = await requireSensitiveActionAuth(req);
+    return "response" in assurance ? assurance.response : null;
+  },
 }));
 
 vi.mock("@/lib/csrf", () => ({
@@ -291,6 +300,35 @@ describe("POST /api/gridmaster/accounts", () => {
     await expect(response.json()).resolves.toEqual({
       error: "Cannot remove the last active gridmaster account",
     });
+    expect(auditInsert).not.toHaveBeenCalled();
+  });
+
+  // The route's check passed and the proof lapsed before the database's (051).
+  it("answers a database refusal for lapsed proof with the step-up prompt", async () => {
+    requestRpc.mockResolvedValueOnce({
+      data: null,
+      error: { message: "STEP_UP_REQUIRED", code: "42501" },
+    });
+    requireSensitiveActionAuth
+      .mockResolvedValueOnce({ user: { id: "gridmaster-1" } })
+      .mockResolvedValueOnce({
+        response: NextResponse.json(
+          { code: "STEP_UP_REQUIRED", method: "password", error: "Confirm your identity." },
+          { status: 403 },
+        ),
+      });
+
+    const response = await POST(
+      makePostRequest({
+        action: "demote",
+        userId: USER_ID,
+        orgId: ORG_ID,
+        orgRole: "user",
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ code: "STEP_UP_REQUIRED" });
     expect(auditInsert).not.toHaveBeenCalled();
   });
 });

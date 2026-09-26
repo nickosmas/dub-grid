@@ -30,7 +30,6 @@ const PUBLIC_SEGMENTS = new Set([
   "request-demo",
   "forgot-password",
   "reset-password",
-  "verify-email",
   "auth", // /auth/* is public
 ]);
 

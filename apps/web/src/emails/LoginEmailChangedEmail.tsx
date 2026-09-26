@@ -16,7 +16,7 @@ export type LoginEmailChangedEmailProps = {
   logoUrl: string;
 };
 
-/** Sent to both addresses when an administrator changes someone's sign-in email. */
+/** Sent to both addresses when an administrator changes someone's email address. */
 export function LoginEmailChangedEmail({
   orgName,
   recipient,
@@ -25,8 +25,8 @@ export function LoginEmailChangedEmail({
 }: LoginEmailChangedEmailProps) {
   const heading =
     recipient === "previous"
-      ? "Your sign-in email was changed"
-      : "This address now signs in to DubGrid";
+      ? "Your email address was changed"
+      : "Your DubGrid email address was updated";
   return (
     <EmailLayout logoUrl={logoUrl} preview={heading}>
       <Text style={styles.heading}>{heading}</Text>
@@ -34,14 +34,14 @@ export function LoginEmailChangedEmail({
       <Text style={styles.paragraph}>
         {recipient === "previous" ? (
           <>
-            An administrator at <strong>{orgName}</strong> changed the email you use to sign in to
-            DubGrid to <strong>{newEmail}</strong>. For your security, we&apos;ve signed you out on
-            your devices. Sign in again with your new address whenever you&apos;re ready.
+            An administrator at <strong>{orgName}</strong> changed your DubGrid email address to{" "}
+            <strong>{newEmail}</strong>. For your security, we&apos;ve signed you out on your
+            devices. Sign in again with your new email address whenever you&apos;re ready.
           </>
         ) : (
           <>
-            An administrator at <strong>{orgName}</strong> set this address as the email for a
-            DubGrid sign-in. Use this address the next time you sign in.
+            An administrator at <strong>{orgName}</strong> updated a DubGrid account to use this
+            email address. Use it the next time you sign in.
           </>
         )}
       </Text>

@@ -4,6 +4,7 @@ import {
   createRequestSupabaseClient,
   requireAuthenticatedUser,
   requireSensitiveActionAuth,
+  stepUpResponseForRefusal,
 } from "@/lib/api-auth";
 import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { getServiceClient } from "@/lib/supabase-service";
@@ -109,6 +110,8 @@ export async function POST(req: NextRequest) {
     });
 
     if (result.error) {
+      const stepUp = await stepUpResponseForRefusal(req, result.error);
+      if (stepUp) return stepUp;
       // Map the RPC's self-action guard to a clean, mappable error code.
       if (result.error.message?.includes(SELF_ACTION_FORBIDDEN_CODE)) {
         return NextResponse.json(

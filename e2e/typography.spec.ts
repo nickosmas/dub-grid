@@ -12,8 +12,14 @@ const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || "localhost";
 const apexOrigin = `http://${baseDomain}:${port}`;
 const organizationOrigin = `http://ardenwood.${baseDomain}:${port}`;
 
-const publicEntryRoutes = typographyRouteAuditManifest.slice(0, 15);
-const authenticatedEntryRoutes = typographyRouteAuditManifest.slice(15);
+// Split by what each entry needs, not by position: removing a public entry
+// used to shift the first signed-in route into the signed-out pass.
+const isSignedOutEntry = (entry: (typeof typographyRouteAuditManifest)[number]) =>
+  entry.access === "public" || entry.browserExpectation === "login-redirect";
+const publicEntryRoutes = typographyRouteAuditManifest.filter(isSignedOutEntry);
+const authenticatedEntryRoutes = typographyRouteAuditManifest.filter(
+  (entry) => !isSignedOutEntry(entry),
+);
 
 const routeAuditViewports = [
   { name: "desktop", width: 1440, height: 900 },
@@ -210,8 +216,8 @@ async function auditRenderedTypography(
 }
 
 test("typography audit manifest owns explicit evidence for every route state", () => {
-  expect(typographyRouteAuditManifest).toHaveLength(26);
-  expect(new Set(typographyRouteAuditManifest.map((entry) => entry.route)).size).toBe(26);
+  expect(typographyRouteAuditManifest).toHaveLength(25);
+  expect(new Set(typographyRouteAuditManifest.map((entry) => entry.route)).size).toBe(25);
 
   for (const entry of typographyRouteAuditManifest) {
     expect(existsSync(resolve(process.cwd(), entry.source)), entry.source).toBe(true);

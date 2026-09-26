@@ -184,7 +184,10 @@ async function signInMobileUser(
   }
 
   if (!authData.user.email_confirmed_at) {
-    throw new MobileApiRequestError(403, "Verify your email on the web before using mobile.");
+    throw new MobileApiRequestError(
+      403,
+      "Finish setting up your account from your invitation email, then sign in.",
+    );
   }
 
   const verifiedTotpFactors = (authData.user.factors ?? []).filter(

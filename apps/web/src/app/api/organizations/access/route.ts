@@ -4,7 +4,11 @@ import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { retryAfterSeconds } from "@/lib/retry-after";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
-import { requireAuthenticatedUser, requireSensitiveActionAuth } from "@/lib/api-auth";
+import {
+  requireAuthenticatedUser,
+  requireSensitiveActionAuth,
+  stepUpResponseForRefusal,
+} from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
@@ -306,6 +310,8 @@ export async function PATCH(req: NextRequest) {
       });
 
       if (error) {
+        const stepUp = await stepUpResponseForRefusal(req, error);
+        if (stepUp) return stepUp;
         const latestUser = await fetchOrganizationUser(orgId, userId);
         if (latestUser && !timestampsMatch(latestUser.updatedAt, expectedUpdatedAt)) {
           return buildConflictResponse(latestUser);

@@ -56,7 +56,7 @@ apps/web/
 │   │   │   ├── gridmaster/     # /gridmaster (platform_role = 'gridmaster')
 │   │   │   ├── onboarding/     # /onboarding (invited member waiting for org setup)
 │   │   │   ├── billing-required/ accept-terms/ goodbye/
-│   │   │   ├── login/ forgot-password/ reset-password/ accept-invite/ verify-email/
+│   │   │   ├── login/ forgot-password/ reset-password/ accept-invite/
 │   │   │   └── auth/           # /auth/callback, /auth/confirm, /auth/verify
 │   │   ├── request-demo/       # /request-demo
 │   │   ├── cookie-policy/      # /cookie-policy

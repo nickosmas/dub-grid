@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const validateCsrfOrigin = vi.fn();
 const requireAuthenticatedUserWithClaims = vi.fn();
-const createRequestSupabaseClient = vi.fn();
+const getServiceClient = vi.fn();
 
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
@@ -11,7 +11,9 @@ vi.mock("@/lib/csrf", () => ({
 
 vi.mock("@/lib/api-auth", () => ({
   requireAuthenticatedUserWithClaims: (req: NextRequest) => requireAuthenticatedUserWithClaims(req),
-  createRequestSupabaseClient: (req: NextRequest) => createRequestSupabaseClient(req),
+}));
+vi.mock("@/lib/supabase-service", () => ({
+  getServiceClient: () => getServiceClient(),
 }));
 
 import { POST } from "./route";
@@ -62,7 +64,7 @@ describe("POST /api/notifications/bulk org-scoping", () => {
     });
 
     builder = makeBuilder();
-    createRequestSupabaseClient.mockReturnValue({
+    getServiceClient.mockReturnValue({
       from: vi.fn(() => builder),
     });
   });

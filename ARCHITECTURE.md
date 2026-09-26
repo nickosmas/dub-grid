@@ -202,7 +202,7 @@ The authentication system includes complete self-service flows:
 
 - **Forgot Password** (`/forgot-password`) - the browser posts to `POST /api/auth/recovery-request`, which applies source, per-target, and global rate limits, writes a security audit event, and only then calls Supabase `resetPasswordForEmail()`. The response is generic (always success) so account existence is never revealed. Mobile uses the same handler at `/api/mobile/v1/auth/recovery-request` and completes the reset in-app with a 6-digit code (`verifyOtp`).
 - **Reset Password** (`/reset-password`) - Token-validated form with password strength meter (4 levels). Password rules live once in `@dubgrid/domain` (`password.ts`). Signs the user out after reset.
-- **Email Verification** (`/verify-email`) - Invited accounts are created pre-confirmed by `/api/invitations/register`, so this page only serves accounts that are genuinely unconfirmed (resend with a 60-second cooldown, auto-redirect on the `SIGNED_IN` event).
+- **Email Verification** - Invited accounts are created pre-confirmed by `/api/invitations/register`, so there is no verification page. Sign-ups are disabled in Supabase, so no unconfirmed account can be created; login refuses one with a pointer back to the invitation.
 - **MFA (TOTP)** - enrollment, verification, and removal run through `POST /api/account/mfa-lifecycle` (mobile: `/api/mobile/v1/profile/mfa-lifecycle`), one shared handler with `enroll`, `remove`, `reauthenticate`, and `cleanup` actions. Enforcement is account-based: once a verified factor exists, sign-in requires the TOTP challenge and sensitive actions require fresh AAL2 proof. Accounts without a factor get a dismissible nag banner, not a hard block. See `internal/mfa-provider-boundary.md`.
 - **Sensitive-action reauthentication** - `@dubgrid/authz`'s `assurance.ts` defines a five-minute fresh-auth window derived from the JWT's `amr` timestamps. Route Handlers call `requireSensitiveActionAuth` before MFA changes, credential updates (`POST /api/account/credential-assurance` preflights Supabase `updateUser`), session revocation, data export, and account or organization deletion; the web `StepUpDialog` and the mobile step-up flow satisfy it.
 
@@ -366,7 +366,7 @@ This pattern provides type safety via row mappers (snake_case → camelCase), ce
 All routes are **simple page files** (no catch-all routes) so Vercel can statically prerender them. Selected routes:
 
 - Public: `/`, `/request-demo`, `/privacy`, `/terms`, `/cookie-policy` (top-level under `apps/web/src/app/`)
-- Auth, under the `(app)` route group: `/login`, `/forgot-password`, `/reset-password`, `/verify-email`, `/auth/callback`, `/auth/confirm`, `/auth/verify`, `/accept-invite`, `/accept-terms`, `/goodbye`, `/billing-required`, `/onboarding`
+- Auth, under the `(app)` route group: `/login`, `/forgot-password`, `/reset-password`, `/auth/callback`, `/auth/confirm`, `/auth/verify`, `/accept-invite`, `/accept-terms`, `/goodbye`, `/billing-required`, `/onboarding`
 - App, under `(app)`: `/dashboard`, `/schedule`, `/people`, `/people/[id]`, `/alerts`, `/reports`, `/profile`, `/account`, `/settings` (sections via `?section=`; `/settings/staff-config` only redirects there)
 - Gridmaster: `/gridmaster`
 

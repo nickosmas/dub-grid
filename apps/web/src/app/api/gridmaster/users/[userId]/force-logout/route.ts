@@ -4,6 +4,7 @@ import {
   createRequestSupabaseClient,
   requireGridmasterSession,
   requireSensitiveActionAuth,
+  stepUpResponseForRefusal,
 } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
@@ -62,6 +63,8 @@ export async function POST(req: NextRequest, context: { params: Promise<{ userId
     });
 
     if (result.error) {
+      const stepUp = await stepUpResponseForRefusal(req, result.error);
+      if (stepUp) return stepUp;
       throw result.error;
     }
 

@@ -573,15 +573,21 @@ export function fetchGridmasterImpersonationHistory(options?: {
   ).then((data) => data.entries);
 }
 
-export function startGridmasterImpersonation(input: {
-  targetUserId: string;
-  justification: string;
-  targetOrgId?: string;
-  userAgent?: string;
-}): Promise<StartImpersonationResult> {
+export function startGridmasterImpersonation(
+  input: {
+    targetUserId: string;
+    justification: string;
+    targetOrgId?: string;
+    userAgent?: string;
+  },
+  accessToken?: string,
+): Promise<StartImpersonationResult> {
   return requestGridmasterJson<StartImpersonationResult>("/api/gridmaster/impersonation", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify({ action: "start", ...input }),
   });
 }

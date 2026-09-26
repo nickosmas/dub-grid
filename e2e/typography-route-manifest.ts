@@ -52,16 +52,6 @@ export const typographyRouteAuditManifest = [
     sourceReviewedStates: ["form", "success", "loading"],
   },
   {
-    route: "/verify-email",
-    visit: "/verify-email",
-    origin: "organization",
-    access: "public",
-    source: "apps/web/src/app/(app)/verify-email/page.tsx",
-    browserExpectation: "rendered",
-    browserStates: ["instructions"],
-    sourceReviewedStates: ["resend cooldown", "loading"],
-  },
-  {
     route: "/auth/verify",
     visit: "/auth/verify",
     origin: "organization",

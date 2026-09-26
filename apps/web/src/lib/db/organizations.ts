@@ -234,53 +234,6 @@ export async function invalidateOrgDirectory(orgId: string): Promise<void> {
   await cacheDel(CacheKey.orgDirectory(orgId));
 }
 
-export async function updateAppOnlyUser(
-  userId: string,
-  orgId: string,
-  data: {
-    firstName?: string;
-    lastName?: string;
-    phone?: string;
-    departmentIds?: number[];
-    deptAdminIds?: number[];
-  },
-): Promise<void> {
-  // Update profile name
-  if (data.firstName !== undefined || data.lastName !== undefined) {
-    const profileUpdate: Record<string, unknown> = { updated_at: new Date().toISOString() };
-    if (data.firstName !== undefined) profileUpdate.first_name = data.firstName;
-    if (data.lastName !== undefined) profileUpdate.last_name = data.lastName;
-    const { error } = await supabase.from("profiles").update(profileUpdate).eq("id", userId);
-    if (error) throw error;
-  }
-  // Update membership phone + departments
-  if (
-    data.phone !== undefined ||
-    data.departmentIds !== undefined ||
-    data.deptAdminIds !== undefined
-  ) {
-    const membershipUpdate: Record<string, unknown> = {};
-    if (data.phone !== undefined) membershipUpdate.phone = data.phone;
-    if (data.departmentIds !== undefined) {
-      membershipUpdate.department_ids = data.departmentIds;
-      // Auto-prune dept_admin_ids to remain a subset of department_ids
-      if (data.deptAdminIds !== undefined) {
-        const deptSet = new Set(data.departmentIds);
-        membershipUpdate.dept_admin_ids = data.deptAdminIds.filter((id) => deptSet.has(id));
-      }
-    } else if (data.deptAdminIds !== undefined) {
-      membershipUpdate.dept_admin_ids = data.deptAdminIds;
-    }
-    const { error } = await supabase
-      .from("organization_memberships")
-      .update(membershipUpdate)
-      .eq("user_id", userId)
-      .eq("org_id", orgId);
-    if (error) throw error;
-  }
-  await cacheDel(CacheKey.orgDirectory(orgId), CacheKey.orgUsers(orgId));
-}
-
 export async function updatePendingInvitation(
   invitationId: string,
   orgId: string,

@@ -5,6 +5,7 @@ import {
   createRequestSupabaseClient,
   requireGridmasterSession,
   requireSensitiveActionAuth,
+  stepUpResponseForRefusal,
 } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
@@ -141,6 +142,8 @@ export async function POST(req: NextRequest) {
         p_email: parsed.data.email,
       });
       if (result.error) {
+        const stepUp = await stepUpResponseForRefusal(req, result.error);
+        if (stepUp) return stepUp;
         return apiErrorResponse(
           result.error,
           "We couldn't promote gridmaster account. Try again.",
@@ -168,6 +171,8 @@ export async function POST(req: NextRequest) {
         p_org_role: parsed.data.orgRole,
       });
       if (result.error) {
+        const stepUp = await stepUpResponseForRefusal(req, result.error);
+        if (stepUp) return stepUp;
         return apiErrorResponse(
           result.error,
           "We couldn't demote gridmaster account. Try again.",
@@ -196,6 +201,8 @@ export async function POST(req: NextRequest) {
       p_deactivate: parsed.data.deactivate,
     });
     if (result.error) {
+      const stepUp = await stepUpResponseForRefusal(req, result.error);
+      if (stepUp) return stepUp;
       return apiErrorResponse(
         result.error,
         "We couldn't update gridmaster account. Try again.",

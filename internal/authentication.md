@@ -184,9 +184,8 @@ sequenceDiagram
     participant SupaAuth as Supabase Auth
     participant Email as Email (Resend)
     participant ResetPage as /reset-password
-    participant VerifyPage as /verify-email
 
-    Note over User,VerifyPage: === PASSWORD RESET FLOW ===
+    Note over User,ResetPage: === PASSWORD RESET FLOW ===
 
     User->>ForgotPage: Navigate to /forgot-password
     User->>ForgotPage: Enter email address
@@ -213,21 +212,6 @@ sequenceDiagram
     else Invalid/expired token (5s timeout)
         ResetPage-->>User: "Invalid or expired link"<br/>Link to /forgot-password
     end
-
-    Note over User,VerifyPage: === EMAIL VERIFICATION FLOW ===
-
-    User->>VerifyPage: Login with an account whose email was never confirmed
-    VerifyPage-->>User: "Verify your email" message
-    VerifyPage->>SupaAuth: Listen for SIGNED_IN event
-
-    alt User clicks resend
-        User->>VerifyPage: Click "Resend Verification Email"
-        VerifyPage->>SupaAuth: resend({ type: 'signup', email })
-        Note over VerifyPage: 60-second cooldown<br/>before next resend
-    end
-
-    SupaAuth-->>VerifyPage: SIGNED_IN event (email confirmed)
-    VerifyPage-->>User: Auto-redirect to /dashboard
 ```
 
 ---
@@ -246,13 +230,9 @@ returned a user with **no session**, so the invitation could not be accepted unt
 invitee found and clicked that mail. The route handler is now the only account-creation
 path, and the flow behaves the same whether or not confirmations are enabled.
 
-`/verify-email` remains for accounts that are genuinely unconfirmed — anyone stranded by
-the old flow, reached by logging in:
-
-- **Verify Email** (`/verify-email`) — Displays verification status with optional `?email=` param
-- Resend button with 60-second cooldown to prevent abuse
-- Listens for `SIGNED_IN` auth event to auto-redirect when verified
-- Email enumeration protection (same UI regardless of email validity)
+There is no verification page or confirmation email. Sign-ups are disabled in Supabase,
+so no unconfirmed account can be created, and production had none when the page was
+removed (2026-09-26). Login refuses an unconfirmed account and points back to the invitation.
 
 Re-clicking a live invitation also repairs such an account: an unconfirmed user that
 belongs to no organization is an abandoned signup, so the register route confirms it and
@@ -623,18 +603,18 @@ super-admin-approved deletions. See `internal/cookies-and-gdpr.md`.
 
 ### 8.4 Summary
 
-| Item                                     | Status                                                                    |
-| ---------------------------------------- | ------------------------------------------------------------------------- |
-| MFA enrollment, challenge, and step-up   | Done; account-based enforcement, nag for unenrolled management accounts   |
-| Failed login tracking                    | Done as per-email, per-IP, and global rate limits; no persistent lockout  |
-| IP allowlisting for Gridmaster           | Not done                                                                  |
-| Password reset flow                      | Done (web link, mobile OTP, server-mediated requests)                     |
-| Email verification                       | Done (invited accounts are pre-confirmed; `/verify-email` for stragglers) |
-| Rate limiting on API routes              | Done                                                                      |
-| Soft delete (users & orgs)               | Done, fail-closed at the membership and session level                     |
-| Refresh token rotation + reuse detection | Enabled in local config; app-side revocation markers regardless           |
-| Role change notifications                | Done                                                                      |
-| GDPR data export                         | Done                                                                      |
+| Item                                     | Status                                                                   |
+| ---------------------------------------- | ------------------------------------------------------------------------ |
+| MFA enrollment, challenge, and step-up   | Done; account-based enforcement, nag for unenrolled management accounts  |
+| Failed login tracking                    | Done as per-email, per-IP, and global rate limits; no persistent lockout |
+| IP allowlisting for Gridmaster           | Not done                                                                 |
+| Password reset flow                      | Done (web link, mobile OTP, server-mediated requests)                    |
+| Email verification                       | Done (invited accounts are pre-confirmed; no verification page)          |
+| Rate limiting on API routes              | Done                                                                     |
+| Soft delete (users & orgs)               | Done, fail-closed at the membership and session level                    |
+| Refresh token rotation + reuse detection | Enabled in local config; app-side revocation markers regardless          |
+| Role change notifications                | Done                                                                     |
+| GDPR data export                         | Done                                                                     |
 
 ---
 

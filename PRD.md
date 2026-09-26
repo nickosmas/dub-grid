@@ -194,7 +194,7 @@ Permissions are **per-person**, set on the People page, not granted by departmen
 - Subdomain routing ensures users stay within their org context
 - Invitation-only registration with 72-hour expiry tokens
 - Self-service password reset: web posts to a rate-limited, audited recovery endpoint and follows the emailed link; mobile completes the reset in-app with a 6-digit code
-- Invited accounts are created pre-confirmed; `/verify-email` (resend with 60s cooldown) only serves accounts that are genuinely unconfirmed
+- Invited accounts are created pre-confirmed, so there is no separate email verification step
 - TOTP multi-factor authentication on web and mobile; once enrolled, sign-in requires the challenge and sensitive actions require fresh (five-minute) AAL2 proof; accounts without a factor use a fresh password proof for sensitive actions
 - Password strength meter (4 levels: too short, weak, fair, strong; minimum 10 characters)
 - Post-login soft navigation: `router.replace` + an `<AuthSplash>` bridge while the session settles, so route guards do not bounce a freshly-authenticated user back to login. Logout is fast and always redirects to `/login`.
@@ -501,7 +501,6 @@ All routes are simple (non-catch-all) to preserve static prerendering on Vercel.
 | `/login`                          | Public        | Organization / gridmaster login                                                            |
 | `/forgot-password`                | Public        | Password reset request (email-based)                                                       |
 | `/reset-password`                 | Public        | Password reset form (via email link token)                                                 |
-| `/verify-email`                   | Public        | Email verification for new accounts                                                        |
 | `/auth/verify`                    | Public        | Auth callback / token verification handler                                                 |
 | `/accept-invite`                  | Public        | Invitation acceptance flow                                                                 |
 | `/request-demo`                   | Public        | Demo request / contact form                                                                |

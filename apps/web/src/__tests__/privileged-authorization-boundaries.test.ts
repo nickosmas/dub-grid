@@ -38,6 +38,8 @@ const AUTHENTICATED_SCOPED_ROUTES: Record<string, string> = {
     "The authenticated user ID owns the account requests.",
   "apps/web/src/app/api/account/mfa-status/route.ts":
     "The authenticated user ID scopes the MFA status row.",
+  "apps/web/src/app/api/notifications/bulk/route.ts":
+    "The authenticated user ID and the verified token's organization scope the caller's own notifications.",
   "apps/web/src/app/api/account/permissions/route.ts":
     "The authenticated user ID and live membership query build the returned permission context.",
   "apps/web/src/app/api/account/profile/route.ts":

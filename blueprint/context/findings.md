@@ -184,14 +184,6 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** Confirm the limit and add it to the rule and the policy test.
 **Resolution:**
 
-### F-60 [P2] open - A Gridmaster token can change memberships and invitations directly in the database
-
-**File:** `supabase/migrations/003_rls_policies.sql:117`, `:751`; `016_harden_authorization_boundaries.sql:79`; `043_invitation_inviter_is_verified.sql:250`
-**Found:** 2026-09-25 by `/audit` re-review of 7ba79e75
-**Why it matters:** `change_user_role`, `assign_org_role_by_email` and `send_invitation` are executable by `authenticated`, and the `gridmaster_all_memberships` and `gridmaster_all_invitations` policies are FOR ALL, so a Gridmaster token can insert a Super Admin membership through PostgREST, skipping every route gate. The same class as F-08; `is_gridmaster()` needs aal2 but not a recent sign-in.
-**Suggested fix:** A decision with F-08: narrow the Gridmaster policies to SELECT and route writes through server-only functions, or require a recent authentication in the RPCs.
-**Resolution:**
-
 ### F-62 [P2] open - Turning on `secure_password_change` would refuse password changes for two-factor users on sessions older than a day
 
 **File:** `apps/web/src/features/account/client/step-up.ts:44`; `apps/mobile/src/features/profile/lib/step-up.ts:62`; `supabase/config.toml` (`secure_password_change = true`)
@@ -222,7 +214,7 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Found:** 2026-09-26 by `/audit` re-review of 58ff57cd (predates 41d4)
 **Why it matters:** An Admin who manages employees can call the RPC through the data API and receive the new invitation's token, then register a pre-confirmed account at an address they do not own. No tier escalation (the function's tier check holds), but the address is not proven. The same class as F-60.
 **Suggested fix:** Move the setup wizard's call to the service client with `p_invited_by`, then revoke EXECUTE on `send_invitation` from `authenticated` in a forward migration and update the SQL entry-point allowlist.
-**Resolution:** Fixed in 41d3 (repair): migration `050_send_invitation_server_only.sql` revokes EXECUTE on `send_invitation` from `authenticated`; the Gridmaster setup route calls it as the service role with `p_invited_by`, like invitations/create. The SQL entry-point allowlist now honours a later revoke, and the live check proves `authenticated` cannot execute it. Production needs 050 applied by the runbook. Re-review (e4e6f905..f2ff543e): closed; no application path or live test calls it as `authenticated` (the e2e fixtures use the superuser). Ordering: production's released code still calls it as the user from the setup wizard, so 050 is applied right after the release that carries the service-role call deploys, not before.
+**Resolution:** Fixed in 41d3 (repair): migration `050_send_invitation_server_only.sql` revokes EXECUTE on `send_invitation` from `authenticated`; the Gridmaster setup route calls it as the service role with `p_invited_by`, like invitations/create. The SQL entry-point allowlist now honours a later revoke, and the live check proves `authenticated` cannot execute it. Production needs 050 applied by the runbook. Re-review (e4e6f905..f2ff543e): closed; no application path or live test calls it as `authenticated` (the e2e fixtures use the superuser). Ordering: production's released code still calls it as the user from the setup wizard, so 050 is applied right after the release that carries the service-role call deploys, not before. Applied to production 2026-09-26 after release #115 deployed; `authenticated` can no longer execute it there.
 
 ### F-72 [P3] open - The SQL entry-point allowlist helper matches names, one grant spelling and simple signatures
 
@@ -239,3 +231,11 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Why it matters:** `internal/authentication.md` and `RBAC_SYSTEM_DESIGN.md` say email sign-up is off in production, but it is on. Anyone with the public publishable key can create and confirm an account through `/auth/v1/signup`, or through a sign-in link request, which also creates a missing user while sign-ups are open. The account has no organization, so RLS should still hide tenant data, but every RPC granted to `authenticated` becomes reachable by strangers.
 **Suggested fix:** Set `disable_signup: true` on production (dashboard or Management API). Only `/api/invitations/register` creates accounts, through `auth.admin.createUser`, which ignores the setting. Local `config.toml` stays open for the integration tests that call `signUp`. Consider having `auth:templates:check` report the setting so it cannot drift again.
 **Resolution:** Production set to `disable_signup: true` through the Management API on 2026-09-26 (read back true; email sign-in and confirmation unchanged). Local `config.toml` stays open for the integration tests. The drift check in `auth:templates:check` is not added yet.
+
+### F-75 [P3] open - Database functions still let a stale Gridmaster token edit organization data
+
+**File:** `supabase/migrations` (`check_admin_permission_for_org`, `is_authorized_org`, `publish_schedule` and the schedule, recurring and request functions that use them; `start_impersonation`; `force_logout_user`)
+**Found:** 2026-09-26 while building 41d6
+**Why it matters:** These SECURITY DEFINER functions are granted to `authenticated` and authorize a Gridmaster with `is_gridmaster()` alone, so a stale or stolen Gridmaster token can still edit schedules, publish, and settle requests in any organization by calling them through the data API. `start_impersonation` called directly also starts a session and its in-app notices without the route's audit row and email notice, and `force_logout_user` is gated in its route but not in the database. They are also how impersonated edits work, through routes that do not ask for fresh proof.
+**Suggested fix:** A decision for the owner. Requiring `caller_has_fresh_proof()` for a Gridmaster in those checks closes it, but a Gridmaster editing schedules while impersonating would then be asked to confirm their identity every five minutes, and the schedule screens would need the step-up prompt wired in. Alternatively accept it: grants of authority and direct table writes are already closed (051 to 054).
+**Resolution:** Narrowed by the owner's choice (2026-09-26, 41d7): migration 055 gives `start_impersonation` and `force_logout_user` the 051 guard, the impersonation route asks for fresh proof before a start (never before an end) and answers a database refusal with the prompt, and the portal runs the start through step-up; live tests prove both refuse a stale Gridmaster, work with fresh proof, and that a stale token still ends a session. Still open: the schedule, recurring, publish and request functions, left unchanged on purpose because fresh proof there would interrupt impersonated editing.

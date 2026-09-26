@@ -338,7 +338,7 @@ describe("dispatchNotificationEvent", () => {
       "security_new_device",
       "New sign-in to your DubGrid account",
       // Where and when, stated outright, so the reader can tell whether it was them.
-      "Your DubGrid sign-in was used on Pixel 8 (iOS device), near Nairobi, Kenya, on September 24, 2026 at 21:42 UTC. If this wasn't you, change your password, review your active sessions, and contact support@dubgrid.com.",
+      "There was a new sign-in to your DubGrid account on Pixel 8 (iOS device), near Nairobi, Kenya, on September 24, 2026 at 21:42 UTC. If this wasn't you, change your password, review your active sessions, and contact support@dubgrid.com.",
       expect.objectContaining({
         platform: "ios",
         deviceLabel: "Pixel 8",

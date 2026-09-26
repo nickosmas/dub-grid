@@ -22,7 +22,7 @@ export interface LoginEmailChangeFollowUp {
 }
 
 /**
- * After an administrator changes someone's sign-in email, sessions opened
+ * After an administrator changes someone's email address, sessions opened
  * under the old identity stop working and both addresses are told why.
  *
  * The change itself has already committed, and a retry of the save would find
@@ -65,14 +65,14 @@ async function sendNotices(input: LoginEmailChangeFollowUp): Promise<void> {
     {
       to: input.newEmail,
       recipient: "new" as const,
-      subject: "This address now signs in to DubGrid",
+      subject: "Your DubGrid email address was updated",
     },
     ...(input.previousEmail
       ? [
           {
             to: input.previousEmail,
             recipient: "previous" as const,
-            subject: "Your DubGrid sign-in email was changed",
+            subject: "Your DubGrid email address was changed",
           },
         ]
       : []),

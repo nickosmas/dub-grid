@@ -37,7 +37,6 @@ const PUBLIC_ROUTES = [
   "/billing-required",
   "/forgot-password",
   "/reset-password",
-  "/verify-email",
   "/request-demo",
 ];
 

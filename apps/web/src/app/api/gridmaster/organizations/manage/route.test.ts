@@ -29,6 +29,15 @@ vi.mock("@/lib/api-auth", () => ({
   }),
   requireGridmasterSession: (req: NextRequest) => requireGridmasterSession(req),
   requireSensitiveActionAuth: (req: NextRequest) => requireSensitiveActionAuth(req),
+  // As the real helper: a database STEP_UP_REQUIRED becomes the route's step-up answer.
+  stepUpResponseForRefusal: async (
+    req: NextRequest,
+    error: { message?: string; code?: string } | null,
+  ) => {
+    if (error?.message !== "STEP_UP_REQUIRED" || error.code !== "42501") return null;
+    const assurance = await requireSensitiveActionAuth(req);
+    return "response" in assurance ? assurance.response : null;
+  },
 }));
 
 vi.mock("@/lib/supabase-service", () => ({
