@@ -660,13 +660,11 @@
           recent sign-in can no longer insert, update or delete through the
           data API; other callers and every application path are unchanged
           (F-74, table policies).
-    - [ ] 41d7. **Impersonation and force logout need fresh proof** -
+    - [x] 41d7. **Impersonation and force logout need fresh proof** -
           starting an impersonation asks a Gridmaster to confirm their
           identity, and `start_impersonation` and `force_logout_user` refuse a
           Gridmaster without a recent sign-in in the database (F-75, the
-          narrow part; schedule editing is unchanged). Built alongside 43a,
-          which holds `current-feature.md`; its spec is
-          `blueprint/context/parked/41d7-impersonation-and-force-logout.md`.
+          narrow part; schedule editing is unchanged).
 - [ ] 42. **Schedule indicators on every schedule surface** - a schedule
       indicator is visible wherever that person's shift is shown, not only on
       the desktop week and two-week grid. Every surface uses the indicator's

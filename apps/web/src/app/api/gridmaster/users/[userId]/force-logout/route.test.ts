@@ -23,6 +23,15 @@ vi.mock("@/lib/api-auth", () => ({
   }),
   requireGridmasterSession: (req: NextRequest) => requireGridmasterSession(req),
   requireSensitiveActionAuth: (req: NextRequest) => requireSensitiveActionAuth(req),
+  // As the real helper: a database STEP_UP_REQUIRED becomes the route's step-up answer.
+  stepUpResponseForRefusal: async (
+    req: NextRequest,
+    error: { message?: string; code?: string } | null,
+  ) => {
+    if (error?.message !== "STEP_UP_REQUIRED" || error.code !== "42501") return null;
+    const assurance = await requireSensitiveActionAuth(req);
+    return "response" in assurance ? assurance.response : null;
+  },
 }));
 
 vi.mock("@/lib/csrf", () => ({
@@ -116,6 +125,31 @@ describe("POST /api/gridmaster/users/[userId]/force-logout", () => {
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toMatchObject({ code: "STEP_UP_REQUIRED" });
     expect(requestRpc).not.toHaveBeenCalled();
+    expect(endUserSessions).not.toHaveBeenCalled();
+    expect(auditInsert).not.toHaveBeenCalled();
+  });
+
+  // The route's check passed and the proof lapsed before the database's (055).
+  it("answers a database refusal for lapsed proof with the step-up prompt", async () => {
+    requestRpc.mockResolvedValueOnce({
+      data: null,
+      error: { message: "STEP_UP_REQUIRED", code: "42501" },
+    });
+    requireSensitiveActionAuth
+      .mockResolvedValueOnce({ user: { id: "gridmaster-user" } })
+      .mockResolvedValueOnce({
+        response: NextResponse.json(
+          { error: "Confirm your identity.", code: "STEP_UP_REQUIRED", method: "totp" },
+          { status: 403 },
+        ),
+      });
+
+    const response = await POST(makeRequest(), {
+      params: Promise.resolve({ userId: USER_ID }),
+    });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ code: "STEP_UP_REQUIRED" });
     expect(endUserSessions).not.toHaveBeenCalled();
     expect(auditInsert).not.toHaveBeenCalled();
   });

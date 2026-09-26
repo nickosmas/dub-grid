@@ -143,6 +143,12 @@ Continuous Mode: they push, send, reach production or reseed shared state.
       sign-in is over five minutes old, so apply 054 with or after that
       release. Needs the owner's approval.
 
+- [ ] **Release note from 41d7** - migration 055 goes to production by the
+      runbook only after the release carrying the impersonation route's
+      fresh-proof gate deploys (production's current route does not map the
+      database refusal, so a stale Gridmaster's impersonation start would
+      fail with a generic error until then). Needs the owner's approval.
+
 ## Notes for the AI
 
 - Never handle token values; the owner places them in `.env.remote`.

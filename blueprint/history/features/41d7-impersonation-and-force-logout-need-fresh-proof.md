@@ -1,7 +1,7 @@
 # Feature: Impersonation and force logout need fresh proof
 
 **From build-plan:** feature 41d7
-**Status:** in progress (built alongside 43a, which holds
+**Status:** verified (built alongside 43a, which held
 `current-feature.md` in another session)
 
 ## Goal
@@ -44,6 +44,10 @@ the database, and starting an impersonation should ask for it in the portal.
 - [x] **Step 3 - inventory and records** - the sensitive-action inventory
       classifies the impersonation route; F-75 narrowed to schedule editing.
 
+- [x] **Repair the audit's P3 (68f86ff0..7275dfc8)** - the force-logout
+      route also answers a database refusal with the step-up prompt, with a
+      route test.
+
 ## Files / areas
 
 - `apps/web/src/app/api/gridmaster/impersonation/route.ts` and its test.
@@ -62,3 +66,10 @@ the database, and starting an impersonation should ask for it in the portal.
 ## Notes for the AI
 
 - Build each function from its newest definition. No em dashes.
+
+## How to try it
+
+On the local stack as the QA Gridmaster: start an impersonation from the
+portal within five minutes of signing in and it starts as before; after five
+minutes a "Confirm your identity" prompt appears first. Ending a session
+never prompts.
