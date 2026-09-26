@@ -190,9 +190,9 @@ Each cron is also behind a `platform_feature_flags` kill switch (`cron_expire_re
 
 ### Invitations and Email
 
-| Method | Path                        | Purpose                            |
-| ------ | --------------------------- | ---------------------------------- |
-| POST   | `/api/notify-impersonation` | Log impersonation start/end events |
+| Method | Path                        | Purpose                                                                 |
+| ------ | --------------------------- | ----------------------------------------------------------------------- |
+| POST   | `/api/notify-impersonation` | Retired: answers 410; `/api/gridmaster/impersonation` sends the notices |
 
 ---
 

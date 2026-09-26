@@ -120,13 +120,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** A forward migration rewording the two RPCs' notification text.
 **Resolution:** Fixed in the security findings cleanup (Step 4): migration 057 redefines `start_impersonation` (from 055, keeping its fresh-proof guard) and `end_impersonation` with notices that read "DubGrid support is using your account" and "DubGrid support has left your account" (and matching Super Admin notices), naming no person. A static test pins the wording and the guard.
 
-### F-41 [P3] open - Stale references to the retired notify route, and no rate limit on impersonation notices
+### F-41 [P3] fixed - Stale references to the retired notify route, and no rate limit on impersonation notices
 
 **File:** `apps/web/e2e/role-variance-impersonation.spec.ts:101`; `internal/api-reference.md:195`
 **Found:** 2026-09-25 by `/audit` (scope: current, 262cddb3..1ddf878f; all lenses)
 **Why it matters:** The e2e spec and the API reference still describe `/api/notify-impersonation`, and the old route's `apiLimiter` has no counterpart, so repeated start and end cycles email the person each time (each still needs a justification and writes an audit row).
 **Suggested fix:** Update the two references when the documentation work lands; consider a per-target limit on starts.
-**Resolution:**
+**Resolution:** Fixed in the security findings cleanup (Step 5): the impersonation e2e spec no longer excuses failures of `/api/notify-impersonation` (nothing calls it since 41c3, so a real failure now surfaces), and the API reference marks the route retired. No per-target limit was added: since 41d7 a start needs fresh proof as well as a justification and an audit row.
 
 ### F-42 [P2] closed - Arming the app lock only on background could leave content in the iOS app switcher
 
@@ -216,13 +216,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** Move the setup wizard's call to the service client with `p_invited_by`, then revoke EXECUTE on `send_invitation` from `authenticated` in a forward migration and update the SQL entry-point allowlist.
 **Resolution:** Fixed in 41d3 (repair): migration `050_send_invitation_server_only.sql` revokes EXECUTE on `send_invitation` from `authenticated`; the Gridmaster setup route calls it as the service role with `p_invited_by`, like invitations/create. The SQL entry-point allowlist now honours a later revoke, and the live check proves `authenticated` cannot execute it. Production needs 050 applied by the runbook. Re-review (e4e6f905..f2ff543e): closed; no application path or live test calls it as `authenticated` (the e2e fixtures use the superuser). Ordering: production's released code still calls it as the user from the setup wizard, so 050 is applied right after the release that carries the service-role call deploys, not before. Applied to production 2026-09-26 after release #115 deployed; `authenticated` can no longer execute it there.
 
-### F-72 [P3] open - The SQL entry-point allowlist helper matches names, one grant spelling and simple signatures
+### F-72 [P3] fixed - The SQL entry-point allowlist helper matches names, one grant spelling and simple signatures
 
 **File:** `apps/web/src/__tests__/helpers/sql-inventory.ts:30`
 **Found:** 2026-09-26 by `/audit` re-review of e4e6f905..f2ff543e
 **Why it matters:** It tracks function names rather than signatures, so revoking one overload would drop a name another overload still grants; it only sees a grant spelled `TO authenticated;`; and `[^)]*` breaks on a typed parameter such as `NUMERIC(10,2)`. None applies to today's migrations, and the live function-grant check would still catch a real drift.
 **Suggested fix:** Track `name(signature)` pairs and accept a role list in the grant pattern.
-**Resolution:**
+**Resolution:** Fixed in the security findings cleanup (Step 5): the helper now reads grants and revokes with any role list that names `authenticated` and argument lists that nest one level of parentheses. It still keys on function names, as the live check does; an overload revoked while another stays granted would need both to key on signatures.
 
 ### F-73 [P2] fixed - Production Supabase accepts public sign-ups on an invite-only product
 
