@@ -278,6 +278,28 @@ export async function requireSensitiveActionAuth(
 }
 
 /**
+ * A grant function refused a Gridmaster whose proof lapsed after the route's
+ * own check (051): answer with the same step-up response the route gives, so
+ * the client prompts instead of reporting a failure.
+ */
+export async function stepUpResponseForRefusal(
+  req: NextRequest,
+  error: unknown,
+): Promise<NextResponse | null> {
+  const message =
+    typeof error === "object" && error !== null && "message" in error
+      ? String((error as { message?: unknown }).message ?? "")
+      : "";
+  if (!message.includes("STEP_UP_REQUIRED")) return null;
+  const assurance = await requireSensitiveActionAuth(req);
+  if ("response" in assurance) return assurance.response;
+  // The route passed and the database refused: the proof crossed the edge of
+  // the window between the two checks.
+  const method = resolveVerifiedTotpFactorPresence(assurance.user.factors) ? "totp" : "password";
+  return NextResponse.json(createSensitiveActionStepUpRequired(method), { status: 403 });
+}
+
+/**
  * Returns a 403 response if the caller has an active sandbox cookie.
  *
  * Use as the first line of any side-effecting endpoint that talks to

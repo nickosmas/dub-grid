@@ -19,6 +19,12 @@ vi.mock("@/lib/csrf", () => ({
 vi.mock("@/lib/api-auth", () => ({
   requireAuthenticatedUser: (req: NextRequest) => requireAuthenticatedUser(req),
   requireSensitiveActionAuth: (req: NextRequest) => requireSensitiveActionAuth(req),
+  // As the real helper: a database STEP_UP_REQUIRED becomes the route's step-up answer.
+  stepUpResponseForRefusal: async (req: NextRequest, error: { message?: string } | null) => {
+    if (!String(error?.message ?? "").includes("STEP_UP_REQUIRED")) return null;
+    const assurance = await requireSensitiveActionAuth(req);
+    return "response" in assurance ? assurance.response : null;
+  },
   createRequestSupabaseClient: (req: NextRequest) => createRequestSupabaseClient(req),
 }));
 vi.mock("@/lib/rate-limit", () => ({

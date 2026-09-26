@@ -1,8 +1,9 @@
 // @vitest-environment node
 
 /**
- * Migration 051: a Gridmaster's grant needs a recent sign-in in the database,
- * by the same rule the routes apply (F-60). Runs the migration and its checks
+ * Migrations 051 and 053: a Gridmaster's grant needs a recent sign-in in the
+ * database, by the same rule the routes apply, and only a Gridmaster that
+ * is_gridmaster() accepts holds that authority (F-60). Runs the migration and its checks
  * on the seeded local database inside a transaction that is rolled back, so a
  * database that has not applied 051 yet is left as it was.
  *
@@ -21,13 +22,14 @@ const DB_CONFIG = {
   connectionString: DB_URL,
   ssl: DB_URL.includes("supabase.co") ? { rejectUnauthorized: false } : false,
 } as const;
-const MIGRATION = readFileSync(
-  path.resolve(
-    __dirname,
-    "../../../../supabase/migrations/051_gridmaster_grants_need_fresh_proof.sql",
-  ),
-  "utf8",
-);
+const MIGRATION = [
+  "051_gridmaster_grants_need_fresh_proof.sql",
+  "053_gridmaster_authority_and_profiles.sql",
+]
+  .map((file) =>
+    readFileSync(path.resolve(__dirname, "../../../../supabase/migrations", file), "utf8"),
+  )
+  .join("\n");
 
 async function probeDb(): Promise<boolean> {
   const probe = new Client(DB_CONFIG);
@@ -128,6 +130,16 @@ describe.runIf(reachable)("fresh proof in the database (051, live DB)", () => {
     expect(await hasFreshProof({ sub: gridmaster, amr: password(10).amr })).toBe(false);
   });
 
+  it("refuses a timestamp beyond the safe-integer range instead of overflowing", async () => {
+    expect(
+      await hasFreshProof({
+        sub: gridmaster,
+        aal: "aal1",
+        amr: [{ method: "password", timestamp: 99999999999999999999 }],
+      }),
+    ).toBe(false);
+  });
+
   it("proves nothing from a malformed method list, as the routes' parser refuses it", async () => {
     const malformed = {
       sub: gridmaster,
@@ -217,5 +229,55 @@ describe.runIf(reachable)("fresh proof in the database (051, live DB)", () => {
       [regular, superAdmin, calmHaven],
     );
     expect(message ?? "").not.toMatch(/STEP_UP_REQUIRED/);
+  });
+
+  async function roleIn(user: string, org: string): Promise<string> {
+    const { rows } = await db.query<{ org_role: string }>(
+      `SELECT org_role::text FROM public.organization_memberships
+        WHERE user_id = $1 AND org_id = $2 AND archived_at IS NULL`,
+      [user, org],
+    );
+    return rows[0]!.org_role;
+  }
+
+  it("gives no Gridmaster authority while the second factor is pending", async () => {
+    await db.query(
+      `INSERT INTO auth.mfa_factors (id, user_id, friendly_name, factor_type, status, created_at, updated_at)
+       VALUES (gen_random_uuid(), $1, 'test', 'totp', 'verified', now(), now())`,
+      [gridmaster],
+    );
+    const before = await roleIn(regular, calmHaven);
+    const pending = { sub: gridmaster, mfa_enrolled: true, ...password(10) };
+    const message = await asCaller(
+      pending,
+      `SELECT public.change_user_role($1, 'super_admin', $2, gen_random_uuid()::text, $3)`,
+      [regular, gridmaster, calmHaven],
+    );
+    expect(message).not.toBeNull();
+    expect(await roleIn(regular, calmHaven)).toBe(before);
+  });
+
+  it("gives a deactivated Gridmaster no authority", async () => {
+    await db.query(`UPDATE public.profiles SET deactivated_at = now() WHERE id = $1`, [gridmaster]);
+    const message = await asCaller(
+      { sub: gridmaster, ...password(10) },
+      `SELECT public.change_user_role($1, 'super_admin', $2, gen_random_uuid()::text, $3)`,
+      [regular, gridmaster, calmHaven],
+    );
+    expect(message).not.toBeNull();
+  });
+
+  it("lets no signed-in caller insert or delete a profile", async () => {
+    const stale = { sub: gridmaster, ...password(3600) };
+    expect(await asCaller(stale, `DELETE FROM public.profiles WHERE id = $1`, [regular])).toMatch(
+      /permission denied/,
+    );
+    expect(
+      await asCaller(
+        stale,
+        `INSERT INTO public.profiles (id, platform_role) VALUES (gen_random_uuid(), 'gridmaster')`,
+        [],
+      ),
+    ).toMatch(/permission denied/);
   });
 });

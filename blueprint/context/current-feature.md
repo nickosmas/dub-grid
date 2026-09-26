@@ -66,6 +66,14 @@ committed as a local checkpoint.
 - [x] **Step 4 - record the remaining surface** - a finding for the owner on
       the other Gridmaster write policies.
 
+- [x] **Repair the audit's grant paths (249941d4..87a64796)** - migration
+      053: `change_user_role` takes Gridmaster authority only from
+      `is_gridmaster()`, `profiles` loses INSERT, DELETE and TRUNCATE, and an
+      oversized amr timestamp proves nothing; the four routes answer a
+      database refusal with the step-up prompt. _Done when:_ live tests for a
+      pending second factor, a deactivated Gridmaster and profile writes fail
+      without 053, and the web suite passes.
+
 ## Files / areas
 
 - `supabase/migrations/051_*.sql`, `052_*.sql`, `checksums.sha256`.

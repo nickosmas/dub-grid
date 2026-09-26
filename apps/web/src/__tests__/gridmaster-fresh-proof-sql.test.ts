@@ -24,6 +24,15 @@ describe("a Gridmaster's grant needs fresh proof in the database (migration 051)
     expect(text).toMatch(/SECURITY DEFINER/);
     expect(text).toMatch(/v_now - v_at <= 300/);
     expect(text).toMatch(/v_at <= v_now \+ 30/);
-    expect(file).toBe("051_gridmaster_grants_need_fresh_proof.sql");
+    expect(file).toBe("053_gridmaster_authority_and_profiles.sql");
+  });
+
+  it("takes change_user_role's Gridmaster authority only from is_gridmaster()", () => {
+    const { file, text } = latestFunctionDefinition("change_user_role");
+    expect(file).toBe("053_gridmaster_authority_and_profiles.sql");
+    expect(text).toContain(
+      "v_caller_platform_role := CASE WHEN public.is_gridmaster() THEN 'gridmaster' ELSE 'none' END;",
+    );
+    expect(text).not.toMatch(/SELECT\s+p\.platform_role/);
   });
 });

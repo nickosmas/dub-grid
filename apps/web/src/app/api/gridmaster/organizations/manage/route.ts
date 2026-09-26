@@ -6,6 +6,7 @@ import {
   createRequestSupabaseClient,
   requireGridmasterSession,
   requireSensitiveActionAuth,
+  stepUpResponseForRefusal,
 } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { composeOrganizationAddress } from "@/lib/organization-profile";
@@ -313,6 +314,8 @@ export async function POST(req: NextRequest) {
           p_org_role: parsed.data.role,
         });
         if (error) {
+          const stepUp = await stepUpResponseForRefusal(req, error);
+          if (stepUp) return stepUp;
           // The portal invites the address instead when no account uses it.
           if (/user with email .* not found/i.test(String(error.message ?? ""))) {
             return NextResponse.json(
