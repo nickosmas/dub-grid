@@ -249,6 +249,23 @@ async function attachJoinedDates(
   }));
 }
 
+/** The single-person form of `attachJoinedDates`: one membership read. */
+async function attachJoinedDate(
+  serviceClient: SupabaseClient,
+  orgId: string,
+  employee: Employee,
+): Promise<Employee> {
+  if (!employee.userId) return { ...employee, joinedAt: null };
+  const { data, error } = await serviceClient
+    .from("organization_memberships")
+    .select("joined_at")
+    .eq("org_id", orgId)
+    .eq("user_id", employee.userId)
+    .maybeSingle();
+  if (error) throw error;
+  return { ...employee, joinedAt: (data as { joined_at: string } | null)?.joined_at ?? null };
+}
+
 // View-only callers (canViewStaff but neither canViewEmployeeDetails nor
 // canManageEmployees, and not super_admin/gridmaster) get the same masked
 // payload the mobile person endpoint returns to non-managers.
@@ -968,7 +985,10 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
-        const employee = await fetchLatestEmployee(auth.serviceClient, data.orgId, data.employeeId);
+        const latest = await fetchLatestEmployee(auth.serviceClient, data.orgId, data.employeeId);
+        const employee = latest
+          ? await attachJoinedDate(auth.serviceClient, data.orgId, latest)
+          : null;
 
         if (
           employee &&

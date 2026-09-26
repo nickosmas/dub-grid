@@ -162,9 +162,14 @@ describe("TermsGate", () => {
     renderGate();
     fireEvent.click(screen.getByText("Accept and continue"));
 
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Accept and continue" })).toBeEnabled();
-    });
+    // Nothing here waits on a timer, but on a saturated machine (the pre-push
+    // run beside other sessions) the re-render has outlasted the 1 s default.
+    await waitFor(
+      () => {
+        expect(screen.getByRole("button", { name: "Accept and continue" })).toBeEnabled();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("surfaces an inline error and keeps gating when acceptance fails", async () => {

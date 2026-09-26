@@ -10,10 +10,10 @@ const invitation: Invitation = {
   invitedBy: "user-2",
   email: "new.hire@example.com",
   roleToAssign: "user",
-  expiresAt: "2099-01-01T00:00:00.000Z",
+  expiresAt: "2099-01-01T12:00:00.000Z",
   acceptedAt: null,
   revokedAt: null,
-  createdAt: "2026-01-01T00:00:00.000Z",
+  createdAt: "2026-01-01T12:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
   employeeId: "emp-1",
 };
@@ -24,6 +24,27 @@ describe("PendingInvitationBanner", () => {
 
     expect(screen.getByText("Invitation pending")).toBeInTheDocument();
     expect(screen.getByText("Sent to new.hire@example.com")).toBeInTheDocument();
+  });
+
+  it("shows when the invitation was sent and when it expires", () => {
+    render(<PendingInvitationBanner pendingInvitation={invitation} onRevoke={vi.fn()} />);
+
+    expect(screen.getByText(/^Sent Jan 1, 2026/)).toHaveTextContent(/Expires Jan 1, 2099/);
+  });
+
+  it("says an expired invitation has expired and still offers Reinvite", () => {
+    render(
+      <PendingInvitationBanner
+        pendingInvitation={invitation}
+        onReinvite={vi.fn()}
+        onRevoke={vi.fn()}
+        expired
+      />,
+    );
+
+    expect(screen.getByText("Invitation expired")).toBeInTheDocument();
+    expect(screen.getByText(/^Sent Jan 1, 2026/)).toHaveTextContent(/Expired Jan 1, 2099/);
+    expect(screen.getByRole("button", { name: "Reinvite" })).toBeInTheDocument();
   });
 
   it("hides the Reinvite button when onReinvite is omitted", () => {

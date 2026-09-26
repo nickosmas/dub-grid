@@ -123,4 +123,16 @@ describe("staff directory cache helpers", () => {
       })[1].firstName,
     ).toBe("Alice");
   });
+
+  it("keeps a row's joined date when a save response carries none", () => {
+    const joined = { ...baseEmployee, userId: "user-1", joinedAt: "2026-03-05T14:00:00.000Z" };
+
+    const [saved] = upsertEmployeeInList([joined], {
+      ...baseEmployee,
+      userId: "user-1",
+      firstName: "Alice",
+    });
+
+    expect(saved).toMatchObject({ firstName: "Alice", joinedAt: "2026-03-05T14:00:00.000Z" });
+  });
 });

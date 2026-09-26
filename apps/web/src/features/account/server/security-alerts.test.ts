@@ -85,10 +85,12 @@ describe("claimNewSignIn", () => {
     expect(updates).toEqual([]);
   });
 
-  it("never blocks sign-in when detection fails", async () => {
+  // Answering 200 on a failure lost the alert; the route now fails so the
+  // client retries (F-46).
+  it("throws when detection fails, so the report is retried", async () => {
     claimResult.mockResolvedValue({ data: null, error: new Error("db down") });
 
-    await expect(claim()).resolves.toBeNull();
+    await expect(claim()).rejects.toThrow("db down");
   });
 });
 

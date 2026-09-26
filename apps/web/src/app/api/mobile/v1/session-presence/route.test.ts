@@ -47,6 +47,22 @@ describe("POST /api/mobile/v1/session-presence", () => {
     rememberSignInDevice.mockResolvedValue(true);
   });
 
+  // Answering success on a failed detection lost the alert (F-46).
+  it("answers a failed detection with a retryable error and records nothing", async () => {
+    claimNewSignIn.mockRejectedValueOnce(new Error("db down"));
+    const { POST } = await import("./route");
+    const response = await POST(
+      new Request("http://localhost/api/mobile/v1/session-presence", {
+        method: "POST",
+        body: JSON.stringify({ platform: "android", deviceLabel: "Pixel 8" }),
+      }) as never,
+    );
+
+    expect(response.status).toBe(503);
+    expect(trackUserSessionForUser).not.toHaveBeenCalled();
+    expect(scheduleSecurityAlert).not.toHaveBeenCalled();
+  });
+
   // Mobile sign-ins used to raise no out-of-band alert at all.
   it("alerts on a mobile sign-in session not seen before", async () => {
     claimNewSignIn.mockResolvedValueOnce("claimed");

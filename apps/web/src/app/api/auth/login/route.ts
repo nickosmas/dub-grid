@@ -448,6 +448,14 @@ export async function POST(req: NextRequest) {
     // login UI can show a friendly "account disabled" modal instead of the
     // generic invalid-credentials toast.
     if (isAccountDisabledMessage(error.message)) {
+      // The password was right; the hook refused the account (F-29). No
+      // session exists yet, so the attempt is recorded by the address hash.
+      await writeSecurityAuditEvent({
+        event: "security.auth.login",
+        outcome: "rejected",
+        reason: "account_disabled",
+        metadata: { targetHash: emailHash, surface: "web" },
+      });
       return NextResponse.json(
         {
           success: false,

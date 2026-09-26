@@ -17,9 +17,9 @@ import type {
   GridmasterUserSession,
   PlatformFeatureFlag,
   PlatformUser,
-  UserMembership,
 } from "@/types";
 import { formatClientErrorMessage } from "@/lib/client-facing";
+import type { GridmasterPersonRecord } from "../person-record";
 
 export interface GridmasterInvitationRecord {
   id: string;
@@ -217,10 +217,17 @@ export function updateGridmasterUserActivation(input: {
   });
 }
 
-export function fetchGridmasterUserMemberships(
-  userId: string,
-): Promise<{ memberships: UserMembership[] }> {
-  return requestGridmasterJson(`/api/gridmaster/users/${encodeURIComponent(userId)}/memberships`);
+export type GridmasterPersonTarget =
+  { kind: "user"; userId: string } | { kind: "staff"; employeeId: string };
+
+export function fetchGridmasterPerson(
+  target: GridmasterPersonTarget,
+): Promise<{ person: GridmasterPersonRecord }> {
+  const path =
+    target.kind === "user"
+      ? `/api/gridmaster/users/${encodeURIComponent(target.userId)}`
+      : `/api/gridmaster/staff/${encodeURIComponent(target.employeeId)}`;
+  return requestGridmasterJson(path);
 }
 
 export function forceLogoutGridmasterUser(

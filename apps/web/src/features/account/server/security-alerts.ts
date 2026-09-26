@@ -3,7 +3,6 @@ import "server-only";
 import { after } from "next/server";
 import { dispatchNotificationEvent, type NotificationEvent } from "@/features/notifications/server";
 import { getServiceClient } from "@/lib/supabase-service";
-import logger from "@/lib/logger";
 
 const RECENT_SIGN_IN_SECONDS = 15 * 60;
 
@@ -51,31 +50,28 @@ export async function claimNewSignIn(input: {
   claims: unknown;
 }): Promise<NewSignInClaim> {
   if (!signedInRecently(input.claims)) return null;
-  try {
-    const service = getServiceClient();
-    const { data: claimed, error } = await service
-      .from("user_sessions")
-      .update({ platform: input.platform })
-      .eq("user_id", input.userId)
-      .eq("supabase_session_id", input.supabaseSessionId)
-      .is("platform", null)
-      .select("id");
-    if (error) throw error;
-    if ((claimed ?? []).length > 0) return "claimed";
+  // A read error throws so the route answers 5xx and the client retries (F-46);
+  // answering 200 lost the alert. Nothing is written before a failure: the
+  // claim either lands (and returns) or changes no row.
+  const service = getServiceClient();
+  const { data: claimed, error } = await service
+    .from("user_sessions")
+    .update({ platform: input.platform })
+    .eq("user_id", input.userId)
+    .eq("supabase_session_id", input.supabaseSessionId)
+    .is("platform", null)
+    .select("id");
+  if (error) throw error;
+  if ((claimed ?? []).length > 0) return "claimed";
 
-    // No hook-created row to claim: new only if there is no row at all.
-    const { data: existing, error: existingError } = await service
-      .from("user_sessions")
-      .select("id")
-      .eq("supabase_session_id", input.supabaseSessionId)
-      .limit(1);
-    if (existingError) throw existingError;
-    return (existing ?? []).length === 0 ? "unrecorded" : null;
-  } catch (err) {
-    // Never block sign-in over detection. A missed alert is logged instead.
-    logger.warn({ err, userId: input.userId }, "new sign-in detection failed");
-    return null;
-  }
+  // No hook-created row to claim: new only if there is no row at all.
+  const { data: existing, error: existingError } = await service
+    .from("user_sessions")
+    .select("id")
+    .eq("supabase_session_id", input.supabaseSessionId)
+    .limit(1);
+  if (existingError) throw existingError;
+  return (existing ?? []).length === 0 ? "unrecorded" : null;
 }
 
 /**

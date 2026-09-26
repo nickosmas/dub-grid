@@ -14,7 +14,6 @@ describe("OverviewTab", () => {
         focusAreas={[]}
         certifications={[]}
         orgRoles={[]}
-        pendingInvite={null}
         thisWeekHours={null}
         scheduleOverview={<div>Recurring schedule card</div>}
       />,
@@ -35,7 +34,6 @@ describe("OverviewTab", () => {
         focusAreaLabel="Care Units"
         certifications={[]}
         orgRoles={[]}
-        pendingInvite={null}
         thisWeekHours={null}
       />,
     );
@@ -48,36 +46,22 @@ describe("OverviewTab", () => {
     expect(screen.getByText("ICU, ED")).toBeInTheDocument();
   });
 
-  it("shows when the staff record was added, and nothing when that is unknown", () => {
-    const props = {
-      shifts: {},
-      assignmentById: new Map(),
-      categoryById: new Map(),
-      focusAreas: [],
-      certifications: [],
-      orgRoles: [],
-      pendingInvite: null,
-      thisWeekHours: null,
-    };
-    // Noon UTC, so the local calendar day is the same in every test zone.
-    const added = "2026-01-09T12:00:00.000Z";
-    const { unmount } = render(
-      <OverviewTab {...props} employee={makeEmployee({ createdAt: added })} />,
+  it("leaves the record facts to the Profile section", () => {
+    render(
+      <OverviewTab
+        employee={makeEmployee({ createdAt: "2026-01-09T12:00:00.000Z" })}
+        shifts={{}}
+        assignmentById={new Map()}
+        categoryById={new Map()}
+        focusAreas={[]}
+        certifications={[]}
+        orgRoles={[]}
+        thisWeekHours={null}
+      />,
     );
 
-    expect(screen.getByText("Date added")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        new Date(added).toLocaleDateString(undefined, {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-        }),
-      ),
-    ).toBeInTheDocument();
-
-    unmount();
-    render(<OverviewTab {...props} employee={makeEmployee({ createdAt: null })} />);
     expect(screen.queryByText("Date added")).not.toBeInTheDocument();
+    expect(screen.queryByText("Account")).not.toBeInTheDocument();
+    expect(screen.queryByText("Linked account")).not.toBeInTheDocument();
   });
 });

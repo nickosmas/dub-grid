@@ -12,11 +12,23 @@ interface PendingInvitationBannerProps {
   onReinvite?: () => Promise<boolean | void> | boolean | void;
   onRevoke: (invitationId: string) => Promise<boolean | void> | boolean | void;
   isInSandbox?: boolean;
+  /** The invitation passed its expiry without being accepted. */
+  expired?: boolean;
+}
+
+function formatInvitationTime(value: string): string {
+  return new Date(value).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 /**
  * Shared "Invitation pending" warning card used everywhere a staff member's
- * live invitation needs to be visible: the full detail page, the slideover,
+ * open invitation needs to be visible, expired ones included: the full detail page, the slideover,
  * and the edit-details panel. Owns its own confirm-before-revoke dialog so
  * every caller gets the same safe behavior without re-implementing it.
  */
@@ -25,6 +37,7 @@ export function PendingInvitationBanner({
   onReinvite,
   onRevoke,
   isInSandbox = false,
+  expired = false,
 }: PendingInvitationBannerProps) {
   const [pendingAction, setPendingAction] = useState<"reinvite" | "revoke" | null>(null);
   const [busy, setBusy] = useState(false);
@@ -83,7 +96,7 @@ export function PendingInvitationBanner({
                 color: "var(--dg-color-warning-text)",
               }}
             >
-              Invitation pending
+              {expired ? "Invitation expired" : "Invitation pending"}
             </div>
             <div
               style={{
@@ -93,6 +106,17 @@ export function PendingInvitationBanner({
               }}
             >
               Sent to {pendingInvitation.email}
+            </div>
+            <div
+              className="dg-tabular-nums"
+              style={{
+                fontSize: "var(--dg-fs-footnote)",
+                color: "var(--dg-color-warning-text)",
+                marginTop: 1,
+              }}
+            >
+              Sent {formatInvitationTime(pendingInvitation.createdAt)}.{" "}
+              {expired ? "Expired" : "Expires"} {formatInvitationTime(pendingInvitation.expiresAt)}.
             </div>
           </div>
         </div>

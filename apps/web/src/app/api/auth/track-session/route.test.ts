@@ -90,6 +90,23 @@ describe("POST /api/auth/track-session", () => {
     expect(trackUserSessionForUser).not.toHaveBeenCalled();
   });
 
+  // Answering success on a failed detection lost the alert (F-46); a 5xx is
+  // what the browser's registration retries.
+  it("answers a failed detection with a retryable error and records nothing", async () => {
+    claimNewSignIn.mockRejectedValueOnce(new Error("db down"));
+
+    const response = await POST(
+      new NextRequest("http://localhost/api/auth/track-session", {
+        method: "POST",
+        headers: { origin: "http://localhost:3000" },
+        body: JSON.stringify({ platform: "web", deviceLabel: "Chrome on macOS" }),
+      }),
+    );
+
+    expect(response.status).toBe(500);
+    expect(trackUserSessionForUser).not.toHaveBeenCalled();
+  });
+
   it("uses the authenticated user and JWT session id instead of caller-controlled identity", async () => {
     await POST(
       new NextRequest("http://localhost/api/auth/track-session", {

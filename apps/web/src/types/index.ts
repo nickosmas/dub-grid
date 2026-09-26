@@ -1207,17 +1207,6 @@ export interface FeatureOverride {
   updatedAt: string;
 }
 
-/** User's memberships across all orgs (gridmaster user detail view). */
-export interface UserMembership {
-  orgId: string;
-  orgName: string;
-  orgSlug: string | null;
-  orgRole: OrganizationRole;
-  joinedAt: string;
-  updatedAt: string | null;
-  adminPermissions: AdminPermissions | null;
-}
-
 export interface ShiftRequest {
   id: string;
   orgId: string;

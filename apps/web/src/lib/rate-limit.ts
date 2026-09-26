@@ -77,6 +77,29 @@ export const loginLimiter = createSlidingWindowLimiter(
 );
 
 /**
+ * Whether the login limiter is refusing this address right now. Null when no
+ * limiter runs (no Redis, or outside production), and on a failed read: a
+ * support view must not fail over an advisory badge.
+ */
+export async function readLoginLock(
+  email: string,
+): Promise<{ locked: boolean; resetsAt: string | null } | null> {
+  if (!loginLimiter || (!isProduction && serverEnv?.RATE_LIMIT_IN_DEV !== "1")) return null;
+  try {
+    const { remaining, reset } = await withTimeoutOrThrow(
+      loginLimiter.getRemaining(`login:email:${hashEmail(email)}`),
+      RATE_LIMIT_TIMEOUT_MS,
+      "login lock read",
+    );
+    const locked = remaining <= 0;
+    return { locked, resetsAt: locked ? new Date(reset).toISOString() : null };
+  } catch (error) {
+    logger.warn({ error }, "login lock read failed");
+    return null;
+  }
+}
+
+/**
  * A broad burst ceiling that protects shared-office users without replacing
  * per-account brute-force protection. Both values are intentionally tunable
  * so production load testing can adjust capacity without code changes.

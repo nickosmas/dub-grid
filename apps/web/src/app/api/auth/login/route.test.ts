@@ -234,6 +234,15 @@ describe("POST /api/auth/login", () => {
       code: "ACCOUNT_DISABLED",
       error: "Your account has been disabled. Contact your organization admin.",
     });
+    // The password was right, so the refusal is recorded (F-29).
+    expect(writeSecurityAuditEvent).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        event: "security.auth.login",
+        outcome: "rejected",
+        reason: "account_disabled",
+        metadata: expect.objectContaining({ surface: "web" }),
+      }),
+    );
   });
 
   it("returns 503 (not a credentials error) when GoTrue fails with a 5xx, e.g. a hook blip", async () => {

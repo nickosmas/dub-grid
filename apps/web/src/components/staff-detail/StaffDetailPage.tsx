@@ -39,7 +39,11 @@ import {
   EmployeeStatusConflictError,
 } from "@/features/employees/client";
 import { queryKeys } from "@/lib/query-keys";
-import { mergeEmployeeIntoDirectoryPerson, upsertEmployeeInList } from "@/lib/staff-directory";
+import {
+  mergeEmployeeIntoDirectoryPerson,
+  upsertEmployeeInList,
+  withKnownJoinedDate,
+} from "@/lib/staff-directory";
 import { isCurrentUsersEmployee } from "@/lib/profile-links";
 import { computeEmployeeWeeklyHours } from "@/lib/dashboard-stats";
 import {
@@ -72,6 +76,8 @@ import { EmployeeStatusActions } from "./EmployeeStatusActions";
 import { OverviewTab } from "./tabs/OverviewTab";
 import { ActivityTab } from "./tabs/ActivityTab";
 import { RecurringScheduleCard } from "./RecurringScheduleCard";
+import { PersonRecordCard } from "./PersonRecordCard";
+import { getPersonAccountState } from "@/lib/person-account-state";
 import { SettingsShell, type ShellNavGroup } from "@/components/settings/SettingsShell";
 import { ActivityIcon, DashboardIcon, ProfileIcon } from "@/components/icons/NavIcons";
 
@@ -150,13 +156,27 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     enabled: Boolean(orgId) && !perms.isLoading && perms.canViewEmployeeDetails,
   });
   const invitations = perms.canViewEmployeeDetails ? (invitationsQuery.data ?? []) : [];
+  // Re-derived on a slow tick so an invitation that expires while the page is
+  // open stops reading as pending, as the People table does.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
   const pendingInvite = useMemo(() => {
     return (
-      invitations.find(
-        (i) => !i.acceptedAt && !i.revokedAt && new Date(i.expiresAt) > new Date(),
-      ) ?? null
+      invitations.find((i) => !i.acceptedAt && !i.revokedAt && Date.parse(i.expiresAt) > nowMs) ??
+      null
     );
-  }, [invitations]);
+  }, [invitations, nowMs]);
+  const accountState = useMemo(
+    () => (employee ? getPersonAccountState(employee, invitations, nowMs) : null),
+    [employee, invitations, nowMs],
+  );
+  const expiredInvite =
+    accountState?.kind === "expired"
+      ? (invitations.find((invitation) => invitation.id === accountState.invitationId) ?? null)
+      : null;
 
   // Same gate as the route: the ledger's read policy plus this page's own
   // details permission. Keyed under `queryKeys.org.auditLog(orgId)` so the
@@ -300,7 +320,11 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     (updatedEmployee?: Employee | null) => {
       if (!orgId || !updatedEmployee) return;
 
-      setEmployee(updatedEmployee);
+      setEmployee((current) =>
+        current?.id === updatedEmployee.id
+          ? withKnownJoinedDate(current, updatedEmployee)
+          : updatedEmployee,
+      );
       queryClient.setQueryData(queryKeys.employees.all(orgId), (current: Employee[] | undefined) =>
         current ? upsertEmployeeInList(current, updatedEmployee) : current,
       );
@@ -353,7 +377,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           orgId,
           previousEmployee.version,
         );
-        setEmployee(savedEmployee);
         syncEmployeeCaches(savedEmployee);
         toast.success(
           revokedInvitationEmail
@@ -366,7 +389,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         }
       } catch (err) {
         if (err instanceof EmployeeProfileConflictError) {
-          setEmployee(err.latestEmployee);
           syncEmployeeCaches(err.latestEmployee);
           toast.error(
             "Employee details changed elsewhere. Review the latest values and try again.",
@@ -398,11 +420,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       let savedEmployee: Employee;
       try {
         savedEmployee = await updateEmployee(updatedEmployee, orgId, previousEmployee.version);
-        setEmployee(savedEmployee);
         syncEmployeeCaches(savedEmployee);
       } catch (err) {
         if (err instanceof EmployeeProfileConflictError) {
-          setEmployee(err.latestEmployee);
           syncEmployeeCaches(err.latestEmployee);
           toast.error(
             "Employee details changed elsewhere. Review the latest values and try again.",
@@ -480,7 +500,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         toast.success("Employee marked inactive");
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
-          setEmployee(err.latestEmployee);
           syncEmployeeCaches(err.latestEmployee);
           toast.error("Employee status changed elsewhere. Review the latest values and try again.");
           return;
@@ -519,7 +538,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         toast.success("Employee activated");
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
-          setEmployee(err.latestEmployee);
           syncEmployeeCaches(err.latestEmployee);
           toast.error("Employee status changed elsewhere. Review the latest values and try again.");
           return;
@@ -550,7 +568,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         toast.success("Employee removed");
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
-          setEmployee(err.latestEmployee);
           syncEmployeeCaches(err.latestEmployee);
           toast.error("Employee status changed elsewhere. Review the latest values and try again.");
           return;
@@ -789,6 +806,14 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                   onRevoke={handleRevokeInvitation}
                 />
               )}
+              {perms.canManageEmployees && !pendingInvite && expiredInvite && (
+                <PendingInvitationBanner
+                  pendingInvitation={expiredInvite}
+                  onReinvite={() => handleResendInvitation(expiredInvite.id)}
+                  onRevoke={handleRevokeInvitation}
+                  expired
+                />
+              )}
 
               <section>
                 <div className="dg-card">
@@ -868,6 +893,16 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                 </div>
               </section>
 
+              {accountState && (
+                <section>
+                  <PersonRecordCard
+                    employee={employee}
+                    accountState={accountState}
+                    lastSignInAt={directoryPerson?.lastSignInAt}
+                  />
+                </section>
+              )}
+
               {(effectiveOrgRole || employee.userId || pendingInvite) && (
                 <section>
                   <div className="dg-card">
@@ -913,7 +948,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                 </section>
               )}
 
-              {canManageManagementAccess &&
+              {(canManageManagementAccess || perms.canManageEmployees) &&
                 orgId &&
                 (directoryPerson?.isManagementUser || hasPendingManagementInvite) && (
                   <section>
@@ -923,7 +958,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                           <div className="dg-card-title">Management departments</div>
                           <div className="dg-card-subtitle">Management department assignment.</div>
                         </div>
-                        {employee.status !== "removed" ? (
+                        {canManageManagementAccess && employee.status !== "removed" ? (
                           <Button
                             type="button"
                             className="dg-btn dg-btn-secondary dg-btn-sm"
@@ -960,6 +995,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                 <div className="flex flex-wrap items-center gap-2 pt-1">
                   {perms.canManageEmployees &&
                   !pendingInvite &&
+                  !expiredInvite &&
                   !employee.userId &&
                   employee.email ? (
                     <Button
@@ -1019,7 +1055,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                   focusAreaLabel={org?.focusAreaLabel}
                   certifications={certifications}
                   orgRoles={orgRoles}
-                  pendingInvite={pendingInvite}
                   thisWeekHours={thisWeekHours}
                   timeZone={org?.timezone}
                   scheduleOverview={

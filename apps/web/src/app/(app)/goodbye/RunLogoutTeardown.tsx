@@ -102,7 +102,7 @@ export function RunLogoutTeardown({ scope, reason = null }: RunLogoutTeardownPro
         queryClient.clear();
         clearImpersonationCookie();
         await settleWithRequestTimeout(clearLogoutCleanup(), PRE_SIGN_OUT_DEADLINE_MS).catch(() => {
-          // Best-effort; sessions auto-expire after 30 min server-side.
+          // Best-effort; a timed-out session no longer grants access either way.
         });
         await settleWithRequestTimeout(clearRealtimeChannels(), PRE_SIGN_OUT_DEADLINE_MS);
       } catch (err) {

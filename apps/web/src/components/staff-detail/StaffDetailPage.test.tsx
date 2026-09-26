@@ -1,9 +1,16 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { StaffDetailPage } from "./StaffDetailPage";
 import { useDirectory, useOrganizationData, usePermissions } from "@/hooks";
-import { fetchEmployeeById, fetchEmployeeShifts } from "@/features/employees/client";
+import {
+  fetchEmployeeById,
+  fetchEmployeeInvitations,
+  fetchEmployeeShifts,
+  updateEmployee,
+} from "@/features/employees/client";
+import { resendInvitation } from "@/features/organization/client";
+import type { Employee } from "@/types";
 
 const mockReplace = vi.fn();
 const mockRouter = { replace: mockReplace, push: vi.fn(), back: vi.fn() };
@@ -60,10 +67,38 @@ vi.mock("./EmployeeStatusActions", () => ({ EmployeeStatusActions: () => <div />
 vi.mock("./tabs/OverviewTab", () => ({ OverviewTab: () => <div data-testid="overview" /> }));
 vi.mock("./tabs/ActivityTab", () => ({ ActivityTab: () => <div /> }));
 vi.mock("./RecurringScheduleCard", () => ({ RecurringScheduleCard: () => <div /> }));
-vi.mock("@/components/EditEmployeePanel", () => ({ default: () => <div /> }));
+vi.mock("@/components/EditEmployeePanel", () => ({
+  default: ({ employee, onSave }: { employee: Employee; onSave: (employee: Employee) => void }) => (
+    <button type="button" onClick={() => onSave({ ...employee, firstName: "Augusta" })}>
+      Save details
+    </button>
+  ),
+}));
 vi.mock("@/components/InviteEmployeeModal", () => ({ default: () => <div /> }));
 vi.mock("@/components/staff/PendingInvitationBanner", () => ({
-  PendingInvitationBanner: () => <div />,
+  PendingInvitationBanner: ({
+    pendingInvitation,
+    onReinvite,
+    expired,
+  }: {
+    pendingInvitation: { id: string };
+    onReinvite?: () => void;
+    expired?: boolean;
+  }) => (
+    <div data-testid="invitation-banner" data-expired={String(Boolean(expired))}>
+      {pendingInvitation.id}
+      <button type="button" onClick={onReinvite}>
+        Reinvite
+      </button>
+    </div>
+  ),
+}));
+vi.mock("@/features/organization/client", () => ({
+  createOrganizationInvitation: vi.fn(),
+  replaceOrganizationInvitationAccessGuarded: vi.fn(),
+  resendInvitation: vi.fn(async () => undefined),
+  revokeInvitation: vi.fn(),
+  updateOrganizationMembershipGuarded: vi.fn(),
 }));
 vi.mock("@/components/staff/EmployeeManagementAccessModal", () => ({
   EmployeeManagementAccessEditor: () => <div />,
@@ -118,7 +153,17 @@ const employee = {
   certificationId: null,
   userId: "user-other",
   version: 1,
+  createdAt: "2026-01-09T12:00:00.000Z",
+  joinedAt: "2026-02-03T12:00:00.000Z",
+  statusChangedAt: null,
+  statusNote: "",
 };
+
+const JOINED_DAY = new Date(employee.joinedAt).toLocaleDateString(undefined, {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+});
 
 function renderPage(employeeId = "emp-2") {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -169,5 +214,144 @@ describe("StaffDetailPage", () => {
 
     expect(screen.getByTestId("staff-detail-shell")).toBeInTheDocument();
     expect(fetchEmployeeById).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the record card on the Profile section, joined date included", async () => {
+    renderPage();
+
+    expect(await screen.findByText("Record")).toBeInTheDocument();
+    expect(screen.getByText("Date joined").nextElementSibling).toHaveTextContent(JOINED_DAY);
+    expect(screen.getByText("Account").nextElementSibling).toHaveTextContent("Linked account");
+  });
+
+  it("keeps the joined date on screen after a save whose response carries none", async () => {
+    const { joinedAt: _omitted, ...savedWithoutJoinedDate } = employee;
+    vi.mocked(updateEmployee).mockResolvedValue({
+      ...savedWithoutJoinedDate,
+      firstName: "Augusta",
+      version: 2,
+    } as never);
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Save details" }));
+
+    await waitFor(() => expect(updateEmployee).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(screen.getByText("Date joined").nextElementSibling).toHaveTextContent(JOINED_DAY),
+    );
+  });
+
+  describe("invitations", () => {
+    const HOUR = 3_600_000;
+    const unlinked = { ...employee, userId: null, joinedAt: null };
+
+    function invitationFor(overrides: Record<string, unknown>) {
+      return {
+        id: "inv-1",
+        orgId: "org-1",
+        invitedBy: null,
+        email: "ada@example.com",
+        roleToAssign: "user",
+        acceptedAt: null,
+        revokedAt: null,
+        createdAt: new Date(Date.now() - 96 * HOUR).toISOString(),
+        expiresAt: new Date(Date.now() + 24 * HOUR).toISOString(),
+        updatedAt: null,
+        employeeId: "emp-2",
+        ...overrides,
+      };
+    }
+
+    beforeEach(() => {
+      vi.mocked(usePermissions).mockReturnValue({
+        ...permissions,
+        canManageEmployees: true,
+      } as never);
+      vi.mocked(fetchEmployeeById).mockResolvedValue(unlinked as never);
+    });
+
+    it("offers Reinvite on an expired invitation and no second invitation", async () => {
+      vi.mocked(fetchEmployeeInvitations).mockResolvedValue([
+        invitationFor({ id: "inv-expired", expiresAt: new Date(Date.now() - HOUR).toISOString() }),
+      ] as never);
+      renderPage();
+
+      const banner = await screen.findByTestId("invitation-banner");
+      expect(banner).toHaveAttribute("data-expired", "true");
+      expect(screen.getByText("Account").nextElementSibling).toHaveTextContent(
+        "Invitation expired",
+      );
+      expect(screen.queryByRole("button", { name: "Send invitation" })).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Reinvite" }));
+      await waitFor(() => expect(resendInvitation).toHaveBeenCalledWith("inv-expired", "org-1"));
+    });
+
+    it("shows a live invitation as pending", async () => {
+      vi.mocked(fetchEmployeeInvitations).mockResolvedValue([invitationFor({})] as never);
+      renderPage();
+
+      const banner = await screen.findByTestId("invitation-banner");
+      expect(banner).toHaveAttribute("data-expired", "false");
+      expect(screen.getByText("Account").nextElementSibling).toHaveTextContent(
+        "Invitation pending",
+      );
+    });
+
+    it("offers Send invitation when there is no open invitation", async () => {
+      vi.mocked(fetchEmployeeInvitations).mockResolvedValue([] as never);
+      renderPage();
+
+      expect(await screen.findByRole("button", { name: "Send invitation" })).toBeInTheDocument();
+      expect(screen.queryByTestId("invitation-banner")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("management departments", () => {
+    const managementPerson = {
+      personId: "person-2",
+      employeeId: "emp-2",
+      userId: "user-other",
+      orgRole: "admin",
+      isManagementUser: true,
+      managementDepartmentIds: [7],
+      invitationStatus: null,
+      lastSignInAt: null,
+    };
+
+    function renderWith(overrides: Record<string, unknown>) {
+      vi.mocked(usePermissions).mockReturnValue({ ...permissions, ...overrides } as never);
+      vi.mocked(useOrganizationData).mockReturnValue({
+        ...organizationData(),
+        departments: [{ id: 7, name: "Nursing Office", type: "management" }],
+      } as never);
+      vi.mocked(useDirectory).mockReturnValue({
+        directory: [managementPerson],
+        refresh: vi.fn(),
+      } as never);
+      renderPage();
+    }
+
+    it("shows a staff-managing Admin the departments, read-only", async () => {
+      renderWith({ role: "admin", isSuperAdmin: false, canManageEmployees: true });
+
+      expect(await screen.findByText("Management departments")).toBeInTheDocument();
+      expect(screen.getByText("Nursing Office")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Edit access" })).not.toBeInTheDocument();
+    });
+
+    it("lets a Super Admin edit them", async () => {
+      renderWith({});
+
+      expect(await screen.findByText("Management departments")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Edit access" })).toBeInTheDocument();
+    });
+
+    it("hides them from a caller who does not manage employees", async () => {
+      renderWith({ role: "admin", isSuperAdmin: false, canManageEmployees: false });
+
+      await screen.findByText("Record");
+      expect(screen.queryByText("Management departments")).not.toBeInTheDocument();
+    });
   });
 });

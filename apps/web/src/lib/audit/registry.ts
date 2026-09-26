@@ -352,6 +352,7 @@ const SECURITY_REJECTION_REASONS: Record<string, string> = {
   organization_unavailable: "organization unavailable",
   organization_access_denied: "no access to this organization",
   gridmaster_portal_required: "Gridmaster accounts sign in through the platform portal",
+  account_disabled: "the account is disabled",
 };
 
 /** Sign-in style events read as outcome first; a rejection names why. */

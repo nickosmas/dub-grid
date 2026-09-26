@@ -368,6 +368,28 @@ describe.runIf(dbReachable)("caller_org_id / caller_org_role SQL layer", () => {
     expect(rows[0]).toEqual({ can_insert: false, can_delete: false });
   });
 
+  // Any signed-in user could forge an audit row, including a sign-in success
+  // that suppressed the real record; only the server writes audit (056, F-32).
+  it("keeps audit writes server-only", async () => {
+    const { rows } = await sqlDb.query<Record<string, boolean>>(`
+      SELECT
+        has_table_privilege('authenticated', 'public.audit_log', 'SELECT') AS audit_read,
+        has_any_column_privilege('authenticated', 'public.audit_log', 'INSERT') AS audit_insert,
+        has_any_column_privilege('authenticated', 'public.audit_log', 'UPDATE') AS audit_update,
+        has_table_privilege('authenticated', 'public.audit_log', 'DELETE') AS audit_delete,
+        has_any_column_privilege('authenticated', 'public.role_change_log', 'INSERT') AS role_insert,
+        has_table_privilege('authenticated', 'public.role_change_log', 'DELETE') AS role_delete
+    `);
+    expect(rows[0]).toEqual({
+      audit_read: true,
+      audit_insert: false,
+      audit_update: false,
+      audit_delete: false,
+      role_insert: false,
+      role_delete: false,
+    });
+  });
+
   // This test used to assert the opposite — that a claim-less JWT falls back to
   // profiles.org_id — and that fallback was a cross-tenant read leak, not a
   // feature. The access-token hook strips org_id precisely when the membership

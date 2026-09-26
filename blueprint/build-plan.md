@@ -641,7 +641,7 @@
           a release blocker. It resumed after 41d4 and 41d5 and qualifies them
           too, and 41d6. Parked again at
           `blueprint/context/parked/41d3-release-qualification.md` while 43a
-          is built; it resumes afterwards.
+          was built; 43a is complete, so it can resume.
     - [x] 41d4. **Gridmaster grants with step-up** - a Gridmaster can invite
           someone as Super Admin from the Gridmaster portal, the setup wizard
           and the People screens, and every Gridmaster grant (invitation
@@ -699,7 +699,7 @@
       support them, including recovery from a two-factor lockout. Secrets
       (refresh, push, calendar and invitation tokens, IP hashes) are never
       shown: only that they exist and their dates.
-  - [ ] 43a. **Manager person detail completeness** - the People detail page
+  - [x] 43a. **Manager person detail completeness** - the People detail page
         shows the date joined (the single-person fetch attaches it, masked for
         view-only callers as the list is), and its Profile section shows the
         date added, status with its date and note, account state, and last

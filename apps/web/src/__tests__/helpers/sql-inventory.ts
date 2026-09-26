@@ -32,10 +32,12 @@ export function authenticatedSecurityDefinerAllowlist(): string[] {
     if (!file.endsWith(".sql") || !Number.isFinite(ordinal) || ordinal <= 16) continue;
     const sql = readFileSync(resolve(dir, file), "utf8");
     for (const match of sql.matchAll(
-      /GRANT EXECUTE ON FUNCTION public\.([a-z0-9_]+)\([^)]*\)\s+TO authenticated;|REVOKE (?:EXECUTE|ALL) ON FUNCTION public\.([a-z0-9_]+)\([^)]*\)\s+FROM ([^;]*);/g,
+      // Argument lists may nest one level (NUMERIC(10,2)); role lists may
+      // name several roles ("TO authenticated, service_role").
+      /(GRANT) EXECUTE ON FUNCTION public\.([a-z0-9_]+)\((?:[^()]|\([^()]*\))*\)\s+TO ([^;]*);|(REVOKE) (?:EXECUTE|ALL) ON FUNCTION public\.([a-z0-9_]+)\((?:[^()]|\([^()]*\))*\)\s+FROM ([^;]*);/g,
     )) {
-      if (match[1]) names.add(match[1]);
-      else if (/\bauthenticated\b/.test(match[3])) names.delete(match[2]);
+      if (match[1] && /\bauthenticated\b/.test(match[3])) names.add(match[2]);
+      else if (match[4] && /\bauthenticated\b/.test(match[6])) names.delete(match[5]);
     }
   }
   return [...names].sort();

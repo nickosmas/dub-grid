@@ -470,6 +470,9 @@ describe("audience", () => {
     expect(describeLogin({ outcome: "challenged", reason: "email_unconfirmed" })).toBe(
       "Sign-in awaiting email confirmation",
     );
+    expect(describeLogin({ outcome: "rejected", reason: "account_disabled" })).toBe(
+      "Sign-in rejected: the account is disabled",
+    );
     expect(describeLogin({ outcome: "rejected", reason: "organization_unavailable" })).toBe(
       "Sign-in rejected: organization unavailable",
     );

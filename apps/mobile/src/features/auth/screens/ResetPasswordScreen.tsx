@@ -292,7 +292,7 @@ export default function ResetPasswordScreen() {
   return (
     <AuthShell footer={keyboardDoneAccessory}>
       {stage === "code" ? (
-        <AuthStage>
+        <AuthStage key="code">
           <AuthHeader
             subtitle={
               <AppText tone="muted">
@@ -352,7 +352,7 @@ export default function ResetPasswordScreen() {
           </AuthActions>
         </AuthStage>
       ) : stage === "no-factor" ? (
-        <AuthStage>
+        <AuthStage key="no-factor">
           <AuthHeader
             subtitle={<AppText tone="muted">{NO_FACTOR_MESSAGE}</AppText>}
             title={<AppText variant="heroMetric">We can't finish this reset</AppText>}
@@ -364,7 +364,7 @@ export default function ResetPasswordScreen() {
           />
         </AuthStage>
       ) : stage === "factor" ? (
-        <AuthStage>
+        <AuthStage key="factor">
           <AuthHeader
             subtitle={
               <AppText tone="muted">
@@ -416,7 +416,7 @@ export default function ResetPasswordScreen() {
           </AuthActions>
         </AuthStage>
       ) : (
-        <AuthStage>
+        <AuthStage key="password">
           <AuthHeader
             subtitle={<AppText tone="muted">Choose a password you haven't used before.</AppText>}
             title={<AppText variant="heroMetric">Set a new password</AppText>}
