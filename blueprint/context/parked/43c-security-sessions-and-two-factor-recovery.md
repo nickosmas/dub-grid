@@ -68,7 +68,7 @@ proof) and F-81 (the page refreshes on more than membership changes).
       `user_known_devices.id` (uuid, unique, default), with the checksum
       locked. _Done when:_ `db:migrations:check` passes and a live check reads
       both columns.
-- [ ] **Step 2 - the record** - `security` and `sessions` on the person
+- [x] **Step 2 - the record** - `security` and `sessions` on the person
       record from Auth factors, `profiles`, `user_known_devices`,
       `user_sessions`, `mobile_device_tokens` and `calendar_feed_tokens`, each
       with an explicit column list. _Done when:_ builder tests show every

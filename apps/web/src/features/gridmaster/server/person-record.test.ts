@@ -134,6 +134,7 @@ function fixtures(): Record<string, Row[]> {
         first_name: "Ada",
         last_name: "Lovelace",
         mfa_enabled: true,
+        mfa_reenroll_required_at: "2026-09-26T09:00:00.000Z",
         terms_version: "2026-05",
         terms_accepted_at: "2026-01-03T00:00:00.000Z",
         scheduled_deletion_at: null,
@@ -245,6 +246,57 @@ function fixtures(): Record<string, Row[]> {
         employee_id: UNLINKED,
       }),
     ],
+    user_known_devices: [
+      {
+        id: "dev-1",
+        user_id: USER,
+        device_hash: "secret-device-hash",
+        platform: "ios",
+        first_seen_at: "2026-09-01T00:00:00.000Z",
+        last_seen_at: "2026-09-20T00:00:00.000Z",
+      },
+    ],
+    user_sessions: [
+      {
+        id: "ses-1",
+        user_id: USER,
+        org_id: ORG_A,
+        platform: "web",
+        device_label: "Macintosh",
+        browser_name: "Chrome",
+        browser_version: "151",
+        app_version: null,
+        ip_address: "192.0.2.77",
+        refresh_token_hash: "secret-refresh-hash",
+        supabase_session_id: "auth-session-1",
+        location_city: "Athens",
+        location_country: "GR",
+        created_at: "2026-09-25T00:00:00.000Z",
+        last_active_at: "2026-09-26T08:00:00.000Z",
+      },
+    ],
+    mobile_device_tokens: [
+      {
+        id: "push-1",
+        user_id: USER,
+        org_id: ORG_A,
+        platform: "ios",
+        expo_push_token: "ExponentPushToken[secret]",
+        last_seen_at: "2026-09-26T07:00:00.000Z",
+        disabled_at: null,
+        created_at: "2026-09-02T00:00:00.000Z",
+      },
+    ],
+    calendar_feed_tokens: [
+      {
+        id: "feed-1",
+        user_id: USER,
+        org_id: ORG_A,
+        token_hash: "secret-feed-hash",
+        issued_at: "2026-09-03T00:00:00.000Z",
+        revoked_at: null,
+      },
+    ],
     organizations: [
       {
         id: ORG_A,
@@ -274,6 +326,17 @@ const AUTH_USERS: Record<string, Row> = {
     created_at: "2026-01-01T00:00:00.000Z",
     last_sign_in_at: "2026-09-25T08:00:00.000Z",
     email_confirmed_at: "2026-01-01T00:00:00.000Z",
+    factors: [
+      {
+        id: "factor-1",
+        friendly_name: "Phone",
+        factor_type: "totp",
+        status: "verified",
+        created_at: "2026-02-01T00:00:00.000Z",
+        updated_at: "2026-02-01T00:00:00.000Z",
+        last_challenged_at: "2026-09-25T08:00:00.000Z",
+      },
+    ],
   },
   [ADMIN]: { id: ADMIN, email: "admin@example.com" },
   [GRIDMASTER]: { id: GRIDMASTER, email: "gm@dubgrid.com" },
@@ -377,8 +440,75 @@ describe("buildPersonRecordForUser", () => {
     });
   });
 
+  it("gathers two-factor, known devices, sessions, push devices and calendar feeds", async () => {
+    const person = await buildPersonRecordForUser(fakeClient(), USER);
+
+    expect(person?.security).toEqual({
+      twoFactor: {
+        enabled: true,
+        reenrollRequiredAt: "2026-09-26T09:00:00.000Z",
+        factors: [
+          {
+            id: "factor-1",
+            type: "totp",
+            name: "Phone",
+            status: "verified",
+            createdAt: "2026-02-01T00:00:00.000Z",
+            lastUsedAt: "2026-09-25T08:00:00.000Z",
+          },
+        ],
+      },
+      knownDevices: [
+        {
+          id: "dev-1",
+          platform: "ios",
+          firstSeenAt: "2026-09-01T00:00:00.000Z",
+          lastSeenAt: "2026-09-20T00:00:00.000Z",
+        },
+      ],
+    });
+    expect(person?.sessions).toEqual({
+      sessions: [
+        {
+          id: "ses-1",
+          orgId: ORG_A,
+          platform: "web",
+          deviceLabel: "Macintosh",
+          browser: "Chrome 151",
+          appVersion: null,
+          location: "Athens, GR",
+          createdAt: "2026-09-25T00:00:00.000Z",
+          lastActiveAt: "2026-09-26T08:00:00.000Z",
+        },
+      ],
+      pushDevices: [
+        {
+          id: "push-1",
+          orgId: ORG_A,
+          platform: "ios",
+          lastSeenAt: "2026-09-26T07:00:00.000Z",
+          disabledAt: null,
+          createdAt: "2026-09-02T00:00:00.000Z",
+        },
+      ],
+      calendarFeeds: [
+        { id: "feed-1", orgId: ORG_A, issuedAt: "2026-09-03T00:00:00.000Z", revokedAt: null },
+      ],
+    });
+  });
+
   it("never carries a token, an IP address or an IP hash", async () => {
     const serialized = JSON.stringify(await buildPersonRecordForUser(fakeClient(), USER));
+    for (const secret of [
+      "secret-device-hash",
+      "192.0.2.77",
+      "secret-refresh-hash",
+      "auth-session-1",
+      "ExponentPushToken",
+      "secret-feed-hash",
+    ]) {
+      expect(serialized).not.toContain(secret);
+    }
     expect(serialized).not.toContain("secret-invitation-token");
     expect(serialized).not.toContain("203.0.113.9");
     expect(serialized).not.toContain("198.51.100.4");
@@ -413,6 +543,8 @@ describe("buildPersonRecordForStaff", () => {
     expect(person?.account).toBeNull();
     expect(person?.profile).toBeNull();
     expect(person?.loginLock).toBeNull();
+    expect(person?.security).toBeNull();
+    expect(person?.sessions).toBeNull();
     expect(person?.organizations).toHaveLength(1);
     expect(person?.organizations[0]).toMatchObject({ org: { id: ORG_B }, membership: null });
     expect(person?.organizations[0].employees[0]).toMatchObject({ firstName: "Grace" });

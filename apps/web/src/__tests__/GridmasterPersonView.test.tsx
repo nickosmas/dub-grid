@@ -133,6 +133,11 @@ function linkedRecord(overrides: Partial<GridmasterPersonRecord> = {}): Gridmast
     ],
     liveImpersonation: null,
     loginLock: null,
+    security: {
+      twoFactor: { enabled: false, reenrollRequiredAt: null, factors: [] },
+      knownDevices: [],
+    },
+    sessions: { sessions: [], pushDevices: [], calendarFeeds: [] },
     organizations: [
       {
         org: { id: ORG, name: "Calm Haven", slug: "calmhaven" },
