@@ -2512,9 +2512,16 @@ export function MembersSection({
                 });
                 const pendingInvitation = pendingInviteByEmployeeId.get(selectedPerson.employeeId);
                 if (selectedPerson.userId) {
-                  await updateAppOnlyUser(selectedPerson.userId, orgId, {
-                    departmentIds: data.managementDepartmentIds,
-                  });
+                  const userId = selectedPerson.userId;
+                  const completed = await stepUp.run((accessToken) =>
+                    updateAppOnlyUser(
+                      userId,
+                      orgId,
+                      { departmentIds: data.managementDepartmentIds },
+                      accessToken,
+                    ),
+                  );
+                  if (!completed) return false;
                 } else if (pendingInvitation && emailChanged) {
                   // employees.email is the single source of truth for the
                   // invitation's own target address now (the field is
@@ -2564,12 +2571,21 @@ export function MembersSection({
                 );
                 if (!completed) return false;
               } else if (selectedPerson.userId) {
-                await updateAppOnlyUser(selectedPerson.userId, orgId, {
-                  firstName: data.firstName,
-                  lastName: data.lastName,
-                  phone: data.phone,
-                  departmentIds: data.managementDepartmentIds,
-                });
+                const userId = selectedPerson.userId;
+                const completed = await stepUp.run((accessToken) =>
+                  updateAppOnlyUser(
+                    userId,
+                    orgId,
+                    {
+                      firstName: data.firstName,
+                      lastName: data.lastName,
+                      phone: data.phone,
+                      departmentIds: data.managementDepartmentIds,
+                    },
+                    accessToken,
+                  ),
+                );
+                if (!completed) return false;
               }
 
               if (updatedEmployee) {

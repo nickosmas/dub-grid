@@ -263,7 +263,16 @@ export const EmployeeManagementAccessEditor = forwardRef<
       });
       if (!completed) return false;
     }
-    // Revoked after the role change, so a cancelled step-up leaves it pending.
+    const completed = await stepUp.run((accessToken) =>
+      updateAppOnlyUser(
+        matchedUser.id,
+        orgId,
+        { departmentIds: managementDepartmentIds },
+        accessToken,
+      ),
+    );
+    if (!completed) return false;
+    // Revoked last, so a cancelled step-up leaves it pending.
     if (pendingInvitation) {
       if (!pendingInvitation.updatedAt) {
         throw new Error("Invitation data is out of date. Refresh and try again.");
@@ -274,9 +283,6 @@ export const EmployeeManagementAccessEditor = forwardRef<
         expectedUpdatedAt: pendingInvitation.updatedAt,
       });
     }
-    await updateAppOnlyUser(matchedUser.id, orgId, {
-      departmentIds: managementDepartmentIds,
-    });
     return true;
   }
 

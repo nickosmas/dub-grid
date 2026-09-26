@@ -544,10 +544,14 @@ export async function updateAppOnlyUser(
     departmentIds?: number[];
     deptAdminIds?: number[];
   },
+  accessToken?: string,
 ): Promise<void> {
   await requestOrganizationJson("/api/organizations/app-only-user", {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify({ orgId, userId, ...data }),
   });
 }

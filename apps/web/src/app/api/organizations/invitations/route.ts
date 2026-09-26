@@ -367,8 +367,15 @@ export async function PATCH(req: NextRequest) {
     const roleChanged =
       fields.roleToAssign !== undefined && fields.roleToAssign !== currentInvitation.roleToAssign;
     // Redirecting a pending invitation to another address grants its role to
-    // that address, so both changes need a Gridmaster's fresh proof (F-59).
-    if ((roleChanged || emailChanged) && (await isGridmasterActor(getServiceClient(), user.id))) {
+    // that address, so both changes need a Gridmaster's fresh proof (F-59), as
+    // does a change to the departments it grants (F-68).
+    const scopeChanged =
+      !sameIdSet(fields.departmentIds, currentInvitation.departmentIds) ||
+      !sameIdSet(fields.deptAdminIds, currentInvitation.deptAdminIds);
+    if (
+      (roleChanged || emailChanged || scopeChanged) &&
+      (await isGridmasterActor(getServiceClient(), user.id))
+    ) {
       const assurance = await requireSensitiveActionAuth(req);
       if ("response" in assurance) return assurance.response;
     }
@@ -915,4 +922,11 @@ export async function POST(req: NextRequest) {
     logger.error({ error: err, orgId, invitationId }, "Invitation resend failed");
     return NextResponse.json({ error: API_ERRORS.UNEXPECTED }, { status: 500 });
   }
+}
+
+/** An omitted list changes nothing; otherwise compare as sets. */
+function sameIdSet(next: number[] | undefined, current: number[] | null | undefined): boolean {
+  if (next === undefined) return true;
+  const currentSet = new Set(current ?? []);
+  return next.length === currentSet.size && next.every((id) => currentSet.has(id));
 }

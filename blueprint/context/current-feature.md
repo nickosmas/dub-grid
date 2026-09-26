@@ -110,7 +110,7 @@ Continuous Mode: they push, send, reach production or reseed shared state.
       the setup wizard's route calls it as the service role. _Done when:_ the
       live function-grant check and the route test pass. Production needs 050
       applied by the runbook.
-- [ ] **Repair F-68** - a Gridmaster's department-admin changes require fresh
+- [x] **Repair F-68** - a Gridmaster's department-admin changes require fresh
       proof, with the prompt in the screens that make them.
 - [ ] **Repair F-69** - the missing 41d4 view and route tests.
 

@@ -269,9 +269,12 @@ describe("EmployeeManagementAccessEditor", () => {
 
     await waitFor(() => {
       // No link call — the user is already attached to the employee row.
-      expect(updateAppOnlyUserMock).toHaveBeenCalledWith("user-1", "org-1", {
-        departmentIds: [10],
-      });
+      expect(updateAppOnlyUserMock).toHaveBeenCalledWith(
+        "user-1",
+        "org-1",
+        { departmentIds: [10] },
+        "step-up-token",
+      );
       expect(updateOrganizationMembershipGuardedMock).not.toHaveBeenCalled();
       expect(onCompleted).toHaveBeenCalledOnce();
       expect(onClose).toHaveBeenCalledOnce();
