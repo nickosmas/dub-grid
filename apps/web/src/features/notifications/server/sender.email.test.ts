@@ -2,11 +2,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const sendResendEmail = vi.fn();
+const sendMobilePushNotifications = vi.fn();
+const pushEligible = vi.fn((_type: string) => false);
 const state = {
   securityEmailsThisHour: 0,
   otherEmailsThisHour: 0,
   dedupeHits: 0,
   orgName: null as string | null,
+  prefs: null as Record<string, { in_app?: boolean; email?: boolean }> | null,
 };
 
 type Op = [string, ...unknown[]];
@@ -22,6 +25,9 @@ function resolve(table: string, ops: Op[]) {
         ? state.securityEmailsThisHour
         : state.otherEmailsThisHour,
     };
+  }
+  if (table === "notification_preferences") {
+    return { data: state.prefs ? { prefs: state.prefs } : null, error: null };
   }
   if (table === "organizations") {
     return { data: state.orgName ? { name: state.orgName } : null, error: null };
@@ -63,8 +69,9 @@ vi.mock("@/lib/resend", () => ({
   sendResendEmail: (...args: unknown[]) => sendResendEmail(...args),
 }));
 vi.mock("@/features/mobile/server", () => ({
-  isPushEligibleNotificationType: () => false,
-  sendMobilePushNotifications: vi.fn(),
+  isPushEligibleNotificationType: (type: string) => pushEligible(type),
+  isAccountWidePushType: (type: string) => type.startsWith("security_"),
+  sendMobilePushNotifications: (...args: unknown[]) => sendMobilePushNotifications(...args),
 }));
 vi.mock("@/lib/logger", () => ({ default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
@@ -92,7 +99,9 @@ describe("sendNotification email", () => {
     state.otherEmailsThisHour = 0;
     state.dedupeHits = 0;
     state.orgName = null;
+    state.prefs = null;
     sendResendEmail.mockResolvedValue({ id: "email-1" });
+    pushEligible.mockReturnValue(false);
   });
 
   // Ten unrelated emails in an hour used to suppress a sign-in warning.
@@ -102,6 +111,56 @@ describe("sendNotification email", () => {
     await send("security_new_device");
 
     expect(sendResendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("pushes a security alert to the whole account and other alerts to the organization", async () => {
+    pushEligible.mockReturnValue(true);
+
+    await send("security_new_device");
+    await send("schedule_published");
+
+    expect(sendMobilePushNotifications).toHaveBeenNthCalledWith(
+      1,
+      "user-1",
+      "org-1",
+      expect.any(Object),
+      { accountWide: true },
+    );
+    expect(sendMobilePushNotifications).toHaveBeenNthCalledWith(
+      2,
+      "user-1",
+      "org-1",
+      expect.any(Object),
+      { accountWide: false },
+    );
+  });
+
+  it("emails a security alert even when an older save turned security email off", async () => {
+    state.prefs = { security: { in_app: false, email: false } };
+
+    await send("security_new_device");
+
+    expect(sendResendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("tells the reader a security alert is always on, and others how to change them", async () => {
+    await send("security_new_device");
+    await send("billing_payment_failed");
+
+    const [security, billing] = sendResendEmail.mock.calls.map(
+      (call) => (call[0] as { html: string }).html,
+    );
+    expect(security).toContain("Security alerts are always on");
+    expect(security).not.toContain("manage your notification preferences");
+    expect(billing).toContain("manage your notification preferences");
+  });
+
+  it("still honors an email preference for other categories", async () => {
+    state.prefs = { billing: { in_app: true, email: false } };
+
+    await send("billing_payment_failed");
+
+    expect(sendResendEmail).not.toHaveBeenCalled();
   });
 
   it("still throttles ordinary mail at its own limit", async () => {

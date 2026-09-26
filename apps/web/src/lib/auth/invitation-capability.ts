@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { DEAD_INVITATION_CODE, DEAD_INVITATION_MESSAGE } from "./dead-invitation";
 
 export { DEAD_INVITATION_CODE, DEAD_INVITATION_MESSAGE };
-export const INVITATION_LIFETIME_MS = 72 * 60 * 60 * 1000;
+export { INVITATION_LIFETIME_MS } from "@dubgrid/domain";
 
 export function deadInvitationResponse(): NextResponse {
   return NextResponse.json(

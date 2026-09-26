@@ -6,6 +6,7 @@ const validateCsrfOrigin = vi.fn();
 const trackUserSessionForUser = vi.fn();
 const dispatchNotificationEvent = vi.fn();
 const claimNewSignIn = vi.fn();
+const rememberSignInDevice = vi.fn();
 const after = vi.fn((task: () => unknown) => void task());
 
 vi.mock("next/server", async (importOriginal) => ({
@@ -34,6 +35,11 @@ vi.mock("@/features/account/server/security-alerts", async (importOriginal) => (
   claimNewSignIn: (...args: unknown[]) => claimNewSignIn(...args),
 }));
 
+vi.mock("@/features/account/server/known-devices", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/account/server/known-devices")>()),
+  rememberSignInDevice: (...args: unknown[]) => rememberSignInDevice(...args),
+}));
+
 vi.mock("@/lib/logger", () => ({
   default: {
     warn: vi.fn(),
@@ -59,7 +65,9 @@ describe("POST /api/auth/track-session", () => {
     trackUserSessionForUser.mockResolvedValue(undefined);
     dispatchNotificationEvent.mockResolvedValue({ success: true });
     // Default: this session was already reported, so it is not a new sign-in.
-    claimNewSignIn.mockResolvedValue(false);
+    claimNewSignIn.mockResolvedValue(null);
+    // Default: a browser this user has not signed in from before.
+    rememberSignInDevice.mockResolvedValue(true);
   });
 
   it("rejects unauthenticated requests", async () => {
@@ -126,7 +134,7 @@ describe("POST /api/auth/track-session", () => {
   });
 
   it("alerts, after the response, on a sign-in session not seen before", async () => {
-    claimNewSignIn.mockResolvedValueOnce(true);
+    claimNewSignIn.mockResolvedValueOnce("claimed");
 
     await POST(
       new NextRequest("http://localhost/api/auth/track-session", {
@@ -210,6 +218,100 @@ describe("POST /api/auth/track-session", () => {
     );
   });
 
+  // The claim is spent once it wins, so an alert held back until after the
+  // write would be lost for good when the write failed and the client retried.
+  it("still alerts when recording the session fails after the claim", async () => {
+    claimNewSignIn.mockResolvedValueOnce("claimed");
+    trackUserSessionForUser.mockRejectedValueOnce(new Error("write failed"));
+
+    const response = await POST(
+      new NextRequest("http://localhost/api/auth/track-session", {
+        method: "POST",
+        headers: { origin: "http://localhost:3000" },
+        body: JSON.stringify({ platform: "web", deviceLabel: "Chrome on macOS" }),
+      }),
+    );
+
+    expect(response.status).toBe(500);
+    expect(dispatchNotificationEvent).toHaveBeenCalledOnce();
+    expect(dispatchNotificationEvent).toHaveBeenCalledWith(
+      "session-user",
+      expect.objectContaining({ action: "security_new_device", supabaseSessionId: "session-id-1" }),
+    );
+  });
+
+  it("alerts a session with no row only once its write lands", async () => {
+    claimNewSignIn.mockResolvedValue("unrecorded");
+    trackUserSessionForUser.mockRejectedValueOnce(new Error("write failed"));
+    const report = () =>
+      POST(
+        new NextRequest("http://localhost/api/auth/track-session", {
+          method: "POST",
+          headers: { origin: "http://localhost:3000" },
+          body: JSON.stringify({ platform: "web", deviceLabel: "Chrome on macOS" }),
+        }),
+      );
+
+    expect((await report()).status).toBe(500);
+    expect(dispatchNotificationEvent).not.toHaveBeenCalled();
+
+    expect((await report()).status).toBe(200);
+    expect(dispatchNotificationEvent).toHaveBeenCalledOnce();
+  });
+
+  it("stays quiet on a new session from a browser this user has signed in from before", async () => {
+    claimNewSignIn.mockResolvedValueOnce("claimed");
+    rememberSignInDevice.mockResolvedValueOnce(false);
+
+    await POST(trackRequest({ cookie: `dg_device=${KNOWN_DEVICE}` }));
+
+    expect(rememberSignInDevice).toHaveBeenCalledWith({
+      userId: "session-user",
+      deviceId: KNOWN_DEVICE,
+      platform: "web",
+    });
+    expect(dispatchNotificationEvent).not.toHaveBeenCalled();
+  });
+
+  it("remembers the device of a session with no row only after its write lands", async () => {
+    claimNewSignIn.mockResolvedValueOnce("unrecorded");
+
+    await POST(trackRequest({ cookie: `dg_device=${KNOWN_DEVICE}` }));
+
+    expect(trackUserSessionForUser.mock.invocationCallOrder[0]).toBeLessThan(
+      rememberSignInDevice.mock.invocationCallOrder[0]!,
+    );
+    expect(dispatchNotificationEvent).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the browser's device id and refreshes its cookie", async () => {
+    const response = await POST(trackRequest({ cookie: `dg_device=${KNOWN_DEVICE}` }));
+
+    const cookie = response.cookies.get("dg_device");
+    expect(cookie?.value).toBe(KNOWN_DEVICE);
+    expect(cookie).toMatchObject({ httpOnly: true, sameSite: "lax", path: "/" });
+    expect(cookie?.maxAge).toBe(400 * 24 * 60 * 60);
+  });
+
+  it("issues a device id to a browser without a valid one", async () => {
+    claimNewSignIn.mockResolvedValueOnce("claimed");
+
+    const response = await POST(trackRequest({ cookie: "dg_device=not-an-issued-id" }));
+
+    const issued = response.cookies.get("dg_device")?.value;
+    expect(issued).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(rememberSignInDevice).toHaveBeenCalledWith(
+      expect.objectContaining({ deviceId: issued }),
+    );
+    expect(dispatchNotificationEvent).toHaveBeenCalledOnce();
+  });
+
+  it("does not check the device when the session has reported before", async () => {
+    await POST(trackRequest({ cookie: `dg_device=${KNOWN_DEVICE}` }));
+
+    expect(rememberSignInDevice).not.toHaveBeenCalled();
+  });
+
   it("stays quiet when the same session reports again", async () => {
     await POST(
       new NextRequest("http://localhost/api/auth/track-session", {
@@ -225,6 +327,16 @@ describe("POST /api/auth/track-session", () => {
     expect(dispatchNotificationEvent).not.toHaveBeenCalled();
   });
 });
+
+const KNOWN_DEVICE = "6f1c2d3e-4b5a-4c6d-8e7f-9a0b1c2d3e4f";
+
+function trackRequest({ cookie }: { cookie: string }): NextRequest {
+  return new NextRequest("http://localhost/api/auth/track-session", {
+    method: "POST",
+    headers: { origin: "http://localhost:3000", cookie },
+    body: JSON.stringify({ platform: "web", deviceLabel: "Chrome on macOS" }),
+  });
+}
 
 function createJwt(payload: Record<string, unknown>): string {
   return [

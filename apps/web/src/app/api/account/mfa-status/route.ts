@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { resolveVerifiedTotpFactorPresence } from "@dubgrid/authz";
 import { updateSelfMfaStatus } from "@/features/account/server";
-import { createRequestSupabaseClient, requireAuthenticatedUser } from "@/lib/api-auth";
+import { createRequestSupabaseClient, requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import logger from "@/lib/logger";
 import { API_ERRORS } from "@dubgrid/client-errors";
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
   if (csrfError) return csrfError;
 
   try {
-    const auth = await requireAuthenticatedUser(req);
+    const auth = await requireAuthenticatedUserWithClaims(req);
     if ("response" in auth) {
       return auth.response;
     }
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     // editor in Settings may POST the current state on save without toggling.
     const { data: priorProfile, error: priorError } = await getServiceClient()
       .from("profiles")
-      .select("mfa_enabled, org_id")
+      .select("mfa_enabled")
       .eq("id", auth.user.id)
       .maybeSingle();
     if (priorError) {
@@ -65,7 +65,9 @@ export async function POST(req: NextRequest) {
     if (wasEnabled !== enabled) {
       scheduleSecurityAlert(auth.user.id, {
         action: "security_mfa_changed",
-        orgId: (priorProfile?.org_id as string | null) ?? null,
+        // The session's own organization. `profiles.org_id` is whichever
+        // organization any device switched to last.
+        orgId: typeof auth.claims.org_id === "string" ? auth.claims.org_id : null,
         targetUserId: auth.user.id,
         enabled,
       });

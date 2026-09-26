@@ -126,7 +126,11 @@ function resolveClientUrl(path: string): string {
   return path;
 }
 
-async function requestGridmasterJson<T>(input: string, init?: RequestInit): Promise<T> {
+async function requestGridmasterJson<T>(
+  input: string,
+  init?: RequestInit,
+  fallbackMessage = "Gridmaster request failed.",
+): Promise<T> {
   const response = await fetch(resolveClientUrl(input), init);
   const contentType = response.headers.get("content-type") ?? "";
   const body = contentType.includes("application/json")
@@ -134,10 +138,11 @@ async function requestGridmasterJson<T>(input: string, init?: RequestInit): Prom
     : null;
 
   if (!response.ok) {
-    throw Object.assign(
-      new Error(formatClientErrorMessage(body?.error, "Gridmaster request failed.")),
-      { status: response.status, code: body?.code, method: body?.method },
-    );
+    throw Object.assign(new Error(formatClientErrorMessage(body?.error, fallbackMessage)), {
+      status: response.status,
+      code: body?.code,
+      method: body?.method,
+    });
   }
 
   return body as T;
@@ -153,33 +158,49 @@ export function fetchGridmasterAccounts(): Promise<{ accounts: GridmasterAccount
 
 export function promoteGridmasterAccount(
   email: string,
+  accessToken?: string,
 ): Promise<{ success: true; userId: string | null }> {
   return requestGridmasterJson("/api/gridmaster/accounts", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify({ action: "promote", email }),
   });
 }
 
-export function demoteGridmasterAccount(input: {
-  userId: string;
-  orgId: string;
-  orgRole: AssignableOrganizationRole;
-}): Promise<{ success: true }> {
+export function demoteGridmasterAccount(
+  input: {
+    userId: string;
+    orgId: string;
+    orgRole: AssignableOrganizationRole;
+  },
+  accessToken?: string,
+): Promise<{ success: true }> {
   return requestGridmasterJson("/api/gridmaster/accounts", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify({ action: "demote", ...input }),
   });
 }
 
-export function updateGridmasterAccountActivation(input: {
-  userId: string;
-  deactivate: boolean;
-}): Promise<{ success: true }> {
+export function updateGridmasterAccountActivation(
+  input: {
+    userId: string;
+    deactivate: boolean;
+  },
+  accessToken?: string,
+): Promise<{ success: true }> {
   return requestGridmasterJson("/api/gridmaster/accounts", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify({ action: "setActivation", ...input }),
   });
 }
@@ -210,6 +231,24 @@ export function forceLogoutGridmasterUser(
     method: "POST",
     headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
   });
+}
+
+export function sendGridmasterPasswordReset(
+  email: string,
+  accessToken?: string,
+): Promise<{ success: true }> {
+  return requestGridmasterJson(
+    "/api/gridmaster/password-reset",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify({ email }),
+    },
+    "We couldn't send that password reset.",
+  );
 }
 
 export function terminateGridmasterUser(
@@ -492,21 +531,27 @@ export function fetchGridmasterFullAuditLog(options?: {
   ).then((data) => data.entries);
 }
 
-export function exportGridmasterAuditLog(options?: {
-  orgId?: string;
-  action?: string;
-  actionPrefix?: string;
-  resourceType?: string;
-  actorId?: string;
-  target?: string;
-  startDate?: string;
-  endDate?: string;
-  highRiskOnly?: boolean;
-  limit?: number;
-}): Promise<GridmasterAuditExportResult> {
+export function exportGridmasterAuditLog(
+  options?: {
+    orgId?: string;
+    action?: string;
+    actionPrefix?: string;
+    resourceType?: string;
+    actorId?: string;
+    target?: string;
+    startDate?: string;
+    endDate?: string;
+    highRiskOnly?: boolean;
+    limit?: number;
+  },
+  accessToken?: string,
+): Promise<GridmasterAuditExportResult> {
   return requestGridmasterJson("/api/gridmaster/audit-log/export", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify(options ?? {}),
   });
 }
@@ -589,10 +634,14 @@ export function assignGridmasterOrgRoleByEmail(
   orgId: string,
   email: string,
   role: AssignableOrganizationRole,
+  accessToken?: string,
 ): Promise<void> {
   return requestGridmasterJson<{ success: true }>("/api/gridmaster/organizations/manage", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify({ action: "assignOrgRoleByEmail", orgId, email, role }),
   }).then(() => undefined);
 }

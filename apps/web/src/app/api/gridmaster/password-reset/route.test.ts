@@ -1,7 +1,8 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requireGridmasterSession = vi.fn();
+const requireSensitiveActionAuth = vi.fn();
 const validateCsrfOrigin = vi.fn();
 const checkRateLimit = vi.fn();
 const resetPasswordForEmail = vi.fn();
@@ -11,6 +12,7 @@ const writeGridmasterAuditLog = vi.fn();
 vi.mock("@/lib/api-auth", () => ({
   createAnonClient: () => ({ auth: { resetPasswordForEmail } }),
   requireGridmasterSession: (req: NextRequest) => requireGridmasterSession(req),
+  requireSensitiveActionAuth: (req: NextRequest) => requireSensitiveActionAuth(req),
 }));
 
 vi.mock("@/lib/csrf", () => ({
@@ -49,6 +51,7 @@ describe("POST /api/gridmaster/password-reset", () => {
     vi.clearAllMocks();
     validateCsrfOrigin.mockReturnValue(null);
     requireGridmasterSession.mockResolvedValue({ user: { id: "gm-1" } });
+    requireSensitiveActionAuth.mockResolvedValue({ user: { id: "gm-1" } });
     checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
     resetPasswordForEmail.mockResolvedValue({ error: null });
     writeGridmasterAuditLog.mockResolvedValue(undefined);
@@ -69,6 +72,22 @@ describe("POST /api/gridmaster/password-reset", () => {
         details: { target_email: "user@example.com" },
       }),
     );
+  });
+
+  // Sending a reset to any account is a platform credential action (41b3).
+  it("returns the step-up challenge without sending anything", async () => {
+    const challenge = { code: "STEP_UP_REQUIRED", method: "totp", error: "Confirm your identity." };
+    requireSensitiveActionAuth.mockResolvedValueOnce({
+      response: NextResponse.json(challenge, { status: 403 }),
+    });
+
+    const response = await POST(makeRequest({ email: "user@example.com" }));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual(challenge);
+    expect(resetPasswordForEmail).not.toHaveBeenCalled();
+    expect(writeGridmasterAuditLog).not.toHaveBeenCalled();
+    expect(checkRateLimit).not.toHaveBeenCalled();
   });
 
   it("reports failure and writes no audit row when the send fails", async () => {

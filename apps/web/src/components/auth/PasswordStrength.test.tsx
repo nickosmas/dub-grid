@@ -10,7 +10,7 @@ describe("PasswordStrength", () => {
     expect(screen.queryByText("Too short")).not.toBeInTheDocument();
     expect(screen.getByText("At least 10 characters")).toBeInTheDocument();
     expect(screen.getByText("Uppercase letter")).toBeInTheDocument();
-    expect(screen.getByText("Number")).toBeInTheDocument();
+    expect(screen.getByText("Letter and number")).toBeInTheDocument();
     expect(screen.getByText("Symbol")).toBeInTheDocument();
   });
 
@@ -18,7 +18,7 @@ describe("PasswordStrength", () => {
     expect(getPasswordStrengthHints("Password-123")).toEqual([
       { id: "length", label: "At least 10 characters", met: true },
       { id: "uppercase", label: "Uppercase letter", met: true },
-      { id: "number", label: "Number", met: true },
+      { id: "number", label: "Letter and number", met: true },
       { id: "symbol", label: "Symbol", met: true },
     ]);
   });

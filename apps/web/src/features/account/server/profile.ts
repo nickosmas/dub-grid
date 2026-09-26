@@ -510,6 +510,18 @@ export async function updateSelfLinkedEmployeePhone(input: {
   return { employee: updatedEmployee };
 }
 
+/** Records two-factor as off, returning whether it was recorded on before. */
+export async function recordSelfMfaOff(userId: string): Promise<boolean> {
+  const { data, error } = await getServiceClient()
+    .from("profiles")
+    .select("mfa_enabled")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  await updateSelfMfaStatus(userId, false);
+  return data?.mfa_enabled === true;
+}
+
 export async function updateSelfMfaStatus(
   userId: string,
   enabled: boolean,

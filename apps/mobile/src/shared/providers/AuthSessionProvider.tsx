@@ -11,6 +11,7 @@ import type { Session } from "@supabase/supabase-js";
 import { authEntryRecorder } from "../../features/auth/lib/auth-entry-measurement";
 import { getMobileAuthIdentity, isSameMobileAuthIdentity } from "../lib/access-token";
 import { registerMobileSessionPresence } from "../lib/api";
+import { reportSessionPresence } from "../lib/session-presence-report";
 import { queryClient } from "../lib/query-client";
 import { getSupabaseClient } from "../lib/supabase";
 
@@ -131,8 +132,16 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
       if (!session?.access_token) {
         lastTrackedAccessTokenRef.current = null;
       } else if (lastTrackedAccessTokenRef.current !== session.access_token) {
-        lastTrackedAccessTokenRef.current = session.access_token;
-        registerMobileSessionPresence(session.access_token).catch(() => {});
+        const token = session.access_token;
+        lastTrackedAccessTokenRef.current = token;
+        const isCurrent = () => lastTrackedAccessTokenRef.current === token;
+        void reportSessionPresence(token, { send: registerMobileSessionPresence, isCurrent }).then(
+          (reported) => {
+            // Forget a token that never got reported, so its next appearance
+            // reports it again.
+            if (!reported && isCurrent()) lastTrackedAccessTokenRef.current = null;
+          },
+        );
       }
 
       setValue({

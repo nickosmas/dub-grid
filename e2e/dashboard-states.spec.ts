@@ -6,23 +6,27 @@ import {
   QA_SUPER_ADMIN_EMAIL,
   QA_SUPER_ADMIN_PASSWORD,
 } from "./helpers/auth";
+import { holdRequests } from "./helpers/held-requests";
 
 const BOOTSTRAP_PATH = "/api/organization/bootstrap";
 
 test.describe("dashboard states", () => {
-  test("shows the top progress bar while the organization bootstrap is in flight", async ({
+  test("shows the workspace splash while the organization bootstrap is in flight", async ({
     page,
   }) => {
     test.setTimeout(60_000);
 
-    await page.route(`**${BOOTSTRAP_PATH}`, async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 1_500));
-      await route.continue();
-    });
+    const releaseBootstrap = await holdRequests(page, `**${BOOTSTRAP_PATH}`);
 
     const navigation = loginAsQaSuperAdmin(page, QA_CALM_HAVEN_ORIGIN);
 
-    await expect(page.locator("[data-progress-bar]")).toBeVisible({ timeout: 15_000 });
+    // Until the bootstrap lands, sign-in and SetupGuard both show the branded
+    // splash. The progress bar this used to wait for belongs to the data the
+    // dashboard loads afterwards, which a held bootstrap never lets it reach.
+    await expect(page.getByRole("heading", { name: "Loading your workspace" })).toBeVisible({
+      timeout: 15_000,
+    });
+    releaseBootstrap();
 
     await navigation;
 

@@ -82,6 +82,22 @@ describe("PUT /api/account/notification-preferences", () => {
     expect(persisted).not.toHaveProperty("marketing");
   });
 
+  // These rows were on the web page but the mobile schema dropped them, so
+  // every save reported success and kept nothing (41c1).
+  it("keeps the web-only categories and never a security preference", async () => {
+    const webPrefs = {
+      ...VALID_PREFS,
+      membership: { in_app: false, email: true },
+      account: { in_app: true, email: true },
+      billing: { in_app: true, email: false },
+    };
+    const res = await PUT(
+      putRequest({ prefs: { ...webPrefs, security: { in_app: false, email: false } } }),
+    );
+    expect(res.status).toBe(200);
+    expect(saveNotificationPreferences).toHaveBeenCalledWith("user-id", webPrefs);
+  });
+
   it("rejects when a category is missing", async () => {
     const { system: _system, ...incomplete } = VALID_PREFS;
     const res = await PUT(putRequest({ prefs: incomplete }));

@@ -344,23 +344,32 @@ function configRecordSpecs(
 
 // ── The registry ─────────────────────────────────────────────────────────────
 
+const SECURITY_REJECTION_REASONS: Record<string, string> = {
+  invalid_credentials: "wrong password",
+  policy_denied: "not allowed",
+  rate_limited: "too many attempts",
+  service_unavailable: "service unavailable",
+  organization_unavailable: "organization unavailable",
+  organization_access_denied: "no access to this organization",
+  gridmaster_portal_required: "Gridmaster accounts sign in through the platform portal",
+};
+
 /** Sign-in style events read as outcome first; a rejection names why. */
 function securityHeadline(d: AuditDetails, succeeded: string, noun: string): string {
   const outcome = d.text("outcome");
   const surface = d.text("surface") === "mobile" ? " from the mobile app" : "";
   if (outcome === "succeeded") return `${succeeded}${surface}`;
-  if (outcome === "challenged") return `${noun} awaiting two-factor code${surface}`;
   const reason = d.text("reason");
+  if (outcome === "challenged") {
+    const awaiting = reason === "email_unconfirmed" ? "email confirmation" : "two-factor code";
+    return `${noun} awaiting ${awaiting}${surface}`;
+  }
+  // Own keys only: audit rows can be written by any signed-in user, so a
+  // reason such as "constructor" must not reach the prototype.
   const why =
-    reason === "invalid_credentials"
-      ? "wrong password"
-      : reason === "policy_denied"
-        ? "not allowed"
-        : reason === "rate_limited"
-          ? "too many attempts"
-          : reason === "service_unavailable"
-            ? "service unavailable"
-            : null;
+    reason && Object.hasOwn(SECURITY_REJECTION_REASONS, reason)
+      ? SECURITY_REJECTION_REASONS[reason]
+      : null;
   const verb = outcome === "throttled" ? "throttled" : outcome === "failed" ? "failed" : "rejected";
   return `${noun} ${verb}${surface}${why ? `: ${why}` : ""}`;
 }
@@ -1155,8 +1164,12 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     severity: "warning",
     headline: (d) => {
       const scope = d.text("scope");
+      if (d.text("reason") === "password_changed") {
+        return "Changed their password and signed out everywhere";
+      }
       if (scope === "others") return "Signed out their other devices";
       if (scope === "global") return "Signed out everywhere";
+      if (scope === "device") return "Signed out one of their devices";
       return "Signed out";
     },
     details: () => [],

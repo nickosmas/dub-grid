@@ -1,5 +1,6 @@
 import {
   deliverMobilePushNotifications,
+  isAccountWidePushType,
   isPushEligibleNotificationType,
   type MobilePushPayload,
   type MobilePushPlatform,
@@ -24,6 +25,7 @@ export async function sendMobilePushNotifications(
   userId: string,
   orgId: string | null,
   payload: MobilePushPayload,
+  options: { accountWide?: boolean } = {},
 ): Promise<void> {
   const serviceClient = getServiceClient();
   const headers: Record<string, string> = {
@@ -40,6 +42,7 @@ export async function sendMobilePushNotifications(
         userId,
         orgId,
         payload,
+        accountWide: options.accountWide,
       },
       {
         fetchPushTokens: ({ userId: targetUserId, orgId: targetOrgId }) =>
@@ -71,4 +74,4 @@ export async function sendMobilePushNotifications(
   }
 }
 
-export { isPushEligibleNotificationType };
+export { isAccountWidePushType, isPushEligibleNotificationType };

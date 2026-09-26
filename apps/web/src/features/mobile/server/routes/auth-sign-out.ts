@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
   } catch {
     // No body means a local sign-out.
   }
-  const { scope, recoveryCompletion } = parseSignOutBody(body);
+  const { scope, recoveryCompletion, passwordChange } = parseSignOutBody(body);
 
   if (scope === "local") {
     await revokeLocalSession(extractMobileBearerToken(req.headers.get("authorization")));
@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
   if ("response" in caller) return caller.response;
 
   try {
-    await revokeBulkSessions({ ...caller, scope, recoveryCompletion });
+    await revokeBulkSessions({ ...caller, scope, recoveryCompletion, passwordChange });
     return NextResponse.json({ success: true }, { headers: NO_STORE });
   } catch {
     // A partial failure is not success and must not trigger automatic replay.

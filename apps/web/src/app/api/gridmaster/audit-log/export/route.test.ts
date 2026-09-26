@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requireGridmasterSession = vi.fn();
+const requireSensitiveActionAuth = vi.fn();
 const validateCsrfOrigin = vi.fn();
 const serviceFrom = vi.fn();
 const auditSelect = vi.fn();
@@ -12,6 +13,7 @@ const fetchFilteredAuditRows = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
   requireGridmasterSession: (req: NextRequest) => requireGridmasterSession(req),
+  requireSensitiveActionAuth: (req: NextRequest) => requireSensitiveActionAuth(req),
 }));
 
 vi.mock("@/lib/csrf", () => ({
@@ -51,6 +53,10 @@ describe("POST /api/gridmaster/audit-log/export", () => {
       user: { id: "gridmaster-user", email: "gm@example.com" },
       session: { access_token: "token" },
     });
+    requireSensitiveActionAuth.mockResolvedValue({
+      user: { id: "gridmaster-user", email: "gm@example.com" },
+      session: { access_token: "fresh-token" },
+    });
     fetchFilteredAuditRows.mockResolvedValue([
       {
         id: 1,
@@ -73,6 +79,27 @@ describe("POST /api/gridmaster/audit-log/export", () => {
       }
       throw new Error(`Unexpected table: ${table}`);
     });
+  });
+
+  // An export needs fresh proof, as any other export does (41d3, F-17).
+  it("exports nothing without fresh proof", async () => {
+    requireSensitiveActionAuth.mockResolvedValueOnce({
+      response: NextResponse.json(
+        {
+          code: "STEP_UP_REQUIRED",
+          method: "totp",
+          error: "Confirm your identity, then try again.",
+        },
+        { status: 403 },
+      ),
+    });
+
+    const response = await POST(makeRequest({ highRiskOnly: true }));
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ code: "STEP_UP_REQUIRED" });
+    expect(fetchFilteredAuditRows).not.toHaveBeenCalled();
+    expect(auditInsert).not.toHaveBeenCalled();
   });
 
   it("rejects CSRF failures before auth", async () => {

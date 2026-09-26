@@ -21,6 +21,7 @@ import {
   fetchGridmasterUserMemberships,
   fetchGridmasterUsers,
   forceLogoutGridmasterUser,
+  sendGridmasterPasswordReset,
   reinstateGridmasterUser,
   terminateGridmasterUser,
   updateGridmasterUserActivation,
@@ -286,17 +287,12 @@ export default function AllUsersView({
     if (!user.email) return;
     setActionLoading(user.id);
     try {
-      const res = await fetch("/api/gridmaster/password-reset", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: user.email }),
+      const email = user.email;
+      const completed = await stepUp.run(async (accessToken) => {
+        await requireCredentialAssurance(accessToken);
+        await sendGridmasterPasswordReset(email, accessToken);
       });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(
-          formatClientErrorMessage(body.error, "We couldn't send that password reset."),
-        );
-      }
+      if (!completed) return;
       toast.success(`Password reset email sent to ${user.email}`);
       setResetConfirm(null);
     } catch (err: unknown) {
@@ -734,7 +730,7 @@ export default function AllUsersView({
       {stepUp.dialog}
 
       {/* Password reset confirm */}
-      {resetConfirm && (
+      {resetConfirm && !stepUp.dialog && (
         <ConfirmDialog
           title="Send Password Reset"
           message={`Send a password reset email to "${resetConfirm.email}"?`}

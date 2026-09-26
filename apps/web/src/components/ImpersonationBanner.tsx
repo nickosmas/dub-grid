@@ -74,12 +74,6 @@ export default function ImpersonationBanner() {
         reason: "manual",
         targetOrgId: imp.targetOrgId,
       });
-      // Best-effort email notification
-      fetch("/api/notify-impersonation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "end", sessionId: imp.sessionId }),
-      }).catch(() => {});
     } catch {
       // Best-effort — cookie clear + redirect is what matters
     }

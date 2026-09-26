@@ -10,6 +10,8 @@ export interface SignOutOptions {
   scope?: SignOutScope;
   /** Override the post-logout destination. Defaults to /goodbye. */
   redirectTo?: string;
+  /** Explains the sign-out on /goodbye. */
+  reason?: "password-changed" | "password-unconfirmed";
 }
 
 /**
@@ -31,11 +33,16 @@ export interface SignOutOptions {
  * signed in) — no navigation.
  */
 export function useLogout() {
-  function signOut({ scope = "local", redirectTo = "/goodbye" }: SignOutOptions = {}): void {
+  function signOut({
+    scope = "local",
+    redirectTo = "/goodbye",
+    reason,
+  }: SignOutOptions = {}): void {
     beginLogout();
     const destination = parseInternalDestination(redirectTo, "/goodbye");
     const url = new URL(destination, window.location.origin);
     url.searchParams.set("scope", scope);
+    if (reason) url.searchParams.set("reason", reason);
     window.location.replace(url.pathname + url.search + url.hash);
   }
 

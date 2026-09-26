@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { loginAsQaSuperAdmin, QA_CALM_HAVEN_ORIGIN } from "./helpers/auth";
+import { holdRequests } from "./helpers/held-requests";
 
 // fetchOperationsReport (features/reports/client/api.ts) appends query params.
 const OPERATIONS_GLOB = "/api/reports/operations*";
@@ -50,10 +51,7 @@ test.describe("reports states", () => {
     // The same endpoint also feeds the target dropdown options; delaying
     // every call is fine here because only the generated report's query
     // drives the progress bar (ReportsPageContent.tsx: reportsQuery.isFetching).
-    await page.route(`**${OPERATIONS_GLOB}`, async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 1_500));
-      await route.continue();
-    });
+    const releaseOperations = await holdRequests(page, `**${OPERATIONS_GLOB}`);
 
     // With no filters, the generated report shares the target-options
     // query's key, which is already cached fresh (staleTime 30s), so nothing
@@ -65,6 +63,7 @@ test.describe("reports states", () => {
     await page.getByRole("button", { name: "Generate report", exact: true }).click();
 
     await expect(page.locator("[data-progress-bar]")).toBeVisible({ timeout: 15_000 });
+    releaseOperations();
     await expect(page.locator("[data-progress-bar]")).toHaveCount(0, { timeout: 15_000 });
   });
 

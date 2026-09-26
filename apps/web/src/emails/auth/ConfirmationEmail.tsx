@@ -2,7 +2,7 @@ import * as React from "react";
 import { AuthActionEmail } from "./AuthActionEmail";
 import { PREVIEW_LOGO_URL } from "./placeholders";
 
-/** Supabase: confirmation.html — verify email after signup. */
+/** Supabase: confirmation.html - verify email after signup. */
 export function ConfirmationEmail({ logoUrl }: { logoUrl?: string } = {}) {
   return (
     <AuthActionEmail

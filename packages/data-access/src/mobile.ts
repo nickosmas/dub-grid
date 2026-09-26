@@ -1,3 +1,4 @@
+import { INVITATION_LIFETIME_MS } from "@dubgrid/domain";
 import type {
   MobileNotification,
   MobileNotificationPriority,
@@ -1861,7 +1862,7 @@ export async function refreshMobileEmployeeInvitationRow(
     .from("invitations")
     .update({
       token: crypto.randomUUID(),
-      expires_at: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString(),
+      expires_at: new Date(Date.now() + INVITATION_LIFETIME_MS).toISOString(),
     })
     .eq("org_id", input.orgId)
     .eq("id", input.invitationId)
@@ -2068,15 +2069,19 @@ export async function fetchActiveMobilePushTokenRows(
   serviceClient: SupabaseClient,
   input: {
     userId: string;
-    orgId: string;
+    /** Null reads the user's tokens across every organization. */
+    orgId: string | null;
   },
 ): Promise<MobilePushTokenRow[]> {
-  const { data, error } = await serviceClient
+  let query = serviceClient
     .from("mobile_device_tokens")
     .select("expo_push_token")
     .eq("user_id", input.userId)
-    .eq("org_id", input.orgId)
     .is("disabled_at", null);
+  if (input.orgId) {
+    query = query.eq("org_id", input.orgId);
+  }
+  const { data, error } = await query;
 
   if (error) {
     throw error;

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requireGridmasterSession = vi.fn();
+const requireSensitiveActionAuth = vi.fn();
 const validateCsrfOrigin = vi.fn();
 const requestRpc = vi.fn();
 const serviceFrom = vi.fn();
@@ -15,6 +16,7 @@ vi.mock("@/lib/api-auth", () => ({
     rpc: requestRpc,
   }),
   requireGridmasterSession: (req: NextRequest) => requireGridmasterSession(req),
+  requireSensitiveActionAuth: (req: NextRequest) => requireSensitiveActionAuth(req),
 }));
 
 vi.mock("@/lib/csrf", () => ({
@@ -53,6 +55,7 @@ function makePostRequest(body: unknown) {
 describe("GET /api/gridmaster/accounts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    requireSensitiveActionAuth.mockResolvedValue({ user: { id: "gridmaster-user" } });
     requireGridmasterSession.mockResolvedValue({
       user: { id: "gridmaster-user", email: "gm@example.com" },
       session: { access_token: "token" },
@@ -124,12 +127,15 @@ describe("GET /api/gridmaster/accounts", () => {
     expect(profilesEq).toHaveBeenCalledWith("platform_role", "gridmaster");
     expect(serviceAuthGetUserById).toHaveBeenCalledWith(USER_ID);
     expect(requestRpc).not.toHaveBeenCalled();
+    // Reading the list changes nothing, so it needs no fresh assurance.
+    expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
   });
 });
 
 describe("POST /api/gridmaster/accounts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    requireSensitiveActionAuth.mockResolvedValue({ user: { id: "gridmaster-user" } });
     validateCsrfOrigin.mockReturnValue(null);
     requireGridmasterSession.mockResolvedValue({
       user: { id: "gridmaster-user", email: "gm@example.com" },
@@ -170,6 +176,29 @@ describe("POST /api/gridmaster/accounts", () => {
     const response = await POST(
       makePostRequest({ action: "demote", userId: "bad", orgId: ORG_ID, orgRole: "user" }),
     );
+
+    expect(response.status).toBe(403);
+    expect(requestRpc).not.toHaveBeenCalled();
+    expect(auditInsert).not.toHaveBeenCalled();
+  });
+
+  // Each action changes platform authority, so none runs on a session without
+  // fresh proof (41b3).
+  it.each([
+    { action: "promote", email: "gm-target@example.com" },
+    {
+      action: "demote",
+      userId: "11111111-1111-4111-8111-111111111111",
+      orgId: "22222222-2222-4222-8222-222222222222",
+      orgRole: "admin",
+    },
+    { action: "setActivation", userId: "11111111-1111-4111-8111-111111111111", deactivate: true },
+  ])("returns the step-up challenge for $action without changing anything", async (body) => {
+    requireSensitiveActionAuth.mockResolvedValueOnce({
+      response: NextResponse.json({ code: "STEP_UP_REQUIRED", method: "totp" }, { status: 403 }),
+    });
+
+    const response = await POST(makePostRequest(body));
 
     expect(response.status).toBe(403);
     expect(requestRpc).not.toHaveBeenCalled();

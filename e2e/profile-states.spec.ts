@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { loginAsQaSuperAdmin, QA_CALM_HAVEN_ORIGIN } from "./helpers/auth";
+import { holdRequests } from "./helpers/held-requests";
 
 // ProfilePage's only data request. fetchSelfProfileData (its single caller in
 // the app) appends an orgId query, hence the trailing wildcard.
@@ -11,16 +12,14 @@ test.describe("profile states", () => {
     await loginAsQaSuperAdmin(page, QA_CALM_HAVEN_ORIGIN);
     await page.waitForLoadState("networkidle");
 
-    await page.route(SELF_PROFILE_GLOB, async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 1_500));
-      await route.continue();
-    });
+    const releaseProfile = await holdRequests(page, SELF_PROFILE_GLOB);
 
     await page.goto(`${QA_CALM_HAVEN_ORIGIN}/profile`);
 
     // ProfilePage.tsx renders <ProgressBar loading /> until permissions and
     // the self profile have both resolved.
     await expect(page.locator("[data-progress-bar]")).toBeVisible({ timeout: 15_000 });
+    releaseProfile();
     await expect(page.locator("[data-progress-bar]")).toHaveCount(0, { timeout: 15_000 });
   });
 

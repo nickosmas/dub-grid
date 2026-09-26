@@ -5,6 +5,7 @@ import { createRequestSupabaseClient, requireGridmasterSession } from "@/lib/api
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
+import { scheduleImpersonationNotice } from "@/app/api/gridmaster/_lib/impersonation-notice";
 import logger from "@/lib/logger";
 
 const historyQuerySchema = z.object({
@@ -26,8 +27,31 @@ const endSchema = z.object({
   // Mirrors impersonation_sessions.end_reason's check constraint, so an
   // unknown value is a 400 here rather than a constraint violation in the RPC.
   reason: z.enum(["manual", "expired", "navigation"]).optional(),
+  // Older clients still send it; the organization comes from the session row.
   targetOrgId: z.string().uuid().nullable().optional(),
 });
+
+/**
+ * This Gridmaster's own impersonation row, the authority for which
+ * organization it was in. The request's organization is never trusted.
+ */
+async function readOwnImpersonation(
+  service: ReturnType<typeof getServiceClient>,
+  sessionId: string,
+  gridmasterId: string,
+): Promise<{ target_user_id: string; target_org_id: string; ended_at: string | null } | null> {
+  const { data, error } = await service
+    .from("impersonation_sessions")
+    .select("target_user_id, target_org_id, ended_at")
+    .eq("session_id", sessionId)
+    .eq("gridmaster_id", gridmasterId)
+    .maybeSingle();
+  if (error) throw error;
+  return (
+    (data as { target_user_id: string; target_org_id: string; ended_at: string | null } | null) ??
+    null
+  );
+}
 
 // start_impersonation raises these for caller mistakes, not outages. Answer
 // them with their own message so the portal can say what to do next.
@@ -151,13 +175,32 @@ export async function POST(req: NextRequest) {
       }
 
       const result = data as { session_id: string; expires_at: string };
+      // The RPC falls back to the target's own organization when none is
+      // named, so the row, not the request, says where the session is.
+      // The session is already running, so a failed read must not fail the
+      // start: the client would hold no cookie and every retry would 409.
+      const started = await readOwnImpersonation(service, result.session_id, auth.user.id).catch(
+        (error: unknown) => {
+          logger.error({ err: error }, "Could not read the started impersonation session");
+          return null;
+        },
+      );
+      // Before the audit write, which throws on failure: the session is
+      // running either way, and the person must hear about it.
+      scheduleImpersonationNotice({
+        kind: "start",
+        targetUserId: parsed.data.targetUserId,
+        targetOrgId: started?.target_org_id ?? null,
+        expiresAt: result.expires_at,
+      });
+
       await writeGridmasterAuditLog({
         serviceClient: service,
         actor: auth.user,
         action: "impersonation.started",
         resourceType: "impersonation_session",
         resourceId: result.session_id,
-        orgId: parsed.data.targetOrgId ?? null,
+        orgId: started?.target_org_id ?? null,
         details: {
           targetUserId: parsed.data.targetUserId,
           justification: parsed.data.justification,
@@ -177,6 +220,16 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
       }
 
+      // end_impersonation does nothing, silently, for a session that is not
+      // this Gridmaster's or has already ended; record only a real end.
+      const session = await readOwnImpersonation(service, parsed.data.sessionId, auth.user.id);
+      if (!session || session.ended_at) {
+        return NextResponse.json(
+          { error: "That viewing session has already ended." },
+          { status: 404 },
+        );
+      }
+
       const { error } = await requestClient.rpc("end_impersonation", {
         p_session_id: parsed.data.sessionId,
         p_reason: parsed.data.reason ?? "manual",
@@ -185,13 +238,21 @@ export async function POST(req: NextRequest) {
         throw error;
       }
 
+      // Before the audit write: a retry after a failed write finds the
+      // session ended and would never send this.
+      scheduleImpersonationNotice({
+        kind: "end",
+        targetUserId: session.target_user_id,
+        targetOrgId: session.target_org_id,
+      });
+
       await writeGridmasterAuditLog({
         serviceClient: service,
         actor: auth.user,
         action: "impersonation.ended",
         resourceType: "impersonation_session",
         resourceId: parsed.data.sessionId,
-        orgId: parsed.data.targetOrgId ?? null,
+        orgId: session.target_org_id,
         details: {
           reason: parsed.data.reason ?? "manual",
         },

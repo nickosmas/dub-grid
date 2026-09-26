@@ -82,6 +82,7 @@ import {
   type AuthEntryRequestKind,
 } from "../../features/auth/lib/auth-entry-measurement";
 import { getMobileEnvConfig } from "./env";
+import { getStoredValue, setStoredValue } from "./local-storage";
 
 type SupabaseSessionLike = {
   access_token: string;
@@ -520,7 +521,7 @@ export type MobileSignOutScope = "local" | "others" | "global";
  */
 export function signOutMobileSessions(
   accessToken: string,
-  body: { scope: MobileSignOutScope; reason?: "password_recovery" },
+  body: { scope: MobileSignOutScope; reason?: "password_recovery" | "password_change" },
 ) {
   const init: RequestInit = { method: "POST", body: JSON.stringify(body) };
   return mobileRequest(
@@ -773,10 +774,31 @@ export async function recordMobileSignInCompleted(accessToken: string): Promise<
   }
 }
 
-export function registerMobileSessionPresence(accessToken: string): Promise<{ success: true }> {
+/**
+ * This install's device id, issued by the server on its first sign-in. Sending
+ * it back is what lets a later sign-in from the same phone skip the new-device
+ * alert. Sign-out removes session keys by name, so it survives signing out.
+ */
+export const SESSION_DEVICE_ID_KEY = "dg_device_id";
+
+export function parseSessionPresenceResponse(value: unknown): {
+  success: true;
+  deviceId: string | null;
+} {
+  if (typeof value === "object" && value !== null && (value as { success?: unknown }).success) {
+    const deviceId = (value as { deviceId?: unknown }).deviceId;
+    return { success: true, deviceId: typeof deviceId === "string" ? deviceId : null };
+  }
+
+  throw new Error("We couldn't update your session status.");
+}
+
+export async function registerMobileSessionPresence(
+  accessToken: string,
+): Promise<{ success: true }> {
   const platform = getNativeSessionPlatform();
   if (!platform) {
-    return Promise.resolve({ success: true });
+    return { success: true };
   }
 
   const metadata = getNativeSessionMetadata(
@@ -784,8 +806,9 @@ export function registerMobileSessionPresence(accessToken: string): Promise<{ su
     Device.modelName,
     Constants.expoConfig?.version,
   );
+  const storedDeviceId = await getStoredValue(SESSION_DEVICE_ID_KEY).catch(() => null);
 
-  return mobileApiRequest(
+  const result = await mobileApiRequest(
     "/api/mobile/v1/session-presence",
     accessToken,
     {
@@ -794,20 +817,16 @@ export function registerMobileSessionPresence(accessToken: string): Promise<{ su
         platform,
         deviceLabel: metadata.deviceLabel,
         ...(metadata.appVersion ? { appVersion: metadata.appVersion } : {}),
+        ...(storedDeviceId ? { deviceId: storedDeviceId } : {}),
       }),
     },
-    (value) => {
-      if (
-        typeof value === "object" &&
-        value !== null &&
-        (value as { success?: unknown }).success === true
-      ) {
-        return { success: true };
-      }
-
-      throw new Error("We couldn't update your session status.");
-    },
+    parseSessionPresenceResponse,
   );
+
+  if (result.deviceId && result.deviceId !== storedDeviceId) {
+    await setStoredValue(SESSION_DEVICE_ID_KEY, result.deviceId).catch(() => undefined);
+  }
+  return { success: true };
 }
 
 export function getNativeSessionMetadata(
@@ -1291,6 +1310,33 @@ export function updateMobileManagementUserInvitation(
       body: JSON.stringify(body),
     },
     (value) => mobileManagementUserResponseSchema.parse(value),
+  );
+}
+
+/**
+ * Stops pushes to this device during a teardown. A 401 here never starts a
+ * teardown: the caller is the teardown, and re-entering it used to stall every
+ * forced sign-out for five seconds while it waited on itself (41d1).
+ */
+export function disablePushToken(
+  accessToken: string,
+  device: { platform: "ios" | "android"; expoPushToken: string },
+) {
+  const init: RequestInit = {
+    method: "POST",
+    body: JSON.stringify({ ...device, disabled: true }),
+  };
+  return mobileRequest(
+    "/api/mobile/v1/push-tokens",
+    {
+      ...init,
+      headers: createHeaders(init, {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      }),
+    },
+    (value) => mobilePushTokenResponseSchema.parse(value),
+    null,
   );
 }
 

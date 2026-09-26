@@ -5,6 +5,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Upload } from "lucide-react";
 import { toast } from "sonner";
 import { exportGridmasterAuditLog, fetchGridmasterCompliance } from "@/features/gridmaster/client";
+import { requireCredentialAssurance } from "@/features/account/client";
+import { useStepUpAction } from "@/hooks/useStepUpAction";
 import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
@@ -115,6 +117,7 @@ export default function GridmasterComplianceView({
 }: {
   onSelectOrg: (orgId: string) => void;
 }) {
+  const stepUp = useStepUpAction();
   const [exporting, setExporting] = useState(false);
   const [exportConfirm, setExportConfirm] = useState(false);
   const complianceQuery = useQuery({
@@ -127,15 +130,21 @@ export default function GridmasterComplianceView({
   async function handleExportHighRisk() {
     setExporting(true);
     try {
-      const result = await exportGridmasterAuditLog({ highRiskOnly: true, limit: 1000 });
-      const blob = new Blob([JSON.stringify(result, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `dubgrid-high-risk-audit-${result.exportedAt.slice(0, 10)}.json`;
-      link.click();
-      URL.revokeObjectURL(url);
-      toast.success(`Exported ${result.rowCount} audit entries`);
+      await stepUp.run(async (accessToken) => {
+        await requireCredentialAssurance(accessToken);
+        const result = await exportGridmasterAuditLog(
+          { highRiskOnly: true, limit: 1000 },
+          accessToken,
+        );
+        const blob = new Blob([JSON.stringify(result, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `dubgrid-high-risk-audit-${result.exportedAt.slice(0, 10)}.json`;
+        link.click();
+        URL.revokeObjectURL(url);
+        toast.success(`Exported ${result.rowCount} audit entries`);
+      });
     } catch (err: unknown) {
       toast.error(formatClientErrorMessage(err, "We couldn't export audit entries right now."));
     } finally {
@@ -345,7 +354,8 @@ export default function GridmasterComplianceView({
           </div>
         </>
       )}
-      {exportConfirm && (
+      {stepUp.dialog}
+      {exportConfirm && !stepUp.dialog && (
         <ConfirmDialog
           title="Export High-Risk Audit"
           message="Export up to 1,000 high-risk activity records?"

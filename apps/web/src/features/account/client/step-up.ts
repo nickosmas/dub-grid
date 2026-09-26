@@ -2,7 +2,7 @@
 
 import { decodeJwt } from "jose";
 import type { Factor } from "@supabase/supabase-js";
-import type { SensitiveActionStepUpRequired } from "@dubgrid/authz";
+import { STEP_UP_REQUIRED_CODE, type SensitiveActionStepUpRequired } from "@dubgrid/authz";
 import {
   getBrowserAuthSession,
   listBrowserMfaFactors,
@@ -16,7 +16,7 @@ export function getStepUpMethod(error: unknown): StepUpMethod | null {
   if (!error || typeof error !== "object") return null;
   const candidate = error as Record<string, unknown>;
   return candidate.status === 403 &&
-    candidate.code === "STEP_UP_REQUIRED" &&
+    candidate.code === STEP_UP_REQUIRED_CODE &&
     (candidate.method === "password" || candidate.method === "totp")
     ? candidate.method
     : null;

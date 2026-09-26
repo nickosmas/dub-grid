@@ -8,9 +8,14 @@ const requestRpc = vi.fn();
 const serviceRpc = vi.fn();
 const serviceFrom = vi.fn();
 const auditInsert = vi.fn();
-const profileSnapshot = vi.fn();
 const dispatchNotificationEvent = vi.fn();
-const revokeAllUserSessions = vi.fn();
+const endUserSessions = vi.fn();
+const after = vi.fn((task: () => unknown) => void task());
+
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (task: () => unknown) => after(task),
+}));
 
 vi.mock("@/lib/api-auth", () => ({
   createRequestSupabaseClient: () => ({
@@ -42,7 +47,7 @@ vi.mock("@/features/notifications/server/events", () => ({
 }));
 
 vi.mock("@/lib/auth/revocation", () => ({
-  revokeAllUserSessions: (userId: string) => revokeAllUserSessions(userId),
+  endUserSessions: (...args: unknown[]) => endUserSessions(...args),
 }));
 
 import { POST } from "./route";
@@ -71,22 +76,10 @@ describe("POST /api/gridmaster/users/[userId]/force-logout", () => {
     requestRpc.mockResolvedValue({ error: null });
     auditInsert.mockResolvedValue({ error: null });
     dispatchNotificationEvent.mockResolvedValue({ success: true });
-    revokeAllUserSessions.mockResolvedValue(undefined);
-    profileSnapshot.mockResolvedValue({
-      data: { org_id: "target-org-id" },
-    });
+    endUserSessions.mockResolvedValue(undefined);
     serviceFrom.mockImplementation((table: string) => {
       if (table === "audit_log") {
         return { insert: auditInsert };
-      }
-      if (table === "profiles") {
-        return {
-          select: () => ({
-            eq: () => ({
-              maybeSingle: () => profileSnapshot(),
-            }),
-          }),
-        };
       }
       throw new Error(`Unexpected table: ${table}`);
     });
@@ -123,7 +116,7 @@ describe("POST /api/gridmaster/users/[userId]/force-logout", () => {
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toMatchObject({ code: "STEP_UP_REQUIRED" });
     expect(requestRpc).not.toHaveBeenCalled();
-    expect(revokeAllUserSessions).not.toHaveBeenCalled();
+    expect(endUserSessions).not.toHaveBeenCalled();
     expect(auditInsert).not.toHaveBeenCalled();
   });
 
@@ -153,6 +146,53 @@ describe("POST /api/gridmaster/users/[userId]/force-logout", () => {
     expect(auditInsert).not.toHaveBeenCalled();
   });
 
+  it("reports a failure to end the sessions instead of claiming the sign-out", async () => {
+    endUserSessions.mockRejectedValueOnce(new Error("auth schema down"));
+
+    const response = await POST(makeRequest(), {
+      params: Promise.resolve({ userId: USER_ID }),
+    });
+
+    expect(response.status).toBe(500);
+    expect(auditInsert).not.toHaveBeenCalled();
+    expect(dispatchNotificationEvent).not.toHaveBeenCalled();
+  });
+
+  // Ending every session would sign the Gridmaster out of the one they are
+  // using, and the SQL function deletes the rows a keep-one sign-out would
+  // list, leaving their other devices' tokens valid (41b1/F-08).
+  it("refuses a Gridmaster's force-logout of their own account", async () => {
+    const selfId = "22222222-2222-4222-8222-222222222222";
+    requireGridmasterSession.mockResolvedValueOnce({
+      user: { id: selfId, email: "gm@example.com" },
+      session: { access_token: "token" },
+    });
+
+    const response = await POST(makeRequest(), {
+      params: Promise.resolve({ userId: selfId }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(requestRpc).not.toHaveBeenCalled();
+    expect(endUserSessions).not.toHaveBeenCalled();
+    expect(auditInsert).not.toHaveBeenCalled();
+  });
+
+  it("refuses self however the id is cased", async () => {
+    const selfId = "22222222-aaaa-4aaa-8aaa-222222222222";
+    requireGridmasterSession.mockResolvedValueOnce({
+      user: { id: selfId, email: "gm@example.com" },
+      session: { access_token: "token" },
+    });
+
+    const response = await POST(makeRequest(), {
+      params: Promise.resolve({ userId: selfId.toUpperCase() }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(requestRpc).not.toHaveBeenCalled();
+  });
+
   it("forces logout and writes a platform audit event", async () => {
     const response = await POST(makeRequest(), {
       params: Promise.resolve({ userId: USER_ID }),
@@ -163,7 +203,7 @@ describe("POST /api/gridmaster/users/[userId]/force-logout", () => {
     expect(requestRpc).toHaveBeenCalledWith("force_logout_user", {
       p_target_user_id: USER_ID,
     });
-    expect(revokeAllUserSessions).toHaveBeenCalledWith(USER_ID);
+    expect(endUserSessions).toHaveBeenCalledWith(USER_ID);
     expect(serviceRpc).not.toHaveBeenCalled();
     expect(auditInsert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -179,9 +219,12 @@ describe("POST /api/gridmaster/users/[userId]/force-logout", () => {
         }),
       }),
     );
+    // Kept alive past the response, and about the sign-in rather than the
+    // organization the target last switched to.
+    expect(after).toHaveBeenCalledTimes(1);
     expect(dispatchNotificationEvent).toHaveBeenCalledWith("gridmaster-user", {
       action: "security_session_revoked",
-      orgId: "target-org-id",
+      orgId: null,
       targetUserId: USER_ID,
       initiatedBy: "gridmaster",
       deviceLabel: null,

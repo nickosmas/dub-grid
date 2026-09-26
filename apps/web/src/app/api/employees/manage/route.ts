@@ -16,7 +16,8 @@ import { fetchAssignmentIdByPairMap } from "@/app/api/shared/schedule";
 import { mapNormalizedScheduleCellRowToScheduleEntry } from "@/lib/schedule-cells";
 import { employeeToRow, rowToEmployee, rowToInvitation } from "@/lib/db/mappers";
 import { EMPLOYEE_COLS, fetchAllRows } from "@/lib/db/shared";
-import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
+import { emailContactConflict, getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
+import { checkEmployeeEmailConflict } from "@/features/employees/server/contact-conflicts";
 import {
   getLoginEmailChange,
   LINKED_EMAIL_REQUIRED_MESSAGE,
@@ -754,9 +755,35 @@ export async function POST(req: NextRequest) {
           previousEmail: previousRow?.email,
           nextEmail: nextEmployee.email,
         });
+        const expectedVersion = data.expectedVersion ?? nextEmployee.version;
         if (loginEmailChange && linkedUserId) {
           const sandboxResponse = forbidIfSandboxCookie(req);
           if (sandboxResponse) return sandboxResponse;
+          // The sign-in changes, sessions end and notices go out before the row
+          // is written, so a save that the row would refuse must be refused
+          // here first: a stale version or a contact email in use (41b2).
+          if (previousRow && previousRow.version !== expectedVersion) {
+            return NextResponse.json(
+              {
+                error: "Employee details changed elsewhere. Refresh and try again.",
+                code: "EMPLOYEE_CONFLICT",
+                employee: previousRow,
+              },
+              { status: 409 },
+            );
+          }
+          const emailConflict = await checkEmployeeEmailConflict(auth.serviceClient, {
+            orgId: data.orgId,
+            email: loginEmailChange,
+            excludeEmployeeId: nextEmployee.id,
+            currentUserId: linkedUserId,
+          });
+          if (emailConflict.conflict) {
+            return NextResponse.json(
+              emailContactConflict(emailConflict.reason ?? "employee_duplicate"),
+              { status: 409 },
+            );
+          }
           const assurance = await requireSensitiveActionAuth(req);
           if ("response" in assurance) return assurance.response;
           try {
@@ -796,7 +823,6 @@ export async function POST(req: NextRequest) {
               )
             : { from: {}, to: {} };
 
-        const expectedVersion = data.expectedVersion ?? nextEmployee.version;
         const query = auth.serviceClient
           .from("employees")
           .update({

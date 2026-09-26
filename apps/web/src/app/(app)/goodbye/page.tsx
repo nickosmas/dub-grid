@@ -1,6 +1,6 @@
 import { PageShell } from "@/components/auth/AuthCard";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
-import { RunLogoutTeardown, type LogoutScope } from "./RunLogoutTeardown";
+import { RunLogoutTeardown, type LogoutReason, type LogoutScope } from "./RunLogoutTeardown";
 
 const HEADLINES: ReadonlyArray<string> = [
   "See you soon!",
@@ -50,9 +50,9 @@ function parseScope(value: string | string[] | undefined): LogoutScope | null {
   return null;
 }
 
-function parseReason(value: string | string[] | undefined): "inactivity" | null {
+function parseReason(value: string | string[] | undefined): LogoutReason | null {
   const v = Array.isArray(value) ? value[0] : value;
-  return v === "inactivity" ? v : null;
+  return v === "inactivity" || v === "password-changed" || v === "password-unconfirmed" ? v : null;
 }
 
 // Server component so the random pick happens once per request and is baked

@@ -31,4 +31,32 @@ describe("Gridmaster AllUsersView account separation", () => {
     expect(mutation).toBeGreaterThan(assurance);
     expect(source).toContain("forceLogoutConfirm && !stepUp.dialog");
   });
+
+  // Two modal dialogs cannot be open at once, so every confirmation that runs
+  // through step-up hides while the step-up dialog is showing.
+  it.each([
+    [
+      "AllUsersView",
+      ["terminateConfirm", "reinstateConfirm", "forceLogoutConfirm", "resetConfirm"],
+    ],
+    [
+      "GridmasterAccountsView",
+      [
+        "activationConfirm",
+        "forceLogoutConfirm",
+        "resetConfirm",
+        "promoteConfirmEmail",
+        "demoteTarget",
+      ],
+    ],
+  ])("%s hides stepped-up confirmations behind the step-up dialog", (view, confirmations) => {
+    const source = readFileSync(
+      resolve(resolveRepoRoot(), `apps/web/src/components/gridmaster/${view}.tsx`),
+      "utf-8",
+    );
+
+    for (const confirmation of confirmations) {
+      expect(source).toContain(`{${confirmation} && !stepUp.dialog && (`);
+    }
+  });
 });

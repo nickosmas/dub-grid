@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   PASSWORD_MISMATCH_MESSAGE,
   PASSWORD_STRENGTH_LABELS,
@@ -33,6 +33,8 @@ import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import { useNavigationDiscardGuard } from "../../../shared/hooks/useNavigationDiscardGuard";
 import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
+import { mayHavePasswordUpdateCommitted } from "@dubgrid/client-errors";
+import { settleMobileAuthAction } from "../../auth/lib/request-deadline";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
@@ -161,6 +163,14 @@ export default function ProfilePasswordScreen() {
   const passwordLooksReady =
     isPasswordAcceptable(newPassword) && passwordsMatch(newPassword, confirmPassword);
 
+  // Set once the password has (or may have) changed. A retry after a failed
+  // sign-out then finishes only the sign-out: repeating the update would
+  // replay a change that already landed and be refused as a reused password.
+  const passwordChangeRef = useRef<{ unconfirmed: boolean } | null>(null);
+  // Mirrors the ref for rendering: once set, the fields lock and the only
+  // action left is finishing the sign-out (41b2/F-02).
+  const [passwordChanged, setPasswordChanged] = useState(false);
+
   // Anything typed into any of the three fields. Back navigation is the only
   // way off this screen, so without a guard a part-entered password change is
   // gone the moment a swipe is misread as a back gesture.
@@ -168,8 +178,12 @@ export default function ProfilePasswordScreen() {
   const guard = useUnsavedChangesGuard({
     isDirty: hasUnsavedChanges,
     disabled: passwordSaving,
-    title: "Discard this password change?",
-    body: "The password you were entering won't be saved.",
+    // After the change landed there is nothing left to discard, only a
+    // sign-out left unfinished (41b2/F-09).
+    title: passwordChanged ? "Leave without signing out?" : "Discard this password change?",
+    body: passwordChanged
+      ? "Your password already changed, but your other sessions are still signed in. Stay to finish signing out."
+      : "The password you were entering won't be saved.",
     onDiscard: () => {
       setNewPassword("");
       setConfirmPassword("");
@@ -190,6 +204,11 @@ export default function ProfilePasswordScreen() {
 
   function requestPasswordChange() {
     if (passwordSaving) {
+      return;
+    }
+    if (passwordChanged) {
+      setConfirmError(null);
+      setIsConfirming(true);
       return;
     }
 
@@ -233,12 +252,23 @@ export default function ProfilePasswordScreen() {
       const completed = await stepUp.run(async (actionAccessToken) => {
         // The preflight must finish before calling Supabase's public mutation.
         // The mutation is never replayed after an ambiguous provider failure.
+        // On a retry it only refreshes the assurance the sign-out needs.
         await requireMobileCredentialAssurance(actionAccessToken);
-        const updateResult = await getSupabaseClient().auth.updateUser({
-          password: newPassword,
-        });
-        if (updateResult.error) {
-          throw updateResult.error;
+        if (!passwordChangeRef.current) {
+          let unconfirmed = false;
+          try {
+            const updateResult = await settleMobileAuthAction(
+              getSupabaseClient().auth.updateUser({ password: newPassword }),
+            );
+            if (updateResult.error) throw updateResult.error;
+          } catch (updateError) {
+            // A deadline or a lost response may hide an applied change, so it
+            // finishes as one: every session signed out, never a retry (41b2).
+            if (!mayHavePasswordUpdateCommitted(updateError)) throw updateError;
+            unconfirmed = true;
+          }
+          passwordChangeRef.current = { unconfirmed };
+          setPasswordChanged(true);
         }
         assuredAccessToken = actionAccessToken;
       });
@@ -246,19 +276,34 @@ export default function ProfilePasswordScreen() {
         identityCancelled = true;
         return;
       }
+      const unconfirmed = passwordChangeRef.current?.unconfirmed ?? false;
 
       // Before the sign-out, while this device's token is still valid.
       await disablePushForCurrentDevice();
 
       try {
         if (!assuredAccessToken) throw new Error("Missing assured session");
-        await signOutMobileSessions(assuredAccessToken, { scope: "global" });
-      } catch (error) {
-        fail(error, "Your password changed, but we couldn't sign out every session.");
+        await signOutMobileSessions(assuredAccessToken, {
+          scope: "global",
+          reason: "password_change",
+        });
+      } catch {
+        // Always inline, even for a network failure: the person must know the
+        // password already changed before they decide what to do next.
+        failed = true;
+        inlineError = "Your password changed, but we couldn't sign out every session. Try again.";
+        setConfirmError(inlineError);
         return;
       }
 
       isRedirecting = true;
+      if (unconfirmed) {
+        pushToast({
+          message:
+            "We couldn't confirm your new password, so we signed you out everywhere. Sign in with your new password. If it doesn't work, use your previous one.",
+          tone: "info",
+        });
+      }
       // Every session is already revoked; this only clears the device.
       await handleExpiredMobileSession();
     } catch (error) {
@@ -283,8 +328,8 @@ export default function ProfilePasswordScreen() {
         contentState.kind === "loading" || contentState.kind === "error" ? null : (
           <View style={styles.submitRow}>
             <Button
-              disabled={!passwordLooksReady || passwordSaving}
-              label="Update password"
+              disabled={(!passwordChanged && !passwordLooksReady) || passwordSaving}
+              label={passwordChanged ? "Finish signing out" : "Update password"}
               loading={passwordSaving}
               onPress={requestPasswordChange}
             />
@@ -327,6 +372,7 @@ export default function ProfilePasswordScreen() {
                   onPress={() => togglePasswordVisibility("newPassword")}
                 />
               }
+              editable={!passwordChanged}
               value={newPassword}
               onChangeText={setNewPassword}
               onBlur={() => setFocusedPasswordField(null)}
@@ -350,6 +396,7 @@ export default function ProfilePasswordScreen() {
                   onPress={() => togglePasswordVisibility("confirmPassword")}
                 />
               }
+              editable={!passwordChanged}
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               onBlur={() => setFocusedPasswordField(null)}
@@ -362,8 +409,12 @@ export default function ProfilePasswordScreen() {
         </ProfileSection>
       )}
       <ConfirmationModal
-        body="You'll be signed out of every device after the password is updated."
-        confirmLabel="Update and sign out"
+        body={
+          passwordChanged
+            ? "Your password already changed. Sign out every session to finish."
+            : "You'll be signed out of every device after the password is updated."
+        }
+        confirmLabel={passwordChanged ? "Sign out everywhere" : "Update and sign out"}
         confirmTone="warning"
         iconName="key-outline"
         loading={passwordSaving}
@@ -372,7 +423,7 @@ export default function ProfilePasswordScreen() {
           setConfirmError(null);
         }}
         onConfirm={() => saveNewPassword()}
-        title="Update password?"
+        title={passwordChanged ? "Finish signing out?" : "Update password?"}
         visible={isConfirming && !stepUp.active}
       >
         {confirmError ? (

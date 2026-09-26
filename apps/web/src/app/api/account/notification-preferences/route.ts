@@ -6,7 +6,7 @@ import {
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import logger from "@/lib/logger";
-import { mobileNotificationPreferencesUpdateBodySchema } from "@dubgrid/contracts";
+import { webNotificationPreferencesUpdateBodySchema } from "@dubgrid/contracts";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
 export async function GET(req: NextRequest) {
@@ -45,7 +45,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
     }
 
-    const parsed = mobileNotificationPreferencesUpdateBodySchema.safeParse(body);
+    const parsed = webNotificationPreferencesUpdateBodySchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }

@@ -28,6 +28,14 @@ export function signedInRecently(claims: unknown): boolean {
 }
 
 /**
+ * `claimed`: this report filled the hook-created row, so the claim holds
+ * whatever happens next and the alert can go out at once. `unrecorded`: there
+ * was no row to claim, so the claim holds only once the report's own write
+ * lands; alert after it, or a failed write and its retry would alert twice.
+ */
+export type NewSignInClaim = "claimed" | "unrecorded" | null;
+
+/**
  * Claims the first report of a new sign-in, exactly once per session.
  *
  * The access-token hook creates the session's `user_sessions` row when its
@@ -41,8 +49,8 @@ export async function claimNewSignIn(input: {
   supabaseSessionId: string;
   platform: "web" | "ios" | "android";
   claims: unknown;
-}): Promise<boolean> {
-  if (!signedInRecently(input.claims)) return false;
+}): Promise<NewSignInClaim> {
+  if (!signedInRecently(input.claims)) return null;
   try {
     const service = getServiceClient();
     const { data: claimed, error } = await service
@@ -53,7 +61,7 @@ export async function claimNewSignIn(input: {
       .is("platform", null)
       .select("id");
     if (error) throw error;
-    if ((claimed ?? []).length > 0) return true;
+    if ((claimed ?? []).length > 0) return "claimed";
 
     // No hook-created row to claim: new only if there is no row at all.
     const { data: existing, error: existingError } = await service
@@ -62,11 +70,11 @@ export async function claimNewSignIn(input: {
       .eq("supabase_session_id", input.supabaseSessionId)
       .limit(1);
     if (existingError) throw existingError;
-    return (existing ?? []).length === 0;
+    return (existing ?? []).length === 0 ? "unrecorded" : null;
   } catch (err) {
     // Never block sign-in over detection. A missed alert is logged instead.
     logger.warn({ err, userId: input.userId }, "new sign-in detection failed");
-    return false;
+    return null;
   }
 }
 

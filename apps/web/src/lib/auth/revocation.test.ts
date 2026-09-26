@@ -26,6 +26,7 @@ vi.mock("@/lib/supabase-service", () => ({
 }));
 
 import {
+  endUserSession,
   endUserSessions,
   revokeAllUserSessions,
   revokeOtherUserSessions,
@@ -73,6 +74,32 @@ describe("session revocation persistence", () => {
     serviceMocks.rpc.mockResolvedValueOnce({ data: null, error: new Error("auth schema down") });
 
     await expect(endUserSessions("user-1")).rejects.toThrow("auth schema down");
+  });
+
+  // A marker alone expires with the access token; the refresh token would
+  // bring the device back (41b1).
+  it("ends one provider session, then marks its tokens revoked", async () => {
+    await endUserSession("user-1", "session-1");
+
+    expect(serviceMocks.rpc).toHaveBeenCalledWith("end_user_auth_session", {
+      p_user_id: "user-1",
+      p_session_id: "session-1",
+    });
+    expect(cacheMocks.cacheSet).toHaveBeenCalledOnce();
+    expect(serviceMocks.eq).toHaveBeenCalledWith("supabase_session_id", "session-1");
+    expect(serviceMocks.rpc.mock.invocationCallOrder[0]).toBeLessThan(
+      cacheMocks.cacheSet.mock.invocationCallOrder[0],
+    );
+  });
+
+  // The marker deletes DubGrid's row; if it ran first, a retry after a failed
+  // provider call would find no row and end nothing.
+  it("keeps the session's row when the provider call fails, so a retry can end it", async () => {
+    serviceMocks.rpc.mockResolvedValueOnce({ data: null, error: new Error("auth schema down") });
+
+    await expect(endUserSession("user-1", "session-1")).rejects.toThrow("auth schema down");
+    expect(cacheMocks.cacheSet).not.toHaveBeenCalled();
+    expect(serviceMocks.delete).not.toHaveBeenCalled();
   });
 
   it("removes the tracked database session used by direct PostgREST RLS", async () => {

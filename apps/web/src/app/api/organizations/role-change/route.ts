@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createRequestSupabaseClient, requireAuthenticatedUser } from "@/lib/api-auth";
+import {
+  createRequestSupabaseClient,
+  requireAuthenticatedUser,
+  requireSensitiveActionAuth,
+} from "@/lib/api-auth";
 import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { getServiceClient } from "@/lib/supabase-service";
 import { isOrgSuperAdminOrGridmaster } from "@/app/api/employees/shared";
@@ -57,6 +61,12 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }
+
+    // A Gridmaster can use this to make anyone Super Admin of any organization,
+    // so every role change here needs fresh proof, as the access route's does
+    // for a Gridmaster (41d3, F-16). No screen calls this route.
+    const assurance = await requireSensitiveActionAuth(req);
+    if ("response" in assurance) return assurance.response;
 
     // Self-action guard: you cannot change your own role. The RPC also blocks
     // this; we short-circuit here for a clean, mappable error code.

@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { loginAsQaSuperAdmin, QA_CALM_HAVEN_ORIGIN } from "./helpers/auth";
+import { holdRequests } from "./helpers/held-requests";
 
 // AlertsInboxPage loads its list through POST /api/notifications/search. The
 // header bell uses GET /api/notifications (a different path), so mocking the
@@ -12,16 +13,14 @@ test.describe("alerts states", () => {
     await loginAsQaSuperAdmin(page, QA_CALM_HAVEN_ORIGIN);
     await page.waitForLoadState("networkidle");
 
-    await page.route(`**${SEARCH_PATH}`, async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 1_500));
-      await route.continue();
-    });
+    const releaseSearch = await holdRequests(page, `**${SEARCH_PATH}`);
 
     await page.goto(`${QA_CALM_HAVEN_ORIGIN}/alerts`);
 
     // ListPlaceholder renders aria-busy="true" while `loadingPage` is set.
     const placeholder = page.locator('main [aria-busy="true"]');
     await expect(placeholder).toBeVisible({ timeout: 15_000 });
+    releaseSearch();
     await expect(placeholder).toHaveCount(0, { timeout: 15_000 });
 
     // The header hides the bell on this page on purpose (it would point at

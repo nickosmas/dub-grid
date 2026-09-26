@@ -55,14 +55,37 @@ vi.mock("@/lib/sentry", () => ({
 }));
 
 vi.mock("@/lib/auth/security-audit", () => ({ writeSecurityAuditEvent: vi.fn() }));
+const endUserSession = vi.fn();
+vi.mock("@/lib/auth/revocation", () => ({
+  endUserSession: (...args: unknown[]) => endUserSession(...args),
+}));
 
 import { POST } from "@/app/api/auth/login/route";
 import { writeSecurityAuditEvent } from "@/lib/auth/security-audit";
+import { hashSessionId } from "@/lib/auth/sign-in-completion";
 import { SANDBOX_COOKIE_NAME } from "@/lib/sandbox-cookie";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const ORG_ID = "22222222-2222-4222-8222-222222222222";
 const OTHER_ORG_ID = "33333333-3333-4333-8333-333333333333";
+const SESSION_ID = "44444444-4444-4444-8444-444444444444";
+
+/** A refusal is recorded against the person and ends the session it created. */
+function expectRefusal(outcome: string, reason: string, orgId: string | null) {
+  expect(writeSecurityAuditEvent).toHaveBeenCalledWith(
+    expect.objectContaining({
+      event: "security.auth.login",
+      outcome,
+      reason,
+      actorId: USER_ID,
+      orgId,
+    }),
+  );
+  expect(writeSecurityAuditEvent).not.toHaveBeenCalledWith(
+    expect.objectContaining({ outcome: "succeeded" }),
+  );
+  expect(endUserSession).toHaveBeenCalledExactlyOnceWith(USER_ID, SESSION_ID);
+}
 
 function encodeJwtSegment(value: Record<string, unknown>): string {
   return Buffer.from(JSON.stringify(value)).toString("base64url");
@@ -81,7 +104,7 @@ function makeSession(
   overrides?: Partial<Record<string, unknown>>,
 ) {
   return {
-    access_token: createJwt({ sub: USER_ID, ...claims }),
+    access_token: createJwt({ sub: USER_ID, session_id: SESSION_ID, ...claims }),
     refresh_token: "refresh-token",
     expires_in: 3600,
     token_type: "bearer",
@@ -155,6 +178,7 @@ describe("POST /api/auth/login", () => {
     }));
     rpc.mockResolvedValue({ data: null, error: null });
     refreshSession.mockResolvedValue({ data: { session: null }, error: null });
+    endUserSession.mockResolvedValue(undefined);
   });
 
   it("returns 429 without attempting sign-in when rate limited", async () => {
@@ -253,7 +277,32 @@ describe("POST /api/auth/login", () => {
         event: "security.auth.login",
         outcome: "challenged",
         reason: "second_factor_required",
+        orgId: ORG_ID,
       }),
+    );
+    expect(endUserSession).not.toHaveBeenCalled();
+  });
+
+  // Before the switch the person may not belong to the host organization, so
+  // that organization's log must not carry their challenge (41c2).
+  it("names no organization for a challenge on another organization's host", async () => {
+    signInWithPassword.mockResolvedValueOnce({
+      data: {
+        session: makeSession({ org_id: OTHER_ORG_ID, org_slug: "other", org_role: "user" }),
+        user: {
+          id: USER_ID,
+          email: "user@example.com",
+          email_confirmed_at: "2026-01-01T00:00:00Z",
+          factors: [{ factor_type: "totp", status: "verified" }],
+        },
+      },
+      error: null,
+    });
+
+    await POST(makeRequest("acme.localhost"));
+
+    expect(writeSecurityAuditEvent).toHaveBeenLastCalledWith(
+      expect.objectContaining({ outcome: "challenged", orgId: null }),
     );
   });
 
@@ -278,6 +327,7 @@ describe("POST /api/auth/login", () => {
     expect(body).toMatchObject({ code: "GRIDMASTER_PORTAL_REQUIRED" });
     expect(refreshSession).not.toHaveBeenCalled();
     expect(fetchTermsAcceptanceStatus).not.toHaveBeenCalled();
+    expectRefusal("rejected", "gridmaster_portal_required", null);
   });
 
   it("rejects an MFA-enrolled gridmaster on an organization login before MFA begins", async () => {
@@ -459,6 +509,7 @@ describe("POST /api/auth/login", () => {
       error: "We couldn't verify your session. Sign in again.",
     });
     expect(body).not.toHaveProperty("session");
+    expectRefusal("failed", "service_unavailable", ORG_ID);
   });
 
   it("refuses login when the requested organization does not exist", async () => {
@@ -482,6 +533,108 @@ describe("POST /api/auth/login", () => {
     expect(res.status).toBe(403);
     expect(body.code).toBe("ORG_ACCESS_DENIED");
     expect(rpc).not.toHaveBeenCalledWith("switch_org", expect.anything());
+    expectRefusal("rejected", "organization_unavailable", null);
+  });
+
+  it("marks a completed password sign-in with its session so it is recorded once", async () => {
+    signInWithPassword.mockResolvedValueOnce({
+      data: {
+        session: makeSession({ org_id: ORG_ID, org_slug: "acme", org_role: "user" }),
+        user: {
+          id: USER_ID,
+          email: "user@example.com",
+          email_confirmed_at: "2026-01-01T00:00:00Z",
+          factors: [],
+        },
+      },
+      error: null,
+    });
+
+    expect((await POST(makeRequest("acme.localhost"))).status).toBe(200);
+    expect(writeSecurityAuditEvent).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        outcome: "succeeded",
+        metadata: expect.objectContaining({ sessionHash: hashSessionId(SESSION_ID) }),
+      }),
+    );
+    expect(endUserSession).not.toHaveBeenCalled();
+  });
+
+  it("refuses and records a sign-in to an organization the person has no access to", async () => {
+    signInWithPassword.mockResolvedValueOnce({
+      data: {
+        session: makeSession({ org_id: OTHER_ORG_ID, org_role: "user" }),
+        user: {
+          id: USER_ID,
+          email: "user@example.com",
+          email_confirmed_at: "2026-01-01T00:00:00Z",
+          factors: [],
+        },
+      },
+      error: null,
+    });
+    stubOrgLookup(ORG_ID);
+    rpc.mockResolvedValueOnce({ data: null, error: { message: "no membership" } });
+
+    const res = await POST(makeRequest("acme.localhost"));
+
+    expect(res.status).toBe(403);
+    expect((await res.json()).code).toBe("ORG_ACCESS_DENIED");
+    expectRefusal("rejected", "organization_access_denied", null);
+  });
+
+  it("records an organization lookup outage as a failure, not a closed organization", async () => {
+    signInWithPassword.mockResolvedValueOnce({
+      data: {
+        session: makeSession({ org_id: OTHER_ORG_ID, org_role: "user" }),
+        user: {
+          id: USER_ID,
+          email: "user@example.com",
+          email_confirmed_at: "2026-01-01T00:00:00Z",
+          factors: [],
+        },
+      },
+      error: null,
+    });
+    serviceFrom.mockImplementation((table: string) => {
+      if (table === "profiles") {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({ data: { platform_role: null }, error: null }),
+            }),
+          }),
+        };
+      }
+      throw new Error("database unavailable");
+    });
+
+    const res = await POST(makeRequest("outage.localhost"));
+
+    expect(res.status).toBe(403);
+    expectRefusal("failed", "service_unavailable", null);
+  });
+
+  it("still refuses when ending the refused session fails", async () => {
+    signInWithPassword.mockResolvedValueOnce({
+      data: {
+        session: makeSession({ org_id: OTHER_ORG_ID, org_role: "user" }),
+        user: {
+          id: USER_ID,
+          email: "user@example.com",
+          email_confirmed_at: "2026-01-01T00:00:00Z",
+          factors: [],
+        },
+      },
+      error: null,
+    });
+    stubOrgLookup(null);
+    endUserSession.mockRejectedValueOnce(new Error("provider down"));
+
+    const res = await POST(makeRequest("missing.localhost"));
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).not.toHaveProperty("session");
   });
 
   it.each([
@@ -508,6 +661,7 @@ describe("POST /api/auth/login", () => {
     expect(res.status).toBe(403);
     expect(body.code).toBe(code);
     expect(rpc).not.toHaveBeenCalledWith("switch_org", expect.anything());
+    expectRefusal("rejected", "organization_unavailable", null);
   });
 
   it("gridmaster: always refreshes once and returns the resolved destination", async () => {
@@ -559,6 +713,7 @@ describe("POST /api/auth/login", () => {
 
     expect(res.status).toBe(401);
     expect(body.code).toBe("SESSION_REFRESH_FAILED");
+    expectRefusal("failed", "service_unavailable", null);
   });
 
   it("directs the user to /accept-terms when current terms aren't accepted", async () => {
@@ -606,5 +761,9 @@ describe("POST /api/auth/login", () => {
     expect(body.destination).toBeNull();
     expect(rpc).not.toHaveBeenCalled();
     expect(fetchTermsAcceptanceStatus).not.toHaveBeenCalled();
+    // Not a completed sign-in: the person still has to confirm the address.
+    expect(writeSecurityAuditEvent).toHaveBeenLastCalledWith(
+      expect.objectContaining({ outcome: "challenged", reason: "email_unconfirmed" }),
+    );
   });
 });

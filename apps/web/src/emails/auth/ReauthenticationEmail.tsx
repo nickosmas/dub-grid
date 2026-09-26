@@ -4,13 +4,13 @@ import { EmailLayout } from "../components/EmailLayout";
 import { emailTheme, fontStack, styles } from "../components/theme";
 import { SUPABASE, PREVIEW_LOGO_URL } from "./placeholders";
 
-/** Supabase: reauthentication.html — shows a one-time code to confirm identity. */
+/** Supabase: reauthentication.html - shows a one-time code to confirm identity. */
 export function ReauthenticationEmail({ logoUrl = SUPABASE.siteUrl }: { logoUrl?: string } = {}) {
   return (
     <EmailLayout logoUrl={logoUrl} preview="Confirm your identity">
       <Text style={{ ...styles.heading, textAlign: "center" }}>Confirm your identity</Text>
       <Text style={{ ...styles.paragraph, textAlign: "center", fontSize: "15px" }}>
-        Enter this code to confirm a sensitive change to your DubGrid sign-in.
+        Enter this code to confirm a sensitive change to your DubGrid sign-in. It expires in 1 hour.
       </Text>
       <Section style={{ textAlign: "center", margin: "0 0 32px" }}>
         <Text

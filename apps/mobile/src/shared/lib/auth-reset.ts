@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { replaceAuthSession } from "../providers/AuthSessionProvider";
-import { registerPushToken, signOutMobileSessions } from "./api";
+import { disablePushToken, signOutMobileSessions } from "./api";
 import { queryClient } from "./query-client";
 import { loadStoredPushDevice } from "./session";
 import { getSupabaseClient } from "./supabase";
@@ -36,7 +36,7 @@ export async function disablePushForCurrentDevice(): Promise<void> {
     const storedDevice = await loadStoredPushDevice();
     if (!storedDevice) return;
 
-    await registerPushToken(accessToken, { ...storedDevice, disabled: true });
+    await disablePushToken(accessToken, storedDevice);
   } catch {
     // Never block sign-out on push cleanup.
   }
@@ -72,6 +72,12 @@ export async function handleRejectedMobileToken(rejectedToken: string): Promise<
       getSupabaseClient().auth.getSession(),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), LOCAL_RESET_STEP_TIMEOUT_MS)),
     ]);
+    // Known to hold no session: a teardown already finished, and a request
+    // that outlived it must not run another, which reset a login form the
+    // person had started (41d1). A lookup that timed out proves nothing.
+    // A lookup that failed (a refresh Supabase could not complete) keeps the
+    // session in storage but reports none, so only a clean answer counts.
+    if (result && !result.error && !result.data.session) return;
     liveToken = result?.data.session?.access_token ?? null;
   } catch {
     liveToken = null;

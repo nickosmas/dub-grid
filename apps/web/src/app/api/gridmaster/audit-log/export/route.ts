@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { API_ERRORS } from "@dubgrid/client-errors";
-import { requireGridmasterSession } from "@/lib/api-auth";
+import { requireGridmasterSession, requireSensitiveActionAuth } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
@@ -31,6 +31,12 @@ export async function POST(req: NextRequest) {
     const auth = await requireGridmasterSession(req);
     if ("response" in auth) {
       return auth.response;
+    }
+    // An export copies every organization's audit trail out of DubGrid, so it
+    // needs the same fresh proof as any other export (41d3, F-17).
+    const assurance = await requireSensitiveActionAuth(req);
+    if ("response" in assurance) {
+      return assurance.response;
     }
 
     let body: unknown;

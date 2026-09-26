@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-quer
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { User } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { toast } from "sonner";
 import { SecurityPanel } from "@/components/account/SecurityPanel";
 import { queryKeys } from "@/lib/query-keys";
 
@@ -169,7 +170,71 @@ describe("SecurityPanel session actions", () => {
     expect(requireCredentialAssurance).toHaveBeenNthCalledWith(1, "old-token");
     expect(requireCredentialAssurance).toHaveBeenNthCalledWith(2, "fresh-token");
     expect(updateBrowserUserPassword).toHaveBeenCalledWith("StrongPass1!");
-    expect(mockSignOut).toHaveBeenCalledWith({ scope: "global" });
+    expect(mockSignOut).toHaveBeenCalledWith({ scope: "global", reason: "password-changed" });
+  });
+
+  async function confirmPasswordChange() {
+    renderSecurityPanel();
+    fireEvent.click(screen.getByRole("button", { name: "Change password" }));
+    fireEvent.change(screen.getByLabelText("Enter new password"), {
+      target: { value: "StrongPass1!" },
+    });
+    fireEvent.change(screen.getByLabelText("Confirm new password"), {
+      target: { value: "StrongPass1!" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Update Password" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Update password?" })).getByRole("button", {
+        name: "Update and sign out",
+      }),
+    );
+    await waitFor(() => expect(updateBrowserUserPassword).toHaveBeenCalledOnce());
+  }
+
+  // A lost response may hide an applied change: finishing it as one signs
+  // everything out, where "couldn't update" left every old session live (41b2).
+  it("signs out everywhere when the update's outcome is unknown", async () => {
+    updateBrowserUserPassword.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    await confirmPasswordChange();
+
+    await waitFor(() =>
+      expect(mockSignOut).toHaveBeenCalledWith({
+        scope: "global",
+        reason: "password-unconfirmed",
+      }),
+    );
+  });
+
+  it("treats a deadline like a lost response", async () => {
+    updateBrowserUserPassword.mockRejectedValueOnce(
+      Object.assign(new Error("Request timed out"), { name: "RequestTimeoutError" }),
+    );
+    await confirmPasswordChange();
+
+    await waitFor(() =>
+      expect(mockSignOut).toHaveBeenCalledWith({
+        scope: "global",
+        reason: "password-unconfirmed",
+      }),
+    );
+  });
+
+  it("keeps the form and signs nothing out when the update is definitely refused", async () => {
+    updateBrowserUserPassword.mockRejectedValueOnce(
+      Object.assign(new Error("New password should be different from the old password."), {
+        status: 422,
+        code: "same_password",
+      }),
+    );
+    await confirmPasswordChange();
+
+    // This file stubs the message extractor, so the refusal lands on the
+    // generic copy; what matters is that nothing was signed out.
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("We couldn't update your password. Try again."),
+    );
+    expect(mockSignOut).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Enter new password")).toBeInTheDocument();
   });
 
   it("keeps the new password draft and original confirmation after cancelling step-up", async () => {

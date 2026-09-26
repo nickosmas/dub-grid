@@ -5,6 +5,7 @@ import {
   AUDIT_ACTIONS,
   AUDIT_CATEGORY_LABELS,
   AUDIT_CATEGORY_OPTIONS,
+  describeAuditAction,
   getAuditCategoryLabel,
   getAuditCategoryOptions,
   getResourceTypeLabel,
@@ -394,6 +395,16 @@ describe("audience", () => {
     }
   });
 
+  it("names a single-device sign-out rather than a plain sign-out", () => {
+    expect(describeAuditAction("security.auth.session", { scope: "device" })).toBe(
+      "Signed out one of their devices",
+    );
+    expect(describeAuditAction("security.auth.session", {})).toBe("Signed out");
+    expect(
+      describeAuditAction("security.auth.session", { scope: "global", reason: "password_changed" }),
+    ).toBe("Changed their password and signed out everywhere");
+  });
+
   it("never shows an organization copy the registry did not write", () => {
     expect(isVisibleToAudience("something.new", "org")).toBe(false);
     expect(isVisibleToAudience("something.new", "platform")).toBe(true);
@@ -445,6 +456,30 @@ describe("audience", () => {
       orgName: null,
     });
     expect(challenged).toBe("Sign-in awaiting two-factor code");
+
+    const describeLogin = (details: Record<string, string>) =>
+      describeAction({
+        action: "security.auth.login",
+        details: { surface: "web", ...details },
+        resourceId: null,
+        resourceType: "user",
+        targetLabel: null,
+        targetEmail: null,
+        orgName: null,
+      });
+    expect(describeLogin({ outcome: "challenged", reason: "email_unconfirmed" })).toBe(
+      "Sign-in awaiting email confirmation",
+    );
+    expect(describeLogin({ outcome: "rejected", reason: "organization_unavailable" })).toBe(
+      "Sign-in rejected: organization unavailable",
+    );
+    expect(describeLogin({ outcome: "rejected", reason: "constructor" })).toBe("Sign-in rejected");
+    expect(describeLogin({ outcome: "rejected", reason: "organization_access_denied" })).toBe(
+      "Sign-in rejected: no access to this organization",
+    );
+    expect(describeLogin({ outcome: "rejected", reason: "gridmaster_portal_required" })).toBe(
+      "Sign-in rejected: Gridmaster accounts sign in through the platform portal",
+    );
     const loginRows = formatDetails({
       action: "security.auth.login",
       details: { outcome: "succeeded", reason: "accepted", surface: "mobile", targetHash: hash },

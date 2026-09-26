@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const requireAuthenticatedUser = vi.fn();
+const requireAuthenticatedUserWithClaims = vi.fn();
 const validateCsrfOrigin = vi.fn();
 const updateSelfMfaStatus = vi.fn();
 const dispatchNotificationEvent = vi.fn();
@@ -16,7 +16,7 @@ vi.mock("next/server", async (importOriginal) => ({
 }));
 
 vi.mock("@/lib/api-auth", () => ({
-  requireAuthenticatedUser: (req: NextRequest) => requireAuthenticatedUser(req),
+  requireAuthenticatedUserWithClaims: (req: NextRequest) => requireAuthenticatedUserWithClaims(req),
   createRequestSupabaseClient: (req: NextRequest) => createRequestSupabaseClient(req),
 }));
 vi.mock("@/lib/csrf", () => ({
@@ -51,7 +51,10 @@ function post(body: unknown): NextRequest {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  requireAuthenticatedUser.mockResolvedValue({ user: { id: "user-1" } });
+  requireAuthenticatedUserWithClaims.mockResolvedValue({
+    user: { id: "user-1" },
+    claims: { org_id: "session-org" },
+  });
   createRequestSupabaseClient.mockReturnValue({ auth: { getUser } });
   getUser.mockResolvedValue({
     data: { user: { id: "user-1", factors: [{ factor_type: "totp", status: "verified" }] } },
@@ -62,7 +65,7 @@ beforeEach(() => {
   dispatchNotificationEvent.mockResolvedValue({ success: true });
   // Stored status is off; live Auth has a verified factor.
   profileSnapshot.mockResolvedValue({
-    data: { mfa_enabled: false, org_id: "org-1" },
+    data: { mfa_enabled: false, org_id: "last-switched-org" },
   });
 });
 
@@ -94,7 +97,7 @@ describe("POST /api/account/mfa-status", () => {
   });
 
   it("blocks unauthenticated callers", async () => {
-    requireAuthenticatedUser.mockResolvedValueOnce({
+    requireAuthenticatedUserWithClaims.mockResolvedValueOnce({
       response: NextResponse.json({ error: "Unauthenticated" }, { status: 401 }),
     });
     const res = await POST(post({ enabled: true }));
@@ -119,7 +122,7 @@ describe("POST /api/account/mfa-status", () => {
     expect(after).toHaveBeenCalledTimes(1);
     expect(dispatchNotificationEvent).toHaveBeenCalledWith("user-1", {
       action: "security_mfa_changed",
-      orgId: "org-1",
+      orgId: "session-org",
       targetUserId: "user-1",
       enabled: true,
     });

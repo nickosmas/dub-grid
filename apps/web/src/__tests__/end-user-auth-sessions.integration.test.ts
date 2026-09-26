@@ -3,7 +3,7 @@
 /**
  * F-21 (migration 046): ending someone's sessions deletes their provider
  * sessions, and their refresh tokens with them, so no refresh can restore
- * access. Runs on the seeded local database inside a rolled-back transaction.
+ * access. 41b1 (migration 047) does the same for exactly one session. Runs on the seeded local database inside a rolled-back transaction.
  *
  * Skipped when the local Postgres is unreachable (CI without Supabase).
  */
@@ -101,6 +101,56 @@ describe.runIf(reachable)("end_user_auth_sessions (F-21, live DB)", () => {
       await db.query(`SET LOCAL ROLE authenticated`);
       await expect(
         db.query(`SELECT public.end_user_auth_sessions(gen_random_uuid())`),
+      ).rejects.toThrow(/permission denied/);
+    } finally {
+      await db.query("ROLLBACK");
+    }
+  });
+});
+
+describe.runIf(reachable)("end_user_auth_session (41b1, live DB)", () => {
+  it("ends exactly the named session of the named user", async () => {
+    await db.query("BEGIN");
+    try {
+      const { rows } = await db.query<{ id: string }>(
+        `SELECT id FROM auth.users WHERE email IN ('qa-regular@dubgrid.test', 'qa-admin@dubgrid.test')
+         ORDER BY email`,
+      );
+      if (rows.length < 2) throw new Error("Local QA fixtures missing; run npm run db:reset");
+      const [admin, member] = rows.map((row) => row.id);
+
+      const revoked = await openSession(member);
+      const sibling = await openSession(member);
+      const bystander = await openSession(admin);
+
+      await db.query(`SET LOCAL ROLE service_role`);
+      // Another user's id with this session's id ends nothing.
+      const mismatched = await db.query<{ ended: number }>(
+        `SELECT public.end_user_auth_session($1, $2) AS ended`,
+        [admin, revoked],
+      );
+      const matched = await db.query<{ ended: number }>(
+        `SELECT public.end_user_auth_session($1, $2) AS ended`,
+        [member, revoked],
+      );
+      await db.query(`RESET ROLE`);
+
+      expect(mismatched.rows[0].ended).toBe(0);
+      expect(matched.rows[0].ended).toBe(1);
+      expect(await liveRefreshTokens([revoked, sibling, bystander])).toEqual(
+        [sibling, bystander].sort(),
+      );
+    } finally {
+      await db.query("ROLLBACK");
+    }
+  });
+
+  it("is not callable by a signed-in user", async () => {
+    await db.query("BEGIN");
+    try {
+      await db.query(`SET LOCAL ROLE authenticated`);
+      await expect(
+        db.query(`SELECT public.end_user_auth_session(gen_random_uuid(), gen_random_uuid())`),
       ).rejects.toThrow(/permission denied/);
     } finally {
       await db.query("ROLLBACK");

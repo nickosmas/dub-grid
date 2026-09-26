@@ -22,6 +22,7 @@ import { parseHost, buildSubdomainHost } from "@/lib/subdomain";
 import * as Sentry from "@/lib/sentry";
 import {
   fetchInvitationLookup,
+  recordBrowserSignInCompleted,
   recordCurrentTermsAcceptance,
   registerInvitedUser,
   signInBrowserWithPassword,
@@ -165,6 +166,10 @@ function AcceptInviteContent() {
         throw new Error(message, { cause: signInError });
       }
       signedInRef.current = true;
+      // Recorded before acceptance signs the session out. The server refuses
+      // a password alone on an account with a second factor, which records
+      // after the challenge instead.
+      await recordBrowserSignInCompleted();
 
       // 3. Accept the invitation (now authenticated)
       if ((await finishAcceptance()) === "needs-mfa") {
@@ -211,8 +216,11 @@ function AcceptInviteContent() {
 
     // 4. Sign out so user re-authenticates with fresh JWT claims.
     // Use global scope to revoke the server-side refresh token too,
-    // otherwise the login page will find a stale token in cookies.
-    await signOutFromBrowser("global");
+    // otherwise the login page will find a stale token in cookies. The
+    // invitation is already accepted, so a failed sign-out is not an error
+    // whose retry would find the link spent (41d1). The global sign-out still
+    // clears this browser's session when it fails.
+    await signOutFromBrowser("global").catch(() => {});
 
     setOrgSlug(slug);
     setState("success");
@@ -252,6 +260,7 @@ function AcceptInviteContent() {
   async function handleMfaVerified() {
     setState("processing");
     try {
+      await recordBrowserSignInCompleted();
       if ((await finishAcceptance()) === "needs-mfa") {
         throw new Error(describeAcceptFailure("step-up"));
       }

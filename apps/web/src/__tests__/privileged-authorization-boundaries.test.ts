@@ -64,11 +64,15 @@ const DELEGATED_SERVICE_HELPERS: Record<string, string> = {
   "apps/web/src/app/api/employees/shared.ts": "Central live employee-management authorization.",
   "apps/web/src/app/api/gridmaster/_lib/audit.ts":
     "Called only after Gridmaster route authorization.",
+  "apps/web/src/app/api/gridmaster/_lib/impersonation-notice.ts":
+    "Called only after Gridmaster route authorization, for the caller's own session row.",
   "apps/web/src/app/api/shared/permissions.ts": "Central live organization authorization.",
   "apps/web/src/app/api/shared/schedule.ts":
     "Receives the authorized org and service client from routes.",
   "apps/web/src/features/account/server/calendar-subscription.ts":
     "Rechecks live user, org, membership, employee, and token ownership.",
+  "apps/web/src/features/account/server/known-devices.ts":
+    "Reads and writes only the authenticated user's own known-device rows, keyed by the verified user ID.",
   "apps/web/src/features/account/server/preferences.ts":
     "Scopes preferences to the authenticated user ID.",
   "apps/web/src/features/account/server/profile.ts":

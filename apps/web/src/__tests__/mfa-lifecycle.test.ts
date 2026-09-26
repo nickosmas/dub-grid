@@ -19,6 +19,8 @@ const mocks = vi.hoisted(() => ({
   rate: vi.fn(),
   csrf: vi.fn(),
   audit: vi.fn(),
+  recordMfaOff: vi.fn(),
+  alert: vi.fn(),
 }));
 vi.mock("@/lib/api-auth", () => ({
   requireLiveAuthenticatedSession: mocks.live,
@@ -44,6 +46,11 @@ vi.mock("@/lib/rate-limit", () => ({
 }));
 vi.mock("@/lib/csrf", () => ({ validateCsrfOrigin: mocks.csrf }));
 vi.mock("@/lib/auth/security-audit", () => ({ writeSecurityAuditEvent: mocks.audit }));
+vi.mock("@/lib/logger", () => ({ default: { error: vi.fn() } }));
+vi.mock("@/features/account/server/profile", () => ({ recordSelfMfaOff: mocks.recordMfaOff }));
+vi.mock("@/features/account/server/security-alerts", () => ({
+  scheduleSecurityAlert: mocks.alert,
+}));
 
 const factorId = "00000000-0000-4000-8000-000000000001";
 const user = { id: "user-1", email: "test@example.com", factors: [] as object[] };
@@ -69,6 +76,7 @@ beforeEach(() => {
     gate.mockImplementation(async () => identity());
   mocks.csrf.mockReturnValue(null);
   mocks.rate.mockResolvedValue({ limited: false });
+  mocks.recordMfaOff.mockResolvedValue(true);
   mocks.scoped.mockReturnValue({
     auth: { mfa: { enroll: mocks.enroll, unenroll: mocks.unenroll } },
     rpc: mocks.rpc,
@@ -85,7 +93,11 @@ beforeEach(() => {
   mocks.refresh.mockResolvedValue({ data: { session }, error: null });
   mocks.signOut.mockResolvedValue({ error: null });
   mocks.rpc.mockResolvedValue({ error: null });
-  mocks.verify.mockResolvedValue({ userId: user.id, claims: { org_id: "org-1" } });
+  mocks.verify.mockResolvedValue({
+    userId: user.id,
+    sessionId: "replacement-session",
+    claims: { org_id: "org-1" },
+  });
 });
 
 describe.each([
@@ -142,6 +154,48 @@ describe.each([
     expect(mocks.unenroll).toHaveBeenCalledWith({ factorId });
   });
 
+  // The alert used to wait for the client's follow-up status call (41c1).
+  it("alerts from the server when the last verified factor is removed", async () => {
+    user.factors = [{ id: factorId, factor_type: "totp", status: "verified" }];
+    expect((await post(request({ action: "remove", factorId }))).status).toBe(200);
+    expect(mocks.recordMfaOff).toHaveBeenCalledWith("user-1");
+    expect(mocks.alert).toHaveBeenCalledExactlyOnceWith("user-1", {
+      action: "security_mfa_changed",
+      orgId: "org-1",
+      targetUserId: "user-1",
+      enabled: false,
+    });
+  });
+
+  it("stays quiet while another verified factor still protects the account", async () => {
+    user.factors = [
+      { id: factorId, factor_type: "totp", status: "verified" },
+      { id: "00000000-0000-4000-8000-000000000002", factor_type: "totp", status: "verified" },
+    ];
+    expect((await post(request({ action: "remove", factorId }))).status).toBe(200);
+    expect(mocks.recordMfaOff).not.toHaveBeenCalled();
+    expect(mocks.alert).not.toHaveBeenCalled();
+  });
+
+  it("stays quiet when cancelling an unfinished setup or when already recorded off", async () => {
+    user.factors = [{ id: factorId, factor_type: "totp", status: "unverified" }];
+    await post(request({ action: "cleanup", factorId }));
+    expect(mocks.alert).not.toHaveBeenCalled();
+
+    user.factors = [{ id: factorId, factor_type: "totp", status: "verified" }];
+    mocks.recordMfaOff.mockResolvedValueOnce(false);
+    await post(request({ action: "remove", factorId }));
+    expect(mocks.recordMfaOff).toHaveBeenCalledWith("user-1");
+    expect(mocks.alert).not.toHaveBeenCalled();
+  });
+
+  it("still reports a completed removal when the follow-up fails", async () => {
+    user.factors = [{ id: factorId, factor_type: "totp", status: "verified" }];
+    mocks.recordMfaOff.mockRejectedValueOnce(new Error("write failed"));
+    expect((await post(request({ action: "remove", factorId }))).status).toBe(200);
+    expect(mocks.alert).not.toHaveBeenCalled();
+  });
+
   it("reauthenticates the live identity and retains its signed organization", async () => {
     const response = await post(
       request({
@@ -155,6 +209,13 @@ describe.each([
     expect(mocks.signIn).toHaveBeenCalledWith({ email: user.email, password: "test-password" });
     expect(mocks.rpc).toHaveBeenCalledWith("switch_org", { target_org_id: "org-1" });
     expect(await response.json()).toEqual(session);
+    // The replacement session is marked, so it never also counts as a sign-in.
+    expect(mocks.audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reason: "reauthenticated",
+        metadata: expect.objectContaining({ sessionHash: expect.stringMatching(/^[0-9a-f]{64}$/) }),
+      }),
+    );
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(mocks.signOut).not.toHaveBeenCalled();
   });

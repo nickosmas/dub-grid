@@ -2,7 +2,7 @@ import * as React from "react";
 import { AuthActionEmail } from "./AuthActionEmail";
 import { PREVIEW_LOGO_URL } from "./placeholders";
 
-/** Supabase: invite.html — Supabase-issued organization invite. */
+/** Supabase: invite.html - Supabase-issued organization invite. */
 export function AuthInviteEmail({ logoUrl }: { logoUrl?: string } = {}) {
   return (
     <AuthActionEmail

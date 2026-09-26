@@ -13,6 +13,7 @@ import {
   walkRoutes,
   warmUpAndCaptureEmployeeHref,
 } from "./helpers/role-variance";
+import { holdRequests } from "./helpers/held-requests";
 
 // 25d2b: the 25d1 route matrix as the non-admin fixtures. The shared walker,
 // collector and locators live in helpers/role-variance.ts.
@@ -123,23 +124,17 @@ async function expectBootstrapStates(page: Page, path: string) {
     })
     .toBeNull();
 
-  // Held until the bar has been seen rather than delayed by a fixed timer: goto
-  // waits for the load event, which on a slow runner can arrive after a timed
-  // delay has already run out and the bar has gone.
-  let releaseBootstrap!: () => void;
-  const bootstrapReleased = new Promise<void>((resolve) => (releaseBootstrap = resolve));
-  await page.route(`**${BOOTSTRAP_PATH}`, async (route) => {
-    await bootstrapReleased;
-    await route.continue().catch(() => undefined);
-  });
+  // People shows its own progress bar while the bootstrap is in flight; the
+  // dashboard sits behind SetupGuard, which shows the workspace splash.
+  const loadingState =
+    path === "/dashboard"
+      ? page.getByRole("heading", { name: "Loading your workspace" })
+      : page.locator("[data-progress-bar]");
+  const releaseBootstrap = await holdRequests(page, `**${BOOTSTRAP_PATH}`);
   await page.goto(`${QA_CALM_HAVEN_ORIGIN}${path}`);
-  await expect(page.locator("[data-progress-bar]"), `${path} loading`).toBeVisible({
-    timeout: 15_000,
-  });
+  await expect(loadingState, `${path} loading`).toBeVisible({ timeout: 15_000 });
   releaseBootstrap();
-  await expect(page.locator("[data-progress-bar]"), `${path} loaded`).toHaveCount(0, {
-    timeout: 15_000,
-  });
+  await expect(loadingState, `${path} loaded`).toHaveCount(0, { timeout: 15_000 });
   await page.unroute(`**${BOOTSTRAP_PATH}`);
 
   await page.route(`**${BOOTSTRAP_PATH}`, async (route) => {

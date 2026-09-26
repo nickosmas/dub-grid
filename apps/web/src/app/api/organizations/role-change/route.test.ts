@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const validateCsrfOrigin = vi.fn();
 const requireAuthenticatedUser = vi.fn();
+const requireSensitiveActionAuth = vi.fn();
 const checkRateLimit = vi.fn();
 const resolveEffectiveOrgId = vi.fn();
 const createRequestSupabaseClient = vi.fn();
@@ -17,6 +18,7 @@ vi.mock("@/lib/csrf", () => ({
 }));
 vi.mock("@/lib/api-auth", () => ({
   requireAuthenticatedUser: (req: NextRequest) => requireAuthenticatedUser(req),
+  requireSensitiveActionAuth: (req: NextRequest) => requireSensitiveActionAuth(req),
   createRequestSupabaseClient: (req: NextRequest) => createRequestSupabaseClient(req),
 }));
 vi.mock("@/lib/rate-limit", () => ({
@@ -67,6 +69,7 @@ function makeRequest(body: unknown): NextRequest {
 }
 
 beforeEach(() => {
+  requireSensitiveActionAuth.mockResolvedValue({ user: { id: "caller" } });
   vi.clearAllMocks();
   validateCsrfOrigin.mockReturnValue(null);
   requireAuthenticatedUser.mockResolvedValue({ user: { id: USER_ID } });
@@ -88,6 +91,28 @@ async function importRoute() {
 }
 
 describe("POST /api/organizations/role-change", () => {
+  // A Gridmaster could make anyone Super Admin anywhere here (41d3, F-16).
+  it("changes no role without fresh proof", async () => {
+    requireSensitiveActionAuth.mockResolvedValueOnce({
+      response: new Response(JSON.stringify({ code: "STEP_UP_REQUIRED" }), { status: 403 }),
+    });
+    const rpc = vi.fn();
+    createRequestSupabaseClient.mockReturnValue({ rpc });
+    const { POST } = await importRoute();
+
+    const response = await POST(
+      makeRequest({
+        targetUserId: "33333333-3333-4333-8333-333333333333",
+        newRole: "super_admin",
+        orgId: ORG_ID,
+        idempotencyKey: "44444444-4444-4444-8444-444444444444",
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it("blocks self role-change with 403", async () => {
     const { POST } = await importRoute();
     const res = await POST(

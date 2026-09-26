@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { loginAsQaSuperAdmin, QA_CALM_HAVEN_ORIGIN } from "./helpers/auth";
+import { holdRequests } from "./helpers/held-requests";
 
 const BOOTSTRAP_PATH = "/api/organization/bootstrap";
 
@@ -11,14 +12,12 @@ test.describe("people states", () => {
     await loginAsQaSuperAdmin(page, QA_CALM_HAVEN_ORIGIN);
     await page.waitForLoadState("networkidle");
 
-    await page.route(`**${BOOTSTRAP_PATH}`, async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 1_500));
-      await route.continue();
-    });
+    const releaseBootstrap = await holdRequests(page, `**${BOOTSTRAP_PATH}`);
 
     await page.goto(`${QA_CALM_HAVEN_ORIGIN}/people`);
 
     await expect(page.locator("[data-progress-bar]")).toBeVisible({ timeout: 15_000 });
+    releaseBootstrap();
     await expect(page.locator("[data-progress-bar]")).toHaveCount(0, { timeout: 15_000 });
   });
 
@@ -136,25 +135,24 @@ test.describe("person detail states", () => {
     test.setTimeout(60_000);
     await loginAsQaSuperAdmin(page, QA_CALM_HAVEN_ORIGIN);
 
+    // Discovery calls fetchEmployeeById too, so the hold starts only once the
+    // target page is known, and the page is then loaded again under it.
+    const href = await goToOtherPersonDetail(page);
+
     // fetchEmployeeById is one of several actions multiplexed through this
     // one endpoint (features/employees/client/api.ts's requestEmployeeAction),
-    // so only that action's requests get delayed - anything else posted here
-    // (e.g. a background list refresh) must pass straight through. Registered
-    // before discovery too: that also calls fetchEmployeeById, which is fine,
-    // it just makes the redirect-check navigations a bit slower.
-    await page.route("**/api/employees/manage", async (route) => {
-      const body = route.request().postDataJSON() as { action?: string };
-      if (body?.action !== "fetchEmployeeById") {
-        await route.continue();
-        return;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 1_500));
-      await route.continue();
-    });
-
-    await goToOtherPersonDetail(page);
+    // so only that action's requests are held - anything else posted here
+    // (e.g. a background list refresh) must pass straight through.
+    const releaseEmployee = await holdRequests(
+      page,
+      "**/api/employees/manage",
+      (request) =>
+        (request.postDataJSON() as { action?: string } | null)?.action === "fetchEmployeeById",
+    );
+    await page.goto(`${QA_CALM_HAVEN_ORIGIN}${href}`);
 
     await expect(page.locator("[data-progress-bar]")).toBeVisible({ timeout: 15_000 });
+    releaseEmployee();
     await expect(page.locator("[data-progress-bar]")).toHaveCount(0, { timeout: 15_000 });
   });
 

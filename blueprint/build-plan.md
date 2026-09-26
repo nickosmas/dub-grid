@@ -569,14 +569,32 @@
           date the person accepted their invitation, rename the staff record's
           creation date "Date added", and show no joined date for someone who
           has not accepted.
-  - [ ] 41b. **Credential, session, and recovery integrity** - require the
+  - [x] 41b. **Credential, session, and recovery integrity** - require the
         same fresh-assurance and session-revocation guarantees on web and
         mobile for password, sign-in email, MFA, recovery, account deletion,
         remote session termination, and manager-initiated credential changes.
         Repair partial-failure, stale-session, app-lock, logout-timeout, and
         corrupt-auth-state paths so security state remains recoverable,
         fail-closed where appropriate, and auditable.
-  - [ ] 41c. **Security notices, audit attribution, and account-global email
+    - [x] 41b1. **Session revocation that holds** - revoking one session,
+          a Gridmaster force-logout, and every account deletion end the
+          session for good rather than for an hour or five minutes: end the
+          provider session and its refresh token, not only DubGrid's marker.
+          Give mobile single-session revocation the web path's error handling,
+          and audit single-session revocation on both platforms.
+    - [x] 41b2. **Credential change completion** - password recovery
+          completes for a two-factor account on web and mobile by asking for
+          the authenticator code before the new password. A signed-in password
+          change treats an unclear outcome as possibly applied, as recovery
+          already does, and a mobile retry after a failed revocation finishes
+          the sign-out instead of repeating the change. A manager's sign-in
+          email change checks the record's version and contact conflicts
+          before it touches the sign-in, and a password change is audited.
+    - [x] 41b3. **Assurance coverage** - every credential-changing route,
+          including the Gridmaster password-reset and account routes, requires
+          fresh assurance and is held by the sensitive-action inventory; close
+          the app lock's one-frame gap between loading and locked.
+  - [x] 41c. **Security notices, audit attribution, and account-global email
         context** - deliver security alerts reliably with useful device and
         event context; record successful authentication only after all gates
         and against the actual organization; authenticate impersonation notice
@@ -585,6 +603,21 @@
         DubGrid sign-in account and may name only a verified initiating
         organization as context, never imply that an organization owns the
         credential or disclose membership counts.
+    - [x] 41c1. **Security alert delivery** - a claimed new sign-in always
+          alerts, removing two-factor alerts from the server, a force-logout
+          alert survives the response, security pushes reach every device on
+          the account, an account deletion sends a notice, Supabase's own
+          password and email change notices are declared and enabled, and the
+          security-alert settings say truthfully that they are always on.
+    - [x] 41c2. **Audit attribution** - record web sign-in denials, audit an
+          invitation acceptance's sign-in, record a completed sign-in once
+          per session, and take the organization of an ended impersonation
+          from the session rather than the request.
+    - [x] 41c3. **Impersonation notices and auth email copy** - send
+          impersonation notices from the server with deduplication, correct
+          the impersonation email copy, and add the missing expiry and
+          "wasn't you" lines to the auth emails, with the template drift
+          check extended to app-sent auth mail.
   - [ ] 41d. **Auth resilience and release qualification** - remove remaining
         retry-loop and source/template drift hazards; add focused regression
         coverage for every repaired path; and perform browser, native-app,
@@ -592,3 +625,17 @@
         production checks before remediation closure. Record unavailable
         environment evidence as a release blocker rather than treating static
         tests as runtime proof.
+    - [x] 41d1. **Retry and teardown resilience** - a failed session report
+          is retried while it can still alert, a mobile teardown never waits
+          on itself or repeats after it finished, an accepted invitation stays
+          accepted when its sign-out fails, and the app lock does not relock
+          on the system prompt's own inactive state.
+    - [x] 41d2. **Source and template drift guards** - migration checksums,
+          the password rule against Supabase's, code lengths against
+          `otp_length`, the push script's comparison, the invitation lifetime,
+          the SQL messages the routes match, and the claim names are each
+          held by a test that fails when the two sides diverge.
+    - [ ] 41d3. **Release qualification** - browser, native-app,
+          email-provider and migration/reissue rehearsals with explicit
+          production checks; unavailable environment evidence is recorded as
+          a release blocker.

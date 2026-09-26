@@ -11,11 +11,21 @@ import { ReauthenticationEmail } from "./ReauthenticationEmail";
 import { RecoveryEmail } from "./RecoveryEmail";
 
 export interface SupabaseAuthTemplate {
-  /** The `[auth.email.template.<key>]` block, and `supabase/templates/<key>.html`. */
+  /**
+   * `supabase/templates/<key>.html`, and the Management API field names. An
+   * action email is declared in `[auth.email.template.<key>]`.
+   */
   key: string;
   Component: ComponentType;
   /** Go placeholders Supabase substitutes at send time; they must survive rendering. */
   placeholders: readonly string[];
+  /**
+   * A security notice is declared in `[auth.email.notification.<type>]` and
+   * sends only when enabled. All four are on: nothing in DubGrid emails the
+   * password and email notices, and the MFA notices reach the owner even for a
+   * change made with a stolen token that never passes through DubGrid.
+   */
+  notification?: { type: string; enabled: boolean };
 }
 
 /**
@@ -57,20 +67,24 @@ export const SUPABASE_AUTH_TEMPLATES: readonly SupabaseAuthTemplate[] = [
     key: "password_changed_notification",
     Component: PasswordChangedEmail,
     placeholders: ["{{ .SiteURL }}"],
+    notification: { type: "password_changed", enabled: true },
   },
   {
     key: "email_changed_notification",
     Component: EmailChangedNotificationEmail,
     placeholders: ["{{ .OldEmail }}", "{{ .NewEmail }}", "{{ .SiteURL }}"],
+    notification: { type: "email_changed", enabled: true },
   },
   {
     key: "mfa_factor_enrolled_notification",
     Component: MfaFactorEnrolledEmail,
     placeholders: ["{{ .SiteURL }}"],
+    notification: { type: "mfa_factor_enrolled", enabled: true },
   },
   {
     key: "mfa_factor_unenrolled_notification",
     Component: MfaFactorUnenrolledEmail,
     placeholders: ["{{ .SiteURL }}"],
+    notification: { type: "mfa_factor_unenrolled", enabled: true },
   },
 ];

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const validateCsrfOrigin = vi.fn();
 const requireGridmasterSession = vi.fn();
+const requireSensitiveActionAuth = vi.fn();
 const requestRpc = vi.fn();
 const serviceFrom = vi.fn();
 const serviceRpc = vi.fn();
@@ -27,6 +28,7 @@ vi.mock("@/lib/api-auth", () => ({
     rpc: requestRpc,
   }),
   requireGridmasterSession: (req: NextRequest) => requireGridmasterSession(req),
+  requireSensitiveActionAuth: (req: NextRequest) => requireSensitiveActionAuth(req),
 }));
 
 vi.mock("@/lib/supabase-service", () => ({
@@ -88,6 +90,7 @@ describe("POST /api/gridmaster/organizations/manage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     validateCsrfOrigin.mockReturnValue(null);
+    requireSensitiveActionAuth.mockResolvedValue({ user: { id: "gridmaster-user" } });
     requireGridmasterSession.mockResolvedValue({
       user: { id: "gridmaster-user", email: "gm@example.com" },
       session: { access_token: "token" },
@@ -274,6 +277,39 @@ describe("POST /api/gridmaster/organizations/manage", () => {
       `dg:org:${ORG_ID}:organization`,
       "dg:org:slug:acme",
     );
+  });
+
+  // A role grant can make anyone Super Admin of any organization (41d3, F-16).
+  it("grants no role without fresh proof", async () => {
+    requireSensitiveActionAuth.mockResolvedValueOnce({
+      response: NextResponse.json(
+        {
+          code: "STEP_UP_REQUIRED",
+          method: "totp",
+          error: "Confirm your identity, then try again.",
+        },
+        { status: 403 },
+      ),
+    });
+
+    const response = await POST(
+      makeRequest({
+        action: "assignOrgRoleByEmail",
+        orgId: ORG_ID,
+        email: "admin@example.com",
+        role: "super_admin",
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(requestRpc).not.toHaveBeenCalled();
+    expect(auditInsert).not.toHaveBeenCalled();
+  });
+
+  it("asks no fresh proof for an action that grants nothing", async () => {
+    await POST(makeRequest({ action: "unsuspendOrganization", orgId: ORG_ID }));
+
+    expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
   });
 
   it("assigns an org role by email and writes an audit event", async () => {

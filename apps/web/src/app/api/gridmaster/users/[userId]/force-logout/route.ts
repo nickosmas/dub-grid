@@ -9,8 +9,8 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
-import { dispatchNotificationEvent } from "@/features/notifications/server/events";
-import { revokeAllUserSessions } from "@/lib/auth/revocation";
+import { scheduleSecurityAlert } from "@/features/account/server/security-alerts";
+import { endUserSessions } from "@/lib/auth/revocation";
 
 const paramsSchema = z.object({
   userId: z.string().uuid(),
@@ -42,6 +42,20 @@ export async function POST(req: NextRequest, context: { params: Promise<{ userId
       );
     }
 
+    // Ending every session would sign the caller out of the one they are
+    // using, and the SQL function deletes the rows a keep-one sign-out lists.
+    // Their other devices have "Sign out other devices" for that.
+    // UUIDs match case-insensitively in Postgres, so compare them that way.
+    if (parsed.data.userId.toLowerCase() === auth.user.id.toLowerCase()) {
+      return NextResponse.json(
+        {
+          error:
+            "You can't force a sign-out on your own account. Use Sign out other devices in your security settings.",
+        },
+        { status: 400 },
+      );
+    }
+
     const serviceClient = getServiceClient();
     const result = await createRequestSupabaseClient(req).rpc("force_logout_user", {
       p_target_user_id: parsed.data.userId,
@@ -51,10 +65,11 @@ export async function POST(req: NextRequest, context: { params: Promise<{ userId
       throw result.error;
     }
 
-    // The SQL function removes tracked database sessions and blocks refresh.
-    // Mirror that cutoff into the Route Handler revocation store so the
-    // already-issued access token also fails app APIs immediately.
-    await revokeAllUserSessions(parsed.data.userId);
+    // The SQL function removes tracked database sessions and blocks refresh,
+    // but only for five minutes: after that the refresh token mints a new
+    // token on the same session. End the provider sessions too, which also
+    // rejects the access tokens already issued (41b1).
+    await endUserSessions(parsed.data.userId);
 
     await writeGridmasterAuditLog({
       serviceClient,
@@ -66,19 +81,13 @@ export async function POST(req: NextRequest, context: { params: Promise<{ userId
       request: req,
     });
 
-    // Resolve the target's default org so the notification is org-scoped
-    // (its bell + inbox is filtered by current org context). Falls back to
-    // null when the target has no membership — the alert still reaches them
-    // as a platform-scoped row.
-    const { data: targetProfile } = await serviceClient
-      .from("profiles")
-      .select("org_id")
-      .eq("id", parsed.data.userId)
-      .maybeSingle();
-
-    void dispatchNotificationEvent(auth.user.id, {
+    // No organization: a Gridmaster ended every session on the sign-in, not a
+    // session in one organization, so the alert is a platform row every inbox
+    // shows and names no organization. Scheduled past the response, which a
+    // bare promise was not.
+    scheduleSecurityAlert(auth.user.id, {
       action: "security_session_revoked",
-      orgId: (targetProfile?.org_id as string | null) ?? null,
+      orgId: null,
       targetUserId: parsed.data.userId,
       initiatedBy: "gridmaster",
       deviceLabel: null,

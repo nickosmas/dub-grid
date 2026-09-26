@@ -16,6 +16,7 @@ import { getSupabasePublishableKey, getSupabaseUrl } from "@/lib/supabase-keys";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { withTiming, type Timer } from "@/lib/server-timing";
 import { writeSecurityAuditEvent } from "@/lib/auth/security-audit";
+import { sessionHashOf } from "@/lib/auth/sign-in-completion";
 
 async function hashIdentifier(value: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -114,14 +115,21 @@ async function handlePOST(req: NextRequest, timer: Timer) {
     );
 
     // With a second factor enrolled the password step is only challenged;
-    // /api/mobile/v1/auth/sign-in-complete records the success.
+    // /api/mobile/v1/auth/sign-in-complete records the success. A success
+    // carries its session so no completion call records it again.
+    const sessionHash = payload.mfaRequired ? null : sessionHashOf(payload.session.accessToken);
     await writeSecurityAuditEvent({
       event: "security.auth.login",
       outcome: payload.mfaRequired ? "challenged" : "succeeded",
       reason: payload.mfaRequired ? "second_factor_required" : "accepted",
       actorId: payload.user.id,
       orgId: payload.organization.id,
-      metadata: { targetHash: emailHash, sourceHash, surface: "mobile" },
+      metadata: {
+        targetHash: emailHash,
+        sourceHash,
+        surface: "mobile",
+        ...(sessionHash ? { sessionHash } : {}),
+      },
     });
 
     return json(mobileAuthLoginResponseSchema.parse(payload));

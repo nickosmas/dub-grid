@@ -28,13 +28,25 @@ interface RunLogoutTeardownProps {
    */
   scope: LogoutScope | null;
   /**
-   * Why the sign-out happened, from `?reason=` on the URL. When "inactivity",
-   * this page surfaces a persistent explanatory toast that stays up until the
-   * user dismisses it, clicks "Sign back in", or navigates elsewhere (any of
-   * which unmounts this component and clears the toast).
+   * Why the sign-out happened, from `?reason=` on the URL. A known reason
+   * surfaces a persistent explanatory toast that stays up until the user
+   * dismisses it, clicks "Sign back in", or navigates elsewhere (any of which
+   * unmounts this component and clears the toast).
    */
-  reason?: "inactivity" | null;
+  reason?: LogoutReason | null;
 }
+
+export type LogoutReason = "inactivity" | "password-changed" | "password-unconfirmed";
+
+const REASON_MESSAGES: Record<LogoutReason, string> = {
+  inactivity: "You were signed out after 30 minutes of inactivity.",
+  "password-changed":
+    "Your password changed, so we signed you out everywhere. Sign in with your new password.",
+  // The change may have landed after the deadline, so every session was
+  // signed out as if it had (41b2).
+  "password-unconfirmed":
+    "We couldn't confirm your new password, so we signed you out everywhere. Sign in with your new password. If it doesn't work, use your previous one.",
+};
 
 /**
  * Runs the real logout teardown on /goodbye mount.
@@ -59,18 +71,23 @@ export function RunLogoutTeardown({ scope, reason = null }: RunLogoutTeardownPro
   // exists to avoid.
   const ranRef = useRef(false);
   const [done, setDone] = useState(scope === null);
+  const passwordReason = reason === "password-changed" || reason === "password-unconfirmed";
+  // A password notice says everything was signed out, so it waits for that
+  // sign-out to succeed, and a local scope never shows one (41b2/F-04).
+  const [passwordSignedOut, setPasswordSignedOut] = useState(false);
+  const showReason = reason === "inactivity" || (passwordReason && passwordSignedOut);
 
   useEffect(() => {
-    if (reason !== "inactivity") return;
-    const id = toast.info("You were signed out after 30 minutes of inactivity.", {
+    if (!reason || !showReason) return;
+    const id = toast.info(REASON_MESSAGES[reason], {
       duration: Infinity,
     });
-    // Clear it the moment the user leaves /goodbye — clicking "Sign back in"
-    // or navigating anywhere else unmounts this component.
+    // Clear it the moment the user leaves /goodbye (clicking "Sign back in"
+    // or navigating anywhere else unmounts this component).
     return () => {
       toast.dismiss(id);
     };
-  }, [reason]);
+  }, [reason, showReason]);
 
   useEffect(() => {
     if (ranRef.current) return;
@@ -92,12 +109,23 @@ export function RunLogoutTeardown({ scope, reason = null }: RunLogoutTeardownPro
         Sentry.captureException(err);
       }
       try {
-        await signOutFromBrowser(scope);
+        // A password change is recorded as one in the audit trail.
+        if (scope === "global" && passwordReason) {
+          await signOutFromBrowser(scope, "password_change");
+          setPasswordSignedOut(true);
+        } else {
+          await signOutFromBrowser(scope);
+        }
       } catch (err) {
         Sentry.captureException(err);
         if (scope === "global") {
+          // A password change keeps its advice when the sign-out fails (F-10).
           toast.error(
-            "We couldn't confirm sign-out on every device. Sign back in to review your sessions.",
+            reason === "password-changed"
+              ? "Your password changed, but we couldn't sign out every device. Sign in with your new password and review your sessions."
+              : reason === "password-unconfirmed"
+                ? "We couldn't confirm your new password or sign out every device. Sign in with your new password, or your previous one if it doesn't work, then review your sessions."
+                : "We couldn't confirm sign-out on every device. Sign back in to review your sessions.",
           );
         }
         // Best-effort. User is on /goodbye and the session is at least

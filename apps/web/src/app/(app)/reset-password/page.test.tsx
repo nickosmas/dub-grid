@@ -6,6 +6,8 @@ const exchangeBrowserCodeForSession = vi.fn();
 const completeBrowserPasswordRecovery = vi.fn();
 const subscribeToBrowserAuthChanges = vi.fn();
 const updateBrowserUserPassword = vi.fn();
+const getBrowserAssuranceLevel = vi.fn();
+const signOutFromBrowser = vi.fn();
 const toastError = vi.fn();
 
 vi.mock("@/features/account/client", () => ({
@@ -13,6 +15,18 @@ vi.mock("@/features/account/client", () => ({
   completeBrowserPasswordRecovery: (...args: unknown[]) => completeBrowserPasswordRecovery(...args),
   subscribeToBrowserAuthChanges: (...args: unknown[]) => subscribeToBrowserAuthChanges(...args),
   updateBrowserUserPassword: (...args: unknown[]) => updateBrowserUserPassword(...args),
+  getBrowserAssuranceLevel: (...args: unknown[]) => getBrowserAssuranceLevel(...args),
+  signOutFromBrowser: (...args: unknown[]) => signOutFromBrowser(...args),
+}));
+
+vi.mock("@/components/profile/MFAVerify", () => ({
+  MFAVerify: ({ onVerified, onCancel }: { onVerified: () => void; onCancel: () => void }) => (
+    <section>
+      <h1>Two-factor authentication</h1>
+      <button onClick={onVerified}>Verify code</button>
+      <button onClick={onCancel}>Back to login</button>
+    </section>
+  ),
 }));
 
 vi.mock("@/components/RouteGuards", () => ({
@@ -33,6 +47,124 @@ describe("ResetPasswordPage", () => {
     });
     updateBrowserUserPassword.mockResolvedValue(undefined);
     completeBrowserPasswordRecovery.mockResolvedValue(undefined);
+    getBrowserAssuranceLevel.mockResolvedValue({
+      data: { currentLevel: "aal1", nextLevel: "aal1" },
+      error: null,
+    });
+    signOutFromBrowser.mockResolvedValue(undefined);
+  });
+
+  // Supabase refuses the new password from a two-factor account's recovery
+  // session until the code promotes it to aal2 (41b2).
+  describe("a two-factor account", () => {
+    beforeEach(() => {
+      getBrowserAssuranceLevel.mockResolvedValue({
+        data: { currentLevel: "aal1", nextLevel: "aal2" },
+        error: null,
+      });
+    });
+
+    it("asks for the authenticator code before the new password", async () => {
+      render(<ResetPasswordPage />);
+
+      expect(
+        await screen.findByRole("heading", { name: "Two-factor authentication" }),
+      ).toBeInTheDocument();
+      expect(screen.queryByLabelText("New password")).not.toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Verify code" }));
+      });
+      expect(await screen.findByRole("heading", { name: "Set new password" })).toBeInTheDocument();
+    });
+
+    it("signs the recovery session out and returns to login when the person backs out", async () => {
+      const original = window.location;
+      const assign = vi.fn();
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        value: { ...original, assign, pathname: "/reset-password", search: "" },
+      });
+      try {
+        render(<ResetPasswordPage />);
+
+        await screen.findByRole("heading", { name: "Two-factor authentication" });
+        await act(async () => {
+          fireEvent.click(screen.getByRole("button", { name: "Back to login" }));
+        });
+
+        expect(signOutFromBrowser).toHaveBeenCalledWith("local");
+        expect(assign).toHaveBeenCalledWith("/login");
+      } finally {
+        Object.defineProperty(window, "location", { configurable: true, value: original });
+      }
+    });
+  });
+
+  // The link's one-time code or capability is spent once the session exists,
+  // so the retry must not go back through it (F-01).
+  it("recovers from a failed assurance check with Try again", async () => {
+    getBrowserAssuranceLevel.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    render(<ResetPasswordPage />);
+
+    await screen.findByRole("heading", { name: "Check your connection" });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    });
+
+    expect(await screen.findByRole("heading", { name: "Set new password" })).toBeInTheDocument();
+  });
+
+  it("finishes a two-factor recovery once the code is verified", async () => {
+    getBrowserAssuranceLevel.mockResolvedValue({
+      data: { currentLevel: "aal1", nextLevel: "aal2" },
+      error: null,
+    });
+    render(<ResetPasswordPage />);
+    await screen.findByRole("heading", { name: "Two-factor authentication" });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Verify code" }));
+    });
+
+    await screen.findByRole("heading", { name: "Set new password" });
+    fireEvent.change(screen.getByLabelText("New password"), {
+      target: { value: "Str0ng!Passphrase" },
+    });
+    fireEvent.change(screen.getByLabelText("Confirm password"), {
+      target: { value: "Str0ng!Passphrase" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Reset Password" }));
+    });
+
+    expect(updateBrowserUserPassword).toHaveBeenCalledWith("Str0ng!Passphrase");
+    expect(completeBrowserPasswordRecovery).toHaveBeenCalledOnce();
+    expect(await screen.findByRole("heading", { name: "Password updated" })).toBeInTheDocument();
+  });
+
+  it("offers a retry when the session's assurance cannot be read", async () => {
+    getBrowserAssuranceLevel.mockRejectedValue(new TypeError("Failed to fetch"));
+    render(<ResetPasswordPage />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Check your connection" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("New password")).not.toBeInTheDocument();
+  });
+
+  it("goes to the code step when the update is refused for its assurance level", async () => {
+    updateBrowserUserPassword.mockRejectedValue(
+      Object.assign(new Error("AAL2 session is required"), {
+        status: 401,
+        code: "insufficient_aal",
+      }),
+    );
+    await submitNewPassword();
+
+    expect(
+      await screen.findByRole("heading", { name: "Two-factor authentication" }),
+    ).toBeInTheDocument();
+    expect(completeBrowserPasswordRecovery).not.toHaveBeenCalled();
   });
 
   it("updates the password then signs out the recovery session before showing success", async () => {

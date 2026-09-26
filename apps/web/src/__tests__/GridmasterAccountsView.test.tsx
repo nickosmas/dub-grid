@@ -1,20 +1,27 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { toast } from "sonner";
 import GridmasterAccountsView from "@/components/gridmaster/GridmasterAccountsView";
 import type { GridmasterAccount, Organization } from "@/types";
 
 const mockFetchGridmasterAccounts = vi.fn();
 const mockForceLogoutGridmasterUser = vi.fn();
 const stepUpRun = vi.fn();
+const mockSendGridmasterPasswordReset = vi.fn();
+const mockPromoteGridmasterAccount = vi.fn();
+const mockDemoteGridmasterAccount = vi.fn();
+const mockUpdateGridmasterAccountActivation = vi.fn();
 const requireCredentialAssurance = vi.fn();
 
 vi.mock("@/features/gridmaster/client", () => ({
   fetchGridmasterAccounts: () => mockFetchGridmasterAccounts(),
-  promoteGridmasterAccount: vi.fn(),
-  demoteGridmasterAccount: vi.fn(),
-  updateGridmasterAccountActivation: vi.fn(),
+  promoteGridmasterAccount: (...args: unknown[]) => mockPromoteGridmasterAccount(...args),
+  demoteGridmasterAccount: (...args: unknown[]) => mockDemoteGridmasterAccount(...args),
+  updateGridmasterAccountActivation: (...args: unknown[]) =>
+    mockUpdateGridmasterAccountActivation(...args),
   forceLogoutGridmasterUser: (...args: unknown[]) => mockForceLogoutGridmasterUser(...args),
+  sendGridmasterPasswordReset: (...args: unknown[]) => mockSendGridmasterPasswordReset(...args),
 }));
 vi.mock("@/hooks/useStepUpAction", () => ({
   useStepUpAction: () => ({ run: stepUpRun, dialog: null }),
@@ -84,6 +91,10 @@ describe("GridmasterAccountsView", () => {
     });
     requireCredentialAssurance.mockResolvedValue({ success: true });
     mockForceLogoutGridmasterUser.mockResolvedValue({ success: true });
+    mockSendGridmasterPasswordReset.mockResolvedValue({ success: true });
+    mockPromoteGridmasterAccount.mockResolvedValue({ success: true, userId: "new-gm" });
+    mockDemoteGridmasterAccount.mockResolvedValue({ success: true });
+    mockUpdateGridmasterAccountActivation.mockResolvedValue({ success: true });
   });
 
   it("renders gridmaster-only management without impersonation controls", async () => {
@@ -117,5 +128,110 @@ describe("GridmasterAccountsView", () => {
     await waitFor(() => expect(mockForceLogoutGridmasterUser).toHaveBeenCalledOnce());
     expect(requireCredentialAssurance).toHaveBeenCalledWith("fresh-token");
     expect(mockForceLogoutGridmasterUser).toHaveBeenCalledWith(accounts[1].id, "fresh-token");
+  });
+
+  it("requires fresh assurance before sending a password reset", async () => {
+    mockFetchGridmasterAccounts.mockResolvedValueOnce({ accounts });
+    renderView();
+
+    const buttons = await screen.findAllByRole("button", { name: "Reset Password" });
+    fireEvent.click(buttons[buttons.length - 1]);
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Send Password Reset" })).getByRole("button", {
+        name: "Send reset email",
+      }),
+    );
+
+    await waitFor(() => expect(mockSendGridmasterPasswordReset).toHaveBeenCalledOnce());
+    expect(requireCredentialAssurance).toHaveBeenCalledWith("fresh-token");
+    expect(requireCredentialAssurance.mock.invocationCallOrder[0]).toBeLessThan(
+      mockSendGridmasterPasswordReset.mock.invocationCallOrder[0],
+    );
+    expect(mockSendGridmasterPasswordReset).toHaveBeenCalledWith(
+      expect.stringContaining("@example.com"),
+      "fresh-token",
+    );
+  });
+
+  // Promotion grants platform authority (41b3).
+  it("requires fresh assurance before promoting a Gridmaster", async () => {
+    mockFetchGridmasterAccounts.mockResolvedValueOnce({ accounts });
+    renderView();
+
+    fireEvent.change(await screen.findByLabelText("Promote by email"), {
+      target: { value: "new-gm@example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Promote" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Promote Gridmaster" })).getByRole("button", {
+        name: "Promote",
+      }),
+    );
+
+    await waitFor(() => expect(mockPromoteGridmasterAccount).toHaveBeenCalledOnce());
+    expect(requireCredentialAssurance).toHaveBeenCalledWith("fresh-token");
+    expect(mockPromoteGridmasterAccount).toHaveBeenCalledWith("new-gm@example.com", "fresh-token");
+  });
+
+  it("requires fresh assurance before demoting a Gridmaster", async () => {
+    mockFetchGridmasterAccounts.mockResolvedValueOnce({ accounts });
+    renderView();
+
+    const buttons = await screen.findAllByRole("button", { name: "Demote" });
+    await waitFor(() => expect(buttons[1]).toBeEnabled());
+    fireEvent.click(buttons[1]);
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Demote Gridmaster" })).getByRole("button", {
+        name: "Demote",
+      }),
+    );
+
+    await waitFor(() => expect(mockDemoteGridmasterAccount).toHaveBeenCalledOnce());
+    expect(requireCredentialAssurance).toHaveBeenCalledWith("fresh-token");
+    expect(mockDemoteGridmasterAccount).toHaveBeenCalledWith(
+      { userId: accounts[1].id, orgId: organizations[0].id, orgRole: expect.any(String) },
+      "fresh-token",
+    );
+  });
+
+  it("requires fresh assurance before deactivating a Gridmaster", async () => {
+    mockFetchGridmasterAccounts.mockResolvedValueOnce({ accounts });
+    renderView();
+
+    const buttons = await screen.findAllByRole("button", { name: "Deactivate" });
+    await waitFor(() => expect(buttons[1]).toBeEnabled());
+    fireEvent.click(buttons[1]);
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Deactivate Gridmaster" })).getByRole("button", {
+        name: "Deactivate",
+      }),
+    );
+
+    await waitFor(() => expect(mockUpdateGridmasterAccountActivation).toHaveBeenCalledOnce());
+    expect(requireCredentialAssurance).toHaveBeenCalledWith("fresh-token");
+    expect(mockUpdateGridmasterAccountActivation).toHaveBeenCalledWith(
+      { userId: accounts[1].id, deactivate: true },
+      "fresh-token",
+    );
+  });
+
+  it("keeps the confirmation open and quiet when step-up is cancelled", async () => {
+    stepUpRun.mockResolvedValue(false);
+    mockFetchGridmasterAccounts.mockResolvedValueOnce({ accounts });
+    renderView();
+
+    const buttons = await screen.findAllByRole("button", { name: "Reset Password" });
+    fireEvent.click(buttons[buttons.length - 1]);
+    const dialog = screen.getByRole("dialog", { name: "Send Password Reset" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Send reset email" }));
+
+    await waitFor(() => expect(stepUpRun).toHaveBeenCalledOnce());
+    await waitFor(() =>
+      expect(within(dialog).getByRole("button", { name: "Send reset email" })).toBeEnabled(),
+    );
+    expect(screen.getByRole("dialog", { name: "Send Password Reset" })).toBeInTheDocument();
+    expect(mockSendGridmasterPasswordReset).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
   });
 });

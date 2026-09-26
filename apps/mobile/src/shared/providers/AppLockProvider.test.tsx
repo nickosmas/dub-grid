@@ -49,6 +49,11 @@ import { AppLockProvider } from "./AppLockProvider";
 
 let appStateListener: ((state: string) => void) | null = null;
 
+function tokenFor(sub: string, nonce: string): string {
+  const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString("base64url");
+  return `${encode({ alg: "none" })}.${encode({ sub, nonce })}.signature`;
+}
+
 describe("AppLockProvider", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -171,6 +176,91 @@ describe("AppLockProvider", () => {
     expect(screen.getByText("App locked")).toBeInTheDocument();
   });
 
+  it("stays unlocked through the inactive state the system prompt causes", async () => {
+    appLockEnabled = true;
+
+    render(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+    await waitFor(() => {
+      expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+    });
+    authenticateAsync.mockClear();
+
+    act(() => {
+      appStateListener?.("inactive");
+    });
+    // Covered for the app switcher's snapshot, but not locked.
+    expect(screen.getByTestId("app-lock-cover")).toBeInTheDocument();
+    expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+
+    act(() => {
+      appStateListener?.("active");
+    });
+
+    expect(screen.queryByTestId("app-lock-cover")).not.toBeInTheDocument();
+    expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+    expect(authenticateAsync).not.toHaveBeenCalled();
+  });
+
+  it("keeps the privacy cover up when the token rotates while inactive", async () => {
+    appLockEnabled = true;
+    useSessionState.mockReturnValue({ accessToken: tokenFor("user-1", "a"), isLoading: false });
+    const view = render(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+    await waitFor(() => {
+      expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+    });
+
+    act(() => {
+      appStateListener?.("inactive");
+    });
+    useSessionState.mockReturnValue({ accessToken: tokenFor("user-1", "b"), isLoading: false });
+    view.rerender(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+
+    expect(screen.getByTestId("app-lock-cover")).toBeInTheDocument();
+  });
+
+  it("never leaves the privacy cover up after a sign-out while covered", async () => {
+    appLockEnabled = true;
+    const view = render(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+    await waitFor(() => {
+      expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+    });
+
+    act(() => {
+      appStateListener?.("inactive");
+    });
+    useSessionState.mockReturnValue({ accessToken: null, isLoading: false });
+    view.rerender(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+    useSessionState.mockReturnValue({ accessToken: "token-123", isLoading: false });
+    view.rerender(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+
+    expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("app-lock-cover")).not.toBeInTheDocument();
+  });
+
   it("locks again when the app returns from the background", async () => {
     appLockEnabled = true;
 
@@ -200,6 +290,57 @@ describe("AppLockProvider", () => {
     });
   });
 
+  it("unlocks when the session token refreshes while the system prompt is up", async () => {
+    appLockEnabled = true;
+    useSessionState.mockReturnValue({ accessToken: tokenFor("user-1", "a"), isLoading: false });
+    let passCheck: (result: { success: boolean }) => void = () => {};
+    authenticateAsync.mockImplementation(
+      () => new Promise<{ success: boolean }>((resolve) => (passCheck = resolve)),
+    );
+
+    const view = render(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+    await waitFor(() => expect(authenticateAsync).toHaveBeenCalledTimes(1));
+
+    useSessionState.mockReturnValue({ accessToken: tokenFor("user-1", "b"), isLoading: false });
+    view.rerender(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+    await act(async () => passCheck({ success: true }));
+
+    expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("app-lock-cover")).not.toBeInTheDocument();
+    expect(authenticateAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it("locks again when a different account signs in", async () => {
+    appLockEnabled = true;
+    useSessionState.mockReturnValue({ accessToken: tokenFor("user-1", "a"), isLoading: false });
+
+    const view = render(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+    await waitFor(() => expect(screen.queryByText("App locked")).not.toBeInTheDocument());
+
+    authenticateAsync.mockImplementation(() => new Promise(() => undefined));
+    useSessionState.mockReturnValue({ accessToken: tokenFor("user-2", "a"), isLoading: false });
+    view.rerender(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+
+    expect(screen.getByText("App locked")).toBeInTheDocument();
+    expect(screen.getByTestId("app-lock-cover")).toBeInTheDocument();
+  });
+
   it("keeps the app covered until the stored setting has loaded", async () => {
     lockStateOverride = "loading";
     render(
@@ -208,7 +349,7 @@ describe("AppLockProvider", () => {
       </AppLockProvider>,
     );
 
-    expect(screen.getByTestId("app-lock-hydrating")).toBeInTheDocument();
+    expect(screen.getByTestId("app-lock-cover")).toBeInTheDocument();
     expect(screen.queryByText("App locked")).not.toBeInTheDocument();
   });
 

@@ -7,6 +7,12 @@ const requestRpc = vi.fn();
 const serviceRpc = vi.fn();
 const serviceFrom = vi.fn();
 const auditInsert = vi.fn();
+const impersonationRow = vi.fn();
+const scheduleImpersonationNotice = vi.fn();
+
+vi.mock("@/app/api/gridmaster/_lib/impersonation-notice", () => ({
+  scheduleImpersonationNotice: (...args: unknown[]) => scheduleImpersonationNotice(...args),
+}));
 
 vi.mock("@/lib/api-auth", () => ({
   createRequestSupabaseClient: () => ({
@@ -130,9 +136,21 @@ describe("POST /api/gridmaster/impersonation", () => {
       session: { access_token: "token" },
     });
     auditInsert.mockResolvedValue({ error: null });
+    impersonationRow.mockResolvedValue({
+      data: { target_user_id: TARGET_USER_ID, target_org_id: ORG_ID, ended_at: null },
+      error: null,
+    });
     serviceFrom.mockImplementation((table: string) => {
       if (table === "audit_log") {
         return { insert: auditInsert };
+      }
+      if (table === "impersonation_sessions") {
+        const query = {
+          select: () => query,
+          eq: () => query,
+          maybeSingle: () => impersonationRow(),
+        };
+        return query;
       }
       throw new Error(`Unexpected table: ${table}`);
     });
@@ -251,6 +269,7 @@ describe("POST /api/gridmaster/impersonation", () => {
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({ error: message });
     expect(auditInsert).not.toHaveBeenCalled();
+    expect(scheduleImpersonationNotice).not.toHaveBeenCalled();
   });
 
   it("rejects an end reason outside the constraint before calling the RPC", async () => {
@@ -273,6 +292,146 @@ describe("POST /api/gridmaster/impersonation", () => {
     expect(requestRpc).toHaveBeenCalledWith("end_impersonation", {
       p_session_id: SESSION_ID,
       p_reason: "navigation",
+    });
+  });
+
+  // The request used to name the organization (41c2).
+  it("records the end against the session's organization, not the request's", async () => {
+    requestRpc.mockResolvedValue({ data: null, error: null });
+
+    await POST(
+      makePostRequest({
+        action: "end",
+        sessionId: SESSION_ID,
+        targetOrgId: "99999999-9999-4999-8999-999999999999",
+      }),
+    );
+
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "impersonation.ended", org_id: ORG_ID }),
+    );
+    // The server sends the end notice itself, once, for a real end (41c3).
+    expect(scheduleImpersonationNotice).toHaveBeenCalledExactlyOnceWith({
+      kind: "end",
+      targetUserId: TARGET_USER_ID,
+      targetOrgId: ORG_ID,
+    });
+  });
+
+  it("still tells the person when recording the start fails", async () => {
+    requestRpc.mockResolvedValueOnce({
+      data: { session_id: SESSION_ID, expires_at: "2026-05-01T17:00:00.000Z" },
+      error: null,
+    });
+    auditInsert.mockResolvedValue({ error: { message: "audit down" } });
+
+    const response = await POST(
+      makePostRequest({
+        action: "start",
+        targetUserId: TARGET_USER_ID,
+        justification: "Need support investigation",
+      }),
+    );
+
+    expect(response.status).toBe(500);
+    expect(scheduleImpersonationNotice).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "start" }),
+    );
+  });
+
+  it.each([
+    [
+      "start",
+      {
+        action: "start",
+        targetUserId: TARGET_USER_ID,
+        justification: "Need support investigation",
+      },
+    ],
+    ["end", { action: "end", sessionId: SESSION_ID }],
+  ])("sends no notice when the %s RPC fails", async (_label, body) => {
+    requestRpc.mockResolvedValue({ data: null, error: { message: "database unavailable" } });
+
+    const response = await POST(makePostRequest(body));
+
+    expect(response.status).toBe(500);
+    expect(scheduleImpersonationNotice).not.toHaveBeenCalled();
+  });
+
+  // A retry after a failed audit write finds the session ended, so the notice
+  // must already be on its way.
+  it("still tells the person when recording the end fails", async () => {
+    requestRpc.mockResolvedValue({ data: null, error: null });
+    auditInsert.mockResolvedValue({ error: { message: "audit down" } });
+
+    const response = await POST(makePostRequest({ action: "end", sessionId: SESSION_ID }));
+
+    expect(response.status).toBe(500);
+    expect(scheduleImpersonationNotice).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "end", targetUserId: TARGET_USER_ID }),
+    );
+  });
+
+  it.each([
+    ["already ended", { target_org_id: ORG_ID, ended_at: "2026-05-01T16:00:00.000Z" }],
+    ["not this Gridmaster's", null],
+  ])("records nothing for a session that is %s", async (_label, row) => {
+    impersonationRow.mockResolvedValue({ data: row, error: null });
+
+    const response = await POST(makePostRequest({ action: "end", sessionId: SESSION_ID }));
+
+    expect(response.status).toBe(404);
+    expect(requestRpc).not.toHaveBeenCalled();
+    expect(auditInsert).not.toHaveBeenCalled();
+    expect(scheduleImpersonationNotice).not.toHaveBeenCalled();
+  });
+
+  it("still starts when the session row cannot be read back", async () => {
+    requestRpc.mockResolvedValueOnce({
+      data: { session_id: SESSION_ID, expires_at: "2026-05-01T17:00:00.000Z" },
+      error: null,
+    });
+    impersonationRow.mockResolvedValueOnce({ data: null, error: new Error("read failed") });
+
+    const response = await POST(
+      makePostRequest({
+        action: "start",
+        targetUserId: TARGET_USER_ID,
+        justification: "Need support investigation",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "impersonation.started", org_id: null }),
+    );
+    expect(scheduleImpersonationNotice).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "start", targetOrgId: null }),
+    );
+  });
+
+  it("records a start against the organization the session landed in", async () => {
+    requestRpc.mockResolvedValueOnce({
+      data: { session_id: SESSION_ID, expires_at: "2026-05-01T17:00:00.000Z" },
+      error: null,
+    });
+
+    await POST(
+      makePostRequest({
+        action: "start",
+        targetUserId: TARGET_USER_ID,
+        justification: "Need support investigation",
+      }),
+    );
+
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "impersonation.started", org_id: ORG_ID }),
+    );
+    expect(scheduleImpersonationNotice).toHaveBeenCalledExactlyOnceWith({
+      kind: "start",
+      targetUserId: TARGET_USER_ID,
+      targetOrgId: ORG_ID,
+      expiresAt: "2026-05-01T17:00:00.000Z",
     });
   });
 });

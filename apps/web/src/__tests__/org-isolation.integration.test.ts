@@ -278,7 +278,11 @@ describe.runIf(dbReachable)("caller_org_id / caller_org_role SQL layer", () => {
       HAVING COUNT(policy.polname) = 0
       ORDER BY class.relname
     `);
-    expect(policylessTables.map((row) => row.table_name)).toEqual(["calendar_feed_tokens"]);
+    // Service-role only by design: each revokes anon and authenticated.
+    expect(policylessTables.map((row) => row.table_name)).toEqual([
+      "calendar_feed_tokens",
+      "user_known_devices",
+    ]);
 
     const { rows: unsafeSearchPaths } = await sqlDb.query<{ function_name: string }>(`
       SELECT procedure.oid::regprocedure::text AS function_name

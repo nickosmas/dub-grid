@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { loginAsQaGridmaster, QA_GRIDMASTER_ORIGIN } from "./helpers/auth";
 import { collectUnexpectedRuntimeFailures } from "./helpers/role-variance";
+import { holdRequests } from "./helpers/held-requests";
 
 // 25d3: the /gridmaster route's states as a real gridmaster. The manifest's
 // entry (e2e/typography-route-manifest.ts) had browser evidence only for the
@@ -120,12 +121,10 @@ test.describe("gridmaster portal states", () => {
     // GridmasterPortal keeps <ProgressBar loading /> up until dashboardQuery
     // (/api/gridmaster/dashboard) settles; the route's loading.tsx paints the
     // same bar during the segment load.
-    await page.route("**/api/gridmaster/dashboard", async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 1_500));
-      await route.continue().catch(() => undefined);
-    });
+    const releaseDashboard = await holdRequests(page, "**/api/gridmaster/dashboard");
     await page.goto(`${QA_GRIDMASTER_ORIGIN}/gridmaster`);
     await expect(page.locator("[data-progress-bar]")).toBeVisible({ timeout: 15_000 });
+    releaseDashboard();
     await expect(page.locator("[data-progress-bar]")).toHaveCount(0, { timeout: 15_000 });
     await expect(page.getByLabel("Gridmaster content").getByText("Platform Oversight")).toBeVisible(
       { timeout: 20_000 },

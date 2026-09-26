@@ -9,6 +9,8 @@ import {
   revokeUserSessionForUser,
 } from "@/features/account/server";
 import { requireMobileAuth, requireMobileSensitiveActionAuth } from "@/features/mobile/server";
+import { writeSecurityAuditEvent } from "@/lib/auth/security-audit";
+import logger from "@/lib/logger";
 
 function mapSession(
   session: Awaited<ReturnType<typeof fetchUserSessionOverviewForUser>>["active"][number],
@@ -72,6 +74,25 @@ export async function DELETE(req: NextRequest) {
     );
   }
 
-  await revokeUserSessionForUser(auth.user.id, parsed.data.refreshTokenHash);
+  let revoked: boolean;
+  try {
+    revoked = await revokeUserSessionForUser(auth.user.id, parsed.data.refreshTokenHash);
+  } catch (error) {
+    logger.error({ error }, "mobile profile session revoke failed");
+    return NextResponse.json(
+      { error: "We couldn't sign out that device. Try again." },
+      { status: 500 },
+    );
+  }
+  if (revoked) {
+    await writeSecurityAuditEvent({
+      event: "security.auth.session",
+      outcome: "succeeded",
+      reason: "session_revoked",
+      actorId: auth.user.id,
+      orgId: auth.currentOrg.id,
+      metadata: { surface: "mobile", scope: "device" },
+    });
+  }
   return NextResponse.json(mobileProfileSessionRevokeResponseSchema.parse({ success: true }));
 }

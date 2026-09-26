@@ -5,6 +5,8 @@ import { Form } from "@/components/Form";
 import { Button } from "@/components/Button";
 import PermissionsEditor from "@/components/PermissionsEditor";
 import { assignGridmasterOrgRoleByEmail } from "@/features/gridmaster/client";
+import { requireCredentialAssurance } from "@/features/account/client";
+import { useStepUpAction } from "@/hooks/useStepUpAction";
 import {
   OrganizationAccessConflictError,
   removeOrganizationMembershipGuarded,
@@ -56,6 +58,7 @@ export function UsersTab({
   onUsersChanged: () => void;
   onImpersonate?: (userId: string, orgId?: string) => void;
 }) {
+  const stepUp = useStepUpAction();
   const [changingRole, setChangingRole] = useState<string | null>(null);
   const [roleChangeConfirm, setRoleChangeConfirm] = useState<{
     user: OrganizationUser;
@@ -101,13 +104,22 @@ export function UsersTab({
       // The access endpoint dispatches role_changed itself; queueing one here
       // too landed two identical "Your role changed" alerts in the target's
       // inbox.
-      await updateOrganizationMembershipGuarded({
-        orgId,
-        userId: target.id,
-        expectedUpdatedAt: target.updatedAt,
-        orgRole: newRole,
-        adminPermissions: newRole === "admin" ? target.adminPermissions : null,
+      const expectedUpdatedAt = target.updatedAt;
+      // A Gridmaster's role change needs fresh proof (41d3, F-16).
+      const completed = await stepUp.run(async (accessToken) => {
+        await requireCredentialAssurance(accessToken);
+        await updateOrganizationMembershipGuarded(
+          {
+            orgId,
+            userId: target.id,
+            expectedUpdatedAt,
+            orgRole: newRole,
+            adminPermissions: newRole === "admin" ? target.adminPermissions : null,
+          },
+          accessToken,
+        );
       });
+      if (!completed) return;
       toast.success("Role updated");
       setRoleChangeConfirm(null);
       onUsersChanged();
@@ -161,7 +173,12 @@ export function UsersTab({
     if (!addUserConfirm) return;
     setAdding(true);
     try {
-      await assignGridmasterOrgRoleByEmail(orgId, addUserConfirm.email, addUserConfirm.role);
+      const { email, role } = addUserConfirm;
+      const completed = await stepUp.run(async (accessToken) => {
+        await requireCredentialAssurance(accessToken);
+        await assignGridmasterOrgRoleByEmail(orgId, email, role, accessToken);
+      });
+      if (!completed) return;
       toast.success(`User added as ${formatOrganizationRoleLabel(addUserConfirm.role)}`);
       setAddEmail("");
       setAddUserConfirm(null);
@@ -503,7 +520,7 @@ export function UsersTab({
         />
       )}
 
-      {roleChangeConfirm && (
+      {roleChangeConfirm && !stepUp.dialog && (
         <ConfirmDialog
           title="Change Organization Role"
           message={`Change ${roleChangeConfirm.user.email ?? "this user"} from ${formatOrganizationRoleLabel(roleChangeConfirm.user.orgRole)} to ${formatOrganizationRoleLabel(roleChangeConfirm.newRole)}?`}
@@ -515,7 +532,8 @@ export function UsersTab({
         />
       )}
 
-      {addUserConfirm && (
+      {stepUp.dialog}
+      {addUserConfirm && !stepUp.dialog && (
         <ConfirmDialog
           title="Add Organization User"
           message={`Add "${addUserConfirm.email}" as ${formatOrganizationRoleLabel(addUserConfirm.role)} for this organization?`}
