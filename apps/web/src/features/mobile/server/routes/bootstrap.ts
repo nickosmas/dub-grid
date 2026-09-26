@@ -13,6 +13,7 @@ import {
   mapOrganizationToMobileConfig,
   requireMobileAuth,
 } from "@/features/mobile/server";
+import { resolveMfaReenrollRequired } from "@/features/account/server";
 import { createMobileOptionsHandler, withMobileCors } from "./cors";
 import { withTiming, type Timer } from "@/lib/server-timing";
 
@@ -37,6 +38,7 @@ async function handleGET(req: NextRequest, timer: Timer) {
       fetchMobileCertifications,
       fetchMobileDepartments,
       fetchTermsAcceptedVersion: fetchMobileTermsAcceptedVersion,
+      fetchMfaReenrollRequired: resolveMfaReenrollRequired,
       mapOrganizationToMobileConfig,
     }),
   );

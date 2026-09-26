@@ -92,7 +92,7 @@ proof) and F-81 (the page refreshes on more than membership changes).
       factor is verified; `updateSelfMfaStatus(true)` clears the flag. _Done
       when:_ tests show the gate blocks and lifts, and the flag clears on
       enrollment.
-- [ ] **Step 7 - mobile re-enrollment** - bootstrap carries the flag; a gate
+- [x] **Step 7 - mobile re-enrollment** - bootstrap carries the flag; a gate
       beside `TermsGate` sends the person to the two-factor screen. _Done
       when:_ contract and gate tests show it blocks, allows the two-factor
       screen and lifts.

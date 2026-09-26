@@ -1,4 +1,5 @@
 export * from "./profile";
+export * from "./mfa-reenroll";
 export * from "./preferences";
 export * from "./sessions";
 export * from "./terms";

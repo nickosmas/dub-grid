@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { resolveVerifiedTotpFactorPresence } from "@dubgrid/authz";
-import { updateSelfMfaStatus } from "@/features/account/server";
+import { resolveMfaReenrollRequired, updateSelfMfaStatus } from "@/features/account/server";
 import { createRequestSupabaseClient, requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import logger from "@/lib/logger";
@@ -23,28 +23,7 @@ export async function GET(req: NextRequest) {
   try {
     const auth = await requireAuthenticatedUserWithClaims(req);
     if ("response" in auth) return auth.response;
-
-    const { data: profile, error: profileError } = await getServiceClient()
-      .from("profiles")
-      .select("mfa_reenroll_required_at")
-      .eq("id", auth.user.id)
-      .maybeSingle();
-    if (profileError) {
-      return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
-    }
-    if (!profile?.mfa_reenroll_required_at) {
-      return NextResponse.json({ reenrollRequired: false });
-    }
-
-    const { data, error } = await createRequestSupabaseClient(req).auth.getUser();
-    if (error || !data.user || data.user.id !== auth.user.id) {
-      return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
-    }
-    if (resolveVerifiedTotpFactorPresence(data.user.factors) === true) {
-      await updateSelfMfaStatus(auth.user.id, true);
-      return NextResponse.json({ reenrollRequired: false });
-    }
-    return NextResponse.json({ reenrollRequired: true });
+    return NextResponse.json({ reenrollRequired: await resolveMfaReenrollRequired(auth.user.id) });
   } catch (error) {
     logger.error({ error }, "account mfa status GET failed");
     return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });

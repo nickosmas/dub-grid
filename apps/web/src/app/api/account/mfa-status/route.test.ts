@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const requireAuthenticatedUserWithClaims = vi.fn();
 const validateCsrfOrigin = vi.fn();
 const updateSelfMfaStatus = vi.fn();
+const resolveMfaReenrollRequired = vi.fn();
 const dispatchNotificationEvent = vi.fn();
 const profileSnapshot = vi.fn();
 const getUser = vi.fn();
@@ -24,6 +25,7 @@ vi.mock("@/lib/csrf", () => ({
 }));
 vi.mock("@/features/account/server", () => ({
   updateSelfMfaStatus: (...args: unknown[]) => updateSelfMfaStatus(...args),
+  resolveMfaReenrollRequired: (...args: unknown[]) => resolveMfaReenrollRequired(...args),
 }));
 vi.mock("@/features/notifications/server/events", () => ({
   dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
@@ -204,39 +206,16 @@ describe("POST /api/account/mfa-status", () => {
 describe("GET /api/account/mfa-status", () => {
   const get = () => GET(new NextRequest("http://localhost/api/account/mfa-status"));
 
-  it("asks for nothing when no reset is pending", async () => {
-    profileSnapshot.mockResolvedValueOnce({
-      data: { mfa_reenroll_required_at: null },
-      error: null,
-    });
-    const response = await get();
-    expect(await response.json()).toEqual({ reenrollRequired: false });
-    expect(getUser).not.toHaveBeenCalled();
-  });
-
-  it("requires enrollment after a reset with no verified factor", async () => {
-    profileSnapshot.mockResolvedValueOnce({
-      data: { mfa_reenroll_required_at: "2026-09-26T10:00:00.000Z" },
-      error: null,
-    });
-    getUser.mockResolvedValueOnce({ data: { user: { id: "user-1", factors: [] } }, error: null });
-    const response = await get();
-    expect(await response.json()).toEqual({ reenrollRequired: true });
-    expect(updateSelfMfaStatus).not.toHaveBeenCalled();
-  });
-
-  it("settles the reset when a verified factor already exists", async () => {
-    profileSnapshot.mockResolvedValueOnce({
-      data: { mfa_reenroll_required_at: "2026-09-26T10:00:00.000Z" },
-      error: null,
-    });
-    const response = await get();
-    expect(await response.json()).toEqual({ reenrollRequired: false });
-    expect(updateSelfMfaStatus).toHaveBeenCalledWith("user-1", true);
+  it("reports whether a reset still needs enrollment", async () => {
+    resolveMfaReenrollRequired.mockResolvedValueOnce(true);
+    expect(await (await get()).json()).toEqual({ reenrollRequired: true });
+    expect(resolveMfaReenrollRequired).toHaveBeenCalledWith("user-1");
+    resolveMfaReenrollRequired.mockResolvedValueOnce(false);
+    expect(await (await get()).json()).toEqual({ reenrollRequired: false });
   });
 
   it("answers 503 rather than guessing when the read fails", async () => {
-    profileSnapshot.mockResolvedValueOnce({ data: null, error: { message: "down" } });
+    resolveMfaReenrollRequired.mockRejectedValueOnce(new Error("down"));
     expect((await get()).status).toBe(503);
   });
 });

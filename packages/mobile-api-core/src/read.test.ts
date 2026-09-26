@@ -38,6 +38,7 @@ describe("loadMobileBootstrapPayload", () => {
         fetchMobileCertifications: vi.fn(async () => []),
         fetchMobileDepartments: vi.fn(async () => []),
         fetchTermsAcceptedVersion: vi.fn(async () => null),
+        fetchMfaReenrollRequired: vi.fn(async () => true),
         mapOrganizationToMobileConfig: vi.fn(() => ({ id: ORG_ID })),
       } as never,
     );
