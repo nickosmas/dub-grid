@@ -206,20 +206,28 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Found:** 2026-09-26 by `/audit` of e42da4bd..821c7ff4
 **Why it matters:** Department-admin assignments are a smaller grant of the same kind F-61 gated for permissions.
 **Suggested fix:** Gate a Gridmaster's department-admin changes like permission changes.
-**Resolution:** Fixed in 41d3 (repair): the app-only-user route and the invitation edit require fresh proof when a Gridmaster changes the department or department-admin set (compared as sets, so a save that leaves them alone asks nothing); the People management screens run those saves through step-up, and the editor revokes a pending invitation only after both prompted steps. Route tests cover a stale session, an unchanged set and an ordinary admin; the inventory classifies the app-only-user route.
+**Resolution:** Fixed in 41d3 (repair): the app-only-user route and the invitation edit require fresh proof when a Gridmaster changes the department or department-admin set (compared as sets, so a save that leaves them alone asks nothing); the People management screens run those saves through step-up, and the editor revokes a pending invitation only after both prompted steps. Route tests cover a stale session, an unchanged set and an ordinary admin; the inventory classifies the app-only-user route. Re-review (e4e6f905..f2ff543e) kept it fixed: the server gates hold, but the People management save wrote the details before the departments' prompt, so a cancel left a silent partial save and a stale version. The save now runs the prompted grant first, so a cancel saves nothing; a MembersSection test proves it and fails against the previous order.
 
-### F-69 [P3] fixed - Test gaps in the 41d4 step-up wiring
+### F-69 [P3] closed - Test gaps in the 41d4 step-up wiring
 
 **File:** `apps/web/src/__tests__/GridmasterUsersTab.test.tsx`; `apps/web/src/components/staff/MemberAccessControls.tsx`; `apps/web/src/components/gridmaster/OrganizationSetupWizard.tsx`
 **Found:** 2026-09-26 by `/audit` of e42da4bd..821c7ff4
 **Why it matters:** Nothing covers a step-up retry that runs the action twice, `PermissionsEditor` staying open when a save is cancelled, `MemberAccessControls`' own cancel, or the wizard's invitation-step cancel.
 **Suggested fix:** Add those view tests. Also: a behavior test that replace-access omits the token, `isGridmasterActor` throwing on a read error, the reinvite info toast, and the revoke-after-role-change order.
-**Resolution:** Fixed in 41d3 (repair): tests for the step-up retry in the Users tab (including the invite flag reset), `PermissionsEditor` staying open on a cancelled save, `MemberAccessControls` cancels (new file), the wizard's invitation-step cancel, replace-access returning no token, `isGridmasterActor` failing closed, the reinvite info toast, and the management editor's revoke-last order. Each was confirmed to fail on a matching regression except the invite flag reset, which the action's structure already prevents. The management editor's role-change branch cannot be reached for a linked user (the picker is hidden), so that order is covered for the department step only.
+**Resolution:** Fixed in 41d3 (repair): tests for the step-up retry in the Users tab (including the invite flag reset), `PermissionsEditor` staying open on a cancelled save, `MemberAccessControls` cancels (new file), the wizard's invitation-step cancel, replace-access returning no token, `isGridmasterActor` failing closed, the reinvite info toast, and the management editor's revoke-last order. Each was confirmed to fail on a matching regression except the invite flag reset, which the action's structure already prevents. The management editor's role-change branch cannot be reached for a linked user (the picker is hidden), so that order is covered for the department step only. Re-review (e4e6f905..f2ff543e): closed; the new tests fail against the old code.
 
-### F-71 [P2] fixed - `send_invitation` returns a token to a direct authenticated caller
+### F-71 [P2] closed - `send_invitation` returns a token to a direct authenticated caller
 
 **File:** `supabase/migrations/043_invitation_inviter_is_verified.sql:250`; `apps/web/src/app/api/gridmaster/organizations/manage/route.ts:469`
 **Found:** 2026-09-26 by `/audit` re-review of 58ff57cd (predates 41d4)
 **Why it matters:** An Admin who manages employees can call the RPC through the data API and receive the new invitation's token, then register a pre-confirmed account at an address they do not own. No tier escalation (the function's tier check holds), but the address is not proven. The same class as F-60.
 **Suggested fix:** Move the setup wizard's call to the service client with `p_invited_by`, then revoke EXECUTE on `send_invitation` from `authenticated` in a forward migration and update the SQL entry-point allowlist.
-**Resolution:** Fixed in 41d3 (repair): migration `050_send_invitation_server_only.sql` revokes EXECUTE on `send_invitation` from `authenticated`; the Gridmaster setup route calls it as the service role with `p_invited_by`, like invitations/create. The SQL entry-point allowlist now honours a later revoke, and the live check proves `authenticated` cannot execute it. Production needs 050 applied by the runbook.
+**Resolution:** Fixed in 41d3 (repair): migration `050_send_invitation_server_only.sql` revokes EXECUTE on `send_invitation` from `authenticated`; the Gridmaster setup route calls it as the service role with `p_invited_by`, like invitations/create. The SQL entry-point allowlist now honours a later revoke, and the live check proves `authenticated` cannot execute it. Production needs 050 applied by the runbook. Re-review (e4e6f905..f2ff543e): closed; no application path or live test calls it as `authenticated` (the e2e fixtures use the superuser). Ordering: production's released code still calls it as the user from the setup wizard, so 050 is applied right after the release that carries the service-role call deploys, not before.
+
+### F-72 [P3] open - The SQL entry-point allowlist helper matches names, one grant spelling and simple signatures
+
+**File:** `apps/web/src/__tests__/helpers/sql-inventory.ts:30`
+**Found:** 2026-09-26 by `/audit` re-review of e4e6f905..f2ff543e
+**Why it matters:** It tracks function names rather than signatures, so revoking one overload would drop a name another overload still grants; it only sees a grant spelled `TO authenticated;`; and `[^)]*` breaks on a typed parameter such as `NUMERIC(10,2)`. None applies to today's migrations, and the live function-grant check would still catch a real drift.
+**Suggested fix:** Track `name(signature)` pairs and accept a role list in the grant pattern.
+**Resolution:**

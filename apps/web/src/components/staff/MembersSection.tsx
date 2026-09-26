@@ -2500,17 +2500,9 @@ export function MembersSection({
                   return false;
                 }
                 const emailChanged = (currentEmployee.email || "") !== (data.email || "");
-                const identityResult = await updateEmployeeIdentity({
-                  employeeId: selectedPerson.employeeId,
-                  orgId,
-                  userId: selectedPerson.userId,
-                  firstName: data.firstName,
-                  lastName: data.lastName,
-                  email: data.email,
-                  phone: data.phone,
-                  expectedVersion: currentEmployee.version,
-                });
                 const pendingInvitation = pendingInviteByEmployeeId.get(selectedPerson.employeeId);
+                // Grants first: they may prompt a Gridmaster, and a cancelled
+                // prompt should save nothing rather than the details alone.
                 if (selectedPerson.userId) {
                   const userId = selectedPerson.userId;
                   const completed = await stepUp.run((accessToken) =>
@@ -2522,20 +2514,7 @@ export function MembersSection({
                     ),
                   );
                   if (!completed) return false;
-                } else if (pendingInvitation && emailChanged) {
-                  // employees.email is the single source of truth for the
-                  // invitation's own target address now (the field is
-                  // read-only in the panel whenever a contact email is
-                  // already on file), so a real change here just backfilled
-                  // it for the first time. If that value doesn't exactly
-                  // match what the invitation was already sent to, the
-                  // trg_revoke_invitation_on_email_change trigger has
-                  // already revoked it as a side effect of the identity
-                  // update above — patching its now-dead fields would only
-                  // silently rewrite a corpse, so skip it and surface the
-                  // revocation instead.
-                  revokedInvitationEmail = pendingInvitation.email;
-                } else if (pendingInvitation) {
+                } else if (pendingInvitation && !emailChanged) {
                   const completed = await stepUp.run((accessToken) =>
                     updatePendingInvitation(
                       pendingInvitation.id,
@@ -2550,6 +2529,31 @@ export function MembersSection({
                     ),
                   );
                   if (!completed) return false;
+                }
+
+                const identityResult = await updateEmployeeIdentity({
+                  employeeId: selectedPerson.employeeId,
+                  orgId,
+                  userId: selectedPerson.userId,
+                  firstName: data.firstName,
+                  lastName: data.lastName,
+                  email: data.email,
+                  phone: data.phone,
+                  expectedVersion: currentEmployee.version,
+                });
+                if (!selectedPerson.userId && pendingInvitation && emailChanged) {
+                  // employees.email is the single source of truth for the
+                  // invitation's own target address now (the field is
+                  // read-only in the panel whenever a contact email is
+                  // already on file), so a real change here just backfilled
+                  // it for the first time. If that value doesn't exactly
+                  // match what the invitation was already sent to, the
+                  // trg_revoke_invitation_on_email_change trigger has
+                  // already revoked it as a side effect of the identity
+                  // update above — patching its now-dead fields would only
+                  // silently rewrite a corpse, so skip it and surface the
+                  // revocation instead.
+                  revokedInvitationEmail = pendingInvitation.email;
                 }
 
                 updatedEmployee = identityResult.employee;
