@@ -76,7 +76,7 @@ proof) and F-81 (the page refreshes on more than membership changes).
 - [x] **Step 3 - the sections** - Security and Sessions and devices on the
       person view, read-only. _Done when:_ a view test shows each field, and
       empty states for a person with none.
-- [ ] **Step 4 - the actions** - the security route and its five actions,
+- [x] **Step 4 - the actions** - the security route and its five actions,
       each with fresh proof, a Gridmaster-target refusal and an audit row;
       the sections run them through step-up. _Done when:_ route tests cover
       each action, a stale session and a row that belongs to someone else; a

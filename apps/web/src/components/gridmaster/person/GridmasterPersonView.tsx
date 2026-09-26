@@ -29,6 +29,7 @@ import { PersonMembershipActions } from "./PersonMembershipActions";
 import { PersonOrganizationCard } from "./PersonOrganizationCard";
 import { PersonSecurityCard } from "./PersonSecurityCard";
 import { PersonSessionsCard } from "./PersonSessionsCard";
+import { usePersonSecurityActions } from "./usePersonSecurityActions";
 import { PersonStaffActions } from "./PersonStaffActions";
 import { getPersonName, getPrimaryOrgId } from "./person-format";
 
@@ -73,6 +74,10 @@ export default function GridmasterPersonView({
     queryFn: () => fetchGridmasterPerson(target).then((result) => result.person),
     staleTime: 30_000,
   });
+  const securityActions = usePersonSecurityActions(
+    personQuery.data?.account?.userId ?? null,
+    refresh,
+  );
 
   function refresh() {
     void queryClient.invalidateQueries({ queryKey: personKey(target) });
@@ -282,8 +287,18 @@ export default function GridmasterPersonView({
       {back}
       <PersonHeader record={record} actions={quickActions} />
       <PersonAccountCard record={record} actions={accountActions} />
-      <PersonSecurityCard record={record} />
-      <PersonSessionsCard record={record} />
+      <PersonSecurityCard
+        record={record}
+        renderDeviceActions={securityActions.renderDeviceActions}
+        loginLockActions={securityActions.loginLockActions}
+      />
+      <PersonSessionsCard
+        record={record}
+        renderSessionActions={securityActions.renderSessionActions}
+        renderPushActions={securityActions.renderPushActions}
+        renderFeedActions={securityActions.renderFeedActions}
+      />
+      {securityActions.dialog}
       {record.organizations.map((organization) => (
         <PersonOrganizationCard
           key={organization.org.id}

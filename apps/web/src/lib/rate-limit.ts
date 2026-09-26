@@ -81,6 +81,22 @@ export const loginLimiter = createSlidingWindowLimiter(
  * limiter runs (no Redis, or outside production), and on a failed read: a
  * support view must not fail over an advisory badge.
  */
+/**
+ * Clears the login limiter for this address and reads it back. Another warm
+ * server may still refuse until its in-memory block cache ages out.
+ */
+export async function clearLoginLock(
+  email: string,
+): Promise<{ locked: boolean; resetsAt: string | null } | null> {
+  if (!loginLimiter) return null;
+  await withTimeoutOrThrow(
+    loginLimiter.resetUsedTokens(`login:email:${hashEmail(email)}`),
+    RATE_LIMIT_TIMEOUT_MS,
+    "login lock reset",
+  );
+  return readLoginLock(email);
+}
+
 export async function readLoginLock(
   email: string,
 ): Promise<{ locked: boolean; resetsAt: string | null } | null> {

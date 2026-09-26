@@ -18,6 +18,7 @@ const reinstateGridmasterUser = vi.fn();
 const updateGridmasterUserActivation = vi.fn();
 const updateGridmasterPersonName = vi.fn();
 const changeGridmasterPersonEmail = vi.fn();
+const runGridmasterPersonSecurityAction = vi.fn();
 const requireCredentialAssurance = vi.fn();
 const stepUpRun = vi.fn();
 
@@ -30,6 +31,8 @@ vi.mock("@/features/gridmaster/client", () => ({
   updateGridmasterUserActivation: (...args: unknown[]) => updateGridmasterUserActivation(...args),
   updateGridmasterPersonName: (...args: unknown[]) => updateGridmasterPersonName(...args),
   changeGridmasterPersonEmail: (...args: unknown[]) => changeGridmasterPersonEmail(...args),
+  runGridmasterPersonSecurityAction: (...args: unknown[]) =>
+    runGridmasterPersonSecurityAction(...args),
 }));
 vi.mock("@/hooks/useStepUpAction", () => ({
   useStepUpAction: () => ({ run: stepUpRun, dialog: null }),
@@ -615,5 +618,91 @@ describe("GridmasterPersonView", () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Security" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Sessions and devices" })).not.toBeInTheDocument();
+  });
+
+  function withSessionAndLock(locked: boolean) {
+    return linkedRecord({
+      loginLock: { locked, resetsAt: null },
+      sessions: {
+        sessions: [
+          {
+            id: "s-1",
+            orgId: ORG,
+            platform: "web",
+            deviceLabel: "Macintosh",
+            browser: null,
+            appVersion: null,
+            location: null,
+            createdAt: "2026-09-25T00:00:00.000Z",
+            lastActiveAt: null,
+          },
+        ],
+        pushDevices: [],
+        calendarFeeds: [],
+      },
+    });
+  }
+
+  it("ends one session through step-up after the credential check", async () => {
+    runGridmasterPersonSecurityAction.mockResolvedValue({ success: true });
+    renderView(withSessionAndLock(false));
+
+    fireEvent.click(await screen.findByRole("button", { name: "End session" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "End session" })).getByRole("button", {
+        name: "End session",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(runGridmasterPersonSecurityAction).toHaveBeenCalledWith(
+        USER,
+        { action: "endSession", sessionId: "s-1" },
+        "fresh-token",
+      ),
+    );
+    expect(requireCredentialAssurance.mock.invocationCallOrder[0]).toBeLessThan(
+      runGridmasterPersonSecurityAction.mock.invocationCallOrder[0],
+    );
+    expect(toast.success).toHaveBeenCalledWith("Session ended");
+    expect(screen.queryByRole("button", { name: "Clear sign-in lock" })).not.toBeInTheDocument();
+  });
+
+  it("ends nothing when step-up is cancelled", async () => {
+    stepUpRun.mockResolvedValueOnce(false);
+    renderView(withSessionAndLock(false));
+
+    fireEvent.click(await screen.findByRole("button", { name: "End session" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "End session" })).getByRole("button", {
+        name: "End session",
+      }),
+    );
+
+    await waitFor(() => expect(stepUpRun).toHaveBeenCalled());
+    expect(runGridmasterPersonSecurityAction).not.toHaveBeenCalled();
+  });
+
+  it("offers to clear the sign-in lock only while it is locked", async () => {
+    runGridmasterPersonSecurityAction.mockResolvedValue({
+      success: true,
+      loginLock: { locked: false, resetsAt: null },
+    });
+    renderView(withSessionAndLock(true));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Clear sign-in lock" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Clear sign-in lock" })).getByRole("button", {
+        name: "Clear lock",
+      }),
+    );
+    await waitFor(() =>
+      expect(runGridmasterPersonSecurityAction).toHaveBeenCalledWith(
+        USER,
+        { action: "clearLoginLock" },
+        "fresh-token",
+      ),
+    );
+    expect(toast.success).toHaveBeenCalledWith("Sign-in lock cleared");
   });
 });

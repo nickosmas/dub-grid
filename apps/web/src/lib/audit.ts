@@ -42,6 +42,12 @@ export type AuditAction =
   | "user.force_logout"
   | "user.name_changed"
   | "user.email_changed"
+  | "user.session_ended"
+  | "user.device_forgotten"
+  | "user.push_device_disabled"
+  | "user.calendar_feed_revoked"
+  | "user.login_lock_cleared"
+  | "user.mfa_reset"
   | "user.password_reset_sent"
   // Invitations
   | "invitation.sent"

@@ -121,6 +121,15 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
       /\bsyncLinkedLoginEmail\s*\(/,
     ],
   },
+  "apps/web/src/app/api/gridmaster/users/[userId]/security/route.ts": {
+    policy: "sensitive",
+    assertions: [
+      /\brequireGridmasterSession\s*\(/,
+      /\brequireSensitiveActionAuth\s*\(/,
+      /\bendPersonSession\s*\(/,
+      /\bclearLoginLock\s*\(/,
+    ],
+  },
   "apps/web/src/app/api/gridmaster/users/[userId]/force-logout/route.ts": {
     policy: "sensitive",
     assertions: [

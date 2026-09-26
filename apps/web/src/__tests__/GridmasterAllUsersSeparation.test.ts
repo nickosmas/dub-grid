@@ -51,6 +51,7 @@ describe("Gridmaster AllUsersView account separation", () => {
       ],
     ],
     ["person/PersonMembershipActions", ["roleConfirm"]],
+    ["person/usePersonSecurityActions", ["securityConfirm"]],
     [
       "GridmasterAccountsView",
       [

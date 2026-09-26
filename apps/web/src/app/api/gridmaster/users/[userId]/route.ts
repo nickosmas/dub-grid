@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { requireGridmasterSession, requireSensitiveActionAuth } from "@/lib/api-auth";
@@ -7,11 +6,9 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import { emailContactConflict } from "@/lib/employee-contact-conflicts";
-import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
-import {
-  buildPersonRecordForUser,
-  throwUnlessNotFound,
-} from "@/features/gridmaster/server/person-record";
+import { writeGridmasterAuditLogAfterCommit } from "@/app/api/gridmaster/_lib/audit";
+import { buildPersonRecordForUser } from "@/features/gridmaster/server/person-record";
+import { loadPersonTarget, loadPrimaryOrgId } from "@/features/gridmaster/server/person-target";
 import { checkEmployeeEmailConflict } from "@/features/employees/server/contact-conflicts";
 import {
   LoginEmailConflictError,
@@ -35,15 +32,6 @@ const patchSchema = z.discriminatedUnion("action", [
 
 const NOT_FOUND = "We couldn't find that account. Refresh the page and try again.";
 
-/** Runs after the change has committed, so a failed audit write is reported, not answered. */
-async function recordAfterCommit(input: Parameters<typeof writeGridmasterAuditLog>[0]) {
-  try {
-    await writeGridmasterAuditLog(input);
-  } catch (error) {
-    logger.error({ error, action: input.action }, "gridmaster person audit write failed");
-  }
-}
-
 export async function GET(req: NextRequest, context: { params: Promise<{ userId: string }> }) {
   try {
     const auth = await requireGridmasterSession(req);
@@ -62,49 +50,6 @@ export async function GET(req: NextRequest, context: { params: Promise<{ userId:
       { status: 500 },
     );
   }
-}
-
-interface Target {
-  userId: string;
-  email: string;
-  firstName: string | null;
-  lastName: string | null;
-}
-
-/** The account to change, or null for none and for a Gridmaster's own kind. */
-async function loadTarget(client: SupabaseClient, userId: string): Promise<Target | null> {
-  const [{ data: profile, error }, { data: authData, error: authError }] = await Promise.all([
-    client
-      .from("profiles")
-      .select("platform_role, first_name, last_name")
-      .eq("id", userId)
-      .maybeSingle(),
-    client.auth.admin.getUserById(userId),
-  ]);
-  if (error) throw error;
-  throwUnlessNotFound(authError);
-  const authUser = authData?.user;
-  if (!profile || !authUser || profile.platform_role === "gridmaster") return null;
-  return {
-    userId,
-    email: authUser.email ?? "",
-    firstName: (profile.first_name as string | null) ?? null,
-    lastName: (profile.last_name as string | null) ?? null,
-  };
-}
-
-/** The organization a notice names: their first active membership, if any. */
-async function primaryOrgId(client: SupabaseClient, userId: string): Promise<string | null> {
-  const { data, error } = await client
-    .from("organization_memberships")
-    .select("org_id")
-    .eq("user_id", userId)
-    .is("archived_at", null)
-    .order("joined_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw error;
-  return (data?.org_id as string | undefined) ?? null;
 }
 
 export async function PATCH(req: NextRequest, context: { params: Promise<{ userId: string }> }) {
@@ -133,7 +78,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ userI
     }
 
     const serviceClient = getServiceClient();
-    const target = await loadTarget(serviceClient, params.data.userId);
+    const target = await loadPersonTarget(serviceClient, params.data.userId);
     if (!target) return NextResponse.json({ error: NOT_FOUND }, { status: 404 });
 
     if (parsed.data.action === "editName") {
@@ -144,7 +89,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ userI
         .update({ first_name: firstName, last_name: lastName })
         .eq("id", target.userId);
       if (error) throw error;
-      await recordAfterCommit({
+      await writeGridmasterAuditLogAfterCommit({
         serviceClient,
         actor: auth.user,
         action: "user.name_changed",
@@ -200,11 +145,11 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ userI
       userId: target.userId,
       previousEmail: target.email || null,
       newEmail: email,
-      orgId: await primaryOrgId(serviceClient, target.userId),
+      orgId: await loadPrimaryOrgId(serviceClient, target.userId),
       actorId: assurance.user.id,
       actorSessionId: assurance.sessionId,
     });
-    await recordAfterCommit({
+    await writeGridmasterAuditLogAfterCommit({
       serviceClient,
       actor: auth.user,
       action: "user.email_changed",

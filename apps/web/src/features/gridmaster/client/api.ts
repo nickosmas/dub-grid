@@ -310,6 +310,28 @@ export function changeGridmasterPersonEmail(
   return patchGridmasterPerson(userId, { action: "changeEmail", email }, accessToken);
 }
 
+export type GridmasterPersonSecurityAction =
+  | { action: "endSession"; sessionId: string }
+  | { action: "forgetDevice"; deviceId: string }
+  | { action: "disablePushDevice"; deviceId: string }
+  | { action: "revokeCalendarFeed"; feedId: string }
+  | { action: "clearLoginLock" };
+
+export function runGridmasterPersonSecurityAction(
+  userId: string,
+  input: GridmasterPersonSecurityAction,
+  accessToken?: string,
+): Promise<{ success: true; loginLock?: { locked: boolean; resetsAt: string | null } | null }> {
+  return requestGridmasterJson(`/api/gridmaster/users/${encodeURIComponent(userId)}/security`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify(input),
+  });
+}
+
 export function reinstateGridmasterUser(
   userId: string,
   accessToken?: string,

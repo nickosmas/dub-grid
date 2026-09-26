@@ -672,6 +672,37 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     severity: "warning",
     headline: (d, ctx) => `Changed the sign-in email of ${who(d, ctx, "an account")}`,
   },
+  "user.session_ended": {
+    category: "access",
+    severity: "warning",
+    headline: (d, ctx) => `Signed ${who(d, ctx, "a team member")} out of one session`,
+  },
+  "user.device_forgotten": {
+    category: "access",
+    severity: "update",
+    headline: (d, ctx) => `Forgot a known device of ${who(d, ctx, "a team member")}`,
+  },
+  "user.push_device_disabled": {
+    category: "access",
+    severity: "update",
+    headline: (d, ctx) =>
+      `Turned off push notifications to a device of ${who(d, ctx, "a team member")}`,
+  },
+  "user.calendar_feed_revoked": {
+    category: "access",
+    severity: "update",
+    headline: (d, ctx) => `Revoked a calendar feed of ${who(d, ctx, "a team member")}`,
+  },
+  "user.login_lock_cleared": {
+    category: "access",
+    severity: "update",
+    headline: (d, ctx) => `Cleared the sign-in lock on ${who(d, ctx, "an account")}`,
+  },
+  "user.mfa_reset": {
+    category: "access",
+    severity: "warning",
+    headline: (d, ctx) => `Reset two-factor for ${who(d, ctx, "a team member")}`,
+  },
   "user.password_reset_sent": {
     category: "access",
     severity: "warning",
