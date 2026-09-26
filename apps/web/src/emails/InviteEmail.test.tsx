@@ -24,7 +24,7 @@ describe("InviteEmail", () => {
   it("names the organization and nobody in it", async () => {
     const body = await text();
 
-    expect(body).toContain("You've been invited to join Calm Haven on DubGrid,");
+    expect(body).toContain("You've been invited to join Calm Haven on DubGrid.");
     expect(body).not.toMatch(/has invited you/i);
   });
 

@@ -58,8 +58,7 @@ export function InviteEmail({
           </>
         ) : (
           <>
-            You&apos;ve been invited to join <strong>{orgName}</strong> on DubGrid, where
-            you&apos;ll find your schedule, shift requests and team updates in one place.
+            You&apos;ve been invited to join <strong>{orgName}</strong> on DubGrid.
           </>
         )}
       </Text>
