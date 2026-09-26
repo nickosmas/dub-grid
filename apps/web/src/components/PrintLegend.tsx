@@ -1,4 +1,4 @@
-import { AssignmentDefinition, ShiftDisplayMode } from "@/types";
+import { AssignmentDefinition, IndicatorType, ShiftDisplayMode } from "@/types";
 
 // Excluded from legend — internal/meta entries with no printed meaning
 const EXCLUDED = new Set(["OFF", "0.3"]);
@@ -6,9 +6,12 @@ const EXCLUDED = new Set(["OFF", "0.3"]);
 export default function PrintLegend({
   assignments,
   shiftDisplayMode = "code",
+  indicators = [],
 }: {
   assignments: AssignmentDefinition[];
   shiftDisplayMode?: ShiftDisplayMode;
+  /** The indicators the printed schedule shows, keyed beneath the shifts. */
+  indicators?: IndicatorType[];
 }) {
   const isNameMode = shiftDisplayMode === "name";
   const items = assignments.filter((s) => !EXCLUDED.has(s.label));
@@ -33,6 +36,28 @@ export default function PrintLegend({
           </div>
         ))}
       </div>
+      {indicators.length > 0 && (
+        <>
+          <div className="print-legend__title">Indicators</div>
+          <div className="print-legend__grid" data-print-legend-indicators="true">
+            {indicators.map((indicator) => (
+              <div key={indicator.id} className="print-legend__item">
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: "50%",
+                    background: indicator.color,
+                    flexShrink: 0,
+                  }}
+                />
+                <span className="print-legend__name">{indicator.name}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

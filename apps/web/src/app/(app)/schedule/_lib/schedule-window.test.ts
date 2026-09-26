@@ -3,6 +3,7 @@ import type { NotePublishChange, ScheduleNote } from "@/types";
 import {
   buildScheduleNoteMap,
   buildScheduleNoteMarks,
+  indicatorIdsInNotes,
   removeScheduleNotesForCell,
   scheduleNoteKey,
 } from "./schedule-window";
@@ -238,5 +239,23 @@ describe("buildScheduleNoteMarks", () => {
     });
 
     expect(marks).toEqual([{ indicatorTypeId: 10, state: "draft_added" }]);
+  });
+});
+
+describe("indicatorIdsInNotes", () => {
+  const notes = {
+    "emp-1_2026-09-01": [
+      { indicatorTypeId: 1, status: "published" as const, updatedBy: null },
+      { indicatorTypeId: 2, status: "draft" as const, updatedBy: null },
+      { indicatorTypeId: 3, status: "draft_deleted" as const, updatedBy: null },
+    ],
+  };
+
+  it("gives an editor their drafts but not what they removed", () => {
+    expect([...indicatorIdsInNotes(notes, true)].sort()).toEqual([1, 2]);
+  });
+
+  it("gives everyone else what is published", () => {
+    expect([...indicatorIdsInNotes(notes, false)].sort()).toEqual([1, 3]);
   });
 });

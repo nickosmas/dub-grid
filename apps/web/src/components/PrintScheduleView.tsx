@@ -8,9 +8,11 @@ import {
   AssignmentDefinition,
   FocusArea,
   JobDefinition,
+  IndicatorType,
   NamedItem,
   ShiftDisplayMode,
 } from "@/types";
+import type { ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
 import {
   addDays,
   formatDateKey,
@@ -158,6 +160,51 @@ function pillText(label: string, max: number): string {
 
 // ── Per-section print grid ─────────────────────────────────────────────────
 
+// The print window carries none of the app's CSS variables, so every colour
+// here is a literal. An archived or unknown indicator prints in plain grey.
+const PRINT_UNKNOWN_INDICATOR = "#94A3B8";
+
+/** Marks that describe what the schedule holds: a removal prints nothing. */
+function printedIndicatorIds(marks: ScheduleNoteMark[]): number[] {
+  return marks
+    .filter((mark) => mark.state !== "draft_removed" && mark.state !== "published_removed")
+    .map((mark) => mark.indicatorTypeId);
+}
+
+function PrintIndicatorDots({
+  ids,
+  indicatorTypes,
+}: {
+  ids: number[];
+  indicatorTypes: IndicatorType[];
+}) {
+  if (ids.length === 0) return null;
+  return (
+    <div
+      data-print-indicators="true"
+      style={{ position: "absolute", top: 1, right: 1, display: "flex", gap: 1 }}
+    >
+      {ids.map((id) => {
+        const indicator = indicatorTypes.find((type) => type.id === id);
+        return (
+          <span
+            key={id}
+            aria-label={indicator?.name ?? "Note"}
+            style={{
+              width: "0.55em",
+              height: "0.55em",
+              borderRadius: "50%",
+              background: indicator?.color ?? PRINT_UNKNOWN_INDICATOR,
+              border: "1px solid #FFFFFF",
+              flexShrink: 0,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 interface PrintSectionProps {
   sectionName: string;
   focusAreaId: number;
@@ -181,6 +228,8 @@ interface PrintSectionProps {
   splitAtIndex?: number;
   fontSize: number;
   shiftDisplayMode?: ShiftDisplayMode;
+  noteMarksForKey?: (empId: string, date: Date, focusAreaId?: number) => ScheduleNoteMark[];
+  indicatorTypes: IndicatorType[];
 }
 
 function PrintSection({
@@ -203,6 +252,8 @@ function PrintSection({
   splitAtIndex,
   fontSize,
   shiftDisplayMode = "code",
+  noteMarksForKey,
+  indicatorTypes,
 }: PrintSectionProps) {
   const isNameMode = shiftDisplayMode === "name";
   // Bind focus-area context so label lookups resolve the section-specific definition first.
@@ -527,6 +578,12 @@ function PrintSection({
                           position: "relative",
                         }}
                       >
+                        <PrintIndicatorDots
+                          ids={printedIndicatorIds(
+                            noteMarksForKey?.(emp.id, date, focusAreaId) ?? [],
+                          )}
+                          indicatorTypes={indicatorTypes}
+                        />
                         {assignment && assignment !== "OFF" ? (
                           (() => {
                             // "/" joins the segments of a worked cell, so it
@@ -1015,7 +1072,12 @@ interface PrintScheduleViewProps {
   onClose: () => void;
   focusAreaLabel?: string;
   shiftDisplayMode?: ShiftDisplayMode;
+  /** The page's note marks, printed in each cell with an indicator legend. */
+  noteMarksForKey?: (empId: string, date: Date, focusAreaId?: number) => ScheduleNoteMark[];
+  indicatorTypes?: IndicatorType[];
 }
+
+const NO_INDICATORS: IndicatorType[] = [];
 
 export default function PrintScheduleView({
   orgName,
@@ -1038,6 +1100,8 @@ export default function PrintScheduleView({
   onClose,
   focusAreaLabel = "Focus Areas",
   shiftDisplayMode = "code",
+  noteMarksForKey,
+  indicatorTypes = NO_INDICATORS,
 }: PrintScheduleViewProps) {
   const isNameMode = shiftDisplayMode === "name";
   const { fontSize, selectedFocusAreas: selectedWings, spanWeeks } = config;
@@ -1114,6 +1178,22 @@ export default function PrintScheduleView({
   }
 
   const legendItems = assignments.filter((s) => !EXCLUDED_LEGEND.has(s.label));
+
+  // The indicator key lists only the indicators this printout shows.
+  const printedIndicators = useMemo(() => {
+    if (!noteMarksForKey || indicatorTypes.length === 0) return [];
+    const ids = new Set<number>();
+    for (const focusArea of printFocusAreas) {
+      for (const emp of allEmployees) {
+        for (const date of dates) {
+          for (const id of printedIndicatorIds(noteMarksForKey(emp.id, date, focusArea.id))) {
+            ids.add(id);
+          }
+        }
+      }
+    }
+    return indicatorTypes.filter((type) => ids.has(type.id));
+  }, [noteMarksForKey, indicatorTypes, printFocusAreas, allEmployees, dates]);
 
   return (
     <div
@@ -1322,6 +1402,8 @@ export default function PrintScheduleView({
                 splitAtIndex={splitAtIndex}
                 fontSize={fontSize}
                 shiftDisplayMode={shiftDisplayMode}
+                noteMarksForKey={noteMarksForKey}
+                indicatorTypes={indicatorTypes}
               />
             );
           })}
@@ -1373,6 +1455,49 @@ export default function PrintScheduleView({
                     {!isNameMode && (
                       <span style={{ fontSize: "0.9em", color: "#334766" }}>{s.name}</span>
                     )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {printedIndicators.length > 0 && (
+            <div
+              data-print-indicator-legend="true"
+              style={{ marginTop: "1em", paddingTop: "0.8em", borderTop: "1px solid #C8D6EC" }}
+            >
+              <div
+                style={{
+                  fontSize: "1em",
+                  fontWeight: 700,
+                  color: "#1A2640",
+                  marginBottom: "0.7em",
+                }}
+              >
+                Indicators
+              </div>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(10em, 1fr))",
+                  gap: "0.5em 1.5em",
+                }}
+              >
+                {printedIndicators.map((indicator) => (
+                  <div
+                    key={indicator.id}
+                    style={{ display: "flex", alignItems: "center", gap: "0.5em" }}
+                  >
+                    <span
+                      style={{
+                        width: "0.8em",
+                        height: "0.8em",
+                        borderRadius: "50%",
+                        background: indicator.color,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span style={{ fontSize: "0.9em", color: "#334766" }}>{indicator.name}</span>
                   </div>
                 ))}
               </div>

@@ -84,7 +84,7 @@ colour and the existing visibility rule.
       whenever there are indicators, beside any change details. _Done when:_
       grid tests show the line on a draft-changed cell, a publish-diff cell
       and a deleted shift that keeps its indicators.
-- [ ] **Step 5 - printed schedule** - `PrintScheduleView` takes
+- [x] **Step 5 - printed schedule** - `PrintScheduleView` takes
       `noteMarksForKey` and `indicatorTypes`, draws each cell's marks with
       literal colours, and adds an "Indicators" legend of the types that
       appear (none when none do); `PrintLegend` gains the same key for the

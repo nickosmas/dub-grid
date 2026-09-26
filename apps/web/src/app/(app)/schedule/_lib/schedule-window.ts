@@ -127,3 +127,23 @@ export function buildScheduleNoteMarks(input: {
 
   return marks;
 }
+
+/**
+ * The indicator types a viewer can see anywhere in the loaded notes, for the
+ * printed indicator key: editors see their drafts, everyone else what is
+ * published (the server has already dropped drafts for them).
+ */
+export function indicatorIdsInNotes(
+  notes: ScheduleNoteMap,
+  isScheduleEditor: boolean,
+): Set<number> {
+  const ids = new Set<number>();
+  for (const cellNotes of Object.values(notes)) {
+    for (const note of cellNotes) {
+      if (isScheduleEditor ? note.status !== "draft_deleted" : note.status !== "draft") {
+        ids.add(note.indicatorTypeId);
+      }
+    }
+  }
+  return ids;
+}

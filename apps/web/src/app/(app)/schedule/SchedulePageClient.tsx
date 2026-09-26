@@ -241,6 +241,7 @@ import {
   buildScheduleNoteMap,
   removeScheduleNotesForCell,
   buildScheduleNoteMarks,
+  indicatorIdsInNotes,
   scheduleNoteKey,
   type ScheduleNoteMap,
 } from "./_lib/schedule-window";
@@ -3720,6 +3721,11 @@ function SchedulerContent({
     },
     [isScheduleEditor, notes, publishNoteChangesMap, showPublishDiff],
   );
+
+  const printedIndicatorTypes = useMemo(() => {
+    const ids = indicatorIdsInNotes(notes, isScheduleEditor);
+    return indicatorTypes.filter((type) => ids.has(type.id));
+  }, [indicatorTypes, isScheduleEditor, notes]);
 
   const panelActiveIndicatorIds = useCallback(
     (focusAreaId: number): number[] => {
@@ -7895,7 +7901,11 @@ function SchedulerContent({
             />
           )}
 
-          <PrintLegend assignments={assignments} shiftDisplayMode={org?.shiftDisplayMode} />
+          <PrintLegend
+            assignments={assignments}
+            shiftDisplayMode={org?.shiftDisplayMode}
+            indicators={printedIndicatorTypes}
+          />
 
           {showPrintOptions && (
             <PrintOptionsModal
@@ -7932,6 +7942,8 @@ function SchedulerContent({
               onClose={() => setActivePrintConfig(null)}
               focusAreaLabel={org?.focusAreaLabel}
               shiftDisplayMode={org?.shiftDisplayMode}
+              noteMarksForKey={noteMarksForKey}
+              indicatorTypes={indicatorTypes}
             />
           )}
 
