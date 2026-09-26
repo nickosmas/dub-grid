@@ -184,13 +184,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** Confirm the limit and add it to the rule and the policy test.
 **Resolution:**
 
-### F-60 [P2] open - A Gridmaster token can change memberships and invitations directly in the database
+### F-60 [P2] fixed - A Gridmaster token can change memberships and invitations directly in the database
 
 **File:** `supabase/migrations/003_rls_policies.sql:117`, `:751`; `016_harden_authorization_boundaries.sql:79`; `043_invitation_inviter_is_verified.sql:250`
 **Found:** 2026-09-25 by `/audit` re-review of 7ba79e75
 **Why it matters:** `change_user_role`, `assign_org_role_by_email` and `send_invitation` are executable by `authenticated`, and the `gridmaster_all_memberships` and `gridmaster_all_invitations` policies are FOR ALL, so a Gridmaster token can insert a Super Admin membership through PostgREST, skipping every route gate. The same class as F-08; `is_gridmaster()` needs aal2 but not a recent sign-in.
 **Suggested fix:** A decision with F-08: narrow the Gridmaster policies to SELECT and route writes through server-only functions, or require a recent authentication in the RPCs.
-**Resolution:**
+**Resolution:** Owner chose to fix it (2026-09-26, 41d5). Migration 049 closed the invitations half. Migration 051 adds `caller_has_fresh_proof()`, the routes' fresh-proof rule in SQL, and the five grant functions (`change_user_role`, `assign_org_role_by_email`, `promote_gridmaster_by_email`, `demote_gridmaster_account`, `set_gridmaster_account_deactivated`) refuse a Gridmaster without it; migration 052 takes INSERT, UPDATE and DELETE on `organization_memberships` from `authenticated`, since only the service role and SECURITY DEFINER functions write them. Live tests prove the rule case by case, each function's refusal (failing without the guard), and the revoked privileges; a static test pins the guard in each newest definition. The Gridmaster write policies on the non-grant tables are F-74.
 
 ### F-62 [P2] open - Turning on `secure_password_change` would refuse password changes for two-factor users on sessions older than a day
 
@@ -239,3 +239,11 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Why it matters:** `internal/authentication.md` and `RBAC_SYSTEM_DESIGN.md` say email sign-up is off in production, but it is on. Anyone with the public publishable key can create and confirm an account through `/auth/v1/signup`, or through a sign-in link request, which also creates a missing user while sign-ups are open. The account has no organization, so RLS should still hide tenant data, but every RPC granted to `authenticated` becomes reachable by strangers.
 **Suggested fix:** Set `disable_signup: true` on production (dashboard or Management API). Only `/api/invitations/register` creates accounts, through `auth.admin.createUser`, which ignores the setting. Local `config.toml` stays open for the integration tests that call `signUp`. Consider having `auth:templates:check` report the setting so it cannot drift again.
 **Resolution:** Production set to `disable_signup: true` through the Management API on 2026-09-26 (read back true; email sign-in and confirmation unchanged). Local `config.toml` stays open for the integration tests. The drift check in `auth:templates:check` is not added yet.
+
+### F-74 [P3] open - A Gridmaster token can still write most organization data directly
+
+**File:** `supabase/migrations/003_rls_policies.sql` (the `gridmaster_all_*` FOR ALL policies)
+**Found:** 2026-09-26 while scoping 41d5
+**Why it matters:** Beyond grants (closed by 051 and 052), the Gridmaster policies are FOR ALL on nearly every organization table (schedules, employees, departments, settings, notifications, subscriptions, feature flags), and `authenticated` holds write privileges on them, so a stolen Gridmaster token could change or delete organization data through the data API without a recent sign-in. Grants of authority are no longer reachable this way, and impersonation already has its own audited path.
+**Suggested fix:** A decision for the owner: narrow the Gridmaster policies to SELECT and route Gridmaster writes through the server, or require `caller_has_fresh_proof()` in those policies' write checks, or accept the risk.
+**Resolution:**

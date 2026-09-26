@@ -63,7 +63,7 @@ committed as a local checkpoint.
       052 revokes the writes; the dead helper goes. _Done when:_ the live
       isolation test proves `authenticated` cannot insert, update or delete
       memberships, and the web suite passes.
-- [ ] **Step 4 - record the remaining surface** - a finding for the owner on
+- [x] **Step 4 - record the remaining surface** - a finding for the owner on
       the other Gridmaster write policies.
 
 ## Files / areas
