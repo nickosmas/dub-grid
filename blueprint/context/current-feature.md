@@ -76,8 +76,11 @@ Continuous Mode: they push, send, reach production or reseed shared state.
       `letters_digits`), `secure_password_change` off (repo on), and no
       session timebox or inactivity limit (repo 24h and 8h). Waiting on the
       owner: the template apply (needed before merge), and separate
-      decisions on the password rules, `secure_password_change` (verify a
-      real password change with it on first) and the session limits.
+      decisions on the password rules and `secure_password_change` (verify a
+      real password change with it on first). Session limits: owner decided
+      (2026-09-26) mobile stays signed in until sign-out, so production keeps
+      none and `config.toml` drops its 24h and 8h; the web app's 30-minute
+      idle sign-out is unchanged.
 
 - [x] **Step 6 - release PR green** (approved 2026-09-25) - `dev` pushed and
       [#113](https://github.com/nickosmas/dub-grid/pull/113) opened, marked

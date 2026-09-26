@@ -11,12 +11,12 @@ import { fileURLToPath } from "node:url";
  * length/expiry those emails are written around.
  *
  * Why this and not `supabase config push`: that command pushes the *entire*
- * `[auth]` block, and ours holds local-dev values — `site_url` of 127.0.0.1, a
- * loopback-only redirect allow-list, session timeboxes production has switched
- * off, and rate limits an order of magnitude below production's. Pushing it
- * whole would take production down. Managing all of that from the repo needs a
- * reconciled `[remotes.production]` block; this script covers the part the repo
- * is unambiguously the source of truth for.
+ * `[auth]` block, and ours holds local-dev values: a `site_url` of 127.0.0.1, a
+ * loopback-only redirect allow-list, and rate limits an order of magnitude
+ * below production's. Pushing it whole would take production down. Managing
+ * all of that from the repo needs a reconciled `[remotes.production]` block;
+ * this script covers the part the repo is unambiguously the source of truth
+ * for.
  *
  * Read-only by default. Pass `--apply` to write.
  *
