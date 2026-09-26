@@ -77,6 +77,8 @@ const DELEGATED_SERVICE_HELPERS: Record<string, string> = {
     "Rechecks live user, org, membership, employee, and token ownership.",
   "apps/web/src/features/account/server/known-devices.ts":
     "Reads and writes only the authenticated user's own known-device rows, keyed by the verified user ID.",
+  "apps/web/src/features/account/server/mfa-reenroll.ts":
+    "Reads and clears only the authenticated user's own two-factor re-enrollment flag, keyed by the verified user ID.",
   "apps/web/src/features/account/server/preferences.ts":
     "Scopes preferences to the authenticated user ID.",
   "apps/web/src/features/account/server/profile.ts":
