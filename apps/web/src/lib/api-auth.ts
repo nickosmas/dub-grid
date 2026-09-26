@@ -286,11 +286,9 @@ export async function stepUpResponseForRefusal(
   req: NextRequest,
   error: unknown,
 ): Promise<NextResponse | null> {
-  const message =
-    typeof error === "object" && error !== null && "message" in error
-      ? String((error as { message?: unknown }).message ?? "")
-      : "";
-  if (!message.includes("STEP_UP_REQUIRED")) return null;
+  // Exactly the guard's refusal: other messages can echo caller input.
+  const refusal = error as { message?: unknown; code?: unknown } | null;
+  if (refusal?.message !== "STEP_UP_REQUIRED" || refusal.code !== "42501") return null;
   const assurance = await requireSensitiveActionAuth(req);
   if ("response" in assurance) return assurance.response;
   // The route passed and the database refused: the proof crossed the edge of

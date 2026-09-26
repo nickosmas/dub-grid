@@ -638,9 +638,8 @@
     - [ ] 41d3. **Release qualification** - browser, native-app,
           email-provider and migration/reissue rehearsals with explicit
           production checks; unavailable environment evidence is recorded as
-          a release blocker. It resumed after 41d4 and qualifies it too; parked at
-          `blueprint/context/parked/41d3-release-qualification.md` while 41d5
-          is built.
+          a release blocker. It resumed after 41d4 and 41d5 and qualifies them
+          too.
     - [x] 41d4. **Gridmaster grants with step-up** - a Gridmaster can invite
           someone as Super Admin from the Gridmaster portal, the setup wizard
           and the People screens, and every Gridmaster grant (invitation
@@ -648,7 +647,7 @@
           Admin, People role and permission changes) asks for fresh proof
           through the step-up prompt rather than failing (F-55, F-58, F-59,
           F-61).
-    - [ ] 41d5. **Gridmaster grants need fresh proof in the database** - a
+    - [x] 41d5. **Gridmaster grants need fresh proof in the database** - a
           Gridmaster token cannot grant authority straight through the data
           API: the grant functions (organization role changes and assignment,
           Gridmaster promotion, demotion and deactivation) refuse a Gridmaster

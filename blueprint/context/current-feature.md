@@ -1,102 +1,137 @@
-# Feature: Gridmaster grants need fresh proof in the database
+# Feature: Release qualification
 
-**From build-plan:** feature 41d5
-**Status:** in progress
+**From build-plan:** feature 41d3
+**Status:** blocked - needs approvals
 
 ## Goal
 
-The routes ask a Gridmaster for a recent sign-in before any grant (41d3,
-41d4), but the database does not: a Gridmaster's token can call the grant
-functions through the data API, and the `gridmaster_all_memberships` policy
-lets it write memberships directly, so a stolen or stale Gridmaster token
-could still make anyone a Super Admin or a Gridmaster (F-60). The database
-should apply the same fresh-proof rule, and no signed-in caller should write
-memberships directly.
+Item 41's repairs are proven by tests; before remediation closes, each must be
+seen working where it runs: in a browser, on a phone, through the email
+provider, and against production's database and Auth settings. Evidence that
+cannot be gathered is recorded as a release blocker, not replaced by a test.
 
-## In scope
+## Rehearsals and what each needs
 
-- **A database fresh-proof check** that mirrors
-  `evaluateSensitiveActionAssurance` in `packages/authz/src/assurance.ts`:
-  the required method is `totp` when the caller has a verified TOTP factor
-  (and then `aal2` is required), otherwise `password`; the newest matching
-  `amr` timestamp must be within 300 seconds, and no more than 30 seconds in
-  the future.
-- **The grant functions refuse a Gridmaster without fresh proof:**
-  `change_user_role`, `assign_org_role_by_email`,
-  `promote_gridmaster_by_email`, `demote_gridmaster_account` and
-  `set_gridmaster_account_deactivated` raise `STEP_UP_REQUIRED` when the
-  caller is a Gridmaster and the check fails. Other callers are unchanged.
-  The routes already gate these calls with the same token, so nothing the
-  app does changes.
-- **Memberships are written by the server only:** `authenticated` loses
-  INSERT, UPDATE and DELETE on `organization_memberships` (every app write
-  already uses the service role), and the unused browser-side
-  `updateAppOnlyUser` in `apps/web/src/lib/db/organizations.ts` is removed.
+| #   | Rehearsal                                              | Proves                                                                                                                                                                            | Needs                                                                                                           |
+| --- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| 1   | Local browser E2E (`npm run test:e2e`, three browsers) | invitation reissue and accept, sign-in refusal and completion, recovery with two-factor, impersonation start and end                                                              | A dedicated local stack or an agreed window: the E2E setup reseeds the shared local database other sessions use |
+| 2   | iOS simulator and an Android device or emulator        | recovery with two-factor, session revocation holding, the app-lock cover in the app switcher (F-42), teardown without the 5 s stall, presence retry                               | A dev build on the simulator and device access                                                                  |
+| 3   | Email provider                                         | invitation, reissue, account deleted, impersonation notices and security alerts arrive with the right copy; Supabase password and email-change notices after `supabase start`     | Sending real mail through Resend to an address the owner controls                                               |
+| 4   | Production migration 047                               | `end_user_auth_session` exists, locked and applied by the runbook, before the release PR merges                                                                                   | Approval to apply to production                                                                                 |
+| 5   | Production Auth settings                               | the push script's read-only diff: templates, subjects, OTP settings and the notice flags; plus hook, password requirements, `secure_password_change`, `jwt_expiry` and `site_url` | Approval and the owner's `.env.remote` token                                                                    |
+| 6   | Release PR                                             | every GitHub check green on the `dev` to `main` PR                                                                                                                                | Approval to push `dev` and open the PR                                                                          |
 
-## Out of scope
+## Evidence already gathered
 
-- The Gridmaster `FOR ALL` policies on the other tables (schedules,
-  employees, settings, notifications and so on). They are not grants of
-  authority; recorded as a decision for the owner.
-- Organization Super Admins calling the functions directly: their tier
-  guards already bound what they can grant.
+- Unit and integration suites green at each 41 sub-item's completion (web and
+  mobile), including live local-Supabase tests for recovery assurance and
+  provider-session ending.
+- Render tests for every app-sent sign-in email and Supabase template.
+- `supabase status` parses the notification sections.
 
-## Build loop
+## Blockers until approved
 
-Each step is implemented, verified and self-reviewed on `dev`, then
-committed as a local checkpoint.
+Each row above is a blocker for closing item 41. None of them is run by
+Continuous Mode: they push, send, reach production or reseed shared state.
 
 ## Build steps
 
-- [x] **Step 1 - the fresh-proof check** - migration 051 adds
-      `caller_has_fresh_proof()`. _Done when:_ live tests with simulated
-      claims prove fresh password, stale password, fresh TOTP at aal2, TOTP
-      at aal1, a future timestamp and missing `amr`, matching the TypeScript
-      rule.
-- [x] **Step 2 - the grant functions refuse a stale Gridmaster** - the same
-      migration redefines the five functions from their newest definitions
-      with the guard first. _Done when:_ live tests prove each refuses a
-      stale Gridmaster, a fresh one still works, and a Super Admin's
-      `change_user_role` is unaffected; a static test pins the guard in each
-      newest definition.
-- [x] **Step 3 - memberships are written by the server only** - migration
-      052 revokes the writes; the dead helper goes. _Done when:_ the live
-      isolation test proves `authenticated` cannot insert, update or delete
-      memberships, and the web suite passes.
-- [x] **Step 4 - record the remaining surface** - a finding for the owner on
-      the other Gridmaster write policies.
+- [x] **Step 0 - owner decisions** (delegated 2026-09-25) - F-08 (Supabase
+      MFA notices on, DubGrid's two-factor alert still emails), F-16 and F-17
+      (role grants and audit export require fresh proof), F-42 (the lock
+      effect keyed on having a session) and F-47 (the password rule requires
+      a letter and a number).
 
-- [x] **Repair the audit's grant paths (249941d4..87a64796)** - migration
-      053: `change_user_role` takes Gridmaster authority only from
-      `is_gridmaster()`, `profiles` loses INSERT, DELETE and TRUNCATE, and an
-      oversized amr timestamp proves nothing; the four routes answer a
-      database refusal with the step-up prompt. _Done when:_ live tests for a
-      pending second factor, a deactivated Gridmaster and profile writes fail
-      without 053, and the web suite passes.
+- [x] **Step 1 - browser rehearsal** (approved 2026-09-25) - ran as the
+      release PR's Playwright shards against CI's own stack. Run
+      [36191730677](https://github.com/nickosmas/dub-grid/actions/runs/36191730677)
+      on 49d44ea8 (#113's head): 12 of 12 Playwright jobs passed across
+      chromium, firefox and webkit, and the shards running dashboard-states and
+      role-variance report no retries. If #113's head moves before merge, the
+      new head's run is the one that counts.
 
-## Files / areas
+- [ ] **Step 2 - native rehearsal** (approved 2026-09-25; blocked) - the
+      simulator's dev build predates current native dependencies, only Xcode
+      27 is installed (Expo 54 needs Xcode 26), no Android device or emulator
+      is attached, and signing in needs the owner.
+- [ ] **Step 3 - email provider rehearsal** (approved 2026-09-25) - seven
+      app-sent emails (invitation, reissue, account deleted, impersonation
+      start and end, new sign-in and two-factor alerts) delivered through
+      Resend to `delivered@resend.dev`. Open: Supabase's own password,
+      email-change and MFA notices, which need production's flags pushed.
+- [x] **Step 4 - production migration 047** - applied 2026-09-25 19:17 UTC
+      by another session after a scratch rehearsal; the read-only inspector
+      reports 47 ledger entries, none missing, every invariant passing.
+      Latest backup before it: 2026-09-25 13:38:30 UTC (physical, completed).
+      Migration 048 (`user_known_devices`) followed from another session; the
+      inspector reads 48 entries, none missing, every invariant passing
+      (2026-09-26).
+- [ ] **Step 5 - production Auth settings** (read-only diff run
+      2026-09-26) - the push script finds three templates behind the repo
+      (email change, reauthentication, MFA factor enrolled: the 41c3 copy);
+      subjects, OTP settings and all four notice flags already match. The
+      hook, `jwt_expiry` (3600), refresh rotation and MFA match. Production
+      is weaker than `config.toml` on settings the script does not push:
+      minimum password length 6 (repo 10), no required characters (repo
+      `letters_digits`), `secure_password_change` off (repo on), and no
+      session timebox or inactivity limit (repo 24h and 8h). Templates
+      applied 2026-09-26 with the owner's approval (`--apply`, 3 fields); a
+      fresh diff reports production matches the repo. Password rules
+      (length 10, `letters_digits`) approved by the owner and applied by the
+      owner 2026-09-26 (the agent's write was refused by its permission
+      mode); read back as 10 and letters plus digits. `secure_password_change` stays off in production: Supabase refuses
+      the change on a session over 24 hours old without a nonce, which the
+      authenticator-code step-up would hit (F-62). Session limits: owner decided
+      (2026-09-26) mobile stays signed in until sign-out, so production keeps
+      none and `config.toml` drops its 24h and 8h; the web app's 30-minute
+      idle sign-out is unchanged.
 
-- `supabase/migrations/051_*.sql`, `052_*.sql`, `checksums.sha256`.
-- `apps/web/src/__tests__/*` (new live and static SQL tests,
-  `org-isolation.integration.test.ts`).
-- `apps/web/src/lib/db/organizations.ts`.
+- [x] **Step 6 - release PR green** (approved 2026-09-25) - `dev` pushed and
+      [#113](https://github.com/nickosmas/dub-grid/pull/113) opened, marked
+      not to merge until Step 5's apply lands. Its live-database run caught
+      048's new service-role table missing from the isolation inventory
+      (fixed in 739fa577), and a held-bootstrap deadlock in the e2e specs was
+      fixed by its owning session (49d44ea8). All 27 checks green on
+      49d44ea8. Merging needs its own yes.
 
-## Data / contracts
+- [x] **Release note from 41d4** - migration
+      `049_invitation_token_server_only.sql` applied to production
+      2026-09-26 with the owner's approval, by the runbook: candidate
+      84f5591f; production at 048 with only 049 missing and every invariant
+      passing; the dry run proposed exactly 049 and no seeds; a scratch stack
+      started at 048 matched production line for line, took 049 and
+      re-inspected complete; app smoke on the local stack (People loads its
+      invitations); latest backup 2026-09-25 13:38:30 UTC (physical, PITR
+      off). After the apply the inspector reads 49 entries, none missing,
+      every invariant passing and health 200; the final dry run is up to
+      date; `authenticated` can no longer read the token or write the table.
 
-- No table or column change. The functions keep their signatures and raise
-  `STEP_UP_REQUIRED` for a stale Gridmaster.
-- Production: 051 and 052 are additive tightenings that no deployed code
-  depends on (every route already gates and every membership write uses the
-  service role), so they can be applied before or after the release.
+- [x] **Repair F-71** - `send_invitation` is server-only (migration 050);
+      the setup wizard's route calls it as the service role. _Done when:_ the
+      live function-grant check and the route test pass.
+- [x] **Release note: migration 050 goes after the deploy** - release PR
+      #115 merged 2026-09-26 10:34 UTC (`b6f1ff56`, all 27 checks green) and
+      deployed (health 200). Migration 050 then applied by the runbook with
+      the owner's approval: production at 049 with only 050 missing and every
+      invariant passing; the dry run proposed exactly 050; a scratch stack at
+      049 took it and re-inspected complete; latest backup 2026-09-25
+      13:38:30 UTC. After the apply the inspector reads 50 entries, none
+      missing, health 200, the final dry run is up to date, and
+      `authenticated` can no longer execute `send_invitation` (the service
+      role still can). The nine reworded auth email templates were pushed the
+      same day (`--apply`, 9 fields), and a fresh diff matches the repo.
+- [x] **Repair F-68** - a Gridmaster's department-admin changes require fresh
+      proof, with the prompt in the screens that make them.
+- [x] **Repair F-69** - the missing 41d4 view and route tests.
 
-## Testing
-
-- Live SQL tests against the local stack with simulated JWT claims, static
-  tests on the newest function definitions, and the full web suite.
+- [ ] **Release note from 41d5** - migrations 051, 052 and 053 go to
+      production in that order by the runbook, before or after the release
+      (production's code already gates every grant, and nothing there writes
+      memberships or profiles as a signed-in user); each apply needs the
+      owner's approval.
 
 ## Notes for the AI
 
-- Build each function from its newest definition
-  (`latestFunctionDefinition` in `apps/web/src/__tests__/helpers/sql-inventory.ts`);
-  never edit an applied migration.
+- Never handle token values; the owner places them in `.env.remote`.
+- Production changes follow the runbook; never `--auto` merge.
 - No em dashes.
