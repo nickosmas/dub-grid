@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { PublicRoute } from "@/components/RouteGuards";
-import { useAuth } from "@/components/AuthProvider";
 import { ACCOUNT_DISABLED_CODE } from "@dubgrid/domain";
 import { markAuthTransition } from "@/lib/auth-transition";
 import { DubGridLogo } from "@/components/Logo";
@@ -17,7 +16,6 @@ import {
   refreshBrowserSession,
   setBrowserSession,
   signOutFromBrowser,
-  syncBrowserSessionInBackground,
 } from "@/features/account/client";
 import {
   AccountDisabledModal,
@@ -36,7 +34,6 @@ export default function GridmasterLogin({
   initialTheme?: ThemePreference;
 }) {
   const router = useRouter();
-  const { user: signedInUser } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -69,7 +66,6 @@ export default function GridmasterLogin({
     e.preventDefault();
     if (submittingRef.current) return;
     submittingRef.current = true;
-    const priorUserId = signedInUser?.id ?? null;
     setLoading(true);
 
     try {
@@ -113,15 +109,6 @@ export default function GridmasterLogin({
         return;
       }
       if (!result) throw Object.assign(new Error("Unexpected login response"), { status: 502 });
-
-      // The login route wrote the session cookies: navigate now and sync the
-      // auth client alongside the page load (see OrgLogin's handleSubmit).
-      if (result.sessionCookieSet && (priorUserId === null || priorUserId === result.user.id)) {
-        void syncBrowserSessionInBackground(result.session);
-        markAuthTransition();
-        router.replace(result.destination);
-        return;
-      }
 
       // Set the session in the client using the tokens from the server
       await settleWithRequestTimeout(
