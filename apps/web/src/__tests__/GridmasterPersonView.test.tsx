@@ -19,6 +19,7 @@ const updateGridmasterUserActivation = vi.fn();
 const updateGridmasterPersonName = vi.fn();
 const changeGridmasterPersonEmail = vi.fn();
 const runGridmasterPersonSecurityAction = vi.fn();
+const resetGridmasterPersonTwoFactor = vi.fn();
 const requireCredentialAssurance = vi.fn();
 const stepUpRun = vi.fn();
 
@@ -33,6 +34,7 @@ vi.mock("@/features/gridmaster/client", () => ({
   changeGridmasterPersonEmail: (...args: unknown[]) => changeGridmasterPersonEmail(...args),
   runGridmasterPersonSecurityAction: (...args: unknown[]) =>
     runGridmasterPersonSecurityAction(...args),
+  resetGridmasterPersonTwoFactor: (...args: unknown[]) => resetGridmasterPersonTwoFactor(...args),
 }));
 vi.mock("@/hooks/useStepUpAction", () => ({
   useStepUpAction: () => ({ run: stepUpRun, dialog: null }),
@@ -704,5 +706,35 @@ describe("GridmasterPersonView", () => {
       ),
     );
     expect(toast.success).toHaveBeenCalledWith("Sign-in lock cleared");
+  });
+
+  it("resets two-factor with a reason through step-up", async () => {
+    resetGridmasterPersonTwoFactor.mockResolvedValue({ success: true, factorsRemoved: 1 });
+    renderView(linkedRecord());
+
+    fireEvent.click(await screen.findByRole("button", { name: "Reset two-factor" }));
+    const dialog = screen.getByRole("dialog", { name: "Reset two-factor" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Reset two-factor" }));
+    expect(toast.error).toHaveBeenCalledWith("Give a reason for the reset.");
+    expect(resetGridmasterPersonTwoFactor).not.toHaveBeenCalled();
+
+    fireEvent.change(within(dialog).getByLabelText("Reset reason"), {
+      target: { value: " Lost phone, verified by call " },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Reset two-factor" }));
+
+    await waitFor(() =>
+      expect(resetGridmasterPersonTwoFactor).toHaveBeenCalledWith(
+        USER,
+        "Lost phone, verified by call",
+        "fresh-token",
+      ),
+    );
+    expect(requireCredentialAssurance.mock.invocationCallOrder[0]).toBeLessThan(
+      resetGridmasterPersonTwoFactor.mock.invocationCallOrder[0],
+    );
+    expect(toast.success).toHaveBeenCalledWith(
+      "Two-factor reset. They set it up again at their next sign-in.",
+    );
   });
 });

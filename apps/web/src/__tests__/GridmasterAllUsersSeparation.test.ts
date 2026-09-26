@@ -48,6 +48,7 @@ describe("Gridmaster AllUsersView account separation", () => {
         "resetConfirm",
         "editNameConfirm",
         "changeEmailConfirm",
+        "mfaResetConfirm",
       ],
     ],
     ["person/PersonMembershipActions", ["roleConfirm"]],

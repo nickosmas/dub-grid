@@ -310,6 +310,24 @@ export function changeGridmasterPersonEmail(
   return patchGridmasterPerson(userId, { action: "changeEmail", email }, accessToken);
 }
 
+export function resetGridmasterPersonTwoFactor(
+  userId: string,
+  reason: string,
+  accessToken?: string,
+): Promise<{ success: true; factorsRemoved: number }> {
+  return requestGridmasterJson(
+    `/api/gridmaster/users/${encodeURIComponent(userId)}/two-factor-reset`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify({ reason }),
+    },
+  );
+}
+
 export type GridmasterPersonSecurityAction =
   | { action: "endSession"; sessionId: string }
   | { action: "forgetDevice"; deviceId: string }

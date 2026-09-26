@@ -51,6 +51,7 @@ const BROWSER_MUTATION_ROUTES = [
   "apps/web/src/app/api/gridmaster/users/[userId]/route.ts",
   "apps/web/src/app/api/gridmaster/users/[userId]/security/route.ts",
   "apps/web/src/app/api/gridmaster/users/[userId]/terminate/route.ts",
+  "apps/web/src/app/api/gridmaster/users/[userId]/two-factor-reset/route.ts",
   "apps/web/src/app/api/gridmaster/users/route.ts",
   "apps/web/src/app/api/import/employees/route.ts",
   "apps/web/src/app/api/invitations/accept/route.ts",

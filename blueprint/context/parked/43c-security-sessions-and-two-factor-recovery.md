@@ -81,7 +81,7 @@ proof) and F-81 (the page refreshes on more than membership changes).
       the sections run them through step-up. _Done when:_ route tests cover
       each action, a stale session and a row that belongs to someone else; a
       view test shows a cancelled step-up changes nothing.
-- [ ] **Step 5 - the two-factor reset** - the route deletes every factor,
+- [x] **Step 5 - the two-factor reset** - the route deletes every factor,
       sets `mfa_enabled` false and the flag, ends every session, emails the
       person and writes the audit row; the page asks for a reason through
       step-up. _Done when:_ route tests cover a missing reason, a stale

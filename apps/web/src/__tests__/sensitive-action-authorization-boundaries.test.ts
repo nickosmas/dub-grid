@@ -130,6 +130,14 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
       /\bclearLoginLock\s*\(/,
     ],
   },
+  "apps/web/src/app/api/gridmaster/users/[userId]/two-factor-reset/route.ts": {
+    policy: "sensitive",
+    assertions: [
+      /\brequireGridmasterSession\s*\(/,
+      /\brequireSensitiveActionAuth\s*\(/,
+      /\bresetPersonTwoFactor\s*\(/,
+    ],
+  },
   "apps/web/src/app/api/gridmaster/users/[userId]/force-logout/route.ts": {
     policy: "sensitive",
     assertions: [

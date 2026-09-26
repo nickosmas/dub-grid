@@ -11,6 +11,7 @@ import {
   fetchGridmasterPerson,
   forceLogoutGridmasterUser,
   reinstateGridmasterUser,
+  resetGridmasterPersonTwoFactor,
   changeGridmasterPersonEmail,
   sendGridmasterPasswordReset,
   terminateGridmasterUser,
@@ -41,6 +42,7 @@ type AccountDialog =
   | "reset"
   | "editName"
   | "changeEmail"
+  | "mfaReset"
   | null;
 
 function personKey(target: GridmasterPersonTarget) {
@@ -68,6 +70,7 @@ export default function GridmasterPersonView({
   const [terminateReason, setTerminateReason] = useState("");
   const [nameDraft, setNameDraft] = useState({ firstName: "", lastName: "" });
   const [emailDraft, setEmailDraft] = useState("");
+  const [resetReason, setResetReason] = useState("");
 
   const personQuery = useQuery({
     queryKey: personKey(target),
@@ -144,6 +147,7 @@ export default function GridmasterPersonView({
       toast.success(success);
       setDialog(null);
       setTerminateReason("");
+      setResetReason("");
       refresh();
     } catch (error: unknown) {
       toast.error(formatClientErrorMessage(error, failure));
@@ -276,10 +280,12 @@ export default function GridmasterPersonView({
   const resetConfirm = dialog === "reset";
   const editNameConfirm = dialog === "editName";
   const changeEmailConfirm = dialog === "changeEmail";
+  const mfaResetConfirm = dialog === "mfaReset";
   const nextEmail = emailDraft.trim();
   const closeDialog = () => {
     setDialog(null);
     setTerminateReason("");
+    setResetReason("");
   };
 
   return (
@@ -289,6 +295,17 @@ export default function GridmasterPersonView({
       <PersonAccountCard record={record} actions={accountActions} />
       <PersonSecurityCard
         record={record}
+        twoFactorActions={
+          account ? (
+            <Button
+              className="dg-btn dg-btn-secondary"
+              onClick={() => setDialog("mfaReset")}
+              disabled={busy}
+            >
+              Reset two-factor
+            </Button>
+          ) : undefined
+        }
         renderDeviceActions={securityActions.renderDeviceActions}
         loginLockActions={securityActions.loginLockActions}
       />
@@ -508,6 +525,44 @@ export default function GridmasterPersonView({
               (userId, accessToken) => changeGridmasterPersonEmail(userId, nextEmail, accessToken),
               `Sign-in email changed to ${nextEmail}`,
               "We couldn't change that email. Try again.",
+            );
+          }}
+          onCancel={closeDialog}
+        />
+      )}
+      {mfaResetConfirm && !stepUp.dialog && (
+        <ConfirmDialog
+          title="Reset two-factor"
+          message={
+            <div className="flex flex-col gap-3">
+              <span>
+                Remove {name}&apos;s authenticator app and sign them out everywhere? They are
+                emailed now and set up two-factor again the next time they sign in. Use this only
+                after confirming who they are.
+              </span>
+              <textarea
+                className="dg-input resize-y"
+                aria-label="Reset reason"
+                placeholder="Reason (required, recorded in the audit log)"
+                value={resetReason}
+                onChange={(event) => setResetReason(event.target.value)}
+                rows={3}
+              />
+            </div>
+          }
+          confirmLabel="Reset two-factor"
+          variant="danger"
+          isLoading={busy}
+          onConfirm={() => {
+            const reason = resetReason.trim();
+            if (!reason) {
+              toast.error("Give a reason for the reset.");
+              return;
+            }
+            return runAssured(
+              (userId, accessToken) => resetGridmasterPersonTwoFactor(userId, reason, accessToken),
+              "Two-factor reset. They set it up again at their next sign-in.",
+              "We couldn't reset their two-factor. Try again.",
             );
           }}
           onCancel={closeDialog}

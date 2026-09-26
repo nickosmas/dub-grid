@@ -9,6 +9,7 @@ import { ImpersonationNoticeEmail } from "./ImpersonationNoticeEmail";
 import { InviteEmail } from "./InviteEmail";
 import { LoginEmailChangedEmail } from "./LoginEmailChangedEmail";
 import { NotificationEmail } from "./NotificationEmail";
+import { TwoFactorResetEmail } from "./TwoFactorResetEmail";
 import { SUPABASE_AUTH_TEMPLATES } from "./auth/supabase-templates";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import { sendNotification } from "@/features/notifications/server/sender";
@@ -94,6 +95,12 @@ const APP_AUTH_EMAILS: AppAuthEmail[] = [
     name: "impersonation ended",
     Component: ImpersonationNoticeEmail as ComponentType<never>,
     props: { orgName: "Calm Haven", ended: true, logoUrl },
+    notice: true,
+  },
+  {
+    name: "two-factor reset",
+    Component: TwoFactorResetEmail as ComponentType<never>,
+    props: { logoUrl },
     notice: true,
   },
 ];
