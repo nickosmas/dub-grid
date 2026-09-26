@@ -500,4 +500,20 @@ describe("GridmasterPersonView", () => {
     expect(changeGridmasterPersonEmail).not.toHaveBeenCalled();
     expect(toast.success).not.toHaveBeenCalled();
   });
+
+  it("shows the newest consent history first and the rest on request", async () => {
+    const consents = Array.from({ length: 5 }, (_, index) => ({
+      version: "1.2",
+      consent: { essential: true, analytics: index === 0 },
+      createdAt: `2026-09-2${index}T00:00:00.000Z`,
+      userAgent: null,
+    }));
+    renderView(linkedRecord({ cookieConsents: consents }));
+
+    expect(await screen.findAllByText(/^Cookies:/)).toHaveLength(3);
+    fireEvent.click(screen.getByRole("button", { name: "Show 2 earlier" }));
+    expect(screen.getAllByText(/^Cookies:/)).toHaveLength(5);
+    fireEvent.click(screen.getByRole("button", { name: "Show fewer" }));
+    expect(screen.getAllByText(/^Cookies:/)).toHaveLength(3);
+  });
 });
