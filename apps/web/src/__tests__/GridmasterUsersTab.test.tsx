@@ -7,6 +7,7 @@ const stepUpRun = vi.fn();
 const requireCredentialAssurance = vi.fn();
 const assignGridmasterOrgRoleByEmail = vi.fn();
 const createOrganizationInvitation = vi.fn();
+const updateOrganizationMembershipGuarded = vi.fn();
 
 vi.mock("@/hooks/useStepUpAction", () => ({
   useStepUpAction: () => ({ run: stepUpRun, dialog: null }),
@@ -21,7 +22,8 @@ vi.mock("@/features/organization/client", () => ({
   createOrganizationInvitation: (...args: unknown[]) => createOrganizationInvitation(...args),
   OrganizationAccessConflictError: class extends Error {},
   removeOrganizationMembershipGuarded: vi.fn(),
-  updateOrganizationMembershipGuarded: vi.fn(),
+  updateOrganizationMembershipGuarded: (...args: unknown[]) =>
+    updateOrganizationMembershipGuarded(...args),
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -106,5 +108,59 @@ describe("Gridmaster Users tab: adding a person (41d4)", () => {
 
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
     expect(createOrganizationInvitation).not.toHaveBeenCalled();
+  });
+});
+
+describe("Gridmaster Users tab: permissions (41d4, F-61)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    stepUpRun.mockImplementation(async (action: (token: string) => Promise<unknown>) => {
+      await action("fresh-token");
+      return true;
+    });
+    requireCredentialAssurance.mockResolvedValue({ success: true });
+    updateOrganizationMembershipGuarded.mockResolvedValue({});
+  });
+
+  const admin = {
+    id: "user-1",
+    email: "admin@example.com",
+    firstName: "Ada",
+    lastName: "Admin",
+    orgRole: "admin",
+    adminPermissions: null,
+    updatedAt: "2026-09-26T00:00:00.000Z",
+  } as unknown as React.ComponentProps<typeof UsersTab>["users"][number];
+
+  async function saveAPermission() {
+    render(<UsersTab users={[admin]} orgId={ORG_ID} onUsersChanged={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Configure" }));
+    fireEvent.click(await screen.findByRole("switch", { name: "Coverage view" }));
+    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+    const confirm = screen.queryByRole("button", { name: /confirm save/i });
+    if (confirm) fireEvent.click(confirm);
+  }
+
+  it("saves a permission change with the assured token", async () => {
+    await saveAPermission();
+
+    await waitFor(() =>
+      expect(updateOrganizationMembershipGuarded).toHaveBeenCalledWith(
+        expect.objectContaining({ orgId: ORG_ID, userId: "user-1" }),
+        "fresh-token",
+      ),
+    );
+    expect(requireCredentialAssurance).toHaveBeenCalledWith("fresh-token");
+    expect(toast.success).toHaveBeenCalledWith("Permissions updated");
+  });
+
+  it("saves nothing when step-up is cancelled", async () => {
+    stepUpRun.mockResolvedValue(false);
+
+    await saveAPermission();
+
+    await waitFor(() => expect(stepUpRun).toHaveBeenCalled());
+    expect(updateOrganizationMembershipGuarded).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
   });
 });

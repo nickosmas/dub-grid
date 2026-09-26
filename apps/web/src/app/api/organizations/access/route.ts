@@ -286,9 +286,10 @@ export async function PATCH(req: NextRequest) {
     const serviceClient = getServiceClient();
 
     const roleChanged = currentUser.orgRole !== nextRole;
-    // A Gridmaster can change roles in any organization, up to Super Admin, so
-    // that needs fresh proof, as its role grant by email does (41d3, F-16).
-    if (roleChanged && allowed.isGridmaster) {
+    // A Gridmaster can change roles and permissions in any organization, up to
+    // Super Admin, so either needs fresh proof, as its role grant by email does
+    // (41d3, F-16; 41d4, F-61).
+    if (allowed.isGridmaster) {
       const assurance = await requireSensitiveActionAuth(req);
       if ("response" in assurance) return assurance.response;
     }

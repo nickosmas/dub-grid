@@ -427,6 +427,8 @@ interface PermissionsEditorProps {
   labels?: Partial<PermissionEditorLabels>;
   /** Resolving `false` means the save was cancelled, so the editor stays open. */
   onSave: (perms: AdminPermissions) => Promise<void | boolean>;
+  /** True while a step-up dialog takes over the save; the review then hides. */
+  obscured?: boolean;
   onClose: () => void;
   /**
    * `initial` is the resolved starting set (stored row over the admin
@@ -448,6 +450,7 @@ export default function PermissionsEditor({
   onSave,
   onClose,
   buildReview,
+  obscured = false,
 }: PermissionsEditorProps) {
   const initialPerms = useMemo(
     () => buildInitialPermissions(initialPermissions),
@@ -647,7 +650,7 @@ export default function PermissionsEditor({
         </div>
       </Modal>
       {unsavedChangesDialog}
-      {reviewConfig ? (
+      {reviewConfig && !obscured ? (
         <ChangeReviewModal
           title={reviewConfig.title}
           description={reviewConfig.description}

@@ -175,7 +175,7 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
     assertions: [
       /export async function DELETE[\s\S]*?\brequirePrivilegedActor\s*\(/,
       /export async function DELETE[\s\S]*?revokeAllUserSessions/,
-      /roleChanged && allowed\.isGridmaster\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.rpc\("change_user_role"/,
+      /if \(allowed\.isGridmaster\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.rpc\("change_user_role"/,
     ],
   },
   // A Gridmaster can invite any address to any organization, up to Super

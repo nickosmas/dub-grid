@@ -387,17 +387,3 @@ export async function changeOrganizationUserRole(
     CacheKey.orgDirectory(orgId),
   );
 }
-
-export async function assignOrgRoleByEmail(
-  orgId: string,
-  email: string,
-  role: string,
-): Promise<void> {
-  const { error } = await supabase.rpc("assign_org_role_by_email", {
-    p_email: email,
-    p_org_id: orgId,
-    p_org_role: role,
-  });
-  if (error) throw error;
-  await cacheDel(CacheKey.orgUsers(orgId), CacheKey.orgDirectory(orgId), CacheKey.allUsers());
-}

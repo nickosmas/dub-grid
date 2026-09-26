@@ -81,7 +81,7 @@ committed as a local checkpoint.
       credential preflight, so only the server's explicit request for a
       Gridmaster prompts; the role controls that own the confirmation
       (`InlineRoleSelect`, `MemberAccessControls`) own the step-up too.
-- [ ] **Step 5 - F-61 and the inventory** - dead helper removed, permission
+- [x] **Step 5 - F-61 and the inventory** - dead helper removed, permission
       changes gated for a Gridmaster, inventory marker extended and routes
       classified. _Done when:_ the inventory test passes and fails if an
       invitation route loses its gate.

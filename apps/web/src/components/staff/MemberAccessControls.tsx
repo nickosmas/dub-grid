@@ -186,6 +186,7 @@ export function MemberAccessControls({
                     }
                   : null;
               }}
+              obscured={Boolean(stepUp.dialog)}
               onSave={async (perms) => {
                 const completed = await stepUp.run((accessToken) =>
                   onPermissionsChange(perms, accessToken),

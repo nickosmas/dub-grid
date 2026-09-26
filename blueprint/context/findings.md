@@ -168,13 +168,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** Exclude `supabase/.temp` and `supabase/.branches`.
 **Resolution:** Both are negated in the inputs; a dry run shows no `.temp` file.
 
-### F-55 [P3] open - The organization-setup wizard assigns Super Admin without fresh proof
+### F-55 [P3] fixed - The organization-setup wizard assigns Super Admin without fresh proof
 
 **File:** `apps/web/src/app/api/gridmaster/organizations/manage/route.ts:445`
 **Found:** 2026-09-25 by `/audit` of a6e3c15c
 **Why it matters:** `createOrganizationSetup` calls `assign_org_role_by_email` with `super_admin` on the Gridmaster session alone. The organization is brand new and empty, so the reach is small.
 **Suggested fix:** Gate the setup when a Super Admin email is given, with step-up in the wizard, or record the exemption.
-**Resolution:**
+**Resolution:** Fixed in 41d4 (Step 3): `createOrganizationSetup` requires `requireSensitiveActionAuth` before creating anything when it names a Super Admin, the wizard runs it through step-up with the credential preflight, and the inventory pins the gate. Route tests prove a stale session creates no organization.
 
 ### F-56 [P3] open - No view tests for the 41d3 step-up wiring
 
@@ -192,21 +192,21 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** Confirm the limit and add it to the rule and the policy test.
 **Resolution:**
 
-### F-58 [P3] open - An impersonating Gridmaster's role change in People fails without a step-up prompt
+### F-58 [P3] fixed - An impersonating Gridmaster's role change in People fails without a step-up prompt
 
 **File:** `apps/web/src/components/staff/MembersSection.tsx:692`; `StaffDetailPage.tsx:700`; `EmployeeManagementAccessModal.tsx:247`; `ProfilePanel.tsx:325`
 **Found:** 2026-09-25 by `/audit` re-review of d6b802ca
 **Why it matters:** Impersonation uses the Gridmaster's own token, so the access route's Gridmaster gate applies, but these screens do not run through step-up: a stale session sees an error toast instead of a prompt. It fails safe.
 **Suggested fix:** Run those calls through `useStepUpAction` with the credential preflight.
-**Resolution:**
+**Resolution:** Fixed in 41d4 (Step 4): every People grant (role and permission changes, invitation create, edit and access replacement) runs inside step-up without the preflight, so only the server's request for a Gridmaster prompts; the role controls that own the confirmation own the step-up and hide it while the prompt shows. View tests cover the token and cancel paths.
 
-### F-59 [P2] open - A Gridmaster can grant Super Admin through invitations without fresh proof
+### F-59 [P2] fixed - A Gridmaster can grant Super Admin through invitations without fresh proof
 
 **File:** `apps/web/src/app/api/organizations/invitations/create/route.ts:225`; `apps/web/src/app/api/organizations/invitations/route.ts:307`, `:604`; `apps/web/src/app/api/gridmaster/organizations/manage/route.ts:457`
 **Found:** 2026-09-25 by `/audit` re-review of 7ba79e75
 **Why it matters:** A Gridmaster passes `canManageEmployees` and `canAssignOrgRole`, so it can invite an address it controls as Super Admin to any organization, or redirect a pending invitation's role and email, and the invitee registers pre-confirmed: the F-16 outcome by another door.
 **Suggested fix:** Require fresh proof for a Gridmaster (or for any Super Admin grant) on invitation create, update and reissue, with step-up in the invitation UI; add `send_invitation` and `replace_pending_invitation_access` to the inventory marker.
-**Resolution:**
+**Resolution:** Fixed in 41d4 (Steps 1-4): invitation create, a role or email edit, and access replacement require fresh proof for a Gridmaster before any write; a role raise records the editor as inviter; `INVITATION_TIER_DENIED` answers 403; the inventory marker includes `send_invitation` and `replace_pending_invitation_access`. Invitation UIs prompt instead of failing.
 
 ### F-60 [P2] open - A Gridmaster token can change memberships and invitations directly in the database
 
@@ -216,13 +216,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** A decision with F-08: narrow the Gridmaster policies to SELECT and route writes through server-only functions, or require a recent authentication in the RPCs.
 **Resolution:**
 
-### F-61 [P3] open - Two smaller role-grant gaps
+### F-61 [P3] fixed - Two smaller role-grant gaps
 
 **File:** `apps/web/src/lib/db/organizations.ts:391`; `apps/web/src/app/api/organizations/access/route.ts:335`
 **Found:** 2026-09-25 by `/audit` re-review of 7ba79e75
 **Why it matters:** `assignOrgRoleByEmail` in `lib/db` calls the RPC from the browser client; it has no callers but is still exported, inviting an ungated path back. A Gridmaster's permission-only change on the access route runs without fresh proof (a smaller grant: an Admin still cannot assign Admin or Super Admin).
 **Suggested fix:** Remove the dead helper; gate a Gridmaster's permission changes like role changes.
-**Resolution:**
+**Resolution:** Fixed in 41d4 (Step 5): the unused browser-side `assignOrgRoleByEmail` is removed, and a Gridmaster's permission-only change on the access route requires fresh proof like a role change; the portal's permission editor runs through step-up and the review hides while the prompt shows.
 
 ### F-62 [P2] open - Turning on `secure_password_change` would refuse password changes for two-factor users on sessions older than a day
 

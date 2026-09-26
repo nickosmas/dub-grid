@@ -494,17 +494,27 @@ export function UsersTab({
                 }
               : null;
           }}
+          obscured={Boolean(stepUp.dialog)}
           onSave={async (perms) => {
-            if (!editingPerms.updatedAt) {
+            const expectedUpdatedAt = editingPerms.updatedAt;
+            if (!expectedUpdatedAt) {
               throw new Error("User access data is out of date. Refresh and try again.");
             }
             try {
-              await updateOrganizationMembershipGuarded({
-                orgId,
-                userId: editingPerms.id,
-                expectedUpdatedAt: editingPerms.updatedAt,
-                adminPermissions: perms,
+              // A Gridmaster's permission change needs fresh proof (41d4, F-61).
+              const completed = await stepUp.run(async (accessToken) => {
+                await requireCredentialAssurance(accessToken);
+                await updateOrganizationMembershipGuarded(
+                  {
+                    orgId,
+                    userId: editingPerms.id,
+                    expectedUpdatedAt,
+                    adminPermissions: perms,
+                  },
+                  accessToken,
+                );
               });
+              if (!completed) return false;
               toast.success("Permissions updated");
               onUsersChanged();
             } catch (err) {
