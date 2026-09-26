@@ -48,12 +48,12 @@ committed as a local checkpoint.
 
 ## Build steps
 
-- [ ] **Step 1 - the fresh-proof check** - migration 051 adds
+- [x] **Step 1 - the fresh-proof check** - migration 051 adds
       `caller_has_fresh_proof()`. _Done when:_ live tests with simulated
       claims prove fresh password, stale password, fresh TOTP at aal2, TOTP
       at aal1, a future timestamp and missing `amr`, matching the TypeScript
       rule.
-- [ ] **Step 2 - the grant functions refuse a stale Gridmaster** - the same
+- [x] **Step 2 - the grant functions refuse a stale Gridmaster** - the same
       migration redefines the five functions from their newest definitions
       with the guard first. _Done when:_ live tests prove each refuses a
       stale Gridmaster, a fresh one still works, and a Super Admin's
