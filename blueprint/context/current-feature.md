@@ -124,11 +124,17 @@ Continuous Mode: they push, send, reach production or reseed shared state.
       proof, with the prompt in the screens that make them.
 - [x] **Repair F-69** - the missing 41d4 view and route tests.
 
-- [ ] **Release note from 41d5** - migrations 051, 052 and 053 go to
-      production in that order by the runbook, before or after the release
-      (production's code already gates every grant, and nothing there writes
-      memberships or profiles as a signed-in user); each apply needs the
-      owner's approval.
+- [x] **Release note from 41d5** - migrations 051, 052 and 053 applied to
+      production 2026-09-26 with the owner's approval, by the runbook:
+      candidate 53dacf24; production at 050 with exactly 051 to 053 missing
+      and every invariant passing; the dry run proposed those three; a
+      scratch stack started at 050 (ledger read directly: 50, then 53) took
+      them and re-inspected complete; latest backup 2026-09-25 13:38:30 UTC.
+      After the apply the inspector reads 53 entries, none missing, health
+      200, the final dry run is up to date, `authenticated` holds no insert
+      or update on memberships and no insert or delete on profiles, cannot
+      execute `caller_has_fresh_proof()`, and all five grant functions carry
+      the guard.
 
 ## Notes for the AI
 
