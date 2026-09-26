@@ -217,7 +217,6 @@ describe("EmployeeManagementAccessEditor", () => {
         updatedAt: "2026-01-03T00:00:00.000Z",
         departmentIds: [10],
       }),
-      token: "resent-token",
       expiresAt: "2026-12-31T00:00:00.000Z",
     });
     revokeOrganizationInvitationGuardedMock.mockResolvedValue(

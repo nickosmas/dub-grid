@@ -34,11 +34,13 @@ export async function isGridmasterActor(
   serviceClient: ServiceClient,
   actorId: string,
 ): Promise<boolean> {
-  const { data: profile } = await serviceClient
+  const { data: profile, error } = await serviceClient
     .from("profiles")
     .select("platform_role")
     .eq("id", actorId)
     .maybeSingle();
+  // Failing open would skip the fresh-proof gate on a read error.
+  if (error) throw error;
   return profile?.platform_role === "gridmaster";
 }
 

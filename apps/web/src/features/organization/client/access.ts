@@ -396,7 +396,7 @@ export async function resendOrganizationInvitationGuarded(input: {
   orgId: string;
   invitationId: string;
   expectedUpdatedAt: string;
-}): Promise<{ invitation: Invitation; token: string; expiresAt: string }> {
+}): Promise<{ invitation: Invitation; expiresAt: string }> {
   const response = await fetch(resolveClientUrl("/api/organizations/invitations"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -409,13 +409,12 @@ export async function resendOrganizationInvitationGuarded(input: {
     throw new InvitationAccessConflictError(body.invitation);
   }
 
-  if (!response.ok || !body?.invitation || !body.token || !body.expiresAt) {
+  if (!response.ok || !body?.invitation || !body.expiresAt) {
     throw new Error(getErrorMessage(body, "We couldn't resend invitation. Try again."));
   }
 
   return {
     invitation: body.invitation,
-    token: body.token,
     expiresAt: body.expiresAt,
   };
 }
@@ -470,7 +469,7 @@ export async function revokeInvitation(invitationId: string, orgId: string): Pro
 export async function resendInvitation(
   invitationId: string,
   orgId: string,
-): Promise<{ token: string; expiresAt: string }> {
+): Promise<{ expiresAt: string }> {
   const invitations = await fetchOrganizationInvitations(orgId);
   const invitation = invitations.find((item) => item.id === invitationId);
   if (!invitation?.updatedAt) {
@@ -481,10 +480,7 @@ export async function resendInvitation(
     invitationId,
     expectedUpdatedAt: invitation.updatedAt,
   });
-  return {
-    token: resent.token,
-    expiresAt: resent.expiresAt,
-  };
+  return { expiresAt: resent.expiresAt };
 }
 
 export async function removeUserFromOrganization(userId: string, orgId: string): Promise<void> {

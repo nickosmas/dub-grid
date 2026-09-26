@@ -438,7 +438,11 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
             accessToken,
           ),
         );
-        if (!completed) return;
+        if (!completed) {
+          // The address change already revoked the old invitation.
+          toast.info("Employee saved. No new invitation was sent.");
+          return;
+        }
 
         toast.success(`Employee saved. A new invitation was sent to ${savedEmployee.email}.`);
       } catch (err) {

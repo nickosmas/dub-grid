@@ -654,7 +654,7 @@ describe("PATCH /api/organizations/invitations - super_admin tier ceiling", () =
     expect(invitationUpdateOperations[0]?.values.role_to_assign).toBe("super_admin");
   });
 
-  it("does not consult the tier ceiling when the role is not being changed", async () => {
+  it("checks a redirect against the invitation's current role", async () => {
     invitationUpdateMaybeSingle.mockResolvedValue({
       data: CURRENT_INVITATION_ROW,
       error: null,
@@ -671,7 +671,7 @@ describe("PATCH /api/organizations/invitations - super_admin tier ceiling", () =
     );
 
     expect(response.status).toBe(200);
-    expect(canAssignOrgRole).not.toHaveBeenCalled();
+    expect(canAssignOrgRole).toHaveBeenCalledWith(expect.anything(), "actor-1", ORG_ID, "user");
   });
 });
 
@@ -953,5 +953,73 @@ describe("a Gridmaster's invitation changes (41d4, F-59)", () => {
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN });
     expect(sendInvitationEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe("an invitation's grant stays with the person who could make it (41d4 audit)", () => {
+  it("refuses an Admin redirecting a Super Admin invitation to another address", async () => {
+    invitationSelectMaybeSingle.mockResolvedValue({
+      data: { ...CURRENT_INVITATION_ROW, role_to_assign: "super_admin" },
+      error: null,
+    });
+    canAssignOrgRole.mockResolvedValue(false);
+
+    const { PATCH } = await importRoute();
+    const response = await PATCH(
+      makePatchRequest({
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+        email: "mine@test.com",
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(canAssignOrgRole).toHaveBeenCalledWith(
+      expect.anything(),
+      "actor-1",
+      ORG_ID,
+      "super_admin",
+    );
+    expect(invitationUpdateOperations).toHaveLength(0);
+  });
+
+  it("never hands a resent token back to the caller", async () => {
+    const pending = { ...CURRENT_INVITATION_ROW, expires_at: "2099-02-01T00:00:00.000Z" };
+    invitationSelectMaybeSingle
+      .mockResolvedValueOnce({ data: pending, error: null })
+      .mockResolvedValue({
+        data: { ...pending, token: "rotated-token", updated_at: "2026-01-01T00:00:01.000Z" },
+        error: null,
+      });
+    invitationUpdateMaybeSingle.mockResolvedValue({
+      data: { ...pending, token: "rotated-token", updated_at: "2026-01-01T00:00:01.000Z" },
+      error: null,
+    });
+    serviceRpc.mockResolvedValue({
+      data: {
+        invitation_id: INVITATION_ID,
+        token: "rotated-token",
+        expires_at: "2099-02-01T00:00:00.000Z",
+        previous_token: "original-token",
+        previous_expires_at: "2099-01-01T00:00:00.000Z",
+      },
+      error: null,
+    });
+
+    const { POST } = await importRoute();
+    const response = await POST(
+      makePostRequest({
+        action: "resend",
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(JSON.stringify(body)).not.toContain("rotated-token");
+    expect(body).not.toHaveProperty("token");
   });
 });

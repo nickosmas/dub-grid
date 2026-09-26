@@ -307,9 +307,17 @@ export async function PATCH(req: NextRequest) {
       return buildConflictResponse(currentInvitation);
     }
 
+    const nextEmail =
+      fields.email !== undefined
+        ? normalizeOptionalStaffEmail(fields.email) || undefined
+        : undefined;
+    const emailChanged = nextEmail !== undefined && nextEmail !== currentInvitation.email;
+    const grantedRole = fields.roleToAssign ?? currentInvitation.roleToAssign;
+    // Redirecting a pending invitation grants its role to the new address, so
+    // the editor must be able to grant that role, as for a role change.
     if (
-      fields.roleToAssign !== undefined &&
-      !(await canAssignOrgRole(getServiceClient(), user.id, orgId, fields.roleToAssign))
+      (fields.roleToAssign !== undefined || emailChanged) &&
+      !(await canAssignOrgRole(getServiceClient(), user.id, orgId, grantedRole))
     ) {
       await writeInvitationAuditEntry({
         orgId,
@@ -319,7 +327,7 @@ export async function PATCH(req: NextRequest) {
         resourceId: invitationId,
         details: {
           email: currentInvitation.email,
-          requestedRole: fields.roleToAssign,
+          requestedRole: grantedRole,
           currentRole: currentInvitation.roleToAssign,
           outcome: "rejected",
           reason: "policy_denied",
@@ -332,10 +340,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     const nextInvitation: Partial<Invitation> = {
-      email:
-        fields.email !== undefined
-          ? normalizeOptionalStaffEmail(fields.email) || undefined
-          : undefined,
+      email: nextEmail,
       roleToAssign: fields.roleToAssign,
       firstName:
         fields.firstName !== undefined
@@ -361,8 +366,6 @@ export async function PATCH(req: NextRequest) {
 
     const roleChanged =
       fields.roleToAssign !== undefined && fields.roleToAssign !== currentInvitation.roleToAssign;
-    const emailChanged =
-      nextInvitation.email !== undefined && nextInvitation.email !== currentInvitation.email;
     // Redirecting a pending invitation to another address grants its role to
     // that address, so both changes need a Gridmaster's fresh proof (F-59).
     if ((roleChanged || emailChanged) && (await isGridmasterActor(getServiceClient(), user.id))) {
@@ -588,6 +591,15 @@ export async function POST(req: NextRequest) {
 
     const serviceClient = getServiceClient();
 
+    // Asked before the recipient's send limit, so a refused attempt spends none.
+    if (
+      parsed.data.action === "replace_access" &&
+      (await isGridmasterActor(serviceClient, user.id))
+    ) {
+      const assurance = await requireSensitiveActionAuth(req);
+      if ("response" in assurance) return assurance.response;
+    }
+
     const targetLimit = await checkInvitationEmailLimit(currentInvitation.email);
     if (targetLimit.misconfigured) {
       return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
@@ -638,11 +650,6 @@ export async function POST(req: NextRequest) {
           userAgent: req.headers.get("user-agent"),
         });
         return NextResponse.json({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN }, { status: 403 });
-      }
-
-      if (await isGridmasterActor(serviceClient, user.id)) {
-        const assurance = await requireSensitiveActionAuth(req);
-        if ("response" in assurance) return assurance.response;
       }
 
       const { data: replacementData, error: replacementError } = await serviceClient.rpc(
@@ -777,10 +784,10 @@ export async function POST(req: NextRequest) {
         inviteeEmail: replacementInvitation.email,
       });
 
+      // The token goes only to the invitee's inbox, never back to the caller.
       return NextResponse.json({
         success: true,
         invitation: replacementInvitation,
-        token: replacement.token,
         expiresAt: replacement.expires_at,
       });
     }
@@ -899,7 +906,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       invitation: latestInvitation,
-      token,
       expiresAt,
     });
   } catch (err) {

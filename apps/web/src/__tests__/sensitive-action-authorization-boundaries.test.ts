@@ -190,7 +190,9 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
     policy: "conditional-sensitive",
     assertions: [
       /\(roleChanged \|\| emailChanged\) && \(await isGridmasterActor\(getServiceClient\(\), user\.id\)\)\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.update\(/,
-      /if \(await isGridmasterActor\(serviceClient, user\.id\)\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;\s*\}\s*const \{ data: replacementData, error: replacementError \} = await serviceClient\.rpc\(\s*"replace_pending_invitation_access"/,
+      /parsed\.data\.action === "replace_access" &&\s*\(await isGridmasterActor\(serviceClient, user\.id\)\)\s*\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;\s*\}\s*const targetLimit[\s\S]*?"replace_pending_invitation_access"/,
+      // Neither resend nor replacement hands the new token back to the caller.
+      /^(?![\s\S]*\btoken: replacement\.token,\s*expiresAt)(?![\s\S]*invitation: latestInvitation,\s*token,)/,
     ],
   },
   "apps/web/src/app/api/organizations/role-change/route.ts": {

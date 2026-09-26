@@ -244,16 +244,6 @@ export const EmployeeManagementAccessEditor = forwardRef<
     // sync role + management departments on the existing membership.
     if (!matchedUser) return false;
 
-    if (pendingInvitation) {
-      if (!pendingInvitation.updatedAt) {
-        throw new Error("Invitation data is out of date. Refresh and try again.");
-      }
-      await revokeOrganizationInvitationGuarded({
-        orgId,
-        invitationId: pendingInvitation.id,
-        expectedUpdatedAt: pendingInvitation.updatedAt,
-      });
-    }
     if (matchedUser.orgRole !== role && matchedUser.orgRole !== "super_admin") {
       if (!matchedUser.updatedAt) {
         throw new Error("User access data is out of date. Refresh and try again.");
@@ -272,6 +262,17 @@ export const EmployeeManagementAccessEditor = forwardRef<
         );
       });
       if (!completed) return false;
+    }
+    // Revoked after the role change, so a cancelled step-up leaves it pending.
+    if (pendingInvitation) {
+      if (!pendingInvitation.updatedAt) {
+        throw new Error("Invitation data is out of date. Refresh and try again.");
+      }
+      await revokeOrganizationInvitationGuarded({
+        orgId,
+        invitationId: pendingInvitation.id,
+        expectedUpdatedAt: pendingInvitation.updatedAt,
+      });
     }
     await updateAppOnlyUser(matchedUser.id, orgId, {
       departmentIds: managementDepartmentIds,

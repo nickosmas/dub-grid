@@ -86,6 +86,16 @@ committed as a local checkpoint.
       classified. _Done when:_ the inventory test passes and fails if an
       invitation route loses its gate.
 
+- [x] **Repair F-63 and F-59 (audit of e42da4bd..821c7ff4)** - an email
+      change checks the editor can grant the invitation's role; resend and
+      access replacement no longer return the token; the Gridmaster check
+      fails closed; access replacement asks before the send limit; the
+      unused `sendInvitation` helper is gone; a cancelled reinvite says so
+      and the management editor revokes after the role change (F-63 to
+      F-67). _Done when:_ route tests prove an Admin's redirect is refused
+      and no token is returned, and they and the inventory fail against the
+      previous code.
+
 ## Files / areas
 
 - `apps/web/src/app/api/organizations/invitations/create/route.ts`,

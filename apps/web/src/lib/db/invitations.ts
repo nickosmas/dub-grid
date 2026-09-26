@@ -1,10 +1,10 @@
-import { supabase, cacheThrough, cacheDel, CacheKey, TTL, logAudit } from "./shared";
+import { supabase, cacheThrough, cacheDel, CacheKey, TTL } from "./shared";
 import { parseNameMismatchResponse } from "@/lib/account-linking";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { rowToInvitation } from "./mappers";
 import type { DbInvitation } from "./types";
 import { resendOrganizationInvitationGuarded, revokeOrganizationInvitationGuarded } from "./access";
-import type { Invitation, AssignableOrganizationRole } from "@/types";
+import type { Invitation } from "@/types";
 
 // ── Invitations ──────────────────────────────────────────────────────────────
 
@@ -20,40 +20,6 @@ export async function acceptInvitation(
     orgId: data.org_id,
     role: data.role,
     orgSlug: data.org_slug ?? null,
-  };
-}
-
-export async function sendInvitation(
-  email: string,
-  role: AssignableOrganizationRole,
-  orgId: string,
-  employeeId?: string,
-  opts?: {
-    firstName?: string;
-    lastName?: string;
-    phone?: string;
-    departmentIds?: number[];
-    deptAdminIds?: number[];
-  },
-): Promise<{ invitationId: string; token: string; expiresAt: string }> {
-  const { data, error } = await supabase.rpc("send_invitation", {
-    p_email: email,
-    p_role: role,
-    p_org_id: orgId,
-    p_employee_id: employeeId ?? null,
-    p_first_name: opts?.firstName ?? null,
-    p_last_name: opts?.lastName ?? null,
-    p_phone: opts?.phone ?? null,
-    p_department_ids: opts?.departmentIds ?? [],
-    p_dept_admin_ids: opts?.deptAdminIds ?? [],
-  });
-  if (error) throw error;
-  await cacheDel(CacheKey.orgDirectory(orgId), CacheKey.invitations(orgId));
-  void logAudit("invitation.sent", "invitation", data.invitation_id, { email, role }, orgId);
-  return {
-    invitationId: data.invitation_id,
-    token: data.token,
-    expiresAt: data.expires_at,
   };
 }
 
@@ -93,7 +59,7 @@ export async function revokeInvitation(invitationId: string, orgId: string): Pro
 export async function resendInvitation(
   invitationId: string,
   orgId: string,
-): Promise<{ token: string; expiresAt: string }> {
+): Promise<{ expiresAt: string }> {
   const { data: invitationRow, error } = await supabase
     .from("invitations")
     .select("updated_at")
@@ -110,10 +76,7 @@ export async function resendInvitation(
     expectedUpdatedAt: invitationRow.updated_at,
   });
   await cacheDel(CacheKey.invitations(orgId));
-  return {
-    token: resent.token,
-    expiresAt: resent.expiresAt,
-  };
+  return { expiresAt: resent.expiresAt };
 }
 
 export async function linkEmployeeToUser(

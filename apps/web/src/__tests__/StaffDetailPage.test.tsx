@@ -394,7 +394,6 @@ describe("StaffDetailPage", () => {
 
   it("reissues a pending invitation in place instead of revoking it and inviting again", async () => {
     vi.mocked(resendInvitation).mockResolvedValue({
-      token: "rotated-token",
       expiresAt: "2099-01-04T00:00:00.000Z",
     });
     render(<StaffDetailPage employeeId="emp-1" />);
