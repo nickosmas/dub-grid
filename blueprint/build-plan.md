@@ -639,7 +639,9 @@
           email-provider and migration/reissue rehearsals with explicit
           production checks; unavailable environment evidence is recorded as
           a release blocker. It resumed after 41d4 and 41d5 and qualifies them
-          too.
+          too; parked at
+          `blueprint/context/parked/41d3-release-qualification.md` while 41d6
+          is built.
     - [x] 41d4. **Gridmaster grants with step-up** - a Gridmaster can invite
           someone as Super Admin from the Gridmaster portal, the setup wizard
           and the People screens, and every Gridmaster grant (invitation
@@ -653,6 +655,11 @@
           Gridmaster promotion, demotion and deactivation) refuse a Gridmaster
           without a recent sign-in, by the same rule the routes apply, and no
           signed-in caller writes organization memberships directly (F-60).
+    - [ ] 41d6. **Gridmaster direct writes need fresh proof** - on every table
+          a Gridmaster policy lets it write, a Gridmaster token without a
+          recent sign-in can no longer insert, update or delete through the
+          data API; other callers and every application path are unchanged
+          (F-74, table policies).
 - [ ] 42. **Schedule indicators on every schedule surface** - a schedule
       indicator is visible wherever that person's shift is shown, not only on
       the desktop week and two-week grid. Every surface uses the indicator's
