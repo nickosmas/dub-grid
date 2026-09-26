@@ -7206,7 +7206,7 @@ function SchedulerContent({
                 certifications={certifications}
                 orgRoles={orgRoles}
                 isCellInteractive={canEditShifts || canEditNotes || !!currentEmpId}
-                activeIndicatorIdsForKey={activeIndicatorIdsForKey}
+                noteMarksForKey={noteMarksForKey}
                 activeFocusArea={activeFocusArea}
                 draftKindForKey={draftKindForKey}
                 shiftDisplayMode={org?.shiftDisplayMode}

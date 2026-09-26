@@ -1,7 +1,7 @@
 # Feature: Web schedule views show indicators
 
 **From build-plan:** feature 42a
-**Status:** spec - awaiting review
+**Status:** in progress
 
 ## Goal
 
@@ -20,8 +20,9 @@ colour and the existing visibility rule.
   positioned (its absolute placement stays the default for the grid).
 - **Phone-width day view.** The generic blue dot and its focus-area-only
   condition go. Each shift shows its marks through `NoteDots`, looked up the
-  way the grid looks them up (the section's focus area when there is one,
-  the general key otherwise), so a general shift shows its indicators too.
+  way the grid looks them up, with the section's focus area. The phone
+  view's sections are always focus areas, so the old condition was always
+  true; the real change is named, coloured marks with their draft states.
 - **Month view.** Day cells show counts, not people, so indicators appear
   where each person's shift does: the day popover's rows. Each row carries
   its employee and focus-area ids so its marks can be found.
@@ -60,20 +61,17 @@ colour and the existing visibility rule.
 
 ## Build steps
 
-- [ ] **Step 1 - inline NoteDots and the phone day view** - `NoteDots` takes
+- [x] **Step 1 - inline NoteDots and the phone day view** - `NoteDots` takes
       a `placement` of `"corner"` (default, today's absolute placement) or
       `"inline"`; `MobileDayView` takes `noteMarksForKey` and
       `indicatorTypes`, drops `activeIndicatorIdsForKey` and the blue dot, and
-      renders inline marks for focus-area and general shifts. _Done when:_ a
-      `NoteDots` test shows inline placement is not absolutely positioned; a
-      `MobileDayView` test shows a general shift and a focus-area shift each
-      render their named marks, and a draft mark renders only when the marks
-      carry it.
+      renders inline marks. _Done when:_ a
+      `NoteDots` test shows inline placement is not absolutely positioned; a `MobileDayView` test shows a shift's named marks looked up with the section's focus area, a draft mark only when the marks carry it, and no dot without indicators.
 - [ ] **Step 2 - Month view day popover** - rows carry `empId` and
       `focusAreaId`; `MonthView` takes `noteMarksForKey` and
       `indicatorTypes` and shows each row's marks inline. _Done when:_ a
       `MonthView` test opens a day and finds each person's indicator by name,
-      including one on a general shift.
+      looked up with the row's focus area.
 - [ ] **Step 3 - read-only indicator list in the slideover** -
       `ShiftEditPanel` renders a labelled list (colour and name) of the
       active indicators when the viewer cannot edit indicators, per card for
