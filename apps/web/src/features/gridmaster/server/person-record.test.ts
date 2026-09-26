@@ -185,7 +185,7 @@ function fixtures(): Record<string, Row[]> {
         phone: null,
         onboarding_completed_at: "2026-01-04T00:00:00.000Z",
         tooltip_tours_completed: { schedule: true },
-        updated_at: null,
+        updated_at: "2026-01-04T00:00:00.000Z",
       },
       {
         id: "m-b",
@@ -202,7 +202,7 @@ function fixtures(): Record<string, Row[]> {
         phone: null,
         onboarding_completed_at: null,
         tooltip_tours_completed: {},
-        updated_at: null,
+        updated_at: "2026-03-01T00:00:00.000Z",
       },
     ],
     employees: [

@@ -102,7 +102,7 @@ throwaway worktree, then committed as a local checkpoint and pushed.
       them through step-up. _Done when:_ route tests cover a stale session, a
       conflicting email, a Gridmaster target and each audit row; a view test
       shows a cancelled step-up changes nothing.
-- [ ] **Step 5 - membership actions** - change role and edit permissions
+- [x] **Step 5 - membership actions** - change role and edit permissions
       (the guarded access helpers and `PermissionsEditor`), remove membership.
       _Done when:_ view tests show each action calls its helper with the
       card's organization and refreshes the record, and a cancel changes

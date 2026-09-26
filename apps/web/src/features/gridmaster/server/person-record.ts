@@ -71,7 +71,7 @@ function mapMembership(row: Row): GridmasterMembership {
     phone: (row.phone as string | null) ?? null,
     onboardingCompletedAt: (row.onboarding_completed_at as string | null) ?? null,
     tooltipToursCompleted: (row.tooltip_tours_completed as Record<string, unknown> | null) ?? {},
-    updatedAt: (row.updated_at as string | null) ?? null,
+    updatedAt: row.updated_at as string,
   };
 }
 

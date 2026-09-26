@@ -81,7 +81,7 @@ export function buildAdminPermissionChanges(
 }
 
 export function buildMembershipAccessChanges(
-  previous: OrganizationUser,
+  previous: Pick<OrganizationUser, "orgRole" | "adminPermissions">,
   next: Pick<OrganizationUser, "orgRole" | "adminPermissions">,
 ): AccessReviewChange[] {
   const changes: AccessReviewChange[] = [];

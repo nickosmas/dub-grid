@@ -24,6 +24,7 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
 import { PersonAccountCard } from "./PersonAccountCard";
 import { PersonHeader } from "./PersonHeader";
+import { PersonMembershipActions } from "./PersonMembershipActions";
 import { PersonOrganizationCard } from "./PersonOrganizationCard";
 import { getPersonName, getPrimaryOrgId } from "./person-format";
 
@@ -283,6 +284,16 @@ export default function GridmasterPersonView({
           organization={organization}
           record={record}
           onOpenOrganization={onOpenOrganization}
+          membershipActions={
+            account ? (
+              <PersonMembershipActions
+                organization={organization}
+                userId={account.userId}
+                name={name}
+                onChanged={refresh}
+              />
+            ) : undefined
+          }
         />
       ))}
       {terminated ? (

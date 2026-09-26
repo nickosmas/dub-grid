@@ -50,6 +50,7 @@ describe("Gridmaster AllUsersView account separation", () => {
         "changeEmailConfirm",
       ],
     ],
+    ["person/PersonMembershipActions", ["roleConfirm"]],
     [
       "GridmasterAccountsView",
       [

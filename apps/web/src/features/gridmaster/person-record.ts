@@ -66,7 +66,7 @@ export interface GridmasterMembership {
   phone: string | null;
   onboardingCompletedAt: string | null;
   tooltipToursCompleted: Record<string, unknown>;
-  updatedAt: string | null;
+  updatedAt: string;
 }
 
 export type GridmasterStaffRecord = Employee & {

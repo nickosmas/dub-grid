@@ -109,11 +109,7 @@ function MembershipFacts({
         value={stamp(record, membership.archivedAt, membership.archivedBy)}
         empty="No"
       />
-      <PersonField
-        label="Membership updated"
-        value={membership.updatedAt ? formatDay(membership.updatedAt) : null}
-        tabular
-      />
+      <PersonField label="Membership updated" value={formatDay(membership.updatedAt)} tabular />
     </PersonFieldGrid>
   );
 }
