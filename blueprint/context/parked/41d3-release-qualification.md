@@ -189,6 +189,14 @@ Continuous Mode: they push, send, reach production or reseed shared state.
       audit table, and both impersonation functions carry the new wording
       with `start_impersonation`'s guard kept.
 
+- [x] **Release note from F-79** - migration 058 (an impersonation ended as
+      expired keeps its expiry as its end time) applied 2026-09-26 by the
+      owner, after release pull request 118 (merge 1031b122) deployed,
+      following a scratch rehearsal from 057. Before: 57 ledger entries, only
+      058 missing; latest backup 2026-09-26 13:40:45 UTC (physical,
+      completed). After: 58 ledger entries, none missing, health 200, a final
+      dry run up to date.
+
 ## Notes for the AI
 
 - Never handle token values; the owner places them in `.env.remote`.
