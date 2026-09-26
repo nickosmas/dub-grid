@@ -13,7 +13,7 @@ describe("push-auth-templates", () => {
   it("reads every template and each security notice's enabled flag", () => {
     const notices = config.templates.filter((template) => template.notification);
 
-    expect(config.templates.length).toBe(10);
+    expect(config.templates.length).toBe(9);
     expect(notices.map((template) => template.notification)).toEqual([
       { type: "password_changed", enabled: true },
       { type: "email_changed", enabled: true },

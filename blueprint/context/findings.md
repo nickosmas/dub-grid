@@ -231,3 +231,11 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Why it matters:** It tracks function names rather than signatures, so revoking one overload would drop a name another overload still grants; it only sees a grant spelled `TO authenticated;`; and `[^)]*` breaks on a typed parameter such as `NUMERIC(10,2)`. None applies to today's migrations, and the live function-grant check would still catch a real drift.
 **Suggested fix:** Track `name(signature)` pairs and accept a role list in the grant pattern.
 **Resolution:**
+
+### F-73 [P2] fixed - Production Supabase accepts public sign-ups on an invite-only product
+
+**File:** `supabase/config.toml:165` (`enable_signup = true`); production auth config (`disable_signup: false`, read 2026-09-26)
+**Found:** 2026-09-26 during the email review (read-only Management API read)
+**Why it matters:** `internal/authentication.md` and `RBAC_SYSTEM_DESIGN.md` say email sign-up is off in production, but it is on. Anyone with the public publishable key can create and confirm an account through `/auth/v1/signup`, or through a sign-in link request, which also creates a missing user while sign-ups are open. The account has no organization, so RLS should still hide tenant data, but every RPC granted to `authenticated` becomes reachable by strangers.
+**Suggested fix:** Set `disable_signup: true` on production (dashboard or Management API). Only `/api/invitations/register` creates accounts, through `auth.admin.createUser`, which ignores the setting. Local `config.toml` stays open for the integration tests that call `signUp`. Consider having `auth:templates:check` report the setting so it cannot drift again.
+**Resolution:** Production set to `disable_signup: true` through the Management API on 2026-09-26 (read back true; email sign-in and confirmation unchanged). Local `config.toml` stays open for the integration tests. The drift check in `auth:templates:check` is not added yet.

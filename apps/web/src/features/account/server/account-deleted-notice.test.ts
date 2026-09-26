@@ -41,7 +41,7 @@ describe("scheduleAccountDeletedNotice", () => {
       expect.objectContaining({
         to: "person@example.com",
         subject: ACCOUNT_DELETED_SUBJECT,
-        html: expect.stringContaining("Your DubGrid account was deleted"),
+        html: expect.stringContaining("Your DubGrid account has been deleted"),
       }),
     );
   });

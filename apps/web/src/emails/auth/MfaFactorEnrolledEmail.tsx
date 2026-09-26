@@ -15,7 +15,7 @@ export function MfaFactorEnrolledEmail({ logoUrl }: { logoUrl?: string } = {}) {
       body="An authenticator app was added as a verification method for your DubGrid sign-in."
       // A reset would ask for the new authenticator, which may be someone
       // else's, so the only useful step for the owner is support.
-      footer="If this was you, there's nothing to do. If it wasn't, contact support@dubgrid.com right away: someone else may be using your DubGrid sign-in."
+      footer="If it was you, you don't need to do anything. If it wasn't you, contact support@dubgrid.com right away, since someone else may be using your DubGrid sign-in."
       logoUrl={logoUrl}
     />
   );

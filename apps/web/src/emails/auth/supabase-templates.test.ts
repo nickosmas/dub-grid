@@ -143,7 +143,7 @@ describe("Supabase auth email templates", () => {
   });
 
   // Supabase's invite email cannot be given a verified organization name, so it
-  // stays unused; invitations go through the app's own email, which names one.
+  // has no template; invitations go through the app's own email, which names one.
   it("sends no invitation through Supabase's generic invite email", () => {
     const sources: string[] = [];
     const walk = (dir: string) => {

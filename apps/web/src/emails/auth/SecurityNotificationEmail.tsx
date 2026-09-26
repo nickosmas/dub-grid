@@ -1,6 +1,7 @@
 import * as React from "react";
-import { Hr, Text } from "@react-email/components";
+import { Text } from "@react-email/components";
 import { EmailLayout } from "../components/EmailLayout";
+import { EmailGreeting, EmailSignOff } from "../components/EmailSalutation";
 import { styles } from "../components/theme";
 import { SUPABASE } from "./placeholders";
 
@@ -37,9 +38,10 @@ export function SecurityNotificationEmail({
   return (
     <EmailLayout logoUrl={logoUrl} preview={heading}>
       <Text style={styles.heading}>{heading}</Text>
+      <EmailGreeting />
       <Text style={styles.paragraph}>{body}</Text>
-      <Hr style={styles.divider} />
-      <Text style={styles.fine}>{footer}</Text>
+      <Text style={styles.paragraph}>{footer}</Text>
+      <EmailSignOff />
     </EmailLayout>
   );
 }

@@ -17,7 +17,7 @@ export function EmailChangedNotificationEmail({ logoUrl }: { logoUrl?: string } 
           {SUPABASE.newEmail}.
         </>
       }
-      footer="If this was you, there's nothing to do. If it wasn't, contact support@dubgrid.com right away: whoever made the change can now sign in with the new address."
+      footer="If it was you, you don't need to do anything. If it wasn't you, contact support@dubgrid.com right away, since whoever made the change can now sign in with the new address."
       logoUrl={logoUrl}
     />
   );

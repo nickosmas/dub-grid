@@ -113,6 +113,39 @@ describe("sendNotification email", () => {
     expect(sendResendEmail).toHaveBeenCalledTimes(1);
   });
 
+  it("emails the labeled layout while push keeps the one-sentence message", async () => {
+    pushEligible.mockReturnValue(true);
+
+    await sendNotification(
+      "user-1",
+      "org-1",
+      "security_new_device" as never,
+      "Title",
+      "Message",
+      {},
+      {
+        writeInApp: false,
+        email: {
+          intro: "We noticed a new sign-in.",
+          details: [{ label: "Device", value: "Chrome on Macintosh" }],
+          closing: "If it wasn't you, contact support@dubgrid.com.",
+        },
+      },
+    );
+
+    const { html } = sendResendEmail.mock.calls[0]?.[0] as { html: string };
+    expect(html).toContain("We noticed a new sign-in.");
+    expect(html).toMatch(/Device<\/strong>(<!-- -->)?: (<!-- -->)?Chrome on Macintosh/);
+    expect(html).toContain("If it wasn&#x27;t you");
+    expect(html).not.toContain(">Message<");
+    expect(sendMobilePushNotifications).toHaveBeenCalledWith(
+      "user-1",
+      "org-1",
+      expect.objectContaining({ body: "Message" }),
+      { accountWide: true },
+    );
+  });
+
   it("pushes a security alert to the whole account and other alerts to the organization", async () => {
     pushEligible.mockReturnValue(true);
 

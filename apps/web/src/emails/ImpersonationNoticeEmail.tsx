@@ -1,6 +1,7 @@
 import * as React from "react";
-import { Hr, Text } from "@react-email/components";
+import { Text } from "@react-email/components";
 import { EmailLayout } from "./components/EmailLayout";
+import { EmailGreeting, EmailSignOff } from "./components/EmailSalutation";
 import { styles, PREVIEW_LOGO_URL } from "./components/theme";
 import { formatInvitationExpiry } from "./invitation-expiry";
 
@@ -43,20 +44,24 @@ export function ImpersonationNoticeEmail({
   return (
     <EmailLayout logoUrl={logoUrl} preview={heading}>
       <Text style={styles.heading}>{heading}</Text>
+      <EmailGreeting />
       <Text style={styles.paragraph}>
         {ended ? (
-          <>DubGrid support is no longer using your account in {where}.</>
+          <>
+            DubGrid support has finished using your account in {where}. There&apos;s nothing you
+            need to do.
+          </>
         ) : (
           <>
-            DubGrid support is using your account in {where}.
+            We&apos;re letting you know that DubGrid support is using your account in {where}.
             {deadline ? ` This access ends by ${deadline} at the latest.` : null}
           </>
         )}
       </Text>
-      <Hr style={styles.divider} />
-      <Text style={styles.fine}>
+      <Text style={styles.paragraph}>
         If you weren&apos;t expecting this, contact support@dubgrid.com.
       </Text>
+      <EmailSignOff />
     </EmailLayout>
   );
 }
