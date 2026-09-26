@@ -168,13 +168,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** Exclude `supabase/.temp` and `supabase/.branches`.
 **Resolution:** Both are negated in the inputs; a dry run shows no `.temp` file.
 
-### F-56 [P3] open - No view tests for the 41d3 step-up wiring
+### F-56 [P3] fixed - No view tests for the 41d3 step-up wiring
 
 **File:** `apps/web/src/components/gridmaster/organization-detail/UsersTab.tsx`; `apps/web/src/components/gridmaster/GridmasterComplianceView.tsx`
 **Found:** 2026-09-25 by `/audit` of a6e3c15c
 **Why it matters:** Hiding the confirmations behind the step-up dialog, clearing loading on cancel, and downloading nothing without assurance are proven only by reading.
 **Suggested fix:** View tests in the pattern of `GridmasterAccountsView.test.tsx`.
-**Resolution:**
+**Resolution:** Fixed in the security findings cleanup (Step 5): the Users tab tests cover the role change with the assured token, a cancelled step-up clearing its loading state, and the confirmation hiding behind the prompt; a new compliance view test covers the audit-log export with the assured token, a cancelled step-up downloading nothing, and a failed credential check. Each was confirmed to fail on a matching regression.
 
 ### F-57 [P3] fixed - The app's password rule has no maximum where Supabase may refuse long passwords
 

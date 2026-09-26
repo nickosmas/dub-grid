@@ -43,7 +43,7 @@ evidence the owner must supply.
 - [x] **Step 2 - F-46 and F-29 sign-in audit and alert gaps**
 - [x] **Step 3 - F-57 password maximum**
 - [x] **Step 4 - F-38 impersonation notice wording** (migration 057)
-- [ ] **Step 5 - F-41, F-72 and F-56 references, helper and tests**
+- [x] **Step 5 - F-41, F-72 and F-56 references, helper and tests**
 - [ ] **Step 6 - review and close**
 
 ## Notes for the AI
