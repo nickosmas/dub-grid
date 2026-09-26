@@ -67,7 +67,7 @@ leave no audit row.
       organization. _Done when:_ a live test ends a session with `navigation`
       and finds one audit row, ends another with `manual` and finds none, and
       the function still differs from 058 only in that insert.
-- [ ] **Step 4 - F-28 refusal after the second factor is recorded** -
+- [x] **Step 4 - F-28 refusal after the second factor is recorded** -
       `findAndSwitchToOrg` signs out locally with a refusal naming `organization_access_denied` and the organization's slug; the sign-out route verifies the
       token, confirms no active membership in the organization by slug, then
       writes `security.auth.login` / `rejected` / `organization_access_denied`

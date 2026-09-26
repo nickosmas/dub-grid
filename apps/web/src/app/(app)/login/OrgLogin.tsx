@@ -238,7 +238,7 @@ export default function OrgLogin({
     if (!isCurrentFlow(generation)) return false;
     const targetOrg = orgs.find((o) => o.org_slug === orgSlug);
     if (!targetOrg) {
-      await signOutFromBrowser("local");
+      await signOutFromBrowser("local", { organizationAccessDenied: orgSlug });
       toast.error("Your account is not associated with this organization.");
       return false;
     }

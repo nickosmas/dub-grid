@@ -17,13 +17,17 @@ export type BrowserRealtimeChannel = ReturnType<typeof supabase.channel>;
 
 export async function signOutFromBrowser(
   scope: "local" | "others" | "global",
-  reason?: "password_change",
+  reason?: "password_change" | { organizationAccessDenied: string },
 ): Promise<void> {
   if (scope !== "local") {
     try {
       const session = await settleWithRequestTimeout(getBrowserSession());
       if (!session) throw new Error("Please sign in again before managing devices.");
-      await signOutAccountSessions(scope, session.access_token, reason);
+      await signOutAccountSessions(
+        scope,
+        session.access_token,
+        reason === "password_change" ? reason : undefined,
+      );
     } finally {
       // Legacy global callers still exit locally if fresh proof is unavailable,
       // but the rejection remains visible: do not claim every device signed out.
@@ -40,7 +44,16 @@ export async function signOutFromBrowser(
     await fetchWithTimeout("/api/auth/sign-out", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scope: "local" }),
+      // A refusal the server records only after checking it (F-28).
+      body: JSON.stringify(
+        typeof reason === "object"
+          ? {
+              scope: "local",
+              reason: "organization_access_denied",
+              orgSlug: reason.organizationAccessDenied,
+            }
+          : { scope: "local" },
+      ),
       keepalive: true,
     });
   } catch {

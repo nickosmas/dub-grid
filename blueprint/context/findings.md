@@ -72,13 +72,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** Have the RPC return whether it ended a row (migration).
 **Resolution:**
 
-### F-28 [P3] open - A host-organization denial after the second factor is not recorded
+### F-28 [P3] fixed - A host-organization denial after the second factor is not recorded
 
 **File:** `apps/web/src/app/(app)/login/OrgLogin.tsx:236`
 **Found:** 2026-09-25 by `/audit` (scope: current, bdbbd4cc..8246596c; all lenses)
 **Why it matters:** On the web two-factor path the client finds no membership, signs out locally and shows a toast; the log ends at the challenge. Predates 41c2.
 **Suggested fix:** A server-side refusal record for this case, for example a denial reason on the local sign-out.
-**Resolution:**
+**Resolution:** Fixed: the web two-factor path's local sign-out carries the refusal (`organization_access_denied` and the organization's slug); the sign-out route verifies the token and records a `rejected` sign-in with that reason, no organization, `surface: web`, `method: totp` and the session hash only when the organization exists, the caller has no active membership in it and the session has no such row yet, before revoking. A failed check records nothing and never blocks the sign-out; mobile is unchanged. Tests cover the parsing, a verified refusal, a member, a missing organization, a repeat, a failed check, an unverifiable token and the client's request body.
 
 ### F-33 [P3] fixed - The proxy's escape end of an impersonation is not audited
 
