@@ -249,13 +249,24 @@ describe("indicatorIdsInNotes", () => {
       { indicatorTypeId: 2, status: "draft" as const, updatedBy: null },
       { indicatorTypeId: 3, status: "draft_deleted" as const, updatedBy: null },
     ],
+    "emp-1_2026-09-02_4": [{ indicatorTypeId: 4, status: "published" as const, updatedBy: null }],
+    "emp-2_2026-09-01": [{ indicatorTypeId: 5, status: "published" as const, updatedBy: null }],
+  };
+  const scope = {
+    empIds: new Set(["emp-1"]),
+    dateKeys: new Set(["2026-09-01", "2026-09-02"]),
   };
 
-  it("gives an editor their drafts but not what they removed", () => {
-    expect([...indicatorIdsInNotes(notes, true)].sort()).toEqual([1, 2]);
+  it("gives an editor everything the grid draws, removals included", () => {
+    expect([...indicatorIdsInNotes(notes, true, scope)].sort()).toEqual([1, 2, 3, 4]);
   });
 
   it("gives everyone else what is published", () => {
-    expect([...indicatorIdsInNotes(notes, false)].sort()).toEqual([1, 3]);
+    expect([...indicatorIdsInNotes(notes, false, scope)].sort()).toEqual([1, 3, 4]);
+  });
+
+  it("leaves out people and dates the page does not print", () => {
+    const narrow = { empIds: new Set(["emp-2"]), dateKeys: new Set(["2026-09-01"]) };
+    expect([...indicatorIdsInNotes(notes, false, narrow)]).toEqual([5]);
   });
 });

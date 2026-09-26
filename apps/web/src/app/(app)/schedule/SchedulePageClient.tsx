@@ -3723,9 +3723,12 @@ function SchedulerContent({
   );
 
   const printedIndicatorTypes = useMemo(() => {
-    const ids = indicatorIdsInNotes(notes, isScheduleEditor);
+    const ids = indicatorIdsInNotes(notes, isScheduleEditor, {
+      empIds: new Set(filteredEmployees.map((emp) => emp.id)),
+      dateKeys: new Set(dates.map(formatDateKey)),
+    });
     return indicatorTypes.filter((type) => ids.has(type.id));
-  }, [indicatorTypes, isScheduleEditor, notes]);
+  }, [dates, filteredEmployees, indicatorTypes, isScheduleEditor, notes]);
 
   const panelActiveIndicatorIds = useCallback(
     (focusAreaId: number): number[] => {
