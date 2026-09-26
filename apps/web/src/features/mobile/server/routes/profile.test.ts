@@ -7,6 +7,7 @@ const listOwnProfileChangeRequests = vi.fn();
 const updateSelfProfileDetails = vi.fn();
 const updateSelfLinkedEmployeePhone = vi.fn();
 const updateSelfMfaStatus = vi.fn();
+const settleMfaReenrollment = vi.fn();
 const fetchLinkedEmployeeForUser = vi.fn();
 const fetchMobileFocusAreas = vi.fn();
 const mapOrganizationToMobileConfig = vi.fn();
@@ -52,6 +53,7 @@ vi.mock("@/features/account/server", () => ({
   updateSelfProfileDetails,
   updateSelfLinkedEmployeePhone,
   updateSelfMfaStatus,
+  settleMfaReenrollment,
   fetchNotificationPreferences,
   saveNotificationPreferences,
   fetchUserSessionOverviewForUser,
@@ -374,6 +376,10 @@ describe("mobile profile routes", () => {
 
     expect(response.status).toBe(200);
     expect(updateSelfMfaStatus).toHaveBeenCalledWith("8af6f242-c060-4920-a7db-91b4cb66fd26", true);
+    expect(settleMfaReenrollment).toHaveBeenCalledWith(
+      "8af6f242-c060-4920-a7db-91b4cb66fd26",
+      expect.any(Array),
+    );
     expect(payload.user.mfaEnabled).toBe(true);
   });
 

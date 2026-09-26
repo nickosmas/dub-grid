@@ -3,7 +3,7 @@ import { z } from "zod";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { requireGridmasterSession, requireSensitiveActionAuth } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
-import { clearLoginLock } from "@/lib/rate-limit";
+import { clearLoginLock, loginLimiterConfigured } from "@/lib/rate-limit";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import { writeGridmasterAuditLogAfterCommit } from "@/app/api/gridmaster/_lib/audit";
@@ -88,6 +88,12 @@ export async function POST(req: NextRequest, context: { params: Promise<{ userId
         details = { ...details, feedId: input.feedId };
         break;
       case "clearLoginLock":
+        if (!loginLimiterConfigured()) {
+          return NextResponse.json(
+            { error: "The sign-in limiter does not run here, so there is no lock to clear." },
+            { status: 409 },
+          );
+        }
         loginLock = await clearLoginLock(target.email);
         changed = true;
         break;

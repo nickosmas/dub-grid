@@ -50,7 +50,8 @@ proof) and F-81 (the page refreshes on more than membership changes).
 - Routes: `POST /api/gridmaster/users/[userId]/security` (end a session,
   forget a device, disable a push device, revoke a calendar feed, clear the
   login lock) and `POST /api/gridmaster/users/[userId]/two-factor-reset`.
-- The reset's notice email and in-app alert.
+- The reset's notice email. No in-app alert: the person cannot reach their
+  inbox until they enroll again, and the email reaches them either way.
 - Re-enrollment gates on web and mobile, and the flag in their status reads.
 - F-80: the deactivate PATCH requires fresh proof, refuses a Gridmaster
   target, and the page runs it through step-up.

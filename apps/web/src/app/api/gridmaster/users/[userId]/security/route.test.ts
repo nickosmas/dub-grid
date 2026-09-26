@@ -18,7 +18,11 @@ vi.mock("@/lib/api-auth", () => ({
 }));
 vi.mock("@/lib/csrf", () => ({ validateCsrfOrigin: () => null }));
 vi.mock("@/lib/supabase-service", () => ({ getServiceClient: () => serviceClient }));
-vi.mock("@/lib/rate-limit", () => ({ clearLoginLock: (email: string) => clearLoginLock(email) }));
+const loginLimiterConfigured = vi.fn(() => true);
+vi.mock("@/lib/rate-limit", () => ({
+  clearLoginLock: (email: string) => clearLoginLock(email),
+  loginLimiterConfigured: () => loginLimiterConfigured(),
+}));
 vi.mock("@/app/api/gridmaster/_lib/audit", () => ({
   writeGridmasterAuditLogAfterCommit: (input: unknown) => writeAudit(input),
 }));
@@ -122,6 +126,13 @@ describe("POST /api/gridmaster/users/[userId]/security", () => {
   it("answers 404 and records nothing for a row that is not theirs", async () => {
     endPersonSession.mockResolvedValueOnce(false);
     expect((await post({ action: "endSession", sessionId: ROW })).status).toBe(404);
+    expect(writeAudit).not.toHaveBeenCalled();
+  });
+
+  it("refuses to clear a lock where no limiter runs, and records nothing", async () => {
+    loginLimiterConfigured.mockReturnValueOnce(false);
+    expect((await post({ action: "clearLoginLock" })).status).toBe(409);
+    expect(clearLoginLock).not.toHaveBeenCalled();
     expect(writeAudit).not.toHaveBeenCalled();
   });
 

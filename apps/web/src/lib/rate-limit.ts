@@ -76,11 +76,11 @@ export const loginLimiter = createSlidingWindowLimiter(
   "15 m",
 );
 
-/**
- * Whether the login limiter is refusing this address right now. Null when no
- * limiter runs (no Redis, or outside production), and on a failed read: a
- * support view must not fail over an advisory badge.
- */
+/** Whether a login limiter exists to clear (Redis is configured). */
+export function loginLimiterConfigured(): boolean {
+  return loginLimiter !== null;
+}
+
 /**
  * Clears the login limiter for this address and reads it back. Another warm
  * server may still refuse until its in-memory block cache ages out.
@@ -97,6 +97,11 @@ export async function clearLoginLock(
   return readLoginLock(email);
 }
 
+/**
+ * Whether the login limiter is refusing this address right now. Null when no
+ * limiter runs (no Redis, or outside production), and on a failed read: a
+ * support view must not fail over an advisory badge.
+ */
 export async function readLoginLock(
   email: string,
 ): Promise<{ locked: boolean; resetsAt: string | null } | null> {

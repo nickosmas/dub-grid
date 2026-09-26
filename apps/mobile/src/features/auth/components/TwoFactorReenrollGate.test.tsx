@@ -90,4 +90,29 @@ describe("TwoFactorReenrollGate", () => {
     expect(screen.queryByText(TITLE)).not.toBeInTheDocument();
     expect(screen.getByText("app-content")).toBeInTheDocument();
   });
+
+  it("waits for the terms gate first", () => {
+    useBootstrap.mockReturnValue({
+      data: { mfaReenrollRequired: true, acceptedCurrentTerms: false },
+    });
+    renderGate();
+    expect(screen.queryByText(TITLE)).not.toBeInTheDocument();
+  });
+
+  it("stays down while bootstrap re-checks after enrollment", () => {
+    let settle: () => void = () => {};
+    invalidateQueries.mockReturnValue(new Promise<void>((resolve) => (settle = resolve)));
+    useBootstrap.mockReturnValue({ data: { mfaReenrollRequired: true } });
+    pathname = "/profile/two-factor";
+    const { rerender } = renderGate();
+
+    pathname = "/profile/security";
+    rerender(
+      <TwoFactorReenrollGate>
+        <div>app-content</div>
+      </TwoFactorReenrollGate>,
+    );
+    expect(screen.queryByText(TITLE)).not.toBeInTheDocument();
+    settle();
+  });
 });

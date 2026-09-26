@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 const from = vi.fn();
 vi.mock("@/lib/supabase-service", () => ({ getServiceClient: () => ({ from }) }));
 
-import { fetchSelfWorkProfileSnapshot, recordSelfMfaOff, updateSelfMfaStatus } from "./profile";
+import { fetchSelfWorkProfileSnapshot, recordSelfMfaOff } from "./profile";
 
 function tableBuilder(result: { data: unknown; error: null }) {
   const builder: Record<string, unknown> = {};
@@ -104,36 +104,5 @@ describe("recordSelfMfaOff", () => {
 
     await expect(recordSelfMfaOff("user-1")).rejects.toThrow("read failed");
     expect(updates).toEqual([]);
-  });
-});
-
-describe("updateSelfMfaStatus", () => {
-  function recordUpdates() {
-    const updates: Record<string, unknown>[] = [];
-    from.mockImplementation(() => {
-      const builder = tableBuilder({
-        data: { first_name: "QA", last_name: "Regular", mfa_enabled: true, terms_version: 1 },
-        error: null,
-      });
-      builder.update = vi.fn((values: Record<string, unknown>) => {
-        updates.push(values);
-        return { eq: () => Promise.resolve({ error: null }) };
-      });
-      return builder;
-    });
-    return updates;
-  }
-
-  it("settles a two-factor reset when a factor is verified", async () => {
-    const updates = recordUpdates();
-    await updateSelfMfaStatus("user-1", true);
-    expect(updates[0]).toMatchObject({ mfa_enabled: true, mfa_reenroll_required_at: null });
-  });
-
-  it("leaves a pending reset alone when two-factor is turned off", async () => {
-    const updates = recordUpdates();
-    await updateSelfMfaStatus("user-1", false);
-    expect(updates[0]).toMatchObject({ mfa_enabled: false });
-    expect(updates[0]).not.toHaveProperty("mfa_reenroll_required_at");
   });
 });

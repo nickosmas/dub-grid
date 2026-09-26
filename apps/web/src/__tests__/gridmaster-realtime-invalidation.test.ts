@@ -173,15 +173,34 @@ describe("resolveGridmasterRealtimeUserId", () => {
 
   it("returns null for tables with no per-user invalidation target", () => {
     expect(
-      resolveGridmasterRealtimeUserId("employees", {
+      resolveGridmasterRealtimeUserId("invitations", {
         new: { user_id: userId },
       }),
     ).toBeNull();
   });
 
-  it("refreshes open person pages when a staff record changes", () => {
+  it("refreshes every open person page when a change names no one", () => {
     expect(getGridmasterRealtimeInvalidationKeys("employees", orgId)).toContainEqual(
       queryKeys.gridmaster.personAll(),
     );
+  });
+
+  it("refreshes only the named person's page when it can", () => {
+    const userId = "33333333-3333-4333-8333-333333333333";
+    for (const table of ["user_sessions", "profiles", "employees"] as const) {
+      const keys = getGridmasterRealtimeInvalidationKeys(table, orgId, userId);
+      expect(keys).toContainEqual(queryKeys.gridmaster.person("user", userId));
+      expect(keys).not.toContainEqual(queryKeys.gridmaster.personAll());
+    }
+  });
+
+  it("finds the person in session, profile and staff changes", () => {
+    const userId = "33333333-3333-4333-8333-333333333333";
+    expect(resolveGridmasterRealtimeUserId("user_sessions", { new: { user_id: userId } })).toBe(
+      userId,
+    );
+    expect(resolveGridmasterRealtimeUserId("profiles", { old: { id: userId } })).toBe(userId);
+    expect(resolveGridmasterRealtimeUserId("employees", { new: { user_id: null } })).toBeNull();
+    expect(resolveGridmasterRealtimeUserId("invitations", { new: { user_id: userId } })).toBeNull();
   });
 });

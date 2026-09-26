@@ -5,6 +5,7 @@ const requireAuthenticatedUserWithClaims = vi.fn();
 const validateCsrfOrigin = vi.fn();
 const updateSelfMfaStatus = vi.fn();
 const resolveMfaReenrollRequired = vi.fn();
+const settleMfaReenrollment = vi.fn();
 const dispatchNotificationEvent = vi.fn();
 const profileSnapshot = vi.fn();
 const getUser = vi.fn();
@@ -26,6 +27,7 @@ vi.mock("@/lib/csrf", () => ({
 vi.mock("@/features/account/server", () => ({
   updateSelfMfaStatus: (...args: unknown[]) => updateSelfMfaStatus(...args),
   resolveMfaReenrollRequired: (...args: unknown[]) => resolveMfaReenrollRequired(...args),
+  settleMfaReenrollment: (...args: unknown[]) => settleMfaReenrollment(...args),
 }));
 vi.mock("@/features/notifications/server/events", () => ({
   dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),

@@ -16,6 +16,7 @@ import {
   listOwnProfileChangeRequests,
   updateSelfProfileDetails,
   updateSelfLinkedEmployeePhone,
+  settleMfaReenrollment,
   updateSelfMfaStatus,
   recordCurrentTermsAcceptance,
 } from "@/features/account/server";
@@ -271,6 +272,7 @@ export async function PATCHMfaStatus(req: NextRequest) {
     return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
   }
   await updateSelfMfaStatus(auth.user.id, enabled);
+  if (enabled) await settleMfaReenrollment(auth.user.id, auth.user.factors);
   if ((priorProfile?.mfa_enabled === true) !== enabled) {
     scheduleSecurityAlert(auth.user.id, {
       action: "security_mfa_changed",

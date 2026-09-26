@@ -1,4 +1,4 @@
-import { useEffect, useRef, type PropsWithChildren } from "react";
+import { useEffect, useRef, useState, type PropsWithChildren } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Keyboard } from "react-native";
 import { router, usePathname } from "expo-router";
@@ -28,18 +28,25 @@ export function TwoFactorReenrollGate({ children }: PropsWithChildren) {
   const pathname = usePathname();
   const onTwoFactorScreen = pathname === TWO_FACTOR_PATH;
   const required = bootstrapQuery.data?.mfaReenrollRequired === true;
+  // Terms come first: two gate sheets at once is a pair iOS refuses.
+  const termsPending = bootstrapQuery.data?.acceptedCurrentTerms === false;
   const wasOnTwoFactorScreen = useRef(onTwoFactorScreen);
+  // Held while bootstrap re-checks after they leave the two-factor screen, so
+  // the gate does not flash back up over a finished enrollment.
+  const [rechecking, setRechecking] = useState(false);
 
   useEffect(() => {
     if (wasOnTwoFactorScreen.current && !onTwoFactorScreen && required) {
+      setRechecking(true);
       void queryClient
         .invalidateQueries({ queryKey: ["mobile", "bootstrap"] })
-        .catch(() => undefined);
+        .catch(() => undefined)
+        .finally(() => setRechecking(false));
     }
     wasOnTwoFactorScreen.current = onTwoFactorScreen;
   }, [onTwoFactorScreen, required, queryClient]);
 
-  const visible = required && !onTwoFactorScreen;
+  const visible = required && !termsPending && !onTwoFactorScreen && !rechecking;
 
   useEffect(() => {
     if (visible) Keyboard.dismiss();

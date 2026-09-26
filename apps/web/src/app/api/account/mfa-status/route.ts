@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { resolveVerifiedTotpFactorPresence } from "@dubgrid/authz";
-import { resolveMfaReenrollRequired, updateSelfMfaStatus } from "@/features/account/server";
+import {
+  resolveMfaReenrollRequired,
+  settleMfaReenrollment,
+  updateSelfMfaStatus,
+} from "@/features/account/server";
 import { createRequestSupabaseClient, requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import logger from "@/lib/logger";
@@ -77,6 +81,7 @@ export async function POST(req: NextRequest) {
     const wasEnabled = priorProfile?.mfa_enabled === true;
 
     const profile = await updateSelfMfaStatus(auth.user.id, enabled);
+    if (enabled) await settleMfaReenrollment(auth.user.id, data.user.factors);
 
     if (wasEnabled !== enabled) {
       scheduleSecurityAlert(auth.user.id, {
