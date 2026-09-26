@@ -18,7 +18,7 @@
 --
 -- CREATE POLICY locks each table briefly; the timeout makes the apply fail
 -- fast rather than queue reads behind a long-running query (retry it).
-SET LOCAL lock_timeout = '5s';
+SET lock_timeout = '5s';
 
 CREATE OR REPLACE FUNCTION public.gridmaster_write_allowed()
 RETURNS BOOLEAN
@@ -91,3 +91,5 @@ BEGIN
   END LOOP;
 END;
 $$;
+
+RESET lock_timeout;

@@ -175,7 +175,8 @@ describe.runIf(reachable)("Gridmaster direct writes (054, live DB)", () => {
     expect(rows.length).toBeGreaterThan(30);
 
     // A policy with the right name and a permissive expression would pass the
-    // name check, so every restrictive expression must be the helper.
+    // name check, so every restrictive expression must be exactly the helper.
+    const HELPER = "( SELECT gridmaster_write_allowed() AS gridmaster_write_allowed)";
     const { rows: loose } = await db.query<{ table_name: string; policy: string }>(`
       SELECT c.relname AS table_name, p.polname AS policy
       FROM pg_policy p
@@ -183,10 +184,8 @@ describe.runIf(reachable)("Gridmaster direct writes (054, live DB)", () => {
       WHERE NOT p.polpermissive
         AND p.polname LIKE 'gridmaster_fresh_%'
         AND NOT (
-          COALESCE(pg_get_expr(p.polqual, p.polrelid), 'SELECT gridmaster_write_allowed()')
-            ILIKE '%SELECT gridmaster_write_allowed()%'
-          AND COALESCE(pg_get_expr(p.polwithcheck, p.polrelid), 'SELECT gridmaster_write_allowed()')
-            ILIKE '%SELECT gridmaster_write_allowed()%'
+          COALESCE(pg_get_expr(p.polqual, p.polrelid), '${HELPER}') = '${HELPER}'
+          AND COALESCE(pg_get_expr(p.polwithcheck, p.polrelid), '${HELPER}') = '${HELPER}'
         )
     `);
     expect(loose).toEqual([]);

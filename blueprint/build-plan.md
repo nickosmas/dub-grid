@@ -639,9 +639,7 @@
           email-provider and migration/reissue rehearsals with explicit
           production checks; unavailable environment evidence is recorded as
           a release blocker. It resumed after 41d4 and 41d5 and qualifies them
-          too; parked at
-          `blueprint/context/parked/41d3-release-qualification.md` while 41d6
-          is built.
+          too, and 41d6.
     - [x] 41d4. **Gridmaster grants with step-up** - a Gridmaster can invite
           someone as Super Admin from the Gridmaster portal, the setup wizard
           and the People screens, and every Gridmaster grant (invitation
@@ -655,7 +653,7 @@
           Gridmaster promotion, demotion and deactivation) refuse a Gridmaster
           without a recent sign-in, by the same rule the routes apply, and no
           signed-in caller writes organization memberships directly (F-60).
-    - [ ] 41d6. **Gridmaster direct writes need fresh proof** - on every table
+    - [x] 41d6. **Gridmaster direct writes need fresh proof** - on every table
           a Gridmaster policy lets it write, a Gridmaster token without a
           recent sign-in can no longer insert, update or delete through the
           data API; other callers and every application path are unchanged
