@@ -200,13 +200,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** Run those calls through `useStepUpAction` with the credential preflight.
 **Resolution:** Fixed in 41d4 (Step 4): every People grant (role and permission changes, invitation create, edit and access replacement) runs inside step-up without the preflight, so only the server's request for a Gridmaster prompts; the role controls that own the confirmation own the step-up and hide it while the prompt shows. View tests cover the token and cancel paths. Re-review (e42da4bd..821c7ff4): closed; every People grant path runs through step-up. Its two follow-ups (a silent cancelled reinvite, a revoke before the prompt) are F-65.
 
-### F-59 [P2] fixed - A Gridmaster can grant Super Admin through invitations without fresh proof
+### F-59 [P2] closed - A Gridmaster can grant Super Admin through invitations without fresh proof
 
 **File:** `apps/web/src/app/api/organizations/invitations/create/route.ts:225`; `apps/web/src/app/api/organizations/invitations/route.ts:307`, `:604`; `apps/web/src/app/api/gridmaster/organizations/manage/route.ts:457`
 **Found:** 2026-09-25 by `/audit` re-review of 7ba79e75
 **Why it matters:** A Gridmaster passes `canManageEmployees` and `canAssignOrgRole`, so it can invite an address it controls as Super Admin to any organization, or redirect a pending invitation's role and email, and the invitee registers pre-confirmed: the F-16 outcome by another door.
 **Suggested fix:** Require fresh proof for a Gridmaster (or for any Super Admin grant) on invitation create, update and reissue, with step-up in the invitation UI; add `send_invitation` and `replace_pending_invitation_access` to the inventory marker.
-**Resolution:** Fixed in 41d4 (Steps 1-4): invitation create, a role or email edit, and access replacement require fresh proof for a Gridmaster before any write; a role raise records the editor as inviter; `INVITATION_TIER_DENIED` answers 403; the inventory marker includes `send_invitation` and `replace_pending_invitation_access`. Invitation UIs prompt instead of failing. Re-review (e42da4bd..821c7ff4) kept it open: resend (and access replacement) returned the new token to the caller, so a stale Gridmaster session could resend any pending Super Admin invitation and read its token. Neither response carries the token now, the client no longer expects one, and a route test plus the inventory fail if it returns.
+**Resolution:** Fixed in 41d4 (Steps 1-4): invitation create, a role or email edit, and access replacement require fresh proof for a Gridmaster before any write; a role raise records the editor as inviter; `INVITATION_TIER_DENIED` answers 403; the inventory marker includes `send_invitation` and `replace_pending_invitation_access`. Invitation UIs prompt instead of failing. Re-review (e42da4bd..821c7ff4) kept it open: resend (and access replacement) returned the new token to the caller, so a stale Gridmaster session could resend any pending Super Admin invitation and read its token. Neither response carries the token now, the client no longer expects one, and a route test plus the inventory fail if it returns. Re-review (821c7ff4..4de3f7d4): closed; no route or handler returns a token.
 
 ### F-60 [P2] open - A Gridmaster token can change memberships and invitations directly in the database
 
@@ -232,45 +232,45 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** Keep it off in production. Before turning it on, either send Supabase's reauthentication nonce with the update or have the authenticator-code step-up issue a fresh session; then set local and production alike.
 **Resolution:**
 
-### F-63 [P1] fixed - An Admin could redirect a pending Super Admin invitation to an address they control
+### F-63 [P1] closed - An Admin could redirect a pending Super Admin invitation to an address they control
 
 **File:** `apps/web/src/app/api/organizations/invitations/route.ts:310`
 **Found:** 2026-09-26 by `/audit` of e42da4bd..821c7ff4 (predates 41d4)
 **Why it matters:** The tier check ran only when the role was sent, so an email-only edit kept `super_admin` and the original Super Admin inviter; resend then returned the token, and registration plus acceptance made the Admin's address a Super Admin.
 **Suggested fix:** Check `canAssignOrgRole` for the invitation's role whenever the email changes.
-**Resolution:** An email change now requires the editor to be able to grant the invitation's role (the requested one, or its current one), before any write; a route test proves an Admin's redirect of a Super Admin invitation is refused and writes nothing. The token is also no longer returned (F-59).
+**Resolution:** An email change now requires the editor to be able to grant the invitation's role (the requested one, or its current one), before any write; a route test proves an Admin's redirect of a Super Admin invitation is refused and writes nothing. The token is also no longer returned (F-59). Re-review (821c7ff4..4de3f7d4): closed as a route fix; user and admin invitations are unaffected. The same takeover through the data API is F-70.
 
-### F-64 [P3] fixed - The Gridmaster check failed open on a read error
+### F-64 [P3] closed - The Gridmaster check failed open on a read error
 
 **File:** `apps/web/src/app/api/employees/shared.ts:37`
 **Found:** 2026-09-26 by `/audit` of e42da4bd..821c7ff4
 **Why it matters:** A transient profile read error skipped the fresh-proof gate.
 **Suggested fix:** Throw on the error.
-**Resolution:** `isGridmasterActor` throws on a read error, so the route answers 500 rather than skipping the gate.
+**Resolution:** `isGridmasterActor` throws on a read error, so the route answers 500 rather than skipping the gate. Re-review (821c7ff4..4de3f7d4): closed.
 
-### F-65 [P3] fixed - A cancelled reinvite said nothing, and one editor revoked before asking for proof
+### F-65 [P3] closed - A cancelled reinvite said nothing, and one editor revoked before asking for proof
 
 **File:** `apps/web/src/hooks/useEmployees.ts:213`; `apps/web/src/components/staff-detail/StaffDetailPage.tsx:441`; `apps/web/src/components/staff/EmployeeManagementAccessModal.tsx:251`
 **Found:** 2026-09-26 by `/audit` of e42da4bd..821c7ff4
 **Why it matters:** After an address change the old invitation is gone, and a cancelled prompt left no message that no new one went out; the management editor revoked a pending invitation before the role change's prompt, so a cancel left it revoked.
 **Suggested fix:** Tell the person no invitation was sent; revoke after the role change.
-**Resolution:** A cancelled reinvite shows "Employee saved. No new invitation was sent."; the editor revokes only after the role change completes.
+**Resolution:** A cancelled reinvite shows "Employee saved. No new invitation was sent."; the editor revokes only after the role change completes. Re-review (821c7ff4..4de3f7d4): closed.
 
-### F-66 [P3] fixed - A refused access replacement spent the recipient's send limit
+### F-66 [P3] closed - A refused access replacement spent the recipient's send limit
 
 **File:** `apps/web/src/app/api/organizations/invitations/route.ts:591`
 **Found:** 2026-09-26 by `/audit` of e42da4bd..821c7ff4
 **Why it matters:** Each stale-session attempt used a send slot for that recipient.
 **Suggested fix:** Ask for proof before the limiter.
-**Resolution:** The Gridmaster gate for access replacement runs before the recipient limit; the inventory pins the order.
+**Resolution:** The Gridmaster gate for access replacement runs before the recipient limit; the inventory pins the order. Re-review (821c7ff4..4de3f7d4): closed.
 
-### F-67 [P3] fixed - Another unused browser-side grant helper
+### F-67 [P3] closed - Another unused browser-side grant helper
 
 **File:** `apps/web/src/lib/db/invitations.ts:25`
 **Found:** 2026-09-26 by `/audit` of e42da4bd..821c7ff4
 **Why it matters:** `sendInvitation` called `send_invitation` from the browser with no callers, inviting an ungated path back.
 **Suggested fix:** Remove it.
-**Resolution:** Removed.
+**Resolution:** Removed. Re-review (821c7ff4..4de3f7d4): closed.
 
 ### F-68 [P3] open - Management-department grants by a Gridmaster run without fresh proof
 
@@ -285,5 +285,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **File:** `apps/web/src/__tests__/GridmasterUsersTab.test.tsx`; `apps/web/src/components/staff/MemberAccessControls.tsx`; `apps/web/src/components/gridmaster/OrganizationSetupWizard.tsx`
 **Found:** 2026-09-26 by `/audit` of e42da4bd..821c7ff4
 **Why it matters:** Nothing covers a step-up retry that runs the action twice, `PermissionsEditor` staying open when a save is cancelled, `MemberAccessControls`' own cancel, or the wizard's invitation-step cancel.
-**Suggested fix:** Add those view tests.
+**Suggested fix:** Add those view tests. Also: a behavior test that replace-access omits the token, `isGridmasterActor` throwing on a read error, the reinvite info toast, and the revoke-after-role-change order.
 **Resolution:**
+
+### F-70 [P1] fixed - Admins could read invitation tokens and rewrite invitations through the data API
+
+**File:** `supabase/migrations/003_rls_policies.sql:755`; `supabase/migrations/004_grants.sql:59`
+**Found:** 2026-09-26 by `/audit` re-review of 4de3f7d4 (predates 41d4)
+**Why it matters:** `invitations_select` let an organization's Admins read its rows and the table grant covered every column, so an Admin could read a pending Super Admin invitation's token and register as its invitee. `invitations_revoke` also let an Admin who manages employees update any column, including `role_to_assign`, `email` and `invited_by`, past every route check. The Gridmaster form of the same door is F-60.
+**Suggested fix:** Revoke the table privilege from `authenticated` and grant reading every column except the token, as 036 did for employee contacts.
+**Resolution:** Migration `049_invitation_token_server_only.sql` revokes every privilege on `invitations` from `authenticated` and regrants reading the sixteen columns other than `token`; nothing in the browser writes the table or reads the token, and every server path uses the service role or a SECURITY DEFINER function. A static test pins the migration, and the live isolation test asserts no token read and no insert, update or delete. Applied to the local stack; production needs 049 applied by the runbook before the release that carries it. This also removes the invitation half of F-60 (a Gridmaster token can no longer write invitations directly).

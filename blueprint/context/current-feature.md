@@ -96,6 +96,13 @@ committed as a local checkpoint.
       and no token is returned, and they and the inventory fail against the
       previous code.
 
+- [x] **Repair F-70 (re-review of 4de3f7d4)** - migration 049 takes the
+      `invitations` table privilege from `authenticated` and regrants reading
+      every column but the token. _Done when:_ the static SQL test and the
+      live isolation test pass, and a direct read of the token as
+      `authenticated` is refused on the local stack. Production needs 049
+      before the release that carries 41d4.
+
 ## Files / areas
 
 - `apps/web/src/app/api/organizations/invitations/create/route.ts`,

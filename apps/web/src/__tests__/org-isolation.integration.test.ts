@@ -319,6 +319,26 @@ describe.runIf(dbReachable)("caller_org_id / caller_org_role SQL layer", () => {
     );
   });
 
+  // An Admin could read a pending Super Admin invitation's token, or rewrite
+  // its role, email or inviter, through the data API (migration 049, F-70).
+  it("keeps invitation tokens and writes server-only", async () => {
+    const { rows } = await sqlDb.query<Record<string, boolean>>(`
+      SELECT
+        has_column_privilege('authenticated', 'public.invitations', 'token', 'SELECT') AS token_read,
+        has_column_privilege('authenticated', 'public.invitations', 'email', 'SELECT') AS email_read,
+        has_any_column_privilege('authenticated', 'public.invitations', 'INSERT') AS can_insert,
+        has_any_column_privilege('authenticated', 'public.invitations', 'UPDATE') AS can_update,
+        has_table_privilege('authenticated', 'public.invitations', 'DELETE') AS can_delete
+    `);
+    expect(rows[0]).toEqual({
+      token_read: false,
+      email_read: true,
+      can_insert: false,
+      can_update: false,
+      can_delete: false,
+    });
+  });
+
   // This test used to assert the opposite — that a claim-less JWT falls back to
   // profiles.org_id — and that fallback was a cross-tenant read leak, not a
   // feature. The access-token hook strips org_id precisely when the membership
