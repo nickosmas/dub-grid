@@ -493,6 +493,21 @@ describe("ResetPasswordScreen", () => {
       });
     });
 
+    // Android keeps a reused field unmasked when keyboardType and
+    // secureTextEntry change together, which showed the new password in
+    // plain text in the 41d3 device rehearsal.
+    it("mounts a fresh field for the new password", async () => {
+      render(<ResetPasswordScreen />);
+      await enterCode();
+      await screen.findByText("Enter your authenticator code");
+      const codeField = screen.getByLabelText("Authenticator code");
+
+      await enterFactorCode();
+      await screen.findByText("Set a new password");
+
+      expect(screen.getByLabelText("New password")).not.toBe(codeField);
+    });
+
     it("keeps the code step for a wrong authenticator code", async () => {
       challengeAndVerify.mockResolvedValue({
         data: null,
