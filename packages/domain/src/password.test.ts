@@ -113,7 +113,7 @@ describe("the maximum Supabase accepts (F-57)", () => {
     expect(getPasswordStrengthHints(base).map((hint) => hint.id)).not.toContain("maxLength");
     expect(getPasswordStrengthHints(base + "x".repeat(63))).toContainEqual({
       id: "maxLength",
-      label: "At most 72 characters",
+      label: "At most 72 characters, fewer with accents or emoji",
       met: false,
     });
   });

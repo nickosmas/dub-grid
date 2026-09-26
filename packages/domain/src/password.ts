@@ -53,7 +53,10 @@ export function passwordByteLength(password: string): number {
   return bytes;
 }
 
-const MAX_LENGTH_HINT = { id: "maxLength", label: "At most 72 characters" } as const;
+const MAX_LENGTH_HINT = {
+  id: "maxLength",
+  label: "At most 72 characters, fewer with accents or emoji",
+} as const;
 
 export type PasswordStrengthHint = {
   id: string;
