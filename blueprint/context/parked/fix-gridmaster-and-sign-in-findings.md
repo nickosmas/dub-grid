@@ -24,7 +24,7 @@ leave no audit row.
   prefix.
 - **F-33:** leaving an impersonation by visiting `/gridmaster` writes an
   `impersonation.ended` audit row, as the portal's end and sign-out do. The
-  middleware gains no service-role write: migration 059 redefines
+  middleware gains no service-role write: migration 060 redefines
   `end_impersonation` (from 058) to insert that row itself when
   `p_reason = 'navigation'` and a row was ended. Every other end reason
   already has a route-written row, so the function writes none for them.
@@ -62,7 +62,7 @@ leave no audit row.
       nothing, a Gridmaster target is refused, and a fresh session deactivates
       and audits as before; a view test shows the step-up token reaches the
       call and a cancelled prompt changes nothing.
-- [ ] **Step 3 - F-33 escape end is audited** (migration 059) - an `impersonation.ended` row whose details name the reason `navigation`, the trigger `escape` and `initiated_by` `gridmaster`, the Gridmaster as
+- [x] **Step 3 - F-33 escape end is audited** (migration 060) - an `impersonation.ended` row whose details name the reason `navigation`, the trigger `escape` and `initiated_by` `gridmaster`, the Gridmaster as
       actor with their email, the session id as resource and the target
       organization. _Done when:_ a live test ends a session with `navigation`
       and finds one audit row, ends another with `manual` and finds none, and
@@ -79,9 +79,9 @@ leave no audit row.
 
 ## Testing
 
-- Unit and route tests beside each change; a live test for migration 059.
+- Unit and route tests beside each change; a live test for migration 060.
 - Final gate: `npm run type-check`, `npm run test:web`, `npm run lint`.
-- Production needs 059 applied by the runbook after it ships.
+- Production needs 060 applied by the runbook after it ships.
 
 ## Notes for the AI
 

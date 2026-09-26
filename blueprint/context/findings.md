@@ -80,13 +80,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** A server-side refusal record for this case, for example a denial reason on the local sign-out.
 **Resolution:**
 
-### F-33 [P3] open - The proxy's escape end of an impersonation is not audited
+### F-33 [P3] fixed - The proxy's escape end of an impersonation is not audited
 
 **File:** `apps/web/src/proxy.ts:478`
 **Found:** 2026-09-25 by `/audit` (scope: current, bdbbd4cc..8246596c; all lenses)
 **Why it matters:** Visiting `/gridmaster` while impersonating ends the row with reason `navigation` and records nothing. Kept out of 41c2 so the middleware gains no service-role write.
 **Suggested fix:** Record it from a route or a job (the 41c3 notice work may carry it).
-**Resolution:**
+**Resolution:** Fixed: migration 060 redefines `end_impersonation` (from 058) to write an `impersonation.ended` audit row, as the Gridmaster with their email, in the target organization and naming the reason `navigation` and the trigger `escape`, whenever a `navigation` end actually ends a row; every other reason is still recorded by its route, and the middleware gains no service-role writer. A live test finds exactly one row for an escape, none for a manual end or a second escape of an ended row, keeps 058's expired end time, and fails against 058. Production needs 060 applied by the runbook; no release depends on it.
 
 ### F-42 [P2] closed - Arming the app lock only on background could leave content in the iOS app switcher
 
