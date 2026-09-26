@@ -37,6 +37,24 @@ export const PASSWORD_STRENGTH_RULES = [
 
 export const PASSWORD_STRENGTH_LABELS = ["Too short", "Weak", "Fair", "Strong"] as const;
 
+/**
+ * Supabase Auth refuses a password over 72 bytes (bcrypt's limit, counted as
+ * UTF-8 in `internal/api/password.go`), so the app refuses it first (F-57).
+ */
+export const PASSWORD_MAX_BYTES = 72;
+
+/** UTF-8 length, counted without TextEncoder so it runs the same everywhere. */
+export function passwordByteLength(password: string): number {
+  let bytes = 0;
+  for (const char of password) {
+    const code = char.codePointAt(0) ?? 0;
+    bytes += code < 0x80 ? 1 : code < 0x800 ? 2 : code < 0x10000 ? 3 : 4;
+  }
+  return bytes;
+}
+
+const MAX_LENGTH_HINT = { id: "maxLength", label: "At most 72 characters" } as const;
+
 export type PasswordStrengthHint = {
   id: string;
   label: string;
@@ -44,11 +62,16 @@ export type PasswordStrengthHint = {
 };
 
 export function getPasswordStrengthHints(password: string): PasswordStrengthHint[] {
-  return PASSWORD_STRENGTH_RULES.map((rule) => ({
+  const hints: PasswordStrengthHint[] = PASSWORD_STRENGTH_RULES.map((rule) => ({
     id: rule.id,
     label: rule.label,
     met: rule.isMet(password),
   }));
+  // Shown only when broken, so the usual list stays as short as it was.
+  if (passwordByteLength(password) > PASSWORD_MAX_BYTES) {
+    hints.push({ ...MAX_LENGTH_HINT, met: false });
+  }
+  return hints;
 }
 
 /**
@@ -79,7 +102,12 @@ export function isPasswordAcceptable(password: string): boolean {
   const met = Object.fromEntries(
     getPasswordStrengthHints(password).map((hint) => [hint.id, hint.met]),
   );
-  return Boolean(met.length && met.number && (met.uppercase || met.symbol));
+  return Boolean(
+    met.length &&
+    met.number &&
+    (met.uppercase || met.symbol) &&
+    passwordByteLength(password) <= PASSWORD_MAX_BYTES,
+  );
 }
 
 /** One wording everywhere. Mobile reset previously said "Those passwords don't match." */

@@ -176,13 +176,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** View tests in the pattern of `GridmasterAccountsView.test.tsx`.
 **Resolution:**
 
-### F-57 [P3] unverified - The app's password rule has no maximum where Supabase may refuse long passwords
+### F-57 [P3] fixed - The app's password rule has no maximum where Supabase may refuse long passwords
 
 **File:** `packages/domain/src/password.ts`
 **Found:** 2026-09-25 by `/audit` of a6e3c15c
 **Why it matters:** Supabase Auth likely refuses passwords over 72 characters (bcrypt), which the app would accept, the same drift F-47 closed for character classes.
 **Suggested fix:** Confirm the limit and add it to the rule and the policy test.
-**Resolution:**
+**Resolution:** Confirmed and fixed in the security findings cleanup (Step 3): Supabase Auth v2.187.0 refuses a password over 72 bytes (`MaxPasswordLength`, counted as UTF-8 in `internal/api/password.go`). The shared rule now refuses the same (`PASSWORD_MAX_BYTES`, `passwordByteLength`) and shows an "At most 72 characters" hint only when the limit is broken; tests cover 72 and 73 bytes and multi-byte characters.
 
 ### F-62 [P2] open - Turning on `secure_password_change` would refuse password changes for two-factor users on sessions older than a day
 
