@@ -1073,7 +1073,7 @@ async function dispatchNotificationEventInternal(
         event.orgId,
         "security_new_device" as NotificationType,
         "New sign-in to your DubGrid account",
-        `Your DubGrid sign-in was used on ${device}${browser}${near}, on ${formatEventTime(event.occurredAt)}. If this wasn't you, change your password, review your active sessions, and contact support@dubgrid.com.`,
+        `There was a new sign-in to your DubGrid account on ${device}${browser}${near}, on ${formatEventTime(event.occurredAt)}. If this wasn't you, change your password, review your active sessions, and contact support@dubgrid.com.`,
         {
           platform: event.platform,
           deviceLabel: event.deviceLabel,
@@ -1106,8 +1106,8 @@ async function dispatchNotificationEventInternal(
         event.enabled
           ? // A reset would ask for the new authenticator, which may be someone
             // else's, so the owner's only useful step is support.
-            "Two-factor authentication was turned on for your DubGrid sign-in. If this wasn't you, contact support@dubgrid.com right away."
-          : "Two-factor authentication was turned off for your DubGrid sign-in. If this wasn't you, change your password, turn it back on, review your active sessions, and contact support@dubgrid.com.",
+            "Two-factor authentication was turned on for your DubGrid account. If this wasn't you, contact support@dubgrid.com right away."
+          : "Two-factor authentication was turned off for your DubGrid account. If this wasn't you, change your password, turn it back on, review your active sessions, and contact support@dubgrid.com.",
         { enabled: event.enabled },
         // Still emailed although Supabase's own factor notices are on (F-08):
         // until production is seen sending those, a duplicate beats silence.

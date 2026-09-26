@@ -166,13 +166,6 @@ export function subscribeToBrowserAuthChanges(
   return supabase.auth.onAuthStateChange(callback);
 }
 
-export async function resendBrowserSignupEmail(email: string) {
-  return supabase.auth.resend({
-    type: "signup",
-    email,
-  });
-}
-
 export async function verifyBrowserOtp(input: { type: EmailOtpType; token_hash: string }) {
   return supabase.auth.verifyOtp(input);
 }

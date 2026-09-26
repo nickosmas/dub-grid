@@ -501,9 +501,9 @@ export async function POST(req: NextRequest) {
   let destination: string | null = null;
   let didSwitchOrg = false;
 
-  // Email not yet confirmed: the client redirects to /verify-email without
-  // ever calling setBrowserSession, so orchestration (which assumes a
-  // fully-usable session) would be wasted work here.
+  // Email not yet confirmed: the client stops without ever calling
+  // setBrowserSession, so orchestration (which assumes a fully-usable
+  // session) would be wasted work here.
   const emailConfirmed = !!data.user.email_confirmed_at;
   const claims = decodeJwt(session.access_token);
   const isGridmaster = await timer.time("gridmaster_login_intent", () =>

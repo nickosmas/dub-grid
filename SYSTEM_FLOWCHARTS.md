@@ -1230,7 +1230,6 @@ flowchart TD
     ACCEPT["User clicks link →\n/accept-invite?token=uuid"]
     VALIDATE{"Token valid?\nNot expired? Not accepted?"}
     CREATE["Create Supabase auth user\nSet employees.user_id\nCreate organization_membership"]
-    VERIFY["Redirect to /verify-email\nWait for email confirmation"]
 
     subgraph Gate["OnboardingGate (client component wrapping every authenticated route)"]
         direction TB
@@ -1267,7 +1266,7 @@ flowchart TD
 
     INVITE --> EMAIL --> ACCEPT --> VALIDATE
     VALIDATE -->|No| REJECT["Error: Invalid or expired invite"]
-    VALIDATE -->|Yes| CREATE --> VERIFY --> AUTHTRANS
+    VALIDATE -->|Yes| CREATE --> AUTHTRANS
 
     AUTHTRANS -->|Yes| SPLASH_A -->|auth settles| BILLING
     AUTHTRANS -->|No| BILLING

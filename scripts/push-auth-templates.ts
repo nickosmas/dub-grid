@@ -25,7 +25,6 @@ import { fileURLToPath } from "node:url";
  */
 
 const TEMPLATE_KEYS = [
-  "confirmation",
   "magic_link",
   "email_change",
   "recovery",

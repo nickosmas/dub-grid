@@ -25,7 +25,7 @@ DubGrid is an active, full-stack monorepo rather than a starter application. The
 - **Onboarding Gate** - Role-aware onboarding rendered inline (no standalone route); non-admins on an unconfigured org see a setup-pending screen
 - **Test Sandbox** - Clone an org's config into an isolated, time-limited sandbox you enter via an HttpOnly cookie (no JWT/session-context hop)
 - **Invite-Only Registration** - No public sign-up; 72-hour invitation tokens linked to employee records
-- **Password Reset & Recovery** - Server-mediated, rate-limited recovery requests on web and an in-app 6-digit OTP reset on mobile, with a password strength meter; invited accounts are created pre-confirmed, so `/verify-email` only serves accounts that are genuinely unconfirmed
+- **Password Reset & Recovery** - Server-mediated, rate-limited recovery requests on web and an in-app 6-digit OTP reset on mobile, with a password strength meter; invited accounts are created pre-confirmed, so there is no separate email verification step
 - **Account Security** - TOTP multi-factor authentication with a five-minute fresh-auth window for sensitive actions (MFA changes, credential updates, session revocation, data export, account deletion), session/device management, security activity alerts, and account-recovery flows
 - **Resilient Auth & Onboarding** - Explicit recovery states for slow or failed organization bootstrap, rather than an empty authenticated shell
 - **Alerts** - Searchable, filterable web and mobile inboxes with bulk actions, archiving, and push support; tapping an alert marks it read and goes to its subject (request board, schedule date, person, invitations, billing) through one shared destination resolver

@@ -1,5 +1,4 @@
 import type { ComponentType } from "react";
-import { ConfirmationEmail } from "./ConfirmationEmail";
 import { EmailChangeEmail } from "./EmailChangeEmail";
 import { EmailChangedNotificationEmail } from "./EmailChangedNotificationEmail";
 import { MagicLinkEmail } from "./MagicLinkEmail";
@@ -32,11 +31,6 @@ export interface SupabaseAuthTemplate {
  * `npm run email:build` and checked against that HTML by the normal test run.
  */
 export const SUPABASE_AUTH_TEMPLATES: readonly SupabaseAuthTemplate[] = [
-  {
-    key: "confirmation",
-    Component: ConfirmationEmail,
-    placeholders: ["{{ .ConfirmationURL }}", "{{ .SiteURL }}"],
-  },
   {
     key: "recovery",
     Component: RecoveryEmail,

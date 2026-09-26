@@ -12,7 +12,7 @@ export function ReauthenticationEmail({ logoUrl = SUPABASE.siteUrl }: { logoUrl?
       <Text style={styles.heading}>Confirm your identity</Text>
       <EmailGreeting />
       <Text style={styles.paragraph}>
-        Enter this code to confirm a change to your DubGrid sign-in. It expires in 1 hour.
+        Enter this code to confirm a change to your DubGrid account. It expires in 1 hour.
       </Text>
       <Section style={{ textAlign: "center", margin: "0 0 32px" }}>
         <Text

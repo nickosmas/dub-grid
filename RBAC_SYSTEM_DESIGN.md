@@ -862,7 +862,7 @@ auth-settle gap so the gate / route guards do not bounce a just-logged-in user t
 >
 > Public routes that skip auth entirely (matched before any role check): `/`, `/login`,
 > `/privacy`, `/terms`, `/cookie-policy`, `/accept-invite`, `/request-demo`,
-> `/forgot-password`, `/reset-password`, `/verify-email`, `/auth/*`, and `/api/*`.
+> `/forgot-password`, `/reset-password`, `/auth/*`, and `/api/*`.
 
 ### 6.2 Middleware Implementation
 
@@ -915,7 +915,6 @@ export async function proxy(req: NextRequest) {
     pathname === "/request-demo" ||
     pathname === "/forgot-password" ||
     pathname === "/reset-password" ||
-    pathname === "/verify-email" ||
     pathname.startsWith("/auth/") ||
     pathname.startsWith("/api")
   ) {
@@ -1395,12 +1394,7 @@ Self-service password reset is fully implemented with security best practices:
 
 ### 12.2 Email Verification
 
-Invited accounts are created **pre-confirmed** by `/api/invitations/register` (service role, `email_confirm: true`), so the invitation link itself proves the address and no second email is sent. `/verify-email` remains only for accounts that are genuinely unconfirmed:
-
-- **Verify Email** (`/verify-email`) — Displays verification status with optional `?email=` param
-- Resend button with 60-second cooldown to prevent abuse
-- Listens for `SIGNED_IN` auth event to auto-redirect when verified
-- Email enumeration protection (same UI regardless of email validity)
+Invited accounts are created **pre-confirmed** by `/api/invitations/register` (service role, `email_confirm: true`), so the invitation link itself proves the address and no second email is sent. There is no verification page: sign-ups are disabled in Supabase, so no unconfirmed account can be created, and login refuses one with a pointer back to the invitation, whose link confirms it.
 
 ### 12.3 Rate Limiting
 

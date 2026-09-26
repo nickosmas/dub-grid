@@ -260,7 +260,6 @@ export async function proxy(req: NextRequest) {
     pathname === "/request-demo" ||
     pathname === "/forgot-password" ||
     pathname === "/reset-password" ||
-    pathname === "/verify-email" ||
     pathname.startsWith("/auth/") ||
     pathname.startsWith("/api")
   ) {

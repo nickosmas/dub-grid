@@ -24,13 +24,7 @@ import { isAuthTransitionPending } from "@/lib/auth-transition";
 // withholding them unmounted the form mid-sign-in (it came back empty and the
 // flow that owned the navigation was gone), and a changed organization claim
 // hard-reloaded the page under the person signing in.
-const SESSION_ENTRY_ROUTES = [
-  "/login",
-  "/accept-invite",
-  "/reset-password",
-  "/verify-email",
-  "/auth",
-];
+const SESSION_ENTRY_ROUTES = ["/login", "/accept-invite", "/reset-password", "/auth"];
 
 function isSessionEntryRoute(pathname: string | null): boolean {
   if (!pathname) return false;

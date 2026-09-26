@@ -201,7 +201,7 @@ When adding or removing cookies, or changing analytics providers, bump `CONSENT_
 `dg-btn-*` is the one button vocabulary everywhere (the old `dg-auth-submit` pill is retired; the class survives only as a full-width layout modifier on auth submit buttons). Input and label vocabularies are not interchangeable:
 
 - **`dg-input` / `dg-label` / `dg-form-error`** - inside the authenticated app (schedule, people, settings, profile, dashboard, reports).
-- **`dg-auth-input` / `dg-auth-link` / `dg-auth-heading`** - public auth flows only (login, forgot-password, reset-password, accept-invite, verify-email), paired with `<AuthCard>`.
+- **`dg-auth-input` / `dg-auth-link` / `dg-auth-heading`** - public auth flows only (login, forgot-password, reset-password, accept-invite), paired with `<AuthCard>`.
 
 Product UI uses Inter; DM Sans is reserved for the wordmark and landing headings. On mobile, every number comes from the `mobile*` token ramps and every text goes through `shared/components/Text` (both lint-enforced). See `apps/web/AGENTS.md` and `apps/mobile/AGENTS.md`.
 

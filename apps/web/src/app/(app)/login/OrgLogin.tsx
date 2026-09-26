@@ -377,9 +377,11 @@ export default function OrgLogin({
       }
       if (!result) throw Object.assign(new Error("Unexpected login response"), { status: 502 });
 
-      // Check if email is confirmed
+      // Accounts are created confirmed from an invitation, and re-opening the
+      // invitation confirms any left over from the old sign-up flow.
       if (!result.user.email_confirmed_at) {
-        window.location.replace(`/verify-email?email=${encodeURIComponent(email)}`);
+        toast.error("Finish setting up your account from your invitation email, then sign in.");
+        setLoading(false);
         return;
       }
 
