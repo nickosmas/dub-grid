@@ -26,6 +26,9 @@ vi.mock("@/lib/logger", () => ({ default: { error: vi.fn() } }));
 
 import { POST } from "./route";
 
+const FUTURE = "2999-01-01T00:00:00.000Z";
+const PAST = "2026-01-01T00:00:00.000Z";
+
 const request = () =>
   new NextRequest("http://localhost/api/account/logout-cleanup", { method: "POST" });
 
@@ -37,7 +40,7 @@ describe("POST /api/account/logout-cleanup (F-35)", () => {
       claims: { platform_role: "gridmaster" },
     });
     fetchLive.mockResolvedValue([
-      { session_id: "s-1", target_user_id: "u-1", target_org_id: "o-1" },
+      { session_id: "s-1", target_user_id: "u-1", target_org_id: "o-1", expires_at: FUTURE },
     ]);
     requestRpc.mockResolvedValue({ error: null });
   });
@@ -86,5 +89,42 @@ describe("POST /api/account/logout-cleanup (F-35)", () => {
     expect(response.status).toBe(500);
     expect(scheduleImpersonationNotice).not.toHaveBeenCalled();
     expect(writeGridmasterAuditLog).not.toHaveBeenCalled();
+  });
+
+  it("ends a timed-out session as expired, without a late email", async () => {
+    fetchLive.mockResolvedValue([
+      { session_id: "s-old", target_user_id: "u-1", target_org_id: "o-1", expires_at: PAST },
+    ]);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(requestRpc).toHaveBeenCalledWith("end_impersonation", {
+      p_session_id: "s-old",
+      p_reason: "expired",
+    });
+    expect(scheduleImpersonationNotice).not.toHaveBeenCalled();
+    expect(writeGridmasterAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({ details: { reason: "expired", trigger: "sign_out" } }),
+    );
+  });
+
+  it("still ends the other sessions when one fails, then reports the failure", async () => {
+    fetchLive.mockResolvedValue([
+      { session_id: "s-1", target_user_id: "u-1", target_org_id: "o-1", expires_at: FUTURE },
+      { session_id: "s-2", target_user_id: "u-2", target_org_id: "o-2", expires_at: FUTURE },
+    ]);
+    requestRpc
+      .mockResolvedValueOnce({ error: new Error("db down") })
+      .mockResolvedValueOnce({ error: null });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(500);
+    expect(requestRpc).toHaveBeenCalledTimes(2);
+    expect(writeGridmasterAuditLog).toHaveBeenCalledTimes(1);
+    expect(writeGridmasterAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({ resourceId: "s-2" }),
+    );
   });
 });

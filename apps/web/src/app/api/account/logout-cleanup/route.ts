@@ -26,21 +26,32 @@ export async function POST(req: NextRequest) {
 
     // Sessions end the way the portal ends them, with the person told and the
     // end recorded (F-35); deleting them sent no notice and erased the history.
+    // Nothing else ends a timed-out row, so one found here may be days old: it
+    // ends as expired, without a late email.
     const live = await fetchLiveImpersonationSessionsForGridmaster(auth.user.id);
+    let failed = 0;
     if (live.length > 0) {
       const requestClient = createRequestSupabaseClient(req);
       const serviceClient = getServiceClient();
+      const now = Date.now();
       for (const session of live) {
+        const reason = Date.parse(session.expires_at) <= now ? "expired" : "manual";
         const { error } = await requestClient.rpc("end_impersonation", {
           p_session_id: session.session_id,
-          p_reason: "manual",
+          p_reason: reason,
         });
-        if (error) throw error;
-        scheduleImpersonationNotice({
-          kind: "end",
-          targetUserId: session.target_user_id,
-          targetOrgId: session.target_org_id,
-        });
+        if (error) {
+          failed += 1;
+          logger.error({ error, sessionId: session.session_id }, "ending impersonation failed");
+          continue;
+        }
+        if (reason === "manual") {
+          scheduleImpersonationNotice({
+            kind: "end",
+            targetUserId: session.target_user_id,
+            targetOrgId: session.target_org_id,
+          });
+        }
         await writeGridmasterAuditLog({
           serviceClient,
           actor: auth.user,
@@ -48,10 +59,16 @@ export async function POST(req: NextRequest) {
           resourceType: "impersonation_session",
           resourceId: session.session_id,
           orgId: session.target_org_id,
-          details: { reason: "manual", trigger: "sign_out" },
+          details: { reason, trigger: "sign_out" },
           request: req,
         });
       }
+    }
+    if (failed > 0) {
+      return NextResponse.json(
+        { error: "We couldn't end those viewing sessions. Try again." },
+        { status: 500 },
+      );
     }
     return NextResponse.json({ success: true });
   } catch (error) {

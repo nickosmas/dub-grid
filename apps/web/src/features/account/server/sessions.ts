@@ -47,10 +47,17 @@ interface FetchUserSessionsOptions {
 /** A Gridmaster's impersonation sessions that have not ended. */
 export async function fetchLiveImpersonationSessionsForGridmaster(
   gridmasterUserId: string,
-): Promise<Array<{ session_id: string; target_user_id: string; target_org_id: string | null }>> {
+): Promise<
+  Array<{
+    session_id: string;
+    target_user_id: string;
+    target_org_id: string | null;
+    expires_at: string;
+  }>
+> {
   const { data, error } = await getServiceClient()
     .from("impersonation_sessions")
-    .select("session_id, target_user_id, target_org_id")
+    .select("session_id, target_user_id, target_org_id, expires_at")
     .eq("gridmaster_id", gridmasterUserId)
     .is("ended_at", null);
 
