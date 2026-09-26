@@ -1,7 +1,7 @@
 # Fix: Gridmaster and sign-in findings batch (F-80, F-81, F-33, F-28)
 
 **Type:** Fix
-**Status:** in progress (parked beside feature 42a, which holds
+**Status:** verified (parked beside feature 42a, which holds
 `current-feature.md`)
 
 ## Goal

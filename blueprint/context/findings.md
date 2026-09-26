@@ -72,21 +72,21 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** Have the RPC return whether it ended a row (migration).
 **Resolution:**
 
-### F-28 [P3] fixed - A host-organization denial after the second factor is not recorded
+### F-28 [P3] closed - A host-organization denial after the second factor is not recorded
 
 **File:** `apps/web/src/app/(app)/login/OrgLogin.tsx:236`
 **Found:** 2026-09-25 by `/audit` (scope: current, bdbbd4cc..8246596c; all lenses)
 **Why it matters:** On the web two-factor path the client finds no membership, signs out locally and shows a toast; the log ends at the challenge. Predates 41c2.
 **Suggested fix:** A server-side refusal record for this case, for example a denial reason on the local sign-out.
-**Resolution:** Fixed: the web two-factor path's local sign-out carries the refusal (`organization_access_denied` and the organization's slug); the sign-out route verifies the token and records a `rejected` sign-in with that reason, no organization, `surface: web`, `method: totp` and the session hash only when the organization exists, the caller has no active membership in it and the session has no such row yet, before revoking. A failed check records nothing and never blocks the sign-out; mobile is unchanged. Tests cover the parsing, a verified refusal, a member, a missing organization, a repeat, a failed check, an unverifiable token and the client's request body.
+**Resolution:** Fixed: the web two-factor path's local sign-out carries the refusal (`organization_access_denied` and the organization's slug); the sign-out route verifies the token and records a `rejected` sign-in with that reason, no organization, `surface: web`, `method: totp` and the session hash only when the organization exists, the caller has no active membership in it and the session has no such row yet, before revoking. A failed check records nothing and never blocks the sign-out; mobile is unchanged. Tests cover the parsing, a verified refusal, a member, a missing organization, a repeat, a failed check, an unverifiable token and the client's request body. Re-review (fix batch, 2026-09-26): closed; the actor comes from the verified token, the organization slug is only a claim checked against the organization and the caller's own membership, the row is written once per session with no organization, and the extra reads run only when a refusal is claimed. The helper is classified in the service-role inventory.
 
-### F-33 [P3] fixed - The proxy's escape end of an impersonation is not audited
+### F-33 [P3] closed - The proxy's escape end of an impersonation is not audited
 
 **File:** `apps/web/src/proxy.ts:478`
 **Found:** 2026-09-25 by `/audit` (scope: current, bdbbd4cc..8246596c; all lenses)
 **Why it matters:** Visiting `/gridmaster` while impersonating ends the row with reason `navigation` and records nothing. Kept out of 41c2 so the middleware gains no service-role write.
 **Suggested fix:** Record it from a route or a job (the 41c3 notice work may carry it).
-**Resolution:** Fixed: migration 060 redefines `end_impersonation` (from 058) to write an `impersonation.ended` audit row, as the Gridmaster with their email, in the target organization and naming the reason `navigation` and the trigger `escape`, whenever a `navigation` end actually ends a row; every other reason is still recorded by its route, and the middleware gains no service-role writer. A live test finds exactly one row for an escape, none for a manual end or a second escape of an ended row, keeps 058's expired end time, and fails against 058. Production needs 060 applied by the runbook; no release depends on it.
+**Resolution:** Fixed: migration 060 redefines `end_impersonation` (from 058) to write an `impersonation.ended` audit row, as the Gridmaster with their email, in the target organization and naming the reason `navigation` and the trigger `escape`, whenever a `navigation` end actually ends a row; every other reason is still recorded by its route, and the middleware gains no service-role writer. A live test finds exactly one row for an escape, none for a manual end or a second escape of an ended row, keeps 058's expired end time, and fails against 058. Production needs 060 applied by the runbook; no release depends on it. Renumbered to migration 060 (43c took 059). Re-review (fix batch, 2026-09-26): closed; 060's body differs from 058 only in the escape's audit insert, which runs as the function's owner under 056, and no other path writes a row for a navigation end: the impersonation route now refuses that reason.
 
 ### F-42 [P2] closed - Arming the app lock only on background could leave content in the iOS app switcher
 
@@ -200,18 +200,34 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** In a forward migration, set `ended_at = LEAST(now(), expires_at)` when `p_reason = 'expired'`.
 **Resolution:** Fixed: migration 058 redefines `end_impersonation` (from 057) so an `expired` end records `LEAST(now(), expires_at)` and every other reason still records `now()`; nothing else changes. A live test ends a session that timed out two days earlier as expired and reads its expiry back, and fails against 057; it also covers an expired end before the expiry and a manual end. Applied to production 2026-09-26 by the owner, after release pull request 118 (merge 1031b122) deployed and a scratch rehearsal from 057: 58 ledger entries, none missing, health 200, a final dry run up to date, and `end_impersonation` carries the expired end time with its wording, SECURITY DEFINER and grant unchanged. Re-review (d314d205): closed; 058's body differs from 057 only in the end time, grants and comment are kept, `LEAST` never gives a time later than now (so a live session cannot be backdated), no reader depends on the old end time, and the live test fails against 057.
 
-### F-80 [P3] fixed - A Gridmaster's deactivate and reactivate ask for no fresh proof
+### F-80 [P3] closed - A Gridmaster's deactivate and reactivate ask for no fresh proof
 
 **File:** `apps/web/src/app/api/gridmaster/users/route.ts` (PATCH)
 **Found:** 2026-09-26 while building 43b
 **Why it matters:** Every other account action on the Gridmaster person page (terminate, reinstate, force logout, password reset, name and sign-in email changes) requires fresh proof; deactivating revokes every session and blocks sign-in on the Gridmaster session alone, and the route does not refuse a Gridmaster target.
 **Suggested fix:** Require `requireSensitiveActionAuth` on the PATCH, run the person page's Deactivate through step-up, refuse a Gridmaster target, and classify the route in the sensitive-action inventory.
-**Resolution:** Fixed in 43c: the PATCH requires `requireSensitiveActionAuth` and refuses a Gridmaster target through `loadPersonTarget`; the person page runs Deactivate and Reactivate through step-up; the inventory classifies the route `sensitive`. Route and view tests cover a stale session, a Gridmaster target and the step-up.
+**Resolution:** Fixed in 43c: the PATCH requires `requireSensitiveActionAuth` and refuses a Gridmaster target through `loadPersonTarget`; the person page runs Deactivate and Reactivate through step-up; the inventory classifies the route `sensitive`. Route and view tests cover a stale session, a Gridmaster target and the step-up. Re-review (fix batch, 2026-09-26): closed; the route checks CSRF, the Gridmaster session, fresh proof, then the target before any write, and the person page runs it through step-up (43c's implementation, which this batch's own matched).
 
-### F-81 [P3] fixed - The person page refreshes on membership changes only
+### F-81 [P3] closed - The person page refreshes on membership changes only
 
 **File:** `apps/web/src/hooks/useGridmasterRealtimeInvalidation.ts`
 **Found:** 2026-09-26 by review of 43b
 **Why it matters:** A change to the person's staff record or invitations made elsewhere shows on the Gridmaster person page only after its 30-second stale time or a reload; the page's own actions refresh it.
 **Suggested fix:** Invalidate the `["gm", "person"]` prefix on `employees` and `invitations` events too.
-**Resolution:** Fixed in 43c: `employees`, `invitations`, `user_sessions` and `profiles` events invalidate the `["gm", "person"]` prefix, so every open person page refreshes; memberships keep their exact key. Push devices, calendar feeds and known devices are not in the realtime publication, so the page refreshes itself after its own actions on them.
+**Resolution:** Fixed in 43c: `employees`, `invitations`, `user_sessions` and `profiles` events invalidate the `["gm", "person"]` prefix, so every open person page refreshes; memberships keep their exact key. Push devices, calendar feeds and known devices are not in the realtime publication, so the page refreshes itself after its own actions on them. Re-review (fix batch, 2026-09-26): closed; staff, invitation, session and profile events refresh every open person page (43c's implementation). Refetch coalescing is F-83.
+
+### F-82 [P3] open - Month view misses a note filed under a person's secondary focus area
+
+**File:** `apps/web/src/components/MonthView.tsx` (row building)
+**Found:** 2026-09-26 by review of 42a
+**Why it matters:** A general shift code is listed only under the person's primary focus area, so an indicator stored against another of their focus areas for that day never appears in the day popover. Rare: indicators are normally stored against the focus area the shift is in.
+**Suggested fix:** Merge the person's marks from their other home focus areas into that row, deduplicated.
+**Resolution:**
+
+### F-83 [P3] open - Gridmaster realtime invalidation is not coalesced
+
+**File:** `apps/web/src/hooks/useGridmasterRealtimeInvalidation.ts`
+**Found:** 2026-09-26 by review of the findings batch
+**Why it matters:** The platform-wide subscription invalidates on every row event with no debounce, so a bulk import or invitation batch in any organization restarts an open person page's (and the platform summaries') fetch once per row. Gridmaster-only, and the summaries already behaved this way.
+**Suggested fix:** Coalesce invalidations per query key over a short window before refetching.
+**Resolution:**

@@ -1,7 +1,7 @@
 # Feature: Web schedule views show indicators
 
 **From build-plan:** feature 42a
-**Status:** in progress
+**Status:** verified
 
 ## Goal
 
