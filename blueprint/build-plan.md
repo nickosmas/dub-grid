@@ -639,7 +639,9 @@
           email-provider and migration/reissue rehearsals with explicit
           production checks; unavailable environment evidence is recorded as
           a release blocker. It resumed after 41d4 and 41d5 and qualifies them
-          too, and 41d6.
+          too, and 41d6. Parked again at
+          `blueprint/context/parked/41d3-release-qualification.md` while 43a
+          is built; it resumes afterwards.
     - [x] 41d4. **Gridmaster grants with step-up** - a Gridmaster can invite
           someone as Super Admin from the Gridmaster portal, the setup wizard
           and the People screens, and every Gridmaster grant (invitation
