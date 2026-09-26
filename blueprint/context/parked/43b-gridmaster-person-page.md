@@ -96,7 +96,7 @@ throwaway worktree, then committed as a local checkpoint and pushed.
       revoked, by whom, derived state), and a link to that organization's
       Employees tab. _Done when:_ a view test shows each field for a linked
       person in two organizations and for an unlinked record.
-- [ ] **Step 4 - account actions** - `PATCH /api/gridmaster/users/[userId]`
+- [x] **Step 4 - account actions** - `PATCH /api/gridmaster/users/[userId]`
       with `editName` and `changeEmail` (fresh proof, audit rows; the email
       change reuses `syncLinkedLoginEmail` and its follow-up); Account runs
       them through step-up. _Done when:_ route tests cover a stale session, a

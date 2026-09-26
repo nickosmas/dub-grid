@@ -16,7 +16,8 @@ export interface LoginEmailChangeFollowUp {
   userId: string;
   previousEmail: string | null;
   newEmail: string;
-  orgId: string;
+  /** The organization the notices name; a Gridmaster change may have none. */
+  orgId: string | null;
   actorId: string;
   actorSessionId: string | null;
 }
@@ -54,11 +55,13 @@ async function sendNotices(input: LoginEmailChangeFollowUp): Promise<void> {
   const config = getInvitationEmailConfig();
   if (!config) return;
 
-  const { data: organization } = await input.serviceClient
-    .from("organizations")
-    .select("name")
-    .eq("id", input.orgId)
-    .maybeSingle();
+  const { data: organization } = input.orgId
+    ? await input.serviceClient
+        .from("organizations")
+        .select("name")
+        .eq("id", input.orgId)
+        .maybeSingle()
+    : { data: null };
   const orgName = (organization?.name as string | null | undefined) || "your organization";
   const logoUrl = emailBaseUrl();
   const notices = [

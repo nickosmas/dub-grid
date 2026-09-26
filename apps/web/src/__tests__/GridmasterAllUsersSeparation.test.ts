@@ -41,7 +41,14 @@ describe("Gridmaster AllUsersView account separation", () => {
   it.each([
     [
       "person/GridmasterPersonView",
-      ["terminateConfirm", "reinstateConfirm", "forceLogoutConfirm", "resetConfirm"],
+      [
+        "terminateConfirm",
+        "reinstateConfirm",
+        "forceLogoutConfirm",
+        "resetConfirm",
+        "editNameConfirm",
+        "changeEmailConfirm",
+      ],
     ],
     [
       "GridmasterAccountsView",

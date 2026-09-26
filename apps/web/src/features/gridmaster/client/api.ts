@@ -273,6 +273,37 @@ export function terminateGridmasterUser(
   });
 }
 
+function patchGridmasterPerson(
+  userId: string,
+  body: Record<string, unknown>,
+  accessToken?: string,
+): Promise<{ success: true }> {
+  return requestGridmasterJson(`/api/gridmaster/users/${encodeURIComponent(userId)}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateGridmasterPersonName(
+  userId: string,
+  name: { firstName: string; lastName: string },
+  accessToken?: string,
+): Promise<{ success: true }> {
+  return patchGridmasterPerson(userId, { action: "editName", ...name }, accessToken);
+}
+
+export function changeGridmasterPersonEmail(
+  userId: string,
+  email: string,
+  accessToken?: string,
+): Promise<{ success: true }> {
+  return patchGridmasterPerson(userId, { action: "changeEmail", email }, accessToken);
+}
+
 export function reinstateGridmasterUser(
   userId: string,
   accessToken?: string,

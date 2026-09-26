@@ -11,8 +11,10 @@ import {
   fetchGridmasterPerson,
   forceLogoutGridmasterUser,
   reinstateGridmasterUser,
+  changeGridmasterPersonEmail,
   sendGridmasterPasswordReset,
   terminateGridmasterUser,
+  updateGridmasterPersonName,
   updateGridmasterUserActivation,
   type GridmasterPersonTarget,
 } from "@/features/gridmaster/client";
@@ -25,7 +27,15 @@ import { PersonHeader } from "./PersonHeader";
 import { PersonOrganizationCard } from "./PersonOrganizationCard";
 import { getPersonName, getPrimaryOrgId } from "./person-format";
 
-type AccountDialog = "deactivate" | "terminate" | "reinstate" | "forceLogout" | "reset" | null;
+type AccountDialog =
+  | "deactivate"
+  | "terminate"
+  | "reinstate"
+  | "forceLogout"
+  | "reset"
+  | "editName"
+  | "changeEmail"
+  | null;
 
 function personKey(target: GridmasterPersonTarget) {
   return target.kind === "user"
@@ -50,6 +60,8 @@ export default function GridmasterPersonView({
   const [dialog, setDialog] = useState<AccountDialog>(null);
   const [busy, setBusy] = useState(false);
   const [terminateReason, setTerminateReason] = useState("");
+  const [nameDraft, setNameDraft] = useState({ firstName: "", lastName: "" });
+  const [emailDraft, setEmailDraft] = useState("");
 
   const personQuery = useQuery({
     queryKey: personKey(target),
@@ -193,6 +205,31 @@ export default function GridmasterPersonView({
 
   const accountActions = account ? (
     <>
+      <Button
+        className="dg-btn dg-btn-secondary"
+        onClick={() => {
+          setNameDraft({
+            firstName: profile?.firstName ?? "",
+            lastName: profile?.lastName ?? "",
+          });
+          setDialog("editName");
+        }}
+        disabled={busy}
+      >
+        Edit name
+      </Button>
+      {!terminated ? (
+        <Button
+          className="dg-btn dg-btn-secondary"
+          onClick={() => {
+            setEmailDraft(account.email);
+            setDialog("changeEmail");
+          }}
+          disabled={busy}
+        >
+          Change sign-in email
+        </Button>
+      ) : null}
       {primaryOrgId && !terminated ? (
         <Button
           className="dg-btn dg-btn-secondary"
@@ -227,6 +264,9 @@ export default function GridmasterPersonView({
   const reinstateConfirm = dialog === "reinstate";
   const forceLogoutConfirm = dialog === "forceLogout";
   const resetConfirm = dialog === "reset";
+  const editNameConfirm = dialog === "editName";
+  const changeEmailConfirm = dialog === "changeEmail";
+  const nextEmail = emailDraft.trim();
   const closeDialog = () => {
     setDialog(null);
     setTerminateReason("");
@@ -349,6 +389,89 @@ export default function GridmasterPersonView({
               "We couldn't send that password reset.",
             )
           }
+          onCancel={closeDialog}
+        />
+      )}
+      {editNameConfirm && !stepUp.dialog && (
+        <ConfirmDialog
+          title="Edit name"
+          message={
+            <div className="flex flex-col gap-3">
+              <span>The name on their account. Staff records keep their own names.</span>
+              <input
+                className="dg-input"
+                aria-label="First name"
+                placeholder="First name"
+                value={nameDraft.firstName}
+                maxLength={100}
+                onChange={(event) =>
+                  setNameDraft((draft) => ({ ...draft, firstName: event.target.value }))
+                }
+              />
+              <input
+                className="dg-input"
+                aria-label="Last name"
+                placeholder="Last name"
+                value={nameDraft.lastName}
+                maxLength={100}
+                onChange={(event) =>
+                  setNameDraft((draft) => ({ ...draft, lastName: event.target.value }))
+                }
+              />
+            </div>
+          }
+          confirmLabel="Save name"
+          variant="info"
+          isLoading={busy}
+          onConfirm={() =>
+            runAssured(
+              (userId, accessToken) =>
+                updateGridmasterPersonName(
+                  userId,
+                  { firstName: nameDraft.firstName.trim(), lastName: nameDraft.lastName.trim() },
+                  accessToken,
+                ),
+              "Name saved",
+              "We couldn't save that name. Try again.",
+            )
+          }
+          onCancel={closeDialog}
+        />
+      )}
+
+      {changeEmailConfirm && !stepUp.dialog && (
+        <ConfirmDialog
+          title="Change sign-in email"
+          message={
+            <div className="flex flex-col gap-3">
+              <span>
+                They sign in with the new address from now on. Every session ends, both addresses
+                are told, and their staff records take the new address too.
+              </span>
+              <input
+                className="dg-input"
+                type="email"
+                aria-label="New sign-in email"
+                value={emailDraft}
+                maxLength={320}
+                onChange={(event) => setEmailDraft(event.target.value)}
+              />
+            </div>
+          }
+          confirmLabel="Change email"
+          variant="warning"
+          isLoading={busy}
+          onConfirm={() => {
+            if (!nextEmail || nextEmail.toLowerCase() === signInEmail.toLowerCase()) {
+              toast.error("Enter a different email address.");
+              return;
+            }
+            return runAssured(
+              (userId, accessToken) => changeGridmasterPersonEmail(userId, nextEmail, accessToken),
+              `Sign-in email changed to ${nextEmail}`,
+              "We couldn't change that email. Try again.",
+            );
+          }}
           onCancel={closeDialog}
         />
       )}

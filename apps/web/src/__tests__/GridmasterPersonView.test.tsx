@@ -16,6 +16,8 @@ const sendGridmasterPasswordReset = vi.fn();
 const terminateGridmasterUser = vi.fn();
 const reinstateGridmasterUser = vi.fn();
 const updateGridmasterUserActivation = vi.fn();
+const updateGridmasterPersonName = vi.fn();
+const changeGridmasterPersonEmail = vi.fn();
 const requireCredentialAssurance = vi.fn();
 const stepUpRun = vi.fn();
 
@@ -26,6 +28,8 @@ vi.mock("@/features/gridmaster/client", () => ({
   terminateGridmasterUser: (...args: unknown[]) => terminateGridmasterUser(...args),
   reinstateGridmasterUser: (...args: unknown[]) => reinstateGridmasterUser(...args),
   updateGridmasterUserActivation: (...args: unknown[]) => updateGridmasterUserActivation(...args),
+  updateGridmasterPersonName: (...args: unknown[]) => updateGridmasterPersonName(...args),
+  changeGridmasterPersonEmail: (...args: unknown[]) => changeGridmasterPersonEmail(...args),
 }));
 vi.mock("@/hooks/useStepUpAction", () => ({
   useStepUpAction: () => ({ run: stepUpRun, dialog: null }),
@@ -416,5 +420,84 @@ describe("GridmasterPersonView", () => {
     expect(await screen.findByText(/No membership/)).toBeInTheDocument();
     expect(screen.getAllByText("Grace Lovelace").length).toBeGreaterThan(1);
     expect(screen.getByText("No invitations sent.")).toBeInTheDocument();
+  });
+
+  it("saves the account name through step-up", async () => {
+    updateGridmasterPersonName.mockResolvedValue({ success: true });
+    renderView(linkedRecord());
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edit name" }));
+    const dialog = screen.getByRole("dialog", { name: "Edit name" });
+    fireEvent.change(within(dialog).getByLabelText("First name"), {
+      target: { value: " Augusta " },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save name" }));
+
+    await waitFor(() =>
+      expect(updateGridmasterPersonName).toHaveBeenCalledWith(
+        USER,
+        { firstName: "Augusta", lastName: "Lovelace" },
+        "fresh-token",
+      ),
+    );
+    expect(toast.success).toHaveBeenCalledWith("Name saved");
+  });
+
+  it("changes the sign-in email through step-up after the credential check", async () => {
+    changeGridmasterPersonEmail.mockResolvedValue({ success: true });
+    renderView(linkedRecord());
+
+    fireEvent.click(await screen.findByRole("button", { name: "Change sign-in email" }));
+    const dialog = screen.getByRole("dialog", { name: "Change sign-in email" });
+    fireEvent.change(within(dialog).getByLabelText("New sign-in email"), {
+      target: { value: "augusta@example.com" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Change email" }));
+
+    await waitFor(() =>
+      expect(changeGridmasterPersonEmail).toHaveBeenCalledWith(
+        USER,
+        "augusta@example.com",
+        "fresh-token",
+      ),
+    );
+    expect(requireCredentialAssurance.mock.invocationCallOrder[0]).toBeLessThan(
+      changeGridmasterPersonEmail.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("shows the server's reason when the email is taken", async () => {
+    changeGridmasterPersonEmail.mockRejectedValue(
+      new Error("That email belongs to a different user account."),
+    );
+    renderView(linkedRecord());
+
+    fireEvent.click(await screen.findByRole("button", { name: "Change sign-in email" }));
+    const dialog = screen.getByRole("dialog", { name: "Change sign-in email" });
+    fireEvent.change(within(dialog).getByLabelText("New sign-in email"), {
+      target: { value: "grace@example.com" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Change email" }));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("That email belongs to a different user account."),
+    );
+    expect(screen.getByRole("dialog", { name: "Change sign-in email" })).toBeInTheDocument();
+  });
+
+  it("changes no email when step-up is cancelled", async () => {
+    stepUpRun.mockResolvedValueOnce(false);
+    renderView(linkedRecord());
+
+    fireEvent.click(await screen.findByRole("button", { name: "Change sign-in email" }));
+    const dialog = screen.getByRole("dialog", { name: "Change sign-in email" });
+    fireEvent.change(within(dialog).getByLabelText("New sign-in email"), {
+      target: { value: "augusta@example.com" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Change email" }));
+
+    await waitFor(() => expect(stepUpRun).toHaveBeenCalled());
+    expect(changeGridmasterPersonEmail).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
   });
 });
