@@ -69,7 +69,7 @@ committed as a local checkpoint.
       sends an invitation when there is no account, all through step-up.
       _Done when:_ route and view tests cover assign, invite-on-no-account,
       Super Admin, and the step-up path.
-- [ ] **Step 3 - setup wizard** - Super Admin in the invitation step; the
+- [x] **Step 3 - setup wizard** - Super Admin in the invitation step; the
       server's Super Admin grant gated; the wizard saves through step-up.
       _Done when:_ route tests prove a stale session grants nothing and the
       persistence runs its calls with the assured token.

@@ -648,13 +648,17 @@ export function assignGridmasterOrgRoleByEmail(
 
 export function createGridmasterOrganizationSetup(
   input: GridmasterOrganizationSetupInput,
+  accessToken?: string,
 ): Promise<{ org: Organization; superAdmin: GridmasterSuperAdminSetupResult }> {
   return requestGridmasterJson<{
     org: Organization;
     superAdmin: GridmasterSuperAdminSetupResult;
   }>("/api/gridmaster/organizations/manage", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify({ action: "createOrganizationSetup", input }),
   });
 }

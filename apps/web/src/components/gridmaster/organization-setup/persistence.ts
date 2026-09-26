@@ -54,11 +54,14 @@ export type SuperAdminSetupResult =
   | { kind: "invited"; displayName: string }
   | { kind: "invite-error"; displayName: string; message: string };
 
-export async function createOrganizationSetup(input: CreateOrganizationSetupInput): Promise<{
+export async function createOrganizationSetup(
+  input: CreateOrganizationSetupInput,
+  accessToken?: string,
+): Promise<{
   org: Organization;
   superAdmin: SuperAdminSetupResult;
 }> {
-  return createGridmasterOrganizationSetup(input);
+  return createGridmasterOrganizationSetup(input, accessToken);
 }
 
 type SaveOrganizationConfigInput = {
@@ -366,6 +369,7 @@ export async function createOrganizationEmployees(
 export async function sendOrganizationInvitations(
   createdOrg: Organization,
   invitationRows: InvitationRow[],
+  accessToken?: string,
 ): Promise<{ sentCount: number; failCount: number }> {
   let sentCount = 0;
   let failCount = 0;
@@ -374,12 +378,15 @@ export async function sendOrganizationInvitations(
     // Counted as sent only once its email has gone out: the create call sends
     // it, and a failed send leaves no invitation behind.
     try {
-      await createOrganizationInvitation({
-        email: invitationRow.email,
-        role: invitationRow.role as AssignableOrganizationRole,
-        orgId: createdOrg.id,
-        employeeId: invitationRow.employeeId,
-      });
+      await createOrganizationInvitation(
+        {
+          email: invitationRow.email,
+          role: invitationRow.role as AssignableOrganizationRole,
+          orgId: createdOrg.id,
+          employeeId: invitationRow.employeeId,
+        },
+        accessToken,
+      );
       sentCount += 1;
     } catch {
       failCount += 1;

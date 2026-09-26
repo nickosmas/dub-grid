@@ -97,7 +97,7 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
   "apps/web/src/app/api/gridmaster/organizations/manage/route.ts": {
     policy: "conditional-sensitive",
     assertions: [
-      /parsed\.data\.action === "assignOrgRoleByEmail"\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) \{\s*return assurance\.response;[\s\S]*?\.rpc\("assign_org_role_by_email"/,
+      /parsed\.data\.action === "assignOrgRoleByEmail" \|\|\s*\(parsed\.data\.action === "createOrganizationSetup" && parsed\.data\.input\.superAdminEmail\)\s*\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) \{\s*return assurance\.response;[\s\S]*?\.rpc\("assign_org_role_by_email"/,
     ],
   },
   "apps/web/src/app/api/gridmaster/password-reset/route.ts": {

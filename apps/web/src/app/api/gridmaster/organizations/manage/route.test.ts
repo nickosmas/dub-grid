@@ -434,6 +434,25 @@ describe("POST /api/gridmaster/organizations/manage", () => {
     },
   };
 
+  it("creates no organization on a stale session when setup names a Super Admin (F-55)", async () => {
+    requireSensitiveActionAuth.mockResolvedValueOnce({
+      response: NextResponse.json({ code: "STEP_UP_REQUIRED" }, { status: 403 }),
+    });
+
+    const response = await POST(makeRequest(SETUP_WITH_NEW_SUPER_ADMIN));
+
+    expect(response.status).toBe(403);
+    expect(organizationInsert).not.toHaveBeenCalled();
+    expect(requestRpc).not.toHaveBeenCalled();
+  });
+
+  it("asks no fresh proof of a setup that names no Super Admin", async () => {
+    const { superAdminEmail: _omitted, ...input } = SETUP_WITH_NEW_SUPER_ADMIN.input;
+    await POST(makeRequest({ action: "createOrganizationSetup", input }));
+
+    expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
+  });
+
   function inviteInsteadOfAssign() {
     requestRpc.mockImplementation(async (fn: string) => {
       if (fn === "assign_org_role_by_email") {
