@@ -107,7 +107,7 @@ throwaway worktree, then committed as a local checkpoint and pushed.
       _Done when:_ view tests show each action calls its helper with the
       card's organization and refreshes the record, and a cancel changes
       nothing.
-- [ ] **Step 6 - staff and invitation actions** - staff status, record edits
+- [x] **Step 6 - staff and invitation actions** - staff status, record edits
       (with the record's version), invitation resend and revoke (guarded).
       _Done when:_ view tests cover each action, a version conflict shows the
       conflict message, and resend on an expired invitation passes its id.

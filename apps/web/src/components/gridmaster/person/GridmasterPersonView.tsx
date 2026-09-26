@@ -24,8 +24,10 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
 import { PersonAccountCard } from "./PersonAccountCard";
 import { PersonHeader } from "./PersonHeader";
+import { PersonInvitationActions } from "./PersonInvitationActions";
 import { PersonMembershipActions } from "./PersonMembershipActions";
 import { PersonOrganizationCard } from "./PersonOrganizationCard";
+import { PersonStaffActions } from "./PersonStaffActions";
 import { getPersonName, getPrimaryOrgId } from "./person-format";
 
 type AccountDialog =
@@ -294,6 +296,12 @@ export default function GridmasterPersonView({
               />
             ) : undefined
           }
+          renderStaffActions={(employee) => (
+            <PersonStaffActions employee={employee} onChanged={refresh} />
+          )}
+          renderInvitationActions={(invitation) => (
+            <PersonInvitationActions invitation={invitation} onChanged={refresh} />
+          )}
         />
       ))}
       {terminated ? (

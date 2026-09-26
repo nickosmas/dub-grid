@@ -9,7 +9,9 @@ const removeOrganizationMembershipGuarded = vi.fn();
 const requireCredentialAssurance = vi.fn();
 const stepUpRun = vi.fn();
 
-class OrganizationAccessConflictError extends Error {}
+const { OrganizationAccessConflictError } = vi.hoisted(() => ({
+  OrganizationAccessConflictError: class extends Error {},
+}));
 
 vi.mock("@/features/organization/client", () => ({
   OrganizationAccessConflictError,
