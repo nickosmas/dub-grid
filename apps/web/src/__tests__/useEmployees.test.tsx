@@ -14,6 +14,7 @@ const mockActivateEmployee = vi.fn();
 const mockCreateOrganizationInvitation = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockToastError = vi.fn();
+const mockToastInfo = vi.fn();
 const runStepUp = vi.fn();
 
 vi.mock("@/features/employees/client", () => {
@@ -49,7 +50,7 @@ vi.mock("sonner", () => ({
   toast: {
     success: (...args: unknown[]) => mockToastSuccess(...args),
     error: (...args: unknown[]) => mockToastError(...args),
-    info: vi.fn(),
+    info: (...args: unknown[]) => mockToastInfo(...args),
   },
 }));
 
@@ -174,6 +175,8 @@ describe("useEmployees — handleSaveEmployeeWithReinvite", () => {
     expect(mockCreateOrganizationInvitation).not.toHaveBeenCalled();
     expect(mockToastSuccess).not.toHaveBeenCalled();
     expect(mockToastError).not.toHaveBeenCalled();
+    expect(mockToastInfo).toHaveBeenCalledTimes(1);
+    expect(mockToastInfo).toHaveBeenCalledWith("Employee saved. No new invitation was sent.");
   });
 
   it("shows a distinct error but keeps the saved employee when the identity save succeeds but sending the new invite fails", async () => {

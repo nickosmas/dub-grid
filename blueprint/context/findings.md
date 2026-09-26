@@ -208,13 +208,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** Gate a Gridmaster's department-admin changes like permission changes.
 **Resolution:** Fixed in 41d3 (repair): the app-only-user route and the invitation edit require fresh proof when a Gridmaster changes the department or department-admin set (compared as sets, so a save that leaves them alone asks nothing); the People management screens run those saves through step-up, and the editor revokes a pending invitation only after both prompted steps. Route tests cover a stale session, an unchanged set and an ordinary admin; the inventory classifies the app-only-user route.
 
-### F-69 [P3] open - Test gaps in the 41d4 step-up wiring
+### F-69 [P3] fixed - Test gaps in the 41d4 step-up wiring
 
 **File:** `apps/web/src/__tests__/GridmasterUsersTab.test.tsx`; `apps/web/src/components/staff/MemberAccessControls.tsx`; `apps/web/src/components/gridmaster/OrganizationSetupWizard.tsx`
 **Found:** 2026-09-26 by `/audit` of e42da4bd..821c7ff4
 **Why it matters:** Nothing covers a step-up retry that runs the action twice, `PermissionsEditor` staying open when a save is cancelled, `MemberAccessControls`' own cancel, or the wizard's invitation-step cancel.
 **Suggested fix:** Add those view tests. Also: a behavior test that replace-access omits the token, `isGridmasterActor` throwing on a read error, the reinvite info toast, and the revoke-after-role-change order.
-**Resolution:**
+**Resolution:** Fixed in 41d3 (repair): tests for the step-up retry in the Users tab (including the invite flag reset), `PermissionsEditor` staying open on a cancelled save, `MemberAccessControls` cancels (new file), the wizard's invitation-step cancel, replace-access returning no token, `isGridmasterActor` failing closed, the reinvite info toast, and the management editor's revoke-last order. Each was confirmed to fail on a matching regression except the invite flag reset, which the action's structure already prevents. The management editor's role-change branch cannot be reached for a linked user (the picker is hidden), so that order is covered for the department step only.
 
 ### F-71 [P2] fixed - `send_invitation` returns a token to a direct authenticated caller
 

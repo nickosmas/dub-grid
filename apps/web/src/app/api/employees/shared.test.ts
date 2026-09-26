@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canManageEmployees } from "./shared";
+import { canManageEmployees, isGridmasterActor, type ServiceClient } from "./shared";
 
 type MockRows = {
   membership?: {
@@ -133,5 +133,51 @@ describe("canManageEmployees", () => {
     });
 
     await expect(canManageEmployees(serviceClient, ACTOR_ID, ORG_ID)).resolves.toBe(false);
+  });
+});
+
+describe("isGridmasterActor (F-69)", () => {
+  function makeProfileClient(result: {
+    data: { platform_role: string | null } | null;
+    error: { message: string } | null;
+  }) {
+    const tables: string[] = [];
+    const client = {
+      from(table: string) {
+        tables.push(table);
+        const query = {
+          select: () => query,
+          eq: () => query,
+          maybeSingle: async () => result,
+        };
+        return query;
+      },
+    } as unknown as ServiceClient;
+    return { client, tables };
+  }
+
+  it("throws on a read error instead of reporting a non-Gridmaster", async () => {
+    const { client, tables } = makeProfileClient({ data: null, error: { message: "boom" } });
+
+    await expect(isGridmasterActor(client, ACTOR_ID)).rejects.toMatchObject({ message: "boom" });
+    expect(tables).toEqual(["profiles"]);
+  });
+
+  it("is true only for the gridmaster platform role", async () => {
+    await expect(
+      isGridmasterActor(
+        makeProfileClient({ data: { platform_role: "gridmaster" }, error: null }).client,
+        ACTOR_ID,
+      ),
+    ).resolves.toBe(true);
+    await expect(
+      isGridmasterActor(
+        makeProfileClient({ data: { platform_role: "none" }, error: null }).client,
+        ACTOR_ID,
+      ),
+    ).resolves.toBe(false);
+    await expect(
+      isGridmasterActor(makeProfileClient({ data: null, error: null }).client, ACTOR_ID),
+    ).resolves.toBe(false);
   });
 });

@@ -281,6 +281,71 @@ describe("EmployeeManagementAccessEditor", () => {
     });
   });
 
+  describe("a linked user with a pending invitation (F-69)", () => {
+    async function saveLinkedAccessWithPendingInvitation() {
+      const onClose = vi.fn();
+      const onCompleted = vi.fn();
+      const editorRef = createRef<EmployeeManagementAccessEditorHandle>();
+      fetchOrganizationUsersMock.mockResolvedValue([makeOrganizationUser()]);
+
+      render(
+        <EmployeeManagementAccessEditor
+          ref={editorRef}
+          employee={{ ...employee, userId: "user-1" }}
+          orgId="org-1"
+          managementDepartments={managementDepartments}
+          pendingInvitation={makePendingInvitation()}
+          onClose={onClose}
+          onCompleted={onCompleted}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(fetchOrganizationUsersMock).toHaveBeenCalled();
+      });
+      await userEvent.setup().click(screen.getByRole("button", { name: "Operations" }));
+      await act(async () => {
+        await editorRef.current?.save();
+      });
+      return { onClose, onCompleted };
+    }
+
+    it("revokes the pending invitation only after the membership's departments are saved", async () => {
+      const { onCompleted } = await saveLinkedAccessWithPendingInvitation();
+
+      await waitFor(() => expect(onCompleted).toHaveBeenCalledOnce());
+      expect(updateAppOnlyUserMock).toHaveBeenCalledWith(
+        "user-1",
+        "org-1",
+        { departmentIds: [10, 11] },
+        "step-up-token",
+      );
+      expect(revokeOrganizationInvitationGuardedMock).toHaveBeenCalledWith({
+        orgId: "org-1",
+        invitationId: "inv-1",
+        expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
+      });
+      expect(revokeOrganizationInvitationGuardedMock.mock.invocationCallOrder[0]).toBeGreaterThan(
+        updateAppOnlyUserMock.mock.invocationCallOrder[0]!,
+      );
+      // The linked user's role is shown elsewhere and never changed from here.
+      expect(updateOrganizationMembershipGuardedMock).not.toHaveBeenCalled();
+    });
+
+    it("leaves the invitation pending when the departments' step-up is cancelled", async () => {
+      stepUpRun.mockResolvedValueOnce(false);
+
+      const { onClose, onCompleted } = await saveLinkedAccessWithPendingInvitation();
+
+      expect(stepUpRun).toHaveBeenCalledOnce();
+      expect(updateAppOnlyUserMock).not.toHaveBeenCalled();
+      expect(revokeOrganizationInvitationGuardedMock).not.toHaveBeenCalled();
+      expect(onCompleted).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+      expect(vi.mocked(toast.success)).not.toHaveBeenCalled();
+    });
+  });
+
   it("disables saving and shows a notice in sandbox mode", async () => {
     const user = userEvent.setup();
     useIsInSandboxMock.mockReturnValue(true);
