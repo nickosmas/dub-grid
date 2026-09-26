@@ -200,13 +200,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** Keep it off in production. Before turning it on, either send Supabase's reauthentication nonce with the update or have the authenticator-code step-up issue a fresh session; then set local and production alike.
 **Resolution:**
 
-### F-68 [P3] fixed - Management-department grants by a Gridmaster run without fresh proof
+### F-68 [P3] closed - Management-department grants by a Gridmaster run without fresh proof
 
 **File:** `apps/web/src/app/api/organizations/invitations/route.ts` (PATCH `deptAdminIds`); `apps/web/src/app/api/organizations/app-only-user/route.ts`
 **Found:** 2026-09-26 by `/audit` of e42da4bd..821c7ff4
 **Why it matters:** Department-admin assignments are a smaller grant of the same kind F-61 gated for permissions.
 **Suggested fix:** Gate a Gridmaster's department-admin changes like permission changes.
-**Resolution:** Fixed in 41d3 (repair): the app-only-user route and the invitation edit require fresh proof when a Gridmaster changes the department or department-admin set (compared as sets, so a save that leaves them alone asks nothing); the People management screens run those saves through step-up, and the editor revokes a pending invitation only after both prompted steps. Route tests cover a stale session, an unchanged set and an ordinary admin; the inventory classifies the app-only-user route. Re-review (e4e6f905..f2ff543e) kept it fixed: the server gates hold, but the People management save wrote the details before the departments' prompt, so a cancel left a silent partial save and a stale version. The save now runs the prompted grant first, so a cancel saves nothing; a MembersSection test proves it and fails against the previous order.
+**Resolution:** Fixed in 41d3 (repair): the app-only-user route and the invitation edit require fresh proof when a Gridmaster changes the department or department-admin set (compared as sets, so a save that leaves them alone asks nothing); the People management screens run those saves through step-up, and the editor revokes a pending invitation only after both prompted steps. Route tests cover a stale session, an unchanged set and an ordinary admin; the inventory classifies the app-only-user route. Re-review (e4e6f905..f2ff543e) kept it fixed: the server gates hold, but the People management save wrote the details before the departments' prompt, so a cancel left a silent partial save and a stale version. The save now runs the prompted grant first, so a cancel saves nothing; a MembersSection test proves it and fails against the previous order. Re-review (1716c586): closed; the branch cases are unchanged, a retry after an identity failure is idempotent, and ordinary admins see no change. A failed save now also refreshes the directory, since a grant may have saved first.
 
 ### F-69 [P3] closed - Test gaps in the 41d4 step-up wiring
 

@@ -2611,6 +2611,10 @@ export function MembersSection({
               );
               return true;
             } catch (err) {
+              // A grant may have saved before the failure, so show what is stored.
+              void queryClient.invalidateQueries({
+                queryKey: queryKeys.org.directory(orgId),
+              });
               toast.error(formatClientErrorMessage(err, "We couldn't save those changes."));
               return false;
             }
