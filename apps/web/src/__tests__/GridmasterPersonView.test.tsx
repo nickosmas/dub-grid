@@ -18,6 +18,8 @@ const reinstateGridmasterUser = vi.fn();
 const updateGridmasterUserActivation = vi.fn();
 const updateGridmasterPersonName = vi.fn();
 const changeGridmasterPersonEmail = vi.fn();
+const runGridmasterPersonSecurityAction = vi.fn();
+const resetGridmasterPersonTwoFactor = vi.fn();
 const requireCredentialAssurance = vi.fn();
 const stepUpRun = vi.fn();
 
@@ -30,6 +32,9 @@ vi.mock("@/features/gridmaster/client", () => ({
   updateGridmasterUserActivation: (...args: unknown[]) => updateGridmasterUserActivation(...args),
   updateGridmasterPersonName: (...args: unknown[]) => updateGridmasterPersonName(...args),
   changeGridmasterPersonEmail: (...args: unknown[]) => changeGridmasterPersonEmail(...args),
+  runGridmasterPersonSecurityAction: (...args: unknown[]) =>
+    runGridmasterPersonSecurityAction(...args),
+  resetGridmasterPersonTwoFactor: (...args: unknown[]) => resetGridmasterPersonTwoFactor(...args),
 }));
 vi.mock("@/hooks/useStepUpAction", () => ({
   useStepUpAction: () => ({ run: stepUpRun, dialog: null }),
@@ -133,6 +138,11 @@ function linkedRecord(overrides: Partial<GridmasterPersonRecord> = {}): Gridmast
     ],
     liveImpersonation: null,
     loginLock: null,
+    security: {
+      twoFactor: { enabled: false, reenrollRequiredAt: null, factors: [] },
+      knownDevices: [],
+    },
+    sessions: { sessions: [], pushDevices: [], calendarFeeds: [] },
     organizations: [
       {
         org: { id: ORG, name: "Calm Haven", slug: "calmhaven" },
@@ -239,8 +249,6 @@ describe("GridmasterPersonView", () => {
 
     expect(await screen.findByText("Sign-in email")).toBeInTheDocument();
     expect(screen.getAllByText("ada@example.com").length).toBeGreaterThan(0);
-    expect(screen.getByText("Two-factor")).toBeInTheDocument();
-    expect(screen.getByText("On")).toBeInTheDocument();
     expect(screen.getByText("Accepted terms 2026-05")).toBeInTheDocument();
     expect(screen.getByText("Mobile Safari")).toBeInTheDocument();
     expect(screen.getByText(/Cookies: Essential, analytics off/)).toBeInTheDocument();
@@ -515,5 +523,238 @@ describe("GridmasterPersonView", () => {
     expect(screen.getAllByText(/^Cookies:/)).toHaveLength(5);
     fireEvent.click(screen.getByRole("button", { name: "Show fewer" }));
     expect(screen.getAllByText(/^Cookies:/)).toHaveLength(3);
+  });
+
+  it("shows two-factor, known devices, sessions, push devices and calendar feeds", async () => {
+    renderView(
+      linkedRecord({
+        loginLock: { locked: false, resetsAt: null },
+        security: {
+          twoFactor: {
+            enabled: true,
+            reenrollRequiredAt: null,
+            factors: [
+              {
+                id: "f-1",
+                type: "totp",
+                name: "Work phone",
+                status: "verified",
+                createdAt: "2026-02-01T00:00:00.000Z",
+                lastUsedAt: null,
+              },
+            ],
+          },
+          knownDevices: [
+            {
+              id: "d-1",
+              platform: "ios",
+              firstSeenAt: "2026-09-01T00:00:00.000Z",
+              lastSeenAt: "2026-09-20T00:00:00.000Z",
+            },
+          ],
+        },
+        sessions: {
+          sessions: [
+            {
+              id: "s-1",
+              orgId: ORG,
+              platform: "web",
+              deviceLabel: "Macintosh",
+              browser: "Chrome 151",
+              appVersion: null,
+              location: "Athens, GR",
+              createdAt: "2026-09-25T00:00:00.000Z",
+              lastActiveAt: "2026-09-26T08:00:00.000Z",
+            },
+          ],
+          pushDevices: [
+            {
+              id: "p-1",
+              orgId: ORG,
+              platform: "android",
+              lastSeenAt: null,
+              disabledAt: "2026-09-10T00:00:00.000Z",
+              createdAt: "2026-09-02T00:00:00.000Z",
+            },
+          ],
+          calendarFeeds: [
+            { id: "c-1", orgId: ORG, issuedAt: "2026-09-03T00:00:00.000Z", revokedAt: null },
+          ],
+        },
+      }),
+    );
+
+    const security = (await screen.findByRole("heading", { name: "Security" })).closest(
+      "section",
+    ) as HTMLElement;
+    expect(within(security).getByText("Work phone")).toBeInTheDocument();
+    expect(within(security).getByText("Verified")).toBeInTheDocument();
+    expect(within(security).getByText(/never used/)).toBeInTheDocument();
+    expect(within(security).getByText(/^ios · first seen/)).toBeInTheDocument();
+    expect(within(security).getByText("Not locked.")).toBeInTheDocument();
+
+    const sessions = screen
+      .getByRole("heading", { name: "Sessions and devices" })
+      .closest("section") as HTMLElement;
+    expect(within(sessions).getByText("Macintosh · Chrome 151")).toBeInTheDocument();
+    expect(within(sessions).getByText(/Calm Haven · Athens, GR · started/)).toBeInTheDocument();
+    expect(within(sessions).getByText(/^Off since/)).toBeInTheDocument();
+    expect(within(sessions).getByText(/^issued/)).toBeInTheDocument();
+  });
+
+  it("shows empty states, and no security or sessions for a staff record", async () => {
+    renderView(linkedRecord());
+    expect(await screen.findByText("No factors enrolled.")).toBeInTheDocument();
+    expect(screen.getByText(/No devices remembered/)).toBeInTheDocument();
+    expect(screen.getByText("No sessions.")).toBeInTheDocument();
+    expect(screen.getByText(/Not tracked here/)).toBeInTheDocument();
+  });
+
+  it("hides security and sessions for a staff record with no account", async () => {
+    renderView(linkedRecord({ account: null, profile: null, security: null, sessions: null }), {
+      kind: "staff",
+      employeeId: "44444444-4444-4444-8444-444444444444",
+    });
+    expect(
+      await screen.findByText(/has a staff record but has never signed in/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Security" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Sessions and devices" })).not.toBeInTheDocument();
+  });
+
+  function withSessionAndLock(locked: boolean) {
+    return linkedRecord({
+      loginLock: { locked, resetsAt: null },
+      sessions: {
+        sessions: [
+          {
+            id: "s-1",
+            orgId: ORG,
+            platform: "web",
+            deviceLabel: "Macintosh",
+            browser: null,
+            appVersion: null,
+            location: null,
+            createdAt: "2026-09-25T00:00:00.000Z",
+            lastActiveAt: null,
+          },
+        ],
+        pushDevices: [],
+        calendarFeeds: [],
+      },
+    });
+  }
+
+  it("ends one session through step-up after the credential check", async () => {
+    runGridmasterPersonSecurityAction.mockResolvedValue({ success: true });
+    renderView(withSessionAndLock(false));
+
+    fireEvent.click(await screen.findByRole("button", { name: "End session" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "End session" })).getByRole("button", {
+        name: "End session",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(runGridmasterPersonSecurityAction).toHaveBeenCalledWith(
+        USER,
+        { action: "endSession", sessionId: "s-1" },
+        "fresh-token",
+      ),
+    );
+    expect(requireCredentialAssurance.mock.invocationCallOrder[0]).toBeLessThan(
+      runGridmasterPersonSecurityAction.mock.invocationCallOrder[0],
+    );
+    expect(toast.success).toHaveBeenCalledWith("Session ended");
+    expect(screen.queryByRole("button", { name: "Clear sign-in lock" })).not.toBeInTheDocument();
+  });
+
+  it("ends nothing when step-up is cancelled", async () => {
+    stepUpRun.mockResolvedValueOnce(false);
+    renderView(withSessionAndLock(false));
+
+    fireEvent.click(await screen.findByRole("button", { name: "End session" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "End session" })).getByRole("button", {
+        name: "End session",
+      }),
+    );
+
+    await waitFor(() => expect(stepUpRun).toHaveBeenCalled());
+    expect(runGridmasterPersonSecurityAction).not.toHaveBeenCalled();
+  });
+
+  it("offers to clear the sign-in lock only while it is locked", async () => {
+    runGridmasterPersonSecurityAction.mockResolvedValue({
+      success: true,
+      loginLock: { locked: false, resetsAt: null },
+    });
+    renderView(withSessionAndLock(true));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Clear sign-in lock" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Clear sign-in lock" })).getByRole("button", {
+        name: "Clear lock",
+      }),
+    );
+    await waitFor(() =>
+      expect(runGridmasterPersonSecurityAction).toHaveBeenCalledWith(
+        USER,
+        { action: "clearLoginLock" },
+        "fresh-token",
+      ),
+    );
+    expect(toast.success).toHaveBeenCalledWith("Sign-in lock cleared");
+  });
+
+  it("resets two-factor with a reason through step-up", async () => {
+    resetGridmasterPersonTwoFactor.mockResolvedValue({ success: true, factorsRemoved: 1 });
+    renderView(linkedRecord());
+
+    fireEvent.click(await screen.findByRole("button", { name: "Reset two-factor" }));
+    const dialog = screen.getByRole("dialog", { name: "Reset two-factor" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Reset two-factor" }));
+    expect(toast.error).toHaveBeenCalledWith("Give a reason for the reset.");
+    expect(resetGridmasterPersonTwoFactor).not.toHaveBeenCalled();
+
+    fireEvent.change(within(dialog).getByLabelText("Reset reason"), {
+      target: { value: " Lost phone, verified by call " },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Reset two-factor" }));
+
+    await waitFor(() =>
+      expect(resetGridmasterPersonTwoFactor).toHaveBeenCalledWith(
+        USER,
+        "Lost phone, verified by call",
+        "fresh-token",
+      ),
+    );
+    expect(requireCredentialAssurance.mock.invocationCallOrder[0]).toBeLessThan(
+      resetGridmasterPersonTwoFactor.mock.invocationCallOrder[0],
+    );
+    expect(toast.success).toHaveBeenCalledWith(
+      "Two-factor reset. They set it up again at their next sign-in.",
+    );
+  });
+
+  it("deactivates through step-up in the person's organization (F-80)", async () => {
+    updateGridmasterUserActivation.mockResolvedValue({ success: true });
+    renderView(linkedRecord());
+
+    fireEvent.click(await screen.findByRole("button", { name: "Deactivate" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Deactivate user" })).getByRole("button", {
+        name: "Deactivate",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(updateGridmasterUserActivation).toHaveBeenCalledWith(
+        { userId: USER, orgId: ORG, deactivate: true },
+        "fresh-token",
+      ),
+    );
+    expect(requireCredentialAssurance).toHaveBeenCalled();
   });
 });

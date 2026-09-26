@@ -4,7 +4,10 @@ import { rowToEmployee, rowToInvitation, rowToOrganizationTerminology } from "@/
 import { readLoginLock } from "@/lib/rate-limit";
 import type { Invitation, OrganizationRole } from "@/types";
 import type {
+  GridmasterFactor,
   GridmasterMembership,
+  GridmasterPersonSecurity,
+  GridmasterPersonSessions,
   GridmasterPersonOrganization,
   GridmasterPersonProfile,
   GridmasterPersonRecord,
@@ -13,7 +16,7 @@ import type {
 
 // Explicit lists: a `*` would carry any token column a later migration adds.
 const PROFILE_COLUMNS =
-  "platform_role, first_name, last_name, mfa_enabled, terms_version, terms_accepted_at, scheduled_deletion_at, deactivation_warned_at, deactivated_at, deactivated_by, terminated_at, terminated_by, terminated_reason, created_at, updated_at";
+  "platform_role, first_name, last_name, mfa_enabled, mfa_reenroll_required_at, terms_version, terms_accepted_at, scheduled_deletion_at, deactivation_warned_at, deactivated_at, deactivated_by, terminated_at, terminated_by, terminated_reason, created_at, updated_at";
 const MEMBERSHIP_COLUMNS =
   "id, org_id, org_role, admin_permissions, joined_at, schedule_last_viewed_at, archived_at, archived_by, department_ids, dept_admin_ids, phone, onboarding_completed_at, tooltip_tours_completed, updated_at";
 const EMPLOYEE_COLUMNS =
@@ -205,6 +208,105 @@ function actorIds(record: Omit<GridmasterPersonRecord, "actors">): (string | nul
   ];
 }
 
+interface AuthFactor {
+  id: string;
+  friendly_name?: string;
+  factor_type: string;
+  status: string;
+  created_at: string;
+  last_challenged_at?: string;
+}
+
+// Explicit columns: device hashes, push and calendar tokens, refresh token
+// hashes and IP addresses stay out.
+async function loadSecurityAndSessions(
+  client: SupabaseClient,
+  userId: string,
+  factors: AuthFactor[],
+  profile: Row | null,
+): Promise<{ security: GridmasterPersonSecurity; sessions: GridmasterPersonSessions }> {
+  const [devices, sessionRows, pushRows, feedRows] = await Promise.all([
+    client
+      .from("user_known_devices")
+      .select("id, platform, first_seen_at, last_seen_at")
+      .eq("user_id", userId)
+      .order("last_seen_at", { ascending: false }),
+    client
+      .from("user_sessions")
+      .select(
+        "id, org_id, platform, device_label, browser_name, browser_version, app_version, location_city, location_country, created_at, last_active_at",
+      )
+      .eq("user_id", userId)
+      .order("last_active_at", { ascending: false }),
+    client
+      .from("mobile_device_tokens")
+      .select("id, org_id, platform, last_seen_at, disabled_at, created_at")
+      .eq("user_id", userId)
+      .order("last_seen_at", { ascending: false }),
+    client
+      .from("calendar_feed_tokens")
+      .select("id, org_id, issued_at, revoked_at")
+      .eq("user_id", userId)
+      .order("issued_at", { ascending: false }),
+  ]);
+
+  const mappedFactors: GridmasterFactor[] = factors.map((factor) => ({
+    id: factor.id,
+    type: factor.factor_type,
+    name: factor.friendly_name || null,
+    status: factor.status,
+    createdAt: factor.created_at,
+    lastUsedAt: factor.last_challenged_at ?? null,
+  }));
+
+  return {
+    security: {
+      twoFactor: {
+        enabled: Boolean(profile?.mfa_enabled),
+        reenrollRequiredAt: (profile?.mfa_reenroll_required_at as string | null) ?? null,
+        factors: mappedFactors,
+      },
+      knownDevices: (unwrap(devices) as Row[]).map((row) => ({
+        id: row.id as string,
+        platform: (row.platform as string | null) ?? null,
+        firstSeenAt: row.first_seen_at as string,
+        lastSeenAt: row.last_seen_at as string,
+      })),
+    },
+    sessions: {
+      sessions: (unwrap(sessionRows) as Row[]).map((row) => {
+        const browser = [row.browser_name, row.browser_version].filter(Boolean).join(" ");
+        const location = [row.location_city, row.location_country].filter(Boolean).join(", ");
+        return {
+          id: row.id as string,
+          orgId: (row.org_id as string | null) ?? null,
+          platform: (row.platform as string | null) ?? null,
+          deviceLabel: (row.device_label as string | null) ?? null,
+          browser: browser || null,
+          appVersion: (row.app_version as string | null) ?? null,
+          location: location || null,
+          createdAt: row.created_at as string,
+          lastActiveAt: (row.last_active_at as string | null) ?? null,
+        };
+      }),
+      pushDevices: (unwrap(pushRows) as Row[]).map((row) => ({
+        id: row.id as string,
+        orgId: (row.org_id as string | null) ?? null,
+        platform: row.platform as string,
+        lastSeenAt: (row.last_seen_at as string | null) ?? null,
+        disabledAt: (row.disabled_at as string | null) ?? null,
+        createdAt: row.created_at as string,
+      })),
+      calendarFeeds: (unwrap(feedRows) as Row[]).map((row) => ({
+        id: row.id as string,
+        orgId: row.org_id as string,
+        issuedAt: row.issued_at as string,
+        revokedAt: (row.revoked_at as string | null) ?? null,
+      })),
+    },
+  };
+}
+
 /**
  * The whole record for an account. Null when there is no such account, or
  * when it belongs to a Gridmaster: those are managed on Gridmaster Accounts.
@@ -261,6 +363,12 @@ export async function buildPersonRecordForUser(
     employees.map((employee) => employee.id),
   );
   const liveRow = (unwrap(impersonation) as Row[])[0];
+  const { security, sessions } = await loadSecurityAndSessions(
+    client,
+    userId,
+    (authUser?.factors ?? []) as AuthFactor[],
+    profile,
+  );
 
   const record: Omit<GridmasterPersonRecord, "actors"> = {
     account: authUser
@@ -293,6 +401,8 @@ export async function buildPersonRecordForUser(
         }
       : null,
     loginLock,
+    security,
+    sessions,
     organizations: await groupByOrganization(client, memberships, employees, invitations),
   };
   return { ...record, actors: await resolveActors(client, actorIds(record)) };
@@ -326,6 +436,8 @@ export async function buildPersonRecordForStaff(
     cookieConsents: [],
     liveImpersonation: null,
     loginLock: null,
+    security: null,
+    sessions: null,
     organizations: await groupByOrganization(client, [], [staff], invitations),
   };
   return { ...record, actors: await resolveActors(client, actorIds(record)) };

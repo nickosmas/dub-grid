@@ -20,6 +20,7 @@ import { MobileRealtimeProvider } from "../src/features/auth/providers/MobileRea
 import { markMobileAuthRuntimeStarted } from "../src/features/auth/lib/auth-entry-measurement";
 import { ConsentGate } from "../src/features/consent/components/ConsentGate";
 import { TermsGate } from "../src/features/consent/components/TermsGate";
+import { TwoFactorReenrollGate } from "../src/features/auth/components/TwoFactorReenrollGate";
 import { ConfigurationScreen } from "../src/shared/components/ConfigurationScreen";
 import { RouteErrorScreen } from "../src/shared/components/RouteErrorScreen";
 import { StartupSplashGate } from "../src/shared/components/StartupSplashGate";
@@ -108,71 +109,80 @@ function RootLayoutContent({
                     <MobileRealtimeProvider>
                       <ConsentGate>
                         <TermsGate>
-                          <StartupSplashGate>
-                            <Stack screenOptions={createCommonStackOptions(mobileColors)}>
-                              <Stack.Screen name="index" options={{ headerShown: false }} />
-                              <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
-                              <Stack.Screen
-                                name="(auth)/forgot-password"
-                                options={{ headerShown: false }}
-                              />
-                              <Stack.Screen
-                                name="(auth)/reset-password"
-                                options={{ headerShown: false }}
-                              />
-                              <Stack.Screen
-                                name="(auth)/onboarding"
-                                options={{ headerShown: false, animation: "fade" }}
-                              />
-                              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                              {/* Registered here rather than behind a nested
+                          <TwoFactorReenrollGate>
+                            <StartupSplashGate>
+                              <Stack screenOptions={createCommonStackOptions(mobileColors)}>
+                                <Stack.Screen name="index" options={{ headerShown: false }} />
+                                <Stack.Screen
+                                  name="(auth)/login"
+                                  options={{ headerShown: false }}
+                                />
+                                <Stack.Screen
+                                  name="(auth)/forgot-password"
+                                  options={{ headerShown: false }}
+                                />
+                                <Stack.Screen
+                                  name="(auth)/reset-password"
+                                  options={{ headerShown: false }}
+                                />
+                                <Stack.Screen
+                                  name="(auth)/onboarding"
+                                  options={{ headerShown: false, animation: "fade" }}
+                                />
+                                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                                {/* Registered here rather than behind a nested
                                   stack of their own: as the root of that stack
                                   the list drew no back control, so leaving it
                                   relied on the edge swipe. In this stack it
                                   gets the same native back as every drill-in. */}
-                              <Stack.Screen
-                                name="alerts/index"
-                                options={createDetailStackOptions(mobileColors, "Alerts", {
-                                  largeTitle: true,
-                                })}
-                              />
-                              <Stack.Screen
-                                name="alerts/[id]"
-                                options={createDetailStackOptions(mobileColors, "Alert")}
-                              />
-                              <Stack.Screen
-                                name="shift/[employeeId]/[date]"
-                                options={createDetailStackOptions(mobileColors, "Shift Detail")}
-                              />
-                              <Stack.Screen
-                                name="person/[id]/index"
-                                options={{
-                                  ...createDetailStackOptions(mobileColors, "Staff Profile", {
-                                    scrollEdge: true,
-                                  }),
-                                  // PersonDetailScreen replaces this placeholder with
-                                  // the person's name once they scroll, the same way
-                                  // ProfileScreen does for the signed-in user's own name.
-                                  headerTitleStyle: {
-                                    color: "transparent",
-                                    fontFamily: mobileTypography.fontFamily.bold,
-                                  },
-                                }}
-                              />
-                              {/* Add to Schedule is a pushed screen rather than a
+                                <Stack.Screen
+                                  name="alerts/index"
+                                  options={createDetailStackOptions(mobileColors, "Alerts", {
+                                    largeTitle: true,
+                                  })}
+                                />
+                                <Stack.Screen
+                                  name="alerts/[id]"
+                                  options={createDetailStackOptions(mobileColors, "Alert")}
+                                />
+                                <Stack.Screen
+                                  name="shift/[employeeId]/[date]"
+                                  options={createDetailStackOptions(mobileColors, "Shift Detail")}
+                                />
+                                <Stack.Screen
+                                  name="person/[id]/index"
+                                  options={{
+                                    ...createDetailStackOptions(mobileColors, "Staff Profile", {
+                                      scrollEdge: true,
+                                    }),
+                                    // PersonDetailScreen replaces this placeholder with
+                                    // the person's name once they scroll, the same way
+                                    // ProfileScreen does for the signed-in user's own name.
+                                    headerTitleStyle: {
+                                      color: "transparent",
+                                      fontFamily: mobileTypography.fontFamily.bold,
+                                    },
+                                  }}
+                                />
+                                {/* Add to Schedule is a pushed screen rather than a
                                   sheet: it is a three-picker form, and stacking
                                   it over the person page put a third modal on a
                                   stack iOS is unreliable about tearing down.
                                   Management access stays a sheet, which is where
                                   management settings always open. */}
-                              <Stack.Screen
-                                name="person/[id]/schedule"
-                                options={createDetailStackOptions(mobileColors, "Add to Schedule", {
-                                  largeTitle: true,
-                                })}
-                              />
-                            </Stack>
-                          </StartupSplashGate>
+                                <Stack.Screen
+                                  name="person/[id]/schedule"
+                                  options={createDetailStackOptions(
+                                    mobileColors,
+                                    "Add to Schedule",
+                                    {
+                                      largeTitle: true,
+                                    },
+                                  )}
+                                />
+                              </Stack>
+                            </StartupSplashGate>
+                          </TwoFactorReenrollGate>
                         </TermsGate>
                       </ConsentGate>
                     </MobileRealtimeProvider>

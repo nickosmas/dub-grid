@@ -93,6 +93,65 @@ export interface GridmasterPersonOrganization {
   invitations: Invitation[];
 }
 
+export interface GridmasterFactor {
+  id: string;
+  type: string;
+  name: string | null;
+  status: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
+export interface GridmasterKnownDevice {
+  id: string;
+  platform: string | null;
+  firstSeenAt: string;
+  lastSeenAt: string;
+}
+
+export interface GridmasterPersonSecurity {
+  twoFactor: {
+    enabled: boolean;
+    reenrollRequiredAt: string | null;
+    factors: GridmasterFactor[];
+  };
+  knownDevices: GridmasterKnownDevice[];
+}
+
+export interface GridmasterSession {
+  id: string;
+  orgId: string | null;
+  platform: string | null;
+  deviceLabel: string | null;
+  browser: string | null;
+  appVersion: string | null;
+  location: string | null;
+  createdAt: string;
+  lastActiveAt: string | null;
+}
+
+export interface GridmasterPushDevice {
+  id: string;
+  orgId: string | null;
+  platform: string;
+  lastSeenAt: string | null;
+  disabledAt: string | null;
+  createdAt: string;
+}
+
+export interface GridmasterCalendarFeed {
+  id: string;
+  orgId: string;
+  issuedAt: string;
+  revokedAt: string | null;
+}
+
+export interface GridmasterPersonSessions {
+  sessions: GridmasterSession[];
+  pushDevices: GridmasterPushDevice[];
+  calendarFeeds: GridmasterCalendarFeed[];
+}
+
 /**
  * Everything a Gridmaster may see about one person. Secrets (tokens, IP
  * addresses and IP hashes) never enter it. Actor columns hold user ids;
@@ -105,6 +164,9 @@ export interface GridmasterPersonRecord {
   cookieConsents: GridmasterCookieConsent[];
   liveImpersonation: GridmasterLiveImpersonation | null;
   loginLock: GridmasterLoginLock | null;
+  /** Null for a staff record with no account. */
+  security: GridmasterPersonSecurity | null;
+  sessions: GridmasterPersonSessions | null;
   organizations: GridmasterPersonOrganization[];
   actors: Record<string, string>;
 }

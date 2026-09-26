@@ -87,19 +87,30 @@ const STATE_SUFFIX: Record<ScheduleNoteMarkState, string> = {
 export function NoteDots({
   marks,
   indicatorTypes,
+  placement = "corner",
   style,
 }: {
   marks: ScheduleNoteMark[];
   indicatorTypes: IndicatorType[];
-  /** Placement within the cell; each call site anchors its own corner. */
-  style: CSSProperties;
+  /**
+   * `corner` pins the dots inside a positioned cell, as the grid does; `inline`
+   * lets them flow with a row's content where nothing is positioned.
+   */
+  placement?: "corner" | "inline";
+  /** Placement within the cell; each corner call site anchors its own corner. */
+  style?: CSSProperties;
 }) {
   if (marks.length === 0) return null;
 
   return (
     <div
-      data-note-dots="true"
-      style={{ position: "absolute", display: "flex", gap: NOTE_DOT_GAP, ...style }}
+      data-note-dots={placement === "inline" ? "inline" : "true"}
+      style={{
+        ...(placement === "corner" ? { position: "absolute" as const } : { flexShrink: 0 }),
+        display: "flex",
+        gap: NOTE_DOT_GAP,
+        ...style,
+      }}
     >
       {marks.map((mark) => {
         const indicator = indicatorTypes.find((type) => type.id === mark.indicatorTypeId);

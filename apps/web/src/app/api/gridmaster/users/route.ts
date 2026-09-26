@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { API_ERRORS } from "@dubgrid/client-errors";
-import { createRequestSupabaseClient, requireGridmasterSession } from "@/lib/api-auth";
+import {
+  createRequestSupabaseClient,
+  requireGridmasterSession,
+  requireSensitiveActionAuth,
+} from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
 import { revokeAllUserSessions } from "@/lib/auth/revocation";
+import { loadPersonTarget } from "@/features/gridmaster/server/person-target";
 import type { PlatformRole, OrganizationRole } from "@dubgrid/domain";
 import type { PlatformUser } from "@/types";
 
@@ -177,6 +182,13 @@ export async function PATCH(req: NextRequest) {
       return auth.response;
     }
 
+    // Deactivating signs someone out everywhere, like the other account
+    // actions on the person page, so it needs fresh proof too (F-80).
+    const assurance = await requireSensitiveActionAuth(req);
+    if ("response" in assurance) {
+      return assurance.response;
+    }
+
     let body: unknown;
     try {
       body = await req.json();
@@ -191,6 +203,13 @@ export async function PATCH(req: NextRequest) {
 
     const { userId, deactivate } = parsed.data;
     const serviceClient = getServiceClient();
+    const target = await loadPersonTarget(serviceClient, userId);
+    if (!target) {
+      return NextResponse.json(
+        { error: "We couldn't find that account. Refresh the page and try again." },
+        { status: 404 },
+      );
+    }
     const { error } = await serviceClient
       .from("profiles")
       .update({

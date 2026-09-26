@@ -53,6 +53,23 @@ describe("signOutFromBrowser recovery", () => {
     expect(mocks.broadcast).toHaveBeenCalledOnce();
   });
 
+  // F-28: the server checks the refusal before recording it.
+  it("sends a host refusal with the local sign-out", async () => {
+    mocks.signOut.mockResolvedValue({ error: null });
+    await signOutFromBrowser("local", { organizationAccessDenied: "calmhaven" });
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/auth/sign-out",
+      expect.objectContaining({
+        body: JSON.stringify({
+          scope: "local",
+          reason: "organization_access_denied",
+          orgSlug: "calmhaven",
+        }),
+      }),
+    );
+    expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
+  });
+
   it("sends others unchanged and never invokes the browser SDK's bulk bypass", async () => {
     vi.mocked(fetch).mockResolvedValue(
       new Response(JSON.stringify({ success: true }), {

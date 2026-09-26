@@ -11,6 +11,11 @@ const fetchLinkedEmployeeForUser = vi.fn();
 const fetchMobileUnreadNotificationCount = vi.fn();
 const fetchMobileTermsAcceptedVersion = vi.fn();
 const mapOrganizationToMobileConfig = vi.fn();
+const resolveMfaReenrollRequired = vi.fn();
+
+vi.mock("@/features/account/server", () => ({
+  resolveMfaReenrollRequired: (userId: string) => resolveMfaReenrollRequired(userId),
+}));
 
 vi.mock("@/features/mobile/server", () => ({
   fetchMobileAbsenceTypes,
@@ -145,6 +150,7 @@ describe("GET /api/mobile/v1/bootstrap", () => {
     ]);
     fetchMobileUnreadNotificationCount.mockResolvedValue(4);
     fetchMobileTermsAcceptedVersion.mockResolvedValue(CURRENT_TERMS_VERSION);
+    resolveMfaReenrollRequired.mockResolvedValue(true);
     mapOrganizationToMobileConfig.mockReturnValue({
       id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
       name: "DubGrid Health",
@@ -176,6 +182,7 @@ describe("GET /api/mobile/v1/bootstrap", () => {
       effectiveRole: "admin",
       unreadNotificationCount: 4,
       acceptedCurrentTerms: true,
+      mfaReenrollRequired: true,
       memberships: [
         {
           id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
@@ -228,5 +235,11 @@ describe("GET /api/mobile/v1/bootstrap", () => {
         },
       ],
     });
+
+    // A failed check never takes the app down.
+    resolveMfaReenrollRequired.mockRejectedValueOnce(new Error("auth down"));
+    const fallback = await GET(new Request("http://localhost/api/mobile/v1/bootstrap") as never);
+    expect(fallback.status).toBe(200);
+    expect((await fallback.json()).mfaReenrollRequired).toBe(false);
   });
 });

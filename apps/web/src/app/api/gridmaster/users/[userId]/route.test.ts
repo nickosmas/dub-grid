@@ -27,7 +27,13 @@ vi.mock("@/lib/api-auth", () => ({
 }));
 vi.mock("@/lib/csrf", () => ({ validateCsrfOrigin: () => null }));
 vi.mock("@/app/api/gridmaster/_lib/audit", () => ({
-  writeGridmasterAuditLog: (input: unknown) => writeGridmasterAuditLog(input),
+  writeGridmasterAuditLogAfterCommit: async (input: unknown) => {
+    try {
+      await writeGridmasterAuditLog(input);
+    } catch {
+      // Reported, not answered, as the real helper does.
+    }
+  },
 }));
 vi.mock("@/features/gridmaster/server/person-record", () => ({
   buildPersonRecordForUser: (client: unknown, id: string) => buildRecord(client, id),

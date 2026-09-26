@@ -22,6 +22,7 @@ import { useTheme } from "next-themes";
 import { MaybeHint } from "@/components/ui/hint";
 import { CalendarOff } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
+import { NoteDots, type ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
 
 function pillText(label: string, max: number): string {
   if (label.length <= max) return label;
@@ -44,7 +45,8 @@ interface MobileDayViewProps {
   shiftCategories: ShiftCategory[];
   indicatorTypes?: IndicatorType[];
   isCellInteractive?: boolean;
-  activeIndicatorIdsForKey?: (empId: string, date: Date, focusAreaId?: number) => number[];
+  /** The page's note marks, so each shift shows its indicators by name and colour. */
+  noteMarksForKey?: (empId: string, date: Date, focusAreaId?: number) => ScheduleNoteMark[];
   activeFocusArea?: number | null;
   certifications?: NamedItem[];
   orgRoles?: NamedItem[];
@@ -77,7 +79,8 @@ export default function MobileDayView({
   focusAreas,
   assignments,
   isCellInteractive = false,
-  activeIndicatorIdsForKey,
+  indicatorTypes = [],
+  noteMarksForKey,
   activeFocusArea,
   certifications = [],
   draftKindForKey,
@@ -429,10 +432,9 @@ export default function MobileDayView({
                     const labelParts = combinedLabel.split("/");
                     const codeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
                     const draftKind = draftKindForKey?.(emp.id, date) ?? null;
-                    const hasIndicators =
-                      activeIndicatorIdsForKey && sectionId != null
-                        ? (activeIndicatorIdsForKey(emp.id, date, sectionId)?.length ?? 0) > 0
-                        : false;
+                    // Keyed like the grid: the section's focus area, or the
+                    // general key for a section without one.
+                    const noteMarks = noteMarksForKey?.(emp.id, date, sectionId ?? undefined) ?? [];
 
                     // Check for absence (off-day) entry first
                     const absenceTypeId = absenceTypeIdForKey?.(emp.id, date) ?? null;
@@ -645,18 +647,12 @@ export default function MobileDayView({
                             —
                           </span>
                         )}
-                        {/* Indicator dot */}
-                        {hasIndicators && (
-                          <div
-                            style={{
-                              width: 4,
-                              height: 4,
-                              borderRadius: "50%",
-                              background: "var(--dg-color-info)",
-                              flexShrink: 0,
-                            }}
-                          />
-                        )}
+                        <NoteDots
+                          marks={noteMarks}
+                          indicatorTypes={indicatorTypes}
+                          placement="inline"
+                          style={{ flexWrap: "wrap", justifyContent: "center" }}
+                        />
                       </Button>
                     );
                   })}

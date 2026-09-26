@@ -65,6 +65,14 @@ vi.mock("../../features/consent/components/TermsGate", async () => {
   };
 });
 
+vi.mock("../../features/auth/components/TwoFactorReenrollGate", async () => {
+  const React = await import("react");
+  return {
+    TwoFactorReenrollGate: ({ children }: { children: React.ReactNode }) =>
+      React.createElement(React.Fragment, null, children),
+  };
+});
+
 vi.mock("@react-navigation/native", async () => {
   const React = await import("react");
 

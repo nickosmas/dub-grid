@@ -127,3 +127,25 @@ export function buildScheduleNoteMarks(input: {
 
   return marks;
 }
+
+/**
+ * The indicator types the printed page shows, for its indicator key: notes for
+ * the given people and dates only, and what that viewer sees there. Editors see
+ * their drafts, including a pending removal (the grid still draws it); everyone
+ * else sees what is published (the server has already dropped drafts for them).
+ */
+export function indicatorIdsInNotes(
+  notes: ScheduleNoteMap,
+  isScheduleEditor: boolean,
+  scope: { empIds: ReadonlySet<string>; dateKeys: ReadonlySet<string> },
+): Set<number> {
+  const ids = new Set<number>();
+  for (const [key, cellNotes] of Object.entries(notes)) {
+    const [empId, dateKey] = key.split("_");
+    if (!scope.empIds.has(empId) || !scope.dateKeys.has(dateKey)) continue;
+    for (const note of cellNotes) {
+      if (isScheduleEditor || note.status !== "draft") ids.add(note.indicatorTypeId);
+    }
+  }
+  return ids;
+}

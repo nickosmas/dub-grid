@@ -223,6 +223,9 @@ export const mobileBootstrapResponseSchema = z.object({
   // Defaults to true so a client talking to an older server that doesn't send
   // this field stays usable rather than being locked out of the app.
   acceptedCurrentTerms: z.boolean().default(true),
+  // After a Gridmaster's two-factor reset, until they enroll again. Defaults to
+  // false so an older server never holds anyone on the enrollment screen.
+  mfaReenrollRequired: z.boolean().default(false),
 });
 
 export const mobileTermsAcceptanceResponseSchema = z.object({

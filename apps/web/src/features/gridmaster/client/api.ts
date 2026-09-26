@@ -205,14 +205,20 @@ export function updateGridmasterAccountActivation(
   });
 }
 
-export function updateGridmasterUserActivation(input: {
-  userId: string;
-  orgId: string;
-  deactivate: boolean;
-}): Promise<{ success: true }> {
+export function updateGridmasterUserActivation(
+  input: {
+    userId: string;
+    orgId: string;
+    deactivate: boolean;
+  },
+  accessToken?: string,
+): Promise<{ success: true }> {
   return requestGridmasterJson("/api/gridmaster/users", {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify(input),
   });
 }
@@ -308,6 +314,46 @@ export function changeGridmasterPersonEmail(
   accessToken?: string,
 ): Promise<{ success: true }> {
   return patchGridmasterPerson(userId, { action: "changeEmail", email }, accessToken);
+}
+
+export function resetGridmasterPersonTwoFactor(
+  userId: string,
+  reason: string,
+  accessToken?: string,
+): Promise<{ success: true; factorsRemoved: number }> {
+  return requestGridmasterJson(
+    `/api/gridmaster/users/${encodeURIComponent(userId)}/two-factor-reset`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify({ reason }),
+    },
+  );
+}
+
+export type GridmasterPersonSecurityAction =
+  | { action: "endSession"; sessionId: string }
+  | { action: "forgetDevice"; deviceId: string }
+  | { action: "disablePushDevice"; deviceId: string }
+  | { action: "revokeCalendarFeed"; feedId: string }
+  | { action: "clearLoginLock" };
+
+export function runGridmasterPersonSecurityAction(
+  userId: string,
+  input: GridmasterPersonSecurityAction,
+  accessToken?: string,
+): Promise<{ success: true; loginLock?: { locked: boolean; resetsAt: string | null } | null }> {
+  return requestGridmasterJson(`/api/gridmaster/users/${encodeURIComponent(userId)}/security`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify(input),
+  });
 }
 
 export function reinstateGridmasterUser(

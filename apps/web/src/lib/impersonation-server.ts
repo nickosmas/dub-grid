@@ -78,6 +78,8 @@ export async function verifyImpersonationSession(
  * Ends the impersonation row when the gridmaster takes the /gridmaster escape.
  * Runs as the gridmaster (the RPC checks auth.uid()), and is best-effort: the
  * cookie is already cleared, so a failed end only leaves the row to expire.
+ * The RPC writes this end's audit row itself (060), so the middleware needs
+ * no service-role writer.
  */
 export async function endImpersonationOnEscape(
   userClient: SupabaseClient<any, any, any>,

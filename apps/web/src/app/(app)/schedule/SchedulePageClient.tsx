@@ -241,6 +241,7 @@ import {
   buildScheduleNoteMap,
   removeScheduleNotesForCell,
   buildScheduleNoteMarks,
+  indicatorIdsInNotes,
   scheduleNoteKey,
   type ScheduleNoteMap,
 } from "./_lib/schedule-window";
@@ -3720,6 +3721,14 @@ function SchedulerContent({
     },
     [isScheduleEditor, notes, publishNoteChangesMap, showPublishDiff],
   );
+
+  const printedIndicatorTypes = useMemo(() => {
+    const ids = indicatorIdsInNotes(notes, isScheduleEditor, {
+      empIds: new Set(filteredEmployees.map((emp) => emp.id)),
+      dateKeys: new Set(dates.map(formatDateKey)),
+    });
+    return indicatorTypes.filter((type) => ids.has(type.id));
+  }, [dates, filteredEmployees, indicatorTypes, isScheduleEditor, notes]);
 
   const panelActiveIndicatorIds = useCallback(
     (focusAreaId: number): number[] => {
@@ -7206,7 +7215,7 @@ function SchedulerContent({
                 certifications={certifications}
                 orgRoles={orgRoles}
                 isCellInteractive={canEditShifts || canEditNotes || !!currentEmpId}
-                activeIndicatorIdsForKey={activeIndicatorIdsForKey}
+                noteMarksForKey={noteMarksForKey}
                 activeFocusArea={activeFocusArea}
                 draftKindForKey={draftKindForKey}
                 shiftDisplayMode={org?.shiftDisplayMode}
@@ -7665,6 +7674,8 @@ function SchedulerContent({
                 shiftDisplayMode={org?.shiftDisplayMode}
                 highlightEmpIds={searchMatchedEmployeeIds}
                 highlightScrollKey={normalizedStaffSearch || undefined}
+                noteMarksForKey={noteMarksForKey}
+                indicatorTypes={indicatorTypes}
               />
             )}
           </div>
@@ -7893,7 +7904,11 @@ function SchedulerContent({
             />
           )}
 
-          <PrintLegend assignments={assignments} shiftDisplayMode={org?.shiftDisplayMode} />
+          <PrintLegend
+            assignments={assignments}
+            shiftDisplayMode={org?.shiftDisplayMode}
+            indicators={printedIndicatorTypes}
+          />
 
           {showPrintOptions && (
             <PrintOptionsModal
@@ -7930,6 +7945,8 @@ function SchedulerContent({
               onClose={() => setActivePrintConfig(null)}
               focusAreaLabel={org?.focusAreaLabel}
               shiftDisplayMode={org?.shiftDisplayMode}
+              noteMarksForKey={noteMarksForKey}
+              indicatorTypes={indicatorTypes}
             />
           )}
 

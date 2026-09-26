@@ -127,17 +127,27 @@ export function getGridmasterRealtimeInvalidationKeys(
         queryKeys.gridmaster.auditAll(),
         ...(orgId ? [queryKeys.gridmaster.orgAudit(orgId, 0, 50)] : []),
       ]);
+    // The person pages show sessions, profiles, staff records and invitations
+    // (F-81). A change that names its person refreshes that page only; one
+    // that does not (an unlinked staff record, an invitation) refreshes every
+    // open person page, which are few.
     case "user_sessions":
-      return uniqueKeys([queryKeys.gridmaster.security(), queryKeys.gridmaster.compliance()]);
+      return uniqueKeys([
+        queryKeys.gridmaster.security(),
+        queryKeys.gridmaster.compliance(),
+        personPageKey(userId),
+      ]);
     case "profiles":
       return uniqueKeys([
         queryKeys.gridmaster.accounts(),
         queryKeys.gridmaster.allUsers(),
         ...platformSummaryKeys,
+        personPageKey(userId),
       ]);
     case "employees":
       return uniqueKeys([
         ...platformSummaryKeys,
+        personPageKey(userId),
         ...(orgId
           ? [
               queryKeys.gridmaster.org(orgId),
@@ -159,6 +169,7 @@ export function getGridmasterRealtimeInvalidationKeys(
       return uniqueKeys([
         ...platformSummaryKeys,
         queryKeys.gridmaster.auditAll(),
+        queryKeys.gridmaster.personAll(),
         ...(orgId
           ? [
               queryKeys.gridmaster.orgInvitations(orgId),
@@ -227,16 +238,25 @@ export function resolveGridmasterRealtimeOrgId(
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
-/** Resolves the affected user's id, for tables where invalidation targets a
- * per-user query (currently just `organization_memberships` →
- * `queryKeys.gridmaster.person("user", userId)`). */
+function personPageKey(userId: string | null | undefined) {
+  return userId ? queryKeys.gridmaster.person("user", userId) : queryKeys.gridmaster.personAll();
+}
+
+/** Resolves the affected user's id, for tables where invalidation targets that
+ * person's page (`queryKeys.gridmaster.person("user", userId)`). */
 export function resolveGridmasterRealtimeUserId(
   table: GridmasterRealtimeTable,
   payload: RealtimePayload,
 ): string | null {
-  if (table !== "organization_memberships") return null;
+  const column =
+    table === "profiles"
+      ? "id"
+      : table === "organization_memberships" || table === "user_sessions" || table === "employees"
+        ? "user_id"
+        : null;
+  if (!column) return null;
   const row = payload.new ?? payload.old ?? {};
-  const value = row.user_id;
+  const value = row[column];
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 

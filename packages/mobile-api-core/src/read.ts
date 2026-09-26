@@ -157,6 +157,7 @@ type FetchLinkedEmployeeForUser = (
 type FetchMobileUnreadNotificationCount = (userClient: SupabaseClient) => Promise<number>;
 
 type FetchTermsAcceptedVersion = (userId: string) => Promise<string | null>;
+type FetchMfaReenrollRequired = (userId: string) => Promise<boolean>;
 
 type FetchMobileAbsenceTypes = (
   serviceClient: SupabaseClient,
@@ -272,6 +273,7 @@ export async function loadMobileBootstrapPayload(
     fetchMobileCertifications: FetchMobileNamedItems;
     fetchMobileDepartments: FetchMobileDepartments;
     fetchTermsAcceptedVersion: FetchTermsAcceptedVersion;
+    fetchMfaReenrollRequired: FetchMfaReenrollRequired;
     mapOrganizationToMobileConfig: MapOrganizationToMobileConfig;
   },
 ): Promise<MobileBootstrapResponse> {
@@ -284,6 +286,7 @@ export async function loadMobileBootstrapPayload(
     certifications,
     departments,
     termsAcceptedVersion,
+    mfaReenrollRequired,
   ] = await Promise.all([
     deps.fetchLinkedEmployeeForUser(auth.serviceClient, auth.currentOrg.id, auth.user.id),
     deps.fetchMobileUnreadNotificationCount(auth.userClient),
@@ -293,6 +296,7 @@ export async function loadMobileBootstrapPayload(
     deps.fetchMobileCertifications(auth.serviceClient, auth.currentOrg.id),
     deps.fetchMobileDepartments(auth.serviceClient, auth.currentOrg.id),
     deps.fetchTermsAcceptedVersion(auth.user.id),
+    deps.fetchMfaReenrollRequired(auth.user.id),
   ]);
 
   return {
@@ -337,6 +341,7 @@ export async function loadMobileBootstrapPayload(
     departments,
     unreadNotificationCount,
     acceptedCurrentTerms: hasAcceptedCurrentTerms(termsAcceptedVersion),
+    mfaReenrollRequired,
   };
 }
 

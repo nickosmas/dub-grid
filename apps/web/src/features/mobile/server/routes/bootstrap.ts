@@ -13,6 +13,8 @@ import {
   mapOrganizationToMobileConfig,
   requireMobileAuth,
 } from "@/features/mobile/server";
+import { resolveMfaReenrollRequired } from "@/features/account/server";
+import logger from "@/lib/logger";
 import { createMobileOptionsHandler, withMobileCors } from "./cors";
 import { withTiming, type Timer } from "@/lib/server-timing";
 
@@ -37,6 +39,15 @@ async function handleGET(req: NextRequest, timer: Timer) {
       fetchMobileCertifications,
       fetchMobileDepartments,
       fetchTermsAcceptedVersion: fetchMobileTermsAcceptedVersion,
+      // A failed check must not take the app down; web lets them through too.
+      fetchMfaReenrollRequired: async (userId: string) => {
+        try {
+          return await resolveMfaReenrollRequired(userId);
+        } catch (error) {
+          logger.warn({ error }, "mobile bootstrap two-factor re-enrollment check failed");
+          return false;
+        }
+      },
       mapOrganizationToMobileConfig,
     }),
   );

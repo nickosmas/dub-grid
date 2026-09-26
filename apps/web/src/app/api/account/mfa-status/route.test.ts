@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const requireAuthenticatedUserWithClaims = vi.fn();
 const validateCsrfOrigin = vi.fn();
 const updateSelfMfaStatus = vi.fn();
+const resolveMfaReenrollRequired = vi.fn();
+const settleMfaReenrollment = vi.fn();
 const dispatchNotificationEvent = vi.fn();
 const profileSnapshot = vi.fn();
 const getUser = vi.fn();
@@ -24,6 +26,8 @@ vi.mock("@/lib/csrf", () => ({
 }));
 vi.mock("@/features/account/server", () => ({
   updateSelfMfaStatus: (...args: unknown[]) => updateSelfMfaStatus(...args),
+  resolveMfaReenrollRequired: (...args: unknown[]) => resolveMfaReenrollRequired(...args),
+  settleMfaReenrollment: (...args: unknown[]) => settleMfaReenrollment(...args),
 }));
 vi.mock("@/features/notifications/server/events", () => ({
   dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
@@ -40,7 +44,7 @@ vi.mock("@/lib/supabase-service", () => ({
   }),
 }));
 
-import { POST } from "./route";
+import { GET, POST } from "./route";
 
 function post(body: unknown): NextRequest {
   return new NextRequest("http://localhost/api/account/mfa-status", {
@@ -198,5 +202,22 @@ describe("POST /api/account/mfa-status", () => {
     });
     expect((await POST(req)).status).toBe(200);
     expect(createRequestSupabaseClient).toHaveBeenCalledWith(req);
+  });
+});
+
+describe("GET /api/account/mfa-status", () => {
+  const get = () => GET(new NextRequest("http://localhost/api/account/mfa-status"));
+
+  it("reports whether a reset still needs enrollment", async () => {
+    resolveMfaReenrollRequired.mockResolvedValueOnce(true);
+    expect(await (await get()).json()).toEqual({ reenrollRequired: true });
+    expect(resolveMfaReenrollRequired).toHaveBeenCalledWith("user-1");
+    resolveMfaReenrollRequired.mockResolvedValueOnce(false);
+    expect(await (await get()).json()).toEqual({ reenrollRequired: false });
+  });
+
+  it("answers 503 rather than guessing when the read fails", async () => {
+    resolveMfaReenrollRequired.mockRejectedValueOnce(new Error("down"));
+    expect((await get()).status).toBe(503);
   });
 });

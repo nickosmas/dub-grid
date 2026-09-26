@@ -297,14 +297,24 @@ describe("POST /api/gridmaster/impersonation", () => {
     requestRpc.mockResolvedValue({ data: null, error: null });
 
     const response = await POST(
-      makePostRequest({ action: "end", sessionId: SESSION_ID, reason: "navigation" }),
+      makePostRequest({ action: "end", sessionId: SESSION_ID, reason: "expired" }),
     );
 
     expect(response.status).toBe(200);
     expect(requestRpc).toHaveBeenCalledWith("end_impersonation", {
       p_session_id: SESSION_ID,
-      p_reason: "navigation",
+      p_reason: "expired",
     });
+  });
+
+  // The middleware's escape is the only navigation end, and the RPC records it.
+  it("refuses a navigation end, which would be recorded twice", async () => {
+    const response = await POST(
+      makePostRequest({ action: "end", sessionId: SESSION_ID, reason: "navigation" }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(requestRpc).not.toHaveBeenCalled();
   });
 
   // The request used to name the organization (41c2).
@@ -500,7 +510,7 @@ describe("POST /api/gridmaster/impersonation", () => {
       requestRpc.mockResolvedValue({ data: null, error: null });
 
       const response = await POST(
-        makePostRequest({ action: "end", sessionId: SESSION_ID, reason: "navigation" }),
+        makePostRequest({ action: "end", sessionId: SESSION_ID, reason: "manual" }),
       );
 
       expect(response.status).toBe(200);

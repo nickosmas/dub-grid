@@ -569,6 +569,36 @@ describe("OrgLogin submit states", () => {
     expect(window.location.replace).not.toHaveBeenCalled();
   });
 
+  // F-28: the refusal goes to the server with the sign-out, which checks it.
+  it("tells the server why when the second factor lands on an organization without access", async () => {
+    mockGetSession.mockResolvedValue(browserSession("user-1", "org-old", "other"));
+    mockFetchOrganizations.mockResolvedValue({
+      organizations: [{ org_id: "org-old", org_slug: "other" }],
+    });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      loginResponse({
+        session: {
+          access_token: sessionToken("user-1", "org-old", "other"),
+          refresh_token: "refresh-token",
+        },
+        mfa_required: true,
+        didSwitchOrg: false,
+        destination: null,
+      }),
+    );
+
+    const { container } = renderWithQueryClient(
+      <OrgLogin orgSlug="calmhaven" seed={{ status: "found", name: "Calm Haven" }} />,
+    );
+    submitForm(container);
+    fireEvent.click(await screen.findByRole("button", { name: "Complete MFA" }));
+
+    await waitFor(() =>
+      expect(mockSignOut).toHaveBeenCalledWith("local", { organizationAccessDenied: "calmhaven" }),
+    );
+    expect(window.location.replace).not.toHaveBeenCalled();
+  });
+
   it("does not navigate when a delayed switched password handoff finishes after unmount", async () => {
     let finishSetSession!: () => void;
     mockSetSession.mockReturnValue(

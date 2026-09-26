@@ -57,3 +57,14 @@ export async function writeGridmasterAuditLog({
     throw error;
   }
 }
+
+/** For a change that has already committed: a failed audit write is reported, not answered. */
+export async function writeGridmasterAuditLogAfterCommit(
+  input: GridmasterAuditInput,
+): Promise<void> {
+  try {
+    await writeGridmasterAuditLog(input);
+  } catch (error) {
+    logger.error({ error, action: input.action }, "gridmaster audit write after commit failed");
+  }
+}

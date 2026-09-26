@@ -6,6 +6,7 @@ import { NavigationGuardProvider } from "@/components/NavigationGuardProvider";
 import { TooltipProvider } from "@/components/ui/hint";
 import { TOOLTIP_DELAY_MS } from "@/lib/constants";
 import OnboardingGate from "@/components/onboarding/OnboardingGate";
+import { TwoFactorReenrollGate } from "@/components/auth/TwoFactorReenrollGate";
 import SignInPrefetch from "@/components/SignInPrefetch";
 import PostHogProvider from "@/components/PostHogProvider";
 import { isFeatureEnabled } from "@/lib/feature-flags";
@@ -54,15 +55,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               around only the part that reads them. */}
           <SignInPrefetch />
           <OnboardingGate>
-            <MobileSubNavProvider>
-              <TooltipProvider delay={TOOLTIP_DELAY_MS}>
-                {/* Wraps the whole shell so it sees every nav link,
+            <TwoFactorReenrollGate>
+              <MobileSubNavProvider>
+                <TooltipProvider delay={TOOLTIP_DELAY_MS}>
+                  {/* Wraps the whole shell so it sees every nav link,
                     not just the ones inside a given page. */}
-                <NavigationGuardProvider>
-                  <AppShell>{children}</AppShell>
-                </NavigationGuardProvider>
-              </TooltipProvider>
-            </MobileSubNavProvider>
+                  <NavigationGuardProvider>
+                    <AppShell>{children}</AppShell>
+                  </NavigationGuardProvider>
+                </TooltipProvider>
+              </MobileSubNavProvider>
+            </TwoFactorReenrollGate>
           </OnboardingGate>
         </QueryProvider>
       </PostHogProvider>
