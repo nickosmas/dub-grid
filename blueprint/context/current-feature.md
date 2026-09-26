@@ -63,7 +63,7 @@ committed as a local checkpoint.
       returns 403. The inventory marker and both routes' classification
       landed here, since the inventory test requires them as soon as a route
       calls the gate; 8 new route tests fail against the previous code.
-- [ ] **Step 2 - Gridmaster portal invites a Super Admin** - the manage
+- [x] **Step 2 - Gridmaster portal invites a Super Admin** - the manage
       route's `assignOrgRoleByEmail` answers `404 ACCOUNT_NOT_FOUND` for an
       address with no account; the Users tab's Add form offers Super Admin and
       sends an invitation when there is no account, all through step-up.

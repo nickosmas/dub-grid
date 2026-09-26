@@ -8,6 +8,7 @@ import { assignGridmasterOrgRoleByEmail } from "@/features/gridmaster/client";
 import { requireCredentialAssurance } from "@/features/account/client";
 import { useStepUpAction } from "@/hooks/useStepUpAction";
 import {
+  createOrganizationInvitation,
   OrganizationAccessConflictError,
   removeOrganizationMembershipGuarded,
   updateOrganizationMembershipGuarded,
@@ -17,6 +18,7 @@ import { formatClientErrorMessage, formatOrganizationRoleLabel } from "@/lib/cli
 import { labelStyle, sectionStyle } from "@/lib/styles";
 import {
   type AdminPermissions,
+  type AssignableOrganizationRole,
   type Organization,
   type OrganizationRole,
   type OrganizationUser,
@@ -68,10 +70,10 @@ export function UsersTab({
   const [removeConfirm, setRemoveConfirm] = useState<OrganizationUser | null>(null);
   const [removing, setRemoving] = useState(false);
   const [addEmail, setAddEmail] = useState("");
-  const [addRole, setAddRole] = useState<"admin" | "user">("user");
+  const [addRole, setAddRole] = useState<AssignableOrganizationRole>("user");
   const [addUserConfirm, setAddUserConfirm] = useState<{
     email: string;
-    role: "admin" | "user";
+    role: AssignableOrganizationRole;
   } | null>(null);
   const [adding, setAdding] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -174,12 +176,24 @@ export function UsersTab({
     setAdding(true);
     try {
       const { email, role } = addUserConfirm;
+      let invited = false;
       const completed = await stepUp.run(async (accessToken) => {
+        invited = false;
         await requireCredentialAssurance(accessToken);
-        await assignGridmasterOrgRoleByEmail(orgId, email, role, accessToken);
+        try {
+          await assignGridmasterOrgRoleByEmail(orgId, email, role, accessToken);
+        } catch (err: unknown) {
+          if ((err as { code?: unknown } | null)?.code !== "ACCOUNT_NOT_FOUND") throw err;
+          await createOrganizationInvitation({ orgId, email, role }, accessToken);
+          invited = true;
+        }
       });
       if (!completed) return;
-      toast.success(`User added as ${formatOrganizationRoleLabel(addUserConfirm.role)}`);
+      toast.success(
+        invited
+          ? `Invitation sent to ${email}`
+          : `User added as ${formatOrganizationRoleLabel(role)}`,
+      );
       setAddEmail("");
       setAddUserConfirm(null);
       setShowAddForm(false);
@@ -249,8 +263,9 @@ export function UsersTab({
                 options={[
                   { value: "user", label: "User" },
                   { value: "admin", label: "Admin" },
+                  { value: "super_admin", label: "Super Admin" },
                 ]}
-                onChange={(v) => setAddRole(v as "admin" | "user")}
+                onChange={(v) => setAddRole(v as AssignableOrganizationRole)}
                 style={{ width: "100%" }}
               />
             </div>
@@ -536,7 +551,7 @@ export function UsersTab({
       {addUserConfirm && !stepUp.dialog && (
         <ConfirmDialog
           title="Add Organization User"
-          message={`Add "${addUserConfirm.email}" as ${formatOrganizationRoleLabel(addUserConfirm.role)} for this organization?`}
+          message={`Add "${addUserConfirm.email}" as ${formatOrganizationRoleLabel(addUserConfirm.role)} for this organization? If no account uses this email, it gets an invitation instead.`}
           confirmLabel="Add"
           variant="warning"
           isLoading={adding}

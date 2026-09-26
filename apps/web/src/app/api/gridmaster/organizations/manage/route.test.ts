@@ -341,6 +341,26 @@ describe("POST /api/gridmaster/organizations/manage", () => {
     );
   });
 
+  it("tells the portal when no account uses the address, so it can invite instead", async () => {
+    requestRpc.mockResolvedValueOnce({
+      data: null,
+      error: { message: "User with email new@example.com not found" },
+    });
+
+    const response = await POST(
+      makeRequest({
+        action: "assignOrgRoleByEmail",
+        orgId: ORG_ID,
+        email: "new@example.com",
+        role: "super_admin",
+      }),
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ code: "ACCOUNT_NOT_FOUND" });
+    expect(auditInsert).not.toHaveBeenCalled();
+  });
+
   it("creates org setup and includes success plus org payload", async () => {
     const response = await POST(
       makeRequest({

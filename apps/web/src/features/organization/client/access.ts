@@ -127,11 +127,15 @@ async function requestOrganizationJson<T>(input: string, init?: RequestInit): Pr
     : null;
 
   if (!response.ok) {
-    throw new OrganizationRequestError(
-      formatClientErrorMessage(body?.error, "Organization request failed."),
-      response.status,
-      null,
-      typeof body?.code === "string" ? body.code : null,
+    // The method lets step-up recognize a request for fresh proof.
+    throw Object.assign(
+      new OrganizationRequestError(
+        formatClientErrorMessage(body?.error, "Organization request failed."),
+        response.status,
+        null,
+        typeof body?.code === "string" ? body.code : null,
+      ),
+      { method: body?.method },
     );
   }
 
@@ -175,22 +179,28 @@ export function fetchOrganizationInvitations(orgId: string): Promise<Invitation[
   ).then((data) => data.invitations);
 }
 
-export async function createOrganizationInvitation(input: {
-  email: string;
-  role: AssignableOrganizationRole;
-  orgId: string;
-  employeeId?: string;
-  firstName?: string;
-  lastName?: string;
-  phone?: string;
-  departmentIds?: number[];
-  deptAdminIds?: number[];
-}): Promise<{ invitationId: string; expiresAt: string; resent?: boolean }> {
+export async function createOrganizationInvitation(
+  input: {
+    email: string;
+    role: AssignableOrganizationRole;
+    orgId: string;
+    employeeId?: string;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    departmentIds?: number[];
+    deptAdminIds?: number[];
+  },
+  accessToken?: string,
+): Promise<{ invitationId: string; expiresAt: string; resent?: boolean }> {
   // Creates the invitation and sends its email in one request; a failed send
   // throws, and nothing is left behind.
   return requestOrganizationJson("/api/organizations/invitations/create", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify(input),
   });
 }

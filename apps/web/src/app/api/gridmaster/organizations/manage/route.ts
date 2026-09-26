@@ -308,6 +308,13 @@ export async function POST(req: NextRequest) {
           p_org_role: parsed.data.role,
         });
         if (error) {
+          // The portal invites the address instead when no account uses it.
+          if (/user with email .* not found/i.test(String(error.message ?? ""))) {
+            return NextResponse.json(
+              { error: "No account uses that email.", code: "ACCOUNT_NOT_FOUND" },
+              { status: 404 },
+            );
+          }
           throw error;
         }
         await writeGridmasterAuditLog({
