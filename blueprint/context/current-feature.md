@@ -94,9 +94,17 @@ Continuous Mode: they push, send, reach production or reseed shared state.
       fixed by its owning session (49d44ea8). All 27 checks green on
       49d44ea8. Merging needs its own yes.
 
-- [ ] **Release note from 41d4** - the next release carries migration
-      `049_invitation_token_server_only.sql`; apply it to production by the
-      runbook before merging that release PR.
+- [x] **Release note from 41d4** - migration
+      `049_invitation_token_server_only.sql` applied to production
+      2026-09-26 with the owner's approval, by the runbook: candidate
+      84f5591f; production at 048 with only 049 missing and every invariant
+      passing; the dry run proposed exactly 049 and no seeds; a scratch stack
+      started at 048 matched production line for line, took 049 and
+      re-inspected complete; app smoke on the local stack (People loads its
+      invitations); latest backup 2026-09-25 13:38:30 UTC (physical, PITR
+      off). After the apply the inspector reads 49 entries, none missing,
+      every invariant passing and health 200; the final dry run is up to
+      date; `authenticated` can no longer read the token or write the table.
 
 ## Notes for the AI
 
