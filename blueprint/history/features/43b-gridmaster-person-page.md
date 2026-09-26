@@ -1,7 +1,7 @@
 # Feature: Gridmaster person page: account and organizations
 
 **From build-plan:** feature 43b
-**Status:** in progress (built alongside the web sign-in fix, which holds
+**Status:** verified (built alongside the web sign-in fix, which held
 `current-feature.md` in another session)
 
 ## Goal
@@ -201,3 +201,21 @@ Actor columns carry ids; the view resolves them through `actors`.
 - Organization terminology comes from each organization's settings.
 - Confirmations are dialogs; operational dates use `dg-tabular-nums`.
 - No em dashes.
+
+## Verification
+
+- Unit and route tests: the person record builder, the person, staff and
+  search routes (including a stale session, a Gridmaster target, both email
+  conflicts, an Auth outage and a failed audit write after a committed
+  change), and view tests for the person view, the membership, staff and
+  invitation actions, and opening a person from All Users and from the
+  search. All Gridmaster API and view tests pass (217 in the focused run);
+  type-check and lint are clean; `next build` passes.
+- Browser: signed in as the local QA Gridmaster on a worktree dev server,
+  opened a linked person (header, Account, one card per organization with
+  its own labels) and an unlinked staff record from the search; no console
+  errors.
+- Review: an independent pass found no access or secret leaks; its five
+  issues were fixed (status conflicts, Test Sandbox clones in the search,
+  Auth outages read as no account, audit failures after a committed change,
+  the lock time) and two follow-ups recorded as F-80 and F-81.

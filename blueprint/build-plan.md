@@ -707,7 +707,7 @@
         expired invitation reads as expired with Reinvite rather than "Not
         invited yet". Whether Admins see management departments, and whether
         mobile gains date added and date joined, are decided in the spec.
-  - [ ] 43b. **Gridmaster person page: account and organizations** - the All
+  - [x] 43b. **Gridmaster person page: account and organizations** - the All
         Users slide-over becomes a full person page. A header carries
         identity, platform role, status badges (deactivated, terminated,
         scheduled deletion, login lock, live impersonation) and quick actions.
