@@ -52,16 +52,21 @@ export async function POST(req: NextRequest) {
             targetOrgId: session.target_org_id,
           });
         }
-        await writeGridmasterAuditLog({
-          serviceClient,
-          actor: auth.user,
-          action: "impersonation.ended",
-          resourceType: "impersonation_session",
-          resourceId: session.session_id,
-          orgId: session.target_org_id,
-          details: { reason, trigger: "sign_out" },
-          request: req,
-        });
+        try {
+          await writeGridmasterAuditLog({
+            serviceClient,
+            actor: auth.user,
+            action: "impersonation.ended",
+            resourceType: "impersonation_session",
+            resourceId: session.session_id,
+            orgId: session.target_org_id,
+            details: { reason, trigger: "sign_out" },
+            request: req,
+          });
+        } catch (error) {
+          failed += 1;
+          logger.error({ error, sessionId: session.session_id }, "impersonation end audit failed");
+        }
       }
     }
     if (failed > 0) {

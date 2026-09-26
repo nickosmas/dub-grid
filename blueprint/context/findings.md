@@ -246,7 +246,7 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Found:** 2026-09-26 by `/audit` re-review of e1c83ac1..e9d49b20
 **Why it matters:** Nothing ends a timed-out row, so the next sign-out, possibly days later, ended each one as `manual` with a fresh email and an audit row carrying the wrong reason; and one failed row stopped the loop, leaving the rest open.
 **Suggested fix:** End rows past `expires_at` as `expired` without the email, and keep going past a failed row before answering 500.
-**Resolution:** Fixed: expired rows end as `expired`, audited as such, with no email (the database still writes its in-app notices); a failed row is logged and the rest still end, then the route answers 500. Route tests cover both and fail against the previous code.
+**Resolution:** Fixed: expired rows end as `expired`, audited as such, with no email (the database still writes its in-app notices); a failed row is logged and the rest still end, then the route answers 500. Route tests cover both and fail against the previous code. Re-review (e6d85e85): kept fixed, since a failed audit write still left the loop; it is now logged, counted as a failure and the loop continues, with a test.
 
 ### F-77 [P3] fixed - The password length hint says characters where the rule counts bytes
 
@@ -254,4 +254,4 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Found:** 2026-09-26 by `/audit` re-review of e1c83ac1..e9d49b20
 **Why it matters:** A password of 25 emoji (100 bytes) is refused with "At most 72 characters".
 **Suggested fix:** Word the hint so accents and emoji make sense of it.
-**Resolution:** Fixed: the hint reads "At most 72 characters, fewer with accents or emoji", and the test pins it.
+**Resolution:** Fixed: the hint reads "At most 72 characters, fewer with accents or emoji", and the test pins it. Re-review (bbff3583): kept fixed, since the mobile reset screen's hint row could run past the card with the longer label; the hint text now shrinks and wraps, as the profile screen's does.

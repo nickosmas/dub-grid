@@ -127,4 +127,18 @@ describe("POST /api/account/logout-cleanup (F-35)", () => {
       expect.objectContaining({ resourceId: "s-2" }),
     );
   });
+
+  it("keeps ending sessions when an audit write fails, then reports the failure", async () => {
+    fetchLive.mockResolvedValue([
+      { session_id: "s-1", target_user_id: "u-1", target_org_id: "o-1", expires_at: FUTURE },
+      { session_id: "s-2", target_user_id: "u-2", target_org_id: "o-2", expires_at: FUTURE },
+    ]);
+    writeGridmasterAuditLog.mockRejectedValueOnce(new Error("insert failed"));
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(500);
+    expect(requestRpc).toHaveBeenCalledTimes(2);
+    expect(writeGridmasterAuditLog).toHaveBeenCalledTimes(2);
+  });
 });
