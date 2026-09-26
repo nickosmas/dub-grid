@@ -1,7 +1,7 @@
 # Fix: Gridmaster and sign-in findings batch (F-80, F-81, F-33, F-28)
 
 **Type:** Fix
-**Status:** spec - awaiting review (parked beside feature 42a, which holds
+**Status:** in progress (parked beside feature 42a, which holds
 `current-feature.md`)
 
 ## Goal
@@ -45,7 +45,8 @@ leave no audit row.
 
 ## Build steps
 
-- [ ] **Step 1 - F-81 person page refresh** -
+- [x] **Step 1 - F-81 person page refresh** (landed in 43c first, which
+      made the same change; this batch adds nothing further) -
       `getGridmasterRealtimeInvalidationKeys` adds the person prefix for
       `employees` and `invitations`. _Done when:_ the hook's test shows both
       events invalidate `["gm", "person"]` and a membership event still
