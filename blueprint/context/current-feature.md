@@ -90,7 +90,7 @@ Out of scope, recorded as follow-ups:
 
 ## Build steps
 
-- [ ] **Step 1 - the browser takes the server's session without re-fetching
+- [x] **Step 1 - the browser takes the server's session without re-fetching
       the user.**
   - Spike first, then pick one mechanism:
     - the login route returns the full session with its user, and the
