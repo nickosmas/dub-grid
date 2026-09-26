@@ -121,8 +121,11 @@ describe.runIf(reachable)("fresh proof in the database (051, live DB)", () => {
 
   it("applies the routes' password rule", async () => {
     expect(await hasFreshProof({ sub: gridmaster, ...password(10) })).toBe(true);
-    expect(await hasFreshProof({ sub: gridmaster, ...password(299) })).toBe(true);
-    expect(await hasFreshProof({ sub: gridmaster, ...password(301) })).toBe(false);
+    // Ten seconds either side of the 300-second window: the proof is stamped
+    // on this clock and judged by the database's now() a round trip later,
+    // which a loaded suite stretched past one second.
+    expect(await hasFreshProof({ sub: gridmaster, ...password(290) })).toBe(true);
+    expect(await hasFreshProof({ sub: gridmaster, ...password(310) })).toBe(false);
     expect(await hasFreshProof({ sub: gridmaster, ...password(-20) })).toBe(true);
     expect(await hasFreshProof({ sub: gridmaster, ...password(-120) })).toBe(false);
     expect(await hasFreshProof({ sub: gridmaster, aal: "aal1" })).toBe(false);
