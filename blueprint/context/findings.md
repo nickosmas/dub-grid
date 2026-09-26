@@ -104,13 +104,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** Record it from a route or a job (the 41c3 notice work may carry it).
 **Resolution:**
 
-### F-35 [P3] open - A Gridmaster sign-out ends an impersonation with no end notice
+### F-35 [P3] fixed - A Gridmaster sign-out ends an impersonation with no end notice
 
 **File:** `apps/web/src/app/api/account/logout-cleanup/route.ts:24`; `apps/web/src/features/account/server/sessions.ts:47`
 **Found:** 2026-09-25 by `/audit` (scope: current, 262cddb3..1ddf878f; all lenses)
 **Why it matters:** Sign-out deletes the Gridmaster's impersonation rows, live ones included: no end email, no in-app notice, and the history is gone.
 **Suggested fix:** End live sessions through `end_impersonation` and send the end notice before deleting, or keep the rows.
-**Resolution:**
+**Resolution:** Fixed in the security findings cleanup: sign-out no longer deletes a Gridmaster's impersonation rows. `logout-cleanup` ends each live session through `end_impersonation` with the Gridmaster's own token (the in-app notices), schedules the end email and writes `impersonation.ended` with `trigger: sign_out`, as the portal's end does; ended rows stay as history, and the proxy already ignores them. Route tests cover the end, a non-Gridmaster and a failed end.
 
 ### F-38 [P3] fixed - In-app impersonation notices still say a platform administrator is reviewing the account
 

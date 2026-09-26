@@ -26,6 +26,8 @@ evidence the owner must supply.
 - **F-72:** the SQL entry-point allowlist helper tracks signatures and role
   lists.
 - **F-56:** view tests for the Users tab and compliance export step-up.
+- **F-35:** a Gridmaster's sign-out ends live impersonations with the
+  end notice and an audit row, and keeps the history.
 - **F-54:** re-reviewed and closed.
 
 ## Out of scope (need a decision or owner evidence)

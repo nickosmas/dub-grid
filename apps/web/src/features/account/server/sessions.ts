@@ -44,17 +44,20 @@ interface FetchUserSessionsOptions {
   activeSince?: string;
 }
 
-export async function clearImpersonationSessionsForGridmaster(
+/** A Gridmaster's impersonation sessions that have not ended. */
+export async function fetchLiveImpersonationSessionsForGridmaster(
   gridmasterUserId: string,
-): Promise<void> {
-  const { error } = await getServiceClient()
+): Promise<Array<{ session_id: string; target_user_id: string; target_org_id: string | null }>> {
+  const { data, error } = await getServiceClient()
     .from("impersonation_sessions")
-    .delete()
-    .eq("gridmaster_id", gridmasterUserId);
+    .select("session_id, target_user_id, target_org_id")
+    .eq("gridmaster_id", gridmasterUserId)
+    .is("ended_at", null);
 
   if (error) {
     throw error;
   }
+  return data ?? [];
 }
 
 export async function fetchUserSessionsForUser(
