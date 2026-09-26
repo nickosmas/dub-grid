@@ -9,6 +9,7 @@ const serviceFrom = vi.fn();
 const auditInsert = vi.fn();
 const impersonationRow = vi.fn();
 const scheduleImpersonationNotice = vi.fn();
+const requireSensitiveActionAuth = vi.fn();
 
 vi.mock("@/app/api/gridmaster/_lib/impersonation-notice", () => ({
   scheduleImpersonationNotice: (...args: unknown[]) => scheduleImpersonationNotice(...args),
@@ -19,6 +20,16 @@ vi.mock("@/lib/api-auth", () => ({
     rpc: requestRpc,
   }),
   requireGridmasterSession: (req: NextRequest) => requireGridmasterSession(req),
+  requireSensitiveActionAuth: (req: NextRequest) => requireSensitiveActionAuth(req),
+  // As the real helper: a database STEP_UP_REQUIRED becomes the route's step-up answer.
+  stepUpResponseForRefusal: async (
+    req: NextRequest,
+    error: { message?: string; code?: string } | null,
+  ) => {
+    if (error?.message !== "STEP_UP_REQUIRED" || error.code !== "42501") return null;
+    const assurance = await requireSensitiveActionAuth(req);
+    return "response" in assurance ? assurance.response : null;
+  },
 }));
 
 vi.mock("@/lib/csrf", () => ({
@@ -140,6 +151,7 @@ describe("POST /api/gridmaster/impersonation", () => {
       data: { target_user_id: TARGET_USER_ID, target_org_id: ORG_ID, ended_at: null },
       error: null,
     });
+    requireSensitiveActionAuth.mockResolvedValue({ user: { id: "gridmaster-user" } });
     serviceFrom.mockImplementation((table: string) => {
       if (table === "audit_log") {
         return { insert: auditInsert };
@@ -432,6 +444,67 @@ describe("POST /api/gridmaster/impersonation", () => {
       targetUserId: TARGET_USER_ID,
       targetOrgId: ORG_ID,
       expiresAt: "2026-05-01T17:00:00.000Z",
+    });
+  });
+
+  describe("fresh proof (41d7, F-75)", () => {
+    const staleSession = () => ({
+      response: NextResponse.json(
+        { code: "STEP_UP_REQUIRED", method: "password", error: "Confirm your identity." },
+        { status: 403 },
+      ),
+    });
+
+    it("starts nothing on a stale session", async () => {
+      requireSensitiveActionAuth.mockResolvedValueOnce(staleSession());
+
+      const response = await POST(
+        makePostRequest({
+          action: "start",
+          targetUserId: TARGET_USER_ID,
+          targetOrgId: ORG_ID,
+          justification: "Need support investigation",
+        }),
+      );
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({ code: "STEP_UP_REQUIRED" });
+      expect(requestRpc).not.toHaveBeenCalled();
+      expect(scheduleImpersonationNotice).not.toHaveBeenCalled();
+      expect(auditInsert).not.toHaveBeenCalled();
+    });
+
+    it("answers a database refusal with the step-up prompt", async () => {
+      requestRpc.mockResolvedValueOnce({
+        data: null,
+        error: { message: "STEP_UP_REQUIRED", code: "42501" },
+      });
+      requireSensitiveActionAuth
+        .mockResolvedValueOnce({ user: { id: "gridmaster-user" } })
+        .mockResolvedValueOnce(staleSession());
+
+      const response = await POST(
+        makePostRequest({
+          action: "start",
+          targetUserId: TARGET_USER_ID,
+          targetOrgId: ORG_ID,
+          justification: "Need support investigation",
+        }),
+      );
+
+      expect(response.status).toBe(403);
+      expect(scheduleImpersonationNotice).not.toHaveBeenCalled();
+    });
+
+    it("ends a session without asking for fresh proof", async () => {
+      requestRpc.mockResolvedValue({ data: null, error: null });
+
+      const response = await POST(
+        makePostRequest({ action: "end", sessionId: SESSION_ID, reason: "navigation" }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
     });
   });
 });

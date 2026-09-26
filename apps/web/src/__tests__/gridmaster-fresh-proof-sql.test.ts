@@ -8,6 +8,9 @@ const GRANT_FUNCTIONS = [
   "promote_gridmaster_by_email",
   "demote_gridmaster_account",
   "set_gridmaster_account_deactivated",
+  // 055: rare, deliberate Gridmaster actions (F-75).
+  "start_impersonation",
+  "force_logout_user",
 ];
 
 describe("a Gridmaster's grant needs fresh proof in the database (migration 051)", () => {

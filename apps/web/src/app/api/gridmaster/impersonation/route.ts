@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { API_ERRORS } from "@dubgrid/client-errors";
-import { createRequestSupabaseClient, requireGridmasterSession } from "@/lib/api-auth";
+import {
+  createRequestSupabaseClient,
+  requireGridmasterSession,
+  requireSensitiveActionAuth,
+  stepUpResponseForRefusal,
+} from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
@@ -159,6 +164,9 @@ export async function POST(req: NextRequest) {
       if (!parsed.success) {
         return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
       }
+      // Acting as someone else needs a recent sign-in; ending never does.
+      const assurance = await requireSensitiveActionAuth(req);
+      if ("response" in assurance) return assurance.response;
 
       const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
       const { data, error } = await requestClient.rpc("start_impersonation", {
@@ -169,6 +177,8 @@ export async function POST(req: NextRequest) {
         p_target_org_id: parsed.data.targetOrgId ?? null,
       });
       if (error) {
+        const stepUp = await stepUpResponseForRefusal(req, error);
+        if (stepUp) return stepUp;
         const conflict = startConflictResponse(error);
         if (conflict) return conflict;
         throw error;

@@ -34,14 +34,14 @@ the database, and starting an impersonation should ask for it in the portal.
 
 ## Build steps
 
-- [ ] **Step 1 - route and portal** - _Done when:_ route tests prove a
+- [x] **Step 1 - route and portal** - _Done when:_ route tests prove a
       stale session starts nothing and ending still works; a view test
       proves the start runs through step-up with the assured token.
-- [ ] **Step 2 - migration 055** - _Done when:_ live tests prove each
+- [x] **Step 2 - migration 055** - _Done when:_ live tests prove each
       function refuses a stale Gridmaster, a fresh one works, and
       `end_impersonation` still ends a session with a stale token; a static
       test pins the guard.
-- [ ] **Step 3 - inventory and records** - the sensitive-action inventory
+- [x] **Step 3 - inventory and records** - the sensitive-action inventory
       classifies the impersonation route; F-75 narrowed to schedule editing.
 
 ## Files / areas

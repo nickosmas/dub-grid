@@ -100,6 +100,13 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
       /parsed\.data\.action === "assignOrgRoleByEmail" \|\|\s*\(parsed\.data\.action === "createOrganizationSetup" && parsed\.data\.input\.superAdminEmail\)\s*\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) \{\s*return assurance\.response;[\s\S]*?\.rpc\("assign_org_role_by_email"/,
     ],
   },
+  // Acting as someone else needs a recent sign-in; ending never does (41d7).
+  "apps/web/src/app/api/gridmaster/impersonation/route.ts": {
+    policy: "conditional-sensitive",
+    assertions: [
+      /if \(action === "start"\)[\s\S]*?const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.rpc\("start_impersonation"/,
+    ],
+  },
   "apps/web/src/app/api/gridmaster/password-reset/route.ts": {
     policy: "sensitive",
     assertions: [
