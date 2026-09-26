@@ -179,5 +179,8 @@ Load-bearing for 43d and 43e, which extend the same record.
   mobile gate waits for terms and stays down while rechecking, no audit row
   for a lock that cannot exist). The reset sends its email only; the in-app
   alert was dropped from scope, since the inbox is behind the gate.
-- Release: production needs migration 059 applied by the runbook before the
-  release that carries 43c.
+- Release: migration 059 applied to production 2026-09-26 by the owner, ahead
+  of the release that carries 43c (it only adds columns and an index), after a
+  scratch rehearsal from 058. Before: 58 ledger entries, only 059 missing;
+  latest backup 2026-09-26 13:40:45 UTC (physical, completed). After: 59
+  ledger entries, none missing, every invariant passing, health 200.
