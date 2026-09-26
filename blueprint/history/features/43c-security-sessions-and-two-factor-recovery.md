@@ -1,7 +1,7 @@
 # Feature: Security, sessions and two-factor recovery
 
 **From build-plan:** feature 43c
-**Status:** in progress (built alongside the web sign-in fix, which holds
+**Status:** verified (built alongside the web sign-in fix, which held
 `current-feature.md` in another session)
 
 ## Goal
@@ -158,3 +158,26 @@ Load-bearing for 43d and 43e, which extend the same record.
 - Production needs 059 applied by the runbook before the release that
   carries this ships.
 - No em dashes.
+
+## Verification
+
+- Tests: builder, route, email, gate and view tests for every step, including
+  a stale session, a Gridmaster target, a row that is not theirs, the reset's
+  order and a failed factor delete, a factor from before the reset never
+  lifting it, and both gates. The affected web suites pass (1005 tests in the
+  focused run), mobile gate and contract tests pass, the live 059 check passes,
+  type-check (web and mobile) and lint are clean, and `next build` passes.
+- Browser, on a worktree dev server with a throwaway Calm Haven account holding
+  a verified authenticator: the Gridmaster saw the factor, reset two-factor with
+  a reason through step-up and saw "No factors enrolled" with the reset time;
+  the person signing in landed on "Set up two-factor again", enrolled from it,
+  and reached the dashboard; the database read two-factor on, one verified
+  factor and the flag cleared. No console errors. The account was deleted.
+- Review: an independent pass found no access, isolation or secret problems;
+  its fixes landed (a pre-reset factor can no longer lift a reset, a failed
+  check never takes mobile down, refreshes scope to the named person, the
+  mobile gate waits for terms and stays down while rechecking, no audit row
+  for a lock that cannot exist). The reset sends its email only; the in-app
+  alert was dropped from scope, since the inbox is behind the gate.
+- Release: production needs migration 059 applied by the runbook before the
+  release that carries 43c.

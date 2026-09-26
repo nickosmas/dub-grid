@@ -720,7 +720,7 @@
         status, membership and invitation actions and a link to that
         organization's People page. Staff without an account are found by a
         cross-organization search.
-  - [ ] 43c. **Security, sessions and two-factor recovery** - Security shows
+  - [x] 43c. **Security, sessions and two-factor recovery** - Security shows
         two-factor state and each factor (type, name, enrolled, last used),
         known devices and any login lock; Sessions and devices shows every
         session, push device and calendar feed. A Gridmaster, and only a
