@@ -80,13 +80,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** A server-side refusal record for this case, for example a denial reason on the local sign-out.
 **Resolution:**
 
-### F-29 [P3] open - A sign-in refused by the access-token hook writes no audit row
+### F-29 [P3] fixed - A sign-in refused by the access-token hook writes no audit row
 
 **File:** `apps/web/src/app/api/auth/login/route.ts:445`
 **Found:** 2026-09-25 by `/audit` (scope: current, bdbbd4cc..8246596c; all lenses)
 **Why it matters:** The `ACCOUNT_DISABLED` branch returns 403 with no record although the password was correct. Predates 41c2.
 **Suggested fix:** Record it as `rejected` with a disabled-account reason (no session exists to end).
-**Resolution:**
+**Resolution:** Fixed in the security findings cleanup (Step 2): the web login route records a `rejected` sign-in with the new `account_disabled` reason (by address hash, since no session exists) before answering 403; the audit view reads it as "Sign-in rejected: the account is disabled". Mobile already recorded these refusals as `policy_denied`.
 
 ### F-32 [P3] fixed - Any signed-in user can insert audit rows as themselves
 
@@ -136,13 +136,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** Cover the app on `inactive` without locking or prompting.
 **Resolution:** `inactive` raises the privacy cover (no lock, no prompt); `active` lowers it; `background` still locks. A provider test covers it. The switcher snapshot needs the 41d3 device rehearsal. Re-review (d4a48aa5): kept open, since the cover could stay up after a sign-out while covered; the effect's cleanup now lowers it, with a test that fails without it. iOS only: Android reports no `inactive`, and its recents snapshot stays unprotected (that needs `FLAG_SECURE`). Second re-review (fe8c51ee): kept open at the repair limit (two attempts). The cleanup that lowers the cover also runs when the token rotates while the app is inactive, so a manual refresh already in flight when the switcher opens drops the cover until `background`. Suggested next fix: key the effect on `Boolean(accessToken)` instead of the token, with a test that rotates the token after `inactive`. Owner delegated the decision (2026-09-25); fixed in 41d3 with the recorded next step: the effect is keyed on `Boolean(accessToken)`, so a token rotation no longer re-runs its cleanup; a test rotates the token while inactive and fails without the change. Re-review (a6e3c15c..d6b802ca): closed.
 
-### F-46 [P3] open - A detection error in the new-sign-in claim loses the alert without a retry
+### F-46 [P3] fixed - A detection error in the new-sign-in claim loses the alert without a retry
 
 **File:** `apps/web/src/features/account/server/security-alerts.ts:74`
 **Found:** 2026-09-25 by `/audit` (scope: current, b3848e11..46bda2bb; all lenses)
 **Why it matters:** `claimNewSignIn` catches a database error and returns no claim, and the route still answers 200, so the client never retries and the alert is gone.
 **Suggested fix:** Answer 5xx when detection fails so the client retries, or record the failure for a later sweep.
-**Resolution:**
+**Resolution:** Fixed in the security findings cleanup (Step 2): `claimNewSignIn` no longer swallows a read error, so `track-session` answers 500 and mobile `session-presence` answers 503, both of which the clients retry (41d1); nothing is written before a failure, so a retry is safe. Tests cover both routes and the claim.
 
 ### F-47 [P2] closed - The app's password rule accepts passwords Supabase's rule refuses
 

@@ -38,7 +38,7 @@ evidence the owner must supply.
 ## Build steps
 
 - [x] **Step 1 - F-32 audit tables server-written only** (migration 056)
-- [ ] **Step 2 - F-46 and F-29 sign-in audit and alert gaps**
+- [x] **Step 2 - F-46 and F-29 sign-in audit and alert gaps**
 - [ ] **Step 3 - F-57 password maximum**
 - [ ] **Step 4 - F-38 impersonation notice wording** (migration)
 - [ ] **Step 5 - F-41, F-72 and F-56 references, helper and tests**
