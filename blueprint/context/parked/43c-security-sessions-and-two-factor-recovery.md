@@ -19,7 +19,7 @@ proof) and F-81 (the page refreshes on more than membership changes).
 
 ## Decisions (made 2026-09-26)
 
-- **Re-enrollment flag:** migration 058 adds
+- **Re-enrollment flag:** migration 059 adds
   `profiles.mfa_reenroll_required_at`. The reset sets it; saving a verified
   factor (`updateSelfMfaStatus(true)`, which web and mobile both reach after
   enrolling) clears it.
@@ -27,7 +27,7 @@ proof) and F-81 (the page refreshes on more than membership changes).
   app route) and mobile (beside `TermsGate`), both sending the person to the
   existing enrollment screen. It is a recovery step, not an access boundary:
   the person's own password still admits them, as before any reset.
-- **Known devices** get a surrogate `id` (058) so one can be forgotten without
+- **Known devices** get a surrogate `id` (059) so one can be forgotten without
   the page ever holding a device hash.
 - **Push devices:** disabling sets `disabled_at`. A signed-in app that
   registers again re-enables its device, so the page offers "End session" for
@@ -64,7 +64,7 @@ proof) and F-81 (the page refreshes on more than membership changes).
 
 ## Build steps
 
-- [ ] **Step 1 - migration 058** - `profiles.mfa_reenroll_required_at` and
+- [x] **Step 1 - migration 059** - `profiles.mfa_reenroll_required_at` and
       `user_known_devices.id` (uuid, unique, default), with the checksum
       locked. _Done when:_ `db:migrations:check` passes and a live check reads
       both columns.
@@ -154,6 +154,6 @@ Load-bearing for 43d and 43e, which extend the same record.
 - Never select a token, hash or IP column; list columns explicitly.
 - New routes join the sensitive-action and browser-mutation inventories, and
   the audit registry gets every new action.
-- Production needs 058 applied by the runbook before the release that
+- Production needs 059 applied by the runbook before the release that
   carries this ships.
 - No em dashes.
