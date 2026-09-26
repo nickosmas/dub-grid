@@ -197,14 +197,14 @@ export function orgContextQueryOptions() {
   });
 }
 
-function useOrgContext(): OrgContext {
+function useOrgContext(enabled: boolean): OrgContext {
   // Read once on mount, like the effect this replaced. Entering or leaving
   // impersonation clears the whole query cache and re-renders from scratch.
   const [impersonation] = useState(() =>
     typeof document === "undefined" ? null : getImpersonationFromCookie(document.cookie),
   );
 
-  const query = useQuery({ ...orgContextQueryOptions(), enabled: !impersonation });
+  const query = useQuery({ ...orgContextQueryOptions(), enabled: enabled && !impersonation });
 
   return useMemo(() => {
     if (impersonation) {
@@ -232,10 +232,12 @@ function useOrgContext(): OrgContext {
 
 export function useOrganizationData(options?: UseOrganizationDataOptions): OrganizationData {
   const queryClient = useQueryClient();
-  const ctx = useOrgContext();
+  const enabled = options?.enabled ?? true;
+  // A disabled caller (the gate before it decides, a Gridmaster, a locked
+  // header) never reads the context, so it does not ask for it either.
+  const ctx = useOrgContext(enabled);
   const includeAssignmentDefinitionCompatibility =
     options?.includeAssignmentDefinitionCompatibility ?? true;
-  const enabled = options?.enabled ?? true;
   const bootstrapQueryKey = queryKeys.org.bootstrap();
 
   // Deliberately not gated on ctx.resolved. The request carries no org id —

@@ -9,6 +9,8 @@ const replace = vi.fn();
 const setBrowserSession = vi.fn();
 const syncBrowserSessionInBackground = vi.fn();
 let signedInUser: { id: string } | null = null;
+const primeSignInQueries = vi.fn();
+const queryClient = {};
 const toastError = vi.fn();
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace }) }));
@@ -20,6 +22,10 @@ vi.mock("next-themes", () => ({
   useTheme: () => ({ theme: mockTheme, setTheme: vi.fn() }),
 }));
 vi.mock("@/components/AuthProvider", () => ({ useAuth: () => ({ user: signedInUser }) }));
+vi.mock("@tanstack/react-query", () => ({ useQueryClient: () => queryClient }));
+vi.mock("@/components/SignInPrefetch", () => ({
+  primeSignInQueries: (...args: unknown[]) => primeSignInQueries(...args),
+}));
 vi.mock("@/components/RouteGuards", () => ({
   PublicRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
@@ -143,6 +149,7 @@ describe("GridmasterLogin with session cookies from the server", () => {
     signedInUser = null;
     setBrowserSession.mockReset().mockReturnValue(new Promise(() => {}));
     syncBrowserSessionInBackground.mockReset().mockResolvedValue(undefined);
+    primeSignInQueries.mockReset();
   });
 
   it("navigates without waiting for the browser's own session check", async () => {
@@ -152,6 +159,7 @@ describe("GridmasterLogin with session cookies from the server", () => {
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/dashboard"));
     expect(syncBrowserSessionInBackground).toHaveBeenCalledExactlyOnceWith(SESSION);
+    expect(primeSignInQueries).toHaveBeenCalledExactlyOnceWith(queryClient, SESSION.access_token);
     expect(setBrowserSession).not.toHaveBeenCalled();
   });
 

@@ -109,11 +109,8 @@ import ThemeToggleButton from "@/components/ThemeToggleButton";
 import ProgressBar from "@/components/ProgressBar";
 import { EmptyState } from "@/components/EmptyState";
 import { InboxView as AlertsInboxView } from "@/app/(app)/alerts/AlertsInboxPage";
-import {
-  fetchGridmasterDashboardData,
-  type GridmasterDashboardData,
-  type TenantStats,
-} from "@/features/gridmaster/client";
+import { type GridmasterDashboardData, type TenantStats } from "@/features/gridmaster/client";
+import { gridmasterDashboardQueryOptions } from "@/features/gridmaster/queries";
 import { queryKeys } from "@/lib/query-keys";
 import type { Organization } from "@/types";
 import type { OrganizationDetailTab } from "@/components/gridmaster/OrganizationDetail";
@@ -442,10 +439,8 @@ export default function GridmasterPortal() {
   }, [menuOpen]);
 
   const dashboardQuery = useQuery({
-    queryKey: queryKeys.gridmaster.dashboard(),
-    queryFn: fetchGridmasterDashboardData,
+    ...gridmasterDashboardQueryOptions(),
     enabled: !permLoading && isGridmaster,
-    staleTime: 30_000,
   });
   const organizations = dashboardQuery.data?.organizations ?? [];
   const stats = useMemo(() => {

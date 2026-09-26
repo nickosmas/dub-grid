@@ -77,10 +77,13 @@ describe("primeSignInQueries", () => {
     expect(fetch).toHaveBeenCalledTimes(6);
   });
 
-  it("does nothing for a Gridmaster, who has no organization shell", () => {
-    primeSignInQueries(queryClient, token({ platform_role: "gridmaster" }));
+  it("starts only the portal's dashboard for a Gridmaster, who has no organization shell", async () => {
     primeSignInQueries(queryClient, token({ platform_role: "gridmaster", org_id: ORG_ID }));
-    expect(fetch).not.toHaveBeenCalled();
+
+    await waitFor(() => expect(requestedPaths()).toEqual(["/api/gridmaster/dashboard"]));
+    await waitFor(() =>
+      expect(queryClient.getQueryState(queryKeys.gridmaster.dashboard())?.status).toBe("success"),
+    );
   });
 
   it("does nothing for a token it cannot read", () => {

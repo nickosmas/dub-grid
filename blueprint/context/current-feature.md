@@ -131,7 +131,7 @@ Out of scope, recorded as follow-ups:
     without dropping prefetch for later navigation.
   - _Done when:_ a local sign-in's network log shows each navigation RSC
     prefetch once.
-- [ ] **Step 5 - Gridmaster path.**
+- [x] **Step 5 - Gridmaster path.**
   - The login route skips the refresh when the token already carries
     `platform_role=gridmaster` (and keeps it when the claim is missing).
   - Gridmasters land on `/gridmaster`.

@@ -6,6 +6,7 @@ import { decodeJwt } from "jose";
 import { extractJwtClaims } from "@dubgrid/authz";
 import { useAuth } from "@/components/AuthProvider";
 import { organizationBillingQueryOptions } from "@/features/billing/queries";
+import { gridmasterDashboardQueryOptions } from "@/features/gridmaster/queries";
 import { getOrganizationBootstrapQueryPolicy } from "@/features/organization/client/api";
 import { accountPermissionsQueryOptions } from "@/features/permissions/client";
 import { employeesQueryOptions } from "@/hooks/useEmployees";
@@ -49,6 +50,10 @@ function bootstrapQueryOptions() {
  * members are sent to billing recovery before any screen reads the list.
  */
 export function primeSignInQueries(queryClient: QueryClient, accessToken: string): void {
+  if (extractJwtClaims(accessToken).effectiveRole === "gridmaster") {
+    primeGridmasterPortal(queryClient);
+    return;
+  }
   const target = signInTarget(accessToken);
   if (!target) return;
 
@@ -60,6 +65,15 @@ export function primeSignInQueries(queryClient: QueryClient, accessToken: string
   if (target.isSuperAdmin) {
     void queryClient.prefetchQuery(organizationBillingQueryOptions(target.orgId));
   }
+}
+
+/**
+ * The portal waits for its dashboard data before it renders, and only then
+ * asks for its first view's code, so start both now.
+ */
+function primeGridmasterPortal(queryClient: QueryClient): void {
+  void queryClient.prefetchQuery(gridmasterDashboardQueryOptions());
+  void import("@/components/gridmaster/GridmasterDashboard").catch(() => {});
 }
 
 /**

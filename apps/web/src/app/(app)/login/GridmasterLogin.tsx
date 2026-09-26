@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { PublicRoute } from "@/components/RouteGuards";
 import { useAuth } from "@/components/AuthProvider";
+import { primeSignInQueries } from "@/components/SignInPrefetch";
 import { ACCOUNT_DISABLED_CODE } from "@dubgrid/domain";
 import { markAuthTransition } from "@/lib/auth-transition";
 import { DubGridLogo } from "@/components/Logo";
@@ -36,6 +38,7 @@ export default function GridmasterLogin({
   initialTheme?: ThemePreference;
 }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { user: signedInUser } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -118,6 +121,7 @@ export default function GridmasterLogin({
       // auth client alongside the page load (see OrgLogin's handleSubmit).
       if (result.sessionCookieSet && (priorUserId === null || priorUserId === result.user.id)) {
         void syncBrowserSessionInBackground(result.session);
+        primeSignInQueries(queryClient, result.session.access_token);
         markAuthTransition();
         router.replace(result.destination);
         return;

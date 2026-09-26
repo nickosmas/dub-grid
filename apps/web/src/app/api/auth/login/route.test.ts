@@ -678,10 +678,11 @@ describe("POST /api/auth/login", () => {
     expectRefusal("rejected", "organization_unavailable", null);
   });
 
-  it("gridmaster: always refreshes once and returns the resolved destination", async () => {
+  function signInGridmaster(claims: Record<string, unknown>) {
+    const session = makeSession(claims);
     signInWithPassword.mockResolvedValueOnce({
       data: {
-        session: makeSession({ platform_role: "gridmaster" }),
+        session,
         user: {
           id: USER_ID,
           email: "gm@example.com",
@@ -691,6 +692,34 @@ describe("POST /api/auth/login", () => {
       },
       error: null,
     });
+    return session;
+  }
+
+  function stubGridmasterProfile() {
+    serviceFrom.mockImplementation(() => ({
+      select: () => ({
+        eq: () => ({
+          maybeSingle: async () => ({ data: { platform_role: "gridmaster" }, error: null }),
+        }),
+      }),
+    }));
+  }
+
+  it("gridmaster: lands on the portal without a second mint when the token says Gridmaster", async () => {
+    const session = signInGridmaster({ platform_role: "gridmaster" });
+
+    const res = await POST(makeRequest("gridmaster.localhost"));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(refreshSession).not.toHaveBeenCalled();
+    expect(body.session.access_token).toBe(session.access_token);
+    expect(body.destination).toBe("/gridmaster");
+  });
+
+  it("gridmaster: refreshes once when the token predates the access-token hook", async () => {
+    signInGridmaster({});
+    stubGridmasterProfile();
     refreshSession.mockResolvedValueOnce({
       data: {
         session: makeSession({ platform_role: "gridmaster" }, { access_token: "gm-refreshed" }),
@@ -704,13 +733,26 @@ describe("POST /api/auth/login", () => {
     expect(res.status).toBe(200);
     expect(refreshSession).toHaveBeenCalledTimes(1);
     expect(body.session.access_token).toBe("gm-refreshed");
-    expect(body.destination).toBe("/dashboard");
+    expect(body.destination).toBe("/gridmaster");
+  });
+
+  it("gridmaster: sends the terms page back to the portal, not /dashboard", async () => {
+    signInGridmaster({ platform_role: "gridmaster" });
+    fetchTermsAcceptanceStatus.mockResolvedValueOnce({
+      acceptedCurrentTerms: false,
+      acceptedVersion: null,
+    });
+
+    const body = await (await POST(makeRequest("gridmaster.localhost"))).json();
+
+    expect(body.destination).toBe("/accept-terms?next=%2Fgridmaster");
   });
 
   it("gridmaster: returns SESSION_REFRESH_FAILED when the post-signin refresh fails", async () => {
+    stubGridmasterProfile();
     signInWithPassword.mockResolvedValueOnce({
       data: {
-        session: makeSession({ platform_role: "gridmaster" }),
+        session: makeSession({}),
         user: {
           id: USER_ID,
           email: "gm@example.com",

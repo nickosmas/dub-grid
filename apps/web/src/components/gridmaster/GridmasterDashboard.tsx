@@ -113,6 +113,35 @@ function OversightCard({
   );
 }
 
+/**
+ * Holds the oversight row's space while the overview loads. Rendering nothing
+ * there let the organization list paint first and then jump down under the
+ * cards when they arrived.
+ */
+function OversightCardsPlaceholder() {
+  return (
+    <div aria-hidden style={{ marginBottom: 28 }}>
+      <div className="dg-skeleton dg-skeleton--text" style={{ width: 140, marginBottom: 10 }} />
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        {Array.from({ length: 5 }, (_, index) => (
+          <div
+            key={index}
+            data-testid="oversight-card-placeholder"
+            style={{ ...sectionStyle, padding: "14px 16px", minWidth: 160, flex: "1 1 170px" }}
+          >
+            <div className="dg-skeleton" style={{ height: 24, width: 56 }} />
+            <div className="dg-skeleton dg-skeleton--text" style={{ marginTop: 6, width: "70%" }} />
+            <div
+              className="dg-skeleton dg-skeleton--text"
+              style={{ marginTop: 6, width: "90%", height: 12 }}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Recent activity row ──────────────────────────────────────────────────────
 
 function ActivityRow({ entry }: { entry: AuditLogEntry }) {
@@ -225,6 +254,7 @@ export default function GridmasterDashboard({
         </Button>
       </div>
 
+      {overviewQuery.isPending && <OversightCardsPlaceholder />}
       {overview && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 28 }}>
           <div>
