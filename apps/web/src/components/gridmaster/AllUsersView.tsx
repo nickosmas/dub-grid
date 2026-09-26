@@ -17,6 +17,7 @@ import { fetchGridmasterUsers, type GridmasterPersonTarget } from "@/features/gr
 import { queryKeys } from "@/lib/query-keys";
 import { gmHeaderStyle, gmTableStyle, gmTdStyle } from "@/components/gridmaster/table-styles";
 import GridmasterPersonView from "@/components/gridmaster/person/GridmasterPersonView";
+import type { OrganizationDetailTab } from "@/components/gridmaster/OrganizationDetail";
 
 function RoleBadge({ role }: { role: string }) {
   const { resolvedTheme } = useTheme();
@@ -94,7 +95,7 @@ export default function AllUsersView({
   onImpersonate,
 }: {
   organizations: Organization[];
-  onNavigateToOrg: (orgId: string) => void;
+  onNavigateToOrg: (orgId: string, tab?: OrganizationDetailTab) => void;
   onImpersonate: (userId: string, orgId?: string) => void;
 }) {
   const [search, setSearch] = useState("");
@@ -132,6 +133,7 @@ export default function AllUsersView({
         target={openPerson}
         onBack={() => setOpenPerson(null)}
         onImpersonate={onImpersonate}
+        onOpenOrganization={(orgId) => onNavigateToOrg(orgId, "employees")}
       />
     );
   }

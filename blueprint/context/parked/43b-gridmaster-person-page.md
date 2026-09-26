@@ -89,7 +89,7 @@ throwaway worktree, then committed as a local checkpoint and pushed.
       when:_ a view test shows each badge and Account field for a fixture
       record and the actions run through step-up; the separation test reads
       the new file.
-- [ ] **Step 3 - organization cards** - one card per organization: membership
+- [x] **Step 3 - organization cards** - one card per organization: membership
       (role, permissions, management departments, joined, onboarding, tours,
       schedule last viewed, archived and by whom), staff record (every field,
       created and updated by), invitation history (sent, expires, accepted,
@@ -175,6 +175,8 @@ interface GridmasterPersonRecord {
   loginLock: null | { locked: boolean; resetsAt: string | null };
   organizations: {
     org: { id: string; name: string; slug: string | null };
+    terminology: OrganizationTerminology; // the organization's own labels
+    names: { departments; focusAreas; roles; certifications }; // id to name
     membership: GridmasterMembership | null; // every column, archived included
     employees: Employee[]; // every linked staff row there
     invitations: GridmasterInvitation[]; // every column except the token

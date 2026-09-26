@@ -237,9 +237,24 @@ function fixtures(): Record<string, Row[]> {
       }),
     ],
     organizations: [
-      { id: ORG_A, name: "Calm Haven", slug: "calmhaven" },
+      {
+        id: ORG_A,
+        name: "Calm Haven",
+        slug: "calmhaven",
+        department_label: "Units",
+        focus_area_label: "Wings",
+        role_label: null,
+        certification_label: null,
+      },
       { id: ORG_B, name: "Birch Court", slug: "birch" },
     ],
+    departments: [
+      { id: 3, org_id: ORG_A, name: "Nursing" },
+      { id: 4, org_id: ORG_B, name: "Kitchen" },
+    ],
+    focus_areas: [{ id: 5, org_id: ORG_A, name: "East Wing" }],
+    organization_roles: [{ id: 8, org_id: ORG_A, name: "Charge" }],
+    certifications: [{ id: 2, org_id: ORG_B, name: "RN" }],
   };
 }
 
@@ -322,6 +337,27 @@ describe("buildPersonRecordForUser", () => {
       version: 4,
     });
     expect(calm?.membership?.tooltipToursCompleted).toEqual({ schedule: true });
+  });
+
+  it("carries each organization's own labels and names", async () => {
+    const person = await buildPersonRecordForUser(fakeClient(), USER);
+    const calm = person?.organizations.find((organization) => organization.org.id === ORG_A);
+    const birch = person?.organizations.find((organization) => organization.org.id === ORG_B);
+
+    expect(calm?.terminology).toEqual({
+      focusAreaLabel: "Wings",
+      certificationLabel: "Certifications",
+      roleLabel: "Roles",
+      departmentLabel: "Units",
+    });
+    expect(calm?.names).toEqual({
+      departments: { 3: "Nursing" },
+      focusAreas: { 5: "East Wing" },
+      roles: { 8: "Charge" },
+      certifications: {},
+    });
+    expect(birch?.names.departments).toEqual({ 4: "Kitchen" });
+    expect(birch?.names.certifications).toEqual({ 2: "RN" });
   });
 
   it("resolves actors to emails", async () => {

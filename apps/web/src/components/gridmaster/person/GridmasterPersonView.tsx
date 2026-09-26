@@ -22,6 +22,7 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
 import { PersonAccountCard } from "./PersonAccountCard";
 import { PersonHeader } from "./PersonHeader";
+import { PersonOrganizationCard } from "./PersonOrganizationCard";
 import { getPersonName, getPrimaryOrgId } from "./person-format";
 
 type AccountDialog = "deactivate" | "terminate" | "reinstate" | "forceLogout" | "reset" | null;
@@ -37,10 +38,12 @@ export default function GridmasterPersonView({
   target,
   onBack,
   onImpersonate,
+  onOpenOrganization,
 }: {
   target: GridmasterPersonTarget;
   onBack: () => void;
   onImpersonate: (userId: string, orgId?: string) => void;
+  onOpenOrganization: (orgId: string) => void;
 }) {
   const queryClient = useQueryClient();
   const stepUp = useStepUpAction();
@@ -234,6 +237,14 @@ export default function GridmasterPersonView({
       {back}
       <PersonHeader record={record} actions={quickActions} />
       <PersonAccountCard record={record} actions={accountActions} />
+      {record.organizations.map((organization) => (
+        <PersonOrganizationCard
+          key={organization.org.id}
+          organization={organization}
+          record={record}
+          onOpenOrganization={onOpenOrganization}
+        />
+      ))}
       {terminated ? (
         <SectionNotice
           tone="warning"

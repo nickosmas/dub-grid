@@ -1,4 +1,5 @@
 import type { AdminPermissions } from "@dubgrid/domain";
+import type { OrganizationTerminology } from "@/lib/db/mappers";
 import type { Employee, Invitation, OrganizationRole } from "@/types";
 
 export interface GridmasterPersonAccount {
@@ -75,8 +76,18 @@ export type GridmasterStaffRecord = Employee & {
   updatedAt: string | null;
 };
 
+/** Names for the ids a membership or staff record carries, archived ones included. */
+export interface GridmasterOrganizationNames {
+  departments: Record<number, string>;
+  focusAreas: Record<number, string>;
+  roles: Record<number, string>;
+  certifications: Record<number, string>;
+}
+
 export interface GridmasterPersonOrganization {
   org: { id: string; name: string; slug: string | null };
+  terminology: OrganizationTerminology;
+  names: GridmasterOrganizationNames;
   membership: GridmasterMembership | null;
   employees: GridmasterStaffRecord[];
   invitations: Invitation[];
