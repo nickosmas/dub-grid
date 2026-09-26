@@ -62,10 +62,14 @@ async function userId(email: string): Promise<string> {
   return rows[0]!.id;
 }
 
+// Only this test's fixture hashes: a real sign-in on the shared local stack
+// records the QA accounts' own devices too.
 async function knownDevices(user: string): Promise<string[]> {
   const { rows } = await db.query<{ device_hash: string }>(
-    `SELECT device_hash FROM public.user_known_devices WHERE user_id = $1 ORDER BY device_hash`,
-    [user],
+    `SELECT device_hash FROM public.user_known_devices
+      WHERE user_id = $1 AND device_hash = ANY($2::text[])
+      ORDER BY device_hash`,
+    [user, [HASH_A, HASH_B]],
   );
   return rows.map((row) => row.device_hash);
 }

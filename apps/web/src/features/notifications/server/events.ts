@@ -5,6 +5,7 @@ import { fetchPublishedShiftRows } from "@/lib/published-shifts";
 import logger from "@/lib/logger";
 import { sendNotification } from "./sender";
 import type { NotificationType } from "@/types";
+import type { NotificationEmailDetail } from "@/emails/NotificationEmail";
 
 export type NotificationEvent =
   | {
@@ -1082,7 +1083,16 @@ async function dispatchNotificationEventInternal(
           locationCountry: event.locationCountry ?? null,
           occurredAt: event.occurredAt,
         },
-        { writeInApp: false, dedupeKey: `security_new_device:${event.supabaseSessionId}` },
+        {
+          writeInApp: false,
+          dedupeKey: `security_new_device:${event.supabaseSessionId}`,
+          email: {
+            intro: "We noticed a new sign-in to your DubGrid account. Here are the details:",
+            details: newSignInDetails(event),
+            closing:
+              "If it was you, you don't need to do anything. If it wasn't you, change your password, sign out any sessions you don't recognize from your profile, and email support@dubgrid.com so we can help.",
+          },
+        },
       );
       return;
     }
@@ -1297,6 +1307,24 @@ function formatPlatformLabel(platform: "web" | "ios" | "android"): string {
   if (platform === "ios") return "iOS device";
   if (platform === "android") return "Android device";
   return "browser";
+}
+
+const SIGN_IN_APP_LABELS = { web: "Web", ios: "iOS", android: "Android" } as const;
+
+function newSignInDetails(
+  event: Extract<NotificationEvent, { action: "security_new_device" }>,
+): NotificationEmailDetail[] {
+  const place = [event.locationCity, event.locationCountry].filter(Boolean).join(", ");
+  const device =
+    event.platform === "web"
+      ? [event.browserName, event.deviceLabel].filter(Boolean).join(" on ")
+      : (event.deviceLabel ?? formatPlatformLabel(event.platform));
+  return [
+    { label: "App", value: SIGN_IN_APP_LABELS[event.platform] },
+    { label: "Time", value: formatEventTime(event.occurredAt) },
+    ...(place ? [{ label: "Approximate location", value: place }] : []),
+    ...(device ? [{ label: "Device", value: device }] : []),
+  ];
 }
 
 /** An explicit, zone-qualified time, since the reader may be anywhere. */

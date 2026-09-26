@@ -18,8 +18,8 @@ describe("AccountDeletedEmail", () => {
   it("says the account is gone and signed out everywhere", async () => {
     const body = await text();
 
-    expect(body).toContain("Your DubGrid account was deleted");
-    expect(body).toContain("It can no longer sign in");
+    expect(body).toContain("Your DubGrid account has been deleted");
+    expect(body).toContain("It can no longer be used to sign in");
     expect(body).toContain("support@dubgrid.com");
   });
 

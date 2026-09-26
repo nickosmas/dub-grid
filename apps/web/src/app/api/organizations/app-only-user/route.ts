@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { optionalUsPhoneSchema, staffNameSchema } from "@dubgrid/contracts";
 import { validateCsrfOrigin } from "@/lib/csrf";
-import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { requireAuthenticatedUser, requireSensitiveActionAuth } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
-import { canManageEmployees } from "@/app/api/employees/shared";
+import { canManageEmployees, isGridmasterActor } from "@/app/api/employees/shared";
 import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import {
   buildStaffValidationErrorResponse,
@@ -67,7 +67,7 @@ export async function PATCH(req: NextRequest) {
     // userId. Confirm the target is actually an active member of orgId first.
     const { data: targetMembership } = await serviceClient
       .from("organization_memberships")
-      .select("user_id")
+      .select("user_id, department_ids, dept_admin_ids")
       .eq("user_id", userId)
       .eq("org_id", orgId)
       .is("archived_at", null)
@@ -82,6 +82,16 @@ export async function PATCH(req: NextRequest) {
     });
     if (Object.keys(referenceErrors).length > 0) {
       return buildStaffValidationErrorResponse(referenceErrors);
+    }
+
+    // Which departments a person manages is a grant, so a Gridmaster's change
+    // to it needs fresh proof, as its permission changes do (F-68).
+    const scopeChanged =
+      !sameIdSet(departmentIds, targetMembership.department_ids) ||
+      !sameIdSet(deptAdminIds, targetMembership.dept_admin_ids);
+    if (scopeChanged && (await isGridmasterActor(serviceClient, user.id))) {
+      const assurance = await requireSensitiveActionAuth(req);
+      if ("response" in assurance) return assurance.response;
     }
 
     if (firstName !== undefined || lastName !== undefined) {
@@ -124,4 +134,11 @@ export async function PATCH(req: NextRequest) {
       { status: 500 },
     );
   }
+}
+
+/** An omitted list changes nothing; otherwise compare as sets. */
+function sameIdSet(next: number[] | undefined, current: number[] | null | undefined): boolean {
+  if (next === undefined) return true;
+  const currentSet = new Set(current ?? []);
+  return next.length === currentSet.size && next.every((id) => currentSet.has(id));
 }

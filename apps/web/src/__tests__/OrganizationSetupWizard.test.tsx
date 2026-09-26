@@ -1,9 +1,11 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import OrganizationSetupWizard from "@/components/gridmaster/OrganizationSetupWizard";
 import { createGridmasterOrganizationSetup } from "@/features/gridmaster/client";
 import { insertEmployee } from "@/features/employees/client";
+import { createOrganizationInvitation } from "@/features/organization/client";
+import { toast } from "sonner";
 import type { Organization } from "@/types";
 
 vi.mock("@/features/gridmaster/client", () => ({
@@ -188,6 +190,63 @@ describe("OrganizationSetupWizard", () => {
 
       await user.type(screen.getAllByPlaceholderText("John")[0]!, "Alice");
       expect(screen.getByLabelText(/employees ready to create/i)).toHaveValue("1");
+    },
+  );
+
+  it(
+    "finishes nothing and reports no invitations when step-up is cancelled at the invitations step (F-69)",
+    { timeout: 15000 },
+    async () => {
+      const user = userEvent.setup();
+      const onCreated = vi.fn();
+      render(<OrganizationSetupWizard onCreated={onCreated} onCancel={vi.fn()} />);
+
+      await user.type(screen.getByPlaceholderText("Acme Healthcare"), "Acme Health");
+      await user.click(screen.getByRole("button", { name: /^next$/i }));
+      await user.type(screen.getByPlaceholderText("Jane"), "Jane");
+      await user.type(screen.getByPlaceholderText("Doe"), "Doe");
+      await user.type(screen.getByPlaceholderText("jane@example.com"), "jane@example.com");
+      await user.click(screen.getByRole("button", { name: /create organization/i }));
+      await user.click(
+        within(screen.getByRole("dialog")).getByRole("button", { name: /^create organization$/i }),
+      );
+      await user.click(await screen.findByRole("button", { name: /set up now/i }));
+      await user.click(screen.getByRole("button", { name: /^skip$/i }));
+
+      await user.type((await screen.findAllByPlaceholderText("John"))[0]!, "Jane");
+      await user.click(screen.getByRole("button", { name: /^create 1 employee$/i }));
+      await user.click(
+        within(screen.getByRole("dialog")).getByRole("button", { name: /^create employees$/i }),
+      );
+
+      // The invitation step's proof is stale: the dialog opens and is dismissed.
+      stepUpRun.mockImplementation(async (action: (token: string) => Promise<unknown>) => {
+        await action("stale-token").catch(() => undefined);
+        return false;
+      });
+      requireCredentialAssurance.mockRejectedValue(
+        Object.assign(new Error("x"), {
+          status: 403,
+          code: "STEP_UP_REQUIRED",
+          method: "password",
+        }),
+      );
+      vi.mocked(toast.success).mockClear();
+
+      await user.click(
+        await screen.findByRole("button", { name: /^send 1 invitation & finish$/i }),
+      );
+      await user.click(
+        within(screen.getByRole("dialog")).getByRole("button", { name: /^send invitations$/i }),
+      );
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(requireCredentialAssurance).toHaveBeenLastCalledWith("stale-token");
+      expect(vi.mocked(createOrganizationInvitation)).not.toHaveBeenCalled();
+      expect(onCreated).not.toHaveBeenCalled();
+      expect(toast.success).not.toHaveBeenCalledWith(expect.stringMatching(/^Sent \d+ invitation/));
+      expect(toast.error).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: /^send 1 invitation & finish$/i })).toBeEnabled();
     },
   );
 });

@@ -38,7 +38,7 @@ describe("ImpersonationNoticeEmail", () => {
   it("says when the access ended, without a deadline", async () => {
     const body = await text({ ended: true });
 
-    expect(body).toContain("DubGrid support is no longer using your account in Calm Haven.");
+    expect(body).toContain("DubGrid support has finished using your account in Calm Haven.");
     expect(body).not.toContain("ends by");
   });
 

@@ -345,8 +345,50 @@ describe("dispatchNotificationEvent", () => {
         ipAddress: "1.2.3.4",
       }),
       // One alert per sign-in, however many times that sign-in is reported.
-      { writeInApp: false, dedupeKey: "security_new_device:session-9" },
+      expect.objectContaining({ writeInApp: false, dedupeKey: "security_new_device:session-9" }),
     );
+  });
+
+  it("gives the new sign-in email one labeled line per fact", async () => {
+    await dispatchNotificationEvent("user-1", {
+      action: "security_new_device",
+      orgId: null,
+      targetUserId: "user-1",
+      supabaseSessionId: "session-9",
+      platform: "web",
+      deviceLabel: "Macintosh",
+      browserName: "Chrome",
+      ipAddress: null,
+      locationCity: "Kakamega",
+      locationCountry: "Kenya",
+      occurredAt: "2026-09-26T08:01:00.000Z",
+    });
+
+    const options = vi.mocked(sendNotification).mock.calls[0]?.[6];
+    expect(options?.email?.details).toEqual([
+      { label: "App", value: "Web" },
+      { label: "Time", value: "September 26, 2026 at 08:01 UTC" },
+      { label: "Approximate location", value: "Kakamega, Kenya" },
+      { label: "Device", value: "Chrome on Macintosh" },
+    ]);
+    expect(options?.email?.closing).toContain("If it wasn't you, change your password");
+  });
+
+  it("leaves out sign-in facts it does not know", async () => {
+    await dispatchNotificationEvent("user-1", {
+      action: "security_new_device",
+      orgId: null,
+      targetUserId: "user-1",
+      supabaseSessionId: "session-9",
+      platform: "android",
+      deviceLabel: null,
+      ipAddress: null,
+      occurredAt: "2026-09-26T08:01:00.000Z",
+    });
+
+    const options = vi.mocked(sendNotification).mock.calls[0]?.[6];
+    expect(options?.email?.details.map((d) => d.label)).toEqual(["App", "Time", "Device"]);
+    expect(options?.email?.details.at(-1)?.value).toBe("Android device");
   });
 
   it("dispatches security_mfa_changed with writeInApp:false (email + push only)", async () => {

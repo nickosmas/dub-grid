@@ -1,5 +1,4 @@
 import type { ComponentType } from "react";
-import { AuthInviteEmail } from "./AuthInviteEmail";
 import { ConfirmationEmail } from "./ConfirmationEmail";
 import { EmailChangeEmail } from "./EmailChangeEmail";
 import { EmailChangedNotificationEmail } from "./EmailChangedNotificationEmail";
@@ -46,11 +45,6 @@ export const SUPABASE_AUTH_TEMPLATES: readonly SupabaseAuthTemplate[] = [
   {
     key: "magic_link",
     Component: MagicLinkEmail,
-    placeholders: ["{{ .ConfirmationURL }}", "{{ .SiteURL }}"],
-  },
-  {
-    key: "invite",
-    Component: AuthInviteEmail,
     placeholders: ["{{ .ConfirmationURL }}", "{{ .SiteURL }}"],
   },
   {

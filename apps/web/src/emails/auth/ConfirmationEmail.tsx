@@ -7,7 +7,7 @@ export function ConfirmationEmail({ logoUrl }: { logoUrl?: string } = {}) {
   return (
     <AuthActionEmail
       heading="Confirm your email"
-      intro="Click the button below to verify your email address and activate your account."
+      intro="Thanks for signing up! Confirm your email address below to finish setting up your account."
       ctaLabel="Confirm email"
       footer="If you didn't create an account, you can safely ignore this email."
       logoUrl={logoUrl}

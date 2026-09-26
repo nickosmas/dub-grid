@@ -13,6 +13,7 @@ import type {
 import {
   fetchOrganizationInvitations,
   replaceOrganizationInvitationAccessGuarded,
+  updateAppOnlyUser,
   updatePendingInvitation,
 } from "@/features/organization/client";
 import { updateEmployeeIdentity } from "@/features/employees/client";
@@ -673,6 +674,59 @@ describe("MembersSection — ManagementStaffPanel email/invitation wiring", () =
 
     expect(saved).toBe(false);
     expect(vi.mocked(toast.error)).toHaveBeenCalled();
+  });
+});
+
+describe("MembersSection — a Gridmaster's department grant (41d3, F-68)", () => {
+  it("saves nothing when the step-up is cancelled, not the details without the departments", async () => {
+    vi.mocked(updateEmployeeIdentity).mockClear();
+    vi.mocked(updateAppOnlyUser).mockClear();
+    vi.mocked(fetchOrganizationInvitations).mockResolvedValueOnce([]);
+    stepUpRun.mockResolvedValueOnce(false);
+    mockDirectory = [
+      makePerson({
+        personId: "person-1",
+        employeeId: "emp-1",
+        userId: "user-1",
+        firstName: "Jamie",
+        lastName: "Rivera",
+        focusAreaIds: [],
+        managementDepartmentIds: [10],
+      }),
+    ];
+
+    renderMembersSection({
+      canManageEmployees: true,
+      isSuperAdmin: true,
+      orgId: "org-1",
+      employees: [makeEmployee({ id: "emp-1", email: "existing@example.com", version: 3 })],
+    });
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /On Schedule/i }));
+    await user.click(screen.getByRole("option", { name: /Management/i }));
+    const row = screen.getByText("Jamie Rivera").closest("tr");
+    if (!row) throw new Error("Expected to find a table row for Jamie Rivera");
+    await user.click(row);
+    await screen.findByTestId("management-staff-panel");
+    if (!lastManagementStaffPanelSave) {
+      throw new Error("Expected ManagementStaffPanel to receive onSave");
+    }
+
+    let saved = true;
+    await act(async () => {
+      saved = await lastManagementStaffPanelSave!({
+        firstName: "Jamie",
+        lastName: "Rivera-Stone",
+        email: "existing@example.com",
+        phone: "",
+        managementDepartmentIds: [10, 20],
+      });
+    });
+
+    expect(saved).toBe(false);
+    expect(vi.mocked(updateEmployeeIdentity)).not.toHaveBeenCalled();
+    expect(vi.mocked(updateAppOnlyUser)).not.toHaveBeenCalled();
   });
 });
 

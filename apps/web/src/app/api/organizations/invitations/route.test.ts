@@ -745,6 +745,45 @@ describe("POST /api/organizations/invitations - replace_access tier ceiling", ()
       expect.objectContaining({ p_role: "super_admin", p_invited_by: "actor-1" }),
     );
   });
+
+  it("never hands the replacement token back to the caller (F-69)", async () => {
+    invitationSelectMaybeSingle
+      .mockResolvedValueOnce({ data: pendingInvitation, error: null })
+      .mockResolvedValueOnce({
+        data: { ...pendingInvitation, role_to_assign: "super_admin", token: "rotated-token" },
+        error: null,
+      });
+    serviceRpc.mockResolvedValue({
+      data: {
+        invitation_id: INVITATION_ID,
+        token: "rotated-token",
+        expires_at: "2099-02-01T00:00:00.000Z",
+        previous_token: "original-token",
+        previous_expires_at: "2099-01-01T00:00:00.000Z",
+      },
+      error: null,
+    });
+
+    const { POST } = await importRoute();
+    const response = await POST(
+      makePostRequest({
+        action: "replace_access",
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+        roleToAssign: "super_admin",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(sendInvitationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ token: "rotated-token" }),
+    );
+    const body = await response.json();
+    expect(body).not.toHaveProperty("token");
+    expect(body.invitation).not.toHaveProperty("token");
+    expect(JSON.stringify(body)).not.toContain("rotated-token");
+  });
 });
 
 describe("POST /api/organizations/invitations - resend and revocation", () => {
@@ -1021,5 +1060,50 @@ describe("an invitation's grant stays with the person who could make it (41d4 au
     const body = await response.json();
     expect(JSON.stringify(body)).not.toContain("rotated-token");
     expect(body).not.toHaveProperty("token");
+  });
+});
+
+describe("a Gridmaster's invitation department change (41d3, F-68)", () => {
+  it("changes no departments on a stale session", async () => {
+    isGridmasterActor.mockResolvedValue(true);
+    requireSensitiveActionAuth.mockResolvedValue({
+      response: NextResponse.json({ code: "STEP_UP_REQUIRED" }, { status: 403 }),
+    });
+
+    const { PATCH } = await importRoute();
+    const response = await PATCH(
+      makePatchRequest({
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+        departmentIds: [7],
+        deptAdminIds: [7],
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(invitationUpdateOperations).toHaveLength(0);
+  });
+
+  it("asks no fresh proof when the departments are unchanged", async () => {
+    isGridmasterActor.mockResolvedValue(true);
+    buildInvitationChanges.mockReturnValue([
+      { key: "firstName", label: "First name", previousValue: null, nextValue: "Ada" },
+    ]);
+    invitationUpdateMaybeSingle.mockResolvedValue({ data: CURRENT_INVITATION_ROW, error: null });
+
+    const { PATCH } = await importRoute();
+    const response = await PATCH(
+      makePatchRequest({
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+        firstName: "Ada",
+        departmentIds: [],
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
   });
 });

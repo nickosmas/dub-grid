@@ -12,7 +12,7 @@ export function MfaFactorUnenrolledEmail({ logoUrl }: { logoUrl?: string } = {})
     <SecurityNotificationEmail
       heading="A sign-in verification method was removed"
       body="An authenticator app was removed as a verification method for your DubGrid sign-in."
-      footer="If this was you, there's nothing to do. If it wasn't, reset your password from the DubGrid sign-in page right away, turn two-factor authentication back on, and review your active sessions in your profile. Contact support@dubgrid.com if you can't sign in."
+      footer="If it was you, you don't need to do anything. If it wasn't you, reset your password from the DubGrid sign-in page right away, turn two-factor authentication back on, and review your active sessions in your profile. Contact support@dubgrid.com if you can't sign in."
       logoUrl={logoUrl}
     />
   );

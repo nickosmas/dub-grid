@@ -74,6 +74,19 @@ export const styles = {
     lineHeight: "1.6",
     color: emailTheme.textBody,
   },
+  detailList: {
+    margin: "0 0 24px",
+  },
+  detail: {
+    margin: "0 0 8px",
+    fontSize: "16px",
+    lineHeight: "1.6",
+    color: emailTheme.textBody,
+  },
+  detailLabel: {
+    color: emailTheme.textPrimary,
+    fontWeight: 600,
+  },
   fine: {
     margin: 0,
     fontSize: "13px",

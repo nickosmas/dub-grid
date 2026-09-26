@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { render } from "@react-email/components";
 import { createClient } from "@supabase/supabase-js";
 import { emailBaseUrl } from "@/lib/email";
-import { NotificationEmail } from "@/emails/NotificationEmail";
+import { NotificationEmail, type NotificationEmailDetail } from "@/emails/NotificationEmail";
 import {
   isAccountWidePushType,
   isPushEligibleNotificationType,
@@ -118,6 +118,15 @@ export interface SendNotificationOptions {
    * reported more than once, such as two concurrent reports of one sign-in.
    */
   dedupeKey?: string;
+  /**
+   * The email's own layout, for alerts whose facts read better as labeled
+   * lines than as the one sentence push and the inbox need.
+   */
+  email?: {
+    intro: string;
+    details: NotificationEmailDetail[];
+    closing: string;
+  };
 }
 
 /**
@@ -245,7 +254,9 @@ export async function sendNotification(
     const html = await render(
       createElement(NotificationEmail, {
         title,
-        message,
+        message: options.email?.intro ?? message,
+        details: options.email?.details,
+        closing: options.email?.closing,
         logoUrl: emailBaseUrl(),
         context: context?.line,
         alwaysOn: category === "security",

@@ -24,7 +24,7 @@ describe("InviteEmail", () => {
   it("names the organization and nobody in it", async () => {
     const body = await text();
 
-    expect(body).toContain("You've been invited to join Calm Haven on DubGrid.");
+    expect(body).toContain("You've been invited to join Calm Haven on DubGrid,");
     expect(body).not.toMatch(/has invited you/i);
   });
 
@@ -43,9 +43,9 @@ describe("InviteEmail", () => {
   it("says a reissued invitation replaces the earlier one", async () => {
     const body = await text({ kind: "reissue" });
 
-    expect(body).toContain("Your new invitation");
+    expect(body).toContain("Here's your new invitation");
     expect(body).toContain(
-      "It replaces your earlier one, so the link in any earlier invitation email no longer works.",
+      "It replaces your earlier one, so the link in that email no longer works.",
     );
     expect(body).toContain("This invitation expires on Monday, September 28, 2026");
     expect(body).not.toMatch(/has invited you/i);

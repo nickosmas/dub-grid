@@ -1,6 +1,7 @@
 import * as React from "react";
-import { Hr, Section, Text } from "@react-email/components";
+import { Section, Text } from "@react-email/components";
 import { EmailLayout } from "../components/EmailLayout";
+import { EmailGreeting, EmailSignOff } from "../components/EmailSalutation";
 import { emailTheme, fontStack, styles } from "../components/theme";
 import { SUPABASE, PREVIEW_LOGO_URL } from "./placeholders";
 
@@ -8,9 +9,10 @@ import { SUPABASE, PREVIEW_LOGO_URL } from "./placeholders";
 export function ReauthenticationEmail({ logoUrl = SUPABASE.siteUrl }: { logoUrl?: string } = {}) {
   return (
     <EmailLayout logoUrl={logoUrl} preview="Confirm your identity">
-      <Text style={{ ...styles.heading, textAlign: "center" }}>Confirm your identity</Text>
-      <Text style={{ ...styles.paragraph, textAlign: "center", fontSize: "15px" }}>
-        Enter this code to confirm a sensitive change to your DubGrid sign-in. It expires in 1 hour.
+      <Text style={styles.heading}>Confirm your identity</Text>
+      <EmailGreeting />
+      <Text style={styles.paragraph}>
+        Enter this code to confirm a change to your DubGrid sign-in. It expires in 1 hour.
       </Text>
       <Section style={{ textAlign: "center", margin: "0 0 32px" }}>
         <Text
@@ -31,11 +33,11 @@ export function ReauthenticationEmail({ logoUrl = SUPABASE.siteUrl }: { logoUrl?
           {SUPABASE.token}
         </Text>
       </Section>
-      <Hr style={styles.divider} />
-      <Text style={{ ...styles.fine, textAlign: "center" }}>
+      <Text style={styles.paragraph}>
         If you didn&apos;t request this code, someone may know your password. Reset it from the
         DubGrid sign-in page and review your active sessions in your profile.
       </Text>
+      <EmailSignOff />
     </EmailLayout>
   );
 }

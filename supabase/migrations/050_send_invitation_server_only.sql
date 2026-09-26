@@ -1,0 +1,11 @@
+-- 050: send_invitation is callable by the service role only.
+--
+-- Audit finding F-71 (41d4 re-review, 2026-09-26): the function returns the new
+-- invitation's token, and 043 granted it to authenticated. An Admin who manages
+-- employees could call it through the data API, read the token, and register a
+-- pre-confirmed account at an address they do not own. Its tier check held, so
+-- nobody gained a role, but the address was never proven. Every application
+-- path now calls it as the service role with the inviter stated
+-- (invitations/create and the Gridmaster setup wizard); the function still
+-- verifies that inviter holds the tier.
+REVOKE EXECUTE ON FUNCTION public.send_invitation(TEXT, TEXT, UUID, UUID, TEXT, TEXT, TEXT, BIGINT[], BIGINT[], UUID) FROM authenticated;

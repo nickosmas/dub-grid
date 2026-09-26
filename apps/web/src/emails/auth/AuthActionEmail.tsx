@@ -1,6 +1,7 @@
 import * as React from "react";
-import { Hr, Section, Text } from "@react-email/components";
+import { Section, Text } from "@react-email/components";
 import { EmailLayout } from "../components/EmailLayout";
+import { EmailGreeting, EmailSignOff } from "../components/EmailSalutation";
 import { EmailButton } from "../components/EmailButton";
 import { emailTheme, fontStack, styles } from "../components/theme";
 import { SUPABASE } from "./placeholders";
@@ -41,8 +42,9 @@ export function AuthActionEmail({
 }: AuthActionEmailProps) {
   return (
     <EmailLayout logoUrl={logoUrl} preview={heading}>
-      <Text style={{ ...styles.heading, textAlign: "center" }}>{heading}</Text>
-      <Text style={{ ...styles.paragraph, textAlign: "center", fontSize: "15px" }}>{intro}</Text>
+      <Text style={styles.heading}>{heading}</Text>
+      <EmailGreeting />
+      <Text style={styles.paragraph}>{intro}</Text>
       <EmailButton href={actionHref}>{ctaLabel}</EmailButton>
       {code ? (
         <Section style={{ textAlign: "center", margin: "0 0 32px" }}>
@@ -68,8 +70,8 @@ export function AuthActionEmail({
           </Text>
         </Section>
       ) : null}
-      <Hr style={styles.divider} />
-      <Text style={{ ...styles.fine, textAlign: "center" }}>{footer}</Text>
+      <Text style={styles.paragraph}>{footer}</Text>
+      <EmailSignOff />
     </EmailLayout>
   );
 }

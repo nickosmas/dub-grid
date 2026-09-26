@@ -5,6 +5,10 @@ import { expect, test } from "@playwright/test";
 const port = process.env.PORT || 3000;
 const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || "localhost";
 const apexURL = `http://${baseDomain}:${port}/`;
+// next/image resizes each large screenshot on its first request, and on a
+// loaded CI runner that has taken longer than the default 5s poll (four of six
+// requests still pending in a failed run). Production serves them from cache.
+const IMAGE_POLL = { timeout: 30_000 } as const;
 const screenshotAlts = [
   "Calm Haven's two-week staff schedule in DubGrid",
   "Calm Haven's scheduling dashboard with coverage and shift summaries",
@@ -12,6 +16,7 @@ const screenshotAlts = [
 ] as const;
 
 test("landing page renders the public DubGrid surface", async ({ page }) => {
+  test.setTimeout(120_000);
   await page.goto(apexURL);
 
   await expect(page).toHaveTitle(/DubGrid/);
@@ -26,19 +31,24 @@ test("landing page renders the public DubGrid surface", async ({ page }) => {
     await screenshot.evaluate((image) => image.scrollIntoView({ block: "center" }));
     await expect(screenshot).toBeVisible();
     await expect
-      .poll(() =>
-        screenshot.evaluate(
-          (image) => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0,
-        ),
+      .poll(
+        () =>
+          screenshot.evaluate(
+            (image) =>
+              image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0,
+          ),
+        IMAGE_POLL,
       )
       .toBe(true);
     await expect
-      .poll(() =>
-        screenshot.evaluate((image) =>
-          image instanceof HTMLImageElement
-            ? new URL(image.currentSrc).searchParams.get("q")
-            : null,
-        ),
+      .poll(
+        () =>
+          screenshot.evaluate((image) =>
+            image instanceof HTMLImageElement
+              ? new URL(image.currentSrc).searchParams.get("q")
+              : null,
+          ),
+        IMAGE_POLL,
       )
       .toBe("95");
   }
@@ -79,6 +89,7 @@ test.describe("landing page at mobile width", () => {
 });
 
 test("landing header and hero stay readable in dark mode", async ({ page }) => {
+  test.setTimeout(120_000);
   // The app intentionally defaults new visitors to light mode. Set the same
   // explicit preference a user creates with the theme control; emulating a
   // dark operating-system scheme alone must not override that default.
@@ -94,12 +105,14 @@ test("landing header and hero stay readable in dark mode", async ({ page }) => {
     const screenshot = page.getByAltText(alt);
     await screenshot.evaluate((image) => image.scrollIntoView({ block: "center" }));
     await expect
-      .poll(() =>
-        screenshot.evaluate(
-          (image) =>
-            image instanceof HTMLImageElement &&
-            decodeURIComponent(image.currentSrc).includes("-dark"),
-        ),
+      .poll(
+        () =>
+          screenshot.evaluate(
+            (image) =>
+              image instanceof HTMLImageElement &&
+              decodeURIComponent(image.currentSrc).includes("-dark"),
+          ),
+        IMAGE_POLL,
       )
       .toBe(true);
   }

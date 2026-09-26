@@ -1,6 +1,7 @@
 import * as React from "react";
-import { Hr, Text } from "@react-email/components";
+import { Text } from "@react-email/components";
 import { EmailLayout } from "./components/EmailLayout";
+import { EmailGreeting, EmailSignOff } from "./components/EmailSalutation";
 import { styles, PREVIEW_LOGO_URL } from "./components/theme";
 
 export type LoginEmailChangedEmailProps = {
@@ -29,26 +30,27 @@ export function LoginEmailChangedEmail({
   return (
     <EmailLayout logoUrl={logoUrl} preview={heading}>
       <Text style={styles.heading}>{heading}</Text>
+      <EmailGreeting />
       <Text style={styles.paragraph}>
         {recipient === "previous" ? (
           <>
             An administrator at <strong>{orgName}</strong> changed the email you use to sign in to
-            DubGrid to <strong>{newEmail}</strong>. You&apos;ve been signed out on your devices.
-            Sign in again with the new address.
+            DubGrid to <strong>{newEmail}</strong>. For your security, we&apos;ve signed you out on
+            your devices. Sign in again with your new address whenever you&apos;re ready.
           </>
         ) : (
           <>
             An administrator at <strong>{orgName}</strong> set this address as the email for a
-            DubGrid sign-in. Use it the next time you sign in.
+            DubGrid sign-in. Use this address the next time you sign in.
           </>
         )}
       </Text>
-      <Hr style={styles.divider} />
-      <Text style={styles.fine}>
+      <Text style={styles.paragraph}>
         {recipient === "previous"
           ? `If you didn't expect this, contact ${orgName} or support@dubgrid.com right away.`
           : `If you don't work with ${orgName}, contact support@dubgrid.com.`}
       </Text>
+      <EmailSignOff />
     </EmailLayout>
   );
 }

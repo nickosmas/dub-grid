@@ -7,12 +7,15 @@ const resolveEffectiveOrgId = vi.fn();
 const getServiceClient = vi.fn();
 const canManageEmployees = vi.fn();
 const validateStaffOrgReferences = vi.fn();
+const requireSensitiveActionAuth = vi.fn();
+const isGridmasterActor = vi.fn();
 
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
 }));
 vi.mock("@/lib/api-auth", () => ({
   requireAuthenticatedUser: (req: NextRequest) => requireAuthenticatedUser(req),
+  requireSensitiveActionAuth: (req: NextRequest) => requireSensitiveActionAuth(req),
 }));
 vi.mock("@/app/api/shared/permissions", () => ({
   resolveEffectiveOrgId: (...args: unknown[]) => resolveEffectiveOrgId(...args),
@@ -22,6 +25,7 @@ vi.mock("@/lib/supabase-service", () => ({
 }));
 vi.mock("@/app/api/employees/shared", () => ({
   canManageEmployees: (...args: unknown[]) => canManageEmployees(...args),
+  isGridmasterActor: (...args: unknown[]) => isGridmasterActor(...args),
 }));
 vi.mock("@/lib/staff-validation", () => ({
   buildStaffValidationErrorResponse: () =>
@@ -42,8 +46,9 @@ const SANDBOX_ORG_ID = "22222222-2222-2222-2222-222222222222";
 const USER_ID = "33333333-3333-3333-3333-333333333333";
 const ACTOR_ID = "44444444-4444-4444-4444-444444444444";
 
-function buildServiceClient(opts: { targetIsMember?: boolean } = {}) {
+function buildServiceClient(opts: { targetIsMember?: boolean; departmentIds?: number[] } = {}) {
   const targetIsMember = opts.targetIsMember ?? true;
+  const departmentIds = opts.departmentIds ?? [];
   const update = vi.fn().mockReturnValue({
     eq: () => ({
       eq: () => ({ is: async () => ({ error: null }) }),
@@ -54,7 +59,9 @@ function buildServiceClient(opts: { targetIsMember?: boolean } = {}) {
       eq: () => ({
         is: () => ({
           maybeSingle: async () => ({
-            data: targetIsMember ? { user_id: USER_ID } : null,
+            data: targetIsMember
+              ? { user_id: USER_ID, department_ids: departmentIds, dept_admin_ids: [] }
+              : null,
             error: null,
           }),
         }),
@@ -88,6 +95,8 @@ beforeEach(() => {
   getServiceClient.mockReturnValue(buildServiceClient());
   canManageEmployees.mockResolvedValue(true);
   validateStaffOrgReferences.mockResolvedValue({});
+  isGridmasterActor.mockResolvedValue(false);
+  requireSensitiveActionAuth.mockResolvedValue({ user: { id: ACTOR_ID } });
 });
 
 describe("PATCH /api/organizations/app-only-user", () => {
@@ -148,5 +157,61 @@ describe("PATCH /api/organizations/app-only-user", () => {
 
     expect(res.status).toBe(404);
     expect(profilesFrom).not.toHaveBeenCalledWith("profiles");
+  });
+});
+
+describe("a Gridmaster's management-department change (41d3, F-68)", () => {
+  function staleSession() {
+    return {
+      response: new Response(JSON.stringify({ code: "STEP_UP_REQUIRED" }), { status: 403 }),
+    };
+  }
+
+  it("changes no departments on a stale session", async () => {
+    isGridmasterActor.mockResolvedValue(true);
+    requireSensitiveActionAuth.mockResolvedValue(staleSession());
+    resolveEffectiveOrgId.mockResolvedValue(REAL_ORG_ID);
+    const client = buildServiceClient({ departmentIds: [1] });
+    getServiceClient.mockReturnValue(client);
+    const updateSpy = vi.spyOn(client, "from");
+
+    const { PATCH } = await import("./route");
+    const res = await PATCH(
+      makeRequest({ orgId: REAL_ORG_ID, userId: USER_ID, departmentIds: [1, 2] }),
+    );
+
+    expect(res.status).toBe(403);
+    expect(updateSpy).not.toHaveBeenCalledWith("profiles");
+    const membershipCalls = updateSpy.mock.results
+      .map((result) => result.value as { update?: ReturnType<typeof vi.fn> })
+      .filter((value) => value.update);
+    for (const value of membershipCalls) expect(value.update).not.toHaveBeenCalled();
+  });
+
+  it("asks nothing of a Gridmaster whose save leaves the departments alone", async () => {
+    isGridmasterActor.mockResolvedValue(true);
+    resolveEffectiveOrgId.mockResolvedValue(REAL_ORG_ID);
+    getServiceClient.mockReturnValue(buildServiceClient({ departmentIds: [2, 1] }));
+
+    const { PATCH } = await import("./route");
+    const res = await PATCH(
+      makeRequest({ orgId: REAL_ORG_ID, userId: USER_ID, firstName: "Ada", departmentIds: [1, 2] }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
+  });
+
+  it("asks an organization admin for no fresh proof", async () => {
+    resolveEffectiveOrgId.mockResolvedValue(REAL_ORG_ID);
+    getServiceClient.mockReturnValue(buildServiceClient({ departmentIds: [1] }));
+
+    const { PATCH } = await import("./route");
+    const res = await PATCH(
+      makeRequest({ orgId: REAL_ORG_ID, userId: USER_ID, departmentIds: [1, 2] }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
   });
 });

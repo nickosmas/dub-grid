@@ -466,7 +466,9 @@ export async function POST(req: NextRequest) {
               displayName,
             };
           } else {
-            const inviteResult = await requestClient.rpc("send_invitation", {
+            // As the service role, which alone may call it since 050 (F-71);
+            // the function still checks that the stated inviter holds the tier.
+            const inviteResult = await serviceClient.rpc("send_invitation", {
               p_email: email,
               p_role: "super_admin",
               p_org_id: org.id,
@@ -476,6 +478,7 @@ export async function POST(req: NextRequest) {
               p_phone: phone || null,
               p_department_ids: [],
               p_dept_admin_ids: [],
+              p_invited_by: auth.user.id,
             });
 
             if (!inviteResult.error) {

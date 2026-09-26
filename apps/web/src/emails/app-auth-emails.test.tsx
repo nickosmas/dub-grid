@@ -145,11 +145,21 @@ async function securityAlerts(): Promise<AppAuthEmail[]> {
     await dispatchNotificationEvent("actor-1", event);
     const call = vi.mocked(sendNotification).mock.calls[0];
     if (!call) throw new Error(`${event.action} sent nothing`);
-    const [, , type, title, message] = call;
+    const [, , type, title, message, , options] = call;
+    const email = options?.email;
     alerts.push({
       name: `${type} (${title})`,
       Component: NotificationEmail as ComponentType<never>,
-      props: { title, message, logoUrl, alwaysOn: true },
+      props: email
+        ? {
+            title,
+            message: email.intro,
+            details: email.details,
+            closing: email.closing,
+            logoUrl,
+            alwaysOn: true,
+          }
+        : { title, message, logoUrl, alwaysOn: true },
       notice: true,
     });
   }

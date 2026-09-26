@@ -10,7 +10,7 @@ import logger from "@/lib/logger";
 import { sendResendEmail } from "@/lib/resend";
 import * as Sentry from "@/lib/sentry";
 
-export const ACCOUNT_DELETED_SUBJECT = "Your DubGrid account was deleted";
+export const ACCOUNT_DELETED_SUBJECT = "Your DubGrid account has been deleted";
 
 /**
  * Tells the deleted account's address that the deletion went through. Call it

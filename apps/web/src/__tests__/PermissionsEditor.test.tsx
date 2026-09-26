@@ -179,4 +179,41 @@ describe("PermissionsEditor", () => {
 
     expect(screen.queryByText("Check these first.")).not.toBeInTheDocument();
   });
+
+  it("stays open with the review up when the save does not complete (F-69)", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const onSave = vi.fn().mockResolvedValue(false);
+    renderEditor({
+      onSave,
+      onClose,
+      buildReview: () => ({
+        title: "Review permission changes",
+        description: "Check these first.",
+        changes: [
+          {
+            key: "adminPermissions",
+            label: "Admin Permissions",
+            previousDisplay: "No extra permissions",
+            nextDisplay: "View coverage requirements",
+            sensitive: true,
+          },
+        ],
+      }),
+    });
+
+    await user.click(screen.getByRole("switch", { name: "Coverage view" }));
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+    await user.click(screen.getByRole("button", { name: /confirm save/i }));
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText("Check these first.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /confirm save/i })).toBeEnabled();
+    // The review is modal, so the editor beneath it is out of the accessibility tree.
+    expect(screen.getByRole("switch", { name: "Coverage view", hidden: true })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+  });
 });

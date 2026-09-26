@@ -25,14 +25,17 @@ export function authenticatedSecurityDefinerAllowlist(): string[] {
   if (!block) throw new Error("Missing authenticated SQL entry-point inventory");
   const names = new Set([...block.matchAll(/'([a-z0-9_]+)'/g)].map((match) => match[1]));
 
-  for (const file of readdirSync(dir)) {
+  // In migration order, so a later revoke from authenticated (050) removes a
+  // name an earlier grant or the 016 inventory added.
+  for (const file of readdirSync(dir).sort()) {
     const ordinal = Number(file.slice(0, 3));
     if (!file.endsWith(".sql") || !Number.isFinite(ordinal) || ordinal <= 16) continue;
     const sql = readFileSync(resolve(dir, file), "utf8");
     for (const match of sql.matchAll(
-      /GRANT EXECUTE ON FUNCTION public\.([a-z0-9_]+)\([^)]*\)\s+TO authenticated;/g,
+      /GRANT EXECUTE ON FUNCTION public\.([a-z0-9_]+)\([^)]*\)\s+TO authenticated;|REVOKE (?:EXECUTE|ALL) ON FUNCTION public\.([a-z0-9_]+)\([^)]*\)\s+FROM ([^;]*);/g,
     )) {
-      names.add(match[1]);
+      if (match[1]) names.add(match[1]);
+      else if (/\bauthenticated\b/.test(match[3])) names.delete(match[2]);
     }
   }
   return [...names].sort();

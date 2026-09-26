@@ -111,6 +111,66 @@ describe("Gridmaster Users tab: adding a person (41d4)", () => {
   });
 });
 
+describe("Gridmaster Users tab: adding a person after a step-up retry (F-69)", () => {
+  const stepUpRequired = () =>
+    Object.assign(new Error("x"), { status: 403, code: "STEP_UP_REQUIRED", method: "password" });
+  const accountNotFound = () =>
+    Object.assign(new Error("No account uses that email."), {
+      status: 404,
+      code: "ACCOUNT_NOT_FOUND",
+    });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    stepUpRun.mockImplementation(async (action: (token: string) => Promise<unknown>) => {
+      try {
+        await action("stale-token");
+      } catch (err) {
+        if ((err as { code?: unknown }).code !== "STEP_UP_REQUIRED") throw err;
+        await action("fresh-token");
+      }
+      return true;
+    });
+    requireCredentialAssurance.mockResolvedValue({ success: true });
+    assignGridmasterOrgRoleByEmail.mockResolvedValue(undefined);
+    createOrganizationInvitation.mockResolvedValue({ invitationId: "inv-1", expiresAt: "x" });
+  });
+
+  it("invites once, with the fresh token, when the first attempt needed step-up", async () => {
+    requireCredentialAssurance.mockRejectedValueOnce(stepUpRequired());
+    assignGridmasterOrgRoleByEmail.mockRejectedValue(accountNotFound());
+
+    await addAsSuperAdmin("new-owner@example.com");
+
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith("Invitation sent to new-owner@example.com"),
+    );
+    expect(requireCredentialAssurance).toHaveBeenCalledTimes(2);
+    expect(createOrganizationInvitation).toHaveBeenCalledTimes(1);
+    expect(createOrganizationInvitation).toHaveBeenCalledWith(
+      { orgId: ORG_ID, email: "new-owner@example.com", role: "super_admin" },
+      "fresh-token",
+    );
+  });
+
+  it("reports an added user when the retry assigns after the first attempt fell back to inviting", async () => {
+    assignGridmasterOrgRoleByEmail.mockRejectedValueOnce(accountNotFound());
+    createOrganizationInvitation.mockRejectedValueOnce(stepUpRequired());
+
+    await addAsSuperAdmin("owner@example.com");
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("User added as Super Admin"));
+    expect(assignGridmasterOrgRoleByEmail).toHaveBeenLastCalledWith(
+      ORG_ID,
+      "owner@example.com",
+      "super_admin",
+      "fresh-token",
+    );
+    expect(createOrganizationInvitation).toHaveBeenCalledTimes(1);
+    expect(toast.success).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("Gridmaster Users tab: permissions (41d4, F-61)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
