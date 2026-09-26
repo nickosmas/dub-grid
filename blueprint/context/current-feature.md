@@ -55,12 +55,14 @@ committed as a local checkpoint.
 
 ## Build steps
 
-- [ ] **Step 1 - invitation routes gate a Gridmaster** - create, edit and
+- [x] **Step 1 - invitation routes gate a Gridmaster** - create, edit and
       replace-access require fresh proof for a Gridmaster; tier denial maps to
       403; a role raise records the editor as inviter. _Done when:_ route tests
       prove a stale Gridmaster session writes nothing on each path, a fresh
       one succeeds, a non-Gridmaster admin is unaffected, and tier denial
-      returns 403.
+      returns 403. The inventory marker and both routes' classification
+      landed here, since the inventory test requires them as soon as a route
+      calls the gate; 8 new route tests fail against the previous code.
 - [ ] **Step 2 - Gridmaster portal invites a Super Admin** - the manage
       route's `assignOrgRoleByEmail` answers `404 ACCOUNT_NOT_FOUND` for an
       address with no account; the Users tab's Add form offers Super Admin and

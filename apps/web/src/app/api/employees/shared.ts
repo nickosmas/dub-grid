@@ -26,6 +26,22 @@ export async function isOrgSuperAdminOrGridmaster(
   return profile?.platform_role === "gridmaster" || membership?.org_role === "super_admin";
 }
 
+/**
+ * A Gridmaster can grant any role in any organization, so the invitations it
+ * sends or changes need fresh proof, as its direct role grants do (F-16, F-59).
+ */
+export async function isGridmasterActor(
+  serviceClient: ServiceClient,
+  actorId: string,
+): Promise<boolean> {
+  const { data: profile } = await serviceClient
+    .from("profiles")
+    .select("platform_role")
+    .eq("id", actorId)
+    .maybeSingle();
+  return profile?.platform_role === "gridmaster";
+}
+
 // The super_admin tier is handed out only by a super admin of that
 // organization or a gridmaster. Creation, editing and replacement of an
 // invitation all apply it, so the rule lives in one place: a pending

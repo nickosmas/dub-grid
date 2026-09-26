@@ -178,6 +178,21 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
       /roleChanged && allowed\.isGridmaster\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.rpc\("change_user_role"/,
     ],
   },
+  // A Gridmaster can invite any address to any organization, up to Super
+  // Admin, so its invitations need fresh proof (41d4, F-59).
+  "apps/web/src/app/api/organizations/invitations/create/route.ts": {
+    policy: "conditional-sensitive",
+    assertions: [
+      /if \(await isGridmasterActor\(serviceClient, user\.id\)\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.rpc\("send_invitation"/,
+    ],
+  },
+  "apps/web/src/app/api/organizations/invitations/route.ts": {
+    policy: "conditional-sensitive",
+    assertions: [
+      /\(roleChanged \|\| emailChanged\) && \(await isGridmasterActor\(getServiceClient\(\), user\.id\)\)\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.update\(/,
+      /if \(await isGridmasterActor\(serviceClient, user\.id\)\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;\s*\}\s*const \{ data: replacementData, error: replacementError \} = await serviceClient\.rpc\(\s*"replace_pending_invitation_access"/,
+    ],
+  },
   "apps/web/src/app/api/organizations/role-change/route.ts": {
     policy: "sensitive",
     assertions: [
@@ -233,7 +248,7 @@ const MOBILE_DELEGATES: Record<string, RegExp[]> = {
 // and mobile handlers only, so a new helper that makes such a change belongs
 // in this list.
 const sensitiveSourceMarker =
-  /\b(?:requireSensitiveActionAuth|requireMobileSensitiveActionAuth|revokeAllUserSessions|revokeOtherUserSessions|revokeUserSessionForUser|endUserSessions?|resetPasswordForEmail|deleteUserAccountWithCleanup|syncLinkedLoginEmail)\s*\(|auth\.admin\.(?:createUser|updateUserById|deleteUser|signOut)\s*\(|gdpr_erase_user_data|force_logout_user|promote_gridmaster_by_email|demote_gridmaster_account|set_gridmaster_account_deactivated|assign_org_role_by_email|change_user_role/;
+  /\b(?:requireSensitiveActionAuth|requireMobileSensitiveActionAuth|revokeAllUserSessions|revokeOtherUserSessions|revokeUserSessionForUser|endUserSessions?|resetPasswordForEmail|deleteUserAccountWithCleanup|syncLinkedLoginEmail)\s*\(|auth\.admin\.(?:createUser|updateUserById|deleteUser|signOut)\s*\(|gdpr_erase_user_data|force_logout_user|promote_gridmaster_by_email|demote_gridmaster_account|set_gridmaster_account_deactivated|assign_org_role_by_email|change_user_role|send_invitation|replace_pending_invitation_access/;
 const delegatedSensitivePath =
   /\/(?:(?:account|mobile\/v1\/profile)\/(?:credential-assurance|mfa-lifecycle|sessions)|mobile\/v1\/auth\/sign-out)\/route\.ts$/;
 

@@ -11,6 +11,8 @@ const dispatchNotificationEvent = vi.fn();
 const checkRateLimit = vi.fn();
 const sendPendingInvitationEmail = vi.fn();
 const getInvitationEmailConfig = vi.fn();
+const requireSensitiveActionAuth = vi.fn();
+const isGridmasterActor = vi.fn();
 
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
@@ -18,12 +20,14 @@ vi.mock("@/lib/csrf", () => ({
 vi.mock("@/lib/api-auth", () => ({
   forbidIfSandboxCookie: (req: NextRequest) => forbidIfSandboxCookie(req),
   requireAuthenticatedUser: (req: NextRequest) => requireAuthenticatedUser(req),
+  requireSensitiveActionAuth: (req: NextRequest) => requireSensitiveActionAuth(req),
 }));
 vi.mock("@/lib/supabase-service", () => ({
   getServiceClient: () => getServiceClient(),
 }));
 vi.mock("@/app/api/employees/shared", () => ({
   canManageEmployees: (...args: unknown[]) => canManageEmployees(...args),
+  isGridmasterActor: (...args: unknown[]) => isGridmasterActor(...args),
   isOrgSuperAdminOrGridmaster: (...args: unknown[]) => isOrgSuperAdminOrGridmaster(...args),
   // The route now asks the shared ceiling helper, which defers to the tier
   // check these cases already drive.
@@ -82,6 +86,81 @@ beforeEach(() => {
   checkRateLimit.mockResolvedValue({ limited: false });
   getInvitationEmailConfig.mockReturnValue({ apiKey: "re_test", from: "DubGrid <t@test>" });
   sendPendingInvitationEmail.mockResolvedValue(undefined);
+  isGridmasterActor.mockResolvedValue(false);
+  requireSensitiveActionAuth.mockResolvedValue({ user: { id: "actor-1" } });
+});
+
+function invitationRpc() {
+  return vi.fn(async () => ({
+    data: { invitation_id: "inv-1", token: "tok-1", expires_at: "2026-01-01T00:00:00Z" },
+    error: null,
+  }));
+}
+
+describe("a Gridmaster's invitation (41d4, F-59)", () => {
+  it("sends nothing on a stale session and answers the step-up response", async () => {
+    isGridmasterActor.mockResolvedValue(true);
+    isOrgSuperAdminOrGridmaster.mockResolvedValue(true);
+    requireSensitiveActionAuth.mockResolvedValue({
+      response: NextResponse.json({ code: "STEP_UP_REQUIRED" }, { status: 403 }),
+    });
+    const rpc = invitationRpc();
+    getServiceClient.mockReturnValue({ rpc });
+
+    const { POST } = await importRoute();
+    const res = await POST(
+      makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "super_admin" }),
+    );
+
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toEqual({ code: "STEP_UP_REQUIRED" });
+    expect(rpc).not.toHaveBeenCalled();
+    expect(sendPendingInvitationEmail).not.toHaveBeenCalled();
+  });
+
+  it("invites as Super Admin once the session is fresh", async () => {
+    isGridmasterActor.mockResolvedValue(true);
+    isOrgSuperAdminOrGridmaster.mockResolvedValue(true);
+    const rpc = invitationRpc();
+    getServiceClient.mockReturnValue({ rpc });
+
+    const { POST } = await importRoute();
+    const res = await POST(
+      makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "super_admin" }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(requireSensitiveActionAuth).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith(
+      "send_invitation",
+      expect.objectContaining({ p_role: "super_admin", p_invited_by: "actor-1" }),
+    );
+    expect(sendPendingInvitationEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks no fresh proof of an organization admin", async () => {
+    getServiceClient.mockReturnValue({ rpc: invitationRpc() });
+
+    const { POST } = await importRoute();
+    const res = await POST(makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "admin" }));
+
+    expect(res.status).toBe(200);
+    expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
+  });
+
+  it("answers the function's tier refusal with 403, not a generic failure", async () => {
+    isOrgSuperAdminOrGridmaster.mockResolvedValue(true);
+    const rpc = vi.fn(async () => ({ data: null, error: { message: "INVITATION_TIER_DENIED" } }));
+    getServiceClient.mockReturnValue({ rpc });
+
+    const { POST } = await importRoute();
+    const res = await POST(
+      makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "super_admin" }),
+    );
+
+    expect(res.status).toBe(403);
+    expect(sendPendingInvitationEmail).not.toHaveBeenCalled();
+  });
 });
 
 describe("POST /api/organizations/invitations/create", () => {

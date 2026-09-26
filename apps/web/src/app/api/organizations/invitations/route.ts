@@ -9,10 +9,14 @@ import { apiLimiter, checkRateLimit, emailTargetLimiter, hashEmail } from "@/lib
 import { retryAfterSeconds } from "@/lib/retry-after";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
-import { forbidIfSandboxCookie, requireAuthenticatedUser } from "@/lib/api-auth";
+import {
+  forbidIfSandboxCookie,
+  requireAuthenticatedUser,
+  requireSensitiveActionAuth,
+} from "@/lib/api-auth";
 import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { getServiceClient } from "@/lib/supabase-service";
-import { canAssignOrgRole } from "@/app/api/employees/shared";
+import { canAssignOrgRole, isGridmasterActor } from "@/app/api/employees/shared";
 import { writeInvitationAuditEntry } from "@/lib/audit/invitation";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
@@ -355,6 +359,17 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ success: true, invitation: currentInvitation });
     }
 
+    const roleChanged =
+      fields.roleToAssign !== undefined && fields.roleToAssign !== currentInvitation.roleToAssign;
+    const emailChanged =
+      nextInvitation.email !== undefined && nextInvitation.email !== currentInvitation.email;
+    // Redirecting a pending invitation to another address grants its role to
+    // that address, so both changes need a Gridmaster's fresh proof (F-59).
+    if ((roleChanged || emailChanged) && (await isGridmasterActor(getServiceClient(), user.id))) {
+      const assurance = await requireSensitiveActionAuth(req);
+      if ("response" in assurance) return assurance.response;
+    }
+
     const deptSet = new Set(fields.departmentIds ?? currentInvitation.departmentIds ?? []);
     const nextDeptAdminIds =
       fields.deptAdminIds !== undefined
@@ -372,6 +387,9 @@ export async function PATCH(req: NextRequest) {
         phone: fields.phone ?? currentInvitation.phone ?? null,
         department_ids: fields.departmentIds ?? currentInvitation.departmentIds ?? [],
         dept_admin_ids: nextDeptAdminIds,
+        // Acceptance checks that the inviter could grant the role, so a
+        // raise is attributed to the person who made it.
+        ...(roleChanged ? { invited_by: user.id } : {}),
       })
       .eq("org_id", orgId)
       .eq("id", invitationId)
@@ -622,6 +640,11 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN }, { status: 403 });
       }
 
+      if (await isGridmasterActor(serviceClient, user.id)) {
+        const assurance = await requireSensitiveActionAuth(req);
+        if ("response" in assurance) return assurance.response;
+      }
+
       const { data: replacementData, error: replacementError } = await serviceClient.rpc(
         "replace_pending_invitation_access",
         {
@@ -646,6 +669,12 @@ export async function POST(req: NextRequest) {
         }
         if (message.includes("not found")) {
           return NextResponse.json({ error: "Invitation not found" }, { status: 404 });
+        }
+        if (message.includes("invitation_tier_denied")) {
+          return NextResponse.json(
+            { error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN },
+            { status: 403 },
+          );
         }
         throw replacementError;
       }
