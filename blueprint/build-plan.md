@@ -653,3 +653,30 @@
           Gridmaster promotion, demotion and deactivation) refuse a Gridmaster
           without a recent sign-in, by the same rule the routes apply, and no
           signed-in caller writes organization memberships directly (F-60).
+- [ ] 42. **Schedule indicators on every schedule surface** - a schedule
+      indicator is visible wherever that person's shift is shown, not only on
+      the desktop week and two-week grid. Every surface uses the indicator's
+      own name and colour and follows the existing visibility rule: anyone who
+      can view the schedule sees published indicators, and only editors see
+      draft ones. No change to indicator storage, editing permissions, or the
+      draft and publish workflow.
+  - [ ] 42a. **Web schedule views** - Month view and the phone-width day view
+        render indicators through the shared `NoteDots` marks (the day view
+        drops its generic blue dot and its focus-area-only condition); the
+        shift slideover shows a read-only indicator list to people who cannot
+        edit indicators; the grid hover card keeps its indicator line on
+        changed cells; and the printed schedule shows indicators with a
+        legend. The data is already loaded on the schedule page.
+  - [ ] 42b. **Mobile API indicators** - mobile schedule entries carry their
+        visible indicators and bootstrap carries the organization's indicator
+        types, in `@dubgrid/contracts` and `@dubgrid/mobile-api-core`, with
+        the same published and draft filtering as web. The existing
+        `schedule_notes` realtime invalidation then refreshes real data.
+  - [ ] 42c. **Mobile indicator display** - the Schedule tab, shift detail,
+        and the Home schedule card show indicators, and a
+        `schedule_note_published` alert opens the person's own shift rather
+        than the team schedule.
+  - [ ] 42d. **Secondary surfaces (decision first)** - decide whether the
+        dashboard schedule rows, People person detail, shift-request
+        snapshots, and calendar (.ics) event descriptions show indicators,
+        then build only the approved ones.
