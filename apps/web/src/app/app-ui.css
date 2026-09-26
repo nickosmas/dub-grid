@@ -272,11 +272,16 @@
   font-weight: var(--dg-type-control-weight);
   font-family: inherit;
   color: var(--dg-type-control-color);
-  background: var(--dg-color-surface);
+  background: var(--dg-color-field);
   outline: none;
   transition:
     border-color 150ms ease,
     box-shadow 150ms ease;
+}
+/* For a toolbar or filter row on the page background, which the default
+   field fill would sink into. See `--dg-color-field`. */
+.dg-field-raised {
+  --dg-color-field: var(--dg-color-surface);
 }
 .dg-input::placeholder {
   color: var(--dg-color-text-faint);
@@ -286,16 +291,16 @@
   box-shadow: 0 0 0 3px var(--dg-focus-ring);
 }
 .dg-input:disabled {
-  background: var(--dg-color-bg);
+  background: transparent;
   color: var(--dg-color-text-subtle);
   cursor: not-allowed;
 }
 /* Read-only is not disabled. The value still has to read and copy cleanly, so
-   it keeps full text color and a text cursor; the recessed fill is the cue
-   that it cannot be edited. This carries the signal for a removed employee's
-   record, which used to be a blanket 50% dim over the whole card. */
+   it keeps full text color and a text cursor; dropping the field fill is the
+   cue that it cannot be edited. This carries the signal for a removed
+   employee's record, which used to be a blanket 50% dim over the whole card. */
 .dg-input[readonly] {
-  background: var(--dg-color-bg);
+  background: transparent;
 }
 .dg-input-error {
   border-color: var(--dg-color-danger);
@@ -317,7 +322,7 @@
   gap: 2px;
   border: 1px solid var(--dg-color-border);
   border-radius: var(--dg-btn-radius);
-  background: var(--dg-color-surface);
+  background: var(--dg-color-field);
   vertical-align: middle;
   transition:
     border-color 150ms ease,
@@ -329,7 +334,7 @@
 }
 .dg-number-field-disabled,
 .dg-number-field-readonly {
-  background: var(--dg-color-bg);
+  background: transparent;
 }
 .dg-number-field-input {
   flex: 1;
@@ -2347,7 +2352,7 @@
   gap: 8px;
 }
 .dg-auth-input--readonly {
-  background: var(--dg-color-bg-secondary);
+  background: transparent;
   color: var(--dg-color-text-subtle);
 }
 /* Workspace pill (slug.basedomain) shown on org login + MFA screens */
@@ -2574,7 +2579,7 @@
   overflow: hidden;
   border: 1.5px solid var(--dg-color-brand);
   border-radius: var(--dg-radius-md);
-  background: var(--dg-color-surface);
+  background: var(--dg-color-field);
 }
 .dg-subdomain-field__control--error {
   border-color: var(--dg-color-danger);
@@ -2593,7 +2598,7 @@
   flex-shrink: 0;
   padding: 14px 16px;
   border-left: 1px solid var(--dg-color-border-light);
-  background: var(--dg-color-bg);
+  background: var(--dg-color-surface);
   color: var(--dg-color-text-subtle);
   font-size: var(--dg-fs-body);
   white-space: nowrap;

@@ -525,7 +525,7 @@ export default function Toolbar({
   if (isMobile) {
     return (
       <div
-        className="dg-toolbar-type"
+        className="dg-toolbar-type dg-field-raised"
         style={{ display: "flex", flexDirection: "column", gap: 8, paddingBottom: 8 }}
       >
         {/* Row 1: Time navigation — where in time */}
@@ -718,7 +718,7 @@ export default function Toolbar({
   /* ── Desktop / Tablet Toolbar ───────────────────────────── */
   return (
     <div
-      className="dg-toolbar-type"
+      className="dg-toolbar-type dg-field-raised"
       style={{
         display: "flex",
         alignItems: "center",

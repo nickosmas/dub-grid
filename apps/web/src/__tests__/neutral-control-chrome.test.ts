@@ -54,6 +54,7 @@ const sidebarPrimitive = readFileSync(resolveWebSource("components/ui/sidebar.ts
 const tooltipPrimitive = readFileSync(resolveWebSource("components/ui/tooltip.tsx"), "utf-8");
 const skeletonPrimitive = readFileSync(resolveWebSource("components/ui/skeleton.tsx"), "utf-8");
 const appToaster = readFileSync(resolveWebSource("components/AppToaster.tsx"), "utf-8");
+const customSelect = readFileSync(resolveWebSource("components/CustomSelect.tsx"), "utf-8");
 const repoRoot = resolveRepoRoot();
 
 function collectSourceFiles(dir: string): string[] {
@@ -163,6 +164,22 @@ describe("shared chrome theming", () => {
     expect(tooltipPrimitive).toContain("rounded-[var(--tooltip-border-radius)]");
     expect(skeletonPrimitive).toContain("rounded-[var(--dg-radius-sm)]");
     expect(appToaster).toContain("rounded-[var(--dg-radius-lg)]");
+  });
+
+  it("fills editable fields one step off the card behind them", () => {
+    expect(globalsCss).toMatch(/\.dark\s*\{[^}]*--dg-color-field: #0a0a0b;/);
+    expect(globalsCss).toMatch(
+      /\.dg-field-raised\s*\{\s*--dg-color-field: var\(--dg-color-surface\);\s*\}/,
+    );
+    for (const selector of ["dg-input", "dg-number-field", "dg-auth-input"]) {
+      expect(globalsCss).toMatch(
+        new RegExp(`\\.${selector}\\s*\\{[^}]*background: var\\(--dg-color-field\\);`),
+      );
+    }
+    expect(globalsCss).toMatch(/\.dg-input\[readonly\]\s*\{\s*background: transparent;\s*\}/);
+    expect(customSelect).toContain('disabled ? "transparent" : "var(--dg-color-field)"');
+    expect(inputPrimitive).toContain("bg-[var(--dg-color-field)]");
+    expect(toolbar.match(/className="dg-toolbar-type dg-field-raised"/g)).toHaveLength(2);
   });
 
   it("routes current inset tab consumers through the shared shell classes", () => {

@@ -206,7 +206,7 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
               textAlign: "center",
               outline: "none",
               color: "var(--dg-color-text-primary)",
-              background: "var(--dg-color-surface)",
+              background: "var(--dg-color-field)",
             }}
           />
 

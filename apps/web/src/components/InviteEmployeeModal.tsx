@@ -649,7 +649,7 @@ const inputStyle: React.CSSProperties = {
   borderRadius: "var(--dg-btn-radius)",
   fontSize: "var(--dg-fs-body-sm)",
   color: "var(--dg-color-text-primary)",
-  background: "var(--dg-color-surface)",
+  background: "var(--dg-color-field)",
   outline: "none",
   boxSizing: "border-box",
 };

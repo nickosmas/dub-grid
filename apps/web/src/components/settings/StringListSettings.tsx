@@ -467,7 +467,7 @@ export default function StringListSettings({
     fontWeight: 500,
     border: "1px solid var(--dg-color-border)",
     borderRadius: "var(--dg-radius-sm)",
-    background: "var(--dg-color-surface)",
+    background: "var(--dg-color-field)",
     color: "var(--dg-color-text-primary)",
     outline: "none",
     transition: "border-color 150ms ease, box-shadow 150ms ease",

@@ -201,7 +201,10 @@ export default function AllUsersView({
       )}
 
       {/* Toolbar */}
-      <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
+      <div
+        className="dg-field-raised"
+        style={{ display: "flex", alignItems: "center", marginBottom: 16 }}
+      >
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <span
             style={{
@@ -306,7 +309,6 @@ export default function AllUsersView({
                 paddingLeft: 32,
                 paddingRight: search ? 30 : 12,
                 fontSize: "var(--dg-fs-caption)",
-                background: "var(--dg-color-surface)",
                 border: "1px solid var(--dg-color-border-light)",
               }}
             />

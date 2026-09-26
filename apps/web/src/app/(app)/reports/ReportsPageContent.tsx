@@ -781,7 +781,11 @@ function ReportsContent() {
               </p>
             </div>
           </div>
-          <div data-testid="reports-filter-controls" style={reportsFilterControlsStyle}>
+          <div
+            data-testid="reports-filter-controls"
+            className="dg-field-raised"
+            style={reportsFilterControlsStyle}
+          >
             <label style={controlLabelStyle}>
               Report
               <CustomSelect

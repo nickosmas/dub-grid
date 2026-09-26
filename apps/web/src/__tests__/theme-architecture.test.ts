@@ -117,6 +117,7 @@ describe("theme architecture", () => {
       "--dg-color-text-label: #666666;",
       "--dg-color-surface-alt: #eeeeee;",
       "--dg-color-surface-hover: #e5e5e5;",
+      "--dg-color-field: #fafafa;",
       "--dg-color-bg-secondary: #eeeeee;",
       "--dg-color-row-alt: #eeeeee;",
       "--dg-color-row-hover: #e5e5e5;",
@@ -133,7 +134,10 @@ describe("theme architecture", () => {
       /#(?:0f172a|1e293b|475569|64748b|68758a|94a3b8|e7ecf2|f1f5f9|fafbfc|cbd5e1|e2e8f0)\b/i,
     );
     expect(lightThemeCss).not.toMatch(/oklch\(0\.97 0 0\)/i);
-    expect(lightThemeCss).not.toMatch(/#f(?:4f4f4|5f5f5|afafa)\b/i);
+    // The field fill is the one sanctioned near-white; any other is drift.
+    expect(lightThemeCss.replace("--dg-color-field: #fafafa;", "")).not.toMatch(
+      /#f(?:4f4f4|5f5f5|afafa)\b/i,
+    );
   });
 
   it("rejects route-local neutral hue drift across production UI sources", () => {

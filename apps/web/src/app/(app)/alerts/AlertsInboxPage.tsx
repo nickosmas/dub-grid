@@ -895,7 +895,7 @@ function Toolbar({
     <div
       role="toolbar"
       aria-label="Alerts"
-      className="dg-toolbar-type"
+      className="dg-toolbar-type dg-field-raised"
       style={{
         display: "flex",
         alignItems: "center",

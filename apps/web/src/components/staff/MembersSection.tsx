@@ -1219,7 +1219,7 @@ export function MembersSection({
 
           <div
             data-testid="people-toolbar"
-            className="dg-toolbar-type"
+            className="dg-toolbar-type dg-field-raised"
             style={
               isMobile
                 ? { display: "flex", flexDirection: "column", gap: 8, paddingBottom: 8 }

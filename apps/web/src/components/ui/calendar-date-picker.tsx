@@ -128,7 +128,7 @@ export default function CalendarDatePicker({
             gap: 10,
             width: "100%",
             minHeight: "var(--dg-toolbar-h)",
-            background: disabled ? "var(--dg-color-bg)" : "var(--dg-color-surface)",
+            background: disabled ? "transparent" : "var(--dg-color-field)",
             border: "1px solid var(--dg-color-border)",
             borderRadius: "var(--dg-btn-radius)",
             padding: "10px 12px",

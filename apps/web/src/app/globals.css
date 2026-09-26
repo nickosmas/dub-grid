@@ -278,6 +278,11 @@
   --dg-color-surface: #ffffff;
   --dg-color-surface-alt: #eeeeee;
   --dg-color-surface-hover: #e5e5e5;
+  /* Fill for an editable field (text, select, picker), one step off the card
+     it sits on: a faint gray on white here, darker than the card in dark mode.
+     A field on the page background takes `.dg-field-raised` instead, and a
+     read-only or disabled field drops the fill. */
+  --dg-color-field: #fafafa;
   --dg-color-bg-secondary: #eeeeee;
   --dg-color-row-alt: #eeeeee;
   --dg-color-row-hover: #e5e5e5;
@@ -417,6 +422,7 @@
   --dg-color-surface: #121214;
   --dg-color-surface-alt: #0a0a0b;
   --dg-color-surface-hover: #1c1c1f;
+  --dg-color-field: #0a0a0b;
   --dg-color-bg-secondary: #1c1c1f;
   --dg-color-row-alt: #0a0a0b;
   --dg-color-row-hover: #1c1c1f;
@@ -1581,7 +1587,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   box-sizing: border-box;
   font-family: inherit;
   color: var(--dg-color-text-primary);
-  background: var(--dg-color-surface);
+  background: var(--dg-color-field);
   transition:
     border-color 150ms ease,
     box-shadow 150ms ease;
@@ -1602,7 +1608,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   box-shadow: 0 0 0 3px var(--dg-focus-ring);
 }
 .dg-auth-input:disabled {
-  background: var(--dg-color-bg);
+  background: transparent;
   color: var(--dg-color-text-subtle);
   cursor: not-allowed;
 }
