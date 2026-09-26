@@ -112,13 +112,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** Read the matched strings from the route; add `VerifiedClaims` with an `in_sandbox` allowance; derive the copy from the constant; use `supabaseMigrationsDir()`-style root resolution; check field names against the Management API schema in 41d3.
 **Resolution:**
 
-### F-54 [P3] fixed - The web test cache hashed the Supabase CLI's gitignored state
+### F-54 [P3] closed - The web test cache hashed the Supabase CLI's gitignored state
 
 **File:** `turbo.json` (`@dubgrid/web#test`)
 **Found:** 2026-09-25 by `/audit` re-review of cd8758d8
 **Why it matters:** Turbo's explicit input globs ignore `.gitignore`, so `supabase/.temp/**` (rewritten by the CLI on update checks, `link` and `start`) caused cache misses with no source change, and local hashes differed from CI's. Never a wrongly replayed pass.
 **Suggested fix:** Exclude `supabase/.temp` and `supabase/.branches`.
-**Resolution:** Both are negated in the inputs; a dry run shows no `.temp` file.
+**Resolution:** Both are negated in the inputs; a dry run shows no `.temp` file. Re-review (origin/dev 54a9f5f5): closed; the negations sit in `@dubgrid/web#test`, the other tasks use `$TURBO_DEFAULT$`, which respects `.gitignore`, and a dry run hashes 2202 inputs with none under `supabase/.temp` or `supabase/.branches` and no gitignored file at all.
 
 ### F-62 [P2] open - Turning on `secure_password_change` would refuse password changes for two-factor users on sessions older than a day
 
@@ -168,21 +168,21 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** A decision for the owner. Requiring `caller_has_fresh_proof()` for a Gridmaster in those checks closes it, but a Gridmaster editing schedules while impersonating would then be asked to confirm their identity every five minutes, and the schedule screens would need the step-up prompt wired in. Alternatively accept it: grants of authority and direct table writes are already closed (051 to 054).
 **Resolution:** Narrowed by the owner's choice (2026-09-26, 41d7): migration 055 gives `start_impersonation` and `force_logout_user` the 051 guard, the impersonation route asks for fresh proof before a start (never before an end) and answers a database refusal with the prompt, and the portal runs the start through step-up; live tests prove both refuse a stale Gridmaster, work with fresh proof, and that a stale token still ends a session. Still open: the schedule, recurring, publish and request functions, left unchanged on purpose because fresh proof there would interrupt impersonated editing.
 
-### F-76 [P3] fixed - A Gridmaster's sign-out ends long-expired impersonations as manual, with a late notice
+### F-76 [P3] closed - A Gridmaster's sign-out ends long-expired impersonations as manual, with a late notice
 
 **File:** `apps/web/src/app/api/account/logout-cleanup/route.ts:29`
 **Found:** 2026-09-26 by `/audit` re-review of e1c83ac1..e9d49b20
 **Why it matters:** Nothing ends a timed-out row, so the next sign-out, possibly days later, ended each one as `manual` with a fresh email and an audit row carrying the wrong reason; and one failed row stopped the loop, leaving the rest open.
 **Suggested fix:** End rows past `expires_at` as `expired` without the email, and keep going past a failed row before answering 500.
-**Resolution:** Fixed: expired rows end as `expired`, audited as such, with no email (the database still writes its in-app notices); a failed row is logged and the rest still end, then the route answers 500. Route tests cover both and fail against the previous code. Re-review (e6d85e85): kept fixed, since a failed audit write still left the loop; it is now logged, counted as a failure and the loop continues, with a test.
+**Resolution:** Fixed: expired rows end as `expired`, audited as such, with no email (the database still writes its in-app notices); a failed row is logged and the rest still end, then the route answers 500. Route tests cover both and fail against the previous code. Re-review (e6d85e85): kept fixed, since a failed audit write still left the loop; it is now logged, counted as a failure and the loop continues, with a test. Re-review (origin/dev 54a9f5f5): closed; expired rows end as expired with no email, failed ends and audit writes are counted without stopping the loop, the sign-out caller never waits on or retries a 500, and each route test fails against the code before its repair. The end time of an expired row is F-79.
 
-### F-77 [P3] fixed - The password length hint says characters where the rule counts bytes
+### F-77 [P3] closed - The password length hint says characters where the rule counts bytes
 
 **File:** `packages/domain/src/password.ts:56`
 **Found:** 2026-09-26 by `/audit` re-review of e1c83ac1..e9d49b20
 **Why it matters:** A password of 25 emoji (100 bytes) is refused with "At most 72 characters".
 **Suggested fix:** Word the hint so accents and emoji make sense of it.
-**Resolution:** Fixed: the hint reads "At most 72 characters, fewer with accents or emoji", and the test pins it. Re-review (bbff3583): kept fixed, since the mobile reset screen's hint row could run past the card with the longer label; the hint text now shrinks and wraps, as the profile screen's does.
+**Resolution:** Fixed: the hint reads "At most 72 characters, fewer with accents or emoji", and the test pins it. Re-review (bbff3583): kept fixed, since the mobile reset screen's hint row could run past the card with the longer label; the hint text now shrinks and wraps, as the profile screen's does. Re-review (origin/dev 54a9f5f5): closed; nothing pins the old label, the hint wraps on web and both mobile screens, and every password-setting path refuses more than 72 bytes.
 
 ### F-78 [P3] open - A mobile sign-in that outlives the app's request timeout leaves an orphan server session
 
@@ -190,4 +190,12 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Found:** 2026-09-26 during the 41d3 Android rehearsal
 **Why it matters:** On a slow server (18.6 s observed under load) the phone gives up while the server finishes, so a session is created that the phone never receives, and Security lists an extra signed-in device until it is revoked or expires.
 **Suggested fix:** End the created session when the client has gone (for example, a short server-side deadline that signs the new session out), or let the next successful sign-in on that device replace the orphan.
+**Resolution:**
+
+### F-79 [P3] open - An impersonation ended as expired at sign-out records the sign-out as its end time
+
+**File:** `apps/web/src/app/api/account/logout-cleanup/route.ts:39`; `supabase/migrations/057_impersonation_notice_wording.sql` (`end_impersonation`, `ended_at = now()`)
+**Found:** 2026-09-26 by `/audit` re-review of F-76 (predates it)
+**Why it matters:** A session that timed out days earlier reads in history as lasting until the Gridmaster signed out, while the lazy cleanup in `002_functions_triggers.sql` records `ended_at = expires_at`. History only; no access is granted.
+**Suggested fix:** In a forward migration, set `ended_at = LEAST(now(), expires_at)` when `p_reason = 'expired'`.
 **Resolution:**
