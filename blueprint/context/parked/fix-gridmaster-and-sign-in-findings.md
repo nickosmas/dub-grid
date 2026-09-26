@@ -51,7 +51,9 @@ leave no audit row.
       `employees` and `invitations`. _Done when:_ the hook's test shows both
       events invalidate `["gm", "person"]` and a membership event still
       invalidates the person key.
-- [ ] **Step 2 - F-80 deactivate and reactivate need fresh proof** - the
+- [x] **Step 2 - F-80 deactivate and reactivate need fresh proof** (landed
+      in 43c first, with the same route gate, step-up and tests; this batch adds
+      nothing further) - the
       PATCH calls `requireSensitiveActionAuth` after the Gridmaster check and
       refuses a Gridmaster target (403, before any write); the person page's
       Deactivate and Reactivate run through `useStepUpAction` with
