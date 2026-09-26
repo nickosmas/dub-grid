@@ -134,10 +134,14 @@ Out of scope, recorded as follow-ups:
     Next 16's segment prefetch for a dynamic route, which fetches the route
     tree (`Next-Router-Segment-Prefetch: /_tree`) and then the route's
     prefetch data (`Next-Router-Prefetch: 1` with its own state tree, hence a
-    different `_rsc` per route). No route was prefetched a third time, and
-    the header's links remount only when the viewport crosses the mobile
-    breakpoint. Prefetch is production-only, so the dev server cannot show
-    this.
+    different `_rsc` per route). The header's links remount only when the
+    viewport crosses the mobile breakpoint. A later capture (pointer off the
+    page) found one dashboard link, a staff-hours person link
+    (`StaffHoursCard`), fetched a third time: a data prefetch without a route
+    tree first, sent with the same state tree as the billing link's single
+    prefetch. It starts after the content has rendered, so it is off the
+    sign-in path; its cause in Next's router is not pinned down. Prefetch is
+    production-only, so the dev server cannot show this.
 - [x] **Step 5 - Gridmaster path.**
   - The login route skips the refresh when the token already carries
     `platform_role=gridmaster` (and keeps it when the claim is missing).
@@ -190,5 +194,9 @@ Out of scope, recorded as follow-ups:
 - **Production, organization-switch sign-in** (full reload): the seven
   requests start together 1.73s into the reloaded page, the dashboard data in
   one wave at 2.6s, content at 3.7s, layout shift 0.
+- **Third run, pointer off the page:** login 1,091; first-screen requests at
+  1,095; shell at 3,161; content at 4,388; layout shift 0. The dashboard's
+  data was done at 2.1s while its page (RSC) arrived at 3.16s, so the page's
+  server render is now the longest wait on the path.
 - **Not exercised:** the MFA paths (out of scope) and a Gridmaster sign-in on
   production (verified by local traces and E2E).
