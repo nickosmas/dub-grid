@@ -173,5 +173,22 @@ describe.runIf(reachable)("Gridmaster direct writes (054, live DB)", () => {
     );
     expect(missing).toEqual([]);
     expect(rows.length).toBeGreaterThan(30);
+
+    // A policy with the right name and a permissive expression would pass the
+    // name check, so every restrictive expression must be the helper.
+    const { rows: loose } = await db.query<{ table_name: string; policy: string }>(`
+      SELECT c.relname AS table_name, p.polname AS policy
+      FROM pg_policy p
+      JOIN pg_class c ON c.oid = p.polrelid
+      WHERE NOT p.polpermissive
+        AND p.polname LIKE 'gridmaster_fresh_%'
+        AND NOT (
+          COALESCE(pg_get_expr(p.polqual, p.polrelid), 'SELECT gridmaster_write_allowed()')
+            ILIKE '%SELECT gridmaster_write_allowed()%'
+          AND COALESCE(pg_get_expr(p.polwithcheck, p.polrelid), 'SELECT gridmaster_write_allowed()')
+            ILIKE '%SELECT gridmaster_write_allowed()%'
+        )
+    `);
+    expect(loose).toEqual([]);
   });
 });

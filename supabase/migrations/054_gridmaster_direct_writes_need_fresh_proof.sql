@@ -13,7 +13,12 @@
 -- Postgres checks EXECUTE on a policy's functions for every caller the policy
 -- applies to, so the proof check (private since 051) is reached through a
 -- boolean helper granted to authenticated; it reveals only whether the caller
--- is a Gridmaster with fresh proof.
+-- is a Gridmaster with fresh proof. The policies call it as a scalar subquery,
+-- so it runs once per statement rather than once per row.
+--
+-- CREATE POLICY locks each table briefly; the timeout makes the apply fail
+-- fast rather than queue reads behind a long-running query (retry it).
+SET LOCAL lock_timeout = '5s';
 
 CREATE OR REPLACE FUNCTION public.gridmaster_write_allowed()
 RETURNS BOOLEAN
@@ -72,15 +77,15 @@ BEGIN
     EXECUTE format('DROP POLICY IF EXISTS gridmaster_fresh_update ON public.%I', target);
     EXECUTE format('DROP POLICY IF EXISTS gridmaster_fresh_delete ON public.%I', target);
     EXECUTE format(
-      'CREATE POLICY gridmaster_fresh_insert ON public.%I AS RESTRICTIVE FOR INSERT TO authenticated WITH CHECK (public.gridmaster_write_allowed())',
+      'CREATE POLICY gridmaster_fresh_insert ON public.%I AS RESTRICTIVE FOR INSERT TO authenticated WITH CHECK ((SELECT public.gridmaster_write_allowed()))',
       target
     );
     EXECUTE format(
-      'CREATE POLICY gridmaster_fresh_update ON public.%I AS RESTRICTIVE FOR UPDATE TO authenticated USING (public.gridmaster_write_allowed()) WITH CHECK (public.gridmaster_write_allowed())',
+      'CREATE POLICY gridmaster_fresh_update ON public.%I AS RESTRICTIVE FOR UPDATE TO authenticated USING ((SELECT public.gridmaster_write_allowed())) WITH CHECK ((SELECT public.gridmaster_write_allowed()))',
       target
     );
     EXECUTE format(
-      'CREATE POLICY gridmaster_fresh_delete ON public.%I AS RESTRICTIVE FOR DELETE TO authenticated USING (public.gridmaster_write_allowed())',
+      'CREATE POLICY gridmaster_fresh_delete ON public.%I AS RESTRICTIVE FOR DELETE TO authenticated USING ((SELECT public.gridmaster_write_allowed()))',
       target
     );
   END LOOP;

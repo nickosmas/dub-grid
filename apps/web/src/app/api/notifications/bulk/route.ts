@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createRequestSupabaseClient, requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
+import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
+import { getServiceClient } from "@/lib/supabase-service";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import logger from "@/lib/logger";
 import { API_ERRORS } from "@dubgrid/client-errors";
@@ -32,14 +33,16 @@ export async function POST(req: NextRequest) {
     }
     const { action, ids } = parsed.data;
 
-    const supabase = createRequestSupabaseClient(req);
+    // The service role: a Gridmaster's own token needs fresh proof to write
+    // since 054, and marking an inbox read is not a grant (41d6). The filters
+    // below keep the update to the caller's own notifications.
+    const supabase = getServiceClient();
     const now = new Date().toISOString();
 
     // Scope the mutation to the caller's current session org. Without this,
     // a multi-org user could mutate notifications belonging to another org by
     // passing their IDs. Platform notifications (org_id IS NULL) are included
     // so users can still mark their own platform notifications read/archived.
-    // RLS enforces the same; this is defense-in-depth at the route layer.
     const claimOrgId = typeof claims.org_id === "string" ? claims.org_id : null;
     const orgFilter = claimOrgId ? (`org_id.eq.${claimOrgId},org_id.is.null` as const) : null;
 

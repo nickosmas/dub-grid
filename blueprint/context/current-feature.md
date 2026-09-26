@@ -52,6 +52,14 @@ committed as a local checkpoint.
 - [x] **Step 3 - record the remaining surface** - F-74 narrowed to the
       SECURITY DEFINER functions, with the trade-off stated.
 
+- [x] **Repair the audit's findings (ea7215d9..61a06a78)** - the
+      notifications bulk route writes with the service role (a Gridmaster's
+      mark-read no longer depends on fresh proof); the policies call the
+      helper once per statement; 054 sets a 5 s lock timeout; the drift guard
+      checks each restrictive expression; F-75 names `start_impersonation`
+      and `force_logout_user`. 054 was revised before it left this worktree
+      and re-run on the local stack.
+
 ## Files / areas
 
 - `supabase/migrations/054_*.sql`, `checksums.sha256`.
