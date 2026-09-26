@@ -545,8 +545,10 @@ export default function OrgLogin({
   const apexHref = parsed ? withThemeParam(`${apexOrigin}/`, theme) : `${apexOrigin}/`;
   const gridmasterPortalHref = `${protocol}//gridmaster.${baseDomain}${parsed?.port ?? ""}/login`;
 
+  // The same phase the next document opens on after the hard navigation, so
+  // the label never steps back.
   if (handoffActive) {
-    return <AuthTransitionScreen phase="workspace" />;
+    return <AuthTransitionScreen phase="signing-in" />;
   }
 
   if (mfaRequired) {

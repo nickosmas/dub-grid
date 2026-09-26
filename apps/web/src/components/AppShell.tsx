@@ -59,6 +59,8 @@ function AppHeader() {
     shouldLoadOrgHeader ? (perms.orgId ?? org?.id ?? null) : null,
   );
   const isOrgSetupComplete = setupStatus.isComplete && employees.length > 0;
+  const setupLoading = perms.isLoading || orgLoading || empLoading;
+  const billingLocked = billing?.billingAccess.isLocked === true;
   // The setup lock hides navigation for members OnboardingGate is holding
   // behind the wizard or the pending screen. It must release on the same
   // condition the gate does, or a member who has finished onboarding is left
@@ -67,13 +69,18 @@ function AppHeader() {
     !perms.isGridmaster &&
     !perms.isImpersonating &&
     entryGate?.onboardingCompleted !== true &&
-    (perms.isLoading || orgLoading || empLoading || !isOrgSetupComplete);
+    (setupLoading || !isOrgSetupComplete);
   const hideForBillingLock =
-    !perms.isGridmaster &&
-    !perms.isImpersonating &&
-    (billingLoading || billing?.billingAccess.isLocked === true);
+    !perms.isGridmaster && !perms.isImpersonating && (billingLoading || billingLocked);
 
-  if (hideForSetupLock || hideForBillingLock) return null;
+  if (hideForSetupLock || hideForBillingLock) {
+    // Still loading: hold the header's height so the page does not jump down
+    // when it arrives. A lock that keeps it hidden leaves no space.
+    const locked = (hideForSetupLock && !setupLoading) || (hideForBillingLock && !billingLoading);
+    return locked ? null : (
+      <div className="dg-app-shell-header-surface dg-app-shell-header-placeholder" aria-hidden />
+    );
+  }
 
   return (
     <div className="dg-app-shell-header-surface">

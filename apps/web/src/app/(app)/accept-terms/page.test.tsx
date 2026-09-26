@@ -1,6 +1,11 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  consumeAuthTransition,
+  isAuthTransitionPending,
+  markAuthTransition,
+} from "@/lib/auth-transition";
 import AcceptTermsPage from "./page";
 
 const replace = vi.fn();
@@ -14,8 +19,9 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => searchParams,
 }));
 vi.mock("sonner", () => ({ toast: { error: (...args: unknown[]) => toastError(...args) } }));
+let mockUser: { id: string } | null = { id: "calm-haven-user" };
 vi.mock("@/components/AuthProvider", () => ({
-  useAuth: () => ({ user: { id: "calm-haven-user" }, isLoading: false }),
+  useAuth: () => ({ user: mockUser, isLoading: false }),
 }));
 vi.mock("@/hooks", () => ({
   useTermsAcceptanceStatus: () => ({
@@ -103,5 +109,45 @@ describe("AcceptTermsPage recovery", () => {
     expect(screen.queryByText("private provider detail")).not.toBeInTheDocument();
     expect(button).toBeEnabled();
     expect(signOutFromBrowser).not.toHaveBeenCalled();
+  });
+});
+
+describe("AcceptTermsPage in a sign-in handoff", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    searchParams = new URLSearchParams();
+    mockUser = { id: "calm-haven-user" };
+    recordCurrentTermsAcceptance.mockResolvedValue({ success: true });
+  });
+
+  afterEach(() => {
+    consumeAuthTransition();
+  });
+
+  it("waits for a sign-in's session instead of sending it back to /login", () => {
+    markAuthTransition();
+    mockUser = null;
+
+    renderPage();
+
+    expect(screen.getByRole("main")).toHaveTextContent("Signing you in");
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("still sends a signed-out visit to /login", async () => {
+    mockUser = null;
+    renderPage();
+    await waitFor(() => expect(replace).toHaveBeenCalledWith(expect.stringMatching(/^\/login/)));
+  });
+
+  it("ends the handoff once the card shows, and starts a new one on acceptance", async () => {
+    markAuthTransition();
+    renderPage();
+
+    await waitFor(() => expect(isAuthTransitionPending()).toBe(false));
+    fireEvent.click(screen.getByRole("button", { name: "Accept and continue" }));
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/dashboard"));
+    expect(isAuthTransitionPending()).toBe(true);
   });
 });

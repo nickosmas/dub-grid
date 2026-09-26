@@ -11,6 +11,7 @@ import {
   freezeOnboardingPhase,
 } from "@/features/onboarding/client";
 import AuthTransitionScreen from "@/components/AuthTransitionScreen";
+import { useSignInSettleDeadline } from "@/components/RouteGuards";
 import { useAuthTransitionPending, consumeAuthTransition } from "@/lib/auth-transition";
 import { queryKeys } from "@/lib/query-keys";
 import { resolveOnboardingDecision } from "./onboarding-decision";
@@ -73,19 +74,12 @@ export default function OnboardingGate({ children }: { children: React.ReactNode
   const { user, isLoading: authLoading } = useAuth();
   const perms = usePermissions();
   const pathname = usePathname();
-  const authTransitionPending = useAuthTransitionPending();
 
   // Public routes never consult onboarding, and `isPublicRoute` is stable for
   // a given pathname, so this branch cannot swap structure mid-render.
   if (isPublicRoute(pathname)) return <>{children}</>;
 
-  // During the post-login transition, hold the branded splash instead of
-  // flashing the app/blank while perms resolve and the onboarding decision is
-  // made (this route bypasses ProtectedRoute's splash). Normal in-app nav has
-  // perms cached, so this branch isn't hit and nothing changes there.
-  if ((authLoading || perms.isLoading) && authTransitionPending) {
-    return <AuthTransitionScreen phase="signing-in" />;
-  }
+  const sessionSettled = !authLoading && Boolean(user) && !perms.isLoading;
 
   // The gate only *decides* for an authenticated member of an org; everyone
   // else (still loading, signed out, gridmaster, no org, impersonating) passes
@@ -95,19 +89,17 @@ export default function OnboardingGate({ children }: { children: React.ReactNode
   // subtree the moment perms resolved. That remount dropped the last observer
   // of the org-bootstrap query, cancelling its in-flight request (the queryFn
   // consumes the abort signal) and refetching it — one wasted round trip and a
-  // full re-render on every hard load (build plan item 26).
+  // full re-render on every hard load (build plan item 26). The sign-in splash
+  // is rendered from the same position for the same reason (see below).
   const gated =
-    !authLoading &&
-    !perms.isLoading &&
-    Boolean(user) &&
-    !perms.isGridmaster &&
-    Boolean(perms.orgId) &&
-    !perms.isImpersonating;
+    sessionSettled && !perms.isGridmaster && Boolean(perms.orgId) && !perms.isImpersonating;
 
   return (
     <Suspense fallback={<>{children}</>}>
       <OnboardingCheckWithSection
         gated={gated}
+        sessionSettled={sessionSettled}
+        signedOut={!authLoading && !user}
         userId={user?.id ?? ""}
         orgId={perms.orgId ?? ""}
         role={perms.role}
@@ -144,6 +136,8 @@ function BillingRedirect({ destination }: { destination: "recovery" | "organizat
 
 function OnboardingCheck({
   gated,
+  sessionSettled,
+  signedOut,
   userId,
   orgId,
   role,
@@ -158,6 +152,10 @@ function OnboardingCheck({
    *  so the page subtree below it keeps a stable tree position, but it asks for
    *  nothing and decides nothing. */
   gated: boolean;
+  /** Auth and permissions have both resolved for a signed-in person. */
+  sessionSettled: boolean;
+  /** Auth has resolved and nobody is signed in. */
+  signedOut: boolean;
   userId: string;
   orgId: string;
   role: string;
@@ -230,7 +228,17 @@ function OnboardingCheck({
   // it just decides nothing and asks for nothing.
   const decision = gated ? resolvedDecision : ({ kind: "app", settled: true } as const);
 
-  const settledAppRender = decision.kind === "app" && decision.settled;
+  // A sign-in's session can still be settling when its first page commits:
+  // the browser syncs its auth client alongside the page load. Hold the splash
+  // rather than let the page render its own, and send a session that never
+  // arrives back to /login as ProtectedRoute would.
+  const awaitingSession = authTransitionPending && !sessionSettled;
+  useSignInSettleDeadline(awaitingSession && signedOut);
+  const holdingSplash =
+    awaitingSession || (authTransitionPending && decision.kind === "app" && !decision.settled);
+
+  // Only a render that actually shows the app counts as having shown it.
+  const settledAppRender = decision.kind === "app" && decision.settled && !holdingSplash;
   useEffect(() => {
     if (settledAppRender) appShownForOrgRef.current = orgId;
   }, [orgId, settledAppRender]);
@@ -239,7 +247,13 @@ function OnboardingCheck({
   // state (onboarding already complete, or a final wizard/app decision). Done in
   // an effect, NOT during render, so a discarded concurrent/strict-mode render
   // can't clear the splash flag before the navigation that needs it. (M-5)
-  const reachedFinalDecision = onboardingComplete || (!orgLoading && entryGate !== null);
+  // Nothing is final before the session settles: the sign-in queries are
+  // primed, so organization data can be cached while the browser is still
+  // syncing its auth client, and ending the handoff then sent the page's guard
+  // to /login. Anyone the gate does not decide for (a Gridmaster, an
+  // impersonation, a person with no organization) has arrived once it does.
+  const reachedFinalDecision =
+    sessionSettled && (onboardingComplete || !gated || (!orgLoading && entryGate !== null));
   useEffect(() => {
     if (reachedFinalDecision) consumeAuthTransition();
   }, [reachedFinalDecision]);
@@ -253,6 +267,13 @@ function OnboardingCheck({
     if (freezePhase) freezeOnboardingPhase(userId, orgId, freezePhase);
   }, [freezePhase, userId, orgId]);
 
+  // One splash for the whole handoff, rendered from this one position so it
+  // is never remounted between phases (its logo restarted on every hop) and
+  // its label only moves forward.
+  if (holdingSplash) {
+    return <AuthTransitionScreen phase={sessionSettled ? "workspace" : "signing-in"} />;
+  }
+
   switch (decision.kind) {
     case "bootstrap-recovery":
       return (
@@ -264,12 +285,8 @@ function OnboardingCheck({
     case "billing-redirect":
       return <BillingRedirect destination={decision.destination} />;
     case "app":
-      // A post-login handoff needs a branded transition while the onboarding
-      // decision resolves. Ordinary signed-in refreshes keep the app visible so
-      // their page-level loading states can render instead of a full-screen gate.
-      if (!decision.settled && authTransitionPending) {
-        return <AuthTransitionScreen phase="workspace" />;
-      }
+      // Ordinary signed-in refreshes keep the app visible so their page-level
+      // loading states can render instead of a full-screen gate.
       return <>{children}</>;
     case "setup-pending":
       return <SetupPendingScreen />;

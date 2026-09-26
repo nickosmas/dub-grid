@@ -1,7 +1,7 @@
 # Fix: Web sign-in request waves and loading jitter
 
 **Type:** Fix
-**Status:** not started
+**Status:** in progress
 
 ## The problem
 
@@ -114,7 +114,7 @@ Out of scope, recorded as follow-ups:
   - _Done when:_ tests show the queries are enabled from the token's
     organization id, and a local sign-in shows them starting in one wave
     after `/dashboard` commits.
-- [ ] **Step 3 - one loading surface, no blank frame.**
+- [x] **Step 3 - one loading surface, no blank frame.**
   - One loading screen at a stable point in the tree, with a label that
     never goes backwards.
   - `OnboardingGate` keeps the same tree shape across its branches.

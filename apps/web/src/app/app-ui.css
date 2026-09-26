@@ -1184,6 +1184,9 @@
 .dg-app-shell-header-surface {
   background: var(--dg-color-bg);
 }
+.dg-app-shell-header-placeholder {
+  height: var(--header-height);
+}
 .dg-modal {
   position: relative;
   background: var(--dg-color-surface);
