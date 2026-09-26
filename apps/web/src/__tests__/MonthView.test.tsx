@@ -22,6 +22,7 @@ const northDay: AssignmentDefinition = {
   sortOrder: 1,
 };
 const general: AssignmentDefinition = { ...northDay, id: 2, label: "G", focusAreaId: null };
+const northEarly: AssignmentDefinition = { ...northDay, id: 3, label: "E", categoryId: 2 };
 
 const indicatorTypes: IndicatorType[] = [
   { id: 7, orgId: "org-1", name: "Float", color: "#ff0000", sortOrder: 1 },
@@ -78,8 +79,11 @@ function renderMonth(
       getShiftStyle={() => northDay}
       todayKey="2026-01-01"
       focusAreas={focusAreas}
-      assignments={[northDay, general]}
-      shiftCategories={[{ id: 1, orgId: "org-1", name: "Day", sortOrder: 1 }]}
+      assignments={[northDay, general, northEarly]}
+      shiftCategories={[
+        { id: 1, orgId: "org-1", name: "Day", sortOrder: 1 },
+        { id: 2, orgId: "org-1", name: "Early", sortOrder: 0 },
+      ]}
       noteMarksForKey={noteMarksForKey}
       indicatorTypes={indicatorTypes}
     />,
@@ -110,7 +114,8 @@ describe("MonthView indicators", () => {
   });
 
   it("shows a person's indicators once, however many codes they have there", () => {
-    codes["emp-1"] = [northDay, { ...northDay, id: 3, label: "E" }];
+    // The second code sorts first, so the row built first ends up second.
+    codes["emp-1"] = [northDay, northEarly];
     renderMonth((empId, date) =>
       formatDateKey(date) === dayKey && empId === "emp-1"
         ? [{ indicatorTypeId: 7, state: "published" }]
@@ -118,7 +123,11 @@ describe("MonthView indicators", () => {
     );
     openDay();
 
-    expect(within(screen.getByRole("dialog")).getAllByLabelText("Float")).toHaveLength(1);
+    const popover = screen.getByRole("dialog");
+    expect(within(popover).getAllByLabelText("Float")).toHaveLength(1);
+    // On the person's first row as the popover orders them, not the first built.
+    const firstRow = within(popover).getAllByText("Alex T.")[0].parentElement!;
+    expect(within(firstRow).getByLabelText("Float")).toBeInTheDocument();
     codes["emp-1"] = [northDay];
   });
 });

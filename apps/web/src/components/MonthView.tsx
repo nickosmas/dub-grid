@@ -45,6 +45,8 @@ interface MonthViewProps {
 }
 
 type DayRow = {
+  empId: string;
+  focusAreaId: number;
   name: string;
   shift: string;
   style: AssignmentDefinition;
@@ -367,15 +369,6 @@ export default function MonthView({
       const categoryCounts = new Map<number, number>();
       let hasHighlightedEmployee = false;
       const byFocusArea = new Map<string, DayRow[]>();
-      // A person's indicators belong to their day in a focus area, not to each
-      // of their shift codes there, so they show on the first row only.
-      const markedRows = new Set<string>();
-      const marksFor = (empId: string, focusAreaId: number): ScheduleNoteMark[] => {
-        const rowKey = `${empId}_${focusAreaId}`;
-        if (!noteMarksForKey || markedRows.has(rowKey)) return [];
-        markedRows.add(rowKey);
-        return noteMarksForKey(empId, date, focusAreaId);
-      };
 
       filteredEmployees.forEach((emp) => {
         const combinedLabel = shiftForKey(emp.id, date);
@@ -409,12 +402,14 @@ export default function MonthView({
             if (!fa) return;
             const list = byFocusArea.get(fa.name) ?? [];
             list.push({
+              empId: emp.id,
+              focusAreaId: fa.id,
               name: getEmployeeDisplayName(emp),
               shift: label,
               style,
               draftKind: dk,
               isHighlighted,
-              marks: marksFor(emp.id, fa.id),
+              marks: [],
             });
             byFocusArea.set(fa.name, list);
           } else {
@@ -424,12 +419,14 @@ export default function MonthView({
             if (primaryFa) {
               const list = byFocusArea.get(primaryFa.name) ?? [];
               list.push({
+                empId: emp.id,
+                focusAreaId: primaryFa.id,
                 name: getEmployeeDisplayName(emp),
                 shift: label,
                 style,
                 draftKind: dk,
                 isHighlighted,
-                marks: marksFor(emp.id, primaryFa.id),
+                marks: [],
               });
               byFocusArea.set(primaryFa.name, list);
             }
@@ -440,6 +437,18 @@ export default function MonthView({
       byFocusArea.forEach((list) =>
         list.sort((a, b) => shiftSortOrder(a.style) - shiftSortOrder(b.style)),
       );
+      // A person's indicators belong to their day in a focus area, not to each
+      // of their shift codes there, so they show on their first row once sorted.
+      if (noteMarksForKey) {
+        byFocusArea.forEach((list) => {
+          const marked = new Set<string>();
+          for (const row of list) {
+            if (marked.has(row.empId)) continue;
+            marked.add(row.empId);
+            row.marks = noteMarksForKey(row.empId, date, row.focusAreaId);
+          }
+        });
+      }
 
       const activeCats = shiftCategories
         .filter((cat) => (categoryCounts.get(cat.id) ?? 0) > 0)
