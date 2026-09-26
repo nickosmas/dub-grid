@@ -42,9 +42,14 @@ Continuous Mode: they push, send, reach production or reseed shared state.
       effect keyed on having a session) and F-47 (the password rule requires
       a letter and a number).
 
-- [ ] **Step 1 - browser rehearsal** (approved 2026-09-25) - runs as the
-      release PR's Playwright shards against CI's own stack, which reseeds
-      nothing shared; closes when those shards pass.
+- [x] **Step 1 - browser rehearsal** (approved 2026-09-25) - ran as the
+      release PR's Playwright shards against CI's own stack. Run
+      [36191730677](https://github.com/nickosmas/dub-grid/actions/runs/36191730677)
+      on 49d44ea8 (#113's head): 12 of 12 Playwright jobs passed across
+      chromium, firefox and webkit, and the shards running dashboard-states and
+      role-variance report no retries. If #113's head moves before merge, the
+      new head's run is the one that counts.
+
 - [ ] **Step 2 - native rehearsal** (approved 2026-09-25; blocked) - the
       simulator's dev build predates current native dependencies, only Xcode
       27 is installed (Expo 54 needs Xcode 26), no Android device or emulator
@@ -61,16 +66,26 @@ Continuous Mode: they push, send, reach production or reseed shared state.
       Migration 048 (`user_known_devices`) followed from another session; the
       inspector reads 48 entries, none missing, every invariant passing
       (2026-09-26).
-- [ ] **Step 5 - production Auth settings** (approval; owner's token) -
-      `.env.remote` has no `SUPABASE_ACCESS_TOKEN`, which the push script's
-      read-only comparison needs. Applying the templates and the four notice
-      flags (a separate approval) must happen before the release merges:
-      from F-08 on, DubGrid no longer emails two-factor changes itself.
-- [ ] **Step 6 - release PR green** (approved 2026-09-25) - `dev` pushed and
+- [ ] **Step 5 - production Auth settings** (read-only diff run
+      2026-09-26) - the push script finds three templates behind the repo
+      (email change, reauthentication, MFA factor enrolled: the 41c3 copy);
+      subjects, OTP settings and all four notice flags already match. The
+      hook, `jwt_expiry` (3600), refresh rotation and MFA match. Production
+      is weaker than `config.toml` on settings the script does not push:
+      minimum password length 6 (repo 10), no required characters (repo
+      `letters_digits`), `secure_password_change` off (repo on), and no
+      session timebox or inactivity limit (repo 24h and 8h). Waiting on the
+      owner: the template apply (needed before merge), and separate
+      decisions on the password rules, `secure_password_change` (verify a
+      real password change with it on first) and the session limits.
+
+- [x] **Step 6 - release PR green** (approved 2026-09-25) - `dev` pushed and
       [#113](https://github.com/nickosmas/dub-grid/pull/113) opened, marked
       not to merge until Step 5's apply lands. Its live-database run caught
       048's new service-role table missing from the isolation inventory
-      (fixed in 739fa577). Merging needs its own yes.
+      (fixed in 739fa577), and a held-bootstrap deadlock in the e2e specs was
+      fixed by its owning session (49d44ea8). All 27 checks green on
+      49d44ea8. Merging needs its own yes.
 
 ## Notes for the AI
 
