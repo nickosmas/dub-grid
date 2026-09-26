@@ -672,7 +672,7 @@
       can view the schedule sees published indicators, and only editors see
       draft ones. No change to indicator storage, editing permissions, or the
       draft and publish workflow.
-  - [ ] 42a. **Web schedule views** - Month view and the phone-width day view
+  - [x] 42a. **Web schedule views** - Month view and the phone-width day view
         render indicators through the shared `NoteDots` marks (the day view
         drops its generic blue dot and its focus-area-only condition); the
         shift slideover shows a read-only indicator list to people who cannot
