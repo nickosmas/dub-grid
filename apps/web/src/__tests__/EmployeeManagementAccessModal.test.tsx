@@ -15,6 +15,7 @@ import {
   updateAppOnlyUser,
 } from "@/features/organization/client";
 import { useIsInSandbox } from "@/hooks/useIsInSandbox";
+import { toast } from "sonner";
 
 vi.mock("@/hooks/useIsInSandbox", () => ({
   useIsInSandbox: vi.fn(() => false),
@@ -49,11 +50,19 @@ vi.mock("@/features/organization/client", () => ({
   },
 }));
 
+const permissions = vi.hoisted(() => ({ isSuperAdmin: true, isGridmaster: false }));
 vi.mock("@/features/permissions/client", () => ({
-  usePermissions: () => ({
-    isSuperAdmin: true,
-    isGridmaster: false,
+  usePermissions: () => permissions,
+}));
+
+const stepUpRun = vi.hoisted(() =>
+  vi.fn(async (action: (token: string) => Promise<unknown>) => {
+    await action("step-up-token");
+    return true;
   }),
+);
+vi.mock("@/hooks/useStepUpAction", () => ({
+  useStepUpAction: () => ({ run: stepUpRun, dialog: null }),
 }));
 
 vi.mock("sonner", () => ({
@@ -187,6 +196,8 @@ function makePendingInvitation(overrides: Partial<Invitation> = {}): Invitation 
 
 describe("EmployeeManagementAccessEditor", () => {
   beforeEach(() => {
+    permissions.isSuperAdmin = true;
+    permissions.isGridmaster = false;
     useIsInSandboxMock.mockReturnValue(false);
     fetchOrganizationUsersMock.mockResolvedValue([]);
     updateAppOnlyUserMock.mockResolvedValue(undefined);
@@ -206,7 +217,6 @@ describe("EmployeeManagementAccessEditor", () => {
         updatedAt: "2026-01-03T00:00:00.000Z",
         departmentIds: [10],
       }),
-      token: "resent-token",
       expiresAt: "2026-12-31T00:00:00.000Z",
     });
     revokeOrganizationInvitationGuardedMock.mockResolvedValue(
@@ -322,17 +332,20 @@ describe("EmployeeManagementAccessEditor", () => {
     });
 
     await waitFor(() => {
-      expect(updateOrganizationInvitationGuardedMock).toHaveBeenCalledWith({
-        orgId: "org-1",
-        invitationId: "inv-1",
-        expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
-        firstName: "Alice",
-        lastName: "Smith",
-        phone: "555-0100",
-        email: "alice@example.com",
-        roleToAssign: "user",
-        departmentIds: [11],
-      });
+      expect(updateOrganizationInvitationGuardedMock).toHaveBeenCalledWith(
+        {
+          orgId: "org-1",
+          invitationId: "inv-1",
+          expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
+          firstName: "Alice",
+          lastName: "Smith",
+          phone: "555-0100",
+          email: "alice@example.com",
+          roleToAssign: "user",
+          departmentIds: [11],
+        },
+        "step-up-token",
+      );
       expect(resendOrganizationInvitationGuardedMock).not.toHaveBeenCalled();
       expect(onCompleted).toHaveBeenCalledWith(null);
       expect(onClose).toHaveBeenCalledOnce();
@@ -375,17 +388,20 @@ describe("EmployeeManagementAccessEditor", () => {
     });
 
     await waitFor(() => {
-      expect(updateOrganizationInvitationGuardedMock).toHaveBeenCalledWith({
-        orgId: "org-1",
-        invitationId: "inv-1",
-        expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
-        firstName: "Alice",
-        lastName: "Smith",
-        phone: "555-0100",
-        email: "alice@example.com",
-        roleToAssign: "user",
-        departmentIds: [10, 11],
-      });
+      expect(updateOrganizationInvitationGuardedMock).toHaveBeenCalledWith(
+        {
+          orgId: "org-1",
+          invitationId: "inv-1",
+          expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
+          firstName: "Alice",
+          lastName: "Smith",
+          phone: "555-0100",
+          email: "alice@example.com",
+          roleToAssign: "user",
+          departmentIds: [10, 11],
+        },
+        "step-up-token",
+      );
       expect(resendOrganizationInvitationGuardedMock).not.toHaveBeenCalled();
       expect(onCompleted).toHaveBeenCalledWith(null);
       expect(onClose).toHaveBeenCalledOnce();
@@ -626,8 +642,75 @@ describe("EmployeeManagementAccessEditor", () => {
     await waitFor(() => {
       expect(createOrganizationInvitationMock).toHaveBeenCalledWith(
         expect.objectContaining({ role: "admin" }),
+        "step-up-token",
       );
     });
+  });
+
+  it.each([
+    { caller: "a Super Admin", isSuperAdmin: true, isGridmaster: false, offered: true },
+    { caller: "a Gridmaster", isSuperAdmin: false, isGridmaster: true, offered: true },
+    { caller: "an Admin", isSuperAdmin: false, isGridmaster: false, offered: false },
+  ])(
+    "offers Super Admin as an invite role only to $caller when it can be granted",
+    async ({ isSuperAdmin, isGridmaster, offered }) => {
+      permissions.isSuperAdmin = isSuperAdmin;
+      permissions.isGridmaster = isGridmaster;
+
+      render(
+        <EmployeeManagementAccessEditor
+          employee={employee}
+          orgId="org-1"
+          managementDepartments={managementDepartments}
+          onClose={vi.fn()}
+          onCompleted={vi.fn()}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(fetchOrganizationUsersMock).toHaveBeenCalled();
+      });
+      await userEvent.setup().click(screen.getByRole("button", { name: "User" }));
+
+      expect(screen.getByRole("option", { name: "Admin" })).toBeInTheDocument();
+      if (offered) {
+        expect(screen.getByRole("option", { name: "Super Admin" })).toBeInTheDocument();
+      } else {
+        expect(screen.queryByRole("option", { name: "Super Admin" })).not.toBeInTheDocument();
+      }
+    },
+  );
+
+  it("sends nothing further when the invitation's step-up is cancelled", async () => {
+    const onClose = vi.fn();
+    const onCompleted = vi.fn();
+    const editorRef = createRef<EmployeeManagementAccessEditorHandle>();
+    stepUpRun.mockResolvedValueOnce(false);
+
+    render(
+      <EmployeeManagementAccessEditor
+        ref={editorRef}
+        employee={employee}
+        orgId="org-1"
+        managementDepartments={managementDepartments}
+        onClose={onClose}
+        onCompleted={onCompleted}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(fetchOrganizationUsersMock).toHaveBeenCalled();
+    });
+    await userEvent.setup().click(screen.getByRole("button", { name: "Leadership" }));
+    await act(async () => {
+      await editorRef.current?.save();
+    });
+
+    expect(stepUpRun).toHaveBeenCalledOnce();
+    expect(createOrganizationInvitationMock).not.toHaveBeenCalled();
+    expect(onCompleted).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(vi.mocked(toast.success)).not.toHaveBeenCalled();
   });
 
   it("uses the Profile details email when inviting someone", async () => {
@@ -660,6 +743,7 @@ describe("EmployeeManagementAccessEditor", () => {
     await waitFor(() => {
       expect(createOrganizationInvitationMock).toHaveBeenCalledWith(
         expect.objectContaining({ email: employee.email }),
+        "step-up-token",
       );
       expect(onCompleted).toHaveBeenCalled();
     });

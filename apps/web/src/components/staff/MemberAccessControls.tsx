@@ -8,6 +8,7 @@ import type { AdminPermissions, OrganizationRole } from "@/types";
 import { SELF_ACTION_FORBIDDEN_MESSAGE } from "@dubgrid/domain";
 import CustomSelect from "@/components/CustomSelect";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { useStepUpAction } from "@/hooks/useStepUpAction";
 import PermissionsEditor, { type PermissionEditorLabels } from "@/components/PermissionsEditor";
 import { buildAdminPermissionChanges } from "@/lib/access-management";
 
@@ -50,8 +51,8 @@ export function MemberAccessControls({
 }: {
   orgRole: OrganizationRole | null | undefined;
   adminPermissions?: AdminPermissions | null;
-  onRoleChange?: (newRole: OrganizationRole) => Promise<void>;
-  onPermissionsChange?: (perms: AdminPermissions) => Promise<void>;
+  onRoleChange?: (newRole: OrganizationRole, accessToken?: string) => Promise<void>;
+  onPermissionsChange?: (perms: AdminPermissions, accessToken?: string) => Promise<void>;
   labelStyle?: CSSProperties;
   isSelf?: boolean;
   pendingInvitationEmail?: string;
@@ -66,6 +67,7 @@ export function MemberAccessControls({
   const [pendingRole, setPendingRole] = useState<OrganizationRole | null>(null);
   const [changingRole, setChangingRole] = useState(false);
   const [showPermissions, setShowPermissions] = useState(false);
+  const stepUp = useStepUpAction();
 
   if (!onRoleChange && !onPermissionsChange) return null;
 
@@ -112,7 +114,7 @@ export function MemberAccessControls({
               ]}
             />
           </div>
-          {pendingRole && (
+          {pendingRole && !stepUp.dialog && (
             <ConfirmDialog
               title={pendingInvitationEmail ? "Change invitation access?" : "Change role"}
               message={
@@ -131,7 +133,13 @@ export function MemberAccessControls({
                 const next = pendingRole;
                 setChangingRole(true);
                 try {
-                  await onRoleChange(next);
+                  const completed = await stepUp.run((accessToken) =>
+                    onRoleChange(next, accessToken),
+                  );
+                  if (!completed) {
+                    setPendingRole(null);
+                    return;
+                  }
                   toast.success(
                     pendingInvitationEmail
                       ? `Invitation replaced with ${ROLE_LABELS[next] ?? next} access.`
@@ -178,8 +186,12 @@ export function MemberAccessControls({
                     }
                   : null;
               }}
+              obscured={Boolean(stepUp.dialog)}
               onSave={async (perms) => {
-                await onPermissionsChange(perms);
+                const completed = await stepUp.run((accessToken) =>
+                  onPermissionsChange(perms, accessToken),
+                );
+                if (!completed) return false;
                 setShowPermissions(false);
               }}
               onClose={() => setShowPermissions(false)}
@@ -187,6 +199,7 @@ export function MemberAccessControls({
           )}
         </div>
       )}
+      {stepUp.dialog}
     </>
   );
 }

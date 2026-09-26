@@ -163,7 +163,12 @@ export async function POST(req: NextRequest) {
 
   // Assigning a role can make any account Super Admin of any organization,
   // so it needs fresh proof, as Gridmaster account changes do (41d3, F-16).
-  if (parsed.data.action === "assignOrgRoleByEmail") {
+  // Setup grants Super Admin too when it names one (41d4, F-55), and asks
+  // before it creates anything.
+  if (
+    parsed.data.action === "assignOrgRoleByEmail" ||
+    (parsed.data.action === "createOrganizationSetup" && parsed.data.input.superAdminEmail)
+  ) {
     const assurance = await requireSensitiveActionAuth(req);
     if ("response" in assurance) {
       return assurance.response;
@@ -308,6 +313,13 @@ export async function POST(req: NextRequest) {
           p_org_role: parsed.data.role,
         });
         if (error) {
+          // The portal invites the address instead when no account uses it.
+          if (/user with email .* not found/i.test(String(error.message ?? ""))) {
+            return NextResponse.json(
+              { error: "No account uses that email.", code: "ACCOUNT_NOT_FOUND" },
+              { status: 404 },
+            );
+          }
           throw error;
         }
         await writeGridmasterAuditLog({

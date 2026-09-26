@@ -36,6 +36,16 @@ vi.mock("@/features/permissions/client", () => ({
   }),
 }));
 
+const stepUpRun = vi.hoisted(() =>
+  vi.fn(async (action: (token: string) => Promise<unknown>) => {
+    await action("step-up-token");
+    return true;
+  }),
+);
+vi.mock("@/hooks/useStepUpAction", () => ({
+  useStepUpAction: () => ({ run: stepUpRun, dialog: null }),
+}));
+
 vi.mock("sonner", () => ({
   toast: {
     success: vi.fn(),
@@ -205,16 +215,19 @@ describe("InviteEmployeeModal", () => {
     await user.click(sendButton);
 
     await waitFor(() => {
-      expect(createOrganizationInvitationMock).toHaveBeenCalledWith({
-        email: "manager@example.com",
-        role: "user",
-        orgId: "org-1",
-        employeeId: undefined,
-        firstName: "Jordan",
-        lastName: "Lee",
-        phone: undefined,
-        departmentIds: undefined,
-      });
+      expect(createOrganizationInvitationMock).toHaveBeenCalledWith(
+        {
+          email: "manager@example.com",
+          role: "user",
+          orgId: "org-1",
+          employeeId: undefined,
+          firstName: "Jordan",
+          lastName: "Lee",
+          phone: undefined,
+          departmentIds: undefined,
+        },
+        "step-up-token",
+      );
       expect(onInvited).toHaveBeenCalledOnce();
       expect(onClose).toHaveBeenCalledOnce();
     });
@@ -253,16 +266,19 @@ describe("InviteEmployeeModal", () => {
     await user.click(sendButton);
 
     await waitFor(() => {
-      expect(createOrganizationInvitationMock).toHaveBeenCalledWith({
-        email: "manager@example.com",
-        role: "user",
-        orgId: "org-1",
-        employeeId: undefined,
-        firstName: "Jordan",
-        lastName: "Lee",
-        phone: undefined,
-        departmentIds: [1, 2],
-      });
+      expect(createOrganizationInvitationMock).toHaveBeenCalledWith(
+        {
+          email: "manager@example.com",
+          role: "user",
+          orgId: "org-1",
+          employeeId: undefined,
+          firstName: "Jordan",
+          lastName: "Lee",
+          phone: undefined,
+          departmentIds: [1, 2],
+        },
+        "step-up-token",
+      );
     });
   });
 
@@ -402,16 +418,19 @@ describe("InviteEmployeeModal", () => {
     await user.click(sendButton);
 
     await waitFor(() => {
-      expect(createOrganizationInvitationMock).toHaveBeenCalledWith({
-        email: "alice@example.com",
-        role: "user",
-        orgId: "org-1",
-        employeeId: "emp-1",
-        firstName: undefined,
-        lastName: undefined,
-        phone: undefined,
-        departmentIds: undefined,
-      });
+      expect(createOrganizationInvitationMock).toHaveBeenCalledWith(
+        {
+          email: "alice@example.com",
+          role: "user",
+          orgId: "org-1",
+          employeeId: "emp-1",
+          firstName: undefined,
+          lastName: undefined,
+          phone: undefined,
+          departmentIds: undefined,
+        },
+        "step-up-token",
+      );
     });
   });
 

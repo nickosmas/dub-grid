@@ -23,6 +23,8 @@ const serviceRpc = vi.fn();
 const auditInsert = vi.fn();
 const getInvitationEmailConfig = vi.fn();
 const sendInvitationEmail = vi.fn();
+const requireSensitiveActionAuth = vi.fn();
+const isGridmasterActor = vi.fn();
 
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
@@ -30,6 +32,7 @@ vi.mock("@/lib/csrf", () => ({
 vi.mock("@/lib/api-auth", () => ({
   forbidIfSandboxCookie: (req: NextRequest) => forbidIfSandboxCookie(req),
   requireAuthenticatedUser: (req: NextRequest) => requireAuthenticatedUser(req),
+  requireSensitiveActionAuth: (req: NextRequest) => requireSensitiveActionAuth(req),
 }));
 vi.mock("@/lib/rate-limit", () => ({
   apiLimiter: {},
@@ -43,6 +46,7 @@ vi.mock("@/app/api/shared/permissions", () => ({
 }));
 vi.mock("@/app/api/employees/shared", () => ({
   canAssignOrgRole: (...args: unknown[]) => canAssignOrgRole(...args),
+  isGridmasterActor: (...args: unknown[]) => isGridmasterActor(...args),
 }));
 vi.mock("@/lib/logger", () => ({ default: { error: vi.fn() } }));
 vi.mock("@/lib/sentry", () => ({ captureException: vi.fn() }));
@@ -188,6 +192,8 @@ beforeEach(() => {
   getInvitationEmailConfig.mockReturnValue({ apiKey: "key", from: "DubGrid <a@b.c>" });
   sendInvitationEmail.mockResolvedValue(undefined);
   auditInsert.mockResolvedValue({ error: null });
+  isGridmasterActor.mockResolvedValue(false);
+  requireSensitiveActionAuth.mockResolvedValue({ user: { id: "actor-1" } });
 });
 
 describe("POST /api/organizations/invitations", () => {
@@ -648,7 +654,7 @@ describe("PATCH /api/organizations/invitations - super_admin tier ceiling", () =
     expect(invitationUpdateOperations[0]?.values.role_to_assign).toBe("super_admin");
   });
 
-  it("does not consult the tier ceiling when the role is not being changed", async () => {
+  it("checks a redirect against the invitation's current role", async () => {
     invitationUpdateMaybeSingle.mockResolvedValue({
       data: CURRENT_INVITATION_ROW,
       error: null,
@@ -665,7 +671,7 @@ describe("PATCH /api/organizations/invitations - super_admin tier ceiling", () =
     );
 
     expect(response.status).toBe(200);
-    expect(canAssignOrgRole).not.toHaveBeenCalled();
+    expect(canAssignOrgRole).toHaveBeenCalledWith(expect.anything(), "actor-1", ORG_ID, "user");
   });
 });
 
@@ -813,5 +819,207 @@ describe("POST /api/organizations/invitations - throttling", () => {
 
     expect(response.status).toBe(503);
     expect(response.headers.get("Retry-After")).toBeNull();
+  });
+});
+
+describe("a Gridmaster's invitation changes (41d4, F-59)", () => {
+  const staleSession = () => ({
+    response: NextResponse.json({ code: "STEP_UP_REQUIRED" }, { status: 403 }),
+  });
+  const pendingInvitation = {
+    ...CURRENT_INVITATION_ROW,
+    expires_at: "2099-02-01T00:00:00.000Z",
+  };
+
+  it("changes no role on a stale session", async () => {
+    isGridmasterActor.mockResolvedValue(true);
+    requireSensitiveActionAuth.mockResolvedValue(staleSession());
+
+    const { PATCH } = await importRoute();
+    const response = await PATCH(
+      makePatchRequest({
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+        roleToAssign: "super_admin",
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ code: "STEP_UP_REQUIRED" });
+    expect(invitationUpdateOperations).toHaveLength(0);
+  });
+
+  it("redirects no invitation to another address on a stale session", async () => {
+    isGridmasterActor.mockResolvedValue(true);
+    requireSensitiveActionAuth.mockResolvedValue(staleSession());
+
+    const { PATCH } = await importRoute();
+    const response = await PATCH(
+      makePatchRequest({
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+        email: "new@test.com",
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(invitationUpdateOperations).toHaveLength(0);
+  });
+
+  it("records a fresh Gridmaster as the inviter of the raised role", async () => {
+    isGridmasterActor.mockResolvedValue(true);
+    invitationUpdateMaybeSingle.mockResolvedValue({
+      data: { ...CURRENT_INVITATION_ROW, role_to_assign: "super_admin", invited_by: "actor-1" },
+      error: null,
+    });
+
+    const { PATCH } = await importRoute();
+    const response = await PATCH(
+      makePatchRequest({
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+        roleToAssign: "super_admin",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(requireSensitiveActionAuth).toHaveBeenCalledTimes(1);
+    expect(invitationUpdateOperations[0]?.values).toMatchObject({
+      role_to_assign: "super_admin",
+      invited_by: "actor-1",
+    });
+  });
+
+  it("asks an organization admin for no fresh proof and keeps the inviter on a name edit", async () => {
+    buildInvitationChanges.mockReturnValue([
+      { key: "firstName", label: "First name", previousValue: null, nextValue: "Ada" },
+    ]);
+    invitationUpdateMaybeSingle.mockResolvedValue({ data: CURRENT_INVITATION_ROW, error: null });
+
+    const { PATCH } = await importRoute();
+    const response = await PATCH(
+      makePatchRequest({
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+        firstName: "Ada",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
+    expect(invitationUpdateOperations[0]?.values).not.toHaveProperty("invited_by");
+  });
+
+  it("replaces no access on a stale session", async () => {
+    isGridmasterActor.mockResolvedValue(true);
+    requireSensitiveActionAuth.mockResolvedValue(staleSession());
+    invitationSelectMaybeSingle.mockResolvedValue({ data: pendingInvitation, error: null });
+
+    const { POST } = await importRoute();
+    const response = await POST(
+      makePostRequest({
+        action: "replace_access",
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+        roleToAssign: "super_admin",
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(serviceRpc).not.toHaveBeenCalled();
+    expect(sendInvitationEmail).not.toHaveBeenCalled();
+  });
+
+  it("answers the function's tier refusal on replacement with 403", async () => {
+    invitationSelectMaybeSingle.mockResolvedValue({ data: pendingInvitation, error: null });
+    serviceRpc.mockResolvedValue({ data: null, error: { message: "INVITATION_TIER_DENIED" } });
+
+    const { POST } = await importRoute();
+    const response = await POST(
+      makePostRequest({
+        action: "replace_access",
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+        roleToAssign: "super_admin",
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN });
+    expect(sendInvitationEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe("an invitation's grant stays with the person who could make it (41d4 audit)", () => {
+  it("refuses an Admin redirecting a Super Admin invitation to another address", async () => {
+    invitationSelectMaybeSingle.mockResolvedValue({
+      data: { ...CURRENT_INVITATION_ROW, role_to_assign: "super_admin" },
+      error: null,
+    });
+    canAssignOrgRole.mockResolvedValue(false);
+
+    const { PATCH } = await importRoute();
+    const response = await PATCH(
+      makePatchRequest({
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+        email: "mine@test.com",
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(canAssignOrgRole).toHaveBeenCalledWith(
+      expect.anything(),
+      "actor-1",
+      ORG_ID,
+      "super_admin",
+    );
+    expect(invitationUpdateOperations).toHaveLength(0);
+  });
+
+  it("never hands a resent token back to the caller", async () => {
+    const pending = { ...CURRENT_INVITATION_ROW, expires_at: "2099-02-01T00:00:00.000Z" };
+    invitationSelectMaybeSingle
+      .mockResolvedValueOnce({ data: pending, error: null })
+      .mockResolvedValue({
+        data: { ...pending, token: "rotated-token", updated_at: "2026-01-01T00:00:01.000Z" },
+        error: null,
+      });
+    invitationUpdateMaybeSingle.mockResolvedValue({
+      data: { ...pending, token: "rotated-token", updated_at: "2026-01-01T00:00:01.000Z" },
+      error: null,
+    });
+    serviceRpc.mockResolvedValue({
+      data: {
+        invitation_id: INVITATION_ID,
+        token: "rotated-token",
+        expires_at: "2099-02-01T00:00:00.000Z",
+        previous_token: "original-token",
+        previous_expires_at: "2099-01-01T00:00:00.000Z",
+      },
+      error: null,
+    });
+
+    const { POST } = await importRoute();
+    const response = await POST(
+      makePostRequest({
+        action: "resend",
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(JSON.stringify(body)).not.toContain("rotated-token");
+    expect(body).not.toHaveProperty("token");
   });
 });

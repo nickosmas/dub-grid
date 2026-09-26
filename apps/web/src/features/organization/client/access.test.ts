@@ -1,9 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  InvitationAccessConflictError,
+  replaceOrganizationInvitationAccessGuarded,
   saveOrganizationSettingsWithRecovery,
+  updateOrganizationInvitationGuarded,
   type UpdateOrganizationSettingsInput,
 } from "./access";
-import type { Organization } from "@/types";
+import { getStepUpMethod } from "@/features/account/client/step-up";
+import type { Invitation, Organization } from "@/types";
 
 const baseline = {
   id: "00000000-0000-4000-8000-000000000001",
@@ -58,5 +62,77 @@ describe("saveOrganizationSettingsWithRecovery", () => {
       organization: latest,
     });
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("guarded invitation writes and step-up", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const invitationInput = {
+    orgId: "org-1",
+    invitationId: "inv-1",
+    expectedUpdatedAt: "2026-09-26T10:00:00.000Z",
+  };
+  const stepUpBody = {
+    error: "Confirm your identity to continue.",
+    code: "STEP_UP_REQUIRED",
+    method: "totp",
+  };
+  const writes = [
+    {
+      name: "replaceOrganizationInvitationAccessGuarded",
+      send: (accessToken?: string) =>
+        replaceOrganizationInvitationAccessGuarded(
+          { ...invitationInput, roleToAssign: "super_admin" },
+          accessToken,
+        ),
+    },
+    {
+      name: "updateOrganizationInvitationGuarded",
+      send: (accessToken?: string) =>
+        updateOrganizationInvitationGuarded(
+          { ...invitationInput, roleToAssign: "super_admin" },
+          accessToken,
+        ),
+    },
+  ];
+
+  it.each(writes)("$name sends the step-up token as a bearer header", async ({ send }) => {
+    const fetch = vi.fn().mockResolvedValue(jsonResponse({ invitation: { id: "inv-1" } }, 200));
+    vi.stubGlobal("fetch", fetch);
+
+    await send("fresh-token");
+
+    expect(fetch.mock.calls[0]![1]!.headers).toMatchObject({
+      Authorization: "Bearer fresh-token",
+    });
+  });
+
+  it.each(writes)("$name sends no bearer header without a token", async ({ send }) => {
+    const fetch = vi.fn().mockResolvedValue(jsonResponse({ invitation: { id: "inv-1" } }, 200));
+    vi.stubGlobal("fetch", fetch);
+
+    await send();
+
+    expect(fetch.mock.calls[0]![1]!.headers).not.toHaveProperty("Authorization");
+  });
+
+  it.each(writes)("$name throws an error step-up recognizes", async ({ send }) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(stepUpBody, 403)));
+
+    const error = await send().catch((failure: unknown) => failure);
+
+    expect(error).toMatchObject({ status: 403, code: "STEP_UP_REQUIRED", method: "totp" });
+    expect(getStepUpMethod(error)).toBe("totp");
+  });
+
+  it.each(writes)("$name still reports a conflict with the latest invitation", async ({ send }) => {
+    const latest = { id: "inv-1", updatedAt: "2026-09-26T10:01:00.000Z" } as Invitation;
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ invitation: latest }, 409)));
+
+    const error = await send().catch((failure: unknown) => failure);
+
+    expect(error).toBeInstanceOf(InvitationAccessConflictError);
+    expect((error as InvitationAccessConflictError).latestInvitation).toEqual(latest);
   });
 });

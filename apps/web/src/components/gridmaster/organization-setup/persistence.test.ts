@@ -40,4 +40,27 @@ describe("sendOrganizationInvitations", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
+
+  it("sends each invitation, Super Admin included, with the assured token (41d4)", async () => {
+    createOrganizationInvitation.mockResolvedValue({ invitationId: "a", expiresAt: "x" });
+
+    await sendOrganizationInvitations(
+      ORG,
+      [
+        {
+          employeeId: "e1",
+          name: "One",
+          email: "one@example.com",
+          selected: true,
+          role: "super_admin",
+        },
+      ],
+      "fresh-token",
+    );
+
+    expect(createOrganizationInvitation).toHaveBeenCalledWith(
+      { email: "one@example.com", role: "super_admin", orgId: "org-1", employeeId: "e1" },
+      "fresh-token",
+    );
+  });
 });

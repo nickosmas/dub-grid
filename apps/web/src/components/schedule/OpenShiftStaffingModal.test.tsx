@@ -115,11 +115,9 @@ describe("OpenShiftStaffingModal", () => {
     expect(within(dialog).getAllByText("Day shift · Nurse").length).toBeGreaterThan(0);
     expect(within(dialog).getByText("2 people needed")).toBeInTheDocument();
     expect(within(dialog).getByText("Ada Nurse")).toBeInTheDocument();
-    expect(within(dialog).getByText("Full-time · Available all day")).toBeInTheDocument();
-    expect(
-      within(dialog).getByText("Part-time · Working: Evening · Support, 3:00 PM–11:00 PM"),
-    ).toBeInTheDocument();
-    expect(within(dialog).getByText("Full-time · Absent: Annual leave")).toBeInTheDocument();
+    expect(within(dialog).getByText("Available all day")).toBeInTheDocument();
+    expect(within(dialog).getByText("Evening · Support, 3:00 PM–11:00 PM")).toBeInTheDocument();
+    expect(within(dialog).getByText("Absent: Annual leave")).toBeInTheDocument();
     expect(within(dialog).getByRole("radio", { name: /Ada Nurse/ })).toHaveAttribute(
       "aria-checked",
       "false",

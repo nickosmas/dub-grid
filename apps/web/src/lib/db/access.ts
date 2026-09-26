@@ -143,7 +143,7 @@ export async function resendOrganizationInvitationGuarded(input: {
   orgId: string;
   invitationId: string;
   expectedUpdatedAt: string;
-}): Promise<{ invitation: Invitation; token: string; expiresAt: string }> {
+}): Promise<{ invitation: Invitation; expiresAt: string }> {
   const response = await fetch("/api/organizations/invitations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -156,13 +156,12 @@ export async function resendOrganizationInvitationGuarded(input: {
     throw new InvitationAccessConflictError(body.invitation);
   }
 
-  if (!response.ok || !body?.invitation || !body.token || !body.expiresAt) {
+  if (!response.ok || !body?.invitation || !body.expiresAt) {
     throw new Error(getErrorMessage(body, "We couldn't resend invitation. Try again."));
   }
 
   return {
     invitation: body.invitation,
-    token: body.token,
     expiresAt: body.expiresAt,
   };
 }

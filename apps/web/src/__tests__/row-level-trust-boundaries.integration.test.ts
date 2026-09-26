@@ -143,7 +143,10 @@ afterAll(async () => {
 });
 
 describe.runIf(reachable)("invitation role ceiling (F-04, live DB)", () => {
-  it("refuses an admin's direct super-admin invitation and accepts a super admin's", async () => {
+  // The row policy's ceiling (F-04) used to decide who could insert directly.
+  // Since 049 no signed-in caller writes the table at all: invitations are
+  // created by send_invitation, whose tier check has its own live tests.
+  it("refuses every direct invitation insert, whatever the caller's tier (049)", async () => {
     await db.query("BEGIN");
     try {
       const fx = await loadFixture();
@@ -151,21 +154,23 @@ describe.runIf(reachable)("invitation role ceiling (F-04, live DB)", () => {
       await expectRaise(async () => {
         await asUser(fx.admin, fx.orgId);
         await insertInvitation(fx, fx.admin, "super_admin", "ceiling@example.test");
-      }, /row-level security/);
+      }, /permission denied/);
 
-      await asUser(fx.admin, fx.orgId);
-      await insertInvitation(fx, fx.admin, "admin", "peer@example.test");
-      await asSuperuser();
+      await expectRaise(async () => {
+        await asUser(fx.admin, fx.orgId);
+        await insertInvitation(fx, fx.admin, "admin", "peer@example.test");
+      }, /permission denied/);
 
-      await asUser(fx.superAdmin, fx.orgId);
-      await insertInvitation(fx, fx.superAdmin, "super_admin", "owner@example.test");
-      await asSuperuser();
+      await expectRaise(async () => {
+        await asUser(fx.superAdmin, fx.orgId);
+        await insertInvitation(fx, fx.superAdmin, "super_admin", "owner@example.test");
+      }, /permission denied/);
 
-      const { rows } = await db.query<{ email: string }>(
-        `SELECT email FROM public.invitations WHERE org_id = $1 AND email LIKE '%@example.test' ORDER BY email`,
+      const { rows } = await db.query(
+        `SELECT email FROM public.invitations WHERE org_id = $1 AND email LIKE '%@example.test'`,
         [fx.orgId],
       );
-      expect(rows.map((row) => row.email)).toEqual(["owner@example.test", "peer@example.test"]);
+      expect(rows).toEqual([]);
     } finally {
       await db.query("ROLLBACK");
     }

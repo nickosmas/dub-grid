@@ -5822,6 +5822,45 @@ function SchedulerContent({
     [assignments, jobs, shiftCategories],
   );
 
+  // The staffing list has room to name every shift's job, even jobs the grid
+  // hides, and to spell out absences rather than show their codes.
+  const staffingAssignmentLabelById = useMemo(
+    () =>
+      new Map(
+        allAssignmentDefinitions.map((assignment) => {
+          const shiftId = assignment.shiftId ?? assignment.categoryId ?? null;
+          const shift =
+            shiftId != null ? (shiftCategories.find((item) => item.id === shiftId) ?? null) : null;
+          const job =
+            assignment.jobId != null
+              ? (jobs.find((item) => item.id === assignment.jobId) ?? null)
+              : null;
+          const parts = buildShiftDisplayParts({
+            shift,
+            job,
+            assignment,
+            shiftDisplayMode: "name",
+          });
+          const withJob =
+            !parts.secondaryLabel && shift && job && !parts.isShiftOnly
+              ? { ...parts, secondaryLabel: job.name }
+              : parts;
+          return [assignment.id, formatAssignableShiftOptionLabel(withJob)];
+        }),
+      ),
+    [allAssignmentDefinitions, jobs, shiftCategories],
+  );
+  const staffingAbsenceLabelById = useMemo(
+    () =>
+      new Map(
+        allAbsenceTypes.map((absenceType) => [
+          absenceType.id,
+          absenceType.name || absenceType.label,
+        ]),
+      ),
+    [allAbsenceTypes],
+  );
+
   // Why the viewer currently looking at openShiftDetails can't personally
   // claim it — shown in the read-only details modal below.
   const openShiftDetailsReasons = useMemo(() => {
@@ -7301,8 +7340,8 @@ function SchedulerContent({
                   spellOutAssignment(staffingOpenShift.assignmentIds[0]) ??
                   staffingOpenShift.assignmentLabel
                 }
-                assignmentLabelById={assignmentNameMap}
-                absenceTypeLabelById={absenceTypeMap}
+                assignmentLabelById={staffingAssignmentLabelById}
+                absenceTypeLabelById={staffingAbsenceLabelById}
                 candidates={staffingCandidates}
                 dateLabel={parseLocalDateKey(staffingOpenShift.date).toLocaleDateString(undefined, {
                   weekday: "long",

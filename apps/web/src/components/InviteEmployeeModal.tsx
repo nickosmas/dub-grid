@@ -23,6 +23,7 @@ import {
 import { checkEmployeePhoneConflict } from "@/features/employees/client";
 import { useIsInSandbox } from "@/hooks";
 import { usePermissions } from "@/features/permissions/client";
+import { useStepUpAction } from "@/hooks/useStepUpAction";
 
 const ROLE_OPTIONS = [
   { value: "user" as const, label: "User" },
@@ -57,6 +58,7 @@ export default function InviteEmployeeModal({
   const isManagementInvite = !employee;
   const isInSandbox = useIsInSandbox();
   const { isSuperAdmin, isGridmaster } = usePermissions();
+  const stepUp = useStepUpAction();
   const roleOptions = useMemo(
     () => (isSuperAdmin || isGridmaster ? [...ROLE_OPTIONS, SUPER_ADMIN_OPTION] : ROLE_OPTIONS),
     [isSuperAdmin, isGridmaster],
@@ -240,16 +242,23 @@ export default function InviteEmployeeModal({
 
     try {
       // Creates the invitation and sends its email in one request.
-      await createOrganizationInvitation({
-        email: trimmedEmail,
-        role,
-        orgId,
-        employeeId: employee?.id,
-        firstName: isManagementInvite ? firstName.trim() : undefined,
-        lastName: isManagementInvite ? lastName.trim() : undefined,
-        phone: isManagementInvite ? normalizeOptionalUsPhone(phone) || undefined : undefined,
-        departmentIds: isManagementInvite && departmentIds.length > 0 ? departmentIds : undefined,
+      const completed = await stepUp.run(async (accessToken) => {
+        await createOrganizationInvitation(
+          {
+            email: trimmedEmail,
+            role,
+            orgId,
+            employeeId: employee?.id,
+            firstName: isManagementInvite ? firstName.trim() : undefined,
+            lastName: isManagementInvite ? lastName.trim() : undefined,
+            phone: isManagementInvite ? normalizeOptionalUsPhone(phone) || undefined : undefined,
+            departmentIds:
+              isManagementInvite && departmentIds.length > 0 ? departmentIds : undefined,
+          },
+          accessToken,
+        );
       });
+      if (!completed) return;
 
       toast.success(`Invitation email sent to ${trimmedEmail}`);
       setSent(true);
@@ -581,6 +590,7 @@ export default function InviteEmployeeModal({
         </div>
       </Modal>
       {unsavedChangesDialog}
+      {stepUp.dialog}
     </>
   );
 }

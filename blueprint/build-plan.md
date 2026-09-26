@@ -638,4 +638,11 @@
     - [ ] 41d3. **Release qualification** - browser, native-app,
           email-provider and migration/reissue rehearsals with explicit
           production checks; unavailable environment evidence is recorded as
-          a release blocker.
+          a release blocker. It resumed after 41d4 and qualifies it too.
+    - [x] 41d4. **Gridmaster grants with step-up** - a Gridmaster can invite
+          someone as Super Admin from the Gridmaster portal, the setup wizard
+          and the People screens, and every Gridmaster grant (invitation
+          create, edit and access replacement, the setup wizard's Super
+          Admin, People role and permission changes) asks for fresh proof
+          through the step-up prompt rather than failing (F-55, F-58, F-59,
+          F-61).

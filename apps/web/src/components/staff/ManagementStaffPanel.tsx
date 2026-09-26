@@ -99,10 +99,10 @@ interface ManagementStaffPanelProps {
   onResendInvitation?: (invitationId: string) => Promise<void>;
   /** Change the linked member's org role. Provided only when the viewer may
    *  manage access and the person has an editable membership. */
-  onRoleChange?: (newRole: OrganizationRole) => Promise<void>;
+  onRoleChange?: (newRole: OrganizationRole, accessToken?: string) => Promise<void>;
   /** Save the admin member's permission matrix. Provided only when the viewer
    *  may manage access and the person has an editable membership. */
-  onPermissionsChange?: (perms: AdminPermissions) => Promise<void>;
+  onPermissionsChange?: (perms: AdminPermissions, accessToken?: string) => Promise<void>;
   onAddToSchedule?: (person: DirectoryPerson) => void;
   /** True when this panel's subject is the current user — destructive
    *  self-actions (role change, status, remove from management) are hidden. */

@@ -32,6 +32,15 @@ vi.mock("@/lib/sentry", () => ({
   captureException: vi.fn(),
 }));
 
+const stepUpRun = vi.fn();
+const requireCredentialAssurance = vi.fn();
+vi.mock("@/hooks/useStepUpAction", () => ({
+  useStepUpAction: () => ({ run: stepUpRun, dialog: null }),
+}));
+vi.mock("@/features/account/client", () => ({
+  requireCredentialAssurance: (...args: unknown[]) => requireCredentialAssurance(...args),
+}));
+
 vi.mock("sonner", () => ({
   toast: {
     success: vi.fn(),
@@ -82,6 +91,11 @@ function makeOrganization(): Organization {
 describe("OrganizationSetupWizard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    stepUpRun.mockImplementation(async (action: (token: string) => Promise<unknown>) => {
+      await action("fresh-token");
+      return true;
+    });
+    requireCredentialAssurance.mockResolvedValue({ success: true });
     vi.mocked(createGridmasterOrganizationSetup).mockResolvedValue({
       org: makeOrganization(),
       superAdmin: { kind: "assigned", displayName: "Jane Doe" },
@@ -148,6 +162,12 @@ describe("OrganizationSetupWizard", () => {
       );
 
       expect(await screen.findByRole("button", { name: /set up now/i })).toBeInTheDocument();
+      // Naming a Super Admin grants the role, so setup ran with fresh proof (41d4).
+      expect(requireCredentialAssurance).toHaveBeenCalledWith("fresh-token");
+      expect(vi.mocked(createGridmasterOrganizationSetup)).toHaveBeenCalledWith(
+        expect.objectContaining({ superAdminEmail: "jane@example.com" }),
+        "fresh-token",
+      );
 
       await user.click(screen.getByRole("button", { name: /set up now/i }));
       expect(screen.getAllByText(/select scheduled department/i).length).toBeGreaterThan(0);

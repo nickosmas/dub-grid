@@ -133,7 +133,12 @@ vi.mock("@/components/staff-detail/tabs/ActivityTab", () => ({
 
 let lastEditEmployeePanelSave: ((updatedEmployee: unknown) => void | Promise<void>) | null = null;
 let lastEditEmployeePanelSaveWithReinvite:
-  ((updatedEmployee: unknown, oldInvitation: unknown) => void | Promise<void>) | null = null;
+  | ((
+      updatedEmployee: unknown,
+      oldInvitation: unknown,
+      runStepUp: (action: (accessToken: string) => Promise<unknown>) => Promise<boolean>,
+    ) => void | Promise<void>)
+  | null = null;
 let lastEditEmployeePanelPendingInvitation: unknown = undefined;
 let lastEditEmployeePanelPersistent = false;
 
@@ -389,7 +394,6 @@ describe("StaffDetailPage", () => {
 
   it("reissues a pending invitation in place instead of revoking it and inviting again", async () => {
     vi.mocked(resendInvitation).mockResolvedValue({
-      token: "rotated-token",
       expiresAt: "2099-01-04T00:00:00.000Z",
     });
     render(<StaffDetailPage employeeId="emp-1" />);
@@ -666,6 +670,10 @@ describe("StaffDetailPage", () => {
       await lastEditEmployeePanelSaveWithReinvite!(
         { ...mockEmployee, email: "new.address@example.com" },
         oldInvitation,
+        async (action: (accessToken: string) => Promise<unknown>) => {
+          await action("step-up-token");
+          return true;
+        },
       );
     });
 
@@ -681,6 +689,7 @@ describe("StaffDetailPage", () => {
         employeeId: "emp-1",
         departmentIds: undefined,
       }),
+      "step-up-token",
     );
     expect(vi.mocked(toast.success)).toHaveBeenCalledWith(
       expect.stringContaining("new.address@example.com"),

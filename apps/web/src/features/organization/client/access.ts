@@ -127,11 +127,15 @@ async function requestOrganizationJson<T>(input: string, init?: RequestInit): Pr
     : null;
 
   if (!response.ok) {
-    throw new OrganizationRequestError(
-      formatClientErrorMessage(body?.error, "Organization request failed."),
-      response.status,
-      null,
-      typeof body?.code === "string" ? body.code : null,
+    // The method lets step-up recognize a request for fresh proof.
+    throw Object.assign(
+      new OrganizationRequestError(
+        formatClientErrorMessage(body?.error, "Organization request failed."),
+        response.status,
+        null,
+        typeof body?.code === "string" ? body.code : null,
+      ),
+      { method: body?.method },
     );
   }
 
@@ -175,22 +179,28 @@ export function fetchOrganizationInvitations(orgId: string): Promise<Invitation[
   ).then((data) => data.invitations);
 }
 
-export async function createOrganizationInvitation(input: {
-  email: string;
-  role: AssignableOrganizationRole;
-  orgId: string;
-  employeeId?: string;
-  firstName?: string;
-  lastName?: string;
-  phone?: string;
-  departmentIds?: number[];
-  deptAdminIds?: number[];
-}): Promise<{ invitationId: string; expiresAt: string; resent?: boolean }> {
+export async function createOrganizationInvitation(
+  input: {
+    email: string;
+    role: AssignableOrganizationRole;
+    orgId: string;
+    employeeId?: string;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    departmentIds?: number[];
+    deptAdminIds?: number[];
+  },
+  accessToken?: string,
+): Promise<{ invitationId: string; expiresAt: string; resent?: boolean }> {
   // Creates the invitation and sends its email in one request; a failed send
   // throws, and nothing is left behind.
   return requestOrganizationJson("/api/organizations/invitations/create", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify(input),
   });
 }
@@ -318,21 +328,27 @@ export async function removeOrganizationMembershipGuarded(input: {
   }
 }
 
-export async function updateOrganizationInvitationGuarded(input: {
-  orgId: string;
-  invitationId: string;
-  expectedUpdatedAt: string;
-  email?: string;
-  roleToAssign?: OrganizationRole;
-  firstName?: string;
-  lastName?: string;
-  phone?: string;
-  departmentIds?: number[];
-  deptAdminIds?: number[];
-}): Promise<Invitation> {
+export async function updateOrganizationInvitationGuarded(
+  input: {
+    orgId: string;
+    invitationId: string;
+    expectedUpdatedAt: string;
+    email?: string;
+    roleToAssign?: OrganizationRole;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    departmentIds?: number[];
+    deptAdminIds?: number[];
+  },
+  accessToken?: string,
+): Promise<Invitation> {
   const response = await fetch(resolveClientUrl("/api/organizations/invitations"), {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify(input),
   });
 
@@ -343,7 +359,10 @@ export async function updateOrganizationInvitationGuarded(input: {
   }
 
   if (!response.ok || !body?.invitation) {
-    throw new Error(getErrorMessage(body, "We couldn't update invitation. Try again."));
+    throw Object.assign(
+      new Error(getErrorMessage(body, "We couldn't update invitation. Try again.")),
+      { status: response.status, code: body?.code, method: body?.method },
+    );
   }
 
   return body.invitation;
@@ -377,7 +396,7 @@ export async function resendOrganizationInvitationGuarded(input: {
   orgId: string;
   invitationId: string;
   expectedUpdatedAt: string;
-}): Promise<{ invitation: Invitation; token: string; expiresAt: string }> {
+}): Promise<{ invitation: Invitation; expiresAt: string }> {
   const response = await fetch(resolveClientUrl("/api/organizations/invitations"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -390,26 +409,31 @@ export async function resendOrganizationInvitationGuarded(input: {
     throw new InvitationAccessConflictError(body.invitation);
   }
 
-  if (!response.ok || !body?.invitation || !body.token || !body.expiresAt) {
+  if (!response.ok || !body?.invitation || !body.expiresAt) {
     throw new Error(getErrorMessage(body, "We couldn't resend invitation. Try again."));
   }
 
   return {
     invitation: body.invitation,
-    token: body.token,
     expiresAt: body.expiresAt,
   };
 }
 
-export async function replaceOrganizationInvitationAccessGuarded(input: {
-  orgId: string;
-  invitationId: string;
-  expectedUpdatedAt: string;
-  roleToAssign: OrganizationRole;
-}): Promise<{ invitation: Invitation }> {
+export async function replaceOrganizationInvitationAccessGuarded(
+  input: {
+    orgId: string;
+    invitationId: string;
+    expectedUpdatedAt: string;
+    roleToAssign: OrganizationRole;
+  },
+  accessToken?: string,
+): Promise<{ invitation: Invitation }> {
   const response = await fetch(resolveClientUrl("/api/organizations/invitations"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify({ ...input, action: "replace_access" }),
   });
 
@@ -420,7 +444,10 @@ export async function replaceOrganizationInvitationAccessGuarded(input: {
   }
 
   if (!response.ok || !body?.invitation) {
-    throw new Error(getErrorMessage(body, "We couldn't replace that invitation. Try again."));
+    throw Object.assign(
+      new Error(getErrorMessage(body, "We couldn't replace that invitation. Try again.")),
+      { status: response.status, code: body?.code, method: body?.method },
+    );
   }
 
   return { invitation: body.invitation };
@@ -442,7 +469,7 @@ export async function revokeInvitation(invitationId: string, orgId: string): Pro
 export async function resendInvitation(
   invitationId: string,
   orgId: string,
-): Promise<{ token: string; expiresAt: string }> {
+): Promise<{ expiresAt: string }> {
   const invitations = await fetchOrganizationInvitations(orgId);
   const invitation = invitations.find((item) => item.id === invitationId);
   if (!invitation?.updatedAt) {
@@ -453,10 +480,7 @@ export async function resendInvitation(
     invitationId,
     expectedUpdatedAt: invitation.updatedAt,
   });
-  return {
-    token: resent.token,
-    expiresAt: resent.expiresAt,
-  };
+  return { expiresAt: resent.expiresAt };
 }
 
 export async function removeUserFromOrganization(userId: string, orgId: string): Promise<void> {
@@ -485,6 +509,7 @@ export async function updatePendingInvitation(
     departmentIds?: number[];
     deptAdminIds?: number[];
   },
+  accessToken?: string,
 ): Promise<void> {
   const invitations = await fetchOrganizationInvitations(orgId);
   const invitation = invitations.find((item) => item.id === invitationId);
@@ -492,18 +517,21 @@ export async function updatePendingInvitation(
     throw new Error("Invitation data is out of date. Refresh and try again.");
   }
 
-  await updateOrganizationInvitationGuarded({
-    orgId,
-    invitationId,
-    expectedUpdatedAt: invitation.updatedAt,
-    firstName: data.firstName,
-    lastName: data.lastName,
-    phone: data.phone,
-    email: data.email?.toLowerCase(),
-    roleToAssign: data.roleToAssign,
-    departmentIds: data.departmentIds,
-    deptAdminIds: data.deptAdminIds,
-  });
+  await updateOrganizationInvitationGuarded(
+    {
+      orgId,
+      invitationId,
+      expectedUpdatedAt: invitation.updatedAt,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      phone: data.phone,
+      email: data.email?.toLowerCase(),
+      roleToAssign: data.roleToAssign,
+      departmentIds: data.departmentIds,
+      deptAdminIds: data.deptAdminIds,
+    },
+    accessToken,
+  );
 }
 
 export async function updateAppOnlyUser(

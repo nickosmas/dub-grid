@@ -6,7 +6,11 @@ import {
 } from "@dubgrid/contracts";
 import { z } from "zod";
 import { validateCsrfOrigin } from "@/lib/csrf";
-import { forbidIfSandboxCookie, requireAuthenticatedUser } from "@/lib/api-auth";
+import {
+  forbidIfSandboxCookie,
+  requireAuthenticatedUser,
+  requireSensitiveActionAuth,
+} from "@/lib/api-auth";
 import {
   apiLimiter,
   checkRateLimit,
@@ -16,7 +20,11 @@ import {
 } from "@/lib/rate-limit";
 import { retryAfterSeconds } from "@/lib/retry-after";
 import { getServiceClient } from "@/lib/supabase-service";
-import { canAssignOrgRole, canManageEmployees } from "@/app/api/employees/shared";
+import {
+  canAssignOrgRole,
+  canManageEmployees,
+  isGridmasterActor,
+} from "@/app/api/employees/shared";
 import { writeInvitationAuditEntry } from "@/lib/audit/invitation";
 import { getRequestIp } from "@/features/mobile/server/management-roster";
 import type { AssignableOrganizationRole } from "@/types";
@@ -254,6 +262,11 @@ export async function POST(req: NextRequest) {
       return buildStaffValidationErrorResponse(fieldErrors);
     }
 
+    if (await isGridmasterActor(serviceClient, user.id)) {
+      const assurance = await requireSensitiveActionAuth(req);
+      if ("response" in assurance) return assurance.response;
+    }
+
     // Nothing is created unless its email can go out.
     if (!getInvitationEmailConfig()) {
       return createInvitationEmailUnavailableResponse();
@@ -462,7 +475,7 @@ export async function POST(req: NextRequest) {
         { status: 404 },
       );
     }
-    if (text.includes("unauthorized")) {
+    if (text.includes("unauthorized") || text.includes("invitation_tier_denied")) {
       return NextResponse.json(
         { error: "You don't have permission to send invitations here." },
         { status: 403 },

@@ -5,6 +5,7 @@ import * as fc from "fast-check";
 import EditEmployeePanel from "@/components/EditEmployeePanel";
 import { checkEmployeeEmailConflict } from "@/features/employees/client";
 import { Employee, FocusArea, Invitation, NamedItem } from "@/types";
+import type { StepUpRun } from "@/hooks/useStepUpAction";
 
 vi.mock("@/hooks", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/hooks")>()),
@@ -138,6 +139,7 @@ function renderPanel(
     onSaveWithReinvite: (
       updated: Employee,
       oldInvitation: Invitation,
+      runStepUp: StepUpRun,
     ) => boolean | void | Promise<boolean | void>;
     orgId: string;
     onEmailConflictChange: (hasConflict: boolean) => void;
@@ -695,6 +697,7 @@ describe("EditEmployeePanel", () => {
       expect(onSaveWithReinvite).toHaveBeenCalledWith(
         expect.objectContaining({ email: "new.address@example.com" }),
         pendingInvitation,
+        stepUpRun,
       );
       expect(onSave).not.toHaveBeenCalled();
     });

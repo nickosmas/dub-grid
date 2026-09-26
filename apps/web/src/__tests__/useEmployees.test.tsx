@@ -14,6 +14,7 @@ const mockActivateEmployee = vi.fn();
 const mockCreateOrganizationInvitation = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockToastError = vi.fn();
+const runStepUp = vi.fn();
 
 vi.mock("@/features/employees/client", () => {
   class MockEmployeeProfileConflictError extends Error {
@@ -48,6 +49,7 @@ vi.mock("sonner", () => ({
   toast: {
     success: (...args: unknown[]) => mockToastSuccess(...args),
     error: (...args: unknown[]) => mockToastError(...args),
+    info: vi.fn(),
   },
 }));
 
@@ -101,6 +103,10 @@ describe("useEmployees — handleSaveEmployeeWithReinvite", () => {
       ...employee,
       version: employee.version + 1,
     }));
+    runStepUp.mockImplementation(async (action: (token: string) => Promise<unknown>) => {
+      await action("step-up-token");
+      return true;
+    });
     mockCreateOrganizationInvitation.mockResolvedValue({
       invitationId: "inv-2",
       token: "fresh-token",
@@ -126,7 +132,11 @@ describe("useEmployees — handleSaveEmployeeWithReinvite", () => {
     let saved = false;
 
     await act(async () => {
-      saved = await result.current.handleSaveEmployeeWithReinvite(updated, OLD_INVITATION);
+      saved = await result.current.handleSaveEmployeeWithReinvite(
+        updated,
+        OLD_INVITATION,
+        runStepUp,
+      );
     });
 
     expect(saved).toBe(true);
@@ -140,9 +150,30 @@ describe("useEmployees — handleSaveEmployeeWithReinvite", () => {
         departmentIds: [10],
         deptAdminIds: [11],
       }),
+      "step-up-token",
     );
     expect(mockToastSuccess).toHaveBeenCalledWith(expect.stringContaining("new@example.com"));
     expect(result.current.employees.find((e) => e.id === "emp-1")?.email).toBe("new@example.com");
+  });
+
+  it("keeps the saved employee and sends nothing when step-up is cancelled", async () => {
+    runStepUp.mockResolvedValueOnce(false);
+    const result = await renderReady();
+    const updated = { ...EMPLOYEE, email: "new@example.com" };
+    let saved = false;
+
+    await act(async () => {
+      saved = await result.current.handleSaveEmployeeWithReinvite(
+        updated,
+        OLD_INVITATION,
+        runStepUp,
+      );
+    });
+
+    expect(saved).toBe(true);
+    expect(mockCreateOrganizationInvitation).not.toHaveBeenCalled();
+    expect(mockToastSuccess).not.toHaveBeenCalled();
+    expect(mockToastError).not.toHaveBeenCalled();
   });
 
   it("shows a distinct error but keeps the saved employee when the identity save succeeds but sending the new invite fails", async () => {
@@ -155,7 +186,11 @@ describe("useEmployees — handleSaveEmployeeWithReinvite", () => {
     let saved = false;
 
     await act(async () => {
-      saved = await result.current.handleSaveEmployeeWithReinvite(updated, OLD_INVITATION);
+      saved = await result.current.handleSaveEmployeeWithReinvite(
+        updated,
+        OLD_INVITATION,
+        runStepUp,
+      );
     });
 
     expect(saved).toBe(true);
@@ -176,7 +211,11 @@ describe("useEmployees — handleSaveEmployeeWithReinvite", () => {
     let saved = true;
 
     await act(async () => {
-      saved = await result.current.handleSaveEmployeeWithReinvite(updated, OLD_INVITATION);
+      saved = await result.current.handleSaveEmployeeWithReinvite(
+        updated,
+        OLD_INVITATION,
+        runStepUp,
+      );
     });
 
     expect(saved).toBe(false);

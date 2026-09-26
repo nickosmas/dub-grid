@@ -10,6 +10,7 @@ import Link from "next/link";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import type { AdminPermissions, OrganizationRole } from "@/types";
 import { Employee, FocusArea, NamedItem, Invitation } from "@/types";
+import type { StepUpRun } from "@/hooks/useStepUpAction";
 import { isSelfAction } from "@dubgrid/domain";
 import { useAuth } from "@/components/AuthProvider";
 import { getInitials, getEmployeeDisplayName } from "@/lib/utils";
@@ -47,6 +48,7 @@ interface StaffDetailPanelProps {
   onSaveWithReinvite?: (
     updatedEmployee: Employee,
     oldInvitation: Invitation,
+    runStepUp: StepUpRun,
   ) => boolean | Promise<boolean>;
   onRemove: (empId: string, note?: string) => void;
   onDeactivate: (empId: string, note?: string) => void;
@@ -55,10 +57,10 @@ interface StaffDetailPanelProps {
   onInvite?: (emp: Employee) => void;
   /** Org access tier, matching the directory table's Access column. */
   orgRole?: OrganizationRole | null;
-  onRoleChange?: (newRole: OrganizationRole) => Promise<void>;
+  onRoleChange?: (newRole: OrganizationRole, accessToken?: string) => Promise<void>;
   /** The permission set behind an admin's `orgRole`, for the on-panel launcher. */
   adminPermissions?: AdminPermissions | null;
-  onPermissionsChange?: (permissions: AdminPermissions) => Promise<void>;
+  onPermissionsChange?: (permissions: AdminPermissions, accessToken?: string) => Promise<void>;
   canManageManagementAccess?: boolean;
   hasManagementAccess?: boolean;
   hasPendingManagementInvite?: boolean;

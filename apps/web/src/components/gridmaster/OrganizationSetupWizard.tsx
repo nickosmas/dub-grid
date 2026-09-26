@@ -31,6 +31,8 @@ import {
 } from "./organization-setup/types";
 import { WizardStepper } from "./organization-setup/WizardStepper";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { requireCredentialAssurance } from "@/features/account/client";
+import { useStepUpAction } from "@/hooks/useStepUpAction";
 
 // ── Main Wizard ───────────────────────────────────────────────────────────────
 
@@ -60,6 +62,8 @@ export default function OrganizationSetupWizard({
   };
   const [currentStep, setCurrentStep] = useState<StepKey>("details");
   const [saving, setSaving] = useState(false);
+  // A Gridmaster's Super Admin grant and invitations need fresh proof (41d4).
+  const stepUp = useStepUpAction();
   const [setupConfirmAction, setSetupConfirmAction] = useState<SetupConfirmAction | null>(null);
   const [createdOrg, setCreatedOrg] = useState<Organization | null>(null);
 
@@ -155,7 +159,7 @@ export default function OrganizationSetupWizard({
   const handleSuperAdminNext = useCallback(async () => {
     setSaving(true);
     try {
-      const { org, superAdmin } = await createOrganizationSetup({
+      const input = {
         name,
         addressLine1,
         addressLine2,
@@ -173,20 +177,31 @@ export default function OrganizationSetupWizard({
         superAdminLastName,
         superAdminEmail,
         superAdminPhone,
-      });
-      setCreatedOrg(org);
-      if (superAdmin.kind === "assigned") {
-        toast.success(`Organization created & ${superAdmin.displayName} assigned as super admin`);
-      } else if (superAdmin.kind === "invited") {
-        toast.success(`Organization created & invitation sent to ${superAdmin.displayName}`);
-      } else if (superAdmin.kind === "invite-error") {
-        toast.success("Organization created");
-        toast.error(formatClientErrorMessage(superAdmin.message, "Failed to create invitation"));
-      } else {
-        toast.success("Organization created");
-      }
+      };
+      const create = async (accessToken?: string) => {
+        const { org, superAdmin } = await createOrganizationSetup(input, accessToken);
+        setCreatedOrg(org);
+        if (superAdmin.kind === "assigned") {
+          toast.success(`Organization created & ${superAdmin.displayName} assigned as super admin`);
+        } else if (superAdmin.kind === "invited") {
+          toast.success(`Organization created & invitation sent to ${superAdmin.displayName}`);
+        } else if (superAdmin.kind === "invite-error") {
+          toast.success("Organization created");
+          toast.error(formatClientErrorMessage(superAdmin.message, "Failed to create invitation"));
+        } else {
+          toast.success("Organization created");
+        }
 
-      setCurrentStep("decision");
+        setCurrentStep("decision");
+      };
+      if (superAdminEmail.trim()) {
+        await stepUp.run(async (accessToken) => {
+          await requireCredentialAssurance(accessToken);
+          await create(accessToken);
+        });
+      } else {
+        await create();
+      }
     } catch (err: unknown) {
       toast.error(formatClientErrorMessage(err, "Failed to create organization"));
     } finally {
@@ -210,6 +225,7 @@ export default function OrganizationSetupWizard({
     superAdminLastName,
     superAdminEmail,
     superAdminPhone,
+    stepUp,
   ]);
 
   // ── Step 3: Save config ───────────────────────────────────────────────────
@@ -300,16 +316,27 @@ export default function OrganizationSetupWizard({
     setSaving(true);
 
     try {
-      const { sentCount, failCount } = await sendOrganizationInvitations(createdOrg, selected);
+      await stepUp.run(async (accessToken) => {
+        await requireCredentialAssurance(accessToken);
+        const { sentCount, failCount } = await sendOrganizationInvitations(
+          createdOrg,
+          selected,
+          accessToken,
+        );
 
-      if (sentCount > 0) toast.success(`Sent ${sentCount} invitation${sentCount !== 1 ? "s" : ""}`);
-      if (failCount > 0) toast.error(`${failCount} invitation${failCount !== 1 ? "s" : ""} failed`);
+        if (sentCount > 0)
+          toast.success(`Sent ${sentCount} invitation${sentCount !== 1 ? "s" : ""}`);
+        if (failCount > 0)
+          toast.error(`${failCount} invitation${failCount !== 1 ? "s" : ""} failed`);
 
-      onCreated(createdOrg);
+        onCreated(createdOrg);
+      });
+    } catch (err: unknown) {
+      toast.error(formatClientErrorMessage(err, "We couldn't send the invitations. Try again."));
     } finally {
       setSaving(false);
     }
-  }, [createdOrg, invitationRows, onCreated]);
+  }, [createdOrg, invitationRows, onCreated, stepUp]);
 
   async function handleConfirmSetupAction() {
     const action = setupConfirmAction;
@@ -1921,6 +1948,7 @@ export default function OrganizationSetupWizard({
                       options={[
                         { value: "user", label: "User" },
                         { value: "admin", label: "Admin" },
+                        { value: "super_admin", label: "Super Admin" },
                       ]}
                       onChange={(val) => {
                         setInvitationRows((prev) =>
@@ -2036,7 +2064,8 @@ export default function OrganizationSetupWizard({
       {currentStep === "config" && renderConfig()}
       {currentStep === "employees" && renderEmployees()}
       {currentStep === "invitations" && renderInvitations()}
-      {setupConfirmCopy && (
+      {stepUp.dialog}
+      {setupConfirmCopy && !stepUp.dialog && (
         <ConfirmDialog
           title={setupConfirmCopy.title}
           message={setupConfirmCopy.message}

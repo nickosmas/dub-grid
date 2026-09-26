@@ -281,6 +281,38 @@ describe("PATCH /api/organizations/access notifications", () => {
     expect(userRpc).not.toHaveBeenCalled();
   });
 
+  it("asks a Gridmaster for fresh proof before changing only permissions (41d4, F-61)", async () => {
+    requireOrgPermissions.mockResolvedValue({
+      orgId: REQUESTED_ORG_ID,
+      userClient,
+      permissions: { isGridmaster: true },
+    });
+    requireSensitiveActionAuth.mockResolvedValueOnce({
+      response: new Response(JSON.stringify({ code: "STEP_UP_REQUIRED", method: "totp" }), {
+        status: 403,
+      }),
+    });
+    membershipSelectEq2.mockResolvedValue({
+      data: {
+        user_id: TARGET_USER_ID,
+        org_id: REQUESTED_ORG_ID,
+        org_role: "admin",
+        admin_permissions: { canViewStaff: true, canEditShifts: false },
+        updated_at: UPDATED_AT,
+      },
+      error: null,
+    });
+
+    const { PATCH } = await import("./route");
+    const res = await PATCH(
+      makePatchRequest({ adminPermissions: { canViewStaff: true, canEditShifts: true } }),
+    );
+
+    expect(res.status).toBe(403);
+    expect(membershipUpdateEq3).not.toHaveBeenCalled();
+    expect(userRpc).not.toHaveBeenCalled();
+  });
+
   it("asks an organization's own Super Admin for no extra proof", async () => {
     membershipSelectEq2.mockResolvedValue({
       data: {

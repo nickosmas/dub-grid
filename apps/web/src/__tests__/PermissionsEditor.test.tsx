@@ -154,4 +154,29 @@ describe("PermissionsEditor", () => {
     expect(onSave).not.toHaveBeenCalled();
     expect(screen.getByText("Check these first.")).toBeInTheDocument();
   });
+
+  it("hides the review while a step-up dialog takes over the save (41d4)", async () => {
+    const user = userEvent.setup();
+    renderEditor({
+      obscured: true,
+      buildReview: () => ({
+        title: "Review permission changes",
+        description: "Check these first.",
+        changes: [
+          {
+            key: "adminPermissions",
+            label: "Admin Permissions",
+            previousDisplay: "No extra permissions",
+            nextDisplay: "View coverage requirements",
+            sensitive: true,
+          },
+        ],
+      }),
+    });
+
+    await user.click(screen.getByRole("switch", { name: "Coverage view" }));
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    expect(screen.queryByText("Check these first.")).not.toBeInTheDocument();
+  });
 });

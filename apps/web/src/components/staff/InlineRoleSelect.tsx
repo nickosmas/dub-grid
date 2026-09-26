@@ -8,6 +8,7 @@ import { SELF_ACTION_FORBIDDEN_MESSAGE } from "@dubgrid/domain";
 import CustomSelect from "@/components/CustomSelect";
 import { MaybeHint } from "@/components/ui/hint";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { useStepUpAction } from "@/hooks/useStepUpAction";
 import { ORG_ROLE_LABELS, getOrgRoleBadgeStyle } from "./org-role-badges";
 
 const ROLE_OPTIONS: { value: OrganizationRole; label: string }[] = [
@@ -29,12 +30,13 @@ export function InlineRoleSelect({
   pendingInvitationEmail,
 }: {
   orgRole: OrganizationRole | null | undefined;
-  onChange?: (newRole: OrganizationRole) => Promise<void>;
+  onChange?: (newRole: OrganizationRole, accessToken?: string) => Promise<void>;
   isSelf?: boolean;
   pendingInvitationEmail?: string;
 }) {
   const [pending, setPending] = useState<OrganizationRole | null>(null);
   const [saving, setSaving] = useState(false);
+  const stepUp = useStepUpAction();
 
   // Self can't change own role: show the dropdown in its disabled state so
   // the Access column reads consistently across rows. The hint explains why.
@@ -77,7 +79,7 @@ export function InlineRoleSelect({
         }}
         options={ROLE_OPTIONS}
       />
-      {pending && (
+      {pending && !stepUp.dialog && (
         <ConfirmDialog
           title={pendingInvitationEmail ? "Change invitation access?" : "Change role"}
           message={
@@ -96,7 +98,11 @@ export function InlineRoleSelect({
             const next = pending;
             setSaving(true);
             try {
-              await onChange(next);
+              const completed = await stepUp.run((accessToken) => onChange(next, accessToken));
+              if (!completed) {
+                setPending(null);
+                return;
+              }
               toast.success(
                 pendingInvitationEmail
                   ? `Invitation replaced with ${ORG_ROLE_LABELS[next]} access.`
@@ -113,6 +119,7 @@ export function InlineRoleSelect({
           }}
         />
       )}
+      {stepUp.dialog}
     </div>
   );
 }

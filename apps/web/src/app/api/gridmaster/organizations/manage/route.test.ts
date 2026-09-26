@@ -341,6 +341,26 @@ describe("POST /api/gridmaster/organizations/manage", () => {
     );
   });
 
+  it("tells the portal when no account uses the address, so it can invite instead", async () => {
+    requestRpc.mockResolvedValueOnce({
+      data: null,
+      error: { message: "User with email new@example.com not found" },
+    });
+
+    const response = await POST(
+      makeRequest({
+        action: "assignOrgRoleByEmail",
+        orgId: ORG_ID,
+        email: "new@example.com",
+        role: "super_admin",
+      }),
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ code: "ACCOUNT_NOT_FOUND" });
+    expect(auditInsert).not.toHaveBeenCalled();
+  });
+
   it("creates org setup and includes success plus org payload", async () => {
     const response = await POST(
       makeRequest({
@@ -413,6 +433,25 @@ describe("POST /api/gridmaster/organizations/manage", () => {
       superAdminPhone: "",
     },
   };
+
+  it("creates no organization on a stale session when setup names a Super Admin (F-55)", async () => {
+    requireSensitiveActionAuth.mockResolvedValueOnce({
+      response: NextResponse.json({ code: "STEP_UP_REQUIRED" }, { status: 403 }),
+    });
+
+    const response = await POST(makeRequest(SETUP_WITH_NEW_SUPER_ADMIN));
+
+    expect(response.status).toBe(403);
+    expect(organizationInsert).not.toHaveBeenCalled();
+    expect(requestRpc).not.toHaveBeenCalled();
+  });
+
+  it("asks no fresh proof of a setup that names no Super Admin", async () => {
+    const { superAdminEmail: _omitted, ...input } = SETUP_WITH_NEW_SUPER_ADMIN.input;
+    await POST(makeRequest({ action: "createOrganizationSetup", input }));
+
+    expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
+  });
 
   function inviteInsteadOfAssign() {
     requestRpc.mockImplementation(async (fn: string) => {

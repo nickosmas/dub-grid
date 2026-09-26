@@ -425,7 +425,10 @@ interface PermissionsEditorProps {
   initialPermissions: AdminPermissions | null | undefined;
   showPermissionCounter?: boolean;
   labels?: Partial<PermissionEditorLabels>;
-  onSave: (perms: AdminPermissions) => Promise<void>;
+  /** Resolving `false` means the save was cancelled, so the editor stays open. */
+  onSave: (perms: AdminPermissions) => Promise<void | boolean>;
+  /** True while a step-up dialog takes over the save; the review then hides. */
+  obscured?: boolean;
   onClose: () => void;
   /**
    * `initial` is the resolved starting set (stored row over the admin
@@ -447,6 +450,7 @@ export default function PermissionsEditor({
   onSave,
   onClose,
   buildReview,
+  obscured = false,
 }: PermissionsEditorProps) {
   const initialPerms = useMemo(
     () => buildInitialPermissions(initialPermissions),
@@ -504,7 +508,7 @@ export default function PermissionsEditor({
   async function performSave() {
     setSaving(true);
     try {
-      await onSave(perms);
+      if ((await onSave(perms)) === false) return;
       setReviewConfig(null);
       onClose();
     } catch (err: unknown) {
@@ -646,7 +650,7 @@ export default function PermissionsEditor({
         </div>
       </Modal>
       {unsavedChangesDialog}
-      {reviewConfig ? (
+      {reviewConfig && !obscured ? (
         <ChangeReviewModal
           title={reviewConfig.title}
           description={reviewConfig.description}

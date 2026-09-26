@@ -13,7 +13,7 @@ import { Employee, FocusArea, NamedItem, Invitation } from "@/types";
 import { Button } from "@/components/Button";
 import CustomSelect from "@/components/CustomSelect";
 import { useMediaQuery, MOBILE, useIsInSandbox } from "@/hooks";
-import { useStepUpAction } from "@/hooks/useStepUpAction";
+import { useStepUpAction, type StepUpRun } from "@/hooks/useStepUpAction";
 import { useLatestRef } from "@/hooks/useLatestRef";
 import { requireCredentialAssurance } from "@/features/account/client";
 import {
@@ -93,6 +93,7 @@ export interface EditEmployeePanelProps {
   onSaveWithReinvite?: (
     updatedEmployee: Employee,
     oldInvitation: Invitation,
+    runStepUp: StepUpRun,
   ) => boolean | void | Promise<boolean | void>;
   /** When true, render no Close/Save row — the host renders its own footer and
    *  drives save/dismiss through the ref handle. */
@@ -927,7 +928,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
           )}
         </div>
         {stepUp.dialog}
-        {pendingReinviteSave && pendingInvitation && onSaveWithReinvite && (
+        {pendingReinviteSave && pendingInvitation && onSaveWithReinvite && !stepUp.dialog && (
           <ConfirmDialog
             title="Send a new invitation?"
             message={
@@ -943,7 +944,11 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
             onCancel={() => setPendingReinviteSave(null)}
             onConfirm={async () => {
               const saved =
-                (await onSaveWithReinvite(pendingReinviteSave, pendingInvitation)) !== false;
+                (await onSaveWithReinvite(
+                  pendingReinviteSave,
+                  pendingInvitation,
+                  stepUpRef.current.run,
+                )) !== false;
               if (!saved) return;
               setPendingReinviteSave(null);
               onSaveCompleted?.();

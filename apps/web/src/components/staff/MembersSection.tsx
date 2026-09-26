@@ -79,6 +79,7 @@ import { ManagementStaffPanel } from "./ManagementStaffPanel";
 import { hasSavedScheduleAssignment } from "./capability-state";
 import { InlineRoleSelect } from "./InlineRoleSelect";
 import { updateOrganizationMembershipGuarded } from "@/features/organization/client/access";
+import { useStepUpAction, type StepUpRun } from "@/hooks/useStepUpAction";
 import { AddManagementUserToScheduleModal } from "./AddManagementUserToScheduleModal";
 import { SortIcon } from "./SortIcon";
 import { StaffContextBar } from "./StaffContextBar";
@@ -117,6 +118,7 @@ export interface MembersSectionProps {
   onSaveWithReinvite?: (
     updatedEmployee: Employee,
     oldInvitation: Invitation,
+    runStepUp: StepUpRun,
   ) => boolean | Promise<boolean>;
   onRemove: (empId: string, note?: string) => void;
   onDeactivate: (empId: string, note?: string) => void;
@@ -171,6 +173,7 @@ export function MembersSection({
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuth();
   const { resolvedTheme } = useTheme();
+  const stepUp = useStepUpAction();
   const isDarkTheme = resolvedTheme === "dark";
   const currentUserId = currentUser?.id ?? null;
   const regularUserMode = !canManageEmployees;
@@ -643,16 +646,19 @@ export function MembersSection({
 
   const replacePendingInvitationRole = (
     pendingInvitation: Invitation | null | undefined,
-  ): ((newRole: OrganizationRole) => Promise<void>) | undefined => {
+  ): ((newRole: OrganizationRole, accessToken?: string) => Promise<void>) | undefined => {
     if (!canManageManagementAccess || !orgId || !pendingInvitation?.updatedAt) return undefined;
     const expectedUpdatedAt = pendingInvitation.updatedAt;
-    return async (newRole) => {
-      const replacement = await replaceOrganizationInvitationAccessGuarded({
-        orgId,
-        invitationId: pendingInvitation.id,
-        expectedUpdatedAt,
-        roleToAssign: newRole,
-      });
+    return async (newRole, accessToken) => {
+      const replacement = await replaceOrganizationInvitationAccessGuarded(
+        {
+          orgId,
+          invitationId: pendingInvitation.id,
+          expectedUpdatedAt,
+          roleToAssign: newRole,
+        },
+        accessToken,
+      );
       setPendingInvitations((current) => [
         replacement.invitation,
         ...current.filter((invitation) => invitation.id !== pendingInvitation.id),
@@ -670,7 +676,7 @@ export function MembersSection({
     employeeId: string,
     userId: string | null | undefined,
     membershipUpdatedAt: string | null | undefined,
-  ): ((newRole: OrganizationRole) => Promise<void>) | undefined => {
+  ): ((newRole: OrganizationRole, accessToken?: string) => Promise<void>) | undefined => {
     // Never provide a role-change handler for the current user: you can't
     // change your own role (also blocked at the API/DB boundary).
     if (
@@ -688,13 +694,16 @@ export function MembersSection({
     const oid = orgId;
     const uid = userId;
     const expectedUpdatedAt = membershipUpdatedAt;
-    return async (newRole) => {
-      await updateOrganizationMembershipGuarded({
-        orgId: oid,
-        userId: uid,
-        expectedUpdatedAt,
-        orgRole: newRole,
-      });
+    return async (newRole, accessToken) => {
+      await updateOrganizationMembershipGuarded(
+        {
+          orgId: oid,
+          userId: uid,
+          expectedUpdatedAt,
+          orgRole: newRole,
+        },
+        accessToken,
+      );
       await queryClient.invalidateQueries({
         queryKey: queryKeys.org.directory(oid),
       });
@@ -1075,18 +1084,24 @@ export function MembersSection({
     [orgId, syncDirectoryPersonInCaches, syncExistingEmployeeInCaches],
   );
 
-  const patchSelectedMembership = async (patch: {
-    orgRole?: OrganizationRole;
-    adminPermissions?: AdminPermissions;
-  }) => {
+  const patchSelectedMembership = async (
+    patch: {
+      orgRole?: OrganizationRole;
+      adminPermissions?: AdminPermissions;
+    },
+    accessToken?: string,
+  ) => {
     const person = selectedEmployeeDirectoryPerson;
     if (!orgId || !person?.userId || !person.membershipUpdatedAt) return;
-    const membership = await updateOrganizationMembershipGuarded({
-      orgId,
-      userId: person.userId,
-      expectedUpdatedAt: person.membershipUpdatedAt,
-      ...patch,
-    });
+    const membership = await updateOrganizationMembershipGuarded(
+      {
+        orgId,
+        userId: person.userId,
+        expectedUpdatedAt: person.membershipUpdatedAt,
+        ...patch,
+      },
+      accessToken,
+    );
     syncMembershipInCaches(membership);
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) }),
@@ -1109,13 +1124,15 @@ export function MembersSection({
   const selectedEmployeeRoleChange = !canManageManagementAccess
     ? undefined
     : canWriteSelectedMembership
-      ? (newRole: OrganizationRole) => patchSelectedMembership({ orgRole: newRole })
+      ? (newRole: OrganizationRole, accessToken?: string) =>
+          patchSelectedMembership({ orgRole: newRole }, accessToken)
       : selectedEmployee
         ? roleChangeHandlerFor(selectedEmployee.id, null, null)
         : undefined;
 
   const selectedEmployeePermissionsChange = canWriteSelectedMembership
-    ? (permissions: AdminPermissions) => patchSelectedMembership({ adminPermissions: permissions })
+    ? (permissions: AdminPermissions, accessToken?: string) =>
+        patchSelectedMembership({ adminPermissions: permissions }, accessToken)
     : undefined;
 
   // The `employees` prop is the on-schedule list (parent filters out rows with
@@ -2401,6 +2418,7 @@ export function MembersSection({
         </Modal>
       )}
       {managementAccessUnsavedChangesDialog}
+      {stepUp.dialog}
 
       {selectedPerson && canSeeManagementUsers && (
         <ManagementStaffPanel
@@ -2415,16 +2433,19 @@ export function MembersSection({
             !canManageManagementAccess
               ? undefined
               : selectedPerson.userId && selectedPerson.membershipUpdatedAt
-                ? async (newRole) => {
+                ? async (newRole, accessToken) => {
                     const userId = selectedPerson.userId;
                     const expectedUpdatedAt = selectedPerson.membershipUpdatedAt;
                     if (!orgId || !userId || !expectedUpdatedAt) return;
-                    await updateOrganizationMembershipGuarded({
-                      orgId,
-                      userId,
-                      expectedUpdatedAt,
-                      orgRole: newRole,
-                    });
+                    await updateOrganizationMembershipGuarded(
+                      {
+                        orgId,
+                        userId,
+                        expectedUpdatedAt,
+                        orgRole: newRole,
+                      },
+                      accessToken,
+                    );
                     await queryClient.invalidateQueries({
                       queryKey: queryKeys.org.directory(orgId),
                     });
@@ -2442,16 +2463,19 @@ export function MembersSection({
           }
           onPermissionsChange={
             canManageManagementAccess && selectedPerson.userId && selectedPerson.membershipUpdatedAt
-              ? async (perms) => {
+              ? async (perms, accessToken) => {
                   const userId = selectedPerson.userId;
                   const expectedUpdatedAt = selectedPerson.membershipUpdatedAt;
                   if (!orgId || !userId || !expectedUpdatedAt) return;
-                  await updateOrganizationMembershipGuarded({
-                    orgId,
-                    userId,
-                    expectedUpdatedAt,
-                    adminPermissions: perms,
-                  });
+                  await updateOrganizationMembershipGuarded(
+                    {
+                      orgId,
+                      userId,
+                      expectedUpdatedAt,
+                      adminPermissions: perms,
+                    },
+                    accessToken,
+                  );
                   await queryClient.invalidateQueries({
                     queryKey: queryKeys.org.directory(orgId),
                   });
@@ -2505,23 +2529,40 @@ export function MembersSection({
                   // revocation instead.
                   revokedInvitationEmail = pendingInvitation.email;
                 } else if (pendingInvitation) {
-                  await updatePendingInvitation(pendingInvitation.id, orgId, {
-                    firstName: data.firstName,
-                    lastName: data.lastName,
-                    phone: data.phone,
-                    departmentIds: data.managementDepartmentIds,
-                  });
+                  const completed = await stepUp.run((accessToken) =>
+                    updatePendingInvitation(
+                      pendingInvitation.id,
+                      orgId,
+                      {
+                        firstName: data.firstName,
+                        lastName: data.lastName,
+                        phone: data.phone,
+                        departmentIds: data.managementDepartmentIds,
+                      },
+                      accessToken,
+                    ),
+                  );
+                  if (!completed) return false;
                 }
 
                 updatedEmployee = identityResult.employee;
               } else if (selectedPerson.source === "pending_invite") {
-                await updatePendingInvitation(selectedPerson.personId.replace("inv:", ""), orgId, {
-                  firstName: data.firstName,
-                  lastName: data.lastName,
-                  email: data.email || undefined,
-                  phone: data.phone,
-                  departmentIds: data.managementDepartmentIds,
-                });
+                const invitationId = selectedPerson.personId.replace("inv:", "");
+                const completed = await stepUp.run((accessToken) =>
+                  updatePendingInvitation(
+                    invitationId,
+                    orgId,
+                    {
+                      firstName: data.firstName,
+                      lastName: data.lastName,
+                      email: data.email || undefined,
+                      phone: data.phone,
+                      departmentIds: data.managementDepartmentIds,
+                    },
+                    accessToken,
+                  ),
+                );
+                if (!completed) return false;
               } else if (selectedPerson.userId) {
                 await updateAppOnlyUser(selectedPerson.userId, orgId, {
                   firstName: data.firstName,

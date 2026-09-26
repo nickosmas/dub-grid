@@ -15,6 +15,8 @@ import {
   updateAppOnlyUser,
 } from "@/features/organization/client";
 import { useIsInSandbox } from "@/hooks";
+import { usePermissions } from "@/features/permissions/client";
+import { useStepUpAction } from "@/hooks/useStepUpAction";
 import { toast } from "sonner";
 import { getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { formatClientErrorMessage } from "@/lib/client-facing";
@@ -51,6 +53,11 @@ const INVITE_ROLE_OPTIONS: { value: AssignableOrganizationRole; label: string }[
   { value: "admin", label: "Admin" },
 ];
 
+const SUPER_ADMIN_OPTION: { value: AssignableOrganizationRole; label: string } = {
+  value: "super_admin",
+  label: "Super Admin",
+};
+
 /**
  * In-place editor shared by every management-access popup. It edits
  * management departments and nothing else: role and permissions are changed on
@@ -79,6 +86,15 @@ export const EmployeeManagementAccessEditor = forwardRef<
   ref,
 ) {
   const isInSandbox = useIsInSandbox();
+  const { isSuperAdmin, isGridmaster } = usePermissions();
+  const stepUp = useStepUpAction();
+  const inviteRoleOptions = useMemo(
+    () =>
+      isSuperAdmin || isGridmaster
+        ? [...INVITE_ROLE_OPTIONS, SUPER_ADMIN_OPTION]
+        : INVITE_ROLE_OPTIONS,
+    [isSuperAdmin, isGridmaster],
+  );
   const [orgUsers, setOrgUsers] = useState<OrganizationUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -221,15 +237,33 @@ export const EmployeeManagementAccessEditor = forwardRef<
     );
   }
 
-  async function applyMatchedUserAccess(): Promise<Employee | null> {
+  async function applyMatchedUserAccess(): Promise<boolean> {
     // matchedUser only fires when employee.userId is already set (linkedUser)
     // — account linking has been removed, so we no longer link a new user to
     // an unlinked employees row from this surface. The remaining work is to
     // sync role + management departments on the existing membership.
-    if (!matchedUser) return null;
+    if (!matchedUser) return false;
 
-    const updatedEmployee: Employee | null = null;
-
+    if (matchedUser.orgRole !== role && matchedUser.orgRole !== "super_admin") {
+      if (!matchedUser.updatedAt) {
+        throw new Error("User access data is out of date. Refresh and try again.");
+      }
+      const expectedUpdatedAt = matchedUser.updatedAt;
+      const completed = await stepUp.run(async (accessToken) => {
+        await updateOrganizationMembershipGuarded(
+          {
+            orgId,
+            userId: matchedUser.id,
+            expectedUpdatedAt,
+            orgRole: role,
+            adminPermissions: role === "admin" ? matchedUser.adminPermissions : null,
+          },
+          accessToken,
+        );
+      });
+      if (!completed) return false;
+    }
+    // Revoked after the role change, so a cancelled step-up leaves it pending.
     if (pendingInvitation) {
       if (!pendingInvitation.updatedAt) {
         throw new Error("Invitation data is out of date. Refresh and try again.");
@@ -240,22 +274,10 @@ export const EmployeeManagementAccessEditor = forwardRef<
         expectedUpdatedAt: pendingInvitation.updatedAt,
       });
     }
-    if (matchedUser.orgRole !== role && matchedUser.orgRole !== "super_admin") {
-      if (!matchedUser.updatedAt) {
-        throw new Error("User access data is out of date. Refresh and try again.");
-      }
-      await updateOrganizationMembershipGuarded({
-        orgId,
-        userId: matchedUser.id,
-        expectedUpdatedAt: matchedUser.updatedAt,
-        orgRole: role,
-        adminPermissions: role === "admin" ? matchedUser.adminPermissions : null,
-      });
-    }
     await updateAppOnlyUser(matchedUser.id, orgId, {
       departmentIds: managementDepartmentIds,
     });
-    return updatedEmployee;
+    return true;
   }
 
   async function handleSubmit() {
@@ -264,9 +286,9 @@ export const EmployeeManagementAccessEditor = forwardRef<
     setSaving(true);
     try {
       if (matchedUser) {
-        const updatedEmployee = await applyMatchedUserAccess();
+        if (!(await applyMatchedUserAccess())) return;
         toast.success("Management access updated");
-        await onCompleted(updatedEmployee);
+        await onCompleted(null);
       } else if (inviteSaveAction === "revoke" && pendingInvitation) {
         if (!pendingInvitation.updatedAt) {
           throw new Error("Invitation data is out of date. Refresh and try again.");
@@ -284,30 +306,43 @@ export const EmployeeManagementAccessEditor = forwardRef<
         }
         // The email comes from Profile details. This only updates
         // role/departments, so there is nothing to resend.
-        await updateOrganizationInvitationGuarded({
-          orgId,
-          invitationId: pendingInvitation.id,
-          expectedUpdatedAt: pendingInvitation.updatedAt,
-          firstName: employee.firstName,
-          lastName: employee.lastName,
-          phone: employee.phone || undefined,
-          email: effectiveEmail.trim(),
-          roleToAssign: role,
-          departmentIds: managementDepartmentIds,
+        const expectedUpdatedAt = pendingInvitation.updatedAt;
+        const completed = await stepUp.run(async (accessToken) => {
+          await updateOrganizationInvitationGuarded(
+            {
+              orgId,
+              invitationId: pendingInvitation.id,
+              expectedUpdatedAt,
+              firstName: employee.firstName,
+              lastName: employee.lastName,
+              phone: employee.phone || undefined,
+              email: effectiveEmail.trim(),
+              roleToAssign: role,
+              departmentIds: managementDepartmentIds,
+            },
+            accessToken,
+          );
         });
+        if (!completed) return;
         toast.success("Invitation updated");
         await onCompleted(null);
       } else {
-        await createOrganizationInvitation({
-          email: effectiveEmail.trim(),
-          role,
-          orgId,
-          employeeId: employee.id,
-          firstName: employee.firstName,
-          lastName: employee.lastName,
-          phone: employee.phone || undefined,
-          departmentIds: managementDepartmentIds,
+        const completed = await stepUp.run(async (accessToken) => {
+          await createOrganizationInvitation(
+            {
+              email: effectiveEmail.trim(),
+              role,
+              orgId,
+              employeeId: employee.id,
+              firstName: employee.firstName,
+              lastName: employee.lastName,
+              phone: employee.phone || undefined,
+              departmentIds: managementDepartmentIds,
+            },
+            accessToken,
+          );
         });
+        if (!completed) return;
         toast.success(`Management invitation sent to ${effectiveEmail.trim()}`);
         await onCompleted(null);
       }
@@ -351,7 +386,7 @@ export const EmployeeManagementAccessEditor = forwardRef<
             <div style={{ maxWidth: 200 }}>
               <CustomSelect
                 value={role}
-                options={INVITE_ROLE_OPTIONS}
+                options={inviteRoleOptions}
                 onChange={(value) => setRole(value as AssignableOrganizationRole)}
               />
             </div>
@@ -443,6 +478,7 @@ export const EmployeeManagementAccessEditor = forwardRef<
           </div>
         )}
       </section>
+      {stepUp.dialog}
     </>
   );
 });
