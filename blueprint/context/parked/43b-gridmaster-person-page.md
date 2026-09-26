@@ -70,7 +70,7 @@ throwaway worktree, then committed as a local checkpoint and pushed.
 
 ## Build steps
 
-- [ ] **Step 1 - the person record** - `features/gridmaster/server/person-record.ts`
+- [x] **Step 1 - the person record** - `features/gridmaster/server/person-record.ts`
       builds `GridmasterPersonRecord` for a user (auth user, profile, terms
       acceptances, cookie consents, live impersonation, login lock, every
       membership including archived ones, every linked staff row, every
@@ -160,20 +160,20 @@ interface GridmasterPersonRecord {
   };
   termsAcceptances: { version: string; acceptedAt: string; userAgent: string | null }[];
   cookieConsents: {
-    version: string;
+    version: string | null;
     consent: Record<string, boolean>;
     createdAt: string;
     userAgent: string | null;
   }[];
   liveImpersonation: null | {
-    gridmasterEmail: string | null;
+    gridmasterId: string; // resolved through actors
     orgId: string;
     startedAt: string;
     expiresAt: string;
   };
   loginLock: null | { locked: boolean; resetsAt: string | null };
   organizations: {
-    org: { id: string; name: string; slug: string };
+    org: { id: string; name: string; slug: string | null };
     membership: GridmasterMembership | null; // every column, archived included
     employees: Employee[]; // every linked staff row there
     invitations: GridmasterInvitation[]; // every column except the token
