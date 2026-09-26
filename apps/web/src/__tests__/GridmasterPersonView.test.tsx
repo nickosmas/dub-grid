@@ -244,8 +244,6 @@ describe("GridmasterPersonView", () => {
 
     expect(await screen.findByText("Sign-in email")).toBeInTheDocument();
     expect(screen.getAllByText("ada@example.com").length).toBeGreaterThan(0);
-    expect(screen.getByText("Two-factor")).toBeInTheDocument();
-    expect(screen.getByText("On")).toBeInTheDocument();
     expect(screen.getByText("Accepted terms 2026-05")).toBeInTheDocument();
     expect(screen.getByText("Mobile Safari")).toBeInTheDocument();
     expect(screen.getByText(/Cookies: Essential, analytics off/)).toBeInTheDocument();
@@ -520,5 +518,102 @@ describe("GridmasterPersonView", () => {
     expect(screen.getAllByText(/^Cookies:/)).toHaveLength(5);
     fireEvent.click(screen.getByRole("button", { name: "Show fewer" }));
     expect(screen.getAllByText(/^Cookies:/)).toHaveLength(3);
+  });
+
+  it("shows two-factor, known devices, sessions, push devices and calendar feeds", async () => {
+    renderView(
+      linkedRecord({
+        loginLock: { locked: false, resetsAt: null },
+        security: {
+          twoFactor: {
+            enabled: true,
+            reenrollRequiredAt: null,
+            factors: [
+              {
+                id: "f-1",
+                type: "totp",
+                name: "Work phone",
+                status: "verified",
+                createdAt: "2026-02-01T00:00:00.000Z",
+                lastUsedAt: null,
+              },
+            ],
+          },
+          knownDevices: [
+            {
+              id: "d-1",
+              platform: "ios",
+              firstSeenAt: "2026-09-01T00:00:00.000Z",
+              lastSeenAt: "2026-09-20T00:00:00.000Z",
+            },
+          ],
+        },
+        sessions: {
+          sessions: [
+            {
+              id: "s-1",
+              orgId: ORG,
+              platform: "web",
+              deviceLabel: "Macintosh",
+              browser: "Chrome 151",
+              appVersion: null,
+              location: "Athens, GR",
+              createdAt: "2026-09-25T00:00:00.000Z",
+              lastActiveAt: "2026-09-26T08:00:00.000Z",
+            },
+          ],
+          pushDevices: [
+            {
+              id: "p-1",
+              orgId: ORG,
+              platform: "android",
+              lastSeenAt: null,
+              disabledAt: "2026-09-10T00:00:00.000Z",
+              createdAt: "2026-09-02T00:00:00.000Z",
+            },
+          ],
+          calendarFeeds: [
+            { id: "c-1", orgId: ORG, issuedAt: "2026-09-03T00:00:00.000Z", revokedAt: null },
+          ],
+        },
+      }),
+    );
+
+    const security = (await screen.findByRole("heading", { name: "Security" })).closest(
+      "section",
+    ) as HTMLElement;
+    expect(within(security).getByText("Work phone")).toBeInTheDocument();
+    expect(within(security).getByText("Verified")).toBeInTheDocument();
+    expect(within(security).getByText(/never used/)).toBeInTheDocument();
+    expect(within(security).getByText(/^ios · first seen/)).toBeInTheDocument();
+    expect(within(security).getByText("Not locked.")).toBeInTheDocument();
+
+    const sessions = screen
+      .getByRole("heading", { name: "Sessions and devices" })
+      .closest("section") as HTMLElement;
+    expect(within(sessions).getByText("Macintosh · Chrome 151")).toBeInTheDocument();
+    expect(within(sessions).getByText(/Calm Haven · Athens, GR · started/)).toBeInTheDocument();
+    expect(within(sessions).getByText(/^Off since/)).toBeInTheDocument();
+    expect(within(sessions).getByText(/^issued/)).toBeInTheDocument();
+  });
+
+  it("shows empty states, and no security or sessions for a staff record", async () => {
+    renderView(linkedRecord());
+    expect(await screen.findByText("No factors enrolled.")).toBeInTheDocument();
+    expect(screen.getByText(/No devices remembered/)).toBeInTheDocument();
+    expect(screen.getByText("No sessions.")).toBeInTheDocument();
+    expect(screen.getByText(/Not tracked here/)).toBeInTheDocument();
+  });
+
+  it("hides security and sessions for a staff record with no account", async () => {
+    renderView(linkedRecord({ account: null, profile: null, security: null, sessions: null }), {
+      kind: "staff",
+      employeeId: "44444444-4444-4444-8444-444444444444",
+    });
+    expect(
+      await screen.findByText(/has a staff record but has never signed in/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Security" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Sessions and devices" })).not.toBeInTheDocument();
   });
 });

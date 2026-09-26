@@ -73,7 +73,7 @@ proof) and F-81 (the page refreshes on more than membership changes).
       `user_sessions`, `mobile_device_tokens` and `calendar_feed_tokens`, each
       with an explicit column list. _Done when:_ builder tests show every
       field and that no token, hash or IP reaches the record.
-- [ ] **Step 3 - the sections** - Security and Sessions and devices on the
+- [x] **Step 3 - the sections** - Security and Sessions and devices on the
       person view, read-only. _Done when:_ a view test shows each field, and
       empty states for a person with none.
 - [ ] **Step 4 - the actions** - the security route and its five actions,

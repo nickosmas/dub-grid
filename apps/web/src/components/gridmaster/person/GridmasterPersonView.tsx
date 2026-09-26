@@ -27,6 +27,8 @@ import { PersonHeader } from "./PersonHeader";
 import { PersonInvitationActions } from "./PersonInvitationActions";
 import { PersonMembershipActions } from "./PersonMembershipActions";
 import { PersonOrganizationCard } from "./PersonOrganizationCard";
+import { PersonSecurityCard } from "./PersonSecurityCard";
+import { PersonSessionsCard } from "./PersonSessionsCard";
 import { PersonStaffActions } from "./PersonStaffActions";
 import { getPersonName, getPrimaryOrgId } from "./person-format";
 
@@ -280,6 +282,8 @@ export default function GridmasterPersonView({
       {back}
       <PersonHeader record={record} actions={quickActions} />
       <PersonAccountCard record={record} actions={accountActions} />
+      <PersonSecurityCard record={record} />
+      <PersonSessionsCard record={record} />
       {record.organizations.map((organization) => (
         <PersonOrganizationCard
           key={organization.org.id}

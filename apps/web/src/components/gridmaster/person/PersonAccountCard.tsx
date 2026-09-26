@@ -76,7 +76,6 @@ export function PersonAccountCard({
           <PersonFieldGrid>
             <PersonField label="First name" value={profile.firstName} />
             <PersonField label="Last name" value={profile.lastName} />
-            <PersonField label="Two-factor" value={profile.mfaEnabled ? "On" : "Off"} />
             <PersonField label="Profile updated" value={formatDay(profile.updatedAt)} tabular />
           </PersonFieldGrid>
 
