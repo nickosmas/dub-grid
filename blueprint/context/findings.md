@@ -112,13 +112,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** End live sessions through `end_impersonation` and send the end notice before deleting, or keep the rows.
 **Resolution:**
 
-### F-38 [P3] open - In-app impersonation notices still say a platform administrator is reviewing the account
+### F-38 [P3] fixed - In-app impersonation notices still say a platform administrator is reviewing the account
 
 **File:** `supabase/migrations/002_functions_triggers.sql` (`start_impersonation`, `end_impersonation`)
 **Found:** 2026-09-25 by `/audit` (scope: current, 262cddb3..1ddf878f; all lenses)
 **Why it matters:** The same event reads as "DubGrid support is using your account" by email and as "A platform administrator is currently reviewing your account" in the app.
 **Suggested fix:** A forward migration rewording the two RPCs' notification text.
-**Resolution:**
+**Resolution:** Fixed in the security findings cleanup (Step 4): migration 057 redefines `start_impersonation` (from 055, keeping its fresh-proof guard) and `end_impersonation` with notices that read "DubGrid support is using your account" and "DubGrid support has left your account" (and matching Super Admin notices), naming no person. A static test pins the wording and the guard.
 
 ### F-41 [P3] open - Stale references to the retired notify route, and no rate limit on impersonation notices
 
