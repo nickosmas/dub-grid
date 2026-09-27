@@ -188,6 +188,7 @@ describe("schedule payloads and the publisher's name", () => {
     }) as never;
   const range = { startDate: "2026-09-20", endDate: "2026-09-26" };
   const fetchMobileScheduleEntries = vi.fn(async () => [entry("Nic Kosmas"), entry(null)]);
+  const fetchMobileScheduleNotes = vi.fn(async () => []);
   const fetchLinkedEmployeeForUser = vi.fn(async () => ({
     id: "employee-9",
     firstName: "Alex",
@@ -206,7 +207,7 @@ describe("schedule payloads and the publisher's name", () => {
         permissions: { canPublishSchedule: false, level: 0 },
       } as never,
       range,
-      { fetchLinkedEmployeeForUser, fetchMobileScheduleEntries } as never,
+      { fetchLinkedEmployeeForUser, fetchMobileScheduleEntries, fetchMobileScheduleNotes } as never,
     );
     expect(payload.entries.map((item) => item.publishedByName)).toEqual([null, null]);
     expect(payload.entries[0]!.publishedAt).toBe("2026-09-18T03:31:00Z");
@@ -227,7 +228,7 @@ describe("schedule payloads and the publisher's name", () => {
         },
       } as never,
       range,
-      { fetchMobileScheduleEntries } as never,
+      { fetchMobileScheduleEntries, fetchMobileScheduleNotes } as never,
     );
     expect(publisher.entries[0]!.publishedByName).toBe("Nic Kosmas");
 
@@ -245,8 +246,136 @@ describe("schedule payloads and the publisher's name", () => {
         },
       } as never,
       range,
-      { fetchMobileScheduleEntries } as never,
+      { fetchMobileScheduleEntries, fetchMobileScheduleNotes } as never,
     );
     expect(superAdmin.entries[0]!.publishedByName).toBe("Nic Kosmas");
+  });
+});
+
+// 42b: entries carry the indicators their viewer may see.
+describe("schedule payloads and their indicators", () => {
+  const range = { startDate: "2026-09-20", endDate: "2026-09-26" };
+  const entry = (employeeId: string, date: string) =>
+    ({ employeeId, date, publishedByName: null }) as never;
+  const note = (
+    employeeId: string,
+    date: string,
+    status: "published" | "draft" | "draft_deleted",
+    indicatorTypeId = 7,
+  ) => ({
+    employeeId,
+    date,
+    indicatorTypeId,
+    focusAreaId: 2,
+    status,
+    name: indicatorTypeId === 7 ? "Float" : "Archived training",
+    color: "#ff0000",
+  });
+  const fetchMobileScheduleEntries = vi.fn(async () => [
+    entry("employee-1", "2026-09-21"),
+    entry("employee-2", "2026-09-21"),
+  ]);
+  const fetchMobileScheduleNotes = vi.fn(async () => [
+    note("employee-1", "2026-09-21", "published"),
+    note("employee-1", "2026-09-21", "draft", 8),
+    note("employee-1", "2026-09-21", "draft_deleted", 9),
+    // No entry that day: a draft-only shift, which mobile does not show.
+    note("employee-2", "2026-09-22", "published"),
+  ]);
+  const orgAuth = (canEditShifts: boolean, canEditNotes: boolean) =>
+    ({
+      currentOrg: { id: ORG_ID },
+      serviceClient: {},
+      permissions: {
+        canViewSchedule: true,
+        canEditShifts,
+        canEditNotes,
+        canApproveShiftRequests: false,
+        canManageEmployees: false,
+        canPublishSchedule: false,
+        level: 0,
+      },
+    }) as never;
+
+  it("shows a viewer published indicators only, a pending removal still published", async () => {
+    const payload = await loadMobileOrgSchedulePayload(orgAuth(false, false), range, {
+      fetchMobileScheduleEntries,
+      fetchMobileScheduleNotes,
+    } as never);
+    expect(payload.entries[0]!.indicators.map((i) => [i.indicatorTypeId, i.state])).toEqual([
+      [7, "published"],
+      [9, "published"],
+    ]);
+  });
+
+  it("shows an editor the drafts with their states", async () => {
+    for (const [shifts, notes] of [
+      [true, false],
+      [false, true],
+    ] as const) {
+      const payload = await loadMobileOrgSchedulePayload(orgAuth(shifts, notes), range, {
+        fetchMobileScheduleEntries,
+        fetchMobileScheduleNotes,
+      } as never);
+      expect(payload.entries[0]!.indicators.map((i) => [i.indicatorTypeId, i.state])).toEqual([
+        [7, "published"],
+        [8, "draft_added"],
+        [9, "draft_removed"],
+      ]);
+    }
+  });
+
+  it("keeps each indicator's own name and colour, archived ones included", async () => {
+    const payload = await loadMobileOrgSchedulePayload(orgAuth(true, false), range, {
+      fetchMobileScheduleEntries,
+      fetchMobileScheduleNotes,
+    } as never);
+    expect(payload.entries[0]!.indicators[1]).toEqual({
+      indicatorTypeId: 8,
+      focusAreaId: 2,
+      name: "Archived training",
+      color: "#ff0000",
+      state: "draft_added",
+    });
+  });
+
+  it("gives an entry without notes none, and drops a note with no entry", async () => {
+    const payload = await loadMobileOrgSchedulePayload(orgAuth(false, false), range, {
+      fetchMobileScheduleEntries,
+      fetchMobileScheduleNotes,
+    } as never);
+    expect(payload.entries[1]!.indicators).toEqual([]);
+    expect(payload.entries).toHaveLength(2);
+  });
+
+  it("reads the caller's own notes in the effective organization for their schedule", async () => {
+    const notes = vi.fn(async () => []);
+    await loadMobileMeSchedulePayload(
+      {
+        currentOrg: { id: ORG_ID },
+        serviceClient: {},
+        user: { id: USER_ID },
+        permissions: {
+          canPublishSchedule: false,
+          level: 0,
+          canEditShifts: false,
+          canEditNotes: false,
+        },
+      } as never,
+      range,
+      {
+        fetchLinkedEmployeeForUser: vi.fn(async () => ({
+          id: "employee-9",
+          firstName: "Alex",
+          lastName: "Reed",
+          status: "active",
+          focusAreaIds: [],
+          departmentIds: [],
+        })),
+        fetchMobileScheduleEntries: vi.fn(async () => []),
+        fetchMobileScheduleNotes: notes,
+      } as never,
+    );
+    expect(notes).toHaveBeenCalledWith({}, { orgId: ORG_ID, employeeId: "employee-9", ...range });
   });
 });

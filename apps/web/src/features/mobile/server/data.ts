@@ -7,6 +7,7 @@ import {
   rowToShiftCategory,
   rowToShiftRequest,
 } from "@/lib/db/mappers";
+import type { MobileScheduleNoteRecord } from "@dubgrid/mobile-api-core";
 import { fetchTermsAcceptanceStatus } from "@/features/account/server";
 import type {
   MobilePublishedScheduleRow,
@@ -16,6 +17,7 @@ import type {
 import {
   fetchLinkedEmployeeRowForUser,
   fetchMobileAbsenceTypeRows,
+  fetchMobileScheduleNoteRows,
   fetchMobileAssignmentSeedRows,
   fetchMobileCertificationRows as fetchMobileCertificationRowsData,
   fetchMobileDepartmentRows as fetchMobileDepartmentRowsData,
@@ -844,6 +846,27 @@ function getMissingDeletedPublishedChanges(
   return [...latestChangesByCell.entries()]
     .filter(([key, change]) => !rowKeys.has(key) && change.kind === "deleted" && change.fromState)
     .map(([, change]) => change);
+}
+
+// A note's indicator type is required, so the colour and name are always set;
+// the fallback only covers a join the database should never return empty.
+const UNKNOWN_INDICATOR_COLOR = "#94A3B8";
+
+/** The range's schedule notes for the schedule loaders, which apply the viewer's rule. */
+export async function fetchMobileScheduleNotes(
+  serviceClient: SupabaseClient,
+  input: { orgId: string; startDate: string; endDate: string; employeeId?: string },
+): Promise<MobileScheduleNoteRecord[]> {
+  const rows = await fetchMobileScheduleNoteRows(serviceClient, input);
+  return rows.map((row) => ({
+    employeeId: row.emp_id,
+    date: row.date,
+    indicatorTypeId: row.indicator_type_id,
+    focusAreaId: row.focus_area_id,
+    status: row.status,
+    name: row.indicator_types?.name || "Note",
+    color: row.indicator_types?.color || UNKNOWN_INDICATOR_COLOR,
+  }));
 }
 
 export async function fetchMobileScheduleEntries(

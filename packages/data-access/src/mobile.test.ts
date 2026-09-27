@@ -6,6 +6,7 @@ import {
   fetchMobilePeopleRows,
   fetchMobileRoleRows,
   fetchScheduleCellQueryRows,
+  fetchMobileScheduleNoteRows,
   fetchMobilePublishHistoryRows,
   fetchMobileShiftRequestHistoryRows,
   insertMobileAuditLogEntry,
@@ -372,6 +373,55 @@ describe("fetchScheduleCellQueryRows", () => {
     const { client } = makeCellClient([{ data: null, error: { message: "boom" } }]);
 
     await expect(fetchScheduleCellQueryRows(client, input, 2)).rejects.toEqual({ message: "boom" });
+  });
+});
+
+// 42b: the notes the schedule loaders filter per viewer.
+describe("fetchMobileScheduleNoteRows", () => {
+  const input = { orgId: "org-1", startDate: "2026-09-01", endDate: "2026-09-30" };
+
+  function makeNoteClient(pages: Array<{ data: unknown[] | null; error: unknown }>) {
+    const range = vi.fn(async () => pages.shift() ?? { data: [], error: null });
+    const chain = {
+      select: vi.fn((_columns: string) => chain),
+      eq: vi.fn(() => chain),
+      gte: vi.fn(() => chain),
+      lte: vi.fn(() => chain),
+      order: vi.fn((_column: string) => chain),
+      range,
+    };
+    const from = vi.fn(() => chain);
+    return { client: { from } as unknown as SupabaseClient, chain, from, range };
+  }
+
+  it("reads every page of the organization's notes with their indicator types", async () => {
+    const note = (n: number) => ({ emp_id: `emp-${n}`, date: "2026-09-01", status: "published" });
+    const { client, chain, from, range } = makeNoteClient([
+      { data: [note(1), note(2)], error: null },
+      { data: [note(3)], error: null },
+    ]);
+
+    const result = await fetchMobileScheduleNoteRows(client, input, 2);
+
+    expect(result).toHaveLength(3);
+    expect(from).toHaveBeenCalledWith("schedule_notes");
+    expect(chain.select.mock.calls[0]![0]).toContain("indicator_types(name, color)");
+    expect(chain.eq).toHaveBeenCalledWith("org_id", "org-1");
+    expect(chain.gte).toHaveBeenCalledWith("date", "2026-09-01");
+    expect(chain.lte).toHaveBeenCalledWith("date", "2026-09-30");
+    expect(range).toHaveBeenNthCalledWith(2, 2, 3);
+    expect(chain.eq).not.toHaveBeenCalledWith("emp_id", expect.anything());
+  });
+
+  it("scopes to one employee and surfaces an error", async () => {
+    const { client, chain } = makeNoteClient([{ data: [], error: null }]);
+    await fetchMobileScheduleNoteRows(client, { ...input, employeeId: "emp-7" }, 2);
+    expect(chain.eq).toHaveBeenCalledWith("emp_id", "emp-7");
+
+    const failing = makeNoteClient([{ data: null, error: { message: "boom" } }]);
+    await expect(fetchMobileScheduleNoteRows(failing.client, input, 2)).rejects.toEqual({
+      message: "boom",
+    });
   });
 });
 

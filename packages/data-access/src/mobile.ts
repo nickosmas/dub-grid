@@ -941,6 +941,53 @@ export async function fetchProfileNameRowsByIds(
 
 // Half PostgREST's 1,000-row cap: each cell carries its snapshots and
 // segments, so a page of these is a heavy response.
+export interface MobileScheduleNoteRow {
+  emp_id: string;
+  date: string;
+  indicator_type_id: number;
+  focus_area_id: number | null;
+  status: "published" | "draft" | "draft_deleted";
+  indicator_types: { name: string; color: string } | null;
+}
+
+const MOBILE_SCHEDULE_NOTE_PAGE_SIZE = 1000;
+
+/**
+ * Every schedule note in the range with its indicator's own name and colour,
+ * archived indicators included. Read past the row policy, so the caller must
+ * apply the viewer's draft rule before anything leaves the server.
+ */
+export async function fetchMobileScheduleNoteRows(
+  serviceClient: SupabaseClient,
+  input: { orgId: string; startDate: string; endDate: string; employeeId?: string },
+  pageSize: number = MOBILE_SCHEDULE_NOTE_PAGE_SIZE,
+): Promise<MobileScheduleNoteRow[]> {
+  const rows: MobileScheduleNoteRow[] = [];
+  let from = 0;
+  for (;;) {
+    let query = serviceClient
+      .from("schedule_notes")
+      .select(
+        "emp_id, date, indicator_type_id, focus_area_id, status, indicator_types(name, color)",
+      )
+      .eq("org_id", input.orgId)
+      .gte("date", input.startDate)
+      .lte("date", input.endDate);
+    if (input.employeeId) query = query.eq("emp_id", input.employeeId);
+    const { data, error } = await query
+      .order("date", { ascending: true })
+      .order("emp_id", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    const page = (data ?? []) as unknown as MobileScheduleNoteRow[];
+    rows.push(...page);
+    if (page.length < pageSize) break;
+    from += pageSize;
+  }
+  return rows;
+}
+
 const MOBILE_SCHEDULE_CELL_PAGE_SIZE = 500;
 
 /** Every cell in the range, paged so a large organization or a long range is never silently cut off. */

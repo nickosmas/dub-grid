@@ -57,7 +57,7 @@ draft rule is the web's, held in one shared place so the two cannot drift.
       bootstrap with and without the new fields (an older server's response
       still parses) and reject an empty colour or an unknown state
       (colours are free text in the database, so no stricter format).
-- [ ] **Step 3 - notes reach schedule entries** - a data-access read of the
+- [x] **Step 3 - notes reach schedule entries** - a data-access read of the
       organization's notes for the range (and the one employee for
       `/me/schedule`), paged like the web route, joined to their indicator
       types including archived ones; `loadMobileMeSchedulePayload` and
