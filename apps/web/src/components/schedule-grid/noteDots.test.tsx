@@ -40,7 +40,7 @@ describe("NoteDots placement", () => {
     expect(container.querySelector("[data-note-icon]")).not.toBeNull();
   });
 
-  it("shows an inline draft removal as a dashed outline icon", () => {
+  it("draws inline icons in the text colour, a draft removal dashed", () => {
     const { container } = render(
       <NoteDots
         marks={[{ indicatorTypeId: 1, state: "draft_removed" }]}
@@ -50,7 +50,8 @@ describe("NoteDots placement", () => {
     );
     const icon = container.querySelector<SVGElement>("[data-note-icon]")!;
     expect(icon.getAttribute("fill")).toBe("none");
-    expect(icon.getAttribute("stroke")).toBe("#ff0000");
+    expect(icon.getAttribute("stroke")).toBe("currentColor");
     expect(icon.getAttribute("stroke-dasharray")).toBe("3 2");
+    expect(container.innerHTML).not.toContain("#ff0000");
   });
 });

@@ -8,7 +8,7 @@ import { mobileSpace, mobileText } from "../theme/tokens";
 import {
   scheduleNoteLabel,
   scheduleNoteStateWords,
-  scheduleNoteIcon,
+  scheduleNoteIconName,
   scheduleNotesSpokenLabel,
 } from "../../features/schedule/lib/scheduleNotes";
 
@@ -17,9 +17,9 @@ const ICON_SIZE = 14;
 const ICON_OFFSET = Math.max(((mobileText.caption.lineHeight ?? ICON_SIZE) - ICON_SIZE) / 2, 0);
 
 /**
- * A shift's schedule notes, spelled out: each name after a sticky-note icon in its
- * own colour, wrapping as needed. `inverse` sits on a filled card (the hero).
- * Renders nothing without notes.
+ * A shift's schedule notes, spelled out: each name after a sticky-note icon,
+ * wrapping as needed. `inverse` sits on a filled card (the hero). Renders
+ * nothing without notes.
  */
 export function ScheduleNoteLabels({
   notes,
@@ -31,7 +31,7 @@ export function ScheduleNoteLabels({
   style?: StyleProp<ViewStyle>;
 }) {
   const mobileColors = useMobileColors();
-  const ringColor = inverse ? mobileColors.textInverse : mobileColors.border;
+  const iconColor = inverse ? mobileColors.textInverse : mobileColors.textMuted;
   const styles = useMemo(() => createStyles(), []);
   if (notes.length === 0) return null;
 
@@ -51,7 +51,14 @@ export function ScheduleNoteLabels({
             style={styles.item}
             accessibilityLabel={scheduleNoteLabel(note)}
           >
-            <NoteIcon note={note} edgeColor={ringColor} />
+            <MaterialCommunityIcons
+              accessibilityElementsHidden
+              color={iconColor}
+              importantForAccessibility="no-hide-descendants"
+              name={scheduleNoteIconName(note.state)}
+              size={ICON_SIZE}
+              style={styles.icon}
+            />
             <AppText variant="caption" tone={inverse ? "inverse" : "secondary"} style={styles.name}>
               {note.name}
               {words ? (
@@ -63,28 +70,6 @@ export function ScheduleNoteLabels({
           </View>
         );
       })}
-    </View>
-  );
-}
-
-function NoteIcon({ note, edgeColor }: { note: MobileScheduleIndicator; edgeColor: string }) {
-  const styles = useMemo(() => createStyles(), []);
-  const icon = scheduleNoteIcon(note, edgeColor);
-  return (
-    <View
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      style={[styles.icon, { opacity: icon.opacity }]}
-    >
-      <MaterialCommunityIcons color={icon.color} name={icon.name} size={ICON_SIZE} />
-      {icon.edgeColor ? (
-        <MaterialCommunityIcons
-          color={icon.edgeColor}
-          name="note-outline"
-          size={ICON_SIZE}
-          style={styles.iconEdge}
-        />
-      ) : null}
     </View>
   );
 }
@@ -108,12 +93,5 @@ const createStyles = () =>
     },
     icon: {
       marginTop: ICON_OFFSET,
-      width: ICON_SIZE,
-      height: ICON_SIZE,
-    },
-    iconEdge: {
-      position: "absolute",
-      top: 0,
-      left: 0,
     },
   });

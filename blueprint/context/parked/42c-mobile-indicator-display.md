@@ -17,10 +17,10 @@ instead of the team schedule.
 - **Spelled out where there is room; a dot only where there is none.**
   Mobile has no schedule grid, so every surface with room writes each
   schedule note's name: a `ScheduleNoteLabels` component shows each name as a
-  sticky-note icon in the note's colour followed by the word, in caption text, wrapping as
+  sticky-note icon followed by the word, in caption text, wrapping as
   needed. No mobile surface uses bare dots. A pure helper chooses which notes a row shows. An editor's draft reads
   "(added, not published)" or "(removed, not published)" after the name; a
-  draft addition's icon is faded and a draft removal's is an outline.
+  draft addition's icon carries a plus and a draft removal's a minus.
 - **Schedule tab (team).** Each person's row lists their schedule notes by
   name on a caption line under the name and time. With a focus-area tab
   selected, a row shows the notes for that focus area and those with no focus
@@ -60,20 +60,21 @@ instead of the team schedule.
 - **Words over dots.** The owner's rule (2026-09-27): outside a grid, spell
   the schedule note out; a dot only where there is no space. Mobile has no grid, so every mobile surface spells notes out.
 - **Sticky-note icon, not a dot (owner, 2026-09-27).** A schedule note is
-  drawn as a sticky-note icon in its colour wherever there is room: every
-  mobile surface (MaterialCommunityIcons `note`, and `note-outline` for a
-  removal) and, on web, the Month popover, the phone-width day view, the
-  shift slideover's read-only list and both print legends (Lucide
-  `StickyNote`, dashed outline for a removal). The week and two-week grid
-  cells and the printed grid's cells keep their dots, for lack of room (the
-  owner's choice).
+  drawn as a sticky-note icon wherever there is room, in the surrounding text
+  colour, never the note's own colour (the owner's call): every mobile
+  surface (MaterialCommunityIcons `note-outline`, with `note-plus-outline` and
+  `note-minus-outline` for an editor's draft addition and removal) and, on
+  web, the Month popover, the phone-width day view, the shift slideover's
+  read-only list and both print legends (Lucide `StickyNote`, faded for a
+  draft addition and dashed for a removal). The week and two-week grid cells
+  and the printed grid's cells keep their coloured dots, for lack of room.
 - **Customer term.** Clients see "Schedule notes", never "indicators".
 - **Draft states.** Mobile has no dashed styling and its badges are never
-  outlined, so a draft addition's icon is faded and a draft removal's is an
-  outline; the words carry the state.
-- **Colours.** The raw note colour in both themes, as on web; a light ring
-  (a thin outline in the surface's edge colour on a filled icon) keeps a
-  note visible on a surface of a similar colour.
+  outlined, so the glyph carries the state (a plus or a minus) beside the
+  words.
+- **Colours.** Outside the grid a note shows no colour: the icon takes the
+  text colour (muted, or white on the hero). Only grid dots use the note's
+  colour.
 
 ## Build steps
 

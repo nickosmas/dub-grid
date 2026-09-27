@@ -43,7 +43,7 @@ export default function PrintLegend({
           <div className="print-legend__grid" data-print-legend-indicators="true">
             {indicators.map((indicator) => (
               <div key={indicator.id} className="print-legend__item">
-                <ScheduleNoteIcon color={indicator.color} size={12} />
+                <ScheduleNoteIcon size={12} />
                 <span className="print-legend__name">{indicator.name}</span>
               </div>
             ))}

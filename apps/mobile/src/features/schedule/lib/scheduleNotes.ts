@@ -41,24 +41,15 @@ export function scheduleNoteLabel(note: MobileScheduleIndicator): string {
 }
 
 /**
- * The sticky-note icon beside a note's name, in the note's colour. A draft
- * addition is faded and a draft removal is an outline. A filled note also
- * wears a thin outline in `edgeColor`, so a colour close to its background
- * (a blue note on the blue hero) still reads.
+ * The sticky-note glyph beside a note's name. It is drawn in the text colour,
+ * never the note's own, so the glyph itself carries an editor's draft state.
  */
-export function scheduleNoteIcon(
-  note: Pick<MobileScheduleIndicator, "color" | "state">,
-  edgeColor: string,
-): { name: "note" | "note-outline"; color: string; opacity: number; edgeColor: string | null } {
-  if (note.state === "draft_removed") {
-    return { name: "note-outline", color: note.color, opacity: 1, edgeColor: null };
-  }
-  return {
-    name: "note",
-    color: note.color,
-    opacity: note.state === "draft_added" ? 0.45 : 1,
-    edgeColor,
-  };
+export function scheduleNoteIconName(
+  state: MobileScheduleIndicator["state"],
+): "note-outline" | "note-plus-outline" | "note-minus-outline" {
+  if (state === "draft_added") return "note-plus-outline";
+  if (state === "draft_removed") return "note-minus-outline";
+  return "note-outline";
 }
 
 export interface ScheduleNoteGroup {

@@ -122,8 +122,12 @@ export function NoteDots({
         return (
           <MaybeHint key={`${mark.indicatorTypeId}_${mark.state}`} content={label} side="top">
             {placement === "inline" ? (
-              <span aria-label={label} role="img" style={{ display: "inline-flex" }}>
-                <ScheduleNoteIcon color={color} state={mark.state} />
+              <span
+                aria-label={label}
+                role="img"
+                style={{ display: "inline-flex", color: "var(--dg-color-text-muted)" }}
+              >
+                <ScheduleNoteIcon state={mark.state} />
               </span>
             ) : (
               <div

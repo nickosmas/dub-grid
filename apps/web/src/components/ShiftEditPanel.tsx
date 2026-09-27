@@ -3139,9 +3139,9 @@ export default function ShiftEditPanel({
             gap: 6,
           }}
         >
-          {active.map(({ id, name, color }) => (
+          {active.map(({ id, name }) => (
             <li key={id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <ScheduleNoteIcon color={isDarkTheme ? toDarkPillColors(color).bg : color} />
+              <ScheduleNoteIcon color="var(--dg-color-text-muted)" />
               <span
                 style={{
                   fontSize: "var(--dg-fs-caption)",

@@ -5,7 +5,7 @@ import {
   scheduleNotesForSegment,
   scheduleNotesSpokenLabel,
   scheduleNoteLabel,
-  scheduleNoteIcon,
+  scheduleNoteIconName,
   scheduleNotesForRow,
 } from "./scheduleNotes";
 
@@ -53,24 +53,11 @@ describe("scheduleNoteLabel", () => {
   });
 });
 
-describe("scheduleNoteIcon", () => {
-  it("fills a published note, fades a draft addition and outlines a draft removal", () => {
-    expect(scheduleNoteIcon(note(1, null), "#fff")).toEqual({
-      name: "note",
-      color: "#E24B4A",
-      opacity: 1,
-      edgeColor: "#fff",
-    });
-    expect(scheduleNoteIcon(note(1, null, "draft_added"), "#fff")).toMatchObject({
-      name: "note",
-      opacity: 0.45,
-    });
-    expect(scheduleNoteIcon(note(1, null, "draft_removed"), "#fff")).toEqual({
-      name: "note-outline",
-      color: "#E24B4A",
-      opacity: 1,
-      edgeColor: null,
-    });
+describe("scheduleNoteIconName", () => {
+  it("marks a draft addition and removal on the glyph itself", () => {
+    expect(scheduleNoteIconName("published")).toBe("note-outline");
+    expect(scheduleNoteIconName("draft_added")).toBe("note-plus-outline");
+    expect(scheduleNoteIconName("draft_removed")).toBe("note-minus-outline");
   });
 });
 

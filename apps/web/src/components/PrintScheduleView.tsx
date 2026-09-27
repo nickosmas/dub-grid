@@ -1489,7 +1489,7 @@ export default function PrintScheduleView({
                     key={indicator.id}
                     style={{ display: "flex", alignItems: "center", gap: "0.5em" }}
                   >
-                    <ScheduleNoteIcon color={indicator.color} size="1em" />
+                    <ScheduleNoteIcon color="#334766" size="1em" />
                     <span style={{ fontSize: "0.9em", color: "#334766" }}>{indicator.name}</span>
                   </div>
                 ))}
