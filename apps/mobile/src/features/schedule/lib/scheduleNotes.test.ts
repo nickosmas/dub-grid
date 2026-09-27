@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { MobileScheduleIndicator } from "@dubgrid/contracts";
-import { scheduleNoteLabel, scheduleNoteSwatchStyle, scheduleNotesForRow } from "./scheduleNotes";
+import type { MobileScheduleEntrySegment, MobileScheduleIndicator } from "@dubgrid/contracts";
+import {
+  scheduleNoteGroups,
+  scheduleNoteLabel,
+  scheduleNoteSwatchStyle,
+  scheduleNotesForRow,
+} from "./scheduleNotes";
 
 const note = (
   indicatorTypeId: number,
@@ -61,5 +66,44 @@ describe("scheduleNoteSwatchStyle", () => {
       borderWidth: 1.5,
       opacity: 1,
     });
+  });
+});
+
+describe("scheduleNoteGroups", () => {
+  const segment = (focusAreaId: number | null, name: string): MobileScheduleEntrySegment =>
+    ({
+      focusAreaId,
+      displayFocusAreaName: name,
+      shiftName: "Day Shift",
+    }) as MobileScheduleEntrySegment;
+
+  it("gives a single shift one untitled group, and none without notes", () => {
+    expect(scheduleNoteGroups([note(1, 2), note(2, null)], [segment(2, "ICU")])).toEqual([
+      { key: "shift", title: null, notes: [note(1, 2), note(2, null)] },
+    ]);
+    expect(scheduleNoteGroups([], [segment(2, "ICU")])).toEqual([]);
+    expect(scheduleNoteGroups(undefined, [])).toEqual([]);
+  });
+
+  it("groups a double shift by focus area, then the whole day", () => {
+    const groups = scheduleNoteGroups(
+      [note(1, 2), note(2, 3), note(3, null), note(4, 9)],
+      [segment(2, "ICU"), segment(3, "Rehab")],
+    );
+    expect(groups.map((group) => [group.title, group.notes.map((n) => n.indicatorTypeId)])).toEqual(
+      [
+        ["ICU", [1]],
+        ["Rehab", [2]],
+        ["For the whole day", [3, 4]],
+      ],
+    );
+  });
+
+  it("lists a focus area worked twice once and leaves out empty halves", () => {
+    const groups = scheduleNoteGroups(
+      [note(1, 2)],
+      [segment(2, "ICU"), segment(2, "ICU"), segment(3, "Rehab")],
+    );
+    expect(groups).toEqual([{ key: "area-2", title: "ICU", notes: [note(1, 2)] }]);
   });
 });

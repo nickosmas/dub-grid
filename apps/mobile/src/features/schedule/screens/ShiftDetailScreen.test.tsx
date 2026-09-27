@@ -414,8 +414,20 @@ describe("ShiftDetailScreen", () => {
                 },
               ],
               indicators: [
-                { id: 1, name: "Training" },
-                { id: 2, name: "Float" },
+                {
+                  indicatorTypeId: 1,
+                  focusAreaId: 2,
+                  name: "Training",
+                  color: "#378ADD",
+                  state: "published",
+                },
+                {
+                  indicatorTypeId: 2,
+                  focusAreaId: null,
+                  name: "Float",
+                  color: "#E24B4A",
+                  state: "draft_added",
+                },
               ],
               change: {
                 kind: "modified",
@@ -481,6 +493,11 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByLabelText("Focus area ICU")).toBeInTheDocument();
     expect(screen.queryByText(/Assignment: Training, Float/)).not.toBeInTheDocument();
     expect(screen.queryByText("Indicators")).not.toBeInTheDocument();
+    const notes = screen.getByTestId("shift-detail-schedule-notes");
+    expect(within(notes).getByText("Schedule notes")).toBeInTheDocument();
+    expect(within(notes).getByLabelText("Training")).toHaveTextContent("Training");
+    expect(within(notes).getByLabelText("Float, added, not published")).toHaveTextContent("Float");
+    expect(within(notes).queryByText("For the whole day")).toBeNull();
     expect(screen.getByText("Working with")).toBeInTheDocument();
     expect(screen.getByText("Jordan Lee")).toBeInTheDocument();
     expect(screen.getByText("Nurse")).toBeInTheDocument();
@@ -512,6 +529,86 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByText("Evening Shift")).toBeInTheDocument();
     expect(screen.getByLabelText("Shift time 3:00 PM - 11:00 PM")).toBeInTheDocument();
     expect(screen.getByLabelText("Focus area Emergency")).toBeInTheDocument();
+  });
+
+  function patchSelectedEntry(patch: Record<string, unknown>) {
+    const base = useQuery.getMockImplementation();
+    useQuery.mockImplementation((args: { queryKey: unknown[] }) => {
+      const result = base?.(args);
+      if (!result?.data?.entries) return result;
+      return {
+        ...result,
+        data: {
+          ...result.data,
+          entries: result.data.entries.map((entry: { employeeId: string; date: string }) =>
+            entry.employeeId === "emp-1" && entry.date === "2026-04-16"
+              ? { ...entry, ...patch }
+              : entry,
+          ),
+        },
+      };
+    });
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn(), reset: vi.fn() });
+  }
+
+  it("lists a double shift's schedule notes under each half and the whole day", () => {
+    patchSelectedEntry({
+      assignmentIds: [1, 2],
+      shiftName: "Day Shift / Evening Shift",
+      endTime: "23:00:00",
+      segments: [
+        {
+          shiftId: 1,
+          shiftName: "Day Shift",
+          startTime: "07:00:00",
+          endTime: "15:00:00",
+          focusAreaId: 2,
+          displayFocusAreaName: "ICU",
+        },
+        {
+          shiftId: 2,
+          shiftName: "Evening Shift",
+          startTime: "15:00:00",
+          endTime: "23:00:00",
+          focusAreaId: 3,
+          displayFocusAreaName: "Rehab",
+        },
+      ],
+      indicators: [
+        {
+          indicatorTypeId: 1,
+          focusAreaId: 2,
+          name: "Training",
+          color: "#378ADD",
+          state: "published",
+        },
+        { indicatorTypeId: 2, focusAreaId: 3, name: "Float", color: "#E24B4A", state: "published" },
+        {
+          indicatorTypeId: 3,
+          focusAreaId: null,
+          name: "New hire",
+          color: "#1D9E75",
+          state: "draft_removed",
+        },
+      ],
+    });
+
+    render(<ShiftDetailScreen />);
+
+    const notes = screen.getByTestId("shift-detail-schedule-notes");
+    expect(notes).toHaveTextContent(
+      "Schedule notesICUTrainingRehabFloatFor the whole dayNew hire (removed, not published)",
+    );
+    expect(within(notes).getByLabelText("New hire, removed, not published")).toBeInTheDocument();
+  });
+
+  it("shows no schedule notes row for a shift without notes", () => {
+    patchSelectedEntry({ indicators: [] });
+
+    render(<ShiftDetailScreen />);
+
+    expect(screen.queryByTestId("shift-detail-schedule-notes")).toBeNull();
+    expect(screen.queryByText("Schedule notes")).toBeNull();
   });
 
   it("does not show Working with for general shifts", () => {

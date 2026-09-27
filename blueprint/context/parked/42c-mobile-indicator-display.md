@@ -82,7 +82,7 @@ focusAreaId?)` that filters by focus area and removes duplicates by
       shift's schedule notes by name, per half for a double shift. _Done when:_ screen tests find the indicator on
       the hero and in the week list, and a deleted (previous-only) entry shows
       none.
-- [ ] **Step 4 - shift detail** - a "Schedule notes" row in the detail stack,
+- [x] **Step 4 - shift detail** - a "Schedule notes" row in the detail stack,
       for single and split shifts. _Done when:_ tests show the row with each
       name, the draft wording for a draft, no row without indicators, and the
       old negative test replaced.

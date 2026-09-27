@@ -19,6 +19,7 @@ import {
   SheetHeader,
 } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
+import { ScheduleNoteLabels } from "../../../shared/components/ScheduleNoteLabels";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { FullPageSheet } from "../../../shared/components/FullPageSheet";
@@ -93,6 +94,7 @@ import {
   getScheduleEntryTitle,
   sortScheduleEntries,
 } from "../lib/schedule";
+import { scheduleNoteGroups } from "../lib/scheduleNotes";
 import {
   describeScheduleEntryChanges,
   getScheduleEntrySegmentChange,
@@ -1484,6 +1486,7 @@ export default function ShiftDetailScreen() {
                   value={focusAreaName}
                 />
               ) : null}
+              <ScheduleNotesDetailRow entry={shiftEntry} />
             </View>
 
             {canCreateRequestsForShift ? (
@@ -1707,6 +1710,40 @@ function DetailIconTile({
       ]}
     >
       <Ionicons color={mobileIconToneColor(tone, isDark)} name={iconName} size={18} />
+    </View>
+  );
+}
+
+/**
+ * The shift's schedule notes, spelled out. A double shift lists each half's
+ * under that half, and the rest under "For the whole day".
+ */
+function ScheduleNotesDetailRow({ entry }: { entry: MobileScheduleEntry }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const groups = scheduleNoteGroups(entry.indicators, getScheduleEntrySegments(entry));
+  if (groups.length === 0) return null;
+
+  return (
+    <View style={styles.detailInfoRow} testID="shift-detail-schedule-notes">
+      <DetailIconTile iconName="bookmark-outline" tone="blue" />
+      <View style={styles.detailInfoCopy}>
+        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.detailInfoLabel}>
+          Schedule notes
+        </Text>
+        <View style={styles.detailNoteGroups}>
+          {groups.map((group) => (
+            <View key={group.key} style={styles.detailNoteGroup}>
+              {group.title ? (
+                <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.detailNoteGroupTitle}>
+                  {group.title}
+                </Text>
+              ) : null}
+              <ScheduleNoteLabels notes={group.notes} />
+            </View>
+          ))}
+        </View>
+      </View>
     </View>
   );
 }

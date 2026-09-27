@@ -1,4 +1,4 @@
-import type { MobileScheduleIndicator } from "@dubgrid/contracts";
+import type { MobileScheduleEntrySegment, MobileScheduleIndicator } from "@dubgrid/contracts";
 
 /**
  * The schedule notes a row shows. With a focus area, the notes filed under it
@@ -62,4 +62,48 @@ export function scheduleNoteSwatchStyle(
     borderWidth: 1,
     opacity: note.state === "draft_added" ? 0.45 : 1,
   };
+}
+
+export interface ScheduleNoteGroup {
+  key: string;
+  /** The half a group belongs to; null for a single shift's one group. */
+  title: string | null;
+  notes: MobileScheduleIndicator[];
+}
+
+export const WHOLE_DAY_NOTES_TITLE = "For the whole day";
+
+/**
+ * A shift's notes as shift detail lists them. A single shift has one untitled
+ * group. A double shift has a group per focus area it works, titled with that
+ * area, then the notes with no focus area (or one the shift no longer works)
+ * under "For the whole day". Empty groups are left out.
+ */
+export function scheduleNoteGroups(
+  notes: readonly MobileScheduleIndicator[] | undefined,
+  segments: readonly MobileScheduleEntrySegment[],
+): ScheduleNoteGroup[] {
+  const all = scheduleNotesForRow(notes);
+  if (segments.length <= 1) {
+    return all.length > 0 ? [{ key: "shift", title: null, notes: all }] : [];
+  }
+  const groups: ScheduleNoteGroup[] = [];
+  const worked = new Set<number>();
+  for (const segment of segments) {
+    const focusAreaId = segment.focusAreaId;
+    if (typeof focusAreaId !== "number" || worked.has(focusAreaId)) continue;
+    worked.add(focusAreaId);
+    const own = all.filter((note) => note.focusAreaId === focusAreaId);
+    if (own.length === 0) continue;
+    groups.push({
+      key: `area-${focusAreaId}`,
+      title: segment.displayFocusAreaName?.trim() || segment.shiftName?.trim() || "Shift",
+      notes: own,
+    });
+  }
+  const rest = all.filter((note) => note.focusAreaId === null || !worked.has(note.focusAreaId));
+  if (rest.length > 0) {
+    groups.push({ key: "whole-day", title: WHOLE_DAY_NOTES_TITLE, notes: rest });
+  }
+  return groups;
 }
