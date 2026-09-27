@@ -10,6 +10,7 @@ import type {
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { MAX_SERIES_OCCURRENCES } from "@/lib/constants";
 import { scheduleCellStateSchema } from "@dubgrid/contracts";
+import { canSeeDraftScheduleNotes, scheduleNotesForViewer } from "@dubgrid/schedule-core";
 import { requireOrgPermissions, resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
@@ -833,13 +834,12 @@ export async function POST(req: NextRequest) {
             .range(from, to);
         };
         const noteRows = await fetchAllRows<DbScheduleNote>(buildNotesPage);
-        // The service client reads past the row policy, so the same rule is
-        // applied here: a viewer never sees a draft note, and a note pending
-        // removal is still the published note to them.
-        const canSeeDraftNotes = auth.permissions.canEditShifts || auth.permissions.canEditNotes;
-        const visibleRows = canSeeDraftNotes
-          ? noteRows
-          : noteRows.filter((row) => row.status !== "draft");
+        // The service client reads past the row policy; the shared rule keeps
+        // drafts from viewers, as it does for the mobile API.
+        const visibleRows = scheduleNotesForViewer(
+          noteRows,
+          canSeeDraftScheduleNotes(auth.permissions),
+        );
 
         return NextResponse.json({
           notes: visibleRows.map((row) => ({
@@ -849,7 +849,7 @@ export async function POST(req: NextRequest) {
             date: row.date,
             indicatorTypeId: row.indicator_type_id,
             focusAreaId: row.focus_area_id,
-            status: !canSeeDraftNotes && row.status === "draft_deleted" ? "published" : row.status,
+            status: row.status,
             createdBy: row.created_by,
             updatedBy: row.updated_by,
             createdAt: row.created_at,

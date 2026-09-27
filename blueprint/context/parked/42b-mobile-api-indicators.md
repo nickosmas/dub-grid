@@ -1,7 +1,7 @@
 # Feature: Mobile API indicators
 
 **From build-plan:** feature 42b
-**Status:** spec - awaiting review (parked; another session's fix holds
+**Status:** in progress (parked; another session's fix holds
 `current-feature.md`)
 
 ## Goal
@@ -44,7 +44,7 @@ draft rule is the web's, held in one shared place so the two cannot drift.
 
 ## Build steps
 
-- [ ] **Step 1 - shared visibility rule** - `canSeeDraftScheduleNotes`
+- [x] **Step 1 - shared visibility rule** - `canSeeDraftScheduleNotes`
       (`canEditShifts || canEditNotes`) and `scheduleNotesForViewer` in `@dubgrid/schedule-core`; the web schedule route's
       `fetchScheduleNotes` uses them in place of its inline copy. _Done when:_
       schedule-core tests cover an editor (drafts and pending removals kept), a
