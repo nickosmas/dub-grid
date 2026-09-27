@@ -884,7 +884,7 @@ export function buildOperationsReportPayload(
       employeeId: note.emp_id,
       employeeName: employeeNameById.get(note.emp_id) ?? "Unknown employee",
       date: note.date,
-      indicator: indicatorById.get(note.indicator_type_id) ?? "Unknown indicator",
+      indicator: indicatorById.get(note.indicator_type_id) ?? "Unknown schedule note",
       focusArea:
         note.focus_area_id == null
           ? ""

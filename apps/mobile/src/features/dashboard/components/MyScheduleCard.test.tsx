@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule, createSafeAreaContextModule } from "../../../test/native";
 
@@ -73,6 +73,44 @@ describe("MyScheduleCard", () => {
     expect(screen.queryByText("D")).not.toBeInTheDocument();
     // The second day in range has no entry -> empty placeholder, not dropped.
     expect(screen.getByText("—")).toBeInTheDocument();
+  });
+
+  it("marks a pill's schedule notes with one icon in its corner, a stack when several", () => {
+    const note = (indicatorTypeId: number, name: string) => ({
+      indicatorTypeId,
+      focusAreaId: null,
+      name,
+      color: "#378ADD",
+      state: "published" as const,
+    });
+    useQuery.mockReturnValue({
+      isLoading: false,
+      data: {
+        range: { startDate: "2026-05-11", endDate: "2026-05-13" },
+        entries: [
+          makeEntry({ date: "2026-05-11", indicators: [note(1, "Training")] }),
+          makeEntry({
+            date: "2026-05-12",
+            indicators: [note(1, "Training"), note(2, "Float")],
+          }),
+        ],
+      },
+    });
+
+    render(<MyScheduleCard accessToken="token" />);
+
+    const single = screen.getByTestId("schedule-card-notes-2026-05-11-0");
+    expect(single.querySelector("[data-icon-name='note-outline']")).not.toBeNull();
+    expect(single).toHaveTextContent("");
+    const several = screen.getByTestId("schedule-card-notes-2026-05-12-0");
+    expect(several.querySelector("[data-icon-name='note-multiple-outline']")).not.toBeNull();
+    expect(several).toHaveTextContent("");
+    // Icon only: the names are spoken with the day, never drawn.
+    expect(screen.queryByText("Training")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Tuesday, May 12. Schedule notes: Training; Float" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId(/^schedule-card-notes-2026-05-13/)).toBeNull();
   });
 
   it("hands a tapped day's shift to the caller, and an empty day with no item", () => {

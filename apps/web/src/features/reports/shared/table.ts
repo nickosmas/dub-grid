@@ -180,7 +180,7 @@ export function buildOperationsReportPreviewTable(
           { label: "Days worked" },
           { label: "Shift breakdown" },
           { label: "Job breakdown" },
-          { label: "Shift notes" },
+          { label: "Schedule notes" },
           { label: "Absence days" },
           { label: "Overtime hours" },
         ],
@@ -193,7 +193,7 @@ export function buildOperationsReportPreviewTable(
             row.workedDays,
             formatListValue(row.shiftBreakdown, "No categorized shifts"),
             formatListValue(row.jobBreakdown, "No jobs"),
-            formatListValue(row.indicatorBreakdown, "No shift notes"),
+            formatListValue(row.indicatorBreakdown, "No schedule notes"),
             row.absenceCount,
             row.overtimeHours,
           ]),
@@ -209,7 +209,7 @@ export function buildOperationsReportPreviewTable(
           { label: "Work days" },
           { label: "Shift breakdown" },
           { label: "Job breakdown" },
-          { label: "Shift notes" },
+          { label: "Schedule notes" },
           { label: "Published off days" },
           { label: "Unscheduled days" },
           { label: "Approved impact" },
@@ -223,7 +223,7 @@ export function buildOperationsReportPreviewTable(
           row.workedDays,
           formatListValue(row.shiftBreakdown, "No categorized shifts"),
           formatListValue(row.jobBreakdown, "No jobs"),
-          formatListValue(row.indicatorBreakdown, "No shift notes"),
+          formatListValue(row.indicatorBreakdown, "No schedule notes"),
           row.publishedAbsenceDays,
           row.unscheduledDays,
           row.approvedImpactCount,
@@ -491,11 +491,11 @@ export function buildOperationsReportPreviewTable(
       };
     case "shift-notes":
       return {
-        title: "Shift notes",
+        title: "Schedule notes",
         columns: [
           { label: "Date" },
           { label: "Employee" },
-          { label: "Indicator" },
+          { label: "Schedule note" },
           { label: "Focus area" },
         ],
         rows: payload.reports.shiftNotes.map((row) => [
@@ -504,7 +504,7 @@ export function buildOperationsReportPreviewTable(
           row.indicator,
           formatListValue(row.focusArea, "No focus area"),
         ]),
-        emptyText: "No published shift notes for this range.",
+        emptyText: "No published schedule notes for this range.",
       };
   }
 }
@@ -685,13 +685,13 @@ export function buildOperationsReportMetrics(
     case "shift-notes": {
       const notes = payload.reports.shiftNotes;
       return [
-        { label: "Shift notes", value: String(notes.length) },
+        { label: "Schedule notes", value: String(notes.length) },
         {
           label: "Staff tagged",
           value: String(new Set(notes.map((row) => row.employeeId)).size),
         },
         {
-          label: "Indicators used",
+          label: "Schedule note types used",
           value: String(new Set(notes.map((row) => row.indicator)).size),
         },
       ];

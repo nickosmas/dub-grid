@@ -3,6 +3,7 @@ import type {
   MobileBootstrapResponse,
   MobileDepartment,
   MobileFocusArea,
+  MobileIndicatorType,
   MobileNamedItem,
   MobileBootstrapRole,
   MobileNotification,
@@ -11,9 +12,15 @@ import type {
   MobileNotificationsQuery,
   MobilePerson,
   MobileScheduleEntry,
+  MobileScheduleIndicator,
   MobileScheduleRange,
 } from "@dubgrid/contracts";
 import { hasAcceptedCurrentTerms } from "@dubgrid/domain";
+import {
+  canSeeDraftScheduleNotes,
+  scheduleNotesForViewer,
+  type ScheduleNoteStatus,
+} from "@dubgrid/schedule-core";
 import type { Organization, PlatformRole } from "@dubgrid/domain";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -43,12 +50,12 @@ type MobileMembershipLike = {
   platformRole: PlatformRole;
 };
 
-// `canManageManagementAccess` is omitted deliberately: it is not an admin
-// permission the auth context carries, it is derived from `canManageUsers` when
-// the payload is built below.
+// `canManageManagementAccess` and `canEditScheduleIndicators` are omitted
+// deliberately: neither is an admin permission the auth context carries. The
+// payload built below derives them from `canManageUsers` and `canEditNotes`.
 type MobilePermissionsLike = Omit<
   MobileBootstrapResponse["permissions"],
-  "canManageManagementAccess"
+  "canManageManagementAccess" | "canEditScheduleIndicators"
 > & {
   role: string;
   level: number;
@@ -79,9 +86,11 @@ export type MobileBootstrapContext = MobileServiceContext &
 
 type MobilePublisherViewerPermissions = Pick<MobilePermissionsLike, "canPublishSchedule" | "level">;
 
+type MobileNoteViewerPermissions = Pick<MobilePermissionsLike, "canEditShifts" | "canEditNotes">;
+
 export type MobileMeScheduleContext = MobileServiceContext & {
   user: Pick<MobileUserLike, "id">;
-  permissions: MobilePublisherViewerPermissions;
+  permissions: MobilePublisherViewerPermissions & MobileNoteViewerPermissions;
 };
 
 export type MobileOrgScheduleContext = MobileServiceContext & {
@@ -89,8 +98,56 @@ export type MobileOrgScheduleContext = MobileServiceContext & {
     MobilePermissionsLike,
     "canViewSchedule" | "canEditShifts" | "canApproveShiftRequests" | "canManageEmployees"
   > &
-    MobilePublisherViewerPermissions;
+    MobilePublisherViewerPermissions &
+    MobileNoteViewerPermissions;
 };
+
+/** A schedule note as the schedule loaders receive it, before the viewer's rule. */
+export type MobileScheduleNoteRecord = {
+  employeeId: string;
+  date: string;
+  indicatorTypeId: number;
+  focusAreaId: number | null;
+  status: ScheduleNoteStatus;
+  name: string;
+  color: string;
+};
+
+const INDICATOR_STATE: Record<ScheduleNoteStatus, MobileScheduleIndicator["state"]> = {
+  published: "published",
+  draft: "draft_added",
+  draft_deleted: "draft_removed",
+};
+
+/**
+ * Each entry's indicators, as this viewer may see them (42b). The notes were
+ * read past the row policy, so the shared rule is what keeps drafts from
+ * viewers; a note on a date with no entry has nothing to ride on and is left
+ * out, as mobile shows no draft-only shifts.
+ */
+export function withScheduleIndicators<TEntry extends { employeeId: string; date: string }>(
+  entries: TEntry[],
+  notes: MobileScheduleNoteRecord[],
+  permissions: MobileNoteViewerPermissions,
+): (TEntry & { indicators: MobileScheduleIndicator[] })[] {
+  const byCell = new Map<string, MobileScheduleIndicator[]>();
+  for (const note of scheduleNotesForViewer(notes, canSeeDraftScheduleNotes(permissions))) {
+    const key = `${note.employeeId}_${note.date}`;
+    const list = byCell.get(key) ?? [];
+    list.push({
+      indicatorTypeId: note.indicatorTypeId,
+      focusAreaId: note.focusAreaId,
+      name: note.name,
+      color: note.color,
+      state: INDICATOR_STATE[note.status],
+    });
+    byCell.set(key, list);
+  }
+  return entries.map((entry) => ({
+    ...entry,
+    indicators: byCell.get(`${entry.employeeId}_${entry.date}`) ?? [],
+  }));
+}
 
 /**
  * Who published a shift is process detail for the people who publish: the web
@@ -184,6 +241,11 @@ type FetchMobileDepartments = (
   orgId: string,
 ) => Promise<MobileDepartment[]>;
 
+type FetchMobileIndicatorTypes = (
+  serviceClient: SupabaseClient,
+  orgId: string,
+) => Promise<MobileIndicatorType[]>;
+
 type FetchMobileScheduleEntries = (
   serviceClient: SupabaseClient,
   input: {
@@ -193,6 +255,16 @@ type FetchMobileScheduleEntries = (
     employeeId?: string;
   },
 ) => Promise<MobileScheduleEntry[]>;
+
+type FetchMobileScheduleNotes = (
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    startDate: string;
+    endDate: string;
+    employeeId?: string;
+  },
+) => Promise<MobileScheduleNoteRecord[]>;
 
 type FetchMobilePeople = (
   serviceClient: SupabaseClient,
@@ -272,6 +344,7 @@ export async function loadMobileBootstrapPayload(
     fetchMobileRoles: FetchMobileRoles;
     fetchMobileCertifications: FetchMobileNamedItems;
     fetchMobileDepartments: FetchMobileDepartments;
+    fetchMobileIndicatorTypes: FetchMobileIndicatorTypes;
     fetchTermsAcceptedVersion: FetchTermsAcceptedVersion;
     fetchMfaReenrollRequired: FetchMfaReenrollRequired;
     mapOrganizationToMobileConfig: MapOrganizationToMobileConfig;
@@ -285,6 +358,7 @@ export async function loadMobileBootstrapPayload(
     roles,
     certifications,
     departments,
+    indicatorTypes,
     termsAcceptedVersion,
     mfaReenrollRequired,
   ] = await Promise.all([
@@ -295,6 +369,8 @@ export async function loadMobileBootstrapPayload(
     deps.fetchMobileRoles(auth.serviceClient, auth.currentOrg.id),
     deps.fetchMobileCertifications(auth.serviceClient, auth.currentOrg.id),
     deps.fetchMobileDepartments(auth.serviceClient, auth.currentOrg.id),
+    // Every member sees indicators, so their types carry no permission gate.
+    deps.fetchMobileIndicatorTypes(auth.serviceClient, auth.currentOrg.id),
     deps.fetchTermsAcceptedVersion(auth.user.id),
     deps.fetchMfaReenrollRequired(auth.user.id),
   ]);
@@ -323,6 +399,7 @@ export async function loadMobileBootstrapPayload(
       // derives as canManageUsers. Spelled out here because the response schema
       // strips keys it doesn't name, so it would otherwise fall to its default.
       canManageManagementAccess: auth.permissions.canManageUsers,
+      canEditScheduleIndicators: auth.permissions.canEditNotes,
     },
     linkedEmployee: linkedEmployee
       ? {
@@ -342,6 +419,7 @@ export async function loadMobileBootstrapPayload(
     unreadNotificationCount,
     acceptedCurrentTerms: hasAcceptedCurrentTerms(termsAcceptedVersion),
     mfaReenrollRequired,
+    indicatorTypes,
   };
 }
 
@@ -351,6 +429,7 @@ export async function loadMobileMeSchedulePayload(
   deps: {
     fetchLinkedEmployeeForUser: FetchLinkedEmployeeForUser;
     fetchMobileScheduleEntries: FetchMobileScheduleEntries;
+    fetchMobileScheduleNotes: FetchMobileScheduleNotes;
   },
 ): Promise<MobileMeScheduleResponse> {
   const linkedEmployee = await deps.fetchLinkedEmployeeForUser(
@@ -367,11 +446,11 @@ export async function loadMobileMeSchedulePayload(
     };
   }
 
-  const entries = await deps.fetchMobileScheduleEntries(auth.serviceClient, {
-    orgId: auth.currentOrg.id,
-    employeeId: linkedEmployee.id,
-    ...range,
-  });
+  const scope = { orgId: auth.currentOrg.id, employeeId: linkedEmployee.id, ...range };
+  const [entries, notes] = await Promise.all([
+    deps.fetchMobileScheduleEntries(auth.serviceClient, scope),
+    deps.fetchMobileScheduleNotes(auth.serviceClient, scope),
+  ]);
 
   return {
     employee: {
@@ -383,7 +462,10 @@ export async function loadMobileMeSchedulePayload(
       departmentIds: linkedEmployee.departmentIds,
     },
     range,
-    entries: withoutPublisherName(entries, auth.permissions),
+    entries: withoutPublisherName(
+      withScheduleIndicators(entries, notes, auth.permissions),
+      auth.permissions,
+    ),
   };
 }
 
@@ -392,6 +474,7 @@ export async function loadMobileOrgSchedulePayload(
   range: MobileScheduleRange,
   deps: {
     fetchMobileScheduleEntries: FetchMobileScheduleEntries;
+    fetchMobileScheduleNotes: FetchMobileScheduleNotes;
   },
 ): Promise<MobileOrgScheduleResponse> {
   if (
@@ -405,14 +488,18 @@ export async function loadMobileOrgSchedulePayload(
     throw new MobileApiAuthorizationError();
   }
 
-  const entries = await deps.fetchMobileScheduleEntries(auth.serviceClient, {
-    orgId: auth.currentOrg.id,
-    ...range,
-  });
+  const scope = { orgId: auth.currentOrg.id, ...range };
+  const [entries, notes] = await Promise.all([
+    deps.fetchMobileScheduleEntries(auth.serviceClient, scope),
+    deps.fetchMobileScheduleNotes(auth.serviceClient, scope),
+  ]);
 
   return {
     range,
-    entries: withoutPublisherName(entries, auth.permissions),
+    entries: withoutPublisherName(
+      withScheduleIndicators(entries, notes, auth.permissions),
+      auth.permissions,
+    ),
   };
 }
 

@@ -349,13 +349,13 @@ flowchart TB
     SA -->|configures permissions for| AD
     AD -.->|elevated from| US
 
-    subgraph PermMatrix["Admin Permission Matrix - 26 permissions (JSONB in organization_memberships)"]
+    subgraph PermMatrix["Admin Permission Matrix - 25 permissions (JSONB in organization_memberships)"]
         direction LR
         subgraph Schedule["Schedule (4)"]
             P1["canViewSchedule always-true\ncanEditShifts\ncanPublishSchedule\ncanApplyRecurringSchedule"]
         end
         subgraph Indicators["Notes + Indicators (3)"]
-            P2["canEditNotes\ncanEditScheduleIndicators\ncanManageIndicatorTypes + canViewIndicatorTypes"]
+            P2["canEditNotes\ncanManageIndicatorTypes + canViewIndicatorTypes"]
         end
         subgraph Recurring["Recurring (3)"]
             P3["canViewRecurringShifts\ncanManageRecurringShifts\ncanManageShiftSeries"]
@@ -376,7 +376,7 @@ flowchart TB
 
     AD -->|permissions stored per-person, NOT per-department| PermMatrix
 
-    NOTE1["26 total perms. canManage* implies canView*.\nPermissions are PER-PERSON (admin_permissions field on organization_memberships).\nDepartments do NOT grant permissions. A user-role member never inherits a stored set.\nBaselines: users start all-false, admins start from ADMIN_DEFAULT_PERMS (schedule editing, publishing, notes, recurring, reports).\nSuper-admin-only (non-delegable): canManageUsers, canConfigureAdminPermissions, canManageOrgSettings."]
+    NOTE1["25 total perms. canManage* implies canView*.\nPermissions are PER-PERSON (admin_permissions field on organization_memberships).\nDepartments do NOT grant permissions. A user-role member never inherits a stored set.\nBaselines: users start all-false, admins start from ADMIN_DEFAULT_PERMS (schedule editing, publishing, notes, recurring, reports).\nSuper-admin-only (non-delegable): canManageUsers, canConfigureAdminPermissions, canManageOrgSettings."]
     PermMatrix -.-> NOTE1
 
     style GM fill:#dc2626,color:#fff
@@ -549,7 +549,7 @@ erDiagram
         uuid user_id FK "auth.users"
         uuid org_id FK "organizations"
         org_role org_role "super_admin or admin or user"
-        jsonb admin_permissions "fine-grained perms - 26 total, per-person"
+        jsonb admin_permissions "fine-grained perms - 25 total, per-person"
         bigint_arr department_ids "departments[]"
         bigint_arr dept_admin_ids "subset of department_ids"
         timestamptz onboarding_completed_at "durable per member and org"

@@ -3326,7 +3326,7 @@ describe("ScheduleGrid", () => {
     fireEvent.mouseEnter(pill);
 
     await waitFor(() => {
-      expect(screen.getByText("Indicators: Flag")).toBeInTheDocument();
+      expect(screen.getByText("Schedule notes: Flag")).toBeInTheDocument();
     });
     expect(screen.getByText("Was N.")).toBeInTheDocument();
   });
@@ -3349,7 +3349,7 @@ describe("ScheduleGrid", () => {
     fireEvent.mouseEnter(pill);
 
     await waitFor(() => {
-      expect(screen.getByText("Indicators: Flag")).toBeInTheDocument();
+      expect(screen.getByText("Schedule notes: Flag")).toBeInTheDocument();
     });
   });
 

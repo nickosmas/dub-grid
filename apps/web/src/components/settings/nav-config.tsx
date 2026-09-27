@@ -236,10 +236,10 @@ export function buildNavGroups(
     if (perms.canManageIndicatorTypes || perms.canViewIndicatorTypes)
       schedItems.push({
         id: "staff-indicators",
-        label: "Indicators",
+        label: "Schedule notes",
         Icon: IndicatorIcon,
         description:
-          "Define custom indicators that can be attached to shift cells on the schedule.",
+          "Define custom schedule notes that can be attached to shift cells on the schedule.",
       });
     if (schedItems.length > 0)
       groups.push({ id: "scheduling", label: "Scheduling", items: schedItems });

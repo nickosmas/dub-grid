@@ -81,6 +81,7 @@ describe("mobile schedule helpers", () => {
       change: null,
       publishedAt: null,
       publishedByName: null,
+      indicators: [],
     };
     const mixedEntry: MobileScheduleEntry = {
       ...generalEntry,

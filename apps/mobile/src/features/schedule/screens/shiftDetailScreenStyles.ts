@@ -202,6 +202,16 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       ...mobileText.body,
       color: mobileColors.textSecondary,
     },
+    detailNoteGroups: {
+      gap: mobileSpace.sm,
+    },
+    detailNoteGroup: {
+      gap: mobileSpace.xs,
+    },
+    detailNoteGroupTitle: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.textSecondary,
+    },
     detailTimeValue: {
       ...mobileText.rowTitle,
       ...mobileTabularText,

@@ -5,6 +5,7 @@ import { loadMobileMeSchedulePayload } from "@dubgrid/mobile-api-core";
 import {
   fetchLinkedEmployeeForUser,
   fetchMobileScheduleEntries,
+  fetchMobileScheduleNotes,
   resolveMobileDateRange,
   requireMobileAuth,
 } from "@/features/mobile/server";
@@ -37,6 +38,7 @@ export async function GET(req: NextRequest) {
   const payload = await loadMobileMeSchedulePayload(auth, range, {
     fetchLinkedEmployeeForUser,
     fetchMobileScheduleEntries,
+    fetchMobileScheduleNotes,
   });
   return json(mobileMeScheduleResponseSchema.parse(payload));
 }

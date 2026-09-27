@@ -73,11 +73,11 @@ export const PERMISSION_MODULES: PermissionModule[] = [
   {
     id: "schedule",
     title: "Schedule",
-    description: "Edit shifts, notes, and indicators on the organization-wide schedule.",
+    description: "Edit shifts and schedule notes on the organization-wide schedule.",
     icon: "calendar",
     category: "CORE",
     viewKeys: [],
-    editKeys: ["canEditShifts", "canEditNotes", "canEditScheduleIndicators"],
+    editKeys: ["canEditShifts", "canEditNotes"],
     alwaysOnView: true,
   },
   {
@@ -141,8 +141,8 @@ export const PERMISSION_MODULES: PermissionModule[] = [
   },
   {
     id: "scheduling-config",
-    title: "Shifts, jobs & indicators",
-    description: "Manage shift codes, jobs, absence types, and indicator types.",
+    title: "Shifts, jobs & schedule notes",
+    description: "Manage shift codes, jobs, absence types, and schedule note types.",
     icon: "settings",
     category: "ADMINISTRATION",
     viewKeys: ["canViewScheduleDefinitions", "canViewIndicatorTypes"],

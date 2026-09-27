@@ -47,6 +47,7 @@ function DashboardContent() {
     certifications,
     orgRoles,
     departments,
+    indicatorTypes,
     loading: refLoading,
     loadError,
     bootstrapRetryable,
@@ -101,6 +102,7 @@ function DashboardContent() {
           departments={departments}
           employees={employees}
           permissions={perms}
+          indicatorTypes={indicatorTypes}
         />
       )}
     </>

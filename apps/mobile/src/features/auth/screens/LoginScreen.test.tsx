@@ -1,3 +1,4 @@
+import { onlineManager } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule, createSafeAreaContextModule } from "../../../test/native";
@@ -78,10 +79,14 @@ vi.mock("../../consent/components/ConsentGate", () => ({
 
 let LoginScreen: (typeof import("./LoginScreen"))["default"];
 let queryClient: (typeof import("../../../shared/lib/query-client"))["queryClient"];
+let buildBootstrapQueryKey: (typeof import("../hooks/useBootstrap"))["buildBootstrapQueryKey"];
+let isSignInHandoffPending: (typeof import("../lib/sign-in-handoff"))["isSignInHandoffPending"];
 
 beforeAll(async () => {
   LoginScreen = (await import("./LoginScreen")).default;
   queryClient = (await import("../../../shared/lib/query-client")).queryClient;
+  buildBootstrapQueryKey = (await import("../hooks/useBootstrap")).buildBootstrapQueryKey;
+  isSignInHandoffPending = (await import("../lib/sign-in-handoff")).isSignInHandoffPending;
 });
 
 describe("LoginScreen", () => {
@@ -539,7 +544,7 @@ describe("LoginScreen", () => {
     // LoginScreen must not send a second request during the same handoff.
     expect(registerMobileSessionPresence).not.toHaveBeenCalled();
     expect(routerReplace).toHaveBeenCalledWith("/(tabs)/home");
-    // Warmed before the handoff, not after it. The tab tree can't draw its tab
+    // Warmed before the replace, not after it. The tab tree can't draw its tab
     // bar or pick the Home screen without bootstrap, and the launch splash is
     // long spent by now, so arriving without it would blank the screen. The
     // submit button's pending state is what covers this wait.
@@ -581,6 +586,127 @@ describe("LoginScreen", () => {
     // strand the user on the login form with a session already stored.
     await waitFor(() => {
       expect(routerReplace).toHaveBeenCalledWith("/(tabs)/home");
+    });
+    expect(routerReplace).toHaveBeenCalledTimes(1);
+  });
+
+  describe("the handoff into the app", () => {
+    function deferred<T>() {
+      let resolve!: (value: T) => void;
+      const promise = new Promise<T>((settle) => {
+        resolve = settle;
+      });
+      return { promise, resolve };
+    }
+
+    async function submitCredentials(setSession: ReturnType<typeof vi.fn>) {
+      lookupOrganization.mockResolvedValue({
+        organization: { id: "org-1", name: "DubGrid Health", slug: "dubgrid-health" },
+      });
+      loginToOrganization.mockResolvedValue({
+        organization: { id: "org-1", name: "DubGrid Health", slug: "dubgrid-health" },
+        session: { accessToken: "token-123", refreshToken: "refresh-123" },
+      });
+      getSupabaseClient.mockReturnValue({ auth: { setSession } });
+
+      const view = render(<LoginScreen />);
+      fireEvent.change(screen.getByPlaceholderText("yourorg"), {
+        target: { value: "dubgrid-health" },
+      });
+      fireEvent.click(screen.getByText("Continue"));
+      await screen.findByPlaceholderText("Email");
+      fireEvent.change(screen.getByPlaceholderText("Email"), {
+        target: { value: "staff@dubgrid.com" },
+      });
+      fireEvent.change(screen.getByPlaceholderText("Password"), {
+        target: { value: "super-secret" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+      return view;
+    }
+
+    it("requests bootstrap before the session is stored and navigates once both settle", async () => {
+      const session = deferred<{ error: null }>();
+      const bootstrap = deferred<{ currentOrg: { id: string } }>();
+      const setSession = vi.fn(() => session.promise);
+      getBootstrap.mockReturnValue(bootstrap.promise);
+
+      await submitCredentials(setSession);
+
+      await waitFor(() => expect(getBootstrap).toHaveBeenCalledWith("token-123"));
+      expect(setSession).toHaveBeenCalled();
+
+      await act(async () => session.resolve({ error: null }));
+      expect(routerReplace).not.toHaveBeenCalled();
+
+      await act(async () => bootstrap.resolve({ currentOrg: { id: "org-1" } }));
+      await waitFor(() => expect(routerReplace).toHaveBeenCalledWith("/(tabs)/home"));
+      expect(routerReplace).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the pending form, not a redirect, when the session appears mid-handoff", async () => {
+      const bootstrap = deferred<{ currentOrg: { id: string } }>();
+      getBootstrap.mockReturnValue(bootstrap.promise);
+      // What AuthSessionProvider does: `setSession` publishes the session
+      // before it resolves, and bootstrap is still on its way.
+      const setSession = vi.fn(async () => {
+        useSessionState.mockReturnValue({
+          session: { access_token: "token-123" },
+          accessToken: "token-123",
+          isLoading: false,
+        });
+        return { error: null };
+      });
+
+      const view = await submitCredentials(setSession);
+      await waitFor(() => expect(setSession).toHaveBeenCalled());
+      view.rerender(<LoginScreen />);
+
+      expect(screen.queryByText(/^redirect:/)).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Sign in" })).toBeDisabled();
+      expect(isSignInHandoffPending()).toBe(true);
+
+      await act(async () => bootstrap.resolve({ currentOrg: { id: "org-1" } }));
+      await waitFor(() => expect(routerReplace).toHaveBeenCalledTimes(1));
+      view.rerender(<LoginScreen />);
+
+      // Still ours until the replace unmounts the screen: no second navigation.
+      expect(screen.queryByText(/^redirect:/)).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Sign in" })).toBeDisabled();
+
+      view.unmount();
+      expect(isSignInHandoffPending()).toBe(false);
+    });
+
+    it("hands off while the query client believes the device is offline", async () => {
+      // After the device sleeps, the online flag can stay false while requests
+      // still go through; a paused warm-up never settles and held the form.
+      onlineManager.setOnline(false);
+      try {
+        const setSession = vi.fn().mockResolvedValue({ error: null });
+
+        await submitCredentials(setSession);
+
+        await waitFor(() => expect(routerReplace).toHaveBeenCalledWith("/(tabs)/home"));
+        expect(getBootstrap).toHaveBeenCalledWith("token-123");
+        expect(routerReplace).toHaveBeenCalledTimes(1);
+      } finally {
+        onlineManager.setOnline(true);
+      }
+    });
+
+    it("navigates nowhere and drops the warmed bootstrap when the session is refused", async () => {
+      const setSession = vi.fn().mockResolvedValue({
+        error: new Error("Session could not be stored"),
+      });
+
+      await submitCredentials(setSession);
+
+      await waitFor(() => expect(screen.getByRole("button", { name: "Sign in" })).toBeEnabled());
+      expect(getBootstrap).toHaveBeenCalledWith("token-123");
+      expect(routerReplace).not.toHaveBeenCalled();
+      expect(queryClient.getQueryState(buildBootstrapQueryKey("token-123"))).toBeUndefined();
+      expect(isSignInHandoffPending()).toBe(false);
     });
   });
 

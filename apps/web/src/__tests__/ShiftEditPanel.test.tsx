@@ -709,10 +709,10 @@ describe("ShiftEditPanel", () => {
         onNoteToggle,
       });
 
-      await user.click(screen.getByRole("button", { name: "Remove Float indicator" }));
+      await user.click(screen.getByRole("button", { name: "Remove Float schedule note" }));
       expect(onNoteToggle).toHaveBeenLastCalledWith(80, false, 1);
 
-      await user.click(screen.getByRole("button", { name: "Add Training indicator" }));
+      await user.click(screen.getByRole("button", { name: "Add Training schedule note" }));
       expect(onNoteToggle).toHaveBeenLastCalledWith(81, true, 1);
     });
 
@@ -732,7 +732,7 @@ describe("ShiftEditPanel", () => {
         onNoteToggle,
       });
 
-      await user.click(screen.getByRole("button", { name: "Remove Training indicator" }));
+      await user.click(screen.getByRole("button", { name: "Remove Training schedule note" }));
       expect(onNoteToggle).toHaveBeenLastCalledWith(81, false, 2);
     });
   });
@@ -753,7 +753,8 @@ describe("ShiftEditPanel", () => {
       expect(list).not.toBeNull();
       expect(within(list!).getByText("Float")).toBeInTheDocument();
       expect(within(list!).queryByText("Training")).toBeNull();
-      expect(screen.queryByRole("button", { name: /indicator$/ })).toBeNull();
+      expect(list!.querySelectorAll("[data-note-icon]")).toHaveLength(1);
+      expect(screen.queryByRole("button", { name: /schedule note$/ })).toBeNull();
     });
 
     it("lists each split card's own indicators", () => {

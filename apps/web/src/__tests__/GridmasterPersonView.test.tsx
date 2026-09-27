@@ -22,6 +22,8 @@ const runGridmasterPersonSecurityAction = vi.fn();
 const resetGridmasterPersonTwoFactor = vi.fn();
 const requireCredentialAssurance = vi.fn();
 const stepUpRun = vi.fn();
+const fetchGridmasterPersonNotifications = vi.fn();
+const fetchGridmasterStaffActivity = vi.fn();
 
 vi.mock("@/features/gridmaster/client", () => ({
   fetchGridmasterPerson: (...args: unknown[]) => fetchGridmasterPerson(...args),
@@ -35,6 +37,9 @@ vi.mock("@/features/gridmaster/client", () => ({
   runGridmasterPersonSecurityAction: (...args: unknown[]) =>
     runGridmasterPersonSecurityAction(...args),
   resetGridmasterPersonTwoFactor: (...args: unknown[]) => resetGridmasterPersonTwoFactor(...args),
+  fetchGridmasterPersonNotifications: (...args: unknown[]) =>
+    fetchGridmasterPersonNotifications(...args),
+  fetchGridmasterStaffActivity: (...args: unknown[]) => fetchGridmasterStaffActivity(...args),
 }));
 vi.mock("@/hooks/useStepUpAction", () => ({
   useStepUpAction: () => ({ run: stepUpRun, dialog: null }),
@@ -187,6 +192,9 @@ function renderView(
   target: GridmasterPersonTarget = { kind: "user", userId: USER },
 ) {
   fetchGridmasterPerson.mockResolvedValue({ person: record });
+  fetchGridmasterPersonNotifications.mockResolvedValue({
+    notifications: { preferences: null, notifications: [] },
+  });
   const onBack = vi.fn();
   const onImpersonate = vi.fn();
   const onOpenOrganization = vi.fn();
@@ -620,6 +628,15 @@ describe("GridmasterPersonView", () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Security" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Sessions and devices" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Notifications" })).not.toBeInTheDocument();
+    expect(fetchGridmasterPersonNotifications).not.toHaveBeenCalled();
+  });
+
+  it("loads the account's notifications into their own card", async () => {
+    renderView(linkedRecord());
+    expect(await screen.findByRole("heading", { name: "Notifications" })).toBeInTheDocument();
+    expect(await screen.findByText("No notifications.")).toBeInTheDocument();
+    expect(fetchGridmasterPersonNotifications).toHaveBeenCalledWith(USER);
   });
 
   function withSessionAndLock(locked: boolean) {

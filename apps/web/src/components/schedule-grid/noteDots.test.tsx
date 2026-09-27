@@ -19,6 +19,9 @@ describe("NoteDots placement", () => {
     const dots = container.querySelector<HTMLElement>("[data-note-dots]")!;
     expect(dots.style.position).toBe("absolute");
     expect(dots.style.top).toBe("1px");
+    // The grid has no room for an icon, so its cells keep dots.
+    expect(container.querySelector("[data-note-dot]")).not.toBeNull();
+    expect(container.querySelector("[data-note-icon]")).toBeNull();
   });
 
   it("lets inline dots flow with the row where nothing is positioned", () => {
@@ -33,5 +36,22 @@ describe("NoteDots placement", () => {
     expect(dots.style.position).toBe("");
     expect(dots.dataset.noteDots).toBe("inline");
     expect(getByLabelText("Float")).toBeInTheDocument();
+    expect(container.querySelector("[data-note-dot]")).toBeNull();
+    expect(container.querySelector("[data-note-icon]")).not.toBeNull();
+  });
+
+  it("draws inline icons in the text colour, a draft removal dashed", () => {
+    const { container } = render(
+      <NoteDots
+        marks={[{ indicatorTypeId: 1, state: "draft_removed" }]}
+        indicatorTypes={indicatorTypes}
+        placement="inline"
+      />,
+    );
+    const icon = container.querySelector<SVGElement>("[data-note-icon]")!;
+    expect(icon.getAttribute("fill")).toBe("none");
+    expect(icon.getAttribute("stroke")).toBe("currentColor");
+    expect(icon.getAttribute("stroke-dasharray")).toBe("3 2");
+    expect(container.innerHTML).not.toContain("#ff0000");
   });
 });

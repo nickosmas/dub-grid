@@ -1,4 +1,7 @@
 import { ActionButtons } from "../../../shared/components/ActionButtons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import { ScheduleNoteLabels } from "../../../shared/components/ScheduleNoteLabels";
+import { scheduleNotesForRow, scheduleNotesForSegment } from "../lib/scheduleNotes";
 import {
   Fragment,
   useCallback,
@@ -1932,6 +1935,11 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
                           groupTimeRange={groupTimeRange}
                           isFirst={memberIndex === 0}
                           linkedEmployeeId={linkedEmployee?.id ?? null}
+                          tabFocusAreaId={
+                            typeof activeTeamFocusAreaTab?.focusAreaId === "number"
+                              ? activeTeamFocusAreaTab.focusAreaId
+                              : undefined
+                          }
                           row={row}
                           onPress={() => handleOpenShiftDetail(row.entry)}
                         />
@@ -2470,6 +2478,40 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
   );
 }
 
+/** Where a half sits among its entry's segments, by identity or by content. */
+function findSegmentIndex(
+  segments: readonly MobileScheduleEntrySegment[],
+  segment: MobileScheduleEntrySegment,
+): number {
+  const same = segments.indexOf(segment);
+  if (same >= 0) return same;
+  return segments.findIndex(
+    (candidate) =>
+      candidate.shiftId === segment.shiftId &&
+      candidate.jobId === segment.jobId &&
+      candidate.startTime === segment.startTime &&
+      candidate.focusAreaId === segment.focusAreaId,
+  );
+}
+
+/**
+ * A shift's notes on a row showing one half: each note on one half, as in
+ * shift detail. A removed shift shows none.
+ */
+function getSegmentScheduleNotes(
+  entry: MobileScheduleEntry,
+  segment: MobileScheduleEntrySegment | null | undefined,
+) {
+  if (isDeletedScheduleHistory(entry)) return [];
+  const segments = getScheduleEntrySegments(entry);
+  const index = segment ? findSegmentIndex(segments, segment) : -1;
+  return scheduleNotesForSegment(entry.indicators, segments, Math.max(index, 0));
+}
+
+// Every context row on the hero (focus area, time, notes) leads with one
+// icon, all one size so the rows' text starts in one column.
+const HERO_ROW_ICON_SIZE = 20;
+
 // The first-run tour renders this card with sample data
 // (`onboarding/components/previews`), so it is exported.
 export function MeHeroCard({
@@ -2513,6 +2555,10 @@ export function MeHeroCard({
       </View>
     );
   }
+  // The hero stands for the whole day, halves included, so it lists every note.
+  const heroNotes = isDeletedScheduleHistory(featuredItem.entry)
+    ? []
+    : scheduleNotesForRow(featuredItem.entry.indicators);
 
   const badgeLabel =
     status === "active"
@@ -2624,7 +2670,11 @@ export function MeHeroCard({
         <View style={styles.meHeroContextGroup}>
           {focusAreaName ? (
             <View style={styles.meHeroAreaRow}>
-              <Ionicons color="rgba(255, 255, 255, 0.82)" name="location-outline" size={18} />
+              <Ionicons
+                color="rgba(255, 255, 255, 0.82)"
+                name="location-outline"
+                size={HERO_ROW_ICON_SIZE}
+              />
               <Text fit="compact" style={styles.meHeroAreaLabel}>
                 {focusAreaName}
               </Text>
@@ -2633,7 +2683,11 @@ export function MeHeroCard({
           {timeRange ? (
             <View style={styles.meHeroScheduleRow}>
               <View style={styles.meHeroTimeRow}>
-                <Ionicons color="rgba(255, 255, 255, 0.82)" name="time-outline" size={24} />
+                <Ionicons
+                  color="rgba(255, 255, 255, 0.82)"
+                  name="time-outline"
+                  size={HERO_ROW_ICON_SIZE}
+                />
                 <Text style={styles.meHeroTimeText}>{timeRange}</Text>
               </View>
               {timing ? <Text style={styles.meHeroProgressLabel}>{timing.label}</Text> : null}
@@ -2649,6 +2703,25 @@ export function MeHeroCard({
               />
             </View>
           ) : null}
+        </View>
+      ) : null}
+      {heroNotes.length > 0 ? (
+        <View style={styles.meHeroNotesRow}>
+          <MaterialCommunityIcons
+            accessibilityElementsHidden
+            color="rgba(255, 255, 255, 0.82)"
+            importantForAccessibility="no-hide-descendants"
+            name="note-outline"
+            size={HERO_ROW_ICON_SIZE}
+            style={styles.meHeroNotesIcon}
+          />
+          <ScheduleNoteLabels
+            inverse
+            notes={heroNotes}
+            showIcon={false}
+            style={styles.meHeroNotesList}
+            textVariant="rowTitle"
+          />
         </View>
       ) : null}
       <MeHeroShiftmates entries={shiftmates} />
@@ -2919,6 +2992,9 @@ function UpcomingShiftsSection({
                                   </Text>
                                 </View>
                               ) : null}
+                              <ScheduleNoteLabels
+                                notes={getSegmentScheduleNotes(item.entry, item.segment)}
+                              />
                               <PreviousShiftRow change={change} />
                             </View>
                           </PressableRow>
@@ -3530,12 +3606,15 @@ function TeamShiftMemberRow({
   groupTimeRange,
   isFirst,
   linkedEmployeeId,
+  tabFocusAreaId,
   row,
   onPress,
 }: {
   groupTimeRange: string | null;
   isFirst: boolean;
   linkedEmployeeId: string | null;
+  /** The selected focus-area tab's area, when it names one. */
+  tabFocusAreaId?: number;
   row: TeamScheduleShiftRow;
   onPress: () => void;
 }) {
@@ -3563,6 +3642,14 @@ function TeamShiftMemberRow({
   // Once the reader raises the text size the role pill moves under the name:
   // the two no longer share a row's width, so neither has to give.
   const stackRolePill = useWindowDimensions().fontScale > 1;
+  // A double shift gives each note to one half; a single shift in a focus-area
+  // tab lists that area's notes, and the all tab every note.
+  const isSplitEntry = getScheduleEntrySegments(entry).length > 1;
+  const notes = isDeletedScheduleHistory(entry)
+    ? []
+    : isSplitEntry
+      ? getSegmentScheduleNotes(entry, segment)
+      : scheduleNotesForRow(entry.indicators, tabFocusAreaId);
   const rolePill =
     roleChip || isMentored ? (
       <View style={[styles.teamMemberRoleRow, stackRolePill && styles.teamMemberRoleRowStacked]}>
@@ -3598,6 +3685,7 @@ function TeamShiftMemberRow({
             {stackRolePill ? null : rolePill}
           </View>
           {memberTimeRange ? <Text style={styles.teamMemberTime}>{memberTimeRange}</Text> : null}
+          <ScheduleNoteLabels notes={notes} />
           <PreviousShiftRow change={change} />
           {splitChipLabel ? (
             <View style={styles.teamMemberSplitBadgeRow}>

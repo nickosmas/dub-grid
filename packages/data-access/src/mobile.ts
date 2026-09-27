@@ -786,6 +786,31 @@ export async function fetchMobileAbsenceTypeRows(
   return (data ?? []) as MobileAbsenceTypeRow[];
 }
 
+export interface MobileIndicatorTypeRow {
+  id: number;
+  name: string;
+  color: string;
+  sort_order: number;
+}
+
+/** The organization's active indicator types, in their configured order. */
+export async function fetchMobileIndicatorTypeRows(
+  serviceClient: SupabaseClient,
+  orgId: string,
+): Promise<MobileIndicatorTypeRow[]> {
+  const { data, error } = await serviceClient
+    .from("indicator_types")
+    .select("id, name, color, sort_order")
+    .eq("org_id", orgId)
+    .is("archived_at", null)
+    .order("sort_order", { ascending: true })
+    .order("id", { ascending: true });
+
+  if (error) throw error;
+
+  return (data ?? []) as MobileIndicatorTypeRow[];
+}
+
 export async function fetchMobileFocusAreaRows(
   serviceClient: SupabaseClient,
   orgId: string,
@@ -937,6 +962,53 @@ export async function fetchProfileNameRowsByIds(
   if (error) throw error;
 
   return (data ?? []) as MobileProfileNameRow[];
+}
+
+export interface MobileScheduleNoteRow {
+  emp_id: string;
+  date: string;
+  indicator_type_id: number;
+  focus_area_id: number | null;
+  status: "published" | "draft" | "draft_deleted";
+  indicator_types: { name: string; color: string } | null;
+}
+
+const MOBILE_SCHEDULE_NOTE_PAGE_SIZE = 1000;
+
+/**
+ * Every schedule note in the range with its indicator's own name and colour,
+ * archived indicators included. Read past the row policy, so the caller must
+ * apply the viewer's draft rule before anything leaves the server.
+ */
+export async function fetchMobileScheduleNoteRows(
+  serviceClient: SupabaseClient,
+  input: { orgId: string; startDate: string; endDate: string; employeeId?: string },
+  pageSize: number = MOBILE_SCHEDULE_NOTE_PAGE_SIZE,
+): Promise<MobileScheduleNoteRow[]> {
+  const rows: MobileScheduleNoteRow[] = [];
+  let from = 0;
+  for (;;) {
+    let query = serviceClient
+      .from("schedule_notes")
+      .select(
+        "emp_id, date, indicator_type_id, focus_area_id, status, indicator_types(name, color)",
+      )
+      .eq("org_id", input.orgId)
+      .gte("date", input.startDate)
+      .lte("date", input.endDate);
+    if (input.employeeId) query = query.eq("emp_id", input.employeeId);
+    const { data, error } = await query
+      .order("date", { ascending: true })
+      .order("emp_id", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    const page = (data ?? []) as unknown as MobileScheduleNoteRow[];
+    rows.push(...page);
+    if (page.length < pageSize) break;
+    from += pageSize;
+  }
+  return rows;
 }
 
 // Half PostgREST's 1,000-row cap: each cell carries its snapshots and

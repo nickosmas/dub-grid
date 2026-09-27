@@ -87,6 +87,8 @@ export const mobilePermissionsSchema = z.object({
   canPublishSchedule: z.boolean(),
   canApplyRecurringSchedule: z.boolean(),
   canEditNotes: z.boolean(),
+  // Retired into canEditNotes (migration 061). Installed builds still require
+  // it, so the server keeps sending it with canEditNotes' value.
   canEditScheduleIndicators: z.boolean(),
   canViewRecurringShifts: z.boolean(),
   canManageRecurringShifts: z.boolean(),
@@ -184,6 +186,15 @@ export const mobileAbsenceTypeSchema = z.object({
   textColor: z.string().nullable().optional(),
 });
 
+/** An organization's active indicator type, for legends and pickers. */
+export const mobileIndicatorTypeSchema = z.object({
+  id: z.number().int(),
+  name: z.string().min(1),
+  // Free text in the database, so no stricter format than present.
+  color: z.string().min(1),
+  sortOrder: z.number().int(),
+});
+
 export const mobileFocusAreaSchema = z.object({
   id: z.number().int(),
   name: z.string(),
@@ -226,6 +237,9 @@ export const mobileBootstrapResponseSchema = z.object({
   // After a Gridmaster's two-factor reset, until they enroll again. Defaults to
   // false so an older server never holds anyone on the enrollment screen.
   mfaReenrollRequired: z.boolean().default(false),
+  // Defaults to empty so a client talking to an older server shows no legend
+  // rather than failing to parse.
+  indicatorTypes: z.array(mobileIndicatorTypeSchema).default([]),
 });
 
 export const mobileTermsAcceptanceResponseSchema = z.object({
@@ -546,6 +560,21 @@ export const mobileScheduleEntryChangeSchema = z.object({
   previousPresentation: resolvedSchedulePresentationSchema.nullable(),
 });
 
+/**
+ * An indicator a viewer may see on a schedule entry. It carries its own name
+ * and colour, since a note can point at an archived indicator type that the
+ * organization's active list no longer holds. Drafts reach editors only.
+ */
+export const mobileScheduleIndicatorSchema = z.object({
+  indicatorTypeId: z.number().int(),
+  focusAreaId: z.number().int().nullable(),
+  name: z.string().min(1),
+  color: z.string().min(1),
+  // A state an older build does not know reads as published, so a new server
+  // value cannot fail that build's whole schedule response.
+  state: z.enum(["published", "draft_added", "draft_removed"]).catch("published"),
+});
+
 export const mobileScheduleEntrySchema = z.object({
   employeeId: z.string().uuid(),
   employeeName: z.string(),
@@ -557,6 +586,10 @@ export const mobileScheduleEntrySchema = z.object({
   change: mobileScheduleEntryChangeSchema.nullable().default(null),
   publishedAt: z.string().nullable(),
   publishedByName: z.string().nullable(),
+  // Defaults to empty so a client talking to an older server still parses. Only
+  // the schedule endpoints fill it; others (shift requests, swap options) send
+  // an empty list, which there means "not looked up", not "none".
+  indicators: z.array(mobileScheduleIndicatorSchema).default([]),
 });
 
 export const mobileMeScheduleResponseSchema = z.object({
@@ -1273,6 +1306,8 @@ export type MobileDepartment = z.infer<typeof mobileDepartmentSchema>;
 export type MobileScheduleRange = z.infer<typeof mobileMeScheduleResponseSchema>["range"];
 export type MobileScheduleEntrySegment = z.infer<typeof mobileScheduleEntrySegmentSchema>;
 export type MobileScheduleEntry = z.infer<typeof mobileScheduleEntrySchema>;
+export type MobileScheduleIndicator = z.infer<typeof mobileScheduleIndicatorSchema>;
+export type MobileIndicatorType = z.infer<typeof mobileIndicatorTypeSchema>;
 export type MobileShiftRequest = z.infer<typeof mobileShiftRequestSchema>;
 export type MobileShiftRequestHistoryCursor = z.infer<typeof mobileShiftRequestHistoryCursorSchema>;
 export type MobileShiftRequestHistoryQuery = z.infer<typeof mobileShiftRequestHistoryQuerySchema>;

@@ -10,6 +10,7 @@ import {
 import { AppState, Platform, type AppStateStatus } from "react-native";
 import { focusManager, onlineManager } from "@tanstack/react-query";
 import * as Network from "expo-network";
+import { subscribeToNetworkState } from "../lib/network-state-source";
 import { getSupabaseClient } from "../lib/supabase";
 
 const NETWORK_RECONNECT_STABILITY_MS = 1_500;
@@ -36,6 +37,7 @@ export function NetworkStateProvider({ children }: PropsWithChildren) {
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isOnlineRef = useRef<boolean | null>(null);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const recheckOfflineRef = useRef<() => void>(() => {});
   const [hasResolvedState, setHasResolvedState] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
 
@@ -115,16 +117,34 @@ export function NetworkStateProvider({ children }: PropsWithChildren) {
         assumeOnline();
       });
 
-    const subscription = Network.addNetworkStateListener((networkState) => {
+    const unsubscribe = subscribeToNetworkState((networkState) => {
       receivedLiveEvent = true;
       applyOnlineState(toOnlineValue(networkState));
     });
+
+    // Events alone cannot undo a wrong offline flag: one that is missed leaves
+    // it offline while requests still work, pausing every query. Only an online
+    // reading is applied, since the native probe also reads offline when it
+    // times out; going offline stays with the events.
+    recheckOfflineRef.current = () => {
+      if (onlineManager.isOnline()) return;
+      Network.getNetworkStateAsync()
+        .then((networkState) => {
+          if (!toOnlineValue(networkState)) return;
+          // React Query's flag is what pauses queries; recover it whatever
+          // this provider last recorded.
+          isOnlineRef.current = false;
+          applyOnlineState(true);
+        })
+        .catch(() => undefined);
+    };
 
     return () => {
       cancelled = true;
       clearTimeout(probeTimeout);
       clearReconnectTimer();
-      subscription.remove();
+      recheckOfflineRef.current = () => {};
+      unsubscribe();
     };
   }, []);
 
@@ -156,6 +176,7 @@ export function NetworkStateProvider({ children }: PropsWithChildren) {
 
       focusManager.setFocused(isActive);
       setAuthRefreshActive(isActive);
+      if (isActive) recheckOfflineRef.current();
     }
 
     const subscription = AppState.addEventListener("change", onAppStateChange);

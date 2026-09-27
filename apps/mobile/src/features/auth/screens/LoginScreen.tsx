@@ -29,6 +29,7 @@ import {
 import { buildBootstrapQueryKey } from "../hooks/useBootstrap";
 import { authEntryRecorder } from "../lib/auth-entry-measurement";
 import { settleMobileAuthAction } from "../lib/request-deadline";
+import { beginSignInHandoff, useSignInHandoffPending } from "../lib/sign-in-handoff";
 import { queryClient } from "../../../shared/lib/query-client";
 import { getInlineErrorMessageOrToast } from "../../../shared/lib/errors";
 import { getMobileEnvConfig } from "../../../shared/lib/env";
@@ -109,6 +110,8 @@ export default function LoginScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [slowSubmission, setSlowSubmission] = useState(false);
   const [restoringSession, setRestoringSession] = useState(false);
+  const signInHandoffPending = useSignInHandoffPending();
+  const releaseSignInHandoffRef = useRef<(() => void) | null>(null);
   const { pushToast } = useToast();
   const { apiBaseUrl } = getMobileEnvConfig();
   const orgSuffix = getOrgSuffixLabel(apiBaseUrl);
@@ -173,6 +176,11 @@ export default function LoginScreen() {
     };
   }, [accessToken, isConsentDecisionPending]);
 
+  // A successful sign-in ends when its replace unmounts this screen. Releasing
+  // any earlier would let the launch route or the redirect below see the new
+  // session and navigate a second time.
+  useEffect(() => () => releaseSignInHandoffRef.current?.(), []);
+
   // No splash here: the only time the session is still restoring is launch, and
   // `StartupSplashGate` is already covering the screen with the app's one
   // splash instance. Rendering another would restart the brand animation.
@@ -198,47 +206,72 @@ export default function LoginScreen() {
     );
   }
 
-  if (accessToken) {
+  // During our own sign-in the session appears before bootstrap does, and this
+  // screen navigates once bootstrap is warm; redirecting here too would land
+  // the user twice.
+  if (accessToken && !signInHandoffPending) {
     return <Redirect href={postLoginDestination} />;
   }
 
-  async function finishLogin(response: MobileAuthLoginResponse, session = response.session) {
+  /** Resolves true once the replace into the app is dispatched. */
+  async function finishLogin(
+    response: MobileAuthLoginResponse,
+    session = response.session,
+  ): Promise<boolean> {
     await saveLastOrg(response.organization);
 
-    const stopSessionHandoff = authEntryRecorder.startPhase("session_handoff");
-    const { error: sessionError } = await settleMobileAuthAction(
-      getSupabaseClient().auth.setSession({
-        access_token: session.accessToken,
-        refresh_token: session.refreshToken,
-      }),
-    ).finally(stopSessionHandoff);
-
-    if (sessionError) {
-      authEntryRecorder.cancel("cold_sign_in");
-      const nextError = getInlineErrorMessageOrToast(pushToast, {
-        error: sessionError,
-        fallbackMessage: "We couldn't finish signing you in. Try again in a moment.",
+    const releaseHandoff = beginSignInHandoff();
+    releaseSignInHandoffRef.current = releaseHandoff;
+    const bootstrapQueryKey = buildBootstrapQueryKey(session.accessToken);
+    let handedOff = false;
+    try {
+      // Warmed beside the session handoff rather than after it, since the
+      // token is already in hand. The tab tree can't draw its tab bar or pick
+      // the Home screen without bootstrap, and the launch splash is long spent,
+      // so the submit button's pending state covers this wait. `prefetchQuery`
+      // never rejects: a failed bootstrap still lets the user through to the
+      // tab gate's locked/error handling. Sent whatever the online flag says:
+      // it can read offline after the device sleeps, and a paused warm-up
+      // never settles, where the request's own timeout always does.
+      const bootstrapWarmed = queryClient.prefetchQuery({
+        queryKey: bootstrapQueryKey,
+        queryFn: () => getBootstrap(session.accessToken),
+        retry: false,
+        networkMode: "always",
       });
-      setError(nextError);
-      return;
+
+      const stopSessionHandoff = authEntryRecorder.startPhase("session_handoff");
+      const { error: sessionError } = await settleMobileAuthAction(
+        getSupabaseClient().auth.setSession({
+          access_token: session.accessToken,
+          refresh_token: session.refreshToken,
+        }),
+      ).finally(stopSessionHandoff);
+
+      if (sessionError) {
+        authEntryRecorder.cancel("cold_sign_in");
+        const nextError = getInlineErrorMessageOrToast(pushToast, {
+          error: sessionError,
+          fallbackMessage: "We couldn't finish signing you in. Try again in a moment.",
+        });
+        setError(nextError);
+        return false;
+      }
+
+      await bootstrapWarmed;
+      router.replace(postLoginDestination);
+      handedOff = true;
+      requestAnimationFrame(() => {
+        authEntryRecorder.markAuthenticatedNavigationReady("cold_sign_in");
+      });
+      return true;
+    } finally {
+      if (!handedOff) {
+        // No session was stored, so nothing may keep a bootstrap fetched for it.
+        queryClient.removeQueries({ queryKey: bootstrapQueryKey, exact: true });
+        releaseHandoff();
+      }
     }
-
-    // Warm bootstrap before handing off. The tab tree can't draw its tab bar or
-    // pick the Home screen without it, and the launch splash is long spent by
-    // now, so arriving without it would blank the screen. The submit button
-    // stays in its pending state for this, which is the honest place to show
-    // the wait. `prefetchQuery` never rejects: a failed bootstrap should still
-    // let the user through to the tab gate's locked/error handling.
-    await queryClient.prefetchQuery({
-      queryKey: buildBootstrapQueryKey(session.accessToken),
-      queryFn: () => getBootstrap(session.accessToken),
-      retry: false,
-    });
-
-    router.replace(postLoginDestination);
-    requestAnimationFrame(() => {
-      authEntryRecorder.markAuthenticatedNavigationReady("cold_sign_in");
-    });
   }
 
   async function handleOrganizationContinue() {
@@ -277,6 +310,7 @@ export default function LoginScreen() {
     setSubmitting(true);
     setError(null);
     authEntryRecorder.start("cold_sign_in");
+    let handedOff = false;
     try {
       const response = await loginToOrganization({
         orgSlug: orgSlug.trim().toLowerCase(),
@@ -294,7 +328,7 @@ export default function LoginScreen() {
         return;
       }
 
-      await finishLogin(response);
+      handedOff = await finishLogin(response);
     } catch (loginError) {
       authEntryRecorder.cancel("cold_sign_in");
       // The JWT hook refuses terminated employees with a sentinel message
@@ -322,7 +356,8 @@ export default function LoginScreen() {
       });
       setError(nextError);
     } finally {
-      setSubmitting(false);
+      // After a handoff the button stays pending until the replace unmounts us.
+      if (!handedOff) setSubmitting(false);
     }
   }
 
@@ -331,6 +366,7 @@ export default function LoginScreen() {
 
     setSubmitting(true);
     setError(null);
+    let handedOff = false;
     try {
       const verifiedSession = await settleMobileAuthAction(
         verifyMobileTotpFactor({
@@ -341,7 +377,7 @@ export default function LoginScreen() {
       );
 
       await recordMobileSignInCompleted(verifiedSession.accessToken);
-      await finishLogin(pendingMfaLogin, verifiedSession);
+      handedOff = await finishLogin(pendingMfaLogin, verifiedSession);
     } catch (mfaError) {
       const nextError = getInlineErrorMessageOrToast(pushToast, {
         error: mfaError,
@@ -353,7 +389,7 @@ export default function LoginScreen() {
         setTimeout(() => mfaInputRef.current?.focus(), 0);
       }
     } finally {
-      setSubmitting(false);
+      if (!handedOff) setSubmitting(false);
     }
   }
 

@@ -50,6 +50,7 @@ export function getMobileRealtimeInvalidationKeys(
   // organization boundary, so this family prefix can only reach the current
   // identity's remaining entries.
   const dashboard = ["mobile", "dashboard"] as const;
+  const homeScheduleCard = ["mobile", "dashboard", "my-schedule"] as const;
 
   switch (table) {
     case "organizations":
@@ -76,8 +77,11 @@ export function getMobileRealtimeInvalidationKeys(
     case "schedule_cell_snapshots":
     case "schedule_cell_segments":
       return [schedule, requests, dashboard, shiftSwapOptions];
+    // The Home schedule card reads /me/schedule under its own dashboard key, and
+    // its entries carry their indicators (42b). Only that card: indicators do not
+    // change the admin dashboard's figures.
     case "schedule_notes":
-      return [schedule];
+      return [schedule, homeScheduleCard];
     case "profile_change_requests":
       return [profileChangeRequests, profileChangeRequestsOwn];
     case "notifications":

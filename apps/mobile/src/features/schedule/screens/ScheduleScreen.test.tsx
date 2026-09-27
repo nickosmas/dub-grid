@@ -563,27 +563,77 @@ describe("ScheduleScreen", () => {
     expect(screen.queryByText("This Week's Hours")).not.toBeInTheDocument();
   });
 
-  it("does not surface published schedule indicators in the Me week list", () => {
+  it("spells out schedule notes on the hero and in Your Week", () => {
     meScheduleEntries = [
       createScheduleEntry({
         indicators: [
-          { id: 1, name: "Training" },
-          { id: 2, name: "Float" },
+          {
+            indicatorTypeId: 1,
+            focusAreaId: null,
+            name: "Training",
+            color: "#378ADD",
+            state: "published",
+          },
         ],
       }),
       createScheduleEntry({
         date: "2026-04-17",
-        indicators: [{ id: 3, name: "New hire" }],
+        indicators: [
+          {
+            indicatorTypeId: 3,
+            focusAreaId: null,
+            name: "New hire",
+            color: "#1D9E75",
+            state: "draft_added",
+          },
+        ],
       }),
     ];
 
     render(<HomeScheduleScreen />);
 
-    expect(screen.queryByText(/Assignment:/)).not.toBeInTheDocument();
-    expect(screen.queryByText("Training")).not.toBeInTheDocument();
-    expect(screen.queryByText("Float")).not.toBeInTheDocument();
-    expect(screen.queryByText("New hire")).not.toBeInTheDocument();
-    expect(screen.queryByText(/Indicators:/)).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("me-hero-card")).getByLabelText("Schedule notes: Training"),
+    ).toHaveTextContent("Training");
+    expect(
+      screen.getByLabelText("Schedule notes: New hire, added, not published"),
+    ).toHaveTextContent("New hire (added, not published)");
+    expect(screen.queryByText(/Indicators/)).not.toBeInTheDocument();
+  });
+
+  it("shows no schedule notes on a removed shift", () => {
+    meScheduleEntries = [
+      createScheduleEntry({
+        date: "2026-04-17",
+        indicators: [
+          {
+            indicatorTypeId: 2,
+            focusAreaId: null,
+            name: "Float",
+            color: "#E24B4A",
+            state: "published",
+          },
+        ],
+        change: {
+          kind: "deleted",
+          previousPresentation: {
+            label: "D",
+            shiftName: "Day Shift",
+            focusAreaId: 2,
+            focusAreaName: "Skilled Nursing",
+            displayFocusAreaName: "Skilled Nursing",
+            startTime: "07:00:00",
+            endTime: "15:00:00",
+            segments: [],
+          },
+        },
+      }),
+      createScheduleEntry(),
+    ];
+
+    render(<HomeScheduleScreen />);
+
+    expect(screen.queryByLabelText("Float")).toBeNull();
   });
 
   it("shows only the no-schedule state when nothing is scheduled this week", () => {
@@ -914,6 +964,95 @@ describe("ScheduleScreen", () => {
     expect(screen.getAllByText("3:00 PM - 11:00 PM").length).toBeGreaterThan(0);
     expect(screen.getByText("Nurse")).toBeInTheDocument();
     expect(screen.getByText("Lead")).toBeInTheDocument();
+  });
+
+  // 42c: schedule notes are spelled out on team rows, per half of a double shift.
+  it("lists a person's schedule notes on their team row", () => {
+    teamScheduleEntries = [
+      createScheduleEntry({
+        indicators: [
+          {
+            indicatorTypeId: 7,
+            focusAreaId: null,
+            name: "Float",
+            color: "#E24B4A",
+            state: "published",
+          },
+        ],
+      }),
+    ];
+
+    render(<TeamScheduleScreen />);
+
+    expect(screen.getByLabelText("Schedule notes: Float")).toHaveTextContent("Float");
+  });
+
+  it("gives each half of a double shift its own focus area's notes", () => {
+    teamScheduleEntries = [
+      createScheduleEntry({
+        employeeId: "emp-2",
+        employeeName: "Bri Shaw",
+        shiftName: "Day Shift / Evening Shift",
+        startTime: "07:00:00",
+        endTime: "23:00:00",
+        segments: [
+          {
+            shiftId: 1,
+            jobId: 10,
+            shiftName: "Day Shift",
+            jobName: "Nurse",
+            startTime: "07:00:00",
+            endTime: "15:00:00",
+            focusAreaId: 2,
+            displayFocusAreaName: "Skilled Nursing",
+          },
+          {
+            shiftId: 2,
+            jobId: 11,
+            shiftName: "Evening Shift",
+            jobName: "Lead",
+            startTime: "15:00:00",
+            endTime: "23:00:00",
+            focusAreaId: 3,
+            displayFocusAreaName: "Memory Care",
+          },
+        ],
+        indicators: [
+          {
+            indicatorTypeId: 7,
+            focusAreaId: 2,
+            name: "Float",
+            color: "#E24B4A",
+            state: "published",
+          },
+          {
+            indicatorTypeId: 8,
+            focusAreaId: 3,
+            name: "Training",
+            color: "#378ADD",
+            state: "published",
+          },
+          {
+            indicatorTypeId: 9,
+            focusAreaId: null,
+            name: "New hire",
+            color: "#1D9E75",
+            state: "published",
+          },
+        ],
+      }),
+    ];
+
+    render(<TeamScheduleScreen />);
+
+    // The whole day's note goes on the first half only, as in shift detail.
+    const dayHalf = screen
+      .getByLabelText("Schedule notes: Float; New hire")
+      .closest("[role=button]");
+    const eveningHalf = screen.getByLabelText("Schedule notes: Training").closest("[role=button]");
+    expect(dayHalf).toHaveTextContent("Nurse");
+    expect(eveningHalf).toHaveTextContent("Lead");
+    expect(screen.getAllByText(/New hire/)).toHaveLength(1);
   });
 
   it("shows mentored assignments with a full label on Home", () => {

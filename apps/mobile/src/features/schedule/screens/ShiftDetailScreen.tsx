@@ -1,3 +1,4 @@
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, View, useWindowDimensions } from "react-native";
@@ -19,6 +20,7 @@ import {
   SheetHeader,
 } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
+import { ScheduleNoteLabels } from "../../../shared/components/ScheduleNoteLabels";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { FullPageSheet } from "../../../shared/components/FullPageSheet";
@@ -79,6 +81,7 @@ import {
   getCompactScheduleDateParts,
   getScheduleEntrySegmentTimeRange,
   getScheduleEntrySegments,
+  isDeletedScheduleHistory,
   getScheduleEntryCategoryKey,
   getScheduleEntryCustomEndTime,
   getScheduleEntryCustomStartTime,
@@ -93,6 +96,7 @@ import {
   getScheduleEntryTitle,
   sortScheduleEntries,
 } from "../lib/schedule";
+import { scheduleNoteGroups } from "../lib/scheduleNotes";
 import {
   describeScheduleEntryChanges,
   getScheduleEntrySegmentChange,
@@ -1484,6 +1488,7 @@ export default function ShiftDetailScreen() {
                   value={focusAreaName}
                 />
               ) : null}
+              <ScheduleNotesDetailRow entry={shiftEntry} />
             </View>
 
             {canCreateRequestsForShift ? (
@@ -1690,9 +1695,12 @@ type DetailIconTone = "blue" | "green";
  */
 function DetailIconTile({
   iconName,
+  materialIconName,
   tone,
 }: {
-  iconName: keyof typeof Ionicons.glyphMap;
+  iconName?: keyof typeof Ionicons.glyphMap;
+  /** A glyph Ionicons lacks, such as the schedule notes' sticky note. */
+  materialIconName?: keyof typeof MaterialCommunityIcons.glyphMap;
   tone: DetailIconTone;
 }) {
   const mobileColors = useMobileColors();
@@ -1706,7 +1714,51 @@ function DetailIconTile({
         tone === "blue" ? styles.detailIconTileBlue : styles.detailIconTileGreen,
       ]}
     >
-      <Ionicons color={mobileIconToneColor(tone, isDark)} name={iconName} size={18} />
+      {materialIconName ? (
+        <MaterialCommunityIcons
+          color={mobileIconToneColor(tone, isDark)}
+          name={materialIconName}
+          size={18}
+        />
+      ) : (
+        <Ionicons color={mobileIconToneColor(tone, isDark)} name={iconName} size={18} />
+      )}
+    </View>
+  );
+}
+
+/**
+ * The shift's schedule notes, spelled out. A double shift lists each half's
+ * under that half, and the rest under "For the whole day".
+ */
+function ScheduleNotesDetailRow({ entry }: { entry: MobileScheduleEntry }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const groups = isDeletedScheduleHistory(entry)
+    ? []
+    : scheduleNoteGroups(entry.indicators, getScheduleEntrySegments(entry));
+  if (groups.length === 0) return null;
+
+  return (
+    <View style={styles.detailInfoRow} testID="shift-detail-schedule-notes">
+      <DetailIconTile materialIconName="note-outline" tone="blue" />
+      <View style={styles.detailInfoCopy}>
+        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.detailInfoLabel}>
+          Schedule notes
+        </Text>
+        <View style={styles.detailNoteGroups}>
+          {groups.map((group) => (
+            <View key={group.key} style={styles.detailNoteGroup}>
+              {group.title ? (
+                <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.detailNoteGroupTitle}>
+                  {group.title}
+                </Text>
+              ) : null}
+              <ScheduleNoteLabels notes={group.notes} showIcon={false} textVariant="body" />
+            </View>
+          ))}
+        </View>
+      </View>
     </View>
   );
 }

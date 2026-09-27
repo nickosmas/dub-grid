@@ -3,7 +3,6 @@ import { StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import { useInfiniteQuery, type InfiniteData } from "@tanstack/react-query";
 import type { MobileNotification, MobileNotificationsResponse } from "@dubgrid/contracts";
-import { resolveAlertDestination } from "@dubgrid/domain";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
@@ -37,8 +36,8 @@ import {
 import { setBootstrapUnreadCount } from "../lib/unread-cache";
 import {
   WEB_ONLY_ALERT_MESSAGE,
-  openNotificationAction,
-  resolveNativeRoute,
+  openNativeRoute,
+  resolveAlertNativeRoute,
 } from "../lib/openNotificationAction";
 import { NotificationRowListSkeleton } from "../components/NotificationRowListSkeleton";
 import { SkeletonLine } from "../../../shared/components/skeleton";
@@ -103,6 +102,7 @@ export default function NotificationsScreen() {
   const [confirmingMarkAllRead, setConfirmingMarkAllRead] = useState(false);
 
   const bootstrapQuery = useBootstrap(accessToken);
+  const linkedEmployeeId = bootstrapQuery.data?.linkedEmployee?.id ?? null;
   const canApproveShiftRequests = Boolean(bootstrapQuery.data?.permissions.canApproveShiftRequests);
   const facetsQuery = useNotificationFacets(accessToken);
   const facets = facetsQuery.data;
@@ -227,9 +227,9 @@ export default function NotificationsScreen() {
       // a network round trip, which read as lag; the write now runs behind
       // the navigation with the row already marked, and a failure puts the
       // row back and says so.
-      const destination = resolveAlertDestination(notification);
-      if (destination && resolveNativeRoute(destination.href)) {
-        openNotificationAction(destination.href);
+      const route = resolveAlertNativeRoute(notification, linkedEmployeeId);
+      if (route) {
+        openNativeRoute(route);
       } else {
         pushToast({ tone: "info", message: WEB_ONLY_ALERT_MESSAGE });
       }
@@ -249,7 +249,14 @@ export default function NotificationsScreen() {
           });
         });
     },
-    [accessToken, facetsQuery, notificationsQuery, patchNotificationReadAt, pushToast],
+    [
+      accessToken,
+      facetsQuery,
+      linkedEmployeeId,
+      notificationsQuery,
+      patchNotificationReadAt,
+      pushToast,
+    ],
   );
 
   const handleArchive = useCallback(

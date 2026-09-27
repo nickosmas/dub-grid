@@ -4,12 +4,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const requireMobileAuth = vi.fn();
 const fetchLinkedEmployeeForUser = vi.fn();
 const fetchMobileScheduleEntries = vi.fn();
+const fetchMobileScheduleNotes = vi.fn(async () => []);
 const resolveMobileDateRange = vi.fn();
 
 vi.mock("@/features/mobile/server", () => ({
   requireMobileAuth,
   fetchLinkedEmployeeForUser,
   fetchMobileScheduleEntries,
+  fetchMobileScheduleNotes,
   resolveMobileDateRange,
 }));
 
@@ -132,5 +134,15 @@ describe("mobile me-schedule route", () => {
       },
       entries: [],
     });
+    // 42b: only the caller's own notes, in the effective organization.
+    expect(fetchMobileScheduleNotes).toHaveBeenCalledWith(
+      {},
+      {
+        orgId: "org-1",
+        employeeId: "11111111-1111-4111-8111-111111111111",
+        startDate: "2026-04-16",
+        endDate: "2026-04-22",
+      },
+    );
   });
 });

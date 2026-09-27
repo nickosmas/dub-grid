@@ -12,6 +12,8 @@ import type {
   PublishChange,
   PublishHistoryEntryWithName,
   AbsenceType,
+  IndicatorType,
+  ScheduleNote,
 } from "@/types";
 import type {
   WeeklyStats,
@@ -92,6 +94,10 @@ export interface DashboardContentProps {
 
   // Absence types
   absenceTypeById: Map<number, AbsenceType>;
+
+  /** The dashboard window's schedule notes; drafts only reach editors. */
+  scheduleNotes: ScheduleNote[];
+  indicatorTypes: IndicatorType[];
 
   // Responsive
   isMobile: boolean;

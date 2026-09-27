@@ -102,7 +102,7 @@ vi.mock("@/features/reports/client/api", () => ({
     { value: "certification-role-matrix", label: "Certifications and roles" },
     { value: "account-access", label: "Account access" },
     { value: "shift-requests", label: "Shift requests" },
-    { value: "shift-notes", label: "Shift notes" },
+    { value: "shift-notes", label: "Schedule notes" },
   ],
   fetchOperationsReport: (...args: unknown[]) => fetchOperationsReport(...args),
   fetchOperationsReportFilterOptions: (...args: unknown[]) =>
@@ -502,9 +502,9 @@ describe("ReportsPageContent", () => {
   it("scopes the shift notes report to selected indicators", async () => {
     renderReports();
 
-    await chooseCustomSelect("Report", "Shift notes");
+    await chooseCustomSelect("Report", "Schedule notes");
 
-    fireEvent.click(screen.getByRole("button", { name: /Indicators/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Schedule notes" }));
     fireEvent.click(await screen.findByLabelText("Late"));
     fireEvent.click(screen.getByRole("button", { name: "Generate report" }));
 
@@ -521,10 +521,10 @@ describe("ReportsPageContent", () => {
     renderReports();
 
     await chooseCustomSelect("Report", "Staff hours");
-    expect(screen.getByRole("button", { name: /Indicators/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Schedule notes" })).toBeInTheDocument();
 
     await chooseCustomSelect("Report", "Coverage");
-    expect(screen.queryByRole("button", { name: /Indicators/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Schedule notes" })).not.toBeInTheDocument();
   });
 
   it("hides range controls for employee directory reports", async () => {

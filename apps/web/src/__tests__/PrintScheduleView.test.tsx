@@ -139,6 +139,7 @@ describe("PrintScheduleView", () => {
       const legend = container.querySelector<HTMLElement>("[data-print-indicator-legend]");
       expect(legend?.textContent).toContain("Float");
       expect(legend?.textContent).not.toContain("Training");
+      expect(legend?.querySelector("[data-note-icon]")?.getAttribute("stroke")).toBe("#334766");
     });
 
     it("prints no indicator key when no indicator appears", () => {
@@ -157,7 +158,7 @@ describe("PrintScheduleView", () => {
         .map((element) => element.outerHTML)
         .join("");
       expect(markup).not.toContain("var(--");
-      expect(markup).toContain('aria-label="Note"');
+      expect(markup).toContain('aria-label="Schedule note"');
     });
   });
 });

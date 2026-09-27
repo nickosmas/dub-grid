@@ -86,6 +86,7 @@ function entry(
     change,
     publishedAt: "2026-09-18T03:31:00.000Z",
     publishedByName: "Nic Kosmas",
+    indicators: [],
   };
 }
 

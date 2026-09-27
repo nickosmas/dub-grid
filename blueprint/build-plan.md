@@ -665,7 +665,7 @@
           identity, and `start_impersonation` and `force_logout_user` refuse a
           Gridmaster without a recent sign-in in the database (F-75, the
           narrow part; schedule editing is unchanged).
-- [ ] 42. **Schedule indicators on every schedule surface** - a schedule
+- [x] 42. **Schedule indicators on every schedule surface** - a schedule
       indicator is visible wherever that person's shift is shown, not only on
       the desktop week and two-week grid. Every surface uses the indicator's
       own name and colour and follows the existing visibility rule: anyone who
@@ -679,19 +679,21 @@
         edit indicators; the grid hover card keeps its indicator line on
         changed cells; and the printed schedule shows indicators with a
         legend. The data is already loaded on the schedule page.
-  - [ ] 42b. **Mobile API indicators** - mobile schedule entries carry their
+  - [x] 42b. **Mobile API indicators** - mobile schedule entries carry their
         visible indicators and bootstrap carries the organization's indicator
         types, in `@dubgrid/contracts` and `@dubgrid/mobile-api-core`, with
         the same published and draft filtering as web. The existing
         `schedule_notes` realtime invalidation then refreshes real data.
-  - [ ] 42c. **Mobile indicator display** - the Schedule tab, shift detail,
+  - [x] 42c. **Mobile indicator display** - the Schedule tab, shift detail,
         and the Home schedule card show indicators, and a
         `schedule_note_published` alert opens the person's own shift rather
         than the team schedule.
-  - [ ] 42d. **Secondary surfaces (decision first)** - decide whether the
+  - [x] 42d. **Secondary surfaces (decision first)** - decide whether the
         dashboard schedule rows, People person detail, shift-request
         snapshots, and calendar (.ics) event descriptions show indicators,
-        then build only the approved ones.
+        then build only the approved ones. Built: the web dashboards' schedule
+        rows (owner, 2026-09-27). The other three were not decided and not
+        built; see `history/features/42d-secondary-surfaces.md`.
 - [ ] 43. **Complete person records and Gridmaster account recovery** -
       managers see every fact about a person they are allowed to see on the
       People detail page, and a Gridmaster has one well-organized page that
@@ -729,7 +731,7 @@
         the person, and makes them enroll again at their next sign-in (a
         migration). Also: end one session, clear a login lock, forget a
         device, disable a push device, revoke a calendar feed.
-  - [ ] 43d. **Schedule, requests and notifications** - per organization, the
+  - [x] 43d. **Schedule, requests and notifications** - per organization, the
         person's recurring schedule and series, recent and upcoming shifts,
         schedule notes, publish changes that affected them, shift requests on
         either side, and profile change requests; their notification

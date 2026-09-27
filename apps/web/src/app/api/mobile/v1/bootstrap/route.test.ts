@@ -5,6 +5,7 @@ const requireMobileAuth = vi.fn();
 const fetchMobileAbsenceTypes = vi.fn();
 const fetchMobileCertifications = vi.fn();
 const fetchMobileDepartments = vi.fn();
+const fetchMobileIndicatorTypes = vi.fn();
 const fetchMobileFocusAreas = vi.fn();
 const fetchMobileRoles = vi.fn();
 const fetchLinkedEmployeeForUser = vi.fn();
@@ -21,6 +22,7 @@ vi.mock("@/features/mobile/server", () => ({
   fetchMobileAbsenceTypes,
   fetchMobileCertifications,
   fetchMobileDepartments,
+  fetchMobileIndicatorTypes,
   fetchMobileFocusAreas,
   fetchMobileRoles,
   requireMobileAuth,
@@ -148,6 +150,9 @@ describe("GET /api/mobile/v1/bootstrap", () => {
         type: "scheduled",
       },
     ]);
+    fetchMobileIndicatorTypes.mockResolvedValue([
+      { id: 7, name: "Float", color: "#ff0000", sortOrder: 1 },
+    ]);
     fetchMobileUnreadNotificationCount.mockResolvedValue(4);
     fetchMobileTermsAcceptedVersion.mockResolvedValue(CURRENT_TERMS_VERSION);
     resolveMfaReenrollRequired.mockResolvedValue(true);
@@ -234,6 +239,7 @@ describe("GET /api/mobile/v1/bootstrap", () => {
           type: "scheduled",
         },
       ],
+      indicatorTypes: [{ id: 7, name: "Float", color: "#ff0000", sortOrder: 1 }],
     });
 
     // A failed check never takes the app down.

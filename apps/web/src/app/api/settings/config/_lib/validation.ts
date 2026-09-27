@@ -494,7 +494,7 @@ export function validateIndicatorType(
       kind: "text",
       key: "name",
       errorKey: "indicatorType.name",
-      label: "Indicator name",
+      label: "Schedule note name",
       maxLength: INDICATOR_NAME_MAX,
     },
   ]);

@@ -121,7 +121,7 @@ async function fetchInvitations(
   return [...byId.values()].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 }
 
-async function resolveActors(
+export async function resolveActors(
   client: SupabaseClient,
   ids: Iterable<string | null>,
 ): Promise<Record<string, string>> {

@@ -4,10 +4,10 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import "./fonts.css";
 import "@/lib/env.server";
-import { clientEnv } from "@/lib/env";
+import { siteBaseUrl } from "@/lib/site-url";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(clientEnv?.NEXT_PUBLIC_SITE_URL ?? "https://dubgrid.com"),
+  metadataBase: new URL(siteBaseUrl()),
   title: "DubGrid",
   description: "Staff scheduling, built for care teams.",
   openGraph: {

@@ -130,4 +130,43 @@ describe("MonthView indicators", () => {
     expect(within(firstRow).getByLabelText("Float")).toBeInTheDocument();
     codes["emp-1"] = [northDay];
   });
+
+  it("shows a note filed under another of the person's focus areas on their row", () => {
+    const south: FocusArea = {
+      id: 2,
+      orgId: "org-1",
+      departmentId: 1,
+      name: "South",
+      sortOrder: 2,
+    };
+    focusAreas.push(south);
+    blair.focusAreaIds = [1, 2];
+    const lookup = vi.fn((empId: string, date: Date, focusAreaId?: number): ScheduleNoteMark[] => {
+      if (formatDateKey(date) !== dayKey || empId !== "emp-2") return [];
+      if (focusAreaId === 1) return [{ indicatorTypeId: 7, state: "published" }];
+      if (focusAreaId === 2) {
+        return [
+          { indicatorTypeId: 7, state: "published" },
+          { indicatorTypeId: 8, state: "published" },
+        ];
+      }
+      return [];
+    });
+
+    try {
+      renderMonth(lookup);
+      openDay();
+
+      const popover = screen.getByRole("dialog");
+      // Blair's general code lists them under North only; South's note joins
+      // that row, and a note filed under both areas shows once.
+      const row = within(popover).getByText("Blair T.").parentElement!;
+      expect(within(row).getByLabelText("Training")).toBeInTheDocument();
+      expect(within(popover).getAllByLabelText("Float")).toHaveLength(1);
+      expect(lookup).toHaveBeenCalledWith("emp-2", day, 2);
+    } finally {
+      focusAreas.pop();
+      blair.focusAreaIds = [1];
+    }
+  });
 });

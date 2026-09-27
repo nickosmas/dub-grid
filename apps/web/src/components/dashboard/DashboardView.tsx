@@ -22,6 +22,7 @@ import type {
   PublishHistoryEntryWithName,
   NamedItem,
   Department,
+  IndicatorType,
 } from "@/types";
 import {
   fetchShifts,
@@ -67,6 +68,8 @@ import DashboardHero from "./DashboardHero";
 import DashboardChecklist from "./DashboardChecklist";
 import DashboardLoading from "./DashboardLoading";
 import { useDashboardInvitations } from "./useDashboardInvitations";
+import { dashboardScheduleWindow } from "./dashboardScheduleNotes";
+import { useDashboardScheduleNotes } from "./useDashboardScheduleNotes";
 const ExpandedCoverage = dynamic(() => import("./expanded/ExpandedCoverage"), {
   ssr: false,
   loading: LazyProgressFallback,
@@ -116,6 +119,7 @@ interface DashboardViewProps {
   departments: Department[];
   employees: Employee[];
   permissions: WebPermissions;
+  indicatorTypes: IndicatorType[];
 }
 
 export function hasDashboardAdminCapability(permissions: Pick<Permissions, "level">): boolean {
@@ -275,6 +279,7 @@ export default function DashboardView({
   departments,
   employees,
   permissions,
+  indicatorTypes,
 }: DashboardViewProps) {
   const { user: authUser } = useAuth();
   const isMobile = useMediaQuery(MOBILE);
@@ -438,6 +443,19 @@ export default function DashboardView({
     };
   }, [isUserDashboardMode, orgId, periodEnd, periodStart, todayKey]);
 
+  const scheduleWindow = useMemo(
+    () =>
+      dashboardScheduleWindow({
+        todayKey,
+        isUserDashboardMode,
+        prevPeriodStart,
+        periodEnd,
+        heroLookaheadDays: HERO_LOOKAHEAD_DAYS,
+      }),
+    [isUserDashboardMode, periodEnd, prevPeriodStart, todayKey],
+  );
+  const scheduleNotes = useDashboardScheduleNotes(orgId, scheduleWindow);
+
   // Stable refs for Maps to avoid re-fetching on every render
   // (Map objects have no referential stability)
   const assignmentLabelMapRef = useLatestRef(assignmentLabelMap);
@@ -447,18 +465,8 @@ export default function DashboardView({
     let cancelled = false;
     setShiftsLoading(true);
 
-    // Fetch the date range needed: previous period start → current period end.
-    // On the user dashboard the window is widened to always cover
-    // [today, today + HERO_LOOKAHEAD_DAYS] as well, so the hero can surface the
-    // next upcoming shift even when it falls outside the period being browsed.
-    const today = new Date(`${todayKey}T00:00:00`);
-    const lookaheadEnd = addDays(today, HERO_LOOKAHEAD_DAYS);
-    const fetchStart = formatDateKey(
-      isUserDashboardMode && today < prevPeriodStart ? today : prevPeriodStart,
-    );
-    const fetchEnd = formatDateKey(
-      isUserDashboardMode && lookaheadEnd > periodEnd ? lookaheadEnd : periodEnd,
-    );
+    const fetchStart = scheduleWindow.start;
+    const fetchEnd = scheduleWindow.end;
     Promise.all([
       fetchShifts(
         orgId,
@@ -512,7 +520,8 @@ export default function DashboardView({
     periodEnd,
     periodEndKey,
     periodStartKey,
-    prevPeriodStart,
+    scheduleWindow.start,
+    scheduleWindow.end,
   ]);
 
   // Shift requests
@@ -1114,6 +1123,8 @@ export default function DashboardView({
     draftModifiedCount,
     draftDeletedCount,
     absenceTypeById,
+    scheduleNotes,
+    indicatorTypes,
     isMobile,
     isTablet,
     onExpandPanel: handleExpandPanel,

@@ -19,7 +19,9 @@ import type {
   AssignmentDefinition,
   Employee,
   FocusArea,
+  IndicatorType,
   Organization,
+  ScheduleNote,
   ShiftCategory,
   ShiftMap,
   ShiftRequest,
@@ -351,6 +353,8 @@ function makeProps(overrides: Partial<DashboardContentProps> = {}): DashboardCon
     },
     viewMode: "week",
     absenceTypeById: new Map(),
+    scheduleNotes: [],
+    indicatorTypes: [],
   };
 
   return { ...baseProps, ...overrides };
@@ -1517,5 +1521,155 @@ describe("UserDashboard", () => {
 
     expect(screen.getByTestId("user-dashboard-unlinked")).toBeInTheDocument();
     expect(screen.getByText("No linked staff profile")).toBeInTheDocument();
+  });
+});
+
+describe("UserDashboard schedule notes", () => {
+  const indicatorTypes = [
+    { id: 1, name: "Float" },
+    { id: 2, name: "Training" },
+  ] as IndicatorType[];
+
+  function note(
+    indicatorTypeId: number,
+    dateKey: string,
+    overrides: Partial<ScheduleNote> = {},
+  ): ScheduleNote {
+    return {
+      id: indicatorTypeId,
+      orgId: "org-1",
+      empId: "emp-1",
+      date: dateKey,
+      indicatorTypeId,
+      focusAreaId: null,
+      status: "published",
+      createdBy: null,
+      updatedBy: null,
+      createdAt: "2026-05-01T00:00:00Z",
+      updatedAt: "2026-05-01T00:00:00Z",
+      ...overrides,
+    };
+  }
+
+  function doubleShift(todayKey: string): ShiftMap {
+    const half = (position: number, focusAreaId: number, startTime: string, endTime: string) => ({
+      assignmentId: null,
+      endTime,
+      focusAreaId,
+      isMentored: false,
+      jobId: 7,
+      label: position === 0 ? "D" : "E",
+      position,
+      shiftId: position === 0 ? 10 : 11,
+      shiftName: position === 0 ? "Day shift" : "Evening shift",
+      startTime,
+    });
+    return {
+      [`emp-1_${todayKey}`]: {
+        assignmentIds: [],
+        customEndTime: null,
+        customStartTime: null,
+        draftKind: null,
+        isDraft: false,
+        label: "D + E",
+        publishedAssignmentDefinitionIds: [],
+        publishedLabel: "D + E",
+        segments: [half(0, 1, "09:00", "12:00"), half(1, 2, "13:00", "17:00")],
+      },
+    };
+  }
+
+  function renderDashboard(notes: ScheduleNote[], overrides: Partial<DashboardContentProps> = {}) {
+    const today = new Date();
+    const todayKey = formatDateKey(today);
+    const shifts = doubleShift(todayKey);
+    const base = makeProps();
+    return render(
+      <UserDashboard
+        {...makeProps({
+          allShifts: shifts,
+          currentPeriodShifts: shifts,
+          focusAreas: [focusArea, { ...focusArea, id: 2, name: "Skilled Nursing" }],
+          indicatorTypes,
+          openShifts: [],
+          periodDates: [today],
+          periodEnd: today,
+          periodStart: today,
+          scheduleNotes: notes.map((entry) => ({ ...entry, date: todayKey })),
+          shiftCategories: [
+            shiftCategory,
+            { ...shiftCategory, abbr: "E", id: 11, name: "Evening shift" },
+          ],
+          shiftRequests: {
+            ...base.shiftRequests,
+            badgeCount: 0,
+            myRequests: [],
+            openPickups: [],
+            requests: [],
+          },
+          ...overrides,
+        })}
+      />,
+    );
+  }
+
+  it("lists every note of the day in the hero and splits a double shift's week rows", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-08T10:00:00.000Z"));
+    try {
+      renderDashboard([note(1, "", { focusAreaId: 2 }), note(2, "")]);
+
+      expect(screen.getByTestId("user-dashboard-hero-notes")).toHaveTextContent(
+        "Schedule notes: Training, Float",
+      );
+      const weekRows = within(screen.getByTestId("user-dashboard-my-week")).getAllByTestId(
+        "user-dashboard-week-notes",
+      );
+      // The first half keeps the whole-day note; Float goes to the half working its area.
+      expect(weekRows.map((row) => row.textContent)).toEqual([
+        "Schedule notes: Training",
+        "Schedule notes: Float",
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("words an editor's drafts and shows a viewer only published notes", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-08T10:00:00.000Z"));
+    try {
+      const notes = [note(1, "", { status: "draft" }), note(2, "")];
+      const base = makeProps();
+
+      const { unmount } = renderDashboard(notes, {
+        permissions: { ...base.permissions, canEditNotes: true },
+      });
+      expect(screen.getByTestId("user-dashboard-hero-notes")).toHaveTextContent(
+        "Float (added, not published), Training",
+      );
+      unmount();
+
+      renderDashboard(notes);
+      expect(screen.getByTestId("user-dashboard-hero-notes")).toHaveTextContent(
+        "Schedule notes: Training",
+      );
+      expect(screen.getByTestId("user-dashboard-hero-notes")).not.toHaveTextContent("Float");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("shows no notes line without notes", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-08T10:00:00.000Z"));
+    try {
+      renderDashboard([]);
+
+      expect(screen.queryByTestId("user-dashboard-hero-notes")).toBeNull();
+      expect(screen.queryByTestId("user-dashboard-week-notes")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

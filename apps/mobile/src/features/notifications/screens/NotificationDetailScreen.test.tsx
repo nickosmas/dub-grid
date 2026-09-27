@@ -12,8 +12,7 @@ const pushToast = vi.fn();
 const getNotifications = vi.fn();
 const markNotificationRead = vi.fn();
 const bulkUpdateNotifications = vi.fn();
-const isNotificationActionSupportedOnMobile = vi.fn();
-const openNotificationAction = vi.fn();
+const openNativeRoute = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
@@ -47,13 +46,10 @@ vi.mock("../../../shared/providers/ToastProvider", () => ({
   useToast: () => ({ pushToast }),
 }));
 
-vi.mock("../lib/openNotificationAction", () => ({
-  WEB_ONLY_ALERT_MESSAGE: "Open this on the web to see more.",
-  isNotificationActionSupportedOnMobile: (...args: unknown[]) =>
-    isNotificationActionSupportedOnMobile(...args),
-  resolveNativeRoute: (href: string) =>
-    isNotificationActionSupportedOnMobile(href) ? { pathname: "/(tabs)/requests" } : null,
-  openNotificationAction: (...args: unknown[]) => openNotificationAction(...args),
+// The real route resolution runs; only the navigation itself is observed.
+vi.mock("../lib/openNotificationAction", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../lib/openNotificationAction")>()),
+  openNativeRoute: (...args: unknown[]) => openNativeRoute(...args),
 }));
 
 let NotificationDetailScreen: (typeof import("./NotificationDetailScreen"))["default"];
@@ -102,13 +98,11 @@ describe("NotificationDetailScreen", () => {
     getNotifications.mockReset();
     markNotificationRead.mockReset();
     bulkUpdateNotifications.mockReset();
-    isNotificationActionSupportedOnMobile.mockReset();
-    openNotificationAction.mockReset();
+    openNativeRoute.mockReset();
 
     useAccessToken.mockReturnValue("token-123");
     markNotificationRead.mockResolvedValue(undefined);
     bulkUpdateNotifications.mockResolvedValue(undefined);
-    isNotificationActionSupportedOnMobile.mockReturnValue(true);
     useQuery.mockReturnValue({ data: null, isLoading: false });
   });
 
@@ -119,7 +113,7 @@ describe("NotificationDetailScreen", () => {
     render(<NotificationDetailScreen />);
 
     expect(screen.getByText("Alert not available")).toBeTruthy();
-    expect(openNotificationAction).not.toHaveBeenCalled();
+    expect(openNativeRoute).not.toHaveBeenCalled();
   });
 
   it("says the fetch failed rather than declaring the alert gone", () => {
@@ -136,7 +130,7 @@ describe("NotificationDetailScreen", () => {
 
     expect(screen.getByText("Could not load this alert")).toBeTruthy();
     expect(screen.queryByText("Alert not available")).toBeNull();
-    expect(openNotificationAction).not.toHaveBeenCalled();
+    expect(openNativeRoute).not.toHaveBeenCalled();
   });
 
   // A deep link can name an alert far older than anything the inbox has
@@ -184,12 +178,12 @@ describe("NotificationDetailScreen", () => {
     await waitFor(() => {
       expect(markNotificationRead).toHaveBeenCalledWith("token-123", NOTIFICATION_ID);
     });
-    expect(openNotificationAction).toHaveBeenCalledWith("/requests?id=req-1", "replace");
+    expect(openNativeRoute).toHaveBeenCalledWith({ pathname: "/(tabs)/requests" }, "replace");
     expect(screen.queryByText("Pickup available")).toBeNull();
 
     rerender(<NotificationDetailScreen />);
     expect(markNotificationRead).toHaveBeenCalledTimes(1);
-    expect(openNotificationAction).toHaveBeenCalledTimes(1);
+    expect(openNativeRoute).toHaveBeenCalledTimes(1);
   });
 
   it("forwards a fetched alert without marking a read one read again", async () => {
@@ -205,14 +199,53 @@ describe("NotificationDetailScreen", () => {
     render(<NotificationDetailScreen />);
 
     await waitFor(() => {
-      expect(openNotificationAction).toHaveBeenCalledWith("/requests?id=req-1", "replace");
+      expect(openNativeRoute).toHaveBeenCalledWith({ pathname: "/(tabs)/requests" }, "replace");
     });
     expect(markNotificationRead).not.toHaveBeenCalled();
   });
 
+  it("opens the reader's own shift for a schedule note alert once bootstrap arrives", async () => {
+    useLocalSearchParams.mockReturnValue({ id: NOTIFICATION_ID });
+    useQuery.mockReturnValue({ data: undefined, isLoading: true });
+    useQueryClient.mockReturnValue(
+      mockQueryClient([
+        {
+          ...SAMPLE_NOTIFICATION,
+          type: "schedule_note_published",
+          metadata: { date: "2026-10-05" } as Record<string, unknown>,
+          readAt: "2026-04-24T13:00:00.000Z",
+        },
+      ]),
+    );
+
+    const { rerender } = render(<NotificationDetailScreen />);
+    expect(openNativeRoute).not.toHaveBeenCalled();
+
+    useQuery.mockReturnValue({
+      data: { linkedEmployee: { id: "emp-1" }, permissions: {} },
+      isLoading: false,
+    });
+    rerender(<NotificationDetailScreen />);
+
+    await waitFor(() => {
+      expect(openNativeRoute).toHaveBeenCalledWith(
+        {
+          pathname: "/shift/[employeeId]/[date]",
+          params: {
+            employeeId: "emp-1",
+            date: "2026-10-05",
+            rangeStart: "2026-10-05",
+            rangeEnd: "2026-10-05",
+            source: "mine",
+          },
+        },
+        "replace",
+      );
+    });
+  });
+
   it("falls back to the inbox with a hint when the subject is web-only", async () => {
     useLocalSearchParams.mockReturnValue({ id: NOTIFICATION_ID });
-    isNotificationActionSupportedOnMobile.mockReturnValue(false);
     useQueryClient.mockReturnValue(
       mockQueryClient([
         {
@@ -232,6 +265,6 @@ describe("NotificationDetailScreen", () => {
     expect(pushToast).toHaveBeenCalledWith(
       expect.objectContaining({ message: "Open this on the web to see more." }),
     );
-    expect(openNotificationAction).not.toHaveBeenCalled();
+    expect(openNativeRoute).not.toHaveBeenCalled();
   });
 });

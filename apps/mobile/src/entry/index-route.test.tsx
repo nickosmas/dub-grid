@@ -1,5 +1,6 @@
-import { render, screen } from "@testing-library/react";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, render, screen } from "@testing-library/react";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beginSignInHandoff } from "../features/auth/lib/sign-in-handoff";
 import { createReactNativeModule, createSafeAreaContextModule } from "../test/native";
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
@@ -13,6 +14,7 @@ const isFocused = vi.fn();
 const useSessionState = vi.fn();
 const getSupabaseClient = vi.fn();
 const useHasSeenOnboarding = vi.fn();
+const loginScreenMounts = vi.fn();
 
 vi.mock("expo-router", () => ({
   router: {
@@ -38,13 +40,15 @@ vi.mock("../features/auth/screens/LoginScreen", async () => {
 
   return {
     __esModule: true,
-    default: () =>
-      React.createElement(
+    default: function LoginScreenStub() {
+      React.useEffect(() => loginScreenMounts(), []);
+      return React.createElement(
         "div",
         {},
         React.createElement("span", {}, "Enter your subdomain"),
         React.createElement("button", { type: "button" }, "Continue"),
-      ),
+      );
+    },
   };
 });
 
@@ -55,6 +59,8 @@ beforeAll(async () => {
 });
 
 describe("IndexScreen", () => {
+  const handoffReleases: Array<() => void> = [];
+
   beforeEach(() => {
     routerReplace.mockReset();
     isFocused.mockReset();
@@ -63,6 +69,46 @@ describe("IndexScreen", () => {
     getSupabaseClient.mockReset();
     useHasSeenOnboarding.mockReset();
     useHasSeenOnboarding.mockReturnValue({ data: true, isLoading: false });
+    loginScreenMounts.mockReset();
+  });
+
+  afterEach(() => {
+    for (const release of handoffReleases.splice(0)) release();
+  });
+
+  function beginHandoff() {
+    const release = beginSignInHandoff();
+    handoffReleases.push(release);
+    return release;
+  }
+
+  // The form's own sign-in publishes the session before bootstrap is warm and
+  // then navigates once; replacing from here as well landed the user twice.
+  it("keeps the same form, and leaves the navigation to it, while its sign-in hands off", () => {
+    useSessionState.mockReturnValue({ accessToken: null, isLoading: false });
+    const view = render(<IndexScreen />);
+    expect(loginScreenMounts).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      beginHandoff();
+    });
+    useSessionState.mockReturnValue({ accessToken: "token", isLoading: false });
+    view.rerender(<IndexScreen />);
+
+    expect(screen.getByText("Enter your subdomain")).toBeInTheDocument();
+    expect(loginScreenMounts).toHaveBeenCalledTimes(1);
+    expect(routerReplace).not.toHaveBeenCalled();
+  });
+
+  it("does not navigate from beneath the login route whose sign-in just ended", () => {
+    isFocused.mockReturnValue(false);
+    const release = beginHandoff();
+    useSessionState.mockReturnValue({ accessToken: "token", isLoading: false });
+    render(<IndexScreen />);
+
+    act(() => release());
+
+    expect(routerReplace).not.toHaveBeenCalled();
   });
 
   // The splash is owned by StartupSplashGate, above the router. A second

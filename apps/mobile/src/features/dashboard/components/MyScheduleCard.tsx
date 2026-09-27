@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import { addDaysToIsoDate, getDaysBetweenIsoDates } from "@dubgrid/schedule-core";
@@ -29,12 +30,17 @@ import {
 import { formatUsTime } from "../../../shared/lib/dates";
 import { getScreenGutter } from "../../../shared/components/screen-layout";
 import { useMyScheduleQuery } from "../hooks/useMyScheduleQuery";
+import {
+  scheduleNotesForRow,
+  scheduleNotesForSegment,
+  scheduleNotesSpokenLabel,
+} from "../../schedule/lib/scheduleNotes";
 
 // Kept as narrow as possible while still fitting a full time range like
-// "10:00 PM–6:00 AM" on one line at the pill's 11px font — a double shift
-// renders two of these side by side, so width matters more here than in a
-// single-pill day.
-const PILL_WIDTH = 124;
+// "10:00 PM–6:00 AM" on one line at the pill's 11px font, with the note icon
+// beside it: a double shift renders two of these side by side, so width
+// matters more here than in a single-pill day.
+const PILL_WIDTH = 140;
 const PILL_GAP = 6;
 const DAY_CARD_GAP = 10;
 // The pill is now the only bounded shape in the day column, so this is the
@@ -56,6 +62,7 @@ const SHADOW_ROOM_BOTTOM = mobileSpace.xl;
 // the same height regardless of whether a given shift has a job name or a
 // time range to show — matches web's MyScheduleRow.tsx ShiftPill.
 const SHIFT_PILL_MIN_HEIGHT = 71;
+const NOTE_ICON_SIZE = 12;
 
 type DaySegmentPill = {
   key: string;
@@ -63,6 +70,8 @@ type DaySegmentPill = {
   jobName: string | null;
   timeRangeLabel: string | null;
   pill: ShiftPillColors | null;
+  /** This half's schedule notes, each note counted on one half. */
+  noteCount: number;
 };
 
 function readOptionalText(value: string | null | undefined): string | null {
@@ -165,6 +174,8 @@ function buildDaySegmentPills(
       jobName,
       timeRangeLabel,
       pill,
+      noteCount: scheduleNotesForSegment(entry.indicators, entry.presentation.segments, index)
+        .length,
     };
   });
 }
@@ -214,6 +225,12 @@ export function MyScheduleCard({
     entries.map((entry) => [entry.date, entry]),
   );
   const dates = range ? buildDateList(range.startDate, range.endDate) : [];
+  const pillsByDate = new Map(
+    dates.map((dateIso) => [
+      dateIso,
+      buildDaySegmentPills(entryByDate.get(dateIso), mobileColors, isDarkTheme),
+    ]),
+  );
 
   return (
     <DashboardCard surface={false} title="Your schedule" onOpen={onExpand}>
@@ -228,15 +245,21 @@ export function MyScheduleCard({
           {dates.map((dateIso) => {
             const entry = entryByDate.get(dateIso);
             const { weekday, dayNumber, spokenDate } = formatDayHeader(dateIso);
-            const segmentPills = buildDaySegmentPills(entry, mobileColors, isDarkTheme);
+            const segmentPills = pillsByDate.get(dateIso) ?? [];
             // What the pills show is what the tap opens: a deleted cell draws
             // as an empty day and opens like one.
             const openableEntry = segmentPills.length > 0 && entry ? entry : null;
+            const notes = openableEntry ? scheduleNotesForRow(openableEntry.indicators) : [];
 
             return (
               <Pressable
                 key={dateIso}
-                accessibilityLabel={spokenDate}
+                // The day's label replaces everything inside it, so it carries the notes.
+                accessibilityLabel={
+                  notes.length > 0
+                    ? `${spokenDate}. ${scheduleNotesSpokenLabel(notes)}`
+                    : spokenDate
+                }
                 accessibilityRole="button"
                 disabled={!onOpenDay}
                 onPress={() => onOpenDay?.({ date: dateIso, entry: openableEntry })}
@@ -290,16 +313,35 @@ export function MyScheduleCard({
                         >
                           {segment.jobName ?? " "}
                         </Text>
-                        <Text
-                          maxFontSizeMultiplier={MAX_FONT_SCALE}
-                          numberOfLines={1}
-                          style={[
-                            styles.shiftTime,
-                            segment.pill ? { color: segment.pill.text } : null,
-                          ]}
-                        >
-                          {segment.timeRangeLabel ?? " "}
-                        </Text>
+                        {/* The note icon (a stack when there are several) ends
+                            the time row, so a pill with notes is no taller. */}
+                        <View style={styles.timeRow}>
+                          <Text
+                            maxFontSizeMultiplier={MAX_FONT_SCALE}
+                            numberOfLines={1}
+                            style={[
+                              styles.shiftTime,
+                              segment.pill ? { color: segment.pill.text } : null,
+                            ]}
+                          >
+                            {segment.timeRangeLabel ?? " "}
+                          </Text>
+                          {segment.noteCount > 0 ? (
+                            <View
+                              accessibilityElementsHidden
+                              importantForAccessibility="no-hide-descendants"
+                              testID={`schedule-card-notes-${segment.key}`}
+                            >
+                              <MaterialCommunityIcons
+                                color={segment.pill?.text ?? mobileColors.textMuted}
+                                name={
+                                  segment.noteCount > 1 ? "note-multiple-outline" : "note-outline"
+                                }
+                                size={NOTE_ICON_SIZE}
+                              />
+                            </View>
+                          ) : null}
+                        </View>
                       </View>
                     ))}
                   </View>
@@ -420,6 +462,13 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, pillWidth: nu
       ...mobileTextWeighted("badge", "regular"),
       ...mobileTabularText,
       color: mobileColors.textMuted,
+      flexShrink: 1,
+    },
+    timeRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: mobileSpace.xs,
     },
     emptyPill: {
       width: pillWidth,

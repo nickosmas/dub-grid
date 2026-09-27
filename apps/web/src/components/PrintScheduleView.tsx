@@ -13,6 +13,7 @@ import {
   ShiftDisplayMode,
 } from "@/types";
 import type { ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
+import { ScheduleNoteIcon } from "@/components/schedule-grid/noteIcon";
 import {
   addDays,
   formatDateKey,
@@ -189,7 +190,7 @@ function PrintIndicatorDots({
         return (
           <span
             key={id}
-            aria-label={indicator?.name ?? "Note"}
+            aria-label={indicator?.name ?? "Schedule note"}
             style={{
               width: "0.55em",
               height: "0.55em",
@@ -1474,7 +1475,7 @@ export default function PrintScheduleView({
                   marginBottom: "0.7em",
                 }}
               >
-                Indicators
+                Schedule notes
               </div>
               <div
                 style={{
@@ -1488,15 +1489,7 @@ export default function PrintScheduleView({
                     key={indicator.id}
                     style={{ display: "flex", alignItems: "center", gap: "0.5em" }}
                   >
-                    <span
-                      style={{
-                        width: "0.8em",
-                        height: "0.8em",
-                        borderRadius: "50%",
-                        background: indicator.color,
-                        flexShrink: 0,
-                      }}
-                    />
+                    <ScheduleNoteIcon color="#334766" size="1em" />
                     <span style={{ fontSize: "0.9em", color: "#334766" }}>{indicator.name}</span>
                   </div>
                 ))}

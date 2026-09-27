@@ -62,4 +62,12 @@ describe("getMobileRealtimeInvalidationKeys", () => {
       expect(keys).not.toContainEqual(DASHBOARD_KEY);
     },
   );
+
+  // 42b: an indicator change refreshes the Home schedule card, not the whole dashboard.
+  it("refreshes only the Home schedule card among dashboard queries for schedule_notes", () => {
+    const keys = getMobileRealtimeInvalidationKeys("token-1", "schedule_notes");
+
+    expect(keys).toContainEqual(["mobile", "dashboard", "my-schedule"]);
+    expect(keys).toContainEqual(["mobile", "schedule"]);
+  });
 });

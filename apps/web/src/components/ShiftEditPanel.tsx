@@ -43,6 +43,7 @@ import { Hint, MaybeHint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import { Switch } from "@/components/ui/switch";
 import { Check, ChevronLeft, ChevronRight, Clock, User } from "lucide-react";
+import { ScheduleNoteIcon } from "@/components/schedule-grid/noteIcon";
 import {
   buildShiftDiffDescriptors,
   expandDelimitedTimeRanges,
@@ -3127,7 +3128,7 @@ export default function ShiftEditPanel({
     if (active.length === 0) return null;
     return (
       <div data-read-only-indicators={focusAreaId} style={compact ? { marginTop: 8 } : undefined}>
-        <div style={sectionLabel}>Indicators</div>
+        <div style={sectionLabel}>Schedule notes</div>
         <ul
           style={{
             listStyle: "none",
@@ -3138,19 +3139,9 @@ export default function ShiftEditPanel({
             gap: 6,
           }}
         >
-          {active.map(({ id, name, color }) => (
+          {active.map(({ id, name }) => (
             <li key={id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span
-                aria-hidden="true"
-                style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: "50%",
-                  background: isDarkTheme ? toDarkPillColors(color).bg : color,
-                  flexShrink: 0,
-                  border: "1px solid rgba(0,0,0,0.08)",
-                }}
-              />
+              <ScheduleNoteIcon color="var(--dg-color-text-muted)" />
               <span
                 style={{
                   fontSize: "var(--dg-fs-caption)",
@@ -3213,7 +3204,7 @@ export default function ShiftEditPanel({
                   {name}
                 </div>
                 <Button
-                  aria-label={`Remove ${name} indicator`}
+                  aria-label={`Remove ${name} schedule note`}
                   onClick={() => onNoteToggle?.(id, false, focusAreaId)}
                   className="dg-btn dg-btn-ghost"
                   style={{
@@ -3235,7 +3226,7 @@ export default function ShiftEditPanel({
           return (
             <Button
               key={id}
-              aria-label={`Add ${name} indicator`}
+              aria-label={`Add ${name} schedule note`}
               onClick={() => onNoteToggle?.(id, true, focusAreaId)}
               style={{
                 display: "flex",
@@ -3275,7 +3266,7 @@ export default function ShiftEditPanel({
     if (indicatorTypes.length === 0) return null;
     return (
       <div>
-        <div style={sectionLabel}>Indicators</div>
+        <div style={sectionLabel}>Schedule notes</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {indicatorTypes.map(({ id, name, color }) => {
             const isActive = getActiveIndicatorIds
@@ -3333,7 +3324,7 @@ export default function ShiftEditPanel({
                 >
                   {identity}
                   <Button
-                    aria-label={`Remove ${name} indicator`}
+                    aria-label={`Remove ${name} schedule note`}
                     onClick={() => onNoteToggle?.(id, false, activeTab)}
                     className="dg-btn dg-btn-secondary"
                     style={{
@@ -3353,7 +3344,7 @@ export default function ShiftEditPanel({
             return (
               <Button
                 key={id}
-                aria-label={`Add ${name} indicator`}
+                aria-label={`Add ${name} schedule note`}
                 onClick={() => onNoteToggle?.(id, true, activeTab)}
                 style={{
                   display: "flex",

@@ -70,7 +70,7 @@ function IndicatorRow({
   const nameError =
     trimmedName.length > 0
       ? getLineTextError(name, {
-          label: "Indicator name",
+          label: "Schedule note name",
           maxLength: 50,
           required: true,
           disallowUrl: true,
@@ -134,7 +134,7 @@ function IndicatorRow({
         id: indicator.isNew ? undefined : indicator.id,
         orgId,
         name: normalizeLineText(name, {
-          label: "Indicator name",
+          label: "Schedule note name",
           maxLength: 50,
           required: true,
           disallowUrl: true,
@@ -146,10 +146,10 @@ function IndicatorRow({
       setColor(saved.color);
       setExpanded(false);
       onSaved(saved, indicator.id);
-      toast.success("Indicator saved");
+      toast.success("Schedule note saved");
     } catch (error) {
       Sentry.captureException(error);
-      toast.error(formatClientErrorMessage(error, "We couldn't save that indicator."));
+      toast.error(formatClientErrorMessage(error, "We couldn't save that schedule note."));
     } finally {
       setSaving(false);
     }
@@ -171,10 +171,10 @@ function IndicatorRow({
       try {
         await deleteIndicatorType(indicator.id, orgId, hard);
         onDeleted(indicator.id);
-        toast.success(hard ? "Indicator deleted" : "Indicator archived");
+        toast.success(hard ? "Schedule note deleted" : "Schedule note archived");
       } catch (error) {
         Sentry.captureException(error);
-        toast.error(hard ? "Failed to delete indicator" : "Failed to archive indicator");
+        toast.error(hard ? "Failed to delete schedule note" : "Failed to archive schedule note");
       } finally {
         setDeleting(false);
         setShowDeleteConfirm(false);
@@ -235,7 +235,7 @@ function IndicatorRow({
             <span
               style={{ color: "var(--dg-color-text-muted)", fontStyle: "italic", fontWeight: 400 }}
             >
-              Untitled indicator
+              Untitled schedule note
             </span>
           )}
         </span>
@@ -278,7 +278,7 @@ function IndicatorRow({
             onClick={(event) => event.stopPropagation()}
           >
             <div>
-              <label style={labelStyle}>Indicator name</label>
+              <label style={labelStyle}>Schedule note name</label>
               <input
                 value={name}
                 onChange={(event) => setName(event.target.value)}
@@ -310,7 +310,7 @@ function IndicatorRow({
                     color: "var(--dg-color-danger)",
                   }}
                 >
-                  Another indicator already uses that name.
+                  Another schedule note already uses that name.
                 </p>
               ) : null}
             </div>
@@ -323,7 +323,7 @@ function IndicatorRow({
                   value={color.startsWith("#") ? color : "#2563EB"}
                   onChange={(event) => setColor(event.target.value)}
                   disabled={!canEdit}
-                  aria-label="Indicator color"
+                  aria-label="Schedule note color"
                   style={{
                     width: 44,
                     height: 36,
@@ -408,14 +408,15 @@ function IndicatorRow({
           if (hasActive) {
             return (
               <ConfirmDialog
-                title={`Archive "${trimmedName || "indicator"}"?`}
+                title={`Archive "${trimmedName || "schedule note"}"?`}
                 message={
                   <>
-                    <strong>{trimmedName || "this indicator"}</strong> is currently{" "}
+                    <strong>{trimmedName || "this schedule note"}</strong> is currently{" "}
                     {dependencyInfo!.summary.toLowerCase()}.
                     <br />
                     <br />
-                    Archiving will preserve those notes but remove the indicator from future use.
+                    Archiving will preserve those notes but remove the schedule note from future
+                    use.
                   </>
                 }
                 confirmLabel="Archive"
@@ -429,11 +430,11 @@ function IndicatorRow({
           if (hasAny) {
             return (
               <ConfirmDialog
-                title={`Archive "${trimmedName || "indicator"}"?`}
+                title={`Archive "${trimmedName || "schedule note"}"?`}
                 message={
                   <>
-                    This will archive <strong>{trimmedName || "this indicator"}</strong>. Historical
-                    records will be preserved.
+                    This will archive <strong>{trimmedName || "this schedule note"}</strong>.
+                    Historical records will be preserved.
                   </>
                 }
                 confirmLabel="Archive"
@@ -446,11 +447,11 @@ function IndicatorRow({
           }
           return (
             <ConfirmDialog
-              title={`Delete "${trimmedName || "indicator"}"?`}
+              title={`Delete "${trimmedName || "schedule note"}"?`}
               message={
                 <>
-                  This will permanently delete <strong>{trimmedName || "this indicator"}</strong>.
-                  Nothing references it.
+                  This will permanently delete{" "}
+                  <strong>{trimmedName || "this schedule note"}</strong>. Nothing references it.
                 </>
               }
               confirmLabel="Delete"
@@ -598,12 +599,12 @@ export default function Indicators({
         ) : (
           <EmptyState
             size="compact"
-            title="No indicators yet"
-            description="Indicators flag readings, conflicts, or notes on shift cells."
+            title="No schedule notes yet"
+            description="Schedule notes flag readings, conflicts, and other details on shift cells."
             action={
               canManageIndicatorTypes ? (
                 <Button onClick={handleAdd} className="dg-btn dg-btn-secondary dg-btn-sm">
-                  + Add Indicator
+                  + Add schedule note
                 </Button>
               ) : undefined
             }
@@ -617,7 +618,7 @@ export default function Indicators({
               className="dg-btn dg-btn-dashed dg-btn-sm"
               style={{ width: "100%" }}
             >
-              + Add Indicator
+              + Add schedule note
             </Button>
           </div>
         )}

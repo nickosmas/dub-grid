@@ -7,6 +7,7 @@ import {
   rowToShiftCategory,
   rowToShiftRequest,
 } from "@/lib/db/mappers";
+import type { MobileScheduleNoteRecord } from "@dubgrid/mobile-api-core";
 import { fetchTermsAcceptanceStatus } from "@/features/account/server";
 import type {
   MobilePublishedScheduleRow,
@@ -16,6 +17,8 @@ import type {
 import {
   fetchLinkedEmployeeRowForUser,
   fetchMobileAbsenceTypeRows,
+  fetchMobileIndicatorTypeRows,
+  fetchMobileScheduleNoteRows,
   fetchMobileAssignmentSeedRows,
   fetchMobileCertificationRows as fetchMobileCertificationRowsData,
   fetchMobileDepartmentRows as fetchMobileDepartmentRowsData,
@@ -69,6 +72,7 @@ import { isRegularStaffSystemJob } from "@/lib/system-jobs";
 import { normalizeMobileScheduleRange, type MobileScheduleQuery } from "@dubgrid/contracts";
 import type {
   MobileAbsenceType,
+  MobileIndicatorType,
   MobileDepartment,
   MobileFocusArea,
   MobileNamedItem,
@@ -330,6 +334,24 @@ async function fetchJobNameMap(
 ): Promise<Map<number, string>> {
   const rows = await fetchMobileJobNameRows(serviceClient, orgId);
   return new Map(rows.map((row) => [row.id, row.name]));
+}
+
+// The database only requires an indicator's name and colour to be present, not
+// non-empty, and the contract refuses an empty one, so a blank value reads as a
+// plain note in neutral grey rather than failing the whole response.
+const UNKNOWN_INDICATOR_COLOR = "#A3A3A3";
+
+export async function fetchMobileIndicatorTypes(
+  serviceClient: SupabaseClient,
+  orgId: string,
+): Promise<MobileIndicatorType[]> {
+  const rows = await fetchMobileIndicatorTypeRows(serviceClient, orgId);
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name || "Note",
+    color: row.color || UNKNOWN_INDICATOR_COLOR,
+    sortOrder: row.sort_order,
+  }));
 }
 
 export async function fetchMobileAbsenceTypes(
@@ -846,6 +868,23 @@ function getMissingDeletedPublishedChanges(
     .map(([, change]) => change);
 }
 
+/** The range's schedule notes for the schedule loaders, which apply the viewer's rule. */
+export async function fetchMobileScheduleNotes(
+  serviceClient: SupabaseClient,
+  input: { orgId: string; startDate: string; endDate: string; employeeId?: string },
+): Promise<MobileScheduleNoteRecord[]> {
+  const rows = await fetchMobileScheduleNoteRows(serviceClient, input);
+  return rows.map((row) => ({
+    employeeId: row.emp_id,
+    date: row.date,
+    indicatorTypeId: row.indicator_type_id,
+    focusAreaId: row.focus_area_id,
+    status: row.status,
+    name: row.indicator_types?.name || "Note",
+    color: row.indicator_types?.color || UNKNOWN_INDICATOR_COLOR,
+  }));
+}
+
 export async function fetchMobileScheduleEntries(
   serviceClient: SupabaseClient,
   input: {
@@ -1038,6 +1077,8 @@ export async function fetchMobileScheduleEntries(
         : null,
       publishedAt: publishEntry?.publishedAt ?? null,
       publishedByName: publishEntry?.publishedByName ?? null,
+      // Attached per viewer by the schedule loaders; other callers need none.
+      indicators: [],
     });
   }
 

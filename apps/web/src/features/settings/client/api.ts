@@ -462,7 +462,7 @@ export async function fetchIndicatorTypes(
       orgId,
       includeArchived: includeArchived ? "1" : "0",
     }),
-    { errorMessage: "We couldn't fetch indicator types. Try again." },
+    { errorMessage: "We couldn't fetch schedule notes. Try again." },
   );
   return body.items;
 }
@@ -472,7 +472,7 @@ export async function upsertIndicatorType(
 ): Promise<IndicatorType> {
   const body = await postSettingsAction<{ item: IndicatorType }>(
     { action: "upsertIndicatorType", indicatorType },
-    "We couldn't save indicator type. Try again.",
+    "We couldn't save schedule note. Try again.",
   );
   return body.item;
 }
@@ -486,7 +486,7 @@ export function checkIndicatorTypeDependencies(
       orgId,
       itemId: String(indicatorTypeId),
     }),
-    { errorMessage: "We couldn't check indicator type dependencies. Try again." },
+    { errorMessage: "We couldn't check schedule note dependencies. Try again." },
   );
 }
 
@@ -497,13 +497,13 @@ export function deleteIndicatorType(
 ): Promise<{ success: true }> {
   return postSettingsAction<{ success: true }>(
     { action: "deleteIndicatorType", orgId, itemId: indicatorTypeId, hard },
-    "We couldn't delete indicator type. Try again.",
+    "We couldn't delete schedule note. Try again.",
   );
 }
 
 export function restoreIndicatorType(indicatorTypeId: number, orgId: string): Promise<void> {
   return postSettingsAction<{ success: true }>(
     { action: "restoreIndicatorType", orgId, itemId: indicatorTypeId },
-    "We couldn't restore indicator type. Try again.",
+    "We couldn't restore schedule note. Try again.",
   ).then(() => undefined);
 }

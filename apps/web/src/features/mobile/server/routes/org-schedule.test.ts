@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requireMobileAuth = vi.fn();
 const fetchMobileScheduleEntries = vi.fn();
+const fetchMobileScheduleNotes = vi.fn(async () => []);
 const resolveMobileDateRange = vi.fn();
 
 vi.mock("@/features/mobile/server", () => ({
   requireMobileAuth,
   fetchMobileScheduleEntries,
+  fetchMobileScheduleNotes,
   resolveMobileDateRange,
 }));
 
@@ -95,6 +97,15 @@ describe("mobile org-schedule route", () => {
 
     expect(response.status).toBe(200);
     expect(fetchMobileScheduleEntries).toHaveBeenCalledWith(
+      {},
+      {
+        orgId: "org-1",
+        startDate: "2026-04-16",
+        endDate: "2026-04-22",
+      },
+    );
+    // 42b: the notes are read for the same organization and range.
+    expect(fetchMobileScheduleNotes).toHaveBeenCalledWith(
       {},
       {
         orgId: "org-1",

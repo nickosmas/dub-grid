@@ -182,3 +182,113 @@ export interface GridmasterStaffSearchResult {
   status: string;
   archivedAt: string | null;
 }
+
+export interface GridmasterRecurringShift {
+  id: string;
+  dayOfWeek: number;
+  label: string;
+  effectiveFrom: string;
+  effectiveUntil: string | null;
+  archivedAt: string | null;
+}
+
+export interface GridmasterShiftSeries {
+  id: string;
+  label: string;
+  frequency: string;
+  daysOfWeek: number[];
+  startDate: string;
+  endDate: string | null;
+  maxOccurrences: number | null;
+  archivedAt: string | null;
+}
+
+export interface GridmasterScheduledDay {
+  date: string;
+  /** Display labels; null when that side has no state, "" for a deleted draft. */
+  published: string | null;
+  draft: string | null;
+  customStart: string | null;
+  customEnd: string | null;
+  source: "recurring" | "series" | "manual";
+  updatedAt: string | null;
+}
+
+export interface GridmasterScheduleIndicator {
+  date: string;
+  name: string;
+  status: "published" | "draft" | "draft_deleted";
+}
+
+export interface GridmasterPublishChange {
+  publishedAt: string;
+  date: string;
+  kind: string;
+  from: string | null;
+  to: string | null;
+  publishedBy: string | null;
+}
+
+export interface GridmasterShiftRequest {
+  id: string;
+  type: "pickup" | "swap" | "calloff";
+  status: string;
+  side: "requester" | "target";
+  partner: string | null;
+  shiftDate: string | null;
+  partnerShiftDate: string | null;
+  adminNote: string | null;
+  settledBy: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
+export interface GridmasterProfileChangeRequest {
+  id: string;
+  type: string;
+  status: string;
+  requested: Record<string, unknown>;
+  note: string | null;
+  resolverNote: string | null;
+  resolvedBy: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
+/**
+ * One staff record's work in its organization, loaded on demand. Read by 43e's
+ * timeline too, so the shape is load-bearing. Actor ids resolve through `actors`.
+ */
+export interface GridmasterPersonSchedule {
+  window: { from: string; to: string };
+  recurring: GridmasterRecurringShift[];
+  series: GridmasterShiftSeries[];
+  shifts: GridmasterScheduledDay[];
+  indicators: GridmasterScheduleIndicator[];
+  publishChanges: GridmasterPublishChange[];
+  shiftRequests: GridmasterShiftRequest[];
+  profileChangeRequests: GridmasterProfileChangeRequest[];
+  actors: Record<string, string>;
+}
+
+export interface GridmasterNotification {
+  id: string;
+  orgId: string | null;
+  type: string;
+  channel: string | null;
+  category: string | null;
+  priority: string | null;
+  title: string;
+  message: string;
+  metadata: Record<string, unknown> | null;
+  readAt: string | null;
+  archivedAt: string | null;
+  createdAt: string;
+}
+
+/** An account's stored notification preferences and its latest notifications. */
+export interface GridmasterPersonNotifications {
+  /** Null when the person has never saved a preference. */
+  preferences: Record<string, unknown> | null;
+  notifications: GridmasterNotification[];
+}

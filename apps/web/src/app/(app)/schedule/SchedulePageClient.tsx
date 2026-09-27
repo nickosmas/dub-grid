@@ -370,7 +370,6 @@ function SchedulerContent({
   const {
     canEditShifts,
     canEditNotes,
-    canEditScheduleIndicators,
     canApplyRecurringSchedule,
     canViewRecurringShifts,
     canManageShiftSeries,
@@ -7697,7 +7696,7 @@ function SchedulerContent({
               onSelect={handleShiftSelect}
               onConfirmDraft={handleConfirmEditPanel}
               allowShiftEdits={canEditShifts}
-              canEditScheduleIndicators={canEditScheduleIndicators}
+              canEditScheduleIndicators={canEditNotes}
               getActiveIndicatorIds={panelActiveIndicatorIds}
               onNoteToggle={handleNoteToggle}
               onClose={closeEditPanel}

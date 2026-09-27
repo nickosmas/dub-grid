@@ -34,11 +34,20 @@ The workflow is defined by the local skills and context files below.
 
 ## DubGrid Git policy
 
-All development work happens directly on `dev`. Do not create, switch to, or
-work on feature, fix, rollback, or other development branches. Do not develop
-on `main`. Keep `main` for an explicitly requested release PR whose head is
-`dev`; preparing that PR does not authorize a checkout, merge, rewrite, or push
-of `main`.
+`dev` is the integration branch. Every feature, fix, and rollback is built on
+its own local branch cut from `dev`, named with the matching prefix from
+`blueprint/config.json` (`git.featureBranchPrefix`, `git.fixBranchPrefix`,
+`git.rollbackBranchPrefix`) plus a short name from the spec, for example
+`feature/42d-secondary-surfaces` or `fix/mobile-online-flag`. Configured
+checkpoint commits go on that branch. `/complete` squash-merges it into `dev` as
+one conventional commit and deletes it. Wherever a Blueprint skill names `main`
+or the default branch as the target of that merge, read `dev`; each workflow
+skill repeats this in a one-line **DubGrid** note under its title.
+
+Do not develop on `main`. Keep `main` for an explicitly requested release PR
+whose head is `dev`; preparing that PR does not authorize a checkout, merge,
+rewrite, or push of `main`. Pushing `dev` needs its own explicit yes, as the
+Blueprint skills already require.
 
 A release PR merges only once every GitHub check on it is green: no pending,
 no failing, no skipped-by-cancel. A merge authorization given before the
@@ -54,17 +63,15 @@ check reads pass, then `gh pr merge <n> --merge`, as the release PRs before it. 
 moves to GitHub Pro or becomes public, replace this paragraph with required
 checks on `main` and enable auto-merge.
 
-This governs agent sessions working in this checkout, where several share one
-working tree and branches would collide. Branch-based contributions still
-exist and still merge into `dev` through a pull request: Claude Code cloud
-sessions push `claude/*` branches, Dependabot pushes its own, and
+This governs agent sessions working in this checkout. Other branch-based
+contributions merge into `dev` through a pull request instead: Claude Code
+cloud sessions push `claude/*` branches, Dependabot pushes its own, and
 `CONTRIBUTING.md` documents the naming for anyone working in their own clone.
 
 ### Several agents share this checkout
 
 Claude Code, Codex and others frequently run against this working tree at the
-same time, and they share its files _and_ its git index. Two rules follow, one
-for everyone and one for the sessions that can take it.
+same time, and they share its files _and_ its git index. Two rules follow.
 
 **Everyone: never leave a gap between staging and committing.** Another session
 can change the index in that gap. On 2026-09-07 one did: a commit took 8 files
@@ -77,37 +84,46 @@ it is yours before chasing it: `git show HEAD:<path>` reads the committed
 version without touching the tree, and another session's half-written file can
 fail your run.
 
-**Terminal sessions: work in a throwaway worktree.** If nobody is watching an
-editor window on this checkout, take the stronger option and isolate yourself
-completely, so neither your files nor your index can be touched:
+**Every session that edits files: work in its own worktree, on its work
+branch.** Neither your files nor your index can then be touched by another
+session:
 
 ```bash
-R=$(git rev-parse --show-toplevel); W=/tmp/dg-$(date +%s)
-git worktree add --detach -q "$W" dev
+R=$(git rev-parse --show-toplevel); W=/tmp/dg-$(date +%s); B=feature/<name>
+git worktree add -q -b "$B" "$W" dev            # the work branch lives here
 ln -s "$R/node_modules" "$W/node_modules"
 ln -s "$R/apps/web/node_modules" "$W/apps/web/node_modules"
 ln -s "$R/apps/mobile/node_modules" "$W/apps/mobile/node_modules"
-# edit, type-check and test inside $W
+# /implement: edit, type-check, test and checkpoint-commit inside $W
 git -C "$W" add -- <exact paths> && git -C "$W" commit
+# /complete: squash the branch onto dev as one commit, still inside $W
+git -C "$W" checkout -q --detach dev
+git -C "$W" merge --squash "$B" && git -C "$W" commit
+git branch -D "$B"                              # squashed, so -d cannot see it merged
+# push only after a separate yes
 git -C "$W" fetch -q origin && git -C "$W" rebase origin/dev   # commit first: rebase
 git -C "$W" push origin HEAD:dev                               # refuses a dirty tree
 git merge --ff-only origin/dev                  # in the repo root: keep it current
 git worktree remove --force "$W" && git worktree prune
 ```
 
-Do not do this from an editor-embedded agent (Cursor, Copilot, Zed, Windsurf,
-the Codex and Claude Code VS Code extensions). The user is watching this
-workspace, and files you change under `/tmp` are invisible to them. Nor from a
-cloud session in its own container: you are already isolated and you push a
-branch instead, per `CONTRIBUTING.md`. Those sessions follow the first rule
+Without a push, fast-forward the root's `dev` to the squash commit instead
+(`git merge --ff-only <sha>` in the repo root), so the next session sees it.
+
+Never switch the repo root off `dev`: every session sharing that tree would
+move with it. An editor-embedded agent (Cursor, Copilot, Zed, Windsurf, the
+Codex and Claude Code VS Code extensions) whose user watches the workspace puts
+its worktree inside it instead of `/tmp`, for example under `.claude/worktrees/`
+as the Claude desktop app already does, so the user can still see the files.
+A cloud session in its own container is already isolated and pushes a
+`claude/*` branch instead, per `CONTRIBUTING.md`; it follows the first rule
 only.
 
-`--detach` is required: git allows a branch in one worktree only, and `dev` is
-already checked out at the repo root. Detaching creates no branch, so the
-dev-only policy above still holds, and pushing `HEAD:dev` keeps every commit on
-`dev`.
+The squash step detaches because git allows a branch in one worktree only, and
+`dev` is already checked out at the repo root. Detaching creates no extra
+branch, and pushing `HEAD:dev` lands the squash commit on `dev`.
 
-Base the worktree on local `dev` rather than `origin/dev`: other sessions
+Cut the branch from local `dev` rather than `origin/dev`: other sessions
 often hold unpushed commits there. Rebase onto `origin/dev` before pushing and
 never force-push. A rebase conflict means another session touched the same
 files, so resolve it deliberately; in the shared checkout that edit would have
@@ -144,7 +160,7 @@ read-only status reporting, but mutating workflow commands stop and point to
 `/doctor` instead of guessing.
 
 Configuration can make review or verification stricter and can tune local
-branch names and automated-mode limits. It never grants permission to commit,
+branch prefixes and automated-mode limits. It never grants permission to commit,
 merge, push, deploy, publish, send, delete data, waive a failing check, or accept
 a finding. Those approval and safety boundaries are not configurable.
 
@@ -212,7 +228,7 @@ through any conversation before running `/overview`.
 
 Optional explicit-only skill: `autopilot` can run one bounded spec/build pass
 when directly invoked, including the configured regular quality gates. It may
-create checkpoint commits on `dev` after passing steps and
+create checkpoint commits on the work branch after passing steps and
 repair confirmed P0/P1 findings when its audit gate runs. It stops before
 `/complete`, merge, push, deploy, or destructive actions.
 

@@ -98,10 +98,11 @@ These names are for work that gets a branch of its own: a contributor in their
 own clone, a Claude Code cloud session (which pushes `claude/*` branches), or
 Dependabot. All of them merge into `dev` through a pull request.
 
-Agent sessions working in a shared local checkout do not branch. Several run
-against one working tree at once, so branches there would collide; they commit
-straight to `dev` from a throwaway worktree instead. See "DubGrid Git policy"
-and "Work in a throwaway worktree" in `AGENTS.md`.
+Agent sessions working in a shared local checkout follow the Blueprint's
+prefixes instead (`feature/`, `fix/`, `rollback/` from `blueprint/config.json`),
+cut from `dev` and squash-merged back into it locally by `/complete`, each
+from its own worktree so several sessions never collide. See "DubGrid Git policy"
+and "Several agents share this checkout" in `AGENTS.md`.
 
 ---
 

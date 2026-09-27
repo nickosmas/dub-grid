@@ -56,10 +56,10 @@ Security is enforced at three independent layers. Compromising one layer does no
 
 ### 1.3 Admin Permissions Model
 
-Admins (Tier 2) receive a configurable set of permissions stored as JSONB in `organization_memberships.admin_permissions`. Super admins configure these **per-user** (on the People page, via the `PermissionsEditor` surfaced from `UserManagement`). The canonical `AdminPermissions` interface — **26 keys** — is defined in `packages/domain/src/permissions.ts` and consumed everywhere through `@dubgrid/authz`.
+Admins (Tier 2) receive a configurable set of permissions stored as JSONB in `organization_memberships.admin_permissions`. Super admins configure these **per-user** (on the People page, via the `PermissionsEditor` surfaced from `UserManagement`). The canonical `AdminPermissions` interface — **25 keys** — is defined in `packages/domain/src/permissions.ts` and consumed everywhere through `@dubgrid/authz`.
 
-> **What "26" counts, and what is delegatable.** The `AdminPermissions` interface holds
-> exactly the 26 keys in the table below; these are the only keys ever written to the
+> **What "25" counts, and what is delegatable.** The `AdminPermissions` interface holds
+> exactly the 25 keys in the table below; these are the only keys ever written to the
 > `admin_permissions` JSONB. Of those, two (`canViewSchedule`, `canViewStaff`) are forced
 > true for everyone, and one (`canManageOrgSettings`) is super_admin-only: `PermissionsEditor`
 > never renders it and always saves it `false`, and `buildPermissionContext` forces it off
@@ -79,7 +79,7 @@ A **user** is `READ_ONLY_PERMS` and nothing else: the JSONB is an admin-tier col
 (`check_admin_permission` in SQL reads it for admins only, and the access route nulls it on
 demotion), so a user row that still carries one never widens what that member sees.
 
-`canViewSchedule` and `canViewStaff` are **always true** for any authenticated user (including Tier 0 `user`). Every other key defaults per role baseline: a `user` resolves against `READ_ONLY_PERMS` (all `false`) and stays there whatever the row stores, and an `admin` resolves against `ADMIN_DEFAULT_PERMS`, the core scheduling set (`canEditShifts`, `canPublishSchedule`, `canEditNotes`, `canEditScheduleIndicators`, the four recurring-shift keys, and `canViewReports`) with nothing in people management or administration. For an admin, a stored JSONB overrides the baseline key by key in both directions, so an unconfigured admin (or one whose row predates a key) can edit and publish the schedule and see Reports, but cannot manage people until a super admin switches that on. The order below matches the interface definition.
+`canViewSchedule` and `canViewStaff` are **always true** for any authenticated user (including Tier 0 `user`). Every other key defaults per role baseline: a `user` resolves against `READ_ONLY_PERMS` (all `false`) and stays there whatever the row stores, and an `admin` resolves against `ADMIN_DEFAULT_PERMS`, the core scheduling set (`canEditShifts`, `canPublishSchedule`, `canEditNotes`, the four recurring-shift keys, and `canViewReports`) with nothing in people management or administration. For an admin, a stored JSONB overrides the baseline key by key in both directions, so an unconfigured admin (or one whose row predates a key) can edit and publish the schedule and see Reports, but cannot manage people until a super admin switches that on. The order below matches the interface definition.
 
 | #   | Category  | Permission                      | Delegatable | Description                                                                              |
 | --- | --------- | ------------------------------- | ----------- | ---------------------------------------------------------------------------------------- |
@@ -87,32 +87,31 @@ demotion), so a user row that still carries one never widens what that member se
 | 2   | Schedule  | `canEditShifts`                 | Yes         | Create, edit, delete schedule cells                                                      |
 | 3   | Schedule  | `canPublishSchedule`            | Yes         | Publish draft changes                                                                    |
 | 4   | Schedule  | `canApplyRecurringSchedule`     | Yes         | Apply recurring shift templates onto the grid                                            |
-| 5   | Notes     | `canEditNotes`                  | Yes         | Manage schedule notes                                                                    |
-| 6   | Notes     | `canEditScheduleIndicators`     | Yes         | Manage schedule indicators (gates `schedule_notes` RLS — §4.5)                           |
-| 7   | Recurring | `canViewRecurringShifts`        | Yes         | View recurring shift templates                                                           |
-| 8   | Recurring | `canManageRecurringShifts`      | Yes         | Configure recurring shift templates                                                      |
-| 9   | Recurring | `canManageShiftSeries`          | Yes         | Manage repeating shift series                                                            |
-| 10  | Staff     | `canViewStaff`                  | Always on   | View staff roster (always true for all authed users)                                     |
-| 11  | Staff     | `canViewEmployeeDetails`        | Yes         | View full employee detail records                                                        |
-| 12  | Staff     | `canManageEmployees`            | Yes         | Add, edit, bench, terminate employees                                                    |
-| 13  | Config    | `canViewFocusAreas`             | Yes         | View focus areas                                                                         |
-| 14  | Config    | `canManageFocusAreas`           | Yes         | Manage focus areas / departments                                                         |
-| 15  | Config    | `canViewScheduleDefinitions`    | Yes         | View schedule definitions (shift codes, absence types)                                   |
-| 16  | Config    | `canManageScheduleDefinitions`  | Yes         | Manage schedule definitions                                                              |
-| 17  | Config    | `canViewIndicatorTypes`         | Yes         | View note/indicator type definitions                                                     |
-| 18  | Config    | `canManageIndicatorTypes`       | Yes         | Manage note/indicator type definitions                                                   |
-| 19  | Config    | `canManageOrgSettings`          | No          | Edit org name, address, phone, timezone (super_admin only)                               |
-| 20  | Config    | `canViewOrgLabels`              | Yes         | View custom terminology labels                                                           |
-| 21  | Config    | `canManageOrgLabels`            | Yes         | Edit custom terminology labels                                                           |
-| 22  | Coverage  | `canViewCoverageRequirements`   | Yes         | View staffing minimum requirements                                                       |
-| 23  | Coverage  | `canManageCoverageRequirements` | Yes         | Manage staffing minimum requirements                                                     |
-| 24  | Requests  | `canApproveShiftRequests`       | Yes         | Approve or reject shift pickup/swap requests; a holder's own requests settle on the spot |
-| 25  | Dashboard | `canViewDashboardAnalytics`     | Yes         | View dashboard analytics                                                                 |
-| 26  | Reports   | `canViewReports`                | Yes         | View and export the operations reports (staff hours, activity, shift categories)         |
+| 5   | Notes     | `canEditNotes`                  | Yes         | Add and remove schedule notes (gates `schedule_notes` RLS, §4.2a)                        |
+| 6   | Recurring | `canViewRecurringShifts`        | Yes         | View recurring shift templates                                                           |
+| 7   | Recurring | `canManageRecurringShifts`      | Yes         | Configure recurring shift templates                                                      |
+| 8   | Recurring | `canManageShiftSeries`          | Yes         | Manage repeating shift series                                                            |
+| 9   | Staff     | `canViewStaff`                  | Always on   | View staff roster (always true for all authed users)                                     |
+| 10  | Staff     | `canViewEmployeeDetails`        | Yes         | View full employee detail records                                                        |
+| 11  | Staff     | `canManageEmployees`            | Yes         | Add, edit, bench, terminate employees                                                    |
+| 12  | Config    | `canViewFocusAreas`             | Yes         | View focus areas                                                                         |
+| 13  | Config    | `canManageFocusAreas`           | Yes         | Manage focus areas / departments                                                         |
+| 14  | Config    | `canViewScheduleDefinitions`    | Yes         | View schedule definitions (shift codes, absence types)                                   |
+| 15  | Config    | `canManageScheduleDefinitions`  | Yes         | Manage schedule definitions                                                              |
+| 16  | Config    | `canViewIndicatorTypes`         | Yes         | View note/indicator type definitions                                                     |
+| 17  | Config    | `canManageIndicatorTypes`       | Yes         | Manage note/indicator type definitions                                                   |
+| 18  | Config    | `canManageOrgSettings`          | No          | Edit org name, address, phone, timezone (super_admin only)                               |
+| 19  | Config    | `canViewOrgLabels`              | Yes         | View custom terminology labels                                                           |
+| 20  | Config    | `canManageOrgLabels`            | Yes         | Edit custom terminology labels                                                           |
+| 21  | Coverage  | `canViewCoverageRequirements`   | Yes         | View staffing minimum requirements                                                       |
+| 22  | Coverage  | `canManageCoverageRequirements` | Yes         | Manage staffing minimum requirements                                                     |
+| 23  | Requests  | `canApproveShiftRequests`       | Yes         | Approve or reject shift pickup/swap requests; a holder's own requests settle on the spot |
+| 24  | Dashboard | `canViewDashboardAnalytics`     | Yes         | View dashboard analytics                                                                 |
+| 25  | Reports   | `canViewReports`                | Yes         | View and export the operations reports (staff hours, activity, shift categories)         |
 
 **View-implications.** `@dubgrid/authz`'s `applyViewImplications` guarantees that every `canManage*` permission implies its matching `canView*` permission, and that `canViewDashboardAnalytics` follows from any of `canEditShifts`, `canManageEmployees`, `canPublishSchedule`, or `canApproveShiftRequests`. The map lives once, as the exported `VIEW_IMPLICATIONS`; the resolver applies it and `PermissionsEditor` reads it, so a view switch shows as "Included" rather than a live control whenever the resolver would grant it anyway. A membership row only needs to store the `canManage*` flag; the resolved permission set always exposes the corresponding `canView*` as `true`. `canViewReports` is never implied. The view-only baseline (`READ_ONLY_PERMS`) is what a Tier 0 `user` receives.
 
-**Keys that also need Schedule edit.** `canApplyRecurringSchedule` and `canManageShiftSeries` both write grid cells, so the API (`/api/schedule/manage`) requires `canEditShifts` alongside them, as the toolbar already did. `canEditScheduleIndicators` is likewise required alongside `canEditNotes` to write a schedule note, since every note carries an indicator type. The editor bundles each pair, so this only bites a JSONB written outside the editor.
+**Keys that also need Schedule edit.** `canApplyRecurringSchedule` and `canManageShiftSeries` both write grid cells, so the API (`/api/schedule/manage`) requires `canEditShifts` alongside them, as the toolbar already did. The editor bundles each pair, so this only bites a JSONB written outside the editor.
 
 **Always-true permissions.** `canViewSchedule` and `canViewStaff` are forced to `true` for every authenticated user regardless of role or stored JSONB — Tier 0 users can always see the schedule grid and the staff roster.
 
@@ -620,10 +619,10 @@ CREATE POLICY "schedule_cells_delete" ON schedule_cells FOR DELETE
 ### 4.2a Schedule Notes Policies
 
 The `schedule_notes` table's `INSERT` / `UPDATE` / `DELETE` policies gate on
-`check_admin_permission('canEditNotes')` (migration `003_rls_policies.sql`).
-`canEditScheduleIndicators` (#6 in §1.3) is a **separate** permission enforced at the
-application layer (schedule indicators in `SchedulePageClient` / `ShiftEditPanel`), not
-in the `schedule_notes` RLS. `check_admin_permission(p)` returns true for gridmaster,
+`check_admin_permission('canEditNotes')` (migration `003_rls_policies.sql`), the same
+key the shift panel and `/api/schedule/manage` check. It absorbed
+`canEditScheduleIndicators` in migration `061`, which had been required alongside it
+since 2026-05. `check_admin_permission(p)` returns true for gridmaster,
 true for super_admin, and for an admin reads the matching flag out of their
 `admin_permissions` JSONB.
 
@@ -1360,7 +1359,7 @@ ALTER TABLE invitations ENABLE ROW LEVEL SECURITY;
 | 4    | Invitee     | Clicks link → arrives at `/accept-invite?token=<uuid>`                                      |
 | 5    | Accept Flow | Validates token, creates Supabase auth user, sets `employees.user_id`                       |
 | 6    | Auth Hook   | JWT issued with `platform_role`, `org_role`, `org_id`, `org_slug` claims                    |
-| 7    | Invitee     | Redirected to their org dashboard, fully authenticated                                      |
+| 6    | Invitee     | Redirected to their org dashboard, fully authenticated                                      |
 
 ### 11.4 Invitation Edge Cases
 

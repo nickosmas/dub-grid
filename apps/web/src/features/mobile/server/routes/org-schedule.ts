@@ -7,6 +7,7 @@ import {
 } from "@dubgrid/mobile-api-core";
 import {
   fetchMobileScheduleEntries,
+  fetchMobileScheduleNotes,
   resolveMobileDateRange,
   requireMobileAuth,
 } from "@/features/mobile/server";
@@ -39,6 +40,7 @@ export async function GET(req: NextRequest) {
   try {
     const payload = await loadMobileOrgSchedulePayload(auth, range, {
       fetchMobileScheduleEntries,
+      fetchMobileScheduleNotes,
     });
     return json(mobileOrgScheduleResponseSchema.parse(payload));
   } catch (error) {

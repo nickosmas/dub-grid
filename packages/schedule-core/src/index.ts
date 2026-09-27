@@ -35,6 +35,7 @@ export * from "./requests-assembly";
 export * from "./hours-assembly";
 export * from "./pay-period";
 export * from "./dates";
+export * from "./schedule-notes";
 import {
   parseIsoDate,
   getScheduleWeekStartDate,

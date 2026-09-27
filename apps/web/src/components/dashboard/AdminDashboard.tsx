@@ -103,9 +103,11 @@ export default function AdminDashboard(props: DashboardContentProps) {
         jobs={jobs}
         shiftCategories={shiftCategories}
         periodDates={periodDates}
-        isMobile={isMobile}
         periodLabel={periodLabel}
         isManagementOnly={isManagementOnly}
+        scheduleNotes={props.scheduleNotes}
+        indicatorTypes={props.indicatorTypes}
+        isScheduleEditor={permissions.canEditShifts || permissions.canEditNotes}
       />
 
       <div
