@@ -440,12 +440,37 @@ export default function MonthView({
       // A person's indicators belong to their day in a focus area, not to each
       // of their shift codes there, so they show on their first row once sorted.
       if (noteMarksForKey) {
-        byFocusArea.forEach((list) => {
+        const firstRowByEmp = new Map<string, DayRow>();
+        const areasWithRowByEmp = new Map<string, Set<number>>();
+        for (const name of focusAreaNames) {
           const marked = new Set<string>();
-          for (const row of list) {
+          for (const row of byFocusArea.get(name) ?? []) {
             if (marked.has(row.empId)) continue;
             marked.add(row.empId);
             row.marks = noteMarksForKey(row.empId, date, row.focusAreaId);
+            if (!firstRowByEmp.has(row.empId)) firstRowByEmp.set(row.empId, row);
+            const areas = areasWithRowByEmp.get(row.empId) ?? new Set<number>();
+            areas.add(row.focusAreaId);
+            areasWithRowByEmp.set(row.empId, areas);
+          }
+        }
+        // A general code lists the person under their primary focus area only,
+        // so a note filed under another area they have no row in that day, or
+        // under none, joins their first row rather than going unseen.
+        firstRowByEmp.forEach((row, empId) => {
+          const areasWithRow = areasWithRowByEmp.get(empId);
+          const otherAreaIds: (number | undefined)[] = [
+            ...focusAreas.map((fa) => fa.id).filter((id) => !areasWithRow?.has(id)),
+            undefined,
+          ];
+          const seen = new Set(row.marks.map((mark) => `${mark.indicatorTypeId}_${mark.state}`));
+          for (const areaId of otherAreaIds) {
+            for (const mark of noteMarksForKey(empId, date, areaId)) {
+              const key = `${mark.indicatorTypeId}_${mark.state}`;
+              if (seen.has(key)) continue;
+              seen.add(key);
+              row.marks.push(mark);
+            }
           }
         });
       }

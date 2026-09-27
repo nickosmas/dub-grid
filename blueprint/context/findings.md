@@ -88,13 +88,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** End the created session when the client has gone (for example, a short server-side deadline that signs the new session out), or let the next successful sign-in on that device replace the orphan.
 **Resolution:**
 
-### F-82 [P3] open - Month view misses a note filed under a person's secondary focus area
+### F-82 [P3] fixed - Month view misses a note filed under a person's secondary focus area
 
 **File:** `apps/web/src/components/MonthView.tsx` (row building)
 **Found:** 2026-09-26 by review of 42a
 **Why it matters:** A general shift code is listed only under the person's primary focus area, so an indicator stored against another of their focus areas for that day never appears in the day popover. Rare: indicators are normally stored against the focus area the shift is in.
 **Suggested fix:** Merge the person's marks from their other home focus areas into that row, deduplicated.
-**Resolution:**
+**Resolution:** Fixed: after building a day's rows, each person's first row also takes the notes filed under every focus area they have no row in that day, and those with no focus area, each note once (`MonthView.tsx`). A test lists a general-code person under their primary area with a note filed under their second area and a note filed under both; it fails against the previous code.
 
 ### F-83 [P3] open - Gridmaster realtime invalidation is not coalesced
 
