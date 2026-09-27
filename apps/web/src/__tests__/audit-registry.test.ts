@@ -310,6 +310,24 @@ describe("access change rows", () => {
     ]);
   });
 
+  it("names the schedule-notes permission once in a change written before 061", () => {
+    const rows = formatDetails({
+      action: "organization_access.updated",
+      details: {
+        changes: [
+          {
+            field: "adminPermissions",
+            label: "Admin Permissions",
+            from: { canEditNotes: true, canEditScheduleIndicators: true },
+            to: { canEditNotes: false, canEditScheduleIndicators: false },
+          },
+        ],
+      },
+    });
+
+    expect(rows).toEqual([{ label: "Not allowed", value: "Edit schedule notes" }]);
+  });
+
   it("lists only what a first grant allowed", () => {
     const rows = formatDetails({
       action: "membership.updated",

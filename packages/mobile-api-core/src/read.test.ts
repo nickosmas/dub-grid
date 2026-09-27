@@ -96,6 +96,39 @@ describe("loadMobileBootstrapPayload indicator types", () => {
   });
 });
 
+describe("loadMobileBootstrapPayload retired permission", () => {
+  const load = (canEditNotes: boolean) =>
+    loadMobileBootstrapPayload(
+      {
+        currentOrg: { id: ORG_ID },
+        serviceClient: {},
+        userClient: {},
+        user: { id: USER_ID, email: "alex@example.com" },
+        memberships: [],
+        permissions: { role: "admin", canManageUsers: false, canEditNotes },
+      } as never,
+      {
+        fetchLinkedEmployeeForUser: vi.fn(async () => null),
+        fetchMobileUnreadNotificationCount: vi.fn(async () => 0),
+        fetchMobileAbsenceTypes: vi.fn(async () => []),
+        fetchMobileFocusAreas: vi.fn(async () => []),
+        fetchMobileRoles: vi.fn(async () => []),
+        fetchMobileCertifications: vi.fn(async () => []),
+        fetchMobileDepartments: vi.fn(async () => []),
+        fetchMobileIndicatorTypes: vi.fn(async () => []),
+        fetchTermsAcceptedVersion: vi.fn(async () => null),
+        fetchMfaReenrollRequired: vi.fn(async () => false),
+        mapOrganizationToMobileConfig: vi.fn(() => ({ id: ORG_ID })),
+      } as never,
+    );
+
+  // Installed builds still require canEditScheduleIndicators after 061.
+  it("still sends canEditScheduleIndicators, equal to canEditNotes", async () => {
+    expect((await load(true)).permissions.canEditScheduleIndicators).toBe(true);
+    expect((await load(false)).permissions.canEditScheduleIndicators).toBe(false);
+  });
+});
+
 describe("loadMobilePeoplePayload", () => {
   const makePerson = (overrides: Record<string, unknown>) => ({
     id: "employee-1",

@@ -87,6 +87,8 @@ export const mobilePermissionsSchema = z.object({
   canPublishSchedule: z.boolean(),
   canApplyRecurringSchedule: z.boolean(),
   canEditNotes: z.boolean(),
+  // Retired into canEditNotes (migration 061). Installed builds still require
+  // it, so the server keeps sending it with canEditNotes' value.
   canEditScheduleIndicators: z.boolean(),
   canViewRecurringShifts: z.boolean(),
   canManageRecurringShifts: z.boolean(),

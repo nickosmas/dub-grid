@@ -77,7 +77,7 @@ export const PERMISSION_MODULES: PermissionModule[] = [
     icon: "calendar",
     category: "CORE",
     viewKeys: [],
-    editKeys: ["canEditShifts", "canEditNotes", "canEditScheduleIndicators"],
+    editKeys: ["canEditShifts", "canEditNotes"],
     alwaysOnView: true,
   },
   {

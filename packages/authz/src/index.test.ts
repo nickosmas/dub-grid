@@ -123,6 +123,12 @@ describe("buildPerms", () => {
     expect(perms.isImpersonating).toBe(true);
   });
 
+  it("shows schedule notes read-only while impersonating, shifts still editable", () => {
+    const perms = buildPerms("gridmaster", "org-1", false, null, true);
+    expect(perms.canEditNotes).toBe(false);
+    expect(perms.canEditShifts).toBe(true);
+  });
+
   // admin_permissions is an unvalidated JSONB column, so the resolver has to
   // hold these guarantees itself rather than trust whatever wrote the row.
   it("resolves a partial admin_permissions JSONB against the admin baseline", () => {

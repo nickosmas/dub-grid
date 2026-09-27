@@ -860,8 +860,8 @@ describe("POST /api/schedule/manage permission gates", () => {
     expect(userRpc).not.toHaveBeenCalled();
   });
 
-  it("refuses a schedule note without the indicators key, even with notes", async () => {
-    grant({ canEditNotes: true, canEditScheduleIndicators: false });
+  it("refuses a schedule note without the notes permission, even with shifts", async () => {
+    grant({ canEditShifts: true, canEditNotes: false });
 
     const response = await POST(
       makeRequest({
@@ -879,7 +879,7 @@ describe("POST /api/schedule/manage permission gates", () => {
   });
 
   it("refuses an indicator on a cell that carries no shift", async () => {
-    grant({ canEditNotes: true, canEditScheduleIndicators: true });
+    grant({ canEditNotes: true });
     stubCellSnapshot(null);
     captureNoteClearing();
 
@@ -902,7 +902,7 @@ describe("POST /api/schedule/manage permission gates", () => {
   });
 
   it("refuses an indicator on an absence, which is not a shift", async () => {
-    grant({ canEditNotes: true, canEditScheduleIndicators: true });
+    grant({ canEditNotes: true });
     stubCellSnapshot("absence");
     captureNoteClearing();
 
@@ -922,7 +922,7 @@ describe("POST /api/schedule/manage permission gates", () => {
   });
 
   it("admits an indicator on a drafted shift, since schedulers tag as they build", async () => {
-    grant({ canEditNotes: true, canEditScheduleIndicators: true });
+    grant({ canEditNotes: true });
     stubCellSnapshot("worked");
     const upsert = vi.fn(async () => ({ error: null }));
     serviceFrom.mockImplementation((table: string) =>

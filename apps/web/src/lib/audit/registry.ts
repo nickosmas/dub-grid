@@ -253,6 +253,11 @@ function changeRows(d: AuditDetails): DetailItem[] {
   });
 }
 
+/** A retired key shares its successor's label, so a pre-061 row can name one twice. */
+function joinLabels(labels: string[]): string {
+  return [...new Set(labels)].join(", ");
+}
+
 /**
  * A change whose sides are permission maps reads as the flags that flipped.
  * "Updated" is the one thing an access audit row must never say, and a first
@@ -272,8 +277,8 @@ function permissionChangeRows(label: string, from: unknown, to: unknown): Detail
     .filter((key) => !diff[key])
     .map(permissionLabel);
   const rows: DetailItem[] = [];
-  if (allowed.length) rows.push({ label: "Allowed", value: allowed.join(", ") });
-  if (revoked.length) rows.push({ label: "Not allowed", value: revoked.join(", ") });
+  if (allowed.length) rows.push({ label: "Allowed", value: joinLabels(allowed) });
+  if (revoked.length) rows.push({ label: "Not allowed", value: joinLabels(revoked) });
   return rows.length ? rows : [{ label, value: "No effective change" }];
 }
 
@@ -610,8 +615,8 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
         (value ? enabled : disabled).push(permissionLabel(key));
       }
       const rows: DetailItem[] = [];
-      if (enabled.length) rows.push({ label: "Allowed", value: enabled.join(", ") });
-      if (disabled.length) rows.push({ label: "Not allowed", value: disabled.join(", ") });
+      if (enabled.length) rows.push({ label: "Allowed", value: joinLabels(enabled) });
+      if (disabled.length) rows.push({ label: "Not allowed", value: joinLabels(disabled) });
       return rows;
     },
   },

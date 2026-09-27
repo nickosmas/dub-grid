@@ -1742,16 +1742,11 @@ export async function POST(req: NextRequest) {
       }
 
       case "upsertScheduleNote": {
-        // A schedule note is an indicator on a cell, so writing one needs the
-        // indicators key as well as notes. The cell editor gates the picker on
-        // indicators; this keeps the API in step with it.
         const auth = await requireOrgPermissions(
           req,
           data.orgId,
           (permissions) =>
-            permissions.isGridmaster ||
-            permissions.isSuperAdmin ||
-            (permissions.canEditNotes && permissions.canEditScheduleIndicators),
+            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditNotes,
           { actor },
         );
         if ("response" in auth) {
@@ -1813,9 +1808,7 @@ export async function POST(req: NextRequest) {
           req,
           data.orgId,
           (permissions) =>
-            permissions.isGridmaster ||
-            permissions.isSuperAdmin ||
-            (permissions.canEditNotes && permissions.canEditScheduleIndicators),
+            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditNotes,
           { actor },
         );
         if ("response" in auth) {

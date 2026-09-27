@@ -50,12 +50,12 @@ type MobileMembershipLike = {
   platformRole: PlatformRole;
 };
 
-// `canManageManagementAccess` is omitted deliberately: it is not an admin
-// permission the auth context carries, it is derived from `canManageUsers` when
-// the payload is built below.
+// `canManageManagementAccess` and `canEditScheduleIndicators` are omitted
+// deliberately: neither is an admin permission the auth context carries. The
+// payload built below derives them from `canManageUsers` and `canEditNotes`.
 type MobilePermissionsLike = Omit<
   MobileBootstrapResponse["permissions"],
-  "canManageManagementAccess"
+  "canManageManagementAccess" | "canEditScheduleIndicators"
 > & {
   role: string;
   level: number;
@@ -399,6 +399,7 @@ export async function loadMobileBootstrapPayload(
       // derives as canManageUsers. Spelled out here because the response schema
       // strips keys it doesn't name, so it would otherwise fall to its default.
       canManageManagementAccess: auth.permissions.canManageUsers,
+      canEditScheduleIndicators: auth.permissions.canEditNotes,
     },
     linkedEmployee: linkedEmployee
       ? {

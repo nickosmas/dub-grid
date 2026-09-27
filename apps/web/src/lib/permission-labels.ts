@@ -12,8 +12,7 @@ export const PERMISSION_LABELS: Record<keyof AdminPermissions, string> = {
   canEditShifts: "Edit shifts",
   canPublishSchedule: "Publish schedule",
   canApplyRecurringSchedule: "Apply recurring schedule",
-  canEditNotes: "Edit notes",
-  canEditScheduleIndicators: "Edit schedule notes",
+  canEditNotes: "Edit schedule notes",
   canViewRecurringShifts: "View recurring shifts",
   canManageRecurringShifts: "Manage recurring shifts",
   canManageShiftSeries: "Manage shift series",
@@ -36,8 +35,13 @@ export const PERMISSION_LABELS: Record<keyof AdminPermissions, string> = {
   canViewReports: "View reports",
 };
 
+/** Keys migration 061 retired, still named in permission history written before it. */
+const RETIRED_PERMISSION_LABELS: Record<string, string> = {
+  canEditScheduleIndicators: PERMISSION_LABELS.canEditNotes,
+};
+
 export function permissionLabel(key: string): string {
-  return PERMISSION_LABELS[key as keyof AdminPermissions] ?? key;
+  return PERMISSION_LABELS[key as keyof AdminPermissions] ?? RETIRED_PERMISSION_LABELS[key] ?? key;
 }
 
 /** Only the flags whose effective value flipped, keyed to their new value. */

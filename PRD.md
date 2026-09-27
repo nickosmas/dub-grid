@@ -151,7 +151,7 @@ DubGrid implements a four-tier RBAC system with JWT-based claims enforced at the
 
 ### 4.2 Admin Permissions (Granular, per-user)
 
-Admins receive a configurable set of permissions stored as JSONB in `organization_memberships.admin_permissions`. The `AdminPermissions` interface (defined in `@dubgrid/domain`) has **26 permissions**. `canViewSchedule` and `canViewStaff` are **always true** for any authenticated user regardless of role. Everything else follows a role baseline that a stored set overrides key by key: users start from all `false`; admins start from the core scheduling set (edit and publish the schedule, notes and indicators, recurring shifts, reports) with no people management or administration, so an unconfigured admin can schedule but cannot manage people. Every `canManage*` permission implies its matching `canView*` (view implications applied by `@dubgrid/authz`).
+Admins receive a configurable set of permissions stored as JSONB in `organization_memberships.admin_permissions`. The `AdminPermissions` interface (defined in `@dubgrid/domain`) has **25 permissions**. `canViewSchedule` and `canViewStaff` are **always true** for any authenticated user regardless of role. Everything else follows a role baseline that a stored set overrides key by key: users start from all `false`; admins start from the core scheduling set (edit and publish the schedule, notes and indicators, recurring shifts, reports) with no people management or administration, so an unconfigured admin can schedule but cannot manage people. Every `canManage*` permission implies its matching `canView*` (view implications applied by `@dubgrid/authz`).
 
 | #   | Category  | Permission                      | Delegatable | Description                                                                |
 | --- | --------- | ------------------------------- | ----------- | -------------------------------------------------------------------------- |
@@ -159,28 +159,27 @@ Admins receive a configurable set of permissions stored as JSONB in `organizatio
 | 2   | Schedule  | `canEditShifts`                 | Yes         | Create, edit, delete schedule cell entries                                 |
 | 3   | Schedule  | `canPublishSchedule`            | Yes         | Publish draft changes                                                      |
 | 4   | Schedule  | `canApplyRecurringSchedule`     | Yes         | Apply recurring shift templates to a date range                            |
-| 5   | Notes     | `canEditNotes`                  | Yes         | Manage schedule notes                                                      |
-| 6   | Notes     | `canEditScheduleIndicators`     | Yes         | Manage schedule indicators (gates `schedule_notes` write RLS)              |
-| 7   | Recurring | `canViewRecurringShifts`        | Yes         | View recurring shift templates                                             |
-| 8   | Recurring | `canManageRecurringShifts`      | Yes         | Configure recurring shift templates                                        |
-| 9   | Recurring | `canManageShiftSeries`          | Yes         | Manage repeating shift series                                              |
-| 10  | Staff     | `canViewStaff`                  | Always on   | View staff roster (always true for all users)                              |
-| 11  | Staff     | `canViewEmployeeDetails`        | Yes         | View individual employee detail records                                    |
-| 12  | Staff     | `canManageEmployees`            | Yes         | Add, edit, bench, activate, terminate employees                            |
-| 13  | Config    | `canViewFocusAreas`             | Yes         | View focus areas / wings                                                   |
-| 14  | Config    | `canManageFocusAreas`           | Yes         | Manage focus areas / wings                                                 |
-| 15  | Config    | `canViewScheduleDefinitions`    | Yes         | View shift and job definitions                                             |
-| 16  | Config    | `canManageScheduleDefinitions`  | Yes         | Manage shift and job definitions                                           |
-| 17  | Config    | `canViewIndicatorTypes`         | Yes         | View note/indicator type definitions                                       |
-| 18  | Config    | `canManageIndicatorTypes`       | Yes         | Manage note/indicator type definitions                                     |
-| 19  | Config    | `canManageOrgSettings`          | No          | Edit org name, address, phone, employee count, timezone (super_admin only) |
-| 20  | Config    | `canViewOrgLabels`              | Yes         | View custom terminology labels                                             |
-| 21  | Config    | `canManageOrgLabels`            | Yes         | Edit custom terminology labels                                             |
-| 22  | Coverage  | `canViewCoverageRequirements`   | Yes         | View minimum staffing requirements                                         |
-| 23  | Coverage  | `canManageCoverageRequirements` | Yes         | Manage minimum staffing requirements                                       |
-| 24  | Requests  | `canApproveShiftRequests`       | Yes         | Approve or reject shift pickup/swap requests                               |
-| 25  | Dashboard | `canViewDashboardAnalytics`     | Yes         | View the organization dashboard and analytics                              |
-| 26  | Reports   | `canViewReports`                | Yes         | View and export the operations reports (staff hours, activity, categories) |
+| 5   | Notes     | `canEditNotes`                  | Yes         | Add and remove schedule notes (gates `schedule_notes` write RLS)           |
+| 6   | Recurring | `canViewRecurringShifts`        | Yes         | View recurring shift templates                                             |
+| 7   | Recurring | `canManageRecurringShifts`      | Yes         | Configure recurring shift templates                                        |
+| 8   | Recurring | `canManageShiftSeries`          | Yes         | Manage repeating shift series                                              |
+| 9   | Staff     | `canViewStaff`                  | Always on   | View staff roster (always true for all users)                              |
+| 10  | Staff     | `canViewEmployeeDetails`        | Yes         | View individual employee detail records                                    |
+| 11  | Staff     | `canManageEmployees`            | Yes         | Add, edit, bench, activate, terminate employees                            |
+| 12  | Config    | `canViewFocusAreas`             | Yes         | View focus areas / wings                                                   |
+| 13  | Config    | `canManageFocusAreas`           | Yes         | Manage focus areas / wings                                                 |
+| 14  | Config    | `canViewScheduleDefinitions`    | Yes         | View shift and job definitions                                             |
+| 15  | Config    | `canManageScheduleDefinitions`  | Yes         | Manage shift and job definitions                                           |
+| 16  | Config    | `canViewIndicatorTypes`         | Yes         | View note/indicator type definitions                                       |
+| 17  | Config    | `canManageIndicatorTypes`       | Yes         | Manage note/indicator type definitions                                     |
+| 18  | Config    | `canManageOrgSettings`          | No          | Edit org name, address, phone, employee count, timezone (super_admin only) |
+| 19  | Config    | `canViewOrgLabels`              | Yes         | View custom terminology labels                                             |
+| 20  | Config    | `canManageOrgLabels`            | Yes         | Edit custom terminology labels                                             |
+| 21  | Coverage  | `canViewCoverageRequirements`   | Yes         | View minimum staffing requirements                                         |
+| 22  | Coverage  | `canManageCoverageRequirements` | Yes         | Manage minimum staffing requirements                                       |
+| 23  | Requests  | `canApproveShiftRequests`       | Yes         | Approve or reject shift pickup/swap requests                               |
+| 24  | Dashboard | `canViewDashboardAnalytics`     | Yes         | View the organization dashboard and analytics                              |
+| 25  | Reports   | `canViewReports`                | Yes         | View and export the operations reports (staff hours, activity, categories) |
 
 Permissions are **per-person**, set on the People page, not granted by departments. A member's effective permissions are their `org_role` plus their own `admin_permissions`. (`departments.permissions` exists for management departments but is vestigial; an earlier department-template union model was reverted.)
 
@@ -415,7 +414,7 @@ The Expo / React Native mobile app (`apps/mobile`) is a first-class product surf
 | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `organizations`                                                             | id, name, slug, address fields, phone, timezone, employee_count, focus_area_label, certification_label, role_label, department_label, shift_display_mode, pay_period_start_date, data_retention_days, suspended_at, archived_at, stripe and trial fields, `workspace_kind` ('real'\|'sandbox', default 'real'), `sandbox_source_org_id` (FK orgs), `sandbox_owner_user_id` (FK auth.users; one active sandbox per user) |
 | `profiles`                                                                  | id (FK auth.users), org_id, platform_role (enum), version, role_locked, mfa_enabled, terms_accepted_at, terms_version, first_name, last_name, last_sign_in_at, deactivated_at, scheduled_deletion_at                                                                                                                                                                                                                    |
-| `organization_memberships`                                                  | user_id, org_id, org_role (enum), admin_permissions (JSONB, 26 keys), department_ids[], dept_admin_ids[], phone, archived_at, joined_at, `onboarding_completed_at`, `tooltip_tours_completed`, `schedule_last_viewed_at`                                                                                                                                                                                                |
+| `organization_memberships`                                                  | user_id, org_id, org_role (enum), admin_permissions (JSONB, 25 keys), department_ids[], dept_admin_ids[], phone, archived_at, joined_at, `onboarding_completed_at`, `tooltip_tours_completed`, `schedule_last_viewed_at`                                                                                                                                                                                                |
 | `departments`                                                               | id, org_id, name, abbr, `type` (`scheduled` \| `management`), permissions (JSONB — management depts only); two-type model, focus areas are children of departments                                                                                                                                                                                                                                                      |
 | `employees`                                                                 | id, org_id, first_name, last_name, status (active/benched/terminated), certification_id (FK), role_ids[], focus_area_ids[], department_ids[], phone, email, seniority, user_id (FK auth.users, nullable)                                                                                                                                                                                                                |
 | `schedule_cells`                                                            | id, emp_id, date, org_id, version (optimistic lock), series_id, from_recurring, focus_area_id                                                                                                                                                                                                                                                                                                                           |
@@ -463,7 +462,7 @@ convenience columns. Dated schedule identity is normalized through
 
 ### 8.3 Database Security
 
-- **Row-Level Security (RLS):** All 42 tables have RLS enabled, enforcing org-scoped data access. `schedule_notes` write policies gate on `check_admin_permission('canEditScheduleIndicators')`, and a note cannot exist without a shift on its cell (migration 015).
+- **Row-Level Security (RLS):** All 42 tables have RLS enabled, enforcing org-scoped data access. `schedule_notes` write policies gate on `check_admin_permission('canEditNotes')`, and a note cannot exist without a shift on its cell (migration 015).
 - **Custom JWT claims:** `platform_role`, `org_role`, `org_id`, `org_slug` written at JWT top level by access token hook
 - **Optimistic locking:** `schedule_cells` uses a `version` column to prevent concurrent overwrites
 - **Idempotency:** Role changes and schedule operations use idempotency keys to prevent duplicate writes
@@ -556,7 +555,7 @@ Everything for the web app lives under `apps/web/`. UI features are organized in
 | `apps/web/src/lib/rate-limit.ts`                          | Upstash Redis rate limiters (API, schedule review, invite, demo, password reset, login by email/IP/global, recovery surge, per-recipient email)                                                                                                                  |
 | `apps/web/src/lib/timezone-from-coords.ts`                | Offline timezone lookup from coordinates (`tz-lookup`)                                                                                                                                                                                                           |
 | `apps/web/src/lib/us-states.ts` / `us-state-timezones.ts` | US state list + default-timezone map                                                                                                                                                                                                                             |
-| `packages/domain/src/`                                    | Domain types + `permissions.ts` (`AdminPermissions`, 26 perms), role enums, billing types, `self-guard.ts`                                                                                                                                                       |
+| `packages/domain/src/`                                    | Domain types + `permissions.ts` (`AdminPermissions`, 25 perms), role enums, billing types, `self-guard.ts`                                                                                                                                                       |
 | `packages/authz/src/`                                     | Permission logic — `ROLE_LEVEL`, role baselines, view implications, JWT claim extraction, sensitive-action assurance (`assurance.ts`)                                                                                                                            |
 | `packages/contracts/src/`                                 | Zod API contract schemas (`schedule`, `mobile`, `staff`, `mfa`)                                                                                                                                                                                                  |
 | `packages/mobile-api-core/src/`                           | Mobile backend orchestration (`auth`, `dashboard`, `organization`, `people-status`, `push`, `read`, `setup`, `shift-requests`, `write`)                                                                                                                          |

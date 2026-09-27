@@ -65,7 +65,7 @@ All eleven packages are private, versioned `0.1.0`, ESM, and build with `tsc` to
 
 | Package                    | Purpose                                                                                                                                                                                                                                                                                                                                                                                   | Depends on                                                               |
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `@dubgrid/domain`          | Platform-neutral domain types/enums + pure logic. `Organization` (incl. `workspaceKind` / `sandbox*`), `AdminPermissions` (26 perms), role enums, billing types, `requests`, `staff`, `password` rules, `terms`, `alert-destination` (the shared alert resolver), `notification-metadata`, `self-guard.ts` (`SelfActionForbiddenError`, `assertNotSelf`, `isSelfAction`).                 | none                                                                     |
+| `@dubgrid/domain`          | Platform-neutral domain types/enums + pure logic. `Organization` (incl. `workspaceKind` / `sandbox*`), `AdminPermissions` (25 perms), role enums, billing types, `requests`, `staff`, `password` rules, `terms`, `alert-destination` (the shared alert resolver), `notification-metadata`, `self-guard.ts` (`SelfActionForbiddenError`, `assertNotSelf`, `isSelfAction`).                 | none                                                                     |
 | `@dubgrid/contracts`       | Zod schemas + inferred types for cross-app API contracts. One `.` export re-exporting `schedule`, `mobile`, `staff`, and `mfa` (there is no `./mobile` subpath).                                                                                                                                                                                                                          | `zod`                                                                    |
 | `@dubgrid/db-types`        | DB-row TS types (`DbOrganization`, etc.): `catalog`, `organization`, `requests`, `schedule`, `staff`.                                                                                                                                                                                                                                                                                     | `contracts`, `domain`                                                    |
 | `@dubgrid/authz`           | Permission logic: `ROLE_LEVEL`, `ALL_PERMS` / `READ_ONLY_PERMS` / `ADMIN_DEFAULT_PERMS`, `VIEW_IMPLICATIONS` / `applyViewImplications`, `buildPermissionContext` / `buildPerms`, `extractJwtClaims`, `getPermissionsFromSession`, plus `assurance.ts` (the five-minute sensitive-action policy shared by web and mobile).                                                                 | `domain`, `@supabase/supabase-js`                                        |
@@ -154,7 +154,7 @@ Super Admin (3) ── org_role = 'super_admin'
     │                Full org access, manages users + permissions
     ▼
 Admin (2) ──────── org_role = 'admin'
-    │                Per-user configurable permissions (26 flags)
+    │                Per-user configurable permissions (25 flags)
     ▼
 User (0) ───────── org_role = 'user'
                      Read-only (canViewSchedule + canViewStaff)
@@ -164,35 +164,35 @@ User (0) ───────── org_role = 'user'
 
 ### Admin Permission Model
 
-Instead of fixed role-based capabilities, admins have **26 individually configurable permissions** stored as JSONB in `organization_memberships.admin_permissions`. The canonical `AdminPermissions` interface lives in `packages/domain/src/permissions.ts`; permission logic lives in `@dubgrid/authz`.
+Instead of fixed role-based capabilities, admins have **25 individually configurable permissions** stored as JSONB in `organization_memberships.admin_permissions`. The canonical `AdminPermissions` interface lives in `packages/domain/src/permissions.ts`; permission logic lives in `@dubgrid/authz`.
 
-The 26 permissions, in interface order:
+The 25 permissions, in interface order:
 
 ```
-1  canViewSchedule*           14 canManageFocusAreas
-2  canEditShifts              15 canViewScheduleDefinitions
-3  canPublishSchedule         16 canManageScheduleDefinitions
-4  canApplyRecurringSchedule  17 canViewIndicatorTypes
-5  canEditNotes               18 canManageIndicatorTypes
-6  canEditScheduleIndicators  19 canManageOrgSettings
-7  canViewRecurringShifts     20 canViewOrgLabels
-8  canManageRecurringShifts   21 canManageOrgLabels
-9  canManageShiftSeries       22 canViewCoverageRequirements
-10 canViewStaff*              23 canManageCoverageRequirements
-11 canViewEmployeeDetails     24 canApproveShiftRequests
-12 canManageEmployees         25 canViewDashboardAnalytics
-13 canViewFocusAreas          26 canViewReports
+1  canViewSchedule*           14 canViewScheduleDefinitions
+2  canEditShifts              15 canManageScheduleDefinitions
+3  canPublishSchedule         16 canViewIndicatorTypes
+4  canApplyRecurringSchedule  17 canManageIndicatorTypes
+5  canEditNotes               18 canManageOrgSettings
+6  canViewRecurringShifts     19 canViewOrgLabels
+7  canManageRecurringShifts   20 canManageOrgLabels
+8  canManageShiftSeries       21 canViewCoverageRequirements
+9  canViewStaff*              22 canManageCoverageRequirements
+10 canViewEmployeeDetails     23 canApproveShiftRequests
+11 canManageEmployees         24 canViewDashboardAnalytics
+12 canViewFocusAreas          25 canViewReports
+13 canManageFocusAreas
 ```
 
 Model rules:
 
 - `canViewSchedule` and `canViewStaff` (*) are always true for any authenticated user.
 - **View implications** - `canManage*` implies the matching `canView*`. Applied by `applyViewImplications` in `@dubgrid/authz`.
-- **Role baselines** - a `user` resolves against `READ_ONLY_PERMS` (all `false`); an `admin` resolves against `ADMIN_DEFAULT_PERMS` (schedule editing and publishing, notes and indicators, recurring shifts, Reports, no people management or administration). A stored JSONB overrides the baseline key by key, and a `user`-role member never inherits a stored set.
+- **Role baselines** - a `user` resolves against `READ_ONLY_PERMS` (all `false`); an `admin` resolves against `ADMIN_DEFAULT_PERMS` (schedule editing and publishing, schedule notes, recurring shifts, Reports, no people management or administration). A stored JSONB overrides the baseline key by key, and a `user`-role member never inherits a stored set.
 - **Per-person, not per-department** - a member's effective permissions are their `org_role` baseline plus the per-person `admin_permissions` set on the People page. Departments do **not** grant permissions; `departments.permissions` is vestigial. (An earlier department-template union model was reverted and its `unionPermissions` helper removed from `@dubgrid/authz`.)
 - Super admins toggle these per user via the `PermissionsEditor` component (`apps/web/src/components/PermissionsEditor.tsx`), which reads the same `VIEW_IMPLICATIONS` map the resolver applies so an implied view shows as "Included" rather than a switch.
 - Always super-admin-only and **not delegable**: `canManageUsers`, `canConfigureAdminPermissions`, `canManageOrgSettings`.
-- **Paired keys at the API** - `canApplyRecurringSchedule` and `canManageShiftSeries` also require `canEditShifts`; writing a schedule note requires `canEditScheduleIndicators` alongside `canEditNotes`.
+- **Paired keys at the API** - `canApplyRecurringSchedule` and `canManageShiftSeries` also require `canEditShifts`.
 
 This design lets organizations create specialized admin roles (e.g. a "Schedule Manager" who can edit shifts but not manage employees) without new database roles.
 
@@ -541,7 +541,7 @@ The complete list with rotation procedures is in `internal/secrets-rotation.md`.
 | **Subdomain-based multi-tenancy**         | Strongest tenant isolation — org context is in the URL, not a query parameter. Prevents accidental cross-tenant data access.                                                                                                                                                                           |
 | **JWT claims at top level**               | Middleware reads `payload.platform_role` directly. Avoids the `app_metadata` nesting Supabase defaults to, which is harder to parse at the edge.                                                                                                                                                       |
 | **RLS as the real security boundary**     | The request proxy is a fast first filter that can fail; RLS at the database is the authoritative gate. The proxy keeps a `decodeJwt` fallback for non-gridmaster users so a `jwtVerify` failure never locks legitimate users out.                                                                      |
-| **Per-person admin permissions (JSONB)**  | More flexible than fixed roles. 26 individually-toggled flags set per person on the People page, with `canManage*` implying `canView*` and a scheduling baseline for unconfigured admins. Departments do not grant permissions. Organizations build custom permission profiles without schema changes. |
+| **Per-person admin permissions (JSONB)**  | More flexible than fixed roles. 25 individually-toggled flags set per person on the People page, with `canManage*` implying `canView*` and a scheduling baseline for unconfigured admins. Departments do not grant permissions. Organizations build custom permission profiles without schema changes. |
 | **Browser never touches data tables**     | All app data flows browser → `features/*/client/api.ts` → Route Handler → `lib/db/*`. Centralizes authorization and keeps Supabase access server-side; mobile follows the same shape via `/api/mobile/v1/*` → `mobile-api-core`.                                                                       |
 | **No global state store**                 | React Query handles server state; local state handles UI. Avoids Redux/Zustand boilerplate for a primarily server-data-driven app.                                                                                                                                                                     |
 | **Optimistic locking over pessimistic**   | Allows concurrent editing without blocking. Version conflicts are rare (editor presence shows who is where) and the UX beats waiting for locks; advisory cell leases were tried and removed.                                                                                                           |
