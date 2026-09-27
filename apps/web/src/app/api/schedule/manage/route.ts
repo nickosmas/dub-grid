@@ -1762,7 +1762,7 @@ export async function POST(req: NextRequest) {
           !(await cellHasWorkedShift(auth.serviceClient, data.orgId, data.employeeId, data.date))
         ) {
           return NextResponse.json(
-            { error: "Cannot add an indicator to a cell without a shift" },
+            { error: "Cannot add a schedule note to a cell without a shift" },
             { status: 400 },
           );
         }

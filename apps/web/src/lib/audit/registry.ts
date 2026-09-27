@@ -817,7 +817,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
   ...configRecordSpecs("absence_type", "time off type"),
   ...configRecordSpecs("shift_category", "shift"),
   ...configRecordSpecs("job", "job"),
-  ...configRecordSpecs("indicator_type", "indicator"),
+  ...configRecordSpecs("indicator_type", "schedule note"),
 
   // ── Setup: saved lists ─────────────────────────────────────────────────────
   "departments.saved": {
@@ -1423,7 +1423,7 @@ const RESOURCE_TYPE_LABELS: Record<string, string> = {
   employee: "Team member",
   focus_area: "Focus area",
   impersonation_session: "Viewing session",
-  indicator_type: "Indicator",
+  indicator_type: "Schedule note",
   invitation: "Invitation",
   job: "Job",
   org_role: "Role",

@@ -305,12 +305,12 @@ describe("validateIndicatorType", () => {
     const missing = await expectValidationError(
       validateIndicatorType(makeIndicatorType({ name: "" })),
     );
-    expect(missing.error).toBe("Indicator name is required");
-    expect(missing.fieldErrors).toEqual({ "indicatorType.name": "Indicator name is required" });
+    expect(missing.error).toBe("Schedule note name is required");
+    expect(missing.fieldErrors).toEqual({ "indicatorType.name": "Schedule note name is required" });
 
     const long = await expectValidationError(
       validateIndicatorType(makeIndicatorType({ name: "x".repeat(51) })),
     );
-    expect(long.error).toBe("Indicator name must be 50 characters or fewer");
+    expect(long.error).toBe("Schedule note name must be 50 characters or fewer");
   });
 });

@@ -26,7 +26,7 @@ export const REPORT_OPTIONS: Array<{
   { value: "certification-role-matrix", label: "Certifications and roles" },
   { value: "account-access", label: "Account access" },
   { value: "schedule-matrix", label: "Schedule matrix" },
-  { value: "shift-notes", label: "Shift notes" },
+  { value: "shift-notes", label: "Schedule notes" },
 ];
 
 export type OperationsReportExportFormat = "csv" | "pdf";

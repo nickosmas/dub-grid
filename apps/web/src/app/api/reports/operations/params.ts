@@ -86,7 +86,7 @@ export function parseOperationsFilters(
 
   const indicatorTypeIds = parseCsv(input.indicatorTypeIds).map((value) => {
     if (!/^\d+$/.test(value)) {
-      throw new RangeError("Choose valid indicators before generating the report.");
+      throw new RangeError("Choose valid schedule notes before generating the report.");
     }
     return Number(value);
   });

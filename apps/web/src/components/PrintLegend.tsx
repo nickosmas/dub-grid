@@ -39,7 +39,7 @@ export default function PrintLegend({
       </div>
       {indicators.length > 0 && (
         <>
-          <div className="print-legend__title">Indicators</div>
+          <div className="print-legend__title">Schedule notes</div>
           <div className="print-legend__grid" data-print-legend-indicators="true">
             {indicators.map((indicator) => (
               <div key={indicator.id} className="print-legend__item">

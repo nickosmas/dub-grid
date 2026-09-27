@@ -190,7 +190,7 @@ function PrintIndicatorDots({
         return (
           <span
             key={id}
-            aria-label={indicator?.name ?? "Note"}
+            aria-label={indicator?.name ?? "Schedule note"}
             style={{
               width: "0.55em",
               height: "0.55em",
@@ -1475,7 +1475,7 @@ export default function PrintScheduleView({
                   marginBottom: "0.7em",
                 }}
               >
-                Indicators
+                Schedule notes
               </div>
               <div
                 style={{

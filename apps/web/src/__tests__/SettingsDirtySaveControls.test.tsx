@@ -535,7 +535,7 @@ describe("settings dirty save controls", () => {
       <Indicators indicatorTypes={[]} orgId="org-1" onChange={vi.fn()} canManageIndicatorTypes />,
     );
 
-    await user.click(screen.getByRole("button", { name: /\+ add indicator/i }));
+    await user.click(screen.getByRole("button", { name: /\+ add schedule note/i }));
 
     expect(screen.getByRole("button", { name: /^cancel$/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
@@ -3089,7 +3089,7 @@ describe("settings dirty save controls", () => {
     await user.clear(input);
     await user.type(input, "https://bad.example");
 
-    expect(screen.getByText("Indicator name cannot contain a URL")).toBeInTheDocument();
+    expect(screen.getByText("Schedule note name cannot contain a URL")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
     expect(upsertIndicatorType).not.toHaveBeenCalled();
   });

@@ -158,7 +158,7 @@ describe("PrintScheduleView", () => {
         .map((element) => element.outerHTML)
         .join("");
       expect(markup).not.toContain("var(--");
-      expect(markup).toContain('aria-label="Note"');
+      expect(markup).toContain('aria-label="Schedule note"');
     });
   });
 });

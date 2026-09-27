@@ -896,7 +896,7 @@ describe("POST /api/schedule/manage permission gates", () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
-      error: "Cannot add an indicator to a cell without a shift",
+      error: "Cannot add a schedule note to a cell without a shift",
     });
     expect(serviceFrom).not.toHaveBeenCalledWith("schedule_notes");
   });

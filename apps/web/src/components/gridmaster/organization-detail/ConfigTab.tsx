@@ -504,7 +504,7 @@ export function ConfigTab({
 
       {/* Indicator Types */}
       <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}>Indicator Types ({activeIndicators.length})</div>
+        <div style={sectionHeaderStyle}>Schedule notes ({activeIndicators.length})</div>
         <div style={sectionBodyStyle}>
           {activeIndicators.length === 0 ? (
             <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--dg-color-text-muted)" }}>

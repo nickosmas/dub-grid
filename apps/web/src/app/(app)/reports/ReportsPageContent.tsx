@@ -631,7 +631,7 @@ function ReportsContent() {
     selectedJobIds.length === 0 ? "All jobs" : `${selectedJobIds.length} selected`;
   const indicatorSummary =
     selectedIndicatorTypeIds.length === 0
-      ? "All indicators"
+      ? "All schedule notes"
       : `${selectedIndicatorTypeIds.length} selected`;
 
   if (permissions.isLoading || !canAccessReports) {
@@ -978,11 +978,11 @@ function ReportsContent() {
                   resetAppliedReport();
                 }}
                 summary={indicatorSummary}
-                title="Indicators"
+                title="Schedule notes"
               >
                 <div style={targetListStyle}>
                   {indicatorOptions.length === 0 ? (
-                    <div style={targetEmptyStyle}>No indicators</div>
+                    <div style={targetEmptyStyle}>No schedule notes</div>
                   ) : (
                     indicatorOptions.map((option) => {
                       const id = Number(option.id);
