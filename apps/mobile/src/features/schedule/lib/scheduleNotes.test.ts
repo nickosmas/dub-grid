@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { MobileScheduleEntrySegment, MobileScheduleIndicator } from "@dubgrid/contracts";
 import {
   scheduleNoteGroups,
+  scheduleNotesForSegment,
+  scheduleNotesSpokenLabel,
   scheduleNoteLabel,
   scheduleNoteSwatchStyle,
   scheduleNotesForRow,
@@ -105,5 +107,48 @@ describe("scheduleNoteGroups", () => {
       [segment(2, "ICU"), segment(2, "ICU"), segment(3, "Rehab")],
     );
     expect(groups).toEqual([{ key: "area-2", title: "ICU", notes: [note(1, 2)] }]);
+  });
+
+  it("keeps a note type filed under two focus areas in both halves", () => {
+    const groups = scheduleNoteGroups(
+      [note(1, 2), note(1, 3), note(1, null)],
+      [segment(2, "ICU"), segment(3, "Rehab")],
+    );
+    expect(groups.map((group) => [group.title, group.notes])).toEqual([
+      ["ICU", [note(1, 2)]],
+      ["Rehab", [note(1, 3)]],
+      ["For the whole day", [note(1, null)]],
+    ]);
+  });
+});
+
+describe("scheduleNotesForSegment", () => {
+  const segment = (focusAreaId: number | null): MobileScheduleEntrySegment =>
+    ({ focusAreaId }) as MobileScheduleEntrySegment;
+  const notes = [note(1, 2), note(2, 3), note(3, null), note(4, 9)];
+
+  it("gives each note to one half: its area's first half, the day's to the first", () => {
+    const segments = [segment(2), segment(3)];
+    expect(scheduleNotesForSegment(notes, segments, 0).map((n) => n.indicatorTypeId)).toEqual([
+      1, 3, 4,
+    ]);
+    expect(scheduleNotesForSegment(notes, segments, 1).map((n) => n.indicatorTypeId)).toEqual([2]);
+  });
+
+  it("lists a focus area worked twice on its first half only", () => {
+    const segments = [segment(3), segment(3)];
+    expect(scheduleNotesForSegment(notes, segments, 1)).toEqual([]);
+  });
+
+  it("gives a single shift all its notes", () => {
+    expect(scheduleNotesForSegment(notes, [segment(2)], 0)).toHaveLength(4);
+  });
+});
+
+describe("scheduleNotesSpokenLabel", () => {
+  it("reads every note with its draft state", () => {
+    expect(
+      scheduleNotesSpokenLabel([note(1, null), { ...note(2, null), state: "draft_added" }]),
+    ).toBe("Schedule notes: Note 1; Note 2, added, not published");
   });
 });

@@ -147,15 +147,6 @@ describe("resolveAlertNativeRoute", () => {
     ).toEqual(ownShift("2026-10-05"));
   });
 
-  it("takes the date from the link when the metadata has none", () => {
-    expect(
-      resolveAlertNativeRoute(
-        { type: "schedule_note_published", metadata: { actionUrl: "/schedule?date=2026-10-06" } },
-        "emp-1",
-      ),
-    ).toEqual(ownShift("2026-10-06"));
-  });
-
   it("opens the day on the schedule without a linked employee or a date", () => {
     expect(
       resolveAlertNativeRoute(
@@ -175,5 +166,36 @@ describe("resolveAlertNativeRoute", () => {
     expect(
       resolveAlertNativeRoute({ type: "billing_payment_failed", metadata: {} }, "emp-1"),
     ).toBeNull();
+  });
+
+  it("opens the day instead for another person, a link or an impossible date", () => {
+    const day = { pathname: "/(tabs)/team", params: { date: "2026-10-05" } };
+    expect(
+      resolveAlertNativeRoute(
+        { type: "schedule_note_published", metadata: { date: "2026-10-05", empId: "emp-9" } },
+        "emp-1",
+      ),
+    ).toEqual(day);
+    expect(
+      resolveAlertNativeRoute(
+        { type: "schedule_note_published", metadata: { date: "2026-10-05", empId: "emp-1" } },
+        "emp-1",
+      ),
+    ).toEqual(ownShift("2026-10-05"));
+    expect(
+      resolveAlertNativeRoute(
+        {
+          type: "schedule_note_published",
+          metadata: { date: "2026-10-05", actionUrl: "/schedule?date=2026-10-05" },
+        },
+        "emp-1",
+      ),
+    ).toEqual(day);
+    expect(
+      resolveAlertNativeRoute(
+        { type: "schedule_note_published", metadata: { date: "2026-13-45" } },
+        "emp-1",
+      )?.pathname,
+    ).toBe("/(tabs)/team");
   });
 });

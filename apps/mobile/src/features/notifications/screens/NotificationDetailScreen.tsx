@@ -87,6 +87,9 @@ export default function NotificationDetailScreen() {
   const forwardedIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (!notification || !accessToken || forwardedIdRef.current === notification.id) return;
+    // A schedule note opens the reader's own shift, which needs their linked
+    // employee; forwarding before bootstrap would settle on the day instead.
+    if (notification.type === "schedule_note_published" && bootstrapQuery.isLoading) return;
     forwardedIdRef.current = notification.id;
 
     if (!notification.readAt) {
@@ -104,7 +107,14 @@ export default function NotificationDetailScreen() {
     }
     pushToast({ tone: "info", message: WEB_ONLY_ALERT_MESSAGE });
     router.replace("/alerts");
-  }, [accessToken, linkedEmployeeId, notification, pushToast, queryClient]);
+  }, [
+    accessToken,
+    bootstrapQuery.isLoading,
+    linkedEmployeeId,
+    notification,
+    pushToast,
+    queryClient,
+  ]);
 
   if (!notification && isResolvingNotification) {
     return (

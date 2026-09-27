@@ -30,7 +30,7 @@ import {
 import { formatUsTime } from "../../../shared/lib/dates";
 import { getScreenGutter } from "../../../shared/components/screen-layout";
 import { useMyScheduleQuery } from "../hooks/useMyScheduleQuery";
-import { scheduleNotesForRow } from "../../schedule/lib/scheduleNotes";
+import { scheduleNotesForRow, scheduleNotesSpokenLabel } from "../../schedule/lib/scheduleNotes";
 
 // Kept as narrow as possible while still fitting a full time range like
 // "10:00 PM–6:00 AM" on one line at the pill's 11px font — a double shift
@@ -242,7 +242,12 @@ export function MyScheduleCard({
             return (
               <Pressable
                 key={dateIso}
-                accessibilityLabel={spokenDate}
+                // The day's label replaces everything inside it, so it carries the notes.
+                accessibilityLabel={
+                  notes.length > 0
+                    ? `${spokenDate}. ${scheduleNotesSpokenLabel(notes)}`
+                    : spokenDate
+                }
                 accessibilityRole="button"
                 disabled={!onOpenDay}
                 onPress={() => onOpenDay?.({ date: dateIso, entry: openableEntry })}

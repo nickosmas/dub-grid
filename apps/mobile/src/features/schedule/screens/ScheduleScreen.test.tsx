@@ -1030,14 +1030,27 @@ describe("ScheduleScreen", () => {
             color: "#378ADD",
             state: "published",
           },
+          {
+            indicatorTypeId: 9,
+            focusAreaId: null,
+            name: "New hire",
+            color: "#1D9E75",
+            state: "published",
+          },
         ],
       }),
     ];
 
     render(<TeamScheduleScreen />);
 
-    expect(screen.getAllByLabelText("Float")).toHaveLength(1);
-    expect(screen.getAllByLabelText("Training")).toHaveLength(1);
+    // The whole day's note goes on the first half only, as in shift detail.
+    const dayHalf = screen
+      .getByLabelText("Schedule notes: Float; New hire")
+      .closest("[role=button]");
+    const eveningHalf = screen.getByLabelText("Schedule notes: Training").closest("[role=button]");
+    expect(dayHalf).toHaveTextContent("Nurse");
+    expect(eveningHalf).toHaveTextContent("Lead");
+    expect(screen.getAllByLabelText("New hire")).toHaveLength(1);
   });
 
   it("shows mentored assignments with a full label on Home", () => {

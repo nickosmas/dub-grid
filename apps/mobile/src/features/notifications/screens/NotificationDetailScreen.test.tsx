@@ -204,12 +204,9 @@ describe("NotificationDetailScreen", () => {
     expect(markNotificationRead).not.toHaveBeenCalled();
   });
 
-  it("opens the reader's own shift for a schedule note alert", async () => {
+  it("opens the reader's own shift for a schedule note alert once bootstrap arrives", async () => {
     useLocalSearchParams.mockReturnValue({ id: NOTIFICATION_ID });
-    useQuery.mockReturnValue({
-      data: { linkedEmployee: { id: "emp-1" }, permissions: {} },
-      isLoading: false,
-    });
+    useQuery.mockReturnValue({ data: undefined, isLoading: true });
     useQueryClient.mockReturnValue(
       mockQueryClient([
         {
@@ -221,7 +218,14 @@ describe("NotificationDetailScreen", () => {
       ]),
     );
 
-    render(<NotificationDetailScreen />);
+    const { rerender } = render(<NotificationDetailScreen />);
+    expect(openNativeRoute).not.toHaveBeenCalled();
+
+    useQuery.mockReturnValue({
+      data: { linkedEmployee: { id: "emp-1" }, permissions: {} },
+      isLoading: false,
+    });
+    rerender(<NotificationDetailScreen />);
 
     await waitFor(() => {
       expect(openNativeRoute).toHaveBeenCalledWith(

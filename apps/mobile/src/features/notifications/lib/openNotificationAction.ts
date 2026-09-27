@@ -67,18 +67,18 @@ export function isNotificationActionSupportedOnMobile(href: string): boolean {
   return isExternalUrl(href) || resolveNativeRoute(href) !== null;
 }
 
-function alertDate(alert: AlertLike, href: string): string | null {
-  const fromMetadata = alert.metadata?.date;
-  if (typeof fromMetadata === "string" && DATE_KEY.test(fromMetadata)) return fromMetadata;
-  const fromHref = parseHref(href).query.get("date");
-  return fromHref && DATE_KEY.test(fromHref) ? fromHref : null;
+function isCalendarDate(value: string): boolean {
+  if (!DATE_KEY.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
 /**
  * Where an alert opens in the app, or `null` when only the web can show it.
  * A schedule note is about the reader's own shift, so it opens that shift
- * (the web, which has no shift screen, opens the day); every other alert
- * follows the shared destination.
+ * (the web, which has no shift screen, opens the day); every other alert,
+ * and a note alert that names a link or another person, follows the shared
+ * destination.
  */
 export function resolveAlertNativeRoute(
   alert: AlertLike,
@@ -86,9 +86,15 @@ export function resolveAlertNativeRoute(
 ): NativeRoute | null {
   const destination = resolveAlertDestination(alert);
   if (!destination) return null;
-  if (alert.type === "schedule_note_published" && linkedEmployeeId) {
-    const date = alertDate(alert, destination.href);
-    if (date) {
+  const empId = alert.metadata?.empId;
+  const isOwnShiftNote =
+    alert.type === "schedule_note_published" &&
+    linkedEmployeeId !== null &&
+    !alert.metadata?.actionUrl &&
+    (empId === undefined || empId === linkedEmployeeId);
+  if (isOwnShiftNote) {
+    const date = alert.metadata?.date;
+    if (typeof date === "string" && isCalendarDate(date)) {
       return {
         pathname: "/shift/[employeeId]/[date]",
         params: {

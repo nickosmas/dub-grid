@@ -99,11 +99,13 @@ describe("MyScheduleCard", () => {
 
     render(<MyScheduleCard accessToken="token" />);
 
-    const day = screen.getByRole("button", { name: "Monday, May 11" });
+    const day = screen.getByRole("button", {
+      name: "Monday, May 11. Schedule notes: Training",
+    });
     expect(within(day).getByLabelText("Training")).toHaveTextContent("Training");
     expect(
       within(screen.getByRole("button", { name: "Tuesday, May 12" })).queryByLabelText(
-        "Schedule notes",
+        /^Schedule notes/,
       ),
     ).toBeNull();
   });

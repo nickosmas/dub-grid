@@ -24,11 +24,14 @@ instead of the team schedule.
 - **Schedule tab (team).** Each person's row lists their schedule notes by
   name on a caption line under the name and time. With a focus-area tab
   selected, a row shows the notes for that focus area and those with no focus
-  area; the all tab shows them all, one per note. Each half of a double shift
-  lists its own focus area's notes.
+  area; the all tab shows them all, one per note. A double shift gives each
+  note to one half, as shift detail does: a half lists its focus area's notes
+  (the first half working that area), and the first half also lists the
+  whole day's (no focus area, or one the shift does not work).
 - **My schedule.** The hero card and each "Your Week" row list the shift's
-  schedule notes by name (white text on the hero); a double shift's halves
-  each list their own.
+  schedule notes by name (white text on the hero). The hero stands for the
+  whole day, so it lists every note; "Your Week" halves follow the one-half
+  rule above. A shift removed in the last publish shows none anywhere.
 - **Shift detail.** A "Schedule notes" row in the detail stack lists each
   note's name, with the draft wording for an editor. It shows nothing when
   there are none. A double shift lists each half's notes under that half, and
@@ -129,10 +132,16 @@ focusAreaId?)` that filters by focus area and removes duplicates by
 
 - A removal alert (`mode: "delete"`) still opens the person's shift, where
   the indicator is already gone; that is the day the change concerns.
-- The alert's date comes from its metadata, or failing that from its link;
-  the shift opens with a one-day range, as the Home card's tap does.
+- The alert's date comes from its metadata and must be a real calendar
+  date; the shift opens with a one-day range, as the Home card's tap does.
+  An alert naming another employee (`empId`) or carrying its own `actionUrl`
+  keeps the shared destination. The alert detail screen waits for bootstrap
+  before forwarding a note alert, so a cold start still opens the shift.
 - "Your Week" titles do not wrap, so the notes sit on their own line in that
   row's copy rather than beside the title.
+- Screen readers hear a note list as one element ("Schedule notes: Float;
+  Training, added, not published"), since a row reads a labelled child's
+  label and stops; the Home day's label carries its notes too.
 - An entry from swap options or shift requests carries an empty list meaning
   "not looked up"; shift detail keeps the viewer's own `/me/schedule` entry
   first, which carries the real list.

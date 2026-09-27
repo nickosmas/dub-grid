@@ -3,14 +3,17 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import type { MobileScheduleIndicator } from "@dubgrid/contracts";
 import { AppText } from "./AppText";
 import { useMobileColors } from "../providers/ThemeModeProvider";
-import { mobileRadii, mobileSpace } from "../theme/tokens";
+import { mobileRadii, mobileSpace, mobileText } from "../theme/tokens";
 import {
   scheduleNoteLabel,
   scheduleNoteStateWords,
   scheduleNoteSwatchStyle,
+  scheduleNotesSpokenLabel,
 } from "../../features/schedule/lib/scheduleNotes";
 
 const SWATCH_SIZE = 8;
+// Centres the swatch on the name's first line once a long name wraps.
+const SWATCH_OFFSET = ((mobileText.caption.lineHeight ?? SWATCH_SIZE) - SWATCH_SIZE) / 2;
 
 /**
  * A shift's schedule notes, spelled out: each name after a small swatch in its
@@ -32,7 +35,13 @@ export function ScheduleNoteLabels({
   if (notes.length === 0) return null;
 
   return (
-    <View style={[styles.list, style]} accessibilityLabel="Schedule notes">
+    // One element for screen readers: a row reads a labelled child's label
+    // and stops, so the names have to be in this one.
+    <View
+      accessible
+      accessibilityLabel={scheduleNotesSpokenLabel(notes)}
+      style={[styles.list, style]}
+    >
       {notes.map((note) => {
         const words = scheduleNoteStateWords(note.state);
         return (
@@ -42,7 +51,7 @@ export function ScheduleNoteLabels({
             accessibilityLabel={scheduleNoteLabel(note)}
           >
             <View style={[styles.swatch, scheduleNoteSwatchStyle(note, ringColor)]} />
-            <AppText variant="caption" tone={inverse ? "inverse" : "secondary"}>
+            <AppText variant="caption" tone={inverse ? "inverse" : "secondary"} style={styles.name}>
               {note.name}
               {words ? (
                 <AppText variant="caption" tone={inverse ? "inverse" : "muted"}>
@@ -67,11 +76,15 @@ const createStyles = () =>
     },
     item: {
       flexDirection: "row",
-      alignItems: "center",
+      alignItems: "flex-start",
       gap: mobileSpace.xs,
       flexShrink: 1,
     },
+    name: {
+      flexShrink: 1,
+    },
     swatch: {
+      marginTop: SWATCH_OFFSET,
       width: SWATCH_SIZE,
       height: SWATCH_SIZE,
       borderRadius: mobileRadii.pill,

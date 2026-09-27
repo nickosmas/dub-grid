@@ -80,6 +80,7 @@ import {
   getCompactScheduleDateParts,
   getScheduleEntrySegmentTimeRange,
   getScheduleEntrySegments,
+  isDeletedScheduleHistory,
   getScheduleEntryCategoryKey,
   getScheduleEntryCustomEndTime,
   getScheduleEntryCustomStartTime,
@@ -1721,7 +1722,9 @@ function DetailIconTile({
 function ScheduleNotesDetailRow({ entry }: { entry: MobileScheduleEntry }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-  const groups = scheduleNoteGroups(entry.indicators, getScheduleEntrySegments(entry));
+  const groups = isDeletedScheduleHistory(entry)
+    ? []
+    : scheduleNoteGroups(entry.indicators, getScheduleEntrySegments(entry));
   if (groups.length === 0) return null;
 
   return (

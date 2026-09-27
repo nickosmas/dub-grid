@@ -37,6 +37,9 @@ describe("ScheduleNoteLabels", () => {
     expect(screen.getByLabelText("Training, added, not published")).toHaveTextContent(
       "Training (added, not published)",
     );
+    expect(
+      screen.getByLabelText("Schedule notes: Float; Training, added, not published"),
+    ).toBeInTheDocument();
   });
 
   it("renders nothing without notes", () => {

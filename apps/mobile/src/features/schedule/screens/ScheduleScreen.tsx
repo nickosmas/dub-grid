@@ -1,6 +1,6 @@
 import { ActionButtons } from "../../../shared/components/ActionButtons";
 import { ScheduleNoteLabels } from "../../../shared/components/ScheduleNoteLabels";
-import { scheduleNotesForRow } from "../lib/scheduleNotes";
+import { scheduleNotesForRow, scheduleNotesForSegment } from "../lib/scheduleNotes";
 import {
   Fragment,
   useCallback,
@@ -136,7 +136,6 @@ import {
   sortScheduleEntries,
   type AvailableShiftFeedItem,
   type FeaturedMeScheduleSegment,
-  type MeScheduleSegmentItem,
   type MobileScheduleMonthDay,
   type MobileScheduleWeekDay,
   type WeeklyHoursSummary,
@@ -2478,17 +2477,34 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
   );
 }
 
-/**
- * A personal schedule item's notes: a half of a double shift lists its own
- * focus area's (and those with none), a single shift all of them. A shift
- * removed in the last publish is never an item, so it shows none.
- */
-function getMeItemScheduleNotes(item: MeScheduleSegmentItem) {
-  const isSplit = getScheduleEntrySegments(item.entry).length > 1;
-  return scheduleNotesForRow(
-    item.entry.indicators,
-    isSplit && typeof item.segment.focusAreaId === "number" ? item.segment.focusAreaId : undefined,
+/** Where a half sits among its entry's segments, by identity or by content. */
+function findSegmentIndex(
+  segments: readonly MobileScheduleEntrySegment[],
+  segment: MobileScheduleEntrySegment,
+): number {
+  const same = segments.indexOf(segment);
+  if (same >= 0) return same;
+  return segments.findIndex(
+    (candidate) =>
+      candidate.shiftId === segment.shiftId &&
+      candidate.jobId === segment.jobId &&
+      candidate.startTime === segment.startTime &&
+      candidate.focusAreaId === segment.focusAreaId,
   );
+}
+
+/**
+ * A shift's notes on a row showing one half: each note on one half, as in
+ * shift detail. A removed shift shows none.
+ */
+function getSegmentScheduleNotes(
+  entry: MobileScheduleEntry,
+  segment: MobileScheduleEntrySegment | null | undefined,
+) {
+  if (isDeletedScheduleHistory(entry)) return [];
+  const segments = getScheduleEntrySegments(entry);
+  const index = segment ? findSegmentIndex(segments, segment) : -1;
+  return scheduleNotesForSegment(entry.indicators, segments, Math.max(index, 0));
 }
 
 // The first-run tour renders this card with sample data
@@ -2672,7 +2688,15 @@ export function MeHeroCard({
           ) : null}
         </View>
       ) : null}
-      <ScheduleNoteLabels inverse notes={getMeItemScheduleNotes(featuredItem)} />
+      {/* The hero stands for the whole day, halves included, so it lists every note. */}
+      <ScheduleNoteLabels
+        inverse
+        notes={
+          isDeletedScheduleHistory(featuredItem.entry)
+            ? []
+            : scheduleNotesForRow(featuredItem.entry.indicators)
+        }
+      />
       <MeHeroShiftmates entries={shiftmates} />
       {heroSplitSegments.segments.length > 0 ? (
         <SplitShiftSegmentList
@@ -2941,7 +2965,9 @@ function UpcomingShiftsSection({
                                   </Text>
                                 </View>
                               ) : null}
-                              <ScheduleNoteLabels notes={getMeItemScheduleNotes(item)} />
+                              <ScheduleNoteLabels
+                                notes={getSegmentScheduleNotes(item.entry, item.segment)}
+                              />
                               <PreviousShiftRow change={change} />
                             </View>
                           </PressableRow>
@@ -3589,13 +3615,14 @@ function TeamShiftMemberRow({
   // Once the reader raises the text size the role pill moves under the name:
   // the two no longer share a row's width, so neither has to give.
   const stackRolePill = useWindowDimensions().fontScale > 1;
-  // Each half of a double shift lists its own focus area's notes; otherwise the
-  // selected tab's area filters them, and the all tab shows every note.
-  const noteFocusAreaId =
-    segment && typeof segment.focusAreaId === "number" && getScheduleEntrySegments(entry).length > 1
-      ? segment.focusAreaId
-      : tabFocusAreaId;
-  const notes = scheduleNotesForRow(entry.indicators, noteFocusAreaId);
+  // A double shift gives each note to one half; a single shift in a focus-area
+  // tab lists that area's notes, and the all tab every note.
+  const isSplitEntry = getScheduleEntrySegments(entry).length > 1;
+  const notes = isDeletedScheduleHistory(entry)
+    ? []
+    : isSplitEntry
+      ? getSegmentScheduleNotes(entry, segment)
+      : scheduleNotesForRow(entry.indicators, tabFocusAreaId);
   const rolePill =
     roleChip || isMentored ? (
       <View style={[styles.teamMemberRoleRow, stackRolePill && styles.teamMemberRoleRowStacked]}>

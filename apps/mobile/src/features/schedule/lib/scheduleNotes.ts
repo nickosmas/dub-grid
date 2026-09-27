@@ -83,17 +83,20 @@ export function scheduleNoteGroups(
   notes: readonly MobileScheduleIndicator[] | undefined,
   segments: readonly MobileScheduleEntrySegment[],
 ): ScheduleNoteGroup[] {
-  const all = scheduleNotesForRow(notes);
   if (segments.length <= 1) {
+    const all = scheduleNotesForRow(notes);
     return all.length > 0 ? [{ key: "shift", title: null, notes: all }] : [];
   }
+  // Grouped before deduplicating: the same note type filed under two focus
+  // areas belongs to both halves.
+  const raw = notes ?? [];
   const groups: ScheduleNoteGroup[] = [];
   const worked = new Set<number>();
   for (const segment of segments) {
     const focusAreaId = segment.focusAreaId;
     if (typeof focusAreaId !== "number" || worked.has(focusAreaId)) continue;
     worked.add(focusAreaId);
-    const own = all.filter((note) => note.focusAreaId === focusAreaId);
+    const own = scheduleNotesForRow(raw.filter((note) => note.focusAreaId === focusAreaId));
     if (own.length === 0) continue;
     groups.push({
       key: `area-${focusAreaId}`,
@@ -101,9 +104,40 @@ export function scheduleNoteGroups(
       notes: own,
     });
   }
-  const rest = all.filter((note) => note.focusAreaId === null || !worked.has(note.focusAreaId));
+  const rest = scheduleNotesForRow(
+    raw.filter((note) => note.focusAreaId === null || !worked.has(note.focusAreaId)),
+  );
   if (rest.length > 0) {
     groups.push({ key: "whole-day", title: WHOLE_DAY_NOTES_TITLE, notes: rest });
   }
   return groups;
+}
+
+/**
+ * The notes one half of a shift lists, matching shift detail so each note
+ * shows once across the halves: the first half working a focus area lists
+ * that area's notes, and the first half also lists the whole day's.
+ */
+export function scheduleNotesForSegment(
+  notes: readonly MobileScheduleIndicator[] | undefined,
+  segments: readonly MobileScheduleEntrySegment[],
+  segmentIndex: number,
+): MobileScheduleIndicator[] {
+  const groups = scheduleNoteGroups(notes, segments);
+  if (segments.length <= 1) return groups[0]?.notes ?? [];
+  const focusAreaId = segments[segmentIndex]?.focusAreaId;
+  const ownsArea =
+    typeof focusAreaId === "number" &&
+    segments.findIndex((segment) => segment.focusAreaId === focusAreaId) === segmentIndex;
+  const own = ownsArea
+    ? (groups.find((group) => group.key === `area-${focusAreaId}`)?.notes ?? [])
+    : [];
+  const wholeDay =
+    segmentIndex === 0 ? (groups.find((group) => group.key === "whole-day")?.notes ?? []) : [];
+  return [...own, ...wholeDay];
+}
+
+/** What a screen reader says for a list of notes, since a row reads its children's labels only. */
+export function scheduleNotesSpokenLabel(notes: readonly MobileScheduleIndicator[]): string {
+  return `Schedule notes: ${notes.map(scheduleNoteLabel).join("; ")}`;
 }
