@@ -5,7 +5,7 @@ import {
   scheduleNotesForSegment,
   scheduleNotesSpokenLabel,
   scheduleNoteLabel,
-  scheduleNoteSwatchStyle,
+  scheduleNoteIcon,
   scheduleNotesForRow,
 } from "./scheduleNotes";
 
@@ -53,20 +53,23 @@ describe("scheduleNoteLabel", () => {
   });
 });
 
-describe("scheduleNoteSwatchStyle", () => {
-  it("fills a published note, fades a draft addition and rings a draft removal", () => {
-    expect(scheduleNoteSwatchStyle(note(1, null), "#fff")).toEqual({
-      backgroundColor: "#E24B4A",
-      borderColor: "#fff",
-      borderWidth: 1,
+describe("scheduleNoteIcon", () => {
+  it("fills a published note, fades a draft addition and outlines a draft removal", () => {
+    expect(scheduleNoteIcon(note(1, null), "#fff")).toEqual({
+      name: "note",
+      color: "#E24B4A",
       opacity: 1,
+      edgeColor: "#fff",
     });
-    expect(scheduleNoteSwatchStyle(note(1, null, "draft_added"), "#fff").opacity).toBe(0.45);
-    expect(scheduleNoteSwatchStyle(note(1, null, "draft_removed"), "#fff")).toEqual({
-      backgroundColor: "transparent",
-      borderColor: "#E24B4A",
-      borderWidth: 1.5,
+    expect(scheduleNoteIcon(note(1, null, "draft_added"), "#fff")).toMatchObject({
+      name: "note",
+      opacity: 0.45,
+    });
+    expect(scheduleNoteIcon(note(1, null, "draft_removed"), "#fff")).toEqual({
+      name: "note-outline",
+      color: "#E24B4A",
       opacity: 1,
+      edgeColor: null,
     });
   });
 });

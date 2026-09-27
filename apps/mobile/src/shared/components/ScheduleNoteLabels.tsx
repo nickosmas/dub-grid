@@ -1,22 +1,23 @@
 import { useMemo } from "react";
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import type { MobileScheduleIndicator } from "@dubgrid/contracts";
 import { AppText } from "./AppText";
 import { useMobileColors } from "../providers/ThemeModeProvider";
-import { mobileRadii, mobileSpace, mobileText } from "../theme/tokens";
+import { mobileSpace, mobileText } from "../theme/tokens";
 import {
   scheduleNoteLabel,
   scheduleNoteStateWords,
-  scheduleNoteSwatchStyle,
+  scheduleNoteIcon,
   scheduleNotesSpokenLabel,
 } from "../../features/schedule/lib/scheduleNotes";
 
-const SWATCH_SIZE = 8;
-// Centres the swatch on the name's first line once a long name wraps.
-const SWATCH_OFFSET = ((mobileText.caption.lineHeight ?? SWATCH_SIZE) - SWATCH_SIZE) / 2;
+const ICON_SIZE = 14;
+// Centres the icon on the name's first line once a long name wraps.
+const ICON_OFFSET = Math.max(((mobileText.caption.lineHeight ?? ICON_SIZE) - ICON_SIZE) / 2, 0);
 
 /**
- * A shift's schedule notes, spelled out: each name after a small swatch in its
+ * A shift's schedule notes, spelled out: each name after a sticky-note icon in its
  * own colour, wrapping as needed. `inverse` sits on a filled card (the hero).
  * Renders nothing without notes.
  */
@@ -50,7 +51,7 @@ export function ScheduleNoteLabels({
             style={styles.item}
             accessibilityLabel={scheduleNoteLabel(note)}
           >
-            <View style={[styles.swatch, scheduleNoteSwatchStyle(note, ringColor)]} />
+            <NoteIcon note={note} edgeColor={ringColor} />
             <AppText variant="caption" tone={inverse ? "inverse" : "secondary"} style={styles.name}>
               {note.name}
               {words ? (
@@ -62,6 +63,28 @@ export function ScheduleNoteLabels({
           </View>
         );
       })}
+    </View>
+  );
+}
+
+function NoteIcon({ note, edgeColor }: { note: MobileScheduleIndicator; edgeColor: string }) {
+  const styles = useMemo(() => createStyles(), []);
+  const icon = scheduleNoteIcon(note, edgeColor);
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={[styles.icon, { opacity: icon.opacity }]}
+    >
+      <MaterialCommunityIcons color={icon.color} name={icon.name} size={ICON_SIZE} />
+      {icon.edgeColor ? (
+        <MaterialCommunityIcons
+          color={icon.edgeColor}
+          name="note-outline"
+          size={ICON_SIZE}
+          style={styles.iconEdge}
+        />
+      ) : null}
     </View>
   );
 }
@@ -83,10 +106,14 @@ const createStyles = () =>
     name: {
       flexShrink: 1,
     },
-    swatch: {
-      marginTop: SWATCH_OFFSET,
-      width: SWATCH_SIZE,
-      height: SWATCH_SIZE,
-      borderRadius: mobileRadii.pill,
+    icon: {
+      marginTop: ICON_OFFSET,
+      width: ICON_SIZE,
+      height: ICON_SIZE,
+    },
+    iconEdge: {
+      position: "absolute",
+      top: 0,
+      left: 0,
     },
   });

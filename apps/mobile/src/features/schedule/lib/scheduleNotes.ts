@@ -41,26 +41,23 @@ export function scheduleNoteLabel(note: MobileScheduleIndicator): string {
 }
 
 /**
- * The swatch beside a note's name. A draft addition is faded and a draft
- * removal is a hollow ring, since mobile marks carry no dashed borders.
+ * The sticky-note icon beside a note's name, in the note's colour. A draft
+ * addition is faded and a draft removal is an outline. A filled note also
+ * wears a thin outline in `edgeColor`, so a colour close to its background
+ * (a blue note on the blue hero) still reads.
  */
-export function scheduleNoteSwatchStyle(
+export function scheduleNoteIcon(
   note: Pick<MobileScheduleIndicator, "color" | "state">,
-  ringColor: string,
-): { backgroundColor: string; borderColor: string; borderWidth: number; opacity: number } {
+  edgeColor: string,
+): { name: "note" | "note-outline"; color: string; opacity: number; edgeColor: string | null } {
   if (note.state === "draft_removed") {
-    return {
-      backgroundColor: "transparent",
-      borderColor: note.color,
-      borderWidth: 1.5,
-      opacity: 1,
-    };
+    return { name: "note-outline", color: note.color, opacity: 1, edgeColor: null };
   }
   return {
-    backgroundColor: note.color,
-    borderColor: ringColor,
-    borderWidth: 1,
+    name: "note",
+    color: note.color,
     opacity: note.state === "draft_added" ? 0.45 : 1,
+    edgeColor,
   };
 }
 
