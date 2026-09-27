@@ -1,4 +1,6 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AuditRow } from "./enrich";
+import { AUDIT_ACTIONS, PERSON_ACTIVITY_CATEGORIES } from "./registry";
 import { diffPermissions } from "@/lib/permission-labels";
 
 export { diffPermissions };
@@ -233,4 +235,73 @@ function targetsUser(row: AuditRow, userId: string): boolean {
 function timestamp(value: unknown): number {
   const time = new Date(String(value)).getTime();
   return Number.isNaN(time) ? 0 : time;
+}
+
+/** Rows each organization query reads; a result this long may have more. */
+export const EMPLOYEE_AUDIT_ROW_LIMIT = 300;
+export const EMPLOYEE_ROLE_CHANGE_ROW_LIMIT = 200;
+
+const PERSON_ACTIVITY_CATEGORY_SET = new Set<string>(PERSON_ACTIVITY_CATEGORIES);
+export const PERSON_ACTIVITY_ACTIONS: readonly string[] = Object.entries(AUDIT_ACTIONS)
+  .filter(([, spec]) => PERSON_ACTIVITY_CATEGORY_SET.has(spec.category))
+  .map(([action]) => action);
+
+/**
+ * The organization's audit rows about one staff record. `actions` defaults to
+ * the person-activity actions an organization sees; a Gridmaster passes `null`
+ * for every action.
+ */
+export async function fetchEmployeeAuditRows(
+  serviceClient: SupabaseClient,
+  orgId: string,
+  employee: EmployeeActivitySubject,
+  invitationIds: string[],
+  options: { actions?: readonly string[] | null } = {},
+): Promise<AuditRow[]> {
+  const targets = [
+    `and(resource_type.eq.employee,resource_id.eq.${employee.id})`,
+    `details->>employeeId.eq.${employee.id}`,
+  ];
+  if (employee.user_id) {
+    targets.push(
+      `and(resource_type.in.(user,organization_membership,role),resource_id.eq.${employee.user_id})`,
+      `details->>targetUserId.eq.${employee.user_id}`,
+    );
+  }
+  if (invitationIds.length > 0) {
+    targets.push(`and(resource_type.eq.invitation,resource_id.in.(${invitationIds.join(",")}))`);
+  }
+
+  const actions = options.actions === undefined ? PERSON_ACTIVITY_ACTIONS : options.actions;
+  let query = serviceClient.from("audit_log").select("*").eq("org_id", orgId);
+  if (actions) query = query.in("action", [...actions]);
+  const { data, error } = await query
+    .or(targets.join(","))
+    .order("created_at", { ascending: false })
+    .limit(EMPLOYEE_AUDIT_ROW_LIMIT);
+  if (error) {
+    throw error;
+  }
+  return (data ?? []) as AuditRow[];
+}
+
+export async function fetchEmployeeRoleChanges(
+  serviceClient: SupabaseClient,
+  orgId: string,
+  userId: string | null,
+): Promise<RoleChangeLogRow[]> {
+  if (!userId) return [];
+  const { data, error } = await serviceClient
+    .from("role_change_log")
+    .select(
+      "id, org_id, target_user_id, changed_by_id, from_role, to_role, change_type, permissions_before, permissions_after, created_at",
+    )
+    .eq("org_id", orgId)
+    .eq("target_user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(EMPLOYEE_ROLE_CHANGE_ROW_LIMIT);
+  if (error) {
+    throw error;
+  }
+  return (data ?? []) as RoleChangeLogRow[];
 }

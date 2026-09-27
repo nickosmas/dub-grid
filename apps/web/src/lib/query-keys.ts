@@ -134,6 +134,8 @@ export const queryKeys = {
     /** Under `personAll`, so whatever refreshes an open person page refreshes these too. */
     personActivity: (employeeId: string) => ["gm", "person", "activity", employeeId] as const,
     personNotifications: (userId: string) => ["gm", "person", "notifications", userId] as const,
+    personHistory: (kind: "user" | "staff", id: string) =>
+      ["gm", "person", "history", kind, id] as const,
     staffSearch: (query: string) => ["gm", "staff-search", query] as const,
     tenantStats: () => ["gm", "tenantStats"] as const,
     org: (orgId: string) => ["gm", "org", orgId] as const,

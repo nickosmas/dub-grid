@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  fetchEmployeeAuditRows,
+  PERSON_ACTIVITY_ACTIONS,
   ACCESS_DEDUPE_WINDOW_MS,
   buildEmployeeActivityRows,
   diffPermissions,
@@ -284,5 +286,40 @@ describe("buildEmployeeActivityRows", () => {
     );
 
     expect(actionsOf(rows)).toEqual(["role.changed", "invitation.sent", "employee.created"]);
+  });
+});
+
+describe("fetchEmployeeAuditRows", () => {
+  function makeClient() {
+    const calls: Array<[string, ...unknown[]]> = [];
+    const chain: Record<string, unknown> = {};
+    for (const op of ["select", "eq", "in", "or", "order", "limit"]) {
+      chain[op] = (...args: unknown[]) => {
+        calls.push([op, ...args]);
+        return op === "limit" ? Promise.resolve({ data: [], error: null }) : chain;
+      };
+    }
+    return { client: { from: () => chain }, calls };
+  }
+  const subject = {
+    id: "emp-1",
+    org_id: "org-1",
+    user_id: "user-1",
+    created_at: null,
+    created_by: null,
+  };
+
+  it("keeps the organization's person-activity actions by default", async () => {
+    const { client, calls } = makeClient();
+    await fetchEmployeeAuditRows(client as never, "org-1", subject, []);
+    expect(calls).toContainEqual(["in", "action", [...PERSON_ACTIVITY_ACTIONS]]);
+    expect(calls).toContainEqual(["eq", "org_id", "org-1"]);
+  });
+
+  it("reads every action when a Gridmaster passes null", async () => {
+    const { client, calls } = makeClient();
+    await fetchEmployeeAuditRows(client as never, "org-1", subject, [], { actions: null });
+    expect(calls.some(([op]) => op === "in")).toBe(false);
+    expect(calls).toContainEqual(["eq", "org_id", "org-1"]);
   });
 });

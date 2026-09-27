@@ -130,6 +130,18 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
       /\bclearLoginLock\s*\(/,
     ],
   },
+  "apps/web/src/app/api/gridmaster/staff/[employeeId]/history/export/route.ts": {
+    policy: "sensitive",
+    assertions: [
+      /\brequireGridmasterSession\s*\([\s\S]*?const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\bloadPersonHistory\s*\(/,
+    ],
+  },
+  "apps/web/src/app/api/gridmaster/users/[userId]/history/export/route.ts": {
+    policy: "sensitive",
+    assertions: [
+      /\brequireGridmasterSession\s*\([\s\S]*?const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\bloadPersonHistory\s*\(/,
+    ],
+  },
   "apps/web/src/app/api/gridmaster/users/[userId]/two-factor-reset/route.ts": {
     policy: "sensitive",
     assertions: [

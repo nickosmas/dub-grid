@@ -7,6 +7,7 @@ import type {
   Organization,
   AssignableOrganizationRole,
   DraftKind,
+  EmployeeActivityEntry,
   GridmasterAccount,
   GridmasterAuditExportResult,
   GridmasterBillingSummary,
@@ -258,6 +259,46 @@ export function fetchGridmasterPersonNotifications(
     `/api/gridmaster/users/${encodeURIComponent(userId)}/notifications`,
     undefined,
     "We couldn't load notifications.",
+  );
+}
+
+export interface GridmasterPersonHistory {
+  entries: EmployeeActivityEntry[];
+  truncated: boolean;
+}
+
+function personHistoryPath(target: GridmasterPersonTarget): string {
+  return target.kind === "user"
+    ? `/api/gridmaster/users/${encodeURIComponent(target.userId)}/history`
+    : `/api/gridmaster/staff/${encodeURIComponent(target.employeeId)}/history`;
+}
+
+export function fetchGridmasterPersonHistory(
+  target: GridmasterPersonTarget,
+): Promise<GridmasterPersonHistory> {
+  return requestGridmasterJson(
+    personHistoryPath(target),
+    undefined,
+    "We couldn't load this history.",
+  );
+}
+
+export interface GridmasterPersonHistoryExport extends GridmasterPersonHistory {
+  exportedAt: string;
+  rowCount: number;
+}
+
+export function exportGridmasterPersonHistory(
+  target: GridmasterPersonTarget,
+  accessToken?: string,
+): Promise<GridmasterPersonHistoryExport> {
+  return requestGridmasterJson(
+    `${personHistoryPath(target)}/export`,
+    {
+      method: "POST",
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    },
+    "We couldn't export this history.",
   );
 }
 

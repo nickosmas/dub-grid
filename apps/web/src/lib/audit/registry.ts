@@ -1020,6 +1020,28 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     },
     suppressKeys: ["justification"],
   },
+  // Read-time rows for the Gridmaster person history (43e): one per session
+  // from impersonation_sessions, carrying what the started and ended rows say.
+  "impersonation.session": {
+    audience: "platform",
+    category: "impersonation",
+    severity: "warning",
+    headline: (d, ctx) => {
+      const target = who(d, ctx, "this person");
+      const minutes = d.number("durationMinutes");
+      const reason = d.text("justification");
+      const length =
+        minutes === null ? " (still going)" : ` for ${minutes} minute${minutes === 1 ? "" : "s"}`;
+      return `Viewed the app as ${target}${length}${reason ? `: ${reason}` : ""}`;
+    },
+    suppressKeys: ["justification", "durationMinutes"],
+  },
+  "schedule.editor_session_ended": {
+    category: "schedule",
+    severity: "update",
+    headline: (d, ctx) =>
+      `Another editor ended ${who(d, ctx, "this person")}'s schedule editing session`,
+  },
   "impersonation.ended": {
     audience: "platform",
     category: "impersonation",
