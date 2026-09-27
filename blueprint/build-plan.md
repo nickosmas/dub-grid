@@ -684,7 +684,7 @@
         types, in `@dubgrid/contracts` and `@dubgrid/mobile-api-core`, with
         the same published and draft filtering as web. The existing
         `schedule_notes` realtime invalidation then refreshes real data.
-  - [ ] 42c. **Mobile indicator display** - the Schedule tab, shift detail,
+  - [x] 42c. **Mobile indicator display** - the Schedule tab, shift detail,
         and the Home schedule card show indicators, and a
         `schedule_note_published` alert opens the person's own shift rather
         than the team schedule.

@@ -1,8 +1,7 @@
 # Feature: Mobile indicator display
 
 **From build-plan:** feature 42c
-**Status:** in progress (parked; another session's fix holds
-`current-feature.md`)
+**Status:** verified
 
 ## Goal
 
@@ -177,3 +176,14 @@ focusAreaId?)` that filters by focus area and removes duplicates by
   metrics, `fit` rules for text, never `adjustsFontSizeToFit`, pills never
   wrap; at a raised text scale, stack rather than wrap.
 - No em dashes.
+
+## Verification
+
+- Every 42c push to `dev` (bd0e4d0e through c10aa79d) passed the pre-push
+  gate: `npm run type-check` and the full web and mobile suites.
+- An independent review found no P0 or P1; its three P2s and the concrete
+  P3s were repaired in bd0e4d0e.
+- iOS simulator, local stack, Calm Haven, 2026-09-27: the Schedule tab row,
+  the Home pill's stacked-notes icon, the hero card's three matched icons
+  with "Readings, Shower", "Your Week", and shift detail's "Schedule notes"
+  row with the sticky note in its tile.
