@@ -136,6 +136,7 @@ import {
   sortScheduleEntries,
   type AvailableShiftFeedItem,
   type FeaturedMeScheduleSegment,
+  type MeScheduleSegmentItem,
   type MobileScheduleMonthDay,
   type MobileScheduleWeekDay,
   type WeeklyHoursSummary,
@@ -2477,6 +2478,19 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
   );
 }
 
+/**
+ * A personal schedule item's notes: a half of a double shift lists its own
+ * focus area's (and those with none), a single shift all of them. A shift
+ * removed in the last publish is never an item, so it shows none.
+ */
+function getMeItemScheduleNotes(item: MeScheduleSegmentItem) {
+  const isSplit = getScheduleEntrySegments(item.entry).length > 1;
+  return scheduleNotesForRow(
+    item.entry.indicators,
+    isSplit && typeof item.segment.focusAreaId === "number" ? item.segment.focusAreaId : undefined,
+  );
+}
+
 // The first-run tour renders this card with sample data
 // (`onboarding/components/previews`), so it is exported.
 export function MeHeroCard({
@@ -2658,6 +2672,7 @@ export function MeHeroCard({
           ) : null}
         </View>
       ) : null}
+      <ScheduleNoteLabels inverse notes={getMeItemScheduleNotes(featuredItem)} />
       <MeHeroShiftmates entries={shiftmates} />
       {heroSplitSegments.segments.length > 0 ? (
         <SplitShiftSegmentList
@@ -2926,6 +2941,7 @@ function UpcomingShiftsSection({
                                   </Text>
                                 </View>
                               ) : null}
+                              <ScheduleNoteLabels notes={getMeItemScheduleNotes(item)} />
                               <PreviousShiftRow change={change} />
                             </View>
                           </PressableRow>

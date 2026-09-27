@@ -563,27 +563,75 @@ describe("ScheduleScreen", () => {
     expect(screen.queryByText("This Week's Hours")).not.toBeInTheDocument();
   });
 
-  it("does not surface published schedule indicators in the Me week list", () => {
+  it("spells out schedule notes on the hero and in Your Week", () => {
     meScheduleEntries = [
       createScheduleEntry({
         indicators: [
-          { id: 1, name: "Training" },
-          { id: 2, name: "Float" },
+          {
+            indicatorTypeId: 1,
+            focusAreaId: null,
+            name: "Training",
+            color: "#378ADD",
+            state: "published",
+          },
         ],
       }),
       createScheduleEntry({
         date: "2026-04-17",
-        indicators: [{ id: 3, name: "New hire" }],
+        indicators: [
+          {
+            indicatorTypeId: 3,
+            focusAreaId: null,
+            name: "New hire",
+            color: "#1D9E75",
+            state: "draft_added",
+          },
+        ],
       }),
     ];
 
     render(<HomeScheduleScreen />);
 
-    expect(screen.queryByText(/Assignment:/)).not.toBeInTheDocument();
-    expect(screen.queryByText("Training")).not.toBeInTheDocument();
-    expect(screen.queryByText("Float")).not.toBeInTheDocument();
-    expect(screen.queryByText("New hire")).not.toBeInTheDocument();
-    expect(screen.queryByText(/Indicators:/)).not.toBeInTheDocument();
+    expect(within(screen.getByTestId("me-hero-card")).getByLabelText("Training")).toHaveTextContent(
+      "Training",
+    );
+    expect(screen.getByLabelText("New hire, added, not published")).toHaveTextContent("New hire");
+    expect(screen.queryByText(/Indicators/)).not.toBeInTheDocument();
+  });
+
+  it("shows no schedule notes on a removed shift", () => {
+    meScheduleEntries = [
+      createScheduleEntry({
+        date: "2026-04-17",
+        indicators: [
+          {
+            indicatorTypeId: 2,
+            focusAreaId: null,
+            name: "Float",
+            color: "#E24B4A",
+            state: "published",
+          },
+        ],
+        change: {
+          kind: "deleted",
+          previousPresentation: {
+            label: "D",
+            shiftName: "Day Shift",
+            focusAreaId: 2,
+            focusAreaName: "Skilled Nursing",
+            displayFocusAreaName: "Skilled Nursing",
+            startTime: "07:00:00",
+            endTime: "15:00:00",
+            segments: [],
+          },
+        },
+      }),
+      createScheduleEntry(),
+    ];
+
+    render(<HomeScheduleScreen />);
+
+    expect(screen.queryByLabelText("Float")).toBeNull();
   });
 
   it("shows only the no-schedule state when nothing is scheduled this week", () => {

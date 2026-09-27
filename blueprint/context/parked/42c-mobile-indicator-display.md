@@ -78,7 +78,7 @@ focusAreaId?)` that filters by focus area and removes duplicates by
       _Done when:_ a screen test finds a person's schedule note by its name
       on the all tab and on a matching focus-area tab, not on another tab, and
       the old "does not surface indicators" test is replaced.
-- [ ] **Step 3 - my schedule** - the hero card and "Your Week" rows list the
+- [x] **Step 3 - my schedule** - the hero card and "Your Week" rows list the
       shift's schedule notes by name, per half for a double shift. _Done when:_ screen tests find the indicator on
       the hero and in the week list, and a deleted (previous-only) entry shows
       none.
