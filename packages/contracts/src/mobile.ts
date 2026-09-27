@@ -568,7 +568,9 @@ export const mobileScheduleIndicatorSchema = z.object({
   focusAreaId: z.number().int().nullable(),
   name: z.string().min(1),
   color: z.string().min(1),
-  state: z.enum(["published", "draft_added", "draft_removed"]),
+  // A state an older build does not know reads as published, so a new server
+  // value cannot fail that build's whole schedule response.
+  state: z.enum(["published", "draft_added", "draft_removed"]).catch("published"),
 });
 
 export const mobileScheduleEntrySchema = z.object({

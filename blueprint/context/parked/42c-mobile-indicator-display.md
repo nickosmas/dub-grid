@@ -1,7 +1,7 @@
 # Feature: Mobile indicator display
 
 **From build-plan:** feature 42c
-**Status:** spec - awaiting review (parked; another session's fix holds
+**Status:** in progress (parked; another session's fix holds
 `current-feature.md`)
 
 ## Goal
@@ -18,9 +18,7 @@ instead of the team schedule.
   Mobile has no schedule grid, so every surface with room writes each
   schedule note's name: a `ScheduleNoteLabels` component shows each name as a
   small colour swatch followed by the word, in caption text, wrapping as
-  needed. The bare `ScheduleNoteDots` form (a dot per note, spoken as its
-  name) is only for the one place with no room, the Home card's day header.
-  A pure helper chooses which notes a row shows. An editor's draft reads
+  needed. No mobile surface uses bare dots. A pure helper chooses which notes a row shows. An editor's draft reads
   "(added, not published)" or "(removed, not published)" after the name; a
   draft addition's swatch is faded and a draft removal's is a hollow ring.
 - **Schedule tab (team).** Each person's row lists their schedule notes by
@@ -35,9 +33,9 @@ instead of the team schedule.
   note's name, with the draft wording for an editor. It shows nothing when
   there are none. A double shift lists each half's notes under that half, and
   notes with no focus area under "For the whole day".
-- **Home schedule card.** Each day's header shows that day's schedule notes
-  as dots, the only place with no room for words, keeping the card's fixed
-  pill height; tapping the day opens shift detail, where they are spelled out.
+- **Home schedule card.** Each day spells out its schedule notes by name
+  on a line under the day's pills (the owner chose words here too,
+  2026-09-27); the card's pills keep their fixed height.
 - **Alert destination.** On mobile, a `schedule_note_published` alert opens
   `/shift/[employeeId]/[date]` for the signed-in person's own linked
   employee, falling back to today's route when there is no linked employee or
@@ -57,8 +55,7 @@ instead of the team schedule.
 ## Design decisions
 
 - **Words over dots.** The owner's rule (2026-09-27): outside a grid, spell
-  the schedule note out; a dot only where there is no space. On mobile that
-  leaves the Home card's day header as the only dot.
+  the schedule note out; a dot only where there is no space. Mobile has no grid, so every mobile surface spells notes out; web's grid and month popover keep dots.
 - **Customer term.** Clients see "Schedule notes", never "indicators".
 - **Draft states.** Mobile has no dashed styling and its badges are never
   outlined, so a draft addition's swatch is faded and a draft removal's is a
@@ -68,8 +65,8 @@ instead of the team schedule.
 
 ## Build steps
 
-- [ ] **Step 1 - the labels, the dots and their rules** - `ScheduleNoteLabels`
-      and `ScheduleNoteDots` (`apps/mobile/src/shared/components`), a pure
+- [x] **Step 1 - the labels and their rules** - `ScheduleNoteLabels`
+      (`apps/mobile/src/shared/components`), a pure
       swatch-style helper per state, a pure label helper, a pure `indicatorsForRow(indicators,
 focusAreaId?)` that filters by focus area and removes duplicates by
       indicator and state, and a lenient `state` in the contract. _Done
@@ -89,9 +86,9 @@ focusAreaId?)` that filters by focus area and removes duplicates by
       for single and split shifts. _Done when:_ tests show the row with each
       name, the draft wording for a draft, no row without indicators, and the
       old negative test replaced.
-- [ ] **Step 5 - Home schedule card** - day headers show the day's dots.
-      _Done when:_ a card test finds a day's indicator by spoken name and the
-      fixture without indicators still renders.
+- [ ] **Step 5 - Home schedule card** - each day lists its schedule notes by
+      name under its pills. _Done when:_ a card test finds a day's note by
+      name and the fixture without notes still renders.
 - [ ] **Step 6 - alert opens my shift** - a helper resolves a notification to
       the native route, sending `schedule_note_published` to the linked
       employee's shift for its date, used by the alerts list and alert detail.
@@ -102,8 +99,7 @@ focusAreaId?)` that filters by focus area and removes duplicates by
 
 ## Files / areas
 
-- `apps/mobile/src/shared/components/ScheduleNoteLabels.tsx` and
-  `ScheduleNoteDots.tsx` (new) and a pure
+- `apps/mobile/src/shared/components/ScheduleNoteLabels.tsx` (new) and a pure
   helper in `apps/mobile/src/features/schedule/lib/`.
 - `packages/contracts/src/mobile.ts` (lenient state).
 - `ScheduleScreen.tsx`, `ShiftDetailScreen.tsx`, `MyScheduleCard.tsx` and
@@ -116,7 +112,7 @@ focusAreaId?)` that filters by focus area and removes duplicates by
 - No API change beyond the lenient parse: 42b's `indicators` and
   `indicatorTypes` are the data.
 - `indicatorsForRow(indicators, focusAreaId?)` returns
-  `MobileScheduleIndicator[]`; `ScheduleNoteLabels` and `ScheduleNoteDots` take that list.
+  `MobileScheduleIndicator[]`; `ScheduleNoteLabels` takes that list.
 
 ## Testing
 
@@ -135,7 +131,7 @@ focusAreaId?)` that filters by focus area and removes duplicates by
   the indicator is already gone; that is the day the change concerns.
 - The alert's date comes from its metadata, or failing that from its link;
   the shift opens with a one-day range, as the Home card's tap does.
-- "Your Week" titles do not wrap, so the dots sit on their own line in that
+- "Your Week" titles do not wrap, so the notes sit on their own line in that
   row's copy rather than beside the title.
 - An entry from swap options or shift requests carries an empty list meaning
   "not looked up"; shift detail keeps the viewer's own `/me/schedule` entry

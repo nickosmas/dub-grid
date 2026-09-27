@@ -70,10 +70,14 @@ describe("mobile schedule indicators", () => {
     expect(parsed.indicators).toHaveLength(2);
   });
 
-  it("refuses an indicator with an empty colour or an unknown state", () => {
+  it("refuses an indicator with an empty colour", () => {
     expect(mobileScheduleIndicatorSchema.safeParse({ ...float, color: "" }).success).toBe(false);
-    expect(mobileScheduleIndicatorSchema.safeParse({ ...float, state: "draft" }).success).toBe(
-      false,
+  });
+
+  // 42c: an older build must survive a state it does not know yet.
+  it("reads an unknown state as published", () => {
+    expect(mobileScheduleIndicatorSchema.parse({ ...float, state: "pending_review" }).state).toBe(
+      "published",
     );
   });
 
