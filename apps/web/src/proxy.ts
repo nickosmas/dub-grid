@@ -750,7 +750,9 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
+  // sitemap.xml is named rather than folded into the extension list: a blanket
+  // .xml exemption would take any future .xml route out of the auth check too.
   matcher: [
-    "/((?!_next|favicon\\.ico|api|monitoring|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|css|js|woff2?|ttf|eot|txt)$).*)",
+    "/((?!_next|favicon\\.ico|sitemap\\.xml$|api|monitoring|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|css|js|woff2?|ttf|eot|txt)$).*)",
   ],
 };
