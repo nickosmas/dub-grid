@@ -68,6 +68,12 @@ instead of the team schedule.
   read-only list and both print legends (Lucide `StickyNote`, faded for a
   draft addition and dashed for a removal). The week and two-week grid cells
   and the printed grid's cells keep their coloured dots, for lack of room.
+- **One leading icon where a row already has one (owner, 2026-09-27).** The
+  hero card lists its notes like its focus-area row: one 18pt sticky note,
+  then the names at the row's title size. Shift detail's "Schedule notes" row
+  shows the sticky note in its icon tile (not a bookmark) and the names at
+  the row's body size. Neither repeats the icon before each name; the words
+  carry a draft's state.
 - **Customer term.** Clients see "Schedule notes", never "indicators".
 - **Draft states.** Mobile has no dashed styling and its badges are never
   outlined, so the glyph carries the state (a plus or a minus) beside the

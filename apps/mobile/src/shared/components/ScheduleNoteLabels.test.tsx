@@ -42,6 +42,26 @@ describe("ScheduleNoteLabels", () => {
     ).toBeInTheDocument();
   });
 
+  it("puts a sticky note before each name unless the row already leads with one", () => {
+    const note = {
+      indicatorTypeId: 1,
+      focusAreaId: null,
+      name: "Float",
+      color: "#E24B4A",
+      state: "draft_added" as const,
+    };
+    const { container, rerender } = render(<ScheduleNoteLabels notes={[note]} />);
+    expect(
+      Array.from(container.querySelectorAll("[data-icon-name]")).map((icon) =>
+        icon.getAttribute("data-icon-name"),
+      ),
+    ).toEqual(["note-plus-outline"]);
+
+    rerender(<ScheduleNoteLabels notes={[note]} showIcons={false} />);
+    expect(container.querySelector("[data-icon-name]")).toBeNull();
+    expect(screen.getByLabelText("Float, added, not published")).toBeInTheDocument();
+  });
+
   it("renders nothing without notes", () => {
     const { container } = render(<ScheduleNoteLabels notes={[]} />);
     expect(container).toBeEmptyDOMElement();

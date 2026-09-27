@@ -1,3 +1,4 @@
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, View, useWindowDimensions } from "react-native";
@@ -1694,9 +1695,12 @@ type DetailIconTone = "blue" | "green";
  */
 function DetailIconTile({
   iconName,
+  materialIconName,
   tone,
 }: {
-  iconName: keyof typeof Ionicons.glyphMap;
+  iconName?: keyof typeof Ionicons.glyphMap;
+  /** A glyph Ionicons lacks, such as the schedule notes' sticky note. */
+  materialIconName?: keyof typeof MaterialCommunityIcons.glyphMap;
   tone: DetailIconTone;
 }) {
   const mobileColors = useMobileColors();
@@ -1710,7 +1714,15 @@ function DetailIconTile({
         tone === "blue" ? styles.detailIconTileBlue : styles.detailIconTileGreen,
       ]}
     >
-      <Ionicons color={mobileIconToneColor(tone, isDark)} name={iconName} size={18} />
+      {materialIconName ? (
+        <MaterialCommunityIcons
+          color={mobileIconToneColor(tone, isDark)}
+          name={materialIconName}
+          size={18}
+        />
+      ) : (
+        <Ionicons color={mobileIconToneColor(tone, isDark)} name={iconName} size={18} />
+      )}
     </View>
   );
 }
@@ -1729,7 +1741,7 @@ function ScheduleNotesDetailRow({ entry }: { entry: MobileScheduleEntry }) {
 
   return (
     <View style={styles.detailInfoRow} testID="shift-detail-schedule-notes">
-      <DetailIconTile iconName="bookmark-outline" tone="blue" />
+      <DetailIconTile materialIconName="note-outline" tone="blue" />
       <View style={styles.detailInfoCopy}>
         <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.detailInfoLabel}>
           Schedule notes
@@ -1742,7 +1754,7 @@ function ScheduleNotesDetailRow({ entry }: { entry: MobileScheduleEntry }) {
                   {group.title}
                 </Text>
               ) : null}
-              <ScheduleNoteLabels notes={group.notes} />
+              <ScheduleNoteLabels notes={group.notes} showIcons={false} textVariant="body" />
             </View>
           ))}
         </View>

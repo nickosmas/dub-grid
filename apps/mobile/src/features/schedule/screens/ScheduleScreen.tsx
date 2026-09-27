@@ -1,4 +1,5 @@
 import { ActionButtons } from "../../../shared/components/ActionButtons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { ScheduleNoteLabels } from "../../../shared/components/ScheduleNoteLabels";
 import { scheduleNotesForRow, scheduleNotesForSegment } from "../lib/scheduleNotes";
 import {
@@ -2550,6 +2551,10 @@ export function MeHeroCard({
       </View>
     );
   }
+  // The hero stands for the whole day, halves included, so it lists every note.
+  const heroNotes = isDeletedScheduleHistory(featuredItem.entry)
+    ? []
+    : scheduleNotesForRow(featuredItem.entry.indicators);
 
   const badgeLabel =
     status === "active"
@@ -2688,15 +2693,25 @@ export function MeHeroCard({
           ) : null}
         </View>
       ) : null}
-      {/* The hero stands for the whole day, halves included, so it lists every note. */}
-      <ScheduleNoteLabels
-        inverse
-        notes={
-          isDeletedScheduleHistory(featuredItem.entry)
-            ? []
-            : scheduleNotesForRow(featuredItem.entry.indicators)
-        }
-      />
+      {heroNotes.length > 0 ? (
+        <View style={styles.meHeroNotesRow}>
+          <MaterialCommunityIcons
+            accessibilityElementsHidden
+            color="rgba(255, 255, 255, 0.82)"
+            importantForAccessibility="no-hide-descendants"
+            name="note-outline"
+            size={18}
+            style={styles.meHeroNotesIcon}
+          />
+          <ScheduleNoteLabels
+            inverse
+            notes={heroNotes}
+            showIcons={false}
+            style={styles.meHeroNotesList}
+            textVariant="rowTitle"
+          />
+        </View>
+      ) : null}
       <MeHeroShiftmates entries={shiftmates} />
       {heroSplitSegments.segments.length > 0 ? (
         <SplitShiftSegmentList

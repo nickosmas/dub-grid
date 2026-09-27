@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import type { MobileScheduleIndicator } from "@dubgrid/contracts";
-import { AppText } from "./AppText";
+import { AppText, type TextVariant } from "./AppText";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import { mobileSpace, mobileText } from "../theme/tokens";
 import {
@@ -18,16 +18,21 @@ const ICON_OFFSET = Math.max(((mobileText.caption.lineHeight ?? ICON_SIZE) - ICO
 
 /**
  * A shift's schedule notes, spelled out: each name after a sticky-note icon,
- * wrapping as needed. `inverse` sits on a filled card (the hero). Renders
- * nothing without notes.
+ * wrapping as needed. `inverse` sits on a filled card (the hero). A row that
+ * already leads with one sticky-note icon turns the per-name icons off and
+ * sets the text size to match its own. Renders nothing without notes.
  */
 export function ScheduleNoteLabels({
   notes,
   inverse = false,
+  showIcons = true,
+  textVariant = "caption",
   style,
 }: {
   notes: readonly MobileScheduleIndicator[];
   inverse?: boolean;
+  showIcons?: boolean;
+  textVariant?: Extract<TextVariant, "caption" | "body" | "rowTitle">;
   style?: StyleProp<ViewStyle>;
 }) {
   const mobileColors = useMobileColors();
@@ -51,18 +56,24 @@ export function ScheduleNoteLabels({
             style={styles.item}
             accessibilityLabel={scheduleNoteLabel(note)}
           >
-            <MaterialCommunityIcons
-              accessibilityElementsHidden
-              color={iconColor}
-              importantForAccessibility="no-hide-descendants"
-              name={scheduleNoteIconName(note.state)}
-              size={ICON_SIZE}
-              style={styles.icon}
-            />
-            <AppText variant="caption" tone={inverse ? "inverse" : "secondary"} style={styles.name}>
+            {showIcons ? (
+              <MaterialCommunityIcons
+                accessibilityElementsHidden
+                color={iconColor}
+                importantForAccessibility="no-hide-descendants"
+                name={scheduleNoteIconName(note.state)}
+                size={ICON_SIZE}
+                style={styles.icon}
+              />
+            ) : null}
+            <AppText
+              variant={textVariant}
+              tone={inverse ? "inverse" : "secondary"}
+              style={styles.name}
+            >
               {note.name}
               {words ? (
-                <AppText variant="caption" tone={inverse ? "inverse" : "muted"}>
+                <AppText variant={textVariant} tone={inverse ? "inverse" : "muted"}>
                   {` (${words})`}
                 </AppText>
               ) : null}
