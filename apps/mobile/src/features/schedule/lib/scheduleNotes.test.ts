@@ -5,7 +5,6 @@ import {
   scheduleNotesForSegment,
   scheduleNotesSpokenLabel,
   scheduleNoteLabel,
-  scheduleNoteIconName,
   scheduleNotesForRow,
 } from "./scheduleNotes";
 
@@ -50,14 +49,6 @@ describe("scheduleNoteLabel", () => {
     expect(scheduleNoteLabel(note(1, null, "draft_removed"))).toBe(
       "Note 1, removed, not published",
     );
-  });
-});
-
-describe("scheduleNoteIconName", () => {
-  it("marks a draft addition and removal on the glyph itself", () => {
-    expect(scheduleNoteIconName("published")).toBe("note-outline");
-    expect(scheduleNoteIconName("draft_added")).toBe("note-plus-outline");
-    expect(scheduleNoteIconName("draft_removed")).toBe("note-minus-outline");
   });
 });
 

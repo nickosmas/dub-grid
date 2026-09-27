@@ -1754,7 +1754,7 @@ function ScheduleNotesDetailRow({ entry }: { entry: MobileScheduleEntry }) {
                   {group.title}
                 </Text>
               ) : null}
-              <ScheduleNoteLabels notes={group.notes} showIcons={false} textVariant="body" />
+              <ScheduleNoteLabels notes={group.notes} showIcon={false} textVariant="body" />
             </View>
           ))}
         </View>

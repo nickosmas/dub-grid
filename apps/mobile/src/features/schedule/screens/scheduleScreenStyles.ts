@@ -321,16 +321,16 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     meHeroAreaRow: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 8,
+      gap: mobileSpace.sm,
     },
     meHeroNotesRow: {
       flexDirection: "row",
       alignItems: "flex-start",
-      gap: 8,
+      gap: mobileSpace.sm,
     },
-    // Centres the icon on the names' first line, as the focus-area row does.
+    // Centres the 20pt icon on the names' first line, as the focus-area row does.
     meHeroNotesIcon: {
-      marginTop: Math.max(((mobileText.rowTitle.lineHeight ?? 18) - 18) / 2, 0),
+      marginTop: Math.max(((mobileText.rowTitle.lineHeight ?? 20) - 20) / 2, 0),
     },
     meHeroNotesList: {
       flex: 1,

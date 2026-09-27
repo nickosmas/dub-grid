@@ -40,18 +40,6 @@ export function scheduleNoteLabel(note: MobileScheduleIndicator): string {
   return words ? `${note.name}, ${words}` : note.name;
 }
 
-/**
- * The sticky-note glyph beside a note's name. It is drawn in the text colour,
- * never the note's own, so the glyph itself carries an editor's draft state.
- */
-export function scheduleNoteIconName(
-  state: MobileScheduleIndicator["state"],
-): "note-outline" | "note-plus-outline" | "note-minus-outline" {
-  if (state === "draft_added") return "note-plus-outline";
-  if (state === "draft_removed") return "note-minus-outline";
-  return "note-outline";
-}
-
 export interface ScheduleNoteGroup {
   key: string;
   /** The half a group belongs to; null for a single shift's one group. */

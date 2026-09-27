@@ -592,10 +592,12 @@ describe("ScheduleScreen", () => {
 
     render(<HomeScheduleScreen />);
 
-    expect(within(screen.getByTestId("me-hero-card")).getByLabelText("Training")).toHaveTextContent(
-      "Training",
-    );
-    expect(screen.getByLabelText("New hire, added, not published")).toHaveTextContent("New hire");
+    expect(
+      within(screen.getByTestId("me-hero-card")).getByLabelText("Schedule notes: Training"),
+    ).toHaveTextContent("Training");
+    expect(
+      screen.getByLabelText("Schedule notes: New hire, added, not published"),
+    ).toHaveTextContent("New hire (added, not published)");
     expect(screen.queryByText(/Indicators/)).not.toBeInTheDocument();
   });
 
@@ -982,7 +984,7 @@ describe("ScheduleScreen", () => {
 
     render(<TeamScheduleScreen />);
 
-    expect(screen.getByLabelText("Float")).toHaveTextContent("Float");
+    expect(screen.getByLabelText("Schedule notes: Float")).toHaveTextContent("Float");
   });
 
   it("gives each half of a double shift its own focus area's notes", () => {
@@ -1050,7 +1052,7 @@ describe("ScheduleScreen", () => {
     const eveningHalf = screen.getByLabelText("Schedule notes: Training").closest("[role=button]");
     expect(dayHalf).toHaveTextContent("Nurse");
     expect(eveningHalf).toHaveTextContent("Lead");
-    expect(screen.getAllByLabelText("New hire")).toHaveLength(1);
+    expect(screen.getAllByText(/New hire/)).toHaveLength(1);
   });
 
   it("shows mentored assignments with a full label on Home", () => {

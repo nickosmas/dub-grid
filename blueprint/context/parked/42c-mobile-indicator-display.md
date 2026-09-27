@@ -20,7 +20,7 @@ instead of the team schedule.
   sticky-note icon followed by the word, in caption text, wrapping as
   needed. No mobile surface uses bare dots. A pure helper chooses which notes a row shows. An editor's draft reads
   "(added, not published)" or "(removed, not published)" after the name; a
-  draft addition's icon carries a plus and a draft removal's a minus.
+  list's single icon does not change; the words carry the state.
 - **Schedule tab (team).** Each person's row lists their schedule notes by
   name on a caption line under the name and time. With a focus-area tab
   selected, a row shows the notes for that focus area and those with no focus
@@ -62,22 +62,22 @@ instead of the team schedule.
 - **Sticky-note icon, not a dot (owner, 2026-09-27).** A schedule note is
   drawn as a sticky-note icon wherever there is room, in the surrounding text
   colour, never the note's own colour (the owner's call): every mobile
-  surface (MaterialCommunityIcons `note-outline`, with `note-plus-outline` and
-  `note-minus-outline` for an editor's draft addition and removal) and, on
+  surface (MaterialCommunityIcons `note-outline`) and, on
   web, the Month popover, the phone-width day view, the shift slideover's
   read-only list and both print legends (Lucide `StickyNote`, faded for a
   draft addition and dashed for a removal). The week and two-week grid cells
   and the printed grid's cells keep their coloured dots, for lack of room.
-- **One leading icon where a row already has one (owner, 2026-09-27).** The
-  hero card lists its notes like its focus-area row: one 18pt sticky note,
-  then the names at the row's title size. Shift detail's "Schedule notes" row
-  shows the sticky note in its icon tile (not a bookmark) and the names at
-  the row's body size. Neither repeats the icon before each name; the words
-  carry a draft's state.
+- **One icon, then a comma-separated list (owner, 2026-09-27).** Every
+  mobile note list is one sticky-note icon followed by the names separated by
+  commas ("Float, Training (added, not published)"); no icon repeats per name,
+  and the words carry a draft's state. The hero lists its notes like its
+  focus-area row, and its three leading icons (focus area, time, notes) share
+  one 20pt size so the rows line up. Shift detail's "Schedule notes" row shows
+  the sticky note in its icon tile (not a bookmark) and the names at the row's
+  body size.
 - **Customer term.** Clients see "Schedule notes", never "indicators".
 - **Draft states.** Mobile has no dashed styling and its badges are never
-  outlined, so the glyph carries the state (a plus or a minus) beside the
-  words.
+  outlined, so the words carry the state.
 - **Colours.** Outside the grid a note shows no colour: the icon takes the
   text colour (muted, or white on the hero). Only grid dots use the note's
   colour.

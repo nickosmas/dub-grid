@@ -495,8 +495,9 @@ describe("ShiftDetailScreen", () => {
     expect(screen.queryByText("Indicators")).not.toBeInTheDocument();
     const notes = screen.getByTestId("shift-detail-schedule-notes");
     expect(within(notes).getByText("Schedule notes")).toBeInTheDocument();
-    expect(within(notes).getByLabelText("Training")).toHaveTextContent("Training");
-    expect(within(notes).getByLabelText("Float, added, not published")).toHaveTextContent("Float");
+    expect(
+      within(notes).getByLabelText("Schedule notes: Training; Float, added, not published"),
+    ).toHaveTextContent("Training, Float (added, not published)");
     expect(within(notes).queryByText("For the whole day")).toBeNull();
     expect(screen.getByText("Working with")).toBeInTheDocument();
     expect(screen.getByText("Jordan Lee")).toBeInTheDocument();
@@ -599,7 +600,9 @@ describe("ShiftDetailScreen", () => {
     expect(notes).toHaveTextContent(
       "Schedule notesICUTrainingRehabFloatFor the whole dayNew hire (removed, not published)",
     );
-    expect(within(notes).getByLabelText("New hire, removed, not published")).toBeInTheDocument();
+    expect(
+      within(notes).getByLabelText("Schedule notes: New hire, removed, not published"),
+    ).toBeInTheDocument();
   });
 
   it("shows no schedule notes row for a shift without notes", () => {

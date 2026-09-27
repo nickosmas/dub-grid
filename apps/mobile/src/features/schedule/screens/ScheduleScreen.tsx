@@ -2508,6 +2508,10 @@ function getSegmentScheduleNotes(
   return scheduleNotesForSegment(entry.indicators, segments, Math.max(index, 0));
 }
 
+// Every context row on the hero (focus area, time, notes) leads with one
+// icon, all one size so the rows' text starts in one column.
+const HERO_ROW_ICON_SIZE = 20;
+
 // The first-run tour renders this card with sample data
 // (`onboarding/components/previews`), so it is exported.
 export function MeHeroCard({
@@ -2666,7 +2670,11 @@ export function MeHeroCard({
         <View style={styles.meHeroContextGroup}>
           {focusAreaName ? (
             <View style={styles.meHeroAreaRow}>
-              <Ionicons color="rgba(255, 255, 255, 0.82)" name="location-outline" size={18} />
+              <Ionicons
+                color="rgba(255, 255, 255, 0.82)"
+                name="location-outline"
+                size={HERO_ROW_ICON_SIZE}
+              />
               <Text fit="compact" style={styles.meHeroAreaLabel}>
                 {focusAreaName}
               </Text>
@@ -2675,7 +2683,11 @@ export function MeHeroCard({
           {timeRange ? (
             <View style={styles.meHeroScheduleRow}>
               <View style={styles.meHeroTimeRow}>
-                <Ionicons color="rgba(255, 255, 255, 0.82)" name="time-outline" size={24} />
+                <Ionicons
+                  color="rgba(255, 255, 255, 0.82)"
+                  name="time-outline"
+                  size={HERO_ROW_ICON_SIZE}
+                />
                 <Text style={styles.meHeroTimeText}>{timeRange}</Text>
               </View>
               {timing ? <Text style={styles.meHeroProgressLabel}>{timing.label}</Text> : null}
@@ -2700,13 +2712,13 @@ export function MeHeroCard({
             color="rgba(255, 255, 255, 0.82)"
             importantForAccessibility="no-hide-descendants"
             name="note-outline"
-            size={18}
+            size={HERO_ROW_ICON_SIZE}
             style={styles.meHeroNotesIcon}
           />
           <ScheduleNoteLabels
             inverse
             notes={heroNotes}
-            showIcons={false}
+            showIcon={false}
             style={styles.meHeroNotesList}
             textVariant="rowTitle"
           />
