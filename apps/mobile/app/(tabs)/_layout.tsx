@@ -1,5 +1,8 @@
+import { useEffect, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import type { ErrorBoundaryProps } from "expo-router";
+import type { ParamListBase } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useNavigation, type ErrorBoundaryProps } from "expo-router";
 import { Icon, Label, NativeTabs, VectorIcon } from "expo-router/unstable-native-tabs";
 import { useTabsGate } from "../../src/features/auth/hooks/useTabsGate";
 import { RouteErrorScreen } from "../../src/shared/components/RouteErrorScreen";
@@ -29,6 +32,20 @@ export default function TabsLayout() {
   const gate = useTabsGate();
   const mobileColors = useMobileColors();
   const { resolvedTheme } = useThemeMode();
+  const navigation = useNavigation<NativeStackNavigationProp<ParamListBase>>();
+  const [, setEntranceEnded] = useState(false);
+
+  // Created while this screen slides in after a sign-in, the iOS tab bar lays
+  // its labels out truncated ("Sc…") and keeps them. One render after the
+  // entrance hands it `labelStyle` afresh, which lays them out again; bootstrap
+  // arriving late used to supply that render, and after sign-in it is warm.
+  useEffect(
+    () =>
+      navigation.addListener("transitionEnd", (event) => {
+        if (!event.data.closing) setEntranceEnded(true);
+      }),
+    [navigation],
+  );
 
   if (gate.kind === "blocked") {
     return gate.element;

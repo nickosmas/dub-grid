@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { router, useNavigation } from "expo-router";
 import { useHasSeenOnboarding } from "../src/features/auth/hooks/useHasSeenOnboarding";
+import { useSignInHandoffPending } from "../src/features/auth/lib/sign-in-handoff";
 import LoginScreen from "../src/features/auth/screens/LoginScreen";
 import { useSessionState } from "../src/shared/providers/AuthSessionProvider";
 
@@ -16,6 +17,7 @@ export default function IndexScreen() {
   const needsOnboarding = onboardingQuery.data === false;
   const navigation = useNavigation();
   const hasNavigatedRef = useRef(false);
+  const signInHandoffPending = useSignInHandoffPending();
 
   useEffect(() => {
     if (isLoading || restoreError || onboardingQuery.isLoading || hasNavigatedRef.current) {
@@ -26,6 +28,8 @@ export default function IndexScreen() {
     if (!navigation.isFocused()) return;
 
     if (accessToken) {
+      // A sign-in from the form below navigates once its bootstrap is warm.
+      if (signInHandoffPending) return;
       hasNavigatedRef.current = true;
       router.replace("/(tabs)/home");
       return;
@@ -42,7 +46,15 @@ export default function IndexScreen() {
     needsOnboarding,
     onboardingQuery.isLoading,
     restoreError,
+    signInHandoffPending,
   ]);
+
+  // The same form instance, still showing its pending button, until the
+  // sign-in it is running replaces this route. Painting nothing here left a
+  // blank page behind the navigation.
+  if (accessToken && signInHandoffPending) {
+    return <LoginScreen />;
+  }
 
   // Nothing to paint until the destination is known: the splash is on top, and
   // rendering the login screen early would flash it at a signed-in or first-run

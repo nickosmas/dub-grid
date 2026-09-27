@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule } from "../test/native";
 
@@ -8,6 +8,8 @@ const usePushRegistration = vi.fn();
 const triggerIconMock = vi.fn();
 const stackScreenMock = vi.fn();
 const handleExpiredMobileSession = vi.fn();
+const navigationListeners = new Map<string, (event: { data: { closing: boolean } }) => void>();
+const nativeTabsLabelStyles: unknown[] = [];
 
 // The shared emulation rather than a three-export hand-roll: the tab layout
 // pulls in Button, which pulls in Reanimated, which needs most of the module.
@@ -36,14 +38,28 @@ vi.mock("expo-router", async () => {
   return {
     Redirect: ({ href }: { href: string }) => React.createElement("div", {}, `redirect:${href}`),
     Stack,
+    useNavigation: () => ({
+      addListener: (name: string, listener: (event: { data: { closing: boolean } }) => void) => {
+        navigationListeners.set(name, listener);
+        return () => navigationListeners.delete(name);
+      },
+    }),
   };
 });
 
 vi.mock("expo-router/unstable-native-tabs", async () => {
   const React = await import("react");
 
-  const NativeTabs = ({ children }: { children: React.ReactNode }) =>
-    React.createElement("div", {}, children);
+  const NativeTabs = ({
+    children,
+    labelStyle,
+  }: {
+    children: React.ReactNode;
+    labelStyle?: unknown;
+  }) => {
+    nativeTabsLabelStyles.push(labelStyle);
+    return React.createElement("div", {}, children);
+  };
 
   const Trigger = ({ children }: { children: React.ReactNode }) =>
     React.createElement("div", {}, children);
@@ -191,6 +207,22 @@ describe("TabsLayout", () => {
 
     expect(screen.getByText("Home")).toBeInTheDocument();
     expect(screen.getByText("Schedule")).toBeInTheDocument();
+  });
+
+  // The tab bar lays out truncated labels when created mid-slide after a
+  // sign-in; a render once the entrance ends lays them out again.
+  it("hands the tab bar its label style again once its entrance ends", () => {
+    nativeTabsLabelStyles.length = 0;
+    render(<TabsLayout />);
+    const rendersBefore = nativeTabsLabelStyles.length;
+
+    act(() => navigationListeners.get("transitionEnd")?.({ data: { closing: true } }));
+    expect(nativeTabsLabelStyles).toHaveLength(rendersBefore);
+
+    act(() => navigationListeners.get("transitionEnd")?.({ data: { closing: false } }));
+    expect(nativeTabsLabelStyles).toHaveLength(rendersBefore + 1);
+    expect(nativeTabsLabelStyles.at(-1)).not.toBe(nativeTabsLabelStyles.at(-2));
+    expect(nativeTabsLabelStyles.at(-1)).toEqual(nativeTabsLabelStyles.at(-2));
   });
 
   it("uses SF symbols on iOS and Android vector icon sources for the native tabs", () => {
