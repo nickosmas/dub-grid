@@ -14,24 +14,30 @@ instead of the team schedule.
 
 ## In scope
 
-- **One indicator mark.** A shared `IndicatorDots` component: a small dot per
-  indicator in its own colour, spoken as its name (and, for an editor's
-  draft, "added, not published" or "removed, not published"), with a pure
-  helper that chooses which indicators a row shows. A published indicator is a
-  filled dot; a draft addition is a filled dot at reduced strength; a draft
-  removal is a hollow ring. Dots are chrome, not pills, so they carry no text
-  and never wrap a label.
-- **Schedule tab (team).** Each person's row shows their indicators after
-  their name. With a focus-area tab selected, a row shows the indicators for
-  that focus area and those with no focus area; the all tab shows them all,
-  one per indicator.
-- **My schedule.** The hero card's title row and each "Your Week" row show the
-  shift's indicators (on the hero, dots sit on a white ring for contrast).
+- **Spelled out where there is room; a dot only where there is none.**
+  Mobile has no schedule grid, so every surface with room writes each
+  schedule note's name: a `ScheduleNoteLabels` component shows each name as a
+  small colour swatch followed by the word, in caption text, wrapping as
+  needed. The bare `ScheduleNoteDots` form (a dot per note, spoken as its
+  name) is only for the one place with no room, the Home card's day header.
+  A pure helper chooses which notes a row shows. An editor's draft reads
+  "(added, not published)" or "(removed, not published)" after the name; a
+  draft addition's swatch is faded and a draft removal's is a hollow ring.
+- **Schedule tab (team).** Each person's row lists their schedule notes by
+  name on a caption line under the name and time. With a focus-area tab
+  selected, a row shows the notes for that focus area and those with no focus
+  area; the all tab shows them all, one per note. Each half of a double shift
+  lists its own focus area's notes.
+- **My schedule.** The hero card and each "Your Week" row list the shift's
+  schedule notes by name (white text on the hero); a double shift's halves
+  each list their own.
 - **Shift detail.** A "Schedule notes" row in the detail stack lists each
-  indicator's dot and name, with the draft wording for an editor. It shows
-  nothing when there are none, and it also appears for split shifts.
-- **Home schedule card.** Each day's header shows that day's indicator dots,
-  keeping the card's fixed pill height and the dashboard's no-pill rule.
+  note's name, with the draft wording for an editor. It shows nothing when
+  there are none. A double shift lists each half's notes under that half, and
+  notes with no focus area under "For the whole day".
+- **Home schedule card.** Each day's header shows that day's schedule notes
+  as dots, the only place with no room for words, keeping the card's fixed
+  pill height; tapping the day opens shift detail, where they are spelled out.
 - **Alert destination.** On mobile, a `schedule_note_published` alert opens
   `/shift/[employeeId]/[date]` for the signed-in person's own linked
   employee, falling back to today's route when there is no linked employee or
@@ -48,33 +54,35 @@ instead of the team schedule.
 - The secondary surfaces (42d).
 - Changing the shared alert destination for web.
 
-## Design decisions (for review)
+## Design decisions
 
+- **Words over dots.** The owner's rule (2026-09-27): outside a grid, spell
+  the schedule note out; a dot only where there is no space. On mobile that
+  leaves the Home card's day header as the only dot.
+- **Customer term.** Clients see "Schedule notes", never "indicators".
 - **Draft states.** Mobile has no dashed styling and its badges are never
-  outlined, so a draft addition is a filled dot at reduced opacity and a draft
-  removal a hollow ring; the spoken label and the detail wording carry the
-  state. Web's dashed borders are not copied.
-- **Colours.** The raw indicator colour in both themes, as on web; the
-  pastel dark-mode remapper would dull these saturated marks. A light ring
-  keeps a dark dot visible on dark surfaces.
+  outlined, so a draft addition's swatch is faded and a draft removal's is a
+  hollow ring; the words carry the state.
+- **Colours.** The raw note colour in both themes, as on web; a light ring
+  keeps a dark swatch visible on dark surfaces.
 
 ## Build steps
 
-- [ ] **Step 1 - the mark and its rules** - `IndicatorDots`
-      (`apps/mobile/src/shared/components`), a pure style helper per state, a
-      pure spoken-label helper, a pure `indicatorsForRow(indicators,
+- [ ] **Step 1 - the labels, the dots and their rules** - `ScheduleNoteLabels`
+      and `ScheduleNoteDots` (`apps/mobile/src/shared/components`), a pure
+      swatch-style helper per state, a pure label helper, a pure `indicatorsForRow(indicators,
 focusAreaId?)` that filters by focus area and removes duplicates by
       indicator and state, and a lenient `state` in the contract. _Done
       when:_ tests cover each state's style and label, the focus-area filter
       (matching, null and all), duplicate removal, an empty list rendering
       nothing, and an unknown state parsing as published.
-- [ ] **Step 2 - Schedule tab team rows** - `TeamShiftMemberRow` renders the
-      row's indicators after the name, filtered by the active focus-area tab.
-      _Done when:_ a screen test finds a person's indicator by its spoken name
+- [ ] **Step 2 - Schedule tab team rows** - `TeamShiftMemberRow` lists the
+      row's schedule notes by name, filtered by the active focus-area tab.
+      _Done when:_ a screen test finds a person's schedule note by its name
       on the all tab and on a matching focus-area tab, not on another tab, and
       the old "does not surface indicators" test is replaced.
-- [ ] **Step 3 - my schedule** - the hero title row and "Your Week" rows show
-      the shift's indicators. _Done when:_ screen tests find the indicator on
+- [ ] **Step 3 - my schedule** - the hero card and "Your Week" rows list the
+      shift's schedule notes by name, per half for a double shift. _Done when:_ screen tests find the indicator on
       the hero and in the week list, and a deleted (previous-only) entry shows
       none.
 - [ ] **Step 4 - shift detail** - a "Schedule notes" row in the detail stack,
@@ -94,7 +102,8 @@ focusAreaId?)` that filters by focus area and removes duplicates by
 
 ## Files / areas
 
-- `apps/mobile/src/shared/components/IndicatorDots.tsx` (new) and a pure
+- `apps/mobile/src/shared/components/ScheduleNoteLabels.tsx` and
+  `ScheduleNoteDots.tsx` (new) and a pure
   helper in `apps/mobile/src/features/schedule/lib/`.
 - `packages/contracts/src/mobile.ts` (lenient state).
 - `ScheduleScreen.tsx`, `ShiftDetailScreen.tsx`, `MyScheduleCard.tsx` and
@@ -107,7 +116,7 @@ focusAreaId?)` that filters by focus area and removes duplicates by
 - No API change beyond the lenient parse: 42b's `indicators` and
   `indicatorTypes` are the data.
 - `indicatorsForRow(indicators, focusAreaId?)` returns
-  `MobileScheduleIndicator[]`; `IndicatorDots` takes that list.
+  `MobileScheduleIndicator[]`; `ScheduleNoteLabels` and `ScheduleNoteDots` take that list.
 
 ## Testing
 
