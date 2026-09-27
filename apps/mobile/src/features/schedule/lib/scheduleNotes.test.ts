@@ -126,6 +126,54 @@ describe("scheduleNotesForSegment", () => {
   });
 });
 
+describe("schedule notes on a double shift in one focus area", () => {
+  const day = {
+    focusAreaId: 21,
+    displayFocusAreaName: "Skilled Nursing",
+    shiftName: "Day Shift",
+    shiftId: 34,
+    jobId: 18,
+  } as MobileScheduleEntrySegment;
+  const evening = { ...day, shiftName: "Evening Shift", shiftId: 35 };
+  const onShift = (indicatorTypeId: number, shiftId: number | null): MobileScheduleIndicator => ({
+    ...note(indicatorTypeId, 21),
+    shiftId,
+    jobId: shiftId == null ? null : 18,
+  });
+
+  it("lists each shift's own notes under that shift, and the area's under the area", () => {
+    const groups = scheduleNoteGroups(
+      [onShift(1, 35), onShift(2, 34), onShift(3, null)],
+      [day, evening],
+    );
+
+    expect(groups.map((group) => [group.title, group.notes.map((n) => n.indicatorTypeId)])).toEqual(
+      [
+        ["Day Shift", [2]],
+        ["Skilled Nursing", [3]],
+        ["Evening Shift", [1]],
+      ],
+    );
+  });
+
+  it("gives a note only to its own half", () => {
+    const notes = [onShift(1, 35), onShift(3, null)];
+
+    expect(scheduleNotesForSegment(notes, [day, evening], 0).map((n) => n.indicatorTypeId)).toEqual(
+      [3],
+    );
+    expect(scheduleNotesForSegment(notes, [day, evening], 1).map((n) => n.indicatorTypeId)).toEqual(
+      [1],
+    );
+  });
+
+  it("files a note for a shift the cell no longer has under its focus area", () => {
+    const groups = scheduleNoteGroups([onShift(1, 99)], [day, evening]);
+
+    expect(groups).toEqual([{ key: "area-21", title: "Skilled Nursing", notes: [onShift(1, 99)] }]);
+  });
+});
+
 describe("scheduleNotesSpokenLabel", () => {
   it("reads every note with its draft state", () => {
     expect(

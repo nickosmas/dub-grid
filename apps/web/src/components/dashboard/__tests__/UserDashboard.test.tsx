@@ -1542,6 +1542,8 @@ describe("UserDashboard schedule notes", () => {
       date: dateKey,
       indicatorTypeId,
       focusAreaId: null,
+      shiftId: null,
+      jobId: null,
       status: "published",
       createdBy: null,
       updatedBy: null,

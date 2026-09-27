@@ -113,6 +113,8 @@ interface PendingNoteRow {
   emp_id: string;
   date: string;
   focus_area_id: number | null;
+  shift_id: number | null;
+  job_id: number | null;
   indicator_type_id: number;
   status: string;
   updated_by: string | null;
@@ -139,7 +141,7 @@ export async function fetchPendingNotePublishChanges(input: {
     serviceClient
       .from("schedule_notes")
       .select(
-        "id, emp_id, date, focus_area_id, indicator_type_id, status, updated_by, indicator_types(name, color)",
+        "id, emp_id, date, focus_area_id, shift_id, job_id, indicator_type_id, status, updated_by, indicator_types(name, color)",
       )
       .eq("org_id", input.orgId)
       .gte("date", input.startDate)
@@ -164,6 +166,8 @@ export async function fetchPendingNotePublishChanges(input: {
       type: "note" as const,
       indicatorTypeId: row.indicator_type_id,
       focusAreaId: row.focus_area_id,
+      shiftId: row.shift_id,
+      jobId: row.job_id,
       indicatorName: row.indicator_types?.name ?? "Note",
       indicatorColor: row.indicator_types?.color ?? "#94a3b8",
     },

@@ -25,6 +25,7 @@ import {
   ShiftDisplayMode,
   Employee,
   ScheduleCellInput,
+  ScheduleNoteShift,
   ShiftJobSegment,
 } from "@/types";
 import CustomSelect from "./CustomSelect";
@@ -44,6 +45,7 @@ import { hint } from "@/components/ui/hint.types";
 import { Switch } from "@/components/ui/switch";
 import { Check, ChevronLeft, ChevronRight, Clock, User } from "lucide-react";
 import { ScheduleNoteIcon } from "@/components/schedule-grid/noteIcon";
+import { noteShiftOf } from "@/app/(app)/schedule/_lib/editor-session";
 import {
   buildShiftDiffDescriptors,
   expandDelimitedTimeRanges,
@@ -66,8 +68,14 @@ interface ShiftEditPanelProps {
   onClose: () => void;
   allowShiftEdits?: boolean;
   canEditScheduleIndicators?: boolean;
-  getActiveIndicatorIds?: (focusAreaId: number) => number[];
-  onNoteToggle?: (indicatorTypeId: number, active: boolean, focusAreaId: number) => void;
+  /** The note types on one shift; with a null shift, those no shift claims. */
+  getActiveIndicatorIds?: (focusAreaId: number, shift: ScheduleNoteShift | null) => number[];
+  onNoteToggle?: (
+    indicatorTypeId: number,
+    active: boolean,
+    focusAreaId: number,
+    shift: ScheduleNoteShift | null,
+  ) => void;
   /** Series ID if the current shift belongs to a repeating series */
   seriesId?: string | null;
   fromRecurring?: boolean;
@@ -431,18 +439,55 @@ export default function ShiftEditPanel({
   const [initialAbsenceTypeId] = useState(() => currentAbsenceTypeId ?? null);
   const [initialCustomStartTime] = useState(() => customStartTime ?? null);
   const [initialCustomEndTime] = useState(() => customEndTime ?? null);
-  const [initialNotesByFocusArea] = useState<Record<number, number[]>>(() => {
-    if (!getActiveIndicatorIds) return {};
+  // Notes are tracked per focus area and shift. A shift added while editing
+  // starts from the notes no shift claims, which it shows as well.
+  const [noteFocusAreaIds] = useState<number[]>(() => {
     const focusAreaIds = new Set<number>(modal.empFocusAreaIds);
     for (const st of assignments) {
       if (st.focusAreaId != null) focusAreaIds.add(st.focusAreaId);
     }
-    const record: Record<number, number[]> = {};
-    for (const faId of focusAreaIds) {
-      record[faId] = [...getActiveIndicatorIds(faId)];
+    return [...focusAreaIds];
+  });
+  const [initialNotesBySlot] = useState<Map<string, number[]>>(() => {
+    const record = new Map<string, number[]>();
+    if (!getActiveIndicatorIds) return record;
+    for (const slot of noteSlots(currentSegments)) {
+      record.set(slot.key, [...getActiveIndicatorIds(slot.focusAreaId, slot.shift)]);
     }
     return record;
   });
+
+  const singleNoteShift = currentSegments.length === 1 ? noteShiftOf(currentSegments[0]) : null;
+
+  function noteSlots(segments: readonly ShiftJobSegment[]) {
+    const shifts = new Map<string, ScheduleNoteShift | null>([["-", null]]);
+    for (const segment of [...initialSegments, ...segments]) {
+      const shift = noteShiftOf(segment);
+      if (shift) shifts.set(`${shift.shiftId ?? "-"}:${shift.jobId}`, shift);
+    }
+    return noteFocusAreaIds.flatMap((focusAreaId) =>
+      [...shifts].map(([shiftKey, shift]) => ({
+        key: `${focusAreaId}|${shiftKey}`,
+        unclaimedKey: `${focusAreaId}|-`,
+        focusAreaId,
+        shift,
+      })),
+    );
+  }
+
+  function noteSlotChanges() {
+    if (!getActiveIndicatorIds) return [];
+    return noteSlots(currentSegments).map((slot) => {
+      const initial =
+        initialNotesBySlot.get(slot.key) ?? initialNotesBySlot.get(slot.unclaimedKey) ?? [];
+      const current = getActiveIndicatorIds(slot.focusAreaId, slot.shift);
+      return {
+        ...slot,
+        added: current.filter((id) => !initial.includes(id)),
+        removed: initial.filter((id) => !current.includes(id)),
+      };
+    });
+  }
   const hasPublishedBaseline = publishedAssignmentIds.length > 0 || publishedAbsenceTypeId != null;
   const panelDiff = useMemo(
     () =>
@@ -528,15 +573,9 @@ export default function ShiftEditPanel({
   const hasTimeEdit =
     (customStartTime ?? null) !== initialCustomStartTime ||
     (customEndTime ?? null) !== initialCustomEndTime;
-  const hasNoteEdit = (() => {
-    if (!getActiveIndicatorIds) return false;
-    for (const [faIdStr, initTypes] of Object.entries(initialNotesByFocusArea)) {
-      const curTypes = getActiveIndicatorIds(Number(faIdStr));
-      if (curTypes.length !== initTypes.length) return true;
-      if (curTypes.some((t) => !initTypes.includes(t))) return true;
-    }
-    return false;
-  })();
+  const hasNoteEdit = noteSlotChanges().some(
+    (slot) => slot.added.length > 0 || slot.removed.length > 0,
+  );
   const hasEdits = hasShiftEdit || hasNoteEdit || hasTimeEdit;
 
   // Build concise change descriptions for the footer summary
@@ -640,24 +679,16 @@ export default function ShiftEditPanel({
   }
 
   function describeNoteChange(): string | null {
-    if (!hasNoteEdit || !getActiveIndicatorIds) return null;
-    const tokens: string[] = [];
-    for (const [faIdStr, initTypes] of Object.entries(initialNotesByFocusArea)) {
-      const curTypes = getActiveIndicatorIds(Number(faIdStr));
-      for (const id of curTypes) {
-        if (!initTypes.includes(id)) {
-          const name = indicatorTypes.find((ind) => ind.id === id)?.name ?? "?";
-          tokens.push(`+${name}`);
-        }
-      }
-      for (const id of initTypes) {
-        if (!curTypes.includes(id)) {
-          const name = indicatorTypes.find((ind) => ind.id === id)?.name ?? "?";
-          tokens.push(`\u2212${name}`);
-        }
-      }
+    if (!hasNoteEdit) return null;
+    const nameOf = (id: number) => indicatorTypes.find((ind) => ind.id === id)?.name ?? "?";
+    // A note no shift claims shows on every shift, so one change can appear
+    // in several slots; each is named once.
+    const tokens = new Set<string>();
+    for (const slot of noteSlotChanges()) {
+      for (const id of slot.added) tokens.add(`+${nameOf(id)}`);
+      for (const id of slot.removed) tokens.add(`\u2212${nameOf(id)}`);
     }
-    return tokens.length > 0 ? `Notes: ${tokens.join(", ")}` : null;
+    return tokens.size > 0 ? `Notes: ${[...tokens].join(", ")}` : null;
   }
 
   const shiftSummary = hasShiftEdit ? describeShiftChange() : null;
@@ -747,18 +778,11 @@ export default function ShiftEditPanel({
     if (hasTimeEdit && onCustomTimeChange) {
       onCustomTimeChange(initialCustomStartTime, initialCustomEndTime);
     }
-    // Revert notes for each focus area
-    if (getActiveIndicatorIds) {
-      for (const [faIdStr, initTypes] of Object.entries(initialNotesByFocusArea)) {
-        const faId = Number(faIdStr);
-        const curTypes = getActiveIndicatorIds(faId);
-        for (const type of initTypes) {
-          if (!curTypes.includes(type)) onNoteToggle?.(type, true, faId);
-        }
-        for (const type of curTypes) {
-          if (!initTypes.includes(type)) onNoteToggle?.(type, false, faId);
-        }
-      }
+    // Revert notes on each focus area and shift. The toggles are idempotent,
+    // so a note no shift claims, which several slots show, is restored once.
+    for (const slot of noteSlotChanges()) {
+      for (const type of slot.removed) onNoteToggle?.(type, true, slot.focusAreaId, slot.shift);
+      for (const type of slot.added) onNoteToggle?.(type, false, slot.focusAreaId, slot.shift);
     }
     // Do NOT close — panel stays open after undo
   }
@@ -2705,7 +2729,9 @@ export default function ShiftEditPanel({
 
   function renderCurrentShiftPill() {
     if (!hasActiveShift || currentLabels.length === 0) return null;
-    const noteTypes = getActiveIndicatorIds ? getActiveIndicatorIds(activeTab) : [];
+    const noteTypes = getActiveIndicatorIds
+      ? getActiveIndicatorIds(activeTab, singleNoteShift)
+      : [];
     const cellDiffBadge = panelDiff.cellBadge;
     const cellBorderKind: ShiftDiffBorderKind =
       cellDiffBadge?.kind === "new" ? "new" : cellDiffBadge ? "modified" : null;
@@ -2886,7 +2912,10 @@ export default function ShiftEditPanel({
           const focusAreaLabel =
             shiftFaId != null ? (focusAreaNameById.get(shiftFaId) ?? null) : null;
           const shiftWingId = shiftFaId ?? activeTab;
-          const pillNoteTypes = getActiveIndicatorIds ? getActiveIndicatorIds(shiftWingId) : [];
+          const cardNoteShift = noteShiftOf(currentSegments[i]);
+          const pillNoteTypes = getActiveIndicatorIds
+            ? getActiveIndicatorIds(shiftWingId, cardNoteShift)
+            : [];
           const pillDiff = panelDiff.pillDiffs[i] ?? {
             borderKind: null,
             badge: null,
@@ -3109,7 +3138,7 @@ export default function ShiftEditPanel({
                     );
                   })()}
                 {/* Inline indicators for this shift's focus area */}
-                {renderInlineIndicators(shiftWingId)}
+                {renderInlineIndicators(shiftWingId, cardNoteShift)}
               </div>
             </div>
           );
@@ -3122,8 +3151,12 @@ export default function ShiftEditPanel({
    * The active indicators by name, for someone who can open the shift but not
    * edit its indicators: the pill's dots alone did not say what they meant.
    */
-  function renderReadOnlyIndicators(focusAreaId: number, compact = false) {
-    const activeIds = getActiveIndicatorIds ? getActiveIndicatorIds(focusAreaId) : [];
+  function renderReadOnlyIndicators(
+    focusAreaId: number,
+    shift: ScheduleNoteShift | null,
+    compact = false,
+  ) {
+    const activeIds = getActiveIndicatorIds ? getActiveIndicatorIds(focusAreaId, shift) : [];
     const active = indicatorTypes.filter((ind) => activeIds.includes(ind.id));
     if (active.length === 0) return null;
     return (
@@ -3158,14 +3191,14 @@ export default function ShiftEditPanel({
     );
   }
 
-  function renderInlineIndicators(focusAreaId: number) {
-    if (!canEditScheduleIndicators) return renderReadOnlyIndicators(focusAreaId, true);
+  function renderInlineIndicators(focusAreaId: number, shift: ScheduleNoteShift | null) {
+    if (!canEditScheduleIndicators) return renderReadOnlyIndicators(focusAreaId, shift, true);
     if (indicatorTypes.length === 0) return null;
     return (
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, paddingTop: 6 }}>
         {indicatorTypes.map(({ id, name, color }) => {
           const isActive = getActiveIndicatorIds
-            ? getActiveIndicatorIds(focusAreaId).includes(id)
+            ? getActiveIndicatorIds(focusAreaId, shift).includes(id)
             : false;
           if (isActive) {
             return (
@@ -3205,7 +3238,7 @@ export default function ShiftEditPanel({
                 </div>
                 <Button
                   aria-label={`Remove ${name} schedule note`}
-                  onClick={() => onNoteToggle?.(id, false, focusAreaId)}
+                  onClick={() => onNoteToggle?.(id, false, focusAreaId, shift)}
                   className="dg-btn dg-btn-ghost"
                   style={{
                     height: 28,
@@ -3227,7 +3260,7 @@ export default function ShiftEditPanel({
             <Button
               key={id}
               aria-label={`Add ${name} schedule note`}
-              onClick={() => onNoteToggle?.(id, true, focusAreaId)}
+              onClick={() => onNoteToggle?.(id, true, focusAreaId, shift)}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -3262,7 +3295,7 @@ export default function ShiftEditPanel({
   }
 
   function renderNotesSection() {
-    if (!canEditScheduleIndicators) return renderReadOnlyIndicators(activeTab);
+    if (!canEditScheduleIndicators) return renderReadOnlyIndicators(activeTab, singleNoteShift);
     if (indicatorTypes.length === 0) return null;
     return (
       <div>
@@ -3270,7 +3303,7 @@ export default function ShiftEditPanel({
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {indicatorTypes.map(({ id, name, color }) => {
             const isActive = getActiveIndicatorIds
-              ? getActiveIndicatorIds(activeTab).includes(id)
+              ? getActiveIndicatorIds(activeTab, singleNoteShift).includes(id)
               : false;
             const identity = (
               <>
@@ -3325,7 +3358,7 @@ export default function ShiftEditPanel({
                   {identity}
                   <Button
                     aria-label={`Remove ${name} schedule note`}
-                    onClick={() => onNoteToggle?.(id, false, activeTab)}
+                    onClick={() => onNoteToggle?.(id, false, activeTab, singleNoteShift)}
                     className="dg-btn dg-btn-secondary"
                     style={{
                       height: 32,
@@ -3345,7 +3378,7 @@ export default function ShiftEditPanel({
               <Button
                 key={id}
                 aria-label={`Add ${name} schedule note`}
-                onClick={() => onNoteToggle?.(id, true, activeTab)}
+                onClick={() => onNoteToggle?.(id, true, activeTab, singleNoteShift)}
                 style={{
                   display: "flex",
                   alignItems: "center",

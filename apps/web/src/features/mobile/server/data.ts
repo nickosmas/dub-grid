@@ -879,6 +879,8 @@ export async function fetchMobileScheduleNotes(
     date: row.date,
     indicatorTypeId: row.indicator_type_id,
     focusAreaId: row.focus_area_id,
+    shiftId: row.shift_id,
+    jobId: row.job_id,
     status: row.status,
     name: row.indicator_types?.name || "Note",
     color: row.indicator_types?.color || UNKNOWN_INDICATOR_COLOR,

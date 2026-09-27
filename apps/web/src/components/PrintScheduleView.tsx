@@ -165,11 +165,8 @@ function pillText(label: string, max: number): string {
 // here is a literal. An archived or unknown indicator prints in plain grey.
 const PRINT_UNKNOWN_INDICATOR = "#94A3B8";
 
-/** Marks that describe what the schedule holds: a removal prints nothing. */
 function printedIndicatorIds(marks: ScheduleNoteMark[]): number[] {
-  return marks
-    .filter((mark) => mark.state !== "draft_removed" && mark.state !== "published_removed")
-    .map((mark) => mark.indicatorTypeId);
+  return marks.map((mark) => mark.indicatorTypeId);
 }
 
 function PrintIndicatorDots({

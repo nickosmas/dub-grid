@@ -49,6 +49,9 @@ export interface DbScheduleNote {
   date: string;
   indicator_type_id: number;
   focus_area_id: number | null;
+  /** The shift the note belongs to, as its segment's (shift_id, job_id); null when none claims it. */
+  shift_id: number | null;
+  job_id: number | null;
   status: "published" | "draft" | "draft_deleted";
   created_by: string | null;
   updated_by: string | null;

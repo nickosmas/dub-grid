@@ -87,6 +87,9 @@ export const notePublishChangeStateSchema = z.object({
   type: z.literal("note"),
   indicatorTypeId: z.number().int(),
   focusAreaId: z.number().int().nullable(),
+  /** Absent on changes recorded before notes belonged to a shift (063). */
+  shiftId: z.number().int().nullable().optional(),
+  jobId: z.number().int().nullable().optional(),
   indicatorName: z.string(),
   indicatorColor: z.string(),
 });

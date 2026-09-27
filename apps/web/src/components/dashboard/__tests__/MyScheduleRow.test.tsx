@@ -1182,6 +1182,8 @@ describe("MyScheduleRow", () => {
         date: "2026-05-11",
         indicatorTypeId,
         focusAreaId: null,
+        shiftId: null,
+        jobId: null,
         status: "published",
         createdBy: null,
         updatedBy: null,

@@ -5,7 +5,7 @@ import {
 import type { ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
 import { addDays } from "@/lib/dashboard-stats";
 import { formatDateKey } from "@/lib/utils";
-import type { IndicatorType, ScheduleNote } from "@/types";
+import type { IndicatorType, ScheduleNote, ScheduleNoteShift } from "@/types";
 
 /**
  * The dates the dashboard loads shifts for: the previous period's start to the
@@ -32,23 +32,29 @@ export function dashboardScheduleWindow(input: {
   };
 }
 
+/** One shift of a person's day, as the dashboard matches notes to it. */
+export interface DashboardNoteShift {
+  focusAreaId: number | null | undefined;
+  shift: ScheduleNoteShift | null;
+}
+
 /**
  * A person's schedule notes for one day, one list of marks per shift half.
  *
- * A single shift shows the whole day's notes. A double shift gives each note
- * to the first half working its focus area, and a note with no focus area (or
- * one the shift does not work) to the first half, so each note shows once, as
- * mobile's Home card and shift detail do. No halves (an absence, a removed
- * shift) show nothing.
+ * A single shift shows the whole day's notes. On a double shift a note goes to
+ * the half it belongs to; a note no shift claims goes to the first half
+ * working its focus area, and one with no focus area (or one the shift does
+ * not work) to the first half, as mobile's Home card and shift detail do. No
+ * halves (an absence, a removed shift) show nothing.
  */
 export function scheduleNoteMarksBySegment(input: {
   notes: readonly ScheduleNote[];
   empId: string | null;
   dateKey: string;
-  segmentFocusAreaIds: readonly (number | null | undefined)[];
+  segments: readonly DashboardNoteShift[];
   isScheduleEditor: boolean;
 }): ScheduleNoteMark[][] {
-  const halves = input.segmentFocusAreaIds.length;
+  const halves = input.segments.length;
   if (!input.empId || halves === 0) return [];
 
   const notesByHalf: NonNullable<ScheduleNoteMap[string]>[] = Array.from(
@@ -58,12 +64,21 @@ export function scheduleNoteMarksBySegment(input: {
   const seen = new Set<string>();
   for (const note of input.notes) {
     if (note.empId !== input.empId || note.date !== input.dateKey) continue;
-    const key = `${note.indicatorTypeId}_${note.status}`;
+    const own =
+      note.jobId == null
+        ? -1
+        : input.segments.findIndex(
+            ({ shift }) => shift?.jobId === note.jobId && shift.shiftId === (note.shiftId ?? null),
+          );
+    const worked =
+      own !== -1 || note.focusAreaId == null
+        ? own
+        : input.segments.findIndex((segment) => segment.focusAreaId === note.focusAreaId);
+    const half = worked === -1 ? 0 : worked;
+    const key = `${half}_${note.indicatorTypeId}_${note.status}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    const worked =
-      note.focusAreaId == null ? -1 : input.segmentFocusAreaIds.indexOf(note.focusAreaId);
-    notesByHalf[worked === -1 ? 0 : worked].push({
+    notesByHalf[half].push({
       indicatorTypeId: note.indicatorTypeId,
       status: note.status,
       updatedBy: note.updatedBy,
@@ -77,7 +92,6 @@ export function scheduleNoteMarksBySegment(input: {
 
 const STATE_WORDS: Partial<Record<ScheduleNoteMark["state"], string>> = {
   draft_added: "added, not published",
-  draft_removed: "removed, not published",
 };
 
 /**
@@ -91,9 +105,7 @@ export function scheduleNoteMarksLabel(
   return marks
     .map((mark) => {
       const name =
-        indicatorTypes.find((type) => type.id === mark.indicatorTypeId)?.name ??
-        mark.name ??
-        "Schedule note";
+        indicatorTypes.find((type) => type.id === mark.indicatorTypeId)?.name ?? "Schedule note";
       const words = STATE_WORDS[mark.state];
       return words ? `${name} (${words})` : name;
     })

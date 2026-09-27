@@ -234,7 +234,7 @@ export async function fetchScheduleNotes(
     let query = supabase
       .from("schedule_notes")
       .select(
-        "id, org_id, emp_id, date, indicator_type_id, focus_area_id, status, created_by, updated_by, created_at, updated_at",
+        "id, org_id, emp_id, date, indicator_type_id, focus_area_id, shift_id, job_id, status, created_by, updated_by, created_at, updated_at",
       )
       .eq("org_id", orgId);
     if (startDate) query = query.gte("date", startDate);
@@ -255,88 +255,14 @@ export async function fetchScheduleNotes(
     date: row.date,
     indicatorTypeId: row.indicator_type_id,
     focusAreaId: row.focus_area_id,
+    shiftId: row.shift_id,
+    jobId: row.job_id,
     status: row.status,
     createdBy: row.created_by,
     updatedBy: row.updated_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }));
-}
-
-export async function upsertScheduleNote(
-  orgId: string,
-  empId: string,
-  date: string,
-  indicatorTypeId: number,
-  focusAreaId: number,
-  existingStatus?: "published" | "draft" | "draft_deleted",
-): Promise<void> {
-  let status: "draft" | "published" | "draft_deleted" = "draft";
-
-  // If we are "adding" a note that was marked for deletion, set it back to published
-  if (existingStatus === "draft_deleted") {
-    status = "published";
-  }
-
-  const { error } = await supabase.from("schedule_notes").upsert(
-    {
-      org_id: orgId,
-      emp_id: empId,
-      date,
-      indicator_type_id: indicatorTypeId,
-      focus_area_id: focusAreaId,
-      status,
-    },
-    { onConflict: "emp_id,date,indicator_type_id,focus_area_id" },
-  );
-  if (error) throw error;
-  void logAudit(
-    "schedule_note.upserted",
-    "schedule_note",
-    `${empId}_${date}`,
-    { indicatorTypeId, focusAreaId, status },
-    orgId,
-  );
-}
-
-export async function deleteScheduleNote(
-  orgId: string,
-  empId: string,
-  date: string,
-  indicatorTypeId: number,
-  focusAreaId: number,
-  existingStatus?: "published" | "draft" | "draft_deleted",
-): Promise<void> {
-  if (existingStatus === "draft") {
-    // If it was a new draft note, just delete it
-    const { error } = await supabase
-      .from("schedule_notes")
-      .delete()
-      .eq("org_id", orgId)
-      .eq("emp_id", empId)
-      .eq("date", date)
-      .eq("indicator_type_id", indicatorTypeId)
-      .eq("focus_area_id", focusAreaId);
-    if (error) throw error;
-  } else {
-    // If it was already published, mark it as draft_deleted
-    const { error } = await supabase
-      .from("schedule_notes")
-      .update({ status: "draft_deleted" })
-      .eq("org_id", orgId)
-      .eq("emp_id", empId)
-      .eq("date", date)
-      .eq("indicator_type_id", indicatorTypeId)
-      .eq("focus_area_id", focusAreaId);
-    if (error) throw error;
-  }
-  void logAudit(
-    "schedule_note.deleted",
-    "schedule_note",
-    `${empId}_${date}`,
-    { indicatorTypeId, focusAreaId, existingStatus },
-    orgId,
-  );
 }
 
 // ── Recurring Shifts Draft Sessions ───────────────────────────────────────────

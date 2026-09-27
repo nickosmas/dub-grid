@@ -49,11 +49,34 @@ export interface ScheduleNoteGroup {
 
 export const WHOLE_DAY_NOTES_TITLE = "For the whole day";
 
+/** The half a note belongs to, or -1 for a note no half claims (or one the shift no longer has). */
+function claimingSegment(
+  note: MobileScheduleIndicator,
+  segments: readonly MobileScheduleEntrySegment[],
+): number {
+  if (note.jobId == null) return -1;
+  return segments.findIndex(
+    (segment) =>
+      segment.jobId === note.jobId && (segment.shiftId ?? null) === (note.shiftId ?? null),
+  );
+}
+
+function sharesFocusArea(segments: readonly MobileScheduleEntrySegment[], index: number): boolean {
+  const focusAreaId = segments[index]?.focusAreaId;
+  return (
+    typeof focusAreaId === "number" &&
+    segments.some((segment, other) => other !== index && segment.focusAreaId === focusAreaId)
+  );
+}
+
 /**
  * A shift's notes as shift detail lists them. A single shift has one untitled
- * group. A double shift has a group per focus area it works, titled with that
- * area, then the notes with no focus area (or one the shift no longer works)
- * under "For the whole day". Empty groups are left out.
+ * group. A double shift lists each focus area it works under that area's name,
+ * with the notes of the half working it and the notes no shift claims. Where
+ * both halves work one area, each half's own notes get a group titled with its
+ * shift instead, so they stay apart. Notes with no focus area (or one the shift
+ * no longer works) come last, under "For the whole day". Empty groups are left
+ * out.
  */
 export function scheduleNoteGroups(
   notes: readonly MobileScheduleIndicator[] | undefined,
@@ -63,25 +86,43 @@ export function scheduleNoteGroups(
     const all = scheduleNotesForRow(notes);
     return all.length > 0 ? [{ key: "shift", title: null, notes: all }] : [];
   }
-  // Grouped before deduplicating: the same note type filed under two focus
-  // areas belongs to both halves.
+  // Grouped before deduplicating: the same note type on two halves, or filed
+  // under two focus areas, belongs to both.
   const raw = notes ?? [];
+  const claimedBy = new Map(raw.map((note) => [note, claimingSegment(note, segments)]));
   const groups: ScheduleNoteGroup[] = [];
   const worked = new Set<number>();
-  for (const segment of segments) {
+  segments.forEach((segment, index) => {
     const focusAreaId = segment.focusAreaId;
-    if (typeof focusAreaId !== "number" || worked.has(focusAreaId)) continue;
+    const areaName = segment.displayFocusAreaName?.trim();
+    const shiftName = segment.shiftName?.trim();
+    const shared = sharesFocusArea(segments, index);
+    const own = raw.filter((note) => claimedBy.get(note) === index);
+    if (shared && own.length > 0) {
+      groups.push({
+        key: `shift-${index}`,
+        title: shiftName || areaName || "Shift",
+        notes: scheduleNotesForRow(own),
+      });
+    }
+    if (typeof focusAreaId !== "number" || worked.has(focusAreaId)) return;
     worked.add(focusAreaId);
-    const own = scheduleNotesForRow(raw.filter((note) => note.focusAreaId === focusAreaId));
-    if (own.length === 0) continue;
+    const area = scheduleNotesForRow([
+      ...(shared ? [] : own),
+      ...raw.filter((note) => claimedBy.get(note) === -1 && note.focusAreaId === focusAreaId),
+    ]);
+    if (area.length === 0) return;
     groups.push({
       key: `area-${focusAreaId}`,
-      title: segment.displayFocusAreaName?.trim() || segment.shiftName?.trim() || "Shift",
-      notes: own,
+      title: areaName || shiftName || "Shift",
+      notes: area,
     });
-  }
+  });
   const rest = scheduleNotesForRow(
-    raw.filter((note) => note.focusAreaId === null || !worked.has(note.focusAreaId)),
+    raw.filter(
+      (note) =>
+        claimedBy.get(note) === -1 && (note.focusAreaId === null || !worked.has(note.focusAreaId)),
+    ),
   );
   if (rest.length > 0) {
     groups.push({ key: "whole-day", title: WHOLE_DAY_NOTES_TITLE, notes: rest });
@@ -91,8 +132,9 @@ export function scheduleNoteGroups(
 
 /**
  * The notes one half of a shift lists, matching shift detail so each note
- * shows once across the halves: the first half working a focus area lists
- * that area's notes, and the first half also lists the whole day's.
+ * shows once across the halves: a half lists its own notes, the first half
+ * working a focus area lists the notes no shift claims there, and the first
+ * half also lists the whole day's.
  */
 export function scheduleNotesForSegment(
   notes: readonly MobileScheduleIndicator[] | undefined,
@@ -101,16 +143,16 @@ export function scheduleNotesForSegment(
 ): MobileScheduleIndicator[] {
   const groups = scheduleNoteGroups(notes, segments);
   if (segments.length <= 1) return groups[0]?.notes ?? [];
+  const group = (key: string) => groups.find((candidate) => candidate.key === key)?.notes ?? [];
   const focusAreaId = segments[segmentIndex]?.focusAreaId;
   const ownsArea =
     typeof focusAreaId === "number" &&
     segments.findIndex((segment) => segment.focusAreaId === focusAreaId) === segmentIndex;
-  const own = ownsArea
-    ? (groups.find((group) => group.key === `area-${focusAreaId}`)?.notes ?? [])
-    : [];
-  const wholeDay =
-    segmentIndex === 0 ? (groups.find((group) => group.key === "whole-day")?.notes ?? []) : [];
-  return [...own, ...wholeDay];
+  return [
+    ...group(`shift-${segmentIndex}`),
+    ...(ownsArea ? group(`area-${focusAreaId}`) : []),
+    ...(segmentIndex === 0 ? group("whole-day") : []),
+  ];
 }
 
 /** What a screen reader says for a list of notes, since a row reads its children's labels only. */

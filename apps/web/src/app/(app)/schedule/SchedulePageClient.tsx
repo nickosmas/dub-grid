@@ -204,7 +204,12 @@ import {
   getScheduleRealtimeChannelOptions,
 } from "./_lib/realtime-channel";
 import {
+  activeNoteIds,
   cloneDraftNotes,
+  dropNotesOfRemovedShifts,
+  noteShiftOf,
+  planNoteWrites,
+  toggleDraftNote,
   cloneShiftEntry,
   computeScheduleEntryDraftKind,
   serializeNotesSnapshot,
@@ -241,7 +246,10 @@ import {
   buildScheduleNoteMap,
   removeScheduleNotesForCell,
   buildScheduleNoteMarks,
+  createLocalWriteLedger,
   indicatorIdsInNotes,
+  markLocalWrite,
+  reconcileFetchedWindow,
   scheduleNoteKey,
   type ScheduleNoteMap,
 } from "./_lib/schedule-window";
@@ -272,6 +280,7 @@ import {
   PublishHistoryEntry,
   GridOpenShift,
   ScheduleCellInput,
+  ScheduleNoteShift,
   ShiftJobSegment,
 } from "@/types";
 
@@ -523,6 +532,7 @@ function SchedulerContent({
   // Serializes DB writes per shift key to prevent race conditions (e.g. edit → undo
   // firing before the edit's DB write completes, causing an optimistic lock conflict).
   const pendingShiftWrites = useRef<Map<string, Promise<void>>>(new Map());
+  const localWrites = useRef(createLocalWriteLedger());
   const [notes, setNotes] = useState<ScheduleNoteMap>({});
   const notesRef = useRef(notes);
   notesRef.current = notes;
@@ -1109,7 +1119,8 @@ function SchedulerContent({
         opts?.recenter && opts.ensureStart && opts.ensureEnd
           ? { start: opts.ensureStart, end: opts.ensureEnd }
           : widenFetchWindow(shiftFetchStart, shiftFetchEnd, opts);
-      const [shiftData, noteRows] = await Promise.all([
+      const startedAt = localWrites.current.generation;
+      const [fetchedShifts, noteRows] = await Promise.all([
         fetchShifts(
           org.id,
           canEditShiftsRef.current,
@@ -1121,7 +1132,13 @@ function SchedulerContent({
         ),
         fetchScheduleNotes(org.id, start, end),
       ]);
-      const noteMap = buildScheduleNoteMap(noteRows);
+      const { shifts: shiftData, notes: noteMap } = reconcileFetchedWindow({
+        fetched: { shifts: fetchedShifts, notes: buildScheduleNoteMap(noteRows) },
+        current: { shifts: shiftsRef.current, notes: notesRef.current },
+        ledger: localWrites.current,
+        startedAt,
+        pendingCellKeys: pendingShiftWrites.current.keys(),
+      });
       setShifts(shiftData);
       setNotes(noteMap);
       setLoadedShiftWindow({ start, end });
@@ -1180,9 +1197,10 @@ function SchedulerContent({
 
     async function loadSchedule() {
       try {
+        const startedAt = localWrites.current.generation;
         // Fetch per-user last-viewed timestamp + critical data in parallel
         const [
-          shiftData,
+          fetchedShifts,
           noteRows,
           recShifts,
           lastViewed,
@@ -1251,7 +1269,15 @@ function SchedulerContent({
             : undefined,
         ).catch(() => [] as PublishHistoryEntry[]);
 
-        const noteMap = buildScheduleNoteMap(noteRows);
+        // A save made on the cached grid painted above can land before this
+        // fetch does.
+        const { shifts: shiftData, notes: noteMap } = reconcileFetchedWindow({
+          fetched: { shifts: fetchedShifts, notes: buildScheduleNoteMap(noteRows) },
+          current: { shifts: shiftsRef.current, notes: notesRef.current },
+          ledger: localWrites.current,
+          startedAt,
+          pendingCellKeys: pendingShiftWrites.current.keys(),
+        });
         setShifts(shiftData);
         setNotes(noteMap);
         writeScheduleWindow(queryClient, orgId, {
@@ -2344,7 +2370,8 @@ function SchedulerContent({
 
     (async () => {
       try {
-        const draftShifts = await fetchShifts(
+        const startedAt = localWrites.current.generation;
+        const fetchedShifts = await fetchShifts(
           org.id,
           true,
           assignmentLabelMapRef.current,
@@ -2353,6 +2380,13 @@ function SchedulerContent({
           shiftFetchEnd,
           segmentCompatibility,
         );
+        const { shifts: draftShifts } = reconcileFetchedWindow({
+          fetched: { shifts: fetchedShifts, notes: notesRef.current },
+          current: { shifts: shiftsRef.current, notes: notesRef.current },
+          ledger: localWrites.current,
+          startedAt,
+          pendingCellKeys: pendingShiftWrites.current.keys(),
+        });
         setShifts(draftShifts);
         // Restamp the snapshot under the permission it was actually fetched
         // with. Without this the entry keeps the canEditShifts=false written by
@@ -3685,17 +3719,22 @@ function SchedulerContent({
   );
 
   const activeIndicatorIdsForKey = useCallback(
-    (empId: string, date: Date, focusAreaId?: number): number[] => {
+    (
+      empId: string,
+      date: Date,
+      focusAreaId: number | undefined,
+      shift: ScheduleNoteShift | null,
+    ): number[] => {
       const dateKey = formatDateKey(date);
       const key =
         focusAreaId != null ? `${empId}_${dateKey}_${focusAreaId}` : `${empId}_${dateKey}`;
-      const noteList = notes[key] ?? [];
       // A note pending removal is still on the schedule, and one pending
       // addition is not on it yet. Non-schedulers see neither draft state, the
       // same way they never see draft shift state.
-      return noteList
+      const visible = cloneDraftNotes(notes[key])
         .filter((n) => (isScheduleEditor ? n.status !== "draft_deleted" : n.status !== "draft"))
-        .map((n) => n.indicatorTypeId);
+        .map((n) => ({ ...n, status: "published" as const }));
+      return activeNoteIds(visible, shift);
     },
     [isScheduleEditor, notes],
   );
@@ -3730,18 +3769,16 @@ function SchedulerContent({
   }, [dates, filteredEmployees, indicatorTypes, isScheduleEditor, notes]);
 
   const panelActiveIndicatorIds = useCallback(
-    (focusAreaId: number): number[] => {
+    (focusAreaId: number, shift: ScheduleNoteShift | null = null): number[] => {
       if (
         editSessionDraft &&
         editSessionCellKey &&
         editSessionDraft.cellKey === editSessionCellKey
       ) {
-        return (editSessionDraft.draftNotes[focusAreaId] ?? [])
-          .filter((note) => note.status !== "draft_deleted")
-          .map((note) => note.indicatorTypeId);
+        return activeNoteIds(editSessionDraft.draftNotes[focusAreaId] ?? [], shift);
       }
       if (!editPanel) return [];
-      return activeIndicatorIdsForKey(editPanel.empId, editPanel.date, focusAreaId);
+      return activeIndicatorIdsForKey(editPanel.empId, editPanel.date, focusAreaId, shift);
     },
     [activeIndicatorIdsForKey, editPanel, editSessionCellKey, editSessionDraft],
   );
@@ -3829,7 +3866,12 @@ function SchedulerContent({
       const previous = keys.map((key) => pendingShiftWrites.current.get(key) ?? Promise.resolve());
       const queued = Promise.all(previous.map((pending) => pending.catch(() => {}))).then(write);
       for (const key of keys) pendingShiftWrites.current.set(key, queued);
+      // Marked again once the write lands: a fetch begun while it was in flight
+      // may have read the cell before the commit. A failed write is not marked,
+      // so the refetch that follows it takes the server's cell.
+      markLocalWrite(localWrites.current, keys);
       void queued
+        .then(() => markLocalWrite(localWrites.current, keys))
         .finally(() => {
           for (const key of keys) {
             if (pendingShiftWrites.current.get(key) === queued) {
@@ -3984,6 +4026,10 @@ function SchedulerContent({
       }
 
       if (updates.length > 1) {
+        markLocalWrite(
+          localWrites.current,
+          updates.map((update) => update.key),
+        );
         const deleteItems: DeleteShiftBatchItem[] = updates.map((update) => ({
           employeeId: update.empId,
           date: update.dateKey,
@@ -4004,6 +4050,10 @@ function SchedulerContent({
             await deleteShiftBatch(orgId, chunk);
             deleted += chunk.length;
           }
+          markLocalWrite(
+            localWrites.current,
+            updates.map((update) => update.key),
+          );
         } catch (err) {
           if (err instanceof OptimisticLockError) {
             await handleShiftWriteConflict();
@@ -4573,81 +4623,36 @@ function SchedulerContent({
           );
         }
 
-        const focusAreaIds = new Set<number>([
-          ...Object.keys(session.baseNotes).map(Number),
-          ...Object.keys(session.draftNotes).map(Number),
-        ]);
-
-        // Collect first, then fire together. Each note write is its own HTTP
-        // round trip and they target distinct (indicator, focus area) rows on
-        // one cell, so awaiting them one at a time only serialised them.
-        const noteWrites: Array<() => Promise<unknown>> = [];
-        // The note map this cell will hold once the writes below land. Derived
-        // rather than refetched, and it mirrors each endpoint's own rule for
-        // what a write leaves behind, so it matches what a refetch would return.
-        const noteResults = new Map<number, DraftNoteState[]>();
-
-        for (const focusAreaId of focusAreaIds) {
-          const baseEntries = session.baseNotes[focusAreaId] ?? [];
-          const draftEntries = session.draftNotes[focusAreaId] ?? [];
-          const indicatorIds = new Set<number>([
-            ...baseEntries.map((note) => note.indicatorTypeId),
-            ...draftEntries.map((note) => note.indicatorTypeId),
-          ]);
-
-          const resulting = new Map<number, DraftNoteState["status"]>(
-            baseEntries.map((note) => [note.indicatorTypeId, note.status]),
+        // The shift save above already cleared the notes of any shift the
+        // cell lost, so they are dropped here too rather than written back.
+        const keptShifts = (session.draftShift?.segments ?? []).flatMap((segment) => {
+          const shift = noteShiftOf(segment);
+          return shift ? [shift] : [];
+        });
+        const draftNotes = Object.fromEntries(
+          Object.entries(session.draftNotes).map(([focusAreaId, entries]) => [
+            Number(focusAreaId),
+            dropNotesOfRemovedShifts(entries, keptShifts),
+          ]),
+        );
+        // Each note write is its own HTTP round trip on a distinct row, so
+        // they are fired together rather than one at a time.
+        const { writes: plannedNoteWrites, results: noteResults } = planNoteWrites(
+          session.baseNotes,
+          draftNotes,
+        );
+        const noteWrites = plannedNoteWrites.map((write) => () => {
+          const writeNote = write.kind === "upsert" ? upsertScheduleNote : deleteScheduleNote;
+          return writeNote(
+            orgId,
+            panel.empId,
+            formatDateKey(panel.date),
+            write.indicatorTypeId,
+            write.focusAreaId,
+            write.baseStatus,
+            write.shift,
           );
-
-          for (const indicatorTypeId of indicatorIds) {
-            const baseStatus = baseEntries.find(
-              (note) => note.indicatorTypeId === indicatorTypeId,
-            )?.status;
-            const draftStatus = draftEntries.find(
-              (note) => note.indicatorTypeId === indicatorTypeId,
-            )?.status;
-            if (baseStatus === draftStatus) continue;
-
-            if (draftStatus && draftStatus !== "draft_deleted") {
-              // upsertScheduleNote restores a draft-deleted note to published,
-              // and otherwise stores it as a draft.
-              resulting.set(
-                indicatorTypeId,
-                baseStatus === "draft_deleted" ? "published" : "draft",
-              );
-              noteWrites.push(() =>
-                upsertScheduleNote(
-                  orgId,
-                  panel.empId,
-                  formatDateKey(panel.date),
-                  indicatorTypeId,
-                  focusAreaId,
-                  baseStatus,
-                ),
-              );
-            } else if (baseStatus) {
-              // deleteScheduleNote removes a draft row outright, but only marks
-              // a published one draft_deleted so the publish can undo it.
-              if (baseStatus === "draft") resulting.delete(indicatorTypeId);
-              else resulting.set(indicatorTypeId, "draft_deleted");
-              noteWrites.push(() =>
-                deleteScheduleNote(
-                  orgId,
-                  panel.empId,
-                  formatDateKey(panel.date),
-                  indicatorTypeId,
-                  focusAreaId,
-                  baseStatus,
-                ),
-              );
-            }
-          }
-
-          noteResults.set(
-            focusAreaId,
-            [...resulting].map(([indicatorTypeId, status]) => ({ indicatorTypeId, status })),
-          );
-        }
+        });
         await Promise.all(noteWrites.map((write) => write()));
 
         // ── Merge, don't refetch ──────────────────────────────────────────
@@ -4662,9 +4667,13 @@ function SchedulerContent({
         );
         const changedNoteKeys = new Set<string>();
 
-        let nextShifts = previousShifts;
+        // Merged onto the grid as it is now, not as it was when the confirm
+        // began: a refetch that landed during the writes is kept.
+        const baseShifts = shiftsRef.current;
+        const baseNotes = notesRef.current;
+        let nextShifts = baseShifts;
         if (echoedCells) {
-          const merged: ShiftMap = { ...previousShifts };
+          const merged: ShiftMap = { ...baseShifts };
           for (const [key, entry] of Object.entries(echoedCells)) {
             if (entry) merged[key] = entry;
             else delete merged[key];
@@ -4672,9 +4681,9 @@ function SchedulerContent({
           nextShifts = merged;
         }
 
-        let nextNotes = previousNotes;
+        let nextNotes = baseNotes;
         if (noteWrites.length > 0) {
-          nextNotes = { ...previousNotes };
+          nextNotes = { ...baseNotes };
           for (const [focusAreaId, entries] of noteResults) {
             const noteKey = scheduleNoteKey(
               panel.empId,
@@ -4691,7 +4700,8 @@ function SchedulerContent({
           }
         }
 
-        if (nextShifts !== previousShifts || nextNotes !== previousNotes) {
+        if (nextShifts !== baseShifts || nextNotes !== baseNotes) {
+          markLocalWrite(localWrites.current, [session.cellKey, ...changedShiftKeys]);
           setShifts(nextShifts);
           setNotes(nextNotes);
           shiftsRef.current = nextShifts;
@@ -5537,41 +5547,24 @@ function SchedulerContent({
   // `public.import_previous_schedule` in 002_functions_triggers.sql.
 
   const handleNoteToggle = useCallback(
-    (indicatorTypeId: number, active: boolean, focusAreaId: number) => {
-      updateEditSessionDraft((prev) => {
-        const existing = prev.draftNotes[focusAreaId] ?? [];
-        const existingStatus = existing.find(
-          (note) => note.indicatorTypeId === indicatorTypeId,
-        )?.status;
-
-        let updated: DraftNoteState[];
-        if (active) {
-          if (existingStatus === "draft_deleted") {
-            updated = existing.map((note) =>
-              note.indicatorTypeId === indicatorTypeId ? { ...note, status: "published" } : note,
-            );
-          } else {
-            updated = [
-              ...existing.filter((note) => note.indicatorTypeId !== indicatorTypeId),
-              { indicatorTypeId, status: "draft" },
-            ];
-          }
-        } else if (existingStatus === "published") {
-          updated = existing.map((note) =>
-            note.indicatorTypeId === indicatorTypeId ? { ...note, status: "draft_deleted" } : note,
-          );
-        } else {
-          updated = existing.filter((note) => note.indicatorTypeId !== indicatorTypeId);
-        }
-
-        return {
-          draftShift: prev.draftShift,
-          draftNotes: {
-            ...prev.draftNotes,
-            [focusAreaId]: updated,
-          },
-        };
-      });
+    (
+      indicatorTypeId: number,
+      active: boolean,
+      focusAreaId: number,
+      shift: ScheduleNoteShift | null = null,
+    ) => {
+      updateEditSessionDraft((prev) => ({
+        draftShift: prev.draftShift,
+        draftNotes: {
+          ...prev.draftNotes,
+          [focusAreaId]: toggleDraftNote(
+            prev.draftNotes[focusAreaId] ?? [],
+            indicatorTypeId,
+            active,
+            shift,
+          ),
+        },
+      }));
     },
     [updateEditSessionDraft],
   );

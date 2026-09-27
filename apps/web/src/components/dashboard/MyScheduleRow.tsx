@@ -8,6 +8,7 @@ import type { ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
 import { ScheduleNoteIcon } from "@/components/schedule-grid/noteIcon";
 import { PublishDiffPill } from "@/components/schedule-grid/publishDiffPill";
 import { scheduleNoteMarksBySegment, scheduleNoteMarksLabel } from "./dashboardScheduleNotes";
+import { noteShiftOf } from "@/app/(app)/schedule/_lib/editor-session";
 import {
   resolveCellChangeBadges,
   type CellChangeBadge,
@@ -28,6 +29,7 @@ import type {
   PublishChange,
   ShiftJobSegment,
   ShiftMap,
+  ScheduleNoteShift,
 } from "@/types";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -90,6 +92,7 @@ type MyScheduleShift = {
   badge: CellChangeBadge | null;
   borderKind: DraftKind;
   focusAreaId: number | null;
+  noteShift: ScheduleNoteShift | null;
   noteMarks: ScheduleNoteMark[];
 };
 
@@ -228,6 +231,7 @@ function buildWorkedShifts(input: {
       badge: null,
       borderKind: null,
       focusAreaId: segment.focusAreaId ?? null,
+      noteShift: noteShiftOf(segment),
       noteMarks: [],
     });
   });
@@ -347,6 +351,7 @@ function buildMyScheduleDay(input: {
             badge: null,
             borderKind: null,
             focusAreaId: null,
+            noteShift: null,
             noteMarks: [],
           },
         ],
@@ -368,7 +373,10 @@ function buildMyScheduleDay(input: {
       notes: input.scheduleNotes,
       empId: input.currentEmpId,
       dateKey,
-      segmentFocusAreaIds: workedShifts.map((shift) => shift.focusAreaId),
+      segments: workedShifts.map((shift) => ({
+        focusAreaId: shift.focusAreaId,
+        shift: shift.noteShift,
+      })),
       isScheduleEditor: input.isScheduleEditor,
     });
     workedShifts.forEach((shift, index) => {

@@ -568,6 +568,10 @@ export const mobileScheduleEntryChangeSchema = z.object({
 export const mobileScheduleIndicatorSchema = z.object({
   indicatorTypeId: z.number().int(),
   focusAreaId: z.number().int().nullable(),
+  // The shift the note belongs to; both null when no shift claims it, and
+  // absent from a server that predates 063.
+  shiftId: z.number().int().nullable().optional(),
+  jobId: z.number().int().nullable().optional(),
   name: z.string().min(1),
   color: z.string().min(1),
   // A state an older build does not know reads as published, so a new server
