@@ -74,7 +74,7 @@ draft rule is the web's, held in one shared place so the two cannot drift.
       (active, in sort order) as a `loadMobileBootstrapPayload` dependency.
       _Done when:_ the core and bootstrap route tests show the types for a
       regular member and an empty list for an organization with none.
-- [ ] **Step 5 - Home card refresh** - the mobile realtime map sends
+- [x] **Step 5 - Home card refresh** - the mobile realtime map sends
       `schedule_notes` changes to the dashboard key as well as the schedule
       prefix; the mobile client parses entries with indicators. _Done when:_
       the invalidation test shows both keys for `schedule_notes`, and an

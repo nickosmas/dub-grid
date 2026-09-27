@@ -20,10 +20,10 @@ const TABLES_THAT_SHOULD_REFRESH_THE_DASHBOARD = [
   "recurring_shifts",
   "publish_history",
   "invitations",
+  "schedule_notes",
 ] as const;
 
 const TABLES_THAT_SHOULD_NOT_REFRESH_THE_DASHBOARD = [
-  "schedule_notes",
   "profile_change_requests",
   "notifications",
   "audit_log",

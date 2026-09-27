@@ -76,8 +76,10 @@ export function getMobileRealtimeInvalidationKeys(
     case "schedule_cell_snapshots":
     case "schedule_cell_segments":
       return [schedule, requests, dashboard, shiftSwapOptions];
+    // The Home schedule card reads /me/schedule under the dashboard key, and
+    // its entries carry their indicators (42b).
     case "schedule_notes":
-      return [schedule];
+      return [schedule, dashboard];
     case "profile_change_requests":
       return [profileChangeRequests, profileChangeRequestsOwn];
     case "notifications":

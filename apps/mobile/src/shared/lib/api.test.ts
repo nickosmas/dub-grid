@@ -118,6 +118,80 @@ describe("mobileApiRequest", () => {
     );
   });
 
+  // 42b: the client keeps the indicators a schedule entry carries.
+  it("parses a schedule entry's indicators", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          range: { startDate: "2026-04-16", endDate: "2026-04-22" },
+          entries: [
+            {
+              employeeId: "33333333-3333-4333-8333-333333333333",
+              employeeName: "Alex North",
+              date: "2026-04-18",
+              state: {
+                kind: "worked",
+                segments: [{ shiftId: 1, jobId: 10, position: 0 }],
+                absenceTypeId: null,
+                customStartTime: null,
+                customEndTime: null,
+                seriesId: null,
+                fromRecurring: false,
+              },
+              presentation: {
+                label: "Nurse",
+                shiftName: "Day Shift",
+                focusAreaId: 2,
+                focusAreaName: "ICU",
+                displayFocusAreaName: "ICU",
+                startTime: "07:00:00",
+                endTime: "15:00:00",
+                segments: [
+                  {
+                    shiftId: 1,
+                    jobId: 10,
+                    label: "Nurse",
+                    shiftName: "Day Shift",
+                    jobName: "Nurse",
+                    jobColor: "#ECFEFF",
+                    jobBorderColor: "#A5F3FC",
+                    jobTextColor: "#0E7490",
+                    startTime: "07:00:00",
+                    endTime: "15:00:00",
+                    displayFocusAreaName: "ICU",
+                  },
+                ],
+              },
+              publishedAt: null,
+              publishedByName: null,
+              indicators: [
+                {
+                  indicatorTypeId: 7,
+                  focusAreaId: 2,
+                  name: "Float",
+                  color: "#ff0000",
+                  state: "published",
+                },
+              ],
+            },
+          ],
+        }),
+      }),
+    );
+    const { getOrgSchedule } = await import("./api");
+
+    const response = await getOrgSchedule("token-123", {
+      startDate: "2026-04-16",
+      endDate: "2026-04-22",
+    });
+
+    expect(response.entries[0]!.indicators).toEqual([
+      { indicatorTypeId: 7, focusAreaId: 2, name: "Float", color: "#ff0000", state: "published" },
+    ]);
+  });
+
   it("cancels a core read when its caller aborts", async () => {
     let transportSignal: AbortSignal | undefined;
     const fetchMock = vi.fn().mockImplementation((_url: string, init: RequestInit) => {
