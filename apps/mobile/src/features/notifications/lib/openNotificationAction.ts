@@ -1,5 +1,6 @@
 import { Linking } from "react-native";
 import { router } from "expo-router";
+import { resolveAlertDestination, type AlertLike } from "@dubgrid/domain";
 
 /** Shown when an alert's subject only exists on the web, e.g. billing. */
 export const WEB_ONLY_ALERT_MESSAGE = "Open this on the web to see more.";
@@ -66,14 +67,54 @@ export function isNotificationActionSupportedOnMobile(href: string): boolean {
   return isExternalUrl(href) || resolveNativeRoute(href) !== null;
 }
 
+function alertDate(alert: AlertLike, href: string): string | null {
+  const fromMetadata = alert.metadata?.date;
+  if (typeof fromMetadata === "string" && DATE_KEY.test(fromMetadata)) return fromMetadata;
+  const fromHref = parseHref(href).query.get("date");
+  return fromHref && DATE_KEY.test(fromHref) ? fromHref : null;
+}
+
+/**
+ * Where an alert opens in the app, or `null` when only the web can show it.
+ * A schedule note is about the reader's own shift, so it opens that shift
+ * (the web, which has no shift screen, opens the day); every other alert
+ * follows the shared destination.
+ */
+export function resolveAlertNativeRoute(
+  alert: AlertLike,
+  linkedEmployeeId: string | null,
+): NativeRoute | null {
+  const destination = resolveAlertDestination(alert);
+  if (!destination) return null;
+  if (alert.type === "schedule_note_published" && linkedEmployeeId) {
+    const date = alertDate(alert, destination.href);
+    if (date) {
+      return {
+        pathname: "/shift/[employeeId]/[date]",
+        params: {
+          employeeId: linkedEmployeeId,
+          date,
+          rangeStart: date,
+          rangeEnd: date,
+          source: "mine",
+        },
+      };
+    }
+  }
+  return resolveNativeRoute(destination.href);
+}
+
+export function openNativeRoute(route: NativeRoute, mode: "push" | "replace" = "push") {
+  const target = (route.params ? route : route.pathname) as Parameters<typeof router.push>[0];
+  if (mode === "replace") router.replace(target);
+  else router.push(target);
+}
+
 export function openNotificationAction(href: string, mode: "push" | "replace" = "push") {
   if (isExternalUrl(href)) {
     void Linking.openURL(href);
     return;
   }
   const route = resolveNativeRoute(href);
-  if (!route) return;
-  const target = (route.params ? route : route.pathname) as Parameters<typeof router.push>[0];
-  if (mode === "replace") router.replace(target);
-  else router.push(target);
+  if (route) openNativeRoute(route, mode);
 }

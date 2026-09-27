@@ -89,7 +89,7 @@ focusAreaId?)` that filters by focus area and removes duplicates by
 - [x] **Step 5 - Home schedule card** - each day lists its schedule notes by
       name under its pills. _Done when:_ a card test finds a day's note by
       name and the fixture without notes still renders.
-- [ ] **Step 6 - alert opens my shift** - a helper resolves a notification to
+- [x] **Step 6 - alert opens my shift** - a helper resolves a notification to
       the native route, sending `schedule_note_published` to the linked
       employee's shift for its date, used by the alerts list and alert detail.
       _Done when:_ tests show the own-shift route with the linked employee and

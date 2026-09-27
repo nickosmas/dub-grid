@@ -17,6 +17,7 @@ vi.mock("react-native", () => ({
 import {
   isNotificationActionSupportedOnMobile,
   openNotificationAction,
+  resolveAlertNativeRoute,
   resolveNativeRoute,
 } from "./openNotificationAction";
 
@@ -128,5 +129,51 @@ describe("isNotificationActionSupportedOnMobile", () => {
   it("marks settings and unknown paths as web-only", () => {
     expect(isNotificationActionSupportedOnMobile("/settings?section=org-billing")).toBe(false);
     expect(isNotificationActionSupportedOnMobile("/reports")).toBe(false);
+  });
+});
+
+describe("resolveAlertNativeRoute", () => {
+  const ownShift = (date: string) => ({
+    pathname: "/shift/[employeeId]/[date]",
+    params: { employeeId: "emp-1", date, rangeStart: date, rangeEnd: date, source: "mine" },
+  });
+
+  it("opens the reader's own shift for a schedule note", () => {
+    expect(
+      resolveAlertNativeRoute(
+        { type: "schedule_note_published", metadata: { date: "2026-10-05", mode: "delete" } },
+        "emp-1",
+      ),
+    ).toEqual(ownShift("2026-10-05"));
+  });
+
+  it("takes the date from the link when the metadata has none", () => {
+    expect(
+      resolveAlertNativeRoute(
+        { type: "schedule_note_published", metadata: { actionUrl: "/schedule?date=2026-10-06" } },
+        "emp-1",
+      ),
+    ).toEqual(ownShift("2026-10-06"));
+  });
+
+  it("opens the day on the schedule without a linked employee or a date", () => {
+    expect(
+      resolveAlertNativeRoute(
+        { type: "schedule_note_published", metadata: { date: "2026-10-05" } },
+        null,
+      ),
+    ).toEqual({ pathname: "/(tabs)/team", params: { date: "2026-10-05" } });
+    expect(
+      resolveAlertNativeRoute({ type: "schedule_note_published", metadata: {} }, "emp-1"),
+    ).toEqual({ pathname: "/(tabs)/team" });
+  });
+
+  it("leaves every other alert on its shared destination", () => {
+    expect(
+      resolveAlertNativeRoute({ type: "shift_change", metadata: { date: "2026-10-05" } }, "emp-1"),
+    ).toEqual({ pathname: "/(tabs)/team", params: { date: "2026-10-05" } });
+    expect(
+      resolveAlertNativeRoute({ type: "billing_payment_failed", metadata: {} }, "emp-1"),
+    ).toBeNull();
   });
 });
