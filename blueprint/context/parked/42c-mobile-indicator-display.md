@@ -37,11 +37,13 @@ instead of the team schedule.
   there are none. A double shift lists each half's notes under that half, and
   notes with no focus area under "For the whole day".
 - **Home schedule card.** Each pill marks its schedule notes with an icon
-  only, inside the pill's bottom-left corner (owner, 2026-09-27): a sticky
-  note for one, a stack of notes (`note-multiple-outline`) for several, in
-  the pill's text colour. A double shift's pills each count their own half's
-  notes. Once any day in the strip has a note, every pill grows by the icon's
-  row so the strip stays one height; the names are spoken with the day.
+  only, at the end of the pill's time row in the bottom-right corner (owner,
+  2026-09-27, replacing an earlier bottom-left footer; landed in `9ac06b80`):
+  a sticky note for one, a stack of notes (`note-multiple-outline`) for
+  several, in the pill's text colour. Pills are 140pt wide so the longest
+  time range fits beside the icon without an ellipsis, and no pill grows for
+  a note. A double shift's pills each count their own half's notes; the names
+  are spoken with the day.
 - **Alert destination.** On mobile, a `schedule_note_published` alert opens
   `/shift/[employeeId]/[date]` for the signed-in person's own linked
   employee, falling back to today's route when there is no linked employee or
