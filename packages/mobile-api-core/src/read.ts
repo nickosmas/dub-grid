@@ -342,6 +342,7 @@ export async function loadMobileBootstrapPayload(
     unreadNotificationCount,
     acceptedCurrentTerms: hasAcceptedCurrentTerms(termsAcceptedVersion),
     mfaReenrollRequired,
+    indicatorTypes: [],
   };
 }
 

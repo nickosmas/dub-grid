@@ -73,6 +73,7 @@ export function buildPreviewScheduleEntry(
     change: null,
     publishedAt: null,
     publishedByName: null,
+    indicators: [],
   };
 }
 

@@ -50,7 +50,7 @@ draft rule is the web's, held in one shared place so the two cannot drift.
       schedule-core tests cover an editor (drafts and pending removals kept), a
       viewer (drafts dropped, pending removals read as published) and each
       permission alone; the web route's existing tests pass unchanged.
-- [ ] **Step 2 - contracts** - `mobileScheduleIndicatorSchema` and an
+- [x] **Step 2 - contracts** - `mobileScheduleIndicatorSchema` and an
       `indicators` field on `mobileScheduleEntrySchema` (default `[]`), and
       `indicatorTypes` on the bootstrap response (default `[]`), in
       `@dubgrid/contracts`. _Done when:_ contract tests parse entries and

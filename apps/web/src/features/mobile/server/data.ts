@@ -1038,6 +1038,8 @@ export async function fetchMobileScheduleEntries(
         : null,
       publishedAt: publishEntry?.publishedAt ?? null,
       publishedByName: publishEntry?.publishedByName ?? null,
+      // Attached per viewer by the schedule loaders; other callers need none.
+      indicators: [],
     });
   }
 
