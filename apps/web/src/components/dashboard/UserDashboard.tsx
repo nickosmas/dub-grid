@@ -1,8 +1,19 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { useTheme } from "next-themes";
-import { CalendarDays, Check, Clock3, Layers, MapPin, UserRound, Users } from "lucide-react";
+import {
+  CalendarDays,
+  Check,
+  Clock3,
+  Layers,
+  MapPin,
+  StickyNote,
+  UserRound,
+  Users,
+} from "lucide-react";
 import type { DashboardContentProps } from "./DashboardContentProps";
 import { EmptyState } from "@/components/EmptyState";
+import type { ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
+import { scheduleNoteMarksBySegment, scheduleNoteMarksLabel } from "./dashboardScheduleNotes";
 import { PublishDiffPill } from "@/components/schedule-grid/publishDiffPill";
 import {
   resolveCellChangeBadges,
@@ -86,6 +97,10 @@ type DashboardScheduleItem = {
   changeBadge: CellChangeBadge | null;
   isDeletedHistory: boolean;
   previousLabel: string | null;
+  /** This pill's schedule notes, by the one-half rule. */
+  noteMarks: ScheduleNoteMark[];
+  /** Every schedule note of the person's day, for the hero. */
+  dayNoteMarks: ScheduleNoteMark[];
 };
 
 type HeroStatus = "active" | "upcoming" | "scheduled" | "away" | "empty";
@@ -180,11 +195,14 @@ export default function UserDashboard(props: DashboardContentProps) {
     openShifts,
     org,
     periodDates,
+    scheduleNotes,
+    indicatorTypes,
     shiftCategories,
     shiftRequests,
     absenceTypeById,
     viewMode,
   } = props;
+  const isScheduleEditor = permissions.canEditShifts || permissions.canEditNotes;
   const isTwoWeekView = viewMode === "2weeks";
   const now = useMinuteNow();
   // "Today" and the current clock are evaluated in the organization's timezone,
@@ -231,6 +249,8 @@ export default function UserDashboard(props: DashboardContentProps) {
         jobById,
         shiftById,
         isDarkTheme,
+        scheduleNotes,
+        isScheduleEditor,
       }),
     [
       absenceTypeById,
@@ -243,6 +263,8 @@ export default function UserDashboard(props: DashboardContentProps) {
       recentPublishedChanges,
       shiftById,
       isDarkTheme,
+      scheduleNotes,
+      isScheduleEditor,
     ],
   );
   const myScheduleItems = useMemo(
@@ -266,6 +288,8 @@ export default function UserDashboard(props: DashboardContentProps) {
         jobById,
         shiftById,
         isDarkTheme,
+        scheduleNotes,
+        isScheduleEditor,
       }).filter((item) => item.dateKey >= todayKey && !item.isDeletedHistory),
     [
       absenceTypeById,
@@ -279,6 +303,8 @@ export default function UserDashboard(props: DashboardContentProps) {
       shiftById,
       todayKey,
       isDarkTheme,
+      scheduleNotes,
+      isScheduleEditor,
     ],
   );
   const heroItems = useMemo(
@@ -448,6 +474,7 @@ export default function UserDashboard(props: DashboardContentProps) {
             isDarkTheme={isDarkTheme}
             followUpItems={heroFollowUpItems}
             followUpTimings={heroFollowUpTimings}
+            indicatorTypes={indicatorTypes}
             item={hero.item}
             segmentCount={heroSegmentCount}
             shiftmates={heroShiftmates}
@@ -478,6 +505,7 @@ export default function UserDashboard(props: DashboardContentProps) {
 
   const myWeek = (
     <MyWeekSection
+      indicatorTypes={indicatorTypes}
       items={myScheduleItems}
       isTwoWeekView={isTwoWeekView}
       periodDates={periodDates}
@@ -634,6 +662,8 @@ function buildScheduleItemsFromShiftMap(input: {
   shiftById: Map<number, { abbr?: string | null; name: string }>;
   isDarkTheme: boolean;
   recentPublishedChanges: Map<string, PublishChange>;
+  scheduleNotes: DashboardContentProps["scheduleNotes"];
+  isScheduleEditor: boolean;
 }): DashboardScheduleItem[] {
   const items: DashboardScheduleItem[] = [];
 
@@ -713,9 +743,28 @@ function buildScheduleItemsFromShiftMap(input: {
         changeBadge: badgeForPill(0),
         isDeletedHistory,
         previousLabel,
+        noteMarks: [],
+        dayNoteMarks: [],
       });
       continue;
     }
+
+    // A shift removed in the last publish keeps no notes.
+    const marksBySegment = isDeletedHistory
+      ? []
+      : scheduleNoteMarksBySegment({
+          notes: input.scheduleNotes,
+          empId: parsedKey.employeeId,
+          dateKey: parsedKey.dateKey,
+          segmentFocusAreaIds: rawSegments.map((rawSegment, index) => {
+            const assignmentId = rawSegment.assignmentId ?? entry.assignmentIds[index];
+            const assignment =
+              assignmentId != null ? input.assignmentById.get(assignmentId) : undefined;
+            return rawSegment.focusAreaId ?? assignment?.focusAreaId ?? null;
+          }),
+          isScheduleEditor: input.isScheduleEditor,
+        });
+    const dayNoteMarks = marksBySegment.flat();
 
     rawSegments.forEach((rawSegment, segmentIndex) => {
       const segment = buildWorkedSegment({
@@ -748,6 +797,8 @@ function buildScheduleItemsFromShiftMap(input: {
         changeBadge: badgeForPill(segmentIndex),
         isDeletedHistory,
         previousLabel,
+        noteMarks: marksBySegment[segmentIndex] ?? [],
+        dayNoteMarks,
       });
     });
   }
@@ -1669,6 +1720,7 @@ function isDateInCurrentOrFutureRange(
 function MeHeroCard({
   followUpItems,
   followUpTimings,
+  indicatorTypes,
   isCompact,
   isDarkTheme,
   item,
@@ -1680,6 +1732,7 @@ function MeHeroCard({
 }: {
   followUpItems: DashboardScheduleItem[];
   followUpTimings: Array<HeroTiming | null>;
+  indicatorTypes: DashboardContentProps["indicatorTypes"];
   isCompact: boolean;
   isDarkTheme: boolean;
   item: DashboardScheduleItem;
@@ -1824,6 +1877,12 @@ function MeHeroCard({
         {item.segment.focusAreaName ? (
           <HeroInfoRow icon={<MapPin size={18} />} text={item.segment.focusAreaName} />
         ) : null}
+        <ScheduleNotesLine
+          marks={item.dayNoteMarks}
+          indicatorTypes={indicatorTypes}
+          testId="user-dashboard-hero-notes"
+          inverse
+        />
         {showsPreviousLabel(item) ? (
           <div
             aria-label={`Previous shift: ${item.previousLabel}`}
@@ -2564,6 +2623,7 @@ function ActionRailSection({
 }
 
 function MyWeekSection({
+  indicatorTypes,
   items,
   isTwoWeekView = false,
   periodDates,
@@ -2571,6 +2631,7 @@ function MyWeekSection({
   todayKey,
   weeklyHours,
 }: {
+  indicatorTypes: DashboardContentProps["indicatorTypes"];
   items: DashboardScheduleItem[];
   isTwoWeekView?: boolean;
   periodDates: Date[];
@@ -2638,7 +2699,11 @@ function MyWeekSection({
                 {activeItems.map((item, itemIndex) => (
                   <div key={item.key}>
                     {itemIndex > 0 ? <DashedDivider /> : null}
-                    <WeekShiftRow item={item} showSegmentLabel={group.items.length > 1} />
+                    <WeekShiftRow
+                      indicatorTypes={indicatorTypes}
+                      item={item}
+                      showSegmentLabel={group.items.length > 1}
+                    />
                   </div>
                 ))}
                 {deletedItems.map((item) => (
@@ -2932,9 +2997,11 @@ function AvailableShiftActionCard({
 }
 
 function WeekShiftRow({
+  indicatorTypes,
   item,
   showSegmentLabel = false,
 }: {
+  indicatorTypes: DashboardContentProps["indicatorTypes"];
   item: DashboardScheduleItem;
   showSegmentLabel?: boolean;
 }) {
@@ -3017,6 +3084,11 @@ function WeekShiftRow({
             {item.segment.focusAreaName}
           </div>
         ) : null}
+        <ScheduleNotesLine
+          marks={item.noteMarks}
+          indicatorTypes={indicatorTypes}
+          testId="user-dashboard-week-notes"
+        />
         {showsPreviousLabel(item) ? (
           <div
             aria-label={`Previous shift: ${item.previousLabel}`}
@@ -3026,6 +3098,46 @@ function WeekShiftRow({
           </div>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+/** Notes spelled out beside one sticky-note icon; wraps rather than truncates. */
+function ScheduleNotesLine({
+  indicatorTypes,
+  inverse = false,
+  marks,
+  testId,
+}: {
+  indicatorTypes: DashboardContentProps["indicatorTypes"];
+  inverse?: boolean;
+  marks: ScheduleNoteMark[];
+  testId: string;
+}) {
+  if (marks.length === 0) return null;
+  return (
+    <div
+      data-testid={testId}
+      style={{
+        alignItems: "flex-start",
+        color: inverse ? "rgba(255,255,255,0.82)" : "var(--dg-color-text-muted)",
+        display: "flex",
+        fontSize: inverse ? 15 : 12,
+        fontWeight: inverse ? 600 : undefined,
+        gap: inverse ? 8 : 5,
+        marginTop: inverse ? 0 : 4,
+        minWidth: 0,
+      }}
+    >
+      <StickyNote
+        aria-hidden="true"
+        size={inverse ? 18 : 14}
+        style={{ flexShrink: 0, marginTop: inverse ? 1 : 0 }}
+      />
+      <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>
+        <span className="sr-only">Schedule notes: </span>
+        {scheduleNoteMarksLabel(marks, indicatorTypes)}
+      </span>
     </div>
   );
 }

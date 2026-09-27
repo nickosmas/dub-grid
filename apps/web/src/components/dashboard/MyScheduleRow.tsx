@@ -1,14 +1,18 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, Files } from "lucide-react";
 import type { DashboardContentProps } from "./DashboardContentProps";
 import { EmptyState } from "@/components/EmptyState";
+import type { ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
+import { ScheduleNoteIcon } from "@/components/schedule-grid/noteIcon";
 import { PublishDiffPill } from "@/components/schedule-grid/publishDiffPill";
+import { scheduleNoteMarksBySegment, scheduleNoteMarksLabel } from "./dashboardScheduleNotes";
 import {
   resolveCellChangeBadges,
   type CellChangeBadge,
 } from "@/components/schedule-grid/cellChangeBadges";
+import { MaybeHint } from "@/components/ui/hint";
 import { ScrollCueButton } from "@/components/ui/scroll-cue-button";
 import { formatDateKey } from "@/lib/utils";
 import { DRAFT_BORDER_COLORS, resolveShiftPillColors } from "@/lib/colors";
@@ -47,6 +51,9 @@ const APPROX_NAME_CHAR_WIDTH = 6.6;
 // in a week-sized cell; the cell links through to the schedule for the full value.
 const MAX_SHIFT_TEXT_LENGTH = 64;
 
+const NO_NOTES: DashboardContentProps["scheduleNotes"] = [];
+const NO_INDICATOR_TYPES: DashboardContentProps["indicatorTypes"] = [];
+
 type MyScheduleRowProps = Pick<
   DashboardContentProps,
   | "currentEmpId"
@@ -65,6 +72,10 @@ type MyScheduleRowProps = Pick<
   // should stay hidden even though they have an employees row.
   isManagementOnly?: boolean;
   recentPublishedChanges?: Map<string, PublishChange>;
+  scheduleNotes?: DashboardContentProps["scheduleNotes"];
+  indicatorTypes?: DashboardContentProps["indicatorTypes"];
+  /** Sees draft notes, as on the schedule page. */
+  isScheduleEditor?: boolean;
 };
 
 type MyScheduleShift = {
@@ -76,6 +87,8 @@ type MyScheduleShift = {
   textColor: string;
   badge: CellChangeBadge | null;
   borderKind: DraftKind;
+  focusAreaId: number | null;
+  noteMarks: ScheduleNoteMark[];
 };
 
 function capShiftText(value: string): string {
@@ -212,6 +225,8 @@ function buildWorkedShifts(input: {
       textColor: resolved?.text ?? "var(--dg-color-text-primary)",
       badge: null,
       borderKind: null,
+      focusAreaId: segment.focusAreaId ?? null,
+      noteMarks: [],
     });
   });
 
@@ -260,6 +275,8 @@ function buildMyScheduleDay(input: {
   isDarkTheme: boolean;
   recentPublishedChanges: Map<string, PublishChange>;
   publishedAssignmentIdByPair: Map<string, number>;
+  scheduleNotes: DashboardContentProps["scheduleNotes"];
+  isScheduleEditor: boolean;
 }): MyScheduleDay {
   const dateKey = formatDateKey(input.date);
   const { entry } = input;
@@ -327,6 +344,8 @@ function buildMyScheduleDay(input: {
             textColor: resolved?.text ?? "var(--dg-color-text-secondary)",
             badge: null,
             borderKind: null,
+            focusAreaId: null,
+            noteMarks: [],
           },
         ],
         badgeInput,
@@ -334,20 +353,32 @@ function buildMyScheduleDay(input: {
     };
   }
 
+  const workedShifts = buildWorkedShifts({
+    entry: displayEntry,
+    assignmentById: input.assignmentById,
+    jobById: input.jobById,
+    shiftById: input.shiftById,
+    isDarkTheme: input.isDarkTheme,
+  });
+  // A shift removed in the last publish has no cell left, so no notes either.
+  if (entry) {
+    const marksByShift = scheduleNoteMarksBySegment({
+      notes: input.scheduleNotes,
+      empId: input.currentEmpId,
+      dateKey,
+      segmentFocusAreaIds: workedShifts.map((shift) => shift.focusAreaId),
+      isScheduleEditor: input.isScheduleEditor,
+    });
+    workedShifts.forEach((shift, index) => {
+      shift.noteMarks = marksByShift[index] ?? [];
+    });
+  }
+
   return {
     key: dateKey,
     dateKey,
     date: input.date,
-    shifts: attachChangeBadges(
-      buildWorkedShifts({
-        entry: displayEntry,
-        assignmentById: input.assignmentById,
-        jobById: input.jobById,
-        shiftById: input.shiftById,
-        isDarkTheme: input.isDarkTheme,
-      }),
-      badgeInput,
-    ),
+    shifts: attachChangeBadges(workedShifts, badgeInput),
   };
 }
 
@@ -362,6 +393,8 @@ function buildMyScheduleDays(input: {
   isDarkTheme: boolean;
   recentPublishedChanges: Map<string, PublishChange>;
   publishedAssignmentIdByPair: Map<string, number>;
+  scheduleNotes: DashboardContentProps["scheduleNotes"];
+  isScheduleEditor: boolean;
 }): MyScheduleDay[] {
   return input.periodDates.map((date) =>
     buildMyScheduleDay({
@@ -375,6 +408,8 @@ function buildMyScheduleDays(input: {
       isDarkTheme: input.isDarkTheme,
       recentPublishedChanges: input.recentPublishedChanges,
       publishedAssignmentIdByPair: input.publishedAssignmentIdByPair,
+      scheduleNotes: input.scheduleNotes,
+      isScheduleEditor: input.isScheduleEditor,
     }),
   );
 }
@@ -483,7 +518,15 @@ function isCrowdedByPill(shift: MyScheduleShift, cellWidth: number): boolean {
   );
 }
 
-function ShiftPill({ shift, alignLeft }: { shift: MyScheduleShift; alignLeft: boolean }) {
+function ShiftPill({
+  shift,
+  alignLeft,
+  indicatorTypes,
+}: {
+  shift: MyScheduleShift;
+  alignLeft: boolean;
+  indicatorTypes: DashboardContentProps["indicatorTypes"];
+}) {
   const draftLabel = resolveDraftLabel(shift);
   const label = capShiftText(shift.label);
   const jobName = shift.jobName ? capShiftText(shift.jobName) : null;
@@ -547,19 +590,60 @@ function ShiftPill({ shift, alignLeft }: { shift: MyScheduleShift; alignLeft: bo
       >
         {jobName ?? " "}
       </div>
+      {/* The note icon (a stack when there are several) ends the time row,
+          so a pill with notes is no taller. */}
       <div
-        aria-hidden={!shift.timeRange}
         style={{
-          fontSize: "var(--dg-type-metadata-size)",
+          display: "flex",
+          alignItems: "flex-end",
+          justifyContent: alignLeft ? "flex-start" : "center",
+          gap: 4,
           marginTop: 1,
-          lineHeight: 1.25,
-          overflowWrap: "anywhere",
-          visibility: shift.timeRange ? "visible" : "hidden",
         }}
       >
-        {shift.timeRange ?? " "}
+        <div
+          aria-hidden={!shift.timeRange}
+          style={{
+            fontSize: "var(--dg-type-metadata-size)",
+            lineHeight: 1.25,
+            overflowWrap: "anywhere",
+            minWidth: 0,
+            visibility: shift.timeRange ? "visible" : "hidden",
+          }}
+        >
+          {shift.timeRange ?? " "}
+        </div>
+        {shift.noteMarks.length > 0 ? (
+          <ScheduleNotesMark marks={shift.noteMarks} indicatorTypes={indicatorTypes} />
+        ) : null}
       </div>
     </div>
+  );
+}
+
+function ScheduleNotesMark({
+  marks,
+  indicatorTypes,
+}: {
+  marks: ScheduleNoteMark[];
+  indicatorTypes: DashboardContentProps["indicatorTypes"];
+}) {
+  const names = scheduleNoteMarksLabel(marks, indicatorTypes);
+  return (
+    <MaybeHint content={names}>
+      <span
+        role="img"
+        aria-label={`Schedule notes: ${names}`}
+        data-testid="my-schedule-notes"
+        style={{ display: "inline-flex", flexShrink: 0, marginLeft: "auto", lineHeight: 0 }}
+      >
+        {marks.length > 1 ? (
+          <Files aria-hidden="true" size={13} strokeWidth={2} />
+        ) : (
+          <ScheduleNoteIcon state={marks[0].state} size={13} />
+        )}
+      </span>
+    </MaybeHint>
   );
 }
 
@@ -587,10 +671,12 @@ function DayBox({
   day,
   fillAvailableWidth,
   cellWidth,
+  indicatorTypes,
 }: {
   day: MyScheduleDay;
   fillAvailableWidth: boolean;
   cellWidth: number;
+  indicatorTypes: DashboardContentProps["indicatorTypes"];
 }) {
   // A day's cards share one alignment: once any of them has to move left to
   // clear its change pill, the ones stacked with it follow.
@@ -650,7 +736,12 @@ function DayBox({
             <EmptyDayPlaceholder />
           ) : (
             day.shifts.map((shift, index) => (
-              <ShiftPill key={index} shift={shift} alignLeft={alignLeft} />
+              <ShiftPill
+                key={index}
+                shift={shift}
+                alignLeft={alignLeft}
+                indicatorTypes={indicatorTypes}
+              />
             ))
           )}
         </div>
@@ -672,6 +763,9 @@ export default function MyScheduleRow({
   isManagementOnly = false,
   recentPublishedChanges = new Map(),
   publishedAssignmentIdByPair,
+  scheduleNotes = NO_NOTES,
+  indicatorTypes = NO_INDICATOR_TYPES,
+  isScheduleEditor = false,
 }: MyScheduleRowProps) {
   const { resolvedTheme } = useTheme();
   const isDarkTheme = resolvedTheme === "dark";
@@ -702,6 +796,8 @@ export default function MyScheduleRow({
             isDarkTheme,
             recentPublishedChanges,
             publishedAssignmentIdByPair: assignmentIdByPair,
+            scheduleNotes,
+            isScheduleEditor,
           })
         : [],
     [
@@ -715,6 +811,8 @@ export default function MyScheduleRow({
       isDarkTheme,
       recentPublishedChanges,
       assignmentIdByPair,
+      scheduleNotes,
+      isScheduleEditor,
     ],
   );
   const hasAnySchedule = days.some((day) => day.shifts.length > 0);
@@ -767,6 +865,7 @@ export default function MyScheduleRow({
                   day={day}
                   fillAvailableWidth={fillsWithoutScrolling}
                   cellWidth={isMobile ? DAY_BOX_WIDTH : cellWidth}
+                  indicatorTypes={indicatorTypes}
                 />
               ))}
             </div>

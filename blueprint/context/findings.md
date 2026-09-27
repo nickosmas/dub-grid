@@ -15,30 +15,6 @@
 **Suggested fix:** Record the change independently of the client, which is the F-08 decision; until then the label is client-reported.
 **Resolution:**
 
-### F-08 [P2] closed - Credential mutations bypass DubGrid's five-minute assurance for a token holder (research G1)
-
-**File:** `apps/web/src/features/account/client/auth.ts:86`; `apps/mobile/src/features/profile/screens/ProfilePasswordScreen.tsx:248`; `apps/web/src/features/account/server/mfa-lifecycle.ts:114`
-**Found:** 2026-09-25 by `/audit` (scope: current, 3c8b690c..3b6d908b; all lenses)
-**Why it matters:** Password and sign-in email changes are direct Supabase calls, and the factor endpoints DubGrid proxies stay reachable with the same JWT, so the assurance is a client preflight. A stolen access token can change the password (Supabase still requires aal2 when a factor exists) or, on an account with no factor, enroll an attacker's authenticator and lock the owner out, skipping DubGrid's audit. Moving the calls into DubGrid routes would not close it.
-**Suggested fix:** A decision for the owner: database triggers on `auth.users` and `auth.mfa_factors` that audit, revoke or alert on credential changes, and/or a shorter `jwt_expiry`. Out of 41b2's scope by design. A third option since 41c1: turn on Supabase's own MFA factor notices (declared in `config.toml`, currently `enabled = false` because DubGrid's alert covers normal flows), which alert the owner of any enrollment or removal, including one made with a stolen token, at the cost of a duplicate email on an ordinary change.
-**Resolution:** Owner delegated the decision (2026-09-25); fixed in 41d3: Supabase's own MFA factor notices are enabled in `config.toml` (sent by Supabase, so a change made with a stolen token still reaches the owner), and DubGrid's two-factor alert pushes only (`sendEmail: false`) so an ordinary change sends one email. Production takes effect when the auth templates and flags are pushed, which must happen before the release merges. A shorter `jwt_expiry` was not chosen. Revised after audit (a6e3c15c): nothing yet shows Supabase sends the MFA notices, so DubGrid's own two-factor alert keeps emailing (the push-only change is reverted) and an ordinary change may send two emails until production is confirmed. Re-review (a6e3c15c..d6b802ca): closed.
-
-### F-16 [P2] closed - Gridmaster organization-role grants run without fresh assurance
-
-**File:** `apps/web/src/app/api/gridmaster/organizations/manage/route.ts:291`
-**Found:** 2026-09-25 by `/audit` (scope: current, 2f001cb4..e24134f8; all lenses)
-**Why it matters:** `assignOrgRoleByEmail` can grant Super Admin of any organization to any account on the Gridmaster session alone. It predates 41b3 and is organization rather than platform authority, so it sits outside 41b3's wording but close to its goal.
-**Suggested fix:** Gate that action with `requireSensitiveActionAuth` and run it through step-up, and classify the route in the inventory. Needs a scope call.
-**Resolution:** Owner delegated the decision (2026-09-25); fixed in 41d3: `assignOrgRoleByEmail` requires `requireSensitiveActionAuth` before the RPC, the Users tab runs it through step-up with the credential preflight, and the inventory classifies the route `conditional-sensitive`. Audit (a6e3c15c) found the Users tab's role dropdown still reached `change_user_role` on the access route unguarded; a Gridmaster role change there now requires fresh proof too, through step-up, and the inventory pins it. Re-review (d6b802ca) kept it open: `/api/organizations/role-change` also calls `change_user_role` ungated. It now requires fresh proof for every caller (no screen calls it), the inventory marker includes `change_user_role`, and a test proves a stale session changes nothing. Re-review (7ba79e75): closed as scoped, direct role grants: `assignOrgRoleByEmail`, the access route for a Gridmaster and the role-change route all require fresh proof, and mobile refuses Gridmaster tokens outright. Grants through invitations and direct database access are recorded as F-59 and F-60.
-
-### F-17 [P3] closed - Gridmaster audit-log export runs without fresh assurance
-
-**File:** `apps/web/src/app/api/gridmaster/audit-log/export/route.ts:24`
-**Found:** 2026-09-25 by `/audit` (scope: current, 2f001cb4..e24134f8; all lenses)
-**Why it matters:** The coding standards list export as a sensitive action; this export predates 41b3 and needs only the Gridmaster session.
-**Suggested fix:** Gate with `requireSensitiveActionAuth` and step-up, or record why a platform audit export is exempt.
-**Resolution:** Owner delegated the decision (2026-09-25); fixed in 41d3: the export requires `requireSensitiveActionAuth` before reading rows, the compliance view runs it through step-up, and the inventory classifies the route `sensitive`. Re-review (a6e3c15c..d6b802ca): closed.
-
 ### F-18 [P3] unverified - The live MFA-policy integration test can lose its verified session under full-suite load
 
 **File:** `apps/web/src/__tests__/mfa-enforced-in-policies.integration.test.ts:110`
@@ -72,22 +48,6 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** Have the RPC return whether it ended a row (migration).
 **Resolution:**
 
-### F-42 [P2] closed - Arming the app lock only on background could leave content in the iOS app switcher
-
-**File:** `apps/mobile/src/shared/providers/AppLockProvider.tsx:119`
-**Found:** 2026-09-25 by `/audit` (scope: current, b3848e11..46bda2bb; all lenses)
-**Why it matters:** iOS goes inactive in the app switcher and snapshots soon after; with only `background` arming the lock, the cover could arrive after the snapshot, showing schedule and people data. Not verified on a device.
-**Suggested fix:** Cover the app on `inactive` without locking or prompting.
-**Resolution:** `inactive` raises the privacy cover (no lock, no prompt); `active` lowers it; `background` still locks. A provider test covers it. The switcher snapshot needs the 41d3 device rehearsal. Re-review (d4a48aa5): kept open, since the cover could stay up after a sign-out while covered; the effect's cleanup now lowers it, with a test that fails without it. iOS only: Android reports no `inactive`, and its recents snapshot stays unprotected (that needs `FLAG_SECURE`). Second re-review (fe8c51ee): kept open at the repair limit (two attempts). The cleanup that lowers the cover also runs when the token rotates while the app is inactive, so a manual refresh already in flight when the switcher opens drops the cover until `background`. Suggested next fix: key the effect on `Boolean(accessToken)` instead of the token, with a test that rotates the token after `inactive`. Owner delegated the decision (2026-09-25); fixed in 41d3 with the recorded next step: the effect is keyed on `Boolean(accessToken)`, so a token rotation no longer re-runs its cleanup; a test rotates the token while inactive and fails without the change. Re-review (a6e3c15c..d6b802ca): closed.
-
-### F-47 [P2] closed - The app's password rule accepts passwords Supabase's rule refuses
-
-**File:** `packages/domain/src/password.ts`; `supabase/config.toml` (`password_requirements = "letters_digits"`)
-**Found:** 2026-09-25 during 41d2 (drift review; recorded, not built)
-**Why it matters:** `isPasswordAcceptable` wants 10 characters and two of uppercase, digit or symbol, so `Abcdefghij!` passes both apps and the register route, but Supabase requires a digit and refuses it at sign-up or reset. Production's setting is unverified.
-**Suggested fix:** A policy decision: require a letter and a digit in the app rule (and its hints and copy on web and mobile), or relax Supabase's requirement to match the app. Then add a test that parses `config.toml` and holds the two together.
-**Resolution:** Owner delegated the decision (2026-09-25); fixed in 41d3: the app rule requires a letter and a number (the hint reads "Letter and number") plus an uppercase letter or a symbol, so it can never accept what `letters_digits` refuses; `password-policy.test.ts` holds it against `config.toml`. Audit (a6e3c15c) found the meter still said "Fair" for refused passwords and the guidance copy omitted the number; the level is capped at Weak for any refused password and the copy names a letter and a number. Re-review (a6e3c15c..d6b802ca): closed.
-
 ### F-50 [P3] open - Remaining drift-guard gaps
 
 **File:** `apps/web/src/__tests__/invitation-sql-contract.test.ts:41`; `access-token-hook-claims.test.ts`; `apps/web/src/emails/InviteEmail.tsx:72`; `apps/web/src/app/page.tsx:93`; `apps/web/src/__tests__/push-auth-templates.test.ts`
@@ -103,30 +63,6 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Why it matters:** Supabase Auth v2.187.0 (`internal/api/user.go:154`) refuses a password update without a reauthentication nonce when the current session started more than 24 hours ago. DubGrid's password step-up replaces the session, so it passes; its authenticator-code step-up keeps the old session, and neither app sends a nonce. Mobile sessions now last until sign-out, so with the setting on, a two-factor user could not change their password on mobile after the first day. Production has it off; local `config.toml` has it on, which the fresh sessions in tests never reach.
 **Suggested fix:** Keep it off in production. Before turning it on, either send Supabase's reauthentication nonce with the update or have the authenticator-code step-up issue a fresh session; then set local and production alike.
 **Resolution:**
-
-### F-68 [P3] closed - Management-department grants by a Gridmaster run without fresh proof
-
-**File:** `apps/web/src/app/api/organizations/invitations/route.ts` (PATCH `deptAdminIds`); `apps/web/src/app/api/organizations/app-only-user/route.ts`
-**Found:** 2026-09-26 by `/audit` of e42da4bd..821c7ff4
-**Why it matters:** Department-admin assignments are a smaller grant of the same kind F-61 gated for permissions.
-**Suggested fix:** Gate a Gridmaster's department-admin changes like permission changes.
-**Resolution:** Fixed in 41d3 (repair): the app-only-user route and the invitation edit require fresh proof when a Gridmaster changes the department or department-admin set (compared as sets, so a save that leaves them alone asks nothing); the People management screens run those saves through step-up, and the editor revokes a pending invitation only after both prompted steps. Route tests cover a stale session, an unchanged set and an ordinary admin; the inventory classifies the app-only-user route. Re-review (e4e6f905..f2ff543e) kept it fixed: the server gates hold, but the People management save wrote the details before the departments' prompt, so a cancel left a silent partial save and a stale version. The save now runs the prompted grant first, so a cancel saves nothing; a MembersSection test proves it and fails against the previous order. Re-review (1716c586): closed; the branch cases are unchanged, a retry after an identity failure is idempotent, and ordinary admins see no change. A failed save now also refreshes the directory, since a grant may have saved first.
-
-### F-69 [P3] closed - Test gaps in the 41d4 step-up wiring
-
-**File:** `apps/web/src/__tests__/GridmasterUsersTab.test.tsx`; `apps/web/src/components/staff/MemberAccessControls.tsx`; `apps/web/src/components/gridmaster/OrganizationSetupWizard.tsx`
-**Found:** 2026-09-26 by `/audit` of e42da4bd..821c7ff4
-**Why it matters:** Nothing covers a step-up retry that runs the action twice, `PermissionsEditor` staying open when a save is cancelled, `MemberAccessControls`' own cancel, or the wizard's invitation-step cancel.
-**Suggested fix:** Add those view tests. Also: a behavior test that replace-access omits the token, `isGridmasterActor` throwing on a read error, the reinvite info toast, and the revoke-after-role-change order.
-**Resolution:** Fixed in 41d3 (repair): tests for the step-up retry in the Users tab (including the invite flag reset), `PermissionsEditor` staying open on a cancelled save, `MemberAccessControls` cancels (new file), the wizard's invitation-step cancel, replace-access returning no token, `isGridmasterActor` failing closed, the reinvite info toast, and the management editor's revoke-last order. Each was confirmed to fail on a matching regression except the invite flag reset, which the action's structure already prevents. The management editor's role-change branch cannot be reached for a linked user (the picker is hidden), so that order is covered for the department step only. Re-review (e4e6f905..f2ff543e): closed; the new tests fail against the old code.
-
-### F-71 [P2] closed - `send_invitation` returns a token to a direct authenticated caller
-
-**File:** `supabase/migrations/043_invitation_inviter_is_verified.sql:250`; `apps/web/src/app/api/gridmaster/organizations/manage/route.ts:469`
-**Found:** 2026-09-26 by `/audit` re-review of 58ff57cd (predates 41d4)
-**Why it matters:** An Admin who manages employees can call the RPC through the data API and receive the new invitation's token, then register a pre-confirmed account at an address they do not own. No tier escalation (the function's tier check holds), but the address is not proven. The same class as F-60.
-**Suggested fix:** Move the setup wizard's call to the service client with `p_invited_by`, then revoke EXECUTE on `send_invitation` from `authenticated` in a forward migration and update the SQL entry-point allowlist.
-**Resolution:** Fixed in 41d3 (repair): migration `050_send_invitation_server_only.sql` revokes EXECUTE on `send_invitation` from `authenticated`; the Gridmaster setup route calls it as the service role with `p_invited_by`, like invitations/create. The SQL entry-point allowlist now honours a later revoke, and the live check proves `authenticated` cannot execute it. Production needs 050 applied by the runbook. Re-review (e4e6f905..f2ff543e): closed; no application path or live test calls it as `authenticated` (the e2e fixtures use the superuser). Ordering: production's released code still calls it as the user from the setup wizard, so 050 is applied right after the release that carries the service-role call deploys, not before. Applied to production 2026-09-26 after release #115 deployed; `authenticated` can no longer execute it there.
 
 ### F-73 [P2] fixed - Production Supabase accepts public sign-ups on an invite-only product
 

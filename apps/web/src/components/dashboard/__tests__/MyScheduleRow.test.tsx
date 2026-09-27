@@ -4,7 +4,9 @@ import MyScheduleRow from "@/components/dashboard/MyScheduleRow";
 import type {
   AbsenceType,
   AssignmentDefinition,
+  IndicatorType,
   JobDefinition,
+  ScheduleNote,
   ShiftCategory,
   ShiftMap,
 } from "@/types";
@@ -1135,5 +1137,145 @@ describe("MyScheduleRow", () => {
     );
 
     expect(screen.getAllByText("Registered Nurse")).toHaveLength(1);
+  });
+  describe("schedule notes", () => {
+    const indicatorTypes = [
+      { id: 1, name: "Float" },
+      { id: 2, name: "Training" },
+    ] as IndicatorType[];
+
+    function note(indicatorTypeId: number, overrides: Partial<ScheduleNote> = {}): ScheduleNote {
+      return {
+        id: indicatorTypeId,
+        orgId: "org-1",
+        empId: "emp-1",
+        date: "2026-05-11",
+        indicatorTypeId,
+        focusAreaId: null,
+        status: "published",
+        createdBy: null,
+        updatedBy: null,
+        createdAt: "2026-05-01T00:00:00Z",
+        updatedAt: "2026-05-01T00:00:00Z",
+        ...overrides,
+      };
+    }
+
+    const dayShift: ShiftMap = {
+      "emp-1_2026-05-11": {
+        label: "D",
+        assignmentIds: [101],
+        isDraft: false,
+        draftKind: null,
+        publishedAssignmentDefinitionIds: [101],
+        publishedLabel: "D",
+      },
+    };
+
+    function renderRow(input: {
+      shifts?: ShiftMap;
+      notes: ScheduleNote[];
+      isScheduleEditor?: boolean;
+      recentPublishedChanges?: Map<string, never>;
+    }) {
+      return render(
+        <MyScheduleRow
+          currentEmpId="emp-1"
+          currentPeriodShifts={input.shifts ?? dayShift}
+          assignmentById={assignmentById}
+          absenceTypeById={absenceTypeById}
+          periodDates={weekDates}
+          periodLabel="this week"
+          scheduleNotes={input.notes}
+          indicatorTypes={indicatorTypes}
+          isScheduleEditor={input.isScheduleEditor}
+          recentPublishedChanges={input.recentPublishedChanges}
+        />,
+      );
+    }
+
+    it("ends the time row with one note's icon, named for screen readers", () => {
+      renderRow({ notes: [note(1)] });
+
+      const mark = screen.getByTestId("my-schedule-notes");
+      expect(mark).toHaveAccessibleName("Schedule notes: Float");
+      expect(mark.querySelector("[data-note-icon]")).not.toBeNull();
+      // Beside the time, not in a row of its own.
+      expect(mark.parentElement).toHaveTextContent("9:00 AM - 5:00 PM");
+    });
+
+    it("uses one stacked icon for several notes, naming each", () => {
+      renderRow({ notes: [note(1), note(2)] });
+
+      const mark = screen.getByTestId("my-schedule-notes");
+      expect(mark).toHaveAccessibleName("Schedule notes: Float, Training");
+      expect(mark.querySelector("[data-note-icon]")).toBeNull();
+      expect(mark.querySelectorAll("svg")).toHaveLength(1);
+    });
+
+    it("shows no icon without notes", () => {
+      renderRow({ notes: [note(1, { date: "2026-05-12" })] });
+
+      expect(screen.queryByTestId("my-schedule-notes")).toBeNull();
+    });
+
+    it("words an editor's drafts and hides a viewer's", () => {
+      const notes = [note(1, { status: "draft" }), note(2)];
+
+      const { unmount } = renderRow({ notes, isScheduleEditor: true });
+      expect(screen.getByTestId("my-schedule-notes")).toHaveAccessibleName(
+        "Schedule notes: Float (added, not published), Training",
+      );
+      unmount();
+
+      renderRow({ notes });
+      expect(screen.getByTestId("my-schedule-notes")).toHaveAccessibleName(
+        "Schedule notes: Training",
+      );
+    });
+
+    it("gives each half of a double shift its own focus area's notes", () => {
+      const shifts: ShiftMap = {
+        "emp-1_2026-05-11": {
+          label: "D+N",
+          assignmentIds: [101, 202],
+          segments: [
+            { shiftId: 10, jobId: 7, position: 0, assignmentId: 101, label: "D", focusAreaId: 1 },
+            { shiftId: 11, jobId: 8, position: 1, assignmentId: 202, label: "N", focusAreaId: 2 },
+          ],
+          isDraft: false,
+          draftKind: null,
+          publishedAssignmentDefinitionIds: [101, 202],
+          publishedLabel: "D+N",
+        },
+      };
+
+      renderRow({ shifts, notes: [note(1, { focusAreaId: 2 }), note(2)] });
+
+      const marks = screen.getAllByTestId("my-schedule-notes");
+      expect(marks.map((mark) => mark.getAttribute("aria-label"))).toEqual([
+        "Schedule notes: Training",
+        "Schedule notes: Float",
+      ]);
+    });
+
+    it("marks no note on an absence", () => {
+      const shifts: ShiftMap = {
+        "emp-1_2026-05-11": {
+          label: "V",
+          assignmentIds: [],
+          absenceTypeId: 5,
+          isDraft: false,
+          draftKind: null,
+          publishedAssignmentDefinitionIds: [],
+          publishedLabel: "V",
+        },
+      };
+
+      renderRow({ shifts, notes: [note(1)] });
+
+      expect(screen.getByText("Vacation")).toBeInTheDocument();
+      expect(screen.queryByTestId("my-schedule-notes")).toBeNull();
+    });
   });
 });

@@ -55,6 +55,9 @@ export default function SuperAdminDashboard(props: DashboardContentProps) {
         isMobile={isMobile}
         periodLabel={periodLabel}
         isManagementOnly={isManagementOnly}
+        scheduleNotes={props.scheduleNotes}
+        indicatorTypes={props.indicatorTypes}
+        isScheduleEditor={permissions.canEditShifts || permissions.canEditNotes}
       />
 
       <div
