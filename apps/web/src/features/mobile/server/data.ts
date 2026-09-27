@@ -336,6 +336,11 @@ async function fetchJobNameMap(
   return new Map(rows.map((row) => [row.id, row.name]));
 }
 
+// The database only requires an indicator's name and colour to be present, not
+// non-empty, and the contract refuses an empty one, so a blank value reads as a
+// plain note in neutral grey rather than failing the whole response.
+const UNKNOWN_INDICATOR_COLOR = "#A3A3A3";
+
 export async function fetchMobileIndicatorTypes(
   serviceClient: SupabaseClient,
   orgId: string,
@@ -343,8 +348,8 @@ export async function fetchMobileIndicatorTypes(
   const rows = await fetchMobileIndicatorTypeRows(serviceClient, orgId);
   return rows.map((row) => ({
     id: row.id,
-    name: row.name,
-    color: row.color,
+    name: row.name || "Note",
+    color: row.color || UNKNOWN_INDICATOR_COLOR,
     sortOrder: row.sort_order,
   }));
 }
@@ -862,10 +867,6 @@ function getMissingDeletedPublishedChanges(
     .filter(([key, change]) => !rowKeys.has(key) && change.kind === "deleted" && change.fromState)
     .map(([, change]) => change);
 }
-
-// A note's indicator type is required, so the colour and name are always set;
-// the fallback only covers a join the database should never return empty.
-const UNKNOWN_INDICATOR_COLOR = "#94A3B8";
 
 /** The range's schedule notes for the schedule loaders, which apply the viewer's rule. */
 export async function fetchMobileScheduleNotes(

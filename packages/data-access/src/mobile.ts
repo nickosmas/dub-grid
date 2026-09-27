@@ -964,8 +964,6 @@ export async function fetchProfileNameRowsByIds(
   return (data ?? []) as MobileProfileNameRow[];
 }
 
-// Half PostgREST's 1,000-row cap: each cell carries its snapshots and
-// segments, so a page of these is a heavy response.
 export interface MobileScheduleNoteRow {
   emp_id: string;
   date: string;
@@ -1013,6 +1011,8 @@ export async function fetchMobileScheduleNoteRows(
   return rows;
 }
 
+// Half PostgREST's 1,000-row cap: each cell carries its snapshots and
+// segments, so a page of these is a heavy response.
 const MOBILE_SCHEDULE_CELL_PAGE_SIZE = 500;
 
 /** Every cell in the range, paged so a large organization or a long range is never silently cut off. */

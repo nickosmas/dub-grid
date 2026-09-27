@@ -20,10 +20,10 @@ const TABLES_THAT_SHOULD_REFRESH_THE_DASHBOARD = [
   "recurring_shifts",
   "publish_history",
   "invitations",
-  "schedule_notes",
 ] as const;
 
 const TABLES_THAT_SHOULD_NOT_REFRESH_THE_DASHBOARD = [
+  "schedule_notes",
   "profile_change_requests",
   "notifications",
   "audit_log",
@@ -62,4 +62,12 @@ describe("getMobileRealtimeInvalidationKeys", () => {
       expect(keys).not.toContainEqual(DASHBOARD_KEY);
     },
   );
+
+  // 42b: an indicator change refreshes the Home schedule card, not the whole dashboard.
+  it("refreshes only the Home schedule card among dashboard queries for schedule_notes", () => {
+    const keys = getMobileRealtimeInvalidationKeys("token-1", "schedule_notes");
+
+    expect(keys).toContainEqual(["mobile", "dashboard", "my-schedule"]);
+    expect(keys).toContainEqual(["mobile", "schedule"]);
+  });
 });

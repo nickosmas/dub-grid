@@ -582,7 +582,9 @@ export const mobileScheduleEntrySchema = z.object({
   change: mobileScheduleEntryChangeSchema.nullable().default(null),
   publishedAt: z.string().nullable(),
   publishedByName: z.string().nullable(),
-  // Defaults to empty so a client talking to an older server still parses.
+  // Defaults to empty so a client talking to an older server still parses. Only
+  // the schedule endpoints fill it; others (shift requests, swap options) send
+  // an empty list, which there means "not looked up", not "none".
   indicators: z.array(mobileScheduleIndicatorSchema).default([]),
 });
 

@@ -1,7 +1,7 @@
 # Feature: Mobile API indicators
 
 **From build-plan:** feature 42b
-**Status:** in progress (parked; another session's fix holds
+**Status:** verified (parked; another session's fix holds
 `current-feature.md`)
 
 ## Goal
@@ -112,6 +112,18 @@ draft rule is the web's, held in one shared place so the two cannot drift.
   `npm run test:web` and `npm run test:mobile`; rebuild packages
   (`npm run build:packages`) before testing consumers.
 - Final gate: `npm run type-check`, `npm run test`, `npm run lint`.
+
+## Review repairs
+
+- A blank indicator name or colour (the database allows both) reads as
+  "Note" in neutral grey instead of failing the whole bootstrap.
+- The Home card refresh invalidates only its own key, not the admin
+  dashboard.
+- A `/me/schedule` viewer test; the contract notes that non-schedule endpoints
+  send an empty `indicators` list meaning "not looked up".
+- For 42c: consider parsing an unknown indicator `state` leniently on the
+  client, so a future server value cannot fail an older build's whole
+  schedule response. The missing `(org_id, date)` index is F-84.
 
 ## Notes for the AI
 

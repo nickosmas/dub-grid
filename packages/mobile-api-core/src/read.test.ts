@@ -389,6 +389,39 @@ describe("schedule payloads and their indicators", () => {
     expect(payload.entries).toHaveLength(2);
   });
 
+  it("shows a viewer only published indicators on their own schedule too", async () => {
+    const payload = await loadMobileMeSchedulePayload(
+      {
+        currentOrg: { id: ORG_ID },
+        serviceClient: {},
+        user: { id: USER_ID },
+        permissions: {
+          canPublishSchedule: false,
+          level: 0,
+          canEditShifts: false,
+          canEditNotes: false,
+        },
+      } as never,
+      range,
+      {
+        fetchLinkedEmployeeForUser: vi.fn(async () => ({
+          id: "employee-1",
+          firstName: "Alex",
+          lastName: "Reed",
+          status: "active",
+          focusAreaIds: [],
+          departmentIds: [],
+        })),
+        fetchMobileScheduleEntries,
+        fetchMobileScheduleNotes,
+      } as never,
+    );
+    expect(payload.entries[0]!.indicators.map((i) => [i.indicatorTypeId, i.state])).toEqual([
+      [7, "published"],
+      [9, "published"],
+    ]);
+  });
+
   it("reads the caller's own notes in the effective organization for their schedule", async () => {
     const notes = vi.fn(async () => []);
     await loadMobileMeSchedulePayload(

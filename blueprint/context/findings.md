@@ -167,3 +167,11 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Why it matters:** The platform-wide subscription invalidates on every row event with no debounce, so a bulk import or invitation batch in any organization restarts an open person page's (and the platform summaries') fetch once per row. Gridmaster-only, and the summaries already behaved this way.
 **Suggested fix:** Coalesce invalidations per query key over a short window before refetching.
 **Resolution:**
+
+### F-84 [P3] open - No index serves an organization's schedule notes by date
+
+**File:** `supabase/migrations/001_schema.sql` (`schedule_notes` indexes)
+**Found:** 2026-09-27 by review of 42b
+**Why it matters:** The web schedule and, since 42b, every mobile team schedule read notes by `org_id` and a date range, ordered by date; with only `(org_id)`, `(emp_id)`, `(emp_id, date)` and `(indicator_type_id)` indexes, that scans the organization's whole note history. Fine at today's sizes.
+**Suggested fix:** A forward migration adding an index on `(org_id, date)`.
+**Resolution:**
