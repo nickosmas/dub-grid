@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { CalendarDays, Files } from "lucide-react";
 import type { DashboardContentProps } from "./DashboardContentProps";
@@ -31,7 +31,10 @@ import type {
 } from "@/types";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const DAY_BOX_WIDTH = 160;
+// Every day cell shares one width, never below this: the longest time range
+// ("12:00 AM - 12:00 AM", 119px at the 12px metadata size) plus the note icon
+// fits on one line, so ordinary cards never wrap. Narrower screens scroll.
+const DAY_BOX_WIDTH = 184;
 const DAY_BOX_MIN_HEIGHT = 86;
 const DAY_GAP = 10;
 const SCROLL_CONTROL_SLOT_WIDTH = 32;
@@ -66,7 +69,6 @@ type MyScheduleRowProps = Pick<
   jobs?: DashboardContentProps["jobs"];
   publishedAssignmentIdByPair?: DashboardContentProps["publishedAssignmentIdByPair"];
   shiftCategories?: DashboardContentProps["shiftCategories"];
-  isMobile?: DashboardContentProps["isMobile"];
   // True for a management-only viewer (management department access, no
   // scheduled focus area) — they're never actually scheduled, so this card
   // should stay hidden even though they have an employees row.
@@ -421,6 +423,7 @@ function useHorizontalScrollState(dependency: unknown) {
   // A scrolling period (2 weeks) should still show week-sized cells, so the
   // visible cell width is derived from what one week would occupy here.
   const [cellWidth, setCellWidth] = useState(DAY_BOX_WIDTH);
+  const [pillHeight, setPillHeight] = useState(SHIFT_PILL_MIN_HEIGHT);
 
   const updateScrollState = useCallback(() => {
     const el = scrollRef.current;
@@ -433,9 +436,11 @@ function useHorizontalScrollState(dependency: unknown) {
         ? Math.max(DAY_BOX_WIDTH, Math.floor((viewportWidth - DAY_GAP * 6) / 7))
         : DAY_BOX_WIDTH,
     );
+    setPillHeight(measureTallestPill(el));
   }, []);
 
-  useEffect(() => {
+  // Before paint, so the cards never flash at uneven heights.
+  useLayoutEffect(() => {
     updateScrollState();
     const el = scrollRef.current;
     if (!el) return;
@@ -462,17 +467,34 @@ function useHorizontalScrollState(dependency: unknown) {
     [cellWidth],
   );
 
-  return { scrollRef, canScrollLeft, canScrollRight, scrollByPage, cellWidth };
+  return { scrollRef, canScrollLeft, canScrollRight, scrollByPage, cellWidth, pillHeight };
+}
+
+/**
+ * The height every card takes: the tallest card's natural height, so a card
+ * whose long name wraps does not leave the others shorter.
+ */
+function measureTallestPill(strip: HTMLElement): number {
+  let tallest = SHIFT_PILL_MIN_HEIGHT;
+  for (const pill of strip.querySelectorAll<HTMLElement>("[data-my-schedule-pill]")) {
+    const assigned = pill.style.minHeight;
+    pill.style.minHeight = `${SHIFT_PILL_MIN_HEIGHT}px`;
+    tallest = Math.max(tallest, Math.ceil(pill.getBoundingClientRect().height));
+    pill.style.minHeight = assigned;
+  }
+  return tallest;
 }
 
 function ScrollCue({
   direction,
   visible,
   onClick,
+  pillHeight,
 }: {
   direction: "left" | "right";
   visible: boolean;
   onClick: () => void;
+  pillHeight: number;
 }) {
   return (
     <div
@@ -481,7 +503,7 @@ function ScrollCue({
         position: "absolute",
         // Anchored to the first card rather than the strip, whose height varies
         // with the tallest day.
-        top: FIRST_CARD_OFFSET + SHIFT_PILL_MIN_HEIGHT / 2,
+        top: FIRST_CARD_OFFSET + pillHeight / 2,
         [direction]: 12,
         transform: "translateY(-50%)",
         zIndex: 1,
@@ -522,10 +544,12 @@ function ShiftPill({
   shift,
   alignLeft,
   indicatorTypes,
+  height,
 }: {
   shift: MyScheduleShift;
   alignLeft: boolean;
   indicatorTypes: DashboardContentProps["indicatorTypes"];
+  height: number;
 }) {
   const draftLabel = resolveDraftLabel(shift);
   const label = capShiftText(shift.label);
@@ -533,8 +557,9 @@ function ShiftPill({
 
   return (
     <div
+      data-my-schedule-pill=""
       style={{
-        minHeight: SHIFT_PILL_MIN_HEIGHT,
+        minHeight: height,
         display: "flex",
         flexDirection: "column",
         justifyContent: "center",
@@ -547,7 +572,9 @@ function ShiftPill({
         background: shift.background,
         color: shift.textColor,
         boxSizing: "border-box",
-        overflowWrap: "anywhere",
+        // Wraps only between words: the cell is wide enough for ordinary
+        // content, and a genuinely long name breaks at a space, never mid-word.
+        overflowWrap: "break-word",
         position: "relative",
       }}
     >
@@ -556,7 +583,7 @@ function ShiftPill({
           fontSize: "var(--dg-type-badge-size)",
           fontWeight: 600,
           lineHeight: 1.25,
-          overflowWrap: "anywhere",
+          overflowWrap: "break-word",
           paddingLeft: draftLabel && !alignLeft ? CHANGE_PILL_RESERVE : 0,
           paddingRight: draftLabel ? CHANGE_PILL_RESERVE : 0,
         }}
@@ -584,7 +611,7 @@ function ShiftPill({
           marginTop: 1,
           opacity: 0.8,
           lineHeight: 1.25,
-          overflowWrap: "anywhere",
+          overflowWrap: "break-word",
           visibility: jobName ? "visible" : "hidden",
         }}
       >
@@ -606,8 +633,7 @@ function ShiftPill({
           style={{
             fontSize: "var(--dg-type-metadata-size)",
             lineHeight: 1.25,
-            overflowWrap: "anywhere",
-            minWidth: 0,
+            whiteSpace: "nowrap",
             visibility: shift.timeRange ? "visible" : "hidden",
           }}
         >
@@ -647,11 +673,11 @@ function ScheduleNotesMark({
   );
 }
 
-function EmptyDayPlaceholder() {
+function EmptyDayPlaceholder({ height }: { height: number }) {
   return (
     <div
       style={{
-        minHeight: SHIFT_PILL_MIN_HEIGHT,
+        minHeight: height,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -669,13 +695,13 @@ function EmptyDayPlaceholder() {
 
 function DayBox({
   day,
-  fillAvailableWidth,
   cellWidth,
+  pillHeight,
   indicatorTypes,
 }: {
   day: MyScheduleDay;
-  fillAvailableWidth: boolean;
   cellWidth: number;
+  pillHeight: number;
   indicatorTypes: DashboardContentProps["indicatorTypes"];
 }) {
   // A day's cards share one alignment: once any of them has to move left to
@@ -690,9 +716,6 @@ function DayBox({
         textDecoration: "none",
         color: "inherit",
         flexShrink: 0,
-        flexGrow: fillAvailableWidth ? 1 : 0,
-        flexBasis: fillAvailableWidth ? 0 : "auto",
-        minWidth: 0,
         display: "flex",
         alignSelf: "stretch",
         scrollSnapAlign: "start",
@@ -701,9 +724,8 @@ function DayBox({
     >
       <div
         style={{
-          width: fillAvailableWidth ? "100%" : cellWidth,
+          width: cellWidth,
           minHeight: DAY_BOX_MIN_HEIGHT,
-          flex: 1,
           display: "flex",
           flexDirection: "column",
           textAlign: "center",
@@ -733,7 +755,7 @@ function DayBox({
           }}
         >
           {day.shifts.length === 0 ? (
-            <EmptyDayPlaceholder />
+            <EmptyDayPlaceholder height={pillHeight} />
           ) : (
             day.shifts.map((shift, index) => (
               <ShiftPill
@@ -741,6 +763,7 @@ function DayBox({
                 shift={shift}
                 alignLeft={alignLeft}
                 indicatorTypes={indicatorTypes}
+                height={pillHeight}
               />
             ))
           )}
@@ -757,7 +780,6 @@ export default function MyScheduleRow({
   absenceTypeById,
   jobs = [],
   shiftCategories = [],
-  isMobile = false,
   periodDates,
   periodLabel,
   isManagementOnly = false,
@@ -816,9 +838,8 @@ export default function MyScheduleRow({
     ],
   );
   const hasAnySchedule = days.some((day) => day.shifts.length > 0);
-  const fillsWithoutScrolling = days.length <= 7 && !isMobile;
-  const { scrollRef, canScrollLeft, canScrollRight, scrollByPage, cellWidth } =
-    useHorizontalScrollState(days.length);
+  const { scrollRef, canScrollLeft, canScrollRight, scrollByPage, cellWidth, pillHeight } =
+    useHorizontalScrollState(days);
 
   if (!currentEmpId || isManagementOnly) return null;
 
@@ -845,7 +866,12 @@ export default function MyScheduleRow({
               position: "relative",
             }}
           >
-            <ScrollCue direction="left" visible={canScrollLeft} onClick={() => scrollByPage(-1)} />
+            <ScrollCue
+              direction="left"
+              visible={canScrollLeft}
+              onClick={() => scrollByPage(-1)}
+              pillHeight={pillHeight}
+            />
             <div
               ref={scrollRef}
               className="dg-no-scrollbar"
@@ -854,7 +880,9 @@ export default function MyScheduleRow({
                 display: "flex",
                 alignItems: "stretch",
                 gap: DAY_GAP,
-                overflowX: fillsWithoutScrolling ? "hidden" : "auto",
+                // A week fills the card when seven cells fit and scrolls when
+                // they do not; cells never shrink below their width.
+                overflowX: "auto",
                 paddingBottom: 2,
                 scrollSnapType: "x proximity",
               }}
@@ -863,13 +891,18 @@ export default function MyScheduleRow({
                 <DayBox
                   key={day.key}
                   day={day}
-                  fillAvailableWidth={fillsWithoutScrolling}
-                  cellWidth={isMobile ? DAY_BOX_WIDTH : cellWidth}
+                  cellWidth={cellWidth}
+                  pillHeight={pillHeight}
                   indicatorTypes={indicatorTypes}
                 />
               ))}
             </div>
-            <ScrollCue direction="right" visible={canScrollRight} onClick={() => scrollByPage(1)} />
+            <ScrollCue
+              direction="right"
+              visible={canScrollRight}
+              onClick={() => scrollByPage(1)}
+              pillHeight={pillHeight}
+            />
           </div>
         )}
       </div>

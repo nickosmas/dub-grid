@@ -52,7 +52,6 @@ export default function SuperAdminDashboard(props: DashboardContentProps) {
         jobs={jobs}
         shiftCategories={shiftCategories}
         periodDates={periodDates}
-        isMobile={isMobile}
         periodLabel={periodLabel}
         isManagementOnly={isManagementOnly}
         scheduleNotes={props.scheduleNotes}
