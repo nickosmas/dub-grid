@@ -75,23 +75,23 @@ describe("MyScheduleCard", () => {
     expect(screen.getByText("—")).toBeInTheDocument();
   });
 
-  it("spells out a day's schedule notes under its pills", () => {
+  it("marks a pill's schedule notes with one icon in its corner, a stack when several", () => {
+    const note = (indicatorTypeId: number, name: string) => ({
+      indicatorTypeId,
+      focusAreaId: null,
+      name,
+      color: "#378ADD",
+      state: "published" as const,
+    });
     useQuery.mockReturnValue({
       isLoading: false,
       data: {
-        range: { startDate: "2026-05-11", endDate: "2026-05-12" },
+        range: { startDate: "2026-05-11", endDate: "2026-05-13" },
         entries: [
+          makeEntry({ date: "2026-05-11", indicators: [note(1, "Training")] }),
           makeEntry({
-            date: "2026-05-11",
-            indicators: [
-              {
-                indicatorTypeId: 1,
-                focusAreaId: null,
-                name: "Training",
-                color: "#378ADD",
-                state: "published",
-              },
-            ],
+            date: "2026-05-12",
+            indicators: [note(1, "Training"), note(2, "Float")],
           }),
         ],
       },
@@ -99,15 +99,18 @@ describe("MyScheduleCard", () => {
 
     render(<MyScheduleCard accessToken="token" />);
 
-    const day = screen.getByRole("button", {
-      name: "Monday, May 11. Schedule notes: Training",
-    });
-    expect(within(day).getByLabelText("Schedule notes: Training")).toHaveTextContent("Training");
+    const single = screen.getByTestId("schedule-card-notes-2026-05-11-0");
+    expect(single.querySelector("[data-icon-name='note-outline']")).not.toBeNull();
+    expect(single).toHaveTextContent("");
+    const several = screen.getByTestId("schedule-card-notes-2026-05-12-0");
+    expect(several.querySelector("[data-icon-name='note-multiple-outline']")).not.toBeNull();
+    expect(several).toHaveTextContent("");
+    // Icon only: the names are spoken with the day, never drawn.
+    expect(screen.queryByText("Training")).toBeNull();
     expect(
-      within(screen.getByRole("button", { name: "Tuesday, May 12" })).queryByLabelText(
-        /^Schedule notes/,
-      ),
-    ).toBeNull();
+      screen.getByRole("button", { name: "Tuesday, May 12. Schedule notes: Training; Float" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId(/^schedule-card-notes-2026-05-13/)).toBeNull();
   });
 
   it("hands a tapped day's shift to the caller, and an empty day with no item", () => {
