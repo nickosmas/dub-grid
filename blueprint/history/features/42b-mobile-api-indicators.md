@@ -1,8 +1,7 @@
 # Feature: Mobile API indicators
 
 **From build-plan:** feature 42b
-**Status:** verified (parked; another session's fix holds
-`current-feature.md`)
+**Status:** verified
 
 ## Goal
 
@@ -134,3 +133,15 @@ draft rule is the web's, held in one shared place so the two cannot drift.
 - Keep the new fields defaulted so older app builds and older servers still
   parse each other's payloads.
 - No em dashes.
+
+## Completion
+
+- Built as five checkpoints on `dev` (59ab1e5b..18d51c5b) and one commit of
+  review repairs (4f74f32d).
+- Evidence: the new unit, contract, data-access, loader, route, bootstrap and
+  realtime tests; the full pre-push web, mobile and package suites; CI on
+  4f74f32d (type check, unit, integration, mobile verify, lint and build).
+- Independent review: no draft leak and no tenant-scope problem. It found a
+  blank indicator type could fail the whole bootstrap (fixed) and smaller
+  issues (fixed or recorded); the missing `(org_id, date)` index is F-84.
+- No findings were resolved by this feature, so none are archived here.

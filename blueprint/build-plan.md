@@ -679,7 +679,7 @@
         edit indicators; the grid hover card keeps its indicator line on
         changed cells; and the printed schedule shows indicators with a
         legend. The data is already loaded on the schedule page.
-  - [ ] 42b. **Mobile API indicators** - mobile schedule entries carry their
+  - [x] 42b. **Mobile API indicators** - mobile schedule entries carry their
         visible indicators and bootstrap carries the organization's indicator
         types, in `@dubgrid/contracts` and `@dubgrid/mobile-api-core`, with
         the same published and draft filtering as web. The existing
