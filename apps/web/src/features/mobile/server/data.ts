@@ -17,6 +17,7 @@ import type {
 import {
   fetchLinkedEmployeeRowForUser,
   fetchMobileAbsenceTypeRows,
+  fetchMobileIndicatorTypeRows,
   fetchMobileScheduleNoteRows,
   fetchMobileAssignmentSeedRows,
   fetchMobileCertificationRows as fetchMobileCertificationRowsData,
@@ -71,6 +72,7 @@ import { isRegularStaffSystemJob } from "@/lib/system-jobs";
 import { normalizeMobileScheduleRange, type MobileScheduleQuery } from "@dubgrid/contracts";
 import type {
   MobileAbsenceType,
+  MobileIndicatorType,
   MobileDepartment,
   MobileFocusArea,
   MobileNamedItem,
@@ -332,6 +334,19 @@ async function fetchJobNameMap(
 ): Promise<Map<number, string>> {
   const rows = await fetchMobileJobNameRows(serviceClient, orgId);
   return new Map(rows.map((row) => [row.id, row.name]));
+}
+
+export async function fetchMobileIndicatorTypes(
+  serviceClient: SupabaseClient,
+  orgId: string,
+): Promise<MobileIndicatorType[]> {
+  const rows = await fetchMobileIndicatorTypeRows(serviceClient, orgId);
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    color: row.color,
+    sortOrder: row.sort_order,
+  }));
 }
 
 export async function fetchMobileAbsenceTypes(

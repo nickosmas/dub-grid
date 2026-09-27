@@ -70,7 +70,7 @@ draft rule is the web's, held in one shared place so the two cannot drift.
       without notes gets `[]`, a note on a date with no entry is dropped, and
       an archived type keeps its name and colour; route tests for both
       endpoints pass the new dependency and the effective organization.
-- [ ] **Step 4 - bootstrap indicator types** - `fetchMobileIndicatorTypes`
+- [x] **Step 4 - bootstrap indicator types** - `fetchMobileIndicatorTypes`
       (active, in sort order) as a `loadMobileBootstrapPayload` dependency.
       _Done when:_ the core and bootstrap route tests show the types for a
       regular member and an empty list for an organization with none.

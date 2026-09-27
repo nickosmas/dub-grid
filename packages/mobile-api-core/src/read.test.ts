@@ -37,6 +37,7 @@ describe("loadMobileBootstrapPayload", () => {
         fetchMobileRoles,
         fetchMobileCertifications: vi.fn(async () => []),
         fetchMobileDepartments: vi.fn(async () => []),
+        fetchMobileIndicatorTypes: vi.fn(async () => []),
         fetchTermsAcceptedVersion: vi.fn(async () => null),
         fetchMfaReenrollRequired: vi.fn(async () => true),
         mapOrganizationToMobileConfig: vi.fn(() => ({ id: ORG_ID })),
@@ -52,6 +53,46 @@ describe("loadMobileBootstrapPayload", () => {
         requiredCertificationIds: [8, 9],
       },
     ]);
+  });
+});
+
+// 42b: every member gets the organization's active indicator types.
+describe("loadMobileBootstrapPayload indicator types", () => {
+  const load = (fetchMobileIndicatorTypes: () => Promise<unknown[]>) =>
+    loadMobileBootstrapPayload(
+      {
+        currentOrg: { id: ORG_ID },
+        serviceClient: {},
+        userClient: {},
+        user: { id: USER_ID, email: "alex@example.com" },
+        memberships: [],
+        permissions: { role: "user", canManageUsers: false, canViewIndicatorTypes: false },
+      } as never,
+      {
+        fetchLinkedEmployeeForUser: vi.fn(async () => null),
+        fetchMobileUnreadNotificationCount: vi.fn(async () => 0),
+        fetchMobileAbsenceTypes: vi.fn(async () => []),
+        fetchMobileFocusAreas: vi.fn(async () => []),
+        fetchMobileRoles: vi.fn(async () => []),
+        fetchMobileCertifications: vi.fn(async () => []),
+        fetchMobileDepartments: vi.fn(async () => []),
+        fetchMobileIndicatorTypes,
+        fetchTermsAcceptedVersion: vi.fn(async () => null),
+        fetchMfaReenrollRequired: vi.fn(async () => false),
+        mapOrganizationToMobileConfig: vi.fn(() => ({ id: ORG_ID })),
+      } as never,
+    );
+
+  it("gives a regular member the types, though they cannot manage them", async () => {
+    const types = [{ id: 7, name: "Float", color: "#ff0000", sortOrder: 1 }];
+    const fetchTypes = vi.fn(async () => types);
+    const payload = await load(fetchTypes);
+    expect(payload.indicatorTypes).toEqual(types);
+    expect(fetchTypes).toHaveBeenCalledWith({}, ORG_ID);
+  });
+
+  it("gives an empty list for an organization with none", async () => {
+    expect((await load(async () => [])).indicatorTypes).toEqual([]);
   });
 });
 

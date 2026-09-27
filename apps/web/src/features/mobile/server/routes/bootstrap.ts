@@ -6,6 +6,7 @@ import {
   fetchMobileCertifications,
   fetchMobileDepartments,
   fetchMobileFocusAreas,
+  fetchMobileIndicatorTypes,
   fetchMobileRoles,
   fetchLinkedEmployeeForUser,
   fetchMobileTermsAcceptedVersion,
@@ -38,6 +39,7 @@ async function handleGET(req: NextRequest, timer: Timer) {
       fetchMobileRoles,
       fetchMobileCertifications,
       fetchMobileDepartments,
+      fetchMobileIndicatorTypes,
       fetchTermsAcceptedVersion: fetchMobileTermsAcceptedVersion,
       // A failed check must not take the app down; web lets them through too.
       fetchMfaReenrollRequired: async (userId: string) => {

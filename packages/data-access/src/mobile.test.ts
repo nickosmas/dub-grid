@@ -7,6 +7,7 @@ import {
   fetchMobileRoleRows,
   fetchScheduleCellQueryRows,
   fetchMobileScheduleNoteRows,
+  fetchMobileIndicatorTypeRows,
   fetchMobilePublishHistoryRows,
   fetchMobileShiftRequestHistoryRows,
   insertMobileAuditLogEntry,
@@ -422,6 +423,28 @@ describe("fetchMobileScheduleNoteRows", () => {
     await expect(fetchMobileScheduleNoteRows(failing.client, input, 2)).rejects.toEqual({
       message: "boom",
     });
+  });
+});
+
+describe("fetchMobileIndicatorTypeRows", () => {
+  it("reads the organization's active types in their configured order", async () => {
+    const chain = {
+      select: vi.fn(() => chain),
+      eq: vi.fn(() => chain),
+      is: vi.fn(() => chain),
+      order: vi.fn((_column: string) => chain),
+      then: (resolve: (value: unknown) => void) =>
+        resolve({ data: [{ id: 7, name: "Float", color: "#ff0000", sort_order: 1 }], error: null }),
+    };
+    const from = vi.fn(() => chain);
+
+    const rows = await fetchMobileIndicatorTypeRows({ from } as unknown as SupabaseClient, "org-1");
+
+    expect(rows).toHaveLength(1);
+    expect(from).toHaveBeenCalledWith("indicator_types");
+    expect(chain.eq).toHaveBeenCalledWith("org_id", "org-1");
+    expect(chain.is).toHaveBeenCalledWith("archived_at", null);
+    expect(chain.order.mock.calls.map(([column]) => column)).toEqual(["sort_order", "id"]);
   });
 });
 

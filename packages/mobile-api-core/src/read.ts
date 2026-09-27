@@ -3,6 +3,7 @@ import type {
   MobileBootstrapResponse,
   MobileDepartment,
   MobileFocusArea,
+  MobileIndicatorType,
   MobileNamedItem,
   MobileBootstrapRole,
   MobileNotification,
@@ -240,6 +241,11 @@ type FetchMobileDepartments = (
   orgId: string,
 ) => Promise<MobileDepartment[]>;
 
+type FetchMobileIndicatorTypes = (
+  serviceClient: SupabaseClient,
+  orgId: string,
+) => Promise<MobileIndicatorType[]>;
+
 type FetchMobileScheduleEntries = (
   serviceClient: SupabaseClient,
   input: {
@@ -338,6 +344,7 @@ export async function loadMobileBootstrapPayload(
     fetchMobileRoles: FetchMobileRoles;
     fetchMobileCertifications: FetchMobileNamedItems;
     fetchMobileDepartments: FetchMobileDepartments;
+    fetchMobileIndicatorTypes: FetchMobileIndicatorTypes;
     fetchTermsAcceptedVersion: FetchTermsAcceptedVersion;
     fetchMfaReenrollRequired: FetchMfaReenrollRequired;
     mapOrganizationToMobileConfig: MapOrganizationToMobileConfig;
@@ -351,6 +358,7 @@ export async function loadMobileBootstrapPayload(
     roles,
     certifications,
     departments,
+    indicatorTypes,
     termsAcceptedVersion,
     mfaReenrollRequired,
   ] = await Promise.all([
@@ -361,6 +369,8 @@ export async function loadMobileBootstrapPayload(
     deps.fetchMobileRoles(auth.serviceClient, auth.currentOrg.id),
     deps.fetchMobileCertifications(auth.serviceClient, auth.currentOrg.id),
     deps.fetchMobileDepartments(auth.serviceClient, auth.currentOrg.id),
+    // Every member sees indicators, so their types carry no permission gate.
+    deps.fetchMobileIndicatorTypes(auth.serviceClient, auth.currentOrg.id),
     deps.fetchTermsAcceptedVersion(auth.user.id),
     deps.fetchMfaReenrollRequired(auth.user.id),
   ]);
@@ -408,7 +418,7 @@ export async function loadMobileBootstrapPayload(
     unreadNotificationCount,
     acceptedCurrentTerms: hasAcceptedCurrentTerms(termsAcceptedVersion),
     mfaReenrollRequired,
-    indicatorTypes: [],
+    indicatorTypes,
   };
 }
 

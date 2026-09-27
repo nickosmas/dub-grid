@@ -786,6 +786,31 @@ export async function fetchMobileAbsenceTypeRows(
   return (data ?? []) as MobileAbsenceTypeRow[];
 }
 
+export interface MobileIndicatorTypeRow {
+  id: number;
+  name: string;
+  color: string;
+  sort_order: number;
+}
+
+/** The organization's active indicator types, in their configured order. */
+export async function fetchMobileIndicatorTypeRows(
+  serviceClient: SupabaseClient,
+  orgId: string,
+): Promise<MobileIndicatorTypeRow[]> {
+  const { data, error } = await serviceClient
+    .from("indicator_types")
+    .select("id, name, color, sort_order")
+    .eq("org_id", orgId)
+    .is("archived_at", null)
+    .order("sort_order", { ascending: true })
+    .order("id", { ascending: true });
+
+  if (error) throw error;
+
+  return (data ?? []) as MobileIndicatorTypeRow[];
+}
+
 export async function fetchMobileFocusAreaRows(
   serviceClient: SupabaseClient,
   orgId: string,
