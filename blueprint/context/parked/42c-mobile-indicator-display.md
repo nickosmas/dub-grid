@@ -27,7 +27,7 @@ instead of the team schedule.
   one per indicator.
 - **My schedule.** The hero card's title row and each "Your Week" row show the
   shift's indicators (on the hero, dots sit on a white ring for contrast).
-- **Shift detail.** An "Indicators" row in the detail stack lists each
+- **Shift detail.** A "Schedule notes" row in the detail stack lists each
   indicator's dot and name, with the draft wording for an editor. It shows
   nothing when there are none, and it also appears for split shifts.
 - **Home schedule card.** Each day's header shows that day's indicator dots,
@@ -77,7 +77,7 @@ focusAreaId?)` that filters by focus area and removes duplicates by
       the shift's indicators. _Done when:_ screen tests find the indicator on
       the hero and in the week list, and a deleted (previous-only) entry shows
       none.
-- [ ] **Step 4 - shift detail** - an "Indicators" row in the detail stack,
+- [ ] **Step 4 - shift detail** - a "Schedule notes" row in the detail stack,
       for single and split shifts. _Done when:_ tests show the row with each
       name, the draft wording for a draft, no row without indicators, and the
       old negative test replaced.
@@ -133,6 +133,10 @@ focusAreaId?)` that filters by focus area and removes duplicates by
   first, which carries the real list.
 
 ## Notes for the AI
+
+- Customers call these **schedule notes**, never "indicators": every label,
+  heading and spoken phrase a client sees says "Schedule notes" (or "schedule
+  note"). Code, types, routes and data keep the `indicator` naming.
 
 - Mobile design rules: tokens through `shared/theme/tokens.ts`, no raw
   metrics, `fit` rules for text, never `adjustsFontSizeToFit`, pills never
