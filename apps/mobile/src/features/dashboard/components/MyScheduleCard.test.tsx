@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule, createSafeAreaContextModule } from "../../../test/native";
 
@@ -73,6 +73,39 @@ describe("MyScheduleCard", () => {
     expect(screen.queryByText("D")).not.toBeInTheDocument();
     // The second day in range has no entry -> empty placeholder, not dropped.
     expect(screen.getByText("—")).toBeInTheDocument();
+  });
+
+  it("spells out a day's schedule notes under its pills", () => {
+    useQuery.mockReturnValue({
+      isLoading: false,
+      data: {
+        range: { startDate: "2026-05-11", endDate: "2026-05-12" },
+        entries: [
+          makeEntry({
+            date: "2026-05-11",
+            indicators: [
+              {
+                indicatorTypeId: 1,
+                focusAreaId: null,
+                name: "Training",
+                color: "#378ADD",
+                state: "published",
+              },
+            ],
+          }),
+        ],
+      },
+    });
+
+    render(<MyScheduleCard accessToken="token" />);
+
+    const day = screen.getByRole("button", { name: "Monday, May 11" });
+    expect(within(day).getByLabelText("Training")).toHaveTextContent("Training");
+    expect(
+      within(screen.getByRole("button", { name: "Tuesday, May 12" })).queryByLabelText(
+        "Schedule notes",
+      ),
+    ).toBeNull();
   });
 
   it("hands a tapped day's shift to the caller, and an empty day with no item", () => {

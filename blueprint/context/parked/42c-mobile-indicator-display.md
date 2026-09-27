@@ -86,7 +86,7 @@ focusAreaId?)` that filters by focus area and removes duplicates by
       for single and split shifts. _Done when:_ tests show the row with each
       name, the draft wording for a draft, no row without indicators, and the
       old negative test replaced.
-- [ ] **Step 5 - Home schedule card** - each day lists its schedule notes by
+- [x] **Step 5 - Home schedule card** - each day lists its schedule notes by
       name under its pills. _Done when:_ a card test finds a day's note by
       name and the fixture without notes still renders.
 - [ ] **Step 6 - alert opens my shift** - a helper resolves a notification to

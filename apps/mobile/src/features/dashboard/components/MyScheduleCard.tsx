@@ -11,6 +11,7 @@ import { resolveShiftPillColors, type ShiftPillColors } from "@dubgrid/design-to
 import { DashboardCard } from "./DashboardCard";
 import { Pressable } from "../../../shared/components/Pressable";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
+import { ScheduleNoteLabels } from "../../../shared/components/ScheduleNoteLabels";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { getClientFriendlyErrorMessage } from "../../../shared/lib/errors";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
@@ -29,6 +30,7 @@ import {
 import { formatUsTime } from "../../../shared/lib/dates";
 import { getScreenGutter } from "../../../shared/components/screen-layout";
 import { useMyScheduleQuery } from "../hooks/useMyScheduleQuery";
+import { scheduleNotesForRow } from "../../schedule/lib/scheduleNotes";
 
 // Kept as narrow as possible while still fitting a full time range like
 // "10:00 PM–6:00 AM" on one line at the pill's 11px font — a double shift
@@ -232,6 +234,10 @@ export function MyScheduleCard({
             // What the pills show is what the tap opens: a deleted cell draws
             // as an empty day and opens like one.
             const openableEntry = segmentPills.length > 0 && entry ? entry : null;
+            const notes = openableEntry ? scheduleNotesForRow(openableEntry.indicators) : [];
+            // The names wrap within the pills' width rather than widening the day.
+            const pillRowWidth =
+              segmentPills.length * pillWidth + Math.max(segmentPills.length - 1, 0) * PILL_GAP;
 
             return (
               <Pressable
@@ -312,6 +318,7 @@ export function MyScheduleCard({
                     </Text>
                   </View>
                 )}
+                <ScheduleNoteLabels notes={notes} style={{ maxWidth: pillRowWidth }} />
               </Pressable>
             );
           })}
