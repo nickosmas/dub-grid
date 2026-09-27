@@ -24,19 +24,26 @@ vi.mock("react-native", async () => ({
   },
 }));
 
-const setOnline = vi.fn();
+let managerOnline = true;
+const setOnline = vi.fn((online: boolean) => {
+  managerOnline = online;
+});
 const setFocused = vi.fn();
 const startAutoRefresh = vi.fn();
 const stopAutoRefresh = vi.fn();
 const getNetworkStateAsync = vi.fn();
 const addNetworkStateListener = vi.fn();
 const removeNetworkListener = vi.fn();
+// Captured once: the provider subscribes to expo-network for the life of the
+// module, never per mount.
 let networkListener:
   ((state: { isConnected?: boolean; isInternetReachable?: boolean }) => void) | null = null;
+let nativeSubscriptions = 0;
 
 vi.mock("@tanstack/react-query", () => ({
   onlineManager: {
     setOnline,
+    isOnline: () => managerOnline,
   },
   focusManager: {
     setFocused,
@@ -81,11 +88,12 @@ function NetworkProbe() {
 describe("NetworkStateProvider", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    networkListener = null;
+    managerOnline = true;
     appStateHarness.listener = null;
     startAutoRefresh.mockResolvedValue(undefined);
     stopAutoRefresh.mockResolvedValue(undefined);
     addNetworkStateListener.mockImplementation((listener) => {
+      nativeSubscriptions += 1;
       networkListener = listener;
       return {
         remove: removeNetworkListener,
@@ -305,5 +313,118 @@ describe("NetworkStateProvider", () => {
 
     expect(screen.getByTestId("offline")).toHaveTextContent("true");
     expect(setOnline).not.toHaveBeenLastCalledWith(true);
+  });
+  // expo-network cancels its native monitor when the last listener goes and
+  // restarts that dead monitor for the next one, so a remount must not unsubscribe.
+  it("keeps one native subscription through a remount and still hears events", async () => {
+    getNetworkStateAsync.mockResolvedValue({ isConnected: true, isInternetReachable: true });
+
+    const first = render(
+      <NetworkStateProvider>
+        <NetworkProbe />
+      </NetworkStateProvider>,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    first.unmount();
+
+    render(
+      <NetworkStateProvider>
+        <NetworkProbe />
+      </NetworkStateProvider>,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(nativeSubscriptions).toBe(1);
+    expect(removeNetworkListener).not.toHaveBeenCalled();
+
+    act(() => {
+      networkListener?.({ isConnected: false, isInternetReachable: false });
+    });
+    expect(screen.getByTestId("offline")).toHaveTextContent("true");
+  });
+
+  it("re-reads the network on foreground and restores a wrong offline flag", async () => {
+    getNetworkStateAsync.mockResolvedValue({ isConnected: false, isInternetReachable: false });
+
+    render(
+      <NetworkStateProvider>
+        <NetworkProbe />
+      </NetworkStateProvider>,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("offline")).toHaveTextContent("true");
+
+    getNetworkStateAsync.mockResolvedValue({ isConnected: true, isInternetReachable: true });
+    await act(async () => {
+      appStateHarness.listener?.("background");
+      appStateHarness.listener?.("active");
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("offline")).toHaveTextContent("true");
+
+    act(() => {
+      vi.advanceTimersByTime(1_500);
+    });
+    expect(screen.getByTestId("online")).toHaveTextContent("true");
+    expect(setOnline).toHaveBeenLastCalledWith(true);
+  });
+
+  it("recovers React Query's flag on foreground even when this provider thinks it is online", async () => {
+    getNetworkStateAsync.mockResolvedValue({ isConnected: true, isInternetReachable: true });
+
+    render(
+      <NetworkStateProvider>
+        <NetworkProbe />
+      </NetworkStateProvider>,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    managerOnline = false;
+    await act(async () => {
+      appStateHarness.listener?.("background");
+      appStateHarness.listener?.("active");
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    act(() => {
+      vi.advanceTimersByTime(1_500);
+    });
+
+    expect(managerOnline).toBe(true);
+  });
+
+  it("never lets a foreground re-read take an online app offline", async () => {
+    getNetworkStateAsync.mockResolvedValue({ isConnected: true, isInternetReachable: true });
+
+    render(
+      <NetworkStateProvider>
+        <NetworkProbe />
+      </NetworkStateProvider>,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // A timed-out native probe reads offline.
+    getNetworkStateAsync.mockResolvedValue({ isConnected: false, isInternetReachable: false });
+    await act(async () => {
+      appStateHarness.listener?.("background");
+      appStateHarness.listener?.("active");
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(getNetworkStateAsync).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("online")).toHaveTextContent("true");
+    expect(setOnline).not.toHaveBeenCalledWith(false);
   });
 });
