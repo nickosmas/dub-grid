@@ -731,7 +731,7 @@
         the person, and makes them enroll again at their next sign-in (a
         migration). Also: end one session, clear a login lock, forget a
         device, disable a push device, revoke a calendar feed.
-  - [ ] 43d. **Schedule, requests and notifications** - per organization, the
+  - [x] 43d. **Schedule, requests and notifications** - per organization, the
         person's recurring schedule and series, recent and upcoming shifts,
         schedule notes, publish changes that affected them, shift requests on
         either side, and profile change requests; their notification

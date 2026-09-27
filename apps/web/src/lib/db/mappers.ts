@@ -646,6 +646,30 @@ function buildResolvedPresentation(
 
 // ── Recurring Shifts ──────────────────────────────────────────────────────────
 
+/** The display label of a stored schedule state (a recurring shift's or a series'). */
+export function scheduleStateLabel(
+  state: ScheduleCellInput,
+  maps: {
+    codeMap: Map<number, string>;
+    absenceTypeMap?: Map<number, string>;
+    segmentCompatibility?: SegmentCompatibilityMaps | null;
+    assignmentIdByPair?: Map<string, number>;
+  },
+): string {
+  const input = normalizeScheduleCellState(state);
+  const { assignmentIds, segments } = resolveSegmentsAndAssignmentDefinitions(
+    input,
+    maps.segmentCompatibility,
+    maps.assignmentIdByPair,
+  );
+  return buildResolvedPresentation(input, {
+    codeMap: maps.codeMap,
+    absenceTypeMap: maps.absenceTypeMap,
+    segments,
+    assignmentIds,
+  }).label;
+}
+
 export function rowToRecurringShift(
   row: DbRecurringShift,
   codeMap: Map<number, string>,

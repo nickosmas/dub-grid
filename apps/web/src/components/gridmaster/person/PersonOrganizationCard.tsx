@@ -13,6 +13,7 @@ import { permissionLabel } from "@/lib/permission-labels";
 import type { Invitation } from "@/types";
 import { PersonField, PersonFieldGrid, PersonSection, PersonSubheading } from "./PersonField";
 import { formatActor, formatDay, formatMoment } from "./person-format";
+import { PersonScheduleSection } from "./PersonScheduleSection";
 
 const STAFF_STATUS: Record<GridmasterStaffRecord["status"], string> = {
   active: "Active",
@@ -280,6 +281,7 @@ export function PersonOrganizationCard({
             {renderStaffActions ? (
               <div className="flex flex-wrap gap-2">{renderStaffActions(employee)}</div>
             ) : null}
+            <PersonScheduleSection employeeId={employee.id} />
           </div>
         ))
       )}

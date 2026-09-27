@@ -29,6 +29,7 @@ import { PersonInvitationActions } from "./PersonInvitationActions";
 import { PersonMembershipActions } from "./PersonMembershipActions";
 import { PersonOrganizationCard } from "./PersonOrganizationCard";
 import { PersonSecurityCard } from "./PersonSecurityCard";
+import { PersonNotificationsCard } from "./PersonNotificationsCard";
 import { PersonSessionsCard } from "./PersonSessionsCard";
 import { usePersonSecurityActions } from "./usePersonSecurityActions";
 import { PersonStaffActions } from "./PersonStaffActions";
@@ -307,6 +308,7 @@ export default function GridmasterPersonView({
         renderPushActions={securityActions.renderPushActions}
         renderFeedActions={securityActions.renderFeedActions}
       />
+      <PersonNotificationsCard record={record} />
       {securityActions.dialog}
       {record.organizations.map((organization) => (
         <PersonOrganizationCard

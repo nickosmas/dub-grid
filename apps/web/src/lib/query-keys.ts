@@ -131,6 +131,9 @@ export const queryKeys = {
     orgHealth: (orgId: string | null) => ["gm", "org-health", orgId ?? "all"] as const,
     personAll: () => ["gm", "person"] as const,
     person: (kind: "user" | "staff", id: string) => ["gm", "person", kind, id] as const,
+    /** Under `personAll`, so whatever refreshes an open person page refreshes these too. */
+    personActivity: (employeeId: string) => ["gm", "person", "activity", employeeId] as const,
+    personNotifications: (userId: string) => ["gm", "person", "notifications", userId] as const,
     staffSearch: (query: string) => ["gm", "staff-search", query] as const,
     tenantStats: () => ["gm", "tenantStats"] as const,
     org: (orgId: string) => ["gm", "org", orgId] as const,

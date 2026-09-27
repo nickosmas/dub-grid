@@ -1,8 +1,7 @@
 # Feature: Schedule, requests and notifications
 
 **From build-plan:** feature 43d
-**Status:** spec - awaiting review (parked: the mobile sign-in fix holds the
-current-feature slot; this moves there when it completes)
+**Status:** verified
 
 ## Goal
 
@@ -61,7 +60,7 @@ as a local checkpoint.
 
 ## Build steps
 
-- [ ] **Step 1 - schedule loader and route** - `loadPersonSchedule` (server)
+- [x] **Step 1 - schedule loader and route** - `loadPersonSchedule` (server)
       reads one staff record's recurring shifts, series, shifts in the window
       (through `mapNormalizedScheduleCellRowToScheduleEntry` with the
       organization's `fetchAssignmentLabelMap`, so snapshots stay the source
@@ -73,18 +72,18 @@ as a local checkpoint.
       removed staff record still loaded, a non-Gridmaster refused, an unknown
       staff id 404, and every query scoped to that staff record and its
       organization.
-- [ ] **Step 2 - requests and changes** - the same loader adds publish changes
+- [x] **Step 2 - requests and changes** - the same loader adds publish changes
       (90 days), shift requests on either side (open plus 90 days, partner
       names and settler resolved), and profile change requests. _Done when:_
       loader tests cover a request where the person is the requester, one
       where they are the target, an open request older than 90 days kept, and
       a publish change row with its publisher.
-- [ ] **Step 3 - notifications route** -
+- [x] **Step 3 - notifications route** -
       `/api/gridmaster/users/[userId]/notifications` (GET) returns the stored
       preferences and the latest 50 notifications (every stored column), behind `requireGridmasterSession`.
       _Done when:_ route tests show the preferences and the 50-row cap, a
       person with no preferences row, and a non-Gridmaster refused.
-- [ ] **Step 4 - Schedule and requests section** - each staff record on an
+- [x] **Step 4 - Schedule and requests section** - each staff record on an
       organization card gets a collapsed "Schedule and requests" section that
       loads Step 1's route when opened, with loading, empty and error states,
       and groups: Recurring, Shifts, Publish changes, Shift requests, Profile
@@ -92,7 +91,7 @@ as a local checkpoint.
       _Done when:_ view tests show nothing requested until opened, each group
       rendered from a fixture, the empty state per group, and a retry after
       an error.
-- [ ] **Step 5 - Notifications card** - after Sessions and devices, for a
+- [x] **Step 5 - Notifications card** - after Sessions and devices, for a
       person with an account: preferences as a list and the recent
       notifications with read and archived state. _Done when:_ view tests
       show both, no card on the staff-only page, and the empty inbox state.
@@ -117,7 +116,7 @@ Load-bearing for 43e, which reads the same rows into its timeline:
 interface GridmasterPersonSchedule {
   window: { from: string; to: string }; // 28 days back, 56 ahead
   recurring: {
-    id: number;
+    id: string;
     dayOfWeek: number;
     label: string;
     effectiveFrom: string;
@@ -125,7 +124,7 @@ interface GridmasterPersonSchedule {
     archivedAt: string | null;
   }[];
   series: {
-    id: number;
+    id: string;
     label: string;
     frequency: string;
     daysOfWeek: number[];
@@ -143,7 +142,7 @@ interface GridmasterPersonSchedule {
     source: "recurring" | "series" | "manual";
     updatedAt: string;
   }[];
-  indicators: { date: string; name: string; status: "draft" | "published" }[];
+  indicators: { date: string; name: string; status: "published" | "draft" | "draft_deleted" }[];
   publishChanges: {
     publishedAt: string;
     date: string;

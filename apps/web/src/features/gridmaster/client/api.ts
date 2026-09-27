@@ -19,7 +19,12 @@ import type {
   PlatformUser,
 } from "@/types";
 import { formatClientErrorMessage } from "@/lib/client-facing";
-import type { GridmasterPersonRecord, GridmasterStaffSearchResult } from "../person-record";
+import type {
+  GridmasterPersonNotifications,
+  GridmasterPersonRecord,
+  GridmasterPersonSchedule,
+  GridmasterStaffSearchResult,
+} from "../person-record";
 
 export interface GridmasterInvitationRecord {
   id: string;
@@ -234,6 +239,26 @@ export function fetchGridmasterPerson(
       ? `/api/gridmaster/users/${encodeURIComponent(target.userId)}`
       : `/api/gridmaster/staff/${encodeURIComponent(target.employeeId)}`;
   return requestGridmasterJson(path);
+}
+
+export function fetchGridmasterStaffActivity(
+  employeeId: string,
+): Promise<{ schedule: GridmasterPersonSchedule }> {
+  return requestGridmasterJson(
+    `/api/gridmaster/staff/${encodeURIComponent(employeeId)}/activity`,
+    undefined,
+    "We couldn't load this schedule.",
+  );
+}
+
+export function fetchGridmasterPersonNotifications(
+  userId: string,
+): Promise<{ notifications: GridmasterPersonNotifications }> {
+  return requestGridmasterJson(
+    `/api/gridmaster/users/${encodeURIComponent(userId)}/notifications`,
+    undefined,
+    "We couldn't load notifications.",
+  );
 }
 
 export function forceLogoutGridmasterUser(
