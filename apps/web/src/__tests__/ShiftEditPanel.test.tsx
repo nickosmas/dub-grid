@@ -753,6 +753,7 @@ describe("ShiftEditPanel", () => {
       expect(list).not.toBeNull();
       expect(within(list!).getByText("Float")).toBeInTheDocument();
       expect(within(list!).queryByText("Training")).toBeNull();
+      expect(list!.querySelectorAll("[data-note-icon]")).toHaveLength(1);
       expect(screen.queryByRole("button", { name: /indicator$/ })).toBeNull();
     });
 

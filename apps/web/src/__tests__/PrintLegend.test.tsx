@@ -12,6 +12,9 @@ describe("PrintLegend indicators", () => {
     );
 
     expect(container.querySelector("[data-print-legend-indicators]")?.textContent).toBe("Float");
+    expect(
+      container.querySelector("[data-print-legend-indicators] [data-note-icon]"),
+    ).not.toBeNull();
   });
 
   it("shows no indicator key without indicators", () => {

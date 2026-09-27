@@ -1,4 +1,5 @@
 import { AssignmentDefinition, IndicatorType, ShiftDisplayMode } from "@/types";
+import { ScheduleNoteIcon } from "@/components/schedule-grid/noteIcon";
 
 // Excluded from legend — internal/meta entries with no printed meaning
 const EXCLUDED = new Set(["OFF", "0.3"]);
@@ -42,16 +43,7 @@ export default function PrintLegend({
           <div className="print-legend__grid" data-print-legend-indicators="true">
             {indicators.map((indicator) => (
               <div key={indicator.id} className="print-legend__item">
-                <span
-                  aria-hidden="true"
-                  style={{
-                    width: 10,
-                    height: 10,
-                    borderRadius: "50%",
-                    background: indicator.color,
-                    flexShrink: 0,
-                  }}
-                />
+                <ScheduleNoteIcon color={indicator.color} size={12} />
                 <span className="print-legend__name">{indicator.name}</span>
               </div>
             ))}

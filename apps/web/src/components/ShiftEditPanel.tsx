@@ -43,6 +43,7 @@ import { Hint, MaybeHint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import { Switch } from "@/components/ui/switch";
 import { Check, ChevronLeft, ChevronRight, Clock, User } from "lucide-react";
+import { ScheduleNoteIcon } from "@/components/schedule-grid/noteIcon";
 import {
   buildShiftDiffDescriptors,
   expandDelimitedTimeRanges,
@@ -3140,17 +3141,7 @@ export default function ShiftEditPanel({
         >
           {active.map(({ id, name, color }) => (
             <li key={id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span
-                aria-hidden="true"
-                style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: "50%",
-                  background: isDarkTheme ? toDarkPillColors(color).bg : color,
-                  flexShrink: 0,
-                  border: "1px solid rgba(0,0,0,0.08)",
-                }}
-              />
+              <ScheduleNoteIcon color={isDarkTheme ? toDarkPillColors(color).bg : color} />
               <span
                 style={{
                   fontSize: "var(--dg-fs-caption)",

@@ -139,6 +139,7 @@ describe("PrintScheduleView", () => {
       const legend = container.querySelector<HTMLElement>("[data-print-indicator-legend]");
       expect(legend?.textContent).toContain("Float");
       expect(legend?.textContent).not.toContain("Training");
+      expect(legend?.querySelector("[data-note-icon]")?.getAttribute("fill")).toBe("#ff0000");
     });
 
     it("prints no indicator key when no indicator appears", () => {

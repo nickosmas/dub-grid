@@ -3,6 +3,7 @@ import { MaybeHint } from "@/components/ui/hint";
 import type { IndicatorType } from "@/types";
 import { NOTE_DOT_GAP, NOTE_DOT_SIZE } from "./badges";
 import { getPublishDiffTone } from "./publishDiffPill";
+import { ScheduleNoteIcon } from "./noteIcon";
 
 /**
  * What a cell's note dot is saying about itself.
@@ -78,7 +79,8 @@ const STATE_SUFFIX: Record<ScheduleNoteMarkState, string> = {
 };
 
 /**
- * The note dots for one cell.
+ * The note marks for one cell: dots in a grid corner, sticky-note icons
+ * inline where there is room.
  *
  * One component for every place they appear. The four branches of the grid
  * cell each carried their own copy, which is how two of them ended up with
@@ -119,11 +121,17 @@ export function NoteDots({
         const label = `${name}${STATE_SUFFIX[mark.state]}`;
         return (
           <MaybeHint key={`${mark.indicatorTypeId}_${mark.state}`} content={label} side="top">
-            <div
-              data-note-dot={mark.state}
-              aria-label={label}
-              style={dotStyle(mark.state, color)}
-            />
+            {placement === "inline" ? (
+              <span aria-label={label} role="img" style={{ display: "inline-flex" }}>
+                <ScheduleNoteIcon color={color} state={mark.state} />
+              </span>
+            ) : (
+              <div
+                data-note-dot={mark.state}
+                aria-label={label}
+                style={dotStyle(mark.state, color)}
+              />
+            )}
           </MaybeHint>
         );
       })}

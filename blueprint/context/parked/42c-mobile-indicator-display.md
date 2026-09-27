@@ -17,10 +17,10 @@ instead of the team schedule.
 - **Spelled out where there is room; a dot only where there is none.**
   Mobile has no schedule grid, so every surface with room writes each
   schedule note's name: a `ScheduleNoteLabels` component shows each name as a
-  small colour swatch followed by the word, in caption text, wrapping as
+  sticky-note icon in the note's colour followed by the word, in caption text, wrapping as
   needed. No mobile surface uses bare dots. A pure helper chooses which notes a row shows. An editor's draft reads
   "(added, not published)" or "(removed, not published)" after the name; a
-  draft addition's swatch is faded and a draft removal's is a hollow ring.
+  draft addition's icon is faded and a draft removal's is an outline.
 - **Schedule tab (team).** Each person's row lists their schedule notes by
   name on a caption line under the name and time. With a focus-area tab
   selected, a row shows the notes for that focus area and those with no focus
@@ -58,13 +58,22 @@ instead of the team schedule.
 ## Design decisions
 
 - **Words over dots.** The owner's rule (2026-09-27): outside a grid, spell
-  the schedule note out; a dot only where there is no space. Mobile has no grid, so every mobile surface spells notes out; web's grid and month popover keep dots.
+  the schedule note out; a dot only where there is no space. Mobile has no grid, so every mobile surface spells notes out.
+- **Sticky-note icon, not a dot (owner, 2026-09-27).** A schedule note is
+  drawn as a sticky-note icon in its colour wherever there is room: every
+  mobile surface (MaterialCommunityIcons `note`, and `note-outline` for a
+  removal) and, on web, the Month popover, the phone-width day view, the
+  shift slideover's read-only list and both print legends (Lucide
+  `StickyNote`, dashed outline for a removal). The week and two-week grid
+  cells and the printed grid's cells keep their dots, for lack of room (the
+  owner's choice).
 - **Customer term.** Clients see "Schedule notes", never "indicators".
 - **Draft states.** Mobile has no dashed styling and its badges are never
-  outlined, so a draft addition's swatch is faded and a draft removal's is a
-  hollow ring; the words carry the state.
+  outlined, so a draft addition's icon is faded and a draft removal's is an
+  outline; the words carry the state.
 - **Colours.** The raw note colour in both themes, as on web; a light ring
-  keeps a dark swatch visible on dark surfaces.
+  (a thin outline in the surface's edge colour on a filled icon) keeps a
+  note visible on a surface of a similar colour.
 
 ## Build steps
 
