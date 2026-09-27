@@ -108,3 +108,9 @@ migrated data resolves the missing key to its admin default (`true`), so its
 effective note access equals the rewritten `canEditNotes`. New code on
 unmigrated data would let a permission set with `canEditNotes` on and the
 retired key off (only possible when written outside the editor) write notes.
+
+Release: migration 061 applied to production 2026-09-27 by the owner, ahead of
+the release that carries step 2, after a scratch rehearsal from 060 and on the
+local stack. Before: 60 ledger entries, only 061 missing; latest backup
+2026-09-26 13:40:45 UTC. After: 61 ledger entries, none missing, every
+invariant passing, health 200.
