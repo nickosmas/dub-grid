@@ -37,10 +37,10 @@ import {
 } from "../../schedule/lib/scheduleNotes";
 
 // Kept as narrow as possible while still fitting a full time range like
-// "10:00 PM–6:00 AM" on one line at the pill's 11px font — a double shift
-// renders two of these side by side, so width matters more here than in a
-// single-pill day.
-const PILL_WIDTH = 124;
+// "10:00 PM–6:00 AM" on one line at the pill's 11px font, with the note icon
+// beside it: a double shift renders two of these side by side, so width
+// matters more here than in a single-pill day.
+const PILL_WIDTH = 140;
 const PILL_GAP = 6;
 const DAY_CARD_GAP = 10;
 // The pill is now the only bounded shape in the day column, so this is the
@@ -62,10 +62,6 @@ const SHADOW_ROOM_BOTTOM = mobileSpace.xl;
 // the same height regardless of whether a given shift has a job name or a
 // time range to show — matches web's MyScheduleRow.tsx ShiftPill.
 const SHIFT_PILL_MIN_HEIGHT = 71;
-// Room under the three lines for a pill's schedule-note icon (a stack of
-// notes when there are several). Every pill in
-// the strip takes it once any day has a note, so the pills stay one height.
-const NOTE_FOOTER_HEIGHT = 16;
 const NOTE_ICON_SIZE = 12;
 
 type DaySegmentPill = {
@@ -235,9 +231,6 @@ export function MyScheduleCard({
       buildDaySegmentPills(entryByDate.get(dateIso), mobileColors, isDarkTheme),
     ]),
   );
-  const stripHasNotes = [...pillsByDate.values()].some((pills) =>
-    pills.some((pill) => pill.noteCount > 0),
-  );
 
   return (
     <DashboardCard surface={false} title="Your schedule" onOpen={onExpand}>
@@ -282,7 +275,6 @@ export function MyScheduleCard({
                         key={segment.key}
                         style={[
                           styles.shiftPill,
-                          stripHasNotes && styles.pillWithNoteFooter,
                           // A tint of the pill's own text, fainter than the
                           // edge other pills wear: `borderSubtle` below is
                           // tuned against white and vanishes on a fill, and
@@ -321,39 +313,42 @@ export function MyScheduleCard({
                         >
                           {segment.jobName ?? " "}
                         </Text>
-                        <Text
-                          maxFontSizeMultiplier={MAX_FONT_SCALE}
-                          numberOfLines={1}
-                          style={[
-                            styles.shiftTime,
-                            segment.pill ? { color: segment.pill.text } : null,
-                          ]}
-                        >
-                          {segment.timeRangeLabel ?? " "}
-                        </Text>
-                        {segment.noteCount > 0 ? (
-                          <View
-                            accessibilityElementsHidden
-                            importantForAccessibility="no-hide-descendants"
-                            style={styles.noteFooter}
-                            testID={`schedule-card-notes-${segment.key}`}
+                        {/* The note icon (a stack when there are several) ends
+                            the time row, so a pill with notes is no taller. */}
+                        <View style={styles.timeRow}>
+                          <Text
+                            maxFontSizeMultiplier={MAX_FONT_SCALE}
+                            numberOfLines={1}
+                            style={[
+                              styles.shiftTime,
+                              segment.pill ? { color: segment.pill.text } : null,
+                            ]}
                           >
-                            <MaterialCommunityIcons
-                              color={segment.pill?.text ?? mobileColors.textMuted}
-                              name={
-                                segment.noteCount > 1 ? "note-multiple-outline" : "note-outline"
-                              }
-                              size={NOTE_ICON_SIZE}
-                            />
-                          </View>
-                        ) : null}
+                            {segment.timeRangeLabel ?? " "}
+                          </Text>
+                          {segment.noteCount > 0 ? (
+                            <View
+                              accessibilityElementsHidden
+                              importantForAccessibility="no-hide-descendants"
+                              testID={`schedule-card-notes-${segment.key}`}
+                            >
+                              <MaterialCommunityIcons
+                                color={segment.pill?.text ?? mobileColors.textMuted}
+                                name={
+                                  segment.noteCount > 1 ? "note-multiple-outline" : "note-outline"
+                                }
+                                size={NOTE_ICON_SIZE}
+                              />
+                            </View>
+                          ) : null}
+                        </View>
                       </View>
                     ))}
                   </View>
                 ) : (
                   // Nothing scheduled at all. Absences no longer land here —
                   // they render as their own coloured pill above.
-                  <View style={[styles.emptyPill, stripHasNotes && styles.emptyPillWithNoteFooter]}>
+                  <View style={styles.emptyPill}>
                     <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.emptyText}>
                       —
                     </Text>
@@ -467,19 +462,13 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, pillWidth: nu
       ...mobileTextWeighted("badge", "regular"),
       ...mobileTabularText,
       color: mobileColors.textMuted,
+      flexShrink: 1,
     },
-    pillWithNoteFooter: {
-      minHeight: SHIFT_PILL_MIN_HEIGHT + NOTE_FOOTER_HEIGHT,
-      paddingBottom: mobileSpace.sm + NOTE_FOOTER_HEIGHT,
-    },
-    emptyPillWithNoteFooter: {
-      minHeight: SHIFT_PILL_MIN_HEIGHT + NOTE_FOOTER_HEIGHT,
-    },
-    // Bottom-left, inside the pill, under the time line.
-    noteFooter: {
-      position: "absolute",
-      left: mobileSpace.sm,
-      bottom: mobileSpace.sm,
+    timeRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: mobileSpace.xs,
     },
     emptyPill: {
       width: pillWidth,
