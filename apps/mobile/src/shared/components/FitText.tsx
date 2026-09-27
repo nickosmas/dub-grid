@@ -47,16 +47,26 @@ export function resolveFitScale(
  * measurement and never chases its own result; `containerWidth` growing past
  * the width it had at that shrink restores the full size for a fresh measure.
  */
-export function FitText({
-  style,
-  containerWidth,
-  children,
-  ...props
-}: Omit<TextProps, "style" | "numberOfLines"> & {
+type FitTextProps = Omit<TextProps, "style" | "numberOfLines"> & {
   style?: StyleProp<TextStyle>;
   /** The enclosing control's width; growth past the width at the last shrink re-measures. */
   containerWidth?: number;
-}) {
+};
+
+export function FitText(props: FitTextProps) {
+  // A new label or font size is measured from scratch. Resetting in place kept
+  // the slot width of the label before it: one Button across sign-in's stages
+  // went from "Continue" to "Verify and sign in", the longer label was judged
+  // against the shorter one's slot and shrank to the floor, and a full-width
+  // button never grows to undo it.
+  const label =
+    typeof props.children === "string" || typeof props.children === "number"
+      ? String(props.children)
+      : "";
+  return <FittedText key={`${label}|${readFontSize(props.style) ?? ""}`} {...props} />;
+}
+
+function FittedText({ style, containerWidth, children, ...props }: FitTextProps) {
   const [scale, setScale] = useState(1);
   const naturalWidth = useRef<number | null>(null);
   const slotWidth = useRef<number | null>(null);
@@ -98,11 +108,6 @@ export function FitText({
     shrunkAtWidth.current = null;
     setScale(1);
   }, []);
-
-  // A new label or a new style starts over at full size. The hidden copy
-  // re-measures on its own; the slot reports on the next layout pass, and
-  // `apply` only acts once both are known.
-  useEffect(reset, [children, fontSize, reset]);
 
   // So does a container that has grown since the label shrank. Only growth
   // counts: a hugging container's width follows the label, so it narrows
