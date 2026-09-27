@@ -1,4 +1,6 @@
 import { ActionButtons } from "../../../shared/components/ActionButtons";
+import { ScheduleNoteLabels } from "../../../shared/components/ScheduleNoteLabels";
+import { scheduleNotesForRow } from "../lib/scheduleNotes";
 import {
   Fragment,
   useCallback,
@@ -1932,6 +1934,11 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
                           groupTimeRange={groupTimeRange}
                           isFirst={memberIndex === 0}
                           linkedEmployeeId={linkedEmployee?.id ?? null}
+                          tabFocusAreaId={
+                            typeof activeTeamFocusAreaTab?.focusAreaId === "number"
+                              ? activeTeamFocusAreaTab.focusAreaId
+                              : undefined
+                          }
                           row={row}
                           onPress={() => handleOpenShiftDetail(row.entry)}
                         />
@@ -3530,12 +3537,15 @@ function TeamShiftMemberRow({
   groupTimeRange,
   isFirst,
   linkedEmployeeId,
+  tabFocusAreaId,
   row,
   onPress,
 }: {
   groupTimeRange: string | null;
   isFirst: boolean;
   linkedEmployeeId: string | null;
+  /** The selected focus-area tab's area, when it names one. */
+  tabFocusAreaId?: number;
   row: TeamScheduleShiftRow;
   onPress: () => void;
 }) {
@@ -3563,6 +3573,13 @@ function TeamShiftMemberRow({
   // Once the reader raises the text size the role pill moves under the name:
   // the two no longer share a row's width, so neither has to give.
   const stackRolePill = useWindowDimensions().fontScale > 1;
+  // Each half of a double shift lists its own focus area's notes; otherwise the
+  // selected tab's area filters them, and the all tab shows every note.
+  const noteFocusAreaId =
+    segment && typeof segment.focusAreaId === "number" && getScheduleEntrySegments(entry).length > 1
+      ? segment.focusAreaId
+      : tabFocusAreaId;
+  const notes = scheduleNotesForRow(entry.indicators, noteFocusAreaId);
   const rolePill =
     roleChip || isMentored ? (
       <View style={[styles.teamMemberRoleRow, stackRolePill && styles.teamMemberRoleRowStacked]}>
@@ -3598,6 +3615,7 @@ function TeamShiftMemberRow({
             {stackRolePill ? null : rolePill}
           </View>
           {memberTimeRange ? <Text style={styles.teamMemberTime}>{memberTimeRange}</Text> : null}
+          <ScheduleNoteLabels notes={notes} />
           <PreviousShiftRow change={change} />
           {splitChipLabel ? (
             <View style={styles.teamMemberSplitBadgeRow}>

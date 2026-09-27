@@ -916,6 +916,82 @@ describe("ScheduleScreen", () => {
     expect(screen.getByText("Lead")).toBeInTheDocument();
   });
 
+  // 42c: schedule notes are spelled out on team rows, per half of a double shift.
+  it("lists a person's schedule notes on their team row", () => {
+    teamScheduleEntries = [
+      createScheduleEntry({
+        indicators: [
+          {
+            indicatorTypeId: 7,
+            focusAreaId: null,
+            name: "Float",
+            color: "#E24B4A",
+            state: "published",
+          },
+        ],
+      }),
+    ];
+
+    render(<TeamScheduleScreen />);
+
+    expect(screen.getByLabelText("Float")).toHaveTextContent("Float");
+  });
+
+  it("gives each half of a double shift its own focus area's notes", () => {
+    teamScheduleEntries = [
+      createScheduleEntry({
+        employeeId: "emp-2",
+        employeeName: "Bri Shaw",
+        shiftName: "Day Shift / Evening Shift",
+        startTime: "07:00:00",
+        endTime: "23:00:00",
+        segments: [
+          {
+            shiftId: 1,
+            jobId: 10,
+            shiftName: "Day Shift",
+            jobName: "Nurse",
+            startTime: "07:00:00",
+            endTime: "15:00:00",
+            focusAreaId: 2,
+            displayFocusAreaName: "Skilled Nursing",
+          },
+          {
+            shiftId: 2,
+            jobId: 11,
+            shiftName: "Evening Shift",
+            jobName: "Lead",
+            startTime: "15:00:00",
+            endTime: "23:00:00",
+            focusAreaId: 3,
+            displayFocusAreaName: "Memory Care",
+          },
+        ],
+        indicators: [
+          {
+            indicatorTypeId: 7,
+            focusAreaId: 2,
+            name: "Float",
+            color: "#E24B4A",
+            state: "published",
+          },
+          {
+            indicatorTypeId: 8,
+            focusAreaId: 3,
+            name: "Training",
+            color: "#378ADD",
+            state: "published",
+          },
+        ],
+      }),
+    ];
+
+    render(<TeamScheduleScreen />);
+
+    expect(screen.getAllByLabelText("Float")).toHaveLength(1);
+    expect(screen.getAllByLabelText("Training")).toHaveLength(1);
+  });
+
   it("shows mentored assignments with a full label on Home", () => {
     meScheduleEntries = [
       createScheduleEntry({

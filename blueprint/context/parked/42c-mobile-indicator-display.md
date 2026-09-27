@@ -73,7 +73,7 @@ focusAreaId?)` that filters by focus area and removes duplicates by
       when:_ tests cover each state's style and label, the focus-area filter
       (matching, null and all), duplicate removal, an empty list rendering
       nothing, and an unknown state parsing as published.
-- [ ] **Step 2 - Schedule tab team rows** - `TeamShiftMemberRow` lists the
+- [x] **Step 2 - Schedule tab team rows** - `TeamShiftMemberRow` lists the
       row's schedule notes by name, filtered by the active focus-area tab.
       _Done when:_ a screen test finds a person's schedule note by its name
       on the all tab and on a matching focus-area tab, not on another tab, and
