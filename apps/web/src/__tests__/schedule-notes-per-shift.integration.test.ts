@@ -36,7 +36,8 @@ async function probeDb(): Promise<boolean> {
 
 const reachable = await probeDb();
 
-const DATE = "2031-06-03";
+// A date no other integration test seeds, so no two suites contend for one cell.
+const DATE = "2031-11-19";
 
 interface Fixture {
   orgId: string;
@@ -219,6 +220,10 @@ describe.skipIf(!reachable)("063 schedule notes per shift", () => {
 
   beforeEach(async () => {
     await db.query("BEGIN");
+    // Taken before anything else: the rewind alters the table, and acquiring
+    // that lock after touching other rows deadlocked against the parallel
+    // integration suites.
+    await db.query("LOCK TABLE public.schedule_notes IN ACCESS EXCLUSIVE MODE");
     await rewindTo062();
     await seedDoubleShift();
   });
