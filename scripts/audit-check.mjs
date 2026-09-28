@@ -63,27 +63,6 @@ const ALLOWLIST = [
       "copycat declares. Forcing it through an override would hand the seed tooling a data " +
       "generator API it was never built against. Revisit when copycat publishes on a patched faker.",
   },
-  {
-    ids: [
-      "GHSA-5jgf-p345-68v8",
-      "GHSA-f65p-4m7j-42xc",
-      "GHSA-fph4-wmhf-6fwf",
-      "GHSA-jqff-g426-hqxp",
-    ],
-    package: "fast-uri",
-    reviewBy: "2026-12-01",
-    reason:
-      "Host confusion and SSRF in URI parsing, all four fixed in 3.1.6. The overrides block pulls " +
-      "every copy npm will let it reach up to 3.1.7. Two stay behind at 3.1.5, both inside the " +
-      "apps/web workspace subtree: @sentry/nextjs > webpack > schema-utils > ajv > fast-uri, and " +
-      "react-email > conf > ajv > fast-uri. A root `overrides` block does not reach into a " +
-      "workspace subtree under `install-strategy=nested`, and neither an exact pin nor a full " +
-      "lockfile re-resolution moved them. Neither copy parses untrusted input: the first validates " +
-      "webpack's own config schema during a build, the second backs the react-email CLI behind " +
-      "`npm run email:build`, so both run on a developer machine or in CI over files we wrote, and " +
-      "neither ships in the web bundle or the server runtime. Revisit when ajv's dependents " +
-      "publish on a fixed fast-uri, or when npm applies root overrides inside workspaces.",
-  },
 ];
 
 /** Every GHSA id in `via`, following the chains npm nests inside each other. */
