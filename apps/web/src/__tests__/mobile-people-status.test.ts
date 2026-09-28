@@ -83,6 +83,10 @@ describe("updateMobilePersonStatus organization membership sync", () => {
     );
 
     expect(result.kind).toBe("updated");
+    expect(deps.updateEmployeeStatus).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ status: "removed", updatedBy: "user-actor" }),
+    );
     expect(deps.archiveOrganizationMembership).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ orgId: "org-1", userId: "user-other" }),

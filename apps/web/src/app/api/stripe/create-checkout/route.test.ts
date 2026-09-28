@@ -8,7 +8,7 @@ const organizationSingle = vi.fn();
 const organizationMembershipSelect = vi.fn();
 const employeeSelect = vi.fn();
 const superAdminMaybeSingle = vi.fn();
-const seatCountIs = vi.fn();
+const seatCountEq = vi.fn();
 const organizationUpdate = vi.fn();
 const organizationUpdateEq = vi.fn();
 const getUserById = vi.fn();
@@ -82,14 +82,15 @@ describe("POST /api/stripe/create-checkout", () => {
       data: { user_id: "super-admin-user" },
       error: null,
     });
-    seatCountIs.mockResolvedValue({
+    seatCountEq.mockResolvedValue({
       data: [
-        { id: 1, user_id: "linked-user" },
-        { id: 2, user_id: null },
-        { id: 3, user_id: null },
-        { id: 4, user_id: null },
-        { id: 5, user_id: null },
-        { id: 6, user_id: null },
+        { id: 1, status: "active", archived_at: null, user_id: "linked-user" },
+        { id: 2, status: "active", archived_at: null, user_id: null },
+        { id: 3, status: "active", archived_at: null, user_id: null },
+        { id: 4, status: "active", archived_at: null, user_id: null },
+        { id: 5, status: "active", archived_at: null, user_id: null },
+        { id: 6, status: "active", archived_at: null, user_id: null },
+        { id: 7, status: "inactive", archived_at: null, user_id: null },
       ],
       error: null,
     });
@@ -116,9 +117,7 @@ describe("POST /api/stripe/create-checkout", () => {
       }
     });
     employeeSelect.mockReturnValue({
-      eq: vi.fn(() => ({
-        is: seatCountIs,
-      })),
+      eq: seatCountEq,
     });
     organizationUpdateEq.mockResolvedValue({ error: null });
     organizationUpdate.mockReturnValue({ eq: organizationUpdateEq });

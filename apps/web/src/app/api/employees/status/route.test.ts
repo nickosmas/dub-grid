@@ -11,6 +11,7 @@ const membershipMaybeSingle = vi.fn();
 const profileSingle = vi.fn();
 const employeeCurrentSingle = vi.fn();
 const employeeUpdateMaybeSingle = vi.fn();
+const employeeUpdate = vi.fn();
 const membershipRestoreUpdate = vi.fn();
 const membershipArchiveUpdate = vi.fn();
 const targetMembershipMaybeSingle = vi.fn();
@@ -130,7 +131,7 @@ vi.mock("@/lib/supabase-service", () => ({
               })),
             })),
           })),
-          update: vi.fn(() => ({
+          update: employeeUpdate.mockImplementation(() => ({
             eq: vi.fn(() => ({
               eq: vi.fn(() => ({
                 eq: vi.fn(() => ({
@@ -293,6 +294,11 @@ describe("POST /api/employees/status", () => {
     const response = await POST(request);
 
     expect(response.status).toBe(200);
+    // Leaving credits the cleared shifts to updated_by, since the service
+    // client has no auth.uid().
+    expect(employeeUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "active", updated_by: USER_ID }),
+    );
     // The Remove-from-staff flow archives organization_memberships alongside
     // the employees.status flip — reactivating must undo both, or the user
     // passes employees.status but still can't log in.

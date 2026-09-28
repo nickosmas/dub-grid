@@ -700,12 +700,13 @@ describe("POST /api/schedule/manage", () => {
         state: { kind: "absence", absenceTypeId: 9 },
         effective_from: "2026-01-01",
         effective_until: null,
+        employee: { status: "active", archived_at: null },
       };
     }
 
-    function mockTables(existingCellSnapshots: unknown[]) {
+    function mockTables(existingCellSnapshots: unknown[], extraTemplates: unknown[] = []) {
       const recurringQuery = chainableQuery({
-        data: [recurringShiftRow()],
+        data: [recurringShiftRow(), ...extraTemplates],
         error: null,
       });
       const cellsQuery = chainableQuery({
@@ -775,6 +776,46 @@ describe("POST /api/schedule/manage", () => {
       // cap on a large org/date range.
       expect(cellsQuery.range).toHaveBeenCalledWith(0, 499);
       expect(cellsQuery.order).toHaveBeenCalledWith("date", { ascending: true });
+    });
+
+    it("skips templates of staff who have left and still fills everyone else's", async () => {
+      mockTables(
+        [],
+        [
+          {
+            ...recurringShiftRow(),
+            id: "rec-inactive",
+            emp_id: "33333333-3333-4333-8333-333333333333",
+            employee: { status: "inactive", archived_at: null },
+          },
+          {
+            ...recurringShiftRow(),
+            id: "rec-removed",
+            emp_id: "44444444-4444-4444-8444-444444444444",
+            employee: { status: "removed", archived_at: "2026-07-01T00:00:00.000Z" },
+          },
+        ],
+      );
+
+      const response = await POST(
+        makeRequest({
+          action: "applyRecurringSchedules",
+          orgId,
+          startDate: dateKey,
+          endDate: dateKey,
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.generated).toEqual([
+        { empId, date: dateKey, label: "Vacation", absenceTypeId: 9 },
+      ]);
+      expect(userRpc).toHaveBeenCalledTimes(1);
+      expect(userRpc).toHaveBeenCalledWith(
+        "write_schedule_cell_snapshot",
+        expect.objectContaining({ p_emp_id: empId }),
+      );
     });
 
     it("fills a genuinely empty cell from the recurring template", async () => {

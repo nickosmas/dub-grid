@@ -1611,7 +1611,7 @@ export async function POST(req: NextRequest) {
         const [{ data: recurringRows, error: recurringError }, cells] = await Promise.all([
           auth.serviceClient
             .from("recurring_shifts")
-            .select(RECURRING_SHIFT_COLS)
+            .select(`${RECURRING_SHIFT_COLS}, employee:employees(status, archived_at)`)
             .eq("org_id", data.orgId)
             .is("archived_at", null)
             .lte("effective_from", data.endDate)
@@ -1624,9 +1624,18 @@ export async function POST(req: NextRequest) {
         if (recurringError) {
           throw recurringError;
         }
+        // The database refuses to schedule someone who has left, so one
+        // leftover template would otherwise fail the whole apply part way.
+        // emp_id is a many-to-one foreign key, so the embed is one row, not the
+        // array the generated types infer.
+        const activeTemplates = (
+          (recurringRows ?? []) as unknown as Array<
+            DbRecurringShift & { employee: { status: string; archived_at: string | null } | null }
+          >
+        ).filter((row) => row.employee?.status === "active" && !row.employee.archived_at);
 
         const templatesByEmpAndDay = new Map<string, DbRecurringShift>();
-        for (const row of (recurringRows ?? []) as DbRecurringShift[]) {
+        for (const row of activeTemplates) {
           const key = `${row.emp_id}_${row.day_of_week}`;
           const current = templatesByEmpAndDay.get(key);
           if (!current || row.effective_from > current.effective_from) {
@@ -1641,7 +1650,7 @@ export async function POST(req: NextRequest) {
 
         const absenceTypeIds = Array.from(
           new Set(
-            ((recurringRows ?? []) as DbRecurringShift[])
+            activeTemplates
               .map((row) =>
                 row.state.kind === "absence" ? (row.state.absenceTypeId ?? null) : null,
               )

@@ -53,14 +53,14 @@ function createQueryClient() {
       if (table === "employees") {
         return {
           select: () => ({
-            eq: () => ({
-              is: async () => ({
-                data: [
-                  { id: 1, user_id: "linked-user" },
-                  { id: 2, user_id: null },
-                ],
-                error: null,
-              }),
+            eq: async () => ({
+              data: [
+                { status: "active", archived_at: null, user_id: "linked-user" },
+                { status: "active", archived_at: null, user_id: null },
+                { status: "inactive", archived_at: null, user_id: null },
+                { status: "removed", archived_at: "2026-09-01T00:00:00Z", user_id: "removed-user" },
+              ],
+              error: null,
             }),
           }),
         };
@@ -70,7 +70,11 @@ function createQueryClient() {
           select: () => ({
             eq: () => ({
               is: async () => ({
-                data: [{ user_id: "linked-user" }, { user_id: "manager-user" }],
+                data: [
+                  { user_id: "linked-user" },
+                  { user_id: "manager-user" },
+                  { user_id: "removed-user" },
+                ],
                 error: null,
               }),
             }),
@@ -128,7 +132,8 @@ describe("loadOrganizationBillingSummary", () => {
     expect(summary.orgName).toBe("Acme Health");
     expect(summary.hasStripeCustomer).toBe(true);
     expect(summary.hasStripeSubscription).toBe(true);
-    // appUserCount = 2 employees + 1 management-only membership (manager-user)
+    // 2 active employees + manager-user; the inactive employee and the removed
+    // employee's still-live membership are not billed.
     expect(summary.appUserCount).toBe(3);
     expect(summary.subscriptionSeats).toBe(5);
     expect(summary.recentOperations?.map((operation) => operation.label)).toEqual([

@@ -5,7 +5,7 @@ const requireOrgPermissions = vi.fn();
 const serviceFrom = vi.fn();
 const organizationSingle = vi.fn();
 const subscriptionMaybeSingle = vi.fn();
-const employeeIs = vi.fn();
+const employeeEq = vi.fn();
 const membershipIs = vi.fn();
 const auditLimit = vi.fn();
 
@@ -76,14 +76,15 @@ describe("GET /api/billing", () => {
       },
       error: null,
     });
-    employeeIs.mockResolvedValue({
+    employeeEq.mockResolvedValue({
       data: [
-        { id: 1, user_id: "linked-user" },
-        { id: 2, user_id: null },
-        { id: 3, user_id: null },
-        { id: 4, user_id: null },
-        { id: 5, user_id: null },
-        { id: 6, user_id: null },
+        { id: 1, status: "active", archived_at: null, user_id: "linked-user" },
+        { id: 2, status: "active", archived_at: null, user_id: null },
+        { id: 3, status: "active", archived_at: null, user_id: null },
+        { id: 4, status: "active", archived_at: null, user_id: null },
+        { id: 5, status: "active", archived_at: null, user_id: null },
+        { id: 6, status: "active", archived_at: null, user_id: null },
+        { id: 7, status: "inactive", archived_at: null, user_id: null },
       ],
       error: null,
     });
@@ -148,9 +149,7 @@ describe("GET /api/billing", () => {
       if (table === "employees") {
         return {
           select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              is: employeeIs,
-            })),
+            eq: employeeEq,
           })),
         };
       }

@@ -177,8 +177,11 @@ export async function POST(req: NextRequest) {
     }
 
     const now = new Date().toISOString();
+    // The service client has no auth.uid(), so name the actor: leaving turns
+    // their future shifts into pending removals credited to this person.
     const update: Record<string, unknown> = {
       status_changed_at: now,
+      updated_by: user.id,
       version: expectedVersion + 1,
     };
 

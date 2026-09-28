@@ -1,6 +1,11 @@
 import { getRateLimitConfigStatus } from "@/lib/rate-limit";
 import { ORGANIZATION_WITH_BILLING_COLS } from "@/lib/db/shared";
 import { rowToOrganization } from "@/lib/db/mappers";
+import {
+  countBillableSeats,
+  type SeatEmployee,
+  type SeatMembership,
+} from "@/features/billing/seats";
 import type { DbOrganization } from "@/lib/db/types";
 import type {
   GridmasterBillingSummary,
@@ -207,7 +212,7 @@ async function loadOversightFactsUncached(serviceClient: QueryClient) {
   const [
     organizations,
     memberships,
-    employees,
+    employeeRecords,
     invitations,
     scheduleCells,
     shiftRequests,
@@ -236,7 +241,7 @@ async function loadOversightFactsUncached(serviceClient: QueryClient) {
       serviceClient,
       "employees",
       "org_id, status, user_id, created_at, updated_at, archived_at",
-    ).then((rows) => rows.filter((row) => !row.archived_at)),
+    ),
     selectRows(
       serviceClient,
       "invitations",
@@ -310,7 +315,8 @@ async function loadOversightFactsUncached(serviceClient: QueryClient) {
     now,
     organizations,
     memberships,
-    employees,
+    employees: employeeRecords.filter((row) => !row.archived_at),
+    employeeRecords,
     invitations,
     scheduleCells,
     shiftRequests,
@@ -609,17 +615,10 @@ function buildBillingSummary(
 }
 
 function billableAppUserCountForOrg(facts: OversightFacts, orgId: string): number {
-  const employees = facts.employees.filter((row) => row.org_id === orgId);
-  const linkedEmployeeUserIds = new Set(
-    employees
-      .map((row) => stringOrNull(row.user_id))
-      .filter((userId): userId is string => Boolean(userId)),
+  return countBillableSeats(
+    facts.employeeRecords.filter((row) => row.org_id === orgId) as SeatEmployee[],
+    facts.memberships.filter((row) => row.org_id === orgId) as SeatMembership[],
   );
-  const managementOnlyMemberships = facts.memberships.filter((row) => {
-    const userId = stringOrNull(row.user_id);
-    return row.org_id === orgId && userId && !linkedEmployeeUserIds.has(userId);
-  });
-  return employees.length + managementOnlyMemberships.length;
 }
 
 function buildComplianceSummary(

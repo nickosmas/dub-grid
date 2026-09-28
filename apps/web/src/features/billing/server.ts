@@ -3,6 +3,7 @@ import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
 import type { BillingOperationSummary, OrganizationBillingSummary } from "@/types";
 import { clientEnv } from "@/lib/env";
 import { serverEnv } from "@/lib/env.server";
+import { countBillableSeats, type SeatEmployee, type SeatMembership } from "./seats";
 
 type QueryClient = Pick<SupabaseClient, "from">;
 
@@ -193,11 +194,7 @@ export async function countBillableAppUsers(
     { data: employees, error: employeesError },
     { data: memberships, error: membershipsError },
   ] = await Promise.all([
-    serviceClient
-      .from("employees")
-      .select("id, user_id")
-      .eq("org_id", orgId)
-      .is("archived_at", null),
+    serviceClient.from("employees").select("status, archived_at, user_id").eq("org_id", orgId),
     serviceClient
       .from("organization_memberships")
       .select("user_id")
@@ -207,17 +204,10 @@ export async function countBillableAppUsers(
   if (employeesError) throw employeesError;
   if (membershipsError) throw membershipsError;
 
-  const linkedEmployeeUserIds = new Set(
-    (employees ?? [])
-      .map((row) => (row as { user_id?: string | null }).user_id)
-      .filter((userId): userId is string => Boolean(userId)),
+  return countBillableSeats(
+    (employees ?? []) as SeatEmployee[],
+    (memberships ?? []) as SeatMembership[],
   );
-  const managementOnlyUserCount = (memberships ?? []).filter((row) => {
-    const userId = (row as { user_id?: string | null }).user_id;
-    return userId && !linkedEmployeeUserIds.has(userId);
-  }).length;
-
-  return (employees?.length ?? 0) + managementOnlyUserCount;
 }
 
 export async function loadOrganizationBillingSummary(

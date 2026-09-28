@@ -45,6 +45,7 @@ type UpdateEmployeeStatus = (
     statusNote: string;
     statusChangedAt: string;
     archivedAt?: string | null;
+    updatedBy: string;
   },
 ) => Promise<Employee | null>;
 
@@ -227,6 +228,7 @@ export async function updateMobilePersonStatus(
     statusChangedAt: now,
     archivedAt:
       input.body.action === "activate" ? null : input.body.action === "remove" ? now : undefined,
+    updatedBy: auth.user.id,
   });
 
   if (!updatedEmployee) {
