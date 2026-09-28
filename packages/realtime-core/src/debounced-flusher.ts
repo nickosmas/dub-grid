@@ -17,6 +17,9 @@ export function createDebouncedTableFlusher<Table extends string>(
 ): DebouncedTableFlusher<Table> {
   const pendingTables = new Set<Table>();
   let flushTimer: ReturnType<typeof setTimeout> | null = null;
+  // An event can still arrive while the channel is leaving; once disposed it
+  // must not arm a flush that runs after teardown.
+  let disposed = false;
 
   const flush = () => {
     flushTimer = null;
@@ -27,12 +30,15 @@ export function createDebouncedTableFlusher<Table extends string>(
 
   return {
     markChanged(table: Table) {
+      if (disposed) return;
       pendingTables.add(table);
       if (flushTimer === null) {
         flushTimer = setTimeout(flush, delayMs);
       }
     },
     dispose() {
+      disposed = true;
+      pendingTables.clear();
       if (flushTimer !== null) {
         clearTimeout(flushTimer);
         flushTimer = null;

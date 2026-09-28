@@ -1,0 +1,897 @@
+{
+  "schemaVersion": 1,
+  "frozenProductCandidate": "1b86aad5f8fadba7712d926f98a7f7ec485facfc",
+  "runtimeProfiles": {
+    "web": {
+      "browsers": ["chromium", "firefox", "webkit"],
+      "viewports": ["desktop", "narrow"],
+      "roles": [
+        "signed-out",
+        "user",
+        "management-only-user",
+        "limited-admin",
+        "admin",
+        "super-admin"
+      ]
+    },
+    "mobile": {
+      "platforms": ["ios", "android"],
+      "roles": ["user", "management-only-user", "admin", "super-admin"],
+      "states": ["loaded", "loading", "empty", "error", "offline", "retry", "cold-start"]
+    }
+  },
+  "pages": [
+    {
+      "id": "home",
+      "file": "docs/index.mdx",
+      "publicRoute": "/",
+      "deliveryOwner": "40b",
+      "lifecycle": "published",
+      "sourceReview": "pending",
+      "audiences": ["prospect", "customer"],
+      "platforms": { "web": "required", "ios": "not-applicable", "android": "not-applicable" },
+      "surfaceIds": ["web:/", "web:/request-demo"],
+      "sections": [
+        {
+          "id": "overview",
+          "claims": ["pending-source-review"],
+          "sourceFiles": ["apps/web/src/app/page.tsx"],
+          "testFiles": [],
+          "runtimeScenarios": [],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "introduction",
+      "file": "docs/introduction.mdx",
+      "publicRoute": "/introduction",
+      "deliveryOwner": "40b",
+      "lifecycle": "published",
+      "sourceReview": "pending",
+      "audiences": ["customer"],
+      "platforms": { "web": "required", "ios": "required", "android": "required" },
+      "surfaceIds": [],
+      "sections": [
+        {
+          "id": "product",
+          "claims": ["pending-source-review"],
+          "sourceFiles": ["apps/web/src/app/page.tsx"],
+          "testFiles": [],
+          "runtimeScenarios": [],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "quickstart",
+      "file": "docs/quickstart.mdx",
+      "publicRoute": "/quickstart",
+      "deliveryOwner": "40b",
+      "lifecycle": "published",
+      "sourceReview": "pending",
+      "audiences": ["customer"],
+      "platforms": { "web": "required", "ios": "required", "android": "required" },
+      "surfaceIds": ["web:/login", "mobile:screen:/(auth)/login:all"],
+      "sections": [
+        {
+          "id": "sign-in",
+          "claims": ["pending-source-review"],
+          "sourceFiles": [
+            "apps/web/src/app/(app)/login/page.tsx",
+            "apps/mobile/app/(auth)/login.tsx"
+          ],
+          "testFiles": [],
+          "runtimeScenarios": [],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "onboarding",
+      "file": "docs/onboarding.mdx",
+      "publicRoute": "/onboarding",
+      "deliveryOwner": "40b",
+      "lifecycle": "published",
+      "sourceReview": "pending",
+      "audiences": ["customer", "admin"],
+      "platforms": { "web": "required", "ios": "required", "android": "required" },
+      "surfaceIds": [
+        "web:/onboarding",
+        "web:/accept-terms",
+        "mobile:screen:/(auth)/onboarding:all"
+      ],
+      "sections": [
+        {
+          "id": "setup",
+          "claims": ["pending-source-review"],
+          "sourceFiles": [
+            "apps/web/src/app/(app)/onboarding/page.tsx",
+            "apps/mobile/app/(auth)/onboarding.tsx"
+          ],
+          "testFiles": [],
+          "runtimeScenarios": [],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "schedule-grid",
+      "file": "docs/features/schedule-grid.mdx",
+      "publicRoute": "/features/schedule-grid",
+      "deliveryOwner": "40b",
+      "lifecycle": "published",
+      "sourceReview": "pending",
+      "audiences": ["user", "admin"],
+      "platforms": { "web": "required", "ios": "required", "android": "required" },
+      "surfaceIds": ["web:/schedule", "mobile:screen:/shift/[employeeId]/[date]:all"],
+      "sections": [
+        {
+          "id": "schedule",
+          "claims": ["pending-source-review"],
+          "sourceFiles": [
+            "apps/web/src/app/(app)/schedule/page.tsx",
+            "apps/mobile/app/shift/[employeeId]/[date].tsx"
+          ],
+          "testFiles": [],
+          "runtimeScenarios": [],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "draft-publish",
+      "file": "docs/features/draft-publish.mdx",
+      "publicRoute": "/features/draft-publish",
+      "deliveryOwner": "40b",
+      "lifecycle": "published",
+      "sourceReview": "pending",
+      "audiences": ["admin"],
+      "platforms": { "web": "required", "ios": "not-applicable", "android": "not-applicable" },
+      "surfaceIds": ["web:/schedule"],
+      "sections": [
+        {
+          "id": "publishing",
+          "claims": ["pending-source-review"],
+          "sourceFiles": ["apps/web/src/app/(app)/schedule/page.tsx"],
+          "testFiles": [],
+          "runtimeScenarios": [],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "recurring-shifts",
+      "file": "docs/features/recurring-shifts.mdx",
+      "publicRoute": "/features/recurring-shifts",
+      "deliveryOwner": "40b",
+      "lifecycle": "published",
+      "sourceReview": "pending",
+      "audiences": ["admin"],
+      "platforms": { "web": "required", "ios": "not-applicable", "android": "not-applicable" },
+      "surfaceIds": ["web:/schedule"],
+      "sections": [
+        {
+          "id": "series",
+          "claims": ["pending-source-review"],
+          "sourceFiles": ["apps/web/src/app/(app)/schedule/page.tsx"],
+          "testFiles": [],
+          "runtimeScenarios": [],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "realtime",
+      "file": "docs/features/real-time-collaboration.mdx",
+      "publicRoute": "/features/real-time-collaboration",
+      "deliveryOwner": "40b",
+      "lifecycle": "published",
+      "sourceReview": "pending",
+      "audiences": ["admin"],
+      "platforms": { "web": "required", "ios": "not-applicable", "android": "not-applicable" },
+      "surfaceIds": ["web:/schedule"],
+      "sections": [
+        {
+          "id": "collaboration",
+          "claims": ["pending-source-review"],
+          "sourceFiles": ["apps/web/src/app/(app)/schedule/page.tsx"],
+          "testFiles": [],
+          "runtimeScenarios": [],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "shift-requests",
+      "file": "docs/features/shift-requests.mdx",
+      "publicRoute": "/features/shift-requests",
+      "deliveryOwner": "40b",
+      "lifecycle": "published",
+      "sourceReview": "pending",
+      "audiences": ["user", "admin"],
+      "platforms": { "web": "required", "ios": "required", "android": "required" },
+      "surfaceIds": ["mobile:layout:/(tabs)/requests:all", "mobile:screen:/(tabs)/requests:all"],
+      "sections": [
+        {
+          "id": "requests",
+          "claims": ["pending-source-review"],
+          "sourceFiles": ["apps/mobile/app/(tabs)/requests/index.tsx"],
+          "testFiles": [],
+          "runtimeScenarios": [],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "dashboard",
+      "file": "docs/features/dashboard.mdx",
+      "publicRoute": "/features/dashboard",
+      "deliveryOwner": "40b",
+      "lifecycle": "published",
+      "sourceReview": "pending",
+      "audiences": ["management-only-user", "admin", "super-admin"],
+      "platforms": { "web": "required", "ios": "required", "android": "required" },
+      "surfaceIds": [
+        "web:/dashboard",
+        "mobile:layout:/(tabs)/home:all",
+        "mobile:screen:/(tabs)/home:all",
+        "mobile:screen:/(tabs)/home/activity:all",
+        "mobile:screen:/(tabs)/home/coverage:all",
+        "mobile:screen:/(tabs)/home/my-schedule:all",
+        "mobile:screen:/(tabs)/home/open-shifts:all",
+        "mobile:screen:/(tabs)/home/pending-approvals:all",
+        "mobile:screen:/(tabs)/home/staff-hours:all"
+      ],
+      "sections": [
+        {
+          "id": "dashboard",
+          "claims": ["pending-source-review"],
+          "sourceFiles": [
+            "apps/web/src/app/(app)/dashboard/page.tsx",
+            "apps/mobile/app/(tabs)/home/index.tsx"
+          ],
+          "testFiles": [],
+          "runtimeScenarios": [],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "roster",
+      "file": "docs/staff/roster.mdx",
+      "publicRoute": "/staff/roster",
+      "deliveryOwner": "40b",
+      "lifecycle": "published",
+      "sourceReview": "pending",
+      "audiences": ["user", "admin"],
+      "platforms": { "web": "required", "ios": "required", "android": "required" },
+      "surfaceIds": [
+        "web:/people",
+        "mobile:layout:/(tabs)/people:all",
+        "mobile:layout:/(tabs)/team:all",
+        "mobile:screen:/(tabs)/people:all",
+        "mobile:screen:/(tabs)/team:all"
+      ],
+      "sections": [
+        {
+          "id": "people",
+          "claims": ["pending-source-review"],
+          "sourceFiles": [
+            "apps/web/src/app/(app)/people/page.tsx",
+            "apps/mobile/app/(tabs)/people/index.tsx"
+          ],
+          "testFiles": [],
+          "runtimeScenarios": [],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "person-detail",
+      "file": "docs/staff/detail-page.mdx",
+      "publicRoute": "/staff/detail-page",
+      "deliveryOwner": "40b",
+      "lifecycle": "published",
+      "sourceReview": "pending",
+      "audiences": ["user", "admin"],
+      "platforms": { "web": "required", "ios": "required", "android": "required" },
+      "surfaceIds": [
+        "web:/people/[id]",
+        "mobile:screen:/(tabs)/people/[id]:all",
+        "mobile:screen:/person/[id]:all",
+        "mobile:screen:/person/[id]/schedule:all"
+      ],
+      "sections": [
+        {
+          "id": "person",
+          "claims": ["pending-source-review"],
+          "sourceFiles": [
+            "apps/web/src/app/(app)/people/[id]/page.tsx",
+            "apps/mobile/app/person/[id]/index.tsx"
+          ],
+          "testFiles": [],
+          "runtimeScenarios": [],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "invitations",
+      "file": "docs/staff/invitations.mdx",
+      "publicRoute": "/staff/invitations",
+      "deliveryOwner": "40b",
+      "lifecycle": "published",
+      "sourceReview": "pending",
+      "audiences": ["invitee", "admin"],
+      "platforms": { "web": "required", "ios": "not-applicable", "android": "not-applicable" },
+      "surfaceIds": ["web:/accept-invite", "web:/auth/verify"],
+      "sections": [
+        {
+          "id": "invite",
+          "claims": ["pending-source-review"],
+          "sourceFiles": ["apps/web/src/app/(app)/accept-invite/page.tsx"],
+          "testFiles": [],
+          "runtimeScenarios": [],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "organization",
+      "file": "docs/configuration/organization.mdx",
+      "publicRoute": "/configuration/organization",
+      "deliveryOwner": "40b",
+      "lifecycle": "published",
+      "sourceReview": "pending",
+      "audiences": ["admin"],
+      "platforms": { "web": "required", "ios": "not-applicable", "android": "not-applicable" },
+      "surfaceIds": ["web:/settings", "settings:org-general", "settings:org-labels"],
+      "sections": [
+        {
+          "id": "organization",
+          "claims": ["pending-source-review"],
+          "sourceFiles": ["apps/web/src/app/(app)/settings/page.tsx"],
+          "testFiles": [],
+          "runtimeScenarios": [],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "shift-codes",
+      "file": "docs/configuration/shift-codes.mdx",
+      "publicRoute": "/configuration/shift-codes",
+      "deliveryOwner": "40b",
+      "lifecycle": "published",
+      "sourceReview": "pending",
+      "audiences": ["admin"],
+      "platforms": { "web": "required", "ios": "not-applicable", "android": "not-applicable" },
+      "surfaceIds": [
+        "settings:schedule-shifts",
+        "settings:schedule-jobs",
+        "settings:schedule-absence-types"
+      ],
+      "sections": [
+        {
+          "id": "schedule-codes",
+          "claims": ["pending-source-review"],
+          "sourceFiles": ["apps/web/src/components/settings/nav-config.tsx"],
+          "testFiles": [],
+          "runtimeScenarios": [],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "focus-areas",
+      "file": "docs/configuration/focus-areas.mdx",
+      "publicRoute": "/configuration/focus-areas",
+      "deliveryOwner": "40b",
+      "lifecycle": "published",
+      "sourceReview": "pending",
+      "audiences": ["admin"],
+      "platforms": { "web": "required", "ios": "not-applicable", "android": "not-applicable" },
+      "surfaceIds": ["settings:staff-departments"],
+      "sections": [
+        {
+          "id": "departments",
+          "claims": ["pending-source-review"],
+          "sourceFiles": ["apps/web/src/components/settings/nav-config.tsx"],
+          "testFiles": [],
+          "runtimeScenarios": [],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "coverage",
+      "file": "docs/configuration/coverage-requirements.mdx",
+      "publicRoute": "/configuration/coverage-requirements",
+      "deliveryOwner": "40b",
+      "lifecycle": "published",
+      "sourceReview": "pending",
+      "audiences": ["admin"],
+      "platforms": { "web": "required", "ios": "not-applicable", "android": "not-applicable" },
+      "surfaceIds": ["settings:schedule-coverage"],
+      "sections": [
+        {
+          "id": "coverage",
+          "claims": ["pending-source-review"],
+          "sourceFiles": ["apps/web/src/components/settings/nav-config.tsx"],
+          "testFiles": [],
+          "runtimeScenarios": [],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "terminology",
+      "file": "docs/configuration/terminology.mdx",
+      "publicRoute": "/configuration/terminology",
+      "deliveryOwner": "40b",
+      "lifecycle": "published",
+      "sourceReview": "pending",
+      "audiences": ["admin"],
+      "platforms": { "web": "required", "ios": "required", "android": "required" },
+      "surfaceIds": [],
+      "sections": [
+        {
+          "id": "terms",
+          "claims": ["pending-source-review"],
+          "sourceFiles": ["packages/domain/src/index.ts"],
+          "testFiles": [],
+          "runtimeScenarios": [],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "roles",
+      "file": "docs/reference/roles.mdx",
+      "publicRoute": "/reference/roles",
+      "deliveryOwner": "40c",
+      "lifecycle": "published",
+      "sourceReview": "pending",
+      "audiences": ["admin"],
+      "platforms": { "web": "required", "ios": "required", "android": "required" },
+      "surfaceIds": ["settings:staff-roles"],
+      "sections": [
+        {
+          "id": "roles",
+          "claims": ["pending-source-review"],
+          "sourceFiles": ["packages/domain/src/index.ts"],
+          "testFiles": [],
+          "runtimeScenarios": [],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "admin-permissions",
+      "file": "docs/reference/admin-permissions.mdx",
+      "publicRoute": "/reference/admin-permissions",
+      "deliveryOwner": "40c",
+      "lifecycle": "published",
+      "sourceReview": "pending",
+      "audiences": ["admin"],
+      "platforms": { "web": "required", "ios": "required", "android": "required" },
+      "surfaceIds": [],
+      "sections": [
+        {
+          "id": "permissions",
+          "claims": ["pending-source-review"],
+          "sourceFiles": ["packages/authz/src/index.ts"],
+          "testFiles": [],
+          "runtimeScenarios": [],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "billing",
+      "file": "docs/reference/billing.mdx",
+      "publicRoute": "/reference/billing",
+      "deliveryOwner": "40c",
+      "lifecycle": "published",
+      "sourceReview": "pending",
+      "audiences": ["admin"],
+      "platforms": { "web": "required", "ios": "not-applicable", "android": "not-applicable" },
+      "surfaceIds": ["web:/billing-required", "settings:org-billing"],
+      "sections": [
+        {
+          "id": "billing",
+          "claims": ["pending-source-review"],
+          "sourceFiles": ["apps/web/src/app/(app)/billing-required/page.tsx"],
+          "testFiles": [],
+          "runtimeScenarios": [],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "subscription",
+      "file": "docs/reference/subscription.mdx",
+      "publicRoute": "/reference/subscription",
+      "deliveryOwner": "40c",
+      "lifecycle": "published",
+      "sourceReview": "pending",
+      "audiences": ["admin"],
+      "platforms": { "web": "required", "ios": "not-applicable", "android": "not-applicable" },
+      "surfaceIds": ["web:/billing-required"],
+      "sections": [
+        {
+          "id": "subscription",
+          "claims": ["pending-source-review"],
+          "sourceFiles": ["apps/web/src/app/(app)/billing-required/page.tsx"],
+          "testFiles": [],
+          "runtimeScenarios": [],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "api-overview",
+      "file": "docs/reference/api-overview.mdx",
+      "publicRoute": "/reference/api-overview",
+      "deliveryOwner": "40c",
+      "lifecycle": "published",
+      "sourceReview": "pending",
+      "audiences": ["admin"],
+      "platforms": { "web": "required", "ios": "not-applicable", "android": "not-applicable" },
+      "surfaceIds": [],
+      "sections": [
+        {
+          "id": "integrations",
+          "claims": ["pending-source-review"],
+          "sourceFiles": ["apps/web/src/app/(app)/reports/page.tsx"],
+          "testFiles": [],
+          "runtimeScenarios": [],
+          "exclusions": ["Internal HTTP endpoints are not a public API."]
+        }
+      ]
+    },
+    {
+      "id": "calendar-export",
+      "file": "docs/reference/calendar-export.mdx",
+      "publicRoute": "/reference/calendar-export",
+      "deliveryOwner": "40c",
+      "lifecycle": "published",
+      "sourceReview": "pending",
+      "audiences": ["user"],
+      "platforms": { "web": "required", "ios": "required", "android": "required" },
+      "surfaceIds": ["mobile:screen:/(tabs)/profile/calendar:all"],
+      "sections": [
+        {
+          "id": "calendar",
+          "claims": ["pending-source-review"],
+          "sourceFiles": ["apps/mobile/app/(tabs)/profile/calendar.tsx"],
+          "testFiles": [],
+          "runtimeScenarios": [],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "mobile-navigation",
+      "file": "docs/features/mobile-navigation.mdx",
+      "publicRoute": "/features/mobile-navigation",
+      "deliveryOwner": "40c",
+      "lifecycle": "planned",
+      "sourceReview": "pending",
+      "audiences": ["user", "admin"],
+      "platforms": { "web": "not-applicable", "ios": "planned", "android": "planned" },
+      "surfaceIds": [
+        "mobile:layout:/(tabs):all",
+        "mobile:layout:/(tabs):android",
+        "mobile:layout:/(tabs):web",
+        "mobile:layout:/:all",
+        "mobile:screen:/:all"
+      ],
+      "sections": [
+        {
+          "id": "navigation",
+          "claims": ["planned-source-review"],
+          "sourceFiles": ["apps/mobile/app/_layout.tsx", "apps/mobile/app/(tabs)/_layout.tsx"],
+          "testFiles": [],
+          "runtimeScenarios": ["cold-start", "deep-link"],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "alerts",
+      "file": "docs/features/alerts.mdx",
+      "publicRoute": "/features/alerts",
+      "deliveryOwner": "40c",
+      "lifecycle": "planned",
+      "sourceReview": "pending",
+      "audiences": ["user", "admin"],
+      "platforms": { "web": "planned", "ios": "planned", "android": "planned" },
+      "surfaceIds": ["web:/alerts", "mobile:screen:/alerts:all", "mobile:screen:/alerts/[id]:all"],
+      "sections": [
+        {
+          "id": "alerts",
+          "claims": ["planned-source-review"],
+          "sourceFiles": [
+            "apps/web/src/app/(app)/alerts/page.tsx",
+            "apps/mobile/app/alerts/index.tsx"
+          ],
+          "testFiles": [],
+          "runtimeScenarios": ["deep-link"],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "reports",
+      "file": "docs/features/reports.mdx",
+      "publicRoute": "/features/reports",
+      "deliveryOwner": "40c",
+      "lifecycle": "planned",
+      "sourceReview": "pending",
+      "audiences": ["admin"],
+      "platforms": { "web": "planned", "ios": "not-applicable", "android": "not-applicable" },
+      "surfaceIds": ["web:/reports"],
+      "sections": [
+        {
+          "id": "reports",
+          "claims": ["planned-source-review"],
+          "sourceFiles": ["apps/web/src/app/(app)/reports/page.tsx"],
+          "testFiles": [],
+          "runtimeScenarios": ["loaded", "empty", "error"],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "profile",
+      "file": "docs/account/profile.mdx",
+      "publicRoute": "/account/profile",
+      "deliveryOwner": "40c",
+      "lifecycle": "planned",
+      "sourceReview": "pending",
+      "audiences": ["user", "admin"],
+      "platforms": { "web": "planned", "ios": "planned", "android": "planned" },
+      "surfaceIds": [
+        "web:/account",
+        "web:/profile",
+        "web:/goodbye",
+        "mobile:layout:/(tabs)/profile:all",
+        "mobile:screen:/(tabs)/profile:all",
+        "mobile:screen:/(tabs)/profile/account:all",
+        "mobile:screen:/(tabs)/profile/work:all"
+      ],
+      "sections": [
+        {
+          "id": "profile",
+          "claims": ["planned-source-review"],
+          "sourceFiles": [
+            "apps/web/src/app/(app)/profile/page.tsx",
+            "apps/mobile/app/(tabs)/profile/index.tsx"
+          ],
+          "testFiles": [],
+          "runtimeScenarios": ["loaded", "validation"],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "security-sessions",
+      "file": "docs/account/security-and-sessions.mdx",
+      "publicRoute": "/account/security-and-sessions",
+      "deliveryOwner": "40c",
+      "lifecycle": "planned",
+      "sourceReview": "pending",
+      "audiences": ["user", "admin"],
+      "platforms": { "web": "planned", "ios": "planned", "android": "planned" },
+      "surfaceIds": [
+        "web:/forgot-password",
+        "web:/reset-password",
+        "mobile:screen:/(auth)/forgot-password:all",
+        "mobile:screen:/(auth)/reset-password:all",
+        "mobile:screen:/(tabs)/profile/password:all",
+        "mobile:screen:/(tabs)/profile/security:all",
+        "mobile:screen:/(tabs)/profile/sessions:all",
+        "mobile:screen:/(tabs)/profile/two-factor:all"
+      ],
+      "sections": [
+        {
+          "id": "security",
+          "claims": ["planned-source-review"],
+          "sourceFiles": [
+            "apps/web/src/app/(app)/reset-password/page.tsx",
+            "apps/mobile/app/(tabs)/profile/security.tsx"
+          ],
+          "testFiles": [],
+          "runtimeScenarios": ["mfa", "recovery", "offline"],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "privacy-controls",
+      "file": "docs/account/notification-privacy-and-data-controls.mdx",
+      "publicRoute": "/account/notification-privacy-and-data-controls",
+      "deliveryOwner": "40c",
+      "lifecycle": "planned",
+      "sourceReview": "pending",
+      "audiences": ["user", "admin"],
+      "platforms": { "web": "planned", "ios": "planned", "android": "planned" },
+      "surfaceIds": [
+        "web:/cookie-policy",
+        "web:/privacy",
+        "web:/terms",
+        "mobile:screen:/(tabs)/profile/notifications:all",
+        "mobile:screen:/(tabs)/profile/privacy:all"
+      ],
+      "sections": [
+        {
+          "id": "controls",
+          "claims": ["planned-source-review"],
+          "sourceFiles": [
+            "apps/web/src/app/privacy/page.tsx",
+            "apps/mobile/app/(tabs)/profile/privacy.tsx"
+          ],
+          "testFiles": [],
+          "runtimeScenarios": ["loaded", "validation"],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "schedule-rules-display",
+      "file": "docs/configuration/schedule-rules-and-display.mdx",
+      "publicRoute": "/configuration/schedule-rules-and-display",
+      "deliveryOwner": "40b",
+      "lifecycle": "planned",
+      "sourceReview": "pending",
+      "audiences": ["admin"],
+      "platforms": { "web": "planned", "ios": "not-applicable", "android": "not-applicable" },
+      "surfaceIds": ["settings:org-display", "settings:schedule-rules"],
+      "sections": [
+        {
+          "id": "rules-display",
+          "claims": ["planned-source-review"],
+          "sourceFiles": ["apps/web/src/components/settings/nav-config.tsx"],
+          "testFiles": [],
+          "runtimeScenarios": ["validation"],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "roles-certifications-indicators",
+      "file": "docs/configuration/roles-certifications-and-indicators.mdx",
+      "publicRoute": "/configuration/roles-certifications-and-indicators",
+      "deliveryOwner": "40b",
+      "lifecycle": "planned",
+      "sourceReview": "pending",
+      "audiences": ["admin"],
+      "platforms": { "web": "planned", "ios": "not-applicable", "android": "not-applicable" },
+      "surfaceIds": [
+        "settings:staff-roles",
+        "settings:staff-certifications",
+        "settings:staff-indicators"
+      ],
+      "sections": [
+        {
+          "id": "staff-configuration",
+          "claims": ["planned-source-review"],
+          "sourceFiles": ["apps/web/src/components/settings/nav-config.tsx"],
+          "testFiles": [],
+          "runtimeScenarios": ["validation"],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "organization-activity-controls",
+      "file": "docs/configuration/organization-activity-and-controls.mdx",
+      "publicRoute": "/configuration/organization-activity-and-controls",
+      "deliveryOwner": "40b",
+      "lifecycle": "planned",
+      "sourceReview": "pending",
+      "audiences": ["super-admin"],
+      "platforms": { "web": "planned", "ios": "not-applicable", "android": "not-applicable" },
+      "surfaceIds": ["settings:org-activity", "settings:org-danger"],
+      "sections": [
+        {
+          "id": "activity-controls",
+          "claims": ["planned-source-review"],
+          "sourceFiles": ["apps/web/src/components/settings/nav-config.tsx"],
+          "testFiles": [],
+          "runtimeScenarios": ["loaded", "denied"],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "departments-focus-areas",
+      "file": "docs/configuration/departments-and-focus-areas.mdx",
+      "publicRoute": "/configuration/departments-and-focus-areas",
+      "deliveryOwner": "40b",
+      "lifecycle": "planned",
+      "sourceReview": "pending",
+      "audiences": ["admin"],
+      "platforms": { "web": "planned", "ios": "not-applicable", "android": "not-applicable" },
+      "surfaceIds": ["settings:staff-departments"],
+      "sections": [
+        {
+          "id": "departments",
+          "claims": ["planned-source-review"],
+          "sourceFiles": ["apps/web/src/components/settings/nav-config.tsx"],
+          "testFiles": [],
+          "runtimeScenarios": ["loaded", "validation"],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "shifts-jobs-absences",
+      "file": "docs/configuration/shifts-jobs-and-absences.mdx",
+      "publicRoute": "/configuration/shifts-jobs-and-absences",
+      "deliveryOwner": "40b",
+      "lifecycle": "planned",
+      "sourceReview": "pending",
+      "audiences": ["admin"],
+      "platforms": { "web": "planned", "ios": "not-applicable", "android": "not-applicable" },
+      "surfaceIds": [
+        "settings:schedule-shifts",
+        "settings:schedule-jobs",
+        "settings:schedule-absence-types"
+      ],
+      "sections": [
+        {
+          "id": "codes",
+          "claims": ["planned-source-review"],
+          "sourceFiles": ["apps/web/src/components/settings/nav-config.tsx"],
+          "testFiles": [],
+          "runtimeScenarios": ["loaded", "validation"],
+          "exclusions": []
+        }
+      ]
+    },
+    {
+      "id": "integrations-exports",
+      "file": "docs/reference/integrations-and-exports.mdx",
+      "publicRoute": "/reference/integrations-and-exports",
+      "deliveryOwner": "40c",
+      "lifecycle": "planned",
+      "sourceReview": "pending",
+      "audiences": ["admin"],
+      "platforms": { "web": "planned", "ios": "planned", "android": "planned" },
+      "surfaceIds": [],
+      "sections": [
+        {
+          "id": "exports",
+          "claims": ["planned-source-review"],
+          "sourceFiles": ["apps/web/src/app/(app)/reports/page.tsx"],
+          "testFiles": [],
+          "runtimeScenarios": ["export-success", "export-error"],
+          "exclusions": ["Internal HTTP endpoints are not a public API."]
+        }
+      ]
+    }
+  ],
+  "surfaceExclusions": [
+    {
+      "surfaceId": "web:/gridmaster",
+      "reasonCode": "internal-only",
+      "rationale": "Gridmaster operations tooling is internal and is not customer documentation.",
+      "sourceFiles": ["apps/web/src/app/(app)/gridmaster/page.tsx"]
+    },
+    {
+      "surfaceId": "web:/settings/staff-config",
+      "reasonCode": "legacy-redirect",
+      "rationale": "This route only redirects to the current staff certification Settings section.",
+      "sourceFiles": ["apps/web/src/app/(app)/settings/staff-config/page.tsx"]
+    },
+    {
+      "surfaceId": "mobile:not-found:/:all",
+      "reasonCode": "framework-only",
+      "rationale": "Expo Router fallback implementation is not a customer workflow.",
+      "sourceFiles": ["apps/mobile/app/+not-found.tsx"]
+    }
+  ]
+}

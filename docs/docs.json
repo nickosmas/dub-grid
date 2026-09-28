@@ -2,7 +2,7 @@
   "$schema": "https://mintlify.com/docs.json",
   "name": "DubGrid",
   "theme": "almond",
-  "favicon": "https://media.brand.dev/dc0c42b2-b4b8-4985-a040-610c085c30d3.png",
+  "favicon": "/favicon.png",
   "colors": {
     "primary": "#2663EB"
   },

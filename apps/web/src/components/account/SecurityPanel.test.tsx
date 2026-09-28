@@ -11,6 +11,7 @@ const mockSignOut = vi.fn();
 const signOutAccountSessions = vi.fn();
 const requireCredentialAssurance = vi.fn();
 const updateBrowserUserPassword = vi.fn();
+const reauthenticateBrowserMfa = vi.fn();
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/profile",
@@ -108,17 +109,18 @@ vi.mock("@/hooks", () => ({
 }));
 
 vi.mock("@/features/account/client", () => ({
+  reauthenticateBrowserMfa: (...args: unknown[]) => reauthenticateBrowserMfa(...args),
   requireCredentialAssurance: (...args: unknown[]) => requireCredentialAssurance(...args),
   updateBrowserUserPassword: (...args: unknown[]) => updateBrowserUserPassword(...args),
   signOutAccountSessions: (...args: unknown[]) => signOutAccountSessions(...args),
 }));
 
-function renderSecurityPanel(queryClient = new QueryClient()) {
+function renderSecurityPanel(queryClient = new QueryClient(), mfaEnabled = false) {
   return render(
     <QueryClientProvider client={queryClient}>
       <SecurityPanel
         user={{ id: "user-1", email: "alex@example.com" } as User}
-        profile={null}
+        profile={mfaEnabled ? ({ mfa_enabled: true } as never) : null}
         setProfile={vi.fn()}
       />
     </QueryClientProvider>,
@@ -132,12 +134,77 @@ describe("SecurityPanel session actions", () => {
     signOutAccountSessions.mockReset().mockResolvedValue({ success: true });
     requireCredentialAssurance.mockReset().mockResolvedValue({ success: true });
     updateBrowserUserPassword.mockReset().mockResolvedValue(undefined);
+    reauthenticateBrowserMfa
+      .mockReset()
+      .mockResolvedValue({ access_token: "fresh-token", refresh_token: "fresh-refresh" });
     stepUpMocks.context.mockResolvedValue({ key: "account-org", accessToken: "old-token" });
     stepUpMocks.confirm.mockReset().mockResolvedValue("fresh-token");
   });
 
-  it("changes a password once after server-selected TOTP step-up", async () => {
-    requireCredentialAssurance.mockRejectedValueOnce(
+  function fillPasswordForm() {
+    fireEvent.click(screen.getByRole("button", { name: "Change password" }));
+    fireEvent.change(screen.getByLabelText("Enter your current password"), {
+      target: { value: "OldPass1!xyz" },
+    });
+    fireEvent.change(screen.getByLabelText("Enter new password"), {
+      target: { value: "StrongPass1!" },
+    });
+    fireEvent.change(screen.getByLabelText("Confirm new password"), {
+      target: { value: "StrongPass1!" },
+    });
+  }
+
+  function confirmUpdate() {
+    fireEvent.click(screen.getByRole("button", { name: "Update Password" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Update password?" })).getByRole("button", {
+        name: "Update and sign out",
+      }),
+    );
+  }
+
+  // Every change runs on a brand-new session, which Supabase's secure
+  // password change always accepts (F-62).
+  it("signs in again with the current password, then changes it once on the new session", async () => {
+    const steps: string[] = [];
+    reauthenticateBrowserMfa.mockImplementation(async () => {
+      steps.push("re-sign-in");
+      return { access_token: "fresh-token", refresh_token: "fresh-refresh" };
+    });
+    requireCredentialAssurance.mockImplementation(async (token: string) => {
+      steps.push(`assurance ${token}`);
+      return { success: true };
+    });
+    updateBrowserUserPassword.mockImplementation(async () => {
+      steps.push("update");
+    });
+    renderSecurityPanel();
+    expect(screen.queryByLabelText("Authenticator Code")).toBeNull();
+    fillPasswordForm();
+    confirmUpdate();
+
+    await waitFor(() => expect(updateBrowserUserPassword).toHaveBeenCalledOnce());
+    expect(reauthenticateBrowserMfa).toHaveBeenCalledWith("OldPass1!xyz", undefined);
+    expect(steps).toEqual(["re-sign-in", "assurance fresh-token", "update"]);
+    expect(updateBrowserUserPassword).toHaveBeenCalledWith("StrongPass1!");
+    expect(mockSignOut).toHaveBeenCalledWith({ scope: "global", reason: "password-changed" });
+  });
+
+  it("asks a two-factor account for its code and signs in again with both", async () => {
+    renderSecurityPanel(new QueryClient(), true);
+    fillPasswordForm();
+    expect(screen.getByRole("button", { name: "Update Password" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Authenticator Code"), {
+      target: { value: "123456" },
+    });
+    confirmUpdate();
+
+    await waitFor(() => expect(updateBrowserUserPassword).toHaveBeenCalledOnce());
+    expect(reauthenticateBrowserMfa).toHaveBeenCalledWith("OldPass1!xyz", "123456");
+  });
+
+  it("shows the code field when the server says the account has two-factor", async () => {
+    reauthenticateBrowserMfa.mockRejectedValueOnce(
       Object.assign(new Error("Confirm"), {
         status: 403,
         code: "STEP_UP_REQUIRED",
@@ -145,35 +212,18 @@ describe("SecurityPanel session actions", () => {
       }),
     );
     renderSecurityPanel();
-    fireEvent.click(screen.getByRole("button", { name: "Change password" }));
-    fireEvent.change(screen.getByLabelText("Enter new password"), {
-      target: { value: "StrongPass1!" },
-    });
-    fireEvent.change(screen.getByLabelText("Confirm new password"), {
-      target: { value: "StrongPass1!" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Update Password" }));
-    fireEvent.click(
-      within(screen.getByRole("dialog", { name: "Update password?" })).getByRole("button", {
-        name: "Update and sign out",
-      }),
-    );
+    fillPasswordForm();
+    confirmUpdate();
 
-    const challenge = await screen.findByRole("dialog", { name: "Confirm your identity" });
+    expect(await screen.findByLabelText("Authenticator Code")).toBeInTheDocument();
+    expect(
+      screen.getByText("Enter the code from your authenticator app to continue."),
+    ).toBeInTheDocument();
     expect(updateBrowserUserPassword).not.toHaveBeenCalled();
-    fireEvent.change(within(challenge).getByLabelText("Authenticator code"), {
-      target: { value: "123456" },
-    });
-    fireEvent.click(within(challenge).getByRole("button", { name: "Continue" }));
-
-    await waitFor(() => expect(updateBrowserUserPassword).toHaveBeenCalledOnce());
-    expect(requireCredentialAssurance).toHaveBeenNthCalledWith(1, "old-token");
-    expect(requireCredentialAssurance).toHaveBeenNthCalledWith(2, "fresh-token");
-    expect(updateBrowserUserPassword).toHaveBeenCalledWith("StrongPass1!");
-    expect(mockSignOut).toHaveBeenCalledWith({ scope: "global", reason: "password-changed" });
+    expect(mockSignOut).not.toHaveBeenCalled();
   });
 
-  async function confirmPasswordChange() {
+  it("needs the current password before a change can be submitted", () => {
     renderSecurityPanel();
     fireEvent.click(screen.getByRole("button", { name: "Change password" }));
     fireEvent.change(screen.getByLabelText("Enter new password"), {
@@ -182,12 +232,13 @@ describe("SecurityPanel session actions", () => {
     fireEvent.change(screen.getByLabelText("Confirm new password"), {
       target: { value: "StrongPass1!" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Update Password" }));
-    fireEvent.click(
-      within(screen.getByRole("dialog", { name: "Update password?" })).getByRole("button", {
-        name: "Update and sign out",
-      }),
-    );
+    expect(screen.getByRole("button", { name: "Update Password" })).toBeDisabled();
+  });
+
+  async function confirmPasswordChange() {
+    renderSecurityPanel();
+    fillPasswordForm();
+    confirmUpdate();
     await waitFor(() => expect(updateBrowserUserPassword).toHaveBeenCalledOnce());
   }
 
@@ -237,33 +288,13 @@ describe("SecurityPanel session actions", () => {
     expect(screen.getByLabelText("Enter new password")).toBeInTheDocument();
   });
 
-  it("keeps the new password draft and original confirmation after cancelling step-up", async () => {
-    requireCredentialAssurance.mockRejectedValueOnce(
-      Object.assign(new Error("Confirm"), {
-        status: 403,
-        code: "STEP_UP_REQUIRED",
-        method: "totp",
-      }),
-    );
+  it("keeps the drafts and changes nothing when the current password is refused", async () => {
+    reauthenticateBrowserMfa.mockRejectedValueOnce(new Error("We couldn't confirm your password."));
     renderSecurityPanel();
-    fireEvent.click(screen.getByRole("button", { name: "Change password" }));
-    fireEvent.change(screen.getByLabelText("Enter new password"), {
-      target: { value: "StrongPass1!" },
-    });
-    fireEvent.change(screen.getByLabelText("Confirm new password"), {
-      target: { value: "StrongPass1!" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Update Password" }));
-    fireEvent.click(
-      within(screen.getByRole("dialog", { name: "Update password?" })).getByRole("button", {
-        name: "Update and sign out",
-      }),
-    );
+    fillPasswordForm();
+    confirmUpdate();
 
-    const challenge = await screen.findByRole("dialog", { name: "Confirm your identity" });
-    fireEvent.click(within(challenge).getByRole("button", { name: "Cancel" }));
-
-    await screen.findByRole("dialog", { name: "Update password?" });
+    await waitFor(() => expect(reauthenticateBrowserMfa).toHaveBeenCalledOnce());
     expect(screen.getByLabelText("Enter new password")).toHaveValue("StrongPass1!");
     expect(screen.getByLabelText("Confirm new password")).toHaveValue("StrongPass1!");
     expect(updateBrowserUserPassword).not.toHaveBeenCalled();

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useTheme } from "next-themes";
+import { INVITATION_LIFETIME_HOURS } from "@dubgrid/domain";
 // @/features/account/client is imported dynamically inside the session effect —
 // see the comment there. A static import here pulls the Supabase auth SDK into
 // the landing page's initial bundle for visitors who are not signed in.
@@ -89,8 +90,7 @@ const FEATURES: Feature[] = [
   {
     icon: Mail,
     title: "Invite only",
-    description:
-      "Every account starts from a link that expires in 72 hours. No open sign-ups, no surprises.",
+    description: `Every account starts from a link that expires in ${INVITATION_LIFETIME_HOURS} hours. No open sign-ups, no surprises.`,
   },
 ];
 
@@ -114,8 +114,7 @@ const SECURITY_FEATURES: Feature[] = [
   {
     icon: Mail,
     title: "Invite-only accounts",
-    description:
-      "Every account starts with an individual invitation link that expires after 72 hours.",
+    description: `Every account starts with an individual invitation link that expires after ${INVITATION_LIFETIME_HOURS} hours.`,
   },
   {
     icon: BellRing,

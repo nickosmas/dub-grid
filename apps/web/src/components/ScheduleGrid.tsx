@@ -3131,10 +3131,10 @@ const SectionBlock = memo(function SectionBlock({
                                                 ? (noteMarksForKey?.(
                                                     emp.id,
                                                     date,
-                                                    // Notes are filed under their shift's
-                                                    // focus area, which a cross pill's is not.
-                                                    codeEntryLi?.focusAreaId ??
-                                                      sectionFocusArea?.id,
+                                                    // A note shows only in its shift's own
+                                                    // focus area, so a pill from another area
+                                                    // finds none in this section.
+                                                    sectionFocusArea?.id,
                                                     {
                                                       shiftId: pillSegment.shiftId,
                                                       jobId: pillSegment.jobId,

@@ -550,7 +550,7 @@ async function authorize(req: NextRequest, orgId: string, permission: SettingsPe
           );
       }
     },
-    { allowDuringSetup: true },
+    { allowDuringSetup: true, gridmasterNeedsImpersonation: permission.endsWith("Manage") },
   );
   if ("response" in auth) {
     return { response: auth.response } as const;

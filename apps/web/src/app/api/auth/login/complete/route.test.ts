@@ -5,7 +5,7 @@ const validateCsrfOrigin = vi.fn();
 const requireLiveAuthenticatedSession = vi.fn();
 const checkRateLimit = vi.fn();
 const writeSecurityAuditEvent = vi.fn();
-const hasRecordedSignIn = vi.fn();
+const recordSignInOnce = vi.fn();
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/csrf", () => ({
@@ -20,7 +20,7 @@ vi.mock("@/lib/rate-limit", () => ({
 }));
 vi.mock("@/lib/auth/security-audit", () => ({
   writeSecurityAuditEvent: (...args: unknown[]) => writeSecurityAuditEvent(...args),
-  hasRecordedSignIn: (...args: unknown[]) => hasRecordedSignIn(...args),
+  recordSignInOnce: (...args: unknown[]) => recordSignInOnce(...args),
 }));
 
 import { hashSessionId } from "@/lib/auth/sign-in-completion";
@@ -50,7 +50,7 @@ describe("POST /api/auth/login/complete", () => {
     vi.clearAllMocks();
     validateCsrfOrigin.mockReturnValue(null);
     checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false, reset: 0 });
-    hasRecordedSignIn.mockResolvedValue(false);
+    recordSignInOnce.mockResolvedValue(true);
   });
 
   it("records a two-factor sign-in against the organization it ended in", async () => {
@@ -59,10 +59,7 @@ describe("POST /api/auth/login/complete", () => {
     const response = await POST(post());
 
     expect(response.status).toBe(200);
-    expect(writeSecurityAuditEvent).toHaveBeenCalledWith({
-      event: "security.auth.login",
-      outcome: "succeeded",
-      reason: "accepted",
+    expect(recordSignInOnce).toHaveBeenCalledWith({
       actorId: "user-1",
       orgId: "org-2",
       metadata: { surface: "web", method: "totp", sessionHash: hashSessionId("session-1") },
@@ -72,15 +69,16 @@ describe("POST /api/auth/login/complete", () => {
   // Repeated calls used to write one success row each (41c2).
   it("records nothing when this session's sign-in is already recorded", async () => {
     authWith({ aal: "aal2", org_id: "org-2", amr: [{ method: "totp", timestamp: now() }] });
-    hasRecordedSignIn.mockResolvedValue(true);
+    recordSignInOnce.mockResolvedValue(false);
 
     const response = await POST(post());
 
     expect(response.status).toBe(200);
-    expect(hasRecordedSignIn).toHaveBeenCalledWith({
-      actorId: "user-1",
-      sessionHash: hashSessionId("session-1"),
-    });
+    expect(recordSignInOnce).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({ sessionHash: hashSessionId("session-1") }),
+      }),
+    );
     expect(writeSecurityAuditEvent).not.toHaveBeenCalled();
   });
 
@@ -88,7 +86,7 @@ describe("POST /api/auth/login/complete", () => {
     authWith({ aal: "aal1", org_id: "org-2", amr: [{ method: "password", timestamp: now() }] }, []);
 
     expect((await POST(post())).status).toBe(200);
-    expect(writeSecurityAuditEvent).toHaveBeenCalledWith(
+    expect(recordSignInOnce).toHaveBeenCalledWith(
       expect.objectContaining({ metadata: expect.objectContaining({ method: "password" }) }),
     );
   });

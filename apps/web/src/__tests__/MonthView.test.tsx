@@ -23,6 +23,7 @@ const northDay: AssignmentDefinition = {
 };
 const general: AssignmentDefinition = { ...northDay, id: 2, label: "G", focusAreaId: null };
 const northEarly: AssignmentDefinition = { ...northDay, id: 3, label: "E", categoryId: 2 };
+const southDay: AssignmentDefinition = { ...northDay, id: 4, label: "S", focusAreaId: 2 };
 
 const indicatorTypes: IndicatorType[] = [
   { id: 7, orgId: "org-1", name: "Float", color: "#ff0000", sortOrder: 1 },
@@ -65,9 +66,11 @@ const codes: Record<string, AssignmentDefinition[]> = {
 
 function renderMonth(
   noteMarksForKey: (empId: string, date: Date, focusAreaId?: number) => ScheduleNoteMark[],
+  activeFocusArea: number | null = null,
 ) {
   return render(
     <MonthView
+      activeFocusArea={activeFocusArea}
       monthStart={monthStart}
       filteredEmployees={[alex, blair]}
       shiftForKey={(empId, date) =>
@@ -79,7 +82,7 @@ function renderMonth(
       getShiftStyle={() => northDay}
       todayKey="2026-01-01"
       focusAreas={focusAreas}
-      assignments={[northDay, general, northEarly]}
+      assignments={[northDay, general, northEarly, southDay]}
       shiftCategories={[
         { id: 1, orgId: "org-1", name: "Day", sortOrder: 1 },
         { id: 2, orgId: "org-1", name: "Early", sortOrder: 0 },
@@ -168,5 +171,88 @@ describe("MonthView indicators", () => {
       focusAreas.pop();
       blair.focusAreaIds = [1];
     }
+  });
+
+  describe("notes filed away from the person's row (F-106)", () => {
+    const south: FocusArea = {
+      id: 2,
+      orgId: "org-1",
+      departmentId: 1,
+      name: "South",
+      sortOrder: 2,
+    };
+    const east: FocusArea = { id: 3, orgId: "org-1", departmentId: 1, name: "East", sortOrder: 3 };
+
+    function withAreas(run: () => void) {
+      focusAreas.push(south, east);
+      try {
+        run();
+      } finally {
+        focusAreas.splice(1);
+        blair.focusAreaIds = [1];
+        alex.focusAreaIds = [1];
+        codes["emp-1"] = [northDay];
+      }
+    }
+
+    it("shows a note filed under no focus area on the person's row", () => {
+      renderMonth((empId, date, focusAreaId) =>
+        formatDateKey(date) === dayKey && empId === "emp-2" && focusAreaId === undefined
+          ? [{ indicatorTypeId: 8, state: "published" }]
+          : [],
+      );
+      openDay();
+
+      const row = within(screen.getByRole("dialog")).getByText("Blair T.").parentElement!;
+      expect(within(row).getByLabelText("Training")).toBeInTheDocument();
+    });
+
+    it("reads only the person's own focus areas", () => {
+      withAreas(() => {
+        blair.focusAreaIds = [1, 2];
+        const lookup = vi.fn((): ScheduleNoteMark[] => []);
+        renderMonth(lookup);
+        openDay();
+
+        expect(lookup).toHaveBeenCalledWith("emp-2", day, 2);
+        expect(lookup).not.toHaveBeenCalledWith("emp-2", day, 3);
+      });
+    });
+
+    it("puts the note on a row the focus-area filter leaves visible", () => {
+      withAreas(() => {
+        alex.focusAreaIds = [1, 2];
+        codes["emp-1"] = [northDay, southDay];
+        renderMonth(
+          (empId, date, focusAreaId) =>
+            formatDateKey(date) === dayKey && empId === "emp-1" && focusAreaId === undefined
+              ? [{ indicatorTypeId: 8, state: "published" }]
+              : [],
+          2,
+        );
+        openDay();
+
+        const popover = screen.getByRole("dialog");
+        expect(within(popover).queryByText("North")).not.toBeInTheDocument();
+        const row = within(popover).getByText("Alex T.").parentElement!;
+        expect(within(row).getByLabelText("Training")).toBeInTheDocument();
+      });
+    });
+
+    it("shows one mark for a note type filed in two areas in different states", () => {
+      withAreas(() => {
+        blair.focusAreaIds = [1, 2];
+        renderMonth((empId, date, focusAreaId) => {
+          if (formatDateKey(date) !== dayKey || empId !== "emp-2") return [];
+          if (focusAreaId === 1) return [{ indicatorTypeId: 7, state: "published" }];
+          if (focusAreaId === 2) return [{ indicatorTypeId: 7, state: "draft_added" }];
+          return [];
+        });
+        openDay();
+
+        const popover = screen.getByRole("dialog");
+        expect(within(popover).getAllByLabelText(/^Float/)).toHaveLength(1);
+      });
+    });
   });
 });

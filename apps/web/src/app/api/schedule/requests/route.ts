@@ -178,6 +178,7 @@ async function requireEmployeeAction(
       permissions.canManageEmployees ||
       permissions.canEditShifts ||
       permissions.canViewSchedule,
+    { gridmasterNeedsImpersonation: true },
   );
   if ("response" in auth) {
     return auth;
@@ -560,6 +561,7 @@ export async function POST(req: NextRequest) {
             permissions.isGridmaster ||
             permissions.isSuperAdmin ||
             permissions.canApproveShiftRequests,
+          { gridmasterNeedsImpersonation: true },
         );
         if ("response" in auth) {
           return auth.response;

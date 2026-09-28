@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   enroll: vi.fn(),
   unenroll: vi.fn(),
   signIn: vi.fn(),
+  challenge: vi.fn(),
   refresh: vi.fn(),
   signOut: vi.fn(),
   rpc: vi.fn(),
@@ -29,6 +30,7 @@ vi.mock("@/lib/api-auth", () => ({
   createAnonClient: () => ({
     auth: {
       signInWithPassword: mocks.signIn,
+      mfa: { challengeAndVerify: mocks.challenge },
       refreshSession: mocks.refresh,
       signOut: mocks.signOut,
     },
@@ -218,6 +220,51 @@ describe.each([
     );
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(mocks.signOut).not.toHaveBeenCalled();
+  });
+
+  it("re-signs a TOTP account in only with its code, answered on the new session (F-62)", async () => {
+    const totpUser = {
+      ...user,
+      factors: [{ id: factorId, factor_type: "totp", status: "verified" }],
+    };
+    user.factors = totpUser.factors;
+    mocks.signIn.mockResolvedValue({ data: { user: totpUser, session }, error: null });
+    mocks.challenge.mockResolvedValue({
+      data: { access_token: "totp-session", refresh_token: "totp-refresh" },
+      error: null,
+    });
+
+    const response = await post(
+      request({ action: "reauthenticate", password: "test-password", code: "123456" }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.challenge).toHaveBeenCalledWith({ factorId, code: "123456" });
+    // The organization is restored on the verified session, not the password-only one.
+    expect(mocks.scoped).toHaveBeenCalledWith("totp-session");
+    expect(mocks.refresh).toHaveBeenCalledWith({ refresh_token: "totp-refresh" });
+    expect(mocks.audit).toHaveBeenCalledWith(
+      expect.objectContaining({ metadata: expect.objectContaining({ method: "totp" }) }),
+    );
+  });
+
+  it("refuses a wrong code and keeps the original session (F-62)", async () => {
+    const totpUser = {
+      ...user,
+      factors: [{ id: factorId, factor_type: "totp", status: "verified" }],
+    };
+    user.factors = totpUser.factors;
+    mocks.signIn.mockResolvedValue({ data: { user: totpUser, session }, error: null });
+    mocks.challenge.mockResolvedValue({ data: null, error: new Error("invalid code detail") });
+
+    const response = await post(
+      request({ action: "reauthenticate", password: "test-password", code: "000000" }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.text()).not.toMatch(/invalid code detail/);
+    expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
+    expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
   it("does not downgrade a TOTP account to password", async () => {

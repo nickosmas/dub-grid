@@ -68,7 +68,6 @@ function pickDomProps(input: Record<string, any>) {
       key === "onResponderGrant" ||
       key === "onResponderRelease" ||
       key === "pointerEvents" ||
-      key === "maxFontSizeMultiplier" ||
       key === "accessibilityIgnoresInvertColors" ||
       key === "android_ripple"
     ) {
@@ -183,6 +182,12 @@ function pickDomProps(input: Record<string, any>) {
 
     if (key === "ellipsizeMode") {
       output["data-ellipsize-mode"] = String(value);
+      continue;
+    }
+
+    // Kept so tests can assert a text scaling ceiling (F-128).
+    if (key === "maxFontSizeMultiplier") {
+      output["data-max-font-size-multiplier"] = String(value);
       continue;
     }
 

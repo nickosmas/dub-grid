@@ -29,13 +29,17 @@ export async function withMfaDeadline<T>(request: PromiseLike<T>): Promise<T> {
     if (timer) clearTimeout(timer);
   }
 }
-export async function reauthenticateMobileMfa(accessToken: string, password: string) {
+export async function reauthenticateMobileMfa(
+  accessToken: string,
+  password: string,
+  code?: string,
+) {
   const session = await mobileApiRequest(
     path,
     accessToken,
     {
       method: "POST",
-      body: JSON.stringify({ action: "reauthenticate", password }),
+      body: JSON.stringify({ action: "reauthenticate", password, ...(code ? { code } : {}) }),
     },
     (value) => mfaReauthenticationResponseSchema.parse(value),
   );

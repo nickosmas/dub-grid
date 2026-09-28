@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule } from "../../test/native";
-import { mobileRadii, mobileRadius } from "../theme/tokens";
+import { MAX_FONT_SCALE_COMPACT, mobileRadii, mobileRadius } from "../theme/tokens";
 
 const hapticSelection = vi.fn();
 const hapticImpact = vi.fn();
@@ -107,6 +107,7 @@ describe("Button", () => {
     const label = screen.getByText("Bold content").parentElement;
     expect(label).toHaveAttribute("data-number-of-lines", "1");
     expect(label).toHaveAttribute("data-ellipsize-mode", "tail");
+    expect(label).toHaveAttribute("data-max-font-size-multiplier", String(MAX_FONT_SCALE_COMPACT));
     expect(screen.queryByTestId("fit-text-measure")).not.toBeInTheDocument();
   });
 

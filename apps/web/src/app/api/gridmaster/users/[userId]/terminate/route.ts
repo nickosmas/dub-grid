@@ -68,9 +68,16 @@ export async function POST(req: NextRequest, context: { params: Promise<{ userId
       return apiErrorResponse(result.error, "We couldn't terminate that account. Try again.", 400);
     }
 
-    // The RPC removes tracked sessions and blocks refresh; the revocation
-    // watermark makes the tokens already in hand fail app APIs immediately.
-    await endUserSessions(userId);
+    // The account is terminated from here on and a retry is refused, so a
+    // failure to end its sessions must not skip the audit row (F-101). The
+    // hook already refuses its refresh; Force logout can finish the rest.
+    let sessionsEnded = true;
+    try {
+      await endUserSessions(userId);
+    } catch (error) {
+      sessionsEnded = false;
+      logger.error({ error, userId }, "gridmaster terminate could not end sessions");
+    }
 
     await writeGridmasterAuditLog({
       serviceClient,
@@ -82,11 +89,12 @@ export async function POST(req: NextRequest, context: { params: Promise<{ userId
         targetUserId: userId,
         reason: parsedBody.data.reason,
         ...(result.data && typeof result.data === "object" ? result.data : {}),
+        sessionsEnded,
       },
       request: req,
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, sessionsEnded });
   } catch (error) {
     logger.error({ error }, "gridmaster terminate POST failed");
     return NextResponse.json(

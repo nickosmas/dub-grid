@@ -41,12 +41,12 @@ const ALLOWLIST = [
     reason:
       "Infinite loops in the ICNS/JXL/HEIF parsers, reachable only by parsing a malicious image. " +
       "image-size is a build-time dependency of Metro, which bundles the mobile app's own asset " +
-      "files on a developer machine or in CI — it is not in the shipped app and not in the web " +
+      "files on a developer machine or in CI; it is not in the shipped app and not in the web " +
       "server, so a denial of service there stops a build we control rather than anything a user " +
-      "or attacker can reach. There is no fix to take: the advisory covers <= 2.0.2 and 2.0.2 is " +
-      "the newest published version, first_patched_version null. npm's proposed fix is expo@53, " +
-      "a major downgrade off SDK 54. Revisit when image-size publishes a patched release or Expo " +
-      "moves Metro onto one.",
+      "or attacker can reach. The fix, 2.0.3, is a major version that Metro cannot take: image-size " +
+      "2 measures only a buffer, and Metro 0.83.3 passes it a file path, so an override would break " +
+      "every image asset. Expo SDK 54's @expo/metro 54.2.0 pins metro 0.83.3 exactly (metro 0.83.8 " +
+      "drops image-size, but SDK 54 does not take it). Revisit with the Expo SDK upgrade (F-123).",
   },
   {
     ids: ["GHSA-qxc2-j82w-r537"],
@@ -62,45 +62,6 @@ const ALLOWLIST = [
       "but pins @faker-js/faker ^8.4.1, so the patched 10.5.0 sits two majors outside the range " +
       "copycat declares. Forcing it through an override would hand the seed tooling a data " +
       "generator API it was never built against. Revisit when copycat publishes on a patched faker.",
-  },
-  {
-    ids: [
-      "GHSA-5jgf-p345-68v8",
-      "GHSA-f65p-4m7j-42xc",
-      "GHSA-fph4-wmhf-6fwf",
-      "GHSA-jqff-g426-hqxp",
-    ],
-    package: "fast-uri",
-    reviewBy: "2026-12-01",
-    reason:
-      "Host confusion and SSRF in URI parsing, all four fixed in 3.1.6. The overrides block pulls " +
-      "every copy npm will let it reach up to 3.1.7. Two stay behind at 3.1.5, both inside the " +
-      "apps/web workspace subtree: @sentry/nextjs > webpack > schema-utils > ajv > fast-uri, and " +
-      "react-email > conf > ajv > fast-uri. A root `overrides` block does not reach into a " +
-      "workspace subtree under `install-strategy=nested`, and neither an exact pin nor a full " +
-      "lockfile re-resolution moved them. Neither copy parses untrusted input: the first validates " +
-      "webpack's own config schema during a build, the second backs the react-email CLI behind " +
-      "`npm run email:build`, so both run on a developer machine or in CI over files we wrote, and " +
-      "neither ships in the web bundle or the server runtime. Revisit when ajv's dependents " +
-      "publish on a fixed fast-uri, or when npm applies root overrides inside workspaces.",
-  },
-  {
-    ids: ["GHSA-2883-xcg3-v3hh"],
-    package: "js-yaml",
-    reviewBy: "2026-12-01",
-    reason:
-      "CPU exhaustion parsing a YAML document with many empty merge keys, fixed in 3.15.2 and " +
-      "4.3.2. The root override pulls every reachable copy up to those versions. Two stay behind, " +
-      "both inside the apps/mobile workspace subtree: react-native > babel-jest > " +
-      "babel-plugin-istanbul > @istanbuljs/load-nyc-config > js-yaml@3.15.1, and expo > @expo/cli " +
-      "> @expo/xcpretty > js-yaml@4.3.1. Same limitation as fast-uri above: a root `overrides` " +
-      "block does not reach into a workspace subtree under `install-strategy=nested`, and neither " +
-      "an exact pin nor a full lockfile re-resolution moved them. Neither copy parses untrusted " +
-      "input: the first loads this repo's own coverage config during `npm test`, the second " +
-      "reformats `xcodebuild`'s own output during a mobile test run, so both run on a developer " +
-      "machine or in CI over output we generated, and neither ships in the mobile app bundle. " +
-      "Revisit when react-native or expo publish on fixed js-yaml, or when npm applies root " +
-      "overrides inside workspaces.",
   },
 ];
 

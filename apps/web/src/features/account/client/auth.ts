@@ -241,9 +241,9 @@ export async function startBrowserTotpEnrollment() {
   };
 }
 
-export async function reauthenticateBrowserMfa(password: string) {
+export async function reauthenticateBrowserMfa(password: string, code?: string) {
   const session = mfaReauthenticationResponseSchema.parse(
-    await requestMfaLifecycle({ action: "reauthenticate", password }),
+    await requestMfaLifecycle({ action: "reauthenticate", password, ...(code ? { code } : {}) }),
   );
   await setBrowserSession(session);
   return session;

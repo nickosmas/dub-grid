@@ -1,16 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const stored = vi.fn();
-const upsert = vi.fn();
+const rpc = vi.fn();
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase-service", () => ({
-  getServiceClient: () => ({
-    from: () => ({
-      select: () => ({ eq: () => ({ maybeSingle: () => stored() }) }),
-      upsert: (...args: unknown[]) => upsert(...args),
-    }),
-  }),
+  getServiceClient: () => ({ rpc: (...args: unknown[]) => rpc(...args) }),
 }));
 
 import { saveNotificationPreferences } from "./preferences";
@@ -21,36 +15,27 @@ const on = { in_app: true, email: true };
 describe("saveNotificationPreferences", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    upsert.mockResolvedValue({ error: null });
   });
 
-  // Mobile knows three categories; its save used to erase the rest.
-  it("keeps stored categories the save does not mention", async () => {
-    stored.mockResolvedValue({ data: { prefs: { billing: off, schedule: on } }, error: null });
+  // Mobile knows three categories; its save used to erase the rest, and a
+  // read-merge-write in the app could still lose a concurrent save (F-20).
+  it("merges in the database and returns what is stored", async () => {
+    rpc.mockResolvedValue({ data: { billing: off, schedule: off, system: on }, error: null });
 
     const saved = await saveNotificationPreferences("user-1", { schedule: off, system: on });
 
+    expect(rpc).toHaveBeenCalledWith("merge_notification_preferences", {
+      p_user_id: "user-1",
+      p_prefs: { schedule: off, system: on },
+    });
     expect(saved).toEqual({ billing: off, schedule: off, system: on });
-    expect(upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ user_id: "user-1", prefs: saved }),
-      { onConflict: "user_id" },
-    );
   });
 
-  it("never stores a security preference", async () => {
-    stored.mockResolvedValue({ data: { prefs: { security: off } }, error: null });
-
-    const saved = await saveNotificationPreferences("user-1", { schedule: on, security: off });
-
-    expect(saved).toEqual({ schedule: on });
-  });
-
-  it("fails without writing when the stored map cannot be read", async () => {
-    stored.mockResolvedValue({ data: null, error: new Error("read failed") });
+  it("fails when the merge fails", async () => {
+    rpc.mockResolvedValue({ data: null, error: new Error("merge failed") });
 
     await expect(saveNotificationPreferences("user-1", { schedule: on })).rejects.toThrow(
-      "read failed",
+      "merge failed",
     );
-    expect(upsert).not.toHaveBeenCalled();
   });
 });

@@ -31,6 +31,8 @@ type MockAccessRow = {
     trial_ends_at: string | null;
   } | null;
   employee?: { status: string | null } | null;
+  impersonation?: { session_id: string } | null;
+  impersonationFilters?: Array<[string, unknown]>;
   setup?: Partial<MockSetupRows>;
 };
 
@@ -116,10 +118,18 @@ function createServiceClientMock(rows: MockAccessRow) {
       return {
         select(_columns?: string, options?: { count?: string; head?: boolean }) {
           const query = {
-            eq() {
+            eq(column: string, value: unknown) {
+              if (table === "impersonation_sessions")
+                rows.impersonationFilters?.push([column, value]);
               return query;
             },
             is() {
+              return query;
+            },
+            gt() {
+              return query;
+            },
+            limit() {
               return query;
             },
             maybeSingle: async () => ({
@@ -132,7 +142,9 @@ function createServiceClientMock(rows: MockAccessRow) {
                       ? (rows.organization ?? null)
                       : table === "employees"
                         ? (rows.employee ?? null)
-                        : null,
+                        : table === "impersonation_sessions"
+                          ? (rows.impersonation ?? null)
+                          : null,
               error: null,
             }),
             then<TResult1 = unknown, TResult2 = never>(
@@ -171,6 +183,99 @@ describe("requireOrgPermissions", () => {
       user: { id: "8af6f242-c060-4920-a7db-91b4cb66fd26" },
     });
     createRequestSupabaseClient.mockReturnValue({});
+  });
+
+  describe("a Gridmaster's changes need an impersonation (F-75)", () => {
+    const ORG = "11111111-1111-4111-8111-111111111111";
+    const GRIDMASTER = "8af6f242-c060-4920-a7db-91b4cb66fd26";
+    const activeOrg = {
+      suspended_at: null,
+      subscription_status: "active",
+      trial_ends_at: null,
+    };
+
+    beforeEach(() => {
+      requireAuthenticatedUser.mockResolvedValue({
+        user: { id: GRIDMASTER },
+        sessionId: "session-1",
+      });
+    });
+
+    it("refuses a Gridmaster who is not impersonating the organization", async () => {
+      getServiceClient.mockReturnValue(
+        createServiceClientMock({
+          membership: null,
+          profile: { platform_role: "gridmaster" },
+          organization: activeOrg,
+          impersonation: null,
+        }),
+      );
+      const { requireOrgPermissions, GRIDMASTER_IMPERSONATION_REQUIRED } =
+        await import("./permissions");
+
+      const result = await requireOrgPermissions(makeRequest("POST"), ORG, () => true, {
+        gridmasterNeedsImpersonation: true,
+      });
+
+      expect("response" in result && result.response.status).toBe(403);
+      if ("response" in result) {
+        expect(await result.response.json()).toEqual({ error: GRIDMASTER_IMPERSONATION_REQUIRED });
+      }
+    });
+
+    it("lets them through an active impersonation started by this session", async () => {
+      const filters: Array<[string, unknown]> = [];
+      getServiceClient.mockReturnValue(
+        createServiceClientMock({
+          membership: null,
+          profile: { platform_role: "gridmaster" },
+          organization: activeOrg,
+          impersonation: { session_id: "impersonation-1" },
+          impersonationFilters: filters,
+        }),
+      );
+      const { requireOrgPermissions } = await import("./permissions");
+
+      const result = await requireOrgPermissions(makeRequest("POST"), ORG, () => true, {
+        gridmasterNeedsImpersonation: true,
+      });
+
+      expect("response" in result).toBe(false);
+      expect(filters).toEqual(
+        expect.arrayContaining([
+          ["gridmaster_id", GRIDMASTER],
+          ["target_org_id", ORG],
+          ["auth_session_id", "session-1"],
+        ]),
+      );
+    });
+
+    it("never asks a Gridmaster who is a member, or a request that changes nothing", async () => {
+      const { requireOrgPermissions } = await import("./permissions");
+      getServiceClient.mockReturnValue(
+        createServiceClientMock({
+          membership: { org_role: "super_admin", admin_permissions: null },
+          profile: { platform_role: "gridmaster" },
+          organization: activeOrg,
+          impersonation: null,
+        }),
+      );
+      const member = await requireOrgPermissions(makeRequest("POST"), ORG, () => true, {
+        gridmasterNeedsImpersonation: true,
+      });
+      expect("response" in member).toBe(false);
+
+      getServiceClient.mockReturnValue(
+        createServiceClientMock({
+          membership: null,
+          profile: { platform_role: "gridmaster" },
+          organization: activeOrg,
+          impersonation: null,
+        }),
+      );
+      const read = await requireOrgPermissions(makeRequest(), ORG, () => true);
+      expect("response" in read).toBe(false);
+    });
   });
 
   // ── Tenant isolation ──────────────────────────────────────────────────

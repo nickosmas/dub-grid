@@ -51,7 +51,7 @@ vi.mock("@/hooks/useStepUpAction", () => ({
 vi.mock("@/features/account/client", () => ({
   requireCredentialAssurance: (...args: unknown[]) => requireCredentialAssurance(...args),
 }));
-vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } }));
 
 const USER = "11111111-1111-4111-8111-111111111111";
 const ADMIN = "22222222-2222-4222-8222-222222222222";
@@ -231,6 +231,7 @@ describe("GridmasterPersonView", () => {
     });
     requireCredentialAssurance.mockResolvedValue({ success: true });
     forceLogoutGridmasterUser.mockResolvedValue({ success: true });
+    terminateGridmasterUser.mockResolvedValue({ success: true, sessionsEnded: true });
   });
 
   it("shows who the person is and every account state badge", async () => {
@@ -827,6 +828,24 @@ describe("GridmasterPersonView", () => {
       );
       expect(requireCredentialAssurance).toHaveBeenCalled();
       expect(toast.success).toHaveBeenCalledWith("Account terminated");
+    });
+
+    it("warns when the account is terminated but its sessions could not be ended (F-101)", async () => {
+      terminateGridmasterUser.mockResolvedValueOnce({ success: true, sessionsEnded: false });
+      renderView(linkedRecord());
+
+      fireEvent.click(await screen.findByRole("button", { name: "Terminate account" }));
+      fireEvent.change(screen.getByLabelText("Termination reason"), {
+        target: { value: "Fraud" },
+      });
+      confirmIn("Terminate account");
+
+      await waitFor(() =>
+        expect(toast.warning).toHaveBeenCalledWith(
+          "Account terminated, but some devices may still be signed in. Use Force logout to finish.",
+        ),
+      );
+      expect(toast.success).not.toHaveBeenCalled();
     });
 
     it("reinstates a terminated account", async () => {

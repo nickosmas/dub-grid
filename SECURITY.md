@@ -133,10 +133,9 @@ controls assume a dependency will eventually be malicious.
   before. Lowering `--audit-level` to get green is the thing this exists to
   prevent. Currently allowlisted: `image-size` (GHSA-w3rx-r6r6-pgpr,
   GHSA-5p2g-fcmc-qvqq) in the Metro/Expo build chain, review by 2026-11-01;
-  `@faker-js/faker` (GHSA-qxc2-j82w-r537), a transitive dev dependency of the
-  seed tooling whose vulnerable function is never called, review by 2026-12-01;
-  and the two `fast-uri` copies nested under `@sentry/nextjs` and `react-email`
-  that npm's override cannot reach, review by 2026-12-01.
+  and `@faker-js/faker` (GHSA-qxc2-j82w-r537), a transitive dev dependency of
+  the seed tooling whose vulnerable function is never called, review by
+  2026-12-01.
 - **Actions are pinned to commit SHAs**, and every workflow declares
   `permissions: contents: read`, so a dependency executing in CI cannot inherit
   a token that writes to the repo.

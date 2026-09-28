@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Hr, Text } from "@react-email/components";
+import { INVITATION_LIFETIME_HOURS } from "@dubgrid/domain";
 import { EmailLayout } from "./components/EmailLayout";
 import { EmailGreeting, EmailSignOff } from "./components/EmailSalutation";
 import { EmailButton } from "./components/EmailButton";
@@ -79,8 +80,8 @@ export function InviteEmail({
       <Hr style={styles.divider} />
       <Text style={styles.fine}>
         {deadline
-          ? `This invitation expires on ${deadline}. That's 72 hours after it was sent, and it doesn't extend.`
-          : "This invitation expires 72 hours after it was sent, and it doesn't extend."}{" "}
+          ? `This invitation expires on ${deadline}. That's ${INVITATION_LIFETIME_HOURS} hours after it was sent, and it doesn't extend.`
+          : `This invitation expires ${INVITATION_LIFETIME_HOURS} hours after it was sent, and it doesn't extend.`}{" "}
         If we send you another invitation, only the link in the newest email will work.
       </Text>
     </EmailLayout>

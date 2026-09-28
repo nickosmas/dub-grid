@@ -136,7 +136,7 @@ export default function GridmasterPersonView({
 
   async function runAssured(
     action: (userId: string, accessToken: string) => Promise<unknown>,
-    success: string,
+    success: string | (() => void),
     failure: string,
   ) {
     if (!account) return;
@@ -147,7 +147,8 @@ export default function GridmasterPersonView({
         await action(account.userId, accessToken);
       });
       if (!completed) return;
-      toast.success(success);
+      if (typeof success === "string") toast.success(success);
+      else success();
       setDialog(null);
       setTerminateReason("");
       setResetReason("");
@@ -176,9 +177,19 @@ export default function GridmasterPersonView({
       toast.error("Give a reason for the termination.");
       return;
     }
+    let sessionsEnded = true;
     return runAssured(
-      (userId, accessToken) => terminateGridmasterUser(userId, reason, accessToken),
-      "Account terminated",
+      async (userId, accessToken) => {
+        const result = await terminateGridmasterUser(userId, reason, accessToken);
+        sessionsEnded = result.sessionsEnded !== false;
+      },
+      () => {
+        if (sessionsEnded) toast.success("Account terminated");
+        else
+          toast.warning(
+            "Account terminated, but some devices may still be signed in. Use Force logout to finish.",
+          );
+      },
       "We couldn't terminate that account. Try again.",
     );
   }

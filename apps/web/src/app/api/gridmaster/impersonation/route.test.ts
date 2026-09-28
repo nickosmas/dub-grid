@@ -294,7 +294,7 @@ describe("POST /api/gridmaster/impersonation", () => {
   });
 
   it("ends a session with a constraint-listed reason", async () => {
-    requestRpc.mockResolvedValue({ data: null, error: null });
+    requestRpc.mockResolvedValue({ data: true, error: null });
 
     const response = await POST(
       makePostRequest({ action: "end", sessionId: SESSION_ID, reason: "expired" }),
@@ -392,6 +392,17 @@ describe("POST /api/gridmaster/impersonation", () => {
     expect(scheduleImpersonationNotice).toHaveBeenCalledWith(
       expect.objectContaining({ kind: "end", targetUserId: TARGET_USER_ID }),
     );
+  });
+
+  it("records and announces nothing when a concurrent end got there first (F-26)", async () => {
+    requestRpc.mockResolvedValue({ data: false, error: null });
+
+    const response = await POST(makePostRequest({ action: "end", sessionId: SESSION_ID }));
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "That viewing session has already ended." });
+    expect(auditInsert).not.toHaveBeenCalled();
+    expect(scheduleImpersonationNotice).not.toHaveBeenCalled();
   });
 
   it.each([

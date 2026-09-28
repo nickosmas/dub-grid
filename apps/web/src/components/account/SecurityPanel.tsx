@@ -20,8 +20,10 @@ import { extractErrorMessage } from "@/lib/error-handling";
 import { settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
 import { useLogout } from "@/hooks";
 import { useStepUpAction } from "@/hooks/useStepUpAction";
+import { getStepUpMethod } from "@/features/account/client/step-up";
 import { queryKeys } from "@/lib/query-keys";
 import {
+  reauthenticateBrowserMfa,
   requireCredentialAssurance,
   updateBrowserUserPassword,
   signOutAccountSessions,
@@ -43,6 +45,9 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
   const mfaEnabled = profile?.mfa_enabled ?? false;
 
   const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [serverAskedForCode, setServerAskedForCode] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -59,35 +64,46 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
     setOtherSessionCount(count);
   }, []);
 
-  const hasPasswordChanges = newPassword.length > 0 || confirmPassword.length > 0;
+  const needsCode = mfaEnabled || serverAskedForCode;
+  const hasPasswordChanges =
+    currentPassword.length > 0 ||
+    code.length > 0 ||
+    newPassword.length > 0 ||
+    confirmPassword.length > 0;
 
-  function openForm() {
-    setError(null);
+  function clearFields() {
+    setCurrentPassword("");
+    setCode("");
     setNewPassword("");
     setConfirmPassword("");
     setShowPassword(false);
+  }
+
+  function openForm() {
+    setError(null);
+    clearFields();
     setShowPasswordForm(true);
   }
 
   function closeForm() {
     setError(null);
-    setNewPassword("");
-    setConfirmPassword("");
-    setShowPassword(false);
+    clearFields();
     setShowPasswordForm(false);
   }
 
   function discardChanges() {
     setError(null);
-    setNewPassword("");
-    setConfirmPassword("");
-    setShowPassword(false);
+    clearFields();
   }
 
   // Derived so the warning appears as the user types the confirmation, matching
   // the mobile in-app change screen.
   const mismatchError = getPasswordMismatchError(newPassword, confirmPassword);
-  const canSubmitPassword = isPasswordAcceptable(newPassword) && mismatchError === null;
+  const canSubmitPassword =
+    currentPassword.length > 0 &&
+    (!needsCode || /^\d{6}$/.test(code)) &&
+    isPasswordAcceptable(newPassword) &&
+    mismatchError === null;
 
   function requestPasswordChange(e: FormEvent) {
     e.preventDefault();
@@ -106,20 +122,38 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
     let shouldRedirect = false;
     let unconfirmed = false;
     try {
-      const completed = await stepUp.run(async (accessToken) => {
-        // The preflight must finish before calling Supabase's public mutation.
-        // The mutation is never automatically replayed after an ambiguous error.
-        await requireCredentialAssurance(accessToken);
-        try {
-          await settleWithRequestTimeout(updateBrowserUserPassword(newPassword));
-        } catch (updateError) {
-          // A lost response or a deadline may hide an applied change, so it
-          // finishes as one: everywhere signed out, never a retry (41b2).
-          if (!mayHavePasswordUpdateCommitted(updateError)) throw updateError;
-          unconfirmed = true;
+      // Every change signs in again first, with the current password and any
+      // authenticator code, so it runs on a brand-new session that Supabase's
+      // secure password change always accepts (F-62).
+      let session: { access_token: string };
+      try {
+        session = await settleWithRequestTimeout(
+          reauthenticateBrowserMfa(currentPassword, needsCode ? code : undefined),
+        );
+      } catch (reauthError) {
+        // Back to the form, where the message and any code field are.
+        setPendingConfirm(false);
+        if (getStepUpMethod(reauthError) === "totp") {
+          setServerAskedForCode(true);
+          setError("Enter the code from your authenticator app to continue.");
+        } else {
+          setError(
+            extractErrorMessage(reauthError, "We couldn't confirm your password. Try again."),
+          );
         }
-      });
-      if (!completed) return;
+        return;
+      }
+      // The preflight must finish before calling Supabase's public mutation.
+      // The mutation is never automatically replayed after an ambiguous error.
+      await requireCredentialAssurance(session.access_token);
+      try {
+        await settleWithRequestTimeout(updateBrowserUserPassword(newPassword));
+      } catch (updateError) {
+        // A lost response or a deadline may hide an applied change, so it
+        // finishes as one: everywhere signed out, never a retry (41b2).
+        if (!mayHavePasswordUpdateCommitted(updateError)) throw updateError;
+        unconfirmed = true;
+      }
       passwordUpdated = true;
       shouldRedirect = true;
       // Rotate session everywhere after a password change. /goodbye handles teardown.
@@ -206,6 +240,38 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
               onSubmit={requestPasswordChange}
               style={{ display: "flex", flexDirection: "column", gap: 14 }}
             >
+              <div>
+                <label className="dg-label" htmlFor="security-current-password">
+                  Current Password
+                </label>
+                <PasswordInput
+                  id="security-current-password"
+                  placeholder="Enter your current password"
+                  value={currentPassword}
+                  onChange={setCurrentPassword}
+                  showPassword={showPassword}
+                  onToggle={() => setShowPassword((v) => !v)}
+                  autoComplete="current-password"
+                  className="dg-input"
+                />
+              </div>
+              {needsCode && (
+                <div>
+                  <label className="dg-label" htmlFor="security-authenticator-code">
+                    Authenticator Code
+                  </label>
+                  <input
+                    id="security-authenticator-code"
+                    className="dg-input dg-tabular-nums"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    placeholder="6-digit code"
+                    value={code}
+                    onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                  />
+                </div>
+              )}
               <div>
                 <label className="dg-label">New Password</label>
                 <PasswordInput

@@ -77,8 +77,10 @@ export function createMfaLifecycleHandler(options: {
       if (rate.limited) return reply({ error: "Wait a few minutes, then try again." }, 429);
 
       if (input.action === "reauthenticate") {
-        // Never let a client choose another identity or downgrade a TOTP account.
-        if (hasTotp) return reply(createSensitiveActionStepUpRequired("totp"), 403);
+        // Never let a client choose another identity or downgrade a TOTP account:
+        // a TOTP account re-signs in only with its code, answered on the new
+        // session, so the result is a whole new aal2 session (F-62).
+        if (hasTotp && !input.code) return reply(createSensitiveActionStepUpRequired("totp"), 403);
         if (!auth.user.email) return reply({ error: "Sign in again to continue." }, 401);
         const client = createAnonClient();
         let delivered = false;
@@ -90,10 +92,30 @@ export function createMfaLifecycleHandler(options: {
           if (error || !data.session || data.user?.id !== auth.user.id) {
             return reply({ error: "We couldn't confirm your password. Try again." }, 403);
           }
-          if (resolveVerifiedTotpFactorPresence(data.user.factors) !== false) {
+          let session = data.session;
+          const verifiedTotp = (data.user.factors ?? []).find(
+            (factor) => factor.factor_type === "totp" && factor.status === "verified",
+          );
+          if (verifiedTotp) {
+            if (!input.code) return reply(createSensitiveActionStepUpRequired("totp"), 403);
+            const answered = await client.auth.mfa.challengeAndVerify({
+              factorId: verifiedTotp.id,
+              code: input.code,
+            });
+            if (answered.error || !answered.data?.access_token) {
+              return reply(
+                { error: "We couldn't confirm that code. Enter a new code and try again." },
+                403,
+              );
+            }
+            session = {
+              ...session,
+              access_token: answered.data.access_token,
+              refresh_token: answered.data.refresh_token,
+            };
+          } else if (resolveVerifiedTotpFactorPresence(data.user.factors) !== false) {
             return reply(createSensitiveActionStepUpRequired("totp"), 403);
           }
-          let session = data.session;
           // Use original signed claims, not a client org or sandbox override.
           if (typeof auth.claims.org_id === "string") {
             const scoped = createTokenScopedClient(session.access_token);
@@ -128,7 +150,7 @@ export function createMfaLifecycleHandler(options: {
             // a new sign-in.
             metadata: {
               surface: options.surface,
-              method: "password",
+              method: verifiedTotp ? "totp" : "password",
               sessionHash: hashSessionId(verified.sessionId),
             },
           });

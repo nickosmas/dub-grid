@@ -1026,7 +1026,7 @@ export async function POST(req: NextRequest) {
           data.orgId,
           (permissions) =>
             permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditShifts,
-          { actor },
+          { actor, gridmasterNeedsImpersonation: true },
         );
         if ("response" in auth) {
           return auth.response;
@@ -1067,7 +1067,7 @@ export async function POST(req: NextRequest) {
           data.orgId,
           (permissions) =>
             permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditShifts,
-          { actor },
+          { actor, gridmasterNeedsImpersonation: true },
         );
         if ("response" in auth) {
           return auth.response;
@@ -1113,7 +1113,7 @@ export async function POST(req: NextRequest) {
           data.orgId,
           (permissions) =>
             permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditShifts,
-          { actor },
+          { actor, gridmasterNeedsImpersonation: true },
         );
         if ("response" in auth) {
           return auth.response;
@@ -1151,7 +1151,7 @@ export async function POST(req: NextRequest) {
           data.orgId,
           (permissions) =>
             permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditShifts,
-          { actor },
+          { actor, gridmasterNeedsImpersonation: true },
         );
         if ("response" in auth) {
           return auth.response;
@@ -1199,7 +1199,7 @@ export async function POST(req: NextRequest) {
           data.orgId,
           (permissions) =>
             permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditShifts,
-          { actor },
+          { actor, gridmasterNeedsImpersonation: true },
         );
         if ("response" in auth) {
           return auth.response;
@@ -1290,7 +1290,7 @@ export async function POST(req: NextRequest) {
           data.orgId,
           (permissions) =>
             permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditShifts,
-          { actor },
+          { actor, gridmasterNeedsImpersonation: true },
         );
         if ("response" in auth) {
           return auth.response;
@@ -1365,7 +1365,7 @@ export async function POST(req: NextRequest) {
             permissions.isGridmaster ||
             permissions.isSuperAdmin ||
             (permissions.canEditShifts && permissions.canManageShiftSeries),
-          { actor },
+          { actor, gridmasterNeedsImpersonation: true },
         );
         if ("response" in auth) {
           return auth.response;
@@ -1457,7 +1457,7 @@ export async function POST(req: NextRequest) {
             permissions.isGridmaster ||
             permissions.isSuperAdmin ||
             (permissions.canEditShifts && permissions.canManageShiftSeries),
-          { actor },
+          { actor, gridmasterNeedsImpersonation: true },
         );
         if ("response" in auth) {
           return auth.response;
@@ -1508,7 +1508,7 @@ export async function POST(req: NextRequest) {
             permissions.isGridmaster ||
             permissions.isSuperAdmin ||
             (permissions.canEditShifts && permissions.canManageShiftSeries),
-          { actor },
+          { actor, gridmasterNeedsImpersonation: true },
         );
         if ("response" in auth) {
           return auth.response;
@@ -1589,7 +1589,7 @@ export async function POST(req: NextRequest) {
             permissions.isGridmaster ||
             permissions.isSuperAdmin ||
             (permissions.canEditShifts && permissions.canApplyRecurringSchedule),
-          { actor },
+          { actor, gridmasterNeedsImpersonation: true },
         );
         if ("response" in auth) {
           return auth.response;
@@ -1783,7 +1783,7 @@ export async function POST(req: NextRequest) {
           data.orgId,
           (permissions) =>
             permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditNotes,
-          { actor },
+          { actor, gridmasterNeedsImpersonation: true },
         );
         if ("response" in auth) {
           return auth.response;
@@ -1859,7 +1859,7 @@ export async function POST(req: NextRequest) {
           data.orgId,
           (permissions) =>
             permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditNotes,
-          { actor },
+          { actor, gridmasterNeedsImpersonation: true },
         );
         if ("response" in auth) {
           return auth.response;

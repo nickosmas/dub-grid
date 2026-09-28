@@ -6,6 +6,11 @@ export function supabaseMigrationsDir(): string {
   return existsSync(fromRoot) ? fromRoot : resolve(process.cwd(), "../../supabase/migrations");
 }
 
+/** The repository root, whether the suite runs from it or from `apps/web`. */
+export function repoRootDir(): string {
+  return resolve(supabaseMigrationsDir(), "..", "..");
+}
+
 export function migrationPath(filename: string): string {
   return resolve(supabaseMigrationsDir(), filename);
 }

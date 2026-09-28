@@ -1227,14 +1227,24 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     },
     details: () => [],
   },
+  // Written by the database whenever Auth stores a new password (074), so it
+  // stands on its own rather than on what a client said (F-05).
+  "security.auth.password": {
+    audience: "platform",
+    category: "security",
+    severity: "warning",
+    headline: () => "Changed their password",
+    details: () => [],
+  },
   "security.auth.session": {
     audience: "platform",
     category: "security",
     severity: "warning",
     headline: (d) => {
       const scope = d.text("scope");
+      // The reason is the client's word; the change itself has its own row.
       if (d.text("reason") === "password_changed") {
-        return "Changed their password and signed out everywhere";
+        return "Signed out everywhere after a password change";
       }
       if (scope === "others") return "Signed out their other devices";
       if (scope === "global") return "Signed out everywhere";

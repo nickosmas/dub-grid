@@ -69,6 +69,34 @@ interface OrgPermissionOptions {
    * request. Anything else skips authentication entirely.
    */
   actor?: User;
+  /**
+   * The request changes the organization's data. A Gridmaster who is not a
+   * member may then act only through an active impersonation of it, started by
+   * the same auth session, matching migration 075 in the database (F-75).
+   */
+  gridmasterNeedsImpersonation?: boolean;
+}
+
+export const GRIDMASTER_IMPERSONATION_REQUIRED =
+  "Start an impersonation of this organization to change its data.";
+
+/** An active, unexpired impersonation of `orgId` started by this auth session. */
+async function hasActiveImpersonation(
+  serviceClient: ReturnType<typeof getServiceClient>,
+  input: { gridmasterId: string; orgId: string; authSessionId: string },
+): Promise<boolean> {
+  const { data, error } = await serviceClient
+    .from("impersonation_sessions")
+    .select("session_id")
+    .eq("gridmaster_id", input.gridmasterId)
+    .eq("target_org_id", input.orgId)
+    .eq("auth_session_id", input.authSessionId)
+    .is("ended_at", null)
+    .gt("expires_at", new Date().toISOString())
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return Boolean(data);
 }
 
 export interface AuthorizedOrgRequest {
@@ -474,6 +502,27 @@ export async function requireOrgPermissions(
   const isGridmaster = profile?.platform_role === "gridmaster";
   if (!isGridmaster && !membership) {
     return { response: forbiddenResponse(API_ERRORS.NOT_ORG_MEMBER) };
+  }
+
+  if (options?.gridmasterNeedsImpersonation && isGridmaster && !membership) {
+    // A caller passed as `actor` came without its session; verify the token once more.
+    if (auth.sessionId == null) {
+      const sessionAuth = await requireAuthenticatedUser(req);
+      if ("response" in sessionAuth || sessionAuth.user.id !== auth.user.id) {
+        return { response: forbiddenResponse() };
+      }
+      auth = sessionAuth;
+    }
+    const impersonating =
+      auth.sessionId != null &&
+      (await hasActiveImpersonation(serviceClient, {
+        gridmasterId: auth.user.id,
+        orgId,
+        authSessionId: auth.sessionId,
+      }));
+    if (!impersonating) {
+      return { response: forbiddenResponse(GRIDMASTER_IMPERSONATION_REQUIRED) };
+    }
   }
 
   // The Edge proxy intentionally excludes /api routes. Without this server

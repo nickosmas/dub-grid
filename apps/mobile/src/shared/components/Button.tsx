@@ -259,10 +259,11 @@ export function Button({
         ) : null}
         {!iconOnly && content && !isLink && !isTextLabel(content) ? (
           // An element label cannot be fitted by measurement (FitText keys on
-          // the text), so it keeps one line and truncates.
+          // the text), so it keeps one line and truncates, and scales to the
+          // compact ceiling like every other button label (F-128).
           <Text
             ellipsizeMode="tail"
-            maxFontSizeMultiplier={MAX_FONT_SCALE}
+            fit="compact"
             numberOfLines={1}
             style={[mobileText[LABEL_VARIANT[resolvedSize]], styles.label, { color: labelColor }]}
           >

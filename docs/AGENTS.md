@@ -8,9 +8,26 @@ and are never published.
 
 - Pages are MDX files with YAML frontmatter
 - Configuration lives in `docs.json`
-- Run `mint dev` to preview locally
-- Run `mint broken-links` to check links
+- Run `npx -p mint@4.2.942 -p openapi-types@12.1.3 mint dev` from this folder
+  to preview locally. Keep the version in step with the root `docs:*` scripts;
+  `openapi-types` works around a dependency Mint's bundle omits.
 - Mintlify deploys from `main`, so a page ships when a release PR merges
+
+## Verification commands
+
+Run documentation checks from the repository root:
+
+- `npm run docs:inventory` regenerates the committed source inventory. Run it
+  only when intentionally accepting a source change.
+- `npm run docs:check` performs the fast, read-only documentation contract
+  check.
+- `npm run docs:validate` runs Mintlify configuration and MDX validation.
+- `npm run docs:links` runs Mintlify's broken-link check.
+- `npm run docs:verify` runs all read-only documentation checks in release
+  order. It never regenerates the inventory.
+
+Do not edit generated files under `internal/documentation/generated/` by hand.
+Do not present a pending or planned manifest entry as verified current truth.
 
 ## Audience
 

@@ -45,6 +45,38 @@ function totpCode(secretBase32: string, atSeconds = Date.now() / 1000): string {
   return ((digest.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).toString().padStart(6, "0");
 }
 
+const TOTP_STEP_MS = 30_000;
+
+/** Waits for the next TOTP window when fewer than `marginMs` of this one remain. */
+async function clearOfWindowEdge(marginMs: number): Promise<void> {
+  const left = TOTP_STEP_MS - (Date.now() % TOTP_STEP_MS);
+  if (left < marginMs) await new Promise((resolve) => setTimeout(resolve, left + 250));
+}
+
+/**
+ * Answers the challenge with a code computed for the moment it is sent. A code
+ * made at the end of a window can reach the server in the next one, and the
+ * server refuses a code it has already seen, so a refused answer is retried
+ * once in the following window rather than resent (F-18).
+ */
+async function answerChallenge(
+  mfaClient: SupabaseClient,
+  factorId: string,
+  secret: string,
+): Promise<{ access_token: string; refresh_token: string }> {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await clearOfWindowEdge(attempt === 0 ? 3_000 : TOTP_STEP_MS);
+    const { data, error } = await mfaClient.auth.mfa.challengeAndVerify({
+      factorId,
+      code: totpCode(secret),
+    });
+    if (data?.access_token && !error) return data;
+    lastError = error;
+  }
+  throw new Error(`The challenge was refused twice: ${JSON.stringify(lastError)}`);
+}
+
 function claimsOf(accessToken: string): Record<string, unknown> {
   return JSON.parse(Buffer.from(accessToken.split(".")[1], "base64").toString());
 }
@@ -101,20 +133,17 @@ describe.runIf(live)("MFA is enforced for data access (live stack)", () => {
       friendlyName: `integration-${Date.now()}`,
     });
     factorId = enrolled!.id;
-    const { data: verified } = await client.auth.mfa.challengeAndVerify({
-      factorId: enrolled!.id,
-      code: totpCode(enrolled!.totp.secret),
-    });
+    const verified = await answerChallenge(client, enrolled!.id, enrolled!.totp.secret);
 
     // Answered: aal2, and access is unchanged.
-    expect(claimsOf(verified!.access_token).aal).toBe("aal2");
-    expect(claimsOf(verified!.access_token).mfa_enrolled).toBe(true);
-    expect(await readsAnyEmployee(verified!.access_token)).toBe(true);
+    expect(claimsOf(verified.access_token).aal).toBe("aal2");
+    expect(claimsOf(verified.access_token).mfa_enrolled).toBe(true);
+    expect(await readsAnyEmployee(verified.access_token)).toBe(true);
 
     // The same session after a refresh keeps its answer, which is what makes
     // enforcing on the claim safe.
     const { data: refreshed } = await client.auth.refreshSession({
-      refresh_token: verified!.refresh_token,
+      refresh_token: verified.refresh_token,
     });
     expect(claimsOf(refreshed.session!.access_token).aal).toBe("aal2");
     expect(await readsAnyEmployee(refreshed.session!.access_token)).toBe(true);
@@ -141,5 +170,5 @@ describe.runIf(live)("MFA is enforced for data access (live stack)", () => {
     });
     expect(claimsOf(healed.session!.access_token).mfa_enrolled).toBe(false);
     expect(await readsAnyEmployee(healed.session!.access_token)).toBe(true);
-  }, 60_000);
+  }, 120_000);
 });

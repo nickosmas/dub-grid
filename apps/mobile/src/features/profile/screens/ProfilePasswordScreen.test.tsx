@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiResponseError } from "@dubgrid/api-client";
 import { createReactNativeModule, createScreenModule } from "../../../test/native";
 import {
   navigatedActions,
@@ -14,6 +15,7 @@ const handleExpiredMobileSession = vi.fn();
 const disablePushForCurrentDevice = vi.fn();
 const pushToast = vi.fn();
 const requireMobileCredentialAssurance = vi.fn();
+const reauthenticateMobileMfa = vi.fn();
 const signOutMobileSessions = vi.fn();
 const stepUpRun = vi.fn();
 
@@ -66,6 +68,10 @@ vi.mock("../../../shared/providers/ToastProvider", () => ({
   }),
 }));
 
+vi.mock("../../../shared/lib/mfa-lifecycle", () => ({
+  reauthenticateMobileMfa: (...args: unknown[]) => reauthenticateMobileMfa(...args),
+}));
+
 vi.mock("../hooks/useMobileStepUpAction", () => ({
   useMobileStepUpAction: () => ({ run: stepUpRun, active: false, sheet: null }),
 }));
@@ -77,6 +83,9 @@ beforeAll(async () => {
 });
 
 function fillValidPassword() {
+  fireEvent.change(screen.getByLabelText("Current password"), {
+    target: { value: "Old-password-123" },
+  });
   fireEvent.change(screen.getByLabelText("New password"), {
     target: { value: "New-password-123" },
   });
@@ -96,6 +105,9 @@ describe("ProfilePasswordScreen", () => {
     disablePushForCurrentDevice.mockResolvedValue(undefined);
     pushToast.mockReset();
     requireMobileCredentialAssurance.mockReset().mockResolvedValue({ success: true });
+    reauthenticateMobileMfa
+      .mockReset()
+      .mockResolvedValue({ access_token: "fresh-token", refresh_token: "fresh-refresh" });
     signOutMobileSessions.mockReset().mockResolvedValue({ success: true });
     stepUpRun.mockReset().mockImplementation(async (action) => {
       await action("fresh-token");
@@ -124,8 +136,9 @@ describe("ProfilePasswordScreen", () => {
 
     render(<ProfilePasswordScreen />);
 
-    // The form is the screen — no "Change password" button to open it first.
-    expect(screen.queryByLabelText("Current password")).not.toBeInTheDocument();
+    // The form is the screen, and a change starts from the current password (F-62).
+    expect(screen.getByLabelText("Current password")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Authenticator code")).not.toBeInTheDocument();
     expect(screen.getByLabelText("New password")).toBeInTheDocument();
     expect(screen.getByLabelText("Confirm new password")).toBeInTheDocument();
 
@@ -144,7 +157,13 @@ describe("ProfilePasswordScreen", () => {
     });
 
     await waitFor(() => {
-      expect(stepUpRun).toHaveBeenCalledTimes(1);
+      // A brand-new session first, then the change on it; no step-up prompt.
+      expect(reauthenticateMobileMfa).toHaveBeenCalledWith(
+        "token-123",
+        "Old-password-123",
+        undefined,
+      );
+      expect(stepUpRun).not.toHaveBeenCalled();
       expect(requireMobileCredentialAssurance).toHaveBeenCalledWith("fresh-token");
       expect(updateUser).toHaveBeenCalledWith({ password: "New-password-123" });
       // Pushes off before the token dies, not after.
@@ -247,7 +266,7 @@ describe("ProfilePasswordScreen", () => {
 
     await confirmUpdate();
 
-    await waitFor(() => expect(stepUpRun).toHaveBeenCalled());
+    await waitFor(() => expect(reauthenticateMobileMfa).toHaveBeenCalled());
     expect(signOutMobileSessions).not.toHaveBeenCalled();
     expect(handleExpiredMobileSession).not.toHaveBeenCalled();
   });
@@ -405,9 +424,12 @@ describe("ProfilePasswordScreen", () => {
     expect(screen.getByLabelText("New password")).toHaveValue("part-entered");
   });
 
-  it("keeps the confirmation and typed password when identity confirmation is cancelled", async () => {
-    stepUpRun.mockResolvedValue(false);
-    getSupabaseClient.mockReturnValue({ auth: { updateUser: vi.fn(), signOut: vi.fn() } } as never);
+  it("keeps the confirmation and typed password when the current password is wrong", async () => {
+    reauthenticateMobileMfa.mockRejectedValue(
+      new Error("We couldn't confirm your password. Try again."),
+    );
+    const updateUser = vi.fn();
+    getSupabaseClient.mockReturnValue({ auth: { updateUser, signOut: vi.fn() } } as never);
 
     render(<ProfilePasswordScreen />);
     fillValidPassword();
@@ -420,5 +442,65 @@ describe("ProfilePasswordScreen", () => {
 
     expect(screen.getByText("Update password?")).toBeInTheDocument();
     expect(screen.getByLabelText("New password")).toHaveValue("New-password-123");
+    expect(updateUser).not.toHaveBeenCalled();
+  });
+
+  it("asks a two-factor account for its code and signs in again with both (F-62)", async () => {
+    useQuery.mockReturnValue({
+      data: {
+        user: { email: "mina@dubgrid.com", mfaEnabled: true },
+        pendingAccountDeletionRequest: false,
+      },
+      error: null,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    const updateUser = vi.fn().mockResolvedValue({ error: null });
+    getSupabaseClient.mockReturnValue({ auth: { updateUser, signOut: vi.fn() } } as never);
+    handleExpiredMobileSession.mockResolvedValue(undefined);
+
+    render(<ProfilePasswordScreen />);
+    fillValidPassword();
+    expect(screen.getByRole("button", { name: "Update password" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Authenticator code"), {
+      target: { value: "123456" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Update password" }));
+    await act(async () => {
+      fireEvent.click(
+        within(screen.getByRole("alert")).getByRole("button", { name: "Update and sign out" }),
+      );
+    });
+
+    await waitFor(() => expect(updateUser).toHaveBeenCalled());
+    expect(reauthenticateMobileMfa).toHaveBeenCalledWith("token-123", "Old-password-123", "123456");
+  });
+
+  it("shows the code field when the server says the account has two-factor (F-62)", async () => {
+    reauthenticateMobileMfa.mockRejectedValue(
+      new ApiResponseError("Confirm your identity.", 403, {
+        code: "STEP_UP_REQUIRED",
+        method: "totp",
+      }),
+    );
+    const updateUser = vi.fn();
+    getSupabaseClient.mockReturnValue({ auth: { updateUser, signOut: vi.fn() } } as never);
+
+    render(<ProfilePasswordScreen />);
+    fillValidPassword();
+    fireEvent.click(screen.getByRole("button", { name: "Update password" }));
+    await act(async () => {
+      fireEvent.click(
+        within(screen.getByRole("alert")).getByRole("button", { name: "Update and sign out" }),
+      );
+    });
+
+    expect(await screen.findByLabelText("Authenticator code")).toBeInTheDocument();
+    expect(pushToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "Enter the code from your authenticator app to continue.",
+      }),
+    );
+    expect(updateUser).not.toHaveBeenCalled();
   });
 });

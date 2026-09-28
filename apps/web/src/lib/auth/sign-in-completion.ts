@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
-import { hasRecordedSignIn, writeSecurityAuditEvent } from "@/lib/auth/security-audit";
+import { recordSignInOnce, writeSecurityAuditEvent } from "@/lib/auth/security-audit";
 
 const FRESH_PROOF_MAX_AGE_SECONDS = 10 * 60;
 
@@ -64,8 +64,10 @@ export function sessionHashOf(accessToken: string): string | null {
 
 /**
  * Records a completed sign-in against the organization the finished session is
- * actually in, once per Auth session: a repeat call for the same session
- * records nothing. Returns whether it recorded.
+ * actually in, once per Auth session: a repeat call for the same session,
+ * even a concurrent one, records nothing. Returns whether this call is known
+ * to have recorded it: false can also mean a record still in flight, or one a
+ * timed-out first attempt made before its retry found it.
  */
 export async function recordCompletedSignIn(input: {
   userId: string;
@@ -75,8 +77,13 @@ export async function recordCompletedSignIn(input: {
   sessionId: string | null;
 }): Promise<boolean> {
   const sessionHash = input.sessionId ? hashSessionId(input.sessionId) : undefined;
-  if (sessionHash && (await hasRecordedSignIn({ actorId: input.userId, sessionHash }))) {
-    return false;
+  if (sessionHash) {
+    const recorded = await recordSignInOnce({
+      actorId: input.userId,
+      orgId: input.orgId,
+      metadata: { surface: input.surface, method: input.method, sessionHash },
+    });
+    if (recorded !== null) return recorded;
   }
   await writeSecurityAuditEvent({
     event: "security.auth.login",
