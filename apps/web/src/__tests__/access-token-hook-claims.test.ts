@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { STEP_UP_REQUIRED_CODE } from "@dubgrid/authz";
-import { latestFunctionDefinition } from "./helpers/sql-inventory";
+import { latestFunctionDefinition, repoRootDir } from "./helpers/sql-inventory";
 
 /**
  * Finding F-01: `caller_mfa_challenge_pending` maps an absent `mfa_enrolled`
@@ -42,9 +42,24 @@ describe("the live access token hook keeps minting every claim the app gates on"
   });
 });
 
-const repoRoot = resolve(process.cwd(), "..", "..");
+const repoRoot = repoRootDir();
 /** Claims Supabase itself issues, which the hook does not mint. */
-const STANDARD_CLAIMS = new Set(["aal", "amr", "session_id", "sub", "role", "email", "exp", "iat"]);
+const STANDARD_CLAIMS = new Set([
+  "aal",
+  "amr",
+  "session_id",
+  "sub",
+  "role",
+  "email",
+  "phone",
+  "is_anonymous",
+  "app_metadata",
+  "user_metadata",
+  "exp",
+  "iat",
+]);
+/** Set by the server on the claims it hands on, never read from a token. */
+const SERVER_DERIVED_CLAIMS = new Set(["in_sandbox"]);
 
 function claimKeys(file: string, typeName: string): string[] {
   const source = readFileSync(resolve(repoRoot, file), "utf8");
@@ -60,8 +75,12 @@ describe("the claim types read only claims the hook mints", () => {
   it.each([
     ["apps/web/src/proxy.ts", "JWTClaims"],
     ["packages/mobile-api-core/src/auth.ts", "MobileAuthClaims"],
+    ["apps/web/src/lib/auth/verify-token.ts", "VerifiedClaims"],
+    ["apps/web/src/lib/api-auth.ts", "Claims"],
   ])("%s %s", (file, typeName) => {
-    const custom = claimKeys(file, typeName).filter((claim) => !STANDARD_CLAIMS.has(claim));
+    const custom = claimKeys(file, typeName).filter(
+      (claim) => !STANDARD_CLAIMS.has(claim) && !SERVER_DERIVED_CLAIMS.has(claim),
+    );
 
     expect(custom.length).toBeGreaterThan(0);
     for (const claim of custom) {

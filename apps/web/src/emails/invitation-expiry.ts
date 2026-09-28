@@ -5,7 +5,7 @@
  * `timeZone` is the organization's configured zone. An empty or unknown value
  * falls back to UTC, because `Intl` throws on an invalid zone and an email must
  * still render. A missing or unreadable date returns null, and the caller
- * describes the 72 hours without a date.
+ * describes the lifetime without a date.
  */
 export function formatInvitationExpiry(
   expiresAt: string | null | undefined,

@@ -2,9 +2,13 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { INVITATION_LIFETIME_HOURS } from "@dubgrid/domain";
-import { latestFunctionDefinition } from "./helpers/sql-inventory";
+import {
+  latestFunctionDefinition,
+  repoRootDir,
+  supabaseMigrationsDir,
+} from "./helpers/sql-inventory";
 
-const migrations = resolve(process.cwd(), "..", "..", "supabase", "migrations");
+const migrations = supabaseMigrationsDir();
 const files = readdirSync(migrations)
   .filter((file) => /^\d{3}_.*\.sql$/.test(file))
   .sort();
@@ -28,8 +32,19 @@ describe("invitation SQL the app depends on", () => {
 
   it("still raises each message the invitations route matches", () => {
     const body = latestFunctionDefinition("replace_pending_invitation_access").text.toLowerCase();
+    // Read from the route, so a message it starts matching is checked too (F-50).
+    const route = readFileSync(
+      resolve(repoRootDir(), "apps/web/src/app/api/organizations/invitations/route.ts"),
+      "utf8",
+    );
+    const call = route.indexOf(`"replace_pending_invitation_access"`);
+    const handling = route.slice(call, route.indexOf("throw replacementError", call));
+    const messages = [...handling.matchAll(/message\.includes\("([^"]+)"\)/g)].map(
+      (match) => match[1]!,
+    );
 
-    for (const message of ["changed elsewhere", "no longer pending", "not found"]) {
+    expect(messages.length).toBeGreaterThanOrEqual(4);
+    for (const message of messages) {
       expect(body, message).toMatch(new RegExp(`raise exception '[^']*${message}`));
     }
   });

@@ -1,10 +1,11 @@
 // @vitest-environment node
-import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { EMAIL_OTP_LENGTH } from "@dubgrid/domain";
 import { diff, readConfig } from "../../../../scripts/push-auth-templates";
+import { MANAGEMENT_API_MAILER_FIELDS } from "./fixtures/management-api-mailer-fields";
+import { repoRootDir } from "./helpers/sql-inventory";
 
-const repoRoot = resolve(process.cwd(), "..", "..");
+const repoRoot = repoRootDir();
 
 // The script syncs production and had never run in a test (41c1/F-22).
 describe("push-auth-templates", () => {
@@ -55,5 +56,16 @@ describe("push-auth-templates", () => {
     const { payload } = diff({ mailer_notifications_mfa_factor_enrolled_enabled: false }, config);
 
     expect(payload.mailer_notifications_mfa_factor_enrolled_enabled).toBe(true);
+  });
+
+  it("writes only fields the Management API accepts (F-50)", () => {
+    // Every field differs from an empty project, so the payload holds them all.
+    const { payload } = diff({}, config);
+    const accepted = new Set<string>(MANAGEMENT_API_MAILER_FIELDS);
+
+    expect(Object.keys(payload).length).toBeGreaterThan(config.templates.length);
+    for (const field of Object.keys(payload)) {
+      expect(accepted.has(field), field).toBe(true);
+    }
   });
 });

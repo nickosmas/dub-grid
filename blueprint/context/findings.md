@@ -48,13 +48,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** Have the RPC return whether it ended a row (migration).
 **Resolution:**
 
-### F-50 [P3] open - Remaining drift-guard gaps
+### F-50 [P3] fixed - Remaining drift-guard gaps
 
 **File:** `apps/web/src/__tests__/invitation-sql-contract.test.ts:41`; `access-token-hook-claims.test.ts`; `apps/web/src/emails/InviteEmail.tsx:72`; `apps/web/src/app/page.tsx:93`; `apps/web/src/__tests__/push-auth-templates.test.ts`
 **Found:** 2026-09-25 by `/audit` (scope: current, a4fa18a7..395a6e57; all lenses)
 **Why it matters:** The SQL messages are copied into the test rather than read from the route; `VerifiedClaims` and the api-auth `Claims` (which add `in_sandbox`) are not in the claim check; the 72 hours in invite and landing copy is not tied to `INVITATION_LIFETIME_HOURS`; the new tests assume they run from `apps/web`; and the push test mirrors the script's Management API field names, so a wrong name would pass.
 **Suggested fix:** Read the matched strings from the route; add `VerifiedClaims` with an `in_sandbox` allowance; derive the copy from the constant; use `supabaseMigrationsDir()`-style root resolution; check field names against the Management API schema in 41d3.
-**Resolution:**
+**Resolution:** Fixed in fix/drift-guard-gaps: the invitation test reads the messages the route matches after `replace_pending_invitation_access` from the route itself (four today) and requires each in the function's latest `RAISE EXCEPTION`; the claim check adds `VerifiedClaims` and `api-auth`'s `Claims`, with Supabase's own claims as standard and `in_sandbox` as server-derived; the invite email and both landing lines use `INVITATION_LIFETIME_HOURS`; a `repoRootDir()` helper lets the three tests run from the root or `apps/web`; and `push-auth-templates.test.ts` checks every field the push can write against a fixture of the Management API's `UpdateAuthConfigBody` `mailer_*` properties (read 2026-09-28).
 
 ### F-62 [P2] open - Turning on `secure_password_change` would refuse password changes for two-factor users on sessions older than a day
 
