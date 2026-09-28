@@ -136,13 +136,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** delete the dead export, add a disposed guard in `createDebouncedTableFlusher`, assert the listener exists, and test the reconnect hook.
 **Resolution:** Fixed in fix/gridmaster-realtime-follow-ups: `invalidateGridmasterRealtimeQueries` and its re-export are deleted; `createDebouncedTableFlusher` records `disposed`, so `dispose()` clears pending tables and a later `markChanged` arms nothing (a realtime-core test covers it, and the org hooks get the same guard); the Gridmaster test's `fire` throws when a table has no listener, and new tests cover `onReconnectAfterError` (one invalidation of `gridmaster.all()`) and a disabled hook subscribing to nothing.
 
-### F-108 [P3] open - `schedule_notes` keeps two indexes its unique key already covers
+### F-108 [P3] fixed - `schedule_notes` keeps two indexes its unique key already covers
 
 **File:** `supabase/migrations/001_schema.sql:1394` (`idx_schedule_notes_emp`, `idx_schedule_notes_emp_date`)
 **Found:** 2026-09-28 by `/audit` (scope: fixed-finding re-review at 1924880c; all lenses), reviewing F-84
 **Why it matters:** both lead with `emp_id` as 063's `schedule_notes_segment_unique` does, so every note write maintains two indexes no query needs. Small at today's sizes.
 **Suggested fix:** a forward migration dropping both, after checking a plan for the emp and date reads.
-**Resolution:**
+**Resolution:** Fixed in fix/schedule-notes-redundant-indexes: migration `070_schedule_notes_redundant_indexes.sql` drops `idx_schedule_notes_emp` and `idx_schedule_notes_emp_date`. With sequential scans off, a read by person and a read by person and date range both plan as an index scan on `schedule_notes_segment_unique` with `emp_id` (and the range) in the condition. `migration-070-schedule-notes-indexes.integration.test.ts` runs 070 from its file and asserts that, and that the unique key and `idx_schedule_notes_org_date` remain. Checksum locked; not yet on production.
 
 ### F-109 [P3] fixed - 065 leaves the Admin write policies and MAINTAIN on `employees`
 
