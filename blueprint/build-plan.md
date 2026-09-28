@@ -766,7 +766,7 @@
           home, introduction, quickstart, and onboarding pages against source,
           and add `docs:fingerprint` so a source-reviewed page records its
           evidence fingerprint in the accuracy manifest.
-    - [ ] 40b2. **Scheduling guides** - rewrite the schedule grid, draft and
+    - [x] 40b2. **Scheduling guides** - rewrite the schedule grid, draft and
           publish, recurring shifts, real-time collaboration, shift requests,
           and dashboard pages.
     - [ ] 40b3. **People guides** - rewrite the roster, person detail, and

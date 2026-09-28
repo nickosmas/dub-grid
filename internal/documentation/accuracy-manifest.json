@@ -317,7 +317,7 @@
       "publicRoute": "/features/schedule-grid",
       "deliveryOwner": "40b",
       "lifecycle": "published",
-      "sourceReview": "pending",
+      "sourceReview": "verified",
       "audiences": [
         "user",
         "admin"
@@ -335,17 +335,55 @@
         {
           "id": "schedule",
           "claims": [
-            "pending-source-review"
+            "rows grouped by department and focus area; Ungrouped; Open Shifts and count rows",
+            "unpublished periods hidden from non-editors",
+            "toolbar views, navigation, pay-period alignment, focus tabs, sort, search highlights, coverage",
+            "Month is read-only; phones show one day",
+            "panel Confirm and Undo, remove actions, right-click and keyboard copy and paste",
+            "drag moves, Shift-drag copies, qualification check",
+            "open shift staffing and claims",
+            "Tools menu items; print options and legends; print may be unavailable",
+            "mobile shift detail offers Drop shift and Swap"
           ],
           "sourceFiles": [
-            "apps/web/src/app/(app)/schedule/page.tsx",
-            "apps/mobile/app/shift/[employeeId]/[date].tsx"
+            "apps/web/src/components/Toolbar.tsx",
+            "apps/web/src/components/ScheduleGrid.tsx",
+            "apps/web/src/components/ShiftEditPanel.tsx",
+            "apps/web/src/components/ShiftPicker.tsx",
+            "apps/web/src/components/ShiftContextMenu.tsx",
+            "apps/web/src/components/PrintOptionsModal.tsx",
+            "apps/web/src/components/PrintScheduleView.tsx",
+            "apps/web/src/components/MonthView.tsx",
+            "apps/web/src/components/MobileDayView.tsx",
+            "apps/web/src/components/schedule-grid/noteDots.tsx",
+            "apps/web/src/components/schedule/OpenShiftStaffingModal.tsx",
+            "apps/web/src/lib/schedule-view.ts",
+            "apps/web/src/lib/schedule-cells.ts",
+            "apps/web/src/hooks/useMediaQuery.ts",
+            "apps/web/src/app/(app)/schedule/_hooks/useScheduleImport.ts",
+            "apps/web/src/app/(app)/schedule/SchedulePageClient.tsx",
+            "packages/authz/src/index.ts",
+            "apps/mobile/app/(tabs)/_layout.tsx",
+            "apps/mobile/src/features/schedule/screens/ShiftDetailScreen.tsx"
           ],
-          "testFiles": [],
+          "testFiles": [
+            "apps/web/src/__tests__/Toolbar.test.tsx",
+            "apps/web/src/__tests__/ScheduleGrid.test.tsx",
+            "apps/web/src/__tests__/ShiftEditPanel.test.tsx",
+            "apps/web/src/__tests__/ShiftContextMenu.test.tsx",
+            "apps/web/src/__tests__/PrintOptionsModal.test.tsx",
+            "apps/web/src/__tests__/PrintScheduleView.test.tsx",
+            "apps/web/src/__tests__/MonthView.test.tsx",
+            "apps/web/src/__tests__/MobileDayView.test.tsx",
+            "apps/web/src/components/schedule/OpenShiftStaffingModal.test.tsx",
+            "apps/web/src/app/(app)/schedule/_components/BulkDeleteReviewContent.test.tsx",
+            "apps/mobile/src/features/schedule/screens/ShiftDetailScreen.test.tsx"
+          ],
           "runtimeScenarios": [],
           "exclusions": []
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:b12280ce159f28d09bd61c034d0c8d3100a0de425f1e58649800111b88ad1456"
     },
     {
       "id": "draft-publish",
@@ -353,7 +391,7 @@
       "publicRoute": "/features/draft-publish",
       "deliveryOwner": "40b",
       "lifecycle": "published",
-      "sourceReview": "pending",
+      "sourceReview": "verified",
       "audiences": [
         "admin"
       ],
@@ -369,16 +407,40 @@
         {
           "id": "publishing",
           "claims": [
-            "pending-source-review"
+            "drafts visible to editors only; draft cell states; drafts saved server-side",
+            "banner counts for the period and other-period banner",
+            "publish dialog: per-author breakdown, on-schedule and coverage warnings; publishes the visible period",
+            "Schedule updated alert to scheduled people except the publisher; Recently published bar; Highlight Changes",
+            "who can publish; Admin default",
+            "discard dialog: my drafts, keep, Super Admin all; period-scoped",
+            "approved requests change the published schedule directly"
           ],
           "sourceFiles": [
-            "apps/web/src/app/(app)/schedule/page.tsx"
+            "apps/web/src/components/DraftBanner.tsx",
+            "apps/web/src/components/ChangeCountChips.tsx",
+            "apps/web/src/app/(app)/schedule/_components/PublishChangeSummary.tsx",
+            "apps/web/src/app/(app)/schedule/SchedulePageClient.tsx",
+            "apps/web/src/app/api/shifts/publish/route.ts",
+            "apps/web/src/app/api/shifts/discard/route.ts",
+            "apps/web/src/features/notifications/server/events.ts",
+            "apps/web/src/lib/schedule-cells.ts",
+            "apps/web/src/components/ScheduleGrid.tsx",
+            "packages/authz/src/index.ts",
+            "supabase/migrations/030_auto_approve_shift_requests.sql"
           ],
-          "testFiles": [],
+          "testFiles": [
+            "apps/web/src/__tests__/DraftBanner.test.tsx",
+            "apps/web/src/app/(app)/schedule/_components/PublishChangeSummary.test.tsx",
+            "apps/web/src/app/api/shifts/publish/route.test.ts",
+            "apps/web/src/app/api/shifts/discard/route.test.ts",
+            "apps/web/src/__tests__/discard-schedule-drafts.integration.test.ts",
+            "apps/web/src/__tests__/draft-state-editor-only.integration.test.ts"
+          ],
           "runtimeScenarios": [],
           "exclusions": []
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:31c3a4db285ec71c4a83d5038cef411627f31071baff356535870b1be4782405"
     },
     {
       "id": "recurring-shifts",
@@ -386,7 +448,7 @@
       "publicRoute": "/features/recurring-shifts",
       "deliveryOwner": "40b",
       "lifecycle": "published",
-      "sourceReview": "pending",
+      "sourceReview": "verified",
       "audiences": [
         "admin"
       ],
@@ -402,16 +464,34 @@
         {
           "id": "series",
           "claims": [
-            "pending-source-review"
+            "recurring schedules on People > Recurring Shifts, Sunday to Saturday; profile card",
+            "Save Draft, Save with confirmation, Discard",
+            "Auto Fill fills empty slots in the period on screen as drafts, never overwriting",
+            "repeating shift fields; 183-occurrence cap; delete series marks for deletion",
+            "permissions for each action; Super Admin all; Admin defaults"
           ],
           "sourceFiles": [
-            "apps/web/src/app/(app)/schedule/page.tsx"
+            "apps/web/src/components/staff/RecurringScheduleSection.tsx",
+            "apps/web/src/components/staff-detail/RecurringScheduleCard.tsx",
+            "apps/web/src/components/StaffView.tsx",
+            "apps/web/src/components/RepeatForm.tsx",
+            "apps/web/src/components/Toolbar.tsx",
+            "apps/web/src/app/api/schedule/manage/route.ts",
+            "apps/web/src/lib/constants.ts",
+            "apps/web/src/app/(app)/schedule/SchedulePageClient.tsx",
+            "packages/authz/src/index.ts"
           ],
-          "testFiles": [],
+          "testFiles": [
+            "apps/web/src/__tests__/RecurringScheduleSection.test.tsx",
+            "apps/web/src/components/staff-detail/RecurringScheduleCard.test.tsx",
+            "apps/web/src/__tests__/shift-series-bounds-sql.test.ts",
+            "apps/web/src/app/api/schedule/manage/route.test.ts"
+          ],
           "runtimeScenarios": [],
           "exclusions": []
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:d312ad89b014ba24385c2a072f95c4286428016be1976f9813e4c66c2e3b2922"
     },
     {
       "id": "realtime",
@@ -419,7 +499,7 @@
       "publicRoute": "/features/real-time-collaboration",
       "deliveryOwner": "40b",
       "lifecycle": "published",
-      "sourceReview": "pending",
+      "sourceReview": "verified",
       "audiences": [
         "admin"
       ],
@@ -435,16 +515,30 @@
         {
           "id": "collaboration",
           "claims": [
-            "pending-source-review"
+            "live updates of drafts and publishes; catch-up on return",
+            "editor avatars, up to four then a count; Editors online list",
+            "Being edited by marker never blocks",
+            "no cell locks; version check message and refresh",
+            "Schedule open elsewhere banner actions; ended session is read-only with reload"
           ],
           "sourceFiles": [
-            "apps/web/src/app/(app)/schedule/page.tsx"
+            "apps/web/src/hooks/useSchedulePresence.ts",
+            "apps/web/src/components/PresenceAvatars.tsx",
+            "apps/web/src/components/ScheduleGrid.tsx",
+            "apps/web/src/app/(app)/schedule/_components/ScheduleSessionDialogs.tsx",
+            "apps/web/src/app/(app)/schedule/SchedulePageClient.tsx",
+            "blueprint/history/fixes/cell-locking-removal-and-editor-indicator.md"
           ],
-          "testFiles": [],
+          "testFiles": [
+            "apps/web/src/__tests__/useSchedulePresence.test.ts",
+            "apps/web/src/__tests__/PresenceAvatars.test.tsx",
+            "apps/web/src/app/(app)/schedule/_components/ScheduleSessionDialogs.test.tsx"
+          ],
           "runtimeScenarios": [],
           "exclusions": []
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:3fe4966e497408d0a7d0c29c3f2227ca2315d9cab078ed23f60c101d76b0e30a"
     },
     {
       "id": "shift-requests",
@@ -452,7 +546,7 @@
       "publicRoute": "/features/shift-requests",
       "deliveryOwner": "40b",
       "lifecycle": "published",
-      "sourceReview": "pending",
+      "sourceReview": "verified",
       "audiences": [
         "user",
         "admin"
@@ -470,16 +564,46 @@
         {
           "id": "requests",
           "claims": [
-            "pending-source-review"
+            "pickup, swap and time off; pickup offers your own shift",
+            "web Drop shift and Swap; app shift detail; requester cancels while open or awaiting approval",
+            "statuses and their meanings; 72-hour expiry, may be unavailable",
+            "teammate accepts first for swaps and named pickups; approval publishes directly; party approver auto-approves",
+            "approved time off leaves the shift open; a published fill settles it",
+            "request board tabs and history filters; app Requests tabs and visibility",
+            "alerts on new, approved, rejected, expired",
+            "approval needs permission; Super Admin always"
           ],
           "sourceFiles": [
-            "apps/mobile/app/(tabs)/requests/index.tsx"
+            "packages/domain/src/requests.ts",
+            "packages/domain/src/shift-request-copy.ts",
+            "apps/web/src/components/ShiftRequestBoard.tsx",
+            "apps/web/src/components/ShiftEditPanel.tsx",
+            "apps/web/src/components/ShiftContextMenu.tsx",
+            "apps/web/src/app/api/schedule/requests/route.ts",
+            "apps/web/src/app/api/cron/expire-requests/route.ts",
+            "apps/web/src/features/notifications/server/sender.ts",
+            "supabase/migrations/001_schema.sql",
+            "supabase/migrations/029_cancel_shift_request_note.sql",
+            "supabase/migrations/030_auto_approve_shift_requests.sql",
+            "supabase/migrations/020_publish_repairs.sql",
+            "apps/mobile/src/features/shift-requests/screens/RequestsScreen.tsx",
+            "apps/mobile/src/features/auth/hooks/useTabsGate.tsx",
+            "apps/mobile/src/features/schedule/screens/ShiftDetailScreen.tsx",
+            "apps/web/src/components/dashboard/UserDashboard.tsx"
           ],
-          "testFiles": [],
+          "testFiles": [
+            "apps/web/src/__tests__/ShiftRequestBoard.test.tsx",
+            "apps/web/src/__tests__/auto-approve-shift-requests.integration.test.ts",
+            "apps/web/src/__tests__/finalize-scheduler-staffed-calloffs.integration.test.ts",
+            "packages/domain/src/shift-request-copy.test.ts",
+            "apps/web/src/app/api/cron/expire-requests/route.test.ts",
+            "apps/mobile/src/features/shift-requests/screens/RequestsScreen.test.tsx"
+          ],
           "runtimeScenarios": [],
           "exclusions": []
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:9bb6b3386d3f7ff00ca70e4d25778d5f62b3d33fe69e266d7fee7b24086cd15f"
     },
     {
       "id": "dashboard",
@@ -487,7 +611,7 @@
       "publicRoute": "/features/dashboard",
       "deliveryOwner": "40b",
       "lifecycle": "published",
-      "sourceReview": "pending",
+      "sourceReview": "verified",
       "audiences": [
         "management-only-user",
         "admin",
@@ -513,17 +637,44 @@
         {
           "id": "dashboard",
           "claims": [
-            "pending-source-review"
+            "dashboard varies by role; period controls",
+            "hero headlines and metric counts with their conditions",
+            "Super Admin and Admin cards; Admin review queue; expanded panels",
+            "setup checklist in the organization labels",
+            "User dashboard cards",
+            "management-only Users go to the Schedule",
+            "mobile Home by role; hidden for management-only Users"
           ],
           "sourceFiles": [
-            "apps/web/src/app/(app)/dashboard/page.tsx",
-            "apps/mobile/app/(tabs)/home/index.tsx"
+            "apps/web/src/components/dashboard/DashboardView.tsx",
+            "apps/web/src/components/dashboard/SuperAdminDashboard.tsx",
+            "apps/web/src/components/dashboard/AdminDashboard.tsx",
+            "apps/web/src/components/dashboard/UserDashboard.tsx",
+            "apps/web/src/components/dashboard/DashboardHeader.tsx",
+            "apps/web/src/components/dashboard/CoverageBySectionCard.tsx",
+            "apps/web/src/components/dashboard/OpenShiftsCard.tsx",
+            "apps/web/src/components/dashboard/ActivityFeed.tsx",
+            "apps/web/src/components/dashboard/ActionQueueCard.tsx",
+            "apps/web/src/components/dashboard/MyScheduleRow.tsx",
+            "apps/web/src/app/(app)/dashboard/DashboardPageContent.tsx",
+            "apps/web/src/components/Header.tsx",
+            "apps/mobile/src/features/dashboard/screens/AdminHomeScreen.tsx",
+            "apps/mobile/app/(tabs)/home/index.tsx",
+            "apps/mobile/src/features/auth/hooks/useTabsGate.tsx"
           ],
-          "testFiles": [],
+          "testFiles": [
+            "apps/web/src/components/dashboard/__tests__/AdminDashboard.test.tsx",
+            "apps/web/src/components/dashboard/__tests__/SuperAdminDashboard.test.tsx",
+            "apps/web/src/components/dashboard/__tests__/UserDashboard.test.tsx",
+            "apps/web/src/__tests__/dashboard-hero-metrics.test.ts",
+            "apps/mobile/src/features/dashboard/screens/AdminHomeScreen.test.tsx",
+            "apps/mobile/src/features/auth/hooks/useTabsGate.test.tsx"
+          ],
           "runtimeScenarios": [],
           "exclusions": []
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:2a806f5521f162ca2a9343607746959ccd13f85a790d180e593ae242e52f7e63"
     },
     {
       "id": "roster",

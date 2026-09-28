@@ -1,85 +1,65 @@
 ---
 title: "Schedule Grid"
-description: "The main scheduling interface, staff rows crossed with date columns, giving you a complete view of your organization's schedule."
+description: "Read and build the schedule: views, navigation, editing shifts, moving them, and printing."
 ---
 
-The schedule grid is where you will spend most of your time in DubGrid. Each row represents a staff member, and each column represents a date. Cells show the shift code assigned to that employee on that day.
+The **Schedule** tab shows your organization's schedule as a grid: people down the side, days across the top. Everyone sees the published schedule. People allowed to edit shifts also see and change drafts; see [Draft and publish](/features/draft-publish).
 
-## View modes
+## Reading the grid
 
-The grid supports three view modes. Use the view toggle in the toolbar to switch between them.
+- **Rows** are grouped by department and, inside each department, by focus area. Focus areas without a department sit under **Ungrouped**. Your own row is tinted and today's column is marked.
+- **Each section** ends with an **Open Shifts** row showing shifts that still need someone, and count rows for each kind of shift showing how many are scheduled against how many are needed.
+- **A cell** shows the person's shifts or off day. A person can hold more than one shift in a day.
+- **Schedule notes** appear as a small mark in the cell's corner; hover over it to read them.
 
-| Mode      | Description                                                             |
-| --------- | ----------------------------------------------------------------------- |
-| **1W**    | One-week view, seven columns, Sunday through Saturday                   |
-| **2W**    | Two-week view (default), fourteen columns across two consecutive weeks  |
-| **Month** | Calendar month view, shows the full calendar grid for the current month |
+If a period hasn't been published yet, people who can't edit the schedule see **This period has not been published yet** instead of drafts.
 
-## Navigating dates
+## Choosing what you see
 
-Use the date navigator buttons in the toolbar to move through time:
+Use the toolbar above the grid:
 
-- **Back** - moves backward by one full view span (one week, two weeks, or one month)
-- **Today** - jumps directly to the period containing today's date
-- **Forward** - moves forward by one full view span
+| Control                            | What it does                                                                                                                   |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **1 Week**, **2 Weeks**, **Month** | How much of the schedule to show. Two weeks is the default; on a narrower screen the grid shows one week at a time.            |
+| Arrows and **Today**               | Move back or forward a whole period, or jump to the current one. Two-week periods line up with your organization's pay period. |
+| Focus area tabs                    | Show **All** or one focus area. The tabs appear when your organization has more than one.                                      |
+| **Sort Staff**                     | Order people by **Seniority** or **Alphabetical**.                                                                             |
+| Search                             | Highlight the people whose names match.                                                                                        |
+| **Coverage**                       | Open the coverage summary, with a count of gaps, if you can see dashboard analytics.                                           |
 
-Today's date column is always highlighted so you can orient yourself at a glance.
+Weeks start on Sunday. The **Month** view is for reading; switch to a week view to make changes. On a phone-sized screen the web app shows one day at a time.
 
-## Editing a shift
+## Editing shifts
 
-<Steps>
-  <Step title="Click a cell">
-    Click any cell in the grid to open the **Shift Edit Panel** on the right side of the screen. The
-    panel shows the employee name and date for context.
-  </Step>
-  <Step title="Select a shift code">
-    Choose a shift code from the list of your organization's configured codes. You can also select
-    multiple codes for split or multi-part shifts. To clear a shift, select **OFF** or remove all
-    codes.
-  </Step>
-  <Step title="Set custom times (optional)">
-    Adjust the start and end times for the shift if the defaults don't apply. Custom times override
-    the shift code's default schedule.
-  </Step>
-  <Step title="Save">
-    Changes save automatically as drafts. The cell updates immediately and shows a visual draft
-    indicator.
-  </Step>
-</Steps>
+You need permission to edit shifts. Every change you make is a draft until it's published.
 
-<Tip>
-  All edits are saved as drafts and are not visible to staff until you publish them. See [Draft &
-  Publish](/features/draft-publish) for details.
-</Tip>
+- **Add or change a shift**: select a cell. The panel lists your organization's shifts grouped by job, plus off-day options. Adjust the times if this shift is different, then select **Confirm**. **Undo** reverts what you changed in the panel.
+- **Remove a shift**: in the panel, select **Remove shift** (or **Remove all shifts** or **Remove off day**) and confirm.
+- **Right-click a cell** for **Copy Entry**, **Paste Entry**, and **Remove Entry**. Pasting over an existing entry asks before replacing it. <kbd>Cmd</kbd> or <kbd>Ctrl</kbd> with <kbd>C</kbd> and <kbd>V</kbd> copy and paste too.
+- **Drag and drop**: drag a shift to another cell to move it, or hold <kbd>Shift</kbd> while dragging to copy it. The shift you drop replaces what was there. DubGrid checks that the person can work that shift first.
+- **Schedule notes**: add or remove them in the panel's **Schedule notes** section, if you can edit notes.
+- **Repeating shifts**: set a shift to repeat from the panel's **Repeating** section. See [Recurring shifts](/features/recurring-shifts).
 
-## Drag and drop
+The panel's **Created by** and **Updated by** lines show who last touched a shift.
 
-You can move a shift from one employee or date to another by dragging:
+## Filling open shifts
 
-1. Click and hold a shift cell until it lifts.
-2. Drag it to the target cell, a different employee row, a different date column, or both.
-3. Release to drop. The move is saved as a draft immediately.
+If you can edit shifts, select a shift in an **Open Shifts** row to see the people who can take it: those with the right focus area, role, and certification, and no absence or overlapping shift that day. Choose someone to put them on it as a draft.
 
-If the target cell already has a shift, the move replaces it (as a draft).
+People who can't edit the schedule can offer to take an open shift instead; their manager approves it. See [Shift requests](/features/shift-requests).
 
-## Focus area filter
+## More tools
 
-The toolbar includes a **Focus Area** filter that lets you narrow the grid to a specific section of your facility. Select **All** to see every staff member, or choose any configured focus area (wing, department, or section) to show only the employees assigned there.
+The **Tools** menu holds the rest, depending on what you're allowed to do:
 
-Your organization may use a custom label for focus areas, the filter label in the toolbar reflects that terminology.
+- **Requests**: the shift request board.
+- **Print**: choose the view, font size, and focus areas, then **Preview & Print**. The printout includes a legend for your shifts and schedule notes. Printing may not be available in every organization.
+- **Export CSV** and **Publish History**, for people who edit shifts.
+- **Auto Fill**: fill empty cells from recurring schedules.
+- **Import Previous Schedule**: copy the previous period into this one as drafts.
+- **Bulk Delete Entries**: select many entries at once and review them before removing them. Available on a desktop-sized screen in the week views.
+- **Authors**: show who made each draft change.
 
-## Staff search
+## On the DubGrid app
 
-While a focus area is active, use the **Search** field in the toolbar to filter the visible staff rows by name. The grid highlights matching employees as you type.
-
-## Printing
-
-DubGrid generates a print-optimized layout for your schedule.
-
-1. Click the **Print** button in the toolbar.
-2. In the **Print Options** dialog, select which focus areas to include.
-3. Choose the date range to print.
-4. Configure additional options such as orientation and whether to include the shift code legend.
-5. Click **Print** to send to your printer or save as a PDF.
-
-The printed output includes your organization name, the date the schedule was printed, and the selected date range. Shift codes are shown with their colors, and a legend appears at the bottom.
+The app's **Schedule** tab shows the team's schedule, and selecting a shift opens its details. From your own shift you can **Drop shift** (offer it for pickup or call off) or **Swap**. Building and publishing the schedule happen on the web.
