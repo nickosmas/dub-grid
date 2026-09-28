@@ -64,13 +64,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** Keep it off in production. Before turning it on, either send Supabase's reauthentication nonce with the update or have the authenticator-code step-up issue a fresh session; then set local and production alike.
 **Resolution:**
 
-### F-73 [P2] fixed - Production Supabase accepts public sign-ups on an invite-only product
+### F-73 [P2] closed - Production Supabase accepts public sign-ups on an invite-only product
 
 **File:** `supabase/config.toml:165` (`enable_signup = true`); production auth config (`disable_signup: false`, read 2026-09-26)
 **Found:** 2026-09-26 during the email review (read-only Management API read)
 **Why it matters:** `internal/authentication.md` and `RBAC_SYSTEM_DESIGN.md` say email sign-up is off in production, but it is on. Anyone with the public publishable key can create and confirm an account through `/auth/v1/signup`, or through a sign-in link request, which also creates a missing user while sign-ups are open. The account has no organization, so RLS should still hide tenant data, but every RPC granted to `authenticated` becomes reachable by strangers.
 **Suggested fix:** Set `disable_signup: true` on production (dashboard or Management API). Only `/api/invitations/register` creates accounts, through `auth.admin.createUser`, which ignores the setting. Local `config.toml` stays open for the integration tests that call `signUp`. Consider having `auth:templates:check` report the setting so it cannot drift again.
-**Resolution:** Production set to `disable_signup: true` through the Management API on 2026-09-26 (read back true; email sign-in and confirmation unchanged). Local `config.toml` stays open for the integration tests. The drift check in `auth:templates:check` is not added yet. Re-review (2026-09-28): not closed. Confirming it needs a production Auth read, which the agent cannot make; it stays `fixed` until the owner confirms Authentication > Sign In / Providers shows new sign-ups disabled, or `auth:templates:check` reports the setting.
+**Resolution:** Production set to `disable_signup: true` through the Management API on 2026-09-26 (read back true; email sign-in and confirmation unchanged). Local `config.toml` stays open for the integration tests. The drift check in `auth:templates:check` is not added yet. Re-review 2026-09-28 (`/audit`, read-only Management API read): production reports `disable_signup: true` with email sign-in still enabled; closed. The suggested drift check in `auth:templates:check` remains optional.
 
 ### F-75 [P3] open - Database functions still let a stale Gridmaster token edit organization data
 
@@ -182,4 +182,12 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Found:** 2026-09-28 by `/audit` (scope: fix/person-page-follow-ups; lens: performance)
 **Why it matters:** `CREATE INDEX` without `CONCURRENTLY` blocks inserts into `audit_log` for the length of the build, and every audited action writes there. Harmless at today's sizes, but production's row count was not measured.
 **Suggested fix:** Read production's `audit_log` row count (read-only) during the release rehearsal and time the build on the scratch stack; if it is more than a few seconds, build the index `CONCURRENTLY` outside the migration transaction.
+**Resolution:**
+
+### F-113 [P3] open - FitText no longer resets for a label passed as elements
+
+**File:** `apps/mobile/src/shared/components/FitText.tsx:66`
+**Found:** 2026-09-28 by `/audit` (scope: `FitText`, `AuthField` at 3715cc49; all lenses)
+**Why it matters:** the fix in 08292520 remounts the fitting logic keyed on the label's text, and element children key as an empty string, so a label given as elements that later grows would keep a shrink measured for the earlier one. No caller does this today: every `Button` passes a string `label` and nothing else renders `FitText`.
+**Suggested fix:** narrow `FitText`'s `children` to `string | number` so the case cannot arise, or key element children by a caller-supplied `labelKey`.
 **Resolution:**
