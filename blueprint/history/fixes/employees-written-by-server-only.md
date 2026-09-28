@@ -82,6 +82,14 @@ same search at the release commit).
 - Manual (optional): as an Admin, edit, deactivate, reactivate and remove a
   staff member on the People page; each works as before.
 
+Release: migration 065 applied to production 2026-09-28 by the owner, ahead of
+the release that carries it, after a scratch rehearsal from 064 (applied from
+`bd41a900`, so 066 was not included). Before: 64 ledger entries, 065 and 066
+missing; latest backup 2026-09-27 13:36:38 UTC. After: 65 ledger entries, none
+missing against `bd41a900`, every invariant passing, health 200. On the
+rehearsal, `authenticated` could no longer update or delete `employees` and
+the service role still could.
+
 ## Findings
 
 ### employees-written-by-server-only/F-100 [P1] closed - An Admin can remove or edit a Super Admin's staff record through the data API
