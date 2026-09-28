@@ -7,13 +7,13 @@
 > finding is `open` or `fixed`, then archives resolved findings with the work
 > and resets this file.
 
-### F-18 [P3] unverified - The live MFA-policy integration test can lose its verified session under full-suite load
+### F-18 [P3] fixed - The live MFA-policy integration test can lose its verified session under full-suite load
 
 **File:** `apps/web/src/__tests__/mfa-enforced-in-policies.integration.test.ts:110`
 **Found:** 2026-09-25 during 41b3's final gate (full `npm run test`)
 **Why it matters:** The challenge verify returned no session once in a full run and passed in isolation (1/1). A TOTP window rollover or local Auth rate limit under parallel live tests are the likely causes; unproven.
 **Suggested fix:** Generate the code for the verify moment and retry once on a window edge, or run the live tests serially.
-**Resolution:**
+**Resolution:** Seen again 2026-09-28 in a full `test:web` and passing alone. Fixed with the owner's approval (fix/mfa-policy-test-flake): the test answers the challenge through `answerChallenge`, which waits out a TOTP window edge before computing the code and, if the answer is refused, retries once in the next window with a fresh code. A second refusal fails with the auth server's error. It passed three runs in a row alone.
 
 ### F-62 [P2] open - Turning on `secure_password_change` would refuse password changes for two-factor users on sessions older than a day
 
