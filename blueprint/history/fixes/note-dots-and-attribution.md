@@ -103,3 +103,11 @@ Decided with the owner 2026-09-28 from previews: dots are replaced by sticky-not
 - **Browser (local, `qa-super-admin@dubgrid.test`):** the grid at 100% and 110%, light and dark, showed single, draft and stacked marks. On Kenneth Crawford's Evening and Night double shift, notes added through the shift panel landed on their own pills and were saved with the QA account as author. The publish dialog listed them under "Your drafts", and "Discard my drafts" removed exactly those five drafts, leaving another session's six untouched.
 - **Found on the way:** the panel files each note under its shift's own focus area, so a cross-focus pill looked in the wrong place; each pill now looks under its shift's focus area. A single cross-focus shift still looks under the section's focus area (outside this spec, unverified).
 - **Migration:** written as `065`, renumbered to `068` because `065`, `066` and `067` went to other work in the meantime. Production must apply `067` then `068`, each rehearsed from the live ledger first, before the release merges.
+
+Release: migration 068 applied to production 2026-09-28 by the owner, right
+after 067 and ahead of the release that carries them (#123), after a scratch
+rehearsal from 066 whose inspector report matched production's line for line
+(applied from `86b6bbad`). Preconditions read on production first: no note
+without a shift, no non-integer `indicatorTypeId` in `audit_log`, and no note
+left for the author backfill. Latest backup 2026-09-28 13:41:39 UTC. After: 68
+ledger entries, none missing, every invariant passing, health 200.

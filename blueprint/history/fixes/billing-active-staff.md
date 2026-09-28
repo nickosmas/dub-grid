@@ -158,3 +158,14 @@ Reported 2026-09-28 by the owner.
   GROUP BY o.id, o.name
   ORDER BY o.name;
   ```
+
+Release: migration 067 applied to production 2026-09-28 by the owner, together
+with 068 and ahead of the release that carries them (#123), after a scratch
+rehearsal from 066 whose inspector report matched production's line for line
+(applied from `86b6bbad`). Before: 66 ledger entries, only 067 and 068 missing;
+latest backup 2026-09-28 13:41:39 UTC. The backfill preview, read on production
+first, found 18 leavers across seven organizations, of which 34 future published
+shifts became pending removals (6 of them in Arden Wood, 28 in the seeded
+organizations) and nothing else to clear: no unpublished cells, past drafts,
+templates, series or open requests. After: 68 ledger entries, none missing,
+every invariant passing, health 200.
