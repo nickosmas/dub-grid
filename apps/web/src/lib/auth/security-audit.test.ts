@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   insert: vi.fn(),
   loggerError: vi.fn(),
+  loggerWarn: vi.fn(),
   rpc: vi.fn(),
 }));
 
@@ -16,7 +17,10 @@ vi.mock("@/lib/supabase-service", () => ({
   }),
 }));
 vi.mock("@/lib/logger", () => ({
-  default: { error: (...args: unknown[]) => mocks.loggerError(...args) },
+  default: {
+    error: (...args: unknown[]) => mocks.loggerError(...args),
+    warn: (...args: unknown[]) => mocks.loggerWarn(...args),
+  },
 }));
 
 import { recordSignInOnce, writeSecurityAuditEvent } from "./security-audit";
@@ -93,15 +97,34 @@ describe("recordSignInOnce", () => {
     await expect(recordSignInOnce(input)).resolves.toBe(false);
   });
 
-  it("answers no when the call only runs past its deadline, which still records (F-127)", async () => {
+  it("asks once more after a deadline, whose answer the lock makes safe (F-127, F-130)", async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.rpc
+        .mockReturnValueOnce(new Promise(() => undefined))
+        .mockResolvedValueOnce({ data: true, error: null });
+      const pending = recordSignInOnce(input);
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      await expect(pending).resolves.toBe(true);
+      expect(mocks.rpc).toHaveBeenCalledTimes(2);
+      // A recovered first attempt is a warning, not a failure.
+      expect(mocks.loggerWarn).toHaveBeenCalledOnce();
+      expect(mocks.loggerError).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("answers no, without a direct write, when both calls run past their deadline", async () => {
     vi.useFakeTimers();
     try {
       mocks.rpc.mockReturnValue(new Promise(() => undefined));
       const pending = recordSignInOnce(input);
-      await vi.advanceTimersByTimeAsync(1_000);
+      await vi.advanceTimersByTimeAsync(2_000);
 
       await expect(pending).resolves.toBe(false);
-      expect(mocks.insert).not.toHaveBeenCalled();
+      expect(mocks.rpc).toHaveBeenCalledTimes(2);
     } finally {
       vi.useRealTimers();
     }

@@ -118,27 +118,3 @@
 **Why it matters:** in an `env.*` module every indented `UPPER_CASE:` key is recorded as a declared environment key, not only properties of the Zod schema. Every current match is a real schema key, so nothing is wrong today; a lookup table with uppercase keys in an env module would add phantom keys that then fail classification.
 **Suggested fix:** read keys only from the object literal passed to `z.object(...)` (the TypeScript AST the route parser already uses), or accept the unclassified-key failure as the guard.
 **Resolution:**
-
-### F-127 [P3] fixed - A sign-in record that runs past its deadline is written again by the fallback
-
-**File:** `apps/web/src/lib/auth/security-audit.ts:89` (`recordSignInOnce`); `apps/web/src/lib/auth/sign-in-completion.ts:78`
-**Found:** 2026-09-28 by an independent `/audit` re-review of F-25
-**Why it matters:** `withTimeoutOrThrow` abandons the RPC without cancelling it, so on a timeout `recordSignInOnce` answered null and `recordCompletedSignIn` wrote directly while the RPC could still commit its own row: two success rows for one call, most likely under the load F-78 observed.
-**Suggested fix:** Fall back only on a returned error, not on a timeout; test an RPC that settles after the deadline.
-**Resolution:** Fixed in fix/audit-follow-ups: a `TimeoutError` answers false (the call is still running and records), so only a returned error falls back to the direct write. A test holds the RPC past its deadline and asserts no direct write.
-
-### F-128 [P3] fixed - An element Button label scales to 1.5x instead of the compact 1.2x
-
-**File:** `apps/mobile/src/shared/components/Button.tsx:260`
-**Found:** 2026-09-28 by an independent `/audit` re-review of F-113
-**Why it matters:** 2ac009c3 moved element labels to a plain `Text` with `maxFontSizeMultiplier={MAX_FONT_SCALE}` and no `fit`, so they could grow to 1.5x where every button label is capped at `MAX_FONT_SCALE_COMPACT`. Latent: no caller passes an element label.
-**Suggested fix:** `fit="compact"` on that `Text`, asserted in `Button.test.tsx`.
-**Resolution:** Fixed in fix/audit-follow-ups: the `Text` takes `fit="compact"`. The native test stub now exposes `maxFontSizeMultiplier` as `data-max-font-size-multiplier` (it dropped the prop), and the element-label test asserts 1.2; it fails against 2ac009c3's `Button`.
-
-### F-129 [P3] fixed - 074's header says it records an invitation's first password
-
-**File:** `supabase/migrations/074_password_change_recorded.sql:8`; `blueprint/history/fixes/password-change-recorded.md:13`
-**Found:** 2026-09-28 by an independent `/audit` re-review of F-05
-**Why it matters:** The normal invitation path creates the user with its password (an insert), so the update trigger does not fire; only the abandoned-unconfirmed branch (`updateUserById`) is recorded. The behaviour is right (a first password is not a change), but the checksum-locked header and the archive claim otherwise.
-**Suggested fix:** Correct the wording while 074 is unapplied on production, or at least correct the archive.
-**Resolution:** Fixed in fix/audit-follow-ups: the archive now names the paths the trigger records and says the header overstates the invitation path. 074 itself is left unchanged: it was already on origin/dev and may be in the production rehearsal, and changing a checksum-locked file under that would do more harm than the comment.

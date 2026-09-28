@@ -65,7 +65,9 @@ export function sessionHashOf(accessToken: string): string | null {
 /**
  * Records a completed sign-in against the organization the finished session is
  * actually in, once per Auth session: a repeat call for the same session,
- * even a concurrent one, records nothing. Returns whether it recorded.
+ * even a concurrent one, records nothing. Returns whether this call is known
+ * to have recorded it: false can also mean a record still in flight, or one a
+ * timed-out first attempt made before its retry found it.
  */
 export async function recordCompletedSignIn(input: {
   userId: string;

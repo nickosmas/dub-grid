@@ -81,28 +81,41 @@ export async function writeSecurityAuditEvent(input: SecurityAuditEvent): Promis
  * record (a completed sign-in, or the replacement session a reauthentication
  * issued), checked and written in one locked step in the database (073,
  * F-25). Null when the call fails, so the caller can still record it:
- * recording a sign-in twice beats losing it. A call that only runs past the
- * deadline is not cancelled and still records, so it answers no rather than
- * handing the caller a second write (F-127).
+ * recording a sign-in twice beats losing it.
+ *
+ * A call past its deadline is abandoned, not cancelled, so it may still
+ * record; a direct write then would duplicate it (F-127). It is asked once
+ * more instead: under the lock the second call either finds the first call's
+ * row or writes the only one, so a first call that never reached the
+ * database is not lost either (F-130).
  */
 export async function recordSignInOnce(input: {
   actorId: string;
   orgId: string | null;
   metadata: SecurityEventMetadata & { sessionHash: string };
 }): Promise<boolean | null> {
-  try {
-    const call = Promise.resolve(
-      getServiceClient().rpc("record_sign_in_once", {
-        p_actor_id: input.actorId,
-        p_org_id: input.orgId,
-        p_details: input.metadata,
-      }),
-    );
-    const { data, error } = await withTimeoutOrThrow(call, 1_000, "security audit sign-in record");
-    if (error) throw error;
-    return data === true;
-  } catch (error) {
-    logger.error({ error }, "Security audit sign-in record failed");
-    return error instanceof TimeoutError ? false : null;
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      const call = Promise.resolve(
+        getServiceClient().rpc("record_sign_in_once", {
+          p_actor_id: input.actorId,
+          p_org_id: input.orgId,
+          p_details: input.metadata,
+        }),
+      );
+      const { data, error } = await withTimeoutOrThrow(
+        call,
+        1_000,
+        "security audit sign-in record",
+      );
+      if (error) throw error;
+      return data === true;
+    } catch (error) {
+      const retrying = error instanceof TimeoutError && attempt === 1;
+      if (retrying) logger.warn({ error }, "Security audit sign-in record timed out; retrying");
+      else logger.error({ error, attempt }, "Security audit sign-in record failed");
+      if (!(error instanceof TimeoutError)) return null;
+      if (attempt === 2) return false;
+    }
   }
 }
