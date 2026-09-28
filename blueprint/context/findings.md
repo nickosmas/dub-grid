@@ -183,3 +183,27 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Why it matters:** the fix in 08292520 remounts the fitting logic keyed on the label's text, and element children key as an empty string, so a label given as elements that later grows would keep a shrink measured for the earlier one. No caller does this today: every `Button` passes a string `label` and nothing else renders `FitText`.
 **Suggested fix:** narrow `FitText`'s `children` to `string | number` so the case cannot arise, or key element children by a caller-supplied `labelKey`.
 **Resolution:** Fixed in fix/fittext-string-labels: `FitText`'s `children` is now `string | number`, so the element case cannot compile, and `Button` sends an element label down a plain one-line, truncating `Text` instead. `Button.test.tsx` proves an element label never reaches `FitText`; type-check and the 30 shared component test files (193 tests) pass.
+
+### F-120 [P3] fixed - The docs tests miss the error paths and assert loosely
+
+**File:** `apps/web/src/__tests__/docs-contract.test.ts`; `apps/web/src/__tests__/docs-inventory.test.ts:419`
+**Found:** 2026-09-28 by `/audit` (scope: current, 1b86aad5..1cc2be3e; lens: tests)
+**Why it matters:** untested: duplicate id or route, unknown surface, missing rationale, verified page without a fingerprint, fingerprint mismatch, unregistered or missing page, nested nav groups, and `checkDocumentationContract` end to end. The first contract test compares only the set of rule names, the `requireClosed` test never shows a closed contract passing, and "classifies environment names without reading values" never asserts the value is absent from the output.
+**Suggested fix:** add those cases, including the fixtures behind F-114 to F-118, assert exact diagnostics, and assert the example value is absent from `renderInventoryJson`.
+**Resolution:** Fixed across 40a steps 4 to 6: fixture cases for each contract rule, the unclassified script and job, every env read form, `ALTER TABLE ONLY` and multi-table drops, a contract that genuinely closes, exact diagnostic lists, and the env value's absence; each new rejection case fails against the previous scripts. The re-review found gaps left (a valid lifecycle used as the invalid case, untested unknown surface, missing rationale, missing fingerprint, missing file and nested navigation); a follow-up test now asserts each with an exact diagnostic list. `checkDocumentationContract` end to end remains covered only by the real `docs:check` run.
+
+### F-121 [P3] unverified - Latent inventory parser traps
+
+**File:** `scripts/documentation/inventory.ts:531` (`resolveSourceModule`), walk helpers; `scripts/documentation/check.ts:84`
+**Found:** 2026-09-28 by `/audit` (scope: current, 1b86aad5..1cc2be3e; all lenses)
+**Why it matters:** each needs a real source to trigger it: an `@/` import in Settings would make the digest read a nonexistent path and crash; a `page.tsx` or `route.ts` under a Next private (`_x`) or `@slot` folder would count as a route; `statSync` follows symlinks, so a loop recurses; untracked local files feed the inventory, so `docs:check` can fail locally but pass in CI; with no `.gitattributes`, a CRLF checkout fails frontmatter parsing and the byte compare.
+**Suggested fix:** resolve aliases through tsconfig paths, skip private and slot folders, walk with `lstat` and skip links, and add `* text=auto eol=lf` for the generated and docs files.
+**Resolution:**
+
+### F-122 [P3] unverified - The env-module declaration pattern could count any uppercase object key
+
+**File:** `scripts/documentation/inventory.ts` (`discoverEnvironmentKeys`, schema-property match)
+**Found:** 2026-09-28 by `/audit` (re-review of F-115 on feature/40a-docs-inventory)
+**Why it matters:** in an `env.*` module every indented `UPPER_CASE:` key is recorded as a declared environment key, not only properties of the Zod schema. Every current match is a real schema key, so nothing is wrong today; a lookup table with uppercase keys in an env module would add phantom keys that then fail classification.
+**Suggested fix:** read keys only from the object literal passed to `z.object(...)` (the TypeScript AST the route parser already uses), or accept the unclassified-key failure as the guard.
+**Resolution:**

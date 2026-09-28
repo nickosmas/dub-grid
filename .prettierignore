@@ -13,3 +13,4 @@ package-lock.json
 apps/mobile/ios/
 apps/mobile/android/
 apps/web/src/lib/database.types.ts
+internal/documentation/generated/
