@@ -117,11 +117,16 @@ WITH org_tables_without_rls AS (
   UNION ALL
   -- 020 also stops publish_schedule casting a pipe-delimited per-segment time
   -- to TIME, which failed the publish of a double shift with both segments
-  -- timed.
+  -- timed. Since 075 the body lives in publish_schedule_unguarded behind a
+  -- wrapper, so read that when it exists.
   SELECT 'publish_schedule_split_times',
-         pg_get_functiondef(to_regprocedure('public.publish_schedule(uuid,date,date,uuid)'))
+         pg_get_functiondef(COALESCE(
+           to_regprocedure('public.publish_schedule_unguarded(uuid,date,date,uuid)'),
+           to_regprocedure('public.publish_schedule(uuid,date,date,uuid)')))
            LIKE '%split_part(COALESCE(c->>''toCustomStart''%',
-         CASE WHEN pg_get_functiondef(to_regprocedure('public.publish_schedule(uuid,date,date,uuid)'))
+         CASE WHEN pg_get_functiondef(COALESCE(
+                     to_regprocedure('public.publish_schedule_unguarded(uuid,date,date,uuid)'),
+                     to_regprocedure('public.publish_schedule(uuid,date,date,uuid)')))
                    LIKE '%split_part(COALESCE(c->>''toCustomStart''%'
               THEN 'repaired' ELSE 'casts delimited times to TIME' END
 )
