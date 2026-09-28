@@ -4,6 +4,8 @@ const checkRateLimit = vi.fn();
 const getServiceClient = vi.fn();
 const createClient = vi.fn();
 const writeSecurityAuditEvent = vi.fn();
+const endUserSession = vi.fn();
+const verifyAccessToken = vi.fn();
 
 vi.mock("@/lib/rate-limit", () => ({
   checkRateLimit,
@@ -22,6 +24,14 @@ vi.mock("@/lib/supabase-service", () => ({
 
 vi.mock("@supabase/supabase-js", () => ({
   createClient,
+}));
+
+vi.mock("@/lib/auth/revocation", () => ({
+  endUserSession,
+}));
+
+vi.mock("@/lib/auth/verify-token", () => ({
+  verifyAccessToken,
 }));
 
 const DEFAULT_ORG_ID = "577a93d3-8f6a-4b45-a93d-b9731122ce11";
@@ -197,6 +207,32 @@ function createSessionClientMock(input?: {
         },
         error: null,
       }),
+    },
+  };
+}
+
+/**
+ * A login request whose client can be made to walk away mid-flight.
+ *
+ * The signal is defined on the request rather than passed to the constructor:
+ * jsdom's AbortSignal is a different class from the one undici's Request
+ * accepts, so RequestInit rejects it outright.
+ */
+function abandonedRequest() {
+  let aborted = false;
+  const request = new Request("http://localhost/api/mobile/v1/auth/login", {
+    method: "POST",
+    body: JSON.stringify({
+      orgSlug: "dubgrid-health",
+      email: "manager@dubgrid.com",
+      password: "super-secret",
+    }),
+  });
+  Object.defineProperty(request, "signal", { get: () => ({ aborted }) });
+  return {
+    request,
+    abandon: () => {
+      aborted = true;
     },
   };
 }
@@ -396,6 +432,94 @@ describe("mobile auth login route", () => {
         email: "manager@dubgrid.com",
       },
     });
+  });
+
+  it("discards the session and answers 504 when the phone has stopped waiting", async () => {
+    checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
+    getServiceClient.mockReturnValue(createServiceClientMock());
+    verifyAccessToken.mockResolvedValue({
+      userId: "8af6f242-c060-4920-a7db-91b4cb66fd26",
+      sessionId: "session-abandoned",
+    });
+
+    const { request, abandon } = abandonedRequest();
+    const sessionClient = createSessionClientMock();
+    // The phone gives up while the server is still signing in, which is the
+    // whole shape of F-78: the session gets made either way.
+    const signIn = sessionClient.auth.signInWithPassword;
+    sessionClient.auth.signInWithPassword = vi.fn(async (...args: Parameters<typeof signIn>) => {
+      abandon();
+      return signIn(...args);
+    });
+    createClient.mockReturnValue(sessionClient);
+
+    const { POST } = await import("./auth-login");
+    const response = await POST(request as never);
+    const payload = await response.json();
+
+    expect(response.status).toBe(504);
+    // No tokens: handing them back is what leaves the orphan behind.
+    expect(payload.session).toBeUndefined();
+    expect(endUserSession).toHaveBeenCalledWith(
+      "8af6f242-c060-4920-a7db-91b4cb66fd26",
+      "session-abandoned",
+    );
+    expect(writeSecurityAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({ clientGone: true, sessionDiscarded: true }),
+      }),
+    );
+  });
+
+  it("still answers 504 when the session cannot be discarded", async () => {
+    checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
+    getServiceClient.mockReturnValue(createServiceClientMock());
+    verifyAccessToken.mockResolvedValue({
+      userId: "8af6f242-c060-4920-a7db-91b4cb66fd26",
+      sessionId: "session-abandoned",
+    });
+    endUserSession.mockRejectedValue(new Error("provider unreachable"));
+
+    const { request, abandon } = abandonedRequest();
+    const sessionClient = createSessionClientMock();
+    const signIn = sessionClient.auth.signInWithPassword;
+    sessionClient.auth.signInWithPassword = vi.fn(async (...args: Parameters<typeof signIn>) => {
+      abandon();
+      return signIn(...args);
+    });
+    createClient.mockReturnValue(sessionClient);
+
+    const { POST } = await import("./auth-login");
+    const response = await POST(request as never);
+
+    // A cleanup failure must not turn into a 500 that hides the real outcome.
+    expect(response.status).toBe(504);
+    expect(writeSecurityAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({ clientGone: true, sessionDiscarded: false }),
+      }),
+    );
+  });
+
+  it("leaves a login the phone is still waiting for alone", async () => {
+    checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
+    getServiceClient.mockReturnValue(createServiceClientMock());
+    createClient.mockReturnValue(createSessionClientMock());
+
+    const { POST } = await import("./auth-login");
+    const response = await POST(
+      new Request("http://localhost/api/mobile/v1/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          orgSlug: "dubgrid-health",
+          email: "manager@dubgrid.com",
+          password: "super-secret",
+        }),
+      }) as never,
+    );
+
+    expect(response.status).toBe(200);
+    expect(endUserSession).not.toHaveBeenCalled();
   });
 
   it("returns an MFA-required login payload without rejecting verified TOTP users", async () => {

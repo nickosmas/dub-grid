@@ -67,6 +67,7 @@ import {
   type MobilePersonUpdateBody,
   type MobileScheduleRange,
   type MobileUpdateShiftRequestBody,
+  MOBILE_REQUEST_TIMEOUT_MS,
 } from "@dubgrid/contracts";
 import {
   ApiResponseError,
@@ -90,8 +91,6 @@ type SupabaseSessionLike = {
   expires_in: number;
   token_type: string;
 };
-
-const MOBILE_REQUEST_TIMEOUT_MS = 15_000;
 
 function getAuthEntryRequestKind(path: string): AuthEntryRequestKind | null {
   if (path === "/api/mobile/v1/auth/login") return "login";
