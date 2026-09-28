@@ -29,7 +29,10 @@
               "features/recurring-shifts",
               "features/real-time-collaboration",
               "features/shift-requests",
-              "features/dashboard"
+              "features/dashboard",
+              "features/alerts",
+              "features/reports",
+              "features/mobile-navigation"
             ]
           },
           {

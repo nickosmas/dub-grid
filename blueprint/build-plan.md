@@ -783,6 +783,16 @@
         notifications, privacy, data controls, billing, onboarding, and access
         behavior; preserve sensible URLs and add permanent redirects for the
         three replaced public pages.
+    - [x] 40c1. **Mobile navigation, alerts, and reports guides** - publish the
+          role-aware mobile navigation page with its deliberate web-only
+          boundaries, and the alerts and reports pages.
+    - [ ] 40c2. **Account guides** - publish the profile, security and sessions,
+          and notification, privacy, and data-control pages.
+    - [ ] 40c3. **Access, billing, and integrations references** - verify the
+          roles, Admin permissions, and billing pages, publish integrations
+          and exports, and permanently redirect the three replaced pages
+          (subscription into billing; API overview and calendar export into
+          integrations and exports).
   - [ ] 40d. **Current engineering, architecture, security, and operations
         references** - reconcile the living root and internal references plus
         app-specific `AGENTS.md` facts for architecture, RBAC, MFA and JWT

@@ -1233,16 +1233,16 @@
       "file": "docs/features/mobile-navigation.mdx",
       "publicRoute": "/features/mobile-navigation",
       "deliveryOwner": "40c",
-      "lifecycle": "planned",
-      "sourceReview": "pending",
+      "lifecycle": "published",
+      "sourceReview": "verified",
       "audiences": [
         "user",
         "admin"
       ],
       "platforms": {
         "web": "not-applicable",
-        "ios": "planned",
-        "android": "planned"
+        "ios": "required",
+        "android": "required"
       },
       "surfaceIds": [
         "mobile:layout:/(tabs):all",
@@ -1253,38 +1253,79 @@
       ],
       "sections": [
         {
-          "id": "navigation",
+          "id": "mobile",
           "claims": [
-            "planned-source-review"
+            "first-launch screens and notifications offer",
+            "organization, credentials and two-factor sign-in; invitations accepted on the web; forgot password by code",
+            "privacy, terms and two-factor re-setup prompts",
+            "tabs, their contents and who sees them; shift detail actions; alerts bell",
+            "app lock setting and lock screen",
+            "offline, tab error and organization unavailable states",
+            "switch organization and sign out",
+            "web-only areas and the open-on-web alert message"
           ],
           "sourceFiles": [
             "apps/mobile/app/_layout.tsx",
-            "apps/mobile/app/(tabs)/_layout.tsx"
+            "apps/mobile/app/index.tsx",
+            "apps/mobile/app/(tabs)/_layout.tsx",
+            "apps/mobile/app/(tabs)/home/index.tsx",
+            "apps/mobile/src/features/auth/hooks/useTabsGate.tsx",
+            "apps/mobile/src/features/auth/screens/LoginScreen.tsx",
+            "apps/mobile/src/features/auth/screens/ForgotPasswordScreen.tsx",
+            "apps/mobile/src/features/auth/screens/ResetPasswordScreen.tsx",
+            "apps/mobile/src/features/auth/screens/OrganizationLockedScreen.tsx",
+            "apps/mobile/src/features/auth/screens/NetworkConnectionRecoveryScreen.tsx",
+            "apps/mobile/src/features/auth/components/TwoFactorReenrollGate.tsx",
+            "apps/mobile/src/features/onboarding/screens/OnboardingScreen.tsx",
+            "apps/mobile/src/features/onboarding/components/NotificationReasons.tsx",
+            "apps/mobile/src/features/consent/components/ConsentGate.tsx",
+            "apps/mobile/src/features/consent/components/TermsGate.tsx",
+            "apps/mobile/src/shared/providers/AppLockProvider.tsx",
+            "apps/mobile/src/shared/providers/ToastProvider.tsx",
+            "apps/mobile/src/shared/components/AppLockSurface.tsx",
+            "apps/mobile/src/features/profile/screens/ProfileScreen.tsx",
+            "apps/mobile/src/features/profile/screens/ProfileSecurityScreen.tsx",
+            "apps/mobile/src/features/schedule/screens/ScheduleScreen.tsx",
+            "apps/mobile/src/features/schedule/screens/ShiftDetailScreen.tsx",
+            "apps/mobile/src/features/shift-requests/screens/RequestsScreen.tsx",
+            "apps/mobile/src/features/people/screens/PeopleScreen.tsx",
+            "apps/mobile/src/features/notifications/lib/openNotificationAction.ts",
+            "packages/domain/src/employment-status.ts",
+            "packages/client-errors/src/index.ts"
           ],
-          "testFiles": [],
+          "testFiles": [
+            "apps/mobile/src/features/auth/hooks/useTabsGate.test.tsx",
+            "apps/mobile/src/features/auth/screens/LoginScreen.test.tsx",
+            "apps/mobile/src/features/onboarding/screens/OnboardingScreen.test.tsx",
+            "apps/mobile/src/features/consent/components/ConsentGate.test.tsx",
+            "apps/mobile/src/shared/providers/AppLockProvider.test.tsx",
+            "apps/mobile/src/features/profile/screens/ProfileScreen.test.tsx"
+          ],
           "runtimeScenarios": [
-            "cold-start",
-            "deep-link"
+            "loaded",
+            "offline",
+            "error"
           ],
           "exclusions": []
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:f56271de4429a6e6a84907da3b44e47867942240ad7609fd88775a55d4456940"
     },
     {
       "id": "alerts",
       "file": "docs/features/alerts.mdx",
       "publicRoute": "/features/alerts",
       "deliveryOwner": "40c",
-      "lifecycle": "planned",
-      "sourceReview": "pending",
+      "lifecycle": "published",
+      "sourceReview": "verified",
       "audiences": [
         "user",
         "admin"
       ],
       "platforms": {
-        "web": "planned",
-        "ios": "planned",
-        "android": "planned"
+        "web": "required",
+        "ios": "required",
+        "android": "required"
       },
       "surfaceIds": [
         "web:/alerts",
@@ -1295,32 +1336,55 @@
         {
           "id": "alerts",
           "claims": [
-            "planned-source-review"
+            "selecting an alert marks it read and opens its subject; destination table",
+            "web bell: unread count, latest 20, mark all read, view all",
+            "alerts page toolbar, categories with billing for Super Admins, priority, sort, bulk and row actions",
+            "app alerts: bell, filters, search, swipe actions, subject navigation, web-only message, push taps",
+            "preferences by category; security alerts always on"
           ],
           "sourceFiles": [
-            "apps/web/src/app/(app)/alerts/page.tsx",
-            "apps/mobile/app/alerts/index.tsx"
+            "apps/web/src/components/NotificationBell.tsx",
+            "apps/web/src/app/(app)/alerts/AlertsInboxPage.tsx",
+            "packages/domain/src/alert-destination.ts",
+            "apps/web/src/features/notifications/server/sender.ts",
+            "apps/web/src/components/profile/NotificationPreferences.tsx",
+            "apps/mobile/src/features/notifications/screens/NotificationsScreen.tsx",
+            "apps/mobile/src/features/notifications/components/NotificationRow.tsx",
+            "apps/mobile/src/features/notifications/lib/openNotificationAction.ts",
+            "apps/mobile/src/features/notifications/hooks/usePushResponseHandler.ts",
+            "apps/mobile/src/shared/navigation/AlertsHeaderButton.tsx"
           ],
-          "testFiles": [],
+          "testFiles": [
+            "apps/web/src/components/NotificationBell.test.tsx",
+            "packages/domain/src/alert-destination.test.ts",
+            "apps/web/src/features/notifications/server/sender.categories.test.ts",
+            "apps/mobile/src/features/notifications/screens/NotificationsScreen.test.tsx",
+            "apps/mobile/src/features/notifications/lib/openNotificationAction.test.ts"
+          ],
           "runtimeScenarios": [
-            "deep-link"
+            "loaded",
+            "empty",
+            "error"
           ],
-          "exclusions": []
+          "exclusions": [
+            "platform and operator alert categories are internal"
+          ]
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:879681b003e375919ae8a6b807b66456e4b58f2c8da57fc36f551e3a71cd8f75"
     },
     {
       "id": "reports",
       "file": "docs/features/reports.mdx",
       "publicRoute": "/features/reports",
       "deliveryOwner": "40c",
-      "lifecycle": "planned",
-      "sourceReview": "pending",
+      "lifecycle": "published",
+      "sourceReview": "verified",
       "audiences": [
         "admin"
       ],
       "platforms": {
-        "web": "planned",
+        "web": "required",
         "ios": "not-applicable",
         "android": "not-applicable"
       },
@@ -1331,12 +1395,24 @@
         {
           "id": "reports",
           "claims": [
-            "planned-source-review"
+            "who can run reports; Admin default; may be unavailable; web only",
+            "report, range, filters, generate and refresh; pay period requirement; roster reports take no range",
+            "the fourteen reports; staff hours and staff activity columns; empty published message",
+            "PDF and CSV export once rows exist"
           ],
           "sourceFiles": [
-            "apps/web/src/app/(app)/reports/page.tsx"
+            "apps/web/src/app/(app)/reports/ReportsPageContent.tsx",
+            "apps/web/src/features/reports/client/api.ts",
+            "apps/web/src/features/reports/shared/table.ts",
+            "apps/web/src/components/Header.tsx",
+            "packages/authz/src/index.ts",
+            "apps/web/src/lib/permission-labels.ts",
+            "apps/web/src/app/api/reports/operations/export/route.ts"
           ],
-          "testFiles": [],
+          "testFiles": [
+            "apps/web/src/app/(app)/reports/ReportsPageContent.test.tsx",
+            "apps/web/src/features/reports/server/operations.test.ts"
+          ],
           "runtimeScenarios": [
             "loaded",
             "empty",
@@ -1344,7 +1420,8 @@
           ],
           "exclusions": []
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:824881127d8c58a463ab7cd1d4fa8f8692102e6dd1816c4050e26520d1dc4ead"
     },
     {
       "id": "profile",
