@@ -7,14 +7,6 @@
 > finding is `open` or `fixed`, then archives resolved findings with the work
 > and resets this file.
 
-### F-05 [P3] fixed - The password-change audit label is client-reported, and a failed sign-out leaves no record
-
-**File:** `apps/web/src/lib/auth/session-sign-out.ts:28`
-**Found:** 2026-09-25 by `/audit` (scope: current, 3c8b690c..3b6d908b; all lenses)
-**Why it matters:** Any assured user can record "Changed their password" on a global sign-out without changing anything, and a password change whose sign-out fails is not recorded at all. No access is gained either way.
-**Suggested fix:** Record the change independently of the client, which is the F-08 decision; until then the label is client-reported.
-**Resolution:** Fixed in fix/password-change-recorded, independently of the client as suggested, without deciding 41b2/F-08: migration `074_password_change_recorded.sql` adds an `AFTER UPDATE OF encrypted_password` trigger on `auth.users` that writes `security.auth.password` ("Changed their password") with the person as actor whenever the stored hash changes, by any path, so a change whose sign-out fails is still recorded. The client-labelled sign-out now reads "Signed out everywhere after a password change". `migration-074-password-change-recorded.integration.test.ts` proves one row per real change, none for an unchanged write, and no client grant; the registry test lists the trigger-written action. Not yet on production.
-
 ### F-18 [P3] unverified - The live MFA-policy integration test can lose its verified session under full-suite load
 
 **File:** `apps/web/src/__tests__/mfa-enforced-in-policies.integration.test.ts:110`
@@ -22,39 +14,6 @@
 **Why it matters:** The challenge verify returned no session once in a full run and passed in isolation (1/1). A TOTP window rollover or local Auth rate limit under parallel live tests are the likely causes; unproven.
 **Suggested fix:** Generate the code for the verify moment and retry once on a window edge, or run the live tests serially.
 **Resolution:**
-
-### F-20 [P3] fixed - Saving notification preferences can lose a concurrent save
-
-**File:** `apps/web/src/features/account/server/preferences.ts:31`
-**Found:** 2026-09-25 by `/audit` (scope: current, 0d010ca0..4d2b515c; all lenses)
-**Why it matters:** The save reads, merges and upserts in three steps, so a mobile save and a web save at the same moment can drop one another's change. Before 41c1 a mobile save erased the web categories every time.
-**Suggested fix:** Merge inside the database (`prefs = notification_preferences.prefs || excluded.prefs` in an RPC), which needs a migration.
-**Resolution:** Fixed in fix/notification-preferences-merge: migration `072_notification_preferences_merge.sql` adds `merge_notification_preferences`, a service-role-only insert-or-merge (`(stored.prefs || EXCLUDED.prefs) - 'security'`) in one statement under the conflict's row lock, and `saveNotificationPreferences` calls it. `migration-072-notification-preferences.integration.test.ts` proves the merge, that security is never stored, the grants, and that two concurrent saves on separate connections keep both categories. Not yet on production; the app needs 072 applied before it ships.
-
-### F-25 [P3] fixed - The once-per-session sign-in record is not atomic
-
-**File:** `apps/web/src/lib/auth/sign-in-completion.ts:61`
-**Found:** 2026-09-25 by `/audit` (scope: current, bdbbd4cc..8246596c; all lenses)
-**Why it matters:** Two concurrent completion calls can both read nothing and both write. The app's clients guard concurrent calls.
-**Suggested fix:** A partial unique index on `(actor_id, details->>'sessionHash')` for successes, which needs a migration.
-**Resolution:** Fixed in fix/sign-in-recorded-once: migration `073_record_sign_in_once.sql` adds `record_sign_in_once`, which checks for the session's success row and inserts it under a transaction advisory lock on the person and session hash (a lock rather than the suggested unique index, since existing rows may already hold duplicates). `recordSignInOnce` replaces `hasRecordedSignIn`, and `recordCompletedSignIn` writes directly only when that call fails or the session has no id. `migration-073-record-sign-in-once.integration.test.ts` proves two racing calls on separate connections leave one row, plus the reauthentication rule, the refusal and the grants. Not yet on production.
-
-### F-26 [P3] fixed - Two concurrent impersonation ends can both be recorded
-
-**File:** `apps/web/src/app/api/gridmaster/impersonation/route.ts:205`
-**Found:** 2026-09-25 by `/audit` (scope: current, bdbbd4cc..8246596c; all lenses)
-**Why it matters:** The row is read before `end_impersonation`, whose second call is a silent no-op, so both requests write `impersonation.ended`.
-Since 41c3 the route also sends the end notice, so a concurrent pair sends two emails as well.
-**Suggested fix:** Have the RPC return whether it ended a row (migration).
-**Resolution:** Fixed in fix/impersonation-end-once: migration `071_end_impersonation_reports_end.sql` recreates `end_impersonation` returning true only when its update ended the row (060's body otherwise, grants to `authenticated` and `service_role`), and the end route answers 404 and records and announces nothing on `false` (a `null` from a database before 071 still counts as ended). `migration-071-end-impersonation.integration.test.ts` proves two ends return true then false with one set of notices, plus 060's single escape row, 058's end time and the grants; a route test covers the `false` case; the 058 and 060 live tests drop the function before re-running their own files. Not yet on production.
-
-### F-50 [P3] fixed - Remaining drift-guard gaps
-
-**File:** `apps/web/src/__tests__/invitation-sql-contract.test.ts:41`; `access-token-hook-claims.test.ts`; `apps/web/src/emails/InviteEmail.tsx:72`; `apps/web/src/app/page.tsx:93`; `apps/web/src/__tests__/push-auth-templates.test.ts`
-**Found:** 2026-09-25 by `/audit` (scope: current, a4fa18a7..395a6e57; all lenses)
-**Why it matters:** The SQL messages are copied into the test rather than read from the route; `VerifiedClaims` and the api-auth `Claims` (which add `in_sandbox`) are not in the claim check; the 72 hours in invite and landing copy is not tied to `INVITATION_LIFETIME_HOURS`; the new tests assume they run from `apps/web`; and the push test mirrors the script's Management API field names, so a wrong name would pass.
-**Suggested fix:** Read the matched strings from the route; add `VerifiedClaims` with an `in_sandbox` allowance; derive the copy from the constant; use `supabaseMigrationsDir()`-style root resolution; check field names against the Management API schema in 41d3.
-**Resolution:** Fixed in fix/drift-guard-gaps: the invitation test reads the messages the route matches after `replace_pending_invitation_access` from the route itself (four today) and requires each in the function's latest `RAISE EXCEPTION`; the claim check adds `VerifiedClaims` and `api-auth`'s `Claims`, with Supabase's own claims as standard and `in_sandbox` as server-derived; the invite email and both landing lines use `INVITATION_LIFETIME_HOURS`; a `repoRootDir()` helper lets the three tests run from the root or `apps/web`; and `push-auth-templates.test.ts` checks every field the push can write against a fixture of the Management API's `UpdateAuthConfigBody` `mailer_*` properties (read 2026-09-28).
 
 ### F-62 [P2] open - Turning on `secure_password_change` would refuse password changes for two-factor users on sessions older than a day
 
@@ -79,14 +38,6 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Why it matters:** On a slow server (18.6 s observed under load) the phone gives up while the server finishes, so a session is created that the phone never receives, and Security lists an extra signed-in device until it is revoked or expires.
 **Suggested fix:** End the created session when the client has gone (for example, a short server-side deadline that signs the new session out), or let the next successful sign-in on that device replace the orphan.
 **Resolution:** Fixed in f3eb3fe0 (fix/mobile-login-orphan-session), taking the first option. The mobile login handler is `apps/web/src/features/mobile/server/routes/auth-login.ts`, not the web route the finding names. Past `MOBILE_LOGIN_SERVER_DEADLINE_MS` (the client timeout less one second), or once `req.signal` reports the client gone, it ends the session it just created and answers 504 rather than returning tokens nobody is waiting for; returning them is what leaves the orphan, so the two are decided together. The ending is `endUserSession` with the user and session ids read back from the token just minted, never a `signOut` on the ephemeral client, whose default global scope would sign the person out on every device. Cleanup is best effort and its outcome is recorded as `sessionDiscarded`, since a sign-in already too slow to use must not also fail on tidying up. `MOBILE_REQUEST_TIMEOUT_MS` moved into `@dubgrid/contracts` because the server has to stay under the client's value and two copies would drift. The handler now changes a session, so `MOBILE_DELEGATES` classifies it with assertions pinning that the only session it can end is the one it just created for that request; a sensitive-action gate would be circular on the endpoint that mints the caller's first token (the findings session agreed). Three route tests cover the abandoned sign-in, a cleanup failure still answering 504, and a normal sign-in ending nothing. Not verified against a real slow server: the 18.6 s case came from a loaded Android rehearsal and was not reproduced.
-
-### F-101 [P2] fixed - A terminate whose session ending fails is never audited and cannot be retried
-
-**File:** `apps/web/src/app/api/gridmaster/users/[userId]/terminate/route.ts:62-87`
-**Found:** 2026-09-28 by `/audit` (scope: fixed-finding re-review at 1924880c; all lenses), reviewing F-89
-**Why it matters:** `terminate_user_account` commits (it writes no audit row itself), then F-89's `endUserSessions` runs before the `user.terminated` audit write. If ending sessions fails, the route answers 500 with no audit row, and a retry is refused with "This account is already terminated" (`021_platform_account_termination.sql:366`), so the termination is never recorded or finished. The hook still blocks refresh for a terminated account, so the exposure is the missing record of a high-risk action, not access.
-**Suggested fix:** Write the audit row right after the RPC and before `endUserSessions`, or catch that failure, log it, record `sessionsEnded: false` and still write the audit; a route test where `endUserSessions` rejects.
-**Resolution:** Fixed in fix/terminate-sessions-audited: once `terminate_user_account` succeeds, the route ends sessions inside its own `try`, logs a failure, and always writes `user.terminated` with `sessionsEnded` in its details, then answers 200 with `sessionsEnded`. The person page shows a warning pointing at Force logout (offered on a terminated account) when it is false. Route tests cover `endUserSessions` rejecting (audited with `sessionsEnded: false`, 200) and the audit write itself failing (500); a view test covers the warning.
 
 ### F-102 [P3] closed - Two-factor reset follow-ups
 
@@ -120,38 +71,6 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** strip keys matching a hash, IP or user-agent pattern at any depth (or an allowlist per action), lowercase the id at the route, and say in the card when the session list was capped.
 **Resolution:** Fixed in fix/person-page-audit-follow-ups (step 2): `withoutNetworkDetails` now drops, at any depth of `details` (objects and arrays), every key whose name ends in `hash`, is `ip`, starts with `ipaddr` or contains `useragent` once case, `_` and `-` are ignored; `loadPersonHistory` lowercases a user target's id before querying and before the F-87 comparison. The cap needed no change: the card already warns the history is partial whenever any source, the impersonation sessions included, returned its full read. Tests with nested and renamed keys and an uppercase id fail against the old code. Closed 2026-09-28 by `/audit` of 2a02d54c: network keys are dropped at any depth and the account id is lowercased before the F-87 comparison. Every current writer (`employees/identity`, `employees/manage`, `employees/status`, `organizations/access`) stores the IP in the `ip_address` column, which is dropped too; a future camelCase key such as `clientIp` would not match, which no writer uses today.
 
-### F-106 [P3] fixed - The Month view's other-area merge reads every focus area and can land in a hidden section
-
-**File:** `apps/web/src/components/MonthView.tsx:461`, `:482`; `apps/web/src/__tests__/MonthView.test.tsx:134`
-**Found:** 2026-09-28 by `/audit` (scope: fixed-finding re-review at 1924880c; all lenses), reviewing F-82
-**Why it matters:** the merge walks every focus area in the organization, not the person's own (`(areas + 1)` lookups per person per day across the grid on every notes change); with a focus-area filter the extra notes can go to a first row in a filtered-out section and not show; dedup keys on state, so one note filed as `published` in one area and `draft_added` in another shows two marks. Tests miss the no-area note, the filter and the row-bearing area.
-**Suggested fix:** walk `emp.focusAreaIds` plus no-area, pick the first visible row, dedup on the type, and add the three cases.
-**Resolution:** Fixed in fix/month-view-note-merge: the merge walks the person's own `focusAreaIds` plus no area (skipping areas where they already have a row), lands on their first row the focus-area filter leaves visible, and deduplicates on the note type. `MonthView.test.tsx` adds a no-area note, own-areas-only, the filter and one-mark-per-type cases; the last three fail against the previous code.
-
-### F-107 [P3] fixed - Gridmaster realtime follow-ups
-
-**File:** `apps/web/src/hooks/useGridmasterRealtimeInvalidation.ts:267`; `packages/realtime-core/src/debounced-flusher.ts`; `apps/web/src/__tests__/gridmaster-realtime-invalidation.test.ts:263`
-**Found:** 2026-09-28 by `/audit` (scope: fixed-finding re-review at 1924880c; all lenses), reviewing F-83
-**Why it matters:** `invalidateGridmasterRealtimeQueries` has no caller left (only the re-export in `hooks/index.ts`); the flusher has no disposed flag, so an event arriving while the channel is still leaving could arm one stray flush after teardown (unverified; same for the org hooks); the test's `fire` uses `listener?.onEvent`, so a table dropped from the subscription would make the teardown test pass vacuously, and `onReconnectAfterError` is untested.
-**Suggested fix:** delete the dead export, add a disposed guard in `createDebouncedTableFlusher`, assert the listener exists, and test the reconnect hook.
-**Resolution:** Fixed in fix/gridmaster-realtime-follow-ups: `invalidateGridmasterRealtimeQueries` and its re-export are deleted; `createDebouncedTableFlusher` records `disposed`, so `dispose()` clears pending tables and a later `markChanged` arms nothing (a realtime-core test covers it, and the org hooks get the same guard); the Gridmaster test's `fire` throws when a table has no listener, and new tests cover `onReconnectAfterError` (one invalidation of `gridmaster.all()`) and a disabled hook subscribing to nothing.
-
-### F-108 [P3] fixed - `schedule_notes` keeps two indexes its unique key already covers
-
-**File:** `supabase/migrations/001_schema.sql:1394` (`idx_schedule_notes_emp`, `idx_schedule_notes_emp_date`)
-**Found:** 2026-09-28 by `/audit` (scope: fixed-finding re-review at 1924880c; all lenses), reviewing F-84
-**Why it matters:** both lead with `emp_id` as 063's `schedule_notes_segment_unique` does, so every note write maintains two indexes no query needs. Small at today's sizes.
-**Suggested fix:** a forward migration dropping both, after checking a plan for the emp and date reads.
-**Resolution:** Fixed in fix/schedule-notes-redundant-indexes: migration `070_schedule_notes_redundant_indexes.sql` drops `idx_schedule_notes_emp` and `idx_schedule_notes_emp_date`. With sequential scans off, a read by person and a read by person and date range both plan as an index scan on `schedule_notes_segment_unique` with `emp_id` (and the range) in the condition. `migration-070-schedule-notes-indexes.integration.test.ts` runs 070 from its file and asserts that, and that the unique key and `idx_schedule_notes_org_date` remain. Checksum locked; not yet on production.
-
-### F-109 [P3] fixed - 065 leaves the Admin write policies and MAINTAIN on `employees`
-
-**File:** `supabase/migrations/003_rls_policies.sql:273` (`admin_insert_employees`, `admin_update_employees`, `admin_delete_employees`); `supabase/migrations/065_employees_written_by_server_only.sql`
-**Found:** 2026-09-28 by `/audit` (scope: F-100 re-review on `fix/employees-written-by-server-only`; all lenses)
-**Why it matters:** with the grant revoked the three write policies grant nothing, but any later broad grant (as 004's `GRANT ... ON ALL TABLES IN SCHEMA public TO authenticated`) would silently reopen F-100; the revoke also leaves `MAINTAIN` (lock, vacuum, reindex; no data writes and not reachable through PostgREST); 065's header omits `purge_expired_data` from its SECURITY DEFINER writers (harmless).
-**Suggested fix:** a forward migration dropping the three policies and revoking `MAINTAIN`, and a live test asserting `has_table_privilege('authenticated', 'public.employees', 'UPDATE')` is false.
-**Resolution:** Fixed in fix/employees-write-policies-dropped: migration `069_employees_admin_write_policies_dropped.sql` drops `admin_insert_employees`, `admin_update_employees` and `admin_delete_employees` and revokes `MAINTAIN` from `authenticated` (its header also records `purge_expired_data`). A live case in `row-level-trust-boundaries.integration.test.ts` runs 069 from its file and asserts `authenticated` holds no write privilege on `employees` (`MAINTAIN` included), the Gridmaster policy is the only permissive write policy left, and with `UPDATE, DELETE` granted back an Admin with `canManageEmployees` changes no row. Checksum locked; `db:migrations:check` passes. Not yet on production.
-
 ### F-110 [P3] closed - The person page's request lists do not say they stop at 90 days
 
 **File:** `apps/web/src/components/gridmaster/person/PersonScheduleSection.tsx:167`, `:195`; `apps/web/src/features/gridmaster/server/person-activity.ts:117`
@@ -176,14 +95,6 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** Read production's `audit_log` row count (read-only) during the release rehearsal and time the build on the scratch stack; if it is more than a few seconds, build the index `CONCURRENTLY` outside the migration transaction.
 **Resolution:** 066 applied to production 2026-09-28 in one statement with no measured stall: production's `audit_log` held about 230 rows (248 kB), a read-only count taken by the person-page session, so the build locked writes for a negligible time and no `CONCURRENTLY` split was needed. Left `unverified` for `/audit` to settle; a later large-table index would need the concurrent build. Re-examined 2026-09-28 by `/audit`: production's `audit_log` held about 230 rows (248 kB) when 066 was applied, so the build's write lock was negligible; the risk does not hold at this size, and a future large-table index would need its own `CONCURRENTLY` plan.
 
-### F-113 [P3] fixed - FitText no longer resets for a label passed as elements
-
-**File:** `apps/mobile/src/shared/components/FitText.tsx:66`
-**Found:** 2026-09-28 by `/audit` (scope: `FitText`, `AuthField` at 3715cc49; all lenses)
-**Why it matters:** the fix in 08292520 remounts the fitting logic keyed on the label's text, and element children key as an empty string, so a label given as elements that later grows would keep a shrink measured for the earlier one. No caller does this today: every `Button` passes a string `label` and nothing else renders `FitText`.
-**Suggested fix:** narrow `FitText`'s `children` to `string | number` so the case cannot arise, or key element children by a caller-supplied `labelKey`.
-**Resolution:** Fixed in fix/fittext-string-labels: `FitText`'s `children` is now `string | number`, so the element case cannot compile, and `Button` sends an element label down a plain one-line, truncating `Text` instead. `Button.test.tsx` proves an element label never reaches `FitText`; type-check and the 30 shared component test files (193 tests) pass.
-
 ### F-120 [P3] fixed - The docs tests miss the error paths and assert loosely
 
 **File:** `apps/web/src/__tests__/docs-contract.test.ts`; `apps/web/src/__tests__/docs-inventory.test.ts:419`
@@ -207,3 +118,27 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Why it matters:** in an `env.*` module every indented `UPPER_CASE:` key is recorded as a declared environment key, not only properties of the Zod schema. Every current match is a real schema key, so nothing is wrong today; a lookup table with uppercase keys in an env module would add phantom keys that then fail classification.
 **Suggested fix:** read keys only from the object literal passed to `z.object(...)` (the TypeScript AST the route parser already uses), or accept the unclassified-key failure as the guard.
 **Resolution:**
+
+### F-127 [P3] fixed - A sign-in record that runs past its deadline is written again by the fallback
+
+**File:** `apps/web/src/lib/auth/security-audit.ts:89` (`recordSignInOnce`); `apps/web/src/lib/auth/sign-in-completion.ts:78`
+**Found:** 2026-09-28 by an independent `/audit` re-review of F-25
+**Why it matters:** `withTimeoutOrThrow` abandons the RPC without cancelling it, so on a timeout `recordSignInOnce` answered null and `recordCompletedSignIn` wrote directly while the RPC could still commit its own row: two success rows for one call, most likely under the load F-78 observed.
+**Suggested fix:** Fall back only on a returned error, not on a timeout; test an RPC that settles after the deadline.
+**Resolution:** Fixed in fix/audit-follow-ups: a `TimeoutError` answers false (the call is still running and records), so only a returned error falls back to the direct write. A test holds the RPC past its deadline and asserts no direct write.
+
+### F-128 [P3] fixed - An element Button label scales to 1.5x instead of the compact 1.2x
+
+**File:** `apps/mobile/src/shared/components/Button.tsx:260`
+**Found:** 2026-09-28 by an independent `/audit` re-review of F-113
+**Why it matters:** 2ac009c3 moved element labels to a plain `Text` with `maxFontSizeMultiplier={MAX_FONT_SCALE}` and no `fit`, so they could grow to 1.5x where every button label is capped at `MAX_FONT_SCALE_COMPACT`. Latent: no caller passes an element label.
+**Suggested fix:** `fit="compact"` on that `Text`, asserted in `Button.test.tsx`.
+**Resolution:** Fixed in fix/audit-follow-ups: the `Text` takes `fit="compact"`. The native test stub now exposes `maxFontSizeMultiplier` as `data-max-font-size-multiplier` (it dropped the prop), and the element-label test asserts 1.2; it fails against 2ac009c3's `Button`.
+
+### F-129 [P3] fixed - 074's header says it records an invitation's first password
+
+**File:** `supabase/migrations/074_password_change_recorded.sql:8`; `blueprint/history/fixes/password-change-recorded.md:13`
+**Found:** 2026-09-28 by an independent `/audit` re-review of F-05
+**Why it matters:** The normal invitation path creates the user with its password (an insert), so the update trigger does not fire; only the abandoned-unconfirmed branch (`updateUserById`) is recorded. The behaviour is right (a first password is not a change), but the checksum-locked header and the archive claim otherwise.
+**Suggested fix:** Correct the wording while 074 is unapplied on production, or at least correct the archive.
+**Resolution:** Fixed in fix/audit-follow-ups: the archive now names the paths the trigger records and says the header overstates the invitation path. 074 itself is left unchanged: it was already on origin/dev and may be in the production rehearsal, and changing a checksum-locked file under that would do more harm than the comment.

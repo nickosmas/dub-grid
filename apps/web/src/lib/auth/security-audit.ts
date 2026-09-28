@@ -1,7 +1,7 @@
 import "server-only";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
-import { withTimeoutOrThrow } from "@/lib/with-timeout";
+import { TimeoutError, withTimeoutOrThrow } from "@/lib/with-timeout";
 
 export type SecurityEventName =
   "security.auth.login" | "security.auth.recovery" | "security.auth.mfa" | "security.auth.session";
@@ -81,7 +81,9 @@ export async function writeSecurityAuditEvent(input: SecurityAuditEvent): Promis
  * record (a completed sign-in, or the replacement session a reauthentication
  * issued), checked and written in one locked step in the database (073,
  * F-25). Null when the call fails, so the caller can still record it:
- * recording a sign-in twice beats losing it.
+ * recording a sign-in twice beats losing it. A call that only runs past the
+ * deadline is not cancelled and still records, so it answers no rather than
+ * handing the caller a second write (F-127).
  */
 export async function recordSignInOnce(input: {
   actorId: string;
@@ -101,6 +103,6 @@ export async function recordSignInOnce(input: {
     return data === true;
   } catch (error) {
     logger.error({ error }, "Security audit sign-in record failed");
-    return null;
+    return error instanceof TimeoutError ? false : null;
   }
 }

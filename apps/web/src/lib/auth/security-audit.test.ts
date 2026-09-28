@@ -93,6 +93,20 @@ describe("recordSignInOnce", () => {
     await expect(recordSignInOnce(input)).resolves.toBe(false);
   });
 
+  it("answers no when the call only runs past its deadline, which still records (F-127)", async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.rpc.mockReturnValue(new Promise(() => undefined));
+      const pending = recordSignInOnce(input);
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      await expect(pending).resolves.toBe(false);
+      expect(mocks.insert).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("answers null when the call fails, so the caller can still record", async () => {
     mocks.rpc.mockResolvedValue({ data: null, error: new Error("down") });
     await expect(recordSignInOnce(input)).resolves.toBeNull();
