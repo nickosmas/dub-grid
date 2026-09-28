@@ -1309,7 +1309,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:f56271de4429a6e6a84907da3b44e47867942240ad7609fd88775a55d4456940"
+      "evidenceFingerprint": "sha256:483d6c21edc7cd87a817abf5a9b66ffd69de8fdbc0ea0ac061cd3d24db18bc58"
     },
     {
       "id": "alerts",
@@ -1371,7 +1371,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:879681b003e375919ae8a6b807b66456e4b58f2c8da57fc36f551e3a71cd8f75"
+      "evidenceFingerprint": "sha256:27ff5d531c0f48bb34dc9df8b60c589f5af84ad9c8b9babb1530292f0dc192c2"
     },
     {
       "id": "reports",
@@ -1428,16 +1428,16 @@
       "file": "docs/account/profile.mdx",
       "publicRoute": "/account/profile",
       "deliveryOwner": "40c",
-      "lifecycle": "planned",
-      "sourceReview": "pending",
+      "lifecycle": "published",
+      "sourceReview": "verified",
       "audiences": [
         "user",
         "admin"
       ],
       "platforms": {
-        "web": "planned",
-        "ios": "planned",
-        "android": "planned"
+        "web": "required",
+        "ios": "required",
+        "android": "required"
       },
       "surfaceIds": [
         "web:/account",
@@ -1452,36 +1452,63 @@
         {
           "id": "profile",
           "claims": [
-            "planned-source-review"
+            "profile menu and sections",
+            "details: email and phone, identity confirmation and confirmation email; concurrent edit message",
+            "direct name editing for people managers and Super Admins; name change requests otherwise",
+            "access and management departments cards",
+            "calendar subscription: create, replace, disable",
+            "app profile tab rows and details behavior",
+            "deletion: requests for most, direct for Super Admins with typed confirmation and sole Super Admin guard",
+            "goodbye page reasons",
+            "multiple organizations: web by address, app switcher"
           ],
           "sourceFiles": [
-            "apps/web/src/app/(app)/profile/page.tsx",
-            "apps/mobile/app/(tabs)/profile/index.tsx"
+            "apps/web/src/components/Header.tsx",
+            "apps/web/src/components/profile/ProfilePage.tsx",
+            "apps/web/src/components/profile/profile-nav-config.tsx",
+            "apps/web/src/components/profile/SelfWorkProfile.tsx",
+            "apps/web/src/components/profile/CalendarSubscriptionCard.tsx",
+            "apps/web/src/components/account/ProfilePanel.tsx",
+            "apps/web/src/components/account/DeleteAccountCard.tsx",
+            "apps/web/src/app/api/auth/delete-account/route.ts",
+            "apps/web/src/app/(app)/goodbye/RunLogoutTeardown.tsx",
+            "apps/web/src/app/(app)/login/OrgLogin.tsx",
+            "apps/mobile/src/features/profile/screens/ProfileScreen.tsx",
+            "apps/mobile/src/features/profile/screens/ProfileWorkScreen.tsx",
+            "apps/mobile/src/features/profile/screens/ProfileCalendarScreen.tsx",
+            "apps/mobile/src/features/profile/screens/ProfileSecurityScreen.tsx"
           ],
-          "testFiles": [],
+          "testFiles": [
+            "apps/web/src/components/account/ProfilePanel.test.tsx",
+            "apps/web/src/components/profile/CalendarSubscriptionCard.test.tsx",
+            "apps/web/src/app/api/auth/delete-account/route.test.ts",
+            "apps/web/src/app/(app)/goodbye/__tests__/RunLogoutTeardown.test.tsx",
+            "apps/mobile/src/features/profile/screens/ProfileWorkScreen.test.tsx"
+          ],
           "runtimeScenarios": [
             "loaded",
             "validation"
           ],
           "exclusions": []
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:ecbce3430e3fb8c01a3a3c61ca5109b972913341abd112c6d524e604f3dd8876"
     },
     {
       "id": "security-sessions",
       "file": "docs/account/security-and-sessions.mdx",
       "publicRoute": "/account/security-and-sessions",
       "deliveryOwner": "40c",
-      "lifecycle": "planned",
-      "sourceReview": "pending",
+      "lifecycle": "published",
+      "sourceReview": "verified",
       "audiences": [
         "user",
         "admin"
       ],
       "platforms": {
-        "web": "planned",
-        "ios": "planned",
-        "android": "planned"
+        "web": "required",
+        "ios": "required",
+        "android": "required"
       },
       "surfaceIds": [
         "web:/forgot-password",
@@ -1497,37 +1524,70 @@
         {
           "id": "security",
           "claims": [
-            "planned-source-review"
+            "password rules and change flow; signs out everywhere",
+            "two-factor setup on web and app, mismatch help, disabling, support reset and re-setup",
+            "identity confirmation triggers and five-minute window",
+            "sessions list, sign out one, others or everywhere; app devices; inactivity prompt",
+            "new sign-in and two-factor emails; administrator email change notices",
+            "app lock",
+            "forgot password on web by link and in the app by code; signs out everywhere; rate limit message"
           ],
           "sourceFiles": [
+            "packages/domain/src/password.ts",
+            "packages/authz/src/assurance.ts",
+            "apps/web/src/components/account/SecurityPanel.tsx",
+            "apps/web/src/components/profile/MFASetup.tsx",
+            "apps/web/src/components/profile/SessionList.tsx",
+            "apps/web/src/components/auth/StepUpDialog.tsx",
+            "apps/web/src/components/auth/TwoFactorReenrollGate.tsx",
+            "apps/web/src/components/InactivityGuard.tsx",
+            "apps/web/src/app/(app)/forgot-password/page.tsx",
             "apps/web/src/app/(app)/reset-password/page.tsx",
-            "apps/mobile/app/(tabs)/profile/security.tsx"
+            "apps/web/src/lib/auth-recovery.ts",
+            "apps/web/src/features/account/server/known-devices.ts",
+            "apps/web/src/features/notifications/server/events.ts",
+            "apps/web/src/emails/LoginEmailChangedEmail.tsx",
+            "apps/mobile/src/features/profile/screens/ProfileSecurityScreen.tsx",
+            "apps/mobile/src/features/profile/screens/ProfileSessionsScreen.tsx",
+            "apps/mobile/src/features/profile/screens/ProfileTwoFactorScreen.tsx",
+            "apps/mobile/src/features/profile/screens/ProfilePasswordScreen.tsx",
+            "apps/mobile/src/features/auth/screens/ForgotPasswordScreen.tsx",
+            "apps/mobile/src/features/auth/screens/ResetPasswordScreen.tsx",
+            "apps/mobile/src/shared/providers/AppLockProvider.tsx"
           ],
-          "testFiles": [],
+          "testFiles": [
+            "apps/web/src/components/account/SecurityPanel.test.tsx",
+            "apps/web/src/components/profile/SessionList.test.tsx",
+            "packages/domain/src/password.test.ts",
+            "apps/web/src/features/account/server/known-devices.test.ts",
+            "apps/mobile/src/features/profile/screens/ProfileTwoFactorScreen.test.tsx",
+            "apps/mobile/src/features/auth/screens/ResetPasswordScreen.test.tsx"
+          ],
           "runtimeScenarios": [
-            "mfa",
-            "recovery",
-            "offline"
+            "loaded",
+            "validation",
+            "error"
           ],
           "exclusions": []
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:8e9018d69df55102e1a3461b93605d56456259efa529034c593f256123a68207"
     },
     {
       "id": "privacy-controls",
       "file": "docs/account/notification-privacy-and-data-controls.mdx",
       "publicRoute": "/account/notification-privacy-and-data-controls",
       "deliveryOwner": "40c",
-      "lifecycle": "planned",
-      "sourceReview": "pending",
+      "lifecycle": "published",
+      "sourceReview": "verified",
       "audiences": [
         "user",
         "admin"
       ],
       "platforms": {
-        "web": "planned",
-        "ios": "planned",
-        "android": "planned"
+        "web": "required",
+        "ios": "required",
+        "android": "required"
       },
       "surfaceIds": [
         "web:/cookie-policy",
@@ -1540,20 +1600,40 @@
         {
           "id": "controls",
           "claims": [
-            "planned-source-review"
+            "web alert categories, defaults, security always on, email throttle",
+            "app push and category switches",
+            "cookie banner choices and where to change them; app privacy sheet and analytics switch",
+            "terms acceptance on web and app; policy links",
+            "data: privacy policy, account deletion, support for other requests"
           ],
           "sourceFiles": [
+            "apps/web/src/components/profile/NotificationPreferences.tsx",
+            "apps/web/src/features/notifications/server/sender.ts",
+            "apps/web/src/components/account/DataPrivacyPanel.tsx",
+            "apps/web/src/components/CookieConsent.tsx",
+            "apps/web/src/components/auth/TermsAcceptanceCard.tsx",
             "apps/web/src/app/privacy/page.tsx",
-            "apps/mobile/app/(tabs)/profile/privacy.tsx"
+            "apps/mobile/src/features/profile/screens/ProfileNotificationsScreen.tsx",
+            "apps/mobile/src/features/profile/components/NotificationCategorySheet.tsx",
+            "apps/mobile/src/features/profile/screens/ProfilePrivacyScreen.tsx",
+            "apps/mobile/src/features/consent/components/ConsentGate.tsx",
+            "apps/mobile/src/features/consent/components/TermsGate.tsx"
           ],
-          "testFiles": [],
+          "testFiles": [
+            "apps/web/src/features/notifications/server/sender.categories.test.ts",
+            "apps/web/src/app/(app)/accept-terms/page.test.tsx",
+            "apps/mobile/src/features/profile/screens/ProfilePrivacyScreen.test.tsx",
+            "apps/mobile/src/features/consent/components/ConsentGate.test.tsx"
+          ],
           "runtimeScenarios": [
-            "loaded",
-            "validation"
+            "loaded"
           ],
-          "exclusions": []
+          "exclusions": [
+            "a self-serve data export is not offered in the product"
+          ]
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:b0a8b7771147f63ec7c1386206d97183286f36d81ed391c8ce2ef848f69923ac"
     },
     {
       "id": "schedule-rules-display",

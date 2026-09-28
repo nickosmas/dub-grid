@@ -786,7 +786,7 @@
     - [x] 40c1. **Mobile navigation, alerts, and reports guides** - publish the
           role-aware mobile navigation page with its deliberate web-only
           boundaries, and the alerts and reports pages.
-    - [ ] 40c2. **Account guides** - publish the profile, security and sessions,
+    - [x] 40c2. **Account guides** - publish the profile, security and sessions,
           and notification, privacy, and data-control pages.
     - [ ] 40c3. **Access, billing, and integrations references** - verify the
           roles, Admin permissions, and billing pages, publish integrations

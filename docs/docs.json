@@ -40,6 +40,14 @@
             "pages": ["staff/roster", "staff/detail-page", "staff/invitations"]
           },
           {
+            "group": "Your Account",
+            "pages": [
+              "account/profile",
+              "account/security-and-sessions",
+              "account/notification-privacy-and-data-controls"
+            ]
+          },
+          {
             "group": "Configuration",
             "pages": [
               "configuration/organization",
