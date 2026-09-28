@@ -48,8 +48,10 @@ import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { ProfilePanel, ProfileSection, ProfileTextInput } from "../components/ProfilePrimitives";
 import { ProfileSkeleton } from "../components/ProfileSkeleton";
 import { useMobileStepUpAction } from "../hooks/useMobileStepUpAction";
+import { getMobileStepUpMethod } from "../lib/step-up";
+import { reauthenticateMobileMfa } from "../../../shared/lib/mfa-lifecycle";
 
-type PasswordField = "newPassword" | "confirmPassword";
+type PasswordField = "currentPassword" | "newPassword" | "confirmPassword";
 
 function PasswordStrengthHints({ password }: { password: string }) {
   const mobileColors = useMobileColors();
@@ -133,6 +135,9 @@ export default function ProfilePasswordScreen() {
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const stepUp = useMobileStepUpAction();
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [serverAskedForCode, setServerAskedForCode] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordSaving, setPasswordSaving] = useState(false);
@@ -142,6 +147,7 @@ export default function ProfilePasswordScreen() {
   const [visiblePasswordFields, setVisiblePasswordFields] = useState<
     Record<PasswordField, boolean>
   >({
+    currentPassword: false,
     newPassword: false,
     confirmPassword: false,
   });
@@ -160,8 +166,12 @@ export default function ProfilePasswordScreen() {
   // The same bar as the reset flow and web, via the shared rule. Gating on
   // length alone let a password the reset screen would reject enable this
   // submit, which is the exact drift `@dubgrid/domain/password` exists to stop.
+  const needsCode = Boolean(profileQuery.data?.user.mfaEnabled) || serverAskedForCode;
   const passwordLooksReady =
-    isPasswordAcceptable(newPassword) && passwordsMatch(newPassword, confirmPassword);
+    currentPassword !== "" &&
+    (!needsCode || /^\d{6}$/.test(code)) &&
+    isPasswordAcceptable(newPassword) &&
+    passwordsMatch(newPassword, confirmPassword);
 
   // Set once the password has (or may have) changed. A retry after a failed
   // sign-out then finishes only the sign-out: repeating the update would
@@ -174,7 +184,8 @@ export default function ProfilePasswordScreen() {
   // Anything typed into any of the three fields. Back navigation is the only
   // way off this screen, so without a guard a part-entered password change is
   // gone the moment a swipe is misread as a back gesture.
-  const hasUnsavedChanges = newPassword !== "" || confirmPassword !== "";
+  const hasUnsavedChanges =
+    currentPassword !== "" || code !== "" || newPassword !== "" || confirmPassword !== "";
   const guard = useUnsavedChangesGuard({
     isDirty: hasUnsavedChanges,
     disabled: passwordSaving,
@@ -185,6 +196,8 @@ export default function ProfilePasswordScreen() {
       ? "Your password already changed, but your other sessions are still signed in. Stay to finish signing out."
       : "The password you were entering won't be saved.",
     onDiscard: () => {
+      setCurrentPassword("");
+      setCode("");
       setNewPassword("");
       setConfirmPassword("");
     },
@@ -249,32 +262,54 @@ export default function ProfilePasswordScreen() {
 
     try {
       let assuredAccessToken: string | null = null;
-      const completed = await stepUp.run(async (actionAccessToken) => {
+      if (!passwordChangeRef.current) {
+        // Every change signs in again first, with the current password and any
+        // authenticator code, so it runs on a brand-new session that
+        // Supabase's secure password change always accepts (F-62).
+        let session: { access_token: string };
+        try {
+          session = await reauthenticateMobileMfa(
+            accessToken!,
+            currentPassword,
+            needsCode ? code : undefined,
+          );
+        } catch (reauthError) {
+          if (getMobileStepUpMethod(reauthError) !== "totp") throw reauthError;
+          setServerAskedForCode(true);
+          pushToast({
+            tone: "info",
+            message: "Enter the code from your authenticator app to continue.",
+          });
+          return;
+        }
         // The preflight must finish before calling Supabase's public mutation.
         // The mutation is never replayed after an ambiguous provider failure.
-        // On a retry it only refreshes the assurance the sign-out needs.
-        await requireMobileCredentialAssurance(actionAccessToken);
-        if (!passwordChangeRef.current) {
-          let unconfirmed = false;
-          try {
-            const updateResult = await settleMobileAuthAction(
-              getSupabaseClient().auth.updateUser({ password: newPassword }),
-            );
-            if (updateResult.error) throw updateResult.error;
-          } catch (updateError) {
-            // A deadline or a lost response may hide an applied change, so it
-            // finishes as one: every session signed out, never a retry (41b2).
-            if (!mayHavePasswordUpdateCommitted(updateError)) throw updateError;
-            unconfirmed = true;
-          }
-          passwordChangeRef.current = { unconfirmed };
-          setPasswordChanged(true);
+        await requireMobileCredentialAssurance(session.access_token);
+        let unconfirmed = false;
+        try {
+          const updateResult = await settleMobileAuthAction(
+            getSupabaseClient().auth.updateUser({ password: newPassword }),
+          );
+          if (updateResult.error) throw updateResult.error;
+        } catch (updateError) {
+          // A deadline or a lost response may hide an applied change, so it
+          // finishes as one: every session signed out, never a retry (41b2).
+          if (!mayHavePasswordUpdateCommitted(updateError)) throw updateError;
+          unconfirmed = true;
         }
-        assuredAccessToken = actionAccessToken;
-      });
-      if (!completed) {
-        identityCancelled = true;
-        return;
+        passwordChangeRef.current = { unconfirmed };
+        setPasswordChanged(true);
+        assuredAccessToken = session.access_token;
+      } else {
+        // A retry only finishes the sign-out; it refreshes the assurance that needs.
+        const completed = await stepUp.run(async (actionAccessToken) => {
+          await requireMobileCredentialAssurance(actionAccessToken);
+          assuredAccessToken = actionAccessToken;
+        });
+        if (!completed) {
+          identityCancelled = true;
+          return;
+        }
       }
       const unconfirmed = passwordChangeRef.current?.unconfirmed ?? false;
 
@@ -356,6 +391,41 @@ export default function ProfilePasswordScreen() {
       ) : (
         <ProfileSection description="Choose a password you don't use anywhere else. You'll be signed out everywhere once it changes.">
           <ProfilePanel>
+            <ProfileTextInput
+              accessibilityLabel="Current password"
+              autoCapitalize="none"
+              autoComplete="current-password"
+              autoCorrect={false}
+              focused={focusedPasswordField === "currentPassword"}
+              label="Current password"
+              placeholder="Current password"
+              secureTextEntry={!visiblePasswordFields.currentPassword}
+              trailingAccessory={
+                <PasswordVisibilityToggle
+                  isVisible={visiblePasswordFields.currentPassword}
+                  label="current password"
+                  onPress={() => togglePasswordVisibility("currentPassword")}
+                />
+              }
+              editable={!passwordChanged}
+              value={currentPassword}
+              onChangeText={setCurrentPassword}
+              onBlur={() => setFocusedPasswordField(null)}
+              onFocus={() => setFocusedPasswordField("currentPassword")}
+            />
+            {needsCode ? (
+              <ProfileTextInput
+                accessibilityLabel="Authenticator code"
+                autoComplete="one-time-code"
+                editable={!passwordChanged}
+                keyboardType="number-pad"
+                label="Authenticator code"
+                maxLength={6}
+                placeholder="6-digit code"
+                value={code}
+                onChangeText={(value) => setCode(value.replace(/\D/g, "").slice(0, 6))}
+              />
+            ) : null}
             <ProfileTextInput
               accessibilityLabel="New password"
               autoCapitalize="none"

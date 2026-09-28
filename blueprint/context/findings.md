@@ -15,13 +15,13 @@
 **Suggested fix:** Generate the code for the verify moment and retry once on a window edge, or run the live tests serially.
 **Resolution:** Seen again 2026-09-28 in a full `test:web` and passing alone. Fixed with the owner's approval (fix/mfa-policy-test-flake): the test answers the challenge through `answerChallenge`, which waits out a TOTP window edge before computing the code and, if the answer is refused, retries once in the next window with a fresh code. A second refusal fails with the auth server's error. It passed three runs in a row alone.
 
-### F-62 [P2] open - Turning on `secure_password_change` would refuse password changes for two-factor users on sessions older than a day
+### F-62 [P2] fixed - Turning on `secure_password_change` would refuse password changes for two-factor users on sessions older than a day
 
 **File:** `apps/web/src/features/account/client/step-up.ts:44`; `apps/mobile/src/features/profile/lib/step-up.ts:62`; `supabase/config.toml` (`secure_password_change = true`)
 **Found:** 2026-09-26 during 41d3's production Auth review
 **Why it matters:** Supabase Auth v2.187.0 (`internal/api/user.go:154`) refuses a password update without a reauthentication nonce when the current session started more than 24 hours ago. DubGrid's password step-up replaces the session, so it passes; its authenticator-code step-up keeps the old session, and neither app sends a nonce. Mobile sessions now last until sign-out, so with the setting on, a two-factor user could not change their password on mobile after the first day. Production has it off; local `config.toml` has it on, which the fresh sessions in tests never reach.
 **Suggested fix:** Keep it off in production. Before turning it on, either send Supabase's reauthentication nonce with the update or have the authenticator-code step-up issue a fresh session; then set local and production alike.
-**Resolution:**
+**Resolution:** Fixed on fix/password-change-fresh-session, the owner's call being "pick the best decision" (2026-09-28): turn it on safely. A signed-in change (web and mobile) always signs in again first, with the current password and, for a two-factor account, its code, which the server answers on the new session. So every change runs on a brand-new session that `secure_password_change` accepts. Route and component tests cover the right, wrong and missing code, and the old code fails them. Still to do: turn the setting on in production once this code is released.
 
 ### F-75 [P3] open - Database functions still let a stale Gridmaster token edit organization data
 

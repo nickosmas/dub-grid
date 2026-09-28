@@ -216,6 +216,18 @@ sequenceDiagram
 
 ---
 
+### 3.3 Changing a Password While Signed In
+
+A signed-in password change (web Security settings, mobile Profile > Password)
+always signs in again first: the current password, plus the authenticator code
+for a two-factor account, through the `reauthenticate` action of the MFA
+lifecycle route. The server answers a two-factor account's challenge on that new
+session, so the change always runs on a brand-new session. That is what lets
+Supabase's `secure_password_change` stay on: it refuses a password update on a
+session older than 24 hours, and a stolen older token can no longer change the
+password through the Auth API directly (F-62). Recovery and reset already run on
+a new recovery session, so they are unaffected.
+
 ## 4. Email Verification
 
 **Invited accounts are never asked to confirm their email.** The invitation link was
