@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 /**
- * Migrations 033, 034 and 065 (audit findings F-04, F-05, F-06, F-21, F-100): rules the routes enforce
+ * Migrations 033, 034, 065 and 069 (audit findings F-04, F-05, F-06, F-21, F-100, F-109): rules the routes enforce
  * now hold at the row level too. Every case runs inside BEGIN/ROLLBACK on
  * the seeded local database and simulates the caller the way PostgREST
  * does, so it is the policies and grants that answer, not the routes.
@@ -9,9 +9,11 @@
  * Skipped when the local Postgres is unreachable (CI without Supabase).
  */
 
+import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Client } from "pg";
 import { actAsAuthenticated } from "./helpers/simulated-jwt";
+import { migrationPath } from "./helpers/sql-inventory";
 
 const DB_URL =
   process.env.LOCAL_SUPABASE_DB_URL ?? "postgres://postgres:postgres@127.0.0.1:54322/postgres";
@@ -442,6 +444,57 @@ describe.runIf(reachable)("staff records are server-written (F-100, live DB)", (
       expect(rows).toEqual([{ status: "inactive" }]);
     } finally {
       await db.query("ROLLBACK");
+    }
+  });
+
+  it("stays closed to an Admin even if a broad table grant returns (F-109)", async () => {
+    await db.query("BEGIN");
+    try {
+      // Dropping a policy takes this lock anyway; taking it before any other
+      // means a parallel suite waits rather than deadlocks.
+      await db.query("LOCK TABLE public.employees IN ACCESS EXCLUSIVE MODE");
+      await db.query(
+        readFileSync(migrationPath("069_employees_admin_write_policies_dropped.sql"), "utf8"),
+      );
+      const { rows: privileges } = await db.query<{ privilege: string; held: boolean }>(
+        `SELECT privilege, has_table_privilege('authenticated', 'public.employees', privilege) AS held
+           FROM unnest(ARRAY['INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'MAINTAIN']) AS privilege`,
+      );
+      expect(privileges.filter((row) => row.held)).toEqual([]);
+
+      const { rows: writePolicies } = await db.query<{ polname: string }>(
+        `SELECT polname FROM pg_policy
+          WHERE polrelid = 'public.employees'::regclass AND polpermissive AND polcmd <> 'r'
+          ORDER BY polname`,
+      );
+      expect(writePolicies.map((row) => row.polname)).toEqual(["gridmaster_all_employees"]);
+
+      const fx = await loadFixture();
+      const { rows: staff } = await db.query<{ id: string }>(
+        `SELECT id FROM public.employees WHERE user_id = $1 AND org_id = $2`,
+        [fx.superAdmin.userId, fx.orgId],
+      );
+      await db.query(
+        `UPDATE public.organization_memberships
+            SET admin_permissions = COALESCE(admin_permissions, '{}'::jsonb) || '{"canManageEmployees": true}'::jsonb
+          WHERE user_id = $1 AND org_id = $2`,
+        [fx.admin.userId, fx.orgId],
+      );
+      // As 004 once did: with the privilege back, no policy lets an Admin write.
+      await db.query(`GRANT UPDATE, DELETE ON public.employees TO authenticated`);
+      await asUser(fx.admin, fx.orgId);
+      const updated = await db.query(
+        `UPDATE public.employees SET status = 'removed' WHERE id = $1`,
+        [staff[0].id],
+      );
+      const deleted = await db.query(`DELETE FROM public.employees WHERE id = $1`, [staff[0].id]);
+      await asSuperuser();
+
+      expect(updated.rowCount).toBe(0);
+      expect(deleted.rowCount).toBe(0);
+    } finally {
+      await db.query("ROLLBACK");
+      await asSuperuser();
     }
   });
 });

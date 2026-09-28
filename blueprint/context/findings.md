@@ -144,13 +144,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** a forward migration dropping both, after checking a plan for the emp and date reads.
 **Resolution:**
 
-### F-109 [P3] open - 065 leaves the Admin write policies and MAINTAIN on `employees`
+### F-109 [P3] fixed - 065 leaves the Admin write policies and MAINTAIN on `employees`
 
 **File:** `supabase/migrations/003_rls_policies.sql:273` (`admin_insert_employees`, `admin_update_employees`, `admin_delete_employees`); `supabase/migrations/065_employees_written_by_server_only.sql`
 **Found:** 2026-09-28 by `/audit` (scope: F-100 re-review on `fix/employees-written-by-server-only`; all lenses)
 **Why it matters:** with the grant revoked the three write policies grant nothing, but any later broad grant (as 004's `GRANT ... ON ALL TABLES IN SCHEMA public TO authenticated`) would silently reopen F-100; the revoke also leaves `MAINTAIN` (lock, vacuum, reindex; no data writes and not reachable through PostgREST); 065's header omits `purge_expired_data` from its SECURITY DEFINER writers (harmless).
 **Suggested fix:** a forward migration dropping the three policies and revoking `MAINTAIN`, and a live test asserting `has_table_privilege('authenticated', 'public.employees', 'UPDATE')` is false.
-**Resolution:**
+**Resolution:** Fixed in fix/employees-write-policies-dropped: migration `069_employees_admin_write_policies_dropped.sql` drops `admin_insert_employees`, `admin_update_employees` and `admin_delete_employees` and revokes `MAINTAIN` from `authenticated` (its header also records `purge_expired_data`). A live case in `row-level-trust-boundaries.integration.test.ts` runs 069 from its file and asserts `authenticated` holds no write privilege on `employees` (`MAINTAIN` included), the Gridmaster policy is the only permissive write policy left, and with `UPDATE, DELETE` granted back an Admin with `canManageEmployees` changes no row. Checksum locked; `db:migrations:check` passes. Not yet on production.
 
 ### F-110 [P3] closed - The person page's request lists do not say they stop at 90 days
 
