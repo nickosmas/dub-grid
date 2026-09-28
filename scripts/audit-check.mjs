@@ -41,12 +41,12 @@ const ALLOWLIST = [
     reason:
       "Infinite loops in the ICNS/JXL/HEIF parsers, reachable only by parsing a malicious image. " +
       "image-size is a build-time dependency of Metro, which bundles the mobile app's own asset " +
-      "files on a developer machine or in CI — it is not in the shipped app and not in the web " +
+      "files on a developer machine or in CI; it is not in the shipped app and not in the web " +
       "server, so a denial of service there stops a build we control rather than anything a user " +
-      "or attacker can reach. There is no fix to take: the advisory covers <= 2.0.2 and 2.0.2 is " +
-      "the newest published version, first_patched_version null. npm's proposed fix is expo@53, " +
-      "a major downgrade off SDK 54. Revisit when image-size publishes a patched release or Expo " +
-      "moves Metro onto one.",
+      "or attacker can reach. The fix, 2.0.3, is a major version that Metro cannot take: image-size " +
+      "2 measures only a buffer, and Metro 0.83.3 passes it a file path, so an override would break " +
+      "every image asset. Expo SDK 54's @expo/metro 54.2.0 pins metro 0.83.3 exactly (metro 0.83.8 " +
+      "drops image-size, but SDK 54 does not take it). Revisit with the Expo SDK upgrade (F-123).",
   },
   {
     ids: ["GHSA-qxc2-j82w-r537"],
