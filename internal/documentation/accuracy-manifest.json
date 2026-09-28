@@ -682,7 +682,7 @@
       "publicRoute": "/staff/roster",
       "deliveryOwner": "40b",
       "lifecycle": "published",
-      "sourceReview": "pending",
+      "sourceReview": "verified",
       "audiences": [
         "user",
         "admin"
@@ -703,17 +703,50 @@
         {
           "id": "people",
           "claims": [
-            "pending-source-review"
+            "directory for everyone; manager columns, status tabs, schedule and management switch, filters, sort, reorder",
+            "account column values",
+            "Add menu and Add Staff Members fields",
+            "CSV import columns, 500-row limit, duplicate blocking and warnings; import may be unavailable",
+            "Super Admin access dropdown, not for yourself; pending invitation access change reissues",
+            "active, inactive and removed meanings; deactivate and remove actions and effects; self and sole Super Admin guards",
+            "permission table; export may be unavailable",
+            "mobile People tab capabilities"
           ],
           "sourceFiles": [
-            "apps/web/src/app/(app)/people/page.tsx",
-            "apps/mobile/app/(tabs)/people/index.tsx"
+            "apps/web/src/app/(app)/people/PeoplePageContent.tsx",
+            "apps/web/src/components/StaffView.tsx",
+            "apps/web/src/components/staff/MembersSection.tsx",
+            "apps/web/src/components/staff/StaffTableRow.tsx",
+            "apps/web/src/components/staff/StaffFilterPopover.tsx",
+            "apps/web/src/components/staff/StaffContextBar.tsx",
+            "apps/web/src/components/staff/useStaffFilters.ts",
+            "apps/web/src/components/staff/InlineRoleSelect.tsx",
+            "apps/web/src/components/staff/BulkImportModal.tsx",
+            "apps/web/src/components/AddEmployeeModal.tsx",
+            "apps/web/src/lib/employee-duplicate-detection.ts",
+            "apps/web/src/app/api/employees/status/route.ts",
+            "apps/web/src/app/api/import/employees/route.ts",
+            "apps/web/src/components/staff-detail/EmployeeStatusActions.tsx",
+            "apps/web/src/components/InactiveAccountBanner.tsx",
+            "packages/authz/src/index.ts",
+            "supabase/migrations/067_inactive_staff_unschedulable.sql",
+            "supabase/migrations/037_mfa_enrolled_claim.sql",
+            "apps/mobile/src/features/people/screens/PeopleScreen.tsx"
           ],
-          "testFiles": [],
+          "testFiles": [
+            "apps/web/src/__tests__/StaffView.test.tsx",
+            "apps/web/src/__tests__/StaffTableRow.test.tsx",
+            "apps/web/src/__tests__/employee-duplicate-detection.test.ts",
+            "apps/web/src/__tests__/inactive-staff-unschedulable.integration.test.ts",
+            "apps/web/src/app/api/employees/status/route.test.ts",
+            "apps/web/src/components/staff/useStaffFilters.test.tsx",
+            "apps/mobile/src/features/people/screens/PeopleScreen.test.tsx"
+          ],
           "runtimeScenarios": [],
           "exclusions": []
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:2182ce17b808cd8a293a670b1fcec28b02b1d0b760070eca6279e700495860f3"
     },
     {
       "id": "person-detail",
@@ -721,7 +754,7 @@
       "publicRoute": "/staff/detail-page",
       "deliveryOwner": "40b",
       "lifecycle": "published",
-      "sourceReview": "pending",
+      "sourceReview": "verified",
       "audiences": [
         "user",
         "admin"
@@ -741,17 +774,43 @@
         {
           "id": "person",
           "claims": [
-            "pending-source-review"
+            "person page needs view-details permission; Profile, Overview, Activity sections; Back to People",
+            "header contents",
+            "Work details, Record account states, Access, Management departments",
+            "Send invitation, Add to schedule or management, Activate or Deactivate; invitation banner Reinvite and Revoke",
+            "edit fields; focus area rule for scheduled and management people",
+            "login email rules: required with an account, step-up, sign-out and notices to both addresses, unique, pending invite reissue",
+            "Overview metrics and cards; Activity scope and who sees it",
+            "profile change requests reviewed under People > Requests",
+            "mobile person screen sections and actions"
           ],
           "sourceFiles": [
             "apps/web/src/app/(app)/people/[id]/page.tsx",
-            "apps/mobile/app/person/[id]/index.tsx"
+            "apps/web/src/components/staff-detail/StaffDetailPage.tsx",
+            "apps/web/src/components/staff-detail/StaffDetailHeader.tsx",
+            "apps/web/src/components/staff-detail/PersonRecordCard.tsx",
+            "apps/web/src/components/staff-detail/RecurringScheduleCard.tsx",
+            "apps/web/src/components/staff-detail/EmployeeStatusActions.tsx",
+            "apps/web/src/components/staff-detail/tabs/OverviewTab.tsx",
+            "apps/web/src/components/EditEmployeePanel.tsx",
+            "apps/web/src/app/api/employees/manage/route.ts",
+            "apps/web/src/features/employees/server/login-email-follow-up.ts",
+            "apps/web/src/components/account/ProfilePanel.tsx",
+            "apps/web/src/components/staff/ProfileChangeRequestQueue.tsx",
+            "apps/web/src/components/staff/PendingInvitationBanner.tsx",
+            "apps/mobile/src/features/people/screens/PersonDetailScreen.tsx"
           ],
-          "testFiles": [],
+          "testFiles": [
+            "apps/web/src/components/staff-detail/StaffDetailPage.test.tsx",
+            "apps/web/src/components/staff-detail/PersonRecordCard.test.tsx",
+            "apps/web/src/__tests__/EditEmployeePanel.test.tsx",
+            "apps/web/src/__tests__/ProfileChangeRequestQueue.test.tsx"
+          ],
           "runtimeScenarios": [],
           "exclusions": []
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:f3a2256febdfb5efac8080602fb849eb6f2ebf525bd98aefc037ce49b285997f"
     },
     {
       "id": "invitations",
@@ -759,7 +818,7 @@
       "publicRoute": "/staff/invitations",
       "deliveryOwner": "40b",
       "lifecycle": "published",
-      "sourceReview": "pending",
+      "sourceReview": "verified",
       "audiences": [
         "invitee",
         "admin"
@@ -777,16 +836,44 @@
         {
           "id": "invite",
           "claims": [
-            "pending-source-review"
+            "invitation only; roster or new manager",
+            "who can invite and which roles; only a Super Admin invites a Super Admin",
+            "where invitations are sent from; fields; Send Invitation",
+            "no invites to addresses already in the organization; existing accounts join with their password",
+            "email subject, button, exact expiry, no sender named; 72-hour absolute link",
+            "Reinvite rotates the link keeping email and access; Revoke kills it; re-invite rotates when access matches; access change reissues",
+            "per-address rate limit message",
+            "expired link; expiry alert may be unavailable",
+            "mobile invitations give User access"
           ],
           "sourceFiles": [
-            "apps/web/src/app/(app)/accept-invite/page.tsx"
+            "apps/web/src/components/InviteEmployeeModal.tsx",
+            "apps/web/src/components/staff/PendingInvitationBanner.tsx",
+            "apps/web/src/components/staff/useInvitationActionConfirm.tsx",
+            "apps/web/src/components/staff/MembersSection.tsx",
+            "apps/web/src/components/staff/InlineRoleSelect.tsx",
+            "apps/web/src/app/api/organizations/invitations/route.ts",
+            "apps/web/src/app/api/organizations/invitations/create/route.ts",
+            "apps/web/src/app/api/employees/shared.ts",
+            "apps/web/src/emails/InviteEmail.tsx",
+            "apps/web/src/features/mobile/server/invitation-email.ts",
+            "packages/domain/src/invitation-lifetime.ts",
+            "apps/web/src/app/api/cron/expire-requests/route.ts",
+            "apps/web/src/components/onboarding/steps/InviteTeamStep.tsx",
+            "apps/web/src/features/mobile/server/routes/person-invitation.ts"
           ],
-          "testFiles": [],
+          "testFiles": [
+            "apps/web/src/__tests__/PendingInvitationBanner.test.tsx",
+            "apps/web/src/__tests__/useInvitationActionConfirm.test.tsx",
+            "apps/web/src/app/api/organizations/invitations/create/route.test.ts",
+            "apps/web/src/emails/InviteEmail.test.tsx",
+            "apps/web/src/features/mobile/server/routes/person-invitation.test.ts"
+          ],
           "runtimeScenarios": [],
           "exclusions": []
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:bed4ccb4a010a74e6d8fe5808b77ca3555c5e66d4ff973594016b5e5c2da3a79"
     },
     {
       "id": "organization",

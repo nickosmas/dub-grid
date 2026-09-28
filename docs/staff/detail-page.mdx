@@ -1,59 +1,52 @@
 ---
-title: "Staff Detail"
-description: "View an employee's full profile, schedule history, activity timeline, and reports."
+title: "Person Page"
+description: "Everything about one person: their work details, record, access, schedule pattern, and history."
 ---
 
-Click any employee row in the roster to open their detail page at `/staff/[id]`. The detail page gives you a complete picture of a single employee, their profile, historical shifts, status changes, and hours data.
+Each person has a page with everything about them. Open it by selecting their name on **People**. You need permission to view staff details; you see your own details on your profile instead.
 
-## Page header
+The page has three sections: **Profile**, **Overview**, and **Activity**. **Back to People** returns to the directory.
 
-The top of the page shows:
+## The header
 
-- **Avatar** - auto-generated from the employee's initials
-- **Full name**
-- **Status badge** - `active`, `benched`, or `terminated`
-- **Certifications** - their certification abbreviation(s)
-- **Quick actions** - bench, activate, or terminate the employee directly from this page
+Their name, access level, email and phone, employment type if they're on the schedule, and their employee number.
 
-## Tabs
+## Profile
 
-<Tabs>
-  <Tab title="Overview">
-    The **Overview** tab shows the employee's complete profile information:
+- **Work details**: employment type, focus areas, certification, roles, and internal notes. If you can manage staff, edit them in place.
+- **Record**: when they were added and joined, their status and when it last changed with any note, whether they have an account, and when they were last active. The account line reads **Linked account**, **Invitation pending**, **Invitation expired**, **Not invited**, or **No email**.
+- **Access**: their role and the permissions it carries. A Super Admin can change the role and choose which permissions an Admin has; see [Roles and permissions](/reference/roles).
+- **Management departments**: the departments they manage, if any. A Super Admin can edit these.
 
-    - **Contact details** - phone number, email address, and any contact notes
-    - **Certifications** - the certification levels assigned to this employee
-    - **Focus areas** - the wings or sections they are assigned to
-    - **Role tags** - the display roles your organization defines (e.g. `Supv`, `CN`, `Mentor`)
+Depending on your permissions and the person, you'll also see **Send invitation** (they have an email but no account or invitation yet), **Add to schedule** or **Add to management**, and **Activate** or **Deactivate**. See [People](/staff/roster) for what each status means.
 
-    Use this tab when you need to quickly look up contact information or confirm an employee's assignments.
+If their invitation is pending or expired, a banner says so, with **Reinvite** and **Revoke**. See [Invitations](/staff/invitations).
 
-  </Tab>
-  <Tab title="Schedule">
-    The **Schedule** tab shows a historical view of this employee's shifts.
+## Editing a person
 
-    Use the **date range picker** to select any time window and review the shifts that were published for this employee. This is useful for checking past coverage patterns or verifying what an employee worked on a given date.
+Edit their name, employment type, phone, email, internal notes, certification, focus areas, and roles. Someone on the schedule needs at least one focus area; removing all of a manager's focus areas takes them off the schedule while keeping their management access.
 
-  </Tab>
-  <Tab title="Activity">
-    The **Activity** tab shows a chronological timeline of changes made to this employee's record, including:
+### Their email address
 
-    - Status changes (e.g. benched, activated, terminated)
-    - Role or certification updates
-    - Other notable events
+A person's email address is also the address they sign in with, so:
 
-    Each entry shows what changed, when it happened, and who made the change.
+- Someone with an account must keep an email address.
+- Changing it asks you to confirm your identity first. It signs them out everywhere and emails both the old and the new address about the change.
+- Two people in your organization can't share an address.
+- Changing the address of someone with a pending invitation asks whether to send a new invitation to the new address.
 
-  </Tab>
-  <Tab title="Reports">
-    The **Reports** tab provides analytics for this individual employee:
+## Overview
 
-    - **Hours history** - total hours worked over time
-    - **Shift distribution** - a chart showing the breakdown of shift codes (D, E, N, etc.)
-    - **Day-of-week patterns** - which days this employee typically works
-    - **Focus area breakdown** - how their time is distributed across different wings or sections
+This week's hours, average hours per week, shifts over the last 12 weeks, and weeks with overtime, followed by their details, their most common shifts and jobs, and their **Recurring schedule**, the weekly pattern for repeating assignments.
 
-    Use reports to identify scheduling patterns, balance workloads, or prepare for staffing reviews.
+## Activity
 
-  </Tab>
-</Tabs>
+**Activity** lists profile edits, status changes, access changes, and invitations for this person. Super Admins see it, as do Admins who can view staff details.
+
+## Changes staff ask for
+
+Staff who can't edit their own record change their phone number on their profile, and ask for name changes or account deletion there. Their requests appear under **People**, in **Requests**, for people who manage staff to approve or reject.
+
+## In the DubGrid app
+
+A person's screen in the app shows their access, contact details, staffing, assignments, and notes. People who manage staff can send, reissue, or revoke an invitation, add them to the schedule or to management, and activate, deactivate, or remove them.

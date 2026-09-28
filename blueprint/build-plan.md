@@ -769,7 +769,7 @@
     - [x] 40b2. **Scheduling guides** - rewrite the schedule grid, draft and
           publish, recurring shifts, real-time collaboration, shift requests,
           and dashboard pages.
-    - [ ] 40b3. **People guides** - rewrite the roster, person detail, and
+    - [x] 40b3. **People guides** - rewrite the roster, person detail, and
           invitations pages.
     - [ ] 40b4. **Configuration guides** - rewrite the organization, coverage,
           and terminology pages and publish the five planned Settings pages
