@@ -361,6 +361,7 @@ export default function MonthView({
   // Pre-compute all day data so the popover can access it
   const dayDataMap = useMemo(() => {
     const map = new Map<string, DayCellData>();
+    const employeeById = new Map(filteredEmployees.map((emp) => [emp.id, emp]));
     for (const date of cells) {
       if (!date) continue;
       const dateKey = formatDateKey(date);
@@ -440,7 +441,7 @@ export default function MonthView({
       // A person's indicators belong to their day in a focus area, not to each
       // of their shift codes there, so they show on their first row once sorted.
       if (noteMarksForKey) {
-        const firstRowByEmp = new Map<string, DayRow>();
+        const firstVisibleRowByEmp = new Map<string, DayRow>();
         const areasWithRowByEmp = new Map<string, Set<number>>();
         for (const name of focusAreaNames) {
           const marked = new Set<string>();
@@ -448,27 +449,31 @@ export default function MonthView({
             if (marked.has(row.empId)) continue;
             marked.add(row.empId);
             row.marks = noteMarksForKey(row.empId, date, row.focusAreaId);
-            if (!firstRowByEmp.has(row.empId)) firstRowByEmp.set(row.empId, row);
+            const visible = activeFocusArea === null || row.focusAreaId === activeFocusArea;
+            if (visible && !firstVisibleRowByEmp.has(row.empId)) {
+              firstVisibleRowByEmp.set(row.empId, row);
+            }
             const areas = areasWithRowByEmp.get(row.empId) ?? new Set<number>();
             areas.add(row.focusAreaId);
             areasWithRowByEmp.set(row.empId, areas);
           }
         }
         // A general code lists the person under their primary focus area only,
-        // so a note filed under another area they have no row in that day, or
-        // under none, joins their first row rather than going unseen.
-        firstRowByEmp.forEach((row, empId) => {
+        // so a note filed under another of their areas they have no row in
+        // that day, or under none, joins their first row a filter leaves
+        // visible rather than going unseen. One mark per note type (F-106).
+        firstVisibleRowByEmp.forEach((row, empId) => {
           const areasWithRow = areasWithRowByEmp.get(empId);
+          const ownAreaIds = employeeById.get(empId)?.focusAreaIds ?? [];
           const otherAreaIds: (number | undefined)[] = [
-            ...focusAreas.map((fa) => fa.id).filter((id) => !areasWithRow?.has(id)),
+            ...ownAreaIds.filter((id) => !areasWithRow?.has(id)),
             undefined,
           ];
-          const seen = new Set(row.marks.map((mark) => `${mark.indicatorTypeId}_${mark.state}`));
+          const seen = new Set(row.marks.map((mark) => mark.indicatorTypeId));
           for (const areaId of otherAreaIds) {
             for (const mark of noteMarksForKey(empId, date, areaId)) {
-              const key = `${mark.indicatorTypeId}_${mark.state}`;
-              if (seen.has(key)) continue;
-              seen.add(key);
+              if (seen.has(mark.indicatorTypeId)) continue;
+              seen.add(mark.indicatorTypeId);
               row.marks.push(mark);
             }
           }

@@ -120,13 +120,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** strip keys matching a hash, IP or user-agent pattern at any depth (or an allowlist per action), lowercase the id at the route, and say in the card when the session list was capped.
 **Resolution:** Fixed in fix/person-page-audit-follow-ups (step 2): `withoutNetworkDetails` now drops, at any depth of `details` (objects and arrays), every key whose name ends in `hash`, is `ip`, starts with `ipaddr` or contains `useragent` once case, `_` and `-` are ignored; `loadPersonHistory` lowercases a user target's id before querying and before the F-87 comparison. The cap needed no change: the card already warns the history is partial whenever any source, the impersonation sessions included, returned its full read. Tests with nested and renamed keys and an uppercase id fail against the old code. Closed 2026-09-28 by `/audit` of 2a02d54c: network keys are dropped at any depth and the account id is lowercased before the F-87 comparison. Every current writer (`employees/identity`, `employees/manage`, `employees/status`, `organizations/access`) stores the IP in the `ip_address` column, which is dropped too; a future camelCase key such as `clientIp` would not match, which no writer uses today.
 
-### F-106 [P3] open - The Month view's other-area merge reads every focus area and can land in a hidden section
+### F-106 [P3] fixed - The Month view's other-area merge reads every focus area and can land in a hidden section
 
 **File:** `apps/web/src/components/MonthView.tsx:461`, `:482`; `apps/web/src/__tests__/MonthView.test.tsx:134`
 **Found:** 2026-09-28 by `/audit` (scope: fixed-finding re-review at 1924880c; all lenses), reviewing F-82
 **Why it matters:** the merge walks every focus area in the organization, not the person's own (`(areas + 1)` lookups per person per day across the grid on every notes change); with a focus-area filter the extra notes can go to a first row in a filtered-out section and not show; dedup keys on state, so one note filed as `published` in one area and `draft_added` in another shows two marks. Tests miss the no-area note, the filter and the row-bearing area.
 **Suggested fix:** walk `emp.focusAreaIds` plus no-area, pick the first visible row, dedup on the type, and add the three cases.
-**Resolution:**
+**Resolution:** Fixed in fix/month-view-note-merge: the merge walks the person's own `focusAreaIds` plus no area (skipping areas where they already have a row), lands on their first row the focus-area filter leaves visible, and deduplicates on the note type. `MonthView.test.tsx` adds a no-area note, own-areas-only, the filter and one-mark-per-type cases; the last three fail against the previous code.
 
 ### F-107 [P3] fixed - Gridmaster realtime follow-ups
 
