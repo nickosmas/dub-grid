@@ -23,13 +23,13 @@
 **Suggested fix:** Generate the code for the verify moment and retry once on a window edge, or run the live tests serially.
 **Resolution:**
 
-### F-20 [P3] open - Saving notification preferences can lose a concurrent save
+### F-20 [P3] fixed - Saving notification preferences can lose a concurrent save
 
 **File:** `apps/web/src/features/account/server/preferences.ts:31`
 **Found:** 2026-09-25 by `/audit` (scope: current, 0d010ca0..4d2b515c; all lenses)
 **Why it matters:** The save reads, merges and upserts in three steps, so a mobile save and a web save at the same moment can drop one another's change. Before 41c1 a mobile save erased the web categories every time.
 **Suggested fix:** Merge inside the database (`prefs = notification_preferences.prefs || excluded.prefs` in an RPC), which needs a migration.
-**Resolution:**
+**Resolution:** Fixed in fix/notification-preferences-merge: migration `072_notification_preferences_merge.sql` adds `merge_notification_preferences`, a service-role-only insert-or-merge (`(stored.prefs || EXCLUDED.prefs) - 'security'`) in one statement under the conflict's row lock, and `saveNotificationPreferences` calls it. `migration-072-notification-preferences.integration.test.ts` proves the merge, that security is never stored, the grants, and that two concurrent saves on separate connections keep both categories. Not yet on production; the app needs 072 applied before it ships.
 
 ### F-25 [P3] open - The once-per-session sign-in record is not atomic
 

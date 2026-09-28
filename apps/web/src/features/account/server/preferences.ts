@@ -21,29 +21,23 @@ export async function fetchNotificationPreferences(
 
 /**
  * Merges into what is stored, so a save from mobile, which knows only three
- * categories, keeps the ones web adds. Security is never stored: those alerts
- * are always on.
+ * categories, keeps the ones web adds. The merge runs inside one upsert in the
+ * database (072), so a web save and a mobile save at the same moment keep each
+ * other's categories (F-20). Security is never stored: those alerts are
+ * always on.
  */
 export async function saveNotificationPreferences(
   userId: string,
   prefs: NotificationPreferenceMap,
 ): Promise<NotificationPreferenceMap> {
-  const stored = (await fetchNotificationPreferences(userId)) ?? {};
-  const merged: NotificationPreferenceMap = { ...stored, ...prefs };
-  delete merged.security;
-
-  const { error } = await getServiceClient().from("notification_preferences").upsert(
-    {
-      user_id: userId,
-      prefs: merged,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id" },
-  );
+  const { data, error } = await getServiceClient().rpc("merge_notification_preferences", {
+    p_user_id: userId,
+    p_prefs: prefs,
+  });
 
   if (error) {
     throw error;
   }
 
-  return merged;
+  return (data as NotificationPreferenceMap | null) ?? {};
 }
