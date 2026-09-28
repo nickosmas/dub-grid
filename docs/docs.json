@@ -71,11 +71,11 @@
           },
           {
             "group": "Billing",
-            "pages": ["reference/billing", "reference/subscription"]
+            "pages": ["reference/billing"]
           },
           {
-            "group": "API",
-            "pages": ["reference/api-overview", "reference/calendar-export"]
+            "group": "Integrations",
+            "pages": ["reference/integrations-and-exports"]
           }
         ]
       }
@@ -90,6 +90,21 @@
     {
       "source": "/configuration/shift-codes",
       "destination": "/configuration/shifts-jobs-and-absences",
+      "permanent": true
+    },
+    {
+      "source": "/reference/subscription",
+      "destination": "/reference/billing",
+      "permanent": true
+    },
+    {
+      "source": "/reference/api-overview",
+      "destination": "/reference/integrations-and-exports",
+      "permanent": true
+    },
+    {
+      "source": "/reference/calendar-export",
+      "destination": "/reference/integrations-and-exports",
       "permanent": true
     }
   ]

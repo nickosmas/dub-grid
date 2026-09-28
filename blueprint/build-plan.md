@@ -777,7 +777,7 @@
           notes; organization activity and controls; departments and focus
           areas; shifts, jobs, and absences), with permanent redirects for
           the focus-area and shift-code pages they replace.
-  - [ ] 40c. **Public mobile, account, alerts, reports, billing, and access
+  - [x] 40c. **Public mobile, account, alerts, reports, billing, and access
         guides** - document role-aware mobile navigation and deliberate parity
         boundaries plus alerts, reports, profile, security, sessions,
         notifications, privacy, data controls, billing, onboarding, and access
@@ -788,7 +788,7 @@
           boundaries, and the alerts and reports pages.
     - [x] 40c2. **Account guides** - publish the profile, security and sessions,
           and notification, privacy, and data-control pages.
-    - [ ] 40c3. **Access, billing, and integrations references** - verify the
+    - [x] 40c3. **Access, billing, and integrations references** - verify the
           roles, Admin permissions, and billing pages, publish integrations
           and exports, and permanently redirect the three replaced pages
           (subscription into billing; API overview and calendar export into

@@ -237,7 +237,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:7317bdf1ba152da8dfe5a6b4e4f96388d138034fe47d77622b89e1be340babfb"
+      "evidenceFingerprint": "sha256:a5319d657dcb0c2fea28686d9534574eeb6edffa92b8bb80b5fe6d0ac1852f33"
     },
     {
       "id": "onboarding",
@@ -928,7 +928,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:fcbea6300712b432992d25f7560f95a262ad1306425cf78b1b4d119a1e242c6e"
+      "evidenceFingerprint": "sha256:3216a2b757f66a0e96e7a41a3eff724edb3d181172231204dc30c7c43789859d"
     },
     {
       "id": "coverage",
@@ -1037,7 +1037,7 @@
       "publicRoute": "/reference/roles",
       "deliveryOwner": "40c",
       "lifecycle": "published",
-      "sourceReview": "pending",
+      "sourceReview": "verified",
       "audiences": [
         "admin"
       ],
@@ -1053,16 +1053,36 @@
         {
           "id": "roles",
           "claims": [
-            "pending-source-review"
+            "three organization roles, per organization; what each can do",
+            "no account counts as User",
+            "Super Admin changes roles on People; immediate; self and last Super Admin guards; Admins invite User or Admin only",
+            "inactive staff are view-only",
+            "Super Admin-only settings"
           ],
           "sourceFiles": [
-            "packages/domain/src/index.ts"
+            "packages/authz/src/index.ts",
+            "packages/domain/src/permissions.ts",
+            "packages/domain/src/org-roles.ts",
+            "packages/domain/src/self-guard.ts",
+            "apps/web/src/lib/access-management.ts",
+            "apps/web/src/components/staff/MemberAccessControls.tsx",
+            "apps/web/src/components/staff/InlineRoleSelect.tsx",
+            "apps/web/src/app/api/organizations/access/route.ts",
+            "apps/web/src/app/api/organizations/invitations/create/route.ts",
+            "apps/web/src/components/settings/nav-config.tsx",
+            "supabase/migrations/051_gridmaster_grants_need_fresh_proof.sql"
           ],
-          "testFiles": [],
+          "testFiles": [
+            "packages/authz/src/index.test.ts",
+            "packages/domain/src/org-roles.test.ts",
+            "apps/web/src/app/api/organizations/access/route.test.ts",
+            "apps/web/src/__tests__/role-escalation-guards.integration.test.ts"
+          ],
           "runtimeScenarios": [],
           "exclusions": []
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:0a44d55ec6a11f5c864cbf54ba0ab261a0b7a097ee85717c587310f7ae6db76b"
     },
     {
       "id": "admin-permissions",
@@ -1070,7 +1090,7 @@
       "publicRoute": "/reference/admin-permissions",
       "deliveryOwner": "40c",
       "lifecycle": "published",
-      "sourceReview": "pending",
+      "sourceReview": "verified",
       "audiences": [
         "admin"
       ],
@@ -1084,16 +1104,28 @@
         {
           "id": "permissions",
           "claims": [
-            "pending-source-review"
+            "permissions per person; Edit admin access opens Edit permissions",
+            "the ten areas with View and Edit, notes on recurring and requests, implied dashboard",
+            "new Admin defaults",
+            "Super Admin-only abilities cannot be delegated"
           ],
           "sourceFiles": [
-            "packages/authz/src/index.ts"
+            "packages/authz/src/index.ts",
+            "apps/web/src/lib/permission-labels.ts",
+            "apps/web/src/components/PermissionsEditor.tsx",
+            "apps/web/src/components/staff/MemberAccessControls.tsx",
+            "apps/web/src/app/api/organizations/access/route.ts"
           ],
-          "testFiles": [],
+          "testFiles": [
+            "packages/authz/src/index.test.ts",
+            "apps/web/src/lib/permission-labels.test.ts",
+            "apps/web/src/__tests__/PermissionsEditor.test.tsx"
+          ],
           "runtimeScenarios": [],
           "exclusions": []
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:760380741e9a3875adc8693e9088ac49eb03ea35ee5dbca7257af3c2c2b964b6"
     },
     {
       "id": "billing",
@@ -1101,7 +1133,7 @@
       "publicRoute": "/reference/billing",
       "deliveryOwner": "40c",
       "lifecycle": "published",
-      "sourceReview": "pending",
+      "sourceReview": "verified",
       "audiences": [
         "admin"
       ],
@@ -1118,115 +1150,41 @@
         {
           "id": "billing",
           "claims": [
-            "pending-source-review"
+            "Super Admin-only Subscription section and its metrics",
+            "14-day trial at first Super Admin sign-in; setup screen for others; welcome message; seven-day reminder; 3 extra days",
+            "Start subscription with a contact email; no second trial; monthly per seat",
+            "seat rule and fixed at checkout; drift shown",
+            "Manage billing opens the provider page",
+            "attention and lock states; locked screens; billing may be unavailable; deleting cancels"
           ],
           "sourceFiles": [
-            "apps/web/src/app/(app)/billing-required/page.tsx"
+            "packages/domain/src/billing.ts",
+            "apps/web/src/components/settings/BillingSettings.tsx",
+            "apps/web/src/components/settings/nav-config.tsx",
+            "apps/web/src/components/TrialWelcomeModal.tsx",
+            "apps/web/src/app/(app)/billing-required/OrganizationGateScreen.tsx",
+            "apps/web/src/proxy.ts",
+            "apps/web/src/features/billing/seats.ts",
+            "apps/web/src/lib/stripe.ts",
+            "apps/web/src/app/api/stripe/create-checkout/route.ts",
+            "apps/web/src/app/api/stripe/billing-portal/route.ts"
           ],
-          "testFiles": [],
-          "runtimeScenarios": [],
-          "exclusions": []
-        }
-      ]
-    },
-    {
-      "id": "subscription",
-      "file": "docs/reference/subscription.mdx",
-      "publicRoute": "/reference/subscription",
-      "deliveryOwner": "40c",
-      "lifecycle": "published",
-      "sourceReview": "pending",
-      "audiences": [
-        "admin"
-      ],
-      "platforms": {
-        "web": "required",
-        "ios": "not-applicable",
-        "android": "not-applicable"
-      },
-      "surfaceIds": [
-        "web:/billing-required"
-      ],
-      "sections": [
-        {
-          "id": "subscription",
-          "claims": [
-            "pending-source-review"
+          "testFiles": [
+            "apps/web/src/__tests__/billing-access.test.ts",
+            "apps/web/src/__tests__/TrialWelcomeModal.test.tsx",
+            "apps/web/src/app/(app)/billing-required/OrganizationGateScreen.test.tsx",
+            "apps/web/src/features/billing/seats.test.ts",
+            "apps/web/src/app/api/stripe/create-checkout/route.test.ts"
           ],
-          "sourceFiles": [
-            "apps/web/src/app/(app)/billing-required/page.tsx"
+          "runtimeScenarios": [
+            "loaded"
           ],
-          "testFiles": [],
-          "runtimeScenarios": [],
-          "exclusions": []
-        }
-      ]
-    },
-    {
-      "id": "api-overview",
-      "file": "docs/reference/api-overview.mdx",
-      "publicRoute": "/reference/api-overview",
-      "deliveryOwner": "40c",
-      "lifecycle": "published",
-      "sourceReview": "pending",
-      "audiences": [
-        "admin"
-      ],
-      "platforms": {
-        "web": "required",
-        "ios": "not-applicable",
-        "android": "not-applicable"
-      },
-      "surfaceIds": [],
-      "sections": [
-        {
-          "id": "integrations",
-          "claims": [
-            "pending-source-review"
-          ],
-          "sourceFiles": [
-            "apps/web/src/app/(app)/reports/page.tsx"
-          ],
-          "testFiles": [],
-          "runtimeScenarios": [],
           "exclusions": [
-            "Internal HTTP endpoints are not a public API."
+            "prices are not stated"
           ]
         }
-      ]
-    },
-    {
-      "id": "calendar-export",
-      "file": "docs/reference/calendar-export.mdx",
-      "publicRoute": "/reference/calendar-export",
-      "deliveryOwner": "40c",
-      "lifecycle": "published",
-      "sourceReview": "pending",
-      "audiences": [
-        "user"
       ],
-      "platforms": {
-        "web": "required",
-        "ios": "required",
-        "android": "required"
-      },
-      "surfaceIds": [
-        "mobile:screen:/(tabs)/profile/calendar:all"
-      ],
-      "sections": [
-        {
-          "id": "calendar",
-          "claims": [
-            "pending-source-review"
-          ],
-          "sourceFiles": [
-            "apps/mobile/app/(tabs)/profile/calendar.tsx"
-          ],
-          "testFiles": [],
-          "runtimeScenarios": [],
-          "exclusions": []
-        }
-      ]
+      "evidenceFingerprint": "sha256:3db1b8418bef26db954bf4b1f17b175a8295b0984b4f70af1c2c2c8676632a96"
     },
     {
       "id": "mobile-navigation",
@@ -1911,36 +1869,57 @@
       "file": "docs/reference/integrations-and-exports.mdx",
       "publicRoute": "/reference/integrations-and-exports",
       "deliveryOwner": "40c",
-      "lifecycle": "planned",
-      "sourceReview": "pending",
+      "lifecycle": "published",
+      "sourceReview": "verified",
       "audiences": [
         "admin"
       ],
       "platforms": {
-        "web": "planned",
-        "ios": "planned",
-        "android": "planned"
+        "web": "required",
+        "ios": "required",
+        "android": "required"
       },
-      "surfaceIds": [],
+      "surfaceIds": [
+        "mobile:screen:/(tabs)/profile/calendar:all"
+      ],
       "sections": [
         {
-          "id": "exports",
+          "id": "integrations",
           "claims": [
-            "planned-source-review"
+            "no public API",
+            "personal calendar subscription on web and app: contents, window, create, replace, disable, eligibility",
+            "print options and browser PDF; may be unavailable",
+            "schedule, staff and report exports, where and who; may be unavailable"
           ],
           "sourceFiles": [
-            "apps/web/src/app/(app)/reports/page.tsx"
+            "apps/web/src/components/profile/CalendarSubscriptionCard.tsx",
+            "packages/domain/src/calendar-links.ts",
+            "apps/web/src/features/account/server/calendar-subscription.ts",
+            "apps/web/src/features/account/server/calendar-feed.ts",
+            "apps/web/src/app/api/calendar/feed/[token]/route.ts",
+            "apps/mobile/src/features/profile/screens/ProfileCalendarScreen.tsx",
+            "apps/web/src/components/Toolbar.tsx",
+            "apps/web/src/components/PrintOptionsModal.tsx",
+            "apps/web/src/app/(app)/schedule/SchedulePageClient.tsx",
+            "apps/web/src/lib/export-csv.ts",
+            "apps/web/src/components/staff/MembersSection.tsx",
+            "apps/web/src/app/api/export/route.ts",
+            "apps/web/src/app/(app)/reports/ReportsPageContent.tsx"
           ],
-          "testFiles": [],
-          "runtimeScenarios": [
-            "export-success",
-            "export-error"
+          "testFiles": [
+            "apps/web/src/components/profile/CalendarSubscriptionCard.test.tsx",
+            "apps/web/src/features/account/server/calendar-feed.test.ts",
+            "packages/domain/src/calendar-links.test.ts",
+            "apps/web/src/app/api/export/route.test.ts",
+            "apps/mobile/src/features/profile/screens/ProfileCalendarScreen.test.tsx"
           ],
+          "runtimeScenarios": [],
           "exclusions": [
-            "Internal HTTP endpoints are not a public API."
+            "no public API is offered"
           ]
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:83d83c0308975b265e70b6b9d9a4fd71ab82f2837ccdb17eb4a650a4074ef2e3"
     }
   ],
   "surfaceExclusions": [

@@ -1,59 +1,37 @@
 ---
 title: "Admin Permissions"
-description: "A complete list of permissions a Super Admin can grant to individual Admins."
+description: "Choose what each Admin can view and manage, one person at a time."
 ---
 
-Super Admins can grant granular permissions to each Admin individually. Rather than every Admin having identical access, you decide exactly what each person can do within your organization.
+An Admin can do only what their Super Admin switches on for them. Permissions are set per person, not per team, so two Admins can have different access.
 
-## Where to configure permissions
+## Changing an Admin's permissions
 
-Go to **Settings → Users**, click the Admin you want to configure, then click **Edit permissions**. Changes take effect immediately.
+A Super Admin opens the Admin on **People** and selects **Edit admin access**. The **Edit permissions** dialog lists each area of DubGrid with a **View** and an **Edit** switch. Turning on **Edit** includes **View**. **Select All** and **Clear All** set everything at once, and a count shows how many are on.
 
-<Warning>
-  Removing a permission takes effect immediately. The Admin will lose access to that action as soon
-  as you save.
-</Warning>
+Nobody can change their own permissions.
 
-## All permissions
+## The areas
 
-DubGrid has 25 permissions. Admins start with a default set and a Super Admin adjusts each one individually.
+| Area                              | View                                                     | Edit                                                                                                                                     |
+| --------------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **Schedule**                      | Always on                                                | Edit shifts and schedule notes                                                                                                           |
+| **Publish schedule**              |                                                          | Publish the schedule                                                                                                                     |
+| **Recurring shifts**              | See recurring schedules                                  | Change recurring schedules, apply them with Auto Fill, and manage repeating shifts. Applying and repeating also need **Schedule: Edit**. |
+| **Staff**                         | See staff details: contact, account, and access          | Add, edit, import, and change the status of staff, and invite people                                                                     |
+| **Shift requests**                | Included                                                 | Approve and reject requests                                                                                                              |
+| **Coverage**                      | See coverage requirements                                | Change coverage requirements                                                                                                             |
+| **Departments & labels**          | See departments, focus areas, and labels                 | Change them                                                                                                                              |
+| **Shifts, jobs & schedule notes** | See shifts, jobs, absence types, and schedule note types | Change them                                                                                                                              |
+| **Dashboard**                     | See dashboard analytics                                  |                                                                                                                                          |
+| **Reports**                       | Run and export reports                                   |                                                                                                                                          |
 
-| Permission                      | What it allows                                        | Delegatable to Admins        |
-| ------------------------------- | ----------------------------------------------------- | ---------------------------- |
-| `canViewSchedule`               | View the schedule grid                                | Always on, cannot be removed |
-| `canViewStaff`                  | View the staff roster                                 | Always on, cannot be removed |
-| `canEditShifts`                 | Create, edit, and delete shift entries                | Yes                          |
-| `canPublishSchedule`            | Publish draft changes to the live schedule            | Yes                          |
-| `canEditNotes`                  | Add and remove schedule notes on schedule cells       | Yes                          |
-| `canViewRecurringShifts`        | View recurring shift templates                        | Yes                          |
-| `canManageRecurringShifts`      | Configure recurring shift templates per employee      | Yes                          |
-| `canApplyRecurringSchedule`     | Apply recurring shift templates to a date range       | Yes                          |
-| `canManageShiftSeries`          | Create and manage repeating shift series              | Yes                          |
-| `canViewEmployeeDetails`        | Open individual staff detail pages                    | Yes                          |
-| `canManageEmployees`            | Add, edit, bench, and terminate employees             | Yes                          |
-| `canViewFocusAreas`             | View the configured focus areas                       | Yes                          |
-| `canManageFocusAreas`           | Create, rename, and remove focus areas                | Yes                          |
-| `canViewScheduleDefinitions`    | View shift code definitions                           | Yes                          |
-| `canManageScheduleDefinitions`  | Create and edit shift codes and their default times   | Yes                          |
-| `canViewIndicatorTypes`         | View schedule note types                              | Yes                          |
-| `canManageIndicatorTypes`       | Manage schedule note types                            | Yes                          |
-| `canViewOrgLabels`              | View the custom terminology labels                    | Yes                          |
-| `canManageOrgLabels`            | Edit custom terminology labels for the organization   | Yes                          |
-| `canManageOrgSettings`          | Edit organization name, address, phone, and timezone  | No, Super Admin only         |
-| `canViewCoverageRequirements`   | View minimum staffing requirements                    | Yes                          |
-| `canManageCoverageRequirements` | Manage minimum staffing requirements                  | Yes                          |
-| `canApproveShiftRequests`       | Approve or reject pickup, swap, and call-off requests | Yes                          |
-| `canViewDashboardAnalytics`     | View the dashboard coverage and analytics cards       | Yes                          |
-| `canViewReports`                | View and export reports                               | Yes                          |
+Seeing everyone's requests comes with approving requests, **Staff: Edit**, or **Schedule: Edit**. Dashboard analytics also come with editing shifts, publishing, managing staff, or approving requests.
 
-## Always-on permissions
+## What a new Admin starts with
 
-`canViewSchedule` and `canViewStaff` are always enabled for all roles and cannot be removed. Every authenticated member of your organization can view the schedule and the staff roster.
+Editing shifts and schedule notes, publishing, recurring shifts and repeating shifts, applying recurring schedules, the dashboard, and reports. Everything else starts off.
 
-## Super Admin-only permissions
+## What only a Super Admin can do
 
-The following permissions are reserved for Super Admins and cannot be delegated to Admins:
-
-- **canManageUsers** - add, remove, and manage organization members
-- **canConfigureAdminPermissions** - configure which permissions each Admin has
-- **canManageOrgSettings** - edit organization name, address, phone, and timezone
+Changing roles and Admin permissions, **Organization Details**, **Shift Display Mode**, **Schedule Rules**, billing, the **Activity Log**, and deleting the organization. These can't be given to an Admin. See [Roles and permissions](/reference/roles).
