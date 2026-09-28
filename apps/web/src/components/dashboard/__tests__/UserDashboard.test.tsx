@@ -1542,8 +1542,8 @@ describe("UserDashboard schedule notes", () => {
       date: dateKey,
       indicatorTypeId,
       focusAreaId: null,
-      shiftId: null,
-      jobId: null,
+      shiftId: 10,
+      jobId: 7,
       status: "published",
       createdBy: null,
       updatedBy: null,
@@ -1619,7 +1619,7 @@ describe("UserDashboard schedule notes", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-08T10:00:00.000Z"));
     try {
-      renderDashboard([note(1, "", { focusAreaId: 2 }), note(2, "")]);
+      renderDashboard([note(1, "", { shiftId: 11 }), note(2, "")]);
 
       expect(screen.getByTestId("user-dashboard-hero-notes")).toHaveTextContent(
         "Schedule notes: Training, Float",
@@ -1627,7 +1627,7 @@ describe("UserDashboard schedule notes", () => {
       const weekRows = within(screen.getByTestId("user-dashboard-my-week")).getAllByTestId(
         "user-dashboard-week-notes",
       );
-      // The first half keeps the whole-day note; Float goes to the half working its area.
+      // Each note sits on the half it belongs to.
       expect(weekRows.map((row) => row.textContent)).toEqual([
         "Schedule notes: Training",
         "Schedule notes: Float",

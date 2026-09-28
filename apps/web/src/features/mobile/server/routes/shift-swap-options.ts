@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import {
   mobileShiftSwapOptionsQuerySchema,
@@ -93,6 +94,8 @@ function buildEntriesByEmployeeAndDate(entries: MobileScheduleEntry[]) {
 export function getSwapOptions(input: {
   requesterEntry: MobileScheduleEntry;
   entries: MobileScheduleEntry[];
+  /** Past shifts of staff who have left stay on the schedule; they cannot take a swap. */
+  activeEmployeeIds: ReadonlySet<string>;
 }): MobileScheduleEntry[] {
   const entriesByEmployeeDate = buildEntriesByEmployeeAndDate(input.entries);
   const requesterRanges = getEntryTimeRanges(input.requesterEntry);
@@ -101,6 +104,7 @@ export function getSwapOptions(input: {
   return input.entries.filter((entry) => {
     if (
       entry.employeeId === input.requesterEntry.employeeId ||
+      !input.activeEmployeeIds.has(entry.employeeId) ||
       !isWorkedShiftEntry(entry) ||
       !canWorkRequiredFocusAreas(
         input.requesterEntry.employeeFocusAreaIds,
@@ -142,6 +146,20 @@ export function getSwapOptions(input: {
   });
 }
 
+async function fetchActiveEmployeeIds(
+  serviceClient: SupabaseClient,
+  orgId: string,
+): Promise<Set<string>> {
+  const { data, error } = await serviceClient
+    .from("employees")
+    .select("id")
+    .eq("org_id", orgId)
+    .eq("status", "active")
+    .is("archived_at", null);
+  if (error) throw error;
+  return new Set((data ?? []).map((row: { id: string }) => row.id));
+}
+
 export async function GET(req: NextRequest) {
   const auth = await requireMobileAuth(req);
   if ("response" in auth) return auth.response;
@@ -178,10 +196,13 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const entries = await fetchMobileScheduleEntries(auth.serviceClient, {
-    orgId: auth.currentOrg.id,
-    ...range,
-  });
+  const [entries, activeEmployeeIds] = await Promise.all([
+    fetchMobileScheduleEntries(auth.serviceClient, {
+      orgId: auth.currentOrg.id,
+      ...range,
+    }),
+    fetchActiveEmployeeIds(auth.serviceClient, auth.currentOrg.id),
+  ]);
   const requesterEntry =
     entries.find(
       (entry) =>
@@ -191,7 +212,7 @@ export async function GET(req: NextRequest) {
 
   const options =
     requesterEntry && isWorkedShiftEntry(requesterEntry)
-      ? getSwapOptions({ requesterEntry, entries })
+      ? getSwapOptions({ requesterEntry, entries, activeEmployeeIds })
       : [];
 
   return NextResponse.json(

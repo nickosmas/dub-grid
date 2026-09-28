@@ -150,14 +150,14 @@ describe("PersonScheduleSection", () => {
     expect(within(changes).getByText(/D to N/)).toBeInTheDocument();
     expect(within(changes).getByText(/by admin@calmhaven.test/)).toBeInTheDocument();
 
-    const requests = group("Shift requests");
+    const requests = group("Shift requests, open and last 90 days");
     expect(within(requests).getByText("Approved")).toBeInTheDocument();
     expect(
       within(requests).getByText(/Swap they asked for, with Ada Lovelace/),
     ).toBeInTheDocument();
     expect(within(requests).getByText(/note: Covered/)).toBeInTheDocument();
 
-    const profile = group("Profile change requests");
+    const profile = group("Profile change requests, open and last 90 days");
     expect(within(profile).getByText(/Contact: Phone 555-0100/)).toBeInTheDocument();
   });
 

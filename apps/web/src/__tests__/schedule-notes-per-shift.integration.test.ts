@@ -114,9 +114,10 @@ async function rewindTo062(): Promise<void> {
   );
   if (rows.length === 0) return;
   await db.query(`
+    -- 068 already dropped the key check once every note named its shift.
     ALTER TABLE public.schedule_notes
       DROP CONSTRAINT schedule_notes_segment_unique,
-      DROP CONSTRAINT schedule_notes_segment_key_check;
+      DROP CONSTRAINT IF EXISTS schedule_notes_segment_key_check;
     DELETE FROM public.schedule_notes a
       USING public.schedule_notes b
      WHERE a.id > b.id

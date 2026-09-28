@@ -35,14 +35,14 @@ export function shouldUseShiftColorForDiffState(args: { isCross: boolean }): boo
   return !args.isCross;
 }
 
-/** Diameter of the note dot rendered for each active indicator, and its gap. */
-export const NOTE_DOT_SIZE = 10;
-export const NOTE_DOT_GAP = 2;
+/** A shift's note mark: one sticky note, or a stacked one for several notes. */
+export const NOTE_ICON_SIZE = 11;
+export const NOTE_STACK_SIZE = 13;
 
-/** Horizontal run the note dots claim for `count` indicators. */
-export function noteDotsWidth(count: number): number {
+/** Horizontal run a shift's note mark claims for `count` notes. */
+export function noteMarksWidth(count: number): number {
   if (count <= 0) return 0;
-  return count * NOTE_DOT_SIZE + (count - 1) * NOTE_DOT_GAP;
+  return count === 1 ? NOTE_ICON_SIZE : NOTE_STACK_SIZE;
 }
 
 /**

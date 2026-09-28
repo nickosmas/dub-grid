@@ -1475,12 +1475,14 @@ export async function updateMobileEmployeeStatusRow(
     statusNote: string;
     statusChangedAt: string;
     archivedAt?: string | null;
+    updatedBy: string;
   },
 ): Promise<DbEmployee | null> {
   const update: Record<string, unknown> = {
     status: input.status,
     status_note: input.statusNote,
     status_changed_at: input.statusChangedAt,
+    updated_by: input.updatedBy,
     version: input.expectedVersion + 1,
   };
 

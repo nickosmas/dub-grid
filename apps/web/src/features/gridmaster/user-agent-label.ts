@@ -9,11 +9,12 @@ const SYSTEM_NAMES: Record<string, string> = {
 
 /** "Safari on Mac" from a raw user agent; the raw string stays the source of truth. */
 export function describeUserAgent(userAgent: string): string {
-  // The native app's requests carry the platform networking stack's agent.
+  // Native requests carry the platform networking stack's agent. Only iOS adds
+  // the app's own bundle name, so only there can the app be named (F-104).
   if (/CFNetwork\//i.test(userAgent) && /Darwin\//i.test(userAgent)) {
-    return "DubGrid app on iPhone";
+    return /^DubGrid\//.test(userAgent) ? "DubGrid app on iPhone" : "iPhone or iPad app";
   }
-  if (/^okhttp\//i.test(userAgent)) return "DubGrid app on Android";
+  if (/^okhttp\//i.test(userAgent)) return "Android app";
 
   const { deviceLabel, browserName } = getWebSessionMetadata(userAgent);
   const browser = browserName ?? "Unknown browser";

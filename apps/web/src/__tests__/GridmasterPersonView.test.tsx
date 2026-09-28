@@ -44,8 +44,9 @@ vi.mock("@/features/gridmaster/client", () => ({
     fetchGridmasterPersonNotifications(...args),
   fetchGridmasterStaffActivity: (...args: unknown[]) => fetchGridmasterStaffActivity(...args),
 }));
+const stepUpState = vi.hoisted(() => ({ dialog: null as unknown }));
 vi.mock("@/hooks/useStepUpAction", () => ({
-  useStepUpAction: () => ({ run: stepUpRun, dialog: null }),
+  useStepUpAction: () => ({ run: stepUpRun, dialog: stepUpState.dialog }),
 }));
 vi.mock("@/features/account/client", () => ({
   requireCredentialAssurance: (...args: unknown[]) => requireCredentialAssurance(...args),
@@ -206,7 +207,7 @@ function renderView(
   const onImpersonate = vi.fn();
   const onOpenOrganization = vi.fn();
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(
+  const tree = () => (
     <QueryClientProvider client={queryClient}>
       <GridmasterPersonView
         target={target}
@@ -214,14 +215,16 @@ function renderView(
         onImpersonate={onImpersonate}
         onOpenOrganization={onOpenOrganization}
       />
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
-  return { onBack, onImpersonate, onOpenOrganization };
+  const view = render(tree());
+  return { onBack, onImpersonate, onOpenOrganization, rerender: () => view.rerender(tree()) };
 }
 
 describe("GridmasterPersonView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    stepUpState.dialog = null;
     stepUpRun.mockImplementation(async (action: (token: string) => Promise<unknown>) => {
       await action("fresh-token");
       return true;
@@ -307,6 +310,20 @@ describe("GridmasterPersonView", () => {
       forceLogoutGridmasterUser.mock.invocationCallOrder[0],
     );
     expect(toast.success).toHaveBeenCalledWith("User sessions terminated");
+  });
+
+  it("refreshes the person's other sections after an action, not only the record (F-91)", async () => {
+    renderView(linkedRecord());
+    await waitFor(() => expect(fetchGridmasterPersonNotifications).toHaveBeenCalledOnce());
+
+    fireEvent.click(await screen.findByRole("button", { name: "Force logout" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Force logout" })).getByRole("button", {
+        name: "Force logout",
+      }),
+    );
+
+    await waitFor(() => expect(fetchGridmasterPersonNotifications).toHaveBeenCalledTimes(2));
   });
 
   it("changes nothing when step-up is cancelled", async () => {
@@ -781,5 +798,130 @@ describe("GridmasterPersonView", () => {
       ),
     );
     expect(requireCredentialAssurance).toHaveBeenCalled();
+  });
+
+  describe("account and device actions (F-95)", () => {
+    function confirmIn(dialogName: string, button = dialogName) {
+      fireEvent.click(
+        within(screen.getByRole("dialog", { name: dialogName })).getByRole("button", {
+          name: button,
+        }),
+      );
+    }
+
+    it("terminates with the reason given, after the credential check", async () => {
+      renderView(linkedRecord());
+
+      fireEvent.click(await screen.findByRole("button", { name: "Terminate account" }));
+      confirmIn("Terminate account");
+      expect(toast.error).toHaveBeenCalledWith("Give a reason for the termination.");
+      expect(terminateGridmasterUser).not.toHaveBeenCalled();
+
+      fireEvent.change(screen.getByLabelText("Termination reason"), {
+        target: { value: "  Fraud  " },
+      });
+      confirmIn("Terminate account");
+
+      await waitFor(() =>
+        expect(terminateGridmasterUser).toHaveBeenCalledWith(USER, "Fraud", "fresh-token"),
+      );
+      expect(requireCredentialAssurance).toHaveBeenCalled();
+      expect(toast.success).toHaveBeenCalledWith("Account terminated");
+    });
+
+    it("reinstates a terminated account", async () => {
+      renderView(
+        linkedRecord({
+          profile: { ...linkedRecord().profile!, terminatedAt: "2026-09-02T00:00:00.000Z" },
+        }),
+      );
+
+      fireEvent.click(await screen.findByRole("button", { name: "Reinstate" }));
+      confirmIn("Reinstate account", "Reinstate");
+
+      await waitFor(() =>
+        expect(reinstateGridmasterUser).toHaveBeenCalledWith(USER, "fresh-token"),
+      );
+    });
+
+    it("sends a password reset to the sign-in email", async () => {
+      renderView(linkedRecord());
+
+      fireEvent.click(await screen.findByRole("button", { name: "Send password reset" }));
+      confirmIn("Send password reset", "Send reset email");
+
+      await waitFor(() => expect(sendGridmasterPasswordReset).toHaveBeenCalledOnce());
+      expect(sendGridmasterPasswordReset.mock.calls[0][1]).toBe("fresh-token");
+    });
+
+    it.each([
+      ["Forget", "Forget device", "Forget device", { action: "forgetDevice", deviceId: "d-1" }],
+      [
+        "Turn off",
+        "Turn off push notifications",
+        "Turn off",
+        { action: "disablePushDevice", deviceId: "p-1" },
+      ],
+      ["Revoke", "Revoke calendar feed", "Revoke", { action: "revokeCalendarFeed", feedId: "c-1" }],
+    ])("%s runs its security action through step-up", async (button, dialog, confirm, input) => {
+      const record = linkedRecord();
+      renderView({
+        ...record,
+        security: {
+          ...record.security!,
+          knownDevices: [
+            {
+              id: "d-1",
+              platform: "ios",
+              firstSeenAt: "2026-09-01T00:00:00.000Z",
+              lastSeenAt: "2026-09-20T00:00:00.000Z",
+            },
+          ],
+        },
+        sessions: {
+          sessions: [],
+          pushDevices: [
+            {
+              id: "p-1",
+              orgId: ORG,
+              platform: "android",
+              lastSeenAt: null,
+              disabledAt: null,
+              createdAt: "2026-09-02T00:00:00.000Z",
+            },
+          ],
+          calendarFeeds: [
+            { id: "c-1", orgId: ORG, issuedAt: "2026-09-03T00:00:00.000Z", revokedAt: null },
+          ],
+        },
+      });
+
+      fireEvent.click(await screen.findByRole("button", { name: button }));
+      confirmIn(dialog, confirm);
+
+      await waitFor(() =>
+        expect(runGridmasterPersonSecurityAction).toHaveBeenCalledWith(USER, input, "fresh-token"),
+      );
+    });
+
+    it("hides the confirmation while the step-up prompt is open", async () => {
+      const { rerender } = renderView(linkedRecord());
+
+      fireEvent.click(await screen.findByRole("button", { name: "Force logout" }));
+      expect(screen.getByRole("dialog", { name: "Force logout" })).toBeInTheDocument();
+
+      stepUpState.dialog = <div role="dialog" aria-label="Confirm your identity" />;
+      rerender();
+
+      // Each card has its own step-up hook, so the stubbed prompt renders once per card.
+      expect(
+        screen.getAllByRole("dialog", { name: "Confirm your identity" }).length,
+      ).toBeGreaterThan(0);
+      expect(screen.queryByRole("dialog", { name: "Force logout" })).toBeNull();
+
+      stepUpState.dialog = null;
+      rerender();
+      expect(screen.getByRole("dialog", { name: "Force logout" })).toBeInTheDocument();
+    });
   });
 });

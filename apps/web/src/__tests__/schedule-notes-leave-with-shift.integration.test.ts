@@ -115,23 +115,14 @@ async function writeDraft(shiftIds: number[]): Promise<void> {
 
 async function addNote(
   indicatorTypeId: number,
-  shiftId: number | null,
+  shiftId: number,
   status: "draft" | "published",
 ): Promise<void> {
   await db.query(
     `INSERT INTO public.schedule_notes
        (org_id, emp_id, date, indicator_type_id, focus_area_id, shift_id, job_id, status)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-    [
-      fx.orgId,
-      fx.empId,
-      DATE,
-      indicatorTypeId,
-      fx.focusAreaId,
-      shiftId,
-      shiftId == null ? null : fx.jobId,
-      status,
-    ],
+    [fx.orgId, fx.empId, DATE, indicatorTypeId, fx.focusAreaId, shiftId, fx.jobId, status],
   );
 }
 
@@ -213,18 +204,16 @@ describe.skipIf(!reachable)("064 schedule notes leave with their shift", () => {
     await addNote(readings, fx.dayShiftId, "draft");
     await addNote(readings, fx.eveningShiftId, "draft");
     await addNote(shower, fx.eveningShiftId, "published");
-    await addNote(shower, null, "draft");
     await settle();
 
     await writeDraft([fx.dayShiftId]);
     await settle();
 
     // Evening's draft note goes, its published one waits for the publish, and
-    // Day's note and the one no shift claims stay.
+    // Day's note stays.
     expect(await notes()).toEqual([
       [readings, fx.dayShiftId, "draft"],
       [shower, fx.eveningShiftId, "draft_deleted"],
-      [shower, null, "draft"],
     ]);
   });
 
@@ -263,15 +252,15 @@ describe.skipIf(!reachable)("064 schedule notes leave with their shift", () => {
     ]);
   });
 
-  it("clears a pruned cell's shift notes and keeps the one no shift claims", async () => {
-    const [dayNote, unclaimed] = fx.indicatorIds;
+  it("clears a pruned cell's notes", async () => {
+    const [dayNote, eveningNote] = fx.indicatorIds;
     await addNote(dayNote, fx.dayShiftId, "draft");
-    await addNote(unclaimed, null, "draft");
+    await addNote(eveningNote, fx.eveningShiftId, "draft");
     await settle();
 
     await db.query(`DELETE FROM public.schedule_cells WHERE id = $1`, [cellId]);
     await settle();
 
-    expect(await notes()).toEqual([[unclaimed, null, "draft"]]);
+    expect(await notes()).toEqual([]);
   });
 });

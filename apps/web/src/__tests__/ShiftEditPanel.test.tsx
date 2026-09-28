@@ -778,10 +778,10 @@ describe("ShiftEditPanel", () => {
             indicatorTypesOverride: indicatorTypes,
             canEditScheduleIndicators: true,
             getActiveIndicatorIds: (focusAreaId, shift) =>
-              focusAreaId === 1 ? activeNoteIds(notes, shift) : [],
-            onNoteToggle: vi.fn((id: number, active: boolean, _fa: number, shift) =>
-              setNotes((prev) => toggleDraftNote(prev, id, active, shift)),
-            ),
+              focusAreaId === 1 && shift ? activeNoteIds(notes, shift) : [],
+            onNoteToggle: vi.fn((id: number, active: boolean, _fa: number, shift) => {
+              if (shift) setNotes((prev) => toggleDraftNote(prev, id, active, shift));
+            }),
           },
           vi.fn(),
           vi.fn(),

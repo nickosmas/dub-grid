@@ -61,7 +61,14 @@ function makeClient(tables: Tables) {
   };
 }
 
-const employee = { id: EMP, org_id: "org-1", user_id: USER, created_at: null, created_by: null };
+const employee = {
+  id: EMP,
+  org_id: "org-1",
+  user_id: USER,
+  created_at: null,
+  created_by: null,
+  organizations: { workspace_kind: "real" },
+};
 
 describe("loadPersonHistory", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -130,6 +137,61 @@ describe("loadPersonHistory", () => {
     const history = await loadPersonHistory(client as never, { kind: "user", userId: USER });
 
     expect(history?.entries[0].details).toEqual({ outcome: "succeeded", surface: "mobile" });
+  });
+
+  it("drops hash, IP and user-agent keys at any depth, whatever they are called (F-105)", async () => {
+    const { client } = makeClient({
+      profiles: { id: USER },
+      employees: [employee],
+      accountAudit: [
+        {
+          id: 3,
+          action: "security.auth.login",
+          details: {
+            outcome: "succeeded",
+            ipHash: "h",
+            ip_address: "203.0.113.9",
+            userAgent: "Safari",
+            targetUserId: USER,
+            request: { ip: "203.0.113.9", "user-agent": "Safari", note: "kept" },
+            devices: [{ deviceHash: "d", label: "kept" }],
+          },
+          created_at: "2026-09-25T10:00:00.000Z",
+        },
+      ],
+    });
+
+    const history = await loadPersonHistory(client as never, { kind: "user", userId: USER });
+
+    expect(history?.entries[0].details).toEqual({
+      outcome: "succeeded",
+      targetUserId: USER,
+      request: { note: "kept" },
+      devices: [{ label: "kept" }],
+    });
+  });
+
+  it("keeps the person's own impersonation actions when the id arrives in capitals (F-105)", async () => {
+    const ADA = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const { client } = makeClient({
+      profiles: { id: ADA },
+      employees: [],
+      accountAudit: [
+        {
+          id: 5,
+          action: "impersonation.started",
+          actor_id: ADA,
+          created_at: "2026-09-25T10:00:00.000Z",
+        },
+      ],
+    });
+
+    const history = await loadPersonHistory(client as never, {
+      kind: "user",
+      userId: ADA.toUpperCase(),
+    });
+
+    expect(history?.entries.map((entry) => entry.id)).toContain("5");
   });
 
   it("shows each impersonation once, though the staff source also finds its rows (F-87)", async () => {
@@ -201,6 +263,25 @@ describe("loadPersonHistory", () => {
     expect(history?.entries.map((entry) => entry.id)).toEqual(["1"]);
     expect(reads).not.toContain("impersonation_sessions");
     expect(reads).not.toContain("profiles");
+  });
+
+  it("refuses a Test Sandbox staff record and ignores an account's sandbox clones (F-93)", async () => {
+    const sandbox = { ...employee, id: "clone-1", organizations: { workspace_kind: "sandbox" } };
+
+    expect(
+      await loadPersonHistory(makeClient({ employees: [sandbox] }).client as never, {
+        kind: "staff",
+        employeeId: "clone-1",
+      }),
+    ).toBeNull();
+
+    const { client, reads } = makeClient({
+      profiles: { id: USER },
+      employees: [employee, sandbox],
+    });
+    await loadPersonHistory(client as never, { kind: "user", userId: USER });
+    // One organization source per real staff record; the clone's is never read.
+    expect(reads.filter((table) => table === "invitations")).toHaveLength(1);
   });
 
   it("finds no one for an unknown account or staff record", async () => {

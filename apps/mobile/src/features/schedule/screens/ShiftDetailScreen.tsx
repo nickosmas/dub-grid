@@ -1729,7 +1729,7 @@ function DetailIconTile({
 
 /**
  * The shift's schedule notes, spelled out. A double shift lists each half's
- * under that half, and the rest under "For the whole day".
+ * notes under that half's shift.
  */
 function ScheduleNotesDetailRow({ entry }: { entry: MobileScheduleEntry }) {
   const mobileColors = useMobileColors();

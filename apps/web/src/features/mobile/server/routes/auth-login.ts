@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { mobileAuthLoginBodySchema, mobileAuthLoginResponseSchema } from "@dubgrid/contracts";
+import {
+  MOBILE_LOGIN_SERVER_DEADLINE_MS,
+  mobileAuthLoginBodySchema,
+  mobileAuthLoginResponseSchema,
+} from "@dubgrid/contracts";
 import {
   createMobileEphemeralAuthClient,
   isValidMobileOrgSlug,
@@ -17,6 +21,8 @@ import { API_ERRORS } from "@dubgrid/client-errors";
 import { withTiming, type Timer } from "@/lib/server-timing";
 import { writeSecurityAuditEvent } from "@/lib/auth/security-audit";
 import { sessionHashOf } from "@/lib/auth/sign-in-completion";
+import { endUserSession } from "@/lib/auth/revocation";
+import { verifyAccessToken } from "@/lib/auth/verify-token";
 
 async function hashIdentifier(value: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -32,7 +38,32 @@ const CORS_METHODS = ["POST", "OPTIONS"] as const;
 
 export const OPTIONS = createMobileOptionsHandler(CORS_METHODS);
 
+/**
+ * The phone stops waiting after MOBILE_REQUEST_TIMEOUT_MS, but the server keeps
+ * going and still creates a session (18.6 s observed under load), which then
+ * lists as a signed-in device nobody used (F-78). Past the deadline, or once
+ * the client has actually disconnected, the session is ended instead of
+ * returned: answering with tokens nobody is waiting for is what leaves the
+ * orphan.
+ */
+function clientHasGoneAway(req: NextRequest, startedAt: number): boolean {
+  return req.signal?.aborted === true || Date.now() - startedAt >= MOBILE_LOGIN_SERVER_DEADLINE_MS;
+}
+
+/** Best effort: a login already too slow to use must not also fail on cleanup. */
+async function discardSession(accessToken: string): Promise<boolean> {
+  try {
+    const verified = await verifyAccessToken(accessToken);
+    if (!verified?.sessionId) return false;
+    await endUserSession(verified.userId, verified.sessionId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function handlePOST(req: NextRequest, timer: Timer) {
+  const startedAt = Date.now();
   const json = (body: unknown, init?: ResponseInit) =>
     withMobileCors(req, NextResponse.json(body, init), CORS_METHODS);
 
@@ -113,6 +144,28 @@ async function handlePOST(req: NextRequest, timer: Timer) {
         orgSlug: normalizedOrgSlug,
       }),
     );
+
+    if (clientHasGoneAway(req, startedAt)) {
+      const discarded = await discardSession(payload.session.accessToken);
+      await writeSecurityAuditEvent({
+        event: "security.auth.login",
+        outcome: "failed",
+        reason: "service_unavailable",
+        actorId: payload.user.id,
+        orgId: payload.organization.id,
+        metadata: {
+          targetHash: emailHash,
+          sourceHash,
+          surface: "mobile",
+          clientGone: true,
+          sessionDiscarded: discarded,
+        },
+      });
+      return json(
+        { error: "That took too long. Check your connection and sign in again." },
+        { status: 504 },
+      );
+    }
 
     // With a second factor enrolled the password step is only challenged;
     // /api/mobile/v1/auth/sign-in-complete records the success. A success

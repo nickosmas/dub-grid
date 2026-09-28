@@ -549,11 +549,15 @@ describe.runIf(dbReachable)("caller_org_id / caller_org_role SQL layer", () => {
       );
       expect(crossTenantRead.rowCount).toBe(0);
 
-      const crossTenantWrite = await sqlDb.query(
-        `UPDATE public.employees SET first_name = first_name WHERE org_id = $1`,
-        [otherOrgId],
-      );
-      expect(crossTenantWrite.rowCount).toBe(0);
+      // Staff records are written by the server only (065), so the write is
+      // refused outright rather than matching no rows.
+      await sqlDb.query("SAVEPOINT cross_tenant_write");
+      await expect(
+        sqlDb.query(`UPDATE public.employees SET first_name = first_name WHERE org_id = $1`, [
+          otherOrgId,
+        ]),
+      ).rejects.toThrow(/permission denied for table employees/);
+      await sqlDb.query("ROLLBACK TO SAVEPOINT cross_tenant_write");
     } finally {
       await sqlDb.query("ROLLBACK");
       await resetJwt();

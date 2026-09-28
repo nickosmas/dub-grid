@@ -7,19 +7,21 @@ const loadPersonTarget = vi.fn();
 const resetPersonTwoFactor = vi.fn();
 const scheduleTwoFactorResetNotice = vi.fn();
 const writeAudit = vi.fn();
+const validateCsrfOrigin = vi.fn();
 const serviceClient = { service: true };
 
 vi.mock("@/lib/api-auth", () => ({
   requireGridmasterSession: (req: NextRequest) => requireGridmasterSession(req),
   requireSensitiveActionAuth: (req: NextRequest) => requireSensitiveActionAuth(req),
 }));
-vi.mock("@/lib/csrf", () => ({ validateCsrfOrigin: () => null }));
+vi.mock("@/lib/csrf", () => ({ validateCsrfOrigin: () => validateCsrfOrigin() }));
 vi.mock("@/lib/supabase-service", () => ({ getServiceClient: () => serviceClient }));
 vi.mock("@/app/api/gridmaster/_lib/audit", () => ({
   writeGridmasterAuditLogAfterCommit: (input: unknown) => writeAudit(input),
 }));
 vi.mock("@/app/api/gridmaster/_lib/two-factor-reset-notice", () => ({
-  scheduleTwoFactorResetNotice: (to: string) => scheduleTwoFactorResetNotice(to),
+  scheduleTwoFactorResetNotice: (to: string, options?: unknown) =>
+    scheduleTwoFactorResetNotice(to, options),
 }));
 vi.mock("@/features/gridmaster/server/person-target", () => ({
   loadPersonTarget: (...args: unknown[]) => loadPersonTarget(...args),
@@ -47,6 +49,7 @@ function post(body: unknown) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  validateCsrfOrigin.mockReturnValue(null);
   requireGridmasterSession.mockResolvedValue({ user: { id: "gm", email: "gm@dubgrid.com" } });
   requireSensitiveActionAuth.mockResolvedValue({ user: { id: "gm" }, sessionId: "s" });
   loadPersonTarget.mockResolvedValue({ userId: USER, email: "ada@example.com" });
@@ -79,7 +82,9 @@ describe("POST /api/gridmaster/users/[userId]/two-factor-reset", () => {
     const response = await post({ reason: " Lost phone, verified by call " });
     expect(response.status).toBe(200);
     expect(resetPersonTwoFactor).toHaveBeenCalledWith(serviceClient, USER);
-    expect(scheduleTwoFactorResetNotice).toHaveBeenCalledWith("ada@example.com");
+    expect(scheduleTwoFactorResetNotice).toHaveBeenCalledWith("ada@example.com", {
+      partial: false,
+    });
     expect(writeAudit).toHaveBeenCalledWith(
       expect.objectContaining({
         action: "user.mfa_reset",
@@ -105,6 +110,9 @@ describe("POST /api/gridmaster/users/[userId]/two-factor-reset", () => {
 
     expect(response.status).toBe(500);
     expect(scheduleTwoFactorResetNotice).toHaveBeenCalledTimes(1);
+    expect(scheduleTwoFactorResetNotice).toHaveBeenCalledWith("ada@example.com", {
+      partial: true,
+    });
     expect(writeAudit).toHaveBeenCalledWith(
       expect.objectContaining({
         action: "user.mfa_reset",
@@ -115,5 +123,15 @@ describe("POST /api/gridmaster/users/[userId]/two-factor-reset", () => {
         }),
       }),
     );
+  });
+
+  it("refuses a cross-origin request before anything else (F-95)", async () => {
+    validateCsrfOrigin.mockReturnValueOnce(
+      NextResponse.json({ error: "Invalid origin" }, { status: 403 }),
+    );
+    expect((await post({ reason: "Lost phone" })).status).toBe(403);
+    expect(requireGridmasterSession).not.toHaveBeenCalled();
+    expect(resetPersonTwoFactor).not.toHaveBeenCalled();
+    expect(writeAudit).not.toHaveBeenCalled();
   });
 });

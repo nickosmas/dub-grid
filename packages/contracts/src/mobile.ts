@@ -11,6 +11,24 @@ import {
   staffNotesSchema,
 } from "./staff";
 
+/**
+ * How long the mobile app waits for one HTTP request before giving up.
+ *
+ * It lives here because the sign-in route has to know it: a login that outruns
+ * this leaves the phone with no tokens while the server finishes and creates a
+ * session anyway, which then shows as an extra signed-in device nobody can
+ * account for (F-78).
+ */
+export const MOBILE_REQUEST_TIMEOUT_MS = 15_000;
+
+/**
+ * When the sign-in route stops and discards the session it created rather than
+ * answering with tokens the phone has already stopped waiting for. Held below
+ * the client timeout so the decision is made while the phone is still
+ * listening, and the margin absorbs the response's own flight time.
+ */
+export const MOBILE_LOGIN_SERVER_DEADLINE_MS = MOBILE_REQUEST_TIMEOUT_MS - 1_000;
+
 export const mobilePlatformSchema = z.enum(["ios", "android"]);
 export const mobileRoleSchema = z.enum(["super_admin", "admin", "user"]);
 export const mobileOrgSlugSchema = z

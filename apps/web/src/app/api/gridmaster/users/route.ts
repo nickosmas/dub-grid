@@ -210,6 +210,16 @@ export async function PATCH(req: NextRequest) {
         { status: 404 },
       );
     }
+    // Deactivation is account-wide; the row joins an organization's activity
+    // only when the person belongs to it, never on the client's word (F-93).
+    const { data: membership, error: membershipError } = await serviceClient
+      .from("organization_memberships")
+      .select("org_id")
+      .eq("user_id", userId)
+      .eq("org_id", parsed.data.orgId)
+      .maybeSingle();
+    if (membershipError) throw membershipError;
+
     const { error } = await serviceClient
       .from("profiles")
       .update({
@@ -222,8 +232,9 @@ export async function PATCH(req: NextRequest) {
       throw error;
     }
 
-    // The hook now refuses a deactivated account at the next token issue;
-    // the watermark makes the tokens already in hand fail app APIs at once.
+    // The hook refuses a deactivated account at the next token issue; ending
+    // its sessions also deletes their refresh tokens, so a device cannot mint
+    // new ones after reactivation (F-89).
     if (deactivate) {
       await endUserSessions(userId);
     }
@@ -234,7 +245,7 @@ export async function PATCH(req: NextRequest) {
       action: deactivate ? "user.deactivated" : "user.reactivated",
       resourceType: "user",
       resourceId: userId,
-      orgId: parsed.data.orgId,
+      orgId: membership ? parsed.data.orgId : null,
       details: { targetUserId: userId },
       request: req,
     });

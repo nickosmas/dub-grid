@@ -11,9 +11,9 @@ export interface EmployeeStatusActionsProps {
   canEdit: boolean;
   /** When true, this employee is the current user — destructive self-actions are hidden. */
   isSelf?: boolean;
-  onDeactivate: (empId: string, note?: string) => void;
+  onDeactivate: (empId: string, note?: string) => void | Promise<boolean>;
   onActivate: (empId: string) => void;
-  onRemove: (empId: string, note?: string) => void;
+  onRemove: (empId: string, note?: string) => void | Promise<boolean>;
   variant: "panel" | "page";
   /** Stretches the active button to fill its container, for an equal-width row of actions. */
   fillWidth?: boolean;

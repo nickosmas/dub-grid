@@ -56,7 +56,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ userId
     if (!target) return NextResponse.json({ error: NOT_FOUND }, { status: 404 });
 
     const recordReset = async (factorsRemoved: number, partial: boolean) => {
-      if (target.email) scheduleTwoFactorResetNotice(target.email);
+      if (target.email) scheduleTwoFactorResetNotice(target.email, { partial });
       await writeGridmasterAuditLogAfterCommit({
         serviceClient,
         actor: auth.user,

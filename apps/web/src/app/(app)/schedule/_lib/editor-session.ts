@@ -1,12 +1,12 @@
 import { cloneScheduleCellEntry, cloneScheduleCellSnapshot } from "@/lib/schedule-cells";
 import type { DraftKind, ScheduleNoteShift, ShiftJobSegment, ShiftMap } from "@/types";
 
-/** A note in the editor: its type, and the shift it belongs to (both null when none). */
+/** A note in the editor: its type, and the shift it belongs to. */
 export type DraftNoteState = {
   indicatorTypeId: number;
   status: "published" | "draft" | "draft_deleted";
   shiftId: number | null;
-  jobId: number | null;
+  jobId: number;
 };
 
 export type EditSessionDraft = {
@@ -27,17 +27,29 @@ export function cloneShiftEntry(
   return cloneScheduleCellEntry(shift);
 }
 
-/** Also fills in the shift for a note from a map entry that predates 063. */
+/** A note always names its shift (065); an entry without one is dropped. */
 export function cloneDraftNotes(
   notes:
-    ReadonlyArray<Omit<DraftNoteState, "shiftId" | "jobId"> & Partial<DraftNoteState>> | undefined,
+    | ReadonlyArray<
+        Pick<DraftNoteState, "indicatorTypeId" | "status"> & {
+          shiftId?: number | null;
+          jobId?: number | null;
+        }
+      >
+    | undefined,
 ): DraftNoteState[] {
-  return (notes ?? []).map((note) => ({
-    indicatorTypeId: note.indicatorTypeId,
-    status: note.status,
-    shiftId: note.shiftId ?? null,
-    jobId: note.jobId ?? null,
-  }));
+  return (notes ?? []).flatMap((note) =>
+    note.jobId == null
+      ? []
+      : [
+          {
+            indicatorTypeId: note.indicatorTypeId,
+            status: note.status,
+            shiftId: note.shiftId ?? null,
+            jobId: note.jobId,
+          },
+        ],
+  );
 }
 
 export function noteShiftOf(
@@ -46,8 +58,7 @@ export function noteShiftOf(
   return segment?.jobId != null ? { shiftId: segment.shiftId ?? null, jobId: segment.jobId } : null;
 }
 
-function isOnShift(note: DraftNoteState, shift: ScheduleNoteShift | null): boolean {
-  if (!shift) return note.jobId == null;
+function isOnShift(note: DraftNoteState, shift: ScheduleNoteShift): boolean {
   return note.jobId === shift.jobId && note.shiftId === shift.shiftId;
 }
 
@@ -55,77 +66,60 @@ const isActiveNote = (note: DraftNoteState) => note.status !== "draft_deleted";
 
 /** Identifies a note within one focus area of a cell. */
 export function draftNoteKey(note: DraftNoteState): string {
-  return `${note.indicatorTypeId}|${note.shiftId ?? "-"}|${note.jobId ?? "-"}`;
+  return `${note.indicatorTypeId}|${note.shiftId ?? "-"}|${note.jobId}`;
 }
 
-/**
- * The note types a shift shows: its own, plus any note no shift claims, which
- * belongs to every shift in its focus area. Without a shift, only the latter.
- */
+/** The note types a shift shows. */
 export function activeNoteIds(
   notes: readonly DraftNoteState[],
-  shift: ScheduleNoteShift | null,
+  shift: ScheduleNoteShift,
 ): number[] {
   const ids = new Set<number>();
   for (const note of notes) {
-    if (!isActiveNote(note)) continue;
-    if (isOnShift(note, shift) || note.jobId == null) ids.add(note.indicatorTypeId);
+    if (isActiveNote(note) && isOnShift(note, shift)) ids.add(note.indicatorTypeId);
   }
   return [...ids];
 }
 
 /**
- * Turns a note on or off for one shift. Turning one on writes it against that
- * shift, unless a note no shift claims already covers it or was only pending
- * removal. Turning one off removes the shift's own note first, and only then
- * one no shift claims, so undoing either restores what was there.
+ * Turns a note on or off for one shift. Turning on a note only pending removal
+ * restores it; turning off a published note marks it for removal, so undoing
+ * either restores what was there.
  */
 export function toggleDraftNote(
   notes: readonly DraftNoteState[],
   indicatorTypeId: number,
   active: boolean,
-  shift: ScheduleNoteShift | null,
+  shift: ScheduleNoteShift,
 ): DraftNoteState[] {
-  const ofType = (note: DraftNoteState) => note.indicatorTypeId === indicatorTypeId;
-  const own = notes.find((note) => ofType(note) && isOnShift(note, shift));
-  const unclaimed = shift ? notes.find((note) => ofType(note) && note.jobId == null) : undefined;
-  const setStatus = (target: DraftNoteState, status: DraftNoteState["status"]) =>
-    notes.map((note) => (note === target ? { ...note, status } : note));
-  const without = (target: DraftNoteState) => notes.filter((note) => note !== target);
+  const own = notes.find(
+    (note) => note.indicatorTypeId === indicatorTypeId && isOnShift(note, shift),
+  );
+  const setStatus = (status: DraftNoteState["status"]) =>
+    notes.map((note) => (note === own ? { ...note, status } : note));
 
   if (active) {
-    if (own?.status === "draft_deleted") return setStatus(own, "published");
+    if (own?.status === "draft_deleted") return setStatus("published");
     if (own) return [...notes];
-    if (unclaimed?.status === "draft_deleted") return setStatus(unclaimed, "published");
-    if (unclaimed) return [...notes];
-    return [
-      ...notes,
-      {
-        indicatorTypeId,
-        status: "draft",
-        shiftId: shift?.shiftId ?? null,
-        jobId: shift?.jobId ?? null,
-      },
-    ];
+    return [...notes, { indicatorTypeId, status: "draft", ...shift }];
   }
 
-  const target =
-    own && isActiveNote(own) ? own : unclaimed && isActiveNote(unclaimed) ? unclaimed : null;
-  if (!target) return [...notes];
-  return target.status === "published" ? setStatus(target, "draft_deleted") : without(target);
+  if (!own || !isActiveNote(own)) return [...notes];
+  return own.status === "published"
+    ? setStatus("draft_deleted")
+    : notes.filter((note) => note !== own);
 }
 
 /**
  * Notes of the shifts a cell no longer has, removed the way the server
  * removes them when the cell is saved: a draft goes, a published note waits
- * for the publish. Notes no shift claims stay.
+ * for the publish.
  */
 export function dropNotesOfRemovedShifts(
   notes: readonly DraftNoteState[],
   keptShifts: ReadonlyArray<ScheduleNoteShift>,
 ): DraftNoteState[] {
-  const kept = (note: DraftNoteState) =>
-    note.jobId == null || keptShifts.some((shift) => isOnShift(note, shift));
+  const kept = (note: DraftNoteState) => keptShifts.some((shift) => isOnShift(note, shift));
   return notes
     .filter((note) => kept(note) || note.status !== "draft")
     .map((note) =>
@@ -137,7 +131,7 @@ export interface PlannedNoteWrite {
   kind: "upsert" | "delete";
   focusAreaId: number;
   indicatorTypeId: number;
-  shift: ScheduleNoteShift | null;
+  shift: ScheduleNoteShift;
   baseStatus: DraftNoteState["status"] | undefined;
 }
 
@@ -172,7 +166,7 @@ export function planNoteWrites(
       const write = {
         focusAreaId,
         indicatorTypeId: note.indicatorTypeId,
-        shift: noteShiftOf(note),
+        shift: { shiftId: note.shiftId, jobId: note.jobId },
         baseStatus: before?.status,
       };
 

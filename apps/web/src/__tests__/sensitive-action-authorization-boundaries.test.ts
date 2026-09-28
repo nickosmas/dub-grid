@@ -277,6 +277,16 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
 };
 
 const MOBILE_DELEGATES: Record<string, RegExp[]> = {
+  // Sign-in ends a session, so it lands here, but a sensitive-action gate would
+  // be incoherent on the endpoint that mints the caller's first token. What
+  // makes it safe instead is the narrowness of the ending: the only session it
+  // can reach is the one it just created for this request, named by the token
+  // it just minted, and it is ended only when the client has stopped waiting,
+  // in place of returning those tokens to anyone (F-78).
+  "apps/web/src/features/mobile/server/routes/auth-login.ts": [
+    /if \(clientHasGoneAway\(req, startedAt\)\) \{[\s\S]*?discardSession\(payload\.session\.accessToken\)[\s\S]*?status: 504/,
+    /const verified = await verifyAccessToken\(accessToken\);[\s\S]*?endUserSession\(verified\.userId, verified\.sessionId\)/,
+  ],
   "apps/web/src/features/mobile/server/routes/person.ts": [
     /if \(loginEmailChange && currentPerson\.userId\) \{[\s\S]*?\brequireMobileSensitiveActionAuth\s*\([\s\S]*?\bsyncLinkedLoginEmail\s*\([\s\S]*?\bfollowUpLinkedLoginEmailChange\s*\(/,
   ],

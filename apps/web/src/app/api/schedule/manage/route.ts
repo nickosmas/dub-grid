@@ -233,7 +233,7 @@ const requestActionSchema = z.discriminatedUnion("action", [
     date: z.string().date(),
     indicatorTypeId: z.number().int(),
     focusAreaId: z.number().int(),
-    shift: noteShiftSchema.nullable().optional(),
+    shift: noteShiftSchema,
     existingStatus: noteStatusSchema.optional(),
   }),
   z.object({
@@ -243,7 +243,7 @@ const requestActionSchema = z.discriminatedUnion("action", [
     date: z.string().date(),
     indicatorTypeId: z.number().int(),
     focusAreaId: z.number().int(),
-    shift: noteShiftSchema.nullable().optional(),
+    shift: noteShiftSchema,
     existingStatus: noteStatusSchema.optional(),
   }),
 ]);
@@ -667,12 +667,11 @@ interface NoteShiftFilter<Q> {
   is(column: string, value: null): Q;
 }
 
-/** Narrows a note query to one shift's notes, or to the notes no shift claims. */
+/** Narrows a note query to one shift's notes. */
 function matchNoteShift<Q extends NoteShiftFilter<Q>>(
   query: Q,
-  shift: { shiftId: number | null; jobId: number } | null,
+  shift: { shiftId: number | null; jobId: number },
 ): Q {
-  if (!shift) return query.is("shift_id", null).is("job_id", null);
   const byJob = query.eq("job_id", shift.jobId);
   return shift.shiftId == null ? byJob.is("shift_id", null) : byJob.eq("shift_id", shift.shiftId);
 }
@@ -688,6 +687,7 @@ function matchNoteShift<Q extends NoteShiftFilter<Q>>(
 async function clearScheduleNotesForCells(
   serviceClient: ScheduleServiceClient,
   orgId: string,
+  actorId: string,
   cells: Array<{ employeeId: string; date: string }>,
 ): Promise<void> {
   await Promise.all(
@@ -705,7 +705,7 @@ async function clearScheduleNotesForCells(
 
       const { error: publishedError } = await serviceClient
         .from("schedule_notes")
-        .update({ status: "draft_deleted" })
+        .update({ status: "draft_deleted", updated_by: actorId })
         .eq("org_id", orgId)
         .eq("emp_id", employeeId)
         .eq("date", date)
@@ -1040,7 +1040,7 @@ export async function POST(req: NextRequest) {
           expectedVersion: data.expectedVersion,
         });
         if (data.clearNotes) {
-          await clearScheduleNotesForCells(auth.serviceClient, data.orgId, [
+          await clearScheduleNotesForCells(auth.serviceClient, data.orgId, auth.actor.id, [
             { employeeId: data.employeeId, date: data.date },
           ]);
         }
@@ -1125,7 +1125,7 @@ export async function POST(req: NextRequest) {
           date: data.date,
           expectedVersion: data.expectedVersion,
         });
-        await clearScheduleNotesForCells(auth.serviceClient, data.orgId, [
+        await clearScheduleNotesForCells(auth.serviceClient, data.orgId, auth.actor.id, [
           { employeeId: data.employeeId, date: data.date },
         ]);
         logScheduleAudit(auth.serviceClient, {
@@ -1176,7 +1176,7 @@ export async function POST(req: NextRequest) {
               date: shift.date,
               expectedVersion: shift.expectedVersion,
             });
-            await clearScheduleNotesForCells(auth.serviceClient, data.orgId, [
+            await clearScheduleNotesForCells(auth.serviceClient, data.orgId, auth.actor.id, [
               { employeeId: shift.employeeId, date: shift.date },
             ]);
             logScheduleAudit(auth.serviceClient, {
@@ -1334,7 +1334,7 @@ export async function POST(req: NextRequest) {
         // is cleared only when the shift actually leaves it, which a copy does
         // not do. A swap is a move onto an occupied target, so both ends clear.
         // move_shift itself never touches schedule_notes.
-        await clearScheduleNotesForCells(auth.serviceClient, data.orgId, [
+        await clearScheduleNotesForCells(auth.serviceClient, data.orgId, auth.actor.id, [
           ...(data.dragMode === "copy"
             ? []
             : [{ employeeId: data.sourceEmpId, date: data.sourceDate }]),
@@ -1541,6 +1541,7 @@ export async function POST(req: NextRequest) {
         await clearScheduleNotesForCells(
           auth.serviceClient,
           data.orgId,
+          auth.actor.id,
           seriesCells.map((cell) => ({
             employeeId: cell.emp_id,
             date: cell.date,
@@ -1611,7 +1612,7 @@ export async function POST(req: NextRequest) {
         const [{ data: recurringRows, error: recurringError }, cells] = await Promise.all([
           auth.serviceClient
             .from("recurring_shifts")
-            .select(RECURRING_SHIFT_COLS)
+            .select(`${RECURRING_SHIFT_COLS}, employee:employees(status, archived_at)`)
             .eq("org_id", data.orgId)
             .is("archived_at", null)
             .lte("effective_from", data.endDate)
@@ -1624,9 +1625,18 @@ export async function POST(req: NextRequest) {
         if (recurringError) {
           throw recurringError;
         }
+        // The database refuses to schedule someone who has left, so one
+        // leftover template would otherwise fail the whole apply part way.
+        // emp_id is a many-to-one foreign key, so the embed is one row, not the
+        // array the generated types infer.
+        const activeTemplates = (
+          (recurringRows ?? []) as unknown as Array<
+            DbRecurringShift & { employee: { status: string; archived_at: string | null } | null }
+          >
+        ).filter((row) => row.employee?.status === "active" && !row.employee.archived_at);
 
         const templatesByEmpAndDay = new Map<string, DbRecurringShift>();
-        for (const row of (recurringRows ?? []) as DbRecurringShift[]) {
+        for (const row of activeTemplates) {
           const key = `${row.emp_id}_${row.day_of_week}`;
           const current = templatesByEmpAndDay.get(key);
           if (!current || row.effective_from > current.effective_from) {
@@ -1641,7 +1651,7 @@ export async function POST(req: NextRequest) {
 
         const absenceTypeIds = Array.from(
           new Set(
-            ((recurringRows ?? []) as DbRecurringShift[])
+            activeTemplates
               .map((row) =>
                 row.state.kind === "absence" ? (row.state.absenceTypeId ?? null) : null,
               )
@@ -1796,9 +1806,14 @@ export async function POST(req: NextRequest) {
             date: data.date,
             indicator_type_id: data.indicatorTypeId,
             focus_area_id: data.focusAreaId,
-            shift_id: data.shift?.shiftId ?? null,
-            job_id: data.shift?.jobId ?? null,
+            shift_id: data.shift.shiftId,
+            job_id: data.shift.jobId,
             status,
+            // The service client has no auth.uid() for the audit trigger to
+            // stamp, so the author is named here; 065 keeps an existing
+            // note's creator on update.
+            created_by: auth.actor.id,
+            updated_by: auth.actor.id,
           },
           { onConflict: "emp_id,date,indicator_type_id,focus_area_id,shift_id,job_id" },
         );
@@ -1830,7 +1845,7 @@ export async function POST(req: NextRequest) {
           details: {
             indicatorTypeId: data.indicatorTypeId,
             focusAreaId: data.focusAreaId,
-            shift: data.shift ?? null,
+            shift: data.shift,
             status,
           },
         });
@@ -1860,7 +1875,7 @@ export async function POST(req: NextRequest) {
               .eq("date", data.date)
               .eq("indicator_type_id", data.indicatorTypeId)
               .eq("focus_area_id", data.focusAreaId),
-            data.shift ?? null,
+            data.shift,
           );
           if (error) {
             throw error;
@@ -1869,13 +1884,13 @@ export async function POST(req: NextRequest) {
           const { error } = await matchNoteShift(
             auth.serviceClient
               .from("schedule_notes")
-              .update({ status: "draft_deleted" })
+              .update({ status: "draft_deleted", updated_by: auth.actor.id })
               .eq("org_id", data.orgId)
               .eq("emp_id", data.employeeId)
               .eq("date", data.date)
               .eq("indicator_type_id", data.indicatorTypeId)
               .eq("focus_area_id", data.focusAreaId),
-            data.shift ?? null,
+            data.shift,
           );
           if (error) {
             throw error;

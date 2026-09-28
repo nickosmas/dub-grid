@@ -24,6 +24,7 @@ import type {
   AssignmentDefinition,
   ShiftDisplayMode,
   ShiftJobSegment,
+  ScheduleNoteShift,
 } from "@/types";
 
 export interface ScheduleGridAccessors {
@@ -35,7 +36,12 @@ export interface ScheduleGridAccessors {
     date: Date,
   ) => Array<Pick<ShiftJobSegment, "shiftId" | "jobId" | "position" | "isMentored">>;
   getShiftStyle: (type: string, focusAreaName?: string) => AssignmentDefinition;
-  noteMarksForKey?: (empId: string, date: Date, focusAreaId?: number) => ScheduleNoteMark[];
+  noteMarksForKey?: (
+    empId: string,
+    date: Date,
+    focusAreaId?: number,
+    shift?: ScheduleNoteShift,
+  ) => ScheduleNoteMark[];
   getCustomShiftTimes?: (
     empId: string,
     date: Date,

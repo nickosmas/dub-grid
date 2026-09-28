@@ -135,4 +135,12 @@ describe("staff directory cache helpers", () => {
 
     expect(saved).toMatchObject({ firstName: "Alice", joinedAt: "2026-03-05T14:00:00.000Z" });
   });
+
+  it("leaves a joined date unknown when neither the row nor the response knows it", () => {
+    const unknown = { ...baseEmployee, userId: "user-1", joinedAt: undefined };
+
+    const [saved] = upsertEmployeeInList([unknown], { ...baseEmployee, userId: "user-1" });
+
+    expect(saved.joinedAt).toBeUndefined();
+  });
 });

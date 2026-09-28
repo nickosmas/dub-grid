@@ -700,12 +700,13 @@ describe("POST /api/schedule/manage", () => {
         state: { kind: "absence", absenceTypeId: 9 },
         effective_from: "2026-01-01",
         effective_until: null,
+        employee: { status: "active", archived_at: null },
       };
     }
 
-    function mockTables(existingCellSnapshots: unknown[]) {
+    function mockTables(existingCellSnapshots: unknown[], extraTemplates: unknown[] = []) {
       const recurringQuery = chainableQuery({
-        data: [recurringShiftRow()],
+        data: [recurringShiftRow(), ...extraTemplates],
         error: null,
       });
       const cellsQuery = chainableQuery({
@@ -775,6 +776,46 @@ describe("POST /api/schedule/manage", () => {
       // cap on a large org/date range.
       expect(cellsQuery.range).toHaveBeenCalledWith(0, 499);
       expect(cellsQuery.order).toHaveBeenCalledWith("date", { ascending: true });
+    });
+
+    it("skips templates of staff who have left and still fills everyone else's", async () => {
+      mockTables(
+        [],
+        [
+          {
+            ...recurringShiftRow(),
+            id: "rec-inactive",
+            emp_id: "33333333-3333-4333-8333-333333333333",
+            employee: { status: "inactive", archived_at: null },
+          },
+          {
+            ...recurringShiftRow(),
+            id: "rec-removed",
+            emp_id: "44444444-4444-4444-8444-444444444444",
+            employee: { status: "removed", archived_at: "2026-07-01T00:00:00.000Z" },
+          },
+        ],
+      );
+
+      const response = await POST(
+        makeRequest({
+          action: "applyRecurringSchedules",
+          orgId,
+          startDate: dateKey,
+          endDate: dateKey,
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.generated).toEqual([
+        { empId, date: dateKey, label: "Vacation", absenceTypeId: 9 },
+      ]);
+      expect(userRpc).toHaveBeenCalledTimes(1);
+      expect(userRpc).toHaveBeenCalledWith(
+        "write_schedule_cell_snapshot",
+        expect.objectContaining({ p_emp_id: empId }),
+      );
     });
 
     it("fills a genuinely empty cell from the recurring template", async () => {
@@ -879,6 +920,7 @@ describe("POST /api/schedule/manage permission gates", () => {
         date: "2026-08-03",
         indicatorTypeId: 1,
         focusAreaId: 1,
+        shift: { shiftId: 34, jobId: 18 },
       }),
     );
 
@@ -899,6 +941,7 @@ describe("POST /api/schedule/manage permission gates", () => {
         date: "2026-08-03",
         indicatorTypeId: 1,
         focusAreaId: 1,
+        shift: { shiftId: 34, jobId: 18 },
       }),
     );
 
@@ -922,6 +965,7 @@ describe("POST /api/schedule/manage permission gates", () => {
         date: "2026-08-03",
         indicatorTypeId: 1,
         focusAreaId: 1,
+        shift: { shiftId: 34, jobId: 18 },
       }),
     );
 
@@ -945,6 +989,7 @@ describe("POST /api/schedule/manage permission gates", () => {
         date: "2026-08-03",
         indicatorTypeId: 1,
         focusAreaId: 1,
+        shift: { shiftId: 34, jobId: 18 },
       }),
     );
 
@@ -974,9 +1019,11 @@ describe("POST /api/schedule/manage permission gates", () => {
     expect(deleted).toEqual([
       { org_id: orgId, emp_id: employeeId, date: "2026-08-03", status: "draft" },
     ]);
+    // The service client has no auth.uid(), so the actor is named as the author.
     expect(softDeleted).toEqual([
       {
         status: "published",
+        updated_by: "actor-user",
         org_id: orgId,
         emp_id: employeeId,
         date: "2026-08-03",
@@ -1063,7 +1110,13 @@ describe("POST /api/schedule/manage permission gates", () => {
 
     expect(response.status).toBe(200);
     expect(upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ shift_id: 35, job_id: 18, focus_area_id: 1 }),
+      expect.objectContaining({
+        shift_id: 35,
+        job_id: 18,
+        focus_area_id: 1,
+        created_by: "actor-user",
+        updated_by: "actor-user",
+      }),
       { onConflict: "emp_id,date,indicator_type_id,focus_area_id,shift_id,job_id" },
     );
   });
@@ -1092,7 +1145,30 @@ describe("POST /api/schedule/manage permission gates", () => {
     expect(response.status).toBe(400);
   });
 
-  it("removes only the named shift's note, or only the unattached one", async () => {
+  it("names the actor on a published note it marks for removal", async () => {
+    grant({ canEditNotes: true });
+    const { softDeleted } = captureNoteClearing();
+
+    const response = await POST(
+      makeRequest({
+        action: "deleteScheduleNote",
+        orgId,
+        employeeId,
+        date: "2026-08-03",
+        indicatorTypeId: 1,
+        focusAreaId: 1,
+        shift: { shiftId: 35, jobId: 18 },
+        existingStatus: "published",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(softDeleted).toEqual([
+      expect.objectContaining({ status: "draft_deleted", updated_by: "actor-user", job_id: 18 }),
+    ]);
+  });
+
+  it("removes only the named shift's note", async () => {
     const body = {
       action: "deleteScheduleNote",
       orgId,
@@ -1118,13 +1194,26 @@ describe("POST /api/schedule/manage permission gates", () => {
       200,
     );
     expect(evening.deleted).toEqual([expect.objectContaining({ job_id: 18, shift_id: 35 })]);
-
-    grant({ canEditNotes: true });
-    const unattached = captureNoteClearing();
-    expect((await POST(makeRequest(body))).status).toBe(200);
-    expect(unattached.deleted).toEqual([expect.objectContaining({ job_id: null, shift_id: null })]);
   });
 
+  it("refuses a note that names no shift", async () => {
+    grant({ canEditNotes: true });
+    stubCellSnapshot("worked");
+
+    const response = await POST(
+      makeRequest({
+        action: "upsertScheduleNote",
+        orgId,
+        employeeId,
+        date: "2026-08-03",
+        indicatorTypeId: 1,
+        focusAreaId: 1,
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(serviceFrom).not.toHaveBeenCalledWith("schedule_notes");
+  });
   it("drops notes across every cell a deleted series covered", async () => {
     const secondEmployeeId = "55555555-5555-4555-8555-555555555555";
     grant({ canEditShifts: true, canManageShiftSeries: true });

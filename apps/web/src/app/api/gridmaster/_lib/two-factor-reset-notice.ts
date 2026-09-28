@@ -14,7 +14,10 @@ import * as Sentry from "@/lib/sentry";
  * Emails the person whose two-factor a Gridmaster reset. Runs past the
  * response and never fails the reset, which has already committed.
  */
-export function scheduleTwoFactorResetNotice(to: string): void {
+export function scheduleTwoFactorResetNotice(
+  to: string,
+  options: { partial?: boolean } = {},
+): void {
   after(async () => {
     try {
       const config = getInvitationEmailConfig();
@@ -27,7 +30,12 @@ export function scheduleTwoFactorResetNotice(to: string): void {
         from: config.from,
         to,
         subject: sanitizeHeaderValue(TWO_FACTOR_RESET_SUBJECT),
-        html: await render(createElement(TwoFactorResetEmail, { logoUrl: emailBaseUrl() })),
+        html: await render(
+          createElement(TwoFactorResetEmail, {
+            logoUrl: emailBaseUrl(),
+            partial: options.partial ?? false,
+          }),
+        ),
       });
     } catch (error) {
       Sentry.captureException(error, { extra: { context: "two-factor-reset-notice" } });

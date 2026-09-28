@@ -47,7 +47,9 @@ export function resolveFitScale(
  * measurement and never chases its own result; `containerWidth` growing past
  * the width it had at that shrink restores the full size for a fresh measure.
  */
-type FitTextProps = Omit<TextProps, "style" | "numberOfLines"> & {
+type FitTextProps = Omit<TextProps, "style" | "numberOfLines" | "children"> & {
+  /** Text only: the fit is measured per label, and an element has no stable label to key on. */
+  children: string | number;
   style?: StyleProp<TextStyle>;
   /** The enclosing control's width; growth past the width at the last shrink re-measures. */
   containerWidth?: number;
@@ -59,11 +61,7 @@ export function FitText(props: FitTextProps) {
   // went from "Continue" to "Verify and sign in", the longer label was judged
   // against the shorter one's slot and shrank to the floor, and a full-width
   // button never grows to undo it.
-  const label =
-    typeof props.children === "string" || typeof props.children === "number"
-      ? String(props.children)
-      : "";
-  return <FittedText key={`${label}|${readFontSize(props.style) ?? ""}`} {...props} />;
+  return <FittedText key={`${props.children}|${readFontSize(props.style) ?? ""}`} {...props} />;
 }
 
 function FittedText({ style, containerWidth, children, ...props }: FitTextProps) {

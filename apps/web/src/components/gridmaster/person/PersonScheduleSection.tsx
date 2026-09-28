@@ -164,7 +164,7 @@ function ScheduleDetail({ schedule }: { schedule: GridmasterPersonSchedule }) {
         ))}
       </Group>
 
-      <Group title="Shift requests" empty="No shift requests.">
+      <Group title="Shift requests, open and last 90 days" empty="No shift requests.">
         {schedule.shiftRequests.map((request) => (
           <Row
             key={request.id}
@@ -192,7 +192,10 @@ function ScheduleDetail({ schedule }: { schedule: GridmasterPersonSchedule }) {
         ))}
       </Group>
 
-      <Group title="Profile change requests" empty="No profile change requests.">
+      <Group
+        title="Profile change requests, open and last 90 days"
+        empty="No profile change requests."
+      >
         {schedule.profileChangeRequests.map((request) => (
           <Row
             key={request.id}

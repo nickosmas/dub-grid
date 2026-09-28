@@ -36,6 +36,14 @@ export function useStepUpAction() {
     };
   }, []);
 
+  function waitForProof(context: string, action: Action, required: StepUpMethod) {
+    setError(null);
+    setMethod(required);
+    return new Promise<boolean>((resolve, reject) => {
+      pending.current = { context, action, resolve, reject };
+    });
+  }
+
   async function run(action: Action): Promise<boolean> {
     if (running.current || !mounted.current) return false;
     running.current = true;
@@ -49,12 +57,26 @@ export function useStepUpAction() {
         const required = getStepUpMethod(failure);
         if (!required) throw failure;
         if (!mounted.current) return false;
-        setError(null);
-        setMethod(required);
-        return await new Promise<boolean>((resolve, reject) => {
-          pending.current = { context: context.key, action, resolve, reject };
-        });
+        return await waitForProof(context.key, action, required);
       }
+    } finally {
+      pending.current = null;
+      running.current = false;
+      if (mounted.current) setMethod(null);
+    }
+  }
+
+  /**
+   * Asks for proof straight away, for a caller that already saw the server
+   * refuse the action; `run` would send it once more first (F-103).
+   */
+  async function prompt(action: Action, required: StepUpMethod): Promise<boolean> {
+    if (running.current || !mounted.current) return false;
+    running.current = true;
+    try {
+      const context = await settleWithRequestTimeout(readStepUpContext());
+      if (!mounted.current) return false;
+      return await waitForProof(context.key, action, required);
     } finally {
       pending.current = null;
       running.current = false;
@@ -104,6 +126,7 @@ export function useStepUpAction() {
 
   return {
     run,
+    prompt,
     dialog: method ? (
       <StepUpDialog
         key={method}

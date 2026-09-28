@@ -34,6 +34,10 @@ export type SecurityEventMetadata = {
   method?: "password" | "totp" | "otp";
   /** SHA-256 of the Auth session id, so a completed sign-in is recorded once. */
   sessionHash?: string;
+  /** The client stopped waiting before the sign-in finished, so it got no tokens. */
+  clientGone?: boolean;
+  /** Whether the session created for that abandoned sign-in was ended (F-78). */
+  sessionDiscarded?: boolean;
 };
 
 export type SecurityAuditEvent = {

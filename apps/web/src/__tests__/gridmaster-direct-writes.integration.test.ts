@@ -13,6 +13,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Client } from "pg";
+import { beginWithLocks, policyGrantTables } from "./helpers/migration-locks";
 import { simulatedTokenClaims } from "./helpers/simulated-jwt";
 
 const DB_URL =
@@ -27,6 +28,10 @@ const MIGRATION = readFileSync(
     "../../../../supabase/migrations/054_gridmaster_direct_writes_need_fresh_proof.sql",
   ),
   "utf8",
+);
+// The tables the migration's loop puts policies on, read from the migration.
+const POLICY_TABLES = [...MIGRATION.match(/ARRAY\[([^\]]*)\]/)![1]!.matchAll(/'([a-z_]+)'/g)].map(
+  ([, table]) => `public.${table}`,
 );
 
 async function probeDb(): Promise<boolean> {
@@ -47,6 +52,7 @@ let db: Client;
 let gridmaster: string;
 let regular: string;
 let calmHaven: string;
+let migrationLocks: string[];
 
 const now = () => Math.floor(Date.now() / 1000);
 const password = (ageSeconds: number) => ({
@@ -94,6 +100,9 @@ beforeAll(async () => {
     `SELECT id FROM public.organizations WHERE slug = 'calmhaven'`,
   );
   calmHaven = rows[0]!.id;
+  // Public tables first: a parallel suite writes one of them, then checks
+  // its foreign key into auth.users, and this order matches it.
+  migrationLocks = [...POLICY_TABLES, ...(await policyGrantTables(db))];
 });
 
 afterAll(async () => {
@@ -102,9 +111,9 @@ afterAll(async () => {
 
 describe.runIf(reachable)("Gridmaster direct writes (054, live DB)", () => {
   beforeEach(async () => {
-    await db.query("BEGIN");
+    await beginWithLocks(db, migrationLocks);
     await db.query(MIGRATION);
-  });
+  }, 60_000);
   afterEach(async () => {
     await db.query("ROLLBACK");
   });

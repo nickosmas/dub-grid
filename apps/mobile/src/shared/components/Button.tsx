@@ -87,6 +87,10 @@ const LABEL_VARIANT = {
   lg: "cardTitle",
 } as const satisfies Record<ButtonSize, keyof typeof mobileText>;
 
+function isTextLabel(value: ReactNode): value is string | number {
+  return typeof value === "string" || typeof value === "number";
+}
+
 export function Button({
   children,
   label,
@@ -253,7 +257,19 @@ export function Button({
             {content}
           </Text>
         ) : null}
-        {!iconOnly && content && !isLink ? (
+        {!iconOnly && content && !isLink && !isTextLabel(content) ? (
+          // An element label cannot be fitted by measurement (FitText keys on
+          // the text), so it keeps one line and truncates.
+          <Text
+            ellipsizeMode="tail"
+            maxFontSizeMultiplier={MAX_FONT_SCALE}
+            numberOfLines={1}
+            style={[mobileText[LABEL_VARIANT[resolvedSize]], styles.label, { color: labelColor }]}
+          >
+            {content}
+          </Text>
+        ) : null}
+        {!iconOnly && isTextLabel(content) && content !== "" && !isLink ? (
           // A filled label is one line and fits its slot: the font shrinks by
           // measurement (never wraps, never ellipsizes at ordinary lengths)
           // and scaling is capped at the compact ceiling.

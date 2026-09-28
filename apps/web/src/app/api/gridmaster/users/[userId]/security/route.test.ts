@@ -10,13 +10,14 @@ const disablePersonPushDevice = vi.fn();
 const revokePersonCalendarFeed = vi.fn();
 const clearLoginLock = vi.fn();
 const writeAudit = vi.fn();
+const validateCsrfOrigin = vi.fn();
 const serviceClient = { service: true };
 
 vi.mock("@/lib/api-auth", () => ({
   requireGridmasterSession: (req: NextRequest) => requireGridmasterSession(req),
   requireSensitiveActionAuth: (req: NextRequest) => requireSensitiveActionAuth(req),
 }));
-vi.mock("@/lib/csrf", () => ({ validateCsrfOrigin: () => null }));
+vi.mock("@/lib/csrf", () => ({ validateCsrfOrigin: () => validateCsrfOrigin() }));
 vi.mock("@/lib/supabase-service", () => ({ getServiceClient: () => serviceClient }));
 const loginLimiterConfigured = vi.fn(() => true);
 vi.mock("@/lib/rate-limit", () => ({
@@ -54,6 +55,7 @@ function post(body: unknown) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  validateCsrfOrigin.mockReturnValue(null);
   requireGridmasterSession.mockResolvedValue({ user: { id: "gm", email: "gm@dubgrid.com" } });
   requireSensitiveActionAuth.mockResolvedValue({ user: { id: "gm" }, sessionId: "s" });
   loadPersonTarget.mockResolvedValue({ userId: USER, email: "ada@example.com" });
@@ -147,5 +149,15 @@ describe("POST /api/gridmaster/users/[userId]/security", () => {
     expect(writeAudit).toHaveBeenCalledWith(
       expect.objectContaining({ action: "user.login_lock_cleared" }),
     );
+  });
+
+  it("refuses a cross-origin request before anything else (F-95)", async () => {
+    validateCsrfOrigin.mockReturnValueOnce(
+      NextResponse.json({ error: "Invalid origin" }, { status: 403 }),
+    );
+    expect((await post({ action: "clearLoginLock" })).status).toBe(403);
+    expect(requireGridmasterSession).not.toHaveBeenCalled();
+    expect(clearLoginLock).not.toHaveBeenCalled();
+    expect(writeAudit).not.toHaveBeenCalled();
   });
 });

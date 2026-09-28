@@ -21,6 +21,22 @@ vi.mock("@/features/mobile/server", () => ({
   fetchMobileShiftRequests,
 }));
 
+const ACTIVE_STAFF = [
+  "11111111-1111-4111-8111-111111111111",
+  "22222222-2222-4222-8222-222222222222",
+  "33333333-3333-4333-8333-333333333333",
+];
+
+/** A service client whose only table is the organization's active staff list. */
+function activeStaffClient(ids: string[]) {
+  const query = {
+    select: () => query,
+    eq: () => query,
+    is: async () => ({ data: ids.map((id) => ({ id })), error: null }),
+  };
+  return { from: () => query };
+}
+
 describe("mobile shift-requests route", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -688,7 +704,14 @@ describe("mobile shift-requests route", () => {
     expect(fetchMobileScheduleEntries).not.toHaveBeenCalled();
   });
 
-  it("returns eligible swap options for a regular linked employee", async () => {
+  it.each([
+    ["returns eligible swap options for a regular linked employee", ACTIVE_STAFF, ["Jordan Lee"]],
+    [
+      "leaves out a teammate who is no longer active",
+      ACTIVE_STAFF.filter((id) => id !== "22222222-2222-4222-8222-222222222222"),
+      [],
+    ],
+  ])("%s", async (_name, activeStaff, expectedNames) => {
     requireMobileAuth.mockResolvedValue({
       currentOrg: {
         id: "org-1",
@@ -699,7 +722,7 @@ describe("mobile shift-requests route", () => {
         canManageEmployees: false,
         canApproveShiftRequests: false,
       },
-      serviceClient: {},
+      serviceClient: activeStaffClient(activeStaff),
       user: {
         id: "user-1",
       },
@@ -830,20 +853,14 @@ describe("mobile shift-requests route", () => {
     const payload = await response.json();
 
     expect(response.status).toBe(200);
-    expect(fetchMobileScheduleEntries).toHaveBeenCalledWith(
-      {},
-      {
-        orgId: "org-1",
-        startDate: "2026-04-19",
-        endDate: "2026-04-25",
-      },
+    expect(fetchMobileScheduleEntries).toHaveBeenCalledWith(expect.anything(), {
+      orgId: "org-1",
+      startDate: "2026-04-19",
+      endDate: "2026-04-25",
+    });
+    expect(payload.entries.map((entry: { employeeName: string }) => entry.employeeName)).toEqual(
+      expectedNames,
     );
-    expect(payload.entries).toEqual([
-      expect.objectContaining({
-        employeeId: "22222222-2222-4222-8222-222222222222",
-        employeeName: "Jordan Lee",
-      }),
-    ]);
   });
 
   it("returns no swap options for a deleted requester history entry", async () => {
@@ -854,7 +871,7 @@ describe("mobile shift-requests route", () => {
         canManageEmployees: false,
         canApproveShiftRequests: false,
       },
-      serviceClient: {},
+      serviceClient: activeStaffClient(ACTIVE_STAFF),
       user: { id: "user-1" },
     });
     fetchLinkedEmployeeForUser.mockResolvedValue({ id: "11111111-1111-4111-8111-111111111111" });

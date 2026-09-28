@@ -987,7 +987,7 @@ describe("ScheduleScreen", () => {
     expect(screen.getByLabelText("Schedule notes: Float")).toHaveTextContent("Float");
   });
 
-  it("gives each half of a double shift its own focus area's notes", () => {
+  it("gives each half of a double shift its own shift's notes", () => {
     teamScheduleEntries = [
       createScheduleEntry({
         employeeId: "emp-2",
@@ -1021,6 +1021,8 @@ describe("ScheduleScreen", () => {
           {
             indicatorTypeId: 7,
             focusAreaId: 2,
+            shiftId: 1,
+            jobId: 10,
             name: "Float",
             color: "#E24B4A",
             state: "published",
@@ -1028,13 +1030,17 @@ describe("ScheduleScreen", () => {
           {
             indicatorTypeId: 8,
             focusAreaId: 3,
+            shiftId: 2,
+            jobId: 11,
             name: "Training",
             color: "#378ADD",
             state: "published",
           },
           {
             indicatorTypeId: 9,
-            focusAreaId: null,
+            focusAreaId: 2,
+            shiftId: 1,
+            jobId: 10,
             name: "New hire",
             color: "#1D9E75",
             state: "published",
@@ -1045,7 +1051,6 @@ describe("ScheduleScreen", () => {
 
     render(<TeamScheduleScreen />);
 
-    // The whole day's note goes on the first half only, as in shift detail.
     const dayHalf = screen
       .getByLabelText("Schedule notes: Float; New hire")
       .closest("[role=button]");

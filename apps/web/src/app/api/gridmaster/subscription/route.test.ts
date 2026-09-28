@@ -7,7 +7,7 @@ const serviceFrom = vi.fn();
 const subscriptionSingle = vi.fn();
 const subscriptionUpdateEq = vi.fn();
 const subscriptionUpdate = vi.fn();
-const employeeIs = vi.fn();
+const employeeEq = vi.fn();
 const membershipIs = vi.fn();
 const organizationEq = vi.fn();
 const organizationUpdate = vi.fn();
@@ -81,16 +81,17 @@ describe("POST /api/gridmaster/subscription", () => {
     subscriptionSingle.mockResolvedValue({ data: null, error: null });
     subscriptionUpdateEq.mockResolvedValue({ error: null });
     subscriptionUpdate.mockReturnValue({ eq: subscriptionUpdateEq });
-    employeeIs.mockResolvedValue({
+    employeeEq.mockResolvedValue({
       data: [
-        { id: 1, user_id: "linked-user" },
-        { id: 2, user_id: null },
-        { id: 3, user_id: null },
-        { id: 4, user_id: null },
-        { id: 5, user_id: null },
-        { id: 6, user_id: null },
-        { id: 7, user_id: null },
-        { id: 8, user_id: null },
+        { id: 1, status: "active", archived_at: null, user_id: "linked-user" },
+        { id: 2, status: "active", archived_at: null, user_id: null },
+        { id: 3, status: "active", archived_at: null, user_id: null },
+        { id: 4, status: "active", archived_at: null, user_id: null },
+        { id: 5, status: "active", archived_at: null, user_id: null },
+        { id: 6, status: "active", archived_at: null, user_id: null },
+        { id: 7, status: "active", archived_at: null, user_id: null },
+        { id: 8, status: "active", archived_at: null, user_id: null },
+        { id: 9, status: "inactive", archived_at: null, user_id: null },
       ],
       error: null,
     });
@@ -124,9 +125,7 @@ describe("POST /api/gridmaster/subscription", () => {
       if (table === "employees") {
         return {
           select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              is: employeeIs,
-            })),
+            eq: employeeEq,
           })),
         };
       }

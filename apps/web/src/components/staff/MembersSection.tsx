@@ -98,10 +98,13 @@ import { useStaffSelection } from "./useStaffSelection";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import ScrollableTabs from "@/components/ScrollableTabs";
+import { mapInBatches } from "@/lib/async-batch";
 
 const REORDER_SETTLE_MS = 220;
 
 type BulkStaffAction = "deactivate" | "activate" | "remove";
+
+const BULK_STATUS_CONCURRENCY = 3;
 
 export interface MembersSectionProps {
   employees: Employee[];
@@ -120,8 +123,9 @@ export interface MembersSectionProps {
     oldInvitation: Invitation,
     runStepUp: StepUpRun,
   ) => boolean | Promise<boolean>;
-  onRemove: (empId: string, note?: string) => void;
-  onDeactivate: (empId: string, note?: string) => void;
+  onRemove: (empId: string, note?: string) => void | Promise<boolean>;
+  onDeactivate: (empId: string, note?: string) => void | Promise<boolean>;
+  statusStepUpOpen?: boolean;
   onActivate: (empId: string) => void;
   onAdd: () => void;
   canViewEmployeeDetails: boolean;
@@ -153,6 +157,7 @@ export function MembersSection({
   onSaveWithReinvite,
   onRemove,
   onDeactivate,
+  statusStepUpOpen = false,
   onActivate,
   onAdd,
   canViewEmployeeDetails,
@@ -852,18 +857,25 @@ export function MembersSection({
 
     setIsBulkActionRunning(true);
     try {
-      const results = await Promise.allSettled(
-        targetIds.map((employeeId) => {
-          if (pendingAction.action === "deactivate") {
-            return onDeactivate(employeeId, trimmedNote);
-          }
-          if (pendingAction.action === "activate") {
-            return onActivate(employeeId);
-          }
-          return onRemove(employeeId, trimmedNote);
-        }),
+      const change = (employeeId: string): unknown => {
+        if (pendingAction.action === "deactivate") return onDeactivate(employeeId, trimmedNote);
+        if (pendingAction.action === "activate") return onActivate(employeeId);
+        return onRemove(employeeId, trimmedNote);
+      };
+      // Three at a time keeps a large bulk inside the status route's rate limit (F-103).
+      const results = await mapInBatches(
+        targetIds,
+        BULK_STATUS_CONCURRENCY,
+        (employeeId): Promise<PromiseSettledResult<unknown>> =>
+          Promise.resolve()
+            .then(() => change(employeeId))
+            .then(
+              (value) => ({ status: "fulfilled", value }),
+              (reason: unknown) => ({ status: "rejected", reason }),
+            ),
       );
-      const succeeded = results.filter((r) => r.status === "fulfilled").length;
+      // A handler resolves false for a change it could not make or a cancelled prompt.
+      const succeeded = results.filter((r) => r.status === "fulfilled" && r.value !== false).length;
       const failed = results.length - succeeded;
 
       if (failed === 0 && droppedSelfCount === 0) {
@@ -2683,7 +2695,7 @@ export function MembersSection({
           );
         })()}
 
-      {bulkConfirm
+      {bulkConfirm && !statusStepUpOpen
         ? (() => {
             const count = bulkConfirm.employeeIds.length;
             const plural = count === 1 ? "" : "s";

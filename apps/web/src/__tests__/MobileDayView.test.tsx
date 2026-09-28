@@ -104,6 +104,6 @@ describe("MobileDayView indicators", () => {
   it("shows no dot where a shift has no indicators", () => {
     const { container } = renderView(() => []);
 
-    expect(container.querySelector("[data-note-dot]")).toBeNull();
+    expect(container.querySelector("[data-note-mark]")).toBeNull();
   });
 });

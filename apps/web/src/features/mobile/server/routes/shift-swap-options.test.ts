@@ -30,26 +30,39 @@ function entry(input: {
 
 describe("getSwapOptions", () => {
   const requester = entry({ employeeId: "me", date: "2026-04-20" });
+  const ACTIVE = new Set(["me", "them"]);
 
   it("offers a teammate's shift on a day the requester is free", () => {
     const candidate = entry({ employeeId: "them", date: "2026-04-21" });
-    expect(getSwapOptions({ requesterEntry: requester, entries: [requester, candidate] })).toEqual([
-      candidate,
-    ]);
+    expect(
+      getSwapOptions({
+        requesterEntry: requester,
+        activeEmployeeIds: ACTIVE,
+        entries: [requester, candidate],
+      }),
+    ).toEqual([candidate]);
   });
 
   it("drops a same-day shift that overlaps the requester's own", () => {
     const candidate = entry({ employeeId: "them", date: "2026-04-20" });
-    expect(getSwapOptions({ requesterEntry: requester, entries: [requester, candidate] })).toEqual(
-      [],
-    );
+    expect(
+      getSwapOptions({
+        requesterEntry: requester,
+        activeEmployeeIds: ACTIVE,
+        entries: [requester, candidate],
+      }),
+    ).toEqual([]);
   });
 
   it("drops a day the requester has time off, like the database does", () => {
     const candidate = entry({ employeeId: "them", date: "2026-04-21" });
     const myTimeOff = entry({ employeeId: "me", date: "2026-04-21", kind: "absence" });
     expect(
-      getSwapOptions({ requesterEntry: requester, entries: [requester, candidate, myTimeOff] }),
+      getSwapOptions({
+        requesterEntry: requester,
+        activeEmployeeIds: ACTIVE,
+        entries: [requester, candidate, myTimeOff],
+      }),
     ).toEqual([]);
   });
 
@@ -57,7 +70,22 @@ describe("getSwapOptions", () => {
     const candidate = entry({ employeeId: "them", date: "2026-04-21" });
     const theirTimeOff = entry({ employeeId: "them", date: "2026-04-20", kind: "absence" });
     expect(
-      getSwapOptions({ requesterEntry: requester, entries: [requester, candidate, theirTimeOff] }),
+      getSwapOptions({
+        requesterEntry: requester,
+        activeEmployeeIds: ACTIVE,
+        entries: [requester, candidate, theirTimeOff],
+      }),
+    ).toEqual([]);
+  });
+
+  it("drops a teammate who is no longer active", () => {
+    const candidate = entry({ employeeId: "left", date: "2026-04-21" });
+    expect(
+      getSwapOptions({
+        requesterEntry: requester,
+        activeEmployeeIds: ACTIVE,
+        entries: [requester, candidate],
+      }),
     ).toEqual([]);
   });
 });

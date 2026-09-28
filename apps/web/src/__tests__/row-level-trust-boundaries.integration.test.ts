@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 /**
- * Migrations 033 and 034 (audit findings F-04, F-05, F-06, F-21): rules the routes enforce
+ * Migrations 033, 034 and 065 (audit findings F-04, F-05, F-06, F-21, F-100): rules the routes enforce
  * now hold at the row level too. Every case runs inside BEGIN/ROLLBACK on
  * the seeded local database and simulates the caller the way PostgREST
  * does, so it is the policies and grants that answer, not the routes.
@@ -375,6 +375,71 @@ describe.runIf(reachable)("session rows are server-owned (F-06, live DB)", () =>
         [seeded[0].id],
       );
       expect(stillThere).toBe(1);
+    } finally {
+      await db.query("ROLLBACK");
+    }
+  });
+});
+
+describe.runIf(reachable)("staff records are server-written (F-100, live DB)", () => {
+  async function superAdminStaffRow(fx: Fixture): Promise<string> {
+    const { rows } = await db.query<{ id: string }>(
+      `SELECT id FROM public.employees WHERE user_id = $1 AND org_id = $2`,
+      [fx.superAdmin.userId, fx.orgId],
+    );
+    if (rows.length === 0) throw new Error("the QA Super Admin has no staff record on Calm Haven");
+    return rows[0].id;
+  }
+
+  it("refuses an Admin who can manage staff any direct write to a staff record", async () => {
+    await db.query("BEGIN");
+    try {
+      const fx = await loadFixture();
+      const staffId = await superAdminStaffRow(fx);
+      // The permission the old policies asked for, so only the grant stands in the way.
+      await db.query(
+        `UPDATE public.organization_memberships
+            SET admin_permissions = COALESCE(admin_permissions, '{}'::jsonb) || '{"canManageEmployees": true}'::jsonb
+          WHERE user_id = $1 AND org_id = $2`,
+        [fx.admin.userId, fx.orgId],
+      );
+
+      await expectRaise(async () => {
+        await asUser(fx.admin, fx.orgId);
+        await db.query(`UPDATE public.employees SET status = 'removed' WHERE id = $1`, [staffId]);
+      }, /permission denied for table employees/);
+      await expectRaise(async () => {
+        await asUser(fx.admin, fx.orgId);
+        await db.query(`DELETE FROM public.employees WHERE id = $1`, [staffId]);
+      }, /permission denied for table employees/);
+      await expectRaise(async () => {
+        await asUser(fx.superAdmin, fx.orgId);
+        await db.query(`UPDATE public.employees SET first_name = first_name WHERE id = $1`, [
+          staffId,
+        ]);
+      }, /permission denied for table employees/);
+
+      const { rows } = await db.query<{ status: string }>(
+        `SELECT status FROM public.employees WHERE id = $1`,
+        [staffId],
+      );
+      expect(rows[0].status).toBe("active");
+    } finally {
+      await db.query("ROLLBACK");
+    }
+  });
+
+  it("keeps the service-role routes writing staff records", async () => {
+    await db.query("BEGIN");
+    try {
+      const fx = await loadFixture();
+      const staffId = await superAdminStaffRow(fx);
+      await db.query(`SET LOCAL ROLE service_role`);
+      const { rows } = await db.query<{ status: string }>(
+        `UPDATE public.employees SET status = 'inactive' WHERE id = $1 RETURNING status`,
+        [staffId],
+      );
+      expect(rows).toEqual([{ status: "inactive" }]);
     } finally {
       await db.query("ROLLBACK");
     }

@@ -231,7 +231,8 @@ function buildWorkedShifts(input: {
       badge: null,
       borderKind: null,
       focusAreaId: segment.focusAreaId ?? null,
-      noteShift: noteShiftOf(segment),
+      // A cell stored before segments names its shift through the assignment.
+      noteShift: noteShiftOf(segment.jobId != null ? segment : assignment),
       noteMarks: [],
     });
   });
@@ -373,10 +374,7 @@ function buildMyScheduleDay(input: {
       notes: input.scheduleNotes,
       empId: input.currentEmpId,
       dateKey,
-      segments: workedShifts.map((shift) => ({
-        focusAreaId: shift.focusAreaId,
-        shift: shift.noteShift,
-      })),
+      segments: workedShifts.map((shift) => ({ shift: shift.noteShift })),
       isScheduleEditor: input.isScheduleEditor,
     });
     workedShifts.forEach((shift, index) => {

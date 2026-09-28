@@ -255,7 +255,8 @@ export function buildNavGroups(
           id: "org-billing",
           label: "Subscription",
           Icon: BillingIcon,
-          helpHint: "Seats are based on active organization users, not employees.",
+          helpHint:
+            "Seats are active staff plus management-only users. Inactive and removed staff are not billed.",
           description: "Review subscription status, seats, and Stripe billing access.",
         },
       ],
