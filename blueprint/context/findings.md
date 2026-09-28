@@ -64,14 +64,6 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** Keep it off in production. Before turning it on, either send Supabase's reauthentication nonce with the update or have the authenticator-code step-up issue a fresh session; then set local and production alike.
 **Resolution:**
 
-### F-73 [P2] closed - Production Supabase accepts public sign-ups on an invite-only product
-
-**File:** `supabase/config.toml:165` (`enable_signup = true`); production auth config (`disable_signup: false`, read 2026-09-26)
-**Found:** 2026-09-26 during the email review (read-only Management API read)
-**Why it matters:** `internal/authentication.md` and `RBAC_SYSTEM_DESIGN.md` say email sign-up is off in production, but it is on. Anyone with the public publishable key can create and confirm an account through `/auth/v1/signup`, or through a sign-in link request, which also creates a missing user while sign-ups are open. The account has no organization, so RLS should still hide tenant data, but every RPC granted to `authenticated` becomes reachable by strangers.
-**Suggested fix:** Set `disable_signup: true` on production (dashboard or Management API). Only `/api/invitations/register` creates accounts, through `auth.admin.createUser`, which ignores the setting. Local `config.toml` stays open for the integration tests that call `signUp`. Consider having `auth:templates:check` report the setting so it cannot drift again.
-**Resolution:** Production set to `disable_signup: true` through the Management API on 2026-09-26 (read back true; email sign-in and confirmation unchanged). Local `config.toml` stays open for the integration tests. The drift check in `auth:templates:check` is not added yet. Re-review 2026-09-28 (`/audit`, read-only Management API read): production reports `disable_signup: true` with email sign-in still enabled; closed. The suggested drift check in `auth:templates:check` remains optional.
-
 ### F-75 [P3] open - Database functions still let a stale Gridmaster token edit organization data
 
 **File:** `supabase/migrations` (`check_admin_permission_for_org`, `is_authorized_org`, `publish_schedule` and the schedule, recurring and request functions that use them; `start_impersonation`; `force_logout_user`)
@@ -168,13 +160,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** Title both groups "..., open and last 90 days", or keep profile change requests unbounded (they are few) and label only shift requests.
 **Resolution:**
 
-### F-111 [P3] open - Migration 066 has no live test
+### F-111 [P3] fixed - Migration 066 has no live test
 
 **File:** `supabase/migrations/066_person_history_target_index.sql`
 **Found:** 2026-09-28 by `/audit` (scope: fix/person-page-follow-ups; lens: tests)
 **Why it matters:** `gridmaster_user_emails` returns any account's email and is safe only because of its grants. The refusal for `anon` and `authenticated` and the index plan were proven by hand in a rolled-back transaction, but nothing re-checks them, unlike 063 and 064, which run from their files in live tests. A later broad grant would expose every email silently.
 **Suggested fix:** A live test that runs 066 from its file in a rolled-back transaction and asserts `has_function_privilege` is false for `anon` and `authenticated` and true for `service_role`, and that the function returns a seeded user's email.
-**Resolution:**
+**Resolution:** Fixed in fix/migration-066-live-test: `migration-066-person-history.integration.test.ts` runs 066 from its file inside a rolled-back transaction (taking `audit_log`'s share lock first) and asserts that only `service_role` may execute `gridmaster_user_emails`, that an `authenticated` call is refused, that it returns a seeded account's email and nothing for an unknown id, and that the history's OR plans through `idx_audit_log_details_target_user` with sequential scans off. A copy of 066 granting `authenticated` fails two cases; one without the index fails the plan case. Passes alone and in the full `test:web` (5,209).
 
 ### F-112 [P3] unverified - Migration 066 locks `audit_log` writes while its index builds
 
