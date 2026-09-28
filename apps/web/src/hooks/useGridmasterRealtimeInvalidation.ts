@@ -264,18 +264,6 @@ export function resolveGridmasterRealtimeUserId(
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
-export function invalidateGridmasterRealtimeQueries(
-  queryClient: QueryClient,
-  table: GridmasterRealtimeTable,
-  orgId: string | null,
-  userId: string | null = null,
-): void {
-  for (const queryKey of getGridmasterRealtimeInvalidationKeys(table, orgId, userId)) {
-    void queryClient.invalidateQueries({ queryKey });
-    broadcastInvalidation(queryKey);
-  }
-}
-
 /**
  * Batches invalidations by query key: a bulk change in any organization emits
  * one event per row, and many tables share keys (`overview`, `orgHealth`), so

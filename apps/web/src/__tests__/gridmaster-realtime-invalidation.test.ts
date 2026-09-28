@@ -16,11 +16,12 @@ type Listener = {
   table: GridmasterRealtimeTable;
   onEvent: (table: GridmasterRealtimeTable, payload: RealtimeChangePayload) => void;
 };
+type Hooks = { onReconnectAfterError?: () => void; onError?: (error: unknown) => void };
 
 const { mockBroadcast, mockUnsubscribe, subscription } = vi.hoisted(() => ({
   mockBroadcast: vi.fn(),
   mockUnsubscribe: vi.fn(),
-  subscription: { listeners: [] as Listener[] },
+  subscription: { listeners: [] as Listener[], hooks: null as Hooks | null },
 }));
 
 vi.mock("@/lib/cache-broadcast", () => ({
@@ -33,8 +34,14 @@ vi.mock("@/features/account/client", () => ({
 
 vi.mock("@dubgrid/realtime-core", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@dubgrid/realtime-core")>()),
-  subscribeToPostgresChanges: (_client: unknown, _name: string, listeners: Listener[]) => {
+  subscribeToPostgresChanges: (
+    _client: unknown,
+    _name: string,
+    listeners: Listener[],
+    hooks: Hooks,
+  ) => {
     subscription.listeners = listeners;
+    subscription.hooks = hooks;
     return mockUnsubscribe;
   },
 }));
@@ -250,6 +257,7 @@ describe("Gridmaster realtime batching", () => {
     mockBroadcast.mockClear();
     mockUnsubscribe.mockClear();
     subscription.listeners = [];
+    subscription.hooks = null;
     queryClient = new QueryClient();
     invalidate = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
   });
@@ -260,7 +268,9 @@ describe("Gridmaster realtime batching", () => {
 
   function fire(table: GridmasterRealtimeTable, row: Record<string, unknown>) {
     const listener = subscription.listeners.find((entry) => entry.table === table);
-    listener?.onEvent(table, { new: row });
+    // A table dropped from the subscription must fail here, not pass vacuously.
+    if (!listener) throw new Error(`No realtime listener for ${table}`);
+    listener.onEvent(table, { new: row });
   }
 
   it("refreshes each key once per burst, after the window and not before", () => {
@@ -327,5 +337,20 @@ describe("Gridmaster realtime batching", () => {
     expect(invalidate).not.toHaveBeenCalled();
     expect(mockBroadcast).not.toHaveBeenCalled();
     expect(mockUnsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes every Gridmaster query once the channel reconnects after an error", () => {
+    renderHook(() => useGridmasterRealtimeInvalidation({ enabled: true, queryClient }));
+    expect(subscription.hooks?.onReconnectAfterError).toBeTypeOf("function");
+
+    subscription.hooks!.onReconnectAfterError!();
+
+    expect(invalidate).toHaveBeenCalledTimes(1);
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.gridmaster.all() });
+  });
+
+  it("subscribes to nothing while disabled", () => {
+    renderHook(() => useGridmasterRealtimeInvalidation({ enabled: false, queryClient }));
+    expect(subscription.listeners).toEqual([]);
   });
 });

@@ -24,7 +24,6 @@ export {
 } from "./useOrgRealtimeInvalidation";
 export {
   getGridmasterRealtimeInvalidationKeys,
-  invalidateGridmasterRealtimeQueries,
   resolveGridmasterRealtimeOrgId,
   useGridmasterRealtimeInvalidation,
 } from "./useGridmasterRealtimeInvalidation";

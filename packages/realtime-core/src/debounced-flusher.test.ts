@@ -59,4 +59,15 @@ describe("createDebouncedTableFlusher", () => {
 
     expect(onFlush).not.toHaveBeenCalled();
   });
+
+  it("ignores changes that arrive after dispose", () => {
+    const onFlush = vi.fn();
+    const flusher = createDebouncedTableFlusher<"employees">(150, onFlush);
+
+    flusher.dispose();
+    flusher.markChanged("employees");
+    vi.advanceTimersByTime(1_000);
+
+    expect(onFlush).not.toHaveBeenCalled();
+  });
 });

@@ -128,13 +128,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** walk `emp.focusAreaIds` plus no-area, pick the first visible row, dedup on the type, and add the three cases.
 **Resolution:**
 
-### F-107 [P3] open - Gridmaster realtime follow-ups
+### F-107 [P3] fixed - Gridmaster realtime follow-ups
 
 **File:** `apps/web/src/hooks/useGridmasterRealtimeInvalidation.ts:267`; `packages/realtime-core/src/debounced-flusher.ts`; `apps/web/src/__tests__/gridmaster-realtime-invalidation.test.ts:263`
 **Found:** 2026-09-28 by `/audit` (scope: fixed-finding re-review at 1924880c; all lenses), reviewing F-83
 **Why it matters:** `invalidateGridmasterRealtimeQueries` has no caller left (only the re-export in `hooks/index.ts`); the flusher has no disposed flag, so an event arriving while the channel is still leaving could arm one stray flush after teardown (unverified; same for the org hooks); the test's `fire` uses `listener?.onEvent`, so a table dropped from the subscription would make the teardown test pass vacuously, and `onReconnectAfterError` is untested.
 **Suggested fix:** delete the dead export, add a disposed guard in `createDebouncedTableFlusher`, assert the listener exists, and test the reconnect hook.
-**Resolution:**
+**Resolution:** Fixed in fix/gridmaster-realtime-follow-ups: `invalidateGridmasterRealtimeQueries` and its re-export are deleted; `createDebouncedTableFlusher` records `disposed`, so `dispose()` clears pending tables and a later `markChanged` arms nothing (a realtime-core test covers it, and the org hooks get the same guard); the Gridmaster test's `fire` throws when a table has no listener, and new tests cover `onReconnectAfterError` (one invalidation of `gridmaster.all()`) and a disabled hook subscribing to nothing.
 
 ### F-108 [P3] open - `schedule_notes` keeps two indexes its unique key already covers
 
