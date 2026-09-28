@@ -238,7 +238,10 @@ export async function POST(req: NextRequest) {
       }
 
       case "saveRecurringDraft": {
-        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring, { actor });
+        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring, {
+          actor,
+          gridmasterNeedsImpersonation: true,
+        });
         if ("response" in auth) {
           return auth.response;
         }
@@ -283,7 +286,10 @@ export async function POST(req: NextRequest) {
       }
 
       case "deleteRecurringDraft": {
-        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring, { actor });
+        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring, {
+          actor,
+          gridmasterNeedsImpersonation: true,
+        });
         if ("response" in auth) {
           return auth.response;
         }
@@ -301,7 +307,10 @@ export async function POST(req: NextRequest) {
       }
 
       case "upsertRecurringShift": {
-        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring, { actor });
+        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring, {
+          actor,
+          gridmasterNeedsImpersonation: true,
+        });
         if ("response" in auth) {
           return auth.response;
         }
@@ -341,7 +350,10 @@ export async function POST(req: NextRequest) {
       }
 
       case "deleteRecurringShift": {
-        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring, { actor });
+        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring, {
+          actor,
+          gridmasterNeedsImpersonation: true,
+        });
         if ("response" in auth) {
           return auth.response;
         }
@@ -371,7 +383,10 @@ export async function POST(req: NextRequest) {
       }
 
       case "saveRecurringShifts": {
-        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring, { actor });
+        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring, {
+          actor,
+          gridmasterNeedsImpersonation: true,
+        });
         if ("response" in auth) {
           return auth.response;
         }

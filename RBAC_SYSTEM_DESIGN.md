@@ -1170,6 +1170,32 @@ await supabase.rpc("end_impersonation", { p_session_id: session.session_id });
 
 ---
 
+### 8.3 A Gridmaster Changes an Organization Only While Impersonating It
+
+A Gridmaster may change an organization's schedule, recurring shifts, requests,
+publishes and settings only during an active impersonation of it: unexpired,
+not ended, and started by the same auth session (the JWT `session_id`) that
+makes the change. Starting one already needs fresh proof (migration 055), so a
+stale or stolen Gridmaster token can no longer change anything, and impersonated
+editing never asks for proof again.
+
+- **Database (migration 075):**
+  - `is_authorized_org` and `check_admin_permission_for_org` let a Gridmaster
+    through only while `caller_impersonates_org`, and now return a definite
+    `FALSE` rather than `NULL` when no branch matches.
+  - The request functions, `publish_schedule` and `set_job_shift_overrides` keep
+    their bodies under `_unguarded` names that `authenticated` cannot call. Their
+    public names guard with `refuse_gridmaster_outside_org`, which recognises a
+    Gridmaster by profile, so a revoked session cannot slip past.
+- **Routes:** `requireOrgPermissions(..., { gridmasterNeedsImpersonation: true })`
+  applies the same rule to every write in the schedule, recurring, requests,
+  publish and settings routes, including the service-role paths the database
+  cannot see. `gridmaster-impersonation-routes.test.ts` fails if a write action
+  forgets it.
+- **Not affected:** members (a Gridmaster who is also a member acts by their
+  membership), reads, and the Gridmaster portal's own tools under
+  `/api/gridmaster/*`.
+
 ## 9. Summary: Race Condition Prevention Matrix
 
 | Race Condition                | Trigger                                           | Layer     | Mechanism                                                                                                                                                             |
