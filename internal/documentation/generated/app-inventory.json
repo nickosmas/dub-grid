@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:5bc1351b310e6713fb6f1936604aceb8050698e4801788c05918351283f73b71",
+  "sourceDigest": "sha256:f2f9f1e20944d6e051baa9c7ae5e228d9feec30dc0b706c99c4cd01173e0c01e",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4429,6 +4429,66 @@
       "sha256": "bcc9d49f351585d38496acbf84c9fd936a9177f7ef38659e298935e036ba422d",
       "source": {
         "path": "supabase/migrations/068_schedule_notes_authors_and_shift_required.sql"
+      }
+    },
+    {
+      "id": "migration:069_employees_admin_write_policies_dropped.sql",
+      "version": "069",
+      "name": "employees_admin_write_policies_dropped",
+      "file": "069_employees_admin_write_policies_dropped.sql",
+      "sha256": "864e4589d2da46c4d34a05086c201eb0d8a5b1e2eb45537c0de29bfa2865c9c3",
+      "source": {
+        "path": "supabase/migrations/069_employees_admin_write_policies_dropped.sql"
+      }
+    },
+    {
+      "id": "migration:070_schedule_notes_redundant_indexes.sql",
+      "version": "070",
+      "name": "schedule_notes_redundant_indexes",
+      "file": "070_schedule_notes_redundant_indexes.sql",
+      "sha256": "2f3beb1bc579b934dad5f29164bab48f7d9b29fd6d712192952854233c793d3a",
+      "source": {
+        "path": "supabase/migrations/070_schedule_notes_redundant_indexes.sql"
+      }
+    },
+    {
+      "id": "migration:071_end_impersonation_reports_end.sql",
+      "version": "071",
+      "name": "end_impersonation_reports_end",
+      "file": "071_end_impersonation_reports_end.sql",
+      "sha256": "1ef5e0ade8b6eab2d1cab18c339a360cb61469c3a1f9f0f8791410103b40777f",
+      "source": {
+        "path": "supabase/migrations/071_end_impersonation_reports_end.sql"
+      }
+    },
+    {
+      "id": "migration:072_notification_preferences_merge.sql",
+      "version": "072",
+      "name": "notification_preferences_merge",
+      "file": "072_notification_preferences_merge.sql",
+      "sha256": "f6c59bed8ba9771975b13dbd74fe74cb9ec575dc96aceaae70594c2baf225923",
+      "source": {
+        "path": "supabase/migrations/072_notification_preferences_merge.sql"
+      }
+    },
+    {
+      "id": "migration:073_record_sign_in_once.sql",
+      "version": "073",
+      "name": "record_sign_in_once",
+      "file": "073_record_sign_in_once.sql",
+      "sha256": "fcac78cb0a3015717e71cfb8837ab1159f046e464ca7cef86b8c742acb08b0da",
+      "source": {
+        "path": "supabase/migrations/073_record_sign_in_once.sql"
+      }
+    },
+    {
+      "id": "migration:074_password_change_recorded.sql",
+      "version": "074",
+      "name": "password_change_recorded",
+      "file": "074_password_change_recorded.sql",
+      "sha256": "7483b9495aabcf5e15575b48e7f644d3b2f53977f565efb1e2fb177ef87b9174",
+      "source": {
+        "path": "supabase/migrations/074_password_change_recorded.sql"
       }
     }
   ],
