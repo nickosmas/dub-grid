@@ -7,13 +7,13 @@
 > finding is `open` or `fixed`, then archives resolved findings with the work
 > and resets this file.
 
-### F-05 [P3] open - The password-change audit label is client-reported, and a failed sign-out leaves no record
+### F-05 [P3] fixed - The password-change audit label is client-reported, and a failed sign-out leaves no record
 
 **File:** `apps/web/src/lib/auth/session-sign-out.ts:28`
 **Found:** 2026-09-25 by `/audit` (scope: current, 3c8b690c..3b6d908b; all lenses)
 **Why it matters:** Any assured user can record "Changed their password" on a global sign-out without changing anything, and a password change whose sign-out fails is not recorded at all. No access is gained either way.
 **Suggested fix:** Record the change independently of the client, which is the F-08 decision; until then the label is client-reported.
-**Resolution:**
+**Resolution:** Fixed in fix/password-change-recorded, independently of the client as suggested, without deciding 41b2/F-08: migration `074_password_change_recorded.sql` adds an `AFTER UPDATE OF encrypted_password` trigger on `auth.users` that writes `security.auth.password` ("Changed their password") with the person as actor whenever the stored hash changes, by any path, so a change whose sign-out fails is still recorded. The client-labelled sign-out now reads "Signed out everywhere after a password change". `migration-074-password-change-recorded.integration.test.ts` proves one row per real change, none for an unchanged write, and no client grant; the registry test lists the trigger-written action. Not yet on production.
 
 ### F-18 [P3] unverified - The live MFA-policy integration test can lose its verified session under full-suite load
 

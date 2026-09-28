@@ -83,6 +83,8 @@ function declaredSecurityEvents(): string[] {
 const TRIGGER_WRITTEN_ACTIONS = [
   // supabase/migrations/010_invitation_auto_revoke_audit.sql
   "invitation.auto_revoked",
+  // supabase/migrations/074_password_change_recorded.sql
+  "security.auth.password",
 ];
 
 describe("audit action registry coverage", () => {
@@ -420,7 +422,18 @@ describe("audience", () => {
     expect(describeAuditAction("security.auth.session", {})).toBe("Signed out");
     expect(
       describeAuditAction("security.auth.session", { scope: "global", reason: "password_changed" }),
-    ).toBe("Changed their password and signed out everywhere");
+    ).toBe("Signed out everywhere after a password change");
+  });
+
+  // The client names the reason for a sign-out, so only the database's own
+  // row says the password changed (F-05).
+  it("says a password changed only from the database's row", () => {
+    expect(
+      describeAuditAction("security.auth.password", {
+        outcome: "succeeded",
+        reason: "password_changed",
+      }),
+    ).toBe("Changed their password");
   });
 
   it("never shows an organization copy the registry did not write", () => {
