@@ -95,6 +95,21 @@ describe("Button", () => {
     expect(screen.getByText("Custom content")).toBeInTheDocument();
   });
 
+  it("keeps an element label on one truncating line without fitting it", () => {
+    render(
+      <Button onPress={vi.fn()}>
+        <b>Bold content</b>
+      </Button>,
+    );
+
+    // FitText keys its measurement on the label's text, which an element
+    // does not have, so an element label never reaches it (F-113).
+    const label = screen.getByText("Bold content").parentElement;
+    expect(label).toHaveAttribute("data-number-of-lines", "1");
+    expect(label).toHaveAttribute("data-ellipsize-mode", "tail");
+    expect(screen.queryByTestId("fit-text-measure")).not.toBeInTheDocument();
+  });
+
   it("blocks press and haptics while disabled", () => {
     const onPress = vi.fn();
     render(<Button disabled label="Save" onPress={onPress} />);

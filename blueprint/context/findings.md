@@ -176,10 +176,10 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** Read production's `audit_log` row count (read-only) during the release rehearsal and time the build on the scratch stack; if it is more than a few seconds, build the index `CONCURRENTLY` outside the migration transaction.
 **Resolution:** 066 applied to production 2026-09-28 in one statement with no measured stall: production's `audit_log` held about 230 rows (248 kB), a read-only count taken by the person-page session, so the build locked writes for a negligible time and no `CONCURRENTLY` split was needed. Left `unverified` for `/audit` to settle; a later large-table index would need the concurrent build. Re-examined 2026-09-28 by `/audit`: production's `audit_log` held about 230 rows (248 kB) when 066 was applied, so the build's write lock was negligible; the risk does not hold at this size, and a future large-table index would need its own `CONCURRENTLY` plan.
 
-### F-113 [P3] open - FitText no longer resets for a label passed as elements
+### F-113 [P3] fixed - FitText no longer resets for a label passed as elements
 
 **File:** `apps/mobile/src/shared/components/FitText.tsx:66`
 **Found:** 2026-09-28 by `/audit` (scope: `FitText`, `AuthField` at 3715cc49; all lenses)
 **Why it matters:** the fix in 08292520 remounts the fitting logic keyed on the label's text, and element children key as an empty string, so a label given as elements that later grows would keep a shrink measured for the earlier one. No caller does this today: every `Button` passes a string `label` and nothing else renders `FitText`.
 **Suggested fix:** narrow `FitText`'s `children` to `string | number` so the case cannot arise, or key element children by a caller-supplied `labelKey`.
-**Resolution:**
+**Resolution:** Fixed in fix/fittext-string-labels: `FitText`'s `children` is now `string | number`, so the element case cannot compile, and `Button` sends an element label down a plain one-line, truncating `Text` instead. `Button.test.tsx` proves an element label never reaches `FitText`; type-check and the 30 shared component test files (193 tests) pass.
