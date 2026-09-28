@@ -101,9 +101,9 @@ async function loadFixture(): Promise<Fixture> {
       [orgId, `Live test ${status}`],
     );
     await db.query(
-      `INSERT INTO public.schedule_notes (org_id, emp_id, date, indicator_type_id, status)
-       VALUES ($1, $2, $3::date, $4, $5)`,
-      [orgId, employees[0].id, date, indicators[0].id, status],
+      `INSERT INTO public.schedule_notes (org_id, emp_id, date, indicator_type_id, job_id, status)
+       VALUES ($1, $2, $3::date, $4, $5, $6)`,
+      [orgId, employees[0].id, date, indicators[0].id, jobs[0].id, status],
     );
   }
 

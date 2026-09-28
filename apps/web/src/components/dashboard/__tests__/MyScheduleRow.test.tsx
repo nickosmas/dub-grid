@@ -1182,8 +1182,8 @@ describe("MyScheduleRow", () => {
         date: "2026-05-11",
         indicatorTypeId,
         focusAreaId: null,
-        shiftId: null,
-        jobId: null,
+        shiftId: 10,
+        jobId: 7,
         status: "published",
         createdBy: null,
         updatedBy: null,
@@ -1266,7 +1266,7 @@ describe("MyScheduleRow", () => {
       );
     });
 
-    it("gives each half of a double shift its own focus area's notes", () => {
+    it("gives each half of a double shift its own notes", () => {
       const shifts: ShiftMap = {
         "emp-1_2026-05-11": {
           label: "D+N",
@@ -1282,7 +1282,7 @@ describe("MyScheduleRow", () => {
         },
       };
 
-      renderRow({ shifts, notes: [note(1, { focusAreaId: 2 }), note(2)] });
+      renderRow({ shifts, notes: [note(1, { shiftId: 11, jobId: 8 }), note(2)] });
 
       const marks = screen.getAllByTestId("my-schedule-notes");
       expect(marks.map((mark) => mark.getAttribute("aria-label"))).toEqual([

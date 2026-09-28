@@ -505,9 +505,9 @@ export interface ScheduleNote {
   /** FK to indicator_types.id — consistent with how schedule cells reference related config by ID */
   indicatorTypeId: number;
   focusAreaId: number | null;
-  /** Both null for a note no shift claims, which applies to its whole focus area. */
+  /** The shift the note belongs to; a note always has one (065). */
   shiftId: number | null;
-  jobId: number | null;
+  jobId: number;
   status: "published" | "draft" | "draft_deleted";
   createdBy: string | null;
   /** Last editor, used to attribute unpublished notes in the publish dialog. */

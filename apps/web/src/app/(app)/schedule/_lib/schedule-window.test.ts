@@ -19,8 +19,8 @@ function note(overrides: Partial<ScheduleNote>): ScheduleNote {
     date: "2026-08-03",
     indicatorTypeId: 10,
     focusAreaId: 5,
-    shiftId: null,
-    jobId: null,
+    shiftId: 34,
+    jobId: 18,
     status: "published",
     createdBy: null,
     updatedBy: null,
@@ -59,8 +59,8 @@ describe("buildScheduleNoteMap", () => {
 
     expect(map).toEqual({
       "emp-1_2026-08-03_5": [
-        { indicatorTypeId: 10, status: "published", updatedBy: null, shiftId: null, jobId: null },
-        { indicatorTypeId: 11, status: "draft", updatedBy: null, shiftId: null, jobId: null },
+        { indicatorTypeId: 10, status: "published", updatedBy: null, shiftId: 34, jobId: 18 },
+        { indicatorTypeId: 11, status: "draft", updatedBy: null, shiftId: 34, jobId: 18 },
       ],
     });
   });
@@ -81,17 +81,17 @@ describe("buildScheduleNoteMap", () => {
     ]);
 
     expect(map["emp-1_2026-08-03"]).toEqual([
-      { indicatorTypeId: 10, status: "published", updatedBy: null, shiftId: null, jobId: null },
+      { indicatorTypeId: 10, status: "published", updatedBy: null, shiftId: 34, jobId: 18 },
     ]);
     expect(map["emp-1_2026-08-03_5"]).toEqual([
-      { indicatorTypeId: 10, status: "published", updatedBy: null, shiftId: null, jobId: null },
+      { indicatorTypeId: 10, status: "published", updatedBy: null, shiftId: 34, jobId: 18 },
     ]);
   });
 
   it("carries draft_deleted through, since the grid renders it distinctly", () => {
     const map = buildScheduleNoteMap([note({ status: "draft_deleted" })]);
     expect(map["emp-1_2026-08-03_5"]).toEqual([
-      { indicatorTypeId: 10, status: "draft_deleted", updatedBy: null, shiftId: null, jobId: null },
+      { indicatorTypeId: 10, status: "draft_deleted", updatedBy: null, shiftId: 34, jobId: 18 },
     ]);
   });
 
@@ -103,8 +103,8 @@ describe("buildScheduleNoteMap", () => {
     ]);
 
     expect(map["emp-1_2026-08-03_5"]).toEqual([
-      { indicatorTypeId: 10, status: "draft", updatedBy: "user-1", shiftId: null, jobId: null },
-      { indicatorTypeId: 11, status: "draft", updatedBy: null, shiftId: null, jobId: null },
+      { indicatorTypeId: 10, status: "draft", updatedBy: "user-1", shiftId: 34, jobId: 18 },
+      { indicatorTypeId: 11, status: "draft", updatedBy: null, shiftId: 34, jobId: 18 },
     ]);
   });
 
@@ -195,6 +195,20 @@ describe("buildScheduleNoteMarks", () => {
     });
 
     expect(marks).toEqual([{ indicatorTypeId: 11, state: "published" }]);
+  });
+
+  it("keeps only one shift's notes when asked for that shift", () => {
+    const marks = buildScheduleNoteMarks({
+      notes: [
+        { indicatorTypeId: 10, status: "published", updatedBy: null, shiftId: 34, jobId: 18 },
+        { indicatorTypeId: 11, status: "draft", updatedBy: null, shiftId: 35, jobId: 18 },
+        { indicatorTypeId: 12, status: "published", updatedBy: null, shiftId: 34, jobId: 19 },
+      ],
+      isScheduleEditor: true,
+      shift: { shiftId: 35, jobId: 18 },
+    });
+
+    expect(marks).toEqual([{ indicatorTypeId: 11, state: "draft_added" }]);
   });
 
   it("promotes a note the last publish added", () => {

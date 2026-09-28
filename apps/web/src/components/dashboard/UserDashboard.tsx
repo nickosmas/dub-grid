@@ -757,15 +757,7 @@ function buildScheduleItemsFromShiftMap(input: {
           notes: input.scheduleNotes,
           empId: parsedKey.employeeId,
           dateKey: parsedKey.dateKey,
-          segments: rawSegments.map((rawSegment, index) => {
-            const assignmentId = rawSegment.assignmentId ?? entry.assignmentIds[index];
-            const assignment =
-              assignmentId != null ? input.assignmentById.get(assignmentId) : undefined;
-            return {
-              focusAreaId: rawSegment.focusAreaId ?? assignment?.focusAreaId ?? null,
-              shift: noteShiftOf(rawSegment),
-            };
-          }),
+          segments: rawSegments.map((rawSegment) => ({ shift: noteShiftOf(rawSegment) })),
           isScheduleEditor: input.isScheduleEditor,
         });
     const dayNoteMarks = marksBySegment.flat();

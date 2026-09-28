@@ -498,7 +498,6 @@ describe("ShiftDetailScreen", () => {
     expect(
       within(notes).getByLabelText("Schedule notes: Training; Float, added, not published"),
     ).toHaveTextContent("Training, Float (added, not published)");
-    expect(within(notes).queryByText("For the whole day")).toBeNull();
     expect(screen.getByText("Working with")).toBeInTheDocument();
     expect(screen.getByText("Jordan Lee")).toBeInTheDocument();
     expect(screen.getByText("Nurse")).toBeInTheDocument();
@@ -552,7 +551,7 @@ describe("ShiftDetailScreen", () => {
     useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn(), reset: vi.fn() });
   }
 
-  it("lists a double shift's schedule notes under each half and the whole day", () => {
+  it("lists a double shift's schedule notes under the shift each belongs to", () => {
     patchSelectedEntry({
       assignmentIds: [1, 2],
       shiftName: "Day Shift / Evening Shift",
@@ -560,6 +559,7 @@ describe("ShiftDetailScreen", () => {
       segments: [
         {
           shiftId: 1,
+          jobId: 5,
           shiftName: "Day Shift",
           startTime: "07:00:00",
           endTime: "15:00:00",
@@ -568,6 +568,7 @@ describe("ShiftDetailScreen", () => {
         },
         {
           shiftId: 2,
+          jobId: 5,
           shiftName: "Evening Shift",
           startTime: "15:00:00",
           endTime: "23:00:00",
@@ -579,14 +580,26 @@ describe("ShiftDetailScreen", () => {
         {
           indicatorTypeId: 1,
           focusAreaId: 2,
+          shiftId: 1,
+          jobId: 5,
           name: "Training",
           color: "#378ADD",
           state: "published",
         },
-        { indicatorTypeId: 2, focusAreaId: 3, name: "Float", color: "#E24B4A", state: "published" },
+        {
+          indicatorTypeId: 2,
+          focusAreaId: 3,
+          shiftId: 2,
+          jobId: 5,
+          name: "Float",
+          color: "#E24B4A",
+          state: "published",
+        },
         {
           indicatorTypeId: 3,
-          focusAreaId: null,
+          focusAreaId: 3,
+          shiftId: 2,
+          jobId: 5,
           name: "New hire",
           color: "#1D9E75",
           state: "draft_removed",
@@ -598,10 +611,10 @@ describe("ShiftDetailScreen", () => {
 
     const notes = screen.getByTestId("shift-detail-schedule-notes");
     expect(notes).toHaveTextContent(
-      "Schedule notesICUTrainingRehabFloatFor the whole dayNew hire (removed, not published)",
+      "Schedule notesDay ShiftTrainingEvening ShiftFloat, New hire (removed, not published)",
     );
     expect(
-      within(notes).getByLabelText("Schedule notes: New hire, removed, not published"),
+      within(notes).getByLabelText("Schedule notes: Float; New hire, removed, not published"),
     ).toBeInTheDocument();
   });
 

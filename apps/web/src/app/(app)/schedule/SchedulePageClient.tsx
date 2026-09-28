@@ -3725,6 +3725,7 @@ function SchedulerContent({
       focusAreaId: number | undefined,
       shift: ScheduleNoteShift | null,
     ): number[] => {
+      if (!shift) return [];
       const dateKey = formatDateKey(date);
       const key =
         focusAreaId != null ? `${empId}_${dateKey}_${focusAreaId}` : `${empId}_${dateKey}`;
@@ -3748,13 +3749,19 @@ function SchedulerContent({
    * removal simply disappears as though it were already gone.
    */
   const noteMarksForKey = useCallback(
-    (empId: string, date: Date, focusAreaId?: number): ScheduleNoteMark[] => {
+    (
+      empId: string,
+      date: Date,
+      focusAreaId?: number,
+      shift?: ScheduleNoteShift,
+    ): ScheduleNoteMark[] => {
       const dateKey = formatDateKey(date);
       const key = scheduleNoteKey(empId, dateKey, focusAreaId ?? null);
       return buildScheduleNoteMarks({
         notes: notes[key],
         publishedChanges: showPublishDiff ? publishNoteChangesMap?.get(key) : undefined,
         isScheduleEditor,
+        shift,
       });
     },
     [isScheduleEditor, notes, publishNoteChangesMap, showPublishDiff],
@@ -3770,6 +3777,8 @@ function SchedulerContent({
 
   const panelActiveIndicatorIds = useCallback(
     (focusAreaId: number, shift: ScheduleNoteShift | null = null): number[] => {
+      // A note always belongs to a shift, so a cell without one has none.
+      if (!shift) return [];
       if (
         editSessionDraft &&
         editSessionCellKey &&
@@ -4649,8 +4658,8 @@ function SchedulerContent({
             formatDateKey(panel.date),
             write.indicatorTypeId,
             write.focusAreaId,
-            write.baseStatus,
             write.shift,
+            write.baseStatus,
           );
         });
         await Promise.all(noteWrites.map((write) => write()));
@@ -5553,6 +5562,7 @@ function SchedulerContent({
       focusAreaId: number,
       shift: ScheduleNoteShift | null = null,
     ) => {
+      if (!shift) return;
       updateEditSessionDraft((prev) => ({
         draftShift: prev.draftShift,
         draftNotes: {

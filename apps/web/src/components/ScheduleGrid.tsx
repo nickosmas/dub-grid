@@ -57,6 +57,7 @@ import {
   GridOpenShift,
   ScheduleCellState,
   ShiftJobSegment,
+  ScheduleNoteShift,
 } from "@/types";
 import { buildScheduleGridModel } from "./schedule-grid/model";
 import type {
@@ -105,8 +106,7 @@ import {
   MentoredShiftBadge,
   LOCK_CORNER_CLEARANCE,
   RequestCornerFold,
-  NOTE_DOT_GAP,
-  NOTE_DOT_SIZE,
+  noteMarksWidth,
   AuthorBadge,
   type GridDiffBadgeConfig,
 } from "./schedule-grid/badges";
@@ -183,7 +183,12 @@ interface LegacyScheduleGridProps {
   isCellInteractive?: boolean;
   /** Whether shifts can be dragged (editor-only). Defaults to isCellInteractive. */
   canDragShifts?: boolean;
-  noteMarksForKey?: (empId: string, date: Date, focusAreaId?: number) => ScheduleNoteMark[];
+  noteMarksForKey?: (
+    empId: string,
+    date: Date,
+    focusAreaId?: number,
+    shift?: ScheduleNoteShift,
+  ) => ScheduleNoteMark[];
   activeFocusArea?: number | null;
   certifications?: NamedItem[];
   orgRoles?: NamedItem[];
@@ -294,7 +299,12 @@ interface SectionBlockProps {
   indicatorTypes: IndicatorType[];
   isCellInteractive: boolean;
   canDragShifts?: boolean;
-  noteMarksForKey?: (empId: string, date: Date, focusAreaId?: number) => ScheduleNoteMark[];
+  noteMarksForKey?: (
+    empId: string,
+    date: Date,
+    focusAreaId?: number,
+    shift?: ScheduleNoteShift,
+  ) => ScheduleNoteMark[];
   getCustomShiftTimes?: (
     empId: string,
     date: Date,
@@ -2869,9 +2879,16 @@ const SectionBlock = memo(function SectionBlock({
                                             <NoteDots
                                               marks={noteMarks}
                                               indicatorTypes={indicatorTypes}
+                                              rimColor={singleForegroundColor}
+                                              surfaceColor={
+                                                singleUsesShiftColor
+                                                  ? effectiveColor
+                                                  : "var(--dg-color-surface)"
+                                              }
+                                              isDark={isDarkTheme}
                                               style={{
-                                                bottom: shouldShowAuthorName ? 18 : 3,
-                                                right: 4,
+                                                bottom: shouldShowAuthorName ? 18 : 4,
+                                                right: 5,
                                               }}
                                             />
                                             {(draftBadge || publishBadge) && (
@@ -2891,7 +2908,11 @@ const SectionBlock = memo(function SectionBlock({
                                           <AuthorBadge
                                             name={auditName}
                                             leftInset={singleAuthorLeftInset}
-                                            rightInset={noteMarks.length > 0 ? 21 : 5}
+                                            rightInset={
+                                              noteMarks.length > 0
+                                                ? 5 + noteMarksWidth(noteMarks.length) + 3
+                                                : 5
+                                            }
                                             bottomInset={singleAuthorBottomInset}
                                           />
                                         )}
@@ -2927,6 +2948,10 @@ const SectionBlock = memo(function SectionBlock({
                                   // Status chips own the top-right corner. Keep
                                   // note dots on the bottom edge instead.
                                   const multiNotesRightOffset = 2;
+                                  // Each pill draws its own shift's notes when the
+                                  // cell's segments line up with its pills.
+                                  const notesPerPill =
+                                    !!noteMarksForKey && cellSegments.length === labels.length;
                                   const multiHoverChangeDetails = Array.from(
                                     new Set(
                                       [
@@ -3099,6 +3124,23 @@ const SectionBlock = memo(function SectionBlock({
                                               const multiDisplayLabel = displayParts.primaryLabel;
                                               const isMentoredPill =
                                                 cellSegments[li]?.isMentored ?? false;
+                                              const pillSegment = notesPerPill
+                                                ? cellSegments[li]
+                                                : undefined;
+                                              const pillNoteMarks = pillSegment
+                                                ? (noteMarksForKey?.(
+                                                    emp.id,
+                                                    date,
+                                                    // Notes are filed under their shift's
+                                                    // focus area, which a cross pill's is not.
+                                                    codeEntryLi?.focusAreaId ??
+                                                      sectionFocusArea?.id,
+                                                    {
+                                                      shiftId: pillSegment.shiftId,
+                                                      jobId: pillSegment.jobId,
+                                                    },
+                                                  ) ?? [])
+                                                : [];
 
                                               return (
                                                 <div
@@ -3328,19 +3370,34 @@ const SectionBlock = memo(function SectionBlock({
                                                       )}
                                                     </span>
                                                   )}
+                                                  <NoteDots
+                                                    marks={pillNoteMarks}
+                                                    indicatorTypes={indicatorTypes}
+                                                    rimColor={multiForegroundColor}
+                                                    surfaceColor={
+                                                      multiUsesShiftColor
+                                                        ? effectiveColorLi
+                                                        : "var(--dg-color-surface)"
+                                                    }
+                                                    isDark={isDarkTheme}
+                                                    style={{ bottom: 2, right: 2 }}
+                                                  />
                                                 </div>
                                               );
                                             })}
                                           </div>
-                                          <NoteDots
-                                            marks={noteMarks}
-                                            indicatorTypes={indicatorTypes}
-                                            style={{
-                                              bottom: 2,
-                                              right: multiNotesRightOffset,
-                                              zIndex: 1,
-                                            }}
-                                          />
+                                          {!notesPerPill && (
+                                            <NoteDots
+                                              marks={noteMarks}
+                                              indicatorTypes={indicatorTypes}
+                                              isDark={isDarkTheme}
+                                              style={{
+                                                bottom: 2,
+                                                right: multiNotesRightOffset,
+                                                zIndex: 1,
+                                              }}
+                                            />
+                                          )}
                                           {(draftBadge || publishBadge) && (
                                             <GridDiffBadge
                                               badge={{
@@ -3567,6 +3624,7 @@ const SectionBlock = memo(function SectionBlock({
                                     <NoteDots
                                       marks={noteMarks}
                                       indicatorTypes={indicatorTypes}
+                                      isDark={isDarkTheme}
                                       style={{ top: 5, right: 5, zIndex: 7 }}
                                     />
                                     {shouldShowAuthorName && auditName && (
@@ -3598,6 +3656,7 @@ const SectionBlock = memo(function SectionBlock({
                                 <NoteDots
                                   marks={noteMarks}
                                   indicatorTypes={indicatorTypes}
+                                  isDark={isDarkTheme}
                                   style={{ top: 5, right: 5 }}
                                 />
                               </>

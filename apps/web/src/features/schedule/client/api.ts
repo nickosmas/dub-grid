@@ -834,8 +834,8 @@ export function upsertScheduleNote(
   date: string,
   indicatorTypeId: number,
   focusAreaId: number,
+  shift: ScheduleNoteShift,
   existingStatus?: "published" | "draft" | "draft_deleted",
-  shift: ScheduleNoteShift | null = null,
 ): Promise<void> {
   return requestScheduleManage<{ success: true }>({
     action: "upsertScheduleNote",
@@ -855,8 +855,8 @@ export function deleteScheduleNote(
   date: string,
   indicatorTypeId: number,
   focusAreaId: number,
+  shift: ScheduleNoteShift,
   existingStatus?: "published" | "draft" | "draft_deleted",
-  shift: ScheduleNoteShift | null = null,
 ): Promise<void> {
   return requestScheduleManage<{ success: true }>({
     action: "deleteScheduleNote",

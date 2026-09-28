@@ -920,6 +920,7 @@ describe("POST /api/schedule/manage permission gates", () => {
         date: "2026-08-03",
         indicatorTypeId: 1,
         focusAreaId: 1,
+        shift: { shiftId: 34, jobId: 18 },
       }),
     );
 
@@ -940,6 +941,7 @@ describe("POST /api/schedule/manage permission gates", () => {
         date: "2026-08-03",
         indicatorTypeId: 1,
         focusAreaId: 1,
+        shift: { shiftId: 34, jobId: 18 },
       }),
     );
 
@@ -963,6 +965,7 @@ describe("POST /api/schedule/manage permission gates", () => {
         date: "2026-08-03",
         indicatorTypeId: 1,
         focusAreaId: 1,
+        shift: { shiftId: 34, jobId: 18 },
       }),
     );
 
@@ -986,6 +989,7 @@ describe("POST /api/schedule/manage permission gates", () => {
         date: "2026-08-03",
         indicatorTypeId: 1,
         focusAreaId: 1,
+        shift: { shiftId: 34, jobId: 18 },
       }),
     );
 
@@ -1015,9 +1019,11 @@ describe("POST /api/schedule/manage permission gates", () => {
     expect(deleted).toEqual([
       { org_id: orgId, emp_id: employeeId, date: "2026-08-03", status: "draft" },
     ]);
+    // The service client has no auth.uid(), so the actor is named as the author.
     expect(softDeleted).toEqual([
       {
         status: "published",
+        updated_by: "actor-user",
         org_id: orgId,
         emp_id: employeeId,
         date: "2026-08-03",
@@ -1104,7 +1110,13 @@ describe("POST /api/schedule/manage permission gates", () => {
 
     expect(response.status).toBe(200);
     expect(upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ shift_id: 35, job_id: 18, focus_area_id: 1 }),
+      expect.objectContaining({
+        shift_id: 35,
+        job_id: 18,
+        focus_area_id: 1,
+        created_by: "actor-user",
+        updated_by: "actor-user",
+      }),
       { onConflict: "emp_id,date,indicator_type_id,focus_area_id,shift_id,job_id" },
     );
   });
@@ -1133,7 +1145,30 @@ describe("POST /api/schedule/manage permission gates", () => {
     expect(response.status).toBe(400);
   });
 
-  it("removes only the named shift's note, or only the unattached one", async () => {
+  it("names the actor on a published note it marks for removal", async () => {
+    grant({ canEditNotes: true });
+    const { softDeleted } = captureNoteClearing();
+
+    const response = await POST(
+      makeRequest({
+        action: "deleteScheduleNote",
+        orgId,
+        employeeId,
+        date: "2026-08-03",
+        indicatorTypeId: 1,
+        focusAreaId: 1,
+        shift: { shiftId: 35, jobId: 18 },
+        existingStatus: "published",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(softDeleted).toEqual([
+      expect.objectContaining({ status: "draft_deleted", updated_by: "actor-user", job_id: 18 }),
+    ]);
+  });
+
+  it("removes only the named shift's note", async () => {
     const body = {
       action: "deleteScheduleNote",
       orgId,
@@ -1159,13 +1194,26 @@ describe("POST /api/schedule/manage permission gates", () => {
       200,
     );
     expect(evening.deleted).toEqual([expect.objectContaining({ job_id: 18, shift_id: 35 })]);
-
-    grant({ canEditNotes: true });
-    const unattached = captureNoteClearing();
-    expect((await POST(makeRequest(body))).status).toBe(200);
-    expect(unattached.deleted).toEqual([expect.objectContaining({ job_id: null, shift_id: null })]);
   });
 
+  it("refuses a note that names no shift", async () => {
+    grant({ canEditNotes: true });
+    stubCellSnapshot("worked");
+
+    const response = await POST(
+      makeRequest({
+        action: "upsertScheduleNote",
+        orgId,
+        employeeId,
+        date: "2026-08-03",
+        indicatorTypeId: 1,
+        focusAreaId: 1,
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(serviceFrom).not.toHaveBeenCalledWith("schedule_notes");
+  });
   it("drops notes across every cell a deleted series covered", async () => {
     const secondEmployeeId = "55555555-5555-4555-8555-555555555555";
     grant({ canEditShifts: true, canManageShiftSeries: true });

@@ -34,18 +34,13 @@ export function dashboardScheduleWindow(input: {
 
 /** One shift of a person's day, as the dashboard matches notes to it. */
 export interface DashboardNoteShift {
-  focusAreaId: number | null | undefined;
   shift: ScheduleNoteShift | null;
 }
 
 /**
- * A person's schedule notes for one day, one list of marks per shift half.
- *
- * A single shift shows the whole day's notes. On a double shift a note goes to
- * the half it belongs to; a note no shift claims goes to the first half
- * working its focus area, and one with no focus area (or one the shift does
- * not work) to the first half, as mobile's Home card and shift detail do. No
- * halves (an absence, a removed shift) show nothing.
+ * A person's schedule notes for one day, one list of marks per shift half:
+ * each note on the half it belongs to. A note whose shift the day no longer
+ * has shows nowhere. No halves (an absence, a removed shift) show nothing.
  */
 export function scheduleNoteMarksBySegment(input: {
   notes: readonly ScheduleNote[];
@@ -64,17 +59,10 @@ export function scheduleNoteMarksBySegment(input: {
   const seen = new Set<string>();
   for (const note of input.notes) {
     if (note.empId !== input.empId || note.date !== input.dateKey) continue;
-    const own =
-      note.jobId == null
-        ? -1
-        : input.segments.findIndex(
-            ({ shift }) => shift?.jobId === note.jobId && shift.shiftId === (note.shiftId ?? null),
-          );
-    const worked =
-      own !== -1 || note.focusAreaId == null
-        ? own
-        : input.segments.findIndex((segment) => segment.focusAreaId === note.focusAreaId);
-    const half = worked === -1 ? 0 : worked;
+    const half = input.segments.findIndex(
+      ({ shift }) => shift?.jobId === note.jobId && shift.shiftId === note.shiftId,
+    );
+    if (half === -1) continue;
     const key = `${half}_${note.indicatorTypeId}_${note.status}`;
     if (seen.has(key)) continue;
     seen.add(key);

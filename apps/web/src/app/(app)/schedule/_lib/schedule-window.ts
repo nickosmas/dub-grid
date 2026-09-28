@@ -1,5 +1,5 @@
 import type { ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
-import type { NotePublishChange, ScheduleNote } from "@/types";
+import type { NotePublishChange, ScheduleNote, ScheduleNoteShift } from "@/types";
 
 /**
  * Notes for a schedule cell, keyed by `empId_date` or `empId_date_focusAreaId`.
@@ -91,10 +91,15 @@ export function buildScheduleNoteMarks(input: {
   notes: ScheduleNoteMap[string] | undefined;
   publishedChanges?: Map<number, NotePublishChange>;
   isScheduleEditor: boolean;
+  /** One shift's notes only, for a double shift's own pill. */
+  shift?: ScheduleNoteShift;
 }): ScheduleNoteMark[] {
-  const noteList = input.notes ?? [];
+  const shift = input.shift;
+  const noteList = (input.notes ?? []).filter(
+    (note) => !shift || (note.jobId === shift.jobId && note.shiftId === shift.shiftId),
+  );
   const marks: ScheduleNoteMark[] = [];
-  // The dots are per cell, so a note on both shifts of a double shift is one dot.
+  // Marks are per cell or per shift, so a note type appears once in each.
   const seen = new Set<string>();
   const push = (mark: ScheduleNoteMark) => {
     const key = `${mark.indicatorTypeId}_${mark.state}`;

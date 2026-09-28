@@ -460,7 +460,7 @@ export default function ShiftEditPanel({
   const singleNoteShift = currentSegments.length === 1 ? noteShiftOf(currentSegments[0]) : null;
 
   function noteSlots(segments: readonly ShiftJobSegment[]) {
-    const shifts = new Map<string, ScheduleNoteShift | null>([["-", null]]);
+    const shifts = new Map<string, ScheduleNoteShift>();
     for (const segment of [...initialSegments, ...segments]) {
       const shift = noteShiftOf(segment);
       if (shift) shifts.set(`${shift.shiftId ?? "-"}:${shift.jobId}`, shift);
@@ -468,7 +468,6 @@ export default function ShiftEditPanel({
     return noteFocusAreaIds.flatMap((focusAreaId) =>
       [...shifts].map(([shiftKey, shift]) => ({
         key: `${focusAreaId}|${shiftKey}`,
-        unclaimedKey: `${focusAreaId}|-`,
         focusAreaId,
         shift,
       })),
@@ -478,8 +477,7 @@ export default function ShiftEditPanel({
   function noteSlotChanges() {
     if (!getActiveIndicatorIds) return [];
     return noteSlots(currentSegments).map((slot) => {
-      const initial =
-        initialNotesBySlot.get(slot.key) ?? initialNotesBySlot.get(slot.unclaimedKey) ?? [];
+      const initial = initialNotesBySlot.get(slot.key) ?? [];
       const current = getActiveIndicatorIds(slot.focusAreaId, slot.shift);
       return {
         ...slot,

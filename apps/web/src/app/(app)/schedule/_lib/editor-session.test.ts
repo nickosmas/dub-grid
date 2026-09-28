@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   activeNoteIds,
+  cloneDraftNotes,
   computeScheduleEntryDraftKind,
   dropNotesOfRemovedShifts,
   planNoteWrites,
@@ -105,14 +106,9 @@ describe("schedule notes per shift", () => {
   const evening = { shiftId: 35, jobId: 18 };
   const onShift = (
     indicatorTypeId: number,
-    shift: { shiftId: number | null; jobId: number } | null,
+    shift: { shiftId: number | null; jobId: number },
     status: DraftNoteState["status"] = "published",
-  ): DraftNoteState => ({
-    indicatorTypeId,
-    status,
-    shiftId: shift?.shiftId ?? null,
-    jobId: shift?.jobId ?? null,
-  });
+  ): DraftNoteState => ({ indicatorTypeId, status, ...shift });
 
   it("turns a note on for one shift of a double shift and leaves the other off", () => {
     const notes = toggleDraftNote([], 1, true, evening);
@@ -121,38 +117,35 @@ describe("schedule notes per shift", () => {
     expect(activeNoteIds(notes, day)).toEqual([]);
   });
 
-  it("shows a note no shift claims on every shift in its area", () => {
-    const notes = [onShift(1, null), onShift(2, day)];
-
-    expect(activeNoteIds(notes, day).sort()).toEqual([1, 2]);
-    expect(activeNoteIds(notes, evening)).toEqual([1]);
-    expect(activeNoteIds(notes, null)).toEqual([1]);
-  });
-
-  it("turns off a shift's own note before one no shift claims, and undoes both", () => {
-    const start = [onShift(1, null), onShift(1, day)];
+  it("turns off a published note by marking it, and undoes it", () => {
+    const start = [onShift(1, day), onShift(1, evening)];
 
     const off = toggleDraftNote(start, 1, false, day);
-    expect(off).toEqual([onShift(1, null), onShift(1, day, "draft_deleted")]);
+    expect(off).toEqual([onShift(1, day, "draft_deleted"), onShift(1, evening)]);
+    expect(activeNoteIds(off, day)).toEqual([]);
+    expect(activeNoteIds(off, evening)).toEqual([1]);
     expect(toggleDraftNote(off, 1, true, day)).toEqual(start);
+  });
 
-    const unclaimedOff = toggleDraftNote([onShift(1, null)], 1, false, evening);
-    expect(unclaimedOff).toEqual([onShift(1, null, "draft_deleted")]);
-    expect(toggleDraftNote(unclaimedOff, 1, true, evening)).toEqual([onShift(1, null)]);
+  it("drops a draft note outright when it is turned off", () => {
+    expect(toggleDraftNote([onShift(1, day, "draft")], 1, false, day)).toEqual([]);
+  });
+
+  it("drops a map entry that names no shift", () => {
+    expect(
+      cloneDraftNotes([
+        { indicatorTypeId: 1, status: "published", shiftId: 34, jobId: 18 },
+        { indicatorTypeId: 2, status: "published" },
+      ]),
+    ).toEqual([onShift(1, day)]);
   });
 
   it("drops only a removed shift's notes: a draft goes, a published one waits", () => {
-    const notes = [
-      onShift(1, day, "draft"),
-      onShift(2, day),
-      onShift(3, evening, "draft"),
-      onShift(4, null, "draft"),
-    ];
+    const notes = [onShift(1, day, "draft"), onShift(2, day), onShift(3, evening, "draft")];
 
     expect(dropNotesOfRemovedShifts(notes, [evening])).toEqual([
       onShift(2, day, "draft_deleted"),
       onShift(3, evening, "draft"),
-      onShift(4, null, "draft"),
     ]);
   });
 
