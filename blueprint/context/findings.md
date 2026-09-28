@@ -232,14 +232,6 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** a `StaffDetailPage` test where the status call refuses with `STEP_UP_REQUIRED`, the prompt appears, and the retry carries the assured token; one `PeoplePageContent` test that `onDeactivate` reaches the prompt.
 **Resolution:**
 
-### F-100 [P1] open - An Admin can remove or edit a Super Admin's staff record through the data API
-
-**File:** `supabase/migrations/003_rls_policies.sql:277` (`admin_update_employees`, and `admin_delete_employees` at :282); `supabase/migrations/004_grants.sql` (UPDATE and DELETE on `employees` to `authenticated`); `supabase/migrations/002_functions_triggers.sql:279` (the hook refuses a `removed` employee)
-**Found:** 2026-09-28 by `/audit` (scope: fixed-finding re-review at 1924880c; all lenses), reviewing F-96's staff status gate
-**Why it matters:** `POST /api/employees/status` refuses an Admin acting on an Admin, Super Admin or Gridmaster and on their own record, but the table itself only asks for `canManageEmployees` in the caller's organization. Reproduced on the local stack inside a rolled-back transaction: an Admin's claims (`canManageEmployees` on, no MFA) ran `UPDATE public.employees SET status = 'removed'` on the Super Admin's linked row and it applied (1 row); the access-token hook then refuses that Super Admin's sign-in and refresh. The same policies let an Admin rewrite or delete any staff record the route's guards protect. No privilege is gained, but a lower tier can lock out a higher one, against the tier rule. Predates item 43. Gridmaster tokens are covered by 054's fresh-proof policies.
-**Suggested fix:** A forward migration. Either (a) revoke INSERT, UPDATE and DELETE on `public.employees` from `authenticated`, as 052 did for memberships, after moving the user-client writes (check which client `lib/db/employees.ts`, `features/account/server/profile.ts` and `profile-change-requests.ts` pass) onto the service role behind their routes; or (b) a `BEFORE UPDATE OR DELETE` trigger that, for a non-service caller below Super Admin, refuses a row linked to an Admin, Super Admin or Gridmaster and a change to the caller's own `status`, mirroring the route. Add a live test that the Admin claims above get zero rows.
-**Resolution:**
-
 ### F-101 [P2] open - A terminate whose session ending fails is never audited and cannot be retried
 
 **File:** `apps/web/src/app/api/gridmaster/users/[userId]/terminate/route.ts:62-87`
@@ -302,4 +294,12 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Found:** 2026-09-28 by `/audit` (scope: fixed-finding re-review at 1924880c; all lenses), reviewing F-84
 **Why it matters:** both lead with `emp_id` as 063's `schedule_notes_segment_unique` does, so every note write maintains two indexes no query needs. Small at today's sizes.
 **Suggested fix:** a forward migration dropping both, after checking a plan for the emp and date reads.
+**Resolution:**
+
+### F-109 [P3] open - 065 leaves the Admin write policies and MAINTAIN on `employees`
+
+**File:** `supabase/migrations/003_rls_policies.sql:273` (`admin_insert_employees`, `admin_update_employees`, `admin_delete_employees`); `supabase/migrations/065_employees_written_by_server_only.sql`
+**Found:** 2026-09-28 by `/audit` (scope: F-100 re-review on `fix/employees-written-by-server-only`; all lenses)
+**Why it matters:** with the grant revoked the three write policies grant nothing, but any later broad grant (as 004's `GRANT ... ON ALL TABLES IN SCHEMA public TO authenticated`) would silently reopen F-100; the revoke also leaves `MAINTAIN` (lock, vacuum, reindex; no data writes and not reachable through PostgREST); 065's header omits `purge_expired_data` from its SECURITY DEFINER writers (harmless).
+**Suggested fix:** a forward migration dropping the three policies and revoking `MAINTAIN`, and a live test asserting `has_table_privilege('authenticated', 'public.employees', 'UPDATE')` is false.
 **Resolution:**

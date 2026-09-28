@@ -7,14 +7,13 @@ import {
   logAudit,
   EMPLOYEE_COLS,
   DEPARTMENT_COLS,
-  OptimisticLockError,
   saveNamedEntities,
 } from "./shared";
 import { fetchAssignmentDefinitions } from "./config";
 import { parseNameMismatchResponse } from "@/lib/account-linking";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import type { DbEmployee, DbInvitation, DbScheduleCell } from "./types";
-import { rowToEmployee, employeeToRow, rowToDepartment, rowToInvitation } from "./mappers";
+import { rowToEmployee, rowToDepartment, rowToInvitation } from "./mappers";
 import { mapNormalizedScheduleCellRowToScheduleEntry } from "@/lib/schedule-cells";
 import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
 import type { Employee, Department, ShiftMap, Invitation, EmployeeStatus } from "@/types";
@@ -157,173 +156,6 @@ export async function fetchEmployeeCount(orgId: string): Promise<number> {
 
   if (error) throw error;
   return count ?? 0;
-}
-
-export async function insertEmployee(data: Omit<Employee, "id">, orgId: string): Promise<Employee> {
-  const { data: row, error } = await supabase
-    .from("employees")
-    .insert(employeeToRow(data, orgId))
-    .select()
-    .single();
-  if (error) throw error;
-  await cacheDel(CacheKey.employees(orgId), CacheKey.orgDirectory(orgId), CacheKey.tenantStats());
-  const result = rowToEmployee(row as DbEmployee);
-  void logAudit(
-    "employee.created",
-    "employee",
-    result.id,
-    { firstName: data.firstName, lastName: data.lastName },
-    orgId,
-  );
-  return result;
-}
-
-async function syncLinkedProfileName(
-  userId: string | null,
-  firstName: string,
-  lastName: string,
-): Promise<void> {
-  if (!userId) return;
-
-  const { error } = await supabase
-    .from("profiles")
-    .update({
-      first_name: firstName,
-      last_name: lastName,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", userId);
-
-  if (error) throw error;
-}
-
-export async function updateEmployee(
-  emp: Employee,
-  orgId: string,
-  expectedVersion?: number,
-): Promise<void> {
-  const nextEmployee: Employee = {
-    ...emp,
-    firstName: emp.firstName.trim(),
-    lastName: emp.lastName.trim(),
-    phone: emp.phone.trim(),
-    email: emp.email.trim(),
-    contactNotes: emp.contactNotes.trim(),
-  };
-  let query = supabase
-    .from("employees")
-    .update(employeeToRow(nextEmployee, orgId))
-    .eq("org_id", orgId)
-    .eq("id", nextEmployee.id);
-  if (expectedVersion !== undefined) {
-    query = query.eq("version", expectedVersion);
-  }
-  const { error, count } = await query.select("id").maybeSingle();
-  if (error) throw error;
-  if (expectedVersion !== undefined && count === 0) {
-    throw new OptimisticLockError(nextEmployee.id, expectedVersion);
-  }
-
-  let syncError: unknown = null;
-  if (nextEmployee.userId) {
-    try {
-      await syncLinkedProfileName(
-        nextEmployee.userId,
-        nextEmployee.firstName,
-        nextEmployee.lastName,
-      );
-    } catch (err) {
-      syncError = err;
-    }
-  }
-  await cacheDel(
-    CacheKey.employees(orgId),
-    CacheKey.employeeDetail(nextEmployee.id),
-    CacheKey.orgDirectory(orgId),
-  );
-  if (syncError) throw syncError;
-  void logAudit(
-    "employee.updated",
-    "employee",
-    nextEmployee.id,
-    { firstName: nextEmployee.firstName, lastName: nextEmployee.lastName },
-    orgId,
-  );
-}
-
-export async function updateEmployeeIdentity(input: {
-  employeeId: string;
-  orgId: string;
-  userId: string | null;
-  firstName: string;
-  lastName: string;
-  phone: string;
-}): Promise<void> {
-  const firstName = input.firstName.trim();
-  const lastName = input.lastName.trim();
-  const phone = input.phone.trim();
-
-  const { error } = await supabase
-    .from("employees")
-    .update({
-      first_name: firstName,
-      last_name: lastName,
-      phone,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("org_id", input.orgId)
-    .eq("id", input.employeeId);
-
-  if (error) throw error;
-
-  let syncError: unknown = null;
-  if (input.userId) {
-    try {
-      await syncLinkedProfileName(input.userId, firstName, lastName);
-    } catch (err) {
-      syncError = err;
-    }
-  }
-
-  await cacheDel(
-    CacheKey.employees(input.orgId),
-    CacheKey.employeeDetail(input.employeeId),
-    CacheKey.orgDirectory(input.orgId),
-  );
-  if (syncError) throw syncError;
-
-  void logAudit(
-    "employee.updated",
-    "employee",
-    input.employeeId,
-    { firstName, lastName },
-    input.orgId,
-  );
-}
-
-export async function updateEmployeeDepartments(
-  employeeId: string,
-  departmentIds: number[],
-  orgId: string,
-  deptAdminIds?: number[],
-): Promise<void> {
-  const deptSet = new Set(departmentIds);
-  const updateData: Record<string, unknown> = { department_ids: departmentIds };
-  // Always prune dept_admin_ids to remain a subset of department_ids
-  if (deptAdminIds !== undefined) {
-    updateData.dept_admin_ids = deptAdminIds.filter((id) => deptSet.has(id));
-  }
-  const { error } = await supabase
-    .from("employees")
-    .update(updateData)
-    .eq("org_id", orgId)
-    .eq("id", employeeId);
-  if (error) throw error;
-  await cacheDel(
-    CacheKey.employees(orgId),
-    CacheKey.employeeDetail(employeeId),
-    CacheKey.orgDirectory(orgId),
-  );
 }
 
 async function updateEmployeeStatus(input: {
