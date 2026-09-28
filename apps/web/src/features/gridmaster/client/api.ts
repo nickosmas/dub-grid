@@ -334,7 +334,7 @@ export function terminateGridmasterUser(
   userId: string,
   reason: string,
   accessToken?: string,
-): Promise<{ success: true }> {
+): Promise<{ success: true; sessionsEnded: boolean }> {
   return requestGridmasterJson(`/api/gridmaster/users/${encodeURIComponent(userId)}/terminate`, {
     method: "POST",
     headers: {

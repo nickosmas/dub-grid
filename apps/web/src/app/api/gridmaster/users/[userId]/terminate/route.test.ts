@@ -78,9 +78,39 @@ describe("POST /api/gridmaster/users/[userId]/terminate", () => {
           reason: "Repeated policy violations",
           memberships_archived: 2,
           employees_removed: 1,
+          sessionsEnded: true,
         }),
       }),
     );
+    await expect(response.json()).resolves.toEqual({ success: true, sessionsEnded: true });
+  });
+
+  it("still audits the termination when its sessions cannot be ended (F-101)", async () => {
+    endUserSessions.mockRejectedValue(new Error("redis unavailable"));
+
+    const response = await call({ reason: "Repeated policy violations" });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ success: true, sessionsEnded: false });
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "user.terminated",
+        resource_id: USER_ID,
+        details: expect.objectContaining({
+          reason: "Repeated policy violations",
+          sessionsEnded: false,
+        }),
+      }),
+    );
+  });
+
+  it("answers 500 when the audit row itself cannot be written", async () => {
+    auditInsert.mockResolvedValue({ error: { message: "insert failed" } });
+
+    const response = await call({ reason: "x" });
+
+    expect(response.status).toBe(500);
+    expect(endUserSessions).toHaveBeenCalledWith(USER_ID);
   });
 
   it("requires a reason", async () => {

@@ -80,13 +80,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** End the created session when the client has gone (for example, a short server-side deadline that signs the new session out), or let the next successful sign-in on that device replace the orphan.
 **Resolution:**
 
-### F-101 [P2] open - A terminate whose session ending fails is never audited and cannot be retried
+### F-101 [P2] fixed - A terminate whose session ending fails is never audited and cannot be retried
 
 **File:** `apps/web/src/app/api/gridmaster/users/[userId]/terminate/route.ts:62-87`
 **Found:** 2026-09-28 by `/audit` (scope: fixed-finding re-review at 1924880c; all lenses), reviewing F-89
 **Why it matters:** `terminate_user_account` commits (it writes no audit row itself), then F-89's `endUserSessions` runs before the `user.terminated` audit write. If ending sessions fails, the route answers 500 with no audit row, and a retry is refused with "This account is already terminated" (`021_platform_account_termination.sql:366`), so the termination is never recorded or finished. The hook still blocks refresh for a terminated account, so the exposure is the missing record of a high-risk action, not access.
 **Suggested fix:** Write the audit row right after the RPC and before `endUserSessions`, or catch that failure, log it, record `sessionsEnded: false` and still write the audit; a route test where `endUserSessions` rejects.
-**Resolution:**
+**Resolution:** Fixed in fix/terminate-sessions-audited: once `terminate_user_account` succeeds, the route ends sessions inside its own `try`, logs a failure, and always writes `user.terminated` with `sessionsEnded` in its details, then answers 200 with `sessionsEnded`. The person page shows a warning pointing at Force logout (offered on a terminated account) when it is false. Route tests cover `endUserSessions` rejecting (audited with `sessionsEnded: false`, 200) and the audit write itself failing (500); a view test covers the warning.
 
 ### F-102 [P3] closed - Two-factor reset follow-ups
 
