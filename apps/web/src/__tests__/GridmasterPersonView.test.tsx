@@ -10,6 +10,9 @@ import type {
 } from "@/features/gridmaster/person-record";
 import type { Invitation } from "@/types";
 
+const SAFARI_ON_MAC =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15";
+
 const fetchGridmasterPerson = vi.fn();
 const forceLogoutGridmasterUser = vi.fn();
 const sendGridmasterPasswordReset = vi.fn();
@@ -131,7 +134,11 @@ function linkedRecord(overrides: Partial<GridmasterPersonRecord> = {}): Gridmast
       updatedAt: "2026-01-03T00:00:00.000Z",
     },
     termsAcceptances: [
-      { version: "2026-05", acceptedAt: "2026-01-03T00:00:00.000Z", userAgent: "Mobile Safari" },
+      {
+        version: "2026-05",
+        acceptedAt: "2026-01-03T00:00:00.000Z",
+        userAgent: SAFARI_ON_MAC,
+      },
     ],
     cookieConsents: [
       {
@@ -258,7 +265,8 @@ describe("GridmasterPersonView", () => {
     expect(await screen.findByText("Sign-in email")).toBeInTheDocument();
     expect(screen.getAllByText("ada@example.com").length).toBeGreaterThan(0);
     expect(screen.getByText("Accepted terms 2026-05")).toBeInTheDocument();
-    expect(screen.getByText("Mobile Safari")).toBeInTheDocument();
+    expect(screen.getByText("Safari on Mac")).toBeInTheDocument();
+    expect(screen.queryByText(SAFARI_ON_MAC)).toBeNull();
     expect(screen.getByText(/Cookies: Essential, analytics off/)).toBeInTheDocument();
   });
 

@@ -5,6 +5,8 @@ import { Button } from "@/components/Button";
 import type { GridmasterPersonRecord } from "@/features/gridmaster/person-record";
 import { PersonField, PersonFieldGrid, PersonSection, PersonSubheading } from "./PersonField";
 import { formatActor, formatDay, formatMoment } from "./person-format";
+import { describeUserAgent } from "@/features/gridmaster/user-agent-label";
+import { MaybeHint } from "@/components/ui/hint";
 
 /** Each history shows its newest entries until the reader asks for the rest. */
 const HISTORY_PREVIEW = 3;
@@ -134,9 +136,11 @@ export function PersonAccountCard({
                 {formatMoment(acceptance.acceptedAt)}
               </span>
               {acceptance.userAgent ? (
-                <span className="block truncate text-[var(--dg-color-text-muted)]">
-                  {acceptance.userAgent}
-                </span>
+                <MaybeHint content={acceptance.userAgent}>
+                  <span className="block truncate text-[var(--dg-color-text-muted)]">
+                    {describeUserAgent(acceptance.userAgent)}
+                  </span>
+                </MaybeHint>
               ) : null}
             </li>
           ))}
@@ -150,9 +154,11 @@ export function PersonAccountCard({
                 {formatMoment(choice.createdAt)}
               </span>
               {choice.userAgent ? (
-                <span className="block truncate text-[var(--dg-color-text-muted)]">
-                  {choice.userAgent}
-                </span>
+                <MaybeHint content={choice.userAgent}>
+                  <span className="block truncate text-[var(--dg-color-text-muted)]">
+                    {describeUserAgent(choice.userAgent)}
+                  </span>
+                </MaybeHint>
               ) : null}
             </li>
           ))}

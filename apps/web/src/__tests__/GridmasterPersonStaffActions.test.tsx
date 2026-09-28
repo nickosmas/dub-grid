@@ -12,6 +12,8 @@ const removeEmployee = vi.fn();
 const updateEmployee = vi.fn();
 const resendOrganizationInvitationGuarded = vi.fn();
 const revokeOrganizationInvitationGuarded = vi.fn();
+const requireCredentialAssurance = vi.fn();
+const stepUpRun = vi.fn();
 
 const {
   EmployeeProfileConflictError,
@@ -40,6 +42,12 @@ vi.mock("@/features/organization/client", () => ({
     resendOrganizationInvitationGuarded(...args),
   revokeOrganizationInvitationGuarded: (...args: unknown[]) =>
     revokeOrganizationInvitationGuarded(...args),
+}));
+vi.mock("@/features/account/client", () => ({
+  requireCredentialAssurance: (...args: unknown[]) => requireCredentialAssurance(...args),
+}));
+vi.mock("@/hooks/useStepUpAction", () => ({
+  useStepUpAction: () => ({ run: stepUpRun, dialog: null }),
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -104,6 +112,11 @@ function confirm(dialogName: string, buttonName: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  stepUpRun.mockImplementation(async (action: (token: string) => Promise<unknown>) => {
+    await action("fresh-token");
+    return true;
+  });
+  requireCredentialAssurance.mockResolvedValue({ success: true });
   for (const mock of [activateEmployee, deactivateEmployee, removeEmployee, updateEmployee]) {
     mock.mockResolvedValue({});
   }
@@ -120,7 +133,11 @@ describe("PersonStaffActions", () => {
     fireEvent.change(screen.getByLabelText("Status note"), { target: { value: " Leave " } });
     confirm("Deactivate staff record", "Deactivate");
 
-    await waitFor(() => expect(deactivateEmployee).toHaveBeenCalledWith(STAFF, "Leave", ORG, 4));
+    // Through step-up after the credential check, with the assured token (F-96).
+    await waitFor(() =>
+      expect(deactivateEmployee).toHaveBeenCalledWith(STAFF, "Leave", ORG, 4, "fresh-token"),
+    );
+    expect(requireCredentialAssurance).toHaveBeenCalledWith("fresh-token");
     expect(onChanged).toHaveBeenCalled();
   });
 

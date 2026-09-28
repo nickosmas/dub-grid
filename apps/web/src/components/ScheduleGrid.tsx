@@ -2010,12 +2010,7 @@ const SectionBlock = memo(function SectionBlock({
                           });
                       const hoverIndicatorNames = indicatorTypes
                         .filter((indicator) =>
-                          noteMarks.some(
-                            (mark) =>
-                              mark.indicatorTypeId === indicator.id &&
-                              mark.state !== "draft_removed" &&
-                              mark.state !== "published_removed",
-                          ),
+                          noteMarks.some((mark) => mark.indicatorTypeId === indicator.id),
                         )
                         .map((indicator) => indicator.name);
                       const hoverStatus = draftKind

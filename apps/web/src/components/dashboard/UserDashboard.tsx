@@ -14,6 +14,7 @@ import type { DashboardContentProps } from "./DashboardContentProps";
 import { EmptyState } from "@/components/EmptyState";
 import type { ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
 import { scheduleNoteMarksBySegment, scheduleNoteMarksLabel } from "./dashboardScheduleNotes";
+import { noteShiftOf } from "@/app/(app)/schedule/_lib/editor-session";
 import { PublishDiffPill } from "@/components/schedule-grid/publishDiffPill";
 import {
   resolveCellChangeBadges,
@@ -756,11 +757,14 @@ function buildScheduleItemsFromShiftMap(input: {
           notes: input.scheduleNotes,
           empId: parsedKey.employeeId,
           dateKey: parsedKey.dateKey,
-          segmentFocusAreaIds: rawSegments.map((rawSegment, index) => {
+          segments: rawSegments.map((rawSegment, index) => {
             const assignmentId = rawSegment.assignmentId ?? entry.assignmentIds[index];
             const assignment =
               assignmentId != null ? input.assignmentById.get(assignmentId) : undefined;
-            return rawSegment.focusAreaId ?? assignment?.focusAreaId ?? null;
+            return {
+              focusAreaId: rawSegment.focusAreaId ?? assignment?.focusAreaId ?? null,
+              shift: noteShiftOf(rawSegment),
+            };
           }),
           isScheduleEditor: input.isScheduleEditor,
         });

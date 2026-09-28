@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule } from "../../test/native";
@@ -25,6 +25,7 @@ vi.mock("./AuthSessionProvider", () => ({
   useSessionState: () => useSessionState(),
 }));
 
+const setAppLockSurface = vi.fn();
 let appLockEnabled = false;
 const loadAppLockEnabled = vi.fn(async () => appLockEnabled);
 const getAppLockEnabledSnapshot = vi.fn(() => appLockEnabled);
@@ -39,7 +40,15 @@ vi.mock("../lib/app-lock", () => ({
   getAppLockEnabledSnapshot: () => getAppLockEnabledSnapshot(),
   getAppLockStateSnapshot: () => getAppLockStateSnapshot(),
   appLockRequired: (state: string) => state === "enabled" || state === "unreadable",
+  isSettingsDeviceCheckOpen: () => false,
+  setAppLockSurface: (surface: { engaged: boolean } | null) => setAppLockSurface(surface),
+  useAppLockSurface: () => ({ engaged: false }),
   subscribeAppLockEnabled: (callback: () => void) => subscribeAppLockEnabled(callback),
+}));
+const handleExpiredMobileSession = vi.fn(async () => undefined);
+
+vi.mock("../lib/auth-reset", () => ({
+  handleExpiredMobileSession: () => handleExpiredMobileSession(),
 }));
 vi.mock("../components/AppSplashScreen", () => ({
   AppSplashScreen: () => <div>splash</div>,
@@ -87,7 +96,7 @@ describe("AppLockProvider", () => {
     await waitFor(() => {
       expect(screen.getByTestId("app-content")).toBeInTheDocument();
     });
-    expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("app-lock")).not.toBeInTheDocument();
   });
 
   it("locks on mount when enabled and unlocks after successful authentication", async () => {
@@ -100,12 +109,12 @@ describe("AppLockProvider", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("App locked")).toBeInTheDocument();
+      expect(screen.getByTestId("app-lock")).toBeInTheDocument();
     });
 
     await waitFor(() => {
       expect(authenticateAsync).toHaveBeenCalled();
-      expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("app-lock")).not.toBeInTheDocument();
     });
   });
 
@@ -120,7 +129,7 @@ describe("AppLockProvider", () => {
     );
 
     await waitFor(() => {
-      expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("app-lock")).not.toBeInTheDocument();
     });
     expect(authenticateAsync).not.toHaveBeenCalled();
   });
@@ -129,7 +138,7 @@ describe("AppLockProvider", () => {
     // The loop this guards against: a declined check leaves `locked` true and
     // `authenticating` back to false, which used to re-enter `attemptUnlock`
     // immediately and raise the system prompt again the moment it closed —
-    // with the sheet's own Unlock button unreachable underneath it.
+    // with no way to reach anything else on screen.
     appLockEnabled = true;
     authenticateAsync.mockResolvedValue({ success: false, error: "user_cancel" });
 
@@ -149,7 +158,97 @@ describe("AppLockProvider", () => {
     });
 
     expect(authenticateAsync).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("App locked")).toBeInTheDocument();
+    expect(screen.getByText("DubGrid is locked")).toBeInTheDocument();
+  });
+
+  it("tells the app's sheets the lock is up, and when it lifts", async () => {
+    appLockEnabled = true;
+
+    render(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+
+    expect(setAppLockSurface).toHaveBeenCalledWith(expect.objectContaining({ engaged: true }));
+    await waitFor(() => expect(screen.queryByTestId("app-lock")).not.toBeInTheDocument());
+    expect(setAppLockSurface).toHaveBeenLastCalledWith(null);
+  });
+
+  it("does not lock the person who turns the lock on until the app leaves", async () => {
+    appLockEnabled = false;
+    const view = render(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+
+    appLockEnabled = true;
+    view.rerender(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+    expect(screen.queryByTestId("app-lock")).not.toBeInTheDocument();
+    expect(authenticateAsync).not.toHaveBeenCalled();
+
+    act(() => {
+      appStateListener?.("background");
+    });
+    expect(screen.getByTestId("app-lock")).toBeInTheDocument();
+  });
+
+  it("opens straight into the device check, without a page to tap first", async () => {
+    appLockEnabled = true;
+    authenticateAsync.mockImplementation(() => new Promise(() => undefined));
+
+    render(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+
+    await waitFor(() => expect(authenticateAsync).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId("app-lock")).toBeInTheDocument();
+    expect(screen.queryByText("DubGrid is locked")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
+  });
+
+  it("unlocks when Try again passes after a failed check", async () => {
+    appLockEnabled = true;
+    authenticateAsync.mockResolvedValueOnce({ success: false, error: "user_cancel" });
+
+    render(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+
+    const retry = await screen.findByRole("button", { name: "Try again" });
+    await act(async () => {
+      fireEvent.click(retry);
+    });
+
+    await waitFor(() => expect(screen.queryByTestId("app-lock")).not.toBeInTheDocument());
+    expect(authenticateAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it("signs out from the failure page", async () => {
+    appLockEnabled = true;
+    authenticateAsync.mockResolvedValue({ success: false, error: "user_cancel" });
+
+    render(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+
+    const signOut = await screen.findByRole("button", { name: "Sign out" });
+    await act(async () => {
+      fireEvent.click(signOut);
+    });
+
+    expect(handleExpiredMobileSession).toHaveBeenCalledTimes(1);
   });
 
   it("stays locked rather than crashing when the device check throws", async () => {
@@ -173,7 +272,7 @@ describe("AppLockProvider", () => {
     });
 
     expect(authenticateAsync).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("App locked")).toBeInTheDocument();
+    expect(screen.getByText("DubGrid is locked")).toBeInTheDocument();
   });
 
   it("stays unlocked through the inactive state the system prompt causes", async () => {
@@ -185,7 +284,7 @@ describe("AppLockProvider", () => {
       </AppLockProvider>,
     );
     await waitFor(() => {
-      expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("app-lock")).not.toBeInTheDocument();
     });
     authenticateAsync.mockClear();
 
@@ -194,14 +293,14 @@ describe("AppLockProvider", () => {
     });
     // Covered for the app switcher's snapshot, but not locked.
     expect(screen.getByTestId("app-lock-cover")).toBeInTheDocument();
-    expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("app-lock")).not.toBeInTheDocument();
 
     act(() => {
       appStateListener?.("active");
     });
 
     expect(screen.queryByTestId("app-lock-cover")).not.toBeInTheDocument();
-    expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("app-lock")).not.toBeInTheDocument();
     expect(authenticateAsync).not.toHaveBeenCalled();
   });
 
@@ -214,7 +313,7 @@ describe("AppLockProvider", () => {
       </AppLockProvider>,
     );
     await waitFor(() => {
-      expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("app-lock")).not.toBeInTheDocument();
     });
 
     act(() => {
@@ -238,7 +337,7 @@ describe("AppLockProvider", () => {
       </AppLockProvider>,
     );
     await waitFor(() => {
-      expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("app-lock")).not.toBeInTheDocument();
     });
 
     act(() => {
@@ -257,7 +356,7 @@ describe("AppLockProvider", () => {
       </AppLockProvider>,
     );
 
-    expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("app-lock")).not.toBeInTheDocument();
     expect(screen.queryByTestId("app-lock-cover")).not.toBeInTheDocument();
   });
 
@@ -271,7 +370,7 @@ describe("AppLockProvider", () => {
     );
 
     await waitFor(() => {
-      expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("app-lock")).not.toBeInTheDocument();
     });
 
     authenticateAsync.mockClear();
@@ -281,12 +380,18 @@ describe("AppLockProvider", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("App locked")).toBeInTheDocument();
+      expect(screen.getByTestId("app-lock")).toBeInTheDocument();
+    });
+    // The prompt waits for the app to be in front again.
+    expect(authenticateAsync).not.toHaveBeenCalled();
+
+    act(() => {
+      appStateListener?.("active");
     });
 
     await waitFor(() => {
       expect(authenticateAsync).toHaveBeenCalled();
-      expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("app-lock")).not.toBeInTheDocument();
     });
   });
 
@@ -313,7 +418,7 @@ describe("AppLockProvider", () => {
     );
     await act(async () => passCheck({ success: true }));
 
-    expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("app-lock")).not.toBeInTheDocument();
     expect(screen.queryByTestId("app-lock-cover")).not.toBeInTheDocument();
     expect(authenticateAsync).toHaveBeenCalledTimes(1);
   });
@@ -327,7 +432,7 @@ describe("AppLockProvider", () => {
         <div data-testid="app-content">content</div>
       </AppLockProvider>,
     );
-    await waitFor(() => expect(screen.queryByText("App locked")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByTestId("app-lock")).not.toBeInTheDocument());
 
     authenticateAsync.mockImplementation(() => new Promise(() => undefined));
     useSessionState.mockReturnValue({ accessToken: tokenFor("user-2", "a"), isLoading: false });
@@ -337,7 +442,7 @@ describe("AppLockProvider", () => {
       </AppLockProvider>,
     );
 
-    expect(screen.getByText("App locked")).toBeInTheDocument();
+    expect(screen.getByTestId("app-lock")).toBeInTheDocument();
     expect(screen.getByTestId("app-lock-cover")).toBeInTheDocument();
   });
 
@@ -350,7 +455,7 @@ describe("AppLockProvider", () => {
     );
 
     expect(screen.getByTestId("app-lock-cover")).toBeInTheDocument();
-    expect(screen.queryByText("App locked")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("app-lock")).not.toBeInTheDocument();
   });
 
   it("locks when the stored setting cannot be read", async () => {
@@ -362,7 +467,7 @@ describe("AppLockProvider", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("App locked")).toBeInTheDocument();
+      expect(screen.getByTestId("app-lock")).toBeInTheDocument();
     });
   });
 });

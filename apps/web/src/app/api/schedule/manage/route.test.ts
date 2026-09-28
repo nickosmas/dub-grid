@@ -41,6 +41,10 @@ function stubSeriesCells(cells: Array<{ emp_id: string; date: string }>) {
   });
 }
 
+/**
+ * Records the note writes a request makes, filters included, so a test can
+ * assert which notes were touched without a real query builder.
+ */
 function captureNoteClearing() {
   const deleted: Array<Record<string, unknown>> = [];
   const softDeleted: Array<Record<string, unknown>> = [];
@@ -48,6 +52,10 @@ function captureNoteClearing() {
   function chain(record: Record<string, unknown>, sink: Array<Record<string, unknown>>) {
     const builder = {
       eq(column: string, value: unknown) {
+        record[column] = value;
+        return builder;
+      },
+      is(column: string, value: null) {
         record[column] = value;
         return builder;
       },
@@ -1031,6 +1039,90 @@ describe("POST /api/schedule/manage permission gates", () => {
       ).status,
     ).toBe(200);
     expect(pasted.deleted.map((row) => row.emp_id)).toEqual([employeeId]);
+  });
+
+  it("writes a note against its own shift and keys the upsert on it", async () => {
+    grant({ canEditNotes: true });
+    stubCellSnapshot("worked");
+    const upsert = vi.fn(async () => ({ error: null }));
+    serviceFrom.mockImplementation((table: string) =>
+      table === "schedule_notes" ? { upsert } : { insert: vi.fn(async () => ({ error: null })) },
+    );
+
+    const response = await POST(
+      makeRequest({
+        action: "upsertScheduleNote",
+        orgId,
+        employeeId,
+        date: "2026-08-03",
+        indicatorTypeId: 1,
+        focusAreaId: 1,
+        shift: { shiftId: 35, jobId: 18 },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ shift_id: 35, job_id: 18, focus_area_id: 1 }),
+      { onConflict: "emp_id,date,indicator_type_id,focus_area_id,shift_id,job_id" },
+    );
+  });
+
+  it("answers a note for a shift the cell has lost with a 400", async () => {
+    grant({ canEditNotes: true });
+    stubCellSnapshot("worked");
+    serviceFrom.mockImplementation((table: string) =>
+      table === "schedule_notes"
+        ? { upsert: vi.fn(async () => ({ error: { code: "23514", message: "refused" } })) }
+        : { insert: vi.fn(async () => ({ error: null })) },
+    );
+
+    const response = await POST(
+      makeRequest({
+        action: "upsertScheduleNote",
+        orgId,
+        employeeId,
+        date: "2026-08-03",
+        indicatorTypeId: 1,
+        focusAreaId: 1,
+        shift: { shiftId: 99, jobId: 18 },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  it("removes only the named shift's note, or only the unattached one", async () => {
+    const body = {
+      action: "deleteScheduleNote",
+      orgId,
+      employeeId,
+      date: "2026-08-03",
+      indicatorTypeId: 1,
+      focusAreaId: 1,
+      existingStatus: "draft",
+    };
+
+    grant({ canEditNotes: true });
+    const shiftless = captureNoteClearing();
+    expect((await POST(makeRequest({ ...body, shift: { shiftId: null, jobId: 16 } }))).status).toBe(
+      200,
+    );
+    expect(shiftless.deleted).toEqual([
+      expect.objectContaining({ indicator_type_id: 1, job_id: 16, shift_id: null }),
+    ]);
+
+    grant({ canEditNotes: true });
+    const evening = captureNoteClearing();
+    expect((await POST(makeRequest({ ...body, shift: { shiftId: 35, jobId: 18 } }))).status).toBe(
+      200,
+    );
+    expect(evening.deleted).toEqual([expect.objectContaining({ job_id: 18, shift_id: 35 })]);
+
+    grant({ canEditNotes: true });
+    const unattached = captureNoteClearing();
+    expect((await POST(makeRequest(body))).status).toBe(200);
+    expect(unattached.deleted).toEqual([expect.objectContaining({ job_id: null, shift_id: null })]);
   });
 
   it("drops notes across every cell a deleted series covered", async () => {

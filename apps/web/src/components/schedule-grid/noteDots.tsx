@@ -12,15 +12,11 @@ import { ScheduleNoteIcon } from "./noteIcon";
  * changes when one is added or removed, and the dot has to carry its own state or
  * an unpublished note is indistinguishable from a published one.
  */
-export type ScheduleNoteMarkState =
-  "published" | "draft_added" | "draft_removed" | "published_added" | "published_removed";
+export type ScheduleNoteMarkState = "published" | "draft_added" | "published_added";
 
 export interface ScheduleNoteMark {
   indicatorTypeId: number;
   state: ScheduleNoteMarkState;
-  /** Only a removed note carries these: its `schedule_notes` row is gone. */
-  name?: string;
-  color?: string;
 }
 
 function dotStyle(state: ScheduleNoteMarkState, color: string): CSSProperties {
@@ -33,39 +29,28 @@ function dotStyle(state: ScheduleNoteMarkState, color: string): CSSProperties {
   };
 
   switch (state) {
+    // The full dot inside a 1px dashed ring of its own colour. An outline
+    // rather than a border: a dashed border on a 10px dot renders as a few
+    // chunky dashes, and it would shrink the dot. The ring sits outside the
+    // dot's box, so two draft dots side by side touch rings.
     case "draft_added":
       return {
         ...base,
         background: color,
-        border: "1.5px dashed rgba(255,255,255,0.95)",
-        boxShadow: `0 0 0 1px ${color}`,
-      };
-    case "draft_removed":
-      return {
-        ...base,
-        background: "transparent",
-        border: `1.5px dashed ${color}`,
-        boxShadow: "0 0 0 1px rgba(255,255,255,0.75)",
+        outline: `1px dashed ${color}`,
+        outlineOffset: 1.5,
       };
     case "published_added":
       return {
         ...base,
         background: color,
-        border: "1.5px solid rgba(255,255,255,0.9)",
-        boxShadow: `0 0 0 1.5px ${getPublishDiffTone("new").background}`,
-      };
-    case "published_removed":
-      return {
-        ...base,
-        background: "transparent",
-        border: `1.5px dashed ${color}`,
-        boxShadow: `0 0 0 1.5px ${getPublishDiffTone("deleted").background}`,
+        border: `1.5px solid ${getPublishDiffTone("new").background}`,
       };
     default:
       return {
         ...base,
         background: color,
-        border: "1.5px solid rgba(255,255,255,0.9)",
+        border: "1px solid rgba(255,255,255,0.9)",
       };
   }
 }
@@ -73,9 +58,7 @@ function dotStyle(state: ScheduleNoteMarkState, color: string): CSSProperties {
 const STATE_SUFFIX: Record<ScheduleNoteMarkState, string> = {
   published: "",
   draft_added: " · Added, not published",
-  draft_removed: " · Removed, not published",
   published_added: " · Added in the last publish",
-  published_removed: " · Removed in the last publish",
 };
 
 /**
@@ -116,8 +99,8 @@ export function NoteDots({
     >
       {marks.map((mark) => {
         const indicator = indicatorTypes.find((type) => type.id === mark.indicatorTypeId);
-        const name = indicator?.name ?? mark.name ?? "Note";
-        const color = indicator?.color ?? mark.color ?? "var(--dg-color-text-muted)";
+        const name = indicator?.name ?? "Note";
+        const color = indicator?.color ?? "var(--dg-color-text-muted)";
         const label = `${name}${STATE_SUFFIX[mark.state]}`;
         return (
           <MaybeHint key={`${mark.indicatorTypeId}_${mark.state}`} content={label} side="top">

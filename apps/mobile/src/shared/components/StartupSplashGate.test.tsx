@@ -23,6 +23,8 @@ vi.mock("expo-splash-screen", () => ({
   },
 }));
 
+vi.mock("../lib/auth-reset", () => ({ handleExpiredMobileSession: vi.fn() }));
+
 vi.mock("../providers/AuthSessionProvider", () => ({
   useSessionState,
 }));

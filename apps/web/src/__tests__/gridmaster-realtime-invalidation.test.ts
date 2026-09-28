@@ -1,10 +1,43 @@
-import { describe, expect, it } from "vitest";
+import { renderHook } from "@testing-library/react";
+import { QueryClient } from "@tanstack/react-query";
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
+import type { RealtimeChangePayload } from "@dubgrid/realtime-core";
 import {
+  createGridmasterInvalidationBatcher,
   getGridmasterRealtimeInvalidationKeys,
   resolveGridmasterRealtimeOrgId,
   resolveGridmasterRealtimeUserId,
+  useGridmasterRealtimeInvalidation,
+  type GridmasterRealtimeTable,
 } from "@/hooks/useGridmasterRealtimeInvalidation";
 import { queryKeys } from "@/lib/query-keys";
+
+type Listener = {
+  table: GridmasterRealtimeTable;
+  onEvent: (table: GridmasterRealtimeTable, payload: RealtimeChangePayload) => void;
+};
+
+const { mockBroadcast, mockUnsubscribe, subscription } = vi.hoisted(() => ({
+  mockBroadcast: vi.fn(),
+  mockUnsubscribe: vi.fn(),
+  subscription: { listeners: [] as Listener[] },
+}));
+
+vi.mock("@/lib/cache-broadcast", () => ({
+  broadcastInvalidation: (...args: unknown[]) => mockBroadcast(...args),
+}));
+
+vi.mock("@/features/account/client", () => ({
+  getBrowserSupabaseClient: () => ({}),
+}));
+
+vi.mock("@dubgrid/realtime-core", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@dubgrid/realtime-core")>()),
+  subscribeToPostgresChanges: (_client: unknown, _name: string, listeners: Listener[]) => {
+    subscription.listeners = listeners;
+    return mockUnsubscribe;
+  },
+}));
 
 const orgId = "11111111-1111-4111-8111-111111111111";
 
@@ -202,5 +235,97 @@ describe("resolveGridmasterRealtimeUserId", () => {
     expect(resolveGridmasterRealtimeUserId("profiles", { old: { id: userId } })).toBe(userId);
     expect(resolveGridmasterRealtimeUserId("employees", { new: { user_id: null } })).toBeNull();
     expect(resolveGridmasterRealtimeUserId("invitations", { new: { user_id: userId } })).toBeNull();
+  });
+});
+
+describe("Gridmaster realtime batching", () => {
+  const otherOrg = "22222222-2222-4222-8222-222222222222";
+  let queryClient: QueryClient;
+  let invalidate: MockInstance<QueryClient["invalidateQueries"]>;
+
+  const invalidatedKeys = () => invalidate.mock.calls.map(([filters]) => filters?.queryKey);
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    mockBroadcast.mockClear();
+    mockUnsubscribe.mockClear();
+    subscription.listeners = [];
+    queryClient = new QueryClient();
+    invalidate = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function fire(table: GridmasterRealtimeTable, row: Record<string, unknown>) {
+    const listener = subscription.listeners.find((entry) => entry.table === table);
+    listener?.onEvent(table, { new: row });
+  }
+
+  it("refreshes each key once per burst, after the window and not before", () => {
+    const batcher = createGridmasterInvalidationBatcher(queryClient);
+    for (let row = 0; row < 50; row += 1) {
+      batcher.markChanged("employees", orgId, null);
+      batcher.markChanged("invitations", otherOrg, null);
+    }
+
+    vi.advanceTimersByTime(149);
+    expect(invalidate).not.toHaveBeenCalled();
+    expect(mockBroadcast).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(1);
+    const expected = new Set(
+      [
+        ...getGridmasterRealtimeInvalidationKeys("employees", orgId),
+        ...getGridmasterRealtimeInvalidationKeys("invitations", otherOrg),
+      ].map((key) => JSON.stringify(key)),
+    );
+    expect(invalidate).toHaveBeenCalledTimes(expected.size);
+    expect(new Set(invalidatedKeys().map((key) => JSON.stringify(key)))).toEqual(expected);
+    expect(mockBroadcast).toHaveBeenCalledTimes(expected.size);
+    // Shared by both tables, so one refresh however many rows changed.
+    expect(
+      invalidatedKeys().filter(
+        (key) => JSON.stringify(key) === JSON.stringify(queryKeys.gridmaster.overview()),
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("starts a new batch for changes after a flush", () => {
+    const batcher = createGridmasterInvalidationBatcher(queryClient);
+    batcher.markChanged("audit_log", null, null);
+    vi.advanceTimersByTime(150);
+    const first = invalidate.mock.calls.length;
+
+    batcher.markChanged("audit_log", null, null);
+    vi.advanceTimersByTime(150);
+    expect(invalidate.mock.calls.length).toBe(first * 2);
+  });
+
+  it("batches the live subscription's row events", () => {
+    renderHook(() => useGridmasterRealtimeInvalidation({ enabled: true, queryClient }));
+    for (let row = 0; row < 20; row += 1) {
+      fire("employees", { org_id: orgId, user_id: null });
+    }
+    expect(invalidate).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(150);
+    expect(invalidate).toHaveBeenCalledTimes(
+      getGridmasterRealtimeInvalidationKeys("employees", orgId).length,
+    );
+  });
+
+  it("drops a pending batch when the subscription is torn down", () => {
+    const { unmount } = renderHook(() =>
+      useGridmasterRealtimeInvalidation({ enabled: true, queryClient }),
+    );
+    fire("organizations", { id: orgId });
+    unmount();
+
+    vi.advanceTimersByTime(1_000);
+    expect(invalidate).not.toHaveBeenCalled();
+    expect(mockBroadcast).not.toHaveBeenCalled();
+    expect(mockUnsubscribe).toHaveBeenCalledTimes(1);
   });
 });

@@ -969,6 +969,8 @@ export interface MobileScheduleNoteRow {
   date: string;
   indicator_type_id: number;
   focus_area_id: number | null;
+  shift_id: number | null;
+  job_id: number | null;
   status: "published" | "draft" | "draft_deleted";
   indicator_types: { name: string; color: string } | null;
 }
@@ -991,7 +993,7 @@ export async function fetchMobileScheduleNoteRows(
     let query = serviceClient
       .from("schedule_notes")
       .select(
-        "emp_id, date, indicator_type_id, focus_area_id, status, indicator_types(name, color)",
+        "emp_id, date, indicator_type_id, focus_area_id, shift_id, job_id, status, indicator_types(name, color)",
       )
       .eq("org_id", input.orgId)
       .gte("date", input.startDate)

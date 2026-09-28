@@ -15,6 +15,28 @@ const screenshotAlts = [
   "Calm Haven's team directory in DubGrid",
 ] as const;
 
+// CI serves images through the app's own optimizer (production uses Vercel's),
+// and there a burst of cold resizes has stalled for good: the page's four
+// simultaneous /_next/image requests never answered, while ones sent alone
+// came back in milliseconds (run 36385802625, all three attempts). Handing them
+// to the server one at a time still exercises the real optimizer and its URLs.
+test.beforeEach(async ({ page }) => {
+  let queue: Promise<unknown> = Promise.resolve();
+  await page.route("**/_next/image?**", (route) => {
+    const turn = queue.then(async () => {
+      const response = await route.fetch();
+      await route.fulfill({ response });
+    });
+    queue = turn.catch(() => undefined);
+    return turn;
+  });
+});
+
+// A resize still queued when a test ends must not fail the run.
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+});
+
 test("landing page renders the public DubGrid surface", async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto(apexURL);

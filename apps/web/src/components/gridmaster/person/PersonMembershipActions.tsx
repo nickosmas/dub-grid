@@ -94,7 +94,15 @@ export function PersonMembershipActions({
   async function handleRemove() {
     setBusy(true);
     try {
-      await removeOrganizationMembershipGuarded({ orgId, userId, expectedUpdatedAt });
+      // Removing someone from an organization needs fresh proof (F-96).
+      const completed = await stepUp.run(async (accessToken) => {
+        await requireCredentialAssurance(accessToken);
+        await removeOrganizationMembershipGuarded(
+          { orgId, userId, expectedUpdatedAt },
+          accessToken,
+        );
+      });
+      if (!completed) return;
       toast.success(`Removed from ${organization.org.name}`);
       setRemoveConfirm(false);
       onChanged();
@@ -159,7 +167,7 @@ export function PersonMembershipActions({
         />
       )}
 
-      {removeConfirm && (
+      {removeConfirm && !stepUp.dialog && (
         <ConfirmDialog
           title="Remove from organization"
           message={`Remove ${name} from ${organization.org.name}? They lose access to it now. Their staff record stays.`}

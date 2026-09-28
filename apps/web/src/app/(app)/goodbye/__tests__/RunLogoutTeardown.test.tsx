@@ -125,14 +125,24 @@ describe("RunLogoutTeardown", () => {
   });
 
   it("labels a password change's global sign-out for the audit trail", async () => {
+    let finishSignOut = () => {};
+    mockSignOutFromBrowser.mockImplementationOnce(
+      () => new Promise<void>((resolve) => (finishSignOut = resolve)),
+    );
     renderWithClient(<RunLogoutTeardown scope="global" reason="password-changed" />);
 
     await waitFor(() => {
       expect(mockSignOutFromBrowser).toHaveBeenCalledWith("global", "password_change");
     });
-    expect(mockToastInfo).toHaveBeenCalledWith(
-      "Your password changed, so we signed you out everywhere. Sign in with your new password.",
-      { duration: Infinity },
+    // The notice says every device is signed out, so it waits for the sign-out.
+    expect(mockToastInfo).not.toHaveBeenCalled();
+
+    finishSignOut();
+    await waitFor(() =>
+      expect(mockToastInfo).toHaveBeenCalledWith(
+        "Your password changed, so we signed you out everywhere. Sign in with your new password.",
+        { duration: Infinity },
+      ),
     );
   });
 
@@ -152,7 +162,8 @@ describe("RunLogoutTeardown", () => {
   it("shows no password notice for a local sign-out", async () => {
     renderWithClient(<RunLogoutTeardown scope="local" reason="password-changed" />);
 
-    await waitFor(() => expect(mockSignOutFromBrowser).toHaveBeenCalledWith("local"));
+    await screen.findByRole("link", { name: /sign back in/i });
+    expect(mockSignOutFromBrowser).toHaveBeenCalledWith("local");
     expect(mockToastInfo).not.toHaveBeenCalled();
   });
 

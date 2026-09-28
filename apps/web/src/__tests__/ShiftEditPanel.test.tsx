@@ -10,6 +10,11 @@ import { beforeEach, describe, it, expect, vi } from "vitest";
 import ShiftEditPanel from "@/components/ShiftEditPanel";
 import { fetchRepeatOverwriteCount } from "@/features/schedule/client";
 import {
+  activeNoteIds,
+  toggleDraftNote,
+  type DraftNoteState,
+} from "@/app/(app)/schedule/_lib/editor-session";
+import {
   AbsenceType,
   DraftKind,
   EditModalState,
@@ -265,7 +270,10 @@ function renderPanel(
     indicatorTypesOverride?: IndicatorType[];
     canEditScheduleIndicators?: boolean;
     allowShiftEdits?: boolean;
-    getActiveIndicatorIds?: (focusAreaId: number) => number[];
+    getActiveIndicatorIds?: (
+      focusAreaId: number,
+      shift: { shiftId: number | null; jobId: number } | null,
+    ) => number[];
     onNoteToggle?: ReturnType<typeof vi.fn>;
     auditInfo?: {
       createdByName: string | null;
@@ -277,7 +285,16 @@ function renderPanel(
 ) {
   const onSelect = overrides.onSelect ?? vi.fn();
   const onClose = overrides.onClose ?? vi.fn();
-  const result = render(
+  const result = render(panelElement(overrides, onSelect, onClose));
+  return { ...result, onSelect, onClose };
+}
+
+function panelElement(
+  overrides: Parameters<typeof renderPanel>[0] & object,
+  onSelect: ReturnType<typeof vi.fn>,
+  onClose: ReturnType<typeof vi.fn>,
+) {
+  return (
     <ShiftEditPanel
       modal={overrides.modalOverride ?? modal}
       currentShift={overrides.currentShift ?? null}
@@ -306,9 +323,8 @@ function renderPanel(
       allowShiftEdits={overrides.allowShiftEdits}
       getActiveIndicatorIds={overrides.getActiveIndicatorIds}
       onNoteToggle={overrides.onNoteToggle}
-    />,
+    />
   );
-  return { ...result, onSelect, onClose };
 }
 
 function renderRequestPanel(
@@ -710,10 +726,10 @@ describe("ShiftEditPanel", () => {
       });
 
       await user.click(screen.getByRole("button", { name: "Remove Float schedule note" }));
-      expect(onNoteToggle).toHaveBeenLastCalledWith(80, false, 1);
+      expect(onNoteToggle).toHaveBeenLastCalledWith(80, false, 1, null);
 
       await user.click(screen.getByRole("button", { name: "Add Training schedule note" }));
-      expect(onNoteToggle).toHaveBeenLastCalledWith(81, true, 1);
+      expect(onNoteToggle).toHaveBeenLastCalledWith(81, true, 1, null);
     });
 
     it("routes explicit split-shift indicator removal to the matching focus area", async () => {
@@ -733,7 +749,56 @@ describe("ShiftEditPanel", () => {
       });
 
       await user.click(screen.getByRole("button", { name: "Remove Training schedule note" }));
-      expect(onNoteToggle).toHaveBeenLastCalledWith(81, false, 2);
+      expect(onNoteToggle).toHaveBeenLastCalledWith(81, false, 2, { shiftId: 12, jobId: 102 });
+    });
+
+    it("keeps a note on one shift of a double shift in one focus area off the other", async () => {
+      const user = userEvent.setup();
+      const eveningNorth: AssignmentDefinition = {
+        ...southShift,
+        id: 4,
+        label: "N",
+        name: "Evening North",
+        categoryId: 13,
+        shiftId: 13,
+        focusAreaId: 1,
+      };
+
+      function Harness() {
+        const [notes, setNotes] = useState<DraftNoteState[]>([]);
+        return panelElement(
+          {
+            currentShift: "D/N",
+            currentAssignmentIds: [1, 4],
+            currentSegments: [
+              { shiftId: 11, jobId: 102, position: 0, label: "D", isMentored: false },
+              { shiftId: 13, jobId: 102, position: 1, label: "N", isMentored: false },
+            ],
+            assignmentsOverride: [...assignments, eveningNorth],
+            indicatorTypesOverride: indicatorTypes,
+            canEditScheduleIndicators: true,
+            getActiveIndicatorIds: (focusAreaId, shift) =>
+              focusAreaId === 1 ? activeNoteIds(notes, shift) : [],
+            onNoteToggle: vi.fn((id: number, active: boolean, _fa: number, shift) =>
+              setNotes((prev) => toggleDraftNote(prev, id, active, shift)),
+            ),
+          },
+          vi.fn(),
+          vi.fn(),
+        );
+      }
+      render(<Harness />);
+
+      const cards = () =>
+        Array.from(document.body.querySelectorAll<HTMLElement>("[data-shift-edit-card-body]"));
+      await user.click(within(cards()[1]).getByRole("button", { name: "Add Float schedule note" }));
+
+      expect(
+        within(cards()[1]).getByRole("button", { name: "Remove Float schedule note" }),
+      ).toBeInTheDocument();
+      expect(
+        within(cards()[0]).getByRole("button", { name: "Add Float schedule note" }),
+      ).toBeInTheDocument();
     });
   });
 

@@ -29,6 +29,7 @@ import { PersonInvitationActions } from "./PersonInvitationActions";
 import { PersonMembershipActions } from "./PersonMembershipActions";
 import { PersonOrganizationCard } from "./PersonOrganizationCard";
 import { PersonSecurityCard } from "./PersonSecurityCard";
+import { PersonHistoryCard } from "./PersonHistoryCard";
 import { PersonNotificationsCard } from "./PersonNotificationsCard";
 import { PersonSessionsCard } from "./PersonSessionsCard";
 import { usePersonSecurityActions } from "./usePersonSecurityActions";
@@ -334,6 +335,7 @@ export default function GridmasterPersonView({
           )}
         />
       ))}
+      <PersonHistoryCard target={target} record={record} />
       {terminated ? (
         <SectionNotice
           tone="warning"

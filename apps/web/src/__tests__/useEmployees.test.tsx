@@ -280,6 +280,54 @@ describe("useEmployees — rollback keeps the full list on failure (not just the
     expect(result.current.employees).toEqual([EMPLOYEE]);
   });
 
+  it.each([
+    ["handleRemoveEmployee", mockRemoveEmployee],
+    ["handleDeactivateEmployee", mockDeactivateEmployee],
+  ] as const)("%s undoes its change and hands a step-up refusal back", async (name, mock) => {
+    const refusal = Object.assign(new Error("Confirm your identity."), {
+      status: 403,
+      code: "STEP_UP_REQUIRED",
+      method: "password",
+    });
+    mock.mockRejectedValueOnce(refusal);
+    const result = await renderReady();
+
+    await act(async () => {
+      await expect(result.current[name]("emp-1", "Left")).rejects.toBe(refusal);
+    });
+
+    expect(result.current.employees).toEqual([EMPLOYEE]);
+    expect(mockToastError).not.toHaveBeenCalled();
+  });
+
+  it("handleDeactivateEmployee sends the assured token", async () => {
+    mockDeactivateEmployee.mockResolvedValueOnce({ ...EMPLOYEE, status: "inactive", version: 4 });
+    const result = await renderReady();
+
+    await act(async () => {
+      await result.current.handleDeactivateEmployee("emp-1", "Left", "assured-token");
+    });
+
+    expect(mockDeactivateEmployee).toHaveBeenCalledWith(
+      "emp-1",
+      "Left",
+      "org-1",
+      3,
+      "assured-token",
+    );
+  });
+
+  it("handleRemoveEmployee sends the assured token", async () => {
+    mockRemoveEmployee.mockResolvedValueOnce({ ...EMPLOYEE, status: "removed", version: 4 });
+    const result = await renderReady();
+
+    await act(async () => {
+      await result.current.handleRemoveEmployee("emp-1", "Left", "assured-token");
+    });
+
+    expect(mockRemoveEmployee).toHaveBeenCalledWith("emp-1", "org-1", 3, "Left", "assured-token");
+  });
+
   it("handleActivateEmployee restores the pre-change list on failure", async () => {
     mockActivateEmployee.mockRejectedValueOnce(new Error("db unavailable"));
     const result = await renderReady();

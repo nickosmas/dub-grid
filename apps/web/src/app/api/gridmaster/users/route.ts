@@ -10,7 +10,7 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
-import { revokeAllUserSessions } from "@/lib/auth/revocation";
+import { endUserSessions } from "@/lib/auth/revocation";
 import { loadPersonTarget } from "@/features/gridmaster/server/person-target";
 import type { PlatformRole, OrganizationRole } from "@dubgrid/domain";
 import type { PlatformUser } from "@/types";
@@ -225,7 +225,7 @@ export async function PATCH(req: NextRequest) {
     // The hook now refuses a deactivated account at the next token issue;
     // the watermark makes the tokens already in hand fail app APIs at once.
     if (deactivate) {
-      await revokeAllUserSessions(userId);
+      await endUserSessions(userId);
     }
 
     await writeGridmasterAuditLog({

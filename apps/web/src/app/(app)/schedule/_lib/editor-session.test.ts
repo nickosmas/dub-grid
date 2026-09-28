@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { computeScheduleEntryDraftKind, shiftEditableIdentityMatches } from "./editor-session";
+import {
+  activeNoteIds,
+  computeScheduleEntryDraftKind,
+  dropNotesOfRemovedShifts,
+  planNoteWrites,
+  shiftEditableIdentityMatches,
+  toggleDraftNote,
+  type DraftNoteState,
+} from "./editor-session";
 import type { ShiftMap } from "@/types";
 
 function makeShiftEntry(overrides: Partial<ShiftMap[string]> = {}): ShiftMap[string] {
@@ -89,5 +97,93 @@ describe("schedule editor session helpers", () => {
     const draft = makeShiftEntry({ customStartTime: "08:00" });
 
     expect(shiftEditableIdentityMatches(base, draft)).toBe(true);
+  });
+});
+
+describe("schedule notes per shift", () => {
+  const day = { shiftId: 34, jobId: 18 };
+  const evening = { shiftId: 35, jobId: 18 };
+  const onShift = (
+    indicatorTypeId: number,
+    shift: { shiftId: number | null; jobId: number } | null,
+    status: DraftNoteState["status"] = "published",
+  ): DraftNoteState => ({
+    indicatorTypeId,
+    status,
+    shiftId: shift?.shiftId ?? null,
+    jobId: shift?.jobId ?? null,
+  });
+
+  it("turns a note on for one shift of a double shift and leaves the other off", () => {
+    const notes = toggleDraftNote([], 1, true, evening);
+
+    expect(activeNoteIds(notes, evening)).toEqual([1]);
+    expect(activeNoteIds(notes, day)).toEqual([]);
+  });
+
+  it("shows a note no shift claims on every shift in its area", () => {
+    const notes = [onShift(1, null), onShift(2, day)];
+
+    expect(activeNoteIds(notes, day).sort()).toEqual([1, 2]);
+    expect(activeNoteIds(notes, evening)).toEqual([1]);
+    expect(activeNoteIds(notes, null)).toEqual([1]);
+  });
+
+  it("turns off a shift's own note before one no shift claims, and undoes both", () => {
+    const start = [onShift(1, null), onShift(1, day)];
+
+    const off = toggleDraftNote(start, 1, false, day);
+    expect(off).toEqual([onShift(1, null), onShift(1, day, "draft_deleted")]);
+    expect(toggleDraftNote(off, 1, true, day)).toEqual(start);
+
+    const unclaimedOff = toggleDraftNote([onShift(1, null)], 1, false, evening);
+    expect(unclaimedOff).toEqual([onShift(1, null, "draft_deleted")]);
+    expect(toggleDraftNote(unclaimedOff, 1, true, evening)).toEqual([onShift(1, null)]);
+  });
+
+  it("drops only a removed shift's notes: a draft goes, a published one waits", () => {
+    const notes = [
+      onShift(1, day, "draft"),
+      onShift(2, day),
+      onShift(3, evening, "draft"),
+      onShift(4, null, "draft"),
+    ];
+
+    expect(dropNotesOfRemovedShifts(notes, [evening])).toEqual([
+      onShift(2, day, "draft_deleted"),
+      onShift(3, evening, "draft"),
+      onShift(4, null, "draft"),
+    ]);
+  });
+
+  it("plans one write per changed note, carrying its shift", () => {
+    const { writes, results } = planNoteWrites(
+      { 21: [onShift(1, day)] },
+      { 21: [onShift(1, day), onShift(1, evening, "draft")] },
+    );
+
+    expect(writes).toEqual([
+      {
+        kind: "upsert",
+        focusAreaId: 21,
+        indicatorTypeId: 1,
+        shift: evening,
+        baseStatus: undefined,
+      },
+    ]);
+    expect(results.get(21)).toEqual([onShift(1, day), onShift(1, evening, "draft")]);
+  });
+
+  it("plans the delete that marks a published note and restores one pending removal", () => {
+    const { writes, results } = planNoteWrites(
+      { 21: [onShift(1, day), onShift(2, evening, "draft_deleted")] },
+      { 21: [onShift(1, day, "draft_deleted"), onShift(2, evening)] },
+    );
+
+    expect(writes.map((write) => [write.kind, write.indicatorTypeId, write.baseStatus])).toEqual([
+      ["delete", 1, "published"],
+      ["upsert", 2, "draft_deleted"],
+    ]);
+    expect(results.get(21)).toEqual([onShift(1, day, "draft_deleted"), onShift(2, evening)]);
   });
 });

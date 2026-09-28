@@ -108,6 +108,8 @@ export type MobileScheduleNoteRecord = {
   date: string;
   indicatorTypeId: number;
   focusAreaId: number | null;
+  shiftId: number | null;
+  jobId: number | null;
   status: ScheduleNoteStatus;
   name: string;
   color: string;
@@ -137,6 +139,8 @@ export function withScheduleIndicators<TEntry extends { employeeId: string; date
     list.push({
       indicatorTypeId: note.indicatorTypeId,
       focusAreaId: note.focusAreaId,
+      shiftId: note.shiftId,
+      jobId: note.jobId,
       name: note.name,
       color: note.color,
       state: INDICATOR_STATE[note.status],

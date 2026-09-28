@@ -20,6 +20,8 @@ function note(
     date: "2026-09-28",
     indicatorTypeId,
     focusAreaId,
+    shiftId: null,
+    jobId: null,
     status,
     createdBy: null,
     updatedBy: null,
@@ -29,15 +31,24 @@ function note(
   };
 }
 
-function marks(input: {
+function marks({
+  segmentFocusAreaIds,
+  segmentShifts = [],
+  ...input
+}: {
   notes: ScheduleNote[];
   segmentFocusAreaIds: (number | null)[];
+  segmentShifts?: ({ shiftId: number | null; jobId: number } | null)[];
   isScheduleEditor?: boolean;
 }) {
   return scheduleNoteMarksBySegment({
     empId: "emp-1",
     dateKey: "2026-09-28",
     isScheduleEditor: false,
+    segments: segmentFocusAreaIds.map((focusAreaId, index) => ({
+      focusAreaId,
+      shift: segmentShifts[index] ?? null,
+    })),
     ...input,
   });
 }
@@ -54,6 +65,48 @@ describe("scheduleNoteMarksBySegment", () => {
         { indicatorTypeId: 1, state: "published" },
         { indicatorTypeId: 2, state: "published" },
         { indicatorTypeId: 3, state: "published" },
+      ],
+    ]);
+  });
+
+  it("gives a note to its own shift of a double shift in one focus area", () => {
+    const day = { shiftId: 34, jobId: 18 };
+    const evening = { shiftId: 35, jobId: 18 };
+    const result = marks({
+      notes: [
+        note(1, 21, "published", { shiftId: 35, jobId: 18 }),
+        note(2, 21, "published", { id: 2, shiftId: 34, jobId: 18 }),
+        note(1, 21, "published", { id: 3, shiftId: 34, jobId: 18 }),
+      ],
+      segmentFocusAreaIds: [21, 21],
+      segmentShifts: [day, evening],
+    });
+
+    // The same note type on both shifts shows on both halves.
+    expect(result).toEqual([
+      [
+        { indicatorTypeId: 2, state: "published" },
+        { indicatorTypeId: 1, state: "published" },
+      ],
+      [{ indicatorTypeId: 1, state: "published" }],
+    ]);
+  });
+
+  it("falls back to the focus area for a note no shift claims or a shift it no longer has", () => {
+    const result = marks({
+      notes: [note(1, 21), note(2, 21, "published", { shiftId: 99, jobId: 18 })],
+      segmentFocusAreaIds: [22, 21],
+      segmentShifts: [
+        { shiftId: 36, jobId: 18 },
+        { shiftId: 35, jobId: 18 },
+      ],
+    });
+
+    expect(result).toEqual([
+      [],
+      [
+        { indicatorTypeId: 1, state: "published" },
+        { indicatorTypeId: 2, state: "published" },
       ],
     ]);
   });
@@ -88,7 +141,6 @@ describe("scheduleNoteMarksBySegment", () => {
     expect(marks({ notes, segmentFocusAreaIds: [null], isScheduleEditor: true })).toEqual([
       [
         { indicatorTypeId: 1, state: "draft_added" },
-        { indicatorTypeId: 2, state: "draft_removed" },
         { indicatorTypeId: 3, state: "published" },
       ],
     ]);
@@ -122,7 +174,7 @@ describe("scheduleNoteMarksBySegment", () => {
         notes: [note(1, null)],
         empId: null,
         dateKey: "2026-09-28",
-        segmentFocusAreaIds: [null],
+        segments: [{ focusAreaId: null, shift: null }],
         isScheduleEditor: false,
       }),
     ).toEqual([]);
@@ -170,22 +222,15 @@ describe("scheduleNoteMarksLabel", () => {
         [
           { indicatorTypeId: 1, state: "published" },
           { indicatorTypeId: 2, state: "draft_added" },
-          { indicatorTypeId: 1, state: "draft_removed" },
         ],
         types,
       ),
-    ).toBe("Float, Training (added, not published), Float (removed, not published)");
+    ).toBe("Float, Training (added, not published)");
   });
 
-  it("falls back to the mark's own name, then a generic one", () => {
-    expect(
-      scheduleNoteMarksLabel(
-        [
-          { indicatorTypeId: 9, state: "published", name: "Archived" },
-          { indicatorTypeId: 8, state: "published" },
-        ],
-        types,
-      ),
-    ).toBe("Archived, Schedule note");
+  it("names an unknown note generically", () => {
+    expect(scheduleNoteMarksLabel([{ indicatorTypeId: 8, state: "published" }], types)).toBe(
+      "Schedule note",
+    );
   });
 });

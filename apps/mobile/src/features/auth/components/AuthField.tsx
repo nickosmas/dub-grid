@@ -123,6 +123,9 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     inputFlex: {
       flex: 1,
+      // Explicit, because iOS keeps a native field's tracking when the prop is
+      // removed: a stage that reused the code field's input read "E m a i l".
+      letterSpacing: 0,
     },
     inputCode: {
       ...mobileInputText("semibold"),

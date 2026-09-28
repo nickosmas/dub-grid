@@ -694,7 +694,7 @@
         then build only the approved ones. Built: the web dashboards' schedule
         rows (owner, 2026-09-27). The other three were not decided and not
         built; see `history/features/42d-secondary-surfaces.md`.
-- [ ] 43. **Complete person records and Gridmaster account recovery** -
+- [x] 43. **Complete person records and Gridmaster account recovery** -
       managers see every fact about a person they are allowed to see on the
       People detail page, and a Gridmaster has one well-organized page that
       holds absolutely everything about a person, with every action needed to
@@ -736,7 +736,7 @@
         schedule notes, publish changes that affected them, shift requests on
         either side, and profile change requests; their notification
         preferences and recent inbox.
-  - [ ] 43e. **Combined history** - one filterable timeline of everything done
+  - [x] 43e. **Combined history** - one filterable timeline of everything done
         by or to the person across the audit log, role changes,
         impersonations of them (who, justification, duration, how it ended)
         and ended editor sessions, including sign-ins and credential changes,

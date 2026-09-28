@@ -73,6 +73,10 @@ function logScheduleAudit(
 
 const mapEntrySchema = z.array(z.tuple([z.number().int(), z.string()]));
 const noteStatusSchema = z.enum(["published", "draft", "draft_deleted"]);
+const noteShiftSchema = z.object({
+  shiftId: z.number().int().nullable(),
+  jobId: z.number().int(),
+});
 const seriesFrequencySchema = z.enum(["daily", "weekly", "biweekly"]);
 const dragModeSchema = z.enum(["move", "copy"]);
 const deleteShiftBatchItemSchema = z.object({
@@ -229,6 +233,7 @@ const requestActionSchema = z.discriminatedUnion("action", [
     date: z.string().date(),
     indicatorTypeId: z.number().int(),
     focusAreaId: z.number().int(),
+    shift: noteShiftSchema.nullable().optional(),
     existingStatus: noteStatusSchema.optional(),
   }),
   z.object({
@@ -238,6 +243,7 @@ const requestActionSchema = z.discriminatedUnion("action", [
     date: z.string().date(),
     indicatorTypeId: z.number().int(),
     focusAreaId: z.number().int(),
+    shift: noteShiftSchema.nullable().optional(),
     existingStatus: noteStatusSchema.optional(),
   }),
 ]);
@@ -653,6 +659,24 @@ async function cellHasWorkedShift(
     : publishedPayload?.state_kind === "worked";
 }
 
+/** 063's trigger refuses a note naming a shift its cell does not have. */
+const NOTE_SHIFT_MISSING = "23514";
+
+interface NoteShiftFilter<Q> {
+  eq(column: string, value: unknown): Q;
+  is(column: string, value: null): Q;
+}
+
+/** Narrows a note query to one shift's notes, or to the notes no shift claims. */
+function matchNoteShift<Q extends NoteShiftFilter<Q>>(
+  query: Q,
+  shift: { shiftId: number | null; jobId: number } | null,
+): Q {
+  if (!shift) return query.is("shift_id", null).is("job_id", null);
+  const byJob = query.eq("job_id", shift.jobId);
+  return shift.shiftId == null ? byJob.is("shift_id", null) : byJob.eq("shift_id", shift.shiftId);
+}
+
 /**
  * Notes cannot outlive the shift they describe, so removing or relocating a
  * cell's shift takes its notes with it. This follows the rule a single note
@@ -819,7 +843,7 @@ export async function POST(req: NextRequest) {
           let query = auth.serviceClient
             .from("schedule_notes")
             .select(
-              "id, org_id, emp_id, date, indicator_type_id, focus_area_id, status, created_by, updated_by, created_at, updated_at",
+              "id, org_id, emp_id, date, indicator_type_id, focus_area_id, shift_id, job_id, status, created_by, updated_by, created_at, updated_at",
             )
             .eq("org_id", data.orgId);
           if (data.startDate) {
@@ -849,6 +873,8 @@ export async function POST(req: NextRequest) {
             date: row.date,
             indicatorTypeId: row.indicator_type_id,
             focusAreaId: row.focus_area_id,
+            shiftId: row.shift_id,
+            jobId: row.job_id,
             status: row.status,
             createdBy: row.created_by,
             updatedBy: row.updated_by,
@@ -1770,10 +1796,18 @@ export async function POST(req: NextRequest) {
             date: data.date,
             indicator_type_id: data.indicatorTypeId,
             focus_area_id: data.focusAreaId,
+            shift_id: data.shift?.shiftId ?? null,
+            job_id: data.shift?.jobId ?? null,
             status,
           },
-          { onConflict: "emp_id,date,indicator_type_id,focus_area_id" },
+          { onConflict: "emp_id,date,indicator_type_id,focus_area_id,shift_id,job_id" },
         );
+        if (error?.code === NOTE_SHIFT_MISSING) {
+          return NextResponse.json(
+            { error: "That shift is no longer in this cell. Reopen it and try again." },
+            { status: 400 },
+          );
+        }
         if (error) {
           throw error;
         }
@@ -1796,6 +1830,7 @@ export async function POST(req: NextRequest) {
           details: {
             indicatorTypeId: data.indicatorTypeId,
             focusAreaId: data.focusAreaId,
+            shift: data.shift ?? null,
             status,
           },
         });
@@ -1816,26 +1851,32 @@ export async function POST(req: NextRequest) {
         }
 
         if (data.existingStatus === "draft") {
-          const { error } = await auth.serviceClient
-            .from("schedule_notes")
-            .delete()
-            .eq("org_id", data.orgId)
-            .eq("emp_id", data.employeeId)
-            .eq("date", data.date)
-            .eq("indicator_type_id", data.indicatorTypeId)
-            .eq("focus_area_id", data.focusAreaId);
+          const { error } = await matchNoteShift(
+            auth.serviceClient
+              .from("schedule_notes")
+              .delete()
+              .eq("org_id", data.orgId)
+              .eq("emp_id", data.employeeId)
+              .eq("date", data.date)
+              .eq("indicator_type_id", data.indicatorTypeId)
+              .eq("focus_area_id", data.focusAreaId),
+            data.shift ?? null,
+          );
           if (error) {
             throw error;
           }
         } else {
-          const { error } = await auth.serviceClient
-            .from("schedule_notes")
-            .update({ status: "draft_deleted" })
-            .eq("org_id", data.orgId)
-            .eq("emp_id", data.employeeId)
-            .eq("date", data.date)
-            .eq("indicator_type_id", data.indicatorTypeId)
-            .eq("focus_area_id", data.focusAreaId);
+          const { error } = await matchNoteShift(
+            auth.serviceClient
+              .from("schedule_notes")
+              .update({ status: "draft_deleted" })
+              .eq("org_id", data.orgId)
+              .eq("emp_id", data.employeeId)
+              .eq("date", data.date)
+              .eq("indicator_type_id", data.indicatorTypeId)
+              .eq("focus_area_id", data.focusAreaId),
+            data.shift ?? null,
+          );
           if (error) {
             throw error;
           }

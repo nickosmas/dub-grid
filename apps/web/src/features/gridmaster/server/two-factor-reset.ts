@@ -1,6 +1,17 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { endUserSessions } from "@/lib/auth/revocation";
 
+/** A reset that failed after it had already removed `factorsRemoved` factors. */
+export class PartialTwoFactorResetError extends Error {
+  constructor(
+    readonly factorsRemoved: number,
+    readonly cause: unknown,
+  ) {
+    super("Two-factor reset stopped part way");
+    this.name = "PartialTwoFactorResetError";
+  }
+}
+
 /**
  * Resets someone's two-factor for a Gridmaster. Each step is safe to repeat,
  * and the flag goes first, so a reset that fails part way still makes the
@@ -20,20 +31,29 @@ export async function resetPersonTwoFactor(
   const { data, error } = await client.auth.admin.mfa.listFactors({ userId });
   if (error) throw error;
   const factors = data?.factors ?? [];
-  for (const factor of factors) {
-    const { error: deleteError } = await client.auth.admin.mfa.deleteFactor({
-      id: factor.id,
-      userId,
-    });
-    if (deleteError) throw deleteError;
+  let factorsRemoved = 0;
+  try {
+    for (const factor of factors) {
+      const { error: deleteError } = await client.auth.admin.mfa.deleteFactor({
+        id: factor.id,
+        userId,
+      });
+      if (deleteError) throw deleteError;
+      factorsRemoved += 1;
+    }
+
+    const { error: offError } = await client
+      .from("profiles")
+      .update({ mfa_enabled: false })
+      .eq("id", userId);
+    if (offError) throw offError;
+
+    await endUserSessions(userId);
+  } catch (error) {
+    // Once a factor is gone the person must hear of it and the reset must be
+    // on record, even though the rest still needs a retry (F-90).
+    if (factorsRemoved > 0) throw new PartialTwoFactorResetError(factorsRemoved, error);
+    throw error;
   }
-
-  const { error: offError } = await client
-    .from("profiles")
-    .update({ mfa_enabled: false })
-    .eq("id", userId);
-  if (offError) throw offError;
-
-  await endUserSessions(userId);
-  return { factorsRemoved: factors.length };
+  return { factorsRemoved };
 }

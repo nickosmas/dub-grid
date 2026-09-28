@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
@@ -16,9 +16,11 @@ const membershipArchiveUpdate = vi.fn();
 const targetMembershipMaybeSingle = vi.fn();
 const superAdminCountIs = vi.fn();
 const auditInsert = vi.fn();
+const requireSensitiveActionAuth = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
   requireAuthenticatedUser: (req: NextRequest) => requireAuthenticatedUser(req),
+  requireSensitiveActionAuth: (req: NextRequest) => requireSensitiveActionAuth(req),
 }));
 
 vi.mock("@/lib/csrf", () => ({
@@ -174,6 +176,7 @@ describe("POST /api/employees/status", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     requireAuthenticatedUser.mockResolvedValue({ user: { id: USER_ID } });
+    requireSensitiveActionAuth.mockResolvedValue({ user: { id: USER_ID } });
     checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
     validateCsrfOrigin.mockReturnValue(null);
     resolveEffectiveOrgId.mockResolvedValue(ORG_ID);
@@ -217,6 +220,33 @@ describe("POST /api/employees/status", () => {
     const response = await POST(makeRequest());
 
     expect(response.status).not.toBe(403);
+  });
+
+  it("asks a Gridmaster for fresh proof before taking a staff record out, and changes nothing without it (F-96)", async () => {
+    membershipMaybeSingle.mockResolvedValue({ data: null, error: null });
+    profileSingle.mockResolvedValue({ data: { platform_role: "gridmaster" }, error: null });
+    requireSensitiveActionAuth.mockResolvedValueOnce({
+      response: NextResponse.json({ code: "STEP_UP_REQUIRED" }, { status: 403 }),
+    });
+
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(403);
+    expect(requireSensitiveActionAuth).toHaveBeenCalledTimes(1);
+    expect(employeeCurrentSingle).not.toHaveBeenCalled();
+    expect(employeeUpdateMaybeSingle).not.toHaveBeenCalled();
+  });
+
+  it("never asks an organization admin for fresh proof (F-96)", async () => {
+    membershipMaybeSingle.mockResolvedValue({
+      data: { org_role: "super_admin", admin_permissions: null },
+      error: null,
+    });
+    profileSingle.mockResolvedValue({ data: { platform_role: "none" }, error: null });
+
+    await POST(makeRequest());
+
+    expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
   });
 
   it("restores an archived organization membership when reactivating a removed employee", async () => {

@@ -61,7 +61,7 @@ describe("loadPersonNotifications", () => {
         priority: "normal",
         title: "Swap approved",
         message: "Your swap was approved.",
-        metadata: { requestId: "req-1" },
+        metadata: null,
         readAt: null,
         archivedAt: null,
         createdAt: "2026-09-26T10:00:00.000Z",
@@ -86,6 +86,37 @@ describe("loadPersonNotifications", () => {
     expect(await loadPersonNotifications(client as never, USER_ID)).toEqual({
       preferences: null,
       notifications: [],
+    });
+  });
+
+  it("keeps no IP address or session id from a new-device alert (F-86)", async () => {
+    const { client } = makeClient({
+      notifications: [
+        {
+          id: "n-2",
+          org_id: null,
+          type: "security_new_device",
+          channel: "email",
+          title: "New sign-in",
+          message: "",
+          metadata: {
+            platform: "web",
+            browserName: "Safari",
+            ipAddress: "203.0.113.9",
+            dedupe_key: "security_new_device:session-1",
+            email_sent: true,
+          },
+          created_at: "2026-09-26T10:00:00.000Z",
+        },
+      ],
+    });
+
+    const { notifications } = await loadPersonNotifications(client as never, USER_ID);
+
+    expect(notifications[0].metadata).toEqual({
+      platform: "web",
+      browserName: "Safari",
+      email_sent: true,
     });
   });
 });

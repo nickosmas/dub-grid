@@ -1,4 +1,5 @@
 export { createRealtimeChannelName } from "./channel-name";
+export { createDebouncedTableFlusher, type DebouncedTableFlusher } from "./debounced-flusher";
 export {
   subscribeToPostgresChanges,
   type PostgresChangeListener,

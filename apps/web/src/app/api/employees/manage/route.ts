@@ -45,13 +45,13 @@ import {
   fetchMobilePendingInvitationRowByEmployeeId,
 } from "@dubgrid/data-access";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
-import { AUDIT_ACTIONS, PERSON_ACTIVITY_CATEGORIES } from "@/lib/audit/registry";
-import { enrichAuditRows, type AuditRow } from "@/lib/audit/enrich";
+import { enrichAuditRows } from "@/lib/audit/enrich";
 import {
   buildEmployeeActivityRows,
+  fetchEmployeeAuditRows,
+  fetchEmployeeRoleChanges,
   type EmployeeActivitySubject,
   type EmployeeInvitationRow,
-  type RoleChangeLogRow,
 } from "@/lib/audit/employee-activity";
 
 export const dynamic = "force-dynamic";
@@ -81,66 +81,6 @@ const canViewEmployeeActivity: OrgPermissionPredicate = (permissions) =>
   permissions.isGridmaster ||
   permissions.isSuperAdmin ||
   (permissions.role === "admin" && permissions.canViewEmployeeDetails);
-
-const PERSON_ACTIVITY_CATEGORY_SET = new Set<string>(PERSON_ACTIVITY_CATEGORIES);
-const PERSON_ACTIVITY_ACTIONS = Object.entries(AUDIT_ACTIONS)
-  .filter(([, spec]) => PERSON_ACTIVITY_CATEGORY_SET.has(spec.category))
-  .map(([action]) => action);
-
-async function fetchEmployeeAuditRows(
-  serviceClient: SupabaseClient,
-  orgId: string,
-  employee: EmployeeActivitySubject,
-  invitationIds: string[],
-): Promise<AuditRow[]> {
-  const targets = [
-    `and(resource_type.eq.employee,resource_id.eq.${employee.id})`,
-    `details->>employeeId.eq.${employee.id}`,
-  ];
-  if (employee.user_id) {
-    targets.push(
-      `and(resource_type.in.(user,organization_membership,role),resource_id.eq.${employee.user_id})`,
-      `details->>targetUserId.eq.${employee.user_id}`,
-    );
-  }
-  if (invitationIds.length > 0) {
-    targets.push(`and(resource_type.eq.invitation,resource_id.in.(${invitationIds.join(",")}))`);
-  }
-
-  const { data, error } = await serviceClient
-    .from("audit_log")
-    .select("*")
-    .eq("org_id", orgId)
-    .in("action", PERSON_ACTIVITY_ACTIONS)
-    .or(targets.join(","))
-    .order("created_at", { ascending: false })
-    .limit(300);
-  if (error) {
-    throw error;
-  }
-  return (data ?? []) as AuditRow[];
-}
-
-async function fetchEmployeeRoleChanges(
-  serviceClient: SupabaseClient,
-  orgId: string,
-  userId: string | null,
-): Promise<RoleChangeLogRow[]> {
-  if (!userId) return [];
-  const { data, error } = await serviceClient
-    .from("role_change_log")
-    .select(
-      "id, org_id, target_user_id, changed_by_id, from_role, to_role, change_type, permissions_before, permissions_after, created_at",
-    )
-    .eq("org_id", orgId)
-    .eq("target_user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(200);
-  if (error) {
-    throw error;
-  }
-  return (data ?? []) as RoleChangeLogRow[];
-}
 
 const employeeStatusSchema = z.enum(["active", "inactive", "removed"]);
 const mapEntrySchema = z.array(z.tuple([z.number().int(), z.string()]));

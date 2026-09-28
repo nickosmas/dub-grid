@@ -4,7 +4,7 @@ import { z } from "zod";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { retryAfterSeconds } from "@/lib/retry-after";
 import { validateCsrfOrigin } from "@/lib/csrf";
-import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { requireAuthenticatedUser, requireSensitiveActionAuth } from "@/lib/api-auth";
 import { revokeAllUserSessions } from "@/lib/auth/revocation";
 import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { canManageEmployees } from "@/app/api/employees/shared";
@@ -112,6 +112,13 @@ export async function POST(req: NextRequest) {
 
     if (!hasPermission) {
       return NextResponse.json({ error: API_ERRORS.CANNOT_MANAGE_EMPLOYEES }, { status: 403 });
+    }
+
+    // Taking a staff record out of the organization is an access removal, so a
+    // Gridmaster needs fresh proof for it; reactivating does not (F-96).
+    if (isGridmaster && (action === "deactivate" || action === "remove")) {
+      const assurance = await requireSensitiveActionAuth(req);
+      if ("response" in assurance) return assurance.response;
     }
 
     const { data: currentRow, error: currentError } = await serviceClient

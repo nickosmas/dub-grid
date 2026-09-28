@@ -6,7 +6,7 @@ const requireSensitiveActionAuth = vi.fn();
 const validateCsrfOrigin = vi.fn();
 const requestRpc = vi.fn();
 const auditInsert = vi.fn();
-const revokeAllUserSessions = vi.fn();
+const endUserSessions = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
   requireGridmasterSession: (req: NextRequest) => requireGridmasterSession(req),
@@ -23,7 +23,7 @@ vi.mock("@/lib/supabase-service", () => ({
 }));
 vi.mock("@/lib/logger", () => ({ default: { error: vi.fn() } }));
 vi.mock("@/lib/auth/revocation", () => ({
-  revokeAllUserSessions: (userId: string) => revokeAllUserSessions(userId),
+  endUserSessions: (userId: string) => endUserSessions(userId),
 }));
 
 import { POST } from "./route";
@@ -56,7 +56,7 @@ describe("POST /api/gridmaster/users/[userId]/terminate", () => {
       error: null,
     });
     auditInsert.mockResolvedValue({ error: null });
-    revokeAllUserSessions.mockResolvedValue(undefined);
+    endUserSessions.mockResolvedValue(undefined);
   });
 
   it("terminates through the RPC, revokes every session, and audits the reason", async () => {
@@ -68,7 +68,7 @@ describe("POST /api/gridmaster/users/[userId]/terminate", () => {
       p_target_user_id: USER_ID,
       p_reason: "Repeated policy violations",
     });
-    expect(revokeAllUserSessions).toHaveBeenCalledWith(USER_ID);
+    expect(endUserSessions).toHaveBeenCalledWith(USER_ID);
     expect(auditInsert).toHaveBeenCalledWith(
       expect.objectContaining({
         action: "user.terminated",
@@ -88,7 +88,7 @@ describe("POST /api/gridmaster/users/[userId]/terminate", () => {
 
     expect(response.status).toBe(400);
     expect(requestRpc).not.toHaveBeenCalled();
-    expect(revokeAllUserSessions).not.toHaveBeenCalled();
+    expect(endUserSessions).not.toHaveBeenCalled();
   });
 
   it("requires fresh sensitive-action assurance", async () => {
@@ -111,7 +111,7 @@ describe("POST /api/gridmaster/users/[userId]/terminate", () => {
     const response = await call({ reason: "x" });
 
     expect(response.status).toBe(400);
-    expect(revokeAllUserSessions).not.toHaveBeenCalled();
+    expect(endUserSessions).not.toHaveBeenCalled();
     expect(auditInsert).not.toHaveBeenCalled();
   });
 });

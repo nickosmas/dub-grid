@@ -127,10 +127,7 @@ describe("PrintScheduleView", () => {
       const { container } = renderPrintView({
         noteMarksForKey: (_, date, focusAreaId) =>
           formatDateKey(date) === firstDay && focusAreaId === 1
-            ? [
-                { indicatorTypeId: 80, state: "published" },
-                { indicatorTypeId: 81, state: "draft_removed" },
-              ]
+            ? [{ indicatorTypeId: 80, state: "published" }]
             : [],
       });
 

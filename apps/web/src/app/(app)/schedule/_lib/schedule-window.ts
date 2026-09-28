@@ -15,6 +15,9 @@ export type ScheduleNoteMap = Record<
     status: "published" | "draft" | "draft_deleted";
     /** Last editor, so unpublished notes can be attributed at publish time. */
     updatedBy: string | null;
+    /** The shift the note belongs to; absent from a peer's broadcast that predates 063. */
+    shiftId?: number | null;
+    jobId?: number | null;
   }[]
 >;
 
@@ -66,6 +69,8 @@ export function buildScheduleNoteMap(noteRows: ScheduleNote[]): ScheduleNoteMap 
       indicatorTypeId: note.indicatorTypeId,
       status: note.status,
       updatedBy: note.updatedBy,
+      shiftId: note.shiftId,
+      jobId: note.jobId,
     });
   }
   return noteMap;
@@ -78,7 +83,9 @@ export function buildScheduleNoteMap(noteRows: ScheduleNote[]): ScheduleNoteMap 
  * change chip moves when one is added or removed - the dot is the only place
  * that can say so. Unpublished state is scheduler-only, the same way draft
  * shift state is: to everyone else a note pending removal is simply still
- * there, and one pending addition is not there yet.
+ * there, and one pending addition is not there yet. No removal is ever drawn,
+ * pending or just published: a dot for a note that is no longer there read as
+ * one that still was.
  */
 export function buildScheduleNoteMarks(input: {
   notes: ScheduleNoteMap[string] | undefined;
@@ -87,41 +94,33 @@ export function buildScheduleNoteMarks(input: {
 }): ScheduleNoteMark[] {
   const noteList = input.notes ?? [];
   const marks: ScheduleNoteMark[] = [];
+  // The dots are per cell, so a note on both shifts of a double shift is one dot.
+  const seen = new Set<string>();
+  const push = (mark: ScheduleNoteMark) => {
+    const key = `${mark.indicatorTypeId}_${mark.state}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    marks.push(mark);
+  };
 
   for (const note of noteList) {
     if (note.status !== "published" && !input.isScheduleEditor) {
       if (note.status === "draft") continue;
-      marks.push({ indicatorTypeId: note.indicatorTypeId, state: "published" });
+      push({ indicatorTypeId: note.indicatorTypeId, state: "published" });
       continue;
     }
 
     if (note.status === "draft") {
-      marks.push({ indicatorTypeId: note.indicatorTypeId, state: "draft_added" });
+      push({ indicatorTypeId: note.indicatorTypeId, state: "draft_added" });
       continue;
     }
-    if (note.status === "draft_deleted") {
-      marks.push({ indicatorTypeId: note.indicatorTypeId, state: "draft_removed" });
-      continue;
-    }
-    marks.push({
+    if (note.status === "draft_deleted") continue;
+    push({
       indicatorTypeId: note.indicatorTypeId,
       state:
         input.publishedChanges?.get(note.indicatorTypeId)?.kind === "new"
           ? "published_added"
           : "published",
-    });
-  }
-
-  for (const change of input.publishedChanges?.values() ?? []) {
-    // A removed note has no row left, so its publish record is the only place
-    // the indicator's name and colour still exist.
-    if (change.kind !== "deleted") continue;
-    if (noteList.some((note) => note.indicatorTypeId === change.indicatorTypeId)) continue;
-    marks.push({
-      indicatorTypeId: change.indicatorTypeId,
-      state: "published_removed",
-      name: change.indicatorName,
-      color: change.indicatorColor,
     });
   }
 
@@ -148,4 +147,62 @@ export function indicatorIdsInNotes(
     }
   }
   return ids;
+}
+
+/**
+ * The cells this tab has written, each stamped with the generation it was
+ * written at. A fetch that began before a write can resolve after it with the
+ * cell's pre-write state, and applying that wholesale erased a just-saved draft
+ * until the next refetch.
+ */
+export interface LocalWriteLedger {
+  generation: number;
+  touched: Map<string, number>;
+}
+
+export function createLocalWriteLedger(): LocalWriteLedger {
+  return { generation: 0, touched: new Map() };
+}
+
+/** `cellKeys` are `empId_date`, the shift map's key. */
+export function markLocalWrite(ledger: LocalWriteLedger, cellKeys: Iterable<string>): void {
+  ledger.generation += 1;
+  for (const key of cellKeys) ledger.touched.set(key, ledger.generation);
+}
+
+function isCellNoteKey(noteKey: string, cellKey: string): boolean {
+  return noteKey === cellKey || noteKey.startsWith(`${cellKey}_`);
+}
+
+/**
+ * A fetched window with this tab's newer cells kept: any cell written after the
+ * fetch began (`startedAt`, the ledger generation then) or still being written
+ * keeps its current shift and notes, and everything else takes the server's.
+ */
+export function reconcileFetchedWindow<Shift>(input: {
+  fetched: { shifts: Record<string, Shift>; notes: ScheduleNoteMap };
+  current: { shifts: Record<string, Shift>; notes: ScheduleNoteMap };
+  ledger: LocalWriteLedger;
+  startedAt: number;
+  pendingCellKeys: Iterable<string>;
+}): { shifts: Record<string, Shift>; notes: ScheduleNoteMap } {
+  const keep = new Set(input.pendingCellKeys);
+  for (const [key, generation] of input.ledger.touched) {
+    if (generation > input.startedAt) keep.add(key);
+  }
+  if (keep.size === 0) return input.fetched;
+
+  const shifts = { ...input.fetched.shifts };
+  const notes = { ...input.fetched.notes };
+  for (const cellKey of keep) {
+    if (cellKey in input.current.shifts) shifts[cellKey] = input.current.shifts[cellKey];
+    else delete shifts[cellKey];
+    for (const noteKey of Object.keys(notes)) {
+      if (isCellNoteKey(noteKey, cellKey)) delete notes[noteKey];
+    }
+    for (const [noteKey, entries] of Object.entries(input.current.notes)) {
+      if (isCellNoteKey(noteKey, cellKey)) notes[noteKey] = entries;
+    }
+  }
+  return { shifts, notes };
 }

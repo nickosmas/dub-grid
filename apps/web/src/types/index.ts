@@ -491,6 +491,12 @@ export interface IndicatorType {
   archivedAt?: string | null;
 }
 
+/** The shift a schedule note belongs to: its segment's shift code and job. */
+export interface ScheduleNoteShift {
+  shiftId: number | null;
+  jobId: number;
+}
+
 export interface ScheduleNote {
   id: number;
   orgId: string;
@@ -499,6 +505,9 @@ export interface ScheduleNote {
   /** FK to indicator_types.id — consistent with how schedule cells reference related config by ID */
   indicatorTypeId: number;
   focusAreaId: number | null;
+  /** Both null for a note no shift claims, which applies to its whole focus area. */
+  shiftId: number | null;
+  jobId: number | null;
   status: "published" | "draft" | "draft_deleted";
   createdBy: string | null;
   /** Last editor, used to attribute unpublished notes in the publish dialog. */

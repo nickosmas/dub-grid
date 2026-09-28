@@ -6,7 +6,7 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
-import { revokeAllUserSessions } from "@/lib/auth/revocation";
+import { endUserSessions } from "@/lib/auth/revocation";
 import { apiErrorResponse } from "@/lib/error-handling";
 
 const paramsSchema = z.object({
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ userId
 
     // The RPC removes tracked sessions and blocks refresh; the revocation
     // watermark makes the tokens already in hand fail app APIs immediately.
-    await revokeAllUserSessions(userId);
+    await endUserSessions(userId);
 
     await writeGridmasterAuditLog({
       serviceClient,

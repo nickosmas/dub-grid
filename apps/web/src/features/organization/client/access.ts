@@ -306,14 +306,20 @@ export async function updateOrganizationMembershipGuarded(
   return body.user;
 }
 
-export async function removeOrganizationMembershipGuarded(input: {
-  orgId: string;
-  userId: string;
-  expectedUpdatedAt: string;
-}): Promise<void> {
+export async function removeOrganizationMembershipGuarded(
+  input: {
+    orgId: string;
+    userId: string;
+    expectedUpdatedAt: string;
+  },
+  accessToken?: string,
+): Promise<void> {
   const response = await fetch(resolveClientUrl("/api/organizations/access"), {
     method: "DELETE",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify(input),
   });
 
@@ -324,7 +330,11 @@ export async function removeOrganizationMembershipGuarded(input: {
   }
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(body, "We couldn't remove organization access. Try again."));
+    // Status, code and method let step-up recognize a request for fresh proof.
+    throw Object.assign(
+      new Error(getErrorMessage(body, "We couldn't remove organization access. Try again.")),
+      { status: response.status, code: body?.code, method: body?.method },
+    );
   }
 }
 

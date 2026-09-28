@@ -89,6 +89,13 @@ beforeAll(async () => {
   isSignInHandoffPending = (await import("../lib/sign-in-handoff")).isSignInHandoffPending;
 });
 
+// The subdomain form shows once the remembered-organization check settles.
+async function renderLogin() {
+  const view = render(<LoginScreen />);
+  await screen.findByPlaceholderText("yourorg");
+  return view;
+}
+
 describe("LoginScreen", () => {
   beforeEach(() => {
     vi.stubEnv("EXPO_PUBLIC_SUPABASE_URL", "https://example-project.supabase.co");
@@ -127,8 +134,8 @@ describe("LoginScreen", () => {
     vi.unstubAllEnvs();
   });
 
-  it("places the organization help link below the primary action", () => {
-    render(<LoginScreen />);
+  it("places the organization help link below the primary action", async () => {
+    await renderLogin();
 
     const primaryAction = screen.getByRole("button", { name: "Continue" });
     const helpLink = screen.getByRole("button", { name: "Need help with your subdomain?" });
@@ -189,7 +196,7 @@ describe("LoginScreen", () => {
 
   // The subdomain is a last resort for when no name is coming. Showing it while
   // the lookup is still in flight flashes it, then replaces it with the name.
-  it("shows nothing rather than the subdomain while the name is still resolving", async () => {
+  it("shows neither the subdomain form nor the credentials while the remembered organization resolves", async () => {
     loadLastOrg.mockResolvedValue({ slug: "dubgrid-health", name: null });
     let resolveLookup: (value: unknown) => void = () => {};
     lookupOrganization.mockReturnValue(
@@ -200,7 +207,8 @@ describe("LoginScreen", () => {
 
     render(<LoginScreen />);
 
-    expect(await screen.findByPlaceholderText("yourorg")).toHaveValue("dubgrid-health");
+    await waitFor(() => expect(lookupOrganization).toHaveBeenCalledWith("dubgrid-health"));
+    expect(screen.queryByPlaceholderText("yourorg")).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText("Email")).not.toBeInTheDocument();
 
     await act(async () => {
@@ -285,7 +293,7 @@ describe("LoginScreen", () => {
       },
     });
 
-    render(<LoginScreen />);
+    await renderLogin();
 
     fireEvent.change(screen.getByPlaceholderText("yourorg"), {
       target: { value: "dubgrid-health" },
@@ -297,9 +305,9 @@ describe("LoginScreen", () => {
     expect(screen.getByPlaceholderText("Email")).toBeInTheDocument();
   });
 
-  it("does not duplicate an active organization lookup", () => {
+  it("does not duplicate an active organization lookup", async () => {
     lookupOrganization.mockReturnValue(new Promise(() => undefined));
-    render(<LoginScreen />);
+    await renderLogin();
 
     fireEvent.change(screen.getByPlaceholderText("yourorg"), {
       target: { value: "dubgrid-health" },
@@ -319,10 +327,11 @@ describe("LoginScreen", () => {
 
     render(<LoginScreen />);
 
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText("yourorg")).toBeInTheDocument();
+    await act(async () => {
+      await Promise.resolve();
     });
     expect(loadLastOrg).not.toHaveBeenCalled();
+    expect(screen.queryByPlaceholderText("yourorg")).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText("Email")).not.toBeInTheDocument();
   });
 
@@ -356,7 +365,7 @@ describe("LoginScreen", () => {
       },
     });
 
-    render(<LoginScreen />);
+    await renderLogin();
 
     expect(screen.getByRole("button", { name: "Done" })).toBeTruthy();
 
@@ -392,7 +401,7 @@ describe("LoginScreen", () => {
     });
     routerPush.mockClear();
 
-    render(<LoginScreen />);
+    await renderLogin();
 
     fireEvent.change(screen.getByPlaceholderText("yourorg"), {
       target: { value: "dubgrid-health" },
@@ -447,7 +456,7 @@ describe("LoginScreen", () => {
     } as never);
 
     try {
-      render(<LoginScreen />);
+      await renderLogin();
       fireEvent.change(screen.getByPlaceholderText("yourorg"), {
         target: { value: "dubgrid-health" },
       });
@@ -506,7 +515,7 @@ describe("LoginScreen", () => {
       },
     } as never);
 
-    render(<LoginScreen />);
+    await renderLogin();
 
     fireEvent.change(screen.getByPlaceholderText("yourorg"), {
       target: { value: "dubgrid-health" },
@@ -566,7 +575,7 @@ describe("LoginScreen", () => {
     const setSession = vi.fn().mockResolvedValue({ data: {}, error: null });
     getSupabaseClient.mockReturnValue({ auth: { setSession } });
 
-    render(<LoginScreen />);
+    await renderLogin();
 
     fireEvent.change(screen.getByPlaceholderText("yourorg"), {
       target: { value: "dubgrid-health" },
@@ -609,7 +618,7 @@ describe("LoginScreen", () => {
       });
       getSupabaseClient.mockReturnValue({ auth: { setSession } });
 
-      const view = render(<LoginScreen />);
+      const view = await renderLogin();
       fireEvent.change(screen.getByPlaceholderText("yourorg"), {
         target: { value: "dubgrid-health" },
       });
@@ -757,7 +766,7 @@ describe("LoginScreen", () => {
       },
     } as never);
 
-    render(<LoginScreen />);
+    await renderLogin();
 
     fireEvent.change(screen.getByPlaceholderText("yourorg"), {
       target: { value: "dubgrid-health" },
@@ -839,7 +848,7 @@ describe("LoginScreen", () => {
     const setSession = vi.fn();
     getSupabaseClient.mockReturnValue({ auth: { setSession } } as never);
 
-    render(<LoginScreen />);
+    await renderLogin();
     fireEvent.change(screen.getByPlaceholderText("yourorg"), {
       target: { value: "dubgrid-health" },
     });
@@ -874,7 +883,7 @@ describe("LoginScreen", () => {
     });
     loginToOrganization.mockRejectedValue(new Error("Invalid email or password"));
 
-    render(<LoginScreen />);
+    await renderLogin();
 
     fireEvent.change(screen.getByPlaceholderText("yourorg"), {
       target: { value: "dubgrid-health" },
@@ -901,7 +910,7 @@ describe("LoginScreen", () => {
       organization: { id: "org-1", name: "DubGrid Health", slug: "dubgrid-health" },
     });
     loginToOrganization.mockReturnValue(new Promise(() => undefined));
-    render(<LoginScreen />);
+    await renderLogin();
 
     fireEvent.change(screen.getByPlaceholderText("yourorg"), {
       target: { value: "dubgrid-health" },
@@ -931,7 +940,7 @@ describe("LoginScreen", () => {
       mfa: { factorId: "factor-123", friendlyName: "Authenticator" },
     });
     verifyMobileTotpFactor.mockRejectedValue(new TypeError("Network request failed"));
-    render(<LoginScreen />);
+    await renderLogin();
 
     fireEvent.change(screen.getByPlaceholderText("yourorg"), {
       target: { value: "dubgrid-health" },
@@ -959,7 +968,7 @@ describe("LoginScreen", () => {
   it("shows an organization lookup error before the credential form", async () => {
     lookupOrganization.mockRejectedValue(new Error("No organization matched that slug."));
 
-    render(<LoginScreen />);
+    await renderLogin();
 
     fireEvent.change(screen.getByPlaceholderText("yourorg"), {
       target: { value: "missing-org" },
@@ -979,7 +988,7 @@ describe("LoginScreen", () => {
       "We couldn't reach the mobile backend at http://192.168.1.181:3000 (Network request failed). Check EXPO_PUBLIC_API_BASE_URL in apps/mobile/.env.local and make sure your phone can reach that host.";
     lookupOrganization.mockRejectedValue(new Error(backendError));
 
-    render(<LoginScreen />);
+    await renderLogin();
 
     fireEvent.change(screen.getByPlaceholderText("yourorg"), {
       target: { value: "dubgrid-health" },
@@ -1005,7 +1014,7 @@ describe("LoginScreen", () => {
     });
     loginToOrganization.mockRejectedValue(new Error("Network request failed"));
 
-    render(<LoginScreen />);
+    await renderLogin();
 
     fireEvent.change(screen.getByPlaceholderText("yourorg"), {
       target: { value: "dubgrid-health" },
@@ -1066,7 +1075,7 @@ describe("LoginScreen", () => {
       },
     } as never);
 
-    render(<LoginScreen />);
+    await renderLogin();
 
     fireEvent.change(screen.getByPlaceholderText("yourorg"), {
       target: { value: "dubgrid-health" },

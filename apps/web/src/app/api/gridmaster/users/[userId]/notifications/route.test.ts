@@ -3,11 +3,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requireGridmasterSession = vi.fn();
 const loadNotifications = vi.fn();
+const loadTarget = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
   requireGridmasterSession: (req: NextRequest) => requireGridmasterSession(req),
 }));
 vi.mock("@/lib/supabase-service", () => ({ getServiceClient: () => ({ service: true }) }));
+vi.mock("@/features/gridmaster/server/person-target", () => ({
+  loadPersonTarget: (client: unknown, id: string) => loadTarget(client, id),
+}));
 vi.mock("@/features/gridmaster/server/person-notifications", () => ({
   loadPersonNotifications: (client: unknown, id: string) => loadNotifications(client, id),
 }));
@@ -27,6 +31,13 @@ describe("GET /api/gridmaster/users/[userId]/notifications", () => {
     vi.clearAllMocks();
     requireGridmasterSession.mockResolvedValue({ user: { id: "gm" } });
     loadNotifications.mockResolvedValue({ preferences: null, notifications: [] });
+    loadTarget.mockImplementation(async (_client: unknown, id: string) => ({ userId: id }));
+  });
+
+  it("answers 404 for another Gridmaster's account without reading its inbox (F-88)", async () => {
+    loadTarget.mockResolvedValueOnce(null);
+    expect((await call()).status).toBe(404);
+    expect(loadNotifications).not.toHaveBeenCalled();
   });
 
   it("refuses a caller who is not a Gridmaster before reading anything", async () => {

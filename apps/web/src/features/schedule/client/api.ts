@@ -7,6 +7,7 @@ import type {
   RecurringScheduleDraft,
   RecurringShift,
   ScheduleNote,
+  ScheduleNoteShift,
   ScheduleCellInput,
   ShiftMap,
   ShiftSeries,
@@ -834,6 +835,7 @@ export function upsertScheduleNote(
   indicatorTypeId: number,
   focusAreaId: number,
   existingStatus?: "published" | "draft" | "draft_deleted",
+  shift: ScheduleNoteShift | null = null,
 ): Promise<void> {
   return requestScheduleManage<{ success: true }>({
     action: "upsertScheduleNote",
@@ -842,6 +844,7 @@ export function upsertScheduleNote(
     date,
     indicatorTypeId,
     focusAreaId,
+    shift,
     existingStatus,
   }).then(() => undefined);
 }
@@ -853,6 +856,7 @@ export function deleteScheduleNote(
   indicatorTypeId: number,
   focusAreaId: number,
   existingStatus?: "published" | "draft" | "draft_deleted",
+  shift: ScheduleNoteShift | null = null,
 ): Promise<void> {
   return requestScheduleManage<{ success: true }>({
     action: "deleteScheduleNote",
@@ -861,6 +865,7 @@ export function deleteScheduleNote(
     date,
     indicatorTypeId,
     focusAreaId,
+    shift,
     existingStatus,
   }).then(() => undefined);
 }

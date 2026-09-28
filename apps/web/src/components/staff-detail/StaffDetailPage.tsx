@@ -18,6 +18,8 @@ import { AddManagementUserToScheduleModal } from "@/components/staff/AddManageme
 import { useDirectory, useOrganizationData, usePermissions } from "@/hooks";
 import { useLatestRef } from "@/hooks/useLatestRef";
 import type { StepUpRun } from "@/hooks/useStepUpAction";
+import { useSharedStepUp } from "@/hooks/useSharedStepUp";
+import { getStepUpMethod } from "@/features/account/client/step-up";
 import {
   isSelfAction,
   SELF_ACTION_FORBIDDEN_MESSAGE,
@@ -481,8 +483,16 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   );
 
   // ── Status action handlers ──────────────────────────────────────────────────
+  // Only an impersonating Gridmaster is asked for fresh proof (F-96).
+  const statusStepUp = useSharedStepUp();
+  const runStatusChange = (action: (accessToken?: string) => Promise<void>) => {
+    statusStepUp.run(action).catch((err) => {
+      toast.error(formatClientErrorMessage(err, "We couldn't update their status. Try again."));
+    });
+  };
+
   const handleDeactivate = useCallback(
-    async (empId: string, note?: string) => {
+    async (empId: string, note?: string, accessToken?: string) => {
       if (!orgId || !employee) return;
       setEmployee((prev) =>
         prev
@@ -495,7 +505,13 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           : prev,
       );
       try {
-        const updatedEmployee = await deactivateEmployee(empId, note, orgId, employee.version);
+        const updatedEmployee = await deactivateEmployee(
+          empId,
+          note,
+          orgId,
+          employee.version,
+          accessToken,
+        );
         syncEmployeeCaches(updatedEmployee);
         toast.success("Employee marked inactive");
       } catch (err) {
@@ -508,6 +524,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         setEmployee((prev) =>
           prev ? { ...prev, status: "active" as const, statusNote: "" } : prev,
         );
+        if (getStepUpMethod(err)) throw err;
         if (err instanceof SelfActionForbiddenError) {
           toast.error(formatClientErrorMessage(err, SELF_ACTION_FORBIDDEN_MESSAGE));
           return;
@@ -554,7 +571,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   );
 
   const handleRemove = useCallback(
-    async (empId: string, note?: string) => {
+    async (empId: string, note?: string, accessToken?: string) => {
       if (!orgId || !employee) return;
       const prevStatus = employee?.status;
       setEmployee((prev) =>
@@ -563,7 +580,13 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           : prev,
       );
       try {
-        const updatedEmployee = await removeEmployee(empId, orgId, employee.version, note);
+        const updatedEmployee = await removeEmployee(
+          empId,
+          orgId,
+          employee.version,
+          note,
+          accessToken,
+        );
         syncEmployeeCaches(updatedEmployee);
         toast.success("Employee removed");
       } catch (err) {
@@ -573,6 +596,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           return;
         }
         setEmployee((prev) => (prev ? { ...prev, status: prevStatus ?? "active" } : prev));
+        if (getStepUpMethod(err)) throw err;
         if (err instanceof SelfActionForbiddenError) {
           toast.error(formatClientErrorMessage(err, SELF_ACTION_FORBIDDEN_MESSAGE));
           return;
@@ -782,6 +806,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   return (
     <>
       <ProgressBar loading={isLoading} />
+      {statusStepUp.dialog}
 
       {/* A re-run of the load (permissions settling, a bootstrap refetch) keeps
           the rendered profile in place; only a first load shows nothing. */}
@@ -1034,9 +1059,13 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     employee={employee}
                     canEdit={perms.canManageEmployees}
                     isSelf={isSelfAction(currentUser?.id, employee.userId)}
-                    onDeactivate={handleDeactivate}
+                    onDeactivate={(empId, note) =>
+                      runStatusChange((token) => handleDeactivate(empId, note, token))
+                    }
                     onActivate={handleActivate}
-                    onRemove={handleRemove}
+                    onRemove={(empId, note) =>
+                      runStatusChange((token) => handleRemove(empId, note, token))
+                    }
                     variant="page"
                   />
                 </div>

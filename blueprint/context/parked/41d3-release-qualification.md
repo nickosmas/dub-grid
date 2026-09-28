@@ -50,7 +50,7 @@ Continuous Mode: they push, send, reach production or reseed shared state.
       role-variance report no retries. If #113's head moves before merge, the
       new head's run is the one that counts.
 
-- [ ] **Step 2 - native rehearsal** (approved 2026-09-25; blocked) - the
+- [x] **Step 2 - native rehearsal** (approved 2026-09-25) - the
       simulator's dev build predates current native dependencies, only Xcode
       27 is installed (Expo 54 needs Xcode 26), no Android device or emulator
       is attached, and signing in needs the owner.
@@ -74,13 +74,38 @@ Continuous Mode: they push, send, reach production or reseed shared state.
       `google-services.json`. Notes: a login that outlives the app's 15 s
       timeout leaves a server session the phone never receives (F-78); the
       earlier emulator freeze and slow sign-outs were host load (up to 60),
-      not the app. The iOS half, including F-42's app-switcher cover, is
-      still to run.
+      not the app. iOS half passed (2026-09-27, iPhone 17 simulator, iOS
+      26, dev build against local web and Supabase at `dev` e2962d4c..ed924400,
+      the seeded `qa-regular` account, restored afterwards). Revocation holds:
+      the phone's session revoked through the web route
+      (`DELETE /api/account/sessions`) got 401 on its next request, signed
+      out, and stayed signed out after a force-quit and relaunch; a
+      controlled run through the same routes showed one token answer 200
+      before the revoke and 401 on bootstrap and schedule after it. App-lock
+      cover (F-42): with app lock on and Face ID enrolled, the app switcher's
+      card showed the privacy cover, not the Home schedule, and returning
+      from the switcher did not prompt. Teardown: a recorded sign-out drew
+      the login screen about 1.5 to 1.9 s after the confirm tap (server
+      sign-out 1.19 s), with no 5 s stall. Two-factor recovery: the emailed
+      code led to the authenticator step, a wrong code was refused, the
+      right one led to a masked new password, recovery signed out with a
+      notice, and the new password plus an authenticator code signed in to
+      Home. Not exercised on iOS: presence retry (no fault injection in the
+      build; Android's result stands). Found and fixed during the run: auth
+      fields inherited the code field's tracking ("E m a i l") and sign-in's
+      button labels shrank across stages (`fix/mobile-auth-text-tracking-and-labels`,
+      08292520), verified on the simulator after the fix.
 - [ ] **Step 3 - email provider rehearsal** (approved 2026-09-25) - seven
       app-sent emails (invitation, reissue, account deleted, impersonation
       start and end, new sign-in and two-factor alerts) delivered through
       Resend to `delivered@resend.dev`. Open: Supabase's own password,
       email-change and MFA notices, which need production's flags pushed.
+      Locally (2026-09-27) Supabase's MFA notice "A new sign-in verification
+      method was added" and its password-reset email arrived for
+      `qa-regular` during the iOS rehearsal. Production's flags already
+      match the repo (Step 5); what remains is seeing one arrive from
+      production, which needs a change on a real account and its inbox, the
+      owner's step.
 - [x] **Step 4 - production migration 047** - applied 2026-09-25 19:17 UTC
       by another session after a scratch rehearsal; the read-only inspector
       reports 47 ledger entries, none missing, every invariant passing.
@@ -88,7 +113,7 @@ Continuous Mode: they push, send, reach production or reseed shared state.
       Migration 048 (`user_known_devices`) followed from another session; the
       inspector reads 48 entries, none missing, every invariant passing
       (2026-09-26).
-- [ ] **Step 5 - production Auth settings** (read-only diff run
+- [x] **Step 5 - production Auth settings** (read-only diff run
       2026-09-26) - the push script finds three templates behind the repo
       (email change, reauthentication, MFA factor enrolled: the 41c3 copy);
       subjects, OTP settings and all four notice flags already match. The
@@ -106,7 +131,9 @@ Continuous Mode: they push, send, reach production or reseed shared state.
       authenticator-code step-up would hit (F-62). Session limits: owner decided
       (2026-09-26) mobile stays signed in until sign-out, so production keeps
       none and `config.toml` drops its 24h and 8h; the web app's 30-minute
-      idle sign-out is unchanged.
+      idle sign-out is unchanged. Re-checked 2026-09-27: `config.toml`
+      matches these decisions and a fresh read-only diff reports production's
+      auth email config matches the repo.
 
 - [x] **Step 6 - release PR green** (approved 2026-09-25) - `dev` pushed and
       [#113](https://github.com/nickosmas/dub-grid/pull/113) opened, marked

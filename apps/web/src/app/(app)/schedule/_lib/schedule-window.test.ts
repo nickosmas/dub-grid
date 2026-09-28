@@ -3,7 +3,10 @@ import type { NotePublishChange, ScheduleNote } from "@/types";
 import {
   buildScheduleNoteMap,
   buildScheduleNoteMarks,
+  createLocalWriteLedger,
   indicatorIdsInNotes,
+  markLocalWrite,
+  reconcileFetchedWindow,
   removeScheduleNotesForCell,
   scheduleNoteKey,
 } from "./schedule-window";
@@ -16,6 +19,8 @@ function note(overrides: Partial<ScheduleNote>): ScheduleNote {
     date: "2026-08-03",
     indicatorTypeId: 10,
     focusAreaId: 5,
+    shiftId: null,
+    jobId: null,
     status: "published",
     createdBy: null,
     updatedBy: null,
@@ -54,8 +59,8 @@ describe("buildScheduleNoteMap", () => {
 
     expect(map).toEqual({
       "emp-1_2026-08-03_5": [
-        { indicatorTypeId: 10, status: "published", updatedBy: null },
-        { indicatorTypeId: 11, status: "draft", updatedBy: null },
+        { indicatorTypeId: 10, status: "published", updatedBy: null, shiftId: null, jobId: null },
+        { indicatorTypeId: 11, status: "draft", updatedBy: null, shiftId: null, jobId: null },
       ],
     });
   });
@@ -76,17 +81,17 @@ describe("buildScheduleNoteMap", () => {
     ]);
 
     expect(map["emp-1_2026-08-03"]).toEqual([
-      { indicatorTypeId: 10, status: "published", updatedBy: null },
+      { indicatorTypeId: 10, status: "published", updatedBy: null, shiftId: null, jobId: null },
     ]);
     expect(map["emp-1_2026-08-03_5"]).toEqual([
-      { indicatorTypeId: 10, status: "published", updatedBy: null },
+      { indicatorTypeId: 10, status: "published", updatedBy: null, shiftId: null, jobId: null },
     ]);
   });
 
   it("carries draft_deleted through, since the grid renders it distinctly", () => {
     const map = buildScheduleNoteMap([note({ status: "draft_deleted" })]);
     expect(map["emp-1_2026-08-03_5"]).toEqual([
-      { indicatorTypeId: 10, status: "draft_deleted", updatedBy: null },
+      { indicatorTypeId: 10, status: "draft_deleted", updatedBy: null, shiftId: null, jobId: null },
     ]);
   });
 
@@ -98,8 +103,8 @@ describe("buildScheduleNoteMap", () => {
     ]);
 
     expect(map["emp-1_2026-08-03_5"]).toEqual([
-      { indicatorTypeId: 10, status: "draft", updatedBy: "user-1" },
-      { indicatorTypeId: 11, status: "draft", updatedBy: null },
+      { indicatorTypeId: 10, status: "draft", updatedBy: "user-1", shiftId: null, jobId: null },
+      { indicatorTypeId: 11, status: "draft", updatedBy: null, shiftId: null, jobId: null },
     ]);
   });
 
@@ -163,7 +168,7 @@ describe("removeScheduleNotesForCell", () => {
 });
 
 describe("buildScheduleNoteMarks", () => {
-  it("marks an added and a removed draft note for a scheduler", () => {
+  it("marks an added draft note for a scheduler and hides a pending removal", () => {
     const marks = buildScheduleNoteMarks({
       notes: [
         { indicatorTypeId: 10, status: "draft", updatedBy: null },
@@ -175,7 +180,6 @@ describe("buildScheduleNoteMarks", () => {
 
     expect(marks).toEqual([
       { indicatorTypeId: 10, state: "draft_added" },
-      { indicatorTypeId: 11, state: "draft_removed" },
       { indicatorTypeId: 12, state: "published" },
     ]);
   });
@@ -209,26 +213,26 @@ describe("buildScheduleNoteMarks", () => {
     ]);
   });
 
-  it("renders a removed published note from its change record", () => {
+  it("draws one dot for a note on both shifts of a double shift", () => {
     const marks = buildScheduleNoteMarks({
-      notes: undefined,
-      publishedChanges: new Map([
-        [
-          10,
-          publishedNoteChange({ kind: "deleted", indicatorName: "Gone", indicatorColor: "#0f0" }),
-        ],
-      ]),
+      notes: [
+        { indicatorTypeId: 10, status: "published", updatedBy: null, shiftId: 34, jobId: 18 },
+        { indicatorTypeId: 10, status: "published", updatedBy: null, shiftId: 35, jobId: 18 },
+      ],
       isScheduleEditor: true,
     });
 
-    expect(marks).toEqual([
-      {
-        indicatorTypeId: 10,
-        state: "published_removed",
-        name: "Gone",
-        color: "#0f0",
-      },
-    ]);
+    expect(marks).toEqual([{ indicatorTypeId: 10, state: "published" }]);
+  });
+
+  it("draws nothing for a note the last publish removed", () => {
+    const marks = buildScheduleNoteMarks({
+      notes: undefined,
+      publishedChanges: new Map([[10, publishedNoteChange({ kind: "deleted" })]]),
+      isScheduleEditor: true,
+    });
+
+    expect(marks).toEqual([]);
   });
 
   it("does not ghost a removed note that has been added back", () => {
@@ -268,5 +272,74 @@ describe("indicatorIdsInNotes", () => {
   it("leaves out people and dates the page does not print", () => {
     const narrow = { empIds: new Set(["emp-2"]), dateKeys: new Set(["2026-09-01"]) };
     expect([...indicatorIdsInNotes(notes, false, narrow)]).toEqual([5]);
+  });
+});
+
+describe("reconcileFetchedWindow", () => {
+  const saved = { shift: "saved" };
+  const stale = { shift: "stale" };
+  const current = {
+    shifts: { "emp-1_2026-08-03": saved, "emp-2_2026-08-03": stale },
+    notes: {
+      "emp-1_2026-08-03_5": [{ indicatorTypeId: 10, status: "draft" as const, updatedBy: "u" }],
+    },
+  };
+  const fetched = {
+    shifts: { "emp-1_2026-08-03": stale, "emp-2_2026-08-03": { shift: "server" } },
+    notes: {
+      "emp-2_2026-08-03_5": [
+        { indicatorTypeId: 11, status: "published" as const, updatedBy: null },
+      ],
+    },
+  };
+
+  it("keeps a cell written after the fetch began and takes the server for the rest", () => {
+    const ledger = createLocalWriteLedger();
+    const startedAt = ledger.generation;
+    markLocalWrite(ledger, ["emp-1_2026-08-03"]);
+
+    const result = reconcileFetchedWindow({
+      fetched,
+      current,
+      ledger,
+      startedAt,
+      pendingCellKeys: [],
+    });
+
+    expect(result.shifts["emp-1_2026-08-03"]).toBe(saved);
+    expect(result.notes["emp-1_2026-08-03_5"]).toBe(current.notes["emp-1_2026-08-03_5"]);
+    expect(result.shifts["emp-2_2026-08-03"]).toEqual({ shift: "server" });
+    expect(result.notes["emp-2_2026-08-03_5"]).toBe(fetched.notes["emp-2_2026-08-03_5"]);
+  });
+
+  it("takes the server's cell for a fetch that began after the write", () => {
+    const ledger = createLocalWriteLedger();
+    markLocalWrite(ledger, ["emp-1_2026-08-03"]);
+
+    const result = reconcileFetchedWindow({
+      fetched,
+      current,
+      ledger,
+      startedAt: ledger.generation,
+      pendingCellKeys: [],
+    });
+
+    expect(result).toBe(fetched);
+  });
+
+  it("keeps a cell whose write is still in flight, including its removal", () => {
+    const ledger = createLocalWriteLedger();
+
+    const result = reconcileFetchedWindow({
+      fetched,
+      current: { shifts: {}, notes: {} },
+      ledger,
+      startedAt: ledger.generation,
+      pendingCellKeys: ["emp-2_2026-08-03"],
+    });
+
+    expect("emp-2_2026-08-03" in result.shifts).toBe(false);
+    expect(result.notes["emp-2_2026-08-03_5"]).toBeUndefined();
+    expect(result.shifts["emp-1_2026-08-03"]).toBe(stale);
   });
 });

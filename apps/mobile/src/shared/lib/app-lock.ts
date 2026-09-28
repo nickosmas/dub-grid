@@ -1,4 +1,6 @@
+import { useSyncExternalStore } from "react";
 import { Platform } from "react-native";
+import * as LocalAuthentication from "expo-local-authentication";
 import { getStoredValue, setStoredValue } from "./local-storage";
 
 const APP_LOCK_STORAGE_KEY = "dg_app_lock_enabled";
@@ -65,4 +67,82 @@ export async function setAppLockEnabled(enabled: boolean): Promise<void> {
   await setStoredValue(APP_LOCK_STORAGE_KEY, enabled ? "1" : "0");
   cachedState = enabled ? "enabled" : "disabled";
   notify();
+}
+
+let settingsChecksOpen = 0;
+
+/**
+ * True while the security screen's own device check is on screen. iOS reports
+ * `inactive` under the system prompt, which would otherwise raise the
+ * app-switcher cover over the screen that asked for the check.
+ */
+export function isSettingsDeviceCheckOpen(): boolean {
+  return settingsChecksOpen > 0;
+}
+
+export type DeviceCheckResult = "passed" | "failed" | "unavailable";
+
+/** Asks the device owner to confirm with biometrics or the passcode. */
+export async function confirmDeviceOwner(promptMessage: string): Promise<DeviceCheckResult> {
+  const [hasHardware, isEnrolled] = await Promise.all([
+    LocalAuthentication.hasHardwareAsync(),
+    LocalAuthentication.isEnrolledAsync(),
+  ]);
+  if (!hasHardware || !isEnrolled) return "unavailable";
+
+  settingsChecksOpen += 1;
+  try {
+    const result = await LocalAuthentication.authenticateAsync({ promptMessage });
+    return result.success ? "passed" : "failed";
+  } catch {
+    return "failed";
+  } finally {
+    settingsChecksOpen -= 1;
+  }
+}
+
+/** What the lock is showing, for the windows the lock page cannot reach. */
+export interface AppLockSurfaceState {
+  engaged: boolean;
+  failed: boolean;
+  retrying: boolean;
+  retry: () => void;
+  signOut: () => void;
+}
+
+const idleSurface: AppLockSurfaceState = {
+  engaged: false,
+  failed: false,
+  retrying: false,
+  retry: () => undefined,
+  signOut: () => undefined,
+};
+let surface = idleSurface;
+const surfaceListeners = new Set<() => void>();
+
+function subscribeLockSurface(callback: () => void): () => void {
+  surfaceListeners.add(callback);
+  return () => {
+    surfaceListeners.delete(callback);
+  };
+}
+
+/** Published by the lock; `null` when it lifts. */
+export function setAppLockSurface(next: AppLockSurfaceState | null): void {
+  surface = next ?? idleSurface;
+  surfaceListeners.forEach((listener) => listener());
+}
+
+/**
+ * The lock as seen from a sheet or confirmation. Each is a native window above
+ * the app, where the lock page cannot reach, so each draws the lock inside
+ * itself instead. Closing them would mean dismissing a confirmation and its
+ * sheet at once, which iOS can leave half done.
+ */
+export function useAppLockSurface(): AppLockSurfaceState {
+  return useSyncExternalStore(
+    subscribeLockSurface,
+    () => surface,
+    () => idleSurface,
+  );
 }

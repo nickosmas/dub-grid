@@ -167,14 +167,31 @@ describe("PersonMembershipActions", () => {
       }),
     );
 
+    // Through step-up after the credential check, with the assured token (F-96).
     await waitFor(() =>
-      expect(removeOrganizationMembershipGuarded).toHaveBeenCalledWith({
-        orgId: ORG,
-        userId: USER,
-        expectedUpdatedAt: UPDATED,
+      expect(removeOrganizationMembershipGuarded).toHaveBeenCalledWith(
+        { orgId: ORG, userId: USER, expectedUpdatedAt: UPDATED },
+        "fresh-token",
+      ),
+    );
+    expect(requireCredentialAssurance).toHaveBeenCalledWith("fresh-token");
+    expect(onChanged).toHaveBeenCalled();
+  });
+
+  it("removes nothing when step-up is cancelled (F-96)", async () => {
+    stepUpRun.mockResolvedValueOnce(false);
+    const { onChanged } = renderActions();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove from organization" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Remove from organization" })).getByRole("button", {
+        name: "Remove",
       }),
     );
-    expect(onChanged).toHaveBeenCalled();
+
+    await waitFor(() => expect(stepUpRun).toHaveBeenCalled());
+    expect(removeOrganizationMembershipGuarded).not.toHaveBeenCalled();
+    expect(onChanged).not.toHaveBeenCalled();
   });
 
   it("reloads the record when the access changed elsewhere", async () => {

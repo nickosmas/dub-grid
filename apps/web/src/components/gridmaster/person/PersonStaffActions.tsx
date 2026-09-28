@@ -15,6 +15,8 @@ import {
 } from "@/features/employees/client";
 import type { GridmasterStaffRecord } from "@/features/gridmaster/person-record";
 import { formatClientErrorMessage } from "@/lib/client-facing";
+import { requireCredentialAssurance } from "@/features/account/client";
+import { useStepUpAction } from "@/hooks/useStepUpAction";
 import type { Employee } from "@/types";
 
 type StatusChange = "activate" | "deactivate" | "remove";
@@ -70,6 +72,7 @@ export function PersonStaffActions({
     contactNotes: employee.contactNotes,
   });
   const [busy, setBusy] = useState(false);
+  const stepUp = useStepUpAction();
   const linked = Boolean(employee.userId);
 
   function handleFailure(error: unknown, fallback: string) {
@@ -88,22 +91,26 @@ export function PersonStaffActions({
     if (!statusChange) return;
     setBusy(true);
     try {
+      const note = statusNote.trim() || undefined;
       if (statusChange === "activate") {
         await activateEmployee(employee.id, employee.orgId, employee.version);
-      } else if (statusChange === "deactivate") {
-        await deactivateEmployee(
-          employee.id,
-          statusNote.trim() || undefined,
-          employee.orgId,
-          employee.version,
-        );
       } else {
-        await removeEmployee(
-          employee.id,
-          employee.orgId,
-          employee.version,
-          statusNote.trim() || undefined,
-        );
+        // Deactivating or removing a staff record needs fresh proof (F-96).
+        const completed = await stepUp.run(async (accessToken) => {
+          await requireCredentialAssurance(accessToken);
+          if (statusChange === "deactivate") {
+            await deactivateEmployee(
+              employee.id,
+              note,
+              employee.orgId,
+              employee.version,
+              accessToken,
+            );
+          } else {
+            await removeEmployee(employee.id, employee.orgId, employee.version, note, accessToken);
+          }
+        });
+        if (!completed) return;
       }
       toast.success("Staff status updated");
       setStatusChange(null);
@@ -187,7 +194,7 @@ export function PersonStaffActions({
         </Button>
       ))}
 
-      {statusChange && (
+      {statusChange && !stepUp.dialog && (
         <ConfirmDialog
           title={STATUS_COPY[statusChange].title}
           message={
@@ -273,6 +280,7 @@ export function PersonStaffActions({
           onCancel={() => setEditing(false)}
         />
       )}
+      {stepUp.dialog}
     </>
   );
 }
