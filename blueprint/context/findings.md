@@ -39,14 +39,14 @@
 **Suggested fix:** A partial unique index on `(actor_id, details->>'sessionHash')` for successes, which needs a migration.
 **Resolution:**
 
-### F-26 [P3] open - Two concurrent impersonation ends can both be recorded
+### F-26 [P3] fixed - Two concurrent impersonation ends can both be recorded
 
 **File:** `apps/web/src/app/api/gridmaster/impersonation/route.ts:205`
 **Found:** 2026-09-25 by `/audit` (scope: current, bdbbd4cc..8246596c; all lenses)
 **Why it matters:** The row is read before `end_impersonation`, whose second call is a silent no-op, so both requests write `impersonation.ended`.
 Since 41c3 the route also sends the end notice, so a concurrent pair sends two emails as well.
 **Suggested fix:** Have the RPC return whether it ended a row (migration).
-**Resolution:**
+**Resolution:** Fixed in fix/impersonation-end-once: migration `071_end_impersonation_reports_end.sql` recreates `end_impersonation` returning true only when its update ended the row (060's body otherwise, grants to `authenticated` and `service_role`), and the end route answers 404 and records and announces nothing on `false` (a `null` from a database before 071 still counts as ended). `migration-071-end-impersonation.integration.test.ts` proves two ends return true then false with one set of notices, plus 060's single escape row, 058's end time and the grants; a route test covers the `false` case; the 058 and 060 live tests drop the function before re-running their own files. Not yet on production.
 
 ### F-50 [P3] fixed - Remaining drift-guard gaps
 

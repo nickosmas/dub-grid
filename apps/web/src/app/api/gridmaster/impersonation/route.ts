@@ -242,12 +242,21 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const { error } = await requestClient.rpc("end_impersonation", {
+      const { data: ended, error } = await requestClient.rpc("end_impersonation", {
         p_session_id: parsed.data.sessionId,
         p_reason: parsed.data.reason ?? "manual",
       });
       if (error) {
         throw error;
+      }
+      // Two ends can both pass the read above; only the one whose call ended
+      // the row records and announces it (071, F-26). Before 071 the function
+      // returned nothing, which still counts as ended.
+      if (ended === false) {
+        return NextResponse.json(
+          { error: "That viewing session has already ended." },
+          { status: 404 },
+        );
       }
 
       // Before the audit write: a retry after a failed write finds the

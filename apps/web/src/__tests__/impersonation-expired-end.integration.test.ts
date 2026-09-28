@@ -75,6 +75,8 @@ describe.runIf(reachable)("the end time of an ended impersonation (058, live DB)
   // is bound to the caller's auth session (017), which user_sessions must hold.
   beforeEach(async () => {
     await db.query("BEGIN");
+    // 071 changed the return type, which CREATE OR REPLACE cannot undo.
+    await db.query("DROP FUNCTION IF EXISTS public.end_impersonation(UUID, TEXT)");
     await db.query(MIGRATION);
     const { rows: session } = await db.query<{ id: string }>(
       `INSERT INTO public.user_sessions (user_id, supabase_session_id)
