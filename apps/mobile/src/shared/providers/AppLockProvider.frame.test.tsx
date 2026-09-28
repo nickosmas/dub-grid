@@ -1,8 +1,11 @@
+import { Profiler } from "react";
 import { render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule } from "../../test/native";
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
+
+vi.mock("../lib/auth-reset", () => ({ handleExpiredMobileSession: vi.fn() }));
 
 vi.mock("expo-local-authentication", () => ({
   hasHardwareAsync: vi.fn(async () => true),
@@ -23,29 +26,22 @@ vi.mock("../lib/app-lock", () => ({
   getAppLockStateSnapshot: () => lockState,
   appLockRequired: (state: string) => state === "enabled" || state === "unreadable",
   subscribeAppLockEnabled: () => () => {},
+  isSettingsDeviceCheckOpen: () => false,
+  setAppLockSurface: () => undefined,
+  useAppLockSurface: () => ({ engaged: false }),
 }));
 
-// Every commit is logged as "was the loading cover up, and was the lock
-// visible". Testing Library flushes effects inside act, so the final DOM
-// cannot show an uncovered frame; this log can.
+// Every commit is logged as "was the cover up, and was the lock showing".
+// Testing Library flushes effects inside act, so the final DOM cannot show an
+// uncovered frame; this log, read from the DOM as each commit lands, can.
 const renders: Array<{ cover: boolean; locked: boolean }> = [];
-let coverThisRender = false;
-vi.mock("../components/AppSplashScreen", () => ({
-  AppSplashScreen: () => {
-    coverThisRender = true;
-    return null;
-  },
-}));
-vi.mock("../components/BottomSheetModal", () => ({
-  BottomSheetModal: ({ visible }: { visible: boolean }) => {
-    renders.push({ cover: coverThisRender, locked: visible });
-    coverThisRender = false;
-    return null;
-  },
-  SheetActions: () => null,
-  SheetCopy: () => null,
-  SheetHeader: () => null,
-}));
+function logCommit() {
+  renders.push({
+    cover: Boolean(document.querySelector('[data-testid="app-lock-cover"]')),
+    locked: Boolean(document.querySelector('[data-testid="app-lock"]')),
+  });
+}
+vi.mock("../components/AppSplashScreen", () => ({ AppSplashScreen: () => null }));
 vi.mock("../components/Button", () => ({ Button: () => null }));
 
 import { AppLockProvider } from "./AppLockProvider";
@@ -53,7 +49,6 @@ import { AppLockProvider } from "./AppLockProvider";
 describe("AppLockProvider frames", () => {
   beforeEach(() => {
     renders.length = 0;
-    coverThisRender = false;
     lockState = "loading";
   });
 
@@ -61,21 +56,23 @@ describe("AppLockProvider frames", () => {
   // setting resolved had neither the loading cover nor the lock (41b3).
   it("never renders content uncovered between loading and locked", () => {
     const { rerender } = render(
-      <AppLockProvider>
-        <div>content</div>
-      </AppLockProvider>,
+      <Profiler id="lock" onRender={logCommit}>
+        <AppLockProvider>
+          <div>content</div>
+        </AppLockProvider>
+      </Profiler>,
     );
     expect(renders.at(-1)).toEqual({ cover: true, locked: false });
 
     lockState = "enabled";
     rerender(
-      <AppLockProvider>
-        <div>content</div>
-      </AppLockProvider>,
+      <Profiler id="lock" onRender={logCommit}>
+        <AppLockProvider>
+          <div>content</div>
+        </AppLockProvider>
+      </Profiler>,
     );
 
-    // The cover also stays under the lock, since the lock is a native modal
-    // that fades in over whatever is already on screen.
     expect(renders.filter((entry) => !entry.cover)).toEqual([]);
     expect(renders.at(-1)).toEqual({ cover: true, locked: true });
   });

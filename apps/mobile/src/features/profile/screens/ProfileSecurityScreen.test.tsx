@@ -76,11 +76,12 @@ vi.mock("../../../shared/providers/ToastProvider", () => ({
 
 const hasHardwareAsync = vi.fn();
 const isEnrolledAsync = vi.fn();
+const authenticateAsync = vi.fn();
 
 vi.mock("expo-local-authentication", () => ({
   hasHardwareAsync: (...args: unknown[]) => hasHardwareAsync(...args),
   isEnrolledAsync: (...args: unknown[]) => isEnrolledAsync(...args),
-  authenticateAsync: vi.fn(),
+  authenticateAsync: (...args: unknown[]) => authenticateAsync(...args),
 }));
 
 let ProfileSecurityScreen: (typeof import("./ProfileSecurityScreen"))["default"];
@@ -119,6 +120,8 @@ describe("ProfileSecurityScreen", () => {
     isEnrolledAsync.mockReset();
     hasHardwareAsync.mockResolvedValue(true);
     isEnrolledAsync.mockResolvedValue(true);
+    authenticateAsync.mockReset();
+    authenticateAsync.mockResolvedValue({ success: true });
     // Module-level store, so it survives between tests unless reset.
     await setAppLockEnabled(false);
 
@@ -238,6 +241,40 @@ describe("ProfileSecurityScreen", () => {
       );
       expect(appLockSwitch).not.toBeChecked();
     });
+  });
+
+  it("asks for the device check before turning app lock off", async () => {
+    await act(async () => {
+      await setAppLockEnabled(true);
+    });
+    render(<ProfileSecurityScreen />);
+    const appLockSwitch = screen.getByLabelText("App lock");
+    expect(appLockSwitch).toBeChecked();
+
+    await act(async () => {
+      fireEvent.click(appLockSwitch);
+    });
+
+    await waitFor(() => {
+      expect(authenticateAsync).toHaveBeenCalledTimes(1);
+      expect(appLockSwitch).not.toBeChecked();
+    });
+  });
+
+  it("keeps app lock on when the device check is declined", async () => {
+    authenticateAsync.mockResolvedValue({ success: false, error: "user_cancel" });
+    await act(async () => {
+      await setAppLockEnabled(true);
+    });
+    render(<ProfileSecurityScreen />);
+    const appLockSwitch = screen.getByLabelText("App lock");
+
+    await act(async () => {
+      fireEvent.click(appLockSwitch);
+    });
+
+    await waitFor(() => expect(authenticateAsync).toHaveBeenCalledTimes(1));
+    expect(appLockSwitch).toBeChecked();
   });
 
   it("requests account deletion after confirming, for a member below super admin", async () => {

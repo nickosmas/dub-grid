@@ -10,7 +10,11 @@ import { ConfirmationModal } from "../../../shared/components/ConfirmationModal"
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
-import { appLockUnsupported, setAppLockEnabled } from "../../../shared/lib/app-lock";
+import {
+  appLockUnsupported,
+  confirmDeviceOwner,
+  setAppLockEnabled,
+} from "../../../shared/lib/app-lock";
 import {
   createProfileChangeRequest,
   getProfile,
@@ -122,6 +126,11 @@ export default function ProfileSecurityScreen() {
           });
           return;
         }
+      } else {
+        // Whoever turns the lock off must be able to pass it. A device that can
+        // no longer check at all is not locked anyway, so it may turn it off.
+        const check = await confirmDeviceOwner("Turn off app lock");
+        if (check === "failed") return;
       }
       await setAppLockEnabled(next);
     } finally {

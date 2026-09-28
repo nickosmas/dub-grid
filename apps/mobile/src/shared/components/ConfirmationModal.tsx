@@ -1,5 +1,7 @@
 import { ActionButtons } from "./ActionButtons";
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useAppLockSurface } from "../lib/app-lock";
+import { AppLockOverlay } from "./AppLockSurface";
 import {
   KeyboardAvoidingView,
   Modal,
@@ -191,8 +193,9 @@ export function ConfirmationModal({
     transform: [{ scale: cardScale.value }],
   }));
 
+  const lockEngaged = useAppLockSurface().engaged;
   const handleDismiss = () => {
-    if (isBusy) return;
+    if (isBusy || lockEngaged) return;
     onCancel();
   };
 
@@ -285,6 +288,8 @@ export function ConfirmationModal({
       visible={visible}
     >
       {surface}
+      {/* Inline confirmations sit inside a sheet, whose own overlay covers them. */}
+      <AppLockOverlay />
     </Modal>
   );
 }

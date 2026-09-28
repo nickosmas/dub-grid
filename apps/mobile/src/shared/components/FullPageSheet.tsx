@@ -9,6 +9,8 @@ import { AppText } from "./AppText";
 import { InsideSheetContext } from "./BottomSheetModal";
 import { createIconControlStyle } from "./icon-control-style";
 import { Pressable } from "./Pressable";
+import { AppLockOverlay } from "./AppLockSurface";
+import { useAppLockSurface } from "../lib/app-lock";
 
 /**
  * A task that needs the whole page: the platform's card-style sheet.
@@ -81,14 +83,15 @@ export function FullPageSheet({
     return registerModalPresentation("sheet", titleRef.current);
   }, [visible]);
 
+  const lockEngaged = useAppLockSurface().engaged;
   const handleDismiss = () => {
-    if (dismissDisabled) return;
+    if (dismissDisabled || lockEngaged) return;
     onDismiss();
   };
 
   return (
     <Modal
-      allowSwipeDismissal={!dismissDisabled && !hasUnsavedChanges}
+      allowSwipeDismissal={!dismissDisabled && !hasUnsavedChanges && !lockEngaged}
       animationType="slide"
       navigationBarTranslucent
       onRequestClose={handleDismiss}
@@ -131,6 +134,7 @@ export function FullPageSheet({
           </ScrollView>
           {footer ? <View style={styles.footer}>{footer}</View> : null}
           {overlay}
+          <AppLockOverlay />
         </View>
       </InsideSheetContext.Provider>
     </Modal>

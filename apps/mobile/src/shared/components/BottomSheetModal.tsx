@@ -3,6 +3,8 @@ import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode }
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Modal, Platform, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Pressable } from "./Pressable";
+import { AppLockOverlay } from "./AppLockSurface";
+import { useAppLockSurface } from "../lib/app-lock";
 import { createIconControlStyle, ICON_CONTROL_SIZE } from "./icon-control-style";
 import { GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
@@ -192,8 +194,9 @@ export function BottomSheetModal({
     return registerModalPresentation(presentationKind, name);
   }, [visible, presentationKind]);
 
+  const lockEngaged = useAppLockSurface().engaged;
   const handleDismiss = () => {
-    if (dismissDisabled) return;
+    if (dismissDisabled || lockEngaged) return;
     onDismiss();
   };
   // A gate never shows the close button; a task sheet always does, and only
@@ -360,6 +363,7 @@ export function BottomSheetModal({
             </Animated.View>
             {overlay}
           </View>
+          <AppLockOverlay />
         </GestureHandlerRootView>
       </InsideSheetContext.Provider>
     </Modal>

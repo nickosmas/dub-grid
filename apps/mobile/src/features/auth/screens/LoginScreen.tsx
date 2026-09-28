@@ -99,6 +99,10 @@ export default function LoginScreen() {
   // which is the one window where we don't yet know what to call it.
   const [isResolvingOrgName, setIsResolvingOrgName] = useState(false);
   const [stage, setStage] = useState<Stage>("organization");
+  // Until the remembered organization is read and confirmed, the stage stays
+  // blank: showing the subdomain form first flashed it on every return visit.
+  const [checkingRememberedOrg, setCheckingRememberedOrg] = useState(true);
+  const [slowRememberedOrg, setSlowRememberedOrg] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mfaCode, setMfaCode] = useState("");
@@ -126,6 +130,12 @@ export default function LoginScreen() {
   }, [orgLoading, submitting]);
 
   useEffect(() => {
+    if (!checkingRememberedOrg) return;
+    const timeout = setTimeout(() => setSlowRememberedOrg(true), 1_000);
+    return () => clearTimeout(timeout);
+  }, [checkingRememberedOrg]);
+
+  useEffect(() => {
     // Both this and the consent gate's own storage read start at mount, and
     // this one usually wins — which raised the keyboard a moment before the
     // consent sheet slid up over it. Wait for the decision instead of racing
@@ -138,8 +148,10 @@ export default function LoginScreen() {
     let active = true;
 
     void (async () => {
-      const storedOrg = await loadLastOrg();
-      if (!active || !storedOrg) {
+      const storedOrg = await loadLastOrg().catch(() => null);
+      if (!active) return;
+      if (!storedOrg) {
+        setCheckingRememberedOrg(false);
         return;
       }
 
@@ -167,7 +179,10 @@ export default function LoginScreen() {
         });
         setError(nextError);
       } finally {
-        if (active) setIsResolvingOrgName(false);
+        if (active) {
+          setIsResolvingOrgName(false);
+          setCheckingRememberedOrg(false);
+        }
       }
     })();
 
@@ -452,7 +467,19 @@ export default function LoginScreen() {
       footer={keyboardDoneAccessory}
       onBrandLongPress={isDevBuild ? () => void handleDevResetFirstRun() : undefined}
     >
-      {stage === "organization" ? (
+      {checkingRememberedOrg ? (
+        <View style={styles.stage}>
+          {slowRememberedOrg ? (
+            <Text
+              accessibilityLiveRegion="polite"
+              maxFontSizeMultiplier={MAX_FONT_SCALE}
+              style={styles.progressText}
+            >
+              Checking your organization…
+            </Text>
+          ) : null}
+        </View>
+      ) : stage === "organization" ? (
         <View style={styles.stage}>
           <View style={styles.header}>
             <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.title}>
