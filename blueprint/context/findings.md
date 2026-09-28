@@ -96,13 +96,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** Merge the person's marks from their other home focus areas into that row, deduplicated.
 **Resolution:** Fixed: after building a day's rows, each person's first row also takes the notes filed under every focus area they have no row in that day, and those with no focus area, each note once (`MonthView.tsx`). A test lists a general-code person under their primary area with a note filed under their second area and a note filed under both; it fails against the previous code.
 
-### F-83 [P3] open - Gridmaster realtime invalidation is not coalesced
+### F-83 [P3] fixed - Gridmaster realtime invalidation is not coalesced
 
 **File:** `apps/web/src/hooks/useGridmasterRealtimeInvalidation.ts`
 **Found:** 2026-09-26 by review of the findings batch
 **Why it matters:** The platform-wide subscription invalidates on every row event with no debounce, so a bulk import or invitation batch in any organization restarts an open person page's (and the platform summaries') fetch once per row. Gridmaster-only, and the summaries already behaved this way.
 **Suggested fix:** Coalesce invalidations per query key over a short window before refetching.
-**Resolution:**
+**Resolution:** Fixed in `fix/gridmaster-realtime-coalesce`: the Gridmaster subscription batches its invalidations by query key through the shared `createDebouncedTableFlusher` (150 ms, as the org hook), so each distinct key refetches and broadcasts once per burst, and a pending batch is dropped on teardown. Tests cover the burst, cross-table dedupe, the live subscription and teardown.
 
 ### F-84 [P3] fixed - No index serves an organization's schedule notes by date
 

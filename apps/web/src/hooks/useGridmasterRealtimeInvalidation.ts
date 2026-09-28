@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import type { QueryClient } from "@tanstack/react-query";
 import {
+  createDebouncedTableFlusher,
   createRealtimeChannelName,
   subscribeToPostgresChanges,
   type RealtimeChangePayload,
@@ -40,6 +41,9 @@ export type GridmasterRealtimeTable =
   | "profiles";
 
 type RealtimePayload = RealtimeChangePayload;
+
+/** Matches the per-organization hook's window. */
+const GRIDMASTER_COALESCE_MS = 150;
 
 const ORG_FILTER_TABLES: GridmasterRealtimeTable[] = [
   "subscriptions",
@@ -272,6 +276,33 @@ export function invalidateGridmasterRealtimeQueries(
   }
 }
 
+/**
+ * Batches invalidations by query key: a bulk change in any organization emits
+ * one event per row, and many tables share keys (`overview`, `orgHealth`), so
+ * each distinct key refetches and broadcasts once per burst. Keys are plain
+ * strings and numbers, so they round-trip through JSON unchanged.
+ */
+export function createGridmasterInvalidationBatcher(
+  queryClient: QueryClient,
+  delayMs = GRIDMASTER_COALESCE_MS,
+) {
+  const flusher = createDebouncedTableFlusher<string>(delayMs, (serializedKeys) => {
+    for (const serialized of serializedKeys) {
+      const queryKey = JSON.parse(serialized) as unknown[];
+      void queryClient.invalidateQueries({ queryKey });
+      broadcastInvalidation(queryKey);
+    }
+  });
+  return {
+    markChanged(table: GridmasterRealtimeTable, orgId: string | null, userId: string | null) {
+      for (const queryKey of getGridmasterRealtimeInvalidationKeys(table, orgId, userId)) {
+        flusher.markChanged(JSON.stringify(queryKey));
+      }
+    },
+    dispose: () => flusher.dispose(),
+  };
+}
+
 export function useGridmasterRealtimeInvalidation({
   enabled,
   queryClient,
@@ -282,9 +313,9 @@ export function useGridmasterRealtimeInvalidation({
   useEffect(() => {
     if (!enabled) return;
 
+    const batcher = createGridmasterInvalidationBatcher(queryClient);
     const handleChange = (table: GridmasterRealtimeTable, payload: RealtimePayload) => {
-      invalidateGridmasterRealtimeQueries(
-        queryClient,
+      batcher.markChanged(
         table,
         resolveGridmasterRealtimeOrgId(table, payload),
         resolveGridmasterRealtimeUserId(table, payload),
@@ -302,7 +333,7 @@ export function useGridmasterRealtimeInvalidation({
       ...ORG_FILTER_TABLES,
     ];
 
-    return subscribeToPostgresChanges<GridmasterRealtimeTable>(
+    const unsubscribe = subscribeToPostgresChanges<GridmasterRealtimeTable>(
       getBrowserSupabaseClient(),
       createRealtimeChannelName("gridmaster-freshness"),
       tables.map((table) => ({ table, onEvent: handleChange })),
@@ -315,5 +346,9 @@ export function useGridmasterRealtimeInvalidation({
         },
       },
     );
+    return () => {
+      batcher.dispose();
+      unsubscribe();
+    };
   }, [enabled, queryClient]);
 }
