@@ -42,8 +42,12 @@ audit log.
 
 ## Out of scope
 
-- IP addresses and user agents: the person record never carries them (43b's
-  rule), and the timeline does not either. The export leaves them out too.
+- IP addresses and user agents in the timeline: the timeline and its export
+  carry neither. The person record never carries IP addresses (43b's rule).
+  It does carry user agents on the account card's terms and consent rows,
+  which the person-page findings fix (2026-09-28, F-96) shows as "Safari on
+  Mac" with the raw string as the hint. This archive said until then that
+  the record never carried them.
 - Sign-in refusals recorded before any session exists: they are stored by a
   hash of the address, not by account, so the timeline cannot attribute
   them. The platform audit log still lists them.

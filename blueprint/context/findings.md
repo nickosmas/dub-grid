@@ -112,53 +112,53 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** A forward migration adding an index on `(org_id, date)`.
 **Resolution:** Fixed: migration `062_schedule_notes_org_date_index.sql` adds `idx_schedule_notes_org_date` on `(org_id, date)` and drops the single-column `idx_schedule_notes_org` it covers; checksum locked and `db:migrations:check` passes. Applied locally, where a week's read for an organization now plans as an index scan on the new index. Applied to production 2026-09-27 by the owner after a scratch rehearsal from 061 and on the local stack. Before: 61 ledger entries, only 062 missing. After: 62 ledger entries, none missing, every invariant passing, health 200, and a final dry run up to date. Shipped in release #120.
 
-### F-85 [P2] open - The Gridmaster history returns IP, email and session hashes, and the export writes them out
+### F-85 [P2] fixed - The Gridmaster history returns IP, email and session hashes, and the export writes them out
 
 **File:** `apps/web/src/features/gridmaster/server/person-history.ts:162`
 **Found:** 2026-09-27 by `/audit` (scope: item 43, 54f5c12d..43327601; all lenses)
 **Why it matters:** `withoutNetworkDetails` strips only the `ip_address` and `user_agent` columns. The person's own `security.auth.*` rows keep `sourceHash` (a hashed client IP), `targetHash` and `sessionHash` in `details`, which the history GET and both export routes return raw. The person record's rule is never to carry IP hashes.
 **Suggested fix:** drop those three keys from `details` in `loadPersonHistory` (or allowlist details keys), with a merge test row that carries them.
-**Resolution:**
+**Resolution:** Fixed in fix/person-page-findings (Step 1): `loadPersonHistory` drops `sourceHash`, `targetHash` and `sessionHash` from every row's `details` beside the network columns, so the history GET and both exports never carry them; a merge test row with all three comes back without them.
 
-### F-86 [P2] open - Person notifications return the IP address and session id stored on new-device alerts
+### F-86 [P2] fixed - Person notifications return the IP address and session id stored on new-device alerts
 
 **File:** `apps/web/src/features/gridmaster/server/person-notifications.ts:37`
 **Found:** 2026-09-27 by `/audit` (scope: item 43; all lenses)
 **Why it matters:** `security_new_device` writes an email-channel row whose `metadata` holds `ipAddress` (`events.ts:1080`) and `dedupe_key: "security_new_device:<session id>"` (`sender.ts:289`). The loader returns `metadata` verbatim to the Gridmaster page.
 **Suggested fix:** allowlist the metadata keys the card needs (or drop `ipAddress` and `dedupe_key`), with a test using a new-device row.
-**Resolution:**
+**Resolution:** Fixed in fix/person-page-findings (Step 1): `loadPersonNotifications` keeps only an allowlist of descriptive metadata keys (platform, device label, browser, city, country, time, `email_sent`); `ipAddress`, `dedupe_key` and unknown keys are dropped. A new-device row test proves it.
 
-### F-87 [P2] open - Every impersonation appears twice in a person's history
+### F-87 [P2] fixed - Every impersonation appears twice in a person's history
 
 **File:** `apps/web/src/features/gridmaster/server/person-history.ts:116`
 **Found:** 2026-09-27 by `/audit` (scope: item 43; all lenses)
 **Why it matters:** the account source drops `impersonation.started`/`.ended` about the person, but the staff source (`fetchEmployeeAuditRows` with every action) still matches them through `details->>targetUserId` in the target organization. Their numeric ids never collide with the string `impersonation-<id>` row, so both show, against the one-entry-per-event rule. The merge test gives the staff query no impersonation rows.
 **Suggested fix:** apply the same drop (action in the pair and actor is not the person) to the merged rows in `loadPersonHistory`, with a merge test.
-**Resolution:**
+**Resolution:** Fixed in fix/person-page-findings (Step 2): `loadPersonHistory` drops `impersonation.started` and `.ended` rows whose actor is not the person from every source after the merge, so the session row is the one entry. A merge test with both rows in the staff source shows one entry and fails without the filter.
 
-### F-88 [P2] open - History, export, notifications and force logout do not refuse a Gridmaster target
+### F-88 [P2] fixed - History, export, notifications and force logout do not refuse a Gridmaster target
 
 **File:** `apps/web/src/features/gridmaster/server/person-history.ts:186`; `person-notifications.ts:14`; `apps/web/src/app/api/gridmaster/users/[userId]/force-logout/route.ts:61`
 **Found:** 2026-09-27 by `/audit` (scope: item 43; all lenses)
 **Why it matters:** the person record (`person-record.ts:323`) and every write through `loadPersonTarget` refuse a Gridmaster account, but these read another Gridmaster's whole audit history, export it, or read their inbox by id; force logout (older, but on the same page) acts on one too.
 **Suggested fix:** return null for `platform_role = 'gridmaster'` in `loadPersonHistory`, use `loadPersonTarget` in the notifications and force-logout routes, and add a refusal test per route.
-**Resolution:**
+**Resolution:** Fixed in fix/person-page-findings (Step 2): `loadPersonHistory` returns null for a Gridmaster account, directly or through a staff record linked to one, so history and export answer 404; the notifications route loads the target through `loadPersonTarget` and answers 404 before reading. Force logout is left as it is: the Gridmaster accounts screen uses it on purpose to sign out another Gridmaster, so that part of the finding did not hold.
 
-### F-89 [P2] open - Deactivating or terminating an account leaves its refresh tokens alive for reactivation
+### F-89 [P2] fixed - Deactivating or terminating an account leaves its refresh tokens alive for reactivation
 
 **File:** `apps/web/src/app/api/gridmaster/users/route.ts:228`; `apps/web/src/app/api/gridmaster/users/[userId]/terminate/route.ts:73`
 **Found:** 2026-09-27 by `/audit` (scope: item 43; all lenses)
 **Why it matters:** both call `revokeAllUserSessions` (a watermark plus the `user_sessions` rows) but not `endUserSessions`, so Supabase refresh tokens survive. The hook refuses them while the account is blocked, but after reactivation or reinstatement a device that was the reason for the block (a lost phone) can mint tokens again. Force logout already fixed this gap for itself.
 **Suggested fix:** call `endUserSessions(userId)` on deactivate and terminate, with route tests.
-**Resolution:**
+**Resolution:** Fixed in fix/person-page-findings (Step 3): deactivate and terminate call `endUserSessions`, which does what `revokeAllUserSessions` did and also ends the provider sessions and their refresh tokens, so a device cannot refresh back in after reactivation or reinstatement. Both route tests and the sensitive-action inventory now require `endUserSessions`.
 
-### F-90 [P2] open - A two-factor reset that fails part way is neither recorded nor announced
+### F-90 [P2] fixed - A two-factor reset that fails part way is neither recorded nor announced
 
 **File:** `apps/web/src/features/gridmaster/server/two-factor-reset.ts:23`; `apps/web/src/app/api/gridmaster/users/[userId]/two-factor-reset/route.ts:55`
 **Found:** 2026-09-27 by `/audit` (scope: item 43; all lenses)
 **Why it matters:** if a later `deleteFactor`, the profile update or `endUserSessions` fails after some factors are gone, the route answers 500 before the `user.mfa_reset` row and the email; nothing records that factors were removed until someone retries, and a retry then records `factorsRemoved: 0`.
 **Suggested fix:** return the running count from the helper and, in the route, record the reset (with `partial: true`) and send the notice whenever any factor was removed.
-**Resolution:**
+**Resolution:** Fixed in fix/person-page-findings (Step 3): the reset helper counts removed factors and, if it fails after removing any, throws `PartialTwoFactorResetError` with that count; the route then records `user.mfa_reset` with `partial: true` and the count, and schedules the notice, before answering 500. Helper and route tests cover it.
 
 ### F-91 [P3] open - The person page's refresh misses its history, notifications and schedule sections
 
@@ -200,13 +200,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** view tests for those actions, one with a non-null step-up dialog, and CSRF tests on the two routes.
 **Resolution:**
 
-### F-96 [P3] open - Owner decisions left by item 43
+### F-96 [P3] fixed - Owner decisions left by item 43
 
 **File:** `apps/web/src/components/gridmaster/person/PersonAccountCard.tsx:136`; `PersonMembershipActions.tsx:94`; `PersonStaffActions.tsx:87`; `blueprint/history/features/43e-combined-history.md`
 **Found:** 2026-09-27 by `/audit` (scope: item 43; all lenses)
 **Why it matters:** user agents are shown on terms and consent rows, as 43b chose, but 43e's archive says the record never carries them; removing someone from an organization and staff deactivate or remove need no fresh proof (as on the People page and in `organizations/access` DELETE) while role and permission changes on the same card do.
 **Suggested fix:** decide whether user agents stay (then correct 43e's wording) or go; decide whether access removal needs fresh proof, server and client together.
-**Resolution:**
+**Resolution:** Fixed on fix/person-page-findings as the owner decided (2026-09-27). (1) The account card's terms and consent rows show the user agent as "Safari on Mac" (`describeUserAgent`, reusing the session parser, with native app cases), the raw string as the hint; 43e's archive no longer says the record never carries them. (2) `DELETE /api/organizations/access` and the deactivate and remove actions of `POST /api/employees/status` require fresh proof from a Gridmaster before any write, and the sensitive-action inventory pins both gates. The person page and the organization Users tab run them through step-up with the credential preflight; the People page and staff profile prompt only when the server refuses, through `useSharedStepUp`, so one prompt covers a bulk action and an organization admin is never asked.
 
 ### F-97 [P3] unverified - A malformed stored schedule state could fail the whole schedule section
 

@@ -5,6 +5,29 @@ export const RECENT_NOTIFICATION_LIMIT = 50;
 
 type Row = Record<string, unknown>;
 
+/**
+ * Metadata keys that describe a notification without network or session
+ * detail. Everything else (an IP address, a session-derived dedupe key, keys a
+ * later sender adds) is dropped rather than shown.
+ */
+const SAFE_METADATA_KEYS = new Set([
+  "platform",
+  "deviceLabel",
+  "browserName",
+  "locationCity",
+  "locationCountry",
+  "occurredAt",
+  "email_sent",
+]);
+
+function safeMetadata(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const kept = Object.entries(value as Record<string, unknown>).filter(([key]) =>
+    SAFE_METADATA_KEYS.has(key),
+  );
+  return kept.length > 0 ? Object.fromEntries(kept) : null;
+}
+
 /** Read-only: the account's preferences as stored and its latest notifications. */
 export async function loadPersonNotifications(
   client: SupabaseClient,
@@ -34,7 +57,7 @@ export async function loadPersonNotifications(
       priority: (row.priority as string | null) ?? null,
       title: (row.title as string | null) ?? "",
       message: (row.message as string | null) ?? "",
-      metadata: (row.metadata as Record<string, unknown> | null) ?? null,
+      metadata: safeMetadata(row.metadata),
       readAt: (row.read_at as string | null) ?? null,
       archivedAt: (row.archived_at as string | null) ?? null,
       createdAt: row.created_at as string,

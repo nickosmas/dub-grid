@@ -12,6 +12,7 @@ const EMP = "33333333-3333-4333-8333-333333333333";
 
 interface Tables {
   profiles?: unknown;
+  schedule_editor_session_terminations?: unknown[];
   employees?: unknown[];
   staffAudit?: unknown[];
   accountAudit?: unknown[];
@@ -104,6 +105,89 @@ describe("loadPersonHistory", () => {
 
     expect(history?.entries[0]).not.toHaveProperty("ip_address");
     expect(history?.entries[0]).not.toHaveProperty("user_agent");
+  });
+
+  it("drops the hashed IP, email and session from sign-in rows (F-85)", async () => {
+    const { client } = makeClient({
+      profiles: { id: USER },
+      employees: [employee],
+      accountAudit: [
+        {
+          id: 2,
+          action: "security.auth.login",
+          details: {
+            outcome: "succeeded",
+            surface: "mobile",
+            sourceHash: "ip-hash",
+            targetHash: "email-hash",
+            sessionHash: "session-hash",
+          },
+          created_at: "2026-09-25T10:00:00.000Z",
+        },
+      ],
+    });
+
+    const history = await loadPersonHistory(client as never, { kind: "user", userId: USER });
+
+    expect(history?.entries[0].details).toEqual({ outcome: "succeeded", surface: "mobile" });
+  });
+
+  it("shows each impersonation once, though the staff source also finds its rows (F-87)", async () => {
+    const GM = "22222222-2222-4222-8222-222222222222";
+    const { client } = makeClient({
+      profiles: { id: USER, platform_role: null },
+      employees: [employee],
+      staffAudit: [
+        {
+          id: 40,
+          action: "impersonation.started",
+          actor_id: GM,
+          created_at: "2026-09-25T10:00:00.000Z",
+        },
+        {
+          id: 41,
+          action: "impersonation.ended",
+          actor_id: GM,
+          created_at: "2026-09-25T10:12:00.000Z",
+        },
+      ],
+      impersonation_sessions: [
+        {
+          session_id: "s-1",
+          gridmaster_id: GM,
+          target_user_id: USER,
+          target_org_id: "org-1",
+          justification: "Ticket 42",
+          created_at: "2026-09-25T10:00:00.000Z",
+          ended_at: "2026-09-25T10:12:00.000Z",
+          end_reason: "manual",
+        },
+      ],
+    });
+
+    const history = await loadPersonHistory(client as never, { kind: "user", userId: USER });
+
+    expect(history?.entries.map((entry) => entry.id)).toEqual(["impersonation-s-1"]);
+  });
+
+  it("refuses a Gridmaster account, directly or through its staff record (F-88)", async () => {
+    const gridmaster = {
+      profiles: { id: USER, platform_role: "gridmaster" },
+      employees: [employee],
+    };
+
+    expect(
+      await loadPersonHistory(makeClient(gridmaster).client as never, {
+        kind: "user",
+        userId: USER,
+      }),
+    ).toBeNull();
+    expect(
+      await loadPersonHistory(makeClient(gridmaster).client as never, {
+        kind: "staff",
+        employeeId: EMP,
+      }),
+    ).toBeNull();
   });
 
   it("reads only organization activity for a staff record with no account", async () => {

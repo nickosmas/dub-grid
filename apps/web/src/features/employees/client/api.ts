@@ -308,22 +308,29 @@ export function fetchEmployeeActivity(
   }).then((data) => data.entries);
 }
 
-async function updateEmployeeStatus(input: {
-  empId: string;
-  orgId: string;
-  action: "deactivate" | "activate" | "remove";
-  expectedVersion: number;
-  note?: string;
-}): Promise<Employee> {
+async function updateEmployeeStatus(
+  input: {
+    empId: string;
+    orgId: string;
+    action: "deactivate" | "activate" | "remove";
+    expectedVersion: number;
+    note?: string;
+  },
+  accessToken?: string,
+): Promise<Employee> {
   const response = await fetch(resolveClientUrl("/api/employees/status"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify(input),
   });
 
   const body = (await response.json().catch(() => null)) as {
     error?: string;
     code?: string;
+    method?: string;
     employee?: Employee;
   } | null;
 
@@ -336,8 +343,12 @@ async function updateEmployeeStatus(input: {
   }
 
   if (!response.ok || !body?.employee) {
-    throw new Error(
-      formatClientErrorMessage(body?.error, "We couldn't update their status. Try again."),
+    // Status, code and method let step-up recognize a request for fresh proof.
+    throw Object.assign(
+      new Error(
+        formatClientErrorMessage(body?.error, "We couldn't update their status. Try again."),
+      ),
+      { status: response.status, code: body?.code, method: body?.method },
     );
   }
 
@@ -349,14 +360,18 @@ export function removeEmployee(
   orgId: string,
   expectedVersion: number,
   note?: string,
+  accessToken?: string,
 ): Promise<Employee> {
-  return updateEmployeeStatus({
-    empId,
-    orgId,
-    action: "remove",
-    expectedVersion,
-    note,
-  });
+  return updateEmployeeStatus(
+    {
+      empId,
+      orgId,
+      action: "remove",
+      expectedVersion,
+      note,
+    },
+    accessToken,
+  );
 }
 
 export function deactivateEmployee(
@@ -364,14 +379,18 @@ export function deactivateEmployee(
   note: string | undefined,
   orgId: string,
   expectedVersion: number,
+  accessToken?: string,
 ): Promise<Employee> {
-  return updateEmployeeStatus({
-    empId,
-    orgId,
-    action: "deactivate",
-    note,
-    expectedVersion,
-  });
+  return updateEmployeeStatus(
+    {
+      empId,
+      orgId,
+      action: "deactivate",
+      note,
+      expectedVersion,
+    },
+    accessToken,
+  );
 }
 
 export function activateEmployee(

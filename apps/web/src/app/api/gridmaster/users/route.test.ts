@@ -14,7 +14,7 @@ const mobileTokensIn = vi.fn();
 const membershipsIn = vi.fn();
 const forceLogoutOrder = vi.fn();
 const terminationsNot = vi.fn();
-const revokeAllUserSessions = vi.fn();
+const endUserSessions = vi.fn();
 const requireSensitiveActionAuth = vi.fn();
 const loadPersonTarget = vi.fn();
 
@@ -42,7 +42,7 @@ vi.mock("@/lib/supabase-service", () => ({
 }));
 
 vi.mock("@/lib/auth/revocation", () => ({
-  revokeAllUserSessions: (userId: string) => revokeAllUserSessions(userId),
+  endUserSessions: (userId: string) => endUserSessions(userId),
 }));
 
 vi.mock("@/lib/logger", () => ({
@@ -270,7 +270,7 @@ describe("PATCH /api/gridmaster/users", () => {
     );
     expect(response.status).toBe(403);
     expect(profileUpdate).not.toHaveBeenCalled();
-    expect(revokeAllUserSessions).not.toHaveBeenCalled();
+    expect(endUserSessions).not.toHaveBeenCalled();
   });
 
   it("refuses a Gridmaster target (F-80)", async () => {
@@ -305,7 +305,7 @@ describe("PATCH /api/gridmaster/users", () => {
     });
     // The account is refused at the next token issue; the watermark makes the
     // tokens already in hand fail immediately instead of at expiry.
-    expect(revokeAllUserSessions).toHaveBeenCalledWith(USER_ID);
+    expect(endUserSessions).toHaveBeenCalledWith(USER_ID);
     expect(profileEq).toHaveBeenCalledWith("id", USER_ID);
     expect(auditInsert).toHaveBeenCalledWith(
       expect.objectContaining({

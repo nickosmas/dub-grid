@@ -449,6 +449,12 @@ export async function DELETE(req: NextRequest) {
     if (!allowed.ok) return allowed.response;
     // Mutate the effective (sandbox-redirected) org, never the raw request orgId.
     orgId = allowed.orgId;
+    // A Gridmaster can remove anyone from any organization, so it needs fresh
+    // proof, as its role and permission changes do (F-96).
+    if (allowed.isGridmaster) {
+      const assurance = await requireSensitiveActionAuth(req);
+      if ("response" in assurance) return assurance.response;
+    }
 
     const currentUser = await fetchOrganizationUser(orgId, userId);
     if (!currentUser) {

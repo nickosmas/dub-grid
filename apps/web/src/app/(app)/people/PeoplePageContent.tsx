@@ -11,6 +11,8 @@ import { useOrganizationData, useEmployees, usePermissions } from "@/hooks";
 import type { NewEmployeeData } from "@/components/AddEmployeeModal";
 import OrganizationBootstrapRecovery from "@/components/onboarding/OrganizationBootstrapRecovery";
 import { queryKeys } from "@/lib/query-keys";
+import { formatClientErrorMessage } from "@/lib/client-facing";
+import { useSharedStepUp } from "@/hooks/useSharedStepUp";
 
 function PeopleContent() {
   const {
@@ -59,6 +61,13 @@ function PeopleContent() {
     handleActivateEmployee,
   } = useEmployees(orgId ?? org?.id ?? null);
 
+  // Only an impersonating Gridmaster is asked for fresh proof (F-96).
+  const statusStepUp = useSharedStepUp();
+  const runStatusChange = (action: (accessToken?: string) => Promise<void>) =>
+    statusStepUp.run(action).catch((err) => {
+      toast.error(formatClientErrorMessage(err, "We couldn't update their status. Try again."));
+    });
+
   const [showAddModal, setShowAddModal] = useState(false);
   const isLoading = refLoading || empLoading || permsLoading;
 
@@ -98,6 +107,7 @@ function PeopleContent() {
   return (
     <>
       <ProgressBar loading={isLoading} />
+      {statusStepUp.dialog}
 
       {!isLoading && (
         <>
@@ -110,8 +120,12 @@ function PeopleContent() {
             roles={orgRoles}
             onSave={handleSaveEmployee}
             onSaveWithReinvite={handleSaveEmployeeWithReinvite}
-            onRemove={handleRemoveEmployee}
-            onDeactivate={handleDeactivateEmployee}
+            onRemove={(empId, note) =>
+              runStatusChange((token) => handleRemoveEmployee(empId, note, token))
+            }
+            onDeactivate={(empId, note) =>
+              runStatusChange((token) => handleDeactivateEmployee(empId, note, token))
+            }
             onActivate={handleActivateEmployee}
             onAdd={() => setShowAddModal(true)}
             orgId={org?.id ?? ""}

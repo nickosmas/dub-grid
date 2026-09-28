@@ -9,9 +9,9 @@ vi.mock("@/lib/auth/revocation", () => ({
   endUserSessions: (userId: string) => endUserSessions(userId),
 }));
 
-import { resetPersonTwoFactor } from "./two-factor-reset";
+import { PartialTwoFactorResetError, resetPersonTwoFactor } from "./two-factor-reset";
 
-function fakeClient(options: { failDelete?: boolean } = {}) {
+function fakeClient(options: { failDelete?: boolean; failDeleteId?: string } = {}) {
   return {
     from: () => ({
       update: (values: Record<string, unknown>) => ({
@@ -30,7 +30,8 @@ function fakeClient(options: { failDelete?: boolean } = {}) {
           }),
           deleteFactor: async ({ id }: { id: string }) => {
             steps.push(`delete ${id}`);
-            return { error: options.failDelete ? { message: "auth down" } : null };
+            const fails = options.failDelete || options.failDeleteId === id;
+            return { error: fails ? { message: "auth down" } : null };
           },
         },
       },
@@ -61,6 +62,16 @@ describe("resetPersonTwoFactor", () => {
       message: "auth down",
     });
     expect(steps).toEqual(["profile mfa_reenroll_required_at", "delete f-1"]);
+    expect(endUserSessions).not.toHaveBeenCalled();
+  });
+
+  it("reports how many factors it removed when it stops part way (F-90)", async () => {
+    const failure = await resetPersonTwoFactor(fakeClient({ failDeleteId: "f-2" }), "user-1").catch(
+      (error: unknown) => error,
+    );
+
+    expect(failure).toBeInstanceOf(PartialTwoFactorResetError);
+    expect(failure).toMatchObject({ factorsRemoved: 1, cause: { message: "auth down" } });
     expect(endUserSessions).not.toHaveBeenCalled();
   });
 });

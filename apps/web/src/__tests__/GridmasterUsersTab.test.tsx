@@ -8,6 +8,7 @@ const requireCredentialAssurance = vi.fn();
 const assignGridmasterOrgRoleByEmail = vi.fn();
 const createOrganizationInvitation = vi.fn();
 const updateOrganizationMembershipGuarded = vi.fn();
+const removeOrganizationMembershipGuarded = vi.fn();
 
 let stepUpDialog: React.ReactNode = null;
 
@@ -23,7 +24,8 @@ vi.mock("@/features/gridmaster/client", () => ({
 vi.mock("@/features/organization/client", () => ({
   createOrganizationInvitation: (...args: unknown[]) => createOrganizationInvitation(...args),
   OrganizationAccessConflictError: class extends Error {},
-  removeOrganizationMembershipGuarded: vi.fn(),
+  removeOrganizationMembershipGuarded: (...args: unknown[]) =>
+    removeOrganizationMembershipGuarded(...args),
   updateOrganizationMembershipGuarded: (...args: unknown[]) =>
     updateOrganizationMembershipGuarded(...args),
 }));
@@ -298,5 +300,62 @@ describe("Gridmaster Users tab: role change (41d3, F-16)", () => {
     expect(screen.getByRole("button", { name: "User" })).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByRole("dialog", { name: "Confirm it's you" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Change role" })).not.toBeInTheDocument();
+  });
+});
+
+describe("Gridmaster Users tab: removal (F-96)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    stepUpDialog = null;
+    stepUpRun.mockImplementation(async (action: (token: string) => Promise<unknown>) => {
+      await action("fresh-token");
+      return true;
+    });
+    requireCredentialAssurance.mockResolvedValue({ success: true });
+    removeOrganizationMembershipGuarded.mockResolvedValue(undefined);
+  });
+
+  const member = {
+    id: "user-3",
+    email: "leaver@example.com",
+    firstName: "Lee",
+    lastName: "Leaver",
+    orgRole: "user",
+    adminPermissions: null,
+    updatedAt: "2026-09-27T00:00:00.000Z",
+  } as unknown as React.ComponentProps<typeof UsersTab>["users"][number];
+
+  function openRemoveConfirm() {
+    const { container } = render(
+      <UsersTab users={[member]} orgId={ORG_ID} onUsersChanged={vi.fn()} />,
+    );
+    // The row menu is an icon-only button, found by its three-dot icon.
+    const menu = container.querySelector('button svg circle[cy="5"]')?.closest("button");
+    fireEvent.click(menu as HTMLButtonElement);
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+  }
+
+  it("removes with the assured token after the credential check", async () => {
+    openRemoveConfirm();
+    fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
+
+    await waitFor(() =>
+      expect(removeOrganizationMembershipGuarded).toHaveBeenCalledWith(
+        { orgId: ORG_ID, userId: "user-3", expectedUpdatedAt: "2026-09-27T00:00:00.000Z" },
+        "fresh-token",
+      ),
+    );
+    expect(requireCredentialAssurance).toHaveBeenCalledWith("fresh-token");
+    expect(toast.success).toHaveBeenCalledWith("User removed from organization");
+  });
+
+  it("removes nothing when step-up is cancelled", async () => {
+    stepUpRun.mockResolvedValue(false);
+    openRemoveConfirm();
+    fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
+
+    await waitFor(() => expect(stepUpRun).toHaveBeenCalled());
+    expect(removeOrganizationMembershipGuarded).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
   });
 });

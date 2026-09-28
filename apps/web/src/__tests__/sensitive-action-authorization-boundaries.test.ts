@@ -80,6 +80,8 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
       /\brequireAuthenticatedUser\s*\(/,
       /\bcanManageEmployees\s*\(/,
       /action === "remove" \|\| action === "deactivate"[\s\S]*?revokeAllUserSessions/,
+      // A Gridmaster taking a staff record out needs fresh proof before any read or write (F-96).
+      /if \(isGridmaster && \(action === "deactivate" \|\| action === "remove"\)\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.from\("employees"\)/,
     ],
   },
   "apps/web/src/app/api/gridmaster/accounts/route.ts": {
@@ -164,7 +166,7 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
       /\brequireGridmasterSession\s*\(/,
       /\brequireSensitiveActionAuth\s*\(/,
       /terminate_user_account/,
-      /revokeAllUserSessions\(userId\)/,
+      /endUserSessions\(userId\)/,
     ],
   },
   "apps/web/src/app/api/gridmaster/users/[userId]/reinstate/route.ts": {
@@ -183,7 +185,7 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
       /\brequireGridmasterSession\s*\(/,
       /\brequireSensitiveActionAuth\s*\(/,
       /\bloadPersonTarget\s*\(/,
-      /if \(deactivate\) \{[\s\S]*?revokeAllUserSessions\(userId\)/,
+      /if \(deactivate\) \{[\s\S]*?endUserSessions\(userId\)/,
     ],
   },
   "apps/web/src/app/api/invitations/register/route.ts": {
@@ -221,6 +223,8 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
     assertions: [
       /export async function DELETE[\s\S]*?\brequirePrivilegedActor\s*\(/,
       /export async function DELETE[\s\S]*?revokeAllUserSessions/,
+      // A Gridmaster's removal needs fresh proof before the membership is read (F-96).
+      /export async function DELETE[\s\S]*?if \(allowed\.isGridmaster\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;\s*\}\s*const currentUser = await fetchOrganizationUser/,
       /if \(allowed\.isGridmaster\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.rpc\("change_user_role"/,
     ],
   },

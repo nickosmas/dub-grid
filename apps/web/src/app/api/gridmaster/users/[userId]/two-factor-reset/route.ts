@@ -8,7 +8,10 @@ import logger from "@/lib/logger";
 import { writeGridmasterAuditLogAfterCommit } from "@/app/api/gridmaster/_lib/audit";
 import { scheduleTwoFactorResetNotice } from "@/app/api/gridmaster/_lib/two-factor-reset-notice";
 import { loadPersonTarget } from "@/features/gridmaster/server/person-target";
-import { resetPersonTwoFactor } from "@/features/gridmaster/server/two-factor-reset";
+import {
+  PartialTwoFactorResetError,
+  resetPersonTwoFactor,
+} from "@/features/gridmaster/server/two-factor-reset";
 
 const paramsSchema = z.object({ userId: z.string().uuid() });
 const bodySchema = z.object({ reason: z.string().trim().min(1).max(500) });
@@ -52,18 +55,35 @@ export async function POST(req: NextRequest, context: { params: Promise<{ userId
     const target = await loadPersonTarget(serviceClient, params.data.userId);
     if (!target) return NextResponse.json({ error: NOT_FOUND }, { status: 404 });
 
-    const { factorsRemoved } = await resetPersonTwoFactor(serviceClient, target.userId);
-    if (target.email) scheduleTwoFactorResetNotice(target.email);
-    await writeGridmasterAuditLogAfterCommit({
-      serviceClient,
-      actor: auth.user,
-      action: "user.mfa_reset",
-      resourceType: "user",
-      resourceId: target.userId,
-      details: { targetUserId: target.userId, reason: parsed.data.reason, factorsRemoved },
-      request: req,
-    });
-    return NextResponse.json({ success: true, factorsRemoved });
+    const recordReset = async (factorsRemoved: number, partial: boolean) => {
+      if (target.email) scheduleTwoFactorResetNotice(target.email);
+      await writeGridmasterAuditLogAfterCommit({
+        serviceClient,
+        actor: auth.user,
+        action: "user.mfa_reset",
+        resourceType: "user",
+        resourceId: target.userId,
+        details: {
+          targetUserId: target.userId,
+          reason: parsed.data.reason,
+          factorsRemoved,
+          ...(partial ? { partial: true } : {}),
+        },
+        request: req,
+      });
+    };
+
+    try {
+      const { factorsRemoved } = await resetPersonTwoFactor(serviceClient, target.userId);
+      await recordReset(factorsRemoved, false);
+      return NextResponse.json({ success: true, factorsRemoved });
+    } catch (error) {
+      if (error instanceof PartialTwoFactorResetError) {
+        await recordReset(error.factorsRemoved, true);
+        throw error.cause;
+      }
+      throw error;
+    }
   } catch (error) {
     logger.error({ error }, "gridmaster two-factor reset failed");
     return NextResponse.json(

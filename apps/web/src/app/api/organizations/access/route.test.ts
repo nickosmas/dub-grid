@@ -193,6 +193,56 @@ describe("DELETE /api/organizations/access", () => {
       expect.objectContaining({ orgId: SANDBOX_ORG_ID }),
     );
     expect(body.success).toBe(true);
+    // An organization's own admin is never asked for fresh proof (F-96).
+    expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
+  });
+
+  it("removes for a Gridmaster with fresh proof (F-96)", async () => {
+    requireOrgPermissions.mockResolvedValue({
+      orgId: REQUESTED_ORG_ID,
+      userClient,
+      permissions: { isGridmaster: true },
+    });
+    requireSensitiveActionAuth.mockResolvedValueOnce({ user: { id: ACTOR_ID } });
+    membershipSelectEq2.mockResolvedValue({
+      data: {
+        user_id: TARGET_USER_ID,
+        org_id: REQUESTED_ORG_ID,
+        org_role: "admin",
+        admin_permissions: null,
+        updated_at: UPDATED_AT,
+      },
+      error: null,
+    });
+    membershipUpdateEq3.mockResolvedValue({ data: { id: "m-1" }, error: null });
+
+    const { DELETE } = await import("./route");
+    const res = await DELETE(makeDeleteRequest());
+
+    expect(res.status).toBe(200);
+    expect(requireSensitiveActionAuth).toHaveBeenCalledTimes(1);
+    expect(membershipUpdateEq3).toHaveBeenCalled();
+  });
+
+  it("asks a Gridmaster for fresh proof and removes nothing without it (F-96)", async () => {
+    requireOrgPermissions.mockResolvedValue({
+      orgId: REQUESTED_ORG_ID,
+      userClient,
+      permissions: { isGridmaster: true },
+    });
+    requireSensitiveActionAuth.mockResolvedValueOnce({
+      response: new Response(JSON.stringify({ code: "STEP_UP_REQUIRED", method: "totp" }), {
+        status: 403,
+      }),
+    });
+
+    const { DELETE } = await import("./route");
+    const res = await DELETE(makeDeleteRequest());
+
+    expect(res.status).toBe(403);
+    expect(membershipSelectEq2).not.toHaveBeenCalled();
+    expect(membershipUpdateEq3).not.toHaveBeenCalled();
+    expect(revokeAllUserSessions).not.toHaveBeenCalled();
   });
 });
 

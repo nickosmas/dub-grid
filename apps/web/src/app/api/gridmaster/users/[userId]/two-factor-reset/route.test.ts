@@ -24,10 +24,12 @@ vi.mock("@/app/api/gridmaster/_lib/two-factor-reset-notice", () => ({
 vi.mock("@/features/gridmaster/server/person-target", () => ({
   loadPersonTarget: (...args: unknown[]) => loadPersonTarget(...args),
 }));
-vi.mock("@/features/gridmaster/server/two-factor-reset", () => ({
+vi.mock("@/features/gridmaster/server/two-factor-reset", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/gridmaster/server/two-factor-reset")>()),
   resetPersonTwoFactor: (...args: unknown[]) => resetPersonTwoFactor(...args),
 }));
 
+import { PartialTwoFactorResetError } from "@/features/gridmaster/server/two-factor-reset";
 import { POST } from "./route";
 
 const USER = "11111111-1111-4111-8111-111111111111";
@@ -93,5 +95,25 @@ describe("POST /api/gridmaster/users/[userId]/two-factor-reset", () => {
     expect(response.status).toBe(500);
     expect(scheduleTwoFactorResetNotice).not.toHaveBeenCalled();
     expect(writeAudit).not.toHaveBeenCalled();
+  });
+
+  it("records and announces a reset that stopped after removing a factor (F-90)", async () => {
+    resetPersonTwoFactor.mockRejectedValueOnce(
+      new PartialTwoFactorResetError(1, new Error("auth down")),
+    );
+    const response = await post({ reason: "Lost phone" });
+
+    expect(response.status).toBe(500);
+    expect(scheduleTwoFactorResetNotice).toHaveBeenCalledTimes(1);
+    expect(writeAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "user.mfa_reset",
+        details: expect.objectContaining({
+          factorsRemoved: 1,
+          partial: true,
+          reason: "Lost phone",
+        }),
+      }),
+    );
   });
 });

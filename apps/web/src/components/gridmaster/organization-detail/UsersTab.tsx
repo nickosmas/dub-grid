@@ -144,11 +144,16 @@ export function UsersTab({
       if (!removeConfirm.updatedAt) {
         throw new Error("User access data is out of date. Refresh and try again.");
       }
-      await removeOrganizationMembershipGuarded({
-        orgId,
-        userId: removeConfirm.id,
-        expectedUpdatedAt: removeConfirm.updatedAt,
+      const expectedUpdatedAt = removeConfirm.updatedAt;
+      // Removing someone from an organization needs fresh proof (F-96).
+      const completed = await stepUp.run(async (accessToken) => {
+        await requireCredentialAssurance(accessToken);
+        await removeOrganizationMembershipGuarded(
+          { orgId, userId: removeConfirm.id, expectedUpdatedAt },
+          accessToken,
+        );
       });
+      if (!completed) return;
       toast.success("User removed from organization");
       setRemoveConfirm(null);
       onUsersChanged();
@@ -533,7 +538,7 @@ export function UsersTab({
       )}
 
       {/* Remove confirm */}
-      {removeConfirm && (
+      {removeConfirm && !stepUp.dialog && (
         <ConfirmDialog
           title="Remove User"
           message={`Remove "${removeConfirm.email ?? removeConfirm.id}" from this organization? They will lose access.`}

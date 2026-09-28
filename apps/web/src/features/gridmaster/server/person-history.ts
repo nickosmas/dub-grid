@@ -159,9 +159,16 @@ async function loadStaffHistoryRows(
   };
 }
 
+/** Sign-in evidence the security audit keeps: a hashed IP, email and session. */
+const HASHED_DETAIL_KEYS = ["sourceHash", "targetHash", "sessionHash"];
+
 function withoutNetworkDetails(row: AuditRow): AuditRow {
   const { ip_address: _ip, user_agent: _agent, ...rest } = row;
-  return rest;
+  const details = rest.details;
+  if (!details || typeof details !== "object" || Array.isArray(details)) return rest;
+  const kept = { ...(details as Record<string, unknown>) };
+  for (const key of HASHED_DETAIL_KEYS) delete kept[key];
+  return { ...rest, details: kept };
 }
 
 export type PersonHistoryTarget =
@@ -185,12 +192,16 @@ export async function loadPersonHistory(
   let employees: EmployeeActivitySubject[];
   if (target.kind === "user") {
     const [profileResult, employeeResult] = await Promise.all([
-      client.from("profiles").select("id").eq("id", target.userId).maybeSingle(),
+      client.from("profiles").select("id, platform_role").eq("id", target.userId).maybeSingle(),
       client.from("employees").select(EMPLOYEE_SUBJECT_COLUMNS).eq("user_id", target.userId),
     ]);
     if (profileResult.error) throw profileResult.error;
     employees = rowsOrThrow(employeeResult) as unknown as EmployeeActivitySubject[];
     if (!profileResult.data && employees.length === 0) return null;
+    // A Gridmaster's own account is not a person page target (43b).
+    if ((profileResult.data as { platform_role?: string } | null)?.platform_role === "gridmaster") {
+      return null;
+    }
     userId = target.userId;
   } else {
     const { data, error } = await client
@@ -202,6 +213,16 @@ export async function loadPersonHistory(
     if (!data) return null;
     employees = [data as EmployeeActivitySubject];
     userId = employees[0].user_id;
+    if (userId) {
+      const { data: profile, error: profileError } = await client
+        .from("profiles")
+        .select("platform_role")
+        .eq("id", userId)
+        .maybeSingle();
+      if (profileError) throw profileError;
+      if ((profile as { platform_role?: string } | null)?.platform_role === "gridmaster")
+        return null;
+    }
   }
 
   const sources = await Promise.all([
@@ -211,6 +232,9 @@ export async function loadPersonHistory(
 
   const byId = new Map<string, AuditRow>();
   for (const row of sources.flatMap((source) => source.rows)) {
+    // Each session row says what these do, and the staff source matches them
+    // too, through the target organization (F-87).
+    if (IMPERSONATION_EVENT_ACTIONS.has(row.action as string) && row.actor_id !== userId) continue;
     const id = String(row.id);
     if (!byId.has(id)) byId.set(id, { ...withoutNetworkDetails(row), id });
   }
