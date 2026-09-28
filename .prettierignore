@@ -14,3 +14,4 @@ apps/mobile/ios/
 apps/mobile/android/
 apps/web/src/lib/database.types.ts
 internal/documentation/generated/
+internal/documentation/accuracy-manifest.json

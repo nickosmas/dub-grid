@@ -3,8 +3,15 @@
   "frozenProductCandidate": "1b86aad5f8fadba7712d926f98a7f7ec485facfc",
   "runtimeProfiles": {
     "web": {
-      "browsers": ["chromium", "firefox", "webkit"],
-      "viewports": ["desktop", "narrow"],
+      "browsers": [
+        "chromium",
+        "firefox",
+        "webkit"
+      ],
+      "viewports": [
+        "desktop",
+        "narrow"
+      ],
       "roles": [
         "signed-out",
         "user",
@@ -15,9 +22,25 @@
       ]
     },
     "mobile": {
-      "platforms": ["ios", "android"],
-      "roles": ["user", "management-only-user", "admin", "super-admin"],
-      "states": ["loaded", "loading", "empty", "error", "offline", "retry", "cold-start"]
+      "platforms": [
+        "ios",
+        "android"
+      ],
+      "roles": [
+        "user",
+        "management-only-user",
+        "admin",
+        "super-admin"
+      ],
+      "states": [
+        "loaded",
+        "loading",
+        "empty",
+        "error",
+        "offline",
+        "retry",
+        "cold-start"
+      ]
     }
   },
   "pages": [
@@ -27,20 +50,56 @@
       "publicRoute": "/",
       "deliveryOwner": "40b",
       "lifecycle": "published",
-      "sourceReview": "pending",
-      "audiences": ["prospect", "customer"],
-      "platforms": { "web": "required", "ios": "not-applicable", "android": "not-applicable" },
-      "surfaceIds": ["web:/", "web:/request-demo"],
+      "sourceReview": "verified",
+      "audiences": [
+        "prospect",
+        "customer"
+      ],
+      "platforms": {
+        "web": "required",
+        "ios": "not-applicable",
+        "android": "not-applicable"
+      },
+      "surfaceIds": [
+        "web:/",
+        "web:/request-demo"
+      ],
       "sections": [
         {
           "id": "overview",
-          "claims": ["pending-source-review"],
-          "sourceFiles": ["apps/web/src/app/page.tsx"],
-          "testFiles": [],
+          "claims": [
+            "demo request starts an organization",
+            "invitation link lasts 72 hours and only the newest works",
+            "first sign-in runs the setup guide",
+            "invites come from setup or People",
+            "drafts until publish; recurring shifts; presence; pickup, swap and call-off requests"
+          ],
+          "sourceFiles": [
+            "apps/web/src/app/request-demo/page.tsx",
+            "apps/web/src/components/Toolbar.tsx",
+            "apps/web/src/components/DraftBanner.tsx",
+            "apps/web/src/hooks/useSchedulePresence.ts",
+            "apps/web/src/app/(app)/schedule/SchedulePageClient.tsx",
+            "packages/domain/src/requests.ts",
+            "packages/domain/src/org-roles.ts",
+            "packages/domain/src/invitation-lifetime.ts",
+            "apps/web/src/emails/InviteEmail.tsx",
+            "apps/web/src/components/Header.tsx",
+            "apps/web/src/components/onboarding/OnboardingWizard.tsx",
+            "apps/web/src/components/onboarding/steps/IdentityStep.tsx",
+            "apps/web/src/components/onboarding/steps/StructureStep.tsx",
+            "apps/web/src/components/onboarding/steps/ScheduleStep.tsx",
+            "apps/web/src/components/onboarding/steps/InviteTeamStep.tsx"
+          ],
+          "testFiles": [
+            "apps/web/src/emails/InviteEmail.test.tsx",
+            "apps/web/src/__tests__/DraftBanner.test.tsx"
+          ],
           "runtimeScenarios": [],
           "exclusions": []
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:002401de89f57d208ec664e36038b8117bfdff358c6c3410fd5e22f3a3e37e9e"
     },
     {
       "id": "introduction",
@@ -48,20 +107,61 @@
       "publicRoute": "/introduction",
       "deliveryOwner": "40b",
       "lifecycle": "published",
-      "sourceReview": "pending",
-      "audiences": ["customer"],
-      "platforms": { "web": "required", "ios": "required", "android": "required" },
+      "sourceReview": "verified",
+      "audiences": [
+        "customer"
+      ],
+      "platforms": {
+        "web": "required",
+        "ios": "required",
+        "android": "required"
+      },
       "surfaceIds": [],
       "sections": [
         {
           "id": "product",
-          "claims": ["pending-source-review"],
-          "sourceFiles": ["apps/web/src/app/page.tsx"],
-          "testFiles": [],
+          "claims": [
+            "organizations are separate, each at its own subdomain",
+            "labels default to Focus Areas, Certifications and Roles and are renamed under Settings > Labels",
+            "1 Week, 2 Weeks, Month; two weeks by default",
+            "drafts until publish",
+            "presence never locks; a conflicting save refreshes",
+            "three organization roles; no account counts as User",
+            "invitation only; 72-hour link replaced by a new one",
+            "calendar subscription for your own shifts",
+            "mobile app scope and web-only areas"
+          ],
+          "sourceFiles": [
+            "apps/web/src/components/Toolbar.tsx",
+            "apps/web/src/components/DraftBanner.tsx",
+            "apps/web/src/hooks/useSchedulePresence.ts",
+            "apps/web/src/app/(app)/schedule/SchedulePageClient.tsx",
+            "packages/domain/src/requests.ts",
+            "packages/domain/src/org-roles.ts",
+            "packages/domain/src/invitation-lifetime.ts",
+            "apps/web/src/emails/InviteEmail.tsx",
+            "apps/web/src/components/Header.tsx",
+            "apps/web/src/lib/db/mappers.ts",
+            "apps/web/src/components/settings/nav-config.tsx",
+            "packages/authz/src/index.ts",
+            "packages/domain/src/permissions.ts",
+            "apps/web/src/components/PrintOptionsModal.tsx",
+            "apps/web/src/components/profile/CalendarSubscriptionCard.tsx",
+            "apps/mobile/app/(tabs)/_layout.tsx",
+            "apps/web/src/app/api/organizations/invitations/create/route.ts",
+            "apps/web/src/lib/schedule-view.ts"
+          ],
+          "testFiles": [
+            "apps/web/src/__tests__/Toolbar.test.tsx",
+            "apps/web/src/__tests__/DraftBanner.test.tsx",
+            "packages/authz/src/index.test.ts",
+            "apps/web/src/components/profile/CalendarSubscriptionCard.test.tsx"
+          ],
           "runtimeScenarios": [],
           "exclusions": []
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:05241e225e803863c3699d9b8f1f04caecc1c6db059cf0f4534a2322608fb4f3"
     },
     {
       "id": "quickstart",
@@ -69,23 +169,75 @@
       "publicRoute": "/quickstart",
       "deliveryOwner": "40b",
       "lifecycle": "published",
-      "sourceReview": "pending",
-      "audiences": ["customer"],
-      "platforms": { "web": "required", "ios": "required", "android": "required" },
-      "surfaceIds": ["web:/login", "mobile:screen:/(auth)/login:all"],
+      "sourceReview": "verified",
+      "audiences": [
+        "customer"
+      ],
+      "platforms": {
+        "web": "required",
+        "ios": "required",
+        "android": "required"
+      },
+      "surfaceIds": [
+        "web:/login",
+        "mobile:screen:/(auth)/login:all"
+      ],
       "sections": [
         {
           "id": "sign-in",
-          "claims": ["pending-source-review"],
-          "sourceFiles": [
-            "apps/web/src/app/(app)/login/page.tsx",
-            "apps/mobile/app/(auth)/login.tsx"
+          "claims": [
+            "invitation email subject, button and exact expiry",
+            "password rules and meter labels",
+            "existing-account and two-factor variants",
+            "dead link message",
+            "sign-in at the subdomain or through the domain selector",
+            "setup guide steps and the shift and job requirement",
+            "14-day trial starts at first Super Admin sign-in; trial message actions",
+            "no built-in shifts or jobs",
+            "People adds staff; accounts optional",
+            "schedule views, drafts, publish confirmation, discard my drafts"
           ],
-          "testFiles": [],
+          "sourceFiles": [
+            "apps/web/src/emails/InviteEmail.tsx",
+            "apps/web/src/features/mobile/server/invitation-email.ts",
+            "packages/domain/src/invitation-lifetime.ts",
+            "apps/web/src/app/(app)/accept-invite/page.tsx",
+            "apps/web/src/lib/auth/dead-invitation.ts",
+            "packages/domain/src/password.ts",
+            "apps/web/src/components/auth/PasswordStrength.tsx",
+            "apps/web/src/app/api/invitations/register/route.ts",
+            "apps/web/src/app/(app)/login/DomainSelector.tsx",
+            "apps/web/src/app/(app)/login/OrgLogin.tsx",
+            "apps/web/src/components/profile/MFAVerify.tsx",
+            "apps/web/src/components/onboarding/OnboardingWizard.tsx",
+            "apps/web/src/components/onboarding/steps/IdentityStep.tsx",
+            "apps/web/src/components/onboarding/steps/StructureStep.tsx",
+            "apps/web/src/components/onboarding/steps/ScheduleStep.tsx",
+            "apps/web/src/components/onboarding/steps/InviteTeamStep.tsx",
+            "apps/web/src/components/onboarding/steps/CompletionStep.tsx",
+            "apps/web/src/components/TrialWelcomeModal.tsx",
+            "apps/web/src/app/api/auth/login/route.ts",
+            "apps/web/src/app/api/gridmaster/organizations/manage/route.ts",
+            "apps/web/src/components/Toolbar.tsx",
+            "apps/web/src/components/DraftBanner.tsx",
+            "apps/web/src/app/(app)/schedule/SchedulePageClient.tsx",
+            "packages/domain/src/org-roles.ts"
+          ],
+          "testFiles": [
+            "apps/web/src/app/(app)/accept-invite/page.test.tsx",
+            "apps/web/src/emails/InviteEmail.test.tsx",
+            "packages/domain/src/password.test.ts",
+            "apps/web/src/app/api/invitations/register/route.test.ts",
+            "apps/web/src/__tests__/CompletionStep.test.tsx",
+            "apps/web/src/__tests__/TrialWelcomeModal.test.tsx",
+            "apps/web/src/__tests__/Toolbar.test.tsx",
+            "apps/web/src/__tests__/DraftBanner.test.tsx"
+          ],
           "runtimeScenarios": [],
           "exclusions": []
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:7317bdf1ba152da8dfe5a6b4e4f96388d138034fe47d77622b89e1be340babfb"
     },
     {
       "id": "onboarding",
@@ -93,9 +245,16 @@
       "publicRoute": "/onboarding",
       "deliveryOwner": "40b",
       "lifecycle": "published",
-      "sourceReview": "pending",
-      "audiences": ["customer", "admin"],
-      "platforms": { "web": "required", "ios": "required", "android": "required" },
+      "sourceReview": "verified",
+      "audiences": [
+        "customer",
+        "admin"
+      ],
+      "platforms": {
+        "web": "required",
+        "ios": "required",
+        "android": "required"
+      },
       "surfaceIds": [
         "web:/onboarding",
         "web:/accept-terms",
@@ -104,16 +263,53 @@
       "sections": [
         {
           "id": "setup",
-          "claims": ["pending-source-review"],
-          "sourceFiles": [
-            "apps/web/src/app/(app)/onboarding/page.tsx",
-            "apps/mobile/app/(auth)/onboarding.tsx"
+          "claims": [
+            "accept invitations on the web; the app has no invitation screen",
+            "password rules; existing-account variant",
+            "web and app sign-in, switch organization, two-factor code, forgot password",
+            "Setup in progress and Organization unavailable screens with Check again",
+            "skippable welcome tour; Admin overview",
+            "web header tabs by permission and the alerts bell",
+            "app tabs by role and the notifications prompt"
           ],
-          "testFiles": [],
+          "sourceFiles": [
+            "apps/web/src/emails/InviteEmail.tsx",
+            "apps/web/src/features/mobile/server/invitation-email.ts",
+            "packages/domain/src/invitation-lifetime.ts",
+            "apps/web/src/app/(app)/accept-invite/page.tsx",
+            "apps/web/src/lib/auth/dead-invitation.ts",
+            "packages/domain/src/password.ts",
+            "apps/web/src/components/auth/PasswordStrength.tsx",
+            "apps/web/src/app/api/invitations/register/route.ts",
+            "apps/web/src/app/(app)/login/DomainSelector.tsx",
+            "apps/web/src/app/(app)/login/OrgLogin.tsx",
+            "apps/web/src/components/profile/MFAVerify.tsx",
+            "apps/web/src/components/onboarding/SetupPendingScreen.tsx",
+            "apps/web/src/app/(app)/billing-required/OrganizationGateScreen.tsx",
+            "apps/web/src/components/onboarding/OnboardingWizard.tsx",
+            "apps/web/src/components/onboarding/onboarding-decision.ts",
+            "apps/web/src/components/Header.tsx",
+            "apps/mobile/src/features/auth/screens/LoginScreen.tsx",
+            "apps/mobile/src/features/auth/hooks/useTabsGate.tsx",
+            "apps/mobile/app/(tabs)/_layout.tsx",
+            "apps/mobile/src/features/onboarding/screens/OnboardingScreen.tsx",
+            "apps/web/src/app/(app)/forgot-password/page.tsx"
+          ],
+          "testFiles": [
+            "apps/web/src/app/(app)/accept-invite/page.test.tsx",
+            "apps/web/src/emails/InviteEmail.test.tsx",
+            "packages/domain/src/password.test.ts",
+            "apps/web/src/app/api/invitations/register/route.test.ts",
+            "apps/web/src/components/onboarding/onboarding-decision.test.ts",
+            "apps/web/src/app/(app)/billing-required/OrganizationGateScreen.test.tsx",
+            "apps/web/src/__tests__/Header.test.tsx",
+            "apps/mobile/src/features/auth/hooks/useTabsGate.test.tsx"
+          ],
           "runtimeScenarios": [],
           "exclusions": []
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:8d520956e4873f2e934ab30a19f6380cdd6e76c3906a3b7f7e9e9396705ecf67"
     },
     {
       "id": "schedule-grid",
@@ -122,13 +318,25 @@
       "deliveryOwner": "40b",
       "lifecycle": "published",
       "sourceReview": "pending",
-      "audiences": ["user", "admin"],
-      "platforms": { "web": "required", "ios": "required", "android": "required" },
-      "surfaceIds": ["web:/schedule", "mobile:screen:/shift/[employeeId]/[date]:all"],
+      "audiences": [
+        "user",
+        "admin"
+      ],
+      "platforms": {
+        "web": "required",
+        "ios": "required",
+        "android": "required"
+      },
+      "surfaceIds": [
+        "web:/schedule",
+        "mobile:screen:/shift/[employeeId]/[date]:all"
+      ],
       "sections": [
         {
           "id": "schedule",
-          "claims": ["pending-source-review"],
+          "claims": [
+            "pending-source-review"
+          ],
           "sourceFiles": [
             "apps/web/src/app/(app)/schedule/page.tsx",
             "apps/mobile/app/shift/[employeeId]/[date].tsx"
@@ -146,14 +354,26 @@
       "deliveryOwner": "40b",
       "lifecycle": "published",
       "sourceReview": "pending",
-      "audiences": ["admin"],
-      "platforms": { "web": "required", "ios": "not-applicable", "android": "not-applicable" },
-      "surfaceIds": ["web:/schedule"],
+      "audiences": [
+        "admin"
+      ],
+      "platforms": {
+        "web": "required",
+        "ios": "not-applicable",
+        "android": "not-applicable"
+      },
+      "surfaceIds": [
+        "web:/schedule"
+      ],
       "sections": [
         {
           "id": "publishing",
-          "claims": ["pending-source-review"],
-          "sourceFiles": ["apps/web/src/app/(app)/schedule/page.tsx"],
+          "claims": [
+            "pending-source-review"
+          ],
+          "sourceFiles": [
+            "apps/web/src/app/(app)/schedule/page.tsx"
+          ],
           "testFiles": [],
           "runtimeScenarios": [],
           "exclusions": []
@@ -167,14 +387,26 @@
       "deliveryOwner": "40b",
       "lifecycle": "published",
       "sourceReview": "pending",
-      "audiences": ["admin"],
-      "platforms": { "web": "required", "ios": "not-applicable", "android": "not-applicable" },
-      "surfaceIds": ["web:/schedule"],
+      "audiences": [
+        "admin"
+      ],
+      "platforms": {
+        "web": "required",
+        "ios": "not-applicable",
+        "android": "not-applicable"
+      },
+      "surfaceIds": [
+        "web:/schedule"
+      ],
       "sections": [
         {
           "id": "series",
-          "claims": ["pending-source-review"],
-          "sourceFiles": ["apps/web/src/app/(app)/schedule/page.tsx"],
+          "claims": [
+            "pending-source-review"
+          ],
+          "sourceFiles": [
+            "apps/web/src/app/(app)/schedule/page.tsx"
+          ],
           "testFiles": [],
           "runtimeScenarios": [],
           "exclusions": []
@@ -188,14 +420,26 @@
       "deliveryOwner": "40b",
       "lifecycle": "published",
       "sourceReview": "pending",
-      "audiences": ["admin"],
-      "platforms": { "web": "required", "ios": "not-applicable", "android": "not-applicable" },
-      "surfaceIds": ["web:/schedule"],
+      "audiences": [
+        "admin"
+      ],
+      "platforms": {
+        "web": "required",
+        "ios": "not-applicable",
+        "android": "not-applicable"
+      },
+      "surfaceIds": [
+        "web:/schedule"
+      ],
       "sections": [
         {
           "id": "collaboration",
-          "claims": ["pending-source-review"],
-          "sourceFiles": ["apps/web/src/app/(app)/schedule/page.tsx"],
+          "claims": [
+            "pending-source-review"
+          ],
+          "sourceFiles": [
+            "apps/web/src/app/(app)/schedule/page.tsx"
+          ],
           "testFiles": [],
           "runtimeScenarios": [],
           "exclusions": []
@@ -209,14 +453,28 @@
       "deliveryOwner": "40b",
       "lifecycle": "published",
       "sourceReview": "pending",
-      "audiences": ["user", "admin"],
-      "platforms": { "web": "required", "ios": "required", "android": "required" },
-      "surfaceIds": ["mobile:layout:/(tabs)/requests:all", "mobile:screen:/(tabs)/requests:all"],
+      "audiences": [
+        "user",
+        "admin"
+      ],
+      "platforms": {
+        "web": "required",
+        "ios": "required",
+        "android": "required"
+      },
+      "surfaceIds": [
+        "mobile:layout:/(tabs)/requests:all",
+        "mobile:screen:/(tabs)/requests:all"
+      ],
       "sections": [
         {
           "id": "requests",
-          "claims": ["pending-source-review"],
-          "sourceFiles": ["apps/mobile/app/(tabs)/requests/index.tsx"],
+          "claims": [
+            "pending-source-review"
+          ],
+          "sourceFiles": [
+            "apps/mobile/app/(tabs)/requests/index.tsx"
+          ],
           "testFiles": [],
           "runtimeScenarios": [],
           "exclusions": []
@@ -230,8 +488,16 @@
       "deliveryOwner": "40b",
       "lifecycle": "published",
       "sourceReview": "pending",
-      "audiences": ["management-only-user", "admin", "super-admin"],
-      "platforms": { "web": "required", "ios": "required", "android": "required" },
+      "audiences": [
+        "management-only-user",
+        "admin",
+        "super-admin"
+      ],
+      "platforms": {
+        "web": "required",
+        "ios": "required",
+        "android": "required"
+      },
       "surfaceIds": [
         "web:/dashboard",
         "mobile:layout:/(tabs)/home:all",
@@ -246,7 +512,9 @@
       "sections": [
         {
           "id": "dashboard",
-          "claims": ["pending-source-review"],
+          "claims": [
+            "pending-source-review"
+          ],
           "sourceFiles": [
             "apps/web/src/app/(app)/dashboard/page.tsx",
             "apps/mobile/app/(tabs)/home/index.tsx"
@@ -264,8 +532,15 @@
       "deliveryOwner": "40b",
       "lifecycle": "published",
       "sourceReview": "pending",
-      "audiences": ["user", "admin"],
-      "platforms": { "web": "required", "ios": "required", "android": "required" },
+      "audiences": [
+        "user",
+        "admin"
+      ],
+      "platforms": {
+        "web": "required",
+        "ios": "required",
+        "android": "required"
+      },
       "surfaceIds": [
         "web:/people",
         "mobile:layout:/(tabs)/people:all",
@@ -276,7 +551,9 @@
       "sections": [
         {
           "id": "people",
-          "claims": ["pending-source-review"],
+          "claims": [
+            "pending-source-review"
+          ],
           "sourceFiles": [
             "apps/web/src/app/(app)/people/page.tsx",
             "apps/mobile/app/(tabs)/people/index.tsx"
@@ -294,8 +571,15 @@
       "deliveryOwner": "40b",
       "lifecycle": "published",
       "sourceReview": "pending",
-      "audiences": ["user", "admin"],
-      "platforms": { "web": "required", "ios": "required", "android": "required" },
+      "audiences": [
+        "user",
+        "admin"
+      ],
+      "platforms": {
+        "web": "required",
+        "ios": "required",
+        "android": "required"
+      },
       "surfaceIds": [
         "web:/people/[id]",
         "mobile:screen:/(tabs)/people/[id]:all",
@@ -305,7 +589,9 @@
       "sections": [
         {
           "id": "person",
-          "claims": ["pending-source-review"],
+          "claims": [
+            "pending-source-review"
+          ],
           "sourceFiles": [
             "apps/web/src/app/(app)/people/[id]/page.tsx",
             "apps/mobile/app/person/[id]/index.tsx"
@@ -323,14 +609,28 @@
       "deliveryOwner": "40b",
       "lifecycle": "published",
       "sourceReview": "pending",
-      "audiences": ["invitee", "admin"],
-      "platforms": { "web": "required", "ios": "not-applicable", "android": "not-applicable" },
-      "surfaceIds": ["web:/accept-invite", "web:/auth/verify"],
+      "audiences": [
+        "invitee",
+        "admin"
+      ],
+      "platforms": {
+        "web": "required",
+        "ios": "not-applicable",
+        "android": "not-applicable"
+      },
+      "surfaceIds": [
+        "web:/accept-invite",
+        "web:/auth/verify"
+      ],
       "sections": [
         {
           "id": "invite",
-          "claims": ["pending-source-review"],
-          "sourceFiles": ["apps/web/src/app/(app)/accept-invite/page.tsx"],
+          "claims": [
+            "pending-source-review"
+          ],
+          "sourceFiles": [
+            "apps/web/src/app/(app)/accept-invite/page.tsx"
+          ],
           "testFiles": [],
           "runtimeScenarios": [],
           "exclusions": []
@@ -344,14 +644,28 @@
       "deliveryOwner": "40b",
       "lifecycle": "published",
       "sourceReview": "pending",
-      "audiences": ["admin"],
-      "platforms": { "web": "required", "ios": "not-applicable", "android": "not-applicable" },
-      "surfaceIds": ["web:/settings", "settings:org-general", "settings:org-labels"],
+      "audiences": [
+        "admin"
+      ],
+      "platforms": {
+        "web": "required",
+        "ios": "not-applicable",
+        "android": "not-applicable"
+      },
+      "surfaceIds": [
+        "web:/settings",
+        "settings:org-general",
+        "settings:org-labels"
+      ],
       "sections": [
         {
           "id": "organization",
-          "claims": ["pending-source-review"],
-          "sourceFiles": ["apps/web/src/app/(app)/settings/page.tsx"],
+          "claims": [
+            "pending-source-review"
+          ],
+          "sourceFiles": [
+            "apps/web/src/app/(app)/settings/page.tsx"
+          ],
           "testFiles": [],
           "runtimeScenarios": [],
           "exclusions": []
@@ -365,8 +679,14 @@
       "deliveryOwner": "40b",
       "lifecycle": "published",
       "sourceReview": "pending",
-      "audiences": ["admin"],
-      "platforms": { "web": "required", "ios": "not-applicable", "android": "not-applicable" },
+      "audiences": [
+        "admin"
+      ],
+      "platforms": {
+        "web": "required",
+        "ios": "not-applicable",
+        "android": "not-applicable"
+      },
       "surfaceIds": [
         "settings:schedule-shifts",
         "settings:schedule-jobs",
@@ -375,8 +695,12 @@
       "sections": [
         {
           "id": "schedule-codes",
-          "claims": ["pending-source-review"],
-          "sourceFiles": ["apps/web/src/components/settings/nav-config.tsx"],
+          "claims": [
+            "pending-source-review"
+          ],
+          "sourceFiles": [
+            "apps/web/src/components/settings/nav-config.tsx"
+          ],
           "testFiles": [],
           "runtimeScenarios": [],
           "exclusions": []
@@ -390,14 +714,26 @@
       "deliveryOwner": "40b",
       "lifecycle": "published",
       "sourceReview": "pending",
-      "audiences": ["admin"],
-      "platforms": { "web": "required", "ios": "not-applicable", "android": "not-applicable" },
-      "surfaceIds": ["settings:staff-departments"],
+      "audiences": [
+        "admin"
+      ],
+      "platforms": {
+        "web": "required",
+        "ios": "not-applicable",
+        "android": "not-applicable"
+      },
+      "surfaceIds": [
+        "settings:staff-departments"
+      ],
       "sections": [
         {
           "id": "departments",
-          "claims": ["pending-source-review"],
-          "sourceFiles": ["apps/web/src/components/settings/nav-config.tsx"],
+          "claims": [
+            "pending-source-review"
+          ],
+          "sourceFiles": [
+            "apps/web/src/components/settings/nav-config.tsx"
+          ],
           "testFiles": [],
           "runtimeScenarios": [],
           "exclusions": []
@@ -411,14 +747,26 @@
       "deliveryOwner": "40b",
       "lifecycle": "published",
       "sourceReview": "pending",
-      "audiences": ["admin"],
-      "platforms": { "web": "required", "ios": "not-applicable", "android": "not-applicable" },
-      "surfaceIds": ["settings:schedule-coverage"],
+      "audiences": [
+        "admin"
+      ],
+      "platforms": {
+        "web": "required",
+        "ios": "not-applicable",
+        "android": "not-applicable"
+      },
+      "surfaceIds": [
+        "settings:schedule-coverage"
+      ],
       "sections": [
         {
           "id": "coverage",
-          "claims": ["pending-source-review"],
-          "sourceFiles": ["apps/web/src/components/settings/nav-config.tsx"],
+          "claims": [
+            "pending-source-review"
+          ],
+          "sourceFiles": [
+            "apps/web/src/components/settings/nav-config.tsx"
+          ],
           "testFiles": [],
           "runtimeScenarios": [],
           "exclusions": []
@@ -432,14 +780,24 @@
       "deliveryOwner": "40b",
       "lifecycle": "published",
       "sourceReview": "pending",
-      "audiences": ["admin"],
-      "platforms": { "web": "required", "ios": "required", "android": "required" },
+      "audiences": [
+        "admin"
+      ],
+      "platforms": {
+        "web": "required",
+        "ios": "required",
+        "android": "required"
+      },
       "surfaceIds": [],
       "sections": [
         {
           "id": "terms",
-          "claims": ["pending-source-review"],
-          "sourceFiles": ["packages/domain/src/index.ts"],
+          "claims": [
+            "pending-source-review"
+          ],
+          "sourceFiles": [
+            "packages/domain/src/index.ts"
+          ],
           "testFiles": [],
           "runtimeScenarios": [],
           "exclusions": []
@@ -453,14 +811,26 @@
       "deliveryOwner": "40c",
       "lifecycle": "published",
       "sourceReview": "pending",
-      "audiences": ["admin"],
-      "platforms": { "web": "required", "ios": "required", "android": "required" },
-      "surfaceIds": ["settings:staff-roles"],
+      "audiences": [
+        "admin"
+      ],
+      "platforms": {
+        "web": "required",
+        "ios": "required",
+        "android": "required"
+      },
+      "surfaceIds": [
+        "settings:staff-roles"
+      ],
       "sections": [
         {
           "id": "roles",
-          "claims": ["pending-source-review"],
-          "sourceFiles": ["packages/domain/src/index.ts"],
+          "claims": [
+            "pending-source-review"
+          ],
+          "sourceFiles": [
+            "packages/domain/src/index.ts"
+          ],
           "testFiles": [],
           "runtimeScenarios": [],
           "exclusions": []
@@ -474,14 +844,24 @@
       "deliveryOwner": "40c",
       "lifecycle": "published",
       "sourceReview": "pending",
-      "audiences": ["admin"],
-      "platforms": { "web": "required", "ios": "required", "android": "required" },
+      "audiences": [
+        "admin"
+      ],
+      "platforms": {
+        "web": "required",
+        "ios": "required",
+        "android": "required"
+      },
       "surfaceIds": [],
       "sections": [
         {
           "id": "permissions",
-          "claims": ["pending-source-review"],
-          "sourceFiles": ["packages/authz/src/index.ts"],
+          "claims": [
+            "pending-source-review"
+          ],
+          "sourceFiles": [
+            "packages/authz/src/index.ts"
+          ],
           "testFiles": [],
           "runtimeScenarios": [],
           "exclusions": []
@@ -495,14 +875,27 @@
       "deliveryOwner": "40c",
       "lifecycle": "published",
       "sourceReview": "pending",
-      "audiences": ["admin"],
-      "platforms": { "web": "required", "ios": "not-applicable", "android": "not-applicable" },
-      "surfaceIds": ["web:/billing-required", "settings:org-billing"],
+      "audiences": [
+        "admin"
+      ],
+      "platforms": {
+        "web": "required",
+        "ios": "not-applicable",
+        "android": "not-applicable"
+      },
+      "surfaceIds": [
+        "web:/billing-required",
+        "settings:org-billing"
+      ],
       "sections": [
         {
           "id": "billing",
-          "claims": ["pending-source-review"],
-          "sourceFiles": ["apps/web/src/app/(app)/billing-required/page.tsx"],
+          "claims": [
+            "pending-source-review"
+          ],
+          "sourceFiles": [
+            "apps/web/src/app/(app)/billing-required/page.tsx"
+          ],
           "testFiles": [],
           "runtimeScenarios": [],
           "exclusions": []
@@ -516,14 +909,26 @@
       "deliveryOwner": "40c",
       "lifecycle": "published",
       "sourceReview": "pending",
-      "audiences": ["admin"],
-      "platforms": { "web": "required", "ios": "not-applicable", "android": "not-applicable" },
-      "surfaceIds": ["web:/billing-required"],
+      "audiences": [
+        "admin"
+      ],
+      "platforms": {
+        "web": "required",
+        "ios": "not-applicable",
+        "android": "not-applicable"
+      },
+      "surfaceIds": [
+        "web:/billing-required"
+      ],
       "sections": [
         {
           "id": "subscription",
-          "claims": ["pending-source-review"],
-          "sourceFiles": ["apps/web/src/app/(app)/billing-required/page.tsx"],
+          "claims": [
+            "pending-source-review"
+          ],
+          "sourceFiles": [
+            "apps/web/src/app/(app)/billing-required/page.tsx"
+          ],
           "testFiles": [],
           "runtimeScenarios": [],
           "exclusions": []
@@ -537,17 +942,29 @@
       "deliveryOwner": "40c",
       "lifecycle": "published",
       "sourceReview": "pending",
-      "audiences": ["admin"],
-      "platforms": { "web": "required", "ios": "not-applicable", "android": "not-applicable" },
+      "audiences": [
+        "admin"
+      ],
+      "platforms": {
+        "web": "required",
+        "ios": "not-applicable",
+        "android": "not-applicable"
+      },
       "surfaceIds": [],
       "sections": [
         {
           "id": "integrations",
-          "claims": ["pending-source-review"],
-          "sourceFiles": ["apps/web/src/app/(app)/reports/page.tsx"],
+          "claims": [
+            "pending-source-review"
+          ],
+          "sourceFiles": [
+            "apps/web/src/app/(app)/reports/page.tsx"
+          ],
           "testFiles": [],
           "runtimeScenarios": [],
-          "exclusions": ["Internal HTTP endpoints are not a public API."]
+          "exclusions": [
+            "Internal HTTP endpoints are not a public API."
+          ]
         }
       ]
     },
@@ -558,14 +975,26 @@
       "deliveryOwner": "40c",
       "lifecycle": "published",
       "sourceReview": "pending",
-      "audiences": ["user"],
-      "platforms": { "web": "required", "ios": "required", "android": "required" },
-      "surfaceIds": ["mobile:screen:/(tabs)/profile/calendar:all"],
+      "audiences": [
+        "user"
+      ],
+      "platforms": {
+        "web": "required",
+        "ios": "required",
+        "android": "required"
+      },
+      "surfaceIds": [
+        "mobile:screen:/(tabs)/profile/calendar:all"
+      ],
       "sections": [
         {
           "id": "calendar",
-          "claims": ["pending-source-review"],
-          "sourceFiles": ["apps/mobile/app/(tabs)/profile/calendar.tsx"],
+          "claims": [
+            "pending-source-review"
+          ],
+          "sourceFiles": [
+            "apps/mobile/app/(tabs)/profile/calendar.tsx"
+          ],
           "testFiles": [],
           "runtimeScenarios": [],
           "exclusions": []
@@ -579,8 +1008,15 @@
       "deliveryOwner": "40c",
       "lifecycle": "planned",
       "sourceReview": "pending",
-      "audiences": ["user", "admin"],
-      "platforms": { "web": "not-applicable", "ios": "planned", "android": "planned" },
+      "audiences": [
+        "user",
+        "admin"
+      ],
+      "platforms": {
+        "web": "not-applicable",
+        "ios": "planned",
+        "android": "planned"
+      },
       "surfaceIds": [
         "mobile:layout:/(tabs):all",
         "mobile:layout:/(tabs):android",
@@ -591,10 +1027,18 @@
       "sections": [
         {
           "id": "navigation",
-          "claims": ["planned-source-review"],
-          "sourceFiles": ["apps/mobile/app/_layout.tsx", "apps/mobile/app/(tabs)/_layout.tsx"],
+          "claims": [
+            "planned-source-review"
+          ],
+          "sourceFiles": [
+            "apps/mobile/app/_layout.tsx",
+            "apps/mobile/app/(tabs)/_layout.tsx"
+          ],
           "testFiles": [],
-          "runtimeScenarios": ["cold-start", "deep-link"],
+          "runtimeScenarios": [
+            "cold-start",
+            "deep-link"
+          ],
           "exclusions": []
         }
       ]
@@ -606,19 +1050,34 @@
       "deliveryOwner": "40c",
       "lifecycle": "planned",
       "sourceReview": "pending",
-      "audiences": ["user", "admin"],
-      "platforms": { "web": "planned", "ios": "planned", "android": "planned" },
-      "surfaceIds": ["web:/alerts", "mobile:screen:/alerts:all", "mobile:screen:/alerts/[id]:all"],
+      "audiences": [
+        "user",
+        "admin"
+      ],
+      "platforms": {
+        "web": "planned",
+        "ios": "planned",
+        "android": "planned"
+      },
+      "surfaceIds": [
+        "web:/alerts",
+        "mobile:screen:/alerts:all",
+        "mobile:screen:/alerts/[id]:all"
+      ],
       "sections": [
         {
           "id": "alerts",
-          "claims": ["planned-source-review"],
+          "claims": [
+            "planned-source-review"
+          ],
           "sourceFiles": [
             "apps/web/src/app/(app)/alerts/page.tsx",
             "apps/mobile/app/alerts/index.tsx"
           ],
           "testFiles": [],
-          "runtimeScenarios": ["deep-link"],
+          "runtimeScenarios": [
+            "deep-link"
+          ],
           "exclusions": []
         }
       ]
@@ -630,16 +1089,32 @@
       "deliveryOwner": "40c",
       "lifecycle": "planned",
       "sourceReview": "pending",
-      "audiences": ["admin"],
-      "platforms": { "web": "planned", "ios": "not-applicable", "android": "not-applicable" },
-      "surfaceIds": ["web:/reports"],
+      "audiences": [
+        "admin"
+      ],
+      "platforms": {
+        "web": "planned",
+        "ios": "not-applicable",
+        "android": "not-applicable"
+      },
+      "surfaceIds": [
+        "web:/reports"
+      ],
       "sections": [
         {
           "id": "reports",
-          "claims": ["planned-source-review"],
-          "sourceFiles": ["apps/web/src/app/(app)/reports/page.tsx"],
+          "claims": [
+            "planned-source-review"
+          ],
+          "sourceFiles": [
+            "apps/web/src/app/(app)/reports/page.tsx"
+          ],
           "testFiles": [],
-          "runtimeScenarios": ["loaded", "empty", "error"],
+          "runtimeScenarios": [
+            "loaded",
+            "empty",
+            "error"
+          ],
           "exclusions": []
         }
       ]
@@ -651,8 +1126,15 @@
       "deliveryOwner": "40c",
       "lifecycle": "planned",
       "sourceReview": "pending",
-      "audiences": ["user", "admin"],
-      "platforms": { "web": "planned", "ios": "planned", "android": "planned" },
+      "audiences": [
+        "user",
+        "admin"
+      ],
+      "platforms": {
+        "web": "planned",
+        "ios": "planned",
+        "android": "planned"
+      },
       "surfaceIds": [
         "web:/account",
         "web:/profile",
@@ -665,13 +1147,18 @@
       "sections": [
         {
           "id": "profile",
-          "claims": ["planned-source-review"],
+          "claims": [
+            "planned-source-review"
+          ],
           "sourceFiles": [
             "apps/web/src/app/(app)/profile/page.tsx",
             "apps/mobile/app/(tabs)/profile/index.tsx"
           ],
           "testFiles": [],
-          "runtimeScenarios": ["loaded", "validation"],
+          "runtimeScenarios": [
+            "loaded",
+            "validation"
+          ],
           "exclusions": []
         }
       ]
@@ -683,8 +1170,15 @@
       "deliveryOwner": "40c",
       "lifecycle": "planned",
       "sourceReview": "pending",
-      "audiences": ["user", "admin"],
-      "platforms": { "web": "planned", "ios": "planned", "android": "planned" },
+      "audiences": [
+        "user",
+        "admin"
+      ],
+      "platforms": {
+        "web": "planned",
+        "ios": "planned",
+        "android": "planned"
+      },
       "surfaceIds": [
         "web:/forgot-password",
         "web:/reset-password",
@@ -698,13 +1192,19 @@
       "sections": [
         {
           "id": "security",
-          "claims": ["planned-source-review"],
+          "claims": [
+            "planned-source-review"
+          ],
           "sourceFiles": [
             "apps/web/src/app/(app)/reset-password/page.tsx",
             "apps/mobile/app/(tabs)/profile/security.tsx"
           ],
           "testFiles": [],
-          "runtimeScenarios": ["mfa", "recovery", "offline"],
+          "runtimeScenarios": [
+            "mfa",
+            "recovery",
+            "offline"
+          ],
           "exclusions": []
         }
       ]
@@ -716,8 +1216,15 @@
       "deliveryOwner": "40c",
       "lifecycle": "planned",
       "sourceReview": "pending",
-      "audiences": ["user", "admin"],
-      "platforms": { "web": "planned", "ios": "planned", "android": "planned" },
+      "audiences": [
+        "user",
+        "admin"
+      ],
+      "platforms": {
+        "web": "planned",
+        "ios": "planned",
+        "android": "planned"
+      },
       "surfaceIds": [
         "web:/cookie-policy",
         "web:/privacy",
@@ -728,13 +1235,18 @@
       "sections": [
         {
           "id": "controls",
-          "claims": ["planned-source-review"],
+          "claims": [
+            "planned-source-review"
+          ],
           "sourceFiles": [
             "apps/web/src/app/privacy/page.tsx",
             "apps/mobile/app/(tabs)/profile/privacy.tsx"
           ],
           "testFiles": [],
-          "runtimeScenarios": ["loaded", "validation"],
+          "runtimeScenarios": [
+            "loaded",
+            "validation"
+          ],
           "exclusions": []
         }
       ]
@@ -746,16 +1258,31 @@
       "deliveryOwner": "40b",
       "lifecycle": "planned",
       "sourceReview": "pending",
-      "audiences": ["admin"],
-      "platforms": { "web": "planned", "ios": "not-applicable", "android": "not-applicable" },
-      "surfaceIds": ["settings:org-display", "settings:schedule-rules"],
+      "audiences": [
+        "admin"
+      ],
+      "platforms": {
+        "web": "planned",
+        "ios": "not-applicable",
+        "android": "not-applicable"
+      },
+      "surfaceIds": [
+        "settings:org-display",
+        "settings:schedule-rules"
+      ],
       "sections": [
         {
           "id": "rules-display",
-          "claims": ["planned-source-review"],
-          "sourceFiles": ["apps/web/src/components/settings/nav-config.tsx"],
+          "claims": [
+            "planned-source-review"
+          ],
+          "sourceFiles": [
+            "apps/web/src/components/settings/nav-config.tsx"
+          ],
           "testFiles": [],
-          "runtimeScenarios": ["validation"],
+          "runtimeScenarios": [
+            "validation"
+          ],
           "exclusions": []
         }
       ]
@@ -767,8 +1294,14 @@
       "deliveryOwner": "40b",
       "lifecycle": "planned",
       "sourceReview": "pending",
-      "audiences": ["admin"],
-      "platforms": { "web": "planned", "ios": "not-applicable", "android": "not-applicable" },
+      "audiences": [
+        "admin"
+      ],
+      "platforms": {
+        "web": "planned",
+        "ios": "not-applicable",
+        "android": "not-applicable"
+      },
       "surfaceIds": [
         "settings:staff-roles",
         "settings:staff-certifications",
@@ -777,10 +1310,16 @@
       "sections": [
         {
           "id": "staff-configuration",
-          "claims": ["planned-source-review"],
-          "sourceFiles": ["apps/web/src/components/settings/nav-config.tsx"],
+          "claims": [
+            "planned-source-review"
+          ],
+          "sourceFiles": [
+            "apps/web/src/components/settings/nav-config.tsx"
+          ],
           "testFiles": [],
-          "runtimeScenarios": ["validation"],
+          "runtimeScenarios": [
+            "validation"
+          ],
           "exclusions": []
         }
       ]
@@ -792,16 +1331,32 @@
       "deliveryOwner": "40b",
       "lifecycle": "planned",
       "sourceReview": "pending",
-      "audiences": ["super-admin"],
-      "platforms": { "web": "planned", "ios": "not-applicable", "android": "not-applicable" },
-      "surfaceIds": ["settings:org-activity", "settings:org-danger"],
+      "audiences": [
+        "super-admin"
+      ],
+      "platforms": {
+        "web": "planned",
+        "ios": "not-applicable",
+        "android": "not-applicable"
+      },
+      "surfaceIds": [
+        "settings:org-activity",
+        "settings:org-danger"
+      ],
       "sections": [
         {
           "id": "activity-controls",
-          "claims": ["planned-source-review"],
-          "sourceFiles": ["apps/web/src/components/settings/nav-config.tsx"],
+          "claims": [
+            "planned-source-review"
+          ],
+          "sourceFiles": [
+            "apps/web/src/components/settings/nav-config.tsx"
+          ],
           "testFiles": [],
-          "runtimeScenarios": ["loaded", "denied"],
+          "runtimeScenarios": [
+            "loaded",
+            "denied"
+          ],
           "exclusions": []
         }
       ]
@@ -813,16 +1368,31 @@
       "deliveryOwner": "40b",
       "lifecycle": "planned",
       "sourceReview": "pending",
-      "audiences": ["admin"],
-      "platforms": { "web": "planned", "ios": "not-applicable", "android": "not-applicable" },
-      "surfaceIds": ["settings:staff-departments"],
+      "audiences": [
+        "admin"
+      ],
+      "platforms": {
+        "web": "planned",
+        "ios": "not-applicable",
+        "android": "not-applicable"
+      },
+      "surfaceIds": [
+        "settings:staff-departments"
+      ],
       "sections": [
         {
           "id": "departments",
-          "claims": ["planned-source-review"],
-          "sourceFiles": ["apps/web/src/components/settings/nav-config.tsx"],
+          "claims": [
+            "planned-source-review"
+          ],
+          "sourceFiles": [
+            "apps/web/src/components/settings/nav-config.tsx"
+          ],
           "testFiles": [],
-          "runtimeScenarios": ["loaded", "validation"],
+          "runtimeScenarios": [
+            "loaded",
+            "validation"
+          ],
           "exclusions": []
         }
       ]
@@ -834,8 +1404,14 @@
       "deliveryOwner": "40b",
       "lifecycle": "planned",
       "sourceReview": "pending",
-      "audiences": ["admin"],
-      "platforms": { "web": "planned", "ios": "not-applicable", "android": "not-applicable" },
+      "audiences": [
+        "admin"
+      ],
+      "platforms": {
+        "web": "planned",
+        "ios": "not-applicable",
+        "android": "not-applicable"
+      },
       "surfaceIds": [
         "settings:schedule-shifts",
         "settings:schedule-jobs",
@@ -844,10 +1420,17 @@
       "sections": [
         {
           "id": "codes",
-          "claims": ["planned-source-review"],
-          "sourceFiles": ["apps/web/src/components/settings/nav-config.tsx"],
+          "claims": [
+            "planned-source-review"
+          ],
+          "sourceFiles": [
+            "apps/web/src/components/settings/nav-config.tsx"
+          ],
           "testFiles": [],
-          "runtimeScenarios": ["loaded", "validation"],
+          "runtimeScenarios": [
+            "loaded",
+            "validation"
+          ],
           "exclusions": []
         }
       ]
@@ -859,17 +1442,32 @@
       "deliveryOwner": "40c",
       "lifecycle": "planned",
       "sourceReview": "pending",
-      "audiences": ["admin"],
-      "platforms": { "web": "planned", "ios": "planned", "android": "planned" },
+      "audiences": [
+        "admin"
+      ],
+      "platforms": {
+        "web": "planned",
+        "ios": "planned",
+        "android": "planned"
+      },
       "surfaceIds": [],
       "sections": [
         {
           "id": "exports",
-          "claims": ["planned-source-review"],
-          "sourceFiles": ["apps/web/src/app/(app)/reports/page.tsx"],
+          "claims": [
+            "planned-source-review"
+          ],
+          "sourceFiles": [
+            "apps/web/src/app/(app)/reports/page.tsx"
+          ],
           "testFiles": [],
-          "runtimeScenarios": ["export-success", "export-error"],
-          "exclusions": ["Internal HTTP endpoints are not a public API."]
+          "runtimeScenarios": [
+            "export-success",
+            "export-error"
+          ],
+          "exclusions": [
+            "Internal HTTP endpoints are not a public API."
+          ]
         }
       ]
     }
@@ -879,19 +1477,25 @@
       "surfaceId": "web:/gridmaster",
       "reasonCode": "internal-only",
       "rationale": "Gridmaster operations tooling is internal and is not customer documentation.",
-      "sourceFiles": ["apps/web/src/app/(app)/gridmaster/page.tsx"]
+      "sourceFiles": [
+        "apps/web/src/app/(app)/gridmaster/page.tsx"
+      ]
     },
     {
       "surfaceId": "web:/settings/staff-config",
       "reasonCode": "legacy-redirect",
       "rationale": "This route only redirects to the current staff certification Settings section.",
-      "sourceFiles": ["apps/web/src/app/(app)/settings/staff-config/page.tsx"]
+      "sourceFiles": [
+        "apps/web/src/app/(app)/settings/staff-config/page.tsx"
+      ]
     },
     {
       "surfaceId": "mobile:not-found:/:all",
       "reasonCode": "framework-only",
       "rationale": "Expo Router fallback implementation is not a customer workflow.",
-      "sourceFiles": ["apps/mobile/app/+not-found.tsx"]
+      "sourceFiles": [
+        "apps/mobile/app/+not-found.tsx"
+      ]
     }
   ]
 }

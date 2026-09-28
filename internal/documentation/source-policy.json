@@ -17,6 +17,7 @@
     "script:root:deps:audit": { "audience": "ci", "status": "supported" },
     "script:root:deps:rebuild": { "audience": "ci", "status": "internal" },
     "script:root:deps:scan": { "audience": "ci", "status": "supported" },
+    "script:root:docs:fingerprint": { "audience": "developer", "status": "supported" },
     "script:root:docs:inventory": { "audience": "developer", "status": "supported" },
     "script:root:docs:check": { "audience": "developer", "status": "supported" },
     "script:root:docs:validate": { "audience": "developer", "status": "supported" },

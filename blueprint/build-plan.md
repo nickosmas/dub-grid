@@ -762,6 +762,21 @@
         invitations, departments, roles, certifications, shifts, jobs,
         absences, coverage, indicators, schedule rules, display options, and
         organization controls against the frozen candidate.
+    - [x] 40b1. **Get started guides and the fingerprint tool** - rewrite the
+          home, introduction, quickstart, and onboarding pages against source,
+          and add `docs:fingerprint` so a source-reviewed page records its
+          evidence fingerprint in the accuracy manifest.
+    - [ ] 40b2. **Scheduling guides** - rewrite the schedule grid, draft and
+          publish, recurring shifts, real-time collaboration, shift requests,
+          and dashboard pages.
+    - [ ] 40b3. **People guides** - rewrite the roster, person detail, and
+          invitations pages.
+    - [ ] 40b4. **Configuration guides** - rewrite the organization, coverage,
+          and terminology pages and publish the five planned Settings pages
+          (schedule rules and display; roles, certifications, and schedule
+          notes; organization activity and controls; departments and focus
+          areas; shifts, jobs, and absences), with permanent redirects for
+          the focus-area and shift-code pages they replace.
   - [ ] 40c. **Public mobile, account, alerts, reports, billing, and access
         guides** - document role-aware mobile navigation and deliberate parity
         boundaries plus alerts, reports, profile, security, sessions,

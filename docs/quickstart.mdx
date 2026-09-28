@@ -1,94 +1,69 @@
 ---
 title: "Quick Start"
-description: "Set up your DubGrid organization and publish your first schedule as a Super Admin."
+description: "Set up your DubGrid organization as its first Super Admin, from the invitation email to a published schedule."
 ---
 
-This guide walks a new Super Admin through getting their organization ready from scratch, from accepting the initial invitation to publishing a first schedule.
+This guide is for the first Super Admin of a new organization. The DubGrid team has created your organization and sent you an invitation.
 
 <Note>
-  Invitation links expire after **72 hours**. If your link has expired, contact DubGrid support to
-  request a new one.
+  An invitation link works for **72 hours** from when it was sent, and it doesn't extend. If DubGrid
+  sends you a new invitation, only the link in the newest email works.
 </Note>
 
 <Steps>
-  <Step title="Open your invitation email">
-    Look for an email from DubGrid with the subject line containing your organization's name. Click the **Accept Invitation** link inside.
+  <Step title="Open the invitation email">
+    The email's subject reads "You're invited to join *your organization* on DubGrid", and it says exactly when the link expires. Select **Accept invitation**.
+  </Step>
 
-    The link takes you to `dubgrid.com/accept-invite` with a secure token embedded in the URL.
+  <Step title="Set your password">
+    The **Accept invitation** page shows your email address, which you can't change. Choose a password of at least 10 characters that includes a letter and a number, plus an uppercase letter or a symbol. The meter reads **Too short**, **Weak**, **Fair**, or **Strong**; any password it accepts will do.
+
+    Enter the password again in **Confirm password**, agree to the Terms of Service and Privacy Policy, and select **Set Password & Accept**.
+
+    - If you already have a DubGrid account with this email, the page asks for your existing **DubGrid password** instead and the button reads **Sign In & Accept**.
+    - If your account uses an authenticator app, enter its 6-digit code when asked.
+    - If the page says **Invitation no longer valid**, the link has expired or been replaced. Ask for a new invitation.
 
   </Step>
 
-  <Step title="Create your password">
-    On the **Accept Invitation** page:
+  <Step title="Sign in">
+    When the page says **You're all set**, it takes you to your organization's sign-in page after a few seconds, or select **Sign In Now**. Sign in with your email and password.
 
-    1. Your email address is pre-filled and locked.
-    2. Enter a password in the **Password** field. Passwords must be **at least 10 characters**. A strength meter shows four levels. Aim for **Strong**.
-    3. Re-enter your password in **Confirm password**.
-    4. Check the box to agree to the Terms of Service and Privacy Policy.
-    5. Click **Set Password & Accept**.
-
-    After a few seconds, you'll see a confirmation and be redirected to your organization's login page automatically.
+    Your organization's address looks like `yourorg.dubgrid.com`. On the main DubGrid sign-in page, enter the subdomain (the `yourorg` part) and select **Continue** first.
 
   </Step>
 
-  <Step title="Verify your email">
-    Check your inbox for a verification email from DubGrid. Click the link inside to confirm your address.
+  <Step title="Work through the setup guide">
+    The first time you sign in, a setup guide opens over the app. As the organization's first Super Admin you complete it before using the rest of DubGrid:
 
-    If the email doesn't arrive within a few minutes, return to the login page, where you'll be prompted to resend it (one resend allowed every 60 seconds).
+    1. **Welcome**
+    2. **Identity**: your organization's name, location, and time zone, and the labels your organization uses for its focus areas, certifications, and roles.
+    3. **Structure**: your departments and focus areas, roles, and certifications.
+    4. **Schedule**: how shifts are displayed, and your shifts and jobs. Add at least one shift and one job to continue.
+    5. **Invite Team**: invite the people who will help you schedule, or skip this for now.
+    6. **Done**: select **Go to People** to add your staff.
 
-  </Step>
-
-  <Step title="Sign in to your organization">
-    Navigate to your organization's subdomain, for example, `acme.dubgrid.com` - and sign in with your email and password.
-
-    If you're starting from `dubgrid.com/login`, enter your subdomain in the domain selector first, then continue to the sign-in form.
-
-  </Step>
-
-  <Step title="Complete the setup wizard">
-    After signing in, you'll land on the **Setup** page. It shows a checklist of items that must be completed before the full app unlocks. Work through each item in order:
-
-    **Organization details** - Confirm your organization name and timezone are correct in **Settings**.
-
-    **Focus areas** - Add the wings, departments, or sections that organize your schedule (e.g., *North Wing*, *Memory Care*). Go to **Settings → Staff Config**.
-
-    **Shift codes** - Review the default shift codes (D, E, N, X, and more) and customize colors, times, or add your own codes. Go to **Settings → Shift Codes**.
-
-    **Certifications** - Define the certification levels your staff carry (e.g., *JLCSN*, *CSN II*). Go to **Settings → Staff Config**.
-
-    **Roles** - Define the display roles used in your organization (e.g., *Supervisor*, *Charge Nurse*). Go to **Settings → Staff Config**.
-
-    **Employees** - Add your staff roster. Go to **Staff** and use **Add Employee** to create records individually, or bulk-import a list.
-
-    Each checklist item links directly to the relevant settings page. Return to `/setup` at any time to check your progress. When all items are complete, DubGrid redirects you to the dashboard automatically.
-
-    <Tip>
-      You don't have to complete every item in a single session. The setup page saves your progress and you can return to it any time the checklist is incomplete.
-    </Tip>
+    DubGrid has no built-in shifts or jobs: you add your organization's own.
 
   </Step>
 
-  <Step title="Navigate to the schedule">
-    Once setup is complete, go to `/schedule` (or click **Schedule** in the left sidebar). You'll see the schedule grid with your configured focus areas and staff roster.
+<Step title="Start your trial">
+  Your organization's 14-day free trial starts the first time a Super Admin signs in. After setup, a
+  **Your trial has started!** message shows how many days are left. Select **Set up billing** now,
+  or **Maybe later**. See [Subscription](/reference/subscription) for what happens when the trial
+  ends.
+</Step>
 
-    The default view is two weeks. Use the **1W**, **2W**, and **Month** buttons in the toolbar to switch views, and the arrow buttons to navigate dates.
-
-  </Step>
+<Step title="Add your people">
+  On **People**, add each person on your schedule and invite the ones who should sign in. Someone on
+  the schedule doesn't need an account; they appear on the schedule either way. See [Staff
+  roster](/staff/roster).
+</Step>
 
   <Step title="Build and publish your first schedule">
-    Click any cell in the grid to open the shift edit panel. Select a shift code to assign it. The cell shows the code immediately in **draft** state, indicated visually until published.
+    Open **Schedule**. Choose **1 Week**, **2 Weeks**, or **Month** in the toolbar, and select a cell to give that person a shift. Every change is a draft: staff don't see it yet.
 
-    When you're ready to publish:
-
-    1. The **Draft** banner at the top of the schedule shows how many changes are pending.
-    2. Click **Publish** in the banner.
-    3. Confirm the publish in the dialog that appears.
-
-    Published shifts are now visible to all users in your organization.
-
-    <Warning>
-      Clicking **Discard** in the draft banner rolls back all unpublished changes. This cannot be undone.
-    </Warning>
+    When the schedule is ready, select **Publish** in the draft banner and confirm **Publish Schedule?**. To throw drafts away instead, select **Discard**; you can discard your own drafts and keep everyone else's. See [Draft and publish](/features/draft-publish).
 
   </Step>
 </Steps>

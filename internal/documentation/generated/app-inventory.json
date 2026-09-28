@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:f2f9f1e20944d6e051baa9c7ae5e228d9feec30dc0b706c99c4cd01173e0c01e",
+  "sourceDigest": "sha256:d4372e2cd67e97c56f433c485ef8bdb72b62361358ecb1b1b945a733d09b7ec2",
   "webRoutes": [
     {
       "id": "web:/",
@@ -7605,6 +7605,16 @@
       }
     },
     {
+      "id": "script:root:docs:fingerprint",
+      "package": "root",
+      "workspacePath": ".",
+      "name": "docs:fingerprint",
+      "command": "npx --yes tsx@4.23.15 scripts/documentation/fingerprint.ts",
+      "source": {
+        "path": "package.json"
+      }
+    },
+    {
       "id": "script:root:docs:inventory",
       "package": "root",
       "workspacePath": ".",
@@ -8071,6 +8081,13 @@
       "id": "command:root:docs:check",
       "scriptId": "script:root:docs:check",
       "invocation": "npm run docs:check",
+      "audience": "developer",
+      "status": "supported"
+    },
+    {
+      "id": "command:root:docs:fingerprint",
+      "scriptId": "script:root:docs:fingerprint",
+      "invocation": "npm run docs:fingerprint",
       "audience": "developer",
       "status": "supported"
     },

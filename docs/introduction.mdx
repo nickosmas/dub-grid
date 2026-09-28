@@ -1,51 +1,41 @@
 ---
 title: "Introduction"
-description: "DubGrid is a multi-tenant employee scheduling platform built for care facilities."
+description: "What DubGrid is, how an organization is organized, and who can do what."
 ---
 
-DubGrid replaces spreadsheet-based scheduling with a modern web application designed for care facilities. Schedulers and admins manage staff rosters, build and publish shift schedules, and collaborate in real time, all from one place.
+DubGrid is staff scheduling for care facilities. Managers build and publish the schedule on the web; everyone in the organization sees the published schedule, requests shift changes, and gets alerts on the web or in the DubGrid mobile app.
 
-## What DubGrid does
+## Your organization
 
-Each organization is fully isolated, with its own staff roster, shift codes, focus areas (wings or departments), and schedule. You reach your organization at a unique subdomain, for example, `acme.dubgrid.com`.
+Each organization is separate from every other: its own people, schedule, settings, and address, such as `yourorg.dubgrid.com`. You sign in at that address, or enter your organization's subdomain (the `yourorg` part) on the DubGrid sign-in page.
 
-## Product pillars
+An organization describes its staff in its own words. The defaults are **Focus Areas**, **Certifications**, and **Roles**, and they can be renamed under **Settings > Labels**. These guides use the default names.
 
-**Schedule grid** - A 1-week, 2-week, or month view of your schedule. Staff are listed by row, dates by column. Click any cell to assign a shift code; drag and drop to move shifts. Auto-calculated count rows appear at the bottom of each section.
+## The schedule
 
-**Role-based access control (RBAC)** - Four roles control what each person can do: Super Admin, Admin, and User within your organization, plus a platform-level Gridmaster role. Admins receive a configurable set of granular permissions set by the Super Admin.
+- **Views**: see **1 Week**, **2 Weeks**, or a **Month** at a time. Two weeks is the default on a wide screen.
+- **Drafts**: every change is a draft until someone allowed to publish does so. A banner shows how many draft changes are waiting and offers **Publish** and **Discard**.
+- **Working together**: while you edit, you see who else is on the schedule and which cell they have open. It never locks you out. If someone else changed a shift before you saved, DubGrid says so and refreshes the schedule instead of overwriting their change.
+- **Recurring shifts**: a person's regular weekly pattern can fill the schedule for you.
+- **Requests**: staff ask to pick up an open shift, swap a shift with a colleague, or call off, and a manager approves or declines.
+- **Printing and calendars**: print a week, two weeks, or a month, and add your own shifts to Apple Calendar, Google Calendar, or Outlook.
 
-**Real-time collaboration** - Changes sync across all open tabs and users instantly. Cell locks show when someone else is editing a cell, and presence indicators show who else is viewing the schedule.
+## Who can do what
 
-**Draft/publish workflow** - Every edit is a draft until a Super Admin or permitted Admin publishes it. A banner shows the count of pending changes. Drafts are saved across browser sessions so nothing is lost.
+Everyone in an organization has one of three roles:
 
-## How organizations are structured
+| Role            | What they do                                                                                              |
+| --------------- | --------------------------------------------------------------------------------------------------------- |
+| **Super Admin** | Everything in the organization, including its settings, billing, and who can manage what                  |
+| **Admin**       | The parts of scheduling and staff management their Super Admin has switched on for them, person by person |
+| **User**        | Sees the published schedule, requests shift changes, and gets alerts                                      |
 
-Each organization on DubGrid has:
+A person on the schedule who has no DubGrid account yet counts as a User. See [Roles and permissions](/reference/roles) for the full list of what an Admin can be given.
 
-- A **subdomain** (e.g., `acme.dubgrid.com`) that routes all users to the correct organization
-- A configurable **staff roster** with employee records, certifications, roles, and focus area assignments
-- Custom **focus areas** (wings, departments, or sections) that organize the schedule grid
-- Custom **shift codes** with colors, time defaults, and certification requirements
-- A **Super Admin** who owns the organization and manages users and settings
+## Access is by invitation
 
-## Invite-only access
+There is no public sign-up. A Super Admin, or an Admin allowed to manage staff, invites each person by email. An invitation link works for 72 hours from when it was sent, and sending a new invitation replaces the old link.
 
-DubGrid does not have public registration. Every account is created through an invitation sent by a Super Admin or Admin with the appropriate permission. Invitation links expire after **72 hours**.
+## Web and mobile
 
-## Explore
-
-<CardGroup cols={2}>
-  <Card title="Quick Start" icon="rocket" href="/quickstart">
-    Set up your organization for the first time as a Super Admin.
-  </Card>
-  <Card title="Schedule Grid" icon="calendar" href="/features/schedule-grid">
-    Learn how to build and publish a schedule.
-  </Card>
-  <Card title="Staff Roster" icon="users" href="/staff/roster">
-    Add employees, assign roles, and manage your roster.
-  </Card>
-  <Card title="Roles & Permissions" icon="shield" href="/reference/roles">
-    Understand the four-tier role hierarchy and admin permissions.
-  </Card>
-</CardGroup>
+Everyone can use the web app. The DubGrid mobile app covers the schedule, requests, people, alerts, the dashboard, and your own account. Building and publishing the schedule, reports, billing, Admin permissions, and organization settings stay on the web.
