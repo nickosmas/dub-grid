@@ -485,7 +485,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   // ── Status action handlers ──────────────────────────────────────────────────
   // Only an impersonating Gridmaster is asked for fresh proof (F-96).
   const statusStepUp = useSharedStepUp();
-  const runStatusChange = (action: (accessToken?: string) => Promise<void>) => {
+  const runStatusChange = (action: (accessToken?: string) => Promise<boolean>) => {
     statusStepUp.run(action).catch((err) => {
       toast.error(formatClientErrorMessage(err, "We couldn't update their status. Try again."));
     });
@@ -493,7 +493,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
 
   const handleDeactivate = useCallback(
     async (empId: string, note?: string, accessToken?: string) => {
-      if (!orgId || !employee) return;
+      if (!orgId || !employee) return false;
       setEmployee((prev) =>
         prev
           ? {
@@ -514,11 +514,12 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         );
         syncEmployeeCaches(updatedEmployee);
         toast.success("Employee marked inactive");
+        return true;
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
           syncEmployeeCaches(err.latestEmployee);
           toast.error("Employee status changed elsewhere. Review the latest values and try again.");
-          return;
+          return false;
         }
         // Revert on failure
         setEmployee((prev) =>
@@ -527,9 +528,10 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         if (getStepUpMethod(err)) throw err;
         if (err instanceof SelfActionForbiddenError) {
           toast.error(formatClientErrorMessage(err, SELF_ACTION_FORBIDDEN_MESSAGE));
-          return;
+          return false;
         }
         toast.error("We couldn't update their status. Try again.");
+        return false;
       }
     },
     [employee, orgId, syncEmployeeCaches],
@@ -572,7 +574,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
 
   const handleRemove = useCallback(
     async (empId: string, note?: string, accessToken?: string) => {
-      if (!orgId || !employee) return;
+      if (!orgId || !employee) return false;
       const prevStatus = employee?.status;
       setEmployee((prev) =>
         prev
@@ -589,19 +591,21 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         );
         syncEmployeeCaches(updatedEmployee);
         toast.success("Employee removed");
+        return true;
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
           syncEmployeeCaches(err.latestEmployee);
           toast.error("Employee status changed elsewhere. Review the latest values and try again.");
-          return;
+          return false;
         }
         setEmployee((prev) => (prev ? { ...prev, status: prevStatus ?? "active" } : prev));
         if (getStepUpMethod(err)) throw err;
         if (err instanceof SelfActionForbiddenError) {
           toast.error(formatClientErrorMessage(err, SELF_ACTION_FORBIDDEN_MESSAGE));
-          return;
+          return false;
         }
         toast.error("We couldn't remove them. Try again.");
+        return false;
       }
     },
     [employee, orgId, syncEmployeeCaches],

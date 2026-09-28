@@ -9,6 +9,7 @@ const serviceRpc = vi.fn();
 const profileUpdate = vi.fn();
 const profileEq = vi.fn();
 const auditInsert = vi.fn();
+const membershipLookup = vi.fn();
 const userSessionsIn = vi.fn();
 const mobileTokensIn = vi.fn();
 const membershipsIn = vi.fn();
@@ -229,8 +230,26 @@ describe("PATCH /api/gridmaster/users", () => {
       if (table === "audit_log") {
         return { insert: auditInsert };
       }
+      if (table === "organization_memberships") {
+        const chain = { select: () => chain, eq: () => chain, maybeSingle: membershipLookup };
+        return chain;
+      }
       throw new Error(`Unexpected table: ${table}`);
     });
+    membershipLookup.mockResolvedValue({ data: { org_id: ORG_ID }, error: null });
+  });
+
+  it("files the row under no organization when the person is not a member of the one sent (F-93)", async () => {
+    membershipLookup.mockResolvedValueOnce({ data: null, error: null });
+
+    const response = await PATCH(
+      makePatchRequest({ userId: USER_ID, orgId: ORG_ID, deactivate: true }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "user.deactivated", org_id: null }),
+    );
   });
 
   it("rejects CSRF failures before gridmaster auth", async () => {

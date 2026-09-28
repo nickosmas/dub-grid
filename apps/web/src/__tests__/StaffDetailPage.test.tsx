@@ -11,6 +11,8 @@ import {
   fetchEmployeeInvitations,
   fetchEmployeeActivity,
   updateEmployee,
+  deactivateEmployee,
+  removeEmployee,
 } from "@/features/employees/client";
 import { toast } from "sonner";
 import {
@@ -57,6 +59,26 @@ vi.mock("@/hooks", () => ({
 
 vi.mock("@/components/AuthProvider", () => ({
   useAuth: () => ({ user: { id: "viewer-user-id" } }),
+}));
+
+const stepUpPrompt = vi.hoisted(() => vi.fn());
+// Stands in for the shared prompt: a refusal the page hands back is retried
+// with an assured token, as the real hook does after the person confirms.
+vi.mock("@/hooks/useSharedStepUp", () => ({
+  useSharedStepUp: () => ({
+    dialog: null,
+    run: async (action: (accessToken?: string) => Promise<unknown>) => {
+      try {
+        await action();
+        return true;
+      } catch (error) {
+        if ((error as { code?: string }).code !== "STEP_UP_REQUIRED") throw error;
+        stepUpPrompt();
+        await action("assured-token");
+        return true;
+      }
+    },
+  }),
 }));
 
 // Note: we no longer mock @tanstack/react-query; `renderWithQuery` provides a
@@ -716,4 +738,33 @@ describe("StaffDetailPage", () => {
     expect(screen.queryByText("Edit details form")).not.toBeInTheDocument();
     expect(screen.getByText("Employment")).toBeInTheDocument();
   });
+
+  it.each([
+    ["Mark inactive", deactivateEmployee],
+    ["Remove", removeEmployee],
+  ] as const)(
+    "%s asks a Gridmaster for fresh proof and retries with the assured token",
+    async (confirmLabel, statusCall) => {
+      const refusal = Object.assign(new Error("Confirm your identity."), {
+        status: 403,
+        code: "STEP_UP_REQUIRED",
+        method: "password",
+      });
+      vi.mocked(statusCall)
+        .mockRejectedValueOnce(refusal)
+        .mockResolvedValueOnce({ ...mockEmployee, status: "inactive", version: 2 });
+
+      render(<StaffDetailPage employeeId="emp-1" />);
+      fireEvent.click(await screen.findByRole("button", { name: "Deactivate" }));
+      if (confirmLabel === "Remove")
+        fireEvent.click(screen.getByRole("radio", { name: /Remove from staff/ }));
+      fireEvent.click(screen.getByRole("button", { name: confirmLabel }));
+
+      await waitFor(() => expect(statusCall).toHaveBeenCalledTimes(2));
+      expect(stepUpPrompt).toHaveBeenCalledOnce();
+      expect(vi.mocked(statusCall).mock.calls[0].at(-1)).toBeUndefined();
+      expect(vi.mocked(statusCall).mock.calls[1].at(-1)).toBe("assured-token");
+      expect(vi.mocked(toast.error)).not.toHaveBeenCalled();
+    },
+  );
 });

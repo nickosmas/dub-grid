@@ -85,7 +85,8 @@ export default function GridmasterPersonView({
   );
 
   function refresh() {
-    void queryClient.invalidateQueries({ queryKey: personKey(target) });
+    // The whole person subtree: the record, history, notifications and schedule.
+    void queryClient.invalidateQueries({ queryKey: queryKeys.gridmaster.personAll() });
     void queryClient.invalidateQueries({ queryKey: queryKeys.gridmaster.allUsers() });
   }
 

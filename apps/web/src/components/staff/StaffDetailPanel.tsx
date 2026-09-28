@@ -50,8 +50,8 @@ interface StaffDetailPanelProps {
     oldInvitation: Invitation,
     runStepUp: StepUpRun,
   ) => boolean | Promise<boolean>;
-  onRemove: (empId: string, note?: string) => void;
-  onDeactivate: (empId: string, note?: string) => void;
+  onRemove: (empId: string, note?: string) => void | Promise<boolean>;
+  onDeactivate: (empId: string, note?: string) => void | Promise<boolean>;
   onActivate: (empId: string) => void;
   onClose: () => void;
   onInvite?: (emp: Employee) => void;

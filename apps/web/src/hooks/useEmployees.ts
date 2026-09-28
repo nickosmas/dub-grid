@@ -44,8 +44,12 @@ export interface EmployeesData {
     runStepUp: StepUpRun,
   ) => Promise<boolean>;
   /** A step-up refusal is rethrown (after the optimistic change is undone) for the caller to prompt. */
-  handleRemoveEmployee: (empId: string, note?: string, accessToken?: string) => Promise<void>;
-  handleDeactivateEmployee: (empId: string, note?: string, accessToken?: string) => Promise<void>;
+  handleRemoveEmployee: (empId: string, note?: string, accessToken?: string) => Promise<boolean>;
+  handleDeactivateEmployee: (
+    empId: string,
+    note?: string,
+    accessToken?: string,
+  ) => Promise<boolean>;
   handleActivateEmployee: (empId: string) => Promise<void>;
 }
 
@@ -240,7 +244,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
   const handleRemoveEmployee = useCallback(
     async (empId: string, note?: string, accessToken?: string) => {
       const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
-      if (!targetEmployee || !orgId) return;
+      if (!targetEmployee || !orgId) return false;
 
       const now = new Date().toISOString();
       const prevAll = allEmployeesRef.current;
@@ -260,20 +264,22 @@ export function useEmployees(orgId: string | null): EmployeesData {
         setAllLocal((prev) => replaceEmployeeRow(prev, updatedEmployee));
         toast.success("Employee removed");
         invalidateEmployees();
+        return true;
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
           setAllLocal((prev) => replaceEmployeeRow(prev, err.latestEmployee));
           toast.error("Employee status changed elsewhere. Review the latest values and try again.");
-          return;
+          return false;
         }
         setAllLocal(prevAll);
         if (getStepUpMethod(err)) throw err;
         if (err instanceof SelfActionForbiddenError) {
           toast.error(formatClientErrorMessage(err, SELF_ACTION_FORBIDDEN_MESSAGE));
-          return;
+          return false;
         }
         toast.error("We couldn't remove them. Try again.");
         Sentry.captureException(err);
+        return false;
       }
     },
     [orgId, invalidateEmployees],
@@ -282,7 +288,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
   const handleDeactivateEmployee = useCallback(
     async (empId: string, note?: string, accessToken?: string) => {
       const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
-      if (!targetEmployee || !orgId) return;
+      if (!targetEmployee || !orgId) return false;
 
       const prevAll = allEmployeesRef.current;
       setAllLocal((prev) =>
@@ -308,20 +314,22 @@ export function useEmployees(orgId: string | null): EmployeesData {
         setAllLocal((prev) => replaceEmployeeRow(prev, updatedEmployee));
         toast.success("Employee marked inactive");
         invalidateEmployees();
+        return true;
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
           setAllLocal((prev) => replaceEmployeeRow(prev, err.latestEmployee));
           toast.error("Employee status changed elsewhere. Review the latest values and try again.");
-          return;
+          return false;
         }
         setAllLocal(prevAll);
         if (getStepUpMethod(err)) throw err;
         if (err instanceof SelfActionForbiddenError) {
           toast.error(formatClientErrorMessage(err, SELF_ACTION_FORBIDDEN_MESSAGE));
-          return;
+          return false;
         }
         toast.error("We couldn't update their status. Try again.");
         Sentry.captureException(err);
+        return false;
       }
     },
     [orgId, invalidateEmployees],

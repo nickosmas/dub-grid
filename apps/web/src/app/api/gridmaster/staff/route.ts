@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireGridmasterSession } from "@/lib/api-auth";
+import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import {
@@ -8,12 +9,23 @@ import {
   toSearchTerms,
 } from "@/features/gridmaster/server/staff-search";
 
-export async function GET(req: NextRequest) {
+/** A POST, so a name, email or phone searched for never lands in a request log's URL (F-94). */
+export async function POST(req: NextRequest) {
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
   try {
     const auth = await requireGridmasterSession(req);
     if ("response" in auth) return auth.response;
 
-    const query = (req.nextUrl.searchParams.get("q") ?? "").trim();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+    }
+    const raw = (body as { q?: unknown } | null)?.q;
+    const query = (typeof raw === "string" ? raw : "").trim();
     const terms = toSearchTerms(query);
     if (query.length < STAFF_SEARCH_MIN_LENGTH || terms.length === 0) {
       return NextResponse.json(

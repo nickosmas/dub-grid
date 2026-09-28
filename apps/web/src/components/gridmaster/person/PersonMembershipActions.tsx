@@ -222,8 +222,10 @@ export function PersonMembershipActions({
               onChanged();
             } catch (error) {
               if (error instanceof OrganizationAccessConflictError) {
+                // Reported here, so the editor must not toast it a second time.
                 toast.error(CONFLICT_MESSAGE);
                 onChanged();
+                return false;
               }
               throw error;
             }

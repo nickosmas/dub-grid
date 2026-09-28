@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DbEmployee, DbInvitation, DbOrganization } from "@/lib/db/types";
 import { rowToEmployee, rowToInvitation, rowToOrganizationTerminology } from "@/lib/db/mappers";
 import { readLoginLock } from "@/lib/rate-limit";
+import logger from "@/lib/logger";
 import type { Invitation, OrganizationRole } from "@/types";
 import type {
   GridmasterFactor,
@@ -126,13 +127,18 @@ export async function resolveActors(
   ids: Iterable<string | null>,
 ): Promise<Record<string, string>> {
   const unique = [...new Set([...ids].filter((id): id is string => Boolean(id)))];
-  const entries = await Promise.all(
-    unique.map(async (id) => {
-      const { data } = await client.auth.admin.getUserById(id);
-      return data?.user?.email ? ([id, data.user.email] as const) : null;
-    }),
+  if (unique.length === 0) return {};
+  // One query for every actor (migration 066), not an Auth call each (F-92).
+  const { data, error } = await client.rpc("gridmaster_user_emails", { p_user_ids: unique });
+  if (error) {
+    // Names are a courtesy; the record still loads without them.
+    logger.warn({ error }, "gridmaster actor emails unavailable");
+    return {};
+  }
+  const rows = (data ?? []) as Array<{ id: string; email: string | null }>;
+  return Object.fromEntries(
+    rows.filter((row) => row.email).map((row) => [row.id, row.email as string]),
   );
-  return Object.fromEntries(entries.filter((entry) => entry !== null));
 }
 
 async function groupByOrganization(

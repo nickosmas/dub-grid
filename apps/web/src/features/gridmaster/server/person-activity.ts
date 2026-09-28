@@ -49,8 +49,24 @@ async function loadLabelMaps(client: SupabaseClient, orgId: string) {
 
 type LabelMaps = Awaited<ReturnType<typeof loadLabelMaps>>;
 
+/**
+ * A publish change carries a cell state or, for a schedule note, the note
+ * itself. A row neither shape reads is shown as unknown rather than failing
+ * the whole section (F-97).
+ */
 function stateLabel(state: unknown, maps: LabelMaps): string | null {
-  return state ? scheduleStateLabel(state as ScheduleCellInput, maps) : null;
+  if (!state || typeof state !== "object") return null;
+  const note = state as { type?: unknown; indicatorName?: unknown };
+  if (note.type === "note") {
+    return typeof note.indicatorName === "string" && note.indicatorName
+      ? `Schedule note: ${note.indicatorName}`
+      : "Schedule note";
+  }
+  try {
+    return scheduleStateLabel(state as ScheduleCellInput, maps);
+  } catch {
+    return "Unknown";
+  }
 }
 
 function employeeName(row: { first_name?: string | null; last_name?: string | null } | null) {
@@ -67,6 +83,8 @@ async function loadRequestsAndChanges(
   nowMs: number,
 ) {
   const cutoff = new Date(nowMs - HISTORY_DAYS * DAY_MS).toISOString();
+  // Every open request, and the rest from the last 90 days, bounded in the query (F-92).
+  const openOrRecent = `or(status.in.(${[...OPEN_REQUEST_STATUSES].join(",")}),created_at.gte.${cutoff})`;
   const [changeResult, requestResult, profileResult] = await Promise.all([
     client
       .from("schedule_publish_changes")
@@ -83,7 +101,11 @@ async function loadRequestsAndChanges(
         "id, type, status, requester_emp_id, target_emp_id, requester_shift_date, target_shift_date, admin_user_id, admin_note, created_at, resolved_at",
       )
       .eq("org_id", orgId)
-      .or(`requester_emp_id.eq.${employeeId},target_emp_id.eq.${employeeId}`)
+      .or(
+        [`requester_emp_id.eq.${employeeId}`, `target_emp_id.eq.${employeeId}`]
+          .map((side) => `and(${side},${openOrRecent})`)
+          .join(","),
+      )
       .order("created_at", { ascending: false }),
     client
       .from("profile_change_requests")
@@ -92,6 +114,7 @@ async function loadRequestsAndChanges(
       )
       .eq("org_id", orgId)
       .eq("requester_employee_id", employeeId)
+      .or(`status.eq.pending,created_at.gte.${cutoff}`)
       .order("created_at", { ascending: false }),
   ]);
 
@@ -109,10 +132,7 @@ async function loadRequestsAndChanges(
     })
     .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
 
-  const requestRows = rowsOrThrow<Row>(requestResult).filter(
-    (row) =>
-      OPEN_REQUEST_STATUSES.has(row.status as string) || (row.created_at as string) >= cutoff,
-  );
+  const requestRows = rowsOrThrow<Row>(requestResult);
   const partnerIds = [
     ...new Set(
       requestRows
@@ -208,12 +228,17 @@ export async function loadPersonSchedule(
 ): Promise<GridmasterPersonSchedule | null> {
   const { data: employee, error } = await client
     .from("employees")
-    .select("id, org_id")
+    .select("id, org_id, organizations!inner(workspace_kind)")
     .eq("id", employeeId)
     .maybeSingle();
   if (error) throw error;
-  if (!employee) return null;
-  const orgId = (employee as { org_id: string }).org_id;
+  const row = employee as {
+    org_id: string;
+    organizations: { workspace_kind: string } | null;
+  } | null;
+  // A Test Sandbox's staff are clones, not people, as the person record says (F-93).
+  if (!row || row.organizations?.workspace_kind !== "real") return null;
+  const orgId = row.org_id;
 
   const window = {
     from: dayKey(nowMs - DAYS_BACK * DAY_MS),

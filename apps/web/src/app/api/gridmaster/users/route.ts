@@ -210,6 +210,16 @@ export async function PATCH(req: NextRequest) {
         { status: 404 },
       );
     }
+    // Deactivation is account-wide; the row joins an organization's activity
+    // only when the person belongs to it, never on the client's word (F-93).
+    const { data: membership, error: membershipError } = await serviceClient
+      .from("organization_memberships")
+      .select("org_id")
+      .eq("user_id", userId)
+      .eq("org_id", parsed.data.orgId)
+      .maybeSingle();
+    if (membershipError) throw membershipError;
+
     const { error } = await serviceClient
       .from("profiles")
       .update({
@@ -234,7 +244,7 @@ export async function PATCH(req: NextRequest) {
       action: deactivate ? "user.deactivated" : "user.reactivated",
       resourceType: "user",
       resourceId: userId,
-      orgId: parsed.data.orgId,
+      orgId: membership ? parsed.data.orgId : null,
       details: { targetUserId: userId },
       request: req,
     });

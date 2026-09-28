@@ -88,150 +88,6 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** End the created session when the client has gone (for example, a short server-side deadline that signs the new session out), or let the next successful sign-in on that device replace the orphan.
 **Resolution:**
 
-### F-82 [P3] closed - Month view misses a note filed under a person's secondary focus area
-
-**File:** `apps/web/src/components/MonthView.tsx` (row building)
-**Found:** 2026-09-26 by review of 42a
-**Why it matters:** A general shift code is listed only under the person's primary focus area, so an indicator stored against another of their focus areas for that day never appears in the day popover. Rare: indicators are normally stored against the focus area the shift is in.
-**Suggested fix:** Merge the person's marks from their other home focus areas into that row, deduplicated.
-**Resolution:** Fixed: after building a day's rows, each person's first row also takes the notes filed under every focus area they have no row in that day, and those with no focus area, each note once (`MonthView.tsx`). A test lists a general-code person under their primary area with a note filed under their second area and a note filed under both; it fails against the previous code. Re-review (2026-09-28, `/audit` at 1924880c): closed. `MonthView.tsx:442-477` gives each person's first row, in focus-area order, the notes filed under every area they have no row in and those with no area, deduplicated; after 063 the note map still keys by employee, date and area, and a note on both shifts of a double shift collapses to one mark (`schedule-window.ts`), so nothing shows twice. Follow-ups are F-106.
-
-### F-83 [P3] closed - Gridmaster realtime invalidation is not coalesced
-
-**File:** `apps/web/src/hooks/useGridmasterRealtimeInvalidation.ts`
-**Found:** 2026-09-26 by review of the findings batch
-**Why it matters:** The platform-wide subscription invalidates on every row event with no debounce, so a bulk import or invitation batch in any organization restarts an open person page's (and the platform summaries') fetch once per row. Gridmaster-only, and the summaries already behaved this way.
-**Suggested fix:** Coalesce invalidations per query key over a short window before refetching.
-**Resolution:** Fixed in `fix/gridmaster-realtime-coalesce`: the Gridmaster subscription batches its invalidations by query key through the shared `createDebouncedTableFlusher` (150 ms, as the org hook), so each distinct key refetches and broadcasts once per burst, and a pending batch is dropped on teardown. Tests cover the burst, cross-table dedupe, the live subscription and teardown. Re-review (2026-09-28, `/audit` at 1924880c): closed. Every Gridmaster query key is strings and numbers (`orgHealth` and `orgAudit` map null to strings), so the JSON round trip is lossless; prefix invalidation, the reconnect path and the channel are unchanged; teardown disposes then unsubscribes, as the org hook does. Follow-ups are F-107.
-
-### F-84 [P3] closed - No index serves an organization's schedule notes by date
-
-**File:** `supabase/migrations/001_schema.sql` (`schedule_notes` indexes)
-**Found:** 2026-09-27 by review of 42b
-**Why it matters:** The web schedule and, since 42b, every mobile team schedule read notes by `org_id` and a date range, ordered by date; with only `(org_id)`, `(emp_id)`, `(emp_id, date)` and `(indicator_type_id)` indexes, that scans the organization's whole note history. Fine at today's sizes.
-**Suggested fix:** A forward migration adding an index on `(org_id, date)`.
-**Resolution:** Fixed: migration `062_schedule_notes_org_date_index.sql` adds `idx_schedule_notes_org_date` on `(org_id, date)` and drops the single-column `idx_schedule_notes_org` it covers; checksum locked and `db:migrations:check` passes. Applied locally, where a week's read for an organization now plans as an index scan on the new index. Applied to production 2026-09-27 by the owner after a scratch rehearsal from 061 and on the local stack. Before: 61 ledger entries, only 062 missing. After: 62 ledger entries, none missing, every invariant passing, health 200, and a final dry run up to date. Shipped in release #120. Re-review (2026-09-28, `/audit` at 1924880c): closed. `idx_schedule_notes_org_date` still leads with `org_id`, so the organization cascade stays indexed; 063 and 064 leave it alone; every range read (`lib/db/schedule.ts`, `data-access/src/mobile.ts`, `schedule-draft-safety.ts`, reports, settings config) filters `org_id` and a date range. Follow-up is F-108.
-
-### F-85 [P2] closed - The Gridmaster history returns IP, email and session hashes, and the export writes them out
-
-**File:** `apps/web/src/features/gridmaster/server/person-history.ts:162`
-**Found:** 2026-09-27 by `/audit` (scope: item 43, 54f5c12d..43327601; all lenses)
-**Why it matters:** `withoutNetworkDetails` strips only the `ip_address` and `user_agent` columns. The person's own `security.auth.*` rows keep `sourceHash` (a hashed client IP), `targetHash` and `sessionHash` in `details`, which the history GET and both export routes return raw. The person record's rule is never to carry IP hashes.
-**Suggested fix:** drop those three keys from `details` in `loadPersonHistory` (or allowlist details keys), with a merge test row that carries them.
-**Resolution:** Closed 2026-09-28 by `/audit` of f6192d2b: `withoutNetworkDetails` drops `sourceHash`, `targetHash` and `sessionHash` from every merged row's `details` (object-only guard), and both exports read the same rows; the merge test carries all three and gets none back.
-
-### F-86 [P2] closed - Person notifications return the IP address and session id stored on new-device alerts
-
-**File:** `apps/web/src/features/gridmaster/server/person-notifications.ts:37`
-**Found:** 2026-09-27 by `/audit` (scope: item 43; all lenses)
-**Why it matters:** `security_new_device` writes an email-channel row whose `metadata` holds `ipAddress` (`events.ts:1080`) and `dedupe_key: "security_new_device:<session id>"` (`sender.ts:289`). The loader returns `metadata` verbatim to the Gridmaster page.
-**Suggested fix:** allowlist the metadata keys the card needs (or drop `ipAddress` and `dedupe_key`), with a test using a new-device row.
-**Resolution:** Closed 2026-09-28 by `/audit` of f6192d2b: `safeMetadata` keeps an allowlist of seven display keys and returns null otherwise, so `ipAddress`, `dedupe_key` and any future key are dropped. The person page's card reads no metadata at all, so nothing it shows was lost.
-
-### F-87 [P2] closed - Every impersonation appears twice in a person's history
-
-**File:** `apps/web/src/features/gridmaster/server/person-history.ts:116`
-**Found:** 2026-09-27 by `/audit` (scope: item 43; all lenses)
-**Why it matters:** the account source drops `impersonation.started`/`.ended` about the person, but the staff source (`fetchEmployeeAuditRows` with every action) still matches them through `details->>targetUserId` in the target organization. Their numeric ids never collide with the string `impersonation-<id>` row, so both show, against the one-entry-per-event rule. The merge test gives the staff query no impersonation rows.
-**Suggested fix:** apply the same drop (action in the pair and actor is not the person) to the merged rows in `loadPersonHistory`, with a merge test.
-**Resolution:** Closed 2026-09-28 by `/audit` of f6192d2b: the merge loop drops `impersonation.started`/`.ended` rows whose actor is not the person, from every source; the synthetic session row uses `impersonation.session` and is unaffected. The account source's own filter (line 117) is now redundant but harmless.
-
-### F-88 [P2] closed - History, export, notifications and force logout do not refuse a Gridmaster target
-
-**File:** `apps/web/src/features/gridmaster/server/person-history.ts:186`; `person-notifications.ts:14`; `apps/web/src/app/api/gridmaster/users/[userId]/force-logout/route.ts:61`
-**Found:** 2026-09-27 by `/audit` (scope: item 43; all lenses)
-**Why it matters:** the person record (`person-record.ts:323`) and every write through `loadPersonTarget` refuse a Gridmaster account, but these read another Gridmaster's whole audit history, export it, or read their inbox by id; force logout (older, but on the same page) acts on one too.
-**Suggested fix:** return null for `platform_role = 'gridmaster'` in `loadPersonHistory`, use `loadPersonTarget` in the notifications and force-logout routes, and add a refusal test per route.
-**Resolution:** Closed 2026-09-28 by `/audit` of f6192d2b: `loadPersonHistory` returns null for a Gridmaster, for a user target and for a staff record linked to one, so history and both exports answer 404; the notifications route goes through `loadPersonTarget`. Force logout stays reachable for another Gridmaster on purpose (the Gridmaster accounts screen uses it); it is gated by fresh proof.
-
-### F-89 [P2] closed - Deactivating or terminating an account leaves its refresh tokens alive for reactivation
-
-**File:** `apps/web/src/app/api/gridmaster/users/route.ts:228`; `apps/web/src/app/api/gridmaster/users/[userId]/terminate/route.ts:73`
-**Found:** 2026-09-27 by `/audit` (scope: item 43; all lenses)
-**Why it matters:** both call `revokeAllUserSessions` (a watermark plus the `user_sessions` rows) but not `endUserSessions`, so Supabase refresh tokens survive. The hook refuses them while the account is blocked, but after reactivation or reinstatement a device that was the reason for the block (a lost phone) can mint tokens again. Force logout already fixed this gap for itself.
-**Suggested fix:** call `endUserSessions(userId)` on deactivate and terminate, with route tests.
-**Resolution:** Closed 2026-09-28 by `/audit` of f6192d2b: deactivate and terminate call `endUserSessions`, which revokes the tracked sessions and then deletes the provider sessions and refresh tokens through `end_user_auth_sessions`; route tests and the sensitive-action inventory pin it.
-
-### F-90 [P2] closed - A two-factor reset that fails part way is neither recorded nor announced
-
-**File:** `apps/web/src/features/gridmaster/server/two-factor-reset.ts:23`; `apps/web/src/app/api/gridmaster/users/[userId]/two-factor-reset/route.ts:55`
-**Found:** 2026-09-27 by `/audit` (scope: item 43; all lenses)
-**Why it matters:** if a later `deleteFactor`, the profile update or `endUserSessions` fails after some factors are gone, the route answers 500 before the `user.mfa_reset` row and the email; nothing records that factors were removed until someone retries, and a retry then records `factorsRemoved: 0`.
-**Suggested fix:** return the running count from the helper and, in the route, record the reset (with `partial: true`) and send the notice whenever any factor was removed.
-**Resolution:** Closed 2026-09-28 by `/audit` of f6192d2b: the helper counts removals and throws `PartialTwoFactorResetError` only after at least one factor is gone; the route then records `user.mfa_reset` with `partial: true` and schedules the notice before answering 500 with the original cause. A failure before any removal records nothing, as it should.
-
-### F-91 [P3] open - The person page's refresh misses its history, notifications and schedule sections
-
-**File:** `apps/web/src/components/gridmaster/person/GridmasterPersonView.tsx:88`; `apps/web/src/lib/query-keys.ts:136`
-**Found:** 2026-09-27 by `/audit` (scope: item 43; all lenses)
-**Why it matters:** `refresh()` invalidates `["gm","person",kind,id]`, which is not a prefix of the `history`, `notifications` or `activity` keys, so after an action (terminate, two-factor reset) an open History card keeps the old list for up to 30 seconds; the key comment claims otherwise. Realtime events do reach them through `personAll`.
-**Suggested fix:** invalidate the three keys in `refresh()` (or nest them under the person key) and correct the comment.
-**Resolution:**
-
-### F-92 [P3] open - Unbounded reads behind the person page
-
-**File:** `apps/web/src/features/gridmaster/server/person-activity.ts:80`; `person-history.ts:90`; `person-record.ts:124`
-**Found:** 2026-09-27 by `/audit` (scope: item 43; lens: performance)
-**Why it matters:** every shift request and profile change request the person ever made is fetched and filtered to 90 days in code; the account history's `details->>targetUserId` branch has no index, so the `.or()` likely scans all of `audit_log` (unverified: no query plan taken); actor emails are one `auth.admin.getUserById` call each, twice per page.
-**Suggested fix:** bound the request query in SQL (`status in (open, pending_approval)` or `created_at >= cutoff`); take a plan and add an expression index on `(details->>'targetUserId')` if it scans; resolve actors in one query.
-**Resolution:**
-
-### F-93 [P3] open - Small inconsistencies on the person page's server side
-
-**File:** `apps/web/src/features/gridmaster/server/person-activity.ts:223`; `person-history.ts:196`; `apps/web/src/app/api/gridmaster/users/route.ts:20`
-**Found:** 2026-09-27 by `/audit` (scope: item 43; all lenses)
-**Why it matters:** the staff schedule and history read Test Sandbox staff, which the staff record refuses (`person-record.ts:427`); the deactivate audit row writes a client-supplied, unchecked `orgId`, so it can land in an unrelated organization's activity.
-**Suggested fix:** the same `workspace_kind = 'real'` check in both loaders; record deactivation with `org_id` null or check `orgId` against the target's memberships.
-**Resolution:**
-
-### F-94 [P3] open - Small client issues on the person page
-
-**File:** `apps/web/src/components/gridmaster/person/PersonMembershipActions.tsx:215`; `apps/web/src/features/gridmaster/client/api.ts:363`; `apps/web/src/lib/staff-directory.ts:81`
-**Found:** 2026-09-27 by `/audit` (scope: item 43; all lenses)
-**Why it matters:** a permission conflict toasts twice (the action toasts and rethrows, `PermissionsEditor` toasts again); staff search sends a name, email or phone in the URL query, where request logs keep it; `withKnownJoinedDate` turns an unknown previous joined date into `null` ("Not joined") instead of leaving it unknown.
-**Suggested fix:** return `false` after the conflict toast; send the search as a POST body; keep `undefined` when the previous date is unknown.
-**Resolution:**
-
-### F-95 [P3] open - Test gaps on the person page's actions
-
-**File:** `apps/web/src/__tests__/GridmasterPersonView.test.tsx`; the two-factor reset and security route tests
-**Found:** 2026-09-27 by `/audit` (scope: item 43; lens: tests)
-**Why it matters:** terminate with its reason, reinstate, password reset, forget device, turn off push and revoke feed are mocked but never exercised in the view; every suite mocks the step-up `dialog` as null, so "a confirmation hides while step-up shows" is untested; the two-factor reset and security routes have no CSRF refusal test.
-**Suggested fix:** view tests for those actions, one with a non-null step-up dialog, and CSRF tests on the two routes.
-**Resolution:**
-
-### F-96 [P3] closed - Owner decisions left by item 43
-
-**File:** `apps/web/src/components/gridmaster/person/PersonAccountCard.tsx:136`; `PersonMembershipActions.tsx:94`; `PersonStaffActions.tsx:87`; `blueprint/history/features/43e-combined-history.md`
-**Found:** 2026-09-27 by `/audit` (scope: item 43; all lenses)
-**Why it matters:** user agents are shown on terms and consent rows, as 43b chose, but 43e's archive says the record never carries them; removing someone from an organization and staff deactivate or remove need no fresh proof (as on the People page and in `organizations/access` DELETE) while role and permission changes on the same card do.
-**Suggested fix:** decide whether user agents stay (then correct 43e's wording) or go; decide whether access removal needs fresh proof, server and client together.
-**Resolution:** Closed 2026-09-28 by `/audit` of f6192d2b. (1) Terms and consent rows show `describeUserAgent` with the raw string in a `MaybeHint`; 43e's archive is corrected. (2) `DELETE /api/organizations/access` and the deactivate and remove actions of `POST /api/employees/status` call `requireSensitiveActionAuth` for a Gridmaster before any read or write of the target, and every other Gridmaster write route already did; admins take no new path. Screens: the person page and Users tab preflight the password; the People page and staff profile prompt on refusal through `useSharedStepUp`. Follow-ups are F-98 and F-99.
-
-### F-97 [P3] unverified - A malformed stored schedule state could fail the whole schedule section
-
-**File:** `apps/web/src/lib/db/mappers.ts:479` (`normalizeScheduleCellState`), called by `person-activity.ts:53`
-**Found:** 2026-09-27 by `/audit` (scope: item 43; all lenses)
-**Why it matters:** `[...state.segments]` has no guard, so a `worked` state without `segments` (for example a publish change from before the snapshot model) would throw and answer 500 for the whole section.
-**Suggested fix:** confirm with a count of `schedule_publish_changes` rows whose `from_state`/`to_state` lack `kind`, or are `worked` without `segments`; if any exist, label them defensively.
-**Resolution:**
-
-### F-98 [P3] open - A bulk status change leaves its confirmation open under the step-up prompt, and counts a cancel as success
-
-**File:** `apps/web/src/components/staff/MembersSection.tsx:2698`; `apps/web/src/app/(app)/people/PeoplePageContent.tsx`
-**Found:** 2026-09-28 by `/audit` (scope: f6192d2b; all lenses)
-**Why it matters:** every other step-up screen hides its confirmation while the prompt shows (`&& !stepUp.dialog`), but the bulk deactivate or remove `ConfirmDialog` stays open (loading) while `PeoplePageContent` renders the step-up dialog, so two modal dialogs stack for an impersonating Gridmaster; unverified in a browser whether focus reaches the prompt. A cancelled prompt resolves each row quietly, so the bulk toast reports them updated (the handlers already swallow their own failures, so the count was loose before).
-**Suggested fix:** hide the bulk confirmation while a status step-up is pending (expose `statusStepUp.dialog` state to `StaffView`, or close the confirm before awaiting), and have the handlers report success so the bulk count is real.
-**Resolution:**
-
-### F-99 [P3] open - The People page's step-up wiring has no test
-
-**File:** `apps/web/src/components/staff-detail/StaffDetailPage.tsx:486`; `apps/web/src/app/(app)/people/PeoplePageContent.tsx`
-**Found:** 2026-09-28 by `/audit` (scope: f6192d2b; lens: tests)
-**Why it matters:** `useSharedStepUp` and the `useEmployees` rethrow are tested, but deleting the step-up rethrow from `StaffDetailPage`'s deactivate or remove handler, or dropping the wrapper in `PeoplePageContent`, would pass every test: the refusal would be toasted and the Gridmaster never prompted.
-**Suggested fix:** a `StaffDetailPage` test where the status call refuses with `STEP_UP_REQUIRED`, the prompt appears, and the retry carries the assured token; one `PeoplePageContent` test that `onDeactivate` reaches the prompt.
-**Resolution:**
-
 ### F-101 [P2] open - A terminate whose session ending fails is never audited and cannot be retried
 
 **File:** `apps/web/src/app/api/gridmaster/users/[userId]/terminate/route.ts:62-87`
@@ -302,4 +158,28 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Found:** 2026-09-28 by `/audit` (scope: F-100 re-review on `fix/employees-written-by-server-only`; all lenses)
 **Why it matters:** with the grant revoked the three write policies grant nothing, but any later broad grant (as 004's `GRANT ... ON ALL TABLES IN SCHEMA public TO authenticated`) would silently reopen F-100; the revoke also leaves `MAINTAIN` (lock, vacuum, reindex; no data writes and not reachable through PostgREST); 065's header omits `purge_expired_data` from its SECURITY DEFINER writers (harmless).
 **Suggested fix:** a forward migration dropping the three policies and revoking `MAINTAIN`, and a live test asserting `has_table_privilege('authenticated', 'public.employees', 'UPDATE')` is false.
+**Resolution:**
+
+### F-110 [P3] open - The person page's request lists do not say they stop at 90 days
+
+**File:** `apps/web/src/components/gridmaster/person/PersonScheduleSection.tsx:167`, `:195`; `apps/web/src/features/gridmaster/server/person-activity.ts:117`
+**Found:** 2026-09-28 by `/audit` (scope: fix/person-page-follow-ups; all lenses)
+**Why it matters:** "Shift requests" has always shown open requests plus the last 90 days, and since F-92 "Profile change requests" does too (before, it listed every one ever made), but neither title says so, unlike "Publish changes, last 90 days". A Gridmaster looking for an older resolved request reads an empty list as "none".
+**Suggested fix:** Title both groups "..., open and last 90 days", or keep profile change requests unbounded (they are few) and label only shift requests.
+**Resolution:**
+
+### F-111 [P3] open - Migration 066 has no live test
+
+**File:** `supabase/migrations/066_person_history_target_index.sql`
+**Found:** 2026-09-28 by `/audit` (scope: fix/person-page-follow-ups; lens: tests)
+**Why it matters:** `gridmaster_user_emails` returns any account's email and is safe only because of its grants. The refusal for `anon` and `authenticated` and the index plan were proven by hand in a rolled-back transaction, but nothing re-checks them, unlike 063 and 064, which run from their files in live tests. A later broad grant would expose every email silently.
+**Suggested fix:** A live test that runs 066 from its file in a rolled-back transaction and asserts `has_function_privilege` is false for `anon` and `authenticated` and true for `service_role`, and that the function returns a seeded user's email.
+**Resolution:**
+
+### F-112 [P3] unverified - Migration 066 locks `audit_log` writes while its index builds
+
+**File:** `supabase/migrations/066_person_history_target_index.sql:15`
+**Found:** 2026-09-28 by `/audit` (scope: fix/person-page-follow-ups; lens: performance)
+**Why it matters:** `CREATE INDEX` without `CONCURRENTLY` blocks inserts into `audit_log` for the length of the build, and every audited action writes there. Harmless at today's sizes, but production's row count was not measured.
+**Suggested fix:** Read production's `audit_log` row count (read-only) during the release rehearsal and time the build on the scratch stack; if it is more than a few seconds, build the index `CONCURRENTLY` outside the migration transaction.
 **Resolution:**

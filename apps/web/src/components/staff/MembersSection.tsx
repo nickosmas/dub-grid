@@ -120,8 +120,9 @@ export interface MembersSectionProps {
     oldInvitation: Invitation,
     runStepUp: StepUpRun,
   ) => boolean | Promise<boolean>;
-  onRemove: (empId: string, note?: string) => void;
-  onDeactivate: (empId: string, note?: string) => void;
+  onRemove: (empId: string, note?: string) => void | Promise<boolean>;
+  onDeactivate: (empId: string, note?: string) => void | Promise<boolean>;
+  statusStepUpOpen?: boolean;
   onActivate: (empId: string) => void;
   onAdd: () => void;
   canViewEmployeeDetails: boolean;
@@ -153,6 +154,7 @@ export function MembersSection({
   onSaveWithReinvite,
   onRemove,
   onDeactivate,
+  statusStepUpOpen = false,
   onActivate,
   onAdd,
   canViewEmployeeDetails,
@@ -863,7 +865,8 @@ export function MembersSection({
           return onRemove(employeeId, trimmedNote);
         }),
       );
-      const succeeded = results.filter((r) => r.status === "fulfilled").length;
+      // A handler resolves false for a change it could not make or a cancelled prompt.
+      const succeeded = results.filter((r) => r.status === "fulfilled" && r.value !== false).length;
       const failed = results.length - succeeded;
 
       if (failed === 0 && droppedSelfCount === 0) {
@@ -2683,7 +2686,7 @@ export function MembersSection({
           );
         })()}
 
-      {bulkConfirm
+      {bulkConfirm && !statusStepUpOpen
         ? (() => {
             const count = bulkConfirm.employeeIds.length;
             const plural = count === 1 ? "" : "s";

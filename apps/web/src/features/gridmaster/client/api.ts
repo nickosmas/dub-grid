@@ -363,7 +363,11 @@ function patchGridmasterPerson(
 export function searchGridmasterStaff(
   query: string,
 ): Promise<{ staff: GridmasterStaffSearchResult[] }> {
-  return requestGridmasterJson(`/api/gridmaster/staff?q=${encodeURIComponent(query)}`);
+  return requestGridmasterJson("/api/gridmaster/staff", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ q: query }),
+  });
 }
 
 export function updateGridmasterPersonName(

@@ -78,5 +78,6 @@ export function upsertEmployeeInList(employees: Employee[], employee: Employee):
 export function withKnownJoinedDate(previous: Employee, next: Employee): Employee {
   if (next.joinedAt !== undefined) return next;
   const sameAccount = next.userId !== null && next.userId === previous.userId;
-  return { ...next, joinedAt: sameAccount ? (previous.joinedAt ?? null) : null };
+  // An unknown previous date stays unknown rather than reading as "Not joined".
+  return { ...next, joinedAt: sameAccount ? previous.joinedAt : null };
 }

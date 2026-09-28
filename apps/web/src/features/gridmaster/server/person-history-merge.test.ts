@@ -61,7 +61,14 @@ function makeClient(tables: Tables) {
   };
 }
 
-const employee = { id: EMP, org_id: "org-1", user_id: USER, created_at: null, created_by: null };
+const employee = {
+  id: EMP,
+  org_id: "org-1",
+  user_id: USER,
+  created_at: null,
+  created_by: null,
+  organizations: { workspace_kind: "real" },
+};
 
 describe("loadPersonHistory", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -201,6 +208,25 @@ describe("loadPersonHistory", () => {
     expect(history?.entries.map((entry) => entry.id)).toEqual(["1"]);
     expect(reads).not.toContain("impersonation_sessions");
     expect(reads).not.toContain("profiles");
+  });
+
+  it("refuses a Test Sandbox staff record and ignores an account's sandbox clones (F-93)", async () => {
+    const sandbox = { ...employee, id: "clone-1", organizations: { workspace_kind: "sandbox" } };
+
+    expect(
+      await loadPersonHistory(makeClient({ employees: [sandbox] }).client as never, {
+        kind: "staff",
+        employeeId: "clone-1",
+      }),
+    ).toBeNull();
+
+    const { client, reads } = makeClient({
+      profiles: { id: USER },
+      employees: [employee, sandbox],
+    });
+    await loadPersonHistory(client as never, { kind: "user", userId: USER });
+    // One organization source per real staff record; the clone's is never read.
+    expect(reads.filter((table) => table === "invitations")).toHaveLength(1);
   });
 
   it("finds no one for an unknown account or staff record", async () => {

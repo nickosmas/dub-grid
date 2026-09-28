@@ -1205,3 +1205,67 @@ describe("MembersSection — per-certification cards", () => {
     expect(screen.queryByRole("button", { name: /staff$/ })).not.toBeInTheDocument();
   });
 });
+
+describe("MembersSection - bulk status changes under step-up (F-98)", () => {
+  const people = [
+    makeEmployee({ id: "emp-1", firstName: "Jamie", lastName: "Rivera" }),
+    makeEmployee({ id: "emp-2", firstName: "Alex", lastName: "Chen" }),
+  ];
+
+  async function openBulkDeactivate(props: Partial<MembersSectionProps>) {
+    const user = userEvent.setup();
+    const view = renderMembersSection({
+      canManageEmployees: true,
+      canViewEmployeeDetails: true,
+      isSuperAdmin: true,
+      employees: people,
+      ...props,
+    });
+    await settleInvitations();
+    // The header checkbox selects every row on the page (the rows' own are unlabeled).
+    await user.click(screen.getAllByRole("checkbox")[0]);
+    await user.click(screen.getByRole("button", { name: "Deactivate" }));
+    await screen.findByText("Deactivate Selected Staff?");
+    return { user, view };
+  }
+
+  it("hides the bulk confirmation while the step-up prompt is open", async () => {
+    const { view } = await openBulkDeactivate({});
+    const rerender = (statusStepUpOpen: boolean) =>
+      view.rerender(
+        <QueryClientProvider client={new QueryClient()}>
+          <MembersSection
+            {...baseProps}
+            canManageEmployees
+            canViewEmployeeDetails
+            isManagementUser={false}
+            isSuperAdmin
+            employees={people}
+            statusStepUpOpen={statusStepUpOpen}
+          />
+        </QueryClientProvider>,
+      );
+
+    rerender(true);
+    expect(screen.queryByText("Deactivate Selected Staff?")).toBeNull();
+    rerender(false);
+    expect(screen.getByText("Deactivate Selected Staff?")).toBeInTheDocument();
+  });
+
+  it("does not count a change that did not go through as updated", async () => {
+    const onDeactivate = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    const { user } = await openBulkDeactivate({ onDeactivate });
+
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: "Deactivate" }),
+    );
+
+    await waitFor(() => expect(onDeactivate).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith(
+        "1 updated, 1 failed. Refresh and retry the ones that didn't go through.",
+      ),
+    );
+    expect(vi.mocked(toast.success)).not.toHaveBeenCalledWith("2 people updated");
+  });
+});

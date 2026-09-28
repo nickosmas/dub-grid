@@ -12,7 +12,19 @@ import {
 
 /** Rows read per source; a source that returns this many may have more. */
 export const HISTORY_SOURCE_CAP = 500;
-const EMPLOYEE_SUBJECT_COLUMNS = "id, org_id, user_id, created_at, created_by";
+const EMPLOYEE_SUBJECT_COLUMNS =
+  "id, org_id, user_id, created_at, created_by, organizations!inner(workspace_kind)";
+
+type EmployeeSubjectRow = EmployeeActivitySubject & {
+  organizations?: { workspace_kind: string } | null;
+};
+
+/** A Test Sandbox's staff are clones, not people, as the person record says (F-93). */
+function realSubjects(rows: EmployeeSubjectRow[]): EmployeeActivitySubject[] {
+  return rows
+    .filter((row) => row.organizations?.workspace_kind === "real")
+    .map(({ organizations: _organizations, ...subject }) => subject);
+}
 
 // Explicit columns: the history never carries IP addresses or user agents.
 const AUDIT_COLUMNS =
@@ -196,7 +208,7 @@ export async function loadPersonHistory(
       client.from("employees").select(EMPLOYEE_SUBJECT_COLUMNS).eq("user_id", target.userId),
     ]);
     if (profileResult.error) throw profileResult.error;
-    employees = rowsOrThrow(employeeResult) as unknown as EmployeeActivitySubject[];
+    employees = realSubjects(rowsOrThrow(employeeResult) as unknown as EmployeeSubjectRow[]);
     if (!profileResult.data && employees.length === 0) return null;
     // A Gridmaster's own account is not a person page target (43b).
     if ((profileResult.data as { platform_role?: string } | null)?.platform_role === "gridmaster") {
@@ -210,8 +222,8 @@ export async function loadPersonHistory(
       .eq("id", target.employeeId)
       .maybeSingle();
     if (error) throw error;
-    if (!data) return null;
-    employees = [data as EmployeeActivitySubject];
+    employees = realSubjects(data ? [data as unknown as EmployeeSubjectRow] : []);
+    if (employees.length === 0) return null;
     userId = employees[0].user_id;
     if (userId) {
       const { data: profile, error: profileError } = await client

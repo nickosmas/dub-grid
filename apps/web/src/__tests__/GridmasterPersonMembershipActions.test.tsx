@@ -8,6 +8,7 @@ const updateOrganizationMembershipGuarded = vi.fn();
 const removeOrganizationMembershipGuarded = vi.fn();
 const requireCredentialAssurance = vi.fn();
 const stepUpRun = vi.fn();
+const permissionsSaved = vi.fn();
 
 const { OrganizationAccessConflictError } = vi.hoisted(() => ({
   OrganizationAccessConflictError: class extends Error {},
@@ -28,7 +29,10 @@ vi.mock("@/hooks/useStepUpAction", () => ({
 }));
 vi.mock("@/components/PermissionsEditor", () => ({
   default: ({ onSave }: { onSave: (permissions: unknown) => Promise<unknown> }) => (
-    <button type="button" onClick={() => void onSave({ canManageEmployees: true })}>
+    <button
+      type="button"
+      onClick={() => void onSave({ canManageEmployees: true }).then(permissionsSaved, () => {})}
+    >
       Save permissions stub
     </button>
   ),
@@ -135,6 +139,20 @@ describe("PersonMembershipActions", () => {
     expect(updateOrganizationMembershipGuarded).not.toHaveBeenCalled();
     expect(onChanged).not.toHaveBeenCalled();
     expect(screen.getByRole("dialog", { name: "Change role" })).toBeInTheDocument();
+  });
+
+  it("reports a permission conflict once and tells the editor the save did not happen", async () => {
+    updateOrganizationMembershipGuarded.mockRejectedValueOnce(
+      new OrganizationAccessConflictError(),
+    );
+    const { onChanged } = renderActions();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit permissions" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save permissions stub" }));
+
+    await waitFor(() => expect(permissionsSaved).toHaveBeenCalledWith(false));
+    expect(toast.error).toHaveBeenCalledOnce();
+    expect(onChanged).toHaveBeenCalled();
   });
 
   it("saves permissions through step-up", async () => {

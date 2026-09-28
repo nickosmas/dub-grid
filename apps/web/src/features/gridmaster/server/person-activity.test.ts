@@ -32,6 +32,10 @@ function snapshot(kind: "published" | "draft", state: "absence" | "deleted", abs
 
 function makeClient(tables: Record<string, unknown>, filters: Record<string, Filters>) {
   return {
+    rpc: vi.fn(async (_fn: string, { p_user_ids }: { p_user_ids: string[] }) => ({
+      data: p_user_ids.map((id) => ({ id, email: `${id}@dubgrid.test` })),
+      error: null,
+    })),
     auth: {
       admin: {
         getUserById: vi.fn(async (id: string) => ({
@@ -71,7 +75,10 @@ describe("loadPersonSchedule", () => {
 
   function load(tables: Record<string, unknown>) {
     const client = makeClient(
-      { employees: { id: EMPLOYEE_ID, org_id: ORG_ID }, ...tables },
+      {
+        employees: { id: EMPLOYEE_ID, org_id: ORG_ID, organizations: { workspace_kind: "real" } },
+        ...tables,
+      },
       filters,
     );
     return loadPersonSchedule(client as never, EMPLOYEE_ID, NOW);
@@ -79,6 +86,18 @@ describe("loadPersonSchedule", () => {
 
   it("returns null for a staff record that does not exist", async () => {
     expect(await load({ employees: null })).toBeNull();
+  });
+
+  it("refuses a Test Sandbox staff record (F-93)", async () => {
+    expect(
+      await load({
+        employees: {
+          id: EMPLOYEE_ID,
+          org_id: ORG_ID,
+          organizations: { workspace_kind: "sandbox" },
+        },
+      }),
+    ).toBeNull();
   });
 
   it("labels each day's published and draft state, keeping the draft only when it differs", async () => {
@@ -238,8 +257,10 @@ describe("loadPersonSchedule", () => {
   describe("requests and changes", () => {
     const OLD = "2026-05-01T00:00:00.000Z";
     const RECENT = "2026-09-20T00:00:00.000Z";
+    const CUTOFF = "2026-06-29T12:00:00.000Z";
+    const OPEN_OR_RECENT = `or(status.in.(open,pending_approval),created_at.gte.${CUTOFF})`;
 
-    it("reads requests on either side, keeping every open one and 90 days of the rest", async () => {
+    it("reads requests on either side, bounded in the query to open ones and 90 days of the rest", async () => {
       const schedule = await load({
         shift_requests: [
           {
@@ -268,21 +289,8 @@ describe("loadPersonSchedule", () => {
             created_at: OLD,
             resolved_at: null,
           },
-          {
-            id: "req-old-settled",
-            type: "calloff",
-            status: "approved",
-            requester_emp_id: EMPLOYEE_ID,
-            target_emp_id: null,
-            requester_shift_date: "2026-04-30",
-            target_shift_date: null,
-            admin_user_id: "admin-1",
-            admin_note: null,
-            created_at: OLD,
-            resolved_at: OLD,
-          },
         ],
-        employees: { id: EMPLOYEE_ID, org_id: ORG_ID },
+        employees: { id: EMPLOYEE_ID, org_id: ORG_ID, organizations: { workspace_kind: "real" } },
       });
 
       expect(schedule?.shiftRequests.map((request) => request.id)).toEqual([
@@ -305,7 +313,13 @@ describe("loadPersonSchedule", () => {
       expect(filters.shift_requests).toEqual(
         expect.arrayContaining([
           ["eq", "org_id", ORG_ID],
-          ["or", `requester_emp_id.eq.${EMPLOYEE_ID},target_emp_id.eq.${EMPLOYEE_ID}`, undefined],
+          [
+            "or",
+            [`requester_emp_id.eq.${EMPLOYEE_ID}`, `target_emp_id.eq.${EMPLOYEE_ID}`]
+              .map((side) => `and(${side},${OPEN_OR_RECENT})`)
+              .join(","),
+            undefined,
+          ],
         ]),
       );
       expect(schedule?.actors).toEqual({ "admin-1": "admin-1@dubgrid.test" });
@@ -314,7 +328,7 @@ describe("loadPersonSchedule", () => {
     it("names the partner from their staff record in the same organization", async () => {
       const partnerClient = makeClient(
         {
-          employees: { id: EMPLOYEE_ID, org_id: ORG_ID },
+          employees: { id: EMPLOYEE_ID, org_id: ORG_ID, organizations: { workspace_kind: "real" } },
           shift_requests: [
             {
               id: "req-1",
@@ -404,6 +418,35 @@ describe("loadPersonSchedule", () => {
       expect(schedule?.actors["admin-2"]).toBe("admin-2@dubgrid.test");
     });
 
+    it("labels schedule note changes and never fails on a state it cannot read", async () => {
+      const publish = { published_at: "2026-09-01T10:00:00.000Z", published_by: null };
+      const schedule = await load({
+        schedule_publish_changes: [
+          {
+            date: "2026-09-10",
+            kind: "new",
+            from_state: null,
+            to_state: { type: "note", focusAreaId: 21, indicatorName: "Readings" },
+            publish,
+          },
+          {
+            date: "2026-09-11",
+            kind: "modified",
+            from_state: { kind: "worked" },
+            to_state: { type: "note", indicatorName: null },
+            publish,
+          },
+        ],
+      });
+
+      expect(schedule?.publishChanges.map(({ date, from, to }) => ({ date, from, to }))).toEqual(
+        expect.arrayContaining([
+          { date: "2026-09-10", from: null, to: "Schedule note: Readings" },
+          { date: "2026-09-11", from: "Unknown", to: "Schedule note" },
+        ]),
+      );
+    });
+
     it("lists the profile change requests the person submitted", async () => {
       const schedule = await load({
         profile_change_requests: [
@@ -438,6 +481,7 @@ describe("loadPersonSchedule", () => {
         expect.arrayContaining([
           ["eq", "org_id", ORG_ID],
           ["eq", "requester_employee_id", EMPLOYEE_ID],
+          ["or", `status.eq.pending,created_at.gte.${CUTOFF}`, undefined],
         ]),
       );
     });

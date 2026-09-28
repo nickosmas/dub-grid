@@ -342,9 +342,17 @@ const AUTH_USERS: Record<string, Row> = {
   [GRIDMASTER]: { id: GRIDMASTER, email: "gm@dubgrid.com" },
 };
 
-function fakeClient(tables = fixtures(), authError: unknown = null) {
+function fakeClient(tables = fixtures(), authError: unknown = null, emailsError: unknown = null) {
   return {
     from: (table: string) => query(tables[table] ?? []),
+    rpc: vi.fn(async (_fn: string, { p_user_ids }: { p_user_ids: string[] }) => ({
+      data: emailsError
+        ? null
+        : p_user_ids
+            .filter((id) => AUTH_USERS[id])
+            .map((id) => ({ id, email: AUTH_USERS[id].email })),
+      error: emailsError,
+    })),
     auth: {
       admin: {
         getUserById: async (id: string) => ({
@@ -432,12 +440,27 @@ describe("buildPersonRecordForUser", () => {
     expect(birch?.names.certifications).toEqual({ 2: "RN" });
   });
 
-  it("resolves actors to emails", async () => {
-    const person = await buildPersonRecordForUser(fakeClient(), USER);
+  it("resolves actors to emails in one call (F-92)", async () => {
+    const client = fakeClient();
+    const person = await buildPersonRecordForUser(client, USER);
     expect(person?.actors).toEqual({
       [ADMIN]: "admin@example.com",
       [GRIDMASTER]: "gm@dubgrid.com",
     });
+    const rpc = (client as unknown as { rpc: ReturnType<typeof vi.fn> }).rpc;
+    expect(rpc).toHaveBeenCalledOnce();
+    expect(rpc).toHaveBeenCalledWith("gridmaster_user_emails", {
+      p_user_ids: expect.arrayContaining([ADMIN, GRIDMASTER]),
+    });
+  });
+
+  it("still loads the record when actor names are unavailable", async () => {
+    const person = await buildPersonRecordForUser(
+      fakeClient(fixtures(), null, { message: "function does not exist" }),
+      USER,
+    );
+    expect(person?.actors).toEqual({});
+    expect(person?.account?.email).toBe("ada@example.com");
   });
 
   it("gathers two-factor, known devices, sessions, push devices and calendar feeds", async () => {
