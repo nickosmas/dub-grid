@@ -93,10 +93,6 @@ async function loadFixture(): Promise<Fixture> {
       ORDER BY seniority LIMIT 1`,
     [orgId, pair.fa],
   );
-  const indicator = await one<{ id: number }>(
-    `SELECT id FROM public.indicator_types WHERE org_id = $1 ORDER BY id LIMIT 1`,
-    [orgId],
-  );
   return {
     orgId,
     empId: emp.id,
@@ -106,7 +102,7 @@ async function loadFixture(): Promise<Fixture> {
     eveningShiftId: Number(pair.evening),
     outsideShiftId: Number(outside.id),
     jobId: Number(job.id),
-    indicatorId: Number(indicator.id),
+    indicatorId: 0,
   };
 }
 
@@ -135,6 +131,19 @@ async function rewindTo062(): Promise<void> {
       UNIQUE (emp_id, date, indicator_type_id, focus_area_id);
   `);
   await db.query(readFileSync(migrationPath("015_schedule_notes_require_shift.sql"), "utf8"));
+}
+
+/**
+ * A note type of the test's own, since a freshly seeded database gives Calm
+ * Haven none (CI seeds it from SQL; local data may carry hand-made ones).
+ */
+async function addIndicatorType(name: string): Promise<number> {
+  const { rows } = await db.query<{ id: number }>(
+    `INSERT INTO public.indicator_types (org_id, name, color) VALUES ($1, $2, '#E24B4A')
+     RETURNING id`,
+    [fx.orgId, name],
+  );
+  return Number(rows[0].id);
 }
 
 /** A cell whose draft works the Day and the Evening shift in one focus area. */
@@ -226,6 +235,7 @@ describe.skipIf(!reachable)("063 schedule notes per shift", () => {
     await db.query("LOCK TABLE public.schedule_notes IN ACCESS EXCLUSIVE MODE");
     await rewindTo062();
     await seedDoubleShift();
+    fx.indicatorId = await addIndicatorType("063 per-shift note");
   });
 
   afterEach(async () => {

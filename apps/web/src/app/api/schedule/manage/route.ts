@@ -678,58 +678,6 @@ function matchNoteShift<Q extends NoteShiftFilter<Q>>(
 }
 
 /**
- * A shift taken out of a cell takes its own notes with it, by the same rule
- * clearScheduleNotesForCells follows. The notes of the shifts that stay, and
- * notes no shift claims, are untouched.
- */
-async function clearScheduleNotesForRemovedShifts(
-  serviceClient: ScheduleServiceClient,
-  orgId: string,
-  employeeId: string,
-  date: string,
-  keptSegments: ReadonlyArray<{ shiftId: number | null; jobId: number }>,
-): Promise<void> {
-  const { data, error } = await serviceClient
-    .from("schedule_notes")
-    .select("id, shift_id, job_id, status")
-    .eq("org_id", orgId)
-    .eq("emp_id", employeeId)
-    .eq("date", date)
-    .not("job_id", "is", null);
-  if (error) throw error;
-
-  const kept = (row: { shift_id: number | null; job_id: number | null }) =>
-    keptSegments.some(
-      (segment) => segment.jobId === row.job_id && segment.shiftId === row.shift_id,
-    );
-  const orphaned = (
-    (data ?? []) as Array<{
-      id: number;
-      shift_id: number | null;
-      job_id: number | null;
-      status: string;
-    }>
-  ).filter((row) => !kept(row));
-  const draftIds = orphaned.filter((row) => row.status === "draft").map((row) => row.id);
-  const publishedIds = orphaned.filter((row) => row.status === "published").map((row) => row.id);
-
-  if (draftIds.length > 0) {
-    const { error: draftError } = await serviceClient
-      .from("schedule_notes")
-      .delete()
-      .in("id", draftIds);
-    if (draftError) throw draftError;
-  }
-  if (publishedIds.length > 0) {
-    const { error: publishedError } = await serviceClient
-      .from("schedule_notes")
-      .update({ status: "draft_deleted" })
-      .in("id", publishedIds);
-    if (publishedError) throw publishedError;
-  }
-}
-
-/**
  * Notes cannot outlive the shift they describe, so removing or relocating a
  * cell's shift takes its notes with it. This follows the rule a single note
  * delete uses: a draft row disappears outright, while a published one becomes
@@ -1095,14 +1043,6 @@ export async function POST(req: NextRequest) {
           await clearScheduleNotesForCells(auth.serviceClient, data.orgId, [
             { employeeId: data.employeeId, date: data.date },
           ]);
-        } else {
-          await clearScheduleNotesForRemovedShifts(
-            auth.serviceClient,
-            data.orgId,
-            data.employeeId,
-            data.date,
-            data.input.segments,
-          );
         }
         logScheduleAudit(auth.serviceClient, {
           orgId: data.orgId,

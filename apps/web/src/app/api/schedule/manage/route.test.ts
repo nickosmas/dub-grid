@@ -41,14 +41,11 @@ function stubSeriesCells(cells: Array<{ emp_id: string; date: string }>) {
   });
 }
 
-type NoteRow = { id: number; shift_id: number | null; job_id: number | null; status: string };
-
 /**
  * Records the note writes a request makes, filters included, so a test can
- * assert which notes were touched without a real query builder. `noteRows`
- * answers the one read the route makes: the notes a cell's shifts own.
+ * assert which notes were touched without a real query builder.
  */
-function captureNoteClearing(noteRows: NoteRow[] = []) {
+function captureNoteClearing() {
   const deleted: Array<Record<string, unknown>> = [];
   const softDeleted: Array<Record<string, unknown>> = [];
 
@@ -62,10 +59,6 @@ function captureNoteClearing(noteRows: NoteRow[] = []) {
         record[column] = value;
         return builder;
       },
-      in(column: string, values: unknown[]) {
-        record[column] = values;
-        return builder;
-      },
       then(resolve: (value: { error: null }) => unknown) {
         sink.push(record);
         return Promise.resolve({ error: null } as const).then(resolve);
@@ -74,21 +67,9 @@ function captureNoteClearing(noteRows: NoteRow[] = []) {
     return builder;
   }
 
-  function read() {
-    const builder = {
-      eq: () => builder,
-      not: () => builder,
-      then(resolve: (value: { data: NoteRow[]; error: null }) => unknown) {
-        return Promise.resolve({ data: noteRows, error: null } as const).then(resolve);
-      },
-    };
-    return builder;
-  }
-
   serviceFrom.mockImplementation((table: string) =>
     table === "schedule_notes"
       ? {
-          select: read,
           delete: () => chain({}, deleted),
           update: (payload: Record<string, unknown>) => chain({ ...payload }, softDeleted),
         }
@@ -304,7 +285,6 @@ describe("POST /api/schedule/manage", () => {
     // data.orgId in place before any action-specific handler runs.
     resolveEffectiveOrgId.mockResolvedValue(sandboxOrgId);
     userRpc.mockResolvedValue({ error: null });
-    captureNoteClearing();
 
     const response = await POST(
       makeRequest({
@@ -1143,52 +1123,6 @@ describe("POST /api/schedule/manage permission gates", () => {
     const unattached = captureNoteClearing();
     expect((await POST(makeRequest(body))).status).toBe(200);
     expect(unattached.deleted).toEqual([expect.objectContaining({ job_id: null, shift_id: null })]);
-  });
-
-  it("drops only the notes of a shift taken out of a double shift", async () => {
-    const keyedNotes = [
-      { id: 1, shift_id: 34, job_id: 18, status: "draft" },
-      { id: 2, shift_id: 34, job_id: 18, status: "published" },
-      { id: 3, shift_id: 35, job_id: 18, status: "published" },
-    ];
-    const upsertBody = (segments: Array<{ shiftId: number; jobId: number }>) =>
-      makeRequest({
-        action: "upsertShift",
-        orgId,
-        employeeId,
-        date: "2026-08-03",
-        input: {
-          kind: "worked",
-          segments: segments.map((segment, position) => ({
-            ...segment,
-            position,
-            isMentored: false,
-          })),
-          absenceTypeId: null,
-        },
-      });
-
-    grant({ canEditShifts: true });
-    const narrowed = captureNoteClearing(keyedNotes);
-    expect((await POST(upsertBody([{ shiftId: 35, jobId: 18 }]))).status).toBe(200);
-    // The Day shift left: its draft note goes, its published one waits for the publish.
-    expect(narrowed.deleted).toEqual([{ id: [1] }]);
-    expect(narrowed.softDeleted).toEqual([{ status: "draft_deleted", id: [2] }]);
-
-    grant({ canEditShifts: true });
-    const kept = captureNoteClearing(keyedNotes);
-    expect(
-      (
-        await POST(
-          upsertBody([
-            { shiftId: 34, jobId: 18 },
-            { shiftId: 35, jobId: 18 },
-          ]),
-        )
-      ).status,
-    ).toBe(200);
-    expect(kept.deleted).toEqual([]);
-    expect(kept.softDeleted).toEqual([]);
   });
 
   it("drops notes across every cell a deleted series covered", async () => {
