@@ -31,13 +31,13 @@
 **Suggested fix:** Merge inside the database (`prefs = notification_preferences.prefs || excluded.prefs` in an RPC), which needs a migration.
 **Resolution:** Fixed in fix/notification-preferences-merge: migration `072_notification_preferences_merge.sql` adds `merge_notification_preferences`, a service-role-only insert-or-merge (`(stored.prefs || EXCLUDED.prefs) - 'security'`) in one statement under the conflict's row lock, and `saveNotificationPreferences` calls it. `migration-072-notification-preferences.integration.test.ts` proves the merge, that security is never stored, the grants, and that two concurrent saves on separate connections keep both categories. Not yet on production; the app needs 072 applied before it ships.
 
-### F-25 [P3] open - The once-per-session sign-in record is not atomic
+### F-25 [P3] fixed - The once-per-session sign-in record is not atomic
 
 **File:** `apps/web/src/lib/auth/sign-in-completion.ts:61`
 **Found:** 2026-09-25 by `/audit` (scope: current, bdbbd4cc..8246596c; all lenses)
 **Why it matters:** Two concurrent completion calls can both read nothing and both write. The app's clients guard concurrent calls.
 **Suggested fix:** A partial unique index on `(actor_id, details->>'sessionHash')` for successes, which needs a migration.
-**Resolution:**
+**Resolution:** Fixed in fix/sign-in-recorded-once: migration `073_record_sign_in_once.sql` adds `record_sign_in_once`, which checks for the session's success row and inserts it under a transaction advisory lock on the person and session hash (a lock rather than the suggested unique index, since existing rows may already hold duplicates). `recordSignInOnce` replaces `hasRecordedSignIn`, and `recordCompletedSignIn` writes directly only when that call fails or the session has no id. `migration-073-record-sign-in-once.integration.test.ts` proves two racing calls on separate connections leave one row, plus the reauthentication rule, the refusal and the grants. Not yet on production.
 
 ### F-26 [P3] fixed - Two concurrent impersonation ends can both be recorded
 

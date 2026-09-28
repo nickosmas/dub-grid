@@ -3,35 +3,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   insert: vi.fn(),
   loggerError: vi.fn(),
-  read: vi.fn(),
-  filters: [] as Array<[string, unknown]>,
+  rpc: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase-service", () => ({
   getServiceClient: () => ({
     from: (table: string) => {
       expect(table).toBe("audit_log");
-      const query = {
-        select: () => query,
-        eq: (column: string, value: unknown) => {
-          mocks.filters.push([column, value]);
-          return query;
-        },
-        in: (column: string, value: unknown) => {
-          mocks.filters.push([column, value]);
-          return query;
-        },
-        limit: () => mocks.read(),
-      };
-      return { insert: mocks.insert, select: query.select };
+      return { insert: mocks.insert };
     },
+    rpc: (...args: unknown[]) => mocks.rpc(...args),
   }),
 }));
 vi.mock("@/lib/logger", () => ({
   default: { error: (...args: unknown[]) => mocks.loggerError(...args) },
 }));
 
-import { hasRecordedSignIn, writeSecurityAuditEvent } from "./security-audit";
+import { recordSignInOnce, writeSecurityAuditEvent } from "./security-audit";
 
 describe("writeSecurityAuditEvent", () => {
   beforeEach(() => {
@@ -77,30 +65,37 @@ describe("writeSecurityAuditEvent", () => {
   });
 });
 
-describe("hasRecordedSignIn", () => {
+describe("recordSignInOnce", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.filters.length = 0;
   });
 
-  it("looks for this person's completed sign-in with this session's hash", async () => {
-    mocks.read.mockResolvedValue({ data: [{ id: 1 }], error: null });
+  const input = {
+    actorId: "user-1",
+    orgId: "org-1",
+    metadata: { surface: "web" as const, method: "totp" as const, sessionHash: "abc" },
+  };
 
-    await expect(hasRecordedSignIn({ actorId: "user-1", sessionHash: "abc" })).resolves.toBe(true);
-    expect(mocks.filters).toEqual([
-      ["action", ["security.auth.login", "security.auth.mfa"]],
-      ["actor_id", "user-1"],
-      ["details->>outcome", "succeeded"],
-      ["details->>sessionHash", "abc"],
-    ]);
+  it("checks and records in one database call", async () => {
+    mocks.rpc.mockResolvedValue({ data: true, error: null });
+
+    await expect(recordSignInOnce(input)).resolves.toBe(true);
+    expect(mocks.rpc).toHaveBeenCalledWith("record_sign_in_once", {
+      p_actor_id: "user-1",
+      p_org_id: "org-1",
+      p_details: { surface: "web", method: "totp", sessionHash: "abc" },
+    });
+    expect(mocks.insert).not.toHaveBeenCalled();
   });
 
-  it("answers no when nothing matches or the read fails", async () => {
-    mocks.read.mockResolvedValueOnce({ data: [], error: null });
-    await expect(hasRecordedSignIn({ actorId: "user-1", sessionHash: "abc" })).resolves.toBe(false);
+  it("answers no when the session already has its sign-in", async () => {
+    mocks.rpc.mockResolvedValue({ data: false, error: null });
+    await expect(recordSignInOnce(input)).resolves.toBe(false);
+  });
 
-    mocks.read.mockResolvedValueOnce({ data: null, error: new Error("down") });
-    await expect(hasRecordedSignIn({ actorId: "user-1", sessionHash: "abc" })).resolves.toBe(false);
+  it("answers null when the call fails, so the caller can still record", async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: new Error("down") });
+    await expect(recordSignInOnce(input)).resolves.toBeNull();
     expect(mocks.loggerError).toHaveBeenCalledOnce();
   });
 });

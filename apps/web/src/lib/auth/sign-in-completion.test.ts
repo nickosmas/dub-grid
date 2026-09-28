@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const writeSecurityAuditEvent = vi.fn();
-const hasRecordedSignIn = vi.fn();
+const recordSignInOnce = vi.fn();
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/auth/security-audit", () => ({
   writeSecurityAuditEvent: (...args: unknown[]) => writeSecurityAuditEvent(...args),
-  hasRecordedSignIn: (...args: unknown[]) => hasRecordedSignIn(...args),
+  recordSignInOnce: (...args: unknown[]) => recordSignInOnce(...args),
 }));
 
 import {
@@ -63,7 +63,7 @@ describe("freshSignInMethod", () => {
 describe("recordCompletedSignIn", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    hasRecordedSignIn.mockResolvedValue(false);
+    recordSignInOnce.mockResolvedValue(true);
   });
 
   const input = {
@@ -74,7 +74,23 @@ describe("recordCompletedSignIn", () => {
     sessionId: "session-1",
   };
 
-  it("records once per session", async () => {
+  // A check and a write in the app let two concurrent calls both record (F-25).
+  it("records once per session through the database's own check", async () => {
+    await expect(recordCompletedSignIn(input)).resolves.toBe(true);
+    expect(recordSignInOnce).toHaveBeenCalledWith({
+      actorId: "user-1",
+      orgId: "org-1",
+      metadata: { surface: "web", method: "totp", sessionHash: hashSessionId("session-1") },
+    });
+
+    recordSignInOnce.mockResolvedValue(false);
+    await expect(recordCompletedSignIn(input)).resolves.toBe(false);
+    expect(writeSecurityAuditEvent).not.toHaveBeenCalled();
+  });
+
+  it("still records when the database call fails", async () => {
+    recordSignInOnce.mockResolvedValue(null);
+
     await expect(recordCompletedSignIn(input)).resolves.toBe(true);
     expect(writeSecurityAuditEvent).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -82,15 +98,12 @@ describe("recordCompletedSignIn", () => {
         metadata: { surface: "web", method: "totp", sessionHash: hashSessionId("session-1") },
       }),
     );
-
-    hasRecordedSignIn.mockResolvedValue(true);
-    await expect(recordCompletedSignIn(input)).resolves.toBe(false);
-    expect(writeSecurityAuditEvent).toHaveBeenCalledOnce();
   });
 
   it("still records a session it cannot identify", async () => {
     await expect(recordCompletedSignIn({ ...input, sessionId: null })).resolves.toBe(true);
-    expect(hasRecordedSignIn).not.toHaveBeenCalled();
+    expect(recordSignInOnce).not.toHaveBeenCalled();
+    expect(writeSecurityAuditEvent).toHaveBeenCalledOnce();
   });
 });
 

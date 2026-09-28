@@ -77,30 +77,30 @@ export async function writeSecurityAuditEvent(input: SecurityAuditEvent): Promis
 }
 
 /**
- * Whether this Auth session already has its sign-in on record: a completed
- * sign-in, or the replacement session a reauthentication issued. A failed
- * read answers no: recording a sign-in twice beats losing it.
+ * Records a completed sign-in unless this Auth session already has one on
+ * record (a completed sign-in, or the replacement session a reauthentication
+ * issued), checked and written in one locked step in the database (073,
+ * F-25). Null when the call fails, so the caller can still record it:
+ * recording a sign-in twice beats losing it.
  */
-export async function hasRecordedSignIn(input: {
+export async function recordSignInOnce(input: {
   actorId: string;
-  sessionHash: string;
-}): Promise<boolean> {
+  orgId: string | null;
+  metadata: SecurityEventMetadata & { sessionHash: string };
+}): Promise<boolean | null> {
   try {
-    const read = Promise.resolve(
-      getServiceClient()
-        .from("audit_log")
-        .select("id")
-        .in("action", ["security.auth.login", "security.auth.mfa"])
-        .eq("actor_id", input.actorId)
-        .eq("details->>outcome", "succeeded")
-        .eq("details->>sessionHash", input.sessionHash)
-        .limit(1),
+    const call = Promise.resolve(
+      getServiceClient().rpc("record_sign_in_once", {
+        p_actor_id: input.actorId,
+        p_org_id: input.orgId,
+        p_details: input.metadata,
+      }),
     );
-    const { data, error } = await withTimeoutOrThrow(read, 1_000, "security audit read");
+    const { data, error } = await withTimeoutOrThrow(call, 1_000, "security audit sign-in record");
     if (error) throw error;
-    return (data ?? []).length > 0;
+    return data === true;
   } catch (error) {
-    logger.error({ error }, "Security audit read failed");
-    return false;
+    logger.error({ error }, "Security audit sign-in record failed");
+    return null;
   }
 }
