@@ -116,6 +116,15 @@ Must not break:
      identity, and both are updated.
   2. Repeat and cancel the prompt. Nobody is reported updated.
 
+Release: migration 066 applied to production 2026-09-28 by the owner, ahead of
+the release that carries it, after a scratch rehearsal from 065 whose
+inspector report matched production's line for line (applied from
+`19e2e61a`). Before: 65 ledger entries, only 066 missing; latest backup
+2026-09-27 13:36:38 UTC. After: 66 ledger entries, none missing, every
+invariant passing, health 200. On the rehearsal the partial index was present,
+`gridmaster_user_emails` was SECURITY DEFINER and executable by `service_role`
+only, and 065's staff-record revoke was unchanged.
+
 ## Findings
 
 ### person-page-follow-ups/F-82 [P3] closed - Month view misses a note filed under a person's secondary focus area

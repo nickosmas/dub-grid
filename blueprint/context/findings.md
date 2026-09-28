@@ -174,7 +174,7 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Found:** 2026-09-28 by `/audit` (scope: fix/person-page-follow-ups; lens: performance)
 **Why it matters:** `CREATE INDEX` without `CONCURRENTLY` blocks inserts into `audit_log` for the length of the build, and every audited action writes there. Harmless at today's sizes, but production's row count was not measured.
 **Suggested fix:** Read production's `audit_log` row count (read-only) during the release rehearsal and time the build on the scratch stack; if it is more than a few seconds, build the index `CONCURRENTLY` outside the migration transaction.
-**Resolution:**
+**Resolution:** 066 applied to production 2026-09-28 in one statement with no measured stall: production's `audit_log` held about 230 rows (248 kB), a read-only count taken by the person-page session, so the build locked writes for a negligible time and no `CONCURRENTLY` split was needed. Left `unverified` for `/audit` to settle; a later large-table index would need the concurrent build.
 
 ### F-113 [P3] open - FitText no longer resets for a label passed as elements
 
