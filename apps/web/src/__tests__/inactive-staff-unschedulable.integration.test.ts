@@ -534,12 +534,17 @@ describe.skipIf(!reachable)("067 leaving clears the future and keeps the past", 
   it("leaves an active employee's schedule alone", async () => {
     await applyMigration();
     await seedLeaver();
+    // The seed may already give this person requests of their own, so compare
+    // against what they held before rather than a fixed count.
+    const before = await leaverLeftovers();
     await db.query(`UPDATE public.employees SET status_note = 'still here' WHERE id = $1`, [
       fx.leaverEmpId,
     ]);
 
     expect((await leaverSchedule())[FUTURE_DRAFT_ONLY]).toEqual(["draft:worked"]);
-    expect(await leaverLeftovers()).toEqual({ templates: 1, series: 1, requests: 1 });
+    expect(await leaverLeftovers()).toEqual(before);
+    expect(before.templates).toBeGreaterThan(0);
+    expect(before.requests).toBeGreaterThan(0);
   });
 
   it("clears staff who had already left when the migration runs", async () => {
