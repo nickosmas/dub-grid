@@ -20,12 +20,27 @@ const screenshotAlts = [
 // simultaneous /_next/image requests never answered, while ones sent alone
 // came back in milliseconds (run 36385802625, all three attempts). Handing them
 // to the server one at a time still exercises the real optimizer and its URLs.
+// A single resize can still hang (run 36429925212), and in a queue that held
+// every image behind it, so each one gets a bounded wait and is sent again.
+const IMAGE_FETCH_TIMEOUT = 10_000;
+const IMAGE_FETCH_ATTEMPTS = 3;
+
 test.beforeEach(async ({ page }) => {
   let queue: Promise<unknown> = Promise.resolve();
   await page.route("**/_next/image?**", (route) => {
     const turn = queue.then(async () => {
-      const response = await route.fetch();
-      await route.fulfill({ response });
+      for (let attempt = 1; ; attempt++) {
+        try {
+          const response = await route.fetch({ timeout: IMAGE_FETCH_TIMEOUT });
+          await route.fulfill({ response });
+          return;
+        } catch (error) {
+          if (attempt >= IMAGE_FETCH_ATTEMPTS) {
+            await route.abort().catch(() => undefined);
+            throw error;
+          }
+        }
+      }
     });
     queue = turn.catch(() => undefined);
     return turn;
