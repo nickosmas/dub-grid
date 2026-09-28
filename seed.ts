@@ -2801,7 +2801,8 @@ async function main() {
     }> = [];
 
     for (const emp of employees) {
-      if (emp.status === "removed") continue;
+      // Migration 067 refuses to schedule anyone who is not active.
+      if (emp.status !== "active") continue;
       const primaryFaId = emp.focus_area_ids[0] ?? null;
       const empWorkAssignments = seededJobs.resolvedAssignments.filter(
         (assignment) =>
