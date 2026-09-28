@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:d4372e2cd67e97c56f433c485ef8bdb72b62361358ecb1b1b945a733d09b7ec2",
+  "sourceDigest": "sha256:a7918401b4a7dfa212ed9308f33efa264746c07745ad6f35debf398596a6a664",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4489,6 +4489,16 @@
       "sha256": "7483b9495aabcf5e15575b48e7f644d3b2f53977f565efb1e2fb177ef87b9174",
       "source": {
         "path": "supabase/migrations/074_password_change_recorded.sql"
+      }
+    },
+    {
+      "id": "migration:075_gridmaster_writes_need_impersonation.sql",
+      "version": "075",
+      "name": "gridmaster_writes_need_impersonation",
+      "file": "075_gridmaster_writes_need_impersonation.sql",
+      "sha256": "437477152ee1bcf35b7c98b04401956c59d70d0d903c73ca5757c77e62f20aa4",
+      "source": {
+        "path": "supabase/migrations/075_gridmaster_writes_need_impersonation.sql"
       }
     }
   ],

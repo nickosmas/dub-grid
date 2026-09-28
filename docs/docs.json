@@ -40,10 +40,13 @@
             "group": "Configuration",
             "pages": [
               "configuration/organization",
-              "configuration/shift-codes",
-              "configuration/focus-areas",
+              "configuration/shifts-jobs-and-absences",
+              "configuration/schedule-rules-and-display",
+              "configuration/departments-and-focus-areas",
+              "configuration/roles-certifications-and-indicators",
               "configuration/coverage-requirements",
-              "configuration/terminology"
+              "configuration/terminology",
+              "configuration/organization-activity-and-controls"
             ]
           }
         ]
@@ -66,5 +69,17 @@
         ]
       }
     ]
-  }
+  },
+  "redirects": [
+    {
+      "source": "/configuration/focus-areas",
+      "destination": "/configuration/departments-and-focus-areas",
+      "permanent": true
+    },
+    {
+      "source": "/configuration/shift-codes",
+      "destination": "/configuration/shifts-jobs-and-absences",
+      "permanent": true
+    }
+  ]
 }

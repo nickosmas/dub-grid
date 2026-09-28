@@ -383,7 +383,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:b12280ce159f28d09bd61c034d0c8d3100a0de425f1e58649800111b88ad1456"
+      "evidenceFingerprint": "sha256:024d03e6f7db3130ac376c17af10806d6ddfe28848ecd007fffd95d771b0fdea"
     },
     {
       "id": "draft-publish",
@@ -440,7 +440,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:31c3a4db285ec71c4a83d5038cef411627f31071baff356535870b1be4782405"
+      "evidenceFingerprint": "sha256:f9b9cbec602408ea7be756d2a5ddab174091819e876dfa4c33c383fcce7a6b54"
     },
     {
       "id": "recurring-shifts",
@@ -491,7 +491,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:d312ad89b014ba24385c2a072f95c4286428016be1976f9813e4c66c2e3b2922"
+      "evidenceFingerprint": "sha256:1f52deb44a545d13a7297a0213d58ea6c8edaea07911a348b4ce1667086fd6a9"
     },
     {
       "id": "realtime",
@@ -538,7 +538,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:3fe4966e497408d0a7d0c29c3f2227ca2315d9cab078ed23f60c101d76b0e30a"
+      "evidenceFingerprint": "sha256:9dd3f6af47812f4bff63710a7612ffb9c6939f9fa9dd2e11142becd1c6613d42"
     },
     {
       "id": "shift-requests",
@@ -603,7 +603,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:9bb6b3386d3f7ff00ca70e4d25778d5f62b3d33fe69e266d7fee7b24086cd15f"
+      "evidenceFingerprint": "sha256:bd2c30dbf492ffd67c2d05428499be3f9e77afacd143c0bcf17c6c8e1009b583"
     },
     {
       "id": "dashboard",
@@ -881,7 +881,7 @@
       "publicRoute": "/configuration/organization",
       "deliveryOwner": "40b",
       "lifecycle": "published",
-      "sourceReview": "pending",
+      "sourceReview": "verified",
       "audiences": [
         "admin"
       ],
@@ -899,84 +899,36 @@
         {
           "id": "organization",
           "claims": [
-            "pending-source-review"
+            "Settings access: Super Admin, or Admin with a settings permission; read-only notice; Admins start with none; Users have no Settings",
+            "Super Admin-only sections",
+            "Organization Details fields and limits; employee count is read-only",
+            "no subdomain or pay period here",
+            "Review & Save opens Review Organization Changes; Discard"
           ],
           "sourceFiles": [
-            "apps/web/src/app/(app)/settings/page.tsx"
+            "apps/web/src/components/settings/nav-config.tsx",
+            "apps/web/src/components/settings/SettingsPage.tsx",
+            "apps/web/src/app/(app)/settings/page.tsx",
+            "packages/authz/src/index.ts",
+            "apps/web/src/lib/permission-labels.ts",
+            "apps/web/src/components/settings/OrganizationGeneral.tsx",
+            "apps/web/src/components/organization/OrganizationLocationFields.tsx",
+            "apps/web/src/components/organization/OrganizationChangeReviewModal.tsx",
+            "apps/web/src/lib/organization-settings.ts",
+            "apps/web/src/proxy.ts",
+            "apps/web/src/components/Header.tsx"
           ],
-          "testFiles": [],
+          "testFiles": [
+            "apps/web/src/components/settings/__tests__/nav-config.test.tsx",
+            "apps/web/src/app/(app)/settings/page.test.tsx",
+            "packages/authz/src/index.test.ts",
+            "apps/web/src/__tests__/OrganizationLocationFields.test.tsx"
+          ],
           "runtimeScenarios": [],
           "exclusions": []
         }
-      ]
-    },
-    {
-      "id": "shift-codes",
-      "file": "docs/configuration/shift-codes.mdx",
-      "publicRoute": "/configuration/shift-codes",
-      "deliveryOwner": "40b",
-      "lifecycle": "published",
-      "sourceReview": "pending",
-      "audiences": [
-        "admin"
       ],
-      "platforms": {
-        "web": "required",
-        "ios": "not-applicable",
-        "android": "not-applicable"
-      },
-      "surfaceIds": [
-        "settings:schedule-shifts",
-        "settings:schedule-jobs",
-        "settings:schedule-absence-types"
-      ],
-      "sections": [
-        {
-          "id": "schedule-codes",
-          "claims": [
-            "pending-source-review"
-          ],
-          "sourceFiles": [
-            "apps/web/src/components/settings/nav-config.tsx"
-          ],
-          "testFiles": [],
-          "runtimeScenarios": [],
-          "exclusions": []
-        }
-      ]
-    },
-    {
-      "id": "focus-areas",
-      "file": "docs/configuration/focus-areas.mdx",
-      "publicRoute": "/configuration/focus-areas",
-      "deliveryOwner": "40b",
-      "lifecycle": "published",
-      "sourceReview": "pending",
-      "audiences": [
-        "admin"
-      ],
-      "platforms": {
-        "web": "required",
-        "ios": "not-applicable",
-        "android": "not-applicable"
-      },
-      "surfaceIds": [
-        "settings:staff-departments"
-      ],
-      "sections": [
-        {
-          "id": "departments",
-          "claims": [
-            "pending-source-review"
-          ],
-          "sourceFiles": [
-            "apps/web/src/components/settings/nav-config.tsx"
-          ],
-          "testFiles": [],
-          "runtimeScenarios": [],
-          "exclusions": []
-        }
-      ]
+      "evidenceFingerprint": "sha256:fcbea6300712b432992d25f7560f95a262ad1306425cf78b1b4d119a1e242c6e"
     },
     {
       "id": "coverage",
@@ -984,7 +936,7 @@
       "publicRoute": "/configuration/coverage-requirements",
       "deliveryOwner": "40b",
       "lifecycle": "published",
-      "sourceReview": "pending",
+      "sourceReview": "verified",
       "audiences": [
         "admin"
       ],
@@ -1000,16 +952,35 @@
         {
           "id": "coverage",
           "claims": [
-            "pending-source-review"
+            "requirements per focus area and shift or job option, grouped by shift plus general jobs",
+            "same every day or per day; 0 to 999; 0 means no requirement and removes it; shifts unaffected",
+            "mentored credit lives in Schedule Rules",
+            "where coverage shows on the schedule and dashboard",
+            "who can view and change"
           ],
           "sourceFiles": [
-            "apps/web/src/components/settings/nav-config.tsx"
+            "apps/web/src/components/settings/nav-config.tsx",
+            "apps/web/src/components/settings/SettingsPage.tsx",
+            "packages/authz/src/index.ts",
+            "apps/web/src/lib/permission-labels.ts",
+            "apps/web/src/components/settings/Coverage.tsx",
+            "apps/web/src/lib/db/config.ts",
+            "apps/web/src/components/CoveragePanel.tsx",
+            "apps/web/src/components/Toolbar.tsx",
+            "apps/web/src/components/ScheduleGrid.tsx",
+            "apps/web/src/components/dashboard/CoverageBySectionCard.tsx",
+            "apps/web/src/components/settings/ScheduleRules.tsx"
           ],
-          "testFiles": [],
+          "testFiles": [
+            "apps/web/src/components/settings/__tests__/nav-config.test.tsx",
+            "packages/authz/src/index.test.ts",
+            "apps/web/src/__tests__/CoveragePanel.test.tsx"
+          ],
           "runtimeScenarios": [],
           "exclusions": []
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:4f4dd36fc4e2ccd9a3c69bf50a0dd2537e7d16384f5ddaa0f1636bd6d3159958"
     },
     {
       "id": "terminology",
@@ -1017,7 +988,7 @@
       "publicRoute": "/configuration/terminology",
       "deliveryOwner": "40b",
       "lifecycle": "published",
-      "sourceReview": "pending",
+      "sourceReview": "verified",
       "audiences": [
         "admin"
       ],
@@ -1031,16 +1002,34 @@
         {
           "id": "terms",
           "claims": [
-            "pending-source-review"
+            "three renamable labels and their defaults; wording only",
+            "blank restores the default; links refused",
+            "where labels appear",
+            "who can change or view labels"
           ],
           "sourceFiles": [
-            "packages/domain/src/index.ts"
+            "apps/web/src/components/settings/nav-config.tsx",
+            "apps/web/src/components/settings/SettingsPage.tsx",
+            "apps/web/src/app/(app)/settings/page.tsx",
+            "packages/authz/src/index.ts",
+            "apps/web/src/lib/permission-labels.ts",
+            "apps/web/src/components/settings/OrganizationLabels.tsx",
+            "apps/web/src/lib/db/mappers.ts",
+            "apps/web/src/components/settings/DepartmentsSettings.tsx",
+            "apps/web/src/components/settings/Jobs.tsx",
+            "apps/web/src/components/dashboard/CoverageBySectionCard.tsx"
           ],
-          "testFiles": [],
+          "testFiles": [
+            "apps/web/src/components/settings/__tests__/nav-config.test.tsx",
+            "apps/web/src/app/(app)/settings/page.test.tsx",
+            "packages/authz/src/index.test.ts",
+            "apps/web/src/components/settings/__tests__/settings-help-tooltips.test.tsx"
+          ],
           "runtimeScenarios": [],
           "exclusions": []
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:52ce399cafe07c2216a1201e853b198b66d8ed9db0f7f5d50ddb6f65fe619013"
     },
     {
       "id": "roles",
@@ -1494,13 +1483,13 @@
       "file": "docs/configuration/schedule-rules-and-display.mdx",
       "publicRoute": "/configuration/schedule-rules-and-display",
       "deliveryOwner": "40b",
-      "lifecycle": "planned",
-      "sourceReview": "pending",
+      "lifecycle": "published",
+      "sourceReview": "verified",
       "audiences": [
         "admin"
       ],
       "platforms": {
-        "web": "planned",
+        "web": "required",
         "ios": "not-applicable",
         "android": "not-applicable"
       },
@@ -1512,31 +1501,48 @@
         {
           "id": "rules-display",
           "claims": [
-            "planned-source-review"
+            "Super Admin only",
+            "five schedule rules, their options and defaults; Save Schedule Rule confirmation",
+            "short codes and full names; hover cards and compact labels toggles with defaults",
+            "full-name mode makes codes optional; Save and Cancel"
           ],
           "sourceFiles": [
-            "apps/web/src/components/settings/nav-config.tsx"
+            "apps/web/src/components/settings/nav-config.tsx",
+            "apps/web/src/components/settings/SettingsPage.tsx",
+            "packages/authz/src/index.ts",
+            "apps/web/src/lib/permission-labels.ts",
+            "apps/web/src/components/settings/ScheduleRules.tsx",
+            "apps/web/src/components/settings/DisplayMode.tsx",
+            "apps/web/src/components/settings/ShiftCategories.tsx",
+            "apps/web/src/components/settings/Jobs.tsx",
+            "apps/web/src/components/settings/AbsenceTypes.tsx"
           ],
-          "testFiles": [],
+          "testFiles": [
+            "apps/web/src/components/settings/__tests__/nav-config.test.tsx",
+            "packages/authz/src/index.test.ts",
+            "apps/web/src/components/settings/__tests__/settings-help-tooltips.test.tsx"
+          ],
           "runtimeScenarios": [
+            "loaded",
             "validation"
           ],
           "exclusions": []
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:c0c7b8f0fc13bb415820388204b42ea565360a2f25af67bd0090d5a017c25aa7"
     },
     {
       "id": "roles-certifications-indicators",
       "file": "docs/configuration/roles-certifications-and-indicators.mdx",
       "publicRoute": "/configuration/roles-certifications-and-indicators",
       "deliveryOwner": "40b",
-      "lifecycle": "planned",
-      "sourceReview": "pending",
+      "lifecycle": "published",
+      "sourceReview": "verified",
       "audiences": [
         "admin"
       ],
       "platforms": {
-        "web": "planned",
+        "web": "required",
         "ios": "not-applicable",
         "android": "not-applicable"
       },
@@ -1549,31 +1555,47 @@
         {
           "id": "staff-configuration",
           "claims": [
-            "planned-source-review"
+            "roles are tags; name, job eligibility, department scope, required certifications; compact labels",
+            "certifications show on the grid and can limit roles and jobs; same editing as roles",
+            "schedule notes: purpose, add with name and color",
+            "archive when in use, rename instead for roles, archived notes stay but cannot be added; delete when unused",
+            "who can view and change each section"
           ],
           "sourceFiles": [
-            "apps/web/src/components/settings/nav-config.tsx"
+            "apps/web/src/components/settings/nav-config.tsx",
+            "apps/web/src/components/settings/SettingsPage.tsx",
+            "packages/authz/src/index.ts",
+            "apps/web/src/lib/permission-labels.ts",
+            "apps/web/src/components/settings/StringListSettings.tsx",
+            "apps/web/src/components/settings/Indicators.tsx",
+            "apps/web/src/components/settings/Jobs.tsx"
           ],
-          "testFiles": [],
+          "testFiles": [
+            "apps/web/src/components/settings/__tests__/nav-config.test.tsx",
+            "packages/authz/src/index.test.ts",
+            "apps/web/src/components/settings/__tests__/StringListSettingsDepartments.test.tsx"
+          ],
           "runtimeScenarios": [
+            "loaded",
             "validation"
           ],
           "exclusions": []
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:ae9eff32ccea333d85c29f10063908d9ae4b731c7897c653c52b40867dba239b"
     },
     {
       "id": "organization-activity-controls",
       "file": "docs/configuration/organization-activity-and-controls.mdx",
       "publicRoute": "/configuration/organization-activity-and-controls",
       "deliveryOwner": "40b",
-      "lifecycle": "planned",
-      "sourceReview": "pending",
+      "lifecycle": "published",
+      "sourceReview": "verified",
       "audiences": [
         "super-admin"
       ],
       "platforms": {
-        "web": "planned",
+        "web": "required",
         "ios": "not-applicable",
         "android": "not-applicable"
       },
@@ -1585,32 +1607,51 @@
         {
           "id": "activity-controls",
           "claims": [
-            "planned-source-review"
+            "both Super Admin only",
+            "Activity Log scope, periods, search, type filter, details, 200 per page",
+            "delete closes the organization, cancels the subscription, removes access",
+            "typed DELETE confirmation and identity check",
+            "signs you out; not reversible in the product; support restores"
           ],
           "sourceFiles": [
-            "apps/web/src/components/settings/nav-config.tsx"
+            "apps/web/src/components/settings/nav-config.tsx",
+            "apps/web/src/components/settings/SettingsPage.tsx",
+            "apps/web/src/app/(app)/settings/page.tsx",
+            "packages/authz/src/index.ts",
+            "apps/web/src/lib/permission-labels.ts",
+            "apps/web/src/components/settings/ActivityLog.tsx",
+            "apps/web/src/lib/audit/registry.ts",
+            "apps/web/src/lib/activity-period.ts",
+            "apps/web/src/components/settings/DangerZone.tsx",
+            "apps/web/src/app/api/organizations/delete/route.ts"
           ],
-          "testFiles": [],
-          "runtimeScenarios": [
-            "loaded",
-            "denied"
+          "testFiles": [
+            "apps/web/src/components/settings/__tests__/nav-config.test.tsx",
+            "apps/web/src/app/(app)/settings/page.test.tsx",
+            "packages/authz/src/index.test.ts",
+            "apps/web/src/components/settings/__tests__/ActivityLog.test.tsx",
+            "apps/web/src/lib/activity-period.test.ts",
+            "apps/web/src/components/settings/__tests__/DangerZone.test.tsx",
+            "apps/web/src/app/api/organizations/delete/route.test.ts"
           ],
+          "runtimeScenarios": [],
           "exclusions": []
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:0c8b499e6844608f79a8da939b5418182dad8c1da9a7fb3cfdc15e9ea7e24229"
     },
     {
       "id": "departments-focus-areas",
       "file": "docs/configuration/departments-and-focus-areas.mdx",
       "publicRoute": "/configuration/departments-and-focus-areas",
       "deliveryOwner": "40b",
-      "lifecycle": "planned",
-      "sourceReview": "pending",
+      "lifecycle": "published",
+      "sourceReview": "verified",
       "audiences": [
         "admin"
       ],
       "platforms": {
-        "web": "planned",
+        "web": "required",
         "ios": "not-applicable",
         "android": "not-applicable"
       },
@@ -1621,32 +1662,48 @@
         {
           "id": "departments",
           "claims": [
-            "planned-source-review"
+            "scheduled departments with focus areas; management departments for unscheduled people",
+            "Edit to add departments and focus areas; name limits and uniqueness; split into focus areas; drag to reorder",
+            "empty scheduled department hint",
+            "archive with Rename Instead when in use; delete when unused",
+            "grid grouping; a person in several focus areas appears in each; toolbar filter",
+            "who can view and change"
           ],
           "sourceFiles": [
-            "apps/web/src/components/settings/nav-config.tsx"
+            "apps/web/src/components/settings/nav-config.tsx",
+            "apps/web/src/components/settings/SettingsPage.tsx",
+            "packages/authz/src/index.ts",
+            "apps/web/src/lib/permission-labels.ts",
+            "apps/web/src/components/settings/DepartmentsSettings.tsx",
+            "apps/web/src/components/Toolbar.tsx",
+            "apps/web/src/components/ScheduleGrid.tsx"
           ],
-          "testFiles": [],
+          "testFiles": [
+            "apps/web/src/components/settings/__tests__/nav-config.test.tsx",
+            "packages/authz/src/index.test.ts",
+            "apps/web/src/components/settings/__tests__/StringListSettingsDepartments.test.tsx"
+          ],
           "runtimeScenarios": [
             "loaded",
             "validation"
           ],
           "exclusions": []
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:7b22fe6e7311401292edf6938ff588230192edf3e3b92f7d91815ea28caadf83"
     },
     {
       "id": "shifts-jobs-absences",
       "file": "docs/configuration/shifts-jobs-and-absences.mdx",
       "publicRoute": "/configuration/shifts-jobs-and-absences",
       "deliveryOwner": "40b",
-      "lifecycle": "planned",
-      "sourceReview": "pending",
+      "lifecycle": "published",
+      "sourceReview": "verified",
       "audiences": [
         "admin"
       ],
       "platforms": {
-        "web": "planned",
+        "web": "required",
         "ios": "not-applicable",
         "android": "not-applicable"
       },
@@ -1659,19 +1716,38 @@
         {
           "id": "codes",
           "claims": [
-            "planned-source-review"
+            "no built-in shifts, jobs or absences; setup needs one shift and one job",
+            "shift fields and limits per focus area; code made from name, hidden in full-name mode",
+            "job groups; shift-only assignments and the default shift job",
+            "job fields; placement; per-shift settings; eligibility matching; ordering",
+            "absence fields and limits",
+            "archive when in use, delete when unused",
+            "who can view and change"
           ],
           "sourceFiles": [
-            "apps/web/src/components/settings/nav-config.tsx"
+            "apps/web/src/components/settings/nav-config.tsx",
+            "apps/web/src/components/settings/SettingsPage.tsx",
+            "packages/authz/src/index.ts",
+            "apps/web/src/lib/permission-labels.ts",
+            "apps/web/src/components/settings/ShiftCategories.tsx",
+            "apps/web/src/components/settings/Jobs.tsx",
+            "apps/web/src/components/settings/AbsenceTypes.tsx",
+            "supabase/migrations/001_schema.sql",
+            "apps/web/src/components/onboarding/steps/ScheduleStep.tsx"
           ],
-          "testFiles": [],
+          "testFiles": [
+            "apps/web/src/components/settings/__tests__/nav-config.test.tsx",
+            "packages/authz/src/index.test.ts",
+            "apps/web/src/components/settings/__tests__/AbsenceTypes.test.tsx"
+          ],
           "runtimeScenarios": [
             "loaded",
             "validation"
           ],
           "exclusions": []
         }
-      ]
+      ],
+      "evidenceFingerprint": "sha256:623c93113fc5a3f193000e4d6f2ce494cf64dba8a3589ed091019d65fe86752d"
     },
     {
       "id": "integrations-exports",

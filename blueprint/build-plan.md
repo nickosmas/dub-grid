@@ -757,7 +757,7 @@
         cron jobs, and supported commands; add the public-page accuracy
         manifest; pin the documentation tooling; and provide fixture-tested
         contract checks for stale or missing evidence.
-  - [ ] 40b. **Public scheduling, people, and configuration guides** - rewrite
+  - [x] 40b. **Public scheduling, people, and configuration guides** - rewrite
         the existing customer guides for scheduling, requests, people,
         invitations, departments, roles, certifications, shifts, jobs,
         absences, coverage, indicators, schedule rules, display options, and
@@ -771,7 +771,7 @@
           and dashboard pages.
     - [x] 40b3. **People guides** - rewrite the roster, person detail, and
           invitations pages.
-    - [ ] 40b4. **Configuration guides** - rewrite the organization, coverage,
+    - [x] 40b4. **Configuration guides** - rewrite the organization, coverage,
           and terminology pages and publish the five planned Settings pages
           (schedule rules and display; roles, certifications, and schedule
           notes; organization activity and controls; departments and focus

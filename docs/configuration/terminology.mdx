@@ -1,59 +1,28 @@
 ---
-title: "Custom Terminology"
-description: "Rename default labels like Focus Areas, Certifications, and Roles to match the language your facility already uses."
+title: "Labels"
+description: "Rename what your organization calls focus areas, certifications, and roles."
 ---
 
-DubGrid lets you replace three default labels with terms that match your facility's existing vocabulary. For example, if your staff call their sections "Wings" instead of "Focus Areas", you can make that change once and it updates everywhere, in the schedule grid, staff roster, settings pages, and any other place the label appears.
+Every organization describes its staff in its own words. **Settings > Labels** renames three of DubGrid's terms. Labels change wording only: they don't change how anything works.
 
-These settings are in **Settings → Organization**.
+| Term           | Default            | Could become, for example   |
+| -------------- | ------------------ | --------------------------- |
+| Focus areas    | **Focus Areas**    | Wings, Units, Departments   |
+| Certifications | **Certifications** | Designations                |
+| Roles          | **Roles**          | Responsibilities, Positions |
 
-Requires the `canManageOrgLabels` permission.
+Leave a label blank to go back to its default. Labels can't contain links.
 
-<Note>
-  Changing a label updates it everywhere in the app immediately. All users in your organization will
-  see the new term as soon as you save.
-</Note>
+## Where your labels appear
 
----
+Your labels replace the defaults in the product, for example:
 
-## Customizable labels
+- the **Settings** sections for roles and certifications, and the buttons for adding focus areas under **Departments**
+- the eligibility settings on jobs
+- the Dashboard's coverage card, "Coverage by" your focus-area label
 
-| Default term       | What it refers to                                                                       | Example custom values                      |
-| ------------------ | --------------------------------------------------------------------------------------- | ------------------------------------------ |
-| **Focus Areas**    | The wings, departments, or sections that divide your schedule grid                      | Wings, Units, Departments, Floors          |
-| **Certifications** | Staff skill levels or qualifications displayed in the staff roster and grid name column | Designations, Credentials, Classifications |
-| **Roles**          | Display roles or position titles assigned to staff members                              | Position, Title, Job Title                 |
+These guides use the default names throughout.
 
----
+## Who can change labels
 
-## Where custom labels appear
-
-Once updated, your custom labels replace the defaults throughout the app, including:
-
-- The **Staff roster** column headers and filter options
-- The **Schedule grid** name column (certifications and roles are shown alongside each employee's name)
-- **Settings** section headings and form labels
-- The **Staff detail page** overview tab
-- Any in-app help text that references these concepts
-
----
-
-## Updating a label
-
-<Steps>
-  <Step title="Open Organization settings">
-    Go to **Settings → Organization** and scroll to the **Custom Terminology** section.
-  </Step>
-  <Step title="Edit the label">
-    Click the field next to the term you want to rename and enter your preferred label.
-  </Step>
-  <Step title="Save">
-    Click **Save**. The new label takes effect immediately for all users in your organization.
-  </Step>
-</Steps>
-
-<Tip>
-  If you're not sure what term to use, check what your staff already call these things in
-  conversation or in your existing spreadsheets, using familiar language reduces confusion when
-  onboarding the team.
-</Tip>
+Super Admins, and Admins with permission to manage organization labels. Admins with permission only to view labels see them read-only.
