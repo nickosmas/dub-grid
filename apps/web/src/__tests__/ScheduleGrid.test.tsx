@@ -2057,7 +2057,63 @@ describe("ScheduleGrid", () => {
     expect(marks[0].getAttribute("aria-label")).toBe("3 notes: Note 1, Note 2, Note 3");
   });
 
-  it("draws each pill of a double shift with its own shift's notes", () => {
+  it("draws each pill of a double shift with its own shift's notes, in its own focus area only", () => {
+    observedWidth = 1600;
+    const lookups: Array<
+      [number | undefined, { shiftId: number | null; jobId: number } | undefined]
+    > = [];
+
+    renderGrid({
+      assignments: [
+        { ...assignments[0], jobId: 101 },
+        { ...assignments[0], id: 2, label: "E", name: "Evening Shift", jobId: 102, sortOrder: 2 },
+        {
+          id: 3,
+          orgId: "org-1",
+          label: "N",
+          name: "Night Shift",
+          color: "#E0F2FE",
+          border: "#0284C7",
+          text: "#0C4A6E",
+          categoryId: 1,
+          focusAreaId: 2,
+          jobId: 103,
+          sortOrder: 3,
+        },
+      ],
+      indicatorTypes: [
+        { id: 1, orgId: "org-1", name: "Readings", color: "#ff2600", sortOrder: 1 },
+        { id: 2, orgId: "org-1", name: "Shower", color: "#2563eb", sortOrder: 2 },
+      ],
+      shiftForKey: () => "D/E",
+      assignmentIdsForKey: () => [1, 2],
+      segmentsForKey: () => [
+        { shiftId: 1, jobId: 101, position: 0, isMentored: false },
+        { shiftId: 1, jobId: 102, position: 1, isMentored: false },
+      ],
+      noteMarksForKey: (_empId, _date, focusAreaId, shift) => {
+        lookups.push([focusAreaId, shift]);
+        if (!shift) return [{ indicatorTypeId: 1, state: "published" }];
+        return shift.jobId === 101
+          ? [{ indicatorTypeId: 1, state: "published" as const }]
+          : [{ indicatorTypeId: 2, state: "draft_added" as const }];
+      },
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pills = Array.from(
+      firstCell.querySelectorAll('[data-shift-pill="multi"]'),
+    ) as HTMLElement[];
+
+    expect(pills).toHaveLength(2);
+    expect(within(pills[0]).getByLabelText("Readings")).toBeInTheDocument();
+    expect(within(pills[1]).getByLabelText("Shower · Added, not published")).toBeInTheDocument();
+    expect(firstCell.querySelectorAll("[data-note-mark]")).toHaveLength(2);
+    expect(lookups).toContainEqual([1, { shiftId: 1, jobId: 101 }]);
+    expect(lookups).toContainEqual([1, { shiftId: 1, jobId: 102 }]);
+  });
+
+  it("shows no note on a pill whose shift belongs to another focus area", () => {
     observedWidth = 1600;
     const lookups: Array<
       [number | undefined, { shiftId: number | null; jobId: number } | undefined]
@@ -2080,37 +2136,29 @@ describe("ScheduleGrid", () => {
           sortOrder: 2,
         },
       ],
-      indicatorTypes: [
-        { id: 1, orgId: "org-1", name: "Readings", color: "#ff2600", sortOrder: 1 },
-        { id: 2, orgId: "org-1", name: "Shower", color: "#2563eb", sortOrder: 2 },
-      ],
+      indicatorTypes: [{ id: 1, orgId: "org-1", name: "Readings", color: "#ff2600", sortOrder: 1 }],
       shiftForKey: () => "D/N",
       assignmentIdsForKey: () => [1, 2],
       segmentsForKey: () => [
         { shiftId: 1, jobId: 101, position: 0, isMentored: false },
         { shiftId: 1, jobId: 102, position: 1, isMentored: false },
       ],
+      // The Night note is filed under the Night Shift's own focus area (2).
       noteMarksForKey: (_empId, _date, focusAreaId, shift) => {
         lookups.push([focusAreaId, shift]);
-        if (!shift) return [{ indicatorTypeId: 1, state: "published" as const }];
-        return shift.jobId === 101
+        return focusAreaId === 2 && shift?.jobId === 102
           ? [{ indicatorTypeId: 1, state: "published" as const }]
-          : [{ indicatorTypeId: 2, state: "draft_added" as const }];
+          : [];
       },
     });
 
+    // North (area 1) is the first section; the person's row there shows the
+    // Night pill with no note, while South (area 2), its own area, shows it.
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const pills = Array.from(
-      firstCell.querySelectorAll('[data-shift-pill="multi"]'),
-    ) as HTMLElement[];
 
-    expect(pills).toHaveLength(2);
-    expect(within(pills[0]).getByLabelText("Readings")).toBeInTheDocument();
-    expect(within(pills[1]).getByLabelText("Shower · Added, not published")).toBeInTheDocument();
-    expect(firstCell.querySelectorAll("[data-note-mark]")).toHaveLength(2);
-    // The second pill's shift belongs to another focus area, where its notes are filed.
-    expect(lookups).toContainEqual([1, { shiftId: 1, jobId: 101 }]);
-    expect(lookups).toContainEqual([2, { shiftId: 1, jobId: 102 }]);
+    expect(lookups).toContainEqual([1, { shiftId: 1, jobId: 102 }]);
+    expect(firstCell.querySelectorAll("[data-note-mark]")).toHaveLength(0);
+    expect(screen.getAllByLabelText("Readings").length).toBeGreaterThan(0);
   });
 
   it("folds the corner of a shift with an open request", () => {
