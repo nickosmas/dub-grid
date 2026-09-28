@@ -13,24 +13,24 @@ export class PartialTwoFactorResetError extends Error {
 }
 
 /**
- * Resets someone's two-factor for a Gridmaster. Each step is safe to repeat,
- * and the flag goes first, so a reset that fails part way still makes the
- * next sign-in enroll again and a retry finishes the rest.
+ * Resets someone's two-factor for a Gridmaster. Each step is safe to repeat.
+ * The flag goes in before any factor is removed, so a reset that fails part
+ * way still makes the next sign-in enroll again and a retry finishes the rest;
+ * it goes in after the factors are listed, so a failed list changes nothing.
  */
 export async function resetPersonTwoFactor(
   client: SupabaseClient,
   userId: string,
 ): Promise<{ factorsRemoved: number }> {
-  const flaggedAt = new Date().toISOString();
-  const { error: flagError } = await client
-    .from("profiles")
-    .update({ mfa_reenroll_required_at: flaggedAt })
-    .eq("id", userId);
-  if (flagError) throw flagError;
-
   const { data, error } = await client.auth.admin.mfa.listFactors({ userId });
   if (error) throw error;
   const factors = data?.factors ?? [];
+
+  const { error: flagError } = await client
+    .from("profiles")
+    .update({ mfa_reenroll_required_at: new Date().toISOString() })
+    .eq("id", userId);
+  if (flagError) throw flagError;
   let factorsRemoved = 0;
   try {
     for (const factor of factors) {

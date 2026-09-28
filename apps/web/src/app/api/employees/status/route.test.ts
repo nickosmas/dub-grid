@@ -161,13 +161,13 @@ const ORG_ID = "22222222-2222-4222-8222-222222222222";
 const EMP_ID = "33333333-3333-4333-8333-333333333333";
 const SANDBOX_ORG_ID = "99999999-9999-4999-8999-999999999999";
 
-function makeRequest() {
+function makeRequest(action: "deactivate" | "remove" | "activate" = "deactivate") {
   return new NextRequest("http://localhost/api/employees/status", {
     method: "POST",
     body: JSON.stringify({
       empId: EMP_ID,
       orgId: ORG_ID,
-      action: "deactivate",
+      action,
       expectedVersion: 1,
     }),
   });
@@ -236,6 +236,40 @@ describe("POST /api/employees/status", () => {
     expect(requireSensitiveActionAuth).toHaveBeenCalledTimes(1);
     expect(employeeCurrentSingle).not.toHaveBeenCalled();
     expect(employeeUpdateMaybeSingle).not.toHaveBeenCalled();
+  });
+
+  it("asks a Gridmaster for fresh proof before a removal too (F-103)", async () => {
+    membershipMaybeSingle.mockResolvedValue({ data: null, error: null });
+    profileSingle.mockResolvedValue({ data: { platform_role: "gridmaster" }, error: null });
+    requireSensitiveActionAuth.mockResolvedValueOnce({
+      response: NextResponse.json({ code: "STEP_UP_REQUIRED" }, { status: 403 }),
+    });
+
+    const response = await POST(makeRequest("remove"));
+
+    expect(response.status).toBe(403);
+    expect(employeeCurrentSingle).not.toHaveBeenCalled();
+    expect(employeeUpdateMaybeSingle).not.toHaveBeenCalled();
+  });
+
+  it("never asks a Gridmaster for proof to reactivate someone (F-103)", async () => {
+    membershipMaybeSingle.mockResolvedValue({ data: null, error: null });
+    profileSingle.mockResolvedValue({ data: { platform_role: "gridmaster" }, error: null });
+
+    await POST(makeRequest("activate"));
+
+    expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
+    expect(employeeCurrentSingle).toHaveBeenCalled();
+  });
+
+  it("lets a Gridmaster with fresh proof go on to the staff record (F-103)", async () => {
+    membershipMaybeSingle.mockResolvedValue({ data: null, error: null });
+    profileSingle.mockResolvedValue({ data: { platform_role: "gridmaster" }, error: null });
+
+    await POST(makeRequest("deactivate"));
+
+    expect(requireSensitiveActionAuth).toHaveBeenCalledTimes(1);
+    expect(employeeCurrentSingle).toHaveBeenCalled();
   });
 
   it("never asks an organization admin for fresh proof (F-96)", async () => {

@@ -17,11 +17,13 @@ export function useSharedStepUp() {
   const prompt = useRef<Promise<string | null> | null>(null);
 
   async function run(action: Action): Promise<boolean> {
+    let required: ReturnType<typeof getStepUpMethod>;
     try {
       await action();
       return true;
     } catch (failure) {
-      if (!getStepUpMethod(failure)) throw failure;
+      required = getStepUpMethod(failure);
+      if (!required) throw failure;
     }
 
     if (prompt.current) {
@@ -32,11 +34,13 @@ export function useSharedStepUp() {
     }
 
     let assured: string | null = null;
+    // The refusal already happened, so ask at once: each refused row is sent
+    // twice (the refusal, then the assured retry), never three times (F-103).
     const current = stepUp
-      .run(async (token) => {
+      .prompt(async (token) => {
         await action(token);
         assured = token;
-      })
+      }, required)
       .then((completed) => (completed ? assured : null))
       .finally(() => {
         if (prompt.current === current) prompt.current = null;

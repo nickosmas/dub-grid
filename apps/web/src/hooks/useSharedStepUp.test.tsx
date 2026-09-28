@@ -74,6 +74,8 @@ describe("useSharedStepUp", () => {
     await confirmIdentity();
 
     await waitFor(() => expect(done).toHaveBeenCalledWith([true]));
+    // The refusal, then the assured retry: never a third send before the prompt (F-103).
+    expect(action).toHaveBeenCalledTimes(2);
     expect(action).toHaveBeenLastCalledWith("renewed-token");
   });
 
@@ -87,6 +89,8 @@ describe("useSharedStepUp", () => {
 
     await waitFor(() => expect(done).toHaveBeenCalledWith([true, true]));
     expect(mocks.confirm).toHaveBeenCalledOnce();
+    expect(first).toHaveBeenCalledTimes(2);
+    expect(second).toHaveBeenCalledTimes(2);
     expect(first).toHaveBeenLastCalledWith("renewed-token");
     expect(second).toHaveBeenLastCalledWith("renewed-token");
   });

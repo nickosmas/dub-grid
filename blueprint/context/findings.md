@@ -88,37 +88,37 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** Write the audit row right after the RPC and before `endUserSessions`, or catch that failure, log it, record `sessionsEnded: false` and still write the audit; a route test where `endUserSessions` rejects.
 **Resolution:**
 
-### F-102 [P3] open - Two-factor reset follow-ups
+### F-102 [P3] fixed - Two-factor reset follow-ups
 
 **File:** `apps/web/src/emails/TwoFactorResetEmail.tsx:24`; `apps/web/src/features/gridmaster/server/two-factor-reset.ts:24`; `apps/web/src/features/gridmaster/server/two-factor-reset.test.ts:14`; comments at `terminate/route.ts:71` and `gridmaster/users/route.ts:225`
 **Found:** 2026-09-28 by `/audit` (scope: fixed-finding re-review at 1924880c; all lenses), reviewing F-90
 **Why it matters:** a partial reset still emails "signed you out everywhere" although `endUserSessions` never ran; the re-enrollment flag is set before any factor is removed, so a failure in `listFactors` leaves the person gated to re-enroll with no record or email; no test makes the profile update or `endUserSessions` fail after every factor is gone; two comments still describe watermark-only revocation.
 **Suggested fix:** a `partial` prop with softer wording; set the flag after the first removal, or record the attempt; the two failure tests; refresh the comments.
-**Resolution:**
+**Resolution:** Fixed in fix/person-page-audit-follow-ups (step 3): `TwoFactorResetEmail` takes `partial`, and a partial reset's notice says some devices may still be signed in and asks the person to sign out of any they don't recognize, never "everywhere"; the route passes `partial` to the notice. `resetPersonTwoFactor` lists factors before setting the re-enroll flag, so a failed list changes nothing, while the flag still precedes every removal. Tests cover the failed list, a failed two-factor switch-off and a failed session ending after both factors are gone (each a partial error counting 2), and both email wordings; the old helper and email fail them. The stale comment in `gridmaster/users/route.ts` now describes `endUserSessions`; the terminate route's was replaced under F-101 by its own session.
 
-### F-103 [P3] open - Each step-up-refused status change is sent three times, and a bulk can partly apply
+### F-103 [P3] fixed - Each step-up-refused status change is sent three times, and a bulk can partly apply
 
 **File:** `apps/web/src/components/staff/useSharedStepUp.tsx:21`; `apps/web/src/hooks/useStepUpAction.tsx:43`; `apps/web/src/app/api/employees/status/route.ts:61`; `apps/web/src/app/api/employees/status/route.test.ts:163`
 **Found:** 2026-09-28 by `/audit` (scope: fixed-finding re-review at 1924880c; all lenses), reviewing F-96
 **Why it matters:** the refused first send, then `stepUp.run`'s own attempt with the current token before it prompts, then the retry: three requests per row against `apiLimiter` (10 per 10 s), which the route checks before the gate. A Gridmaster's bulk of five or more confirmed quickly can hit 429 on the last retries and apply only part of the batch, which F-98's quiet-cancel counting then reports as done (unverified in a browser). The status route test covers only `deactivate`, not `remove`, `activate` staying ungated, or a Gridmaster with fresh proof going on to write.
 **Suggested fix:** a "prompt now" entry on `useStepUpAction` that skips the first attempt, bounded bulk concurrency, `toHaveBeenCalledTimes` in `useSharedStepUp.test.tsx`, and the three route cases.
-**Resolution:**
+**Resolution:** Fixed in fix/person-page-audit-follow-ups (step 4, on c6dfdb51): `useStepUpAction` gains `prompt(action, method)`, which opens the dialog at once; `useSharedStepUp` uses it after a refusal, so a refused row is sent twice (the refusal, then the assured retry) and never three times. The bulk runs its status changes through `mapInBatches` three at a time. Tests: call counts in `useSharedStepUp.test.tsx`, `prompt` asking before any send, a five-person bulk never exceeding three in flight, and in the status route a Gridmaster's removal gated, reactivation ungated, and a fresh Gridmaster going on to the record. Reverting the hook or the bulk fails them.
 
-### F-104 [P3] open - Consent-row device labels over-claim the DubGrid app
+### F-104 [P3] fixed - Consent-row device labels over-claim the DubGrid app
 
 **File:** `apps/web/src/lib/user-agent-label.ts:13`
 **Found:** 2026-09-28 by `/audit` (scope: fixed-finding re-review at 1924880c; all lenses), reviewing F-96
 **Why it matters:** any CFNetwork and Darwin client (a Mac app, an iPad, any iOS app) reads "DubGrid app on iPhone", and any `okhttp/` client "DubGrid app on Android", on rows kept as consent evidence from a client-set header; the card says "Mac" and "Windows" where the sessions list says "Macintosh" and "Windows PC".
 **Suggested fix:** require the app's own `DubGrid/` token before naming the app, fall back to a neutral label, and share one vocabulary with the sessions list.
-**Resolution:**
+**Resolution:** Fixed in fix/person-page-audit-follow-ups (step 1): the app is named only for an agent starting with the iOS app's own `DubGrid/` bundle token; any other CFNetwork agent reads "iPhone or iPad app" and `okhttp/` reads "Android app". Decision (owner delegated, 2026-09-28): keep the owner's F-96 wording "Safari on Mac" rather than the sessions list's "Macintosh"; the two lists keep their own vocabularies. Tests cover all three native agents; the old helper fails them.
 
-### F-105 [P3] open - The person history's detail stripping is a narrow denylist, and two edge cases drop events
+### F-105 [P3] fixed - The person history's detail stripping is a narrow denylist, and two edge cases drop events
 
 **File:** `apps/web/src/features/gridmaster/server/person-history.ts:163`, `:237`, `:100`
 **Found:** 2026-09-28 by `/audit` (scope: fixed-finding re-review at 1924880c; all lenses), reviewing F-85 and F-87
 **Why it matters:** no leak today (every current writer puts IP and user agent in columns and only the three hash keys in `details`), but only three top-level keys are removed, so a later writer adding `ipHash`, `userAgent` or a nested hash would reach the history and its export; the F-87 filter compares `actor_id` to a `userId` the route accepts in any case, so an uppercase id would drop the person's own impersonation actions (unverified, clients send lowercase); an impersonation older than the newest 500 sessions is now missing rather than duplicated (`truncated` is set).
 **Suggested fix:** strip keys matching a hash, IP or user-agent pattern at any depth (or an allowlist per action), lowercase the id at the route, and say in the card when the session list was capped.
-**Resolution:**
+**Resolution:** Fixed in fix/person-page-audit-follow-ups (step 2): `withoutNetworkDetails` now drops, at any depth of `details` (objects and arrays), every key whose name ends in `hash`, is `ip`, starts with `ipaddr` or contains `useragent` once case, `_` and `-` are ignored; `loadPersonHistory` lowercases a user target's id before querying and before the F-87 comparison. The cap needed no change: the card already warns the history is partial whenever any source, the impersonation sessions included, returned its full read. Tests with nested and renamed keys and an uppercase id fail against the old code.
 
 ### F-106 [P3] open - The Month view's other-area merge reads every focus area and can land in a hidden section
 
@@ -152,13 +152,13 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** a forward migration dropping the three policies and revoking `MAINTAIN`, and a live test asserting `has_table_privilege('authenticated', 'public.employees', 'UPDATE')` is false.
 **Resolution:**
 
-### F-110 [P3] open - The person page's request lists do not say they stop at 90 days
+### F-110 [P3] fixed - The person page's request lists do not say they stop at 90 days
 
 **File:** `apps/web/src/components/gridmaster/person/PersonScheduleSection.tsx:167`, `:195`; `apps/web/src/features/gridmaster/server/person-activity.ts:117`
 **Found:** 2026-09-28 by `/audit` (scope: fix/person-page-follow-ups; all lenses)
 **Why it matters:** "Shift requests" has always shown open requests plus the last 90 days, and since F-92 "Profile change requests" does too (before, it listed every one ever made), but neither title says so, unlike "Publish changes, last 90 days". A Gridmaster looking for an older resolved request reads an empty list as "none".
 **Suggested fix:** Title both groups "..., open and last 90 days", or keep profile change requests unbounded (they are few) and label only shift requests.
-**Resolution:**
+**Resolution:** Fixed in fix/person-page-audit-follow-ups (step 1): both groups are titled "…, open and last 90 days", matching "Publish changes, last 90 days".
 
 ### F-111 [P3] fixed - Migration 066 has no live test
 

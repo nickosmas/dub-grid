@@ -1269,3 +1269,39 @@ describe("MembersSection - bulk status changes under step-up (F-98)", () => {
     expect(vi.mocked(toast.success)).not.toHaveBeenCalledWith("2 people updated");
   });
 });
+
+describe("MembersSection - bulk status change pacing (F-103)", () => {
+  it("never runs more than three status changes at once", async () => {
+    const people = Array.from({ length: 5 }, (_, index) =>
+      makeEmployee({ id: `emp-${index}`, firstName: `Person${index}`, lastName: "Test" }),
+    );
+    let inFlight = 0;
+    let most = 0;
+    const onDeactivate = vi.fn(async () => {
+      inFlight += 1;
+      most = Math.max(most, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      inFlight -= 1;
+      return true;
+    });
+    const user = userEvent.setup();
+    renderMembersSection({
+      canManageEmployees: true,
+      canViewEmployeeDetails: true,
+      isSuperAdmin: true,
+      employees: people,
+      onDeactivate,
+    });
+    await settleInvitations();
+    await user.click(screen.getAllByRole("checkbox")[0]);
+    await user.click(screen.getByRole("button", { name: "Deactivate" }));
+    await screen.findByText("Deactivate Selected Staff?");
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: "Deactivate" }),
+    );
+
+    await waitFor(() => expect(onDeactivate).toHaveBeenCalledTimes(5));
+    await waitFor(() => expect(vi.mocked(toast.success)).toHaveBeenCalledWith("5 people updated"));
+    expect(most).toBeLessThanOrEqual(3);
+  });
+});

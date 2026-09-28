@@ -25,7 +25,8 @@ describe("describeUserAgent", () => {
       "Chrome on Android",
     ],
     ["DubGrid/1 CFNetwork/1498.700.2 Darwin/23.6.0", "DubGrid app on iPhone"],
-    ["okhttp/4.12.0", "DubGrid app on Android"],
+    ["SomeOtherApp/3 CFNetwork/1498.700.2 Darwin/23.6.0", "iPhone or iPad app"],
+    ["okhttp/4.12.0", "Android app"],
     ["curl/8.4.0", "Unknown browser"],
   ])("%s", (userAgent, label) => {
     expect(describeUserAgent(userAgent)).toBe(label);

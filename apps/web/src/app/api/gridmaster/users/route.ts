@@ -232,8 +232,9 @@ export async function PATCH(req: NextRequest) {
       throw error;
     }
 
-    // The hook now refuses a deactivated account at the next token issue;
-    // the watermark makes the tokens already in hand fail app APIs at once.
+    // The hook refuses a deactivated account at the next token issue; ending
+    // its sessions also deletes their refresh tokens, so a device cannot mint
+    // new ones after reactivation (F-89).
     if (deactivate) {
       await endUserSessions(userId);
     }

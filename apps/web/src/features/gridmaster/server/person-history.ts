@@ -171,16 +171,35 @@ async function loadStaffHistoryRows(
   };
 }
 
-/** Sign-in evidence the security audit keeps: a hashed IP, email and session. */
-const HASHED_DETAIL_KEYS = ["sourceHash", "targetHash", "sessionHash"];
+/**
+ * Keys naming a hash, an IP address or a user agent, whatever a writer calls
+ * them: the security audit's `sourceHash`, `targetHash` and `sessionHash`, and
+ * any later `ipHash`, `ip_address` or `userAgent` (F-85, F-105).
+ */
+function isNetworkDetailKey(key: string): boolean {
+  const name = key.toLowerCase().replace(/[_-]/g, "");
+  return (
+    name.endsWith("hash") ||
+    name === "ip" ||
+    name.startsWith("ipaddr") ||
+    name.includes("useragent")
+  );
+}
+
+function withoutNetworkKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(withoutNetworkKeys);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([key]) => !isNetworkDetailKey(key))
+      .map(([key, entry]) => [key, withoutNetworkKeys(entry)]),
+  );
+}
 
 function withoutNetworkDetails(row: AuditRow): AuditRow {
   const { ip_address: _ip, user_agent: _agent, ...rest } = row;
-  const details = rest.details;
-  if (!details || typeof details !== "object" || Array.isArray(details)) return rest;
-  const kept = { ...(details as Record<string, unknown>) };
-  for (const key of HASHED_DETAIL_KEYS) delete kept[key];
-  return { ...rest, details: kept };
+  if (!rest.details || typeof rest.details !== "object") return rest;
+  return { ...rest, details: withoutNetworkKeys(rest.details) as AuditRow["details"] };
 }
 
 export type PersonHistoryTarget =
@@ -203,9 +222,12 @@ export async function loadPersonHistory(
   let userId: string | null;
   let employees: EmployeeActivitySubject[];
   if (target.kind === "user") {
+    // Stored ids are lowercase, and the impersonation filter below compares
+    // them as text, so an uppercase id from the URL must not reach it (F-105).
+    const accountId = target.userId.toLowerCase();
     const [profileResult, employeeResult] = await Promise.all([
-      client.from("profiles").select("id, platform_role").eq("id", target.userId).maybeSingle(),
-      client.from("employees").select(EMPLOYEE_SUBJECT_COLUMNS).eq("user_id", target.userId),
+      client.from("profiles").select("id, platform_role").eq("id", accountId).maybeSingle(),
+      client.from("employees").select(EMPLOYEE_SUBJECT_COLUMNS).eq("user_id", accountId),
     ]);
     if (profileResult.error) throw profileResult.error;
     employees = realSubjects(rowsOrThrow(employeeResult) as unknown as EmployeeSubjectRow[]);
@@ -214,7 +236,7 @@ export async function loadPersonHistory(
     if ((profileResult.data as { platform_role?: string } | null)?.platform_role === "gridmaster") {
       return null;
     }
-    userId = target.userId;
+    userId = accountId;
   } else {
     const { data, error } = await client
       .from("employees")

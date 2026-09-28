@@ -139,6 +139,61 @@ describe("loadPersonHistory", () => {
     expect(history?.entries[0].details).toEqual({ outcome: "succeeded", surface: "mobile" });
   });
 
+  it("drops hash, IP and user-agent keys at any depth, whatever they are called (F-105)", async () => {
+    const { client } = makeClient({
+      profiles: { id: USER },
+      employees: [employee],
+      accountAudit: [
+        {
+          id: 3,
+          action: "security.auth.login",
+          details: {
+            outcome: "succeeded",
+            ipHash: "h",
+            ip_address: "203.0.113.9",
+            userAgent: "Safari",
+            targetUserId: USER,
+            request: { ip: "203.0.113.9", "user-agent": "Safari", note: "kept" },
+            devices: [{ deviceHash: "d", label: "kept" }],
+          },
+          created_at: "2026-09-25T10:00:00.000Z",
+        },
+      ],
+    });
+
+    const history = await loadPersonHistory(client as never, { kind: "user", userId: USER });
+
+    expect(history?.entries[0].details).toEqual({
+      outcome: "succeeded",
+      targetUserId: USER,
+      request: { note: "kept" },
+      devices: [{ label: "kept" }],
+    });
+  });
+
+  it("keeps the person's own impersonation actions when the id arrives in capitals (F-105)", async () => {
+    const ADA = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const { client } = makeClient({
+      profiles: { id: ADA },
+      employees: [],
+      accountAudit: [
+        {
+          id: 5,
+          action: "impersonation.started",
+          actor_id: ADA,
+          created_at: "2026-09-25T10:00:00.000Z",
+        },
+      ],
+    });
+
+    const history = await loadPersonHistory(client as never, {
+      kind: "user",
+      userId: ADA.toUpperCase(),
+    });
+
+    expect(history?.entries.map((entry) => entry.id)).toContain("5");
+  });
+
   it("shows each impersonation once, though the staff source also finds its rows (F-87)", async () => {
     const GM = "22222222-2222-4222-8222-222222222222";
     const { client } = makeClient({

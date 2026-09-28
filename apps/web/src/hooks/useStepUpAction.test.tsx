@@ -48,6 +48,21 @@ function Harness({
     </>
   );
 }
+function PromptHarness({
+  action,
+  done,
+}: {
+  action: (token: string) => Promise<unknown>;
+  done: (value: boolean) => void;
+}) {
+  const stepUp = useStepUpAction();
+  return (
+    <>
+      <button onClick={() => void stepUp.prompt(action, "password").then(done)}>Retry</button>
+      {stepUp.dialog}
+    </>
+  );
+}
 async function start() {
   fireEvent.click(screen.getByRole("button", { name: "Sensitive action" }));
   await screen.findByRole("dialog", { name: "Confirm your identity" });
@@ -92,6 +107,20 @@ describe("useStepUpAction", () => {
       expect(screen.getByLabelText("Pending details")).toHaveValue("Keep these edits");
     },
   );
+
+  it("prompt asks at once and sends the action only with the assured token (F-103)", async () => {
+    const action = vi.fn().mockResolvedValue(undefined);
+    const done = vi.fn();
+    render(<PromptHarness action={action} done={done} />);
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await screen.findByRole("dialog", { name: "Confirm your identity" });
+    expect(action).not.toHaveBeenCalled();
+    submit();
+
+    await waitFor(() => expect(done).toHaveBeenCalledWith(true));
+    expect(action).toHaveBeenCalledExactlyOnceWith("renewed-token");
+  });
 
   it("cancels without repeating the pending action or clearing its form", async () => {
     const action = vi.fn().mockRejectedValue(required());

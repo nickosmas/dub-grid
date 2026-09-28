@@ -98,10 +98,13 @@ import { useStaffSelection } from "./useStaffSelection";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import ScrollableTabs from "@/components/ScrollableTabs";
+import { mapInBatches } from "@/lib/async-batch";
 
 const REORDER_SETTLE_MS = 220;
 
 type BulkStaffAction = "deactivate" | "activate" | "remove";
+
+const BULK_STATUS_CONCURRENCY = 3;
 
 export interface MembersSectionProps {
   employees: Employee[];
@@ -854,16 +857,22 @@ export function MembersSection({
 
     setIsBulkActionRunning(true);
     try {
-      const results = await Promise.allSettled(
-        targetIds.map((employeeId) => {
-          if (pendingAction.action === "deactivate") {
-            return onDeactivate(employeeId, trimmedNote);
-          }
-          if (pendingAction.action === "activate") {
-            return onActivate(employeeId);
-          }
-          return onRemove(employeeId, trimmedNote);
-        }),
+      const change = (employeeId: string): unknown => {
+        if (pendingAction.action === "deactivate") return onDeactivate(employeeId, trimmedNote);
+        if (pendingAction.action === "activate") return onActivate(employeeId);
+        return onRemove(employeeId, trimmedNote);
+      };
+      // Three at a time keeps a large bulk inside the status route's rate limit (F-103).
+      const results = await mapInBatches(
+        targetIds,
+        BULK_STATUS_CONCURRENCY,
+        (employeeId): Promise<PromiseSettledResult<unknown>> =>
+          Promise.resolve()
+            .then(() => change(employeeId))
+            .then(
+              (value) => ({ status: "fulfilled", value }),
+              (reason: unknown) => ({ status: "rejected", reason }),
+            ),
       );
       // A handler resolves false for a change it could not make or a cancelled prompt.
       const succeeded = results.filter((r) => r.status === "fulfilled" && r.value !== false).length;

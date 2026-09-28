@@ -20,7 +20,8 @@ vi.mock("@/app/api/gridmaster/_lib/audit", () => ({
   writeGridmasterAuditLogAfterCommit: (input: unknown) => writeAudit(input),
 }));
 vi.mock("@/app/api/gridmaster/_lib/two-factor-reset-notice", () => ({
-  scheduleTwoFactorResetNotice: (to: string) => scheduleTwoFactorResetNotice(to),
+  scheduleTwoFactorResetNotice: (to: string, options?: unknown) =>
+    scheduleTwoFactorResetNotice(to, options),
 }));
 vi.mock("@/features/gridmaster/server/person-target", () => ({
   loadPersonTarget: (...args: unknown[]) => loadPersonTarget(...args),
@@ -81,7 +82,9 @@ describe("POST /api/gridmaster/users/[userId]/two-factor-reset", () => {
     const response = await post({ reason: " Lost phone, verified by call " });
     expect(response.status).toBe(200);
     expect(resetPersonTwoFactor).toHaveBeenCalledWith(serviceClient, USER);
-    expect(scheduleTwoFactorResetNotice).toHaveBeenCalledWith("ada@example.com");
+    expect(scheduleTwoFactorResetNotice).toHaveBeenCalledWith("ada@example.com", {
+      partial: false,
+    });
     expect(writeAudit).toHaveBeenCalledWith(
       expect.objectContaining({
         action: "user.mfa_reset",
@@ -107,6 +110,9 @@ describe("POST /api/gridmaster/users/[userId]/two-factor-reset", () => {
 
     expect(response.status).toBe(500);
     expect(scheduleTwoFactorResetNotice).toHaveBeenCalledTimes(1);
+    expect(scheduleTwoFactorResetNotice).toHaveBeenCalledWith("ada@example.com", {
+      partial: true,
+    });
     expect(writeAudit).toHaveBeenCalledWith(
       expect.objectContaining({
         action: "user.mfa_reset",
