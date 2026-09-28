@@ -70,7 +70,7 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Found:** 2026-09-26 during the email review (read-only Management API read)
 **Why it matters:** `internal/authentication.md` and `RBAC_SYSTEM_DESIGN.md` say email sign-up is off in production, but it is on. Anyone with the public publishable key can create and confirm an account through `/auth/v1/signup`, or through a sign-in link request, which also creates a missing user while sign-ups are open. The account has no organization, so RLS should still hide tenant data, but every RPC granted to `authenticated` becomes reachable by strangers.
 **Suggested fix:** Set `disable_signup: true` on production (dashboard or Management API). Only `/api/invitations/register` creates accounts, through `auth.admin.createUser`, which ignores the setting. Local `config.toml` stays open for the integration tests that call `signUp`. Consider having `auth:templates:check` report the setting so it cannot drift again.
-**Resolution:** Production set to `disable_signup: true` through the Management API on 2026-09-26 (read back true; email sign-in and confirmation unchanged). Local `config.toml` stays open for the integration tests. The drift check in `auth:templates:check` is not added yet.
+**Resolution:** Production set to `disable_signup: true` through the Management API on 2026-09-26 (read back true; email sign-in and confirmation unchanged). Local `config.toml` stays open for the integration tests. The drift check in `auth:templates:check` is not added yet. Re-review (2026-09-28): not closed. Confirming it needs a production Auth read, which the agent cannot make; it stays `fixed` until the owner confirms Authentication > Sign In / Providers shows new sign-ups disabled, or `auth:templates:check` reports the setting.
 
 ### F-75 [P3] open - Database functions still let a stale Gridmaster token edit organization data
 
@@ -88,29 +88,29 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Suggested fix:** End the created session when the client has gone (for example, a short server-side deadline that signs the new session out), or let the next successful sign-in on that device replace the orphan.
 **Resolution:**
 
-### F-82 [P3] fixed - Month view misses a note filed under a person's secondary focus area
+### F-82 [P3] closed - Month view misses a note filed under a person's secondary focus area
 
 **File:** `apps/web/src/components/MonthView.tsx` (row building)
 **Found:** 2026-09-26 by review of 42a
 **Why it matters:** A general shift code is listed only under the person's primary focus area, so an indicator stored against another of their focus areas for that day never appears in the day popover. Rare: indicators are normally stored against the focus area the shift is in.
 **Suggested fix:** Merge the person's marks from their other home focus areas into that row, deduplicated.
-**Resolution:** Fixed: after building a day's rows, each person's first row also takes the notes filed under every focus area they have no row in that day, and those with no focus area, each note once (`MonthView.tsx`). A test lists a general-code person under their primary area with a note filed under their second area and a note filed under both; it fails against the previous code.
+**Resolution:** Fixed: after building a day's rows, each person's first row also takes the notes filed under every focus area they have no row in that day, and those with no focus area, each note once (`MonthView.tsx`). A test lists a general-code person under their primary area with a note filed under their second area and a note filed under both; it fails against the previous code. Re-review (2026-09-28, `/audit` at 1924880c): closed. `MonthView.tsx:442-477` gives each person's first row, in focus-area order, the notes filed under every area they have no row in and those with no area, deduplicated; after 063 the note map still keys by employee, date and area, and a note on both shifts of a double shift collapses to one mark (`schedule-window.ts`), so nothing shows twice. Follow-ups are F-106.
 
-### F-83 [P3] fixed - Gridmaster realtime invalidation is not coalesced
+### F-83 [P3] closed - Gridmaster realtime invalidation is not coalesced
 
 **File:** `apps/web/src/hooks/useGridmasterRealtimeInvalidation.ts`
 **Found:** 2026-09-26 by review of the findings batch
 **Why it matters:** The platform-wide subscription invalidates on every row event with no debounce, so a bulk import or invitation batch in any organization restarts an open person page's (and the platform summaries') fetch once per row. Gridmaster-only, and the summaries already behaved this way.
 **Suggested fix:** Coalesce invalidations per query key over a short window before refetching.
-**Resolution:** Fixed in `fix/gridmaster-realtime-coalesce`: the Gridmaster subscription batches its invalidations by query key through the shared `createDebouncedTableFlusher` (150 ms, as the org hook), so each distinct key refetches and broadcasts once per burst, and a pending batch is dropped on teardown. Tests cover the burst, cross-table dedupe, the live subscription and teardown.
+**Resolution:** Fixed in `fix/gridmaster-realtime-coalesce`: the Gridmaster subscription batches its invalidations by query key through the shared `createDebouncedTableFlusher` (150 ms, as the org hook), so each distinct key refetches and broadcasts once per burst, and a pending batch is dropped on teardown. Tests cover the burst, cross-table dedupe, the live subscription and teardown. Re-review (2026-09-28, `/audit` at 1924880c): closed. Every Gridmaster query key is strings and numbers (`orgHealth` and `orgAudit` map null to strings), so the JSON round trip is lossless; prefix invalidation, the reconnect path and the channel are unchanged; teardown disposes then unsubscribes, as the org hook does. Follow-ups are F-107.
 
-### F-84 [P3] fixed - No index serves an organization's schedule notes by date
+### F-84 [P3] closed - No index serves an organization's schedule notes by date
 
 **File:** `supabase/migrations/001_schema.sql` (`schedule_notes` indexes)
 **Found:** 2026-09-27 by review of 42b
 **Why it matters:** The web schedule and, since 42b, every mobile team schedule read notes by `org_id` and a date range, ordered by date; with only `(org_id)`, `(emp_id)`, `(emp_id, date)` and `(indicator_type_id)` indexes, that scans the organization's whole note history. Fine at today's sizes.
 **Suggested fix:** A forward migration adding an index on `(org_id, date)`.
-**Resolution:** Fixed: migration `062_schedule_notes_org_date_index.sql` adds `idx_schedule_notes_org_date` on `(org_id, date)` and drops the single-column `idx_schedule_notes_org` it covers; checksum locked and `db:migrations:check` passes. Applied locally, where a week's read for an organization now plans as an index scan on the new index. Applied to production 2026-09-27 by the owner after a scratch rehearsal from 061 and on the local stack. Before: 61 ledger entries, only 062 missing. After: 62 ledger entries, none missing, every invariant passing, health 200, and a final dry run up to date. Shipped in release #120.
+**Resolution:** Fixed: migration `062_schedule_notes_org_date_index.sql` adds `idx_schedule_notes_org_date` on `(org_id, date)` and drops the single-column `idx_schedule_notes_org` it covers; checksum locked and `db:migrations:check` passes. Applied locally, where a week's read for an organization now plans as an index scan on the new index. Applied to production 2026-09-27 by the owner after a scratch rehearsal from 061 and on the local stack. Before: 61 ledger entries, only 062 missing. After: 62 ledger entries, none missing, every invariant passing, health 200, and a final dry run up to date. Shipped in release #120. Re-review (2026-09-28, `/audit` at 1924880c): closed. `idx_schedule_notes_org_date` still leads with `org_id`, so the organization cascade stays indexed; 063 and 064 leave it alone; every range read (`lib/db/schedule.ts`, `data-access/src/mobile.ts`, `schedule-draft-safety.ts`, reports, settings config) filters `org_id` and a date range. Follow-up is F-108.
 
 ### F-85 [P2] closed - The Gridmaster history returns IP, email and session hashes, and the export writes them out
 
@@ -230,4 +230,76 @@ Since 41c3 the route also sends the end notice, so a concurrent pair sends two e
 **Found:** 2026-09-28 by `/audit` (scope: f6192d2b; lens: tests)
 **Why it matters:** `useSharedStepUp` and the `useEmployees` rethrow are tested, but deleting the step-up rethrow from `StaffDetailPage`'s deactivate or remove handler, or dropping the wrapper in `PeoplePageContent`, would pass every test: the refusal would be toasted and the Gridmaster never prompted.
 **Suggested fix:** a `StaffDetailPage` test where the status call refuses with `STEP_UP_REQUIRED`, the prompt appears, and the retry carries the assured token; one `PeoplePageContent` test that `onDeactivate` reaches the prompt.
+**Resolution:**
+
+### F-100 [P1] open - An Admin can remove or edit a Super Admin's staff record through the data API
+
+**File:** `supabase/migrations/003_rls_policies.sql:277` (`admin_update_employees`, and `admin_delete_employees` at :282); `supabase/migrations/004_grants.sql` (UPDATE and DELETE on `employees` to `authenticated`); `supabase/migrations/002_functions_triggers.sql:279` (the hook refuses a `removed` employee)
+**Found:** 2026-09-28 by `/audit` (scope: fixed-finding re-review at 1924880c; all lenses), reviewing F-96's staff status gate
+**Why it matters:** `POST /api/employees/status` refuses an Admin acting on an Admin, Super Admin or Gridmaster and on their own record, but the table itself only asks for `canManageEmployees` in the caller's organization. Reproduced on the local stack inside a rolled-back transaction: an Admin's claims (`canManageEmployees` on, no MFA) ran `UPDATE public.employees SET status = 'removed'` on the Super Admin's linked row and it applied (1 row); the access-token hook then refuses that Super Admin's sign-in and refresh. The same policies let an Admin rewrite or delete any staff record the route's guards protect. No privilege is gained, but a lower tier can lock out a higher one, against the tier rule. Predates item 43. Gridmaster tokens are covered by 054's fresh-proof policies.
+**Suggested fix:** A forward migration. Either (a) revoke INSERT, UPDATE and DELETE on `public.employees` from `authenticated`, as 052 did for memberships, after moving the user-client writes (check which client `lib/db/employees.ts`, `features/account/server/profile.ts` and `profile-change-requests.ts` pass) onto the service role behind their routes; or (b) a `BEFORE UPDATE OR DELETE` trigger that, for a non-service caller below Super Admin, refuses a row linked to an Admin, Super Admin or Gridmaster and a change to the caller's own `status`, mirroring the route. Add a live test that the Admin claims above get zero rows.
+**Resolution:**
+
+### F-101 [P2] open - A terminate whose session ending fails is never audited and cannot be retried
+
+**File:** `apps/web/src/app/api/gridmaster/users/[userId]/terminate/route.ts:62-87`
+**Found:** 2026-09-28 by `/audit` (scope: fixed-finding re-review at 1924880c; all lenses), reviewing F-89
+**Why it matters:** `terminate_user_account` commits (it writes no audit row itself), then F-89's `endUserSessions` runs before the `user.terminated` audit write. If ending sessions fails, the route answers 500 with no audit row, and a retry is refused with "This account is already terminated" (`021_platform_account_termination.sql:366`), so the termination is never recorded or finished. The hook still blocks refresh for a terminated account, so the exposure is the missing record of a high-risk action, not access.
+**Suggested fix:** Write the audit row right after the RPC and before `endUserSessions`, or catch that failure, log it, record `sessionsEnded: false` and still write the audit; a route test where `endUserSessions` rejects.
+**Resolution:**
+
+### F-102 [P3] open - Two-factor reset follow-ups
+
+**File:** `apps/web/src/emails/TwoFactorResetEmail.tsx:24`; `apps/web/src/features/gridmaster/server/two-factor-reset.ts:24`; `apps/web/src/features/gridmaster/server/two-factor-reset.test.ts:14`; comments at `terminate/route.ts:71` and `gridmaster/users/route.ts:225`
+**Found:** 2026-09-28 by `/audit` (scope: fixed-finding re-review at 1924880c; all lenses), reviewing F-90
+**Why it matters:** a partial reset still emails "signed you out everywhere" although `endUserSessions` never ran; the re-enrollment flag is set before any factor is removed, so a failure in `listFactors` leaves the person gated to re-enroll with no record or email; no test makes the profile update or `endUserSessions` fail after every factor is gone; two comments still describe watermark-only revocation.
+**Suggested fix:** a `partial` prop with softer wording; set the flag after the first removal, or record the attempt; the two failure tests; refresh the comments.
+**Resolution:**
+
+### F-103 [P3] open - Each step-up-refused status change is sent three times, and a bulk can partly apply
+
+**File:** `apps/web/src/components/staff/useSharedStepUp.tsx:21`; `apps/web/src/hooks/useStepUpAction.tsx:43`; `apps/web/src/app/api/employees/status/route.ts:61`; `apps/web/src/app/api/employees/status/route.test.ts:163`
+**Found:** 2026-09-28 by `/audit` (scope: fixed-finding re-review at 1924880c; all lenses), reviewing F-96
+**Why it matters:** the refused first send, then `stepUp.run`'s own attempt with the current token before it prompts, then the retry: three requests per row against `apiLimiter` (10 per 10 s), which the route checks before the gate. A Gridmaster's bulk of five or more confirmed quickly can hit 429 on the last retries and apply only part of the batch, which F-98's quiet-cancel counting then reports as done (unverified in a browser). The status route test covers only `deactivate`, not `remove`, `activate` staying ungated, or a Gridmaster with fresh proof going on to write.
+**Suggested fix:** a "prompt now" entry on `useStepUpAction` that skips the first attempt, bounded bulk concurrency, `toHaveBeenCalledTimes` in `useSharedStepUp.test.tsx`, and the three route cases.
+**Resolution:**
+
+### F-104 [P3] open - Consent-row device labels over-claim the DubGrid app
+
+**File:** `apps/web/src/lib/user-agent-label.ts:13`
+**Found:** 2026-09-28 by `/audit` (scope: fixed-finding re-review at 1924880c; all lenses), reviewing F-96
+**Why it matters:** any CFNetwork and Darwin client (a Mac app, an iPad, any iOS app) reads "DubGrid app on iPhone", and any `okhttp/` client "DubGrid app on Android", on rows kept as consent evidence from a client-set header; the card says "Mac" and "Windows" where the sessions list says "Macintosh" and "Windows PC".
+**Suggested fix:** require the app's own `DubGrid/` token before naming the app, fall back to a neutral label, and share one vocabulary with the sessions list.
+**Resolution:**
+
+### F-105 [P3] open - The person history's detail stripping is a narrow denylist, and two edge cases drop events
+
+**File:** `apps/web/src/features/gridmaster/server/person-history.ts:163`, `:237`, `:100`
+**Found:** 2026-09-28 by `/audit` (scope: fixed-finding re-review at 1924880c; all lenses), reviewing F-85 and F-87
+**Why it matters:** no leak today (every current writer puts IP and user agent in columns and only the three hash keys in `details`), but only three top-level keys are removed, so a later writer adding `ipHash`, `userAgent` or a nested hash would reach the history and its export; the F-87 filter compares `actor_id` to a `userId` the route accepts in any case, so an uppercase id would drop the person's own impersonation actions (unverified, clients send lowercase); an impersonation older than the newest 500 sessions is now missing rather than duplicated (`truncated` is set).
+**Suggested fix:** strip keys matching a hash, IP or user-agent pattern at any depth (or an allowlist per action), lowercase the id at the route, and say in the card when the session list was capped.
+**Resolution:**
+
+### F-106 [P3] open - The Month view's other-area merge reads every focus area and can land in a hidden section
+
+**File:** `apps/web/src/components/MonthView.tsx:461`, `:482`; `apps/web/src/__tests__/MonthView.test.tsx:134`
+**Found:** 2026-09-28 by `/audit` (scope: fixed-finding re-review at 1924880c; all lenses), reviewing F-82
+**Why it matters:** the merge walks every focus area in the organization, not the person's own (`(areas + 1)` lookups per person per day across the grid on every notes change); with a focus-area filter the extra notes can go to a first row in a filtered-out section and not show; dedup keys on state, so one note filed as `published` in one area and `draft_added` in another shows two marks. Tests miss the no-area note, the filter and the row-bearing area.
+**Suggested fix:** walk `emp.focusAreaIds` plus no-area, pick the first visible row, dedup on the type, and add the three cases.
+**Resolution:**
+
+### F-107 [P3] open - Gridmaster realtime follow-ups
+
+**File:** `apps/web/src/hooks/useGridmasterRealtimeInvalidation.ts:267`; `packages/realtime-core/src/debounced-flusher.ts`; `apps/web/src/__tests__/gridmaster-realtime-invalidation.test.ts:263`
+**Found:** 2026-09-28 by `/audit` (scope: fixed-finding re-review at 1924880c; all lenses), reviewing F-83
+**Why it matters:** `invalidateGridmasterRealtimeQueries` has no caller left (only the re-export in `hooks/index.ts`); the flusher has no disposed flag, so an event arriving while the channel is still leaving could arm one stray flush after teardown (unverified; same for the org hooks); the test's `fire` uses `listener?.onEvent`, so a table dropped from the subscription would make the teardown test pass vacuously, and `onReconnectAfterError` is untested.
+**Suggested fix:** delete the dead export, add a disposed guard in `createDebouncedTableFlusher`, assert the listener exists, and test the reconnect hook.
+**Resolution:**
+
+### F-108 [P3] open - `schedule_notes` keeps two indexes its unique key already covers
+
+**File:** `supabase/migrations/001_schema.sql:1394` (`idx_schedule_notes_emp`, `idx_schedule_notes_emp_date`)
+**Found:** 2026-09-28 by `/audit` (scope: fixed-finding re-review at 1924880c; all lenses), reviewing F-84
+**Why it matters:** both lead with `emp_id` as 063's `schedule_notes_segment_unique` does, so every note write maintains two indexes no query needs. Small at today's sizes.
+**Suggested fix:** a forward migration dropping both, after checking a plan for the emp and date reads.
 **Resolution:**
