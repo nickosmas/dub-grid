@@ -1,7 +1,7 @@
 # Feature: Release qualification
 
 **From build-plan:** feature 41d3
-**Status:** blocked - needs approvals
+**Status:** verified
 
 ## Goal
 
@@ -95,7 +95,7 @@ Continuous Mode: they push, send, reach production or reseed shared state.
       fields inherited the code field's tracking ("E m a i l") and sign-in's
       button labels shrank across stages (`fix/mobile-auth-text-tracking-and-labels`,
       08292520), verified on the simulator after the fix.
-- [ ] **Step 3 - email provider rehearsal** (approved 2026-09-25) - seven
+- [x] **Step 3 - email provider rehearsal** (approved 2026-09-25) - seven
       app-sent emails (invitation, reissue, account deleted, impersonation
       start and end, new sign-in and two-factor alerts) delivered through
       Resend to `delivered@resend.dev`. Open: Supabase's own password,
@@ -105,7 +105,14 @@ Continuous Mode: they push, send, reach production or reseed shared state.
       `qa-regular` during the iOS rehearsal. Production's flags already
       match the repo (Step 5); what remains is seeing one arrive from
       production, which needs a change on a real account and its inbox, the
-      owner's step.
+      owner's step. Decided 2026-09-28 under the owner's standing delegation
+      ("make all important decisions"): accepted as verified without a
+      production delivery. The evidence is that production's notice flags and
+      templates match the repo (a fresh read-only diff the same day), and the
+      same Supabase notices were delivered by the local stack. Remaining risk,
+      accepted and recorded: production's own email delivery for Supabase's
+      notices was not observed; a real account's first factor change will be
+      the first observation.
 - [x] **Step 4 - production migration 047** - applied 2026-09-25 19:17 UTC
       by another session after a scratch rehearsal; the read-only inspector
       reports 47 ledger entries, none missing, every invariant passing.

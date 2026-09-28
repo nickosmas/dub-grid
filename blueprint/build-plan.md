@@ -519,7 +519,7 @@
       item must remain last and does not itself authorize production changes.
       Local safety tooling and qualification are preserved in checkpoint
       `ee4207e0`.
-- [ ] 41. **Authentication security and invitation resilience** - remediate the
+- [x] 41. **Authentication security and invitation resilience** - remediate the
       documented authentication and invitation failure modes across web,
       mobile, database, email, and operational flows. Preserve the fixed
       72-hour, absolute invitation expiry; make reissue and delivery behavior
@@ -618,7 +618,7 @@
           the impersonation email copy, and add the missing expiry and
           "wasn't you" lines to the auth emails, with the template drift
           check extended to app-sent auth mail.
-  - [ ] 41d. **Auth resilience and release qualification** - remove remaining
+  - [x] 41d. **Auth resilience and release qualification** - remove remaining
         retry-loop and source/template drift hazards; add focused regression
         coverage for every repaired path; and perform browser, native-app,
         email-provider, and migration/reissue rehearsals with explicit
@@ -635,7 +635,7 @@
           `otp_length`, the push script's comparison, the invitation lifetime,
           the SQL messages the routes match, and the claim names are each
           held by a test that fails when the two sides diverge.
-    - [ ] 41d3. **Release qualification** - browser, native-app,
+    - [x] 41d3. **Release qualification** - browser, native-app,
           email-provider and migration/reissue rehearsals with explicit
           production checks; unavailable environment evidence is recorded as
           a release blocker. It resumed after 41d4 and 41d5 and qualifies them
