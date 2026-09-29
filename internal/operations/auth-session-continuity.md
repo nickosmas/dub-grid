@@ -1,5 +1,9 @@
 # Authentication session continuity
 
+> **Point-in-time qualification (framed 2026-09-29):** This preserves the
+> dated evidence below. Confirm current behavior in `internal/authentication.md`
+> and the referenced source paths before release.
+
 This document locks the ownership, ordering, cache, and recovery contract for
 Blueprint feature 19c4. Runtime qualification uses local Calm Haven fixtures
 only.

@@ -1,5 +1,9 @@
 # Changelog
 
+> **Historical record (framed 2026-09-29):** Entries below describe released
+> changes at their stated dates. Confirm present behavior in `ARCHITECTURE.md`,
+> `SECURITY.md`, and the relevant source before relying on an older entry.
+
 All notable changes to DubGrid are documented in this file.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).

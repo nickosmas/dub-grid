@@ -1,5 +1,9 @@
 # Auth Errors & Edge Cases — DubGrid
 
+> **Point-in-time record (framed 2026-09-29):** This keeps the dated findings
+> below unchanged. For the current authentication model, use
+> `internal/authentication.md`, `SECURITY.md`, and `RBAC_SYSTEM_DESIGN.md`.
+
 **Date:** 2026-05-24 (findings) · re-verified 2026-05-25
 **Scope:** The authentication surface — login (org/gridmaster/subdomain-selector),
 logout, session lifecycle (`AuthProvider`, `RouteGuards`, token refresh),

@@ -793,7 +793,7 @@
           and exports, and permanently redirect the three replaced pages
           (subscription into billing; API overview and calendar export into
           integrations and exports).
-  - [ ] 40d. **Current engineering, architecture, security, and operations
+  - [x] 40d. **Current engineering, architecture, security, and operations
         references** - reconcile the living root and internal references plus
         app-specific `AGENTS.md` facts for architecture, RBAC, MFA and JWT
         behavior, mobile boundaries, APIs, migrations, setup, deployment, and

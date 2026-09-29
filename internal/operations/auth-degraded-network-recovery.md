@@ -1,5 +1,9 @@
 # Authentication degraded-network recovery
 
+> **Point-in-time qualification (framed 2026-09-29):** This preserves the
+> evidence and limits recorded below. Verify the current implementation against
+> `internal/authentication.md` and the referenced source paths before release.
+
 This document records the request owners, recovery contract, and final
 qualification evidence for Blueprint feature 19c3. All runtime qualification
 uses local Calm Haven fixtures only.

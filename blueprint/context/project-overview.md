@@ -1,406 +1,277 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash 60849baa54b454a5e7b19f42eba055711294dd536310facdd0d2cda6e01a1d8c -->
+<!-- blueprint:source-hash b5d523fed3103cbbc315c940ba71258f2c9b07f42da2e94c5c42cc426593fe70 -->
 
-> Multi-tenant employee scheduling platform for care facilities, replacing
-> spreadsheet scheduling with a connected Next.js web app and Expo mobile app.
+> Multi-tenant employee scheduling for care facilities, delivered through a
+> connected Next.js web app and Expo mobile app.
 
 ## Problem
 
-Care facilities schedule staff on shared spreadsheets, which can't safely
-handle multiple managers and staff editing concurrently, can't enforce
-who's allowed to change what, and leave no audit trail of shift-change
-activity (call-offs, swaps, pickups). DubGrid replaces that with a
-real-time, role-based scheduling platform purpose-built for care
-facilities.
+Care facilities need more than a shared scheduling spreadsheet. Concurrent
+editing, tenant isolation, role-based access, staff lifecycle changes, shift
+requests, and auditable schedule history all require a connected system with
+clear authorization and recovery behavior. DubGrid provides that system for
+organization staff, managers, and platform operators.
 
 ## Users
 
-- **Staff** - view their schedule, submit shift requests (pickup, swap,
-  call-off), see alerts and notifications, on web and mobile.
-- **Managers / Admins** - build and publish schedules, manage people and
-  focus areas, review and approve requests, run reports, configure org
-  settings. Admin capability is a configurable, per-person set of 26
-  permissions, not a role template.
-- **Super Admins** - full control within one organization, including
-  managing Admin-tier permissions and billing.
-- **Gridmaster (platform team)** - cross-organization platform
-  administration: impersonation, audit logs, tenant lifecycle. A distinct
-  platform role, never surfaced as an "admin portal" to org users.
-- Organizations are multi-tenant, each isolated on its own subdomain.
+- **Staff** - view schedules, submit pickup, swap, and call-off requests, and
+  receive alerts on web and mobile.
+- **Managers and Admins** - build and publish schedules, manage people, review
+  requests, run reports, and configure the organization. Admin capabilities are
+  assigned per person through a 25-permission set.
+- **Super Admins** - have full control inside one organization, including Admin
+  permissions and billing.
+- **Gridmasters** - operate the cross-organization platform, including
+  impersonation, platform audit, feature controls, and tenant lifecycle. This is
+  an internal platform role, not an organization admin portal.
+- **Organizations** - are isolated tenants with their own subdomain, data,
+  settings, terminology, and subscription state.
 
 ## Features
 
-Everything below is shipped. Item 28, the final production migration gate,
-closed on 2026-09-23 when migrations 026 to 040 were applied to production.
+Items appear in build-plan order. Items 1 through 39 and 41 through 43 are
+shipped. Item 40 is in progress.
 
-1. **Multi-tenant organizations** - subdomain-isolated tenants with their
-   own settings and terminology overrides.
-2. **Four-tier RBAC** - Gridmaster > Super Admin > Admin > User, with
-   per-person configurable admin permissions.
-3. **Schedule grid** - drag-drop week / 2-week / month views, draft/publish
-   workflow, recurring shifts. Headline feature - the core product.
-4. **Real-time schedule collaboration** - Supabase Realtime presence with a
-   non-blocking "being edited" marker per cell, and an optimistic version check
-   so concurrent edits don't collide (advisory cell locks were tried and
-   removed).
-5. **Staff / people management** - lifecycle, focus areas, certifications.
-6. **Shift requests** - pickup, swap, call-off with approval workflow and
-   auditable request events/snapshots.
-7. **Coverage tracking and dashboard analytics** - shared coverage engine
-   used by both web and mobile.
-8. **Reports** - staff hours, staff activity, shift-category breakdowns,
-   CSV/PDF export.
-9. **Gridmaster portal** - cross-org platform administration,
-   impersonation, audit logs.
-10. **Billing** - Stripe per-seat subscriptions with a 14-day free trial.
-11. **Mobile app parity** - Expo app covering schedule, people, requests,
-    alerts, dashboard. Reports, billing, the Gridmaster portal, the
-    permissions editor, and org settings are deliberately web-only.
-12. **Invite-only onboarding** - pre-confirmed accounts via the invitation
-    flow; no public self-serve signup.
-13. **Auth** - password reset (mobile uses an in-app OTP flow), MFA/TOTP,
-    per-session org isolation.
-14. **Notification inbox**.
-15. **Print / export** - PDF, CSV, and .ics output.
-16. **Test sandbox** - cookie-based cloned org for safe QA against
-    non-production data.
-17. **Management-only assignment visibility** - hide schedule-assignment
-    controls and their stale schedule-removal notice as soon as a person is no
-    longer on the schedule; conversely, hide management-only controls when
-    management access is removed. Saved capability state, not a stale form,
-    determines the visible editor sections.
-18. **Mobile release catch-up** - close release-delta gaps while preserving
-    deliberate web-only authoring and organization-settings boundaries.
-    - **18a. Mobile role certification eligibility** - expose role credential
-      requirements and prevent incompatible new mobile selections before save.
-    - **18b. Canonical mobile dashboard model** - share dashboard calculations
-      and deliver canonical dashboard data through the authenticated mobile API.
-    - **18c. Canonical mobile dashboard experience** - show those facts in
-      native, read-only dashboard cards and detail screens.
-19. **Authentication and onboarding release hardening** - leave no known
-    correctness, performance, resilience, or security defects across the full
-    web and mobile entry lifecycle.
-    - **19a. Admission and onboarding state correctness** - treat durable
-      per-member, per-organization completion as authoritative. A completed
-      member must never be returned to onboarding after admission, refresh,
-      token rotation, realtime organization changes, role changes, or a new
-      session; an incomplete member cannot bypass required gates.
-    - **19b. Complete authentication journey coverage** - verify invitation,
-      organization entry, sign-in, session restoration, recovery, MFA,
-      revocation, onboarding variants, and trial/setup gates for every role on
-      web and mobile.
-      - **19b1. Invitation and organization entry** - verify invitation
-        acceptance, subdomain and organization selection, and signed-out and
-        signed-in entry states on web and mobile.
-      - **19b2. Sign-in, restoration, expiry, and revocation** - verify
-        web/mobile login, session restoration, expired-session recovery,
-        logout, and forced or session-specific revocation.
-      - **19b3. Password recovery and reset** - verify web recovery links and
-        the mobile OTP reset flow, including error and replay states.
-      - **19b4. MFA enrollment and challenge** - verify TOTP enrollment,
-        verification, unenrollment, required-MFA challenges, and role
-        differences across web and mobile.
-      - **19b5. Role-based setup, onboarding, and trial gates** - verify every
-        role's setup, onboarding, and trial path without duplicating 19a's
-        stale-bootstrap admission repair.
-    - **19c. Authentication speed and resilience** - measure cold and warm
-      entry, remove avoidable serial work and duplicate requests, prevent blank
-      states, and verify slow, offline, retry, cross-tab, and token-refresh
-      behavior.
-      - **19c1. Web authentication entry performance** - measure and improve
-        cold and warm login, proxy, session-verification, and organization-
-        bootstrap paths without weakening authentication or tenant checks.
-      - **19c2. Mobile authentication entry performance** - measure and improve
-        cold and warm session restoration and organization bootstrap without
-        treating slow restoration as logout.
-      - **19c3. Degraded-network authentication recovery** - keep useful
-        content or an explicit bounded recovery path visible during slow,
-        offline, timeout, and retry states on web and mobile.
-      - **19c4. Authentication session continuity under change** - preserve
-        current identity, permissions, and tenant data through cross-tab auth,
-        token rotation, foreground/resume, and organization switching.
-    - **19d. Authentication security hardening** - complete four bounded
-      security passes without weakening authentication performance or tenant
-      isolation.
-      - **19d1. Live tenant, membership, and session authorization** - verify
-        stale claims, archived memberships, session revocation, tenant
-        isolation, service-role boundaries, sandbox and impersonation
-        boundaries, and RLS enforcement across web and mobile APIs.
-      - **19d2. MFA assurance and sensitive-action reauthentication** - require
-        appropriate AAL2 or fresh-auth proof for MFA changes, credentials,
-        sessions, exports, account deletion, and irreversible actions.
-      - **19d3. Invite, recovery, redirect, and CSRF integrity** - verify token
-        expiry, single use, and replay protection; safe redirects; origin
-        validation; generic failures; and public state-changing endpoints.
-      - **19d4. Abuse resistance, token secrecy, and security auditability** -
-        verify enumeration resistance, distributed and per-target rate limits,
-        production fail-closed behavior, token secrecy, and security-event
-        audit coverage.
-    - **19e. Authentication release qualification** - maintain an automated
-      role/state/browser matrix, run authenticated browser and native device
-      checks, close confirmed defects, and disclose unavailable evidence.
-20. **Explicit schedule-indicator removal** - provide a discoverable,
-    accessible removal control for active shift notes/indicators in the shift
-    slideover rather than relying only on clicking the selected indicator.
-21. **Production display-mode layout resilience** - repair the Settings
-    display-mode preview layout so choices remain fully visible, readable, and
-    selectable at supported desktop widths and browser zoom levels; render role
-    names as plain table text; and make Settings data tables use the Departments
-    width as their desktop floor, grow for edit or dense modes, distribute columns
-    across the surface, align with page headings, and show complete field values.
+| Item | Status      | Outcome                                                                                                                         |
+| ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Shipped     | Multi-tenant organizations with subdomain isolation and organization-specific settings.                                         |
+| 2    | Shipped     | Four-tier RBAC with per-person Admin permissions.                                                                               |
+| 3    | Shipped     | Week, two-week, and month schedule views with draft and publish workflows.                                                      |
+| 4    | Shipped     | Realtime editor presence plus optimistic conflict detection; advisory cell locks were removed.                                  |
+| 5    | Shipped     | People lifecycle, departments or focus areas, roles, and certifications.                                                        |
+| 6    | Shipped     | Pickup, swap, and call-off requests with approval events and snapshots.                                                         |
+| 7    | Shipped     | Shared coverage calculations and role-aware dashboard analytics.                                                                |
+| 8    | Shipped     | Staff hours, activity, and other reports with CSV and PDF export.                                                               |
+| 9    | Shipped     | Internal Gridmaster platform operations, impersonation, audit, and tenant controls.                                             |
+| 10   | Shipped     | Stripe per-seat subscriptions with a 14-day trial beginning on first Super Admin login.                                         |
+| 11   | Shipped     | Expo mobile access to schedule, people, requests, alerts, dashboard, and account surfaces, with deliberate web-only boundaries. |
+| 12   | Shipped     | Invite-only, pre-confirmed account creation and member onboarding.                                                              |
+| 13   | Shipped     | Web and mobile recovery, MFA/TOTP, and per-session organization isolation.                                                      |
+| 14   | Shipped     | Web and mobile notification inboxes.                                                                                            |
+| 15   | Shipped     | PDF, CSV, calendar, and print outputs where supported.                                                                          |
+| 16   | Shipped     | Internal Test Sandbox using a cookie-selected cloned organization.                                                              |
+| 17   | Shipped     | Capability-aware People forms that hide scheduling or management fields when access changes.                                    |
+| 18   | Shipped     | Mobile role eligibility and a canonical shared dashboard model and experience.                                                  |
+| 19   | Shipped     | Auth and onboarding correctness, journey coverage, resilience, security, and release qualification.                             |
+| 20   | Shipped     | An explicit, accessible control for removing an active schedule note.                                                           |
+| 21   | Shipped     | Resilient Settings display previews and content-aware configuration tables.                                                     |
+| 22   | Shipped     | Qualified, conflict-free staffing of open shifts through the normal draft workflow.                                             |
+| 23   | Shipped     | Overflow-safe pills, chips, badges, and segmented controls across web and mobile.                                               |
+| 24   | Shipped     | Inter for product UI, DM Sans for the wordmark and marketing headings, and tabular scheduling numerals.                         |
+| 25   | Shipped     | Shared web UI contracts plus route, role, state, viewport, theme, and zoom qualification.                                       |
+| 26   | Shipped     | Removed duplicate Staff-page data loading.                                                                                      |
+| 27   | Shipped     | Cleared the stale publish-highlight state after publication.                                                                    |
+| 28   | Shipped     | Removed duplicate published-range loading on the Schedule page.                                                                 |
+| 29   | Shipped     | Removed duplicate dashboard request fetching and realtime subscriptions.                                                        |
+| 30   | Shipped     | Removed duplicate operations-report fetching.                                                                                   |
+| 31   | Shipped     | Made publish-difference highlighting work in Month and Mobile Day views.                                                        |
+| 32   | Shipped     | Made adjacent-day staffing overlap checks explicit and complete.                                                                |
+| 33   | Shipped     | Exercised the staffed-call-off finalization trigger with real publish behavior.                                                 |
+| 34   | Shipped     | Added final swap resolution alerts for an affected swap partner.                                                                |
+| 35   | Shipped     | Shared one reference-counted mobile shift-request realtime channel.                                                             |
+| 36   | Shipped     | Delayed the trial welcome until onboarding is complete.                                                                         |
+| 38   | Shipped     | Unified mobile spacing, type, controls, dashboard, request exits, sheets, and qualification evidence.                           |
+| 39   | Shipped     | Made alerts navigate to their subject through one shared destination contract.                                                  |
+| 37   | Shipped     | Reconciled and applied the production migration suffix through 040 with scratch rehearsal and ledger verification.              |
+| 41   | Shipped     | Invitation, credential, session, recovery, and security-notice hardening with Gridmaster grants that need fresh proof.          |
+| 42   | Shipped     | Schedule notes on every schedule surface, each belonging to its shift.                                                          |
+| 43   | Shipped     | Complete person records for managers and one Gridmaster person page with two-factor lockout recovery.                           |
+| 40   | In progress | Public and internal documentation accurate for `dev`, with permanent drift gates.                                               |
 
-22. **Scheduler open-shift staffing** - when a scheduler clicks an open shift in
-    the web schedule, show active staff who satisfy its focus-area, role, and
-    certification requirements and have no absence or overlapping shift that
-    day. Let the scheduler assign a selected person through the normal
-    draft/publish workflow, while regular staff keep the existing volunteer flow.
+Item 40 is split:
 
-23. **App-wide pill overflow resilience** - keep pill, chip, tag, badge, and
-    segmented-choice text within its visual bounds on web and mobile. On web,
-    display values may wrap and grow; interactive controls remain one line and
-    truncate safely while retaining the full accessible value. On mobile no
-    pill wraps: chrome (headers, tab bar, avatars, date tiles, count dots)
-    holds its size whatever the OS text setting, and button, pill and badge
-    labels grow to a hard 1.2x ceiling, so a raised text size never breaks
-    the shape.
-    - **23a. Numeric badge shape consistency** - equivalent number counts use
-      one pill-shaped contract across web and mobile, including one- and
-      two-digit values, notification/tab/open-shift/staffing counts, with
-      shared sizing, padding, typography, overflow, and accessible labeling.
+- **40a - Source-derived inventory and documentation contract:** shipped.
+- **40b - Public scheduling, people, and configuration guides:** shipped.
+- **40c - Public mobile, account, alerts, reports, billing, and access
+  guides:** shipped; every public page is verified against source, and the
+  replaced pages redirect.
+- **40d - Current engineering, architecture, security, and operations
+  references:** in progress.
+- **40e - Cross-platform runtime qualification and permanent drift gates:**
+  planned; requires recorded iOS and Android evidence.
 
-24. **Inter product typography** - use Inter for all product UI and ordinary
-    copy across web and mobile, with Inter Variable optical sizing on web and
-    native Inter 400/500/600/700 faces on mobile. Keep DM Sans for the wordmark
-    and every landing or marketing title and heading, preserve the existing
-    semantic type scale, use tabular numerals for scheduling data, and verify
-    fallbacks, layout, browser zoom, and native text scaling.
-
-25. **Web UI consistency and interaction resilience** - audit and repair every
-    project-owned web route, component, primitive, and rendered state so
-    equivalent elements share one visual and interaction contract and no known
-    clipping, overlap, reflow, first-paint, loading, error, empty-state,
-    keyboard, focus, or responsive defect remains. Consolidate repeated visual
-    primitives, repair the confirmed dashboard and high-zoom layout defects,
-    restore the Inter-aware browser audit, and qualify the complete role, theme,
-    viewport, zoom, permission, loading, empty, error, and overlay matrix with
-    reproducible evidence. Split this epic into bounded sub-features during
-    `/feature`. Use `better-ui` for surface depth, concentric radii, optical icon
-    alignment, explicit transition properties, theme-switch snapping, and
-    hit-area polish. Use `emil-design-eng` for motion purpose and frequency,
-    interruptible states, origin-aware popovers, gesture velocity, perceived
-    loading speed, and slow-motion or device review. Preserve DubGrid's tokens,
-    density, platform-specific mobile motion, and reduced-motion behavior; these
-    references guide review and do not authorize a new dependency or wholesale
-    visual rewrite.
-
-26. **Mobile UI consistency and interaction resilience** - bring the Expo app
-    to one spacing, typography, control-scale, and interaction contract: a
-    `display`/`title` type ramp and a 36/44/52 control scale, fill-only badges,
-    a redesigned admin dashboard with pressable drill-in rows and purposeful
-    motion, request flows that exit on one tap (swap target selection on a
-    full-page modal, confirmation for call-off only), a mechanical token
-    migration of the schedule and requests screens, and a screenshot-qualified
-    role, theme, text-scale, and device matrix. No new dependency; preserve the
-    `mobile*` tokens and reduced-motion behavior.
-
-27. **Alerts go to their subject** - an alert is one sentence about something
-    else, so tapping it anywhere (web bell popup, web `/alerts` rows, mobile
-    alerts list) marks it read and navigates to what it is about through one
-    shared destination resolver in `@dubgrid/domain`: requests to the request
-    board, schedule changes to that date, people changes to the person,
-    invitations to People > Invitations, billing to Settings > Subscription,
-    role and permission changes to the person's own profile, profile-change
-    requests to their existing action, and web-only destinations shown as such
-    on mobile. The web detail modal and the mobile detail screen go away for
-    organization users; gridmasters keep a Details disclosure for platform
-    rows. The web alerts page loses its sidebar: Inbox / Archived, the read
-    filter, search, category, priority, sort, select-all with bulk actions,
-    and Mark all read live in one toolbar above the list. Mobile rows stop
-    truncating and show a human note inline, and every alert row on web and
-    mobile gets a clear title-versus-content text hierarchy.
-
-28. **Production migration safety** - the final release gate after all product
-    work and hardening: inventory linked production, reconcile migration
-    history, rehearse the exact upgrade path on a scratch local stack that
-    starts at production's ledger (no Supabase branching or PITR, decided
-    2026-09-19), apply only reviewed forward migrations, and verify health,
-    schema, tenant isolation, and ledger state. This item must remain last and
-    does not authorize a production mutation.
+Public documentation covers customer behavior only. Gridmaster tooling, Test
+Sandbox, feature flags, migrations, environment variables, and internal HTTP
+endpoints remain internal.
 
 ## Data model
 
 ### Organization
 
-- `id`, `subdomain`, `name`, terminology overrides (e.g. Wings -> Focus
-  Areas, Skill Levels -> Certifications)
-- `workspace_kind` - the only place "workspace" appears in the schema
-- relationship: has many Employees, Schedules, Focus Areas, Absence Types
+- `id` (UUID) - tenant identifier
+- `subdomain` (text) - organization routing boundary
+- `name` (text) - customer-facing organization name
+- terminology and configuration fields - organization-specific labels and
+  settings
+- `workspace_kind` - the only approved use of the word "workspace" in product
+  data
+- has many memberships, employees, schedule records, requests, notifications,
+  and audit entries
 
-### Profile / User
+### Profile
 
-- `id`, `platform_role` (top-level, e.g. Gridmaster)
-- relationship: has many Organization Memberships (one per org they
-  belong to)
+- `id` (UUID) - Supabase Auth user identifier
+- `platform_role` - platform-level role, including Gridmaster
+- has memberships in one or more organizations
+- has sessions and account-level security, notification, privacy, and calendar
+  preferences
 
-### Organization Membership
+### Organization membership
 
-- `org_id`, `user_id`, `org_role` (Super Admin / Admin / User),
-  `admin_permissions` (26-key JSONB, per-person, not department-templated),
-  `onboarding_completed_at`, onboarding-tour state
-- relationship: belongs to one Organization and one Profile
+- `org_id` and `user_id` - tenant and profile relationship
+- `org_role` - Super Admin, Admin, or User
+- `admin_permissions` (JSONB) - the 25-key per-person Admin capability set
+- onboarding completion and tour state
+- archived and access state used by admission checks
+- belongs to one organization and one profile
 
-### Employee / Staff
+### Employee
 
-- `org_id`, `focus_area_id`, `employment_status`, `certifications`
-  (nursing-credential staff only; support staff carry no certification,
-  never a catch-all "Other")
-- relationship: belongs to an Organization and a Focus Area
+- `org_id` and linked user identity where present
+- department or focus-area assignment, role, and certifications
+- `employment_status` - active, inactive, or removed; only active staff can be
+  scheduled and count toward billing
+- scheduling and management access are independent capabilities
+- belongs to one organization and participates in schedules and requests
 
-### Schedule Entry
+### Schedule entry and recurring shift
 
-- `org_id`, `employee_id`, `date`, `shift_code`, draft/published state,
-  snapshot fields for audit history (top-level fields like start time and
-  label are derived from the snapshot, not independently patchable)
-- relationship: belongs to an Employee, references a Recurring Shift when
-  generated from one
+- organization, employee or open-shift identity, date, shift, job, and absence
+  facts
+- draft and published state with optimistic versioning
+- snapshot fields are the source of truth for schedule-cell audit history
+- recurring shifts generate bounded series through the normal draft workflow
 
-### Shift Request
+### Schedule note
 
-- `org_id`, `employee_id`, `type` (pickup / swap / call-off), `status`,
-  approval events, request snapshot for audit trail
-- relationship: belongs to an Employee, may reference a Schedule Entry
+- organization, employee, date, note type, and the shift it belongs to
+- draft and published state; every note records its author
 
-### Absence Type
+### Shift request
 
-- `org_id`, label (customizable), whether it represents a published
-  absence vs. an unscheduled day
-- relationship: belongs to an Organization
+- `org_id`, requester, optional target person, and related schedule entry
+- `type` - pickup, swap, or call-off
+- status, approval events, and immutable request snapshots
+- belongs to an employee and organization
 
 ### Notification
 
-- `org_id`, `user_id`, type, read state
-- relationship: belongs to a Profile
+- organization, recipient, type, read or archived state, priority, metadata, and
+  optional action destination
+- destinations are resolved through the shared domain contract
 
-### Subscription (Billing)
+### Subscription
 
-- `org_id`, Stripe customer id, Stripe subscription id, trial state
-  (trial clock starts on first Super Admin login via `start_trial_for_org`,
-  not on signup), seat count (per-seat pricing)
-- relationship: belongs to an Organization
+- organization, Stripe customer and subscription identifiers, seat count, and
+  trial or billing state
+- the trial begins on first Super Admin login, not at signup
 
-### Audit Log
+### Audit log
 
-- Gridmaster-level and per-org activity entries: actor, action, target,
-  timestamp
-- relationship: references a Profile and, where applicable, an
-  Organization
+- actor, action, target, timestamp, and organization when applicable
+- organization activity is customer-facing; platform audit remains internal
 
-> Locked: Schedule Entry snapshots are the source of truth for
-> schedule-cell audit history - later features must patch through the
-> snapshot upsert, not top-level fields directly.
+### Auth session
+
+- session identity, user identity, organization, assurance, and revocation state
+- drives per-session JWT claims and live authorization checks
+
+> Schedule snapshots, organization scope, and the effective sandbox-aware
+> organization ID are security and history boundaries. Later work must preserve
+> them.
 
 ## Tech stack
 
-- **Next.js 16 (App Router) + React 19** - web app, TypeScript strict
-- **Expo SDK 54 + Expo Router** - mobile app
-- **npm workspaces + Turborepo** - monorepo across `apps/web`,
-  `apps/mobile`, and 11 shared `packages/*`
-- **Supabase** - Postgres, Auth, Realtime, Row Level Security (no ORM;
-  RLS is the real security boundary)
-- **Tailwind CSS v4** - styling, CSS-first `@theme` config, dark mode first
-- **TanStack Query v5** - client-side and mobile data fetching
-- **@dnd-kit** - schedule grid drag-drop
-- **Zod** - input validation
-- **jose** - local JWT verification (avoids a network round trip per
-  request)
-- **Upstash Redis + @upstash/ratelimit** - production-only rate limiting
-- **Stripe** - billing
-- **Resend + react-email** - transactional email
-- **Sentry, PostHog, Vercel Analytics** - observability
-- **Vitest + Testing Library, Playwright** - unit/integration and E2E
-  testing (already configured; the testing gate is on)
+- **Monorepo** - npm workspaces and Turborepo across `apps/web`,
+  `apps/mobile`, and 11 shared packages.
+- **Web** - Next.js 16 App Router, React 19, strict TypeScript, and Tailwind CSS
+  v4.
+- **Mobile** - Expo SDK 54, Expo Router, and React Native.
+- **Backend** - Supabase Postgres, Auth, Realtime, and Row Level Security with no
+  ORM.
+- **Data access** - direct Supabase clients on the server, TanStack Query v5 for
+  client and mobile state, and the authenticated mobile HTTP API for application
+  data. Mobile uses Supabase directly for Auth and Realtime, not application
+  table CRUD.
+- **Validation and auth** - Zod and locally verified JWTs through `jose`.
+- **Scheduling UI** - `@dnd-kit` for web drag and drop.
+- **Infrastructure services** - Upstash rate limiting, Stripe, Resend, Sentry,
+  PostHog, and Vercel Analytics.
+- **Testing** - Vitest, Testing Library, and Playwright.
+- **Documentation** - Mintlify, with a source-derived inventory, an accuracy
+  manifest whose pages carry evidence fingerprints, and `docs:check`,
+  `docs:fingerprint`, and `docs:verify`.
 
 ## Monetization
 
-Per-seat subscription pricing via Stripe: price scales with the number of
-staff/users in an organization. New organizations get a 14-day free
-trial before conversion is required.
+DubGrid uses Stripe per-seat subscriptions, billed monthly. New organizations
+receive a 14-day trial beginning on the first Super Admin login, then 3 grace
+days before the organization locks.
 
-> TODO: exact per-seat price points and any tier breaks.
+> TODO: exact per-seat prices and tier breaks remain unconfirmed.
 
 ## UI/UX
 
-Every organization receives the same product-quality and interaction contract.
-Component choice, layout, spacing, typography, responsive behavior,
-accessibility, loading/error treatment, and action placement cannot drift by
-tenant or data path. Intentional organization content and configuration may
-differ, including data, terminology, permissions, branding, and enabled
-features.
+- Product UI and ordinary copy use Inter. The DubGrid wordmark and landing or
+  marketing headings use DM Sans.
+- The interface supports dark and light themes and uses shared semantic design
+  tokens across web and mobile.
+- Organization-configurable terminology must come from organization settings,
+  never hardcoded defaults.
+- "Organization" is customer-facing terminology. Code may use `org` or
+  `organization`; "workspace" is reserved for the literal `workspace_kind`
+  field. Customers say "schedule notes"; code keeps `indicator`.
+- Schedule data uses tabular numerals.
+- Mobile has native primitives and motion while preserving the same product
+  hierarchy and accessibility contract as web.
 
-Dark mode first, light mode as an option. Tailwind v4 with design tokens
-in `packages/design-tokens` (avatar tone, elevation, gradients, icon
-tone) shared conceptually with a parallel `mobile*` token set (the two
-apps don't share component code, only the visual language). Neutral
-grays carry a deliberate tint - slate in light mode, zinc in dark mode.
-All org-customizable terminology (Wings, Skill Levels, etc.) is read
-through the org's terminology config, never hardcoded.
+Main web surfaces:
 
-DM Sans is the brand-heading typeface for the wordmark and every landing or
-marketing title and heading. Inter is the product typeface for all product UI
-and ordinary copy. Web uses Inter Variable with optical sizing; mobile uses
-native Inter 400/500/600/700 faces. The existing semantic size hierarchy stays
-in place, and schedules, dates, times, durations, and totals use tabular
-numerals.
+- public landing, demo request, legal, login, invitation, recovery, and reset
+  routes
+- the authenticated organization app for Dashboard, Schedule, People, Reports,
+  Settings, Profile, Alerts, billing recovery, and onboarding
+- a separate internal Gridmaster portal
+- Route Handlers under `/api`, including the authenticated mobile API
 
-Alerts are one sentence about something else: tapping one marks it read and
-goes to its subject rather than opening a detail view that repeats the
-sentence. The web alerts page is a list under one toolbar, and every alert
-row keeps a clear title-versus-content hierarchy.
+Main mobile surfaces:
 
-For future web UI consistency work, `better-ui` is a reference for surfaces,
-radii, optical alignment, icon state, explicit transitions, and theme-switch
-behavior. `emil-design-eng` is a reference for motion purpose, interruptibility,
-easing, gesture physics, perceived performance, and reduced-motion review. Both
-are review guidance only: preserve DubGrid's tokens, density, platform-specific
-motion, and accessibility contracts, and do not add a dependency solely to
-satisfy either checklist.
-
-Main route groups (web, App Router):
-
-- `(app)` - authenticated area: dashboard, schedule, people, reports,
-  settings, profile, Gridmaster portal
-- `/api` - Route Handlers (webhooks, mobile endpoints, uploads)
-- `/cookie-policy`, `/privacy`, `/terms`, `/request-demo` - public pages
+- role-adaptive Home, Schedule, Requests, People, and Profile tabs
+- alerts, person and shift detail, dashboard drill-ins, security, MFA, sessions,
+  password, calendar, notification, privacy, onboarding, offline, and recovery
+  flows
+- schedule authoring and publishing, reports, billing, Gridmaster operations,
+  Admin permission editing, and organization settings remain web-only
 
 ## Deployment
 
-- **Host:** Vercel (web). `apps/web/vercel.json` pins the region and schedules
-  two crons (`/api/cron/trial-expiry`, `/api/cron/sandbox-cleanup`); the rest of
-  the project configuration lives in the Vercel dashboard.
-- **App type:** Next.js 16 App Router, standard Vercel build
-  (`npm run build`) and start (`npm run start`).
+- **Web host:** Vercel. `apps/web/vercel.json` pins the region and the daily
+  trial-expiry and sandbox-cleanup jobs.
+- **Build and start:** `npm run build` and `npm run start`; the root production
+  build targets the Next.js web app.
 - **Database:** Supabase-hosted Postgres with an immutable ordered migration
-  stream in `supabase/migrations/` (`001`-`004` frozen, forward migrations
-  through `027`, checksum-locked, applied by ledger). Feature flags are seeded
-  in `001` and toggled through the Gridmaster UI; a new switch is one INSERT in
-  a forward migration plus a call site.
-- **Background jobs:** `cron-expire-requests.yml` (GitHub Action, hourly)
-  expires stale shift requests and invitations; the two Vercel crons above
-  handle trial-expiry notices and sandbox cleanup. All three need `CRON_SECRET`.
-- **Final migration gate:** after all product work and authentication release
-  qualification, inventory and reconcile linked production, rehearse the
-  missing suffix on a scratch local stack at production's ledger, then apply
-  only reviewed forward migrations and verify health, schema, tenant
-  isolation, and ledger state. The restore point is the latest daily backup.
-  The tracked plan grants no authority to mutate production.
-
-> Env vars by name and rotation procedure are in `internal/secrets-rotation.md`;
-> the health check is `GET /api/health`. Run `/release vercel` for a real
-> readiness pass on domain notes.
+  stream. Migrations `001` through `004` are frozen. The repository is
+  checksum-locked through `075`.
+- **Production boundary:** migration `075` was recorded as applied to production
+  on 2026-09-28. Read the live ledger with `npm run db:migrations:inspect`
+  (read-only) before any release rather than relying on this line.
+- **Background jobs:** a GitHub Action expires stale requests and invitations
+  hourly; Vercel runs trial-expiry and sandbox-cleanup jobs daily. They require
+  `CRON_SECRET`.
+- **Health:** `GET /api/health`.
+- **Feature controls:** Gridmasters create and manage feature flags through the
+  platform UI.
+- **Native boundary:** the repository contains an Expo application, but the plan
+  does not claim signed builds, store distribution, or released native versions.
+- **Documentation boundary:** Mintlify publishes `docs/`; public pages are
+  verified against source before release. Production, provider, and
+  native-release claims require separately dated evidence.
 
 ## Open questions
 
-- Exact per-seat billing price points / tier breaks are unconfirmed.
-- Deployment domain notes are unconfirmed (env vars are listed in
-  `internal/secrets-rotation.md`; the health check is `GET /api/health`).
+- Exact per-seat billing price points and tier breaks are unconfirmed.
+- Deployment domain details are unconfirmed.
+- Item 40e cannot complete until both iOS and Android runtime evidence is
+  recorded.
+- The Privacy Policy promises a self-serve data export that no screen offers.

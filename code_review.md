@@ -1,5 +1,9 @@
 # code_review.md
 
+> **Point-in-time guide (framed 2026-09-29):** This review checklist records
+> the repository conventions when it was maintained. Confirm current behavior
+> against `AGENTS.md`, `ARCHITECTURE.md`, and the relevant app guide before use.
+
 Use this guide whenever Claude is asked to review code in this repository.
 Review for concrete, evidence-backed risks first. Do not nitpick style unless
 it affects readability, consistency, correctness, or maintainability.

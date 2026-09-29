@@ -1,5 +1,9 @@
 # Mobile authentication entry performance
 
+> **Point-in-time qualification (framed 2026-09-29):** This preserves the
+> measurements and limits recorded below. Confirm current behavior in
+> `internal/authentication.md` and the referenced source paths before release.
+
 This procedure measures development-only mobile authentication entry against the
 local Calm Haven fixture. It does not send measurement traffic to staging or
 production, and it does not measure native binary launch before JavaScript
