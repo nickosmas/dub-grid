@@ -1,56 +1,43 @@
 ---
 title: "Invitations"
-description: "Invite employees to create their DubGrid account, no public sign-up is available."
+description: "Invite people to sign in to your organization, and reissue or revoke an invitation."
 ---
 
-DubGrid is invite-only. There is no public sign-up page. To give an employee access to your organization, you send them an invitation from **Settings → Users**. The invitation email contains a unique link they use to create their account.
+People sign in to DubGrid only by invitation. You invite someone who's already on your roster, or a manager you add as you invite them. There's no public sign-up.
 
-<Warning>
-  Invitation links expire after 72 hours. If a link expires before the employee accepts it, go to
-  **Settings → Users** and send a new invitation.
-</Warning>
+## Who can invite
 
-## How to invite an employee
+A Super Admin can invite anyone and give them any access level. An Admin who can manage staff can invite people from their person page, as a **User** or **Admin**. Only a Super Admin can invite another Super Admin.
 
-<Steps>
-  <Step title="Go to Settings → Users">
-    In the left sidebar, navigate to **Settings**, then select **Users**.
-  </Step>
-  <Step title="Find the employee row">
-    Locate the employee you want to invite in the users table. The employee must already exist as a
-    record in your staff roster.
-  </Step>
-  <Step title="Click Invite">
-    Click the **Invite** button on their row. DubGrid sends an invitation email to the employee's
-    email address on file.
-  </Step>
-  <Step title="Wait for the employee to accept">
-    The employee receives the email, clicks the invitation link, and completes account setup. Once
-    they accept, their account is linked to their employee record automatically.
-  </Step>
-  <Step title="Assign their organization role">
-    After the employee sets their password and verifies their email, they land on a waiting page. Go
-    to **Settings → Users** and assign them an organization role to grant access.
-  </Step>
-</Steps>
+## Sending an invitation
 
-<Note>
-  Each invitation is tied to the employee's record in the roster. When they accept, their DubGrid
-  account is automatically connected to their employee profile, no manual linking is required.
-</Note>
+- **Someone on your roster**: open their [person page](/staff/detail-page) and select **Send invitation**. It's sent to the email address in their profile; choose their access level and select **Send Invitation**. Super Admins can also invite from the directory, one person or several at once.
+- **A manager who isn't on the schedule**: on **People**, select **Add**, then **Management staff**. Enter their name, email, optional phone, the departments they'll manage, and their access level, and select **Send Invitation**.
+- **During setup**: the first Super Admin can invite people from the setup guide's **Invite Team** step.
 
-## What the employee receives
+You can't invite an address that's already part of your organization. If the address already has a DubGrid account at another organization, the person joins yours when they accept, using their existing password.
 
-When you send an invitation, the employee gets an email with a **Accept Invitation** button. The email includes your organization name and the inviter's name.
+## What the invitee gets
 
-The employee then:
+An email with the subject "You're invited to join _your organization_ on DubGrid" and an **Accept invitation** button. It says exactly when the link expires, in your organization's time zone. It doesn't say who sent it.
 
-1. Clicks the invitation link
-2. Sets their password (minimum 10 characters)
-3. Accepts the Terms of Service and Privacy Policy
-4. Verifies their email address
-5. Lands on an onboarding waiting page until you assign their organization role
+The link works for **72 hours** from when it was sent and doesn't extend. The invitee sets a password and agrees to the terms, then signs in; see [Joining your team](/onboarding).
 
-## Resending an invitation
+## Reissuing and revoking
 
-If the employee didn't receive the email or the link expired, go back to **Settings → Users**, find their row, and click **Invite** again. A fresh 72-hour link is sent to their email address.
+On the person's page, a banner shows a pending or expired invitation:
+
+- **Reinvite** sends a new link and confirms **Reissue Invitation?** first. The old link stops working immediately; the invitation keeps its email and access level. A reissued email's subject reads "Your new invitation to join _your organization_ on DubGrid".
+- **Revoke** confirms **Revoke Invitation?**, then the link stops working immediately.
+
+Inviting the same address again while an invitation is pending reissues it, as long as the access level matches. Changing a pending invitation's access level in the **Access** column also sends a new link.
+
+If you send several invitations to the same address in a short time, DubGrid asks you to wait a few minutes before trying again.
+
+## When an invitation expires
+
+An expired link stops working. The person's page then shows **Invitation expired** with **Reinvite**, and the person who sent it and the Super Admins get an alert, which may not be available in every organization.
+
+## In the DubGrid app
+
+People who manage staff can send, reissue, and revoke invitations from a person's screen. Invitations sent from the app give User access.

@@ -15,7 +15,7 @@
 - [x] 1. **Multi-tenant organizations** - subdomain-isolated tenants, each
       with its own settings and terminology overrides
 - [x] 2. **Four-tier RBAC** - Gridmaster / Super Admin / Admin / User,
-      with per-person configurable admin permissions (26-key set)
+      with per-person configurable admin permissions (25-key set)
 - [x] 3. **Schedule grid** - drag-drop week / 2-week / month views with a
       draft/publish workflow and recurring shifts
 - [x] 4. **Real-time schedule collaboration** - Supabase Realtime editor
@@ -757,18 +757,43 @@
         cron jobs, and supported commands; add the public-page accuracy
         manifest; pin the documentation tooling; and provide fixture-tested
         contract checks for stale or missing evidence.
-  - [ ] 40b. **Public scheduling, people, and configuration guides** - rewrite
+  - [x] 40b. **Public scheduling, people, and configuration guides** - rewrite
         the existing customer guides for scheduling, requests, people,
         invitations, departments, roles, certifications, shifts, jobs,
         absences, coverage, indicators, schedule rules, display options, and
         organization controls against the frozen candidate.
-  - [ ] 40c. **Public mobile, account, alerts, reports, billing, and access
+    - [x] 40b1. **Get started guides and the fingerprint tool** - rewrite the
+          home, introduction, quickstart, and onboarding pages against source,
+          and add `docs:fingerprint` so a source-reviewed page records its
+          evidence fingerprint in the accuracy manifest.
+    - [x] 40b2. **Scheduling guides** - rewrite the schedule grid, draft and
+          publish, recurring shifts, real-time collaboration, shift requests,
+          and dashboard pages.
+    - [x] 40b3. **People guides** - rewrite the roster, person detail, and
+          invitations pages.
+    - [x] 40b4. **Configuration guides** - rewrite the organization, coverage,
+          and terminology pages and publish the five planned Settings pages
+          (schedule rules and display; roles, certifications, and schedule
+          notes; organization activity and controls; departments and focus
+          areas; shifts, jobs, and absences), with permanent redirects for
+          the focus-area and shift-code pages they replace.
+  - [x] 40c. **Public mobile, account, alerts, reports, billing, and access
         guides** - document role-aware mobile navigation and deliberate parity
         boundaries plus alerts, reports, profile, security, sessions,
         notifications, privacy, data controls, billing, onboarding, and access
         behavior; preserve sensible URLs and add permanent redirects for the
         three replaced public pages.
-  - [ ] 40d. **Current engineering, architecture, security, and operations
+    - [x] 40c1. **Mobile navigation, alerts, and reports guides** - publish the
+          role-aware mobile navigation page with its deliberate web-only
+          boundaries, and the alerts and reports pages.
+    - [x] 40c2. **Account guides** - publish the profile, security and sessions,
+          and notification, privacy, and data-control pages.
+    - [x] 40c3. **Access, billing, and integrations references** - verify the
+          roles, Admin permissions, and billing pages, publish integrations
+          and exports, and permanently redirect the three replaced pages
+          (subscription into billing; API overview and calendar export into
+          integrations and exports).
+  - [x] 40d. **Current engineering, architecture, security, and operations
         references** - reconcile the living root and internal references plus
         app-specific `AGENTS.md` facts for architecture, RBAC, MFA and JWT
         behavior, mobile boundaries, APIs, migrations, setup, deployment, and
@@ -780,3 +805,17 @@
         qualify migration readiness on an isolated database, close every
         manifest entry, and enforce the fast and full documentation checks in
         hooks and CI. Android evidence is mandatory before completion.
+    - [x] 40e1. **Closed documentation contract and drift gates** - make the
+          strict contract check the canonical fast gate, run the full Mintlify
+          verification before a push and in CI, and reconcile the living
+          Blueprint overview with the completed documentation work.
+    - [ ] 40e2. **Isolated migration readiness qualification** - rehearse the
+          contiguous checksum-locked migration ledger against a local scratch
+          database and record reproducible evidence without touching a remote
+          project.
+    - [ ] 40e3. **Web browser role and state qualification** - execute and
+          retain the documented Chromium, Firefox, and WebKit role/state
+          matrix against the dedicated local E2E environment.
+    - [ ] 40e4. **Native iOS and Android qualification** - record real-device
+          evidence for the required mobile roles and states, including the
+          mandatory Android pass; do not infer unavailable device evidence.

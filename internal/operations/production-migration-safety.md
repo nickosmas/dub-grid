@@ -1,5 +1,9 @@
 # Production migration safety
 
+> **Point-in-time runbook evidence (framed 2026-09-29):** Each rehearsal and
+> production result below is true only at its recorded time. Inspect the live
+> ledger with `npm run db:migrations:inspect` before any release action.
+
 This is the final release gate for DubGrid's hosted Supabase database. It is an
 operator runbook, not authorization to change production. The protected
 production project ref is `xpoylacxkbphnudsupuu`.

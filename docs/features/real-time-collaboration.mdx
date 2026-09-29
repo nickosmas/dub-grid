@@ -1,37 +1,25 @@
 ---
-title: "Real-Time Collaboration"
-description: "Multiple schedulers can work on the same schedule simultaneously, changes sync instantly across all open sessions."
+title: "Working Together"
+description: "Several people can edit the schedule at once. See who else is working and what happens when two edits meet."
 ---
 
-DubGrid keeps every user on the same page in real time. When one scheduler makes a change, every other open session sees it immediately, no manual refresh required.
+Everyone viewing the schedule sees changes as they happen, without reloading. Drafts appear for other editors as they're saved, and a publish updates every open schedule. When you come back to a tab you left open, it catches up.
 
-<Note>
-  Real-time collaboration requires an active internet connection. If your connection drops, DubGrid
-  will automatically catch up with any missed changes when you reconnect.
-</Note>
+## Who else is editing
 
-## Presence avatars
+People who can edit the schedule see the other editors who have it open, as avatars in the toolbar: up to four, then a count of the rest. Hover over an avatar for the name, or open the list, **Editors online**, to see how many tabs or devices each person is using.
 
-Colored avatars appear in the schedule toolbar to show who else is currently viewing the schedule. Each avatar represents an active user session. Hover over an avatar to see the user's name.
+When another editor has a cell open, it shows their avatar and **Being edited by** their name. That's for information only: it never stops you from editing the same cell.
 
-Presence avatars update automatically as users join or leave the schedule view.
+## When two edits meet
 
-## Cell locks
+DubGrid doesn't lock cells. Instead, when you save a shift that someone else changed after you opened it, DubGrid tells you, for example **This shift changed in another tab or by another editor.**, and refreshes the schedule so you can see their change before making yours. Your save never silently overwrites someone else's.
 
-When a user opens a cell for editing, that cell is locked for everyone else. A lock indicator appears directly on the cell, showing the name and avatar of the user currently editing it. Other users cannot edit a locked cell until the editor closes the shift panel and the lock releases.
+## The same account in two places
 
-Cell locks prevent two people from overwriting each other's changes at the same time.
+If your account has the schedule open for editing somewhere else, such as another computer, a **Schedule open elsewhere** banner appears. To avoid conflicting unsaved changes, either:
 
-## Live sync
+- **Sign out this device**, or
+- **End other schedule sessions**, which closes the schedule on those devices but leaves them signed in.
 
-Changes made by any user, new shifts, edits, deletions, propagate to all open sessions in real time. The grid updates without any page reload or manual action on your part.
-
-This applies to:
-
-- Draft shift changes
-- Published schedule updates
-- Discard actions
-
-## Cross-tab coordination
-
-If you have the schedule open in multiple browser tabs at the same time, all tabs stay in sync with each other. An action taken in one tab is immediately reflected in the others.
+A tab whose session was ended says **Schedule session ended** and becomes read-only; changes it hadn't saved are lost. Select **Reload to start a new session** to keep working there.

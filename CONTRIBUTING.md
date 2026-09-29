@@ -114,7 +114,7 @@ Use clear, imperative-style messages:
 feat: add org soft-delete danger zone
 fix: prevent cross-org mutation in shift updates
 refactor: extract audit logging into shared utility
-docs: update RBAC permission table to 26 permissions
+docs: update RBAC permission table to 25 permissions
 test: add vitest coverage for OnboardingGate
 chore: pin protobufjs to 7.5.9
 ```
@@ -176,7 +176,7 @@ Database history is an immutable, ordered migration stream under `supabase/migra
 | File                                            | Contents                                                    |
 | ----------------------------------------------- | ----------------------------------------------------------- |
 | `001_schema.sql` through `004_grants.sql`       | Frozen historical baseline (schema, functions, RLS, grants) |
-| `005_*.sql` and later (currently through `023`) | One retry-safe forward migration per schema change          |
+| `005_*.sql` and later (currently through `075`) | One retry-safe forward migration per schema change          |
 | `checksums.sha256`                              | Locks every reviewed migration                              |
 
 **Every schema change is a new `NNN_snake_case.sql` at the next number.** Make it idempotent, add its hash to `checksums.sha256` in the same change, and run `npm run db:migrations:check`. Never edit an applied migration (including `001`-`004`), and never replay `supabase/patches/` as a migration stream. See [supabase/AGENTS.md](supabase/AGENTS.md).
@@ -224,7 +224,7 @@ When modifying the schema:
 
 1. Add a new `NNN_name.sql` at the next number and lock it in `supabase/migrations/checksums.sha256`.
 2. Run `npm run db:reset` to verify the full sequence applies cleanly locally, then `npm run db:migrations:check`.
-3. Run `npm run gen:types` if the change affects `apps/web/src/lib/database.types.ts`.
+3. Update the hand-written row types in `packages/db-types` if the change affects them (`npm run gen:types` is deprecated: its target, `apps/web/src/lib/database.types.ts`, was deliberately removed).
 4. If your change affects the JWT hook, test via `signInWithPassword` (not just direct SQL).
 5. If adding a table the hook reads, grant it to `supabase_auth_admin` in the same migration.
 6. If removing or renaming a table/column, carry the RLS policy and grant changes in that migration too, and keep `npm run db:migrations:inspect:local -- --expect-complete` green.

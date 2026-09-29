@@ -1,56 +1,34 @@
 ---
-title: "Draft & Publish"
-description: "All schedule edits are saved as drafts first, nothing is visible to staff until you explicitly publish."
+title: "Draft and Publish"
+description: "Schedule changes stay drafts until someone publishes them. How drafts, publishing, and discarding work."
 ---
 
-DubGrid uses a draft/publish workflow to give you full control over when schedule changes go live. Every edit you make, adding a shift, modifying a code, deleting an entry, is saved as a draft. Drafts are visible only to users with edit access, not to general staff.
+Every change to the schedule starts as a draft. Staff keep seeing the published schedule until someone allowed to publish makes the drafts live, so nobody sees a half-finished schedule.
 
-## Draft state
+## Drafts
 
-When a cell has a pending draft change, it displays a visual indicator so you can distinguish it from published shifts at a glance. The indicator varies by change type:
+Only people who can edit the schedule see drafts. A changed cell is marked **Draft new**, **Draft changes**, or **Marked for deletion**. Drafts are saved as you make them, so closing the browser doesn't lose them, and every editor sees everyone's drafts.
 
-- **New** - a shift that has been added but not yet published
-- **Modified** - an existing published shift that has been edited
-- **Deleted** - a published shift that has been marked for removal
+While there are drafts in the period you're looking at, a **Draft changes** banner shows how many shifts are new, edited, or deleted and how many schedule notes changed. If other periods have drafts too, a second banner lists them so you can go to them.
 
-## Draft banner
+## Publishing
 
-The **Draft Banner** appears at the top of the schedule grid whenever there are unpublished changes. It shows the number of pending changes across the current view. Use it as a quick check before publishing.
+1. Select **Publish** in the banner. If you can't publish, the button explains why.
+2. The **Publish Schedule?** dialog lists the changes in this period by who made them: **Your drafts** first, then each other editor's. It warns you if an editor is on the schedule right now, since anything they haven't saved yet won't be included, and if coverage gaps remain.
+3. Select **Publish**.
 
-## Publishing changes
+Publishing covers the period on screen. Drafts in other periods stay drafts until you publish those too.
 
-<Note>
-  Before publishing, DubGrid shows a confirmation dialog summarizing the changes. Review the count
-  carefully, publishing promotes all drafts to the live schedule simultaneously and notifies any
-  connected users.
-</Note>
+After publishing, everyone viewing the schedule sees the change, and people with shifts in that period get a **Schedule updated** alert (except you). A **Recently published** bar shows what changed, and **Highlight Changes** marks those cells until you hide them.
 
-To publish all pending changes:
+Super Admins can always publish. Admins can publish when their Super Admin allows it, which is on for new Admins by default.
 
-1. Click **Publish** in the draft banner.
-2. Review the confirmation dialog.
-3. Click **Confirm** to publish.
+## Discarding drafts
 
-All drafts across the organization are promoted to published status at once. Connected users see the updated schedule in real time.
+Select **Discard** in the banner. The **Discard drafts?** dialog offers **Discard my drafts**, which removes only your own drafts in this period, or **Keep drafts**. When other editors also have drafts, a Super Admin also sees **Discard all drafts**.
 
-## Discarding changes
+Discarding leaves the published schedule as it is and doesn't touch drafts in other periods. Discarded drafts can't be restored.
 
-To roll back all unpublished drafts:
+## What staff see
 
-1. Click **Discard** in the draft banner.
-2. Confirm the action when prompted.
-
-All pending draft changes are removed and the schedule reverts to the last published state. This action cannot be undone.
-
-## Draft recovery
-
-If you close your browser or navigate away before publishing, your drafts are not lost. DubGrid automatically saves your draft session. The next time you open the schedule, a recovery prompt appears so you can pick up where you left off.
-
-## Who can publish
-
-Only the following users can publish schedule changes:
-
-- **Super Admins** - always have publish access
-- **Admins** with the `canPublishSchedule` permission, granted by a Super Admin
-
-To learn more about admin permissions, see [Admin Permissions](/reference/admin-permissions).
+Staff see only the published schedule. A period that has never been published shows **This period has not been published yet**. Approved shift requests are different: they change the published schedule straight away, without a draft. See [Shift requests](/features/shift-requests).

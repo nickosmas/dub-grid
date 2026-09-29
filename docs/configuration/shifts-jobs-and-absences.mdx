@@ -1,0 +1,59 @@
+---
+title: "Shifts, Jobs, and Absences"
+description: "Define your shifts, the jobs people do on them, and the absences that replace them."
+---
+
+DubGrid comes with no built-in shifts, jobs, or absences: your organization adds its own. The setup guide asks for at least one shift and one job before you start. All three live under **Settings > Scheduling**.
+
+- A **shift** is a block of time in a focus area, such as Day, Evening, or Night.
+- A **job** is what someone does, such as Supervisor, Mentor, or Nurse. Scheduled jobs go with a shift; general jobs stand on their own.
+- An **absence** replaces working, such as PTO or a sick day, and doesn't count toward coverage.
+
+## Shifts
+
+Shifts are set per focus area. Select **+ Add Shift** in a focus area and give it:
+
+| Field                 | Notes                                                                                                                                          |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Name**              | Required, up to 50 characters, unique within the focus area.                                                                                   |
+| **Code**              | Up to 8 characters, the short form shown on the schedule. Made from the name if you leave it blank. Hidden when the schedule shows full names. |
+| **Color**             | Choose from the presets.                                                                                                                       |
+| **Start** and **End** | The default times. People can have different times on a given day.                                                                             |
+| **Break (min)**       | Optional, up to 480 minutes. The shift shows its gross, break, and net hours.                                                                  |
+
+## Jobs
+
+**Settings > Jobs** has up to three groups:
+
+- **Scheduled Jobs**, worked on a shift.
+- **General Jobs**, worked without a shift, with a default length or fixed default times (fixed times win).
+- **Default Shift Job**, used when **Shift-only assignments** is on, letting staff be scheduled with just a shift and no job. It's hidden on the schedule but still decides where the shift goes, who qualifies, and its times and colors.
+
+For each job:
+
+| Setting                | Notes                                                                                                                                                                                                                                                       |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Job name**           | Up to 50 characters, unique.                                                                                                                                                                                                                                |
+| **Grid abbreviation**  | Up to 6 characters, unique. Required when the schedule shows short codes.                                                                                                                                                                                   |
+| **Color**              | Choose from the presets.                                                                                                                                                                                                                                    |
+| Placement              | The scheduled departments, focus areas, and shifts it's worked in.                                                                                                                                                                                          |
+| **Per-shift Settings** | A different color or times for particular shifts.                                                                                                                                                                                                           |
+| **Eligibility**        | Which roles and certifications can work it. **Require both** needs a matching role and certification; **Allow either** accepts one or the other. Leave a list empty to let anyone through on that side. Only roles set to count for job eligibility appear. |
+
+A scheduled job needs a scheduled department with a focus area and a shift to go in. Jobs are listed by how much qualification they need.
+
+## Absences
+
+**Settings > Absence Types** lists the off-day and call-off labels your schedulers use. Each has:
+
+- a **Code / label** of up to 6 characters, unique, required when the schedule shows short codes (for example PTO)
+- a full name of up to 50 characters
+- a color
+
+## Removing one
+
+Removing a shift, job, or absence that's in use archives it: its history stays, but it can't be used for new scheduling. One that nothing refers to is deleted.
+
+## Who can do what
+
+People with permission to view shifts and jobs can see these sections. Changing them, including turning shift-only assignments on or off, needs permission to manage shifts and jobs. Super Admins can do both.

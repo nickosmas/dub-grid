@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:f2f9f1e20944d6e051baa9c7ae5e228d9feec30dc0b706c99c4cd01173e0c01e",
+  "sourceDigest": "sha256:318bafd0c22cfc5a58db93f8f8468625ad598db54a38fcc488325c7d0befcba8",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4490,6 +4490,16 @@
       "source": {
         "path": "supabase/migrations/074_password_change_recorded.sql"
       }
+    },
+    {
+      "id": "migration:075_gridmaster_writes_need_impersonation.sql",
+      "version": "075",
+      "name": "gridmaster_writes_need_impersonation",
+      "file": "075_gridmaster_writes_need_impersonation.sql",
+      "sha256": "437477152ee1bcf35b7c98b04401956c59d70d0d903c73ca5757c77e62f20aa4",
+      "source": {
+        "path": "supabase/migrations/075_gridmaster_writes_need_impersonation.sql"
+      }
     }
   ],
   "rlsTables": [
@@ -7605,6 +7615,26 @@
       }
     },
     {
+      "id": "script:root:docs:check:closed",
+      "package": "root",
+      "workspacePath": ".",
+      "name": "docs:check:closed",
+      "command": "npm run docs:check -- --require-closed",
+      "source": {
+        "path": "package.json"
+      }
+    },
+    {
+      "id": "script:root:docs:fingerprint",
+      "package": "root",
+      "workspacePath": ".",
+      "name": "docs:fingerprint",
+      "command": "npx --yes tsx@4.23.15 scripts/documentation/fingerprint.ts",
+      "source": {
+        "path": "package.json"
+      }
+    },
+    {
       "id": "script:root:docs:inventory",
       "package": "root",
       "workspacePath": ".",
@@ -7639,7 +7669,7 @@
       "package": "root",
       "workspacePath": ".",
       "name": "docs:verify",
-      "command": "npm run docs:check && npm run docs:validate && npm run docs:links",
+      "command": "npm run docs:check:closed && npm run docs:validate && npm run docs:links",
       "source": {
         "path": "package.json"
       }
@@ -8071,6 +8101,20 @@
       "id": "command:root:docs:check",
       "scriptId": "script:root:docs:check",
       "invocation": "npm run docs:check",
+      "audience": "developer",
+      "status": "supported"
+    },
+    {
+      "id": "command:root:docs:check:closed",
+      "scriptId": "script:root:docs:check:closed",
+      "invocation": "npm run docs:check:closed",
+      "audience": "ci",
+      "status": "supported"
+    },
+    {
+      "id": "command:root:docs:fingerprint",
+      "scriptId": "script:root:docs:fingerprint",
+      "invocation": "npm run docs:fingerprint",
       "audience": "developer",
       "status": "supported"
     },

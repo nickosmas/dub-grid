@@ -1,87 +1,81 @@
 ---
-title: "Staff Roster"
-description: "View, add, and manage every employee in your organization from the staff roster."
+title: "People"
+description: "Find your colleagues, add and import staff, change someone's access, and move people between active, inactive, and removed."
 ---
 
-The staff roster at `/staff` is your central list of all employees. You can search, filter, and sort the table, and take actions on individual records, adding new hires, benching staff temporarily, or terminating employees who have left.
+The **People** tab lists everyone in your organization. What you see and can change depends on your role: everyone sees the directory, and managers see more details and actions.
 
-<Note>
-  Add, edit, bench, and terminate actions require the `canManageEmployees` permission. Users without
-  this permission can view the roster but cannot make changes.
-</Note>
+## The directory
 
-## What the roster shows
+**Directory** lists your colleagues with their focus areas, certification, and roles. Search by name, or by qualification. Your own row is marked **You**.
 
-Each row in the table displays:
+If you manage staff, the directory also shows each person's employment type, account, access level, and the date they joined, plus their email or phone, and you can search by name, email, or phone. If you can manage staff, selecting a name opens their [person page](/staff/detail-page).
 
-- **Name** - the employee's full name
-- **Certification** - their primary certification abbreviation (e.g. `JLCSN`, `CSN III`)
-- **Roles** - one or more role tags (e.g. `Supv`, `CN`, `Mentor`)
-- **Focus areas** - the wings or sections they are assigned to
-- **Status** - a badge indicating `active`, `benched`, or `terminated`
+Managers also get:
 
-## Employee statuses
+- **Status tabs**: **All**, **Active**, **Inactive**, and **Removed**, each with a count. Everyone else sees active staff only.
+- **On Schedule** and **Management**, to switch between people on the schedule and people who manage a department but aren't scheduled, when your organization has management departments.
+- **Filters**: qualifications, employment type, department, whether the person has an account, contact details, and access level.
+- **Sort**: by seniority, name, or access level.
+- **Reorder**: on the **Active** tab, sorted by seniority with no filters, drag people to change the seniority order and select **Save Order**.
 
-| Status         | Meaning                                                                                   |
-| -------------- | ----------------------------------------------------------------------------------------- |
-| **Active**     | The employee is included in scheduling.                                                   |
-| **Benched**    | Temporarily removed from scheduling without being terminated.                             |
-| **Terminated** | Marked as no longer with the organization. Retained in the roster for historical records. |
+The **Account** column says whether each person can sign in: **Linked** (they have an account), **Invited**, **Not invited**, or **No email**. People without an account still appear on the schedule.
 
-## Search and filter
+## Adding people
 
-Use the **search bar** at the top of the toolbar to find employees by name. To narrow the list further, open the **filter panel** to filter by:
+Select **Add**. If you can add both kinds of people, choose **Scheduled staff** or **Management staff**.
 
-- **Status** - active, benched, or terminated
-- **Focus area** - a specific wing or section
-- **Certification** - a certification level defined in your organization's settings
+**Add Staff Members** adds several people at once; use **Add Another Person** for each extra row. For each person enter:
 
-You can also **sort** the table by seniority or name.
+- **First name** and **Last name** (required)
+- **Employment**: full-time or part-time
+- Their certification (optional)
+- **Email** (optional; needed to invite them)
+- At least one focus area
 
-## Adding a new employee
+Then invite the people who should sign in. See [Invitations](/staff/invitations).
 
-<Steps>
-  <Step title="Open the Add Employee modal">
-    Click **Add Employee** in the top-right of the roster toolbar. The modal opens.
-  </Step>
-  <Step title="Enter the employee's name">Fill in the employee's first and last name.</Step>
-  <Step title="Set their certification and role(s)">
-    Select their primary certification from the dropdown, then assign one or more role tags.
-  </Step>
-  <Step title="Assign focus areas and seniority">
-    Choose which focus areas (wings/sections) the employee works in. Set their seniority number,
-    lower numbers appear higher in the roster.
-  </Step>
-  <Step title="Add contact information">Enter the employee's phone number and email address.</Step>
-  <Step title="Save">
-    Click **Save** to add the employee to the roster. They will appear as **Active** immediately.
-  </Step>
-</Steps>
+### Importing a list
 
-<Tip>
-  If you're onboarding many employees at once, use **Bulk Import** to upload multiple records in a
-  single step instead of adding them one by one.
-</Tip>
+On a desktop-sized screen, **Import** adds people from a `.csv` file of up to 500 rows. The file's columns are `first_name`, `last_name`, `email`, `phone`, `focus_areas`, `certification`, `roles`, and `notes`; only the names are required, and several focus areas are separated with semicolons.
 
-## Editing an employee
+Before importing, DubGrid checks for duplicates. A row that matches someone already on your roster by name, email, or phone, or another row in the file, is skipped. A row with a similar name but different contact details is flagged so you can double-check it. Importing may not be available in every organization.
 
-Click anywhere on an employee's row to open the **Edit Employee** panel. Update any field, name, certification, roles, focus areas, seniority, phone, or email, then click **Save**.
+## Changing someone's access
 
-## Benching an employee
+A Super Admin sets each person's access in the **Access** column: **User**, **Admin**, or **Super Admin**. The change takes effect immediately. You can't change your own access; ask another Super Admin.
 
-Benching temporarily removes an employee from scheduling without terminating their record. Use this for staff on extended leave.
+Changing the access of someone whose invitation is still pending sends them a new invitation, and their old link stops working.
 
-To bench an employee, open their row in the roster and select **Bench**. Their status badge changes to `benched` and they will no longer appear in the schedule grid.
+## Active, inactive, and removed
 
-To return them to active scheduling, select **Activate** from their row.
+| Status       | What it means                                                                                          |
+| ------------ | ------------------------------------------------------------------------------------------------------ |
+| **Active**   | On the schedule and able to sign in. Only active staff can be scheduled and count toward billing.      |
+| **Inactive** | Temporarily off the schedule. They can still sign in, but see a notice that their account is inactive. |
+| **Removed**  | Off the schedule and unable to sign in.                                                                |
 
-## Terminating an employee
+To change someone's status, select **Deactivate** and choose **Mark inactive** or **Remove from staff**, with an optional reason. **Activate** brings them back. You can also select several people and use **Activate**, **Deactivate**, or **Remove** together.
 
-Terminating marks an employee as no longer with the organization. Their record is retained for historical reporting.
+When someone becomes inactive or is removed:
 
-To terminate an employee, open their row and select **Terminate**. You can add an optional note and the timestamp is recorded automatically. Their status badge changes to `terminated`.
+- They're signed out everywhere.
+- From today on, their draft shifts are cleared and their published shifts are marked for removal at the next publish. Their recurring schedules and repeating shifts stop, and their open requests expire.
+- Their past schedule is kept. Reactivating them doesn't bring back what was cleared.
 
-<Note>
-  Terminated employees remain visible in the roster when you filter by **Terminated** status. Their
-  historical shifts and reports are preserved.
-</Note>
+You can't change your own status, and an organization's only Super Admin can't be removed.
+
+## Who can do what
+
+| To                                               | You need                         |
+| ------------------------------------------------ | -------------------------------- |
+| See the directory                                | Everyone                         |
+| See contact details, account, and access         | Permission to view staff details |
+| Add, import, edit, or change the status of staff | Permission to manage staff       |
+| Change someone's access, or add management staff | Super Admin                      |
+
+Exporting staff data is available to people who can view staff details, and may not be available in every organization.
+
+## In the DubGrid app
+
+The app's **People** tab has a **Schedule** and **Management** switch, search, filters, and sorting. Managers can add people, approve or reject profile requests, and change a person's status or invitation from their page.

@@ -21,7 +21,7 @@ concurrently.
   call-off), see facility alerts and notifications, on web and mobile.
 - **Managers / Admins** - build and publish schedules, manage people and
   focus areas, review and approve requests, run reports, configure org
-  settings. A configurable set of 26 admin permissions controls what an
+  settings. A configurable set of 25 admin permissions controls what an
   Admin can do within their organization.
 - **Super Admins** - full control within one organization, including
   managing Admin-tier permissions and billing.
@@ -128,32 +128,44 @@ Shipped capabilities and active roadmap (see `build-plan.md` for status):
   for platform rows. The web alerts page is a list under one toolbar (no
   sidebar), mobile rows show the full message and any human note inline, and
   every alert row has a clear title-versus-content hierarchy.
-- Production migration safety: the final release gate only after product work
-  and release hardening are complete. Inventory linked production state,
-  reconcile the migration ledger, rehearse against a production-shaped
-  Supabase branch, apply only reviewed forward migrations, and verify health,
-  schema, tenant isolation, and ledger state. Planning this gate does not
-  authorize any production mutation.
+- Production migration safety: the 2026-09-23 release gate inventoried linked
+  production, reconciled its ledger, rehearsed the exact forward suffix on a
+  scratch local stack at production's ledger without Supabase branching or
+  PITR, applied migrations 026 through 040, and verified health, schema, tenant
+  isolation, and ledger state. Later releases follow the same rehearsal. That
+  gate does not authorize any later production mutation.
+- Authentication security and invitation resilience: invitation
+  authorization and in-place reissue with a fixed 72-hour absolute expiry,
+  credential, session and recovery integrity on web and mobile, security
+  notices with device context, Gridmaster grants and writes that need fresh
+  proof, and qualified release journeys.
+- Schedule notes on every schedule surface: a schedule note (the customer term
+  for an indicator) shows wherever that person's shift is shown, following the
+  existing visibility rule, and each note belongs to a shift.
+- Complete person records and Gridmaster account recovery: managers see every
+  fact about a person they may see, and a Gridmaster has one page with
+  everything about a person, including recovery from a two-factor lockout,
+  without ever showing secrets.
+- Documentation truth and drift prevention: public documentation and the
+  living engineering references describe the current `dev` through
+  source-derived inventories and a machine-checked accuracy manifest, with
+  customer behavior only in public guides; Gridmaster tooling, Test Sandbox,
+  feature flags, migrations, environment variables, and internal HTTP
+  endpoints stay internal, and future drift fails verification.
 
-The roadmap starts with management-only assignment visibility in item 17, then
-the mobile release catch-up in item 18, authentication and onboarding release
-hardening in item 19, explicit schedule-indicator removal in item 20, and
-production display-mode layout resilience in item 21. Scheduler open-shift
-staffing is item 22, app-wide pill overflow resilience is item 23, and Inter
-product typography is item 24. Web UI consistency and interaction resilience is
-item 25, mobile UI consistency is item 26, alerts go to their subject is item
-27, and production migration safety remains last as item 28. Item 18 is
-deliberately split into role eligibility, the shared dashboard model, and native
-dashboard presentation so each can be reviewed independently. Item 19 is split
-into state correctness, full journey coverage, performance and resilience,
-security, and release qualification. Item 28 must remain last.
+Items 1 through 39 and 41 through 43 are shipped. Item 40, documentation truth
+and drift prevention, is in progress: the source inventory and contract (40a),
+every public guide (40b, 40c), and the engineering references (40d) are
+verified against source. Cross-platform qualification with permanent drift gates
+(40e) remains. Item 40e cannot complete without recorded iOS and Android
+runtime evidence.
 
 ## 4. Data - What are we storing?
 
 - Organizations (tenants), subdomains, org settings/terminology overrides
 - Users / profiles, with `platform_role` and per-org `org_role`
   (Gridmaster/Super Admin/Admin/User) plus per-user `admin_permissions`
-  (26-key JSONB)
+  (25-key JSONB)
 - Organization memberships (per-tenant role assignment)
 - Per-membership onboarding completion and onboarding-tour state
 - Employees / staff records, focus areas, certifications, employment
@@ -247,7 +259,9 @@ before conversion is required.
   (`npm run build`) and start.
 - **Database:** Supabase (hosted Postgres + Auth + Realtime), an immutable
   ordered migration stream under `supabase/migrations/` (`001`-`004` frozen,
-  forward migrations through `023`, checksum-locked). Feature flags are
+  forward migrations through `075`, checksum-locked). Read the linked
+  production ledger with `npm run db:migrations:inspect` (read-only) before
+  any release rather than trusting a recorded number. Feature flags are
   created via the Gridmaster UI; a new switch is one INSERT in a forward
   migration plus a call site.
 - **Background jobs:** `cron-expire-requests.yml` GitHub Action (hourly)

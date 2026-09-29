@@ -1,5 +1,9 @@
 # Web authentication entry performance
 
+> **Point-in-time qualification (framed 2026-09-29):** This preserves the
+> measurements and limits recorded below. Confirm current behavior in
+> `internal/authentication.md` and the referenced source paths before release.
+
 ## Repeat the local measurement
 
 Run this from the repository root with local Supabase running and the standard

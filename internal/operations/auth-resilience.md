@@ -1,5 +1,9 @@
 # Authentication resilience operations
 
+> **Point-in-time operations record (framed 2026-09-29):** Verify current
+> alerts and ownership against `internal/authentication.md`, the linked source,
+> and the provider configuration before relying on this runbook.
+
 ## Sentry dashboard
 
 Create a dashboard named **Authentication and Organization bootstrap** in the

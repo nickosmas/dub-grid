@@ -1,5 +1,10 @@
 # Security Audit — DubGrid
 
+> **Point-in-time record (framed 2026-09-29):** This preserves the findings and
+> evidence true on each date stated below. It is not a statement of current
+> release readiness; use `SECURITY.md`, `RBAC_SYSTEM_DESIGN.md`, and
+> `internal/authentication.md` for the living security model.
+
 **Date:** 2026-05-21 (last updated 2026-09-19; see the dated sections appended below)
 **Scope:** Entire monorepo — `apps/web` (Next.js 16), `apps/mobile` (Expo),
 `packages/*`, Supabase migrations (RLS / RPCs / grants / JWT hook), the request

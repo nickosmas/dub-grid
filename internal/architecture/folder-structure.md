@@ -241,7 +241,7 @@ supabase/
 │   ├── 002_functions_triggers.sql  # Functions, triggers, JWT hook, RPCs
 │   ├── 003_rls_policies.sql    # RLS enable + all policies
 │   ├── 004_grants.sql          # Grants + default privileges
-│   ├── 005_*.sql ... 020_*.sql # Immutable numbered forward migrations
+│   ├── 005_*.sql ... 075_*.sql # Immutable numbered forward migrations
 │   └── checksums.sha256        # Locks every reviewed migration
 ├── patches/                    # Historical one-time production patches (evidence only)
 ├── seed_arden_wood.sql, seed_calm_haven.sql, seed_gridmaster.sql  # Local seed SQL (run by root seed.ts)
@@ -260,21 +260,21 @@ evidence only and are not a second migration stream.
 
 Key commands defined in the root `package.json`:
 
-| Command                         | What it does                                                                           |
-| ------------------------------- | -------------------------------------------------------------------------------------- |
-| `npm run dev`                   | Start the web app in development mode                                                  |
-| `npm run dev:mobile`            | Start the Expo dev server                                                              |
-| `npm test`                      | Run all workspace tests (Vitest, via Turbo)                                            |
-| `npm run test:web`              | Run web app tests only                                                                 |
-| `npm run test:mobile`           | Run mobile, contracts, and schedule-core tests                                         |
-| `npm run test:e2e`              | Run Playwright end-to-end tests                                                        |
-| `npm run build`                 | Production build (web app)                                                             |
-| `npm run type-check`            | TypeScript check across all workspaces                                                 |
-| `npm run db:reset`              | Reset local Supabase DB and re-seed                                                    |
-| `npm run db:reset:remote`       | Drop/recreate a non-production remote DB, run migrations, re-seed (refuses production) |
-| `npm run db:migrations:check`   | Validate the ordered migration inventory against `checksums.sha256`                    |
-| `npm run db:migrations:inspect` | Read-only linked-project ledger and schema qualification                               |
-| `npm run gen:types`             | Regenerate `apps/web/src/lib/database.types.ts` from Supabase                          |
-| `npm run build:packages`        | Build all shared packages                                                              |
-| `npm run lint`                  | Run ESLint                                                                             |
-| `npm run hooks:install`         | Enable the repo's git hooks for this clone                                             |
+| Command                         | What it does                                                                                                            |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`                   | Start the web app in development mode                                                                                   |
+| `npm run dev:mobile`            | Start the Expo dev server                                                                                               |
+| `npm test`                      | Run all workspace tests (Vitest, via Turbo)                                                                             |
+| `npm run test:web`              | Run web app tests only                                                                                                  |
+| `npm run test:mobile`           | Run mobile, contracts, and schedule-core tests                                                                          |
+| `npm run test:e2e`              | Run Playwright end-to-end tests                                                                                         |
+| `npm run build`                 | Production build (web app)                                                                                              |
+| `npm run type-check`            | TypeScript check across all workspaces                                                                                  |
+| `npm run db:reset`              | Reset local Supabase DB and re-seed                                                                                     |
+| `npm run db:reset:remote`       | Drop/recreate a non-production remote DB, run migrations, re-seed (refuses production)                                  |
+| `npm run db:migrations:check`   | Validate the ordered migration inventory against `checksums.sha256`                                                     |
+| `npm run db:migrations:inspect` | Read-only linked-project ledger and schema qualification                                                                |
+| `npm run gen:types`             | Deprecated: writes the removed `apps/web/src/lib/database.types.ts`; use `packages/db-types` for hand-written row types |
+| `npm run build:packages`        | Build all shared packages                                                                                               |
+| `npm run lint`                  | Run ESLint                                                                                                              |
+| `npm run hooks:install`         | Enable the repo's git hooks for this clone                                                                              |

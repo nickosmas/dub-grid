@@ -38,7 +38,7 @@ DubGrid is a **monorepo** — npm workspaces orchestrated by Turborepo — conta
 ┌─────────────────────────────────────────────────────────────────┐
 │                        Supabase                                  │
 │  PostgreSQL · Auth (JWT + Custom Claims) · Realtime · RLS         │
-│  Ordered forward migrations (001-020) · Row-level org isolation   │
+│  Ordered forward migrations (001-075) · Row-level org isolation   │
 └─────────────────────────────────────────────────────────────────┘
 
 External services: Stripe (billing) · Resend (email) · PostHog (analytics)
@@ -226,15 +226,15 @@ A new organization's 14-day trial clock starts on the **first super admin login*
 
 ### Migration Strategy
 
-Database history is an immutable, ordered migration stream under `supabase/migrations/`. Migrations `001`-`004` are the frozen baseline; every later schema change is a new, retry-safe `NNN_snake_case.sql` at the next number (currently through `027`), and `checksums.sha256` locks every reviewed file (`npm run db:migrations:check`). Never edit an applied migration and never mirror a change back into the baseline.
+Database history is an immutable, ordered migration stream under `supabase/migrations/`. Migrations `001`-`004` are the frozen baseline; every later schema change is a new, retry-safe `NNN_snake_case.sql` at the next number (currently through `075`), and `checksums.sha256` locks every reviewed file (`npm run db:migrations:check`). Never edit an applied migration and never mirror a change back into the baseline.
 
-| File                         | Contents                                                                                                                                                                                                                                                                                                                                                 |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `001_schema.sql`             | Baseline: enums, tables, foreign keys, indexes, realtime                                                                                                                                                                                                                                                                                                 |
-| `002_functions_triggers.sql` | Baseline: functions, triggers, auth hooks, RPCs                                                                                                                                                                                                                                                                                                          |
-| `003_rls_policies.sql`       | Baseline: RLS enable statements + all policies                                                                                                                                                                                                                                                                                                           |
-| `004_grants.sql`             | Baseline: grants for anon, authenticated, service_role, supabase_auth_admin                                                                                                                                                                                                                                                                              |
-| `005`-`020`                  | Forward migrations: live-membership guard, atomic notification and mobile-employee mutations, calendar feed tokens, invitation replacement and hardened acceptance, schedule editor session terminations, schedule notes requiring a shift, authorization and effective-tenant hardening, the scheduler-staffed call-off trigger and its publish repairs |
+| File                         | Contents                                                                                                                                                                                                                                    |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `001_schema.sql`             | Baseline: enums, tables, foreign keys, indexes, realtime                                                                                                                                                                                    |
+| `002_functions_triggers.sql` | Baseline: functions, triggers, auth hooks, RPCs                                                                                                                                                                                             |
+| `003_rls_policies.sql`       | Baseline: RLS enable statements + all policies                                                                                                                                                                                              |
+| `004_grants.sql`             | Baseline: grants for anon, authenticated, service_role, supabase_auth_admin                                                                                                                                                                 |
+| `005`-`075`                  | Forward migrations: membership and invitation hardening, draft and schedule recovery, mobile and notification writes, session and credential controls, tenant authorization, schedule notes, requests, publishing, and Gridmaster authority |
 
 Migrations are applied by ledger (`supabase db push`, Supabase branching, or the local `db:reset`), never by dropping and replaying the schema on production. `supabase/patches/` holds historical one-time production patches as evidence only. The runbook is `internal/operations/production-migration-safety.md`; `npm run db:migrations:inspect` is the read-only ledger and invariant check.
 

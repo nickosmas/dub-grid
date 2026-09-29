@@ -1,5 +1,10 @@
 # DubGrid
 
+> **Planning snapshot (framed 2026-09-29):** This PRD records product intent
+> and the implementation snapshot identified in its dated sections. Current
+> technical behavior is documented in `ARCHITECTURE.md`, `SECURITY.md`, and
+> `internal/api-reference.md`.
+
 ## Multi-Tenant Employee Scheduling Platform
 
 ### Product Requirements Document · v4.0

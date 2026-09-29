@@ -29,7 +29,10 @@
               "features/recurring-shifts",
               "features/real-time-collaboration",
               "features/shift-requests",
-              "features/dashboard"
+              "features/dashboard",
+              "features/alerts",
+              "features/reports",
+              "features/mobile-navigation"
             ]
           },
           {
@@ -37,13 +40,24 @@
             "pages": ["staff/roster", "staff/detail-page", "staff/invitations"]
           },
           {
+            "group": "Your Account",
+            "pages": [
+              "account/profile",
+              "account/security-and-sessions",
+              "account/notification-privacy-and-data-controls"
+            ]
+          },
+          {
             "group": "Configuration",
             "pages": [
               "configuration/organization",
-              "configuration/shift-codes",
-              "configuration/focus-areas",
+              "configuration/shifts-jobs-and-absences",
+              "configuration/schedule-rules-and-display",
+              "configuration/departments-and-focus-areas",
+              "configuration/roles-certifications-and-indicators",
               "configuration/coverage-requirements",
-              "configuration/terminology"
+              "configuration/terminology",
+              "configuration/organization-activity-and-controls"
             ]
           }
         ]
@@ -57,14 +71,41 @@
           },
           {
             "group": "Billing",
-            "pages": ["reference/billing", "reference/subscription"]
+            "pages": ["reference/billing"]
           },
           {
-            "group": "API",
-            "pages": ["reference/api-overview", "reference/calendar-export"]
+            "group": "Integrations",
+            "pages": ["reference/integrations-and-exports"]
           }
         ]
       }
     ]
-  }
+  },
+  "redirects": [
+    {
+      "source": "/configuration/focus-areas",
+      "destination": "/configuration/departments-and-focus-areas",
+      "permanent": true
+    },
+    {
+      "source": "/configuration/shift-codes",
+      "destination": "/configuration/shifts-jobs-and-absences",
+      "permanent": true
+    },
+    {
+      "source": "/reference/subscription",
+      "destination": "/reference/billing",
+      "permanent": true
+    },
+    {
+      "source": "/reference/api-overview",
+      "destination": "/reference/integrations-and-exports",
+      "permanent": true
+    },
+    {
+      "source": "/reference/calendar-export",
+      "destination": "/reference/integrations-and-exports",
+      "permanent": true
+    }
+  ]
 }

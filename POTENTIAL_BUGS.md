@@ -1,5 +1,9 @@
 # Bug and Edge-Case Hunt — DubGrid
 
+> **Point-in-time record (framed 2026-09-29):** This preserves findings and
+> their resolutions as of the dates below. For current behavior, consult
+> `ARCHITECTURE.md`, `SECURITY.md`, and `internal/authentication.md`.
+
 **Date:** 2026-05-23 (last reconciled 2026-09-19)
 
 Proactive sweep across rendering/config, middleware, API/data, auth/session/React,

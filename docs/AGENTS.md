@@ -21,10 +21,12 @@ Run documentation checks from the repository root:
   only when intentionally accepting a source change.
 - `npm run docs:check` performs the fast, read-only documentation contract
   check.
+- `npm run docs:check:closed` performs the same check and rejects a planned,
+  pending, or otherwise unverified manifest entry.
 - `npm run docs:validate` runs Mintlify configuration and MDX validation.
 - `npm run docs:links` runs Mintlify's broken-link check.
-- `npm run docs:verify` runs all read-only documentation checks in release
-  order. It never regenerates the inventory.
+- `npm run docs:verify` runs the strict contract, Mintlify validation, and
+  broken-link checks in release order. It never regenerates the inventory.
 
 Do not edit generated files under `internal/documentation/generated/` by hand.
 Do not present a pending or planned manifest entry as verified current truth.

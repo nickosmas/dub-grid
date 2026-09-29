@@ -1,42 +1,55 @@
 ---
 title: "Shift Requests"
-description: "Staff can request to pick up open shifts or propose swaps with colleagues, with admin approval at every step."
+description: "Offer a shift for pickup, swap with a colleague, or ask for time off, and how managers approve requests."
 ---
 
-Shift requests give staff members a way to pick up extra shifts or trade shifts with colleagues. Admins review and approve or reject requests through the **Shift Request Board**.
+Staff ask for schedule changes through requests instead of editing the schedule. There are three kinds:
 
-## Request types
+| Request      | What it means                                                                               |
+| ------------ | ------------------------------------------------------------------------------------------- |
+| **Pickup**   | You offer your shift for a teammate to take, or offer to cover a specific teammate's shift. |
+| **Swap**     | You ask a teammate to trade shifts with you.                                                |
+| **Time off** | You call off a shift you can't work.                                                        |
 
-**Pickup requests** - An employee requests to pick up a shift that is currently open (unassigned). The request goes to an admin for approval.
+## Making a request
 
-**Swap requests** - An employee proposes to swap one of their existing shifts with a colleague. Both the colleague and an admin must approve before the swap takes effect.
+**On the web**, select your shift on the schedule (or right-click it) and choose **Drop shift**, then **Offer for pickup** or call off, or choose **Swap** and pick the teammate. **In the DubGrid app**, open your shift and use **Drop shift** or **Swap**.
 
-## Request lifecycle
+You can cancel your own request while it's still open or awaiting approval, with **Cancel request**.
 
-Each request moves through a defined set of statuses from creation to resolution.
+## How a request moves
 
-| Status             | Meaning                                                                           |
-| ------------------ | --------------------------------------------------------------------------------- |
-| `open`             | The request has been submitted and is waiting for the involved parties to respond |
-| `pending_approval` | All parties have agreed, the request is awaiting final admin approval             |
-| `approved`         | An admin has approved the request; the schedule change is applied as a draft      |
-| `rejected`         | An admin has rejected the request                                                 |
-| `cancelled`        | The requesting employee cancelled their own request                               |
-| `expired`          | The request was not resolved before its expiration deadline                       |
+| Status                | Meaning                                                                                                        |
+| --------------------- | -------------------------------------------------------------------------------------------------------------- |
+| **Open**              | Waiting for a teammate: someone to take the pickup, or the teammate you asked to accept the swap.              |
+| **Awaiting approval** | Waiting for a manager. A time-off request starts here.                                                         |
+| **Approved**          | The change is on the published schedule.                                                                       |
+| **Rejected**          | A manager declined it, or the teammate you asked declined.                                                     |
+| **Cancelled**         | The person who asked cancelled it.                                                                             |
+| **Expired**           | Nobody settled it within 72 hours of the request. Automatic expiry may not be available in every organization. |
 
-<Note>
-  Staff can cancel their own requests at any time while the request is still in `open` or
-  `pending_approval` status.
-</Note>
+- A **pickup** you offer stays open until a teammate claims it; then it waits for approval.
+- A **swap** or a pickup offered to a named teammate waits for that teammate to **Accept** or **Decline** first.
+- When a manager **Approves**, the change goes straight onto the published schedule, with no draft to publish. A manager who is part of the request themselves has it approved automatically.
+- An approved time-off request leaves the shift open. When a scheduler fills it in a draft and publishes, the time off is settled.
 
-## Admin approval
+## Where requests live
 
-Admins with the `canApproveShiftRequests` permission can access the **Shift Request Board** from the schedule toolbar. The board lists all active requests and allows filtering by status and request type.
+**On the web**, open **Schedule**, then **Tools** and **Requests**. The board has four tabs:
 
-To approve or reject a request:
+- **Available Shifts**: shifts offered for pickup that you can claim.
+- **My Requests**: the requests you made or were asked to accept.
+- **Approval Queue**: requests waiting for a manager, if you can approve requests. Editors who can't approve see **All Requests** instead.
+- **History**: settled requests, filtered by type and outcome.
 
-1. Open the **Shift Request Board**.
-2. Locate the request you want to act on.
-3. Click **Approve** or **Reject**.
+Your **Dashboard** also shows cover requests and available shifts.
 
-Approved shift changes are applied to the schedule as drafts and must be published before they are visible to all staff.
+**In the DubGrid app**, the **Requests** tab has **Available**, **All**, **Mine**, **Approval**, and **History**. You see the tab if you're on the schedule or can approve requests.
+
+## Alerts
+
+You get an alert when a request that involves you is made, approved, rejected, or expires.
+
+## Who can approve
+
+Super Admins can approve any request. Admins can when their Super Admin gives them permission to approve shift requests.

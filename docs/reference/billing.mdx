@@ -1,48 +1,33 @@
 ---
-title: "Billing"
-description: "How DubGrid's seat-based billing works and how to subscribe."
+title: "Billing and Subscription"
+description: "Your free trial, subscribing, seats, and what happens when billing needs attention."
 ---
 
-DubGrid uses seat-based subscription billing. Your subscription quantity is based on the number of members in your organization.
+Billing is for Super Admins only, on the web, under **Settings > Subscription**. It shows your subscription status, app users, billed seats, and your trial or renewal dates.
 
 ## Your free trial
 
-Every new organization gets a 14-day free trial. It starts automatically the first time a Super Admin signs in, so there is nothing to activate and no payment details to enter to begin.
+Your organization's 14-day free trial starts the first time a Super Admin signs in, with no payment details needed. Until then, other members see that the organization opens once an administrator finishes setup.
 
-When the trial ends, your organization needs an active subscription to keep full access. You can subscribe at any point during the trial.
+After setup, a **Your trial has started!** message shows how many days are left, with **Set up billing** or **Maybe later**. In the last seven days, Settings reminds you that the trial is ending. When the trial ends, you have **3 extra days** to add billing before the organization is locked.
 
-<Note>
-  Subscribing ends the trial and starts billing immediately. Stripe checkout does not add a second
-  free period on top of your in-app trial, so subscribe when you are ready rather than on day one.
-</Note>
+## Subscribing
 
-## Who can access billing
+In **Settings > Subscription**, select **Start subscription**, enter a billing contact email, and complete checkout with our payment provider. Your subscription starts straight away; there's no second trial on top of the one you had. Billing is monthly, per seat.
 
-Only Super Admins can view and manage billing. Admins, whatever other permissions they have been granted, cannot open billing settings or start a subscription.
+**Seats** count your active staff plus members who don't have a staff record. The number of seats is set when you subscribe; if your team grows or shrinks, the subscription page shows the difference between app users and billed seats.
 
-## How to subscribe
+Once you're subscribed, **Manage billing** opens our payment provider's billing page, where you manage your payment details and subscription.
 
-<Steps>
-  <Step title="Open billing settings">
-    Go to **Settings → Billing** in your organization dashboard.
-  </Step>
-  <Step title="Start the upgrade">Click **Upgrade** or **Subscribe**.</Step>
-  <Step title="Complete checkout">
-    You are redirected to the Stripe checkout page. Enter your payment details and confirm your
-    purchase.
-  </Step>
-  <Step title="Subscription activated">
-    After a successful payment, your subscription is activated immediately and your organization
-    gets full access.
-  </Step>
-</Steps>
+## When billing needs attention
 
-## Seats
+| Situation                                                                                 | What happens                                                             |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| **Trial ending soon**                                                                     | A reminder in Settings.                                                  |
+| **Trial ended**                                                                           | A reminder to add billing before the 3 extra days run out.               |
+| **Payment needs attention** (a payment failed or is incomplete)                           | A notice asks you to update your payment details. Everyone keeps access. |
+| **Locked** (the trial and extra days are over, or the subscription is canceled or unpaid) | The organization is on hold until billing is restored.                   |
 
-Your subscription quantity corresponds to the number of members in your organization. DubGrid calculates the seat count automatically when you start checkout.
+While the organization is locked, Super Admins go straight to **Settings > Subscription** to fix it. Everyone else sees **Organization unavailable**: "This organization is on hold until an administrator sorts out its billing." with **Check again**, which also re-checks on its own.
 
-<Note>
-  Billing is handled through Stripe's secure checkout. DubGrid never stores your card details.
-</Note>
-
-<Tip>To check your current subscription status, see [Subscription](/reference/subscription).</Tip>
+Billing actions may not be available in every organization. Deleting your organization cancels its subscription; see [Activity log and deleting an organization](/configuration/organization-activity-and-controls).
