@@ -24,6 +24,8 @@ On the **Schedule** tab, open **Tools** and select **Auto Fill**. DubGrid counts
 
 Auto Fill only fills empty slots: it never overwrites a shift already on the schedule. Everything it adds is a draft, so review it and [publish](/features/draft-publish) when you're ready.
 
+Auto Fill leaves a cell empty when it already has a visible entry, the recurring pattern is outside its effective date range, or it refers to an archived shift, job, or absence type. Review the resulting coverage gaps instead of assuming every recurring pattern was applied.
+
 ## Repeating shifts
 
 Select a cell on the schedule, choose the shift, and open the panel's **Repeating** section:
@@ -38,6 +40,8 @@ Select a cell on the schedule, choose the shift, and open the panel's **Repeatin
 A repeating shift runs for at most 183 occurrences, about six months. Its shifts are drafts until published.
 
 To remove a repeating shift, delete the series and confirm **Delete Shift Series?**. Its shifts are marked for deletion and come off the schedule when you publish.
+
+Changing or deleting a series affects only its generated shifts. It does not replace a different shift that was already on the schedule.
 
 ## Who can do what
 

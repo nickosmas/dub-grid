@@ -383,7 +383,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:024d03e6f7db3130ac376c17af10806d6ddfe28848ecd007fffd95d771b0fdea"
+      "evidenceFingerprint": "sha256:645800a513ff054031a806deb8bfce218a85a6d68d10f136aaf1e310645483ab"
     },
     {
       "id": "draft-publish",
@@ -440,7 +440,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:f9b9cbec602408ea7be756d2a5ddab174091819e876dfa4c33c383fcce7a6b54"
+      "evidenceFingerprint": "sha256:c1c2a4fa524e80de976ca422335eb4900f80368b7b657b66347a8373cd291d1e"
     },
     {
       "id": "recurring-shifts",
@@ -491,7 +491,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:1f52deb44a545d13a7297a0213d58ea6c8edaea07911a348b4ce1667086fd6a9"
+      "evidenceFingerprint": "sha256:ed595d9f40ebf984f41bdf5f3225d6145872bfaa1b2715794dc008f04ab8b2a3"
     },
     {
       "id": "realtime",
@@ -538,7 +538,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:9dd3f6af47812f4bff63710a7612ffb9c6939f9fa9dd2e11142becd1c6613d42"
+      "evidenceFingerprint": "sha256:318fdced272f29f4c10ffda29c6c196e7cc7c87169b3b5a349cb59b67fb64b37"
     },
     {
       "id": "shift-requests",
@@ -980,7 +980,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:4f4dd36fc4e2ccd9a3c69bf50a0dd2537e7d16384f5ddaa0f1636bd6d3159958"
+      "evidenceFingerprint": "sha256:62f1b1d080d051f6633d939763099f1f812546ed65b8713db6beca0521e1b97b"
     },
     {
       "id": "terminology",
@@ -1267,7 +1267,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:483d6c21edc7cd87a817abf5a9b66ffd69de8fdbc0ea0ac061cd3d24db18bc58"
+      "evidenceFingerprint": "sha256:e03c3809a5aaac1062526909368e9e6239b9354581aa26418ceb4bbe8852f76b"
     },
     {
       "id": "alerts",
@@ -1697,7 +1697,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:ae9eff32ccea333d85c29f10063908d9ae4b731c7897c653c52b40867dba239b"
+      "evidenceFingerprint": "sha256:ca0d6bd4ea31aa7f99c325a5ca6e3f4e682d65c68ee141ab2d0a420f25751050"
     },
     {
       "id": "organization-activity-controls",
@@ -1863,6 +1863,161 @@
         }
       ],
       "evidenceFingerprint": "sha256:623c93113fc5a3f193000e4d6f2ce494cf64dba8a3589ed091019d65fe86752d"
+    },
+    {
+      "id": "schedule-tools",
+      "file": "docs/features/schedule-tools.mdx",
+      "publicRoute": "/features/schedule-tools",
+      "deliveryOwner": "40e",
+      "lifecycle": "published",
+      "sourceReview": "verified",
+      "audiences": [
+        "staff",
+        "admin"
+      ],
+      "platforms": {
+        "web": "required",
+        "ios": "not-applicable",
+        "android": "not-applicable"
+      },
+      "surfaceIds": [],
+      "sections": [
+        {
+          "id": "reuse-review-output",
+          "claims": [
+            "import previous schedule creates drafts in the current period",
+            "Auto Fill is separate and fills empty slots from recurring schedules",
+            "Bulk Delete Entries is desktop week-view-only and creates deletion drafts",
+            "print options, schedule CSV export, Authors, and Publish History are management tools"
+          ],
+          "sourceFiles": [
+            "apps/web/src/app/(app)/schedule/SchedulePageClient.tsx",
+            "apps/web/src/app/(app)/schedule/_hooks/useScheduleImport.ts",
+            "apps/web/src/app/(app)/schedule/_components/BulkDeleteReviewContent.tsx",
+            "apps/web/src/components/PrintOptionsModal.tsx",
+            "apps/web/src/components/PrintScheduleView.tsx",
+            "apps/web/src/app/api/schedule/publish-history/route.ts"
+          ],
+          "testFiles": [
+            "apps/web/src/app/(app)/schedule/_lib/import-cell-keys.test.ts",
+            "apps/web/src/app/(app)/schedule/_components/BulkDeleteReviewContent.test.tsx",
+            "apps/web/src/__tests__/PrintOptionsModal.test.tsx",
+            "apps/web/src/__tests__/PrintScheduleView.test.tsx",
+            "apps/web/src/app/api/schedule/publish-history/route.test.ts"
+          ],
+          "runtimeScenarios": [
+            "management tools available",
+            "tools unavailable to staff"
+          ],
+          "exclusions": [
+            "mobile schedule authoring and publication are web-only"
+          ]
+        }
+      ],
+      "evidenceFingerprint": "sha256:a813220157cad756f6acf7e404efadca05bed692fe93202153e61739f6afbd23"
+    },
+    {
+      "id": "coverage-open-shifts",
+      "file": "docs/features/coverage-and-open-shifts.mdx",
+      "publicRoute": "/features/coverage-and-open-shifts",
+      "deliveryOwner": "40e",
+      "lifecycle": "published",
+      "sourceReview": "verified",
+      "audiences": [
+        "staff",
+        "admin"
+      ],
+      "platforms": {
+        "web": "required",
+        "ios": "not-applicable",
+        "android": "not-applicable"
+      },
+      "surfaceIds": [],
+      "sections": [
+        {
+          "id": "coverage-open-shifts",
+          "claims": [
+            "editors see working coverage while staff see published coverage",
+            "open-shift staffing checks focus area, role, certification, absence, and overlap",
+            "eligible staff can offer to cover a visible open shift through a pickup request",
+            "call-off vacancies follow the Organization's visibility setting"
+          ],
+          "sourceFiles": [
+            "apps/web/src/app/(app)/schedule/SchedulePageClient.tsx",
+            "apps/web/src/app/(app)/schedule/_lib/open-shifts.ts",
+            "apps/web/src/app/(app)/schedule/_lib/open-shift-staffing.ts",
+            "apps/web/src/components/CoveragePanel.tsx",
+            "apps/web/src/components/settings/ScheduleRules.tsx"
+          ],
+          "testFiles": [
+            "apps/web/src/app/(app)/schedule/_lib/open-shifts.test.ts",
+            "apps/web/src/app/(app)/schedule/_lib/open-shift-staffing.test.ts",
+            "apps/web/src/__tests__/CoveragePanel.test.tsx",
+            "apps/web/src/__tests__/scheduler-staffing-sql.test.ts"
+          ],
+          "runtimeScenarios": [
+            "staff viewing published coverage",
+            "editor filling an open shift",
+            "call-off vacancy visible"
+          ],
+          "exclusions": [
+            "native proof belongs to 40e3"
+          ]
+        }
+      ],
+      "evidenceFingerprint": "sha256:998ca63e1962fc04c6204898fc86506d158f913ef4007c15d195890f112a655d"
+    },
+    {
+      "id": "mobile-schedule",
+      "file": "docs/features/mobile-schedule.mdx",
+      "publicRoute": "/features/mobile-schedule",
+      "deliveryOwner": "40e",
+      "lifecycle": "published",
+      "sourceReview": "verified",
+      "audiences": [
+        "staff",
+        "admin"
+      ],
+      "platforms": {
+        "web": "not-applicable",
+        "ios": "required",
+        "android": "required"
+      },
+      "surfaceIds": [],
+      "sections": [
+        {
+          "id": "mobile-schedule-actions",
+          "claims": [
+            "week and month navigation with focus-area filtering",
+            "shift detail shows schedule facts and supports drop, pickup, call-off, and swap requests",
+            "mobile schedule surfaces explain loading, unavailable, unlinked, error, and retry states",
+            "schedule authoring and publication remain web-only"
+          ],
+          "sourceFiles": [
+            "apps/mobile/src/features/schedule/screens/ScheduleScreen.tsx",
+            "apps/mobile/src/features/schedule/screens/ShiftDetailScreen.tsx",
+            "apps/mobile/src/features/schedule/lib/schedule.ts",
+            "apps/mobile/src/features/shift-requests/screens/RequestsScreen.tsx"
+          ],
+          "testFiles": [
+            "apps/mobile/src/features/schedule/screens/ScheduleScreen.test.tsx",
+            "apps/mobile/src/features/schedule/screens/ShiftDetailScreen.test.tsx",
+            "apps/mobile/src/features/schedule/lib/schedule.test.ts",
+            "apps/mobile/src/features/shift-requests/screens/RequestsScreen.test.tsx"
+          ],
+          "runtimeScenarios": [
+            "loaded schedule",
+            "loading schedule",
+            "empty schedule",
+            "schedule error",
+            "offline retry"
+          ],
+          "exclusions": [
+            "native device proof belongs to 40e3"
+          ]
+        }
+      ],
+      "evidenceFingerprint": "sha256:616e22fb720dcd17c6807b26d8a359b63121d5123645d9431890283122139daf"
     },
     {
       "id": "integrations-exports",

@@ -6,12 +6,6 @@
   "colors": {
     "primary": "#2663EB"
   },
-  "navbar": {
-    "primary": {
-      "type": "github",
-      "href": "https://github.com/nickosmas/dub-grid"
-    }
-  },
   "navigation": {
     "tabs": [
       {
@@ -22,17 +16,25 @@
             "pages": ["introduction", "quickstart", "onboarding"]
           },
           {
-            "group": "Core Features",
+            "group": "Schedule and staffing",
             "pages": [
               "features/schedule-grid",
+              "features/schedule-tools",
+              "features/coverage-and-open-shifts",
               "features/draft-publish",
               "features/recurring-shifts",
               "features/real-time-collaboration",
-              "features/shift-requests",
+              "features/shift-requests"
+            ]
+          },
+          {
+            "group": "Stay informed",
+            "pages": [
               "features/dashboard",
               "features/alerts",
               "features/reports",
-              "features/mobile-navigation"
+              "features/mobile-navigation",
+              "features/mobile-schedule"
             ]
           },
           {
