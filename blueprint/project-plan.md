@@ -154,10 +154,10 @@ Shipped capabilities and active roadmap (see `build-plan.md` for status):
   endpoints stay internal, and future drift fails verification.
 
 Items 1 through 39 and 41 through 43 are shipped. Item 40, documentation truth
-and drift prevention, is in progress: the source inventory and contract (40a)
-and every public guide (40b, 40c) are verified against source; the engineering
-references (40d) and cross-platform qualification with permanent drift gates
-(40e) remain. Item 40e cannot complete without recorded iOS and Android
+and drift prevention, is in progress: the source inventory and contract (40a),
+every public guide (40b, 40c), and the engineering references (40d) are
+verified against source. Cross-platform qualification with permanent drift gates
+(40e) remains. Item 40e cannot complete without recorded iOS and Android
 runtime evidence.
 
 ## 4. Data - What are we storing?

@@ -47,4 +47,11 @@ if [ -n "$LINT_FILES" ]; then
   fi
 fi
 
+echo "pre-commit: documentation contract"
+if ! npm run docs:check:closed --silent; then
+  echo
+  echo "  Documentation contract failed. Update the inventory or evidence before committing."
+  exit 1
+fi
+
 exit 0

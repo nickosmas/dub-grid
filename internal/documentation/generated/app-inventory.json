@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:a7918401b4a7dfa212ed9308f33efa264746c07745ad6f35debf398596a6a664",
+  "sourceDigest": "sha256:318bafd0c22cfc5a58db93f8f8468625ad598db54a38fcc488325c7d0befcba8",
   "webRoutes": [
     {
       "id": "web:/",
@@ -7615,6 +7615,16 @@
       }
     },
     {
+      "id": "script:root:docs:check:closed",
+      "package": "root",
+      "workspacePath": ".",
+      "name": "docs:check:closed",
+      "command": "npm run docs:check -- --require-closed",
+      "source": {
+        "path": "package.json"
+      }
+    },
+    {
       "id": "script:root:docs:fingerprint",
       "package": "root",
       "workspacePath": ".",
@@ -7659,7 +7669,7 @@
       "package": "root",
       "workspacePath": ".",
       "name": "docs:verify",
-      "command": "npm run docs:check && npm run docs:validate && npm run docs:links",
+      "command": "npm run docs:check:closed && npm run docs:validate && npm run docs:links",
       "source": {
         "path": "package.json"
       }
@@ -8092,6 +8102,13 @@
       "scriptId": "script:root:docs:check",
       "invocation": "npm run docs:check",
       "audience": "developer",
+      "status": "supported"
+    },
+    {
+      "id": "command:root:docs:check:closed",
+      "scriptId": "script:root:docs:check:closed",
+      "invocation": "npm run docs:check:closed",
+      "audience": "ci",
       "status": "supported"
     },
     {

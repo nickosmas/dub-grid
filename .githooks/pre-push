@@ -30,4 +30,11 @@ if ! npm test --silent; then
   exit 1
 fi
 
+echo "pre-push: documentation verification"
+if ! npm run docs:verify --silent; then
+  echo
+  echo "  Documentation verification failed. Push blocked."
+  exit 1
+fi
+
 exit 0

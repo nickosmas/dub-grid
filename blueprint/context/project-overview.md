@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash b5d523fed3103cbbc315c940ba71258f2c9b07f42da2e94c5c42cc426593fe70 -->
+<!-- blueprint:source-hash 1c82ee55025d1acc1690d565ff715e564129dc7591c004fe577c72d5cb0b2bf7 -->
 
 > Multi-tenant employee scheduling for care facilities, delivered through a
 > connected Next.js web app and Expo mobile app.
@@ -87,9 +87,14 @@ Item 40 is split:
   guides:** shipped; every public page is verified against source, and the
   replaced pages redirect.
 - **40d - Current engineering, architecture, security, and operations
-  references:** in progress.
+  references:** shipped.
 - **40e - Cross-platform runtime qualification and permanent drift gates:**
-  planned; requires recorded iOS and Android evidence.
+  in progress; requires recorded iOS and Android evidence.
+  - **40e1 - Closed documentation contract and drift gates:** in progress.
+  - **40e2 - Isolated migration readiness qualification:** planned.
+  - **40e3 - Web browser role and state qualification:** planned.
+  - **40e4 - Native iOS and Android qualification:** planned; Android evidence
+    is mandatory.
 
 Public documentation covers customer behavior only. Gridmaster tooling, Test
 Sandbox, feature flags, migrations, environment variables, and internal HTTP

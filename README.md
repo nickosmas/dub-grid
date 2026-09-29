@@ -206,63 +206,64 @@ seed.ts                             # Root seed runner (executes the SQL seed fi
 
 ## Available Scripts
 
-| Script                                | Description                                                  |
-| ------------------------------------- | ------------------------------------------------------------ |
-| `npm run dev`                         | Start the web app through TurboRepo                          |
-| `npm run dev:web`                     | Start the Next.js web app through TurboRepo                  |
-| `npm run dev:web:lan`                 | Start the Next.js web app on `0.0.0.0` for phone access      |
-| `npm run dev:webpack`                 | Start the web app with the Webpack dev server                |
-| `npm run dev:mobile`                  | Start the Expo mobile app in LAN mode                        |
-| `npm run dev:mobile:phone`            | Start the Expo mobile app in tunnel mode for Expo Go         |
-| `npm run dev:mobile:lan`              | Start the Expo mobile app in LAN mode                        |
-| `npm run build`                       | Dependency-aware production build for the web app            |
-| `npm run build:packages`              | Build all `packages/*` workspaces (tsc → `dist/`)            |
-| `npm run start`                       | Start the web production server                              |
-| `npm run lint`                        | Run ESLint                                                   |
-| `npm run lint:rules`                  | Run the `node:test` rule tests in `eslint-rules/`            |
-| `npm run format`                      | Rewrite files with Prettier                                  |
-| `npm run format:check`                | Check Prettier formatting without writing files              |
-| `npm run hooks:install`               | Point `core.hooksPath` at `.githooks/` (once per clone)      |
-| `npm run type-check`                  | Run workspace type-checks through TurboRepo, then the root   |
-| `npm test`                            | Run workspace tests through TurboRepo                        |
-| `npm run test:web`                    | Run web workspace tests                                      |
-| `npm run test:mobile`                 | Run mobile, contracts, and schedule-core workspace tests     |
-| `npm run test:e2e`                    | Run Playwright end-to-end tests                              |
-| `npm run test:e2e:ui`                 | Run Playwright tests with interactive UI                     |
-| `npm run test:e2e:production`         | Run Playwright against a local production build              |
-| `npm run test:load`                   | Run the k6 schedule load test                                |
-| `npm run test:load:auth`              | Run the k6 auth-flow load test                               |
-| `npm run test:load:stress`            | Run the k6 schedule load test in stress mode                 |
-| `npm run test:load:schedule`          | Run the k6 schedule load test with signed-in users           |
-| `npm run measure:auth:web`            | Measure web sign-in entry timings with Playwright            |
-| `npm run measure:auth:mobile`         | Summarize captured mobile auth-entry measurements            |
-| `npm run analyze`                     | Build the web app with bundle analysis                       |
-| `npm run gen:types`                   | Deprecated: writes the removed `database.types.ts`           |
-| `npm run seed`                        | Seed the local database (runs `seed.ts` → SQL seed files)    |
-| `npm run db:reset`                    | Reset local Supabase DB (runs migrations + seed)             |
-| `npm run db:reset:mobile`             | Reset the local DB and Android mobile storage                |
-| `npm run db:reset:remote`             | Destructively reset an explicitly non-production remote      |
-| `npm run db:reset:staging`            | Same as above, reading `.env.staging`                        |
-| `npm run db:seed:branch`              | Seed a Supabase preview branch (`DATABASE_URL` from env)     |
-| `npm run db:migrations:check`         | Validate the local ordered migration inventory               |
-| `npm run db:migrations:inspect`       | Read-only linked-production ledger/schema qualification      |
-| `npm run db:migrations:inspect:local` | Read-only local ledger/schema qualification                  |
-| `npm run auth:templates:check`        | Diff the compiled auth email templates against remote        |
-| `npm run auth:templates:push`         | Push the compiled auth email templates to remote Supabase    |
-| `npm run docs:inventory`              | Regenerate the source-derived documentation inventory        |
-| `npm run docs:check`                  | Check the inventory, manifest, and page fingerprints         |
-| `npm run docs:fingerprint`            | Record reviewed pages' fingerprints in the accuracy manifest |
-| `npm run docs:validate`               | Validate the Mintlify site in `docs/`                        |
-| `npm run docs:links`                  | Check the Mintlify site for broken links                     |
-| `npm run docs:verify`                 | Run `docs:check`, `docs:validate`, and `docs:links`          |
-| `node scripts/doctor-mobile.mjs`      | Diagnose the mobile app's local environment setup            |
-| `npm run use:local`                   | Switch .env.local to local Supabase credentials              |
-| `npm run use:mobile:local`            | Generate `apps/mobile/.env.local` for local phone testing    |
-| `npm run use:mobile:remote`           | Copy remote mobile envs into `apps/mobile/.env.local`        |
-| `npm run use:remote`                  | Switch .env.local to remote Supabase credentials             |
-| `npm run deps:audit`                  | Run the dependency advisory check                            |
-| `npm run deps:scan`                   | Run the supply-chain scan                                    |
-| `npm run deps:rebuild`                | Rebuild the allowlisted native dependencies                  |
+| Script                                | Description                                                   |
+| ------------------------------------- | ------------------------------------------------------------- |
+| `npm run dev`                         | Start the web app through TurboRepo                           |
+| `npm run dev:web`                     | Start the Next.js web app through TurboRepo                   |
+| `npm run dev:web:lan`                 | Start the Next.js web app on `0.0.0.0` for phone access       |
+| `npm run dev:webpack`                 | Start the web app with the Webpack dev server                 |
+| `npm run dev:mobile`                  | Start the Expo mobile app in LAN mode                         |
+| `npm run dev:mobile:phone`            | Start the Expo mobile app in tunnel mode for Expo Go          |
+| `npm run dev:mobile:lan`              | Start the Expo mobile app in LAN mode                         |
+| `npm run build`                       | Dependency-aware production build for the web app             |
+| `npm run build:packages`              | Build all `packages/*` workspaces (tsc → `dist/`)             |
+| `npm run start`                       | Start the web production server                               |
+| `npm run lint`                        | Run ESLint                                                    |
+| `npm run lint:rules`                  | Run the `node:test` rule tests in `eslint-rules/`             |
+| `npm run format`                      | Rewrite files with Prettier                                   |
+| `npm run format:check`                | Check Prettier formatting without writing files               |
+| `npm run hooks:install`               | Point `core.hooksPath` at `.githooks/` (once per clone)       |
+| `npm run type-check`                  | Run workspace type-checks through TurboRepo, then the root    |
+| `npm test`                            | Run workspace tests through TurboRepo                         |
+| `npm run test:web`                    | Run web workspace tests                                       |
+| `npm run test:mobile`                 | Run mobile, contracts, and schedule-core workspace tests      |
+| `npm run test:e2e`                    | Run Playwright end-to-end tests                               |
+| `npm run test:e2e:ui`                 | Run Playwright tests with interactive UI                      |
+| `npm run test:e2e:production`         | Run Playwright against a local production build               |
+| `npm run test:load`                   | Run the k6 schedule load test                                 |
+| `npm run test:load:auth`              | Run the k6 auth-flow load test                                |
+| `npm run test:load:stress`            | Run the k6 schedule load test in stress mode                  |
+| `npm run test:load:schedule`          | Run the k6 schedule load test with signed-in users            |
+| `npm run measure:auth:web`            | Measure web sign-in entry timings with Playwright             |
+| `npm run measure:auth:mobile`         | Summarize captured mobile auth-entry measurements             |
+| `npm run analyze`                     | Build the web app with bundle analysis                        |
+| `npm run gen:types`                   | Deprecated: writes the removed `database.types.ts`            |
+| `npm run seed`                        | Seed the local database (runs `seed.ts` → SQL seed files)     |
+| `npm run db:reset`                    | Reset local Supabase DB (runs migrations + seed)              |
+| `npm run db:reset:mobile`             | Reset the local DB and Android mobile storage                 |
+| `npm run db:reset:remote`             | Destructively reset an explicitly non-production remote       |
+| `npm run db:reset:staging`            | Same as above, reading `.env.staging`                         |
+| `npm run db:seed:branch`              | Seed a Supabase preview branch (`DATABASE_URL` from env)      |
+| `npm run db:migrations:check`         | Validate the local ordered migration inventory                |
+| `npm run db:migrations:inspect`       | Read-only linked-production ledger/schema qualification       |
+| `npm run db:migrations:inspect:local` | Read-only local ledger/schema qualification                   |
+| `npm run auth:templates:check`        | Diff the compiled auth email templates against remote         |
+| `npm run auth:templates:push`         | Push the compiled auth email templates to remote Supabase     |
+| `npm run docs:inventory`              | Regenerate the source-derived documentation inventory         |
+| `npm run docs:check`                  | Check the inventory, manifest, and page fingerprints          |
+| `npm run docs:check:closed`           | Require a fully reviewed, closed documentation contract       |
+| `npm run docs:fingerprint`            | Record reviewed pages' fingerprints in the accuracy manifest  |
+| `npm run docs:validate`               | Validate the Mintlify site in `docs/`                         |
+| `npm run docs:links`                  | Check the Mintlify site for broken links                      |
+| `npm run docs:verify`                 | Run the strict contract, Mintlify validation, and link checks |
+| `node scripts/doctor-mobile.mjs`      | Diagnose the mobile app's local environment setup             |
+| `npm run use:local`                   | Switch .env.local to local Supabase credentials               |
+| `npm run use:mobile:local`            | Generate `apps/mobile/.env.local` for local phone testing     |
+| `npm run use:mobile:remote`           | Copy remote mobile envs into `apps/mobile/.env.local`         |
+| `npm run use:remote`                  | Switch .env.local to remote Supabase credentials              |
+| `npm run deps:audit`                  | Run the dependency advisory check                             |
+| `npm run deps:scan`                   | Run the supply-chain scan                                     |
+| `npm run deps:rebuild`                | Rebuild the allowlisted native dependencies                   |
 
 `npm test` runs the workspace suites in parallel through Turbo. If a resource-constrained machine hits unrelated Vitest timeouts, rerun serially before treating it as a product regression:
 

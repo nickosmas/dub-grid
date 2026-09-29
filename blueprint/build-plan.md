@@ -15,7 +15,7 @@
 - [x] 1. **Multi-tenant organizations** - subdomain-isolated tenants, each
       with its own settings and terminology overrides
 - [x] 2. **Four-tier RBAC** - Gridmaster / Super Admin / Admin / User,
-      with per-person configurable admin permissions (26-key set)
+      with per-person configurable admin permissions (25-key set)
 - [x] 3. **Schedule grid** - drag-drop week / 2-week / month views with a
       draft/publish workflow and recurring shifts
 - [x] 4. **Real-time schedule collaboration** - Supabase Realtime editor
@@ -805,3 +805,17 @@
         qualify migration readiness on an isolated database, close every
         manifest entry, and enforce the fast and full documentation checks in
         hooks and CI. Android evidence is mandatory before completion.
+    - [x] 40e1. **Closed documentation contract and drift gates** - make the
+          strict contract check the canonical fast gate, run the full Mintlify
+          verification before a push and in CI, and reconcile the living
+          Blueprint overview with the completed documentation work.
+    - [ ] 40e2. **Isolated migration readiness qualification** - rehearse the
+          contiguous checksum-locked migration ledger against a local scratch
+          database and record reproducible evidence without touching a remote
+          project.
+    - [ ] 40e3. **Web browser role and state qualification** - execute and
+          retain the documented Chromium, Firefox, and WebKit role/state
+          matrix against the dedicated local E2E environment.
+    - [ ] 40e4. **Native iOS and Android qualification** - record real-device
+          evidence for the required mobile roles and states, including the
+          mandatory Android pass; do not infer unavailable device evidence.
