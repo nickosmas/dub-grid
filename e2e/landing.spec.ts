@@ -20,21 +20,27 @@ const screenshotAlts = [
 // simultaneous /_next/image requests never answered, while ones sent alone
 // came back in milliseconds (run 36385802625, all three attempts). Handing them
 // to the server one at a time still exercises the real optimizer and its URLs.
-// A cold resize can take longer than ten seconds on a loaded CI runner. Let
-// one request use the page's full image-poll window instead of aborting it and
-// placing retries behind the same serialized queue.
+// A cold resize can take longer than ten seconds on a loaded CI runner, but a
+// request can also stall. Retry once after the full image-poll window so one
+// stalled request cannot hold the serialized queue forever.
 const IMAGE_FETCH_TIMEOUT = 30_000;
+const IMAGE_FETCH_ATTEMPTS = 2;
 
 test.beforeEach(async ({ page }) => {
   let queue: Promise<unknown> = Promise.resolve();
   await page.route("**/_next/image?**", (route) => {
     const turn = queue.then(async () => {
-      try {
-        const response = await route.fetch({ timeout: IMAGE_FETCH_TIMEOUT });
-        await route.fulfill({ response });
-      } catch (error) {
-        await route.abort().catch(() => undefined);
-        throw error;
+      for (let attempt = 1; attempt <= IMAGE_FETCH_ATTEMPTS; attempt++) {
+        try {
+          const response = await route.fetch({ timeout: IMAGE_FETCH_TIMEOUT });
+          await route.fulfill({ response });
+          return;
+        } catch (error) {
+          if (attempt === IMAGE_FETCH_ATTEMPTS) {
+            await route.abort().catch(() => undefined);
+            throw error;
+          }
+        }
       }
     });
     queue = turn.catch(() => undefined);
