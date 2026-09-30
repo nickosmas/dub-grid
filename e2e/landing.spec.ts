@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
 // Marketing pages render on the canonical apex. This explicit target keeps the
 // test independent of whichever origin authenticated-flow tests use.
@@ -9,49 +9,40 @@ const apexURL = `http://${baseDomain}:${port}/`;
 // loaded CI runner that has taken longer than the default 5s poll (four of six
 // requests still pending in a failed run). Production serves them from cache.
 const IMAGE_POLL = { timeout: 30_000 } as const;
+const IMAGE_FETCH = { timeout: 30_000 } as const;
+const LANDING_IMAGE_PATH = /^\/landing\/screenshots\/[a-z-]+\.png$/;
 const screenshotAlts = [
   "Calm Haven's two-week staff schedule in DubGrid",
   "Calm Haven's scheduling dashboard with coverage and shift summaries",
   "Calm Haven's team directory in DubGrid",
 ] as const;
-
-// CI serves images through the app's own optimizer (production uses Vercel's),
-// and there a burst of cold resizes has stalled for good: the page's four
-// simultaneous /_next/image requests never answered, while ones sent alone
-// came back in milliseconds (run 36385802625, all three attempts). Handing them
-// to the server one at a time still exercises the real optimizer and its URLs.
-// A cold resize can take longer than ten seconds on a loaded CI runner, but a
-// request can also stall. Retry once after the full image-poll window so one
-// stalled request cannot hold the serialized queue forever.
-const IMAGE_FETCH_TIMEOUT = 30_000;
-const IMAGE_FETCH_ATTEMPTS = 2;
+const mobileHomeAlt =
+  "The DubGrid mobile Home tab with this week's shifts and coverage for Calm Haven";
 
 test.beforeEach(async ({ page }) => {
-  let queue: Promise<unknown> = Promise.resolve();
-  await page.route("**/_next/image?**", (route) => {
-    const turn = queue.then(async () => {
-      for (let attempt = 1; attempt <= IMAGE_FETCH_ATTEMPTS; attempt++) {
-        try {
-          const response = await route.fetch({ timeout: IMAGE_FETCH_TIMEOUT });
-          await route.fulfill({ response });
-          return;
-        } catch (error) {
-          if (attempt === IMAGE_FETCH_ATTEMPTS) {
-            await route.abort().catch(() => undefined);
-            throw error;
-          }
-        }
-      }
-    });
-    queue = turn.catch(() => undefined);
-    return turn;
+  await page.route("**/_next/image?**", async (route) => {
+    const source = new URL(route.request().url()).searchParams.get("url");
+    if (!source || !LANDING_IMAGE_PATH.test(source)) {
+      await route.continue();
+      return;
+    }
+
+    await route.fulfill({ path: `apps/web/public${source}` });
   });
 });
 
-// A resize still queued when a test ends must not fail the run.
-test.afterEach(async ({ page }) => {
-  await page.unrouteAll({ behavior: "ignoreErrors" });
-});
+async function expectOptimizerImage(page: Page, request: APIRequestContext, alt: string) {
+  const image = page.getByAltText(alt);
+  const source = await image.evaluate((element) => {
+    if (!(element instanceof HTMLImageElement)) return null;
+    return element.currentSrc;
+  });
+
+  expect(source).toContain("/_next/image?");
+  const response = await request.get(source!, IMAGE_FETCH);
+  expect(response.status()).toBe(200);
+  expect(response.headers()["content-type"]).toMatch(/^image\//);
+}
 
 test("landing page renders the public DubGrid surface", async ({ page }) => {
   test.setTimeout(120_000);
@@ -89,7 +80,11 @@ test("landing page renders the public DubGrid surface", async ({ page }) => {
         IMAGE_POLL,
       )
       .toBe("95");
+
+    await expectOptimizerImage(page, page.request, alt);
   }
+
+  await expectOptimizerImage(page, page.request, mobileHomeAlt);
 
   await expect(page.locator(".landing-screenshot").first()).toHaveCSS("border-top-width", "8px");
   await expect(page.locator(".landing-screenshot").first()).toHaveCSS(
@@ -153,7 +148,11 @@ test("landing header and hero stay readable in dark mode", async ({ page }) => {
         IMAGE_POLL,
       )
       .toBe(true);
+
+    await expectOptimizerImage(page, page.request, alt);
   }
+
+  await expectOptimizerImage(page, page.request, mobileHomeAlt);
 
   await expect(page.locator(".landing-screenshot").first()).toHaveCSS("border-top-width", "8px");
   await expect(page.locator(".landing-screenshot").first()).toHaveCSS(
