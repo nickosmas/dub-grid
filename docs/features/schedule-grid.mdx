@@ -1,6 +1,6 @@
 ---
 title: "Schedule Grid"
-description: "Read and build the schedule: views, navigation, editing shifts, moving them, and printing."
+description: "Read and build the schedule: views, navigation, editing shifts, and filling open shifts."
 ---
 
 The **Schedule** tab shows your organization's schedule as a grid: people down the side, days across the top. Everyone sees the published schedule. People allowed to edit shifts also see and change drafts; see [Draft and publish](/features/draft-publish).
@@ -12,7 +12,7 @@ The **Schedule** tab shows your organization's schedule as a grid: people down t
 - **A cell** shows the person's shifts or off day. A person can hold more than one shift in a day.
 - **Schedule notes** appear as a small mark in the cell's corner; hover over it to read them.
 
-If a period hasn't been published yet, people who can't edit the schedule see **This period has not been published yet** instead of drafts.
+If a period hasn't been published yet, people who can't edit the schedule see **This period has not been published yet** instead of drafts. The schedule follows your Organization's time zone, so **Today** and the active date stay consistent for everyone.
 
 ## Choosing what you see
 
@@ -37,7 +37,7 @@ You need permission to edit shifts. Every change you make is a draft until it's 
 - **Remove a shift**: in the panel, select **Remove shift** (or **Remove all shifts** or **Remove off day**) and confirm.
 - **Right-click a cell** for **Copy Entry**, **Paste Entry**, and **Remove Entry**. Pasting over an existing entry asks before replacing it. <kbd>Cmd</kbd> or <kbd>Ctrl</kbd> with <kbd>C</kbd> and <kbd>V</kbd> copy and paste too.
 - **Drag and drop**: drag a shift to another cell to move it, or hold <kbd>Shift</kbd> while dragging to copy it. The shift you drop replaces what was there. DubGrid checks that the person can work that shift first.
-- **Schedule notes**: add or remove them in the panel's **Schedule notes** section, if you can edit notes.
+- **Schedule notes**: add or remove them in the panel's **Schedule notes** section, if you can edit notes. A note belongs to the shift you selected, so it stays with that shift when the schedule changes.
 - **Repeating shifts**: set a shift to repeat from the panel's **Repeating** section. See [Recurring shifts](/features/recurring-shifts).
 
 The panel's **Created by** and **Updated by** lines show who last touched a shift.
@@ -47,6 +47,8 @@ The panel's **Created by** and **Updated by** lines show who last touched a shif
 If you can edit shifts, select a shift in an **Open Shifts** row to see the people who can take it: those with the right focus area, role, and certification, and no absence or overlapping shift that day. Choose someone to put them on it as a draft.
 
 People who can't edit the schedule can offer to take an open shift instead; their manager approves it. See [Shift requests](/features/shift-requests).
+
+See [Coverage and Open Shifts](/features/coverage-and-open-shifts) for the difference between a coverage gap and an open shift, who can see each one, and how call-off vacancies work.
 
 ## More tools
 
@@ -59,6 +61,8 @@ The **Tools** menu holds the rest, depending on what you're allowed to do:
 - **Import Previous Schedule**: copy the previous period into this one as drafts.
 - **Bulk Delete Entries**: select many entries at once and review them before removing them. Available on a desktop-sized screen in the week views.
 - **Authors**: show who made each draft change.
+
+For the full workflow for importing a period, reviewing a batch deletion, viewing publication history, printing, and exporting, see [Schedule tools](/features/schedule-tools).
 
 ## On the DubGrid app
 

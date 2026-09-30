@@ -45,14 +45,17 @@ knowledge of the codebase.
   it is configurable rather than presenting it as fixed: Focus Areas (formerly
   Wings), Certifications (formerly Skill Levels), shift codes, absence types,
   and role labels.
-- **Gridmaster** is the platform-team role. Never call it an admin portal.
-- Roles are Gridmaster, Super Admin, Admin, and User. Admin access is a
+- Write training guidance from the reader's perspective: say **your
+  organization**. Mention several organizations only where someone is
+  switching between or otherwise using more than one.
+- Customer-facing roles are Super Admin, Admin, and User. Admin access is a
   per-person set of permissions granted individually, not a role template.
 
 ## Content boundaries
 
-- Do not document Gridmaster tooling, impersonation, audit-log internals, or
-  tenant lifecycle. Those are platform-team surfaces, not customer features.
+- Do not name or document internal support roles or tools, including
+  impersonation, audit-log internals, or organization lifecycle operations.
+  Say **DubGrid support** when public guidance needs a support reference.
 - Do not document the test sandbox, feature flags, or internal APIs.
 - Reports, billing, the permissions editor, and organization settings are
   deliberately web-only. Say so where it matters instead of describing a

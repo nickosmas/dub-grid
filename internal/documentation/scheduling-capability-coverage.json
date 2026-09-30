@@ -1,0 +1,263 @@
+{
+  "schemaVersion": 1,
+  "capabilities": [
+    {
+      "id": "schedule-reading-and-navigation",
+      "group": "Read and navigate the schedule",
+      "roles": ["staff", "admin", "super-admin"],
+      "platforms": ["web", "ios", "android"],
+      "states": ["normal", "unpublished", "loading", "error"],
+      "sourceFiles": [
+        "apps/web/src/app/(app)/schedule/SchedulePageClient.tsx",
+        "apps/web/src/lib/schedule-view.ts",
+        "packages/schedule-core/src/pay-period.ts"
+      ],
+      "testFiles": [
+        "apps/web/src/__tests__/schedule-layout.test.ts",
+        "packages/schedule-core/src/pay-period.test.ts"
+      ],
+      "documentation": {
+        "file": "docs/features/schedule-grid.mdx",
+        "anchor": "choosing-what-you-see"
+      }
+    },
+    {
+      "id": "schedule-authoring",
+      "group": "Create and change shifts",
+      "roles": ["admin", "super-admin"],
+      "platforms": ["web"],
+      "states": ["normal", "draft", "conflict", "error"],
+      "sourceFiles": [
+        "apps/web/src/app/(app)/schedule/SchedulePageClient.tsx",
+        "apps/web/src/components/ScheduleGrid.tsx",
+        "apps/web/src/app/api/schedule/manage/route.ts"
+      ],
+      "testFiles": [
+        "apps/web/src/__tests__/ScheduleGrid.test.tsx",
+        "apps/web/src/app/api/schedule/manage/route.test.ts"
+      ],
+      "documentation": {
+        "file": "docs/features/schedule-grid.mdx",
+        "anchor": "editing-shifts"
+      }
+    },
+    {
+      "id": "schedule-tools-and-outputs",
+      "group": "Reuse, review, and output schedule data",
+      "roles": ["admin", "super-admin"],
+      "platforms": ["web"],
+      "states": ["normal", "draft", "error"],
+      "sourceFiles": [
+        "apps/web/src/app/(app)/schedule/_hooks/useScheduleImport.ts",
+        "apps/web/src/components/PrintOptionsModal.tsx",
+        "apps/web/src/components/PrintScheduleView.tsx"
+      ],
+      "testFiles": [
+        "apps/web/src/__tests__/PrintOptionsModal.test.tsx",
+        "apps/web/src/__tests__/PrintScheduleView.test.tsx"
+      ],
+      "documentation": {
+        "file": "docs/features/schedule-grid.mdx",
+        "anchor": "more-tools"
+      }
+    },
+    {
+      "id": "schedule-drafts-and-publishing",
+      "group": "Draft and publish lifecycle",
+      "roles": ["staff", "admin", "super-admin"],
+      "platforms": ["web"],
+      "states": ["draft", "published", "unpublished", "unavailable"],
+      "sourceFiles": [
+        "apps/web/src/app/(app)/schedule/SchedulePageClient.tsx",
+        "apps/web/src/app/api/shifts/publish/route.ts",
+        "apps/web/src/lib/server/schedule-draft-safety.ts"
+      ],
+      "testFiles": [
+        "apps/web/src/__tests__/publish-sql.test.ts",
+        "apps/web/src/__tests__/schedule-draft-safety.test.ts"
+      ],
+      "documentation": {
+        "file": "docs/features/draft-publish.mdx",
+        "anchor": "publishing"
+      }
+    },
+    {
+      "id": "schedule-recurring-patterns",
+      "group": "Recurring weekly schedules",
+      "roles": ["admin", "super-admin"],
+      "platforms": ["web"],
+      "states": ["normal", "draft", "empty", "error"],
+      "sourceFiles": [
+        "apps/web/src/components/staff/RecurringScheduleSection.tsx",
+        "apps/web/src/app/api/schedule/recurring/route.ts"
+      ],
+      "testFiles": [
+        "apps/web/src/__tests__/RecurringScheduleSection.test.tsx",
+        "apps/web/src/app/api/schedule/recurring/route.test.ts"
+      ],
+      "documentation": {
+        "file": "docs/features/recurring-shifts.mdx",
+        "anchor": "recurring-schedules"
+      }
+    },
+    {
+      "id": "schedule-repeat-series",
+      "group": "Repeating shift series",
+      "roles": ["admin", "super-admin"],
+      "platforms": ["web"],
+      "states": ["draft", "published", "error"],
+      "sourceFiles": [
+        "apps/web/src/app/(app)/schedule/SchedulePageClient.tsx",
+        "apps/web/src/app/api/schedule/manage/route.ts"
+      ],
+      "testFiles": [
+        "apps/web/src/__tests__/schedule-series.test.ts",
+        "apps/web/src/__tests__/shift-series-bounds-sql.test.ts"
+      ],
+      "documentation": {
+        "file": "docs/features/recurring-shifts.mdx",
+        "anchor": "repeating-shifts"
+      }
+    },
+    {
+      "id": "schedule-realtime-collaboration",
+      "group": "Concurrent schedule editing",
+      "roles": ["admin", "super-admin"],
+      "platforms": ["web"],
+      "states": ["normal", "conflict", "unavailable", "retry"],
+      "sourceFiles": [
+        "apps/web/src/app/(app)/schedule/SchedulePageClient.tsx",
+        "apps/web/src/app/api/schedule/editor-sessions/route.ts"
+      ],
+      "testFiles": [
+        "apps/web/src/__tests__/schedule-editor-visibility.test.ts",
+        "apps/web/src/app/api/schedule/editor-sessions/route.test.ts"
+      ],
+      "documentation": {
+        "file": "docs/features/real-time-collaboration.mdx",
+        "anchor": "who-else-is-editing"
+      }
+    },
+    {
+      "id": "schedule-coverage-and-open-shifts",
+      "group": "Coverage and open shifts",
+      "roles": ["staff", "admin", "super-admin"],
+      "platforms": ["web", "ios", "android"],
+      "states": ["normal", "empty", "unavailable", "error"],
+      "sourceFiles": [
+        "apps/web/src/components/CoveragePanel.tsx",
+        "apps/web/src/app/(app)/schedule/_lib/open-shift-staffing.ts",
+        "packages/schedule-core/src/coverage.ts"
+      ],
+      "testFiles": [
+        "apps/web/src/__tests__/CoveragePanel.test.tsx",
+        "apps/web/src/app/(app)/schedule/_lib/open-shift-staffing.test.ts",
+        "packages/schedule-core/src/coverage.test.ts"
+      ],
+      "documentation": {
+        "file": "docs/features/schedule-grid.mdx",
+        "anchor": "filling-open-shifts"
+      }
+    },
+    {
+      "id": "schedule-notes",
+      "group": "Schedule notes",
+      "roles": ["staff", "admin", "super-admin"],
+      "platforms": ["web", "ios", "android"],
+      "states": ["normal", "draft", "published", "error"],
+      "sourceFiles": [
+        "packages/schedule-core/src/schedule-notes.ts",
+        "apps/mobile/src/features/schedule/lib/scheduleNotes.ts"
+      ],
+      "testFiles": [
+        "packages/schedule-core/src/schedule-notes.test.ts",
+        "apps/mobile/src/features/schedule/lib/scheduleNotes.test.ts"
+      ],
+      "documentation": {
+        "file": "docs/configuration/roles-certifications-and-indicators.mdx",
+        "anchor": "schedule-notes"
+      }
+    },
+    {
+      "id": "schedule-shift-requests",
+      "group": "Pickup, swap, and call-off requests",
+      "roles": ["staff", "admin", "super-admin"],
+      "platforms": ["web", "ios", "android"],
+      "states": ["normal", "approval-pending", "published", "expired", "error"],
+      "sourceFiles": [
+        "apps/web/src/components/ShiftRequestBoard.tsx",
+        "packages/data-access/src/shift-request-settlement.ts",
+        "apps/mobile/src/features/shift-requests/screens/RequestsScreen.tsx"
+      ],
+      "testFiles": [
+        "apps/web/src/__tests__/ShiftRequestBoard.test.tsx",
+        "packages/data-access/src/shift-request-settlement.test.ts",
+        "apps/mobile/src/features/shift-requests/screens/RequestsScreen.test.tsx"
+      ],
+      "documentation": {
+        "file": "docs/features/shift-requests.mdx",
+        "anchor": "how-a-request-moves"
+      }
+    },
+    {
+      "id": "schedule-configuration",
+      "group": "Scheduling rules and coverage configuration",
+      "roles": ["admin", "super-admin"],
+      "platforms": ["web"],
+      "states": ["normal", "empty", "error"],
+      "sourceFiles": [
+        "apps/web/src/components/settings/ScheduleRules.tsx",
+        "apps/web/src/components/settings/Coverage.tsx",
+        "apps/web/src/app/api/settings/config/route.ts"
+      ],
+      "testFiles": [
+        "apps/web/src/__tests__/SettingsDirtySaveControls.test.tsx",
+        "apps/web/src/app/api/settings/config/route.test.ts"
+      ],
+      "documentation": {
+        "file": "docs/configuration/schedule-rules-and-display.mdx",
+        "anchor": "schedule-rules"
+      }
+    },
+    {
+      "id": "schedule-mobile-experience",
+      "group": "Mobile schedule and shift details",
+      "roles": ["staff", "admin", "super-admin"],
+      "platforms": ["ios", "android"],
+      "states": ["normal", "loading", "empty", "error", "offline", "retry"],
+      "sourceFiles": [
+        "apps/mobile/src/features/schedule/screens/ScheduleScreen.tsx",
+        "apps/mobile/src/features/schedule/screens/ShiftDetailScreen.tsx"
+      ],
+      "testFiles": [
+        "apps/mobile/src/features/schedule/screens/ScheduleScreen.test.tsx",
+        "apps/mobile/src/features/schedule/screens/ShiftDetailScreen.test.tsx"
+      ],
+      "documentation": {
+        "file": "docs/features/mobile-schedule.mdx",
+        "anchor": "find-a-day-or-week"
+      }
+    },
+    {
+      "id": "schedule-connected-surfaces",
+      "group": "Schedule alerts and dashboard entry points",
+      "roles": ["staff", "admin", "super-admin"],
+      "platforms": ["web", "ios", "android"],
+      "states": ["normal", "empty", "loading", "error"],
+      "sourceFiles": [
+        "apps/web/src/app/(app)/dashboard/DashboardPageContent.tsx",
+        "apps/mobile/src/features/dashboard/screens/AdminHomeScreen.tsx",
+        "apps/web/src/features/dashboard/shared/analytics.ts"
+      ],
+      "testFiles": [
+        "apps/web/src/app/(app)/dashboard/DashboardPageContent.test.tsx",
+        "apps/mobile/src/features/dashboard/screens/AdminHomeScreen.test.tsx",
+        "apps/web/src/__tests__/dashboard-metrics.test.ts"
+      ],
+      "documentation": {
+        "file": "docs/features/dashboard.mdx",
+        "anchor": "for-super-admins-and-admins"
+      }
+    }
+  ]
+}

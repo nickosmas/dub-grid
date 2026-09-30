@@ -6,9 +6,12 @@ import path from "node:path";
 import {
   isInsideRepository,
   loadAccuracyManifest,
+  loadSchedulingCapabilityCoverage,
   validateAccuracyManifest,
+  validateSchedulingCapabilityCoverage,
   type AccuracyManifest,
   type AccuracyManifestPage,
+  type SchedulingCapabilityCoverage,
 } from "./contract";
 import {
   generatedInventory,
@@ -250,7 +253,7 @@ export function checkProhibitedPublicInternals(
 ): DocumentationDiagnostic[] {
   const diagnostics: DocumentationDiagnostic[] = [];
   const prohibited: Array<[RegExp, string]> = [
-    [/\/gridmaster\b/i, "Gridmaster route"],
+    [/\bGridmaster\b/i, "internal platform role"],
     [/\bTest Sandbox\b/i, "Test Sandbox tooling"],
     [/\bfeature flags?\b/i, "feature flags"],
     [/\bprocess\.env\b/i, "environment variables"],
@@ -371,6 +374,43 @@ export function checkPublicDocumentation(
   return diagnostics;
 }
 
+export function checkSchedulingCapabilityTargets(
+  repoRoot: string,
+  coverage: SchedulingCapabilityCoverage,
+): DocumentationDiagnostic[] {
+  const diagnostics: DocumentationDiagnostic[] = [];
+  const docsConfig = JSON.parse(
+    readFileSync(path.join(repoRoot, "docs/docs.json"), "utf8"),
+  ) as unknown;
+  const targets = new Set(navTargets(docsConfig));
+  for (const capability of coverage.capabilities) {
+    const documentation = capability.documentation;
+    if (!documentation?.file || !documentation.anchor?.trim()) continue;
+    const absolute = path.join(repoRoot, documentation.file);
+    if (!existsSync(absolute)) continue;
+    if (!anchors(readFileSync(absolute, "utf8")).has(documentation.anchor)) {
+      diagnostics.push(
+        diagnostic(
+          "scheduling-coverage-anchor",
+          "internal/documentation/scheduling-capability-coverage.json",
+          `${capability.id} target is missing anchor #${documentation.anchor} in ${documentation.file}`,
+        ),
+      );
+    }
+    const pageTarget = documentation.file.replace(/^docs\//, "").replace(/\.mdx$/, "");
+    if (pageTarget !== "index" && !targets.has(pageTarget)) {
+      diagnostics.push(
+        diagnostic(
+          "scheduling-coverage-navigation",
+          "internal/documentation/scheduling-capability-coverage.json",
+          `${capability.id} target is not reachable from Mintlify navigation: ${documentation.file}`,
+        ),
+      );
+    }
+  }
+  return diagnostics;
+}
+
 export function checkDocumentationContract(
   repoRoot: string,
   options: { requireClosed?: boolean } = {},
@@ -388,6 +428,32 @@ export function checkDocumentationContract(
     ),
   );
   diagnostics.push(...checkPublicDocumentation(repoRoot, inventory, manifest));
+  const schedulingCoveragePath = path.join(
+    repoRoot,
+    "internal/documentation/scheduling-capability-coverage.json",
+  );
+  if (!existsSync(schedulingCoveragePath)) {
+    diagnostics.push(
+      diagnostic(
+        "scheduling-coverage",
+        "internal/documentation/scheduling-capability-coverage.json",
+        "missing scheduling capability coverage file",
+      ),
+    );
+  } else {
+    const schedulingCoverage = loadSchedulingCapabilityCoverage(repoRoot);
+    diagnostics.push(
+      ...validateSchedulingCapabilityCoverage(repoRoot, schedulingCoverage, manifest).map(
+        (message) =>
+          diagnostic(
+            "scheduling-coverage",
+            "internal/documentation/scheduling-capability-coverage.json",
+            message,
+          ),
+      ),
+      ...checkSchedulingCapabilityTargets(repoRoot, schedulingCoverage),
+    );
+  }
   return {
     diagnostics: diagnostics.sort((left, right) =>
       `${left.file}:${left.rule}:${left.message}`.localeCompare(

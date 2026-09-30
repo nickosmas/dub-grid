@@ -13,12 +13,17 @@ import {
   checkPermissionClaims,
   checkProhibitedPublicInternals,
   checkPublicDocumentation,
+  checkSchedulingCapabilityTargets,
   computePageFingerprint,
 } from "../../../../scripts/documentation/check";
 import {
+  REQUIRED_SCHEDULING_CAPABILITY_IDS,
   validateAccuracyManifest,
+  validateSchedulingCapabilityCoverage,
   type AccuracyManifest,
   type AccuracyManifestPage,
+  type SchedulingCapability,
+  type SchedulingCapabilityCoverage,
   type SurfaceExclusion,
 } from "../../../../scripts/documentation/contract";
 import type { DocumentationSourceInventory } from "../../../../scripts/documentation/inventory";
@@ -91,6 +96,22 @@ function manifest(pages: AccuracyManifestPage[]): AccuracyManifest {
     runtimeProfiles: {},
     pages,
     surfaceExclusions: [],
+  };
+}
+
+function schedulingCoverage(): SchedulingCapabilityCoverage {
+  return {
+    schemaVersion: 1,
+    capabilities: REQUIRED_SCHEDULING_CAPABILITY_IDS.map((id): SchedulingCapability => ({
+      id,
+      group: "Scheduling",
+      roles: ["staff"],
+      platforms: ["web"],
+      states: ["normal"],
+      sourceFiles: ["source.ts"],
+      testFiles: ["test.ts"],
+      documentation: { file: "docs/guide.mdx", anchor: "guide" },
+    })),
   };
 }
 
@@ -370,10 +391,69 @@ describe("documentation contract", () => {
   it("rejects prohibited public internals", () => {
     const result = checkProhibitedPublicInternals(
       "guide.mdx",
-      "Use `/gridmaster`, Test Sandbox, feature flags, process.env, and `/api/private`.",
+      "Use Gridmaster, Test Sandbox, feature flags, process.env, and `/api/private`.",
     );
     expect(result).toHaveLength(5);
     expect(result.every((item) => item.rule === "public-internals")).toBe(true);
+  });
+
+  it("requires every source-evidenced scheduling capability exactly once", () => {
+    const root = fixture();
+    write(root, "docs/guide.mdx", "# Guide\n");
+    write(root, "source.ts", "export {};\n");
+    write(root, "test.ts", "export {};\n");
+    const coverage = schedulingCoverage();
+    expect(validateSchedulingCapabilityCoverage(root, coverage, manifest([page()]))).toEqual([]);
+
+    coverage.capabilities.pop();
+    coverage.capabilities.push({ ...coverage.capabilities[0] });
+    expect(validateSchedulingCapabilityCoverage(root, coverage, manifest([page()]))).toEqual(
+      expect.arrayContaining([
+        "scheduling-capability-coverage.json: duplicate capability id schedule-reading-and-navigation",
+        "scheduling-capability-coverage.json: missing required capability schedule-connected-surfaces",
+      ]),
+    );
+  });
+
+  it("rejects incomplete scheduling evidence and unknown client metadata", () => {
+    const root = fixture();
+    write(root, "docs/guide.mdx", "# Guide\n");
+    write(root, "source.ts", "export {};\n");
+    write(root, "test.ts", "export {};\n");
+    const coverage = schedulingCoverage();
+    coverage.capabilities[0] = {
+      ...coverage.capabilities[0],
+      roles: ["visitor"],
+      platforms: ["desktop"],
+      states: ["archived"],
+      sourceFiles: [],
+      testFiles: ["missing.test.ts"],
+      documentation: { file: "docs/missing.mdx", anchor: "" },
+    };
+    expect(validateSchedulingCapabilityCoverage(root, coverage, manifest([page()]))).toEqual(
+      expect.arrayContaining([
+        "scheduling-capability-coverage.json: schedule-reading-and-navigation has unknown role visitor",
+        "scheduling-capability-coverage.json: schedule-reading-and-navigation has unknown platform desktop",
+        "scheduling-capability-coverage.json: schedule-reading-and-navigation has unknown state archived",
+        "scheduling-capability-coverage.json: schedule-reading-and-navigation has no sourceFiles",
+        "scheduling-capability-coverage.json: schedule-reading-and-navigation references missing testFiles file missing.test.ts",
+        "scheduling-capability-coverage.json: schedule-reading-and-navigation needs a documentation target",
+      ]),
+    );
+  });
+
+  it("rejects a scheduling target with a missing heading or navigation entry", () => {
+    const root = fixture();
+    write(root, "docs/docs.json", JSON.stringify({ navigation: { pages: [] } }));
+    write(root, "docs/guide.mdx", "# Guide\n");
+    const coverage = schedulingCoverage();
+    coverage.capabilities = [
+      { ...coverage.capabilities[0], documentation: { file: "docs/guide.mdx", anchor: "missing" } },
+    ];
+    expect(checkSchedulingCapabilityTargets(root, coverage)).toEqual([
+      expect.objectContaining({ rule: "scheduling-coverage-anchor" }),
+      expect.objectContaining({ rule: "scheduling-coverage-navigation" }),
+    ]);
   });
 
   it("detects stale generated artifacts without rewriting them", () => {

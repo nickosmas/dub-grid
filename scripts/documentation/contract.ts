@@ -12,6 +12,39 @@ const EXCLUSION_REASONS = [
   "legacy-redirect",
   "platform-boundary",
 ] as const;
+const CLIENT_ROLES = ["staff", "admin", "super-admin"] as const;
+const CLIENT_PLATFORMS = ["web", "ios", "android"] as const;
+const SCHEDULING_STATES = [
+  "normal",
+  "unpublished",
+  "draft",
+  "published",
+  "empty",
+  "unavailable",
+  "conflict",
+  "loading",
+  "error",
+  "offline",
+  "retry",
+  "approval-pending",
+  "expired",
+] as const;
+
+export const REQUIRED_SCHEDULING_CAPABILITY_IDS = [
+  "schedule-reading-and-navigation",
+  "schedule-authoring",
+  "schedule-tools-and-outputs",
+  "schedule-drafts-and-publishing",
+  "schedule-recurring-patterns",
+  "schedule-repeat-series",
+  "schedule-realtime-collaboration",
+  "schedule-coverage-and-open-shifts",
+  "schedule-notes",
+  "schedule-shift-requests",
+  "schedule-configuration",
+  "schedule-mobile-experience",
+  "schedule-connected-surfaces",
+] as const;
 
 export type PageLifecycle = (typeof PAGE_LIFECYCLES)[number];
 export type SourceReviewState = (typeof SOURCE_REVIEW_STATES)[number];
@@ -57,6 +90,25 @@ export interface AccuracyManifest {
   runtimeProfiles: Record<string, unknown>;
   pages: AccuracyManifestPage[];
   surfaceExclusions: SurfaceExclusion[];
+}
+
+export interface SchedulingCapability {
+  id: string;
+  group: string;
+  roles: string[];
+  platforms: string[];
+  states: string[];
+  sourceFiles: string[];
+  testFiles: string[];
+  documentation: {
+    file: string;
+    anchor: string;
+  };
+}
+
+export interface SchedulingCapabilityCoverage {
+  schemaVersion: 1;
+  capabilities: SchedulingCapability[];
 }
 
 export interface ContractReport {
@@ -141,6 +193,114 @@ export function loadAccuracyManifest(repoRoot: string): AccuracyManifest {
   return readJson<AccuracyManifest>(
     path.join(repoRoot, "internal/documentation/accuracy-manifest.json"),
   );
+}
+
+export function loadSchedulingCapabilityCoverage(repoRoot: string): SchedulingCapabilityCoverage {
+  return readJson<SchedulingCapabilityCoverage>(
+    path.join(repoRoot, "internal/documentation/scheduling-capability-coverage.json"),
+  );
+}
+
+function validateEnumList(
+  value: unknown,
+  allowed: readonly string[],
+  label: string,
+  capabilityId: string,
+): string[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    return [`scheduling-capability-coverage.json: ${capabilityId} has no ${label}`];
+  }
+  const errors: string[] = [];
+  for (const item of value) {
+    if (typeof item !== "string" || !allowed.includes(item)) {
+      errors.push(
+        `scheduling-capability-coverage.json: ${capabilityId} has unknown ${label} ${String(item)}`,
+      );
+    }
+  }
+  return errors;
+}
+
+function validateEvidenceList(
+  repoRoot: string,
+  value: unknown,
+  label: "sourceFiles" | "testFiles",
+  capabilityId: string,
+): string[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    return [`scheduling-capability-coverage.json: ${capabilityId} has no ${label}`];
+  }
+  const errors: string[] = [];
+  for (const file of value) {
+    if (typeof file !== "string" || !isInsideRepository(repoRoot, file)) {
+      errors.push(
+        `scheduling-capability-coverage.json: ${capabilityId} ${label} file is outside the repository: ${String(file)}`,
+      );
+    } else if (!existsSync(path.join(repoRoot, file))) {
+      errors.push(
+        `scheduling-capability-coverage.json: ${capabilityId} references missing ${label} file ${file}`,
+      );
+    }
+  }
+  return errors;
+}
+
+export function validateSchedulingCapabilityCoverage(
+  repoRoot: string,
+  coverage: SchedulingCapabilityCoverage,
+  manifest: AccuracyManifest,
+): string[] {
+  const errors: string[] = [];
+  if (coverage.schemaVersion !== 1) {
+    errors.push("scheduling-capability-coverage.json: schemaVersion must be 1");
+  }
+  if (!Array.isArray(coverage.capabilities)) {
+    return [...errors, "scheduling-capability-coverage.json: capabilities must be an array"];
+  }
+
+  const publishedPages = new Map(
+    manifest.pages
+      .filter((page) => page.lifecycle === "published")
+      .map((page) => [page.file, page]),
+  );
+  const capabilityIds = coverage.capabilities.map((capability) => capability.id);
+  for (const duplicate of duplicateValues(capabilityIds)) {
+    errors.push(`scheduling-capability-coverage.json: duplicate capability id ${duplicate}`);
+  }
+  for (const requiredId of REQUIRED_SCHEDULING_CAPABILITY_IDS) {
+    if (!capabilityIds.includes(requiredId)) {
+      errors.push(`scheduling-capability-coverage.json: missing required capability ${requiredId}`);
+    }
+  }
+  for (const capability of coverage.capabilities) {
+    const capabilityId = typeof capability.id === "string" ? capability.id : String(capability.id);
+    if (!capabilityId.trim()) {
+      errors.push("scheduling-capability-coverage.json: capability id must be non-empty");
+    } else if (!REQUIRED_SCHEDULING_CAPABILITY_IDS.includes(capabilityId as never)) {
+      errors.push(`scheduling-capability-coverage.json: unknown capability id ${capabilityId}`);
+    }
+    if (!capability.group?.trim()) {
+      errors.push(`scheduling-capability-coverage.json: ${capabilityId} needs a group`);
+    }
+    errors.push(
+      ...validateEnumList(capability.roles, CLIENT_ROLES, "role", capabilityId),
+      ...validateEnumList(capability.platforms, CLIENT_PLATFORMS, "platform", capabilityId),
+      ...validateEnumList(capability.states, SCHEDULING_STATES, "state", capabilityId),
+      ...validateEvidenceList(repoRoot, capability.sourceFiles, "sourceFiles", capabilityId),
+      ...validateEvidenceList(repoRoot, capability.testFiles, "testFiles", capabilityId),
+    );
+    const target = capability.documentation;
+    if (!target?.file || !target.anchor?.trim()) {
+      errors.push(
+        `scheduling-capability-coverage.json: ${capabilityId} needs a documentation target`,
+      );
+    } else if (!publishedPages.has(target.file)) {
+      errors.push(
+        `scheduling-capability-coverage.json: ${capabilityId} documentation target is not a published page: ${target.file}`,
+      );
+    }
+  }
+  return errors.sort();
 }
 
 export function validateAccuracyManifest(
