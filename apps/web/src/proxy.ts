@@ -752,7 +752,9 @@ export async function proxy(req: NextRequest) {
 export const config = {
   // sitemap.xml is named rather than folded into the extension list: a blanket
   // .xml exemption would take any future .xml route out of the auth check too.
+  // The Open Graph and Twitter image routes have no extension at all, so they
+  // are named the same way; link-preview crawlers fetch them anonymously.
   matcher: [
-    "/((?!_next|favicon\\.ico|sitemap\\.xml$|api|monitoring|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|css|js|woff2?|ttf|eot|txt)$).*)",
+    "/((?!_next|favicon\\.ico|sitemap\\.xml$|opengraph-image$|twitter-image$|api|monitoring|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|css|js|woff2?|ttf|eot|txt)$).*)",
   ],
 };
