@@ -1,32 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
-  <style>
-    .cell { fill: #2563EB; }
-    @media (prefers-color-scheme: dark) {
-      .cell { fill: #F1F5F9; }
-    }
-  </style>
-
-  <!-- Row 0 (top) — all full opacity -->
-  <rect class="cell" x="3.2" y="3.2" width="25.6" height="25.6" rx="6.4" opacity="1"/>
-  <rect class="cell" x="35.2" y="3.2" width="25.6" height="25.6" rx="6.4" opacity="1"/>
-  <rect class="cell" x="67.2" y="3.2" width="25.6" height="25.6" rx="6.4" opacity="1"/>
-  <rect class="cell" x="99.2" y="3.2" width="25.6" height="25.6" rx="6.4" opacity="1"/>
-
-  <!-- Row 1 -->
-  <rect class="cell" x="3.2" y="35.2" width="25.6" height="25.6" rx="6.4" opacity="1"/>
-  <rect class="cell" x="35.2" y="35.2" width="25.6" height="25.6" rx="6.4" opacity="0.75"/>
-  <rect class="cell" x="67.2" y="35.2" width="25.6" height="25.6" rx="6.4" opacity="0.75"/>
-  <rect class="cell" x="99.2" y="35.2" width="25.6" height="25.6" rx="6.4" opacity="0.3"/>
-
-  <!-- Row 2 -->
-  <rect class="cell" x="3.2" y="67.2" width="25.6" height="25.6" rx="6.4" opacity="1"/>
-  <rect class="cell" x="35.2" y="67.2" width="25.6" height="25.6" rx="6.4" opacity="0.75"/>
-  <rect class="cell" x="67.2" y="67.2" width="25.6" height="25.6" rx="6.4" opacity="0.3"/>
-  <rect class="cell" x="99.2" y="67.2" width="25.6" height="25.6" rx="6.4" opacity="0.3"/>
-
-  <!-- Row 3 (bottom) -->
-  <rect class="cell" x="3.2" y="99.2" width="25.6" height="25.6" rx="6.4" opacity="1"/>
-  <rect class="cell" x="35.2" y="99.2" width="25.6" height="25.6" rx="6.4" opacity="0.3"/>
-  <rect class="cell" x="67.2" y="99.2" width="25.6" height="25.6" rx="6.4" opacity="0.3"/>
-  <rect class="cell" x="99.2" y="99.2" width="25.6" height="25.6" rx="6.4" opacity="0.3"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1.4999999999999982 -3.009999999999998 106.02 106.02" width="128" height="128">
+  <style>svg{color:#2563EB}@media (prefers-color-scheme:dark){svg{color:#4A9BFF}}</style>
+  <mask id="gap" maskUnits="userSpaceOnUse" x="-10" y="-10" width="120" height="120">
+    <rect x="-10" y="-10" width="120" height="120" fill="#fff"/>
+    <path d="M47.32,22.24H72.66C93.23,22.24 97,26.01 97,46.58V53.42C97,73.99 93.23,77.76 72.66,77.76H47.32C26.75,77.76 22.98,73.99 22.98,53.42V46.58C22.98,26.01 26.75,22.24 47.32,22.24Z" fill="#000" stroke="#000" stroke-width="12"/>
+  </mask>
+  <path d="M22.98,25.02H49.63C66.52,25.02 69.61,28.11 69.61,45V55C69.61,71.89 66.52,74.98 49.63,74.98H22.98C6.09,74.98 3,71.89 3,55V45C3,28.11 6.09,25.02 22.98,25.02Z" fill="none" stroke="currentColor" stroke-width="6" mask="url(#gap)"/>
+  <path d="M47.32,22.24H72.66C93.23,22.24 97,26.01 97,46.58V53.42C97,73.99 93.23,77.76 72.66,77.76H47.32C26.75,77.76 22.98,73.99 22.98,53.42V46.58C22.98,26.01 26.75,22.24 47.32,22.24Z" fill="currentColor"/>
 </svg>

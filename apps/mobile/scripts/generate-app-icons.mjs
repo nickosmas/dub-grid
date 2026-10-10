@@ -1,189 +1,170 @@
 /**
- * Renders the mobile launcher and launch images into apps/mobile/assets/images/.
+ * Renders the mobile launcher, launch and logo images into
+ * apps/mobile/assets/images/ from the shared two-card geometry in
+ * @dubgrid/design-tokens.
  *
- * App icons are the DM Sans wordmark stacked as "dub" over "grid" on brand
- * blue, because the 16-cell grid mark cannot survive the launcher masks: iOS
- * clips its corner cells and Android shows only the central 72/108 of an
- * adaptive icon.
+ * App icons are the white symbol on brand blue, optically centered (the solid
+ * front card would otherwise pull it right of center):
  *   - icon.png                      iOS, opaque blue field behind Apple's squircle
  *   - adaptive-icon.png             Android foreground layer, white on transparent
  *   - adaptive-icon-monochrome.png  Android themed-icon layer, same shapes
+ * Android shows the central 72/108 of an adaptive icon and guarantees only the
+ * inner 66/108 circle, so the symbol's corners are kept inside that circle.
  *
- * Launch images are the first frame of the JS splash: the static grid mark
- * with AnimatedDubGridLogo's geometry, so the native splash hands off to the
- * animated one without a visible seam.
+ * Launch images are the first frame of the JS splash: the symbol in the
+ * shared square box, `SPLASH_MARK_SIZE` wide, so the native splash hands off
+ * without a visible seam.
  *   - splash-icon.png / splash-icon-dark.png
  *
- * Run `npm run icons` in apps/mobile, then `npx expo prebuild` and rebuild
- * the dev client so the native asset catalogs pick the files up.
- * `--preview <path>` also writes a sheet of the icons under each platform's
- * mask.
+ * Logos:
+ *   - brand-mark.png                white, cropped to the ink; the app tints it
+ *   - logo-blue.png / logo-white.png and icon-blue-on-white.png
+ *
+ * Build the packages first (`npm run build:packages`), then run `npm run
+ * icons` in apps/mobile, then `npx expo prebuild` and rebuild the dev client
+ * so the native asset catalogs pick the files up. `--preview <path>` also
+ * writes a sheet of the icons under each platform's mask.
  */
 import { chromium } from "@playwright/test";
-import { readFileSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
+import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-const require = createRequire(import.meta.url);
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const imagesDir = join(scriptDir, "..", "assets", "images");
-const fontPath = require.resolve("@expo-google-fonts/dm-sans/700Bold/DMSans_700Bold.ttf");
+
+// The package's index is bundler-only, but this module has no imports, so
+// plain Node can load it straight from the build output.
+const {
+  BRAND_MARK_BACK,
+  BRAND_MARK_BACK_STROKE,
+  BRAND_MARK_COLORS,
+  BRAND_MARK_FRONT,
+  BRAND_MARK_GAP,
+  BRAND_MARK_INK,
+  BRAND_MARK_OPTICAL_OFFSET_X,
+  BRAND_MARK_SQUARE,
+  brandMarkCardPath,
+} = await import(
+  pathToFileURL(
+    join(scriptDir, "..", "..", "..", "packages", "design-tokens", "dist", "brand-mark.js"),
+  ).href
+);
 
 const SIZE = 1024;
-const BRAND_BLUE = "#2563EB";
-const WHITE = "#FFFFFF";
+const WHITE = BRAND_MARK_COLORS.onBrand;
+const BRAND_BLUE = BRAND_MARK_COLORS.light;
 
-// Android shows the central 72/108 of an adaptive icon and guarantees only the
-// inner 66/108 circle under every launcher mask. iOS shows the whole square.
 const ANDROID_VISIBLE = 72 / 108;
 const ANDROID_SAFE = 66 / 108;
 
-// Wordmark width as a share of what the launcher shows, so the mark reads at
-// the same scale inside the iOS squircle and the Android circle.
-const WORDMARK_WIDTH = 0.6;
-// Baseline-to-baseline pitch in em: tight enough that the two words read as one
-// mark while "grid"'s ascenders still clear the "dub" baseline.
-const LINE_PITCH = 0.94;
-const LETTER_SPACING = "-0.02em"; // matches DubGridWordmark
+// Symbol ink width as a share of what the launcher shows, so it reads at the
+// same scale inside the iOS squircle and the Android circle.
+const SYMBOL_WIDTH = 0.62;
 
-// Mirrors @dubgrid/design-tokens (BRAND_ANIMATED_LOGO_SIZE and the light and
-// dark `brand` colors), which plain Node cannot import from the package's
-// bundler-only dist. Keep in step with `imageWidth` in app.json.
+// Mirrors BRAND_ANIMATED_LOGO_SIZE in @dubgrid/design-tokens. Keep in step
+// with `imageWidth` in app.json.
 const SPLASH_MARK_SIZE = 96;
-// Drawn at 10x so every cell edge lands on a whole pixel.
 const SPLASH_SCALE = 10;
-const SPLASHES = [
-  { name: "splash-icon.png", color: "#2563EB" },
-  { name: "splash-icon-dark.png", color: "#2075FF" },
-];
 
-const ICONS = [
-  { name: "icon.png", background: BRAND_BLUE, visible: 1, safe: 1 },
-  { name: "adaptive-icon.png", background: null, visible: ANDROID_VISIBLE, safe: ANDROID_SAFE },
+const BACK_PATH = brandMarkCardPath(BRAND_MARK_BACK);
+const FRONT_PATH = brandMarkCardPath(BRAND_MARK_FRONT);
+
+// The gap is masked out of the back card, so the images stay transparent
+// there and sit on any background.
+function symbolSvg({ viewBox, width, height, color }) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox.join(" ")}" width="${width}" height="${height}">
+  <mask id="gap" maskUnits="userSpaceOnUse" x="-20" y="-20" width="140" height="140">
+    <rect x="-20" y="-20" width="140" height="140" fill="#fff"/>
+    <path d="${FRONT_PATH}" fill="#000" stroke="#000" stroke-width="${BRAND_MARK_GAP * 2}"/>
+  </mask>
+  <path d="${BACK_PATH}" fill="none" stroke="${color}" stroke-width="${BRAND_MARK_BACK_STROKE}" mask="url(#gap)"/>
+  <path d="${FRONT_PATH}" fill="${color}"/>
+</svg>`;
+}
+
+const SQUARE_BOX = [
+  BRAND_MARK_SQUARE.x,
+  BRAND_MARK_SQUARE.y,
+  BRAND_MARK_SQUARE.size,
+  BRAND_MARK_SQUARE.size,
+];
+const INK_BOX = [BRAND_MARK_INK.x, BRAND_MARK_INK.y, BRAND_MARK_INK.width, BRAND_MARK_INK.height];
+
+/**
+ * A square view box that puts the symbol's ink at `share` of the visible
+ * width, optically centered, shrunk if its corners would leave the safe circle.
+ */
+function iconBox({ visible, safe }) {
+  const half = Math.hypot(BRAND_MARK_INK.width / 2, BRAND_MARK_INK.height / 2);
+  const inkShare = Math.min(SYMBOL_WIDTH * visible, (safe / 2) * (BRAND_MARK_INK.width / half));
+  const size = BRAND_MARK_INK.width / inkShare;
+  const centerX = BRAND_MARK_INK.x + BRAND_MARK_INK.width / 2 + BRAND_MARK_OPTICAL_OFFSET_X;
+  const centerY = BRAND_MARK_INK.y + BRAND_MARK_INK.height / 2;
+  return [centerX - size / 2, centerY - size / 2, size, size];
+}
+
+const IMAGES = [
+  {
+    name: "icon.png",
+    size: SIZE,
+    background: BRAND_BLUE,
+    svg: { viewBox: iconBox({ visible: 1, safe: 1 }), color: WHITE },
+  },
+  {
+    name: "adaptive-icon.png",
+    size: SIZE,
+    svg: { viewBox: iconBox({ visible: ANDROID_VISIBLE, safe: ANDROID_SAFE }), color: WHITE },
+  },
   {
     name: "adaptive-icon-monochrome.png",
-    background: null,
-    visible: ANDROID_VISIBLE,
-    safe: ANDROID_SAFE,
+    size: SIZE,
+    svg: { viewBox: iconBox({ visible: ANDROID_VISIBLE, safe: ANDROID_SAFE }), color: WHITE },
+  },
+  {
+    name: "icon-blue-on-white.png",
+    size: SIZE,
+    background: WHITE,
+    svg: { viewBox: iconBox({ visible: 1, safe: 1 }), color: BRAND_BLUE },
+  },
+  {
+    name: "splash-icon.png",
+    size: SPLASH_MARK_SIZE * SPLASH_SCALE,
+    svg: { viewBox: SQUARE_BOX, color: BRAND_MARK_COLORS.light },
+  },
+  {
+    name: "splash-icon-dark.png",
+    size: SPLASH_MARK_SIZE * SPLASH_SCALE,
+    svg: { viewBox: SQUARE_BOX, color: BRAND_MARK_COLORS.dark },
+  },
+  { name: "logo-blue.png", size: SIZE, svg: { viewBox: SQUARE_BOX, color: BRAND_BLUE } },
+  { name: "logo-white.png", size: SIZE, svg: { viewBox: SQUARE_BOX, color: WHITE } },
+  {
+    name: "brand-mark.png",
+    size: 512,
+    height: Math.round((512 * BRAND_MARK_INK.height) / BRAND_MARK_INK.width),
+    svg: { viewBox: INK_BOX, color: WHITE },
   },
 ];
 
-function drawIcon({
-  size,
-  background,
-  color,
-  visible,
-  safe,
-  widthShare,
-  linePitch,
-  letterSpacing,
-}) {
-  const lines = ["dub", "grid"];
-  const scratch = document.createElement("canvas");
-  scratch.width = size;
-  scratch.height = size;
-  const sctx = scratch.getContext("2d");
-  if (!("letterSpacing" in sctx)) throw new Error("canvas letterSpacing unsupported");
-
-  const setFont = (ctx, px) => {
-    ctx.font = `700 ${px}px 'DM Sans'`;
-    ctx.letterSpacing = letterSpacing;
-    ctx.textBaseline = "alphabetic";
-  };
-  const measure = (px) => {
-    setFont(sctx, px);
-    return lines.map((text) => {
-      const m = sctx.measureText(text);
-      return { text, left: m.actualBoundingBoxLeft, right: m.actualBoundingBoxRight };
-    });
-  };
-
-  const refWidth = Math.max(...measure(100).map((m) => m.left + m.right));
-  let px = ((size * visible * widthShare) / refWidth) * 100;
-
-  const paint = (ctx, dx, dy) => {
-    setFont(ctx, px);
-    ctx.fillStyle = color;
-    measure(px).forEach((m, i) => {
-      const inkWidth = m.left + m.right;
-      ctx.fillText(
-        m.text,
-        size / 2 - inkWidth / 2 + m.left + dx,
-        size / 2 + i * px * linePitch + dy,
-      );
-    });
-  };
-  const inkBox = () => {
-    sctx.clearRect(0, 0, size, size);
-    paint(sctx, 0, 0);
-    const { data } = sctx.getImageData(0, 0, size, size);
-    let x0 = size,
-      y0 = size,
-      x1 = -1,
-      y1 = -1;
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        if (data[(y * size + x) * 4 + 3] === 0) continue;
-        if (x < x0) x0 = x;
-        if (x > x1) x1 = x;
-        if (y < y0) y0 = y;
-        if (y > y1) y1 = y;
-      }
-    }
-    return { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
-  };
-
-  // Center by ink, then shrink until the ink box's corners sit inside the
-  // safe circle. Ink box, not line boxes: the descender of "g" and the
-  // ascenders of "d" and "b" are what the mask would clip.
-  let box = inkBox();
-  const safeRadius = (size * safe) / 2;
-  const cornerRadius = () => Math.hypot(box.w / 2, box.h / 2);
-  if (cornerRadius() > safeRadius) {
-    px *= safeRadius / cornerRadius();
-    box = inkBox();
-  }
-  const dx = size / 2 - (box.x + box.w / 2);
-  const dy = size / 2 - (box.y + box.h / 2);
-
-  const out = document.createElement("canvas");
-  out.width = size;
-  out.height = size;
-  const ctx = out.getContext("2d");
+function drawImage({ width, height, background, svg }) {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
   if (background) {
     ctx.fillStyle = background;
-    ctx.fillRect(0, 0, size, size);
+    ctx.fillRect(0, 0, width, height);
   }
-  paint(ctx, dx, dy);
-  return {
-    dataUrl: out.toDataURL("image/png"),
-    fontPx: Math.round(px),
-    ink: { x: box.x + dx, y: box.y + dy, w: box.w, h: box.h },
-  };
-}
-
-// Same cells, gaps, radii and static opacities as AnimatedDubGridLogo.
-function drawGridMark({ size, scale, color }) {
-  const px = size * scale;
-  const canvas = document.createElement("canvas");
-  canvas.width = px;
-  canvas.height = px;
-  const ctx = canvas.getContext("2d");
-  const cell = px / 4;
-  const gap = cell * 0.1;
-  const inner = cell - gap * 2;
-  const radius = cell * 0.2;
-  ctx.fillStyle = color;
-  for (let row = 0; row < 4; row++) {
-    for (let col = 0; col < 4; col++) {
-      ctx.globalAlpha = row === 0 || col === 0 ? 1 : row + col <= 4 ? 0.75 : 0.3;
-      ctx.beginPath();
-      ctx.roundRect(col * cell + gap, row * cell + gap, inner, inner, radius);
-      ctx.fill();
-    }
-  }
-  return canvas.toDataURL("image/png");
+  const img = new Image();
+  return new Promise((resolve, reject) => {
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = reject;
+    img.src = `data:image/svg+xml;base64,${btoa(svg)}`;
+  });
 }
 
 function drawPreview({ ios, androidForeground, size, blue, visible }) {
@@ -287,44 +268,22 @@ async function main() {
   const previewPath = previewFlag === -1 ? null : process.argv[previewFlag + 1];
   if (previewFlag !== -1 && !previewPath) throw new Error("--preview needs a path");
 
-  const fontBase64 = readFileSync(fontPath).toString("base64");
   const browser = await chromium.launch();
   const page = await browser.newPage();
-  await page.setContent(
-    `<!doctype html><style>@font-face{font-family:'DM Sans';font-weight:700;` +
-      `src:url(data:font/ttf;base64,${fontBase64})}</style>`,
-  );
-  await page.evaluate(() => document.fonts.load("700 100px 'DM Sans'"));
 
   const rendered = {};
-  for (const icon of ICONS) {
-    const result = await page.evaluate(drawIcon, {
-      size: SIZE,
-      background: icon.background,
-      color: WHITE,
-      visible: icon.visible,
-      safe: icon.safe,
-      widthShare: WORDMARK_WIDTH,
-      linePitch: LINE_PITCH,
-      letterSpacing: LETTER_SPACING,
+  for (const image of IMAGES) {
+    const width = image.size;
+    const height = image.height ?? image.size;
+    const dataUrl = await page.evaluate(drawImage, {
+      width,
+      height,
+      background: image.background ?? null,
+      svg: symbolSvg({ ...image.svg, width, height }),
     });
-    writeFileSync(join(imagesDir, icon.name), pngBuffer(result.dataUrl));
-    rendered[icon.name] = result.dataUrl;
-    const { ink } = result;
-    console.log(
-      `✓ ${icon.name}: DM Sans ${result.fontPx}px, ink ${Math.round(ink.w)}x${Math.round(ink.h)} ` +
-        `at (${Math.round(ink.x)}, ${Math.round(ink.y)})`,
-    );
-  }
-
-  for (const splash of SPLASHES) {
-    const dataUrl = await page.evaluate(drawGridMark, {
-      size: SPLASH_MARK_SIZE,
-      scale: SPLASH_SCALE,
-      color: splash.color,
-    });
-    writeFileSync(join(imagesDir, splash.name), pngBuffer(dataUrl));
-    console.log(`✓ ${splash.name}: grid mark ${SPLASH_MARK_SIZE}dp in ${splash.color}`);
+    writeFileSync(join(imagesDir, image.name), pngBuffer(dataUrl));
+    rendered[image.name] = dataUrl;
+    console.log(`✓ ${image.name}: ${width}x${height}`);
   }
 
   if (previewPath) {

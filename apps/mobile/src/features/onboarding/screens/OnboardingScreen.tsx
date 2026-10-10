@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { router } from "expo-router";
 import {
   Dimensions,
-  Image,
   StyleSheet,
   View,
   type NativeScrollEvent,
@@ -11,7 +10,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { useAnimatedScrollHandler, useSharedValue } from "react-native-reanimated";
 import { Button } from "../../../shared/components/Button";
-import { DubGridWordmark } from "../../../shared/components/DubGridWordmark";
+import { DubGridLockup } from "../../../shared/components/BrandMark";
 import { GradientBackdrop } from "../../../shared/components/GradientBackdrop";
 import { hapticSelection } from "../../../shared/lib/haptics";
 import { markHasSeenOnboarding } from "../../auth/hooks/useHasSeenOnboarding";
@@ -137,13 +136,7 @@ export default function OnboardingScreen() {
       <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
         <View style={styles.headerRow}>
           <View style={styles.brand}>
-            <Image
-              accessibilityIgnoresInvertColors
-              accessibilityLabel="DubGrid logo"
-              source={require("../../../../assets/images/logo-blue.png")}
-              style={styles.brandMark}
-            />
-            <DubGridWordmark fontSize={20} color={mobileColors.textPrimary} />
+            <DubGridLockup color={mobileColors.textPrimary} fontSize={20} />
           </View>
           <View style={styles.skipButton}>
             <Button label="Skip" onPress={handleSkip} tone="link" />
@@ -232,11 +225,6 @@ const createStyles = (mobileColors: MobileColors) =>
     brand: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 8,
-    },
-    brandMark: {
-      width: 24,
-      height: 24,
     },
     skipButton: {
       minWidth: 64,

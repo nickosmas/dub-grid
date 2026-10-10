@@ -7,7 +7,7 @@ import { Button } from "@/components/Button";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { AuthStateCard } from "@/components/auth/AuthStateCard";
-import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { DubGridStackedLockup } from "@/components/Logo";
 import {
   fetchOrganizationAccessStatus,
   type OrganizationAccessState,
@@ -132,8 +132,7 @@ export function OrganizationGateScreen() {
             it moves with the viewport height. Every other auth page keeps the
             logo on the card surface for the same reason. */}
         <div className="dg-auth-logo-block dg-auth-logo-block--spacious">
-          <DubGridLogo size={72} />
-          <DubGridWordmark />
+          <DubGridStackedLockup />
         </div>
 
         <AuthStateCard

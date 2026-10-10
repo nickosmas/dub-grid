@@ -10,7 +10,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import CustomSelect from "@/components/CustomSelect";
 import { Form } from "@/components/Form";
-import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { DubGridStackedLockup } from "@/components/Logo";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { CheckCircle } from "lucide-react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -162,8 +162,7 @@ export default function RequestDemoPage() {
     <PageShell>
       <Card>
         <Link href="/" className="dg-auth-logo-block dg-auth-logo-block--spacious">
-          <DubGridLogo size={52} />
-          <DubGridWordmark />
+          <DubGridStackedLockup />
         </Link>
 
         <h1 className="dg-font-brand-heading dg-auth-heading dg-auth-page-heading">

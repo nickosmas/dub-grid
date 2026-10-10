@@ -12,6 +12,8 @@ import {
   type PublishedShiftRow,
 } from "@/lib/published-shifts";
 import { fetchAllRows } from "@/lib/db/shared";
+import { getBrandLockupSymbolLayout } from "@dubgrid/design-tokens";
+import { pdfBrandMarkCommands } from "./pdf-brand-mark";
 import {
   buildOperationsReportMetrics,
   buildOperationsReportPreviewTable,
@@ -1671,33 +1673,6 @@ function estimatePdfTextWidth(value: string, size: number): number {
   return value.length * size * 0.56;
 }
 
-function pdfDubGridLogoCommands(x: number, top: number, size = 24): string[] {
-  const cell = size / 4;
-  const gap = cell * 0.1;
-  const square = cell - gap * 2;
-  const ink: [number, number, number] = [0.059, 0.09, 0.141];
-  const medium: [number, number, number] = [0.294, 0.318, 0.356];
-  const light: [number, number, number] = [0.718, 0.727, 0.742];
-  const commands: string[] = [];
-
-  for (const row of [0, 1, 2, 3]) {
-    for (const col of [0, 1, 2, 3]) {
-      const color = row === 0 || col === 0 ? ink : row + col <= 4 ? medium : light;
-      commands.push(
-        pdfFillRgbRectCommand(
-          x + col * cell + gap,
-          top - row * cell - gap - square,
-          square,
-          square,
-          color,
-        ),
-      );
-    }
-  }
-
-  return commands;
-}
-
 function pdfImageCommand(
   name: string,
   x: number,
@@ -1715,8 +1690,9 @@ type PdfPngImage = {
   alpha: Uint8Array | null;
 };
 
-let cachedReportLogo: PdfPngImage | null | undefined;
-let cachedReportWordmark: PdfPngImage | null | undefined;
+let cachedReportLockup: PdfPngImage | null | undefined;
+// public/lockup.png is a 16 px wordmark rendered at 8x.
+const LOCKUP_SOURCE_FONT_PX = 128;
 
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -1845,7 +1821,7 @@ function parseRgbaPng(buffer: Buffer, tintColor?: [number, number, number]): Pdf
 }
 
 /**
- * Reads one of the app's own brand PNGs for the PDF export.
+ * Reads the app's own brand lockup PNG for the PDF export.
  *
  * Each readFileSync takes a fully literal path, and the two locations are
  * spelled out rather than looped over, because Turbopack resolves that argument
@@ -1859,46 +1835,25 @@ function parseRgbaPng(buffer: Buffer, tintColor?: [number, number, number]): Pdf
  * throwing, so a PDF still renders (without the artwork) in an environment that
  * does not expose public assets.
  */
-function readBrandAsset(name: "logo" | "wordmark-white"): Buffer | null {
-  if (name === "logo") {
-    try {
-      return readFileSync(join(process.cwd(), "public", "logo.png"));
-    } catch {
-      /* fall through to the monorepo-root location */
-    }
-    try {
-      return readFileSync(join(process.cwd(), "apps", "web", "public", "logo.png"));
-    } catch {
-      return null;
-    }
-  }
-
+function readReportLockup(): Buffer | null {
   try {
-    return readFileSync(join(process.cwd(), "public", "wordmark-white.png"));
+    return readFileSync(join(process.cwd(), "public", "lockup.png"));
   } catch {
     /* fall through to the monorepo-root location */
   }
   try {
-    return readFileSync(join(process.cwd(), "apps", "web", "public", "wordmark-white.png"));
+    return readFileSync(join(process.cwd(), "apps", "web", "public", "lockup.png"));
   } catch {
     return null;
   }
 }
 
-function getReportLogo(): PdfPngImage | null {
-  if (cachedReportLogo !== undefined) return cachedReportLogo;
+function getReportLockup(): PdfPngImage | null {
+  if (cachedReportLockup !== undefined) return cachedReportLockup;
 
-  const bytes = readBrandAsset("logo");
-  cachedReportLogo = bytes ? parseRgbaPng(bytes) : null;
-  return cachedReportLogo;
-}
-
-function getReportWordmark(): PdfPngImage | null {
-  if (cachedReportWordmark !== undefined) return cachedReportWordmark;
-
-  const bytes = readBrandAsset("wordmark-white");
-  cachedReportWordmark = bytes ? parseRgbaPng(bytes, [0.059, 0.09, 0.141]) : null;
-  return cachedReportWordmark;
+  const bytes = readReportLockup();
+  cachedReportLockup = bytes ? parseRgbaPng(bytes) : null;
+  return cachedReportLockup;
 }
 
 function formatPdfDateRangeLabel(range: OperationsReportRange): string {
@@ -1936,36 +1891,43 @@ function addOperationsPdfHeader(
   margin: number,
   top: number,
   contentWidth: number,
-  hasLogo: boolean,
-  hasWordmark: boolean,
+  lockup: PdfPngImage | null,
 ): number {
-  const logoSize = 24;
+  const brandSize = 17;
+  const brandRowHeight = 24;
   const ink: [number, number, number] = [0.059, 0.09, 0.141];
   const orgText: [number, number, number] = [0.29, 0.376, 0.502];
   const muted: [number, number, number] = [0.29, 0.376, 0.502];
   const divider: [number, number, number] = [0.059, 0.09, 0.141];
-  const wordmarkWidth = 72;
-  const wordmarkHeight = 25.5;
-  const wordmarkSize = 18;
   const orgSize = 11;
   const separatorHeight = 16;
-  const separatorPadding = 5;
+  const separatorPadding = 7;
   const separatorVisualWidth = 2.4;
   const separatorStrokeWidth = 0.8;
   const printedSize = 8;
   const titleSize = 9;
   const wordmark = "dubgrid";
-  const lineCenterY = top - logoSize / 2;
+  const lineCenterY = top - brandRowHeight / 2;
   const textCenterOffset = 0.26;
   const orgTextCenterOffset = 0.35;
-  const logoTop = lineCenterY + logoSize / 2;
-  const brandBaseline = lineCenterY - wordmarkSize * textCenterOffset;
-  const wordmarkX = margin + logoSize + 8;
-  const wordmarkTop = lineCenterY + wordmarkHeight / 2;
-  const renderedWordmarkWidth = hasWordmark
-    ? wordmarkWidth
-    : estimatePdfTextWidth(wordmark, wordmarkSize);
-  const separatorX = wordmarkX + renderedWordmarkWidth + separatorPadding;
+  const brandBaseline = lineCenterY - brandSize * textCenterOffset;
+  let brandRight: number;
+
+  if (lockup) {
+    const height = (brandSize * lockup.height) / LOCKUP_SOURCE_FONT_PX;
+    const width = (height * lockup.width) / lockup.height;
+    commands.push(pdfImageCommand("Lockup", margin, lineCenterY + height / 2, width, height));
+    brandRight = margin + width;
+  } else {
+    const symbol = getBrandLockupSymbolLayout(brandSize);
+    const inkTop = brandBaseline - symbol.belowBaseline + symbol.height;
+    const wordmarkX = margin + symbol.width + symbol.marginRight;
+    commands.push(...pdfBrandMarkCommands(margin, inkTop, symbol.width, ink));
+    commands.push(pdfTextCommand(wordmarkX, brandBaseline, brandSize, wordmark, ink, "F2"));
+    brandRight = wordmarkX + estimatePdfTextWidth(wordmark, brandSize);
+  }
+
+  const separatorX = brandRight + separatorPadding;
   const separatorStrokeX = separatorX + (separatorVisualWidth - separatorStrokeWidth) / 2;
   const separatorY = lineCenterY - separatorHeight / 2;
   const orgX = separatorX + separatorVisualWidth + separatorPadding;
@@ -1978,18 +1940,6 @@ function addOperationsPdfHeader(
   const printedLabel = `Printed ${formatPdfPrintedDate(payload.generatedAt, payload.orgTimezone)}`;
   const printedX = margin + contentWidth - estimatePdfTextWidth(printedLabel, printedSize);
 
-  if (hasLogo) {
-    commands.push(pdfImageCommand("Logo", margin, logoTop, logoSize, logoSize));
-  } else {
-    commands.push(...pdfDubGridLogoCommands(margin, logoTop, logoSize));
-  }
-  if (hasWordmark) {
-    commands.push(
-      pdfImageCommand("Wordmark", wordmarkX, wordmarkTop, wordmarkWidth, wordmarkHeight),
-    );
-  } else {
-    commands.push(pdfTextCommand(wordmarkX, brandBaseline, wordmarkSize, wordmark, ink, "F2"));
-  }
   commands.push(
     pdfFillRgbRectCommand(
       separatorStrokeX,
@@ -2068,41 +2018,26 @@ function pdfImageObject(
   return `<< /Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} /ColorSpace ${colorSpace} /BitsPerComponent 8 /Filter [/ASCIIHexDecode /FlateDecode]${smask} /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
 }
 
-function buildPdfDocument(
-  pageStreams: string[],
-  logo: PdfPngImage | null,
-  wordmark: PdfPngImage | null,
-): ArrayBuffer {
+function buildPdfDocument(pageStreams: string[], lockup: PdfPngImage | null): ArrayBuffer {
   const encoder = new TextEncoder();
   const objects: string[] = [];
   const pageObjectIds: number[] = [];
   const fontObjectId = 3;
   const boldFontObjectId = 4;
-  let logoObjectId: number | null = null;
-  let wordmarkObjectId: number | null = null;
+  let lockupObjectId: number | null = null;
 
   objects[1] = "<< /Type /Catalog /Pages 2 0 R >>";
   objects[fontObjectId] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>";
   objects[boldFontObjectId] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>";
 
-  if (logo) {
+  if (lockup) {
     let smaskObjectId: number | null = null;
-    if (logo.alpha) {
+    if (lockup.alpha) {
       smaskObjectId = objects.length;
-      objects[smaskObjectId] = pdfImageObject(logo, "alpha");
+      objects[smaskObjectId] = pdfImageObject(lockup, "alpha");
     }
-    logoObjectId = objects.length;
-    objects[logoObjectId] = pdfImageObject(logo, "rgb", smaskObjectId);
-  }
-
-  if (wordmark) {
-    let smaskObjectId: number | null = null;
-    if (wordmark.alpha) {
-      smaskObjectId = objects.length;
-      objects[smaskObjectId] = pdfImageObject(wordmark, "alpha");
-    }
-    wordmarkObjectId = objects.length;
-    objects[wordmarkObjectId] = pdfImageObject(wordmark, "rgb", smaskObjectId);
+    lockupObjectId = objects.length;
+    objects[lockupObjectId] = pdfImageObject(lockup, "rgb", smaskObjectId);
   }
 
   for (const stream of pageStreams) {
@@ -2110,11 +2045,8 @@ function buildPdfDocument(
     objects[contentId] =
       `<< /Length ${encoder.encode(stream).length} >>\nstream\n${stream}\nendstream`;
     const pageId = objects.length;
-    const xObjects = [
-      logoObjectId == null ? "" : `/Logo ${logoObjectId} 0 R`,
-      wordmarkObjectId == null ? "" : `/Wordmark ${wordmarkObjectId} 0 R`,
-    ].filter(Boolean);
-    const xObjectResources = xObjects.length === 0 ? "" : ` /XObject << ${xObjects.join(" ")} >>`;
+    const xObjectResources =
+      lockupObjectId == null ? "" : ` /XObject << /Lockup ${lockupObjectId} 0 R >>`;
     objects[pageId] =
       `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 792 612] /Resources << /Font << /F1 ${fontObjectId} 0 R /F2 ${boldFontObjectId} 0 R >>${xObjectResources} >> /Contents ${contentId} 0 R >>`;
     pageObjectIds.push(pageId);
@@ -2146,8 +2078,7 @@ export function buildOperationsReportPdf(
 ): ArrayBuffer {
   const table = buildOperationsReportTable(payload, report);
   const pageStreams: string[] = [];
-  const logo = getReportLogo();
-  const wordmark = getReportWordmark();
+  const lockup = getReportLockup();
   const margin = 32;
   const pageHeight = 612;
   const contentWidth = 792 - margin * 2;
@@ -2172,17 +2103,7 @@ export function buildOperationsReportPdf(
     y -= gap;
   };
 
-  y = addOperationsPdfHeader(
-    commands,
-    payload,
-    report,
-    table,
-    margin,
-    y,
-    contentWidth,
-    logo != null,
-    wordmark != null,
-  );
+  y = addOperationsPdfHeader(commands, payload, report, table, margin, y, contentWidth, lockup);
 
   const details = buildOperationsReportMetrics(payload, report);
   if (details.length > 0) {
@@ -2255,7 +2176,7 @@ export function buildOperationsReportPdf(
     pageStreams.push(commands.join("\n"));
   }
 
-  return buildPdfDocument(pageStreams, logo, wordmark);
+  return buildPdfDocument(pageStreams, lockup);
 }
 
 /**

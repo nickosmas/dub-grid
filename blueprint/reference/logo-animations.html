@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>DubGrid logo animations</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css"
+    />
+    <style>
+      :root {
+        --text-primary: #111827;
+        --text-secondary: #6b7280;
+        --surface-1: #f4f4f5;
+        --surface-2: #ffffff;
+        --page: #fafafa;
+        --border: rgba(0, 0, 0, 0.1);
+        --border-strong: rgba(0, 0, 0, 0.18);
+        --radius: 8px;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --text-primary: #fafafa;
+          --text-secondary: #a1a1aa;
+          --surface-1: #18181b;
+          --surface-2: #202024;
+          --page: #0f0f11;
+          --border: rgba(255, 255, 255, 0.1);
+          --border-strong: rgba(255, 255, 255, 0.18);
+        }
+      }
+      body {
+        margin: 0;
+        padding: 24px 16px;
+        background: var(--page);
+        color: var(--text-primary);
+        font-family: Inter, system-ui, sans-serif;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 20px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      .sub {
+        font-size: 13px;
+        color: var(--text-secondary);
+        margin: 0 0 18px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Logo animations</h1>
+      <p class="sub">
+        The approved set: refined Shuffle, original motion for the other eight. Spec in
+        logo-animations.md.
+      </p>
+      <div id="anRoot">
+        <style>
+          #anRoot .lbl {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin: 0 0 5px;
+          }
+          .an-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            align-items: flex-end;
+            margin-bottom: 14px;
+          }
+          .an-seg {
+            display: flex;
+            padding: 2px;
+            gap: 2px;
+            border-radius: var(--radius);
+            background: var(--surface-1);
+            border: 0.5px solid var(--border);
+          }
+          .an-seg button {
+            font: inherit;
+            font-size: 12.5px;
+            padding: 5px 9px;
+            border: 0;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            white-space: nowrap;
+          }
+          .an-seg button[aria-pressed="true"] {
+            background: var(--surface-2);
+            color: var(--text-primary);
+            box-shadow: 0 0 0 0.5px var(--border-strong);
+          }
+          .an-btn {
+            font: inherit;
+            font-size: 12.5px;
+            padding: 6px 11px;
+            border-radius: var(--radius);
+            border: 0.5px solid var(--border-strong);
+            background: var(--surface-2);
+            color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            gap: 6px;
+            align-items: center;
+          }
+          .an-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+          }
+          .an-card {
+            border-radius: 12px;
+            border: 0.5px solid var(--border);
+            background: var(--surface-2);
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+          }
+          .an-card.wide {
+            grid-column: 1/-1;
+          }
+          .an-stage {
+            height: 132px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+          }
+          .an-stage svg {
+            height: 84px;
+            width: auto;
+            overflow: visible;
+          }
+          .an-card.wide .an-stage svg {
+            height: 62px;
+          }
+          .an-head {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+          }
+          .an-name {
+            font-size: 14px;
+            font-weight: 500;
+            flex: 1;
+          }
+          .an-tag {
+            font-size: 11.5px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+          }
+          .an-use {
+            font-size: 12.5px;
+            color: var(--text-secondary);
+            line-height: 1.45;
+            margin: 0;
+          }
+        </style>
+        <div class="an-bar">
+          <div>
+            <p class="lbl">Background</p>
+            <div class="an-seg" data-k="bg">
+              <button data-v="light">Light</button><button data-v="dark">Dark</button
+              ><button data-v="blue">Blue</button>
+            </div>
+          </div>
+          <div>
+            <p class="lbl">Speed</p>
+            <div class="an-seg" data-k="speed">
+              <button data-v="1">1×</button><button data-v="0.5">0.5×</button
+              ><button data-v="0.25">0.25×</button>
+            </div>
+          </div>
+          <button class="an-btn" id="anReplay">
+            <i class="ti ti-refresh" aria-hidden="true"></i>Replay all
+          </button>
+        </div>
+        <div class="an-grid" id="anGrid"></div>
+      </div>
+      <script>
+        (function () {
+          const R = document.getElementById("anRoot"),
+            $ = (s) => R.querySelector(s),
+            $$ = (s) => R.querySelectorAll(s);
+          const WORD = {
+            w: 3740,
+            p: "M290,12Q221,12 166,-22Q112,-56 81,-116Q50,-176 50,-251Q50,-328 82,-388Q113,-447 168,-482Q224,-516 293,-516Q347,-516 388,-496Q429,-476 454,-439L454,-720L589,-720L589,0L469,0L454,-69L454,-69Q439,-48 416,-29Q394,-10 363,1Q332,12 290,12ZM322,-106Q362,-106 392,-124Q423,-143 440,-176Q457,-209 457,-252Q457,-295 440,-328Q423,-361 392,-380Q362,-398 322,-398Q284,-398 253,-380Q222,-361 204,-328Q187,-295 187,-253Q187,-209 204,-176Q222,-143 252,-124Q283,-106 322,-106ZM889,12Q828,12 784,-14Q741,-39 718,-88Q695,-138 695,-211L695,-504L830,-504L830,-225Q830,-164 856,-133Q881,-102 934,-102Q968,-102 994,-118Q1020,-133 1036,-162Q1051,-192 1051,-235L1051,-504L1185,-504L1185,0L1067,0L1056,-82L1056,-82Q1034,-39 991,-14Q948,12 889,12ZM1595,12Q1556,12 1526,2Q1495,-8 1472,-26Q1448,-43 1432,-65L1432,-65L1417,0L1297,0L1297,-720L1432,-720L1432,-434Q1456,-469 1496,-492Q1535,-516 1594,-516Q1664,-516 1718,-482Q1773,-447 1804,-388Q1836,-328 1836,-251Q1836,-176 1804,-116Q1773,-56 1719,-22Q1665,12 1595,12ZM1563,-106Q1603,-106 1634,-124Q1664,-143 1681,-176Q1698,-208 1698,-251Q1698,-294 1681,-328Q1664,-361 1634,-380Q1603,-398 1563,-398Q1524,-398 1494,-380Q1463,-361 1446,-328Q1428,-295 1428,-252Q1428,-209 1446,-176Q1463,-142 1494,-124Q1524,-106 1563,-106ZM2149,232Q2077,232 2023,214Q1969,197 1940,162Q1910,126 1910,74Q1910,39 1928,8Q1946,-23 1980,-48Q2015,-74 2067,-92L2118,-26Q2072,-11 2052,12Q2031,34 2031,60Q2031,83 2046,99Q2062,115 2088,122Q2115,130 2148,130Q2180,130 2204,122Q2227,114 2240,98Q2254,83 2254,62Q2254,35 2235,18Q2216,1 2159,-3Q2108,-7 2068,-14Q2029,-22 1999,-32Q1969,-43 1948,-56Q1928,-69 1915,-82L1915,-105L2022,-220L2119,-189L1993,-65L2031,-131Q2042,-125 2052,-120Q2063,-114 2079,-110Q2095,-105 2121,-101Q2147,-97 2187,-94Q2253,-88 2296,-69Q2338,-50 2358,-18Q2378,13 2378,59Q2378,104 2354,144Q2329,183 2278,208Q2227,232 2149,232ZM2149,-149Q2086,-149 2040,-174Q1995,-198 1970,-240Q1946,-281 1946,-332Q1946,-383 1970,-424Q1995,-466 2040,-491Q2086,-516 2149,-516Q2213,-516 2258,-491Q2304,-466 2328,-424Q2352,-383 2352,-332Q2352,-281 2328,-240Q2304,-198 2258,-174Q2213,-149 2149,-149ZM2149,-252Q2188,-252 2212,-272Q2236,-292 2236,-331Q2236,-370 2212,-390Q2188,-411 2149,-411Q2111,-411 2086,-390Q2062,-370 2062,-331Q2062,-292 2086,-272Q2111,-252 2149,-252ZM2233,-408L2211,-504L2418,-504L2418,-424L2233,-408ZM2508,0L2508,-504L2628,-504L2641,-411L2641,-411Q2659,-444 2686,-467Q2714,-490 2750,-503Q2785,-516 2828,-516L2828,-373L2782,-373Q2752,-373 2726,-366Q2701,-359 2682,-344Q2663,-328 2653,-301Q2643,-274 2643,-233L2643,0L2508,0ZM2900,0L2900,-504L3035,-504L3035,0L2900,0ZM2968,-573Q2932,-573 2908,-594Q2885,-616 2885,-649Q2885,-682 2908,-704Q2932,-725 2968,-725Q3005,-725 3028,-704Q3052,-682 3052,-649Q3052,-616 3028,-594Q3005,-573 2968,-573ZM3375,12Q3306,12 3252,-22Q3197,-56 3166,-116Q3135,-176 3135,-251Q3135,-328 3166,-388Q3198,-447 3254,-482Q3309,-516 3378,-516Q3432,-516 3473,-496Q3514,-476 3539,-439L3539,-720L3674,-720L3674,0L3554,0L3539,-69L3539,-69Q3524,-48 3502,-29Q3479,-10 3448,1Q3417,12 3375,12ZM3407,-106Q3447,-106 3478,-124Q3508,-143 3525,-176Q3542,-209 3542,-252Q3542,-295 3525,-328Q3508,-361 3478,-380Q3447,-398 3407,-398Q3369,-398 3338,-380Q3307,-361 3290,-328Q3272,-295 3272,-253Q3272,-209 3290,-176Q3307,-143 3338,-124Q3368,-106 3407,-106Z",
+          };
+          const S = { bg: "light", speed: "1" };
+          const f = (n) => (+n).toFixed(2);
+          function rrc(x, y, w, h, r, s = 0.6) {
+            const m = Math.min(w, h) / 2;
+            r = Math.max(0, Math.min(r, m));
+            const p = Math.min(r * (1 + s), m),
+              q = Math.max(0, (2.343 * r - p) / 3);
+            return `M${f(x + p)},${f(y)}H${f(x + w - p)}C${f(x + w - q)},${f(y)} ${f(x + w)},${f(y + q)} ${f(x + w)},${f(y + p)}V${f(y + h - p)}C${f(x + w)},${f(y + h - q)} ${f(x + w - q)},${f(y + h)} ${f(x + w - p)},${f(y + h)}H${f(x + p)}C${f(x + q)},${f(y + h)} ${f(x)},${f(y + h - q)} ${f(x)},${f(y + h - p)}V${f(y + p)}C${f(x)},${f(y + q)} ${f(x + q)},${f(y)} ${f(x + p)},${f(y)}Z`;
+          }
+          const TH = {
+            light: { bg: "#ffffff", ink: "#111827", front: "#2563EB" },
+            dark: { bg: "#09090B", ink: "#FAFAFA", front: "#4A9BFF" },
+            blue: { bg: "#2563EB", ink: "#ffffff", front: "#ffffff" },
+          };
+          const B = { cx: 36.31, cy: 50, w: 66.61, r: 12.49 },
+            F = { cx: 59.99, cy: 50, w: 74.02, r: 15.21 },
+            AR = 0.75;
+          const cl = (x) => Math.max(0, Math.min(1, x)),
+            lerp = (a, b, t) => a + (b - a) * t;
+          const eio = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2),
+            eo = (x) => 1 - Math.pow(1 - x, 3),
+            eob = (x) => 1 + 2.4 * Math.pow(x - 1, 3) + 1.4 * Math.pow(x - 1, 2);
+          const move = (x) => (x < 0.5 ? 8 * x * x * x * x : 1 - Math.pow(-2 * x + 2, 4) / 2);
+          const ss = (a, b, x) => {
+            x = cl((x - a) / (b - a));
+            return x * x * (3 - 2 * x);
+          };
+          const mid = (a, b, k) => ({
+            cx: lerp(a.cx, b.cx, k),
+            cy: lerp(a.cy, b.cy, k),
+            w: lerp(a.w, b.w, k),
+            r: lerp(a.r, b.r, k),
+          });
+          const C = (base, o = {}) =>
+            Object.assign(
+              {
+                cx: base.cx,
+                cy: base.cy,
+                w: base.w,
+                r: base.r,
+                s: 1,
+                a: 1,
+                wt: 0,
+                rot: 0,
+                dash: 1,
+                off: 0,
+              },
+              o,
+            );
+          function card(c, th) {
+            if (c.a < 0.003) return "";
+            const w = c.w * c.s,
+              h = w * AR,
+              x = c.cx - w / 2,
+              y = c.cy - h / 2,
+              P = rrc(x, y, w, h, c.r * c.s),
+              tr = c.rot ? ` transform="rotate(${f(c.rot)} ${f(c.cx)} ${f(c.cy)})"` : "";
+            let s = "";
+            if (c.wt > 0.02)
+              s += `<path d="${P}" fill="none" stroke="${th.bg}" stroke-width="${f(12 * c.wt)}" stroke-linejoin="round"${tr}/>`;
+            const dash =
+              c.dash < 1
+                ? ` pathLength="1" stroke-dasharray="${f(c.dash)} 1" stroke-dashoffset="${f(c.off)}"`
+                : "";
+            s += `<path d="${P}" fill="${th.front}" fill-opacity="${f(c.wt)}" stroke="${th.front}" stroke-width="${f(6 * (1 - c.wt))}"${dash}${tr}/>`;
+            return `<g opacity="${f(c.a)}">${s}</g>`;
+          }
+          const frame = (cards, th) =>
+            cards
+              .slice()
+              .sort((p, q) => p.wt - q.wt)
+              .map((c) => card(c, th))
+              .join("");
+          const A = [
+            {
+              n: "Reveal",
+              use: "Sign-in and website intro: the symbol is dealt, then the name wipes in.",
+              tag: "Once · 1.65 s",
+              P: 3.4,
+              wide: 1,
+              fn: (t) => {
+                const k = cl((t - 0.3) / 0.5);
+                return {
+                  cards: [
+                    C(B, { dash: eo(cl(t / 0.45)) }),
+                    C(F, { wt: 1, a: cl(k * 3), cx: F.cx + 22 * (1 - eob(k)) }),
+                  ],
+                  word: eo(cl((t - 0.75) / 0.9)),
+                };
+              },
+            },
+            {
+              n: "Deal",
+              use: "First launch: the back card draws in, the front card is dealt on top.",
+              tag: "Once · 0.9 s",
+              P: 2.6,
+              fn: (t) => {
+                const k = cl((t - 0.35) / 0.55);
+                return [
+                  C(B, { dash: eo(cl(t / 0.55)) }),
+                  C(F, { wt: 1, a: cl(k * 3), cx: F.cx + 28 * (1 - eob(k)) }),
+                ];
+              },
+            },
+            {
+              n: "Shuffle",
+              use: "Loading: the cards trade places along one arc, then rest. Refined.",
+              tag: "Loop · 1.8 s",
+              P: 1.8,
+              loop: 1,
+              fn: (t) => {
+                const u = cl(t),
+                  q = Math.PI * move(u),
+                  w = ss(0.3, 0.7, u);
+                return [0, Math.PI].map((o) => {
+                  const a = q + o,
+                    k = (1 - Math.cos(a)) / 2,
+                    c = C(mid(F, B, k), { wt: o ? w : 1 - w });
+                  c.cy = 50 - 8 * Math.sin(a);
+                  return c;
+                });
+              },
+            },
+            {
+              n: "Breathe",
+              use: "Splash while the session restores: a calm, slow pulse.",
+              tag: "Loop · 2.4 s",
+              P: 2.4,
+              loop: 1,
+              fn: (t) => {
+                const u = 0.5 - 0.5 * Math.cos((2 * Math.PI * t) / 2.4);
+                return [C(B, { cx: B.cx - 4 * u }), C(F, { wt: 1, s: 1 + 0.045 * u })];
+              },
+            },
+            {
+              n: "Trace",
+              use: "Syncing and work in progress: the back card is traced around.",
+              tag: "Loop · 1.4 s",
+              P: 1.4,
+              loop: 1,
+              fn: (t) => [C(B, { a: 0.28 }), C(B, { dash: 0.32, off: -t / 1.4 }), C(F, { wt: 1 })],
+            },
+            {
+              n: "Conveyor",
+              use: "Publishing: new cards arrive at the front, the oldest leaves.",
+              tag: "Loop · 1.8 s",
+              P: 1.8,
+              loop: 1,
+              fn: (t) => {
+                const k = eio(cl((t - 0.35) / 1.1)),
+                  out = { cx: B.cx - 30, cy: B.cy, w: B.w * 0.9, r: B.r },
+                  inn = { cx: F.cx + 40, cy: F.cy, w: F.w, r: F.r };
+                return [
+                  C(mid(B, out, k), { a: 1 - k }),
+                  C(mid(F, B, k), { wt: 1 - k }),
+                  C(mid(inn, F, k), { wt: 1, a: cl(k * 2.5) }),
+                ];
+              },
+            },
+            {
+              n: "Pull",
+              use: "Pull-to-refresh on the phone: the cards fan as you pull and snap back.",
+              tag: "Gesture",
+              P: 2.4,
+              loop: 1,
+              fn: (t) => {
+                const p = t < 0.8 ? eo(t / 0.8) : t < 1.2 ? 1 : 1 - eob(cl((t - 1.2) / 0.6));
+                return [
+                  C(B, { cx: B.cx - 12 * p, rot: -8 * p }),
+                  C(F, { wt: 1, cx: F.cx + 5 * p, rot: 5 * p }),
+                ];
+              },
+            },
+            {
+              n: "Press",
+              use: "Tapping the logo: the front card presses into the back one.",
+              tag: "Once · 0.45 s",
+              P: 1.3,
+              loop: 1,
+              fn: (t) => {
+                const p = t < 0.12 ? eo(t / 0.12) : 1 - eob(cl((t - 0.12) / 0.33));
+                return [C(B, { cx: B.cx + 5 * p }), C(F, { wt: 1, s: 1 - 0.07 * p })];
+              },
+            },
+            {
+              n: "Exit",
+              use: "Goodbye after sign-out: the cards slide apart and fade (shown returning).",
+              tag: "Once · 0.8 s",
+              P: 2.6,
+              fn: (t) => {
+                const k = t < 0.8 ? eio(t / 0.8) : t < 1.3 ? 1 : 1 - eio(cl((t - 1.3) / 0.8));
+                return [
+                  C(B, { cx: B.cx - 24 * k, a: 1 - k }),
+                  C(F, { wt: 1, cx: F.cx + 24 * k, a: 1 - k }),
+                ];
+              },
+            },
+          ];
+          $("#anGrid").innerHTML = A.map(
+            (a, i) =>
+              `<div class="an-card${a.wide ? " wide" : ""}"><div class="an-stage" id="st${i}"></div><div class="an-head"><span class="an-name">${a.n}</span><span class="an-tag">${a.tag}</span></div><p class="an-use">${a.use}</p></div>`,
+          ).join("");
+          const stages = A.map((_, i) => $("#st" + i));
+          let t0 = performance.now(),
+            still = false;
+          try {
+            still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+          } catch (e) {}
+          function draw(now) {
+            const th = TH[S.bg],
+              T = ((now - t0) / 1000) * +S.speed;
+            A.forEach((a, i) => {
+              const t = still ? (a.loop ? 0 : a.P * 0.99) : T % a.P,
+                r = a.fn(t),
+                cards = Array.isArray(r) ? r : r.cards;
+              let svg;
+              if (a.wide) {
+                const ws = 55.51 / 720,
+                  ww = r.word,
+                  id = "wc" + i,
+                  W2 = WORD.w * ws,
+                  x0 = 97 + 230 * ws;
+                svg = `<svg viewBox="-4 0 ${f(x0 + W2 + 12)} 100" aria-hidden="true"><defs><clipPath id="${id}"><rect x="${f(x0 - 4)}" y="0" width="${f(ww * (W2 + 8))}" height="100"/></clipPath></defs>${frame(cards, th)}<g clip-path="url(#${id})"><g transform="translate(${f(x0)},77.76) scale(${f(ws)})"><path d="${WORD.p}" fill="${th.ink}"/></g></g></svg>`;
+              } else
+                svg = `<svg viewBox="-10 0 120 100" aria-hidden="true">${frame(cards, th)}</svg>`;
+              stages[i].innerHTML = svg;
+              stages[i].style.background = th.bg;
+              stages[i].style.boxShadow =
+                S.bg === "light" ? "inset 0 0 0 0.5px var(--border-strong)" : "none";
+            });
+            if (!still) requestAnimationFrame(draw);
+          }
+          function sync() {
+            $$(".an-seg[data-k]").forEach((sg) =>
+              sg
+                .querySelectorAll("button")
+                .forEach((b) =>
+                  b.setAttribute("aria-pressed", String(S[sg.dataset.k] === b.dataset.v)),
+                ),
+            );
+          }
+          $$(".an-seg[data-k]").forEach((sg) =>
+            sg.addEventListener("click", (e) => {
+              const b = e.target.closest("button");
+              if (!b) return;
+              S[sg.dataset.k] = b.dataset.v;
+              t0 = performance.now();
+              sync();
+              if (still) draw(performance.now());
+            }),
+          );
+          $("#anReplay").addEventListener("click", () => {
+            t0 = performance.now();
+          });
+          sync();
+          requestAnimationFrame(draw);
+        })();
+      </script>
+    </main>
+  </body>
+</html>

@@ -9,7 +9,7 @@ import { AuthStateCard } from "@/components/auth/AuthStateCard";
 import { PasswordInput } from "@/components/auth/PasswordInput";
 import { PasswordStrength } from "@/components/auth/PasswordStrength";
 import { getPasswordMismatchError, isPasswordAcceptable } from "@dubgrid/domain";
-import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { DubGridStackedLockup } from "@/components/Logo";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { ApexLandingLink } from "@/components/auth/ApexLandingLink";
 import { toast } from "sonner";
@@ -291,8 +291,7 @@ function ResetPasswordContent() {
       <Card>
         {/* Logo */}
         <ApexLandingLink className="dg-auth-logo-block dg-auth-logo-block--compact">
-          <DubGridLogo size={44} />
-          <DubGridWordmark />
+          <DubGridStackedLockup />
         </ApexLandingLink>
 
         {state === "loading" ? (

@@ -16,7 +16,7 @@ Feature code in `apps/mobile/src`.
 - iOS: `npm --workspace @dubgrid/mobile run ios`
 - Android: `npm --workspace @dubgrid/mobile run android`
 - Root mobile + contracts + schedule-core tests: `npm run test:mobile`
-- App icons: `npm --workspace @dubgrid/mobile run icons` (stacked wordmark, both platforms' safe zones)
+- App icons: `npm --workspace @dubgrid/mobile run icons` (the two-card symbol from `@dubgrid/design-tokens`, both platforms' safe zones; build the packages first)
 
 First-run state is device-local storage, not DB state, so `npm run db:reset`
 never clears it: `hasSeenOnboarding` (`shared/lib/session.ts`) and the cookie

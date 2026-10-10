@@ -8,7 +8,7 @@ import { INVITATION_LIFETIME_HOURS } from "@dubgrid/domain";
 // @/features/account/client is imported dynamically inside the session effect —
 // see the comment there. A static import here pulls the Supabase auth SDK into
 // the landing page's initial bundle for visitors who are not signed in.
-import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { DubGridLockup, DubGridLogo } from "@/components/Logo";
 import { Button } from "@/components/Button";
 import ButtonSpinner from "@/components/ButtonSpinner";
 import { openConsentPreferences } from "@/components/CookieConsent";
@@ -281,8 +281,11 @@ export default function RootPage() {
       <nav className="landing-nav fixed top-0 left-0 right-0 z-50 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <DubGridLogo size={28} color="var(--dg-color-text-inverse)" />
-            <DubGridWordmark fontSize={18} color="var(--dg-color-text-inverse)" />
+            <DubGridLockup
+              fontSize={24}
+              color="var(--dg-color-text-inverse)"
+              markColor="var(--dg-color-text-inverse)"
+            />
           </div>
 
           <div className="hidden md:flex items-center gap-1">
@@ -319,8 +322,11 @@ export default function RootPage() {
         <div className="landing-mobile-menu fixed inset-0 z-[60] flex flex-col">
           <div className="flex items-center justify-between px-6 h-14">
             <div className="flex items-center gap-2.5">
-              <DubGridLogo size={28} color="var(--dg-color-text-inverse)" />
-              <DubGridWordmark fontSize={18} color="var(--dg-color-text-inverse)" />
+              <DubGridLockup
+                fontSize={24}
+                color="var(--dg-color-text-inverse)"
+                markColor="var(--dg-color-text-inverse)"
+              />
             </div>
             <div className="flex items-center gap-1">
               <ThemeToggleButton onDarkSurface />

@@ -1,5 +1,5 @@
 import { ImageResponse } from "next/og";
-import { LogoGrid, loadDmSansFonts } from "./logo-grid";
+import { LogoMark, loadDmSansFonts } from "./logo-grid";
 
 export const alt = "DubGrid: Smart staff scheduling for care facilities";
 export const size = { width: 1200, height: 630 };
@@ -20,7 +20,7 @@ export default async function OpenGraphImage() {
         fontFamily: "DM Sans",
       }}
     >
-      <LogoGrid size={200} />
+      <LogoMark width={220} background="#F8FAFC" />
       <div
         style={{
           display: "flex",

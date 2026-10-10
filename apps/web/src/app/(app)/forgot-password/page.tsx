@@ -5,7 +5,7 @@ import { PublicRoute } from "@/components/RouteGuards";
 import { Form } from "@/components/Form";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { AuthStateCard } from "@/components/auth/AuthStateCard";
-import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { DubGridStackedLockup } from "@/components/Logo";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -56,8 +56,7 @@ function ForgotPasswordContent() {
       <Card>
         {/* Logo */}
         <ApexLandingLink className="dg-auth-logo-block dg-auth-logo-block--compact">
-          <DubGridLogo size={44} />
-          <DubGridWordmark />
+          <DubGridStackedLockup />
         </ApexLandingLink>
 
         {sent ? (

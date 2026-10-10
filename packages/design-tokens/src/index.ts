@@ -1,13 +1,30 @@
+export { BRAND_ANIMATED_LOGO_SIZE } from "./animated-logo";
+
 export {
-  BRAND_ANIMATED_LOGO_SIZE,
-  ANIMATED_LOGO_OPACITY_MIN,
-  ANIMATED_LOGO_OPACITY_MAX,
-  ANIMATED_LOGO_DURATION_MIN_S,
-  ANIMATED_LOGO_DURATION_MAX_S,
-  ANIMATED_LOGO_DELAY_MAX_S,
-  generateAnimatedLogoTimings,
-  type AnimatedLogoTiming,
-} from "./animated-logo";
+  BRAND_LOCKUP_GAP_EM,
+  BRAND_LOCKUP_SYMBOL_EM,
+  BRAND_MARK_BACK,
+  BRAND_MARK_BACK_STROKE,
+  BRAND_MARK_COLORS,
+  BRAND_MARK_CORNER_SMOOTHING,
+  BRAND_MARK_FRONT,
+  BRAND_MARK_GAP,
+  BRAND_MARK_INK,
+  BRAND_MARK_OPTICAL_OFFSET_X,
+  BRAND_MARK_SQUARE,
+  BRAND_MARK_VIEWBOX,
+  BRAND_STACKED_GAP_EM,
+  BRAND_STACKED_SYMBOL_EM,
+  BRAND_WORDMARK_METRICS_EM,
+  BRAND_WORDMARK_OPTICAL_CENTER_EM,
+  BRAND_WORDMARK_TRACKING_EM,
+  brandMarkCardPath,
+  getBrandLockupSymbolLayout,
+  getBrandStackedLayout,
+  type BrandStackedLayout,
+  type BrandLockupSymbolLayout,
+  type BrandMarkCard,
+} from "./brand-mark";
 
 export { getAvatarTone, resolveAvatarSeed, type AvatarTone } from "./avatar-tone";
 export {

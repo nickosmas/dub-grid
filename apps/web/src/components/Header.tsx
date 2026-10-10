@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
-import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { DubGridLockup, DubGridLogo } from "@/components/Logo";
 import { Button } from "@/components/Button";
 import {
   DashboardIcon,
@@ -448,7 +448,7 @@ export default function Header({ orgName }: HeaderProps) {
         >
           {/* Logo + Org Name */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
-            <DubGridLogo size={26} />
+            <DubGridLogo size={36} />
             {orgName && (
               <>
                 <span
@@ -559,8 +559,11 @@ export default function Header({ orgName }: HeaderProps) {
       >
         {/* Logo + Org Anchor */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flexShrink: 0 }}>
-          <DubGridLogo size={30} />
-          {!isTablet && <DubGridWordmark fontSize={18} color="var(--dg-color-text-primary)" />}
+          {isTablet ? (
+            <DubGridLogo size={40} />
+          ) : (
+            <DubGridLockup fontSize={24} color="var(--dg-color-text-primary)" />
+          )}
           {orgName && (
             <>
               <span
