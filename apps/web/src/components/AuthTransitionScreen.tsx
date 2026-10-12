@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AnimatedDubGridLogo } from "@/components/AnimatedDubGridLogo";
 import { Button } from "@/components/Button";
+import { DelayedReveal } from "@/components/DelayedReveal";
 import { useLogout } from "@/hooks/useLogout";
 import { getAuthTransitionStartedAt } from "@/lib/auth-transition";
 
@@ -34,12 +35,18 @@ export default function AuthTransitionScreen({
   retrying = false,
   offline = false,
   showActionsImmediately = false,
+  revealAfterMs = 0,
 }: {
   phase: TransitionPhase;
   onRetry?: () => Promise<void>;
   retrying?: boolean;
   offline?: boolean;
   showActionsImmediately?: boolean;
+  /**
+   * Shows only the background until this many ms have passed, for waits that
+   * are usually too short to need a loading screen.
+   */
+  revealAfterMs?: number;
 }) {
   const { signOut } = useLogout();
   const [startedAt] = useState(() => getAuthTransitionStartedAt() ?? Date.now());
@@ -63,6 +70,54 @@ export default function AuthTransitionScreen({
       ? "This is taking a little longer than usual. We’re still getting things ready."
       : copy.detail;
 
+  const content = (
+    <div style={{ width: "100%", maxWidth: 440, textAlign: "center" }}>
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
+        {/* A long wait or a retry trades the calm pulse for a traced outline, so
+            the screen visibly shows work still in progress. */}
+        <AnimatedDubGridLogo animation={isSlow || retrying ? "trace" : "breathe"} />
+      </div>
+      <h1
+        style={{
+          margin: "0 0 12px",
+          color: "var(--dg-color-text-primary)",
+          fontSize: "var(--dg-fs-page-title)",
+          fontWeight: 700,
+        }}
+      >
+        {copy.title}
+      </h1>
+      <p
+        style={{
+          maxWidth: 360,
+          margin: "0 auto",
+          color: "var(--dg-color-text-muted)",
+          fontSize: "var(--dg-fs-body)",
+          lineHeight: 1.6,
+        }}
+      >
+        {detail}
+      </p>
+      {showEscape ? (
+        <div style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: 28 }}>
+          {onRetry ? (
+            <Button
+              type="button"
+              className="dg-btn dg-btn-primary"
+              loading={retrying}
+              onClick={onRetry}
+            >
+              Try again
+            </Button>
+          ) : null}
+          <Button type="button" className="dg-btn dg-btn-secondary" onClick={() => signOut()}>
+            Sign out
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+
   return (
     <main
       aria-live="polite"
@@ -79,51 +134,13 @@ export default function AuthTransitionScreen({
         fontFamily: "var(--font-sans)",
       }}
     >
-      <div style={{ width: "100%", maxWidth: 440, textAlign: "center" }}>
-        <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
-          {/* A long wait or a retry trades the calm pulse for a traced outline, so
-              the screen visibly shows work still in progress. */}
-          <AnimatedDubGridLogo animation={isSlow || retrying ? "trace" : "breathe"} />
-        </div>
-        <h1
-          style={{
-            margin: "0 0 12px",
-            color: "var(--dg-color-text-primary)",
-            fontSize: "var(--dg-fs-page-title)",
-            fontWeight: 700,
-          }}
-        >
-          {copy.title}
-        </h1>
-        <p
-          style={{
-            maxWidth: 360,
-            margin: "0 auto",
-            color: "var(--dg-color-text-muted)",
-            fontSize: "var(--dg-fs-body)",
-            lineHeight: 1.6,
-          }}
-        >
-          {detail}
-        </p>
-        {showEscape ? (
-          <div style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: 28 }}>
-            {onRetry ? (
-              <Button
-                type="button"
-                className="dg-btn dg-btn-primary"
-                loading={retrying}
-                onClick={onRetry}
-              >
-                Try again
-              </Button>
-            ) : null}
-            <Button type="button" className="dg-btn dg-btn-secondary" onClick={() => signOut()}>
-              Sign out
-            </Button>
-          </div>
-        ) : null}
-      </div>
+      {revealAfterMs > 0 ? (
+        <DelayedReveal afterMs={revealAfterMs} style={{ width: "100%", maxWidth: 440 }}>
+          {content}
+        </DelayedReveal>
+      ) : (
+        content
+      )}
     </main>
   );
 }
