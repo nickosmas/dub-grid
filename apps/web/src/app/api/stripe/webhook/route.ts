@@ -21,9 +21,11 @@ function stripeObjectId(value: string | { id: string } | null | undefined) {
   return typeof value === "string" ? value : value.id;
 }
 
-async function upsertSubscription(sub: Stripe.Subscription, event: Stripe.Event) {
-  const supabase = getServiceClient();
-  await upsertStripeSubscriptionToDb(supabase, sub, {
+async function upsertSubscription(stripe: Stripe, sub: Stripe.Subscription, event: Stripe.Event) {
+  // Stripe delivers events out of order and retries late ones, so the payload
+  // can be older than what is stored. Write Stripe's current state instead.
+  const current = await stripe.subscriptions.retrieve(sub.id);
+  await upsertStripeSubscriptionToDb(getServiceClient(), current, {
     audit: {
       source: "stripe_webhook",
       stripeEventId: event.id,
@@ -92,7 +94,7 @@ export async function POST(req: NextRequest) {
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
         const sub = event.data.object as Stripe.Subscription;
-        await upsertSubscription(sub, event);
+        await upsertSubscription(stripe, sub, event);
         break;
       }
       case "invoice.payment_failed": {

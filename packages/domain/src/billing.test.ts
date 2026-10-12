@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   effectiveBillingStatus,
   evaluateOrganizationBillingAccess,
+  isLiveSubscriptionStatus,
   trialControls,
 } from "./billing";
 
@@ -99,5 +100,19 @@ describe("trialControls", () => {
         now,
       }),
     ).toMatchObject({ change: true, end: false, expire: false });
+  });
+});
+
+describe("isLiveSubscriptionStatus", () => {
+  it("counts every subscription Stripe can still change as live", () => {
+    for (const status of ["active", "trialing", "past_due", "unpaid", "incomplete", "paused"]) {
+      expect(isLiveSubscriptionStatus(status)).toBe(true);
+    }
+  });
+
+  it("treats an ended or missing subscription as not live", () => {
+    expect(isLiveSubscriptionStatus("canceled")).toBe(false);
+    expect(isLiveSubscriptionStatus("incomplete_expired")).toBe(false);
+    expect(isLiveSubscriptionStatus(null)).toBe(false);
   });
 });

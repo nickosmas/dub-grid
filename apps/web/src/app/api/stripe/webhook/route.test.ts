@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const constructEvent = vi.fn();
+const subscriptionsRetrieve = vi.fn();
 const serviceFrom = vi.fn();
 const subscriptionUpsert = vi.fn();
 const subscriptionMaybeSingle = vi.fn();
@@ -17,6 +18,9 @@ vi.mock("@/lib/stripe", async () => ({
   getStripe: () => ({
     webhooks: {
       constructEvent,
+    },
+    subscriptions: {
+      retrieve: subscriptionsRetrieve,
     },
   }),
   requireStripeEnabled: async () => null,
@@ -70,6 +74,10 @@ describe("POST /api/stripe/webhook", () => {
     // First-time event by default (no prior row) — the replay-dedup insert succeeds.
     dedupInsert.mockResolvedValue({ error: null });
     dedupRelease.mockResolvedValue({ error: null });
+    // By default Stripe's current state is the event's own snapshot.
+    subscriptionsRetrieve.mockImplementation(
+      async () => constructEvent.mock.results.at(-1)?.value?.data?.object,
+    );
     serviceFrom.mockImplementation((table: string) => {
       if (table === "stripe_processed_events") {
         return { insert: dedupInsert, delete: vi.fn(() => ({ eq: dedupRelease })) };
@@ -204,12 +212,10 @@ describe("POST /api/stripe/webhook", () => {
     const response = await POST(makeRequest());
 
     expect(response.status).toBe(200);
-    expect(organizationUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        subscription_status: "trialing",
-        trial_ends_at: "2026-05-16T00:00:00.000Z",
-      }),
-    );
+    // Neither cleared nor replaced with a made-up date: the stored end stands.
+    const update = organizationUpdate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(update).toMatchObject({ subscription_status: "trialing" });
+    expect(update).not.toHaveProperty("trial_ends_at");
   });
 
   it("records a canceled billing operation when Stripe cancels a subscription", async () => {
@@ -395,6 +401,95 @@ describe("POST /api/stripe/webhook", () => {
         }),
       }),
     );
+  });
+
+  it("writes Stripe's current state when a late event carries an older snapshot", async () => {
+    constructEvent.mockReturnValue({
+      id: "evt_late",
+      type: "customer.subscription.updated",
+      data: {
+        object: {
+          id: "sub_123",
+          customer: "cus_123",
+          status: "past_due",
+          metadata: { org_id: "11111111-1111-4111-8111-111111111111" },
+          items: { data: [{ price: { id: "price_123" }, quantity: 4 }] },
+          cancel_at: null,
+          canceled_at: null,
+          trial_end: null,
+        },
+      },
+    });
+    subscriptionsRetrieve.mockResolvedValueOnce({
+      id: "sub_123",
+      customer: "cus_123",
+      status: "active",
+      metadata: { org_id: "11111111-1111-4111-8111-111111111111" },
+      items: { data: [{ price: { id: "price_123" }, quantity: 4 }] },
+      cancel_at: null,
+      canceled_at: null,
+      trial_end: null,
+    });
+
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(subscriptionsRetrieve).toHaveBeenCalledWith("sub_123");
+    expect(organizationUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ subscription_status: "active" }),
+    );
+  });
+
+  it("leaves the live subscription in place when an older one ends", async () => {
+    subscriptionMaybeSingle.mockResolvedValue({
+      data: {
+        stripe_subscription_id: "sub_new",
+        status: "active",
+        quantity: 4,
+        current_period_end: null,
+        cancel_at: null,
+        canceled_at: null,
+        trial_end: null,
+      },
+      error: null,
+    });
+    constructEvent.mockReturnValue({
+      id: "evt_old_deleted",
+      type: "customer.subscription.deleted",
+      data: {
+        object: {
+          id: "sub_old",
+          customer: "cus_123",
+          status: "canceled",
+          metadata: { org_id: "11111111-1111-4111-8111-111111111111" },
+          items: { data: [{ price: { id: "price_123" }, quantity: 4 }] },
+          cancel_at: null,
+          canceled_at: 1_780_876_800,
+          trial_end: null,
+        },
+      },
+    });
+
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(subscriptionUpsert).not.toHaveBeenCalled();
+    expect(organizationUpdate).not.toHaveBeenCalled();
+  });
+
+  it("asks Stripe to retry when the current state can't be read", async () => {
+    constructEvent.mockReturnValue({
+      id: "evt_123",
+      type: "customer.subscription.updated",
+      data: { object: { id: "sub_123", customer: "cus_123", status: "active" } },
+    });
+    subscriptionsRetrieve.mockRejectedValueOnce(new Error("Stripe unavailable"));
+
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(500);
+    expect(subscriptionUpsert).not.toHaveBeenCalled();
+    expect(dedupRelease).toHaveBeenCalledWith("event_id", "evt_123");
   });
 
   it("returns a retryable error when the subscription write fails", async () => {

@@ -40,6 +40,16 @@ export interface BillingAccessResult {
   trialGraceEndsAt: string | null;
 }
 
+const ENDED_SUBSCRIPTION_STATUSES = new Set(["canceled", "incomplete_expired"]);
+
+/**
+ * Whether a Stripe subscription still exists to manage. An ended one can't be
+ * revived from Stripe's billing portal, so the organization subscribes anew.
+ */
+export function isLiveSubscriptionStatus(status: string | null | undefined): boolean {
+  return Boolean(status) && !ENDED_SUBSCRIPTION_STATUSES.has(status as string);
+}
+
 /** The stored status for a trial a Gridmaster ended with no grace period. */
 export const TRIAL_EXPIRED_STATUS = "trial_expired";
 

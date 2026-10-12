@@ -9,6 +9,7 @@ import { retryAfterSeconds } from "@/lib/retry-after";
 import {
   cancelSubscription,
   extendTrial,
+  invalidateOrganizationBillingCache,
   scheduleSubscriptionCancellation,
   syncSubscriptionSeats,
 } from "@/lib/stripe";
@@ -17,7 +18,6 @@ import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
 import { countBillableAppUsers } from "@/features/billing/server";
-import { cacheDel, CacheKey } from "@/lib/cache";
 
 const orgIdSchema = z.string().uuid();
 const billingStatusSchema = z.enum([
@@ -67,8 +67,10 @@ function defaultTrialEndFrom(date: Date): string {
   return new Date(date.getTime() + DEFAULT_TRIAL_DAYS * 86_400_000).toISOString();
 }
 
-async function invalidateOrganizationAccess(orgId: string): Promise<void> {
-  await cacheDel(CacheKey.mwOrgAccess(orgId), CacheKey.organization(orgId));
+/** Runs a database write and fails the action, before any audit row, if it failed. */
+async function write(query: PromiseLike<{ error: unknown }>): Promise<void> {
+  const { error } = await query;
+  if (error) throw error;
 }
 
 export async function POST(req: NextRequest) {
@@ -176,16 +178,17 @@ export async function POST(req: NextRequest) {
         status = TRIAL_EXPIRED_STATUS;
       }
 
-      const { error: updateError } = await admin
-        .from("organizations")
-        .update({
-          trial_started_at: trialStartedAt,
-          trial_ends_at: trialEndsAt,
-          subscription_status: status,
-        })
-        .eq("id", orgId);
-      if (updateError) throw updateError;
-      await invalidateOrganizationAccess(orgId);
+      await write(
+        admin
+          .from("organizations")
+          .update({
+            trial_started_at: trialStartedAt,
+            trial_ends_at: trialEndsAt,
+            subscription_status: status,
+          })
+          .eq("id", orgId),
+      );
+      await invalidateOrganizationBillingCache(orgId);
       await writeGridmasterAuditLog({
         serviceClient: admin,
         actor: user,
@@ -216,8 +219,10 @@ export async function POST(req: NextRequest) {
         );
       }
       await cancelSubscription(sub.stripe_subscription_id);
-      await admin.from("organizations").update({ subscription_status: "canceled" }).eq("id", orgId);
-      await invalidateOrganizationAccess(orgId);
+      await write(
+        admin.from("organizations").update({ subscription_status: "canceled" }).eq("id", orgId),
+      );
+      await invalidateOrganizationBillingCache(orgId);
       await writeGridmasterAuditLog({
         serviceClient: admin,
         actor: user,
@@ -250,21 +255,25 @@ export async function POST(req: NextRequest) {
         ? new Date(item.current_period_end * 1000).toISOString()
         : null;
 
-      await admin
-        .from("subscriptions")
-        .update({
-          status: scheduledSubscription.status,
-          current_period_end: currentPeriodEnd,
-          cancel_at: cancelAt,
-          canceled_at: canceledAt,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("org_id", orgId);
-      await admin
-        .from("organizations")
-        .update({ subscription_status: scheduledSubscription.status })
-        .eq("id", orgId);
-      await invalidateOrganizationAccess(orgId);
+      await write(
+        admin
+          .from("subscriptions")
+          .update({
+            status: scheduledSubscription.status,
+            current_period_end: currentPeriodEnd,
+            cancel_at: cancelAt,
+            canceled_at: canceledAt,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("org_id", orgId),
+      );
+      await write(
+        admin
+          .from("organizations")
+          .update({ subscription_status: scheduledSubscription.status })
+          .eq("id", orgId),
+      );
+      await invalidateOrganizationBillingCache(orgId);
       await writeGridmasterAuditLog({
         serviceClient: admin,
         actor: user,
@@ -284,11 +293,17 @@ export async function POST(req: NextRequest) {
       }
       const seats = Math.max(await countBillableAppUsers(admin, orgId), 1);
       await syncSubscriptionSeats(sub.stripe_subscription_id, seats);
-      await admin
-        .from("subscriptions")
-        .update({ quantity: seats, updated_at: new Date().toISOString() })
-        .eq("org_id", orgId);
-      await admin.from("organizations").update({ subscription_seats: seats }).eq("id", orgId);
+      await write(
+        admin
+          .from("subscriptions")
+          .update({ quantity: seats, updated_at: new Date().toISOString() })
+          .eq("org_id", orgId),
+      );
+      await write(
+        admin.from("organizations").update({ subscription_seats: seats }).eq("id", orgId),
+      );
+      // Seats feed the access check's cached organization like any billing field.
+      await invalidateOrganizationBillingCache(orgId);
       await writeGridmasterAuditLog({
         serviceClient: admin,
         actor: user,
@@ -304,14 +319,16 @@ export async function POST(req: NextRequest) {
 
     if (action === "override_status") {
       const status = parsed.data.status;
-      await admin
-        .from("organizations")
-        .update({
-          subscription_status: status,
-          ...(status === "trialing" ? { trial_ends_at: defaultTrialEndFrom(new Date()) } : {}),
-        })
-        .eq("id", orgId);
-      await invalidateOrganizationAccess(orgId);
+      await write(
+        admin
+          .from("organizations")
+          .update({
+            subscription_status: status,
+            ...(status === "trialing" ? { trial_ends_at: defaultTrialEndFrom(new Date()) } : {}),
+          })
+          .eq("id", orgId),
+      );
+      await invalidateOrganizationBillingCache(orgId);
       await writeGridmasterAuditLog({
         serviceClient: admin,
         actor: user,

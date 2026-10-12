@@ -3,7 +3,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import BillingSettings from "@/components/settings/BillingSettings";
-import { fetchOrganizationBilling } from "@/features/billing/client";
+import { fetchOrganizationBilling, startBillingCheckout } from "@/features/billing/client";
+import { toast } from "sonner";
 import type { Organization, OrganizationBillingSummary } from "@/types";
 
 const mockSignOut = vi.fn();
@@ -27,6 +28,10 @@ vi.mock("@/hooks", () => ({
     reports: true,
     printing: true,
   }),
+}));
+
+vi.mock("sonner", () => ({
+  toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
 vi.mock("@/features/billing/client", () => ({
@@ -241,5 +246,61 @@ describe("BillingSettings", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
 
     expect(mockSignOut).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers a new subscription to an organization whose subscription ended", async () => {
+    vi.mocked(fetchOrganizationBilling).mockResolvedValueOnce({
+      ...billingSummary,
+      status: "canceled",
+      hasStripeCustomer: true,
+      hasStripeSubscription: false,
+      billingAccess: {
+        state: "locked",
+        reason: "payment_status",
+        isLocked: true,
+        shouldNotifyAdmins: true,
+        daysUntilTrialEnd: null,
+        trialGraceEndsAt: null,
+      },
+    });
+
+    renderBillingSettings();
+
+    expect(await screen.findByRole("button", { name: "Start subscription" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Manage billing" })).not.toBeInTheDocument();
+  });
+
+  it("says a suspended organization is suspended", async () => {
+    vi.mocked(fetchOrganizationBilling).mockResolvedValueOnce({
+      ...billingSummary,
+      status: "active",
+      billingAccess: {
+        state: "suspended",
+        reason: "suspended",
+        isLocked: true,
+        shouldNotifyAdmins: true,
+        daysUntilTrialEnd: null,
+        trialGraceEndsAt: null,
+      },
+    });
+
+    renderBillingSettings();
+
+    expect(await screen.findByText("Suspended")).toBeInTheDocument();
+    expect(
+      screen.getByText("Your organization is suspended. Contact DubGrid Support for help."),
+    ).toBeInTheDocument();
+  });
+
+  it("tells an admin who tries to subscribe twice to use Manage billing", async () => {
+    const message =
+      "Your organization already has a subscription. Use Manage billing to change it.";
+    vi.mocked(startBillingCheckout).mockRejectedValueOnce(new Error(message));
+
+    renderBillingSettings();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Start subscription" }));
+
+    await vi.waitFor(() => expect(toast.error).toHaveBeenCalledWith(message));
   });
 });

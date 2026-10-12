@@ -17,7 +17,7 @@ const auditInsert = vi.fn();
 const scheduleSubscriptionCancellation = vi.fn();
 const syncSubscriptionSeats = vi.fn();
 const extendTrial = vi.fn();
-const cacheDel = vi.fn();
+const invalidateCache = vi.fn();
 
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
@@ -37,6 +37,7 @@ vi.mock("@/lib/supabase-service", () => ({
 vi.mock("@/lib/stripe", () => ({
   cancelSubscription: vi.fn(),
   extendTrial: (...args: unknown[]) => extendTrial(...args),
+  invalidateOrganizationBillingCache: (orgId: string) => invalidateCache(orgId),
   scheduleSubscriptionCancellation: (...args: unknown[]) =>
     scheduleSubscriptionCancellation(...args),
   syncSubscriptionSeats: (...args: unknown[]) => syncSubscriptionSeats(...args),
@@ -50,14 +51,6 @@ vi.mock("@/lib/logger", () => ({
 
 vi.mock("@/lib/sentry", () => ({
   captureException: vi.fn(),
-}));
-
-vi.mock("@/lib/cache", () => ({
-  cacheDel: (...args: unknown[]) => cacheDel(...args),
-  CacheKey: {
-    mwOrgAccess: (orgId: string) => `dg:mw:orgAccess:${orgId}`,
-    organization: (orgId: string) => `dg:org:${orgId}:organization`,
-  },
 }));
 
 import { POST } from "./route";
@@ -74,7 +67,7 @@ function makeRequest(body: unknown) {
 describe("POST /api/gridmaster/subscription", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    cacheDel.mockResolvedValue(undefined);
+    invalidateCache.mockResolvedValue(undefined);
     validateCsrfOrigin.mockReturnValue(null);
     requireGridmasterSession.mockResolvedValue({
       user: { id: "gridmaster-user", email: "gm@example.com" },
@@ -316,10 +309,7 @@ describe("POST /api/gridmaster/subscription", () => {
       trial_ends_at: "2026-10-09T00:00:00Z",
       subscription_status: "trial_expired",
     });
-    expect(cacheDel).toHaveBeenCalledWith(
-      `dg:mw:orgAccess:${ORG_ID}`,
-      `dg:org:${ORG_ID}:organization`,
-    );
+    expect(invalidateCache).toHaveBeenCalledWith(ORG_ID);
     expect(auditInsert).toHaveBeenCalledWith(
       expect.objectContaining({ action: "billing.trial_expired" }),
     );
@@ -404,10 +394,7 @@ describe("POST /api/gridmaster/subscription", () => {
       subscription_status: "trialing",
       trial_ends_at: expect.any(String),
     });
-    expect(cacheDel).toHaveBeenCalledWith(
-      `dg:mw:orgAccess:${ORG_ID}`,
-      `dg:org:${ORG_ID}:organization`,
-    );
+    expect(invalidateCache).toHaveBeenCalledWith(ORG_ID);
   });
 
   it("invalidates organization access after overriding billing to active", async () => {
@@ -416,10 +403,7 @@ describe("POST /api/gridmaster/subscription", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(cacheDel).toHaveBeenCalledWith(
-      `dg:mw:orgAccess:${ORG_ID}`,
-      `dg:org:${ORG_ID}:organization`,
-    );
+    expect(invalidateCache).toHaveBeenCalledWith(ORG_ID);
   });
 
   it("syncs Stripe seats to app users and audits the action", async () => {
@@ -512,5 +496,36 @@ describe("POST /api/gridmaster/subscription", () => {
     });
     expect(syncSubscriptionSeats).not.toHaveBeenCalled();
     expect(organizationUpdate).not.toHaveBeenCalled();
+  });
+
+  it("refreshes cached access after truing up seats", async () => {
+    subscriptionSingle.mockResolvedValueOnce({
+      data: { stripe_subscription_id: "sub_123" },
+      error: null,
+    });
+
+    const response = await POST(makeRequest({ orgId: ORG_ID, action: "sync_seats" }));
+
+    expect(response.status).toBe(200);
+    expect(invalidateCache).toHaveBeenCalledWith(ORG_ID);
+  });
+
+  it.each([
+    ["cancel", { action: "cancel" }],
+    ["cancel_at_period_end", { action: "cancel_at_period_end" }],
+    ["sync_seats", { action: "sync_seats" }],
+    ["override_status", { action: "override_status", status: "active" }],
+  ])("reports a failed %s write instead of auditing it", async (_name, body) => {
+    subscriptionSingle.mockResolvedValueOnce({
+      data: { stripe_subscription_id: "sub_123" },
+      error: null,
+    });
+    organizationEq.mockResolvedValue({ error: { message: "write failed" } });
+    subscriptionUpdateEq.mockResolvedValue({ error: { message: "write failed" } });
+
+    const response = await POST(makeRequest({ orgId: ORG_ID, ...body }));
+
+    expect(response.status).toBe(500);
+    expect(auditInsert).not.toHaveBeenCalled();
   });
 });

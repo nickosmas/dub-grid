@@ -31,7 +31,7 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Items 1 through 39 and 41 through 43 are
-shipped. Item 40 is in progress. Item 44 is planned.
+shipped. Items 40 and 44 are in progress.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -78,7 +78,7 @@ shipped. Item 40 is in progress. Item 44 is planned.
 | 42   | Shipped     | Schedule notes on every schedule surface, each belonging to its shift.                                                          |
 | 43   | Shipped     | Complete person records for managers and one Gridmaster person page with two-factor lockout recovery.                           |
 | 40   | In progress | Public and internal documentation accurate for `dev`, with permanent drift gates.                                               |
-| 44   | Planned     | Safe billing actions, Gridmaster billing controls and policy, and billing history.                                              |
+| 44   | In progress | Safe billing actions, Gridmaster billing controls and policy, and billing history.                                              |
 
 Item 40 is split:
 
@@ -99,8 +99,9 @@ Item 40 is split:
 
 Item 44 is split:
 
-- **44a - Billing safety fixes:** planned; includes the two defects that can
-  lock a trialing organization or stop a canceled one from resubscribing.
+- **44a - Billing safety fixes:** shipped; a sync no longer locks a trialing
+  organization, a canceled one can subscribe again, and webhooks, checkout,
+  and Gridmaster billing writes can no longer leave the wrong state.
 - **44b - Gridmaster billing controls:** planned; risky actions are refused
   by the server where impossible and ask for fresh proof otherwise.
 - **44c - Customer billing clarity:** planned; customers see support changes

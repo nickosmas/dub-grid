@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
+import { evaluateOrganizationBillingAccess, isLiveSubscriptionStatus } from "@dubgrid/domain";
 import type { BillingOperationSummary, OrganizationBillingSummary } from "@/types";
 import { DUBGRID_SUPPORT_ACTOR_LABEL } from "@/lib/client-facing";
 import { clientEnv } from "@/lib/env";
@@ -16,6 +16,7 @@ type OrganizationBillingRow = {
   subscription_status: string | null;
   trial_ends_at: string | null;
   subscription_seats: number | null;
+  suspended_at: string | null;
 };
 
 type SubscriptionBillingRow = {
@@ -227,7 +228,7 @@ export async function loadOrganizationBillingSummary(
       serviceClient
         .from("organizations")
         .select(
-          "id, name, slug, stripe_customer_id, subscription_status, trial_ends_at, subscription_seats",
+          "id, name, slug, stripe_customer_id, subscription_status, trial_ends_at, subscription_seats, suspended_at",
         )
         .eq("id", orgId)
         .single(),
@@ -264,12 +265,16 @@ export async function loadOrganizationBillingSummary(
     appUserCount,
     seatDelta,
     hasStripeCustomer: Boolean(orgRow.stripe_customer_id ?? subscriptionRow?.stripe_customer_id),
-    hasStripeSubscription: Boolean(subscriptionRow?.stripe_subscription_id),
+    // Only a live subscription can be managed; an ended one means subscribing again.
+    hasStripeSubscription:
+      Boolean(subscriptionRow?.stripe_subscription_id) &&
+      isLiveSubscriptionStatus(subscriptionRow?.status),
     stripeConfigured: isStripeBillingConfigured(),
     canManageBilling: options.canManageBilling,
     billingAccess: evaluateOrganizationBillingAccess({
       subscriptionStatus: orgRow.subscription_status ?? subscriptionRow?.status ?? null,
       trialEndsAt: orgRow.trial_ends_at ?? subscriptionRow?.trial_end ?? null,
+      suspendedAt: orgRow.suspended_at,
     }),
     recentOperations,
   };

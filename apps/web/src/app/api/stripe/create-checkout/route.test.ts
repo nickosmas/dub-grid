@@ -14,6 +14,8 @@ const organizationUpdateEq = vi.fn();
 const getUserById = vi.fn();
 const createCheckoutSession = vi.fn();
 const createStripeCustomer = vi.fn();
+const findLiveStripeSubscription = vi.fn();
+const subscriptionMaybeSingle = vi.fn();
 const checkRateLimit = vi.fn();
 
 vi.mock("@/lib/csrf", () => ({
@@ -27,6 +29,7 @@ vi.mock("@/app/api/shared/permissions", () => ({
 vi.mock("@/lib/stripe", () => ({
   createCheckoutSession: (...args: unknown[]) => createCheckoutSession(...args),
   createStripeCustomer: (...args: unknown[]) => createStripeCustomer(...args),
+  findLiveStripeSubscription: (...args: unknown[]) => findLiveStripeSubscription(...args),
   requireStripeEnabled: async () => null,
 }));
 
@@ -142,6 +145,11 @@ describe("POST /api/stripe/create-checkout", () => {
       if (table === "employees") {
         return { select: employeeSelect };
       }
+      if (table === "subscriptions") {
+        return {
+          select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: subscriptionMaybeSingle })) })),
+        };
+      }
       throw new Error(`Unexpected table: ${table}`);
     });
     requireOrgPermissions.mockResolvedValue({
@@ -158,6 +166,8 @@ describe("POST /api/stripe/create-checkout", () => {
       url: "https://checkout.stripe.com/session",
     });
     createStripeCustomer.mockResolvedValue({ id: "cus_created" });
+    findLiveStripeSubscription.mockResolvedValue(null);
+    subscriptionMaybeSingle.mockResolvedValue({ data: null, error: null });
     checkRateLimit.mockResolvedValue({ limited: false });
   });
 
@@ -281,6 +291,57 @@ describe("POST /api/stripe/create-checkout", () => {
     });
     expect(createCheckoutSession).toHaveBeenCalledWith(
       "cus_created",
+      ORG_ID,
+      7,
+      "http://localhost:3000/settings?section=org-billing",
+    );
+  });
+
+  it("refuses a second checkout while the recorded subscription is live", async () => {
+    subscriptionMaybeSingle.mockResolvedValueOnce({ data: { status: "past_due" }, error: null });
+
+    const response = await POST(
+      makeRequest({
+        orgId: ORG_ID,
+        returnUrl: "http://localhost:3000/settings?section=org-billing",
+      }),
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "Your organization already has a subscription. Use Manage billing to change it.",
+    });
+    expect(createCheckoutSession).not.toHaveBeenCalled();
+  });
+
+  it("refuses a second checkout when Stripe has a live subscription we haven't recorded", async () => {
+    findLiveStripeSubscription.mockResolvedValueOnce("sub_live");
+
+    const response = await POST(
+      makeRequest({
+        orgId: ORG_ID,
+        returnUrl: "http://localhost:3000/settings?section=org-billing",
+      }),
+    );
+
+    expect(response.status).toBe(409);
+    expect(findLiveStripeSubscription).toHaveBeenCalledWith("cus_123");
+    expect(createCheckoutSession).not.toHaveBeenCalled();
+  });
+
+  it("lets an organization whose subscription ended subscribe again", async () => {
+    subscriptionMaybeSingle.mockResolvedValueOnce({ data: { status: "canceled" }, error: null });
+
+    const response = await POST(
+      makeRequest({
+        orgId: ORG_ID,
+        returnUrl: "http://localhost:3000/settings?section=org-billing",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(createCheckoutSession).toHaveBeenCalledWith(
+      "cus_123",
       ORG_ID,
       7,
       "http://localhost:3000/settings?section=org-billing",

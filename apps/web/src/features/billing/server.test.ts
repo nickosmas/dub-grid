@@ -5,7 +5,12 @@ import { loadOrganizationBillingSummary } from "./server";
 // real source org's data (the route resolves it with ignoreSandbox). So this
 // exercises the real mapping for a normal organization: org row + subscription
 // + billable app-user count + recent billing audit-log operations.
-function createQueryClient() {
+function createQueryClient(
+  overrides: {
+    org?: Record<string, unknown>;
+    subscription?: Record<string, unknown>;
+  } = {},
+) {
   return {
     from(table: string) {
       if (table === "organizations") {
@@ -22,6 +27,8 @@ function createQueryClient() {
                   subscription_status: "active",
                   trial_ends_at: null,
                   subscription_seats: 5,
+                  suspended_at: null,
+                  ...overrides.org,
                 },
                 error: null,
               }),
@@ -43,6 +50,7 @@ function createQueryClient() {
                   cancel_at: null,
                   canceled_at: null,
                   trial_end: null,
+                  ...overrides.subscription,
                 },
                 error: null,
               }),
@@ -141,5 +149,31 @@ describe("loadOrganizationBillingSummary", () => {
       "Seats synced",
       "Billing portal opened",
     ]);
+  });
+
+  it("offers a new subscription once the old one has ended", async () => {
+    const summary = await loadOrganizationBillingSummary(
+      createQueryClient({
+        org: { subscription_status: "canceled" },
+        subscription: { status: "canceled", canceled_at: "2026-05-10T00:00:00Z" },
+      }) as unknown as Parameters<typeof loadOrganizationBillingSummary>[0],
+      "org-1",
+      { canManageBilling: true },
+    );
+
+    expect(summary.hasStripeCustomer).toBe(true);
+    expect(summary.hasStripeSubscription).toBe(false);
+  });
+
+  it("reads a suspension as suspended, whatever the billing status", async () => {
+    const summary = await loadOrganizationBillingSummary(
+      createQueryClient({
+        org: { suspended_at: "2026-05-10T00:00:00Z" },
+      }) as unknown as Parameters<typeof loadOrganizationBillingSummary>[0],
+      "org-1",
+      { canManageBilling: true },
+    );
+
+    expect(summary.billingAccess).toMatchObject({ state: "suspended", isLocked: true });
   });
 });

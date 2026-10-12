@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
-import { DEFAULT_TRIAL_DAYS } from "@dubgrid/domain";
+import { isLiveSubscriptionStatus } from "@dubgrid/domain";
 import logger from "@/lib/logger";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import { createClient } from "@supabase/supabase-js";
@@ -66,15 +66,8 @@ function withCheckoutSessionPlaceholder(returnUrl: string) {
   return `${successUrl}${separator}stripe_checkout_session_id={CHECKOUT_SESSION_ID}`;
 }
 
-function defaultTrialEndFrom(date: Date): string {
-  return new Date(date.getTime() + DEFAULT_TRIAL_DAYS * 86_400_000).toISOString();
-}
-
 function resolveStripeTrialEnd(sub: Stripe.Subscription): string | null {
-  if (sub.trial_end) {
-    return new Date(sub.trial_end * 1000).toISOString();
-  }
-  return sub.status === "trialing" ? defaultTrialEndFrom(new Date()) : null;
+  return sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null;
 }
 
 function stripeCustomerId(
@@ -120,6 +113,18 @@ export async function createStripeCustomer(orgId: string, orgName: string, email
     name: orgName,
     email,
   });
+}
+
+/** The id of a subscription Stripe can still change for this customer, if any. */
+export async function findLiveStripeSubscription(customerId: string): Promise<string | null> {
+  const s = getStripe();
+  if (!s) throw new Error("Stripe not configured");
+  const subscriptions = await s.subscriptions.list({
+    customer: customerId,
+    status: "all",
+    limit: 10,
+  });
+  return subscriptions.data.find((sub) => isLiveSubscriptionStatus(sub.status))?.id ?? null;
 }
 
 /**
@@ -255,7 +260,7 @@ export async function getSubscription(subscriptionId: string): Promise<Stripe.Su
 // it: a payment that unlocked the organization still sent people to billing
 // until those copies expired. Deleting the organization entry also drops the
 // bootstrap's copy.
-async function invalidateOrganizationBillingCache(orgId: string): Promise<void> {
+export async function invalidateOrganizationBillingCache(orgId: string): Promise<void> {
   await cacheDel(CacheKey.mwOrgAccess(orgId), CacheKey.organization(orgId));
 }
 
@@ -290,6 +295,20 @@ export async function upsertStripeSubscriptionToDb(
   const cancelAt = sub.cancel_at ? new Date(sub.cancel_at * 1000).toISOString() : null;
   const canceledAt = sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString() : null;
   const previous = await loadPreviousSubscriptionForAudit(serviceClient, orgId);
+  // An older subscription ending (say, a duplicate checkout) must not overwrite
+  // the newer one the organization is billed on.
+  if (
+    previous?.stripe_subscription_id &&
+    previous.stripe_subscription_id !== sub.id &&
+    isLiveSubscriptionStatus(previous.status) &&
+    !isLiveSubscriptionStatus(sub.status)
+  ) {
+    logger.warn(
+      { orgId, subscriptionId: sub.id, liveSubscriptionId: previous.stripe_subscription_id },
+      "Ignoring an ended subscription that is not the organization's live one",
+    );
+    return;
+  }
 
   const { error: subError } = await serviceClient.from("subscriptions").upsert(
     {
@@ -318,7 +337,9 @@ export async function upsertStripeSubscriptionToDb(
       stripe_customer_id: customerId,
       subscription_status: sub.status,
       subscription_seats: item?.quantity ?? null,
-      trial_ends_at: trialEnd,
+      // The trial clock is DubGrid's: a trialing subscription that names no end
+      // leaves the organization's own end date where it is.
+      ...(trialEnd !== null || sub.status !== "trialing" ? { trial_ends_at: trialEnd } : {}),
     })
     .eq("id", orgId);
   if (orgError) throw orgError;
@@ -421,7 +442,17 @@ export async function syncSubscriptionToDb(orgId: string): Promise<void> {
 
   const sub = subscriptions.data[0];
   if (!sub) {
-    // No subscription found — keep the org summary aligned with the local subscription record.
+    // A customer with no subscription is usually an abandoned checkout, and the
+    // organization is still on its trial. Only a subscription we recorded and
+    // Stripe no longer has means billing ended.
+    const { data: recorded, error: recordedError } = await adminClient
+      .from("subscriptions")
+      .select("stripe_subscription_id")
+      .eq("org_id", orgId)
+      .maybeSingle();
+    if (recordedError) throw recordedError;
+    if (!recorded?.stripe_subscription_id) return;
+
     const { error: subUpdateError } = await adminClient
       .from("subscriptions")
       .update({

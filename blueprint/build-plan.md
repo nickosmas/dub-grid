@@ -825,7 +825,7 @@
       concerns them, and add configurable trial and grace policy, pause and
       resume, past-due deadlines, an alert when access locks, and seat and
       revenue history. Ended-trial display shipped separately in 9ce24309.
-  - [ ] 44a. **Billing safety fixes** - Sync Stripe never cancels an
+  - [x] 44a. **Billing safety fixes** - Sync Stripe never cancels an
         organization that has a payment customer but no subscription; a
         canceled organization can start a new subscription; Gridmaster billing
         writes check their result before reporting success; checkout refuses a
