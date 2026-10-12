@@ -253,7 +253,7 @@ describe("GET /api/billing", () => {
           id: "43",
           action: "billing.trial_extended",
           label: "Trial extended",
-          actorLabel: "Gridmaster",
+          actorLabel: "DubGrid Support",
           resourceType: "billing",
           resourceId: null,
           details: { initiated_by: "gridmaster", days: 14 },

@@ -13,6 +13,7 @@ import {
   updateGridmasterSubscription,
 } from "@/features/gridmaster/client";
 import { formatBillingStatusLabel, formatClientErrorMessage } from "@/lib/client-facing";
+import { effectiveBillingStatus } from "@dubgrid/domain";
 import { queryKeys } from "@/lib/query-keys";
 import { sectionBodyStyle, sectionHeaderStyle, sectionStyle } from "@/lib/styles";
 import { type GridmasterBillingOrgSummary, type Organization } from "@/types";
@@ -37,15 +38,17 @@ export function formatBillingDate(value: string | null) {
 }
 
 export function billingStatusTone(status: string | null) {
-  if (status === "active" || status === "trialing") return "var(--dg-color-success)";
-  if (status === "past_due" || status === "incomplete") return "var(--dg-color-warning)";
-  if (status === "canceled" || status === "unpaid" || status === "incomplete_expired")
-    return "var(--dg-color-danger)";
+  if (status === "active" || status === "trialing") return "var(--dg-color-success-text)";
+  if (status === "past_due" || status === "incomplete" || status === "trial_grace")
+    return "var(--dg-color-warning-text)";
+  if (
+    status === "canceled" ||
+    status === "unpaid" ||
+    status === "incomplete_expired" ||
+    status === "trial_expired"
+  )
+    return "var(--dg-color-danger-text)";
   return "var(--dg-color-text-muted)";
-}
-
-export function billingStatusIsPending(status: string | null, trialEndsAt: string | null) {
-  return status === "trialing" && !trialEndsAt;
 }
 
 export function BillingMetric({
@@ -59,11 +62,11 @@ export function BillingMetric({
 }) {
   const color =
     tone === "good"
-      ? "var(--dg-color-success)"
+      ? "var(--dg-color-success-text)"
       : tone === "warning"
-        ? "var(--dg-color-warning)"
+        ? "var(--dg-color-warning-text)"
         : tone === "danger"
-          ? "var(--dg-color-danger)"
+          ? "var(--dg-color-danger-text)"
           : "var(--dg-color-text-primary)";
 
   return (
@@ -258,7 +261,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
         style={{
           padding: "12px 16px",
           background: "var(--dg-color-danger-bg)",
-          color: "var(--dg-color-danger)",
+          color: "var(--dg-color-danger-text)",
           borderRadius: "var(--dg-radius-lg)",
           fontSize: "var(--dg-fs-label)",
           fontWeight: 600,
@@ -299,6 +302,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
     );
   }
 
+  const displayStatus = effectiveBillingStatus(billingOrg.status, billingOrg.trialEndsAt);
   const deltaTone =
     billingOrg.seatDelta == null
       ? "neutral"
@@ -374,15 +378,9 @@ export function BillingTab({ organization }: { organization: Organization }) {
             <InfoRow
               label="Status"
               value={
-                billingStatusIsPending(billingOrg.status, billingOrg.trialEndsAt) ? (
-                  <span style={{ color: "var(--dg-color-text-muted)", fontWeight: 600 }}>
-                    Trial pending
-                  </span>
-                ) : (
-                  <span style={{ color: billingStatusTone(billingOrg.status), fontWeight: 600 }}>
-                    {formatBillingStatusLabel(billingOrg.status)}
-                  </span>
-                )
+                <span style={{ color: billingStatusTone(displayStatus), fontWeight: 600 }}>
+                  {formatBillingStatusLabel(displayStatus)}
+                </span>
               }
             />
             <InfoRow

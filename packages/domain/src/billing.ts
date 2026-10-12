@@ -168,3 +168,27 @@ export function evaluateOrganizationBillingAccess(input: BillingAccessInput): Bi
     trialGraceEndsAt: trialEndsAt ? addDays(trialEndsAt, graceDays).toISOString() : null,
   };
 }
+
+/**
+ * The status to show for an organization. Stripe leaves a lapsed trial on
+ * `trialing`, so a trial whose end date has passed reads as its grace period
+ * or as expired, and one whose clock has not started reads as pending.
+ */
+export function effectiveBillingStatus(
+  status: string | null | undefined,
+  trialEndsAt: string | null | undefined,
+  now: Date = new Date(),
+): string | null {
+  const stored = status ?? null;
+  if (stored !== null && stored !== "trialing") return stored;
+  if (!trialEndsAt) return stored === "trialing" ? "trial_pending" : null;
+
+  const { reason } = evaluateOrganizationBillingAccess({
+    subscriptionStatus: stored,
+    trialEndsAt,
+    now,
+  });
+  if (reason === "trial_grace") return "trial_grace";
+  if (reason === "trial_expired") return "trial_expired";
+  return "trialing";
+}

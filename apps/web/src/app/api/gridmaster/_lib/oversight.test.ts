@@ -241,6 +241,24 @@ describe("gridmaster organization health facts", () => {
     expect(summaries[0].supportSnapshot.activeSessions).toBe(1);
   });
 
+  it("flags a trial that has ended as a billing risk", async () => {
+    const daysFromNow = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString();
+    const flagsFor = async (trialEndsAt: string) => {
+      resetOversightFactsMemoForTests();
+      const [summary] = await loadGridmasterOrgHealth(
+        mockServiceClient({
+          organizations: [{ ...organizationRow(), trial_ends_at: trialEndsAt }],
+        }),
+        orgId,
+      );
+      return summary.riskFlags;
+    };
+
+    expect(await flagsFor(daysFromNow(5))).not.toContain("billing_risk");
+    expect(await flagsFor(daysFromNow(-1))).toContain("billing_risk");
+    expect(await flagsFor(daysFromNow(-10))).toContain("billing_risk");
+  });
+
   it("pages past PostgREST's row cap so a large tenant is counted in full", async () => {
     const total = OVERSIGHT_PAGE_SIZE * 2 + 7;
     const memberships = Array.from({ length: total }, (_, index) => ({

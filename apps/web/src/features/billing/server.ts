@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
 import type { BillingOperationSummary, OrganizationBillingSummary } from "@/types";
+import { DUBGRID_SUPPORT_ACTOR_LABEL } from "@/lib/client-facing";
 import { clientEnv } from "@/lib/env";
 import { serverEnv } from "@/lib/env.server";
 import { countBillableSeats, type SeatEmployee, type SeatMembership } from "./seats";
@@ -140,7 +141,7 @@ function describeBillingOperation(action: string): string {
 function actorLabelForBillingOperation(row: BillingAuditRow, actor: BillingActorContext): string {
   const initiatedBy = row.details?.initiated_by;
   if (initiatedBy === "gridmaster" || initiatedBy === "gridmaster_sync") {
-    return "Gridmaster";
+    return DUBGRID_SUPPORT_ACTOR_LABEL;
   }
   if (actor?.id && row.actor_id === actor.id) {
     const name = actorDisplayName(actor);

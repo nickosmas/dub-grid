@@ -19,6 +19,7 @@ import { EmptyState } from "@/components/EmptyState";
 import ProgressBar from "@/components/ProgressBar";
 import { queryKeys } from "@/lib/query-keys";
 import { formatBillingStatusLabel, formatClientErrorMessage } from "@/lib/client-facing";
+import { effectiveBillingStatus } from "@dubgrid/domain";
 import { sectionStyle } from "@/lib/styles";
 import type { GridmasterBillingOrgSummary } from "@/types";
 import { gmTableStyle, gmTdStyle, gmThStyle } from "@/components/gridmaster/table-styles";
@@ -65,9 +66,9 @@ function MiniCard({
 }) {
   const color =
     tone === "danger"
-      ? "var(--dg-color-danger)"
+      ? "var(--dg-color-danger-text)"
       : tone === "warning"
-        ? "var(--dg-color-warning)"
+        ? "var(--dg-color-warning-text)"
         : "var(--dg-color-text-primary)";
   return (
     <div style={{ ...sectionStyle, padding: "14px 16px", flex: "1 1 160px" }}>
@@ -108,26 +109,29 @@ function formatTrialEnds(org: GridmasterBillingOrgSummary) {
 }
 
 function statusTone(status: string | null) {
-  if (status === "active" || status === "trialing") return "var(--dg-color-success)";
-  if (status === "past_due" || status === "incomplete") return "var(--dg-color-warning)";
-  if (status === "canceled" || status === "unpaid" || status === "incomplete_expired")
-    return "var(--dg-color-danger)";
+  if (status === "active" || status === "trialing") return "var(--dg-color-success-text)";
+  if (status === "past_due" || status === "incomplete" || status === "trial_grace")
+    return "var(--dg-color-warning-text)";
+  if (
+    status === "canceled" ||
+    status === "unpaid" ||
+    status === "incomplete_expired" ||
+    status === "trial_expired"
+  )
+    return "var(--dg-color-danger-text)";
   return "var(--dg-color-text-muted)";
 }
 
-// A trialing org with no end date hasn't started its trial yet (no super_admin
-// has intentionally accessed it). Surface that as a distinct "pending" status
-// instead of the green "Trial active" the bare status maps to.
 function isTrialPending(org: GridmasterBillingOrgSummary) {
   return org.status === "trialing" && !org.trialEndsAt;
 }
 
 function statusLabelFor(org: GridmasterBillingOrgSummary) {
-  return isTrialPending(org) ? "Trial pending" : formatBillingStatusLabel(org.status);
+  return formatBillingStatusLabel(effectiveBillingStatus(org.status, org.trialEndsAt));
 }
 
 function statusToneFor(org: GridmasterBillingOrgSummary) {
-  return isTrialPending(org) ? "var(--dg-color-text-muted)" : statusTone(org.status);
+  return statusTone(effectiveBillingStatus(org.status, org.trialEndsAt));
 }
 
 function BillingOversightSkeleton() {
@@ -489,7 +493,7 @@ export default function GridmasterBillingView({
           style={{
             padding: "12px 16px",
             background: "var(--dg-color-danger-bg)",
-            color: "var(--dg-color-danger)",
+            color: "var(--dg-color-danger-text)",
             borderRadius: "var(--dg-radius-lg)",
             fontSize: "var(--dg-fs-label)",
             fontWeight: 600,
@@ -614,7 +618,7 @@ export default function GridmasterBillingView({
                             style={{
                               ...gmTdStyle,
                               color: org.cancelAt
-                                ? "var(--dg-color-warning)"
+                                ? "var(--dg-color-warning-text)"
                                 : "var(--dg-color-text-muted)",
                               fontWeight: org.cancelAt ? 700 : undefined,
                             }}
@@ -628,7 +632,7 @@ export default function GridmasterBillingView({
                               ...gmTdStyle,
                               color:
                                 org.seatDelta != null && org.seatDelta < 0
-                                  ? "var(--dg-color-danger)"
+                                  ? "var(--dg-color-danger-text)"
                                   : "var(--dg-color-text-muted)",
                               fontWeight: 700,
                             }}

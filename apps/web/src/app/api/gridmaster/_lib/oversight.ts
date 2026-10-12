@@ -1,3 +1,4 @@
+import { effectiveBillingStatus } from "@dubgrid/domain";
 import { getRateLimitConfigStatus } from "@/lib/rate-limit";
 import { ORGANIZATION_WITH_BILLING_COLS } from "@/lib/db/shared";
 import { rowToOrganization } from "@/lib/db/mappers";
@@ -477,7 +478,9 @@ function buildOrgHealthSummaries(facts: OversightFacts): GridmasterOrgHealthSumm
     }
     if (pendingInvites.get(org.id) ?? 0) riskFlags.push("pending_invites");
     if (openRequests.get(org.id) ?? 0) riskFlags.push("open_requests");
-    if (isBillingRisk(org)) riskFlags.push("billing_risk");
+    if (isBillingRisk(org.subscriptionStatus ?? null, org.trialEndsAt ?? null, facts.now)) {
+      riskFlags.push("billing_risk");
+    }
 
     const oversightScore = Math.max(
       0,
@@ -597,9 +600,7 @@ function buildBillingSummary(
     (row) => !row.trialEndsAt && (row.status === "trialing" || !row.status),
   );
   const riskOrganizations = organizations.filter((row) =>
-    ["past_due", "canceled", "unpaid", "incomplete", "incomplete_expired"].includes(
-      row.status ?? "",
-    ),
+    isBillingRisk(row.status, row.trialEndsAt, facts.now),
   );
   const missingStripeCustomer = organizations.filter((row) => !row.stripeCustomerId);
   const seatMismatches = organizations.filter((row) => row.seatDelta != null && row.seatDelta < 0);
@@ -803,10 +804,18 @@ function isNormalOperationAuditRow(row: Row) {
   );
 }
 
-function isBillingRisk(org: Organization) {
-  return ["past_due", "canceled", "unpaid", "incomplete", "incomplete_expired"].includes(
-    org.subscriptionStatus ?? "",
-  );
+const BILLING_RISK_STATUSES = new Set([
+  "past_due",
+  "canceled",
+  "unpaid",
+  "incomplete",
+  "incomplete_expired",
+  "trial_grace",
+  "trial_expired",
+]);
+
+function isBillingRisk(status: string | null, trialEndsAt: string | null, now: Date) {
+  return BILLING_RISK_STATUSES.has(effectiveBillingStatus(status, trialEndsAt, now) ?? "");
 }
 
 function riskPenalty(flag: GridmasterOrgHealthSummary["riskFlags"][number]) {

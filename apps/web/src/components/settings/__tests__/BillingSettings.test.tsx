@@ -1,7 +1,7 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import BillingSettings from "@/components/settings/BillingSettings";
 import { fetchOrganizationBilling } from "@/features/billing/client";
 import type { Organization, OrganizationBillingSummary } from "@/types";
@@ -76,7 +76,7 @@ const billingSummary: OrganizationBillingSummary = {
       id: "43",
       action: "billing.trial_extended",
       label: "Trial extended",
-      actorLabel: "Gridmaster",
+      actorLabel: "DubGrid Support",
       resourceType: "billing",
       resourceId: null,
       details: {},
@@ -122,6 +122,13 @@ describe("BillingSettings", () => {
     vi.clearAllMocks();
     mockSignOut.mockReset();
     vi.mocked(fetchOrganizationBilling).mockResolvedValue(billingSummary);
+    // The fixture trial ends 2026-05-16T12:00Z; the countdown reads the clock.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-02T12:00:00.000Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("shows explicit trial time left before the warning threshold", async () => {
@@ -159,7 +166,7 @@ describe("BillingSettings", () => {
     expect(screen.getByText("Subscription canceled")).toBeInTheDocument();
     expect(screen.getByText("Stripe")).toBeInTheDocument();
     expect(screen.getByText("Trial extended")).toBeInTheDocument();
-    expect(screen.getByText("Gridmaster")).toBeInTheDocument();
+    expect(screen.getByText("DubGrid Support")).toBeInTheDocument();
     expect(screen.queryByText("gridmaster@example.com")).not.toBeInTheDocument();
     expect(screen.getByText("Subscription started")).toBeInTheDocument();
     expect(screen.getByText("You (Olivia Chen)")).toBeInTheDocument();
