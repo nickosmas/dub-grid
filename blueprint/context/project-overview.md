@@ -31,7 +31,7 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Items 1 through 39 and 41 through 43 are
-shipped. Item 40 is in progress.
+shipped. Item 40 is in progress. Item 44 is planned.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -78,6 +78,7 @@ shipped. Item 40 is in progress.
 | 42   | Shipped     | Schedule notes on every schedule surface, each belonging to its shift.                                                          |
 | 43   | Shipped     | Complete person records for managers and one Gridmaster person page with two-factor lockout recovery.                           |
 | 40   | In progress | Public and internal documentation accurate for `dev`, with permanent drift gates.                                               |
+| 44   | Planned     | Safe billing actions, Gridmaster billing controls and policy, and billing history.                                              |
 
 Item 40 is split:
 
@@ -95,6 +96,17 @@ Item 40 is split:
   - **40e3 - Web browser role and state qualification:** planned.
   - **40e4 - Native iOS and Android qualification:** planned; Android evidence
     is mandatory.
+
+Item 44 is split:
+
+- **44a - Billing safety fixes:** planned; includes the two defects that can
+  lock a trialing organization or stop a canceled one from resubscribing.
+- **44b - Gridmaster billing controls:** planned; risky actions are refused
+  by the server where impossible and ask for fresh proof otherwise.
+- **44c - Customer billing clarity:** planned; customers see support changes
+  that affect them, never upkeep or raw payment-provider details.
+- **44d to 44g - Policy settings, pause and resume, past-due deadlines and
+  lock alerts, seat and revenue history:** planned; each needs a migration.
 
 Public documentation covers customer behavior only. Gridmaster tooling, Test
 Sandbox, feature flags, migrations, environment variables, and internal HTTP
