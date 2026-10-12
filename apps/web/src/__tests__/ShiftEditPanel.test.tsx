@@ -1,7 +1,12 @@
 // Pin to UTC (production runtime) so the panel's week-range labels and
 // local-midnight date probes are deterministic regardless of the dev machine's
 // timezone.
-process.env.TZ = "UTC";
+// Set in vi.hoisted, which runs before the imports: a plain assignment runs
+// after them, and a module that builds a date formatter on load keeps the
+// machine's timezone.
+vi.hoisted(() => {
+  process.env.TZ = "UTC";
+});
 
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

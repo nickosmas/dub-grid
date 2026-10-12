@@ -383,7 +383,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:d62c294c1e1c087a3f27cffe96800174e6fa16e98372a2c183ecbb03cdf42c53"
+      "evidenceFingerprint": "sha256:850253bfb9dc8ba13b156c4b752f67405c41c8817ac56072e09a055a00a5fe8c"
     },
     {
       "id": "draft-publish",
@@ -674,7 +674,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:e436af1ed5ed891371f5744ca6564fac3f9496e69cc8ddbfe2c100207cc2ec4f"
+      "evidenceFingerprint": "sha256:a0b6920a4bc991af2e5aaadfb1f0ed66ce911d1bf924f71b91e34cb7dda2a023"
     },
     {
       "id": "roster",

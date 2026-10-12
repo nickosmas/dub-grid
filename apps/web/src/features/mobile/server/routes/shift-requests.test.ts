@@ -1,7 +1,12 @@
 // Pin the runtime timezone to UTC (matching production servers) so the
 // default mobile schedule range derived from the system clock resolves to
 // stable ISO dates regardless of the local machine timezone.
-process.env.TZ = "UTC";
+// Set in vi.hoisted, which runs before the imports: a plain assignment runs
+// after them, and a module that builds a date formatter on load keeps the
+// machine's timezone.
+vi.hoisted(() => {
+  process.env.TZ = "UTC";
+});
 
 import { NextResponse } from "next/server";
 import { API_ERRORS } from "@dubgrid/client-errors";

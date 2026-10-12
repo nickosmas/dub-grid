@@ -1,7 +1,12 @@
 // Pin the runtime timezone to UTC (matching production servers) so the
 // ISO date round-trips in resolveMobileDateRange/getMobileDatesBetween are
 // stable regardless of the local machine timezone the suite runs on.
-process.env.TZ = "UTC";
+// Set in vi.hoisted, which runs before the imports: a plain assignment runs
+// after them, and a module that builds a date formatter on load keeps the
+// machine's timezone.
+vi.hoisted(() => {
+  process.env.TZ = "UTC";
+});
 
 import { describe, expect, it, vi } from "vitest";
 import {
