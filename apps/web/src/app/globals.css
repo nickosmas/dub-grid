@@ -307,7 +307,7 @@
   --dg-color-on-brand-surface: #ffffff;
   --dg-color-brand: #2563eb;
   --dg-color-brand-light: #3b82f6;
-  --dg-color-brand-mark: #2563eb;
+  --dg-color-brand-mark: var(--dg-color-primary);
   --dg-color-brand-bg: #eff6ff;
   --dg-color-brand-border: #bfdbfe;
   --dg-color-nav-active-bg: #e5e5e5;
@@ -442,7 +442,7 @@
   --dg-color-text-inverse: #ffffff;
   --dg-color-brand: #2075ff;
   --dg-color-brand-light: #4a9bff;
-  --dg-color-brand-mark: #4a9bff;
+  --dg-color-brand-mark: var(--dg-color-primary);
   --dg-color-brand-bg: #152238;
   --dg-color-brand-border: #1e3a5f;
   --dg-color-nav-active-bg: #26262b;

@@ -743,3 +743,16 @@ export function getMobileNavigationTheme(isDark: boolean) {
 
 /** @deprecated Use `getMobileNavigationTheme(isDark)` — this alias exists only for back-compat with existing static imports and always resolves to the light theme. */
 export const mobileNavigationTheme = getMobileNavigationTheme(false);
+
+export {
+  BRAND_MOTION_ASPECT,
+  BRAND_MOTION_DURATION,
+  brandBreathe,
+  brandMotionFrames,
+  brandRestFrame,
+  brandShuffle,
+  brandTrace,
+  type BrandAnimation,
+  type BrandMotionCard,
+  type BrandMotionFrame,
+} from "./brand-motion";

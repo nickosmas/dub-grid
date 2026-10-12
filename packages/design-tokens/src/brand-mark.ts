@@ -71,9 +71,10 @@ export const BRAND_MARK_INK = {
   height: inkBottom - inkTop,
 } as const;
 
+/** The brand blue of primary buttons in each theme, so the mark matches them. */
 export const BRAND_MARK_COLORS = {
   light: "#2563EB",
-  dark: "#4A9BFF",
+  dark: "#2075FF",
   onBrand: "#FFFFFF",
   mono: "#111827",
 } as const;

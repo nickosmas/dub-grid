@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="-1.4999999999999982 -3.009999999999998 106.02 106.02" width="128" height="128">
-  <style>svg{color:#2563EB}@media (prefers-color-scheme:dark){svg{color:#4A9BFF}}</style>
+  <style>svg{color:#2563EB}@media (prefers-color-scheme:dark){svg{color:#2075FF}}</style>
   <mask id="gap" maskUnits="userSpaceOnUse" x="-10" y="-10" width="120" height="120">
     <rect x="-10" y="-10" width="120" height="120" fill="#fff"/>
     <path d="M47.32,22.24H72.66C93.23,22.24 97,26.01 97,46.58V53.42C97,73.99 93.23,77.76 72.66,77.76H47.32C26.75,77.76 22.98,73.99 22.98,53.42V46.58C22.98,26.01 26.75,22.24 47.32,22.24Z" fill="#000" stroke="#000" stroke-width="12"/>

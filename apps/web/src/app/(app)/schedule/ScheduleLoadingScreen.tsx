@@ -20,7 +20,7 @@ export function ScheduleLoadingScreen() {
         zIndex: 50,
       }}
     >
-      <AnimatedDubGridLogo />
+      <AnimatedDubGridLogo animation="shuffle" />
     </div>
   );
 }
