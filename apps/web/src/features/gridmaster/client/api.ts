@@ -539,34 +539,25 @@ export function syncGridmasterBilling(orgId: string): Promise<{ success: true }>
   });
 }
 
+export type GridmasterSubscriptionInput =
+  | { orgId: string; action: "set_trial_days"; trialDays: number }
+  | { orgId: string; action: "end_trial" }
+  | { orgId: string; action: "expire_trial" }
+  | { orgId: string; action: "cancel" }
+  | { orgId: string; action: "cancel_at_period_end" }
+  | { orgId: string; action: "sync_seats" }
+  | { orgId: string; action: "override_status"; status: string };
+
 export function updateGridmasterSubscription(
-  input:
-    | {
-        orgId: string;
-        action: "extend_trial";
-        trialDays: number;
-      }
-    | {
-        orgId: string;
-        action: "cancel";
-      }
-    | {
-        orgId: string;
-        action: "cancel_at_period_end";
-      }
-    | {
-        orgId: string;
-        action: "sync_seats";
-      }
-    | {
-        orgId: string;
-        action: "override_status";
-        status: string;
-      },
+  input: GridmasterSubscriptionInput,
+  accessToken?: string,
 ): Promise<{ success: true }> {
   return requestGridmasterJson("/api/gridmaster/subscription", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify(input),
   });
 }

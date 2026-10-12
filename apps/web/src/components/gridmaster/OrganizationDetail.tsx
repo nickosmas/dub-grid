@@ -14,11 +14,6 @@ import { BillingTab } from "./organization-detail/BillingTab";
 
 import { InvitationsTab } from "./organization-detail/InvitationsTab";
 
-import {
-  BillingConfirmDialog,
-  ExtendTrialDialog,
-  type BillingConfirmAction,
-} from "@/components/gridmaster/BillingActionDialogs";
 import OrganizationChangeReviewModal from "@/components/organization/OrganizationChangeReviewModal";
 import OrganizationLocationFields from "@/components/organization/OrganizationLocationFields";
 import { getEmployeeDisplayName } from "@/lib/utils";

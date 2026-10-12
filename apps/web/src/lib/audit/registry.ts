@@ -418,6 +418,15 @@ function amountRows(d: AuditDetails, key: string): DetailItem[] {
   return [{ label: "Amount", value: formatMinorUnits(amount, currency) }];
 }
 
+function trialEndRows(d: AuditDetails): DetailItem[] {
+  const rows: DetailItem[] = [];
+  const before = d.text("previous_trial_ends_at");
+  const after = d.text("trial_ends_at");
+  if (before) rows.push({ label: "Previous end", value: formatShortDate(before) });
+  if (after) rows.push({ label: "New end", value: formatShortDate(after) });
+  return rows;
+}
+
 export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
   // ── People ─────────────────────────────────────────────────────────────────
   "employee.created": {
@@ -1086,6 +1095,24 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     category: "billing",
     severity: "update",
     headline: () => "Extended the trial",
+  },
+  "billing.trial_changed": {
+    category: "billing",
+    severity: "update",
+    headline: () => "Changed the trial end date",
+    details: (d) => trialEndRows(d),
+  },
+  "billing.trial_ended": {
+    category: "billing",
+    severity: "warning",
+    headline: () => "Ended the trial early",
+    details: (d) => trialEndRows(d),
+  },
+  "billing.trial_expired": {
+    category: "billing",
+    severity: "delete",
+    headline: () => "Expired the trial",
+    details: (d) => trialEndRows(d),
   },
   "billing.payment_failed": {
     category: "billing",

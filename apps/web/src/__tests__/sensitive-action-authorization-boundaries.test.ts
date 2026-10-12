@@ -109,6 +109,14 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
       /if \(action === "start"\)[\s\S]*?const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.rpc\("start_impersonation"/,
     ],
   },
+  // Locking an organization or rewriting its billing needs a recent sign-in;
+  // changing a trial's length, syncing, or scheduling a cancellation never does.
+  "apps/web/src/app/api/gridmaster/subscription/route.ts": {
+    policy: "conditional-sensitive",
+    assertions: [
+      /\brequireGridmasterSession\s*\([\s\S]*?if \(action === "expire_trial" \|\| action === "cancel" \|\| action === "override_status"\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\bcancelSubscription\(/,
+    ],
+  },
   "apps/web/src/app/api/gridmaster/password-reset/route.ts": {
     policy: "sensitive",
     assertions: [

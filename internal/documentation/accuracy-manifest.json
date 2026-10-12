@@ -1184,7 +1184,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:12700c999a687d50de5739a722a70a4105ffa73307a36c5e35346f6c3a36dceb"
+      "evidenceFingerprint": "sha256:cb95a0014cea742e67dd27fad3ffcb514aa7377b28d28b56fdc07efa98e4760a"
     },
     {
       "id": "mobile-navigation",
@@ -1753,7 +1753,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:0c8b499e6844608f79a8da939b5418182dad8c1da9a7fb3cfdc15e9ea7e24229"
+      "evidenceFingerprint": "sha256:8d38394ae541c4e7c662a49ee9319e2870669d441726e1b66be7d392b3dfe69c"
     },
     {
       "id": "departments-focus-areas",

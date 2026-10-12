@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { API_ERRORS } from "@dubgrid/client-errors";
-import { DEFAULT_TRIAL_DAYS } from "@dubgrid/domain";
-import { requireGridmasterSession } from "@/lib/api-auth";
+import { DEFAULT_TRIAL_DAYS, TRIAL_EXPIRED_STATUS, trialControls } from "@dubgrid/domain";
+import { requireGridmasterSession, requireSensitiveActionAuth } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { retryAfterSeconds } from "@/lib/retry-after";
@@ -33,8 +33,16 @@ const billingStatusSchema = z.enum([
 const bodySchema = z.discriminatedUnion("action", [
   z.object({
     orgId: orgIdSchema,
-    action: z.literal("extend_trial"),
-    trialDays: z.number().int().min(1).optional(),
+    action: z.literal("set_trial_days"),
+    trialDays: z.number().int().min(1),
+  }),
+  z.object({
+    orgId: orgIdSchema,
+    action: z.literal("end_trial"),
+  }),
+  z.object({
+    orgId: orgIdSchema,
+    action: z.literal("expire_trial"),
   }),
   z.object({
     orgId: orgIdSchema,
@@ -85,6 +93,12 @@ export async function POST(req: NextRequest) {
   const { orgId, action } = parsed.data;
   const admin = getServiceClient();
 
+  // Each of these locks an organization or rewrites its billing outright.
+  if (action === "expire_trial" || action === "cancel" || action === "override_status") {
+    const assurance = await requireSensitiveActionAuth(req);
+    if ("response" in assurance) return assurance.response;
+  }
+
   const { limited, reset, misconfigured } = await checkRateLimit(
     apiLimiter,
     `gridmaster-subscription:${user.id}:${orgId}`,
@@ -112,58 +126,96 @@ export async function POST(req: NextRequest) {
       .eq("org_id", orgId)
       .single();
 
-    if (action === "extend_trial") {
-      const days = parsed.data.trialDays ?? 14;
-      // If extending starts a pending trial (no start recorded yet), stamp the
-      // start now; otherwise preserve the existing start so the column stays
-      // consistent with trial_ends_at. See trial activation in 002 migrations.
-      const { data: orgRow } = await admin
+    if (action === "set_trial_days" || action === "end_trial" || action === "expire_trial") {
+      const { data: orgRow, error: orgError } = await admin
         .from("organizations")
-        .select("trial_started_at")
+        .select("subscription_status, trial_started_at, trial_ends_at")
         .eq("id", orgId)
         .single();
-      const startedAt = orgRow?.trial_started_at ?? new Date().toISOString();
-      if (!sub?.stripe_subscription_id) {
-        // No Stripe subscription — just update trial_ends_at on the org
-        const newEnd = new Date(Date.now() + days * 86400000).toISOString();
-        await admin
-          .from("organizations")
-          .update({
-            trial_started_at: startedAt,
-            trial_ends_at: newEnd,
-            subscription_status: "trialing",
-          })
-          .eq("id", orgId);
-      } else {
-        const newEnd = new Date(Date.now() + days * 86400000);
-        await extendTrial(sub.stripe_subscription_id, newEnd);
-        await admin
-          .from("organizations")
-          .update({
-            trial_started_at: startedAt,
-            trial_ends_at: newEnd.toISOString(),
-            subscription_status: "trialing",
-          })
-          .eq("id", orgId);
+      if (orgError || !orgRow) {
+        return NextResponse.json({ error: "Organization not found." }, { status: 404 });
       }
+      const previousTrialEndsAt = (orgRow.trial_ends_at as string | null) ?? null;
+      const controls = trialControls({
+        status: orgRow.subscription_status as string | null,
+        trialEndsAt: previousTrialEndsAt,
+        hasStripeSubscription: Boolean(sub?.stripe_subscription_id),
+      });
+      const allowed =
+        action === "set_trial_days"
+          ? controls.change
+          : action === "end_trial"
+            ? controls.end
+            : controls.expire;
+      if (!allowed) {
+        return NextResponse.json(
+          { error: controls.reason ?? "That trial change doesn't apply to this organization." },
+          { status: 409 },
+        );
+      }
+
+      const now = new Date();
+      // A trial that never started gets its start stamped with the change.
+      const trialStartedAt = (orgRow.trial_started_at as string | null) ?? now.toISOString();
+      let trialEndsAt: string;
+      let status: string;
+      if (action === "set_trial_days") {
+        const newEnd = new Date(now.getTime() + parsed.data.trialDays * 86_400_000);
+        if (sub?.stripe_subscription_id) await extendTrial(sub.stripe_subscription_id, newEnd);
+        trialEndsAt = newEnd.toISOString();
+        status = "trialing";
+      } else if (action === "end_trial") {
+        trialEndsAt = now.toISOString();
+        status = "trialing";
+      } else {
+        // Keep a past end date: the trial really ended then.
+        trialEndsAt =
+          previousTrialEndsAt && Date.parse(previousTrialEndsAt) < now.getTime()
+            ? previousTrialEndsAt
+            : now.toISOString();
+        status = TRIAL_EXPIRED_STATUS;
+      }
+
+      const { error: updateError } = await admin
+        .from("organizations")
+        .update({
+          trial_started_at: trialStartedAt,
+          trial_ends_at: trialEndsAt,
+          subscription_status: status,
+        })
+        .eq("id", orgId);
+      if (updateError) throw updateError;
       await invalidateOrganizationAccess(orgId);
       await writeGridmasterAuditLog({
         serviceClient: admin,
         actor: user,
-        action: "billing.trial_extended",
+        action:
+          action === "set_trial_days"
+            ? "billing.trial_changed"
+            : action === "end_trial"
+              ? "billing.trial_ended"
+              : "billing.trial_expired",
         resourceType: "organization",
         resourceId: orgId,
         orgId,
-        details: { days },
+        details: {
+          previous_trial_ends_at: previousTrialEndsAt,
+          trial_ends_at: trialEndsAt,
+          ...(action === "set_trial_days" ? { days: parsed.data.trialDays } : {}),
+        },
         request: req,
       });
-      return NextResponse.json({ success: true });
+      return NextResponse.json({ success: true, trialEndsAt });
     }
 
     if (action === "cancel") {
-      if (sub?.stripe_subscription_id) {
-        await cancelSubscription(sub.stripe_subscription_id);
+      if (!sub?.stripe_subscription_id) {
+        return NextResponse.json(
+          { error: "There's no subscription to cancel. Expire the trial instead." },
+          { status: 409 },
+        );
       }
+      await cancelSubscription(sub.stripe_subscription_id);
       await admin.from("organizations").update({ subscription_status: "canceled" }).eq("id", orgId);
       await invalidateOrganizationAccess(orgId);
       await writeGridmasterAuditLog({

@@ -40,6 +40,9 @@ export interface BillingAccessResult {
   trialGraceEndsAt: string | null;
 }
 
+/** The stored status for a trial a Gridmaster ended with no grace period. */
+export const TRIAL_EXPIRED_STATUS = "trial_expired";
+
 const LOCKED_STATUSES = new Set(["canceled", "incomplete_expired", "unpaid"]);
 
 const PAYMENT_ATTENTION_STATUSES = new Set(["incomplete", "past_due", "paused"]);
@@ -73,6 +76,18 @@ export function evaluateOrganizationBillingAccess(input: BillingAccessInput): Bi
       shouldNotifyAdmins: true,
       daysUntilTrialEnd: trialEndsAt ? daysUntil(now, trialEndsAt) : null,
       trialGraceEndsAt: trialEndsAt ? addDays(trialEndsAt, graceDays).toISOString() : null,
+    };
+  }
+
+  // Stored only by a Gridmaster expiring a trial early; Stripe never sends it.
+  if (status === TRIAL_EXPIRED_STATUS) {
+    return {
+      state: "locked",
+      reason: "trial_expired",
+      isLocked: true,
+      shouldNotifyAdmins: true,
+      daysUntilTrialEnd: trialEndsAt ? daysUntil(now, trialEndsAt) : null,
+      trialGraceEndsAt: null,
     };
   }
 
@@ -191,4 +206,54 @@ export function effectiveBillingStatus(
   if (reason === "trial_grace") return "trial_grace";
   if (reason === "trial_expired") return "trial_expired";
   return "trialing";
+}
+
+export interface TrialControlInput {
+  status: string | null | undefined;
+  trialEndsAt: string | null | undefined;
+  hasStripeSubscription: boolean;
+  now?: Date;
+}
+
+export interface TrialControls {
+  /** Set the days left, which also reopens an ended or expired trial. */
+  change: boolean;
+  /** End the trial now; the grace period still applies. */
+  end: boolean;
+  /** Lock the organization now with no grace period. */
+  expire: boolean;
+  /** Why the controls are off, when none of them apply. */
+  reason: string | null;
+}
+
+/**
+ * Which trial actions a Gridmaster may take. The server enforces the same
+ * answer, so a paying organization can never be put back on a trial and an
+ * organization billed through Stripe never has its trial ended from here.
+ */
+export function trialControls(input: TrialControlInput): TrialControls {
+  const status = input.status ?? null;
+  if (status !== null && status !== "trialing" && status !== TRIAL_EXPIRED_STATUS) {
+    return {
+      change: false,
+      end: false,
+      expire: false,
+      reason: "This organization isn't on a trial.",
+    };
+  }
+  if (status === TRIAL_EXPIRED_STATUS) {
+    return { change: true, end: false, expire: false, reason: null };
+  }
+  if (input.hasStripeSubscription) {
+    return {
+      change: true,
+      end: false,
+      expire: false,
+      reason: "Stripe bills this trial. Cancel the subscription to end it.",
+    };
+  }
+  const now = input.now ?? new Date();
+  const endsAt = input.trialEndsAt ? new Date(input.trialEndsAt).getTime() : null;
+  const running = endsAt === null || endsAt > now.getTime();
+  return { change: true, end: running, expire: true, reason: null };
 }

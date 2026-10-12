@@ -1,25 +1,19 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import { fetchGridmasterBilling } from "@/features/gridmaster/client";
 import {
-  fetchGridmasterBilling,
-  syncGridmasterBilling,
-  updateGridmasterSubscription,
-} from "@/features/gridmaster/client";
-import {
-  BillingConfirmDialog,
-  ExtendTrialDialog,
-  type BillingConfirmAction,
-} from "@/components/gridmaster/BillingActionDialogs";
+  useGridmasterBillingActions,
+  type GridmasterBillingActions,
+} from "@/components/gridmaster/useGridmasterBillingActions";
 import { Button } from "@/components/Button";
 import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
 import { EmptyState } from "@/components/EmptyState";
 import ProgressBar from "@/components/ProgressBar";
 import { queryKeys } from "@/lib/query-keys";
 import { formatBillingStatusLabel, formatClientErrorMessage } from "@/lib/client-facing";
-import { effectiveBillingStatus } from "@dubgrid/domain";
+import { effectiveBillingStatus, trialControls } from "@dubgrid/domain";
 import { sectionStyle } from "@/lib/styles";
 import type { GridmasterBillingOrgSummary } from "@/types";
 import { gmTableStyle, gmTdStyle, gmThStyle } from "@/components/gridmaster/table-styles";
@@ -193,55 +187,57 @@ function BillingOversightSkeleton() {
 function BillingRowActions({
   org,
   busy,
-  onSync,
-  onSyncSeats,
-  onExtendTrial,
-  onCancel,
-  onCancelAtPeriodEnd,
-  onOverrideStatus,
+  actions,
 }: {
   org: GridmasterBillingOrgSummary;
   busy: boolean;
-  onSync: (org: GridmasterBillingOrgSummary) => void;
-  onSyncSeats: (org: GridmasterBillingOrgSummary) => void;
-  onExtendTrial: (org: GridmasterBillingOrgSummary) => void;
-  onCancel: (org: GridmasterBillingOrgSummary) => void;
-  onCancelAtPeriodEnd: (org: GridmasterBillingOrgSummary) => void;
-  onOverrideStatus: (org: GridmasterBillingOrgSummary, status: string) => void;
+  actions: GridmasterBillingActions;
 }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const trial = trialControls({
+    status: org.status,
+    trialEndsAt: org.trialEndsAt,
+    hasStripeSubscription: Boolean(org.stripeSubscriptionId),
+  });
 
   // One overflow menu per row, the control the schedule toolbar uses: seven
   // inline buttons and a status select made the Actions column wider than the
   // table and stacked them five deep on wide displays. The menu is portalled,
   // so the table's horizontal scroll container cannot clip it.
   const items: Array<{ label: string; disabled: boolean; danger?: boolean; run: () => void }> = [
-    { label: "Sync Stripe", disabled: busy || !org.stripeCustomerId, run: () => onSync(org) },
+    {
+      label: "Sync Stripe",
+      disabled: busy || !org.stripeCustomerId,
+      run: () => actions.confirm({ kind: "sync_billing", org }),
+    },
     {
       label: "True up seats",
       disabled: busy || !org.stripeSubscriptionId || org.seats === org.appUsers,
-      run: () => onSyncSeats(org),
+      run: () => actions.confirm({ kind: "sync_seats", org }),
     },
-    // Only a trialing org has a trial to extend; for active/canceled/past_due
-    // there is no trial clock, so the action would be a no-op.
+    { label: "Change trial", disabled: busy || !trial.change, run: () => actions.changeTrial(org) },
     {
-      label: "Extend trial",
-      disabled: busy || org.status !== "trialing",
-      run: () => onExtendTrial(org),
+      label: "End trial now",
+      disabled: busy || !trial.end,
+      run: () => actions.confirm({ kind: "end_trial", org }),
+    },
+    {
+      label: "Expire trial",
+      disabled: busy || !trial.expire,
+      danger: true,
+      run: () => actions.confirm({ kind: "expire_trial", org }),
     },
     {
       label: "End at period end",
       disabled: busy || !org.stripeSubscriptionId || org.status === "canceled" || !!org.cancelAt,
-      run: () => onCancelAtPeriodEnd(org),
+      run: () => actions.confirm({ kind: "cancel_at_period_end", org }),
     },
-    // No Stripe subscription = nothing to cancel; use a status override to
-    // change a local-only org's status instead.
     {
       label: "Cancel subscription",
       disabled: busy || org.status === "canceled" || !org.stripeSubscriptionId,
       danger: true,
-      run: () => onCancel(org),
+      run: () => actions.confirm({ kind: "cancel", org }),
     },
   ];
   const overrides = BILLING_STATUSES.filter((status) => status !== org.status);
@@ -294,7 +290,11 @@ function BillingRowActions({
               Override status
             </div>
             {overrides.map((status) => (
-              <MenuItem key={status} disabled={busy} onClick={() => onOverrideStatus(org, status)}>
+              <MenuItem
+                key={status}
+                disabled={busy}
+                onClick={() => actions.confirm({ kind: "override_status", org, status })}
+              >
                 {formatBillingStatusLabel(status)}
               </MenuItem>
             ))}
@@ -310,138 +310,14 @@ export default function GridmasterBillingView({
 }: {
   onSelectOrg: (orgId: string, initialTab?: "billing") => void;
 }) {
-  const queryClient = useQueryClient();
-  const [busyOrgId, setBusyOrgId] = useState<string | null>(null);
-  const [confirmAction, setConfirmAction] = useState<BillingConfirmAction | null>(null);
-  const [extendTrialOrg, setExtendTrialOrg] = useState<GridmasterBillingOrgSummary | null>(null);
-  const [trialDays, setTrialDays] = useState("14");
+  const actions = useGridmasterBillingActions();
+  const { busyOrgId } = actions;
   const billingQuery = useQuery({
     queryKey: queryKeys.gridmaster.billing(),
     queryFn: fetchGridmasterBilling,
     staleTime: 30_000,
   });
   const billing = billingQuery.data;
-
-  function invalidateBilling() {
-    queryClient.invalidateQueries({ queryKey: queryKeys.gridmaster.billing() });
-    queryClient.invalidateQueries({ queryKey: queryKeys.gridmaster.overview() });
-    queryClient.invalidateQueries({ queryKey: queryKeys.gridmaster.dashboard() });
-  }
-
-  const syncMutation = useMutation({
-    mutationFn: syncGridmasterBilling,
-    onSuccess: () => {
-      toast.success("Billing synced");
-      invalidateBilling();
-    },
-    onError: (error) => {
-      toast.error(
-        formatClientErrorMessage(error, "We couldn't refresh the billing details. Try again."),
-      );
-    },
-    onSettled: () => {
-      setBusyOrgId(null);
-      setConfirmAction(null);
-    },
-  });
-
-  const subscriptionMutation = useMutation({
-    mutationFn: updateGridmasterSubscription,
-    onSuccess: (_result, input) => {
-      toast.success(
-        input.action === "extend_trial"
-          ? "Trial extended"
-          : input.action === "cancel"
-            ? "Subscription canceled"
-            : input.action === "cancel_at_period_end"
-              ? "Cancellation scheduled"
-              : input.action === "sync_seats"
-                ? "Seats synced"
-                : "Billing status overridden",
-      );
-      invalidateBilling();
-    },
-    onError: (error) => {
-      toast.error(formatClientErrorMessage(error, "Billing action failed"));
-    },
-    onSettled: () => {
-      setBusyOrgId(null);
-      setConfirmAction(null);
-      setExtendTrialOrg(null);
-    },
-  });
-
-  function handleSync(org: GridmasterBillingOrgSummary) {
-    setConfirmAction({ kind: "sync_billing", org });
-  }
-
-  function handleExtendTrial(org: GridmasterBillingOrgSummary) {
-    setTrialDays("14");
-    setExtendTrialOrg(org);
-  }
-
-  function handleConfirmExtendTrial() {
-    if (!extendTrialOrg) return;
-
-    const days = Number.parseInt(trialDays, 10);
-    if (!Number.isFinite(days) || days < 1) {
-      toast.error("Trial extension must be at least 1 day");
-      return;
-    }
-
-    setBusyOrgId(extendTrialOrg.orgId);
-    subscriptionMutation.mutate({
-      orgId: extendTrialOrg.orgId,
-      action: "extend_trial",
-      trialDays: days,
-    });
-  }
-
-  function handleCancel(org: GridmasterBillingOrgSummary) {
-    setConfirmAction({ kind: "cancel", org });
-  }
-
-  function handleCancelAtPeriodEnd(org: GridmasterBillingOrgSummary) {
-    setConfirmAction({ kind: "cancel_at_period_end", org });
-  }
-
-  function handleSyncSeats(org: GridmasterBillingOrgSummary) {
-    setConfirmAction({ kind: "sync_seats", org });
-  }
-
-  function handleOverrideStatus(org: GridmasterBillingOrgSummary, status: string) {
-    setConfirmAction({ kind: "override_status", org, status });
-  }
-
-  function handleConfirmAction() {
-    if (!confirmAction) return;
-
-    setBusyOrgId(confirmAction.org.orgId);
-    switch (confirmAction.kind) {
-      case "sync_billing":
-        syncMutation.mutate(confirmAction.org.orgId);
-        break;
-      case "sync_seats":
-        subscriptionMutation.mutate({ orgId: confirmAction.org.orgId, action: "sync_seats" });
-        break;
-      case "cancel_at_period_end":
-        subscriptionMutation.mutate({
-          orgId: confirmAction.org.orgId,
-          action: "cancel_at_period_end",
-        });
-        break;
-      case "cancel":
-        subscriptionMutation.mutate({ orgId: confirmAction.org.orgId, action: "cancel" });
-        break;
-      case "override_status":
-        subscriptionMutation.mutate({
-          orgId: confirmAction.org.orgId,
-          action: "override_status",
-          status: confirmAction.status,
-        });
-        break;
-    }
-  }
 
   return (
     <>
@@ -658,12 +534,7 @@ export default function GridmasterBillingView({
                             <BillingRowActions
                               org={org}
                               busy={busyOrgId === org.orgId}
-                              onSync={handleSync}
-                              onSyncSeats={handleSyncSeats}
-                              onExtendTrial={handleExtendTrial}
-                              onCancel={handleCancel}
-                              onCancelAtPeriodEnd={handleCancelAtPeriodEnd}
-                              onOverrideStatus={handleOverrideStatus}
+                              actions={actions}
                             />
                           </td>
                         </tr>
@@ -676,20 +547,7 @@ export default function GridmasterBillingView({
           </div>
         </>
       )}
-      <BillingConfirmDialog
-        action={confirmAction}
-        isLoading={subscriptionMutation.isPending || syncMutation.isPending}
-        onConfirm={handleConfirmAction}
-        onCancel={() => setConfirmAction(null)}
-      />
-      <ExtendTrialDialog
-        org={extendTrialOrg}
-        days={trialDays}
-        isLoading={subscriptionMutation.isPending}
-        onDaysChange={setTrialDays}
-        onConfirm={handleConfirmExtendTrial}
-        onCancel={() => setExtendTrialOrg(null)}
-      />
+      {actions.dialogs}
     </>
   );
 }

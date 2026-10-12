@@ -15,6 +15,18 @@ vi.mock("@/features/gridmaster/client", () => ({
   updateGridmasterSubscription: (input: unknown) => mockUpdateGridmasterSubscription(input),
 }));
 
+// The identity check needs a real browser session; run the action as if
+// the server accepted the current one.
+vi.mock("@/hooks/useStepUpAction", () => ({
+  useStepUpAction: () => ({
+    run: async (action: (accessToken: string) => Promise<unknown>) => {
+      await action("access-token");
+      return true;
+    },
+    dialog: null,
+  }),
+}));
+
 vi.mock("sonner", () => ({
   toast: {
     success: vi.fn(),
@@ -119,27 +131,43 @@ describe("GridmasterBillingView", () => {
     expect(onSelectOrg).toHaveBeenCalledWith("11111111-1111-4111-8111-111111111111", "billing");
   });
 
-  it("extends a trial from the row action", async () => {
+  it("sets the trial days left from the row action", async () => {
     const user = userEvent.setup();
 
     renderView();
 
     await screen.findByText("Acme Health");
-    await openRowAction(user, "Extend trial");
-    await user.clear(await screen.findByLabelText("Trial extension days"));
-    await user.type(screen.getByLabelText("Trial extension days"), "21");
-    // The row trigger and the dialog confirm are both "Extend trial", so scope
-    // the confirm to the dialog rather than matching whichever comes first.
-    const extendDialog = await screen.findByRole("dialog", { name: "Extend trial" });
-    await user.click(within(extendDialog).getByRole("button", { name: "Extend trial" }));
+    await openRowAction(user, "Change trial");
+    await user.clear(await screen.findByLabelText("Trial days left"));
+    await user.type(screen.getByLabelText("Trial days left"), "21");
+    const trialDialog = await screen.findByRole("dialog", { name: "Change trial" });
+    expect(within(trialDialog).getByText(/^The trial will end on /)).toBeInTheDocument();
+    await user.click(within(trialDialog).getByRole("button", { name: "Save trial" }));
 
     await waitFor(() => {
       expect(mockUpdateGridmasterSubscription).toHaveBeenCalledWith({
         orgId: "11111111-1111-4111-8111-111111111111",
-        action: "extend_trial",
+        action: "set_trial_days",
         trialDays: 21,
       });
     });
+  });
+
+  it("leaves ending a Stripe-billed trial to Stripe", async () => {
+    const user = userEvent.setup();
+
+    renderView();
+
+    await screen.findByText("Acme Health");
+    await user.click(screen.getByRole("button", { name: "Billing actions for Acme Health" }));
+    expect(await screen.findByRole("menuitem", { name: "End trial now" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("menuitem", { name: "Expire trial" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
 
   it("cancels billing after confirmation", async () => {

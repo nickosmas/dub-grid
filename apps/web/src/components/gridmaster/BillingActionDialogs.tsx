@@ -1,5 +1,6 @@
 "use client";
 
+import { TRIAL_GRACE_DAYS } from "@dubgrid/domain";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { formatBillingStatusLabel } from "@/lib/client-facing";
 import type { GridmasterBillingOrgSummary } from "@/types";
@@ -10,7 +11,13 @@ export type BillingConfirmAction =
   | { kind: "sync_seats"; org: GridmasterBillingOrgSummary }
   | { kind: "cancel_at_period_end"; org: GridmasterBillingOrgSummary }
   | { kind: "cancel"; org: GridmasterBillingOrgSummary }
+  | { kind: "end_trial"; org: GridmasterBillingOrgSummary }
+  | { kind: "expire_trial"; org: GridmasterBillingOrgSummary }
   | { kind: "override_status"; org: GridmasterBillingOrgSummary; status: string };
+
+function formatDay(date: Date): string {
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
 
 function getConfirmDialogCopy(action: BillingConfirmAction) {
   switch (action.kind) {
@@ -38,8 +45,24 @@ function getConfirmDialogCopy(action: BillingConfirmAction) {
     case "cancel":
       return {
         title: "Cancel Billing",
-        message: `Cancel billing for ${action.org.orgName}? This immediately cancels the Stripe subscription when one exists.`,
+        message: `Cancel the Stripe subscription for ${action.org.orgName} now? The organization locks immediately.`,
         confirmLabel: "Cancel Billing",
+        variant: "danger" as const,
+      };
+    case "end_trial": {
+      const accessEnds = new Date(Date.now() + TRIAL_GRACE_DAYS * 86_400_000);
+      return {
+        title: "End trial now",
+        message: `End the trial for ${action.org.orgName} now? They keep access for ${TRIAL_GRACE_DAYS} more days, until ${formatDay(accessEnds)}, then the organization locks unless billing is added.`,
+        confirmLabel: "End trial",
+        variant: "warning" as const,
+      };
+    }
+    case "expire_trial":
+      return {
+        title: "Expire trial",
+        message: `Expire the trial for ${action.org.orgName} now? The organization locks immediately, with no grace period. Members can't use it until billing is added or you give it trial days again.`,
+        confirmLabel: "Expire trial",
         variant: "danger" as const,
       };
     case "override_status":
@@ -80,7 +103,14 @@ export function BillingConfirmDialog({
   );
 }
 
-export function ExtendTrialDialog({
+/** Whole days left on a running trial, for the dialog's starting value. */
+export function trialDaysLeft(trialEndsAt: string | null, now: Date = new Date()): number | null {
+  if (!trialEndsAt) return null;
+  const left = Math.ceil((Date.parse(trialEndsAt) - now.getTime()) / 86_400_000);
+  return left > 0 ? left : null;
+}
+
+export function TrialDaysDialog({
   org,
   days,
   isLoading,
@@ -89,33 +119,44 @@ export function ExtendTrialDialog({
   onCancel,
 }: {
   org: GridmasterBillingOrgSummary | null;
-  days: string;
+  days: number | null;
   isLoading: boolean;
-  onDaysChange: (days: string) => void;
+  onDaysChange: (days: number | null) => void;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
   if (!org) return null;
 
+  const valid = days !== null && days >= 1;
+  const restarts = trialDaysLeft(org.trialEndsAt) === null && Boolean(org.trialEndsAt);
+
   return (
     <ConfirmDialog
-      title="Extend trial"
+      title="Change trial"
       message={
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <span>Extend the trial for {org.orgName} by how many days?</span>
+          <span>
+            How many days should {org.orgName} have left?
+            {restarts ? " This puts the organization back on its trial." : ""}
+          </span>
           <NumberField
             nullable
             min={1}
-            value={days === "" ? null : Number.parseInt(days, 10)}
-            onChange={(value) => onDaysChange(value === null ? "" : String(value))}
-            aria-label="Trial extension days"
+            value={days}
+            onChange={onDaysChange}
+            aria-label="Trial days left"
           />
+          <span className="dg-tabular-nums" style={{ color: "var(--dg-color-text-muted)" }}>
+            {valid
+              ? `The trial will end on ${formatDay(new Date(Date.now() + days * 86_400_000))}.`
+              : "Enter at least 1 day."}
+          </span>
         </div>
       }
-      confirmLabel="Extend trial"
+      confirmLabel="Save trial"
       variant="warning"
       isLoading={isLoading}
-      confirmDisabled={!days.trim()}
+      confirmDisabled={!valid}
       onConfirm={onConfirm}
       onCancel={onCancel}
     />

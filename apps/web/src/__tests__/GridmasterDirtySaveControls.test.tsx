@@ -59,6 +59,18 @@ vi.mock("@/features/gridmaster/client", () => ({
   assignGridmasterOrgRoleByEmail: vi.fn(),
 }));
 
+// The identity check needs a real browser session; run the action as if
+// the server accepted the current one.
+vi.mock("@/hooks/useStepUpAction", () => ({
+  useStepUpAction: () => ({
+    run: async (action: (accessToken: string) => Promise<unknown>) => {
+      await action("access-token");
+      return true;
+    },
+    dialog: null,
+  }),
+}));
+
 vi.mock("@/lib/notify", () => ({
   queueNotification: vi.fn(),
 }));

@@ -124,6 +124,12 @@ function describeBillingOperation(action: string): string {
       return "Billing portal opened";
     case "billing.trial_extended":
       return "Trial extended";
+    case "billing.trial_changed":
+      return "Trial end date changed";
+    case "billing.trial_ended":
+      return "Trial ended early";
+    case "billing.trial_expired":
+      return "Trial expired";
     case "billing.seats_synced":
       return "Seats synced";
     case "billing.status_overridden":
