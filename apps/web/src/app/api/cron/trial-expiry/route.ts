@@ -52,6 +52,9 @@ export async function GET(req: NextRequest) {
     .select("id, trial_ends_at")
     .gte("trial_ends_at", endingTarget.toISOString())
     .lt("trial_ends_at", endingTargetEnd.toISOString())
+    // An organization moved off its trial keeps the old end date; it is not
+    // ending anything.
+    .eq("subscription_status", "trialing")
     .is("archived_at", null)
     .is("suspended_at", null);
   if (endingError) {

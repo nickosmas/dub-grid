@@ -8,7 +8,10 @@ import {
   saveOrganizationSettingsWithRecovery,
   updateOrganizationSettings,
 } from "@/features/organization/client";
-import { fetchGridmasterBilling, updateGridmasterSubscription } from "@/features/gridmaster/client";
+import {
+  fetchGridmasterOrgBilling,
+  updateGridmasterSubscription,
+} from "@/features/gridmaster/client";
 import type { Organization } from "@/types";
 
 vi.mock("@/features/organization/client", () => ({
@@ -47,7 +50,7 @@ vi.mock("@/features/settings/client", () => ({
 }));
 
 vi.mock("@/features/gridmaster/client", () => ({
-  fetchGridmasterBilling: vi.fn(),
+  fetchGridmasterOrgBilling: vi.fn(),
   fetchGridmasterFullAuditLog: vi.fn().mockResolvedValue([]),
   fetchGridmasterInvitations: vi.fn().mockResolvedValue({ invitations: [] }),
   syncGridmasterBilling: vi.fn(),
@@ -142,33 +145,26 @@ describe("gridmaster dirty save controls", () => {
     vi.mocked(fetchOrganizationEmployeeCount).mockResolvedValue({
       employeeCount: 42,
     });
-    vi.mocked(fetchGridmasterBilling).mockResolvedValue({
-      generatedAt: "2026-05-02T00:00:00.000Z",
-      organizations: [
-        {
-          orgId: "org-1",
-          orgName: "Acme Health",
-          orgSlug: "acme-health",
-          status: "active",
-          stripeCustomerId: "cus_123",
-          stripeSubscriptionId: "sub_123",
-          trialStartedAt: null,
-          trialEndsAt: null,
-          currentPeriodEnd: "2026-06-01T00:00:00.000Z",
-          cancelAt: null,
-          canceledAt: null,
-          seats: 7,
-          appUsers: 9,
-          employeeCount: 8,
-          seatDelta: -2,
-          updatedAt: "2026-05-01T00:00:00.000Z",
-        },
-      ],
-      trialEndingSoon: [],
-      trialsNotStarted: [],
-      riskOrganizations: [],
-      missingStripeCustomer: [],
-      seatMismatches: [],
+    vi.mocked(fetchGridmasterOrgBilling).mockResolvedValue({
+      organization: {
+        orgId: "org-1",
+        orgName: "Acme Health",
+        orgSlug: "acme-health",
+        status: "active",
+        stripeCustomerId: "cus_123",
+        stripeSubscriptionId: "sub_123",
+        trialStartedAt: null,
+        trialEndsAt: null,
+        currentPeriodEnd: "2026-06-01T00:00:00.000Z",
+        cancelAt: null,
+        canceledAt: null,
+        seats: 7,
+        appUsers: 9,
+        employeeCount: 8,
+        seatDelta: -2,
+        updatedAt: "2026-05-01T00:00:00.000Z",
+      },
+      stripeMode: null,
     });
     vi.mocked(updateGridmasterSubscription).mockResolvedValue({ success: true });
   });

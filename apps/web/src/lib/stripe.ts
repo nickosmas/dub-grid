@@ -88,6 +88,14 @@ function getStripe(): Stripe | null {
   return _stripe;
 }
 
+/** Which Stripe dashboard the configured key belongs to; null when none is set. */
+export function stripeMode(): "test" | "live" | null {
+  const key = serverEnv?.STRIPE_SECRET_KEY ?? "";
+  if (/^(sk|rk)_test_/.test(key)) return "test";
+  if (/^(sk|rk)_live_/.test(key)) return "live";
+  return null;
+}
+
 /** Lazily-initialized Stripe instance. Returns null if STRIPE_SECRET_KEY is not set. */
 export { getStripe };
 

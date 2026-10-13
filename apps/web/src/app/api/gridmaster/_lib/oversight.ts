@@ -9,6 +9,7 @@ import {
 } from "@/features/billing/seats";
 import type { DbOrganization } from "@/lib/db/types";
 import type {
+  GridmasterBillingOrgSummary,
   GridmasterBillingSummary,
   GridmasterComplianceSummary,
   GridmasterOrgHealthSummary,
@@ -288,11 +289,7 @@ async function loadOversightFactsUncached(serviceClient: QueryClient) {
       .order("created_at", { ascending: false })
       .limit(250)
       .then(toRows),
-    selectRows(
-      serviceClient,
-      "subscriptions",
-      "org_id, stripe_subscription_id, stripe_customer_id, status, quantity, current_period_end, cancel_at, canceled_at, trial_end, updated_at",
-    ),
+    selectRows(serviceClient, "subscriptions", SUBSCRIPTION_BILLING_COLS),
     selectRows(serviceClient, "departments", "id, org_id, type, archived_at"),
     selectRows(serviceClient, "focus_areas", "id, org_id, department_id, archived_at"),
     selectRows(serviceClient, "shift_categories", "id, org_id, focus_area_id, archived_at"),
@@ -556,38 +553,93 @@ function buildSecuritySummary(facts: OversightFacts): GridmasterSecuritySummary 
   };
 }
 
+const SUBSCRIPTION_BILLING_COLS =
+  "org_id, stripe_subscription_id, stripe_customer_id, status, quantity, current_period_end, cancel_at, canceled_at, trial_end, updated_at";
+
+function toBillingOrgSummary(
+  org: Organization,
+  subscription: Row | undefined,
+  counts: { appUsers: number; employeeCount: number },
+): GridmasterBillingOrgSummary {
+  const seats = org.subscriptionSeats ?? numberOrNull(subscription?.quantity);
+  return {
+    orgId: org.id,
+    orgName: org.name,
+    orgSlug: org.slug,
+    status: org.subscriptionStatus ?? stringOrNull(subscription?.status),
+    stripeCustomerId: org.stripeCustomerId ?? stringOrNull(subscription?.stripe_customer_id),
+    stripeSubscriptionId: stringOrNull(subscription?.stripe_subscription_id),
+    trialStartedAt: org.trialStartedAt ?? null,
+    trialEndsAt: org.trialEndsAt ?? stringOrNull(subscription?.trial_end),
+    currentPeriodEnd: stringOrNull(subscription?.current_period_end),
+    cancelAt: stringOrNull(subscription?.cancel_at),
+    canceledAt: stringOrNull(subscription?.canceled_at),
+    seats,
+    appUsers: counts.appUsers,
+    employeeCount: counts.employeeCount,
+    seatDelta: seats == null ? null : seats - counts.appUsers,
+    updatedAt: stringOrNull(subscription?.updated_at),
+  };
+}
+
+/**
+ * One organization's billing row, read on its own so the organization Billing
+ * tab doesn't load the whole platform. Null for an unknown or sandbox org.
+ */
+export async function loadGridmasterOrgBilling(
+  serviceClient: QueryClient,
+  orgId: string,
+): Promise<GridmasterBillingOrgSummary | null> {
+  const [orgResult, subscriptionResult, employeesResult, membershipsResult] = await Promise.all([
+    serviceClient
+      .from("organizations")
+      .select(ORGANIZATION_WITH_BILLING_COLS)
+      .eq("id", orgId)
+      .eq("workspace_kind", "real")
+      .maybeSingle(),
+    serviceClient
+      .from("subscriptions")
+      .select(SUBSCRIPTION_BILLING_COLS)
+      .eq("org_id", orgId)
+      .maybeSingle(),
+    serviceClient.from("employees").select("status, archived_at, user_id").eq("org_id", orgId),
+    serviceClient
+      .from("organization_memberships")
+      .select("user_id")
+      .eq("org_id", orgId)
+      .is("archived_at", null),
+  ]);
+  for (const result of [orgResult, subscriptionResult, employeesResult, membershipsResult]) {
+    if (result.error) throw result.error;
+  }
+  if (!orgResult.data) return null;
+
+  const employees = (employeesResult.data ?? []) as Row[];
+  return toBillingOrgSummary(
+    rowToOrganization(orgResult.data as unknown as DbOrganization),
+    (subscriptionResult.data as Row | null) ?? undefined,
+    {
+      appUsers: countBillableSeats(
+        employees as SeatEmployee[],
+        (membershipsResult.data ?? []) as SeatMembership[],
+      ),
+      employeeCount: employees.filter((row) => !row.archived_at).length,
+    },
+  );
+}
+
 function buildBillingSummary(
   facts: OversightFacts,
   orgHealth: GridmasterOrgHealthSummary[],
 ): GridmasterBillingSummary {
   const subscriptionByOrg = new Map(facts.subscriptions.map((row) => [String(row.org_id), row]));
-  const organizations = facts.organizations.map((org) => {
-    const health = orgHealth.find((summary) => summary.orgId === org.id);
-    const subscription = subscriptionByOrg.get(org.id);
-    const seats = org.subscriptionSeats ?? numberOrNull(subscription?.quantity);
-    const appUsers = billableAppUserCountForOrg(facts, org.id);
-    const seatDelta = seats == null ? null : seats - appUsers;
-    const status = org.subscriptionStatus ?? stringOrNull(subscription?.status);
-    const trialEndsAt = org.trialEndsAt ?? stringOrNull(subscription?.trial_end);
-    return {
-      orgId: org.id,
-      orgName: org.name,
-      orgSlug: org.slug,
-      status,
-      stripeCustomerId: org.stripeCustomerId ?? stringOrNull(subscription?.stripe_customer_id),
-      stripeSubscriptionId: stringOrNull(subscription?.stripe_subscription_id),
-      trialStartedAt: org.trialStartedAt ?? null,
-      trialEndsAt,
-      currentPeriodEnd: stringOrNull(subscription?.current_period_end),
-      cancelAt: stringOrNull(subscription?.cancel_at),
-      canceledAt: stringOrNull(subscription?.canceled_at),
-      seats,
-      appUsers,
-      employeeCount: health?.supportSnapshot.employeeCount ?? 0,
-      seatDelta,
-      updatedAt: stringOrNull(subscription?.updated_at),
-    };
-  });
+  const organizations = facts.organizations.map((org) =>
+    toBillingOrgSummary(org, subscriptionByOrg.get(org.id), {
+      appUsers: billableAppUserCountForOrg(facts, org.id),
+      employeeCount:
+        orgHealth.find((summary) => summary.orgId === org.id)?.supportSnapshot.employeeCount ?? 0,
+    }),
+  );
   const nowMs = facts.now.getTime();
   const trialEndingSoon = organizations.filter((row) => {
     if (!row.trialEndsAt) return false;

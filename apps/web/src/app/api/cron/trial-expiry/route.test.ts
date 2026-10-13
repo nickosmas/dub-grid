@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const dispatchNotificationEvent = vi.fn();
 const endingSoonQuery = vi.fn();
 const expiredQuery = vi.fn();
+const endingSoonEq = vi.fn();
 
 vi.mock("@/features/notifications/server/events", () => ({
   dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
@@ -23,6 +24,10 @@ vi.mock("@/lib/supabase-service", () => ({
       builder.gte = vi.fn(() => builder);
       builder.lt = vi.fn(() => builder);
       builder.in = vi.fn(() => builder);
+      builder.eq = vi.fn((column: string, value: unknown) => {
+        if (myIndex === 0) endingSoonEq(column, value);
+        return builder;
+      });
       builder.is = vi.fn(() => {
         const inner: Record<string, unknown> = {};
         inner.is = vi.fn(() => (myIndex === 0 ? endingSoonQuery() : expiredQuery()));
@@ -111,6 +116,13 @@ describe("GET /api/cron/trial-expiry", () => {
         orgId: "org-b",
       }),
     );
+  });
+
+  it("reminds only organizations still on their trial", async () => {
+    const res = await GET(makeReq({ authorization: `Bearer ${SECRET}` }));
+
+    expect(res.status).toBe(200);
+    expect(endingSoonEq).toHaveBeenCalledWith("subscription_status", "trialing");
   });
 
   it("dispatches billing_trial_expired for orgs whose trial expired with no paid status", async () => {

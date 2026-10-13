@@ -3,10 +3,13 @@
 import { useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { DEFAULT_TRIAL_DAYS } from "@dubgrid/domain";
+import { DEFAULT_TRIAL_DAYS, trialControls } from "@dubgrid/domain";
 import {
   BillingConfirmDialog,
+  EndTrialDialog,
+  OverrideStatusDialog,
   TrialDaysDialog,
+  type EndTrialChoice,
   trialDaysLeft,
   type BillingConfirmAction,
 } from "@/components/gridmaster/BillingActionDialogs";
@@ -15,6 +18,7 @@ import {
   updateGridmasterSubscription,
   type GridmasterSubscriptionInput,
 } from "@/features/gridmaster/client";
+import { trialActionReasons } from "@/components/gridmaster/gridmaster-billing-rules";
 import { useStepUpAction } from "@/hooks/useStepUpAction";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
@@ -35,6 +39,8 @@ export interface GridmasterBillingActions {
   busyOrgId: string | null;
   confirm: (action: BillingConfirmAction) => void;
   changeTrial: (org: GridmasterBillingOrgSummary) => void;
+  /** Ends the trial, with the grace period or by locking now, as the dialog asks. */
+  endTrial: (org: GridmasterBillingOrgSummary) => void;
   /** The confirmation, trial and identity-check dialogs; render once. */
   dialogs: ReactNode;
 }
@@ -51,6 +57,10 @@ export function useGridmasterBillingActions(): GridmasterBillingActions {
   const [confirmAction, setConfirmAction] = useState<BillingConfirmAction | null>(null);
   const [trialOrg, setTrialOrg] = useState<GridmasterBillingOrgSummary | null>(null);
   const [trialDays, setTrialDays] = useState<number | null>(DEFAULT_TRIAL_DAYS);
+  const [overrideReason, setOverrideReason] = useState("");
+  const [endTrialOrg, setEndTrialOrg] = useState<GridmasterBillingOrgSummary | null>(null);
+  const [endTrialChoice, setEndTrialChoice] = useState<EndTrialChoice>("grace");
+  const endTrialReasons = endTrialOrg ? reasonsFor(endTrialOrg) : null;
 
   function invalidateBilling() {
     void queryClient.invalidateQueries({ queryKey: queryKeys.gridmaster.billing() });
@@ -81,6 +91,7 @@ export function useGridmasterBillingActions(): GridmasterBillingActions {
     // The confirmation steps aside so the identity check is the only dialog.
     setConfirmAction(null);
     setTrialOrg(null);
+    setEndTrialOrg(null);
     try {
       const completed = await stepUp.run((accessToken) =>
         updateGridmasterSubscription(input, accessToken),
@@ -107,11 +118,20 @@ export function useGridmasterBillingActions(): GridmasterBillingActions {
           orgId: org.orgId,
           action: "override_status",
           status: confirmAction.status,
+          reason: overrideReason.trim(),
         });
         break;
       default:
         void runSubscription({ orgId: org.orgId, action: confirmAction.kind });
     }
+  }
+
+  function handleEndTrial() {
+    if (!endTrialOrg) return;
+    void runSubscription({
+      orgId: endTrialOrg.orgId,
+      action: endTrialChoice === "lock" ? "expire_trial" : "end_trial",
+    });
   }
 
   function handleSaveTrial() {
@@ -121,16 +141,42 @@ export function useGridmasterBillingActions(): GridmasterBillingActions {
 
   return {
     busyOrgId,
-    confirm: setConfirmAction,
+    confirm: (action) => {
+      setOverrideReason("");
+      setConfirmAction(action);
+    },
     changeTrial: (org) => {
       setTrialDays(trialDaysLeft(org.trialEndsAt) ?? DEFAULT_TRIAL_DAYS);
       setTrialOrg(org);
     },
+    endTrial: (org) => {
+      setEndTrialChoice(reasonsFor(org).grace ? "lock" : "grace");
+      setEndTrialOrg(org);
+    },
     dialogs: (
       <>
+        <EndTrialDialog
+          org={endTrialOrg}
+          choice={endTrialChoice}
+          graceReason={endTrialReasons?.grace ?? null}
+          lockReason={endTrialReasons?.lock ?? null}
+          isLoading={busyOrgId !== null}
+          onChoiceChange={setEndTrialChoice}
+          onConfirm={handleEndTrial}
+          onCancel={() => setEndTrialOrg(null)}
+        />
         <BillingConfirmDialog
           action={confirmAction}
           isLoading={busyOrgId !== null}
+          onConfirm={handleConfirm}
+          onCancel={() => setConfirmAction(null)}
+        />
+        <OverrideStatusDialog
+          org={confirmAction?.kind === "override_status" ? confirmAction.org : null}
+          status={confirmAction?.kind === "override_status" ? confirmAction.status : ""}
+          reason={overrideReason}
+          isLoading={busyOrgId !== null}
+          onReasonChange={setOverrideReason}
           onConfirm={handleConfirm}
           onCancel={() => setConfirmAction(null)}
         />
@@ -146,4 +192,14 @@ export function useGridmasterBillingActions(): GridmasterBillingActions {
       </>
     ),
   };
+}
+
+function reasonsFor(org: GridmasterBillingOrgSummary) {
+  return trialActionReasons(
+    trialControls({
+      status: org.status,
+      trialEndsAt: org.trialEndsAt,
+      hasStripeSubscription: Boolean(org.stripeSubscriptionId),
+    }),
+  );
 }

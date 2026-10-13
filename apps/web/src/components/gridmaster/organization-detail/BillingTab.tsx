@@ -2,8 +2,15 @@ import AuditLogView from "@/components/gridmaster/AuditLogView";
 import CustomSelect from "@/components/CustomSelect";
 import { Button } from "@/components/Button";
 import { useGridmasterBillingActions } from "@/components/gridmaster/useGridmasterBillingActions";
+import {
+  billingActionStates,
+  disabledActionSummary,
+  stripeDashboardUrl,
+  summarizeReasons,
+  trialActionReasons,
+} from "@/components/gridmaster/gridmaster-billing-rules";
 import { InfoRow } from "@/components/gridmaster/organization-detail/shared";
-import { fetchGridmasterBilling } from "@/features/gridmaster/client";
+import { fetchGridmasterOrgBilling } from "@/features/gridmaster/client";
 import { formatBillingStatusLabel, formatClientErrorMessage } from "@/lib/client-facing";
 import {
   effectiveBillingStatus,
@@ -90,16 +97,21 @@ export function BillingMetric({
   );
 }
 
+const actionNoteStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: "var(--dg-fs-caption)",
+  color: "var(--dg-color-text-muted)",
+};
+
 export function BillingTab({ organization }: { organization: Organization }) {
   const [status, setStatus] = useState<string>("");
   const actions = useGridmasterBillingActions();
   const billingQuery = useQuery({
-    queryKey: queryKeys.gridmaster.billing(),
-    queryFn: fetchGridmasterBilling,
+    queryKey: queryKeys.gridmaster.orgBilling(organization.id),
+    queryFn: () => fetchGridmasterOrgBilling(organization.id),
     staleTime: 30_000,
   });
-  const billingOrg =
-    billingQuery.data?.organizations.find((org) => org.orgId === organization.id) ?? null;
+  const billingOrg = billingQuery.data?.organization ?? null;
   const busy = actions.busyOrgId !== null;
 
   // Start the override select on the current status, never on a default that
@@ -176,11 +188,19 @@ export function BillingTab({ organization }: { organization: Organization }) {
     subscriptionStatus: billingOrg.status,
     trialEndsAt: billingOrg.trialEndsAt,
   });
+  const mode = billingQuery.data?.stripeMode ?? null;
+  const stripeActions = billingActionStates(billingOrg);
+  const stripeActionNotes = disabledActionSummary(stripeActions);
   const trial = trialControls({
     status: billingOrg.status,
     trialEndsAt: billingOrg.trialEndsAt,
     hasStripeSubscription: Boolean(billingOrg.stripeSubscriptionId),
   });
+  const trialReasons = trialActionReasons(trial);
+  const trialNotes = summarizeReasons([
+    ["Change trial", trialReasons.change],
+    ["End trial", trialReasons.end],
+  ]);
   const deltaTone =
     billingOrg.seatDelta == null
       ? "neutral"
@@ -306,7 +326,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
               value={
                 billingOrg.stripeCustomerId ? (
                   <a
-                    href={`https://dashboard.stripe.com/customers/${billingOrg.stripeCustomerId}`}
+                    href={stripeDashboardUrl(mode, "customers", billingOrg.stripeCustomerId)}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{ color: "var(--dg-color-brand)", fontWeight: 700 }}
@@ -320,7 +340,24 @@ export function BillingTab({ organization }: { organization: Organization }) {
             />
             <InfoRow
               label="Subscription"
-              value={billingOrg.stripeSubscriptionId ?? "Not connected"}
+              value={
+                billingOrg.stripeSubscriptionId ? (
+                  <a
+                    href={stripeDashboardUrl(
+                      mode,
+                      "subscriptions",
+                      billingOrg.stripeSubscriptionId,
+                    )}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "var(--dg-color-brand)", fontWeight: 700 }}
+                  >
+                    {billingOrg.stripeSubscriptionId}
+                  </a>
+                ) : (
+                  "Not connected"
+                )
+              }
             />
             <InfoRow label="Org slug" value={billingOrg.orgSlug ?? "—"} />
           </div>
@@ -334,7 +371,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
             <Button
               type="button"
               className="dg-btn dg-btn-secondary dg-btn-sm"
-              disabled={busy || !billingOrg.stripeCustomerId}
+              disabled={busy || !stripeActions.sync.enabled}
               onClick={() => actions.confirm({ kind: "sync_billing", org: billingOrg })}
             >
               Sync Stripe
@@ -342,9 +379,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
             <Button
               type="button"
               className="dg-btn dg-btn-secondary dg-btn-sm"
-              disabled={
-                busy || !billingOrg.stripeSubscriptionId || billingOrg.seats === billingOrg.appUsers
-              }
+              disabled={busy || !stripeActions.trueUp.enabled}
               onClick={() => actions.confirm({ kind: "sync_seats", org: billingOrg })}
             >
               True up seats
@@ -352,27 +387,29 @@ export function BillingTab({ organization }: { organization: Organization }) {
             <Button
               type="button"
               className="dg-btn dg-btn-secondary dg-btn-sm"
-              disabled={
-                busy ||
-                !billingOrg.stripeSubscriptionId ||
-                billingOrg.status === "canceled" ||
-                !!billingOrg.cancelAt
-              }
+              disabled={busy || !stripeActions.cancelAtPeriodEnd.enabled}
               onClick={() => actions.confirm({ kind: "cancel_at_period_end", org: billingOrg })}
             >
-              End period
+              Cancel at period end
             </Button>
             <Button
               type="button"
               className="dg-btn dg-btn-danger dg-btn-sm"
-              disabled={
-                busy || billingOrg.status === "canceled" || !billingOrg.stripeSubscriptionId
-              }
+              disabled={busy || !stripeActions.cancel.enabled}
               onClick={() => actions.confirm({ kind: "cancel", org: billingOrg })}
             >
               Cancel
             </Button>
           </div>
+          {stripeActionNotes.length > 0 && (
+            <div style={{ display: "grid", gap: 2, marginTop: -6 }}>
+              {stripeActionNotes.map((note) => (
+                <p key={note} style={actionNoteStyle}>
+                  {note}
+                </p>
+              ))}
+            </div>
+          )}
 
           <div style={{ display: "grid", gap: 6 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -387,31 +424,17 @@ export function BillingTab({ organization }: { organization: Organization }) {
               <Button
                 type="button"
                 className="dg-btn dg-btn-secondary dg-btn-sm"
-                disabled={busy || !trial.end}
-                onClick={() => actions.confirm({ kind: "end_trial", org: billingOrg })}
+                disabled={busy || Boolean(trialReasons.end)}
+                onClick={() => actions.endTrial(billingOrg)}
               >
-                End trial now
-              </Button>
-              <Button
-                type="button"
-                className="dg-btn dg-btn-danger dg-btn-sm"
-                disabled={busy || !trial.expire}
-                onClick={() => actions.confirm({ kind: "expire_trial", org: billingOrg })}
-              >
-                Expire trial
+                End trial…
               </Button>
             </div>
-            {trial.reason && (
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: "var(--dg-fs-caption)",
-                  color: "var(--dg-color-text-muted)",
-                }}
-              >
-                {trial.reason}
+            {trialNotes.map((note) => (
+              <p key={note} style={actionNoteStyle}>
+                {note}
               </p>
-            )}
+            ))}
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>

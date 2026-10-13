@@ -5,21 +5,23 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { formatBillingStatusLabel } from "@/lib/client-facing";
 import type { GridmasterBillingOrgSummary } from "@/types";
 import { NumberField } from "@/components/ui/number-field";
+import {
+  describeOverrideOutcome,
+  OVERRIDE_REASON_MAX_LENGTH,
+} from "@/components/gridmaster/gridmaster-billing-rules";
 
 export type BillingConfirmAction =
   | { kind: "sync_billing"; org: GridmasterBillingOrgSummary }
   | { kind: "sync_seats"; org: GridmasterBillingOrgSummary }
   | { kind: "cancel_at_period_end"; org: GridmasterBillingOrgSummary }
   | { kind: "cancel"; org: GridmasterBillingOrgSummary }
-  | { kind: "end_trial"; org: GridmasterBillingOrgSummary }
-  | { kind: "expire_trial"; org: GridmasterBillingOrgSummary }
   | { kind: "override_status"; org: GridmasterBillingOrgSummary; status: string };
 
 function formatDay(date: Date): string {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
-function getConfirmDialogCopy(action: BillingConfirmAction) {
+function getConfirmDialogCopy(action: Exclude<BillingConfirmAction, { kind: "override_status" }>) {
   switch (action.kind) {
     case "sync_billing":
       return {
@@ -37,9 +39,9 @@ function getConfirmDialogCopy(action: BillingConfirmAction) {
       };
     case "cancel_at_period_end":
       return {
-        title: "End Billing Period",
-        message: `Schedule ${action.org.orgName} to cancel at the end of the current billing period? Access remains active until the period ends.`,
-        confirmLabel: "End Period",
+        title: "Cancel at period end",
+        message: `Schedule ${action.org.orgName}'s subscription to cancel at the end of the current billing period? Access stays open until then.`,
+        confirmLabel: "Cancel at period end",
         variant: "warning" as const,
       };
     case "cancel":
@@ -48,29 +50,6 @@ function getConfirmDialogCopy(action: BillingConfirmAction) {
         message: `Cancel the Stripe subscription for ${action.org.orgName} now? The organization locks immediately.`,
         confirmLabel: "Cancel Billing",
         variant: "danger" as const,
-      };
-    case "end_trial": {
-      const accessEnds = new Date(Date.now() + TRIAL_GRACE_DAYS * 86_400_000);
-      return {
-        title: "End trial now",
-        message: `End the trial for ${action.org.orgName} now? They keep access for ${TRIAL_GRACE_DAYS} more days, until ${formatDay(accessEnds)}, then the organization locks unless billing is added.`,
-        confirmLabel: "End trial",
-        variant: "warning" as const,
-      };
-    }
-    case "expire_trial":
-      return {
-        title: "Expire trial",
-        message: `Expire the trial for ${action.org.orgName} now? The organization locks immediately, with no grace period. Members can't use it until billing is added or you give it trial days again.`,
-        confirmLabel: "Expire trial",
-        variant: "danger" as const,
-      };
-    case "override_status":
-      return {
-        title: "Override Billing Status",
-        message: `Override ${action.org.orgName} billing status to ${formatBillingStatusLabel(action.status)}?`,
-        confirmLabel: "Override Status",
-        variant: "warning" as const,
       };
   }
 }
@@ -86,7 +65,8 @@ export function BillingConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
-  if (!action) return null;
+  // An override asks for a reason, so it has its own dialog.
+  if (!action || action.kind === "override_status") return null;
 
   const copy = getConfirmDialogCopy(action);
 
@@ -97,6 +77,175 @@ export function BillingConfirmDialog({
       confirmLabel={copy.confirmLabel}
       variant={copy.variant}
       isLoading={isLoading}
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+    />
+  );
+}
+
+export function OverrideStatusDialog({
+  org,
+  status,
+  reason,
+  isLoading,
+  onReasonChange,
+  onConfirm,
+  onCancel,
+}: {
+  org: GridmasterBillingOrgSummary | null;
+  status: string;
+  reason: string;
+  isLoading: boolean;
+  onReasonChange: (reason: string) => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  if (!org) return null;
+
+  const outcome = describeOverrideOutcome(org, status);
+  const reasonFieldId = `override-reason-${org.orgId}`;
+
+  return (
+    <ConfirmDialog
+      title="Override billing status"
+      message={
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <span>
+            Set {org.orgName} to {formatBillingStatusLabel(status)}?
+          </span>
+          {outcome.map((line) => (
+            <span key={line} style={{ color: "var(--dg-color-text-secondary)" }}>
+              {line}
+            </span>
+          ))}
+          <label htmlFor={reasonFieldId} style={{ fontWeight: 600 }}>
+            Reason <span style={{ color: "var(--dg-color-danger-text)" }}>*</span>
+          </label>
+          <textarea
+            id={reasonFieldId}
+            className="dg-input"
+            value={reason}
+            maxLength={OVERRIDE_REASON_MAX_LENGTH}
+            onChange={(event) => onReasonChange(event.target.value)}
+            placeholder="Why are you overriding this organization's billing status?"
+            rows={3}
+            style={{ resize: "vertical", width: "100%" }}
+          />
+        </div>
+      }
+      confirmLabel="Override status"
+      variant="warning"
+      isLoading={isLoading}
+      confirmDisabled={!reason.trim()}
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+    />
+  );
+}
+
+export type EndTrialChoice = "grace" | "lock";
+
+const RADIO_CLASS =
+  "appearance-none aspect-square w-4 h-4 shrink-0 mt-0.5 rounded-full border-2 border-[var(--dg-color-border)] box-border cursor-pointer relative disabled:cursor-not-allowed disabled:opacity-50";
+
+export function EndTrialDialog({
+  org,
+  choice,
+  graceReason,
+  lockReason,
+  isLoading,
+  onChoiceChange,
+  onConfirm,
+  onCancel,
+}: {
+  org: GridmasterBillingOrgSummary | null;
+  choice: EndTrialChoice;
+  /** Why the grace choice doesn't apply; null when it does. */
+  graceReason: string | null;
+  /** Why locking doesn't apply; null when it does. */
+  lockReason: string | null;
+  isLoading: boolean;
+  onChoiceChange: (choice: EndTrialChoice) => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  if (!org) return null;
+
+  const accessEnds = formatDay(new Date(Date.now() + TRIAL_GRACE_DAYS * 86_400_000));
+  const options: Array<{
+    value: EndTrialChoice;
+    title: string;
+    detail: string;
+    reason: string | null;
+    checkedClass: string;
+  }> = [
+    {
+      value: "grace",
+      title: `Give the usual ${TRIAL_GRACE_DAYS} days to add billing`,
+      detail: `The organization stays open until ${accessEnds}, then locks unless it subscribes.`,
+      reason: graceReason,
+      checkedClass:
+        "checked:border-[var(--dg-color-warning)] checked:before:absolute checked:before:inset-[2px] checked:before:rounded-full checked:before:bg-[var(--dg-color-warning)]",
+    },
+    {
+      value: "lock",
+      title: "Lock now, with no grace period",
+      detail: "Members can't use DubGrid until billing is added. Asks for your password.",
+      reason: lockReason,
+      checkedClass:
+        "checked:border-[var(--dg-color-danger)] checked:before:absolute checked:before:inset-[2px] checked:before:rounded-full checked:before:bg-[var(--dg-color-danger)]",
+    },
+  ];
+
+  return (
+    <ConfirmDialog
+      title="End trial"
+      message={
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <span>
+            {graceReason && !lockReason
+              ? `${org.orgName}'s trial has already ended. Lock it now?`
+              : `End the trial for ${org.orgName} today?`}
+          </span>
+          {options.map((option) => (
+            <label
+              key={option.value}
+              style={{
+                display: "flex",
+                gap: 10,
+                alignItems: "flex-start",
+                cursor: option.reason ? "not-allowed" : "pointer",
+              }}
+            >
+              <input
+                type="radio"
+                name={`end-trial-${org.orgId}`}
+                value={option.value}
+                checked={choice === option.value}
+                disabled={Boolean(option.reason)}
+                onChange={() => onChoiceChange(option.value)}
+                className={`${RADIO_CLASS} ${option.checkedClass}`}
+              />
+              <span>
+                <span style={{ display: "block", fontWeight: 600 }}>{option.title}</span>
+                <span
+                  style={{
+                    display: "block",
+                    fontSize: "var(--dg-fs-label)",
+                    color: "var(--dg-color-text-muted)",
+                  }}
+                >
+                  {option.reason ?? option.detail}
+                </span>
+              </span>
+            </label>
+          ))}
+        </div>
+      }
+      confirmLabel={choice === "lock" ? "Lock now" : "End trial"}
+      variant={choice === "lock" ? "danger" : "warning"}
+      isLoading={isLoading}
+      confirmDisabled={Boolean(choice === "lock" ? lockReason : graceReason)}
       onConfirm={onConfirm}
       onCancel={onCancel}
     />
@@ -128,6 +277,7 @@ export function TrialDaysDialog({
   if (!org) return null;
 
   const valid = days !== null && days >= 1;
+  const longerThanAYear = valid && days > 365;
   const restarts = trialDaysLeft(org.trialEndsAt) === null && Boolean(org.trialEndsAt);
 
   return (
@@ -151,6 +301,11 @@ export function TrialDaysDialog({
               ? `The trial will end on ${formatDay(new Date(Date.now() + days * 86_400_000))}.`
               : "Enter at least 1 day."}
           </span>
+          {longerThanAYear && (
+            <span style={{ color: "var(--dg-color-warning-text)", fontWeight: 600 }}>
+              That's more than a year of free access.
+            </span>
+          )}
         </div>
       }
       confirmLabel="Save trial"

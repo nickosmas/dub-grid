@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { Fragment, useId, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchGridmasterBilling } from "@/features/gridmaster/client";
 import {
@@ -14,6 +14,11 @@ import ProgressBar from "@/components/ProgressBar";
 import { queryKeys } from "@/lib/query-keys";
 import { formatBillingStatusLabel, formatClientErrorMessage } from "@/lib/client-facing";
 import { effectiveBillingStatus, trialControls } from "@dubgrid/domain";
+import {
+  billingActionStates,
+  stripeDashboardUrl,
+  trialActionReasons,
+} from "@/components/gridmaster/gridmaster-billing-rules";
 import { sectionStyle } from "@/lib/styles";
 import type { GridmasterBillingOrgSummary } from "@/types";
 import { gmTableStyle, gmTdStyle, gmThStyle } from "@/components/gridmaster/table-styles";
@@ -205,37 +210,50 @@ function BillingRowActions({
   // inline buttons and a status select made the Actions column wider than the
   // table and stacked them five deep on wide displays. The menu is portalled,
   // so the table's horizontal scroll container cannot clip it.
-  const items: Array<{ label: string; disabled: boolean; danger?: boolean; run: () => void }> = [
+  const stripe = billingActionStates(org);
+  const trialReasons = trialActionReasons(trial);
+  const menuId = useId();
+  const items: Array<{
+    label: string;
+    disabled: boolean;
+    reason?: string | null;
+    danger?: boolean;
+    run: () => void;
+  }> = [
     {
       label: "Sync Stripe",
-      disabled: busy || !org.stripeCustomerId,
+      disabled: busy || !stripe.sync.enabled,
+      reason: stripe.sync.reason,
       run: () => actions.confirm({ kind: "sync_billing", org }),
     },
     {
       label: "True up seats",
-      disabled: busy || !org.stripeSubscriptionId || org.seats === org.appUsers,
+      disabled: busy || !stripe.trueUp.enabled,
+      reason: stripe.trueUp.reason,
       run: () => actions.confirm({ kind: "sync_seats", org }),
     },
-    { label: "Change trial", disabled: busy || !trial.change, run: () => actions.changeTrial(org) },
     {
-      label: "End trial now",
-      disabled: busy || !trial.end,
-      run: () => actions.confirm({ kind: "end_trial", org }),
+      label: "Change trial",
+      disabled: busy || !trial.change,
+      reason: trialReasons.change,
+      run: () => actions.changeTrial(org),
     },
     {
-      label: "Expire trial",
-      disabled: busy || !trial.expire,
-      danger: true,
-      run: () => actions.confirm({ kind: "expire_trial", org }),
+      label: "End trial…",
+      disabled: busy || Boolean(trialReasons.end),
+      reason: trialReasons.end,
+      run: () => actions.endTrial(org),
     },
     {
-      label: "End at period end",
-      disabled: busy || !org.stripeSubscriptionId || org.status === "canceled" || !!org.cancelAt,
+      label: "Cancel at period end",
+      disabled: busy || !stripe.cancelAtPeriodEnd.enabled,
+      reason: stripe.cancelAtPeriodEnd.reason,
       run: () => actions.confirm({ kind: "cancel_at_period_end", org }),
     },
     {
       label: "Cancel subscription",
-      disabled: busy || org.status === "canceled" || !org.stripeSubscriptionId,
+      disabled: busy || !stripe.cancel.enabled,
+      reason: stripe.cancel.reason,
       danger: true,
       run: () => actions.confirm({ kind: "cancel", org }),
     },
@@ -268,16 +286,35 @@ function BillingRowActions({
             finalFocus={triggerRef}
             style={{ minWidth: 200 }}
           >
-            {items.map((item) => (
-              <MenuItem
-                key={item.label}
-                disabled={item.disabled}
-                className={item.danger ? "dg-menu-item--danger" : undefined}
-                onClick={item.run}
-              >
-                {item.label}
-              </MenuItem>
-            ))}
+            {items.map((item, index) => {
+              const reasonId =
+                item.disabled && item.reason ? `${menuId}-reason-${index}` : undefined;
+              return (
+                <Fragment key={item.label}>
+                  <MenuItem
+                    disabled={item.disabled}
+                    className={item.danger ? "dg-menu-item--danger" : undefined}
+                    aria-describedby={reasonId}
+                    onClick={item.run}
+                  >
+                    {item.label}
+                  </MenuItem>
+                  {/* Outside the item, which fades when disabled, so it stays readable. */}
+                  {reasonId && (
+                    <div
+                      id={reasonId}
+                      style={{
+                        padding: "0 10px 6px",
+                        fontSize: "var(--dg-fs-caption)",
+                        color: "var(--dg-color-text-muted)",
+                      }}
+                    >
+                      {item.reason}
+                    </div>
+                  )}
+                </Fragment>
+              );
+            })}
             <div className="dg-menu-divider" />
             <div
               style={{
@@ -477,7 +514,19 @@ export default function GridmasterBillingView({
                             background: risky ? "var(--dg-color-danger-bg)" : undefined,
                           }}
                         >
-                          <td style={{ ...gmTdStyle, fontWeight: 700 }}>{org.orgName}</td>
+                          <td style={{ ...gmTdStyle, fontWeight: 700 }}>
+                            {/* The row opens on click; this is the keyboard way in. */}
+                            <button
+                              type="button"
+                              className="dg-table-row-link"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onSelectOrg(org.orgId, "billing");
+                              }}
+                            >
+                              {org.orgName}
+                            </button>
+                          </td>
                           <td style={{ ...gmTdStyle, color: statusToneFor(org), fontWeight: 600 }}>
                             {statusLabelFor(org)}
                           </td>
@@ -518,7 +567,11 @@ export default function GridmasterBillingView({
                           <td style={gmTdStyle}>
                             {org.stripeCustomerId ? (
                               <a
-                                href={`https://dashboard.stripe.com/customers/${org.stripeCustomerId}`}
+                                href={stripeDashboardUrl(
+                                  billing?.stripeMode ?? null,
+                                  "customers",
+                                  org.stripeCustomerId,
+                                )}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(event) => event.stopPropagation()}

@@ -1164,6 +1164,16 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     category: "billing",
     severity: "warning",
     headline: () => "Overrode the billing status",
+    details: (d) => {
+      const rows: DetailItem[] = [];
+      const before = d.text("previous_status");
+      const after = d.text("new_status");
+      const reason = d.text("reason");
+      if (before) rows.push({ label: "Was", value: formatBillingStatusLabel(before) });
+      if (after) rows.push({ label: "Now", value: formatBillingStatusLabel(after) });
+      if (reason) rows.push({ label: "Reason", value: reason });
+      return rows;
+    },
   },
   "billing.synced": {
     audience: "platform",

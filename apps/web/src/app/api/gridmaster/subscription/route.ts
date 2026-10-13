@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { API_ERRORS } from "@dubgrid/client-errors";
-import { DEFAULT_TRIAL_DAYS, TRIAL_EXPIRED_STATUS, trialControls } from "@dubgrid/domain";
+import { TRIAL_EXPIRED_STATUS, trialControls } from "@dubgrid/domain";
 import { requireGridmasterSession, requireSensitiveActionAuth } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
@@ -60,12 +60,9 @@ const bodySchema = z.discriminatedUnion("action", [
     orgId: orgIdSchema,
     action: z.literal("override_status"),
     status: billingStatusSchema,
+    reason: z.string().trim().min(1).max(500),
   }),
 ]);
-
-function defaultTrialEndFrom(date: Date): string {
-  return new Date(date.getTime() + DEFAULT_TRIAL_DAYS * 86_400_000).toISOString();
-}
 
 /** Runs a database write and fails the action, before any audit row, if it failed. */
 async function write(query: PromiseLike<{ error: unknown }>): Promise<void> {
@@ -318,15 +315,19 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "override_status") {
-      const status = parsed.data.status;
+      const { status, reason } = parsed.data;
+      const { data: orgRow, error: orgError } = await admin
+        .from("organizations")
+        .select("subscription_status")
+        .eq("id", orgId)
+        .single();
+      if (orgError || !orgRow) {
+        return NextResponse.json({ error: "Organization not found." }, { status: 404 });
+      }
+      // Only the status changes; the trial keeps its own dates, which Change
+      // trial sets.
       await write(
-        admin
-          .from("organizations")
-          .update({
-            subscription_status: status,
-            ...(status === "trialing" ? { trial_ends_at: defaultTrialEndFrom(new Date()) } : {}),
-          })
-          .eq("id", orgId),
+        admin.from("organizations").update({ subscription_status: status }).eq("id", orgId),
       );
       await invalidateOrganizationBillingCache(orgId);
       await writeGridmasterAuditLog({
@@ -336,7 +337,11 @@ export async function POST(req: NextRequest) {
         resourceType: "organization",
         resourceId: orgId,
         orgId,
-        details: { new_status: status },
+        details: {
+          previous_status: (orgRow.subscription_status as string | null) ?? null,
+          new_status: status,
+          reason,
+        },
         request: req,
       });
       return NextResponse.json({ success: true });

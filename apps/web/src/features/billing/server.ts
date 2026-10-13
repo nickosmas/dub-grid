@@ -103,6 +103,16 @@ export function resolveBillingReturnUrl(
   }
 }
 
+// A Gridmaster's own note on an action, such as an override reason, is for
+// DubGrid staff; the organization sees what changed, not why support did it.
+const INTERNAL_DETAIL_KEYS = new Set(["reason"]);
+
+function withoutInternalNotes(details: Record<string, unknown> | null): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(details ?? {}).filter(([key]) => !INTERNAL_DETAIL_KEYS.has(key)),
+  );
+}
+
 function describeBillingOperation(action: string): string {
   switch (action) {
     case "billing.subscription_created":
@@ -186,7 +196,7 @@ async function loadRecentBillingOperations(
       actorLabel: actorLabelForBillingOperation(row, actor),
       resourceType: row.resource_type ?? "billing",
       resourceId: row.resource_id,
-      details: row.details ?? {},
+      details: withoutInternalNotes(row.details),
       createdAt: row.created_at,
     }));
   } catch {

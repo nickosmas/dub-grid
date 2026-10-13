@@ -1037,6 +1037,25 @@ button {
   cursor: default;
   pointer-events: none;
 }
+/* A table row's name as a plain-text button: the row opens on click, and this
+   is the way in from the keyboard. */
+.dg-table-row-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.dg-table-row-link:hover {
+  text-decoration: underline;
+}
+.dg-table-row-link:focus-visible {
+  outline: 2px solid var(--dg-color-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--dg-radius-xs);
+}
 /* ── Address Autocomplete ─────────────────────────────── */
 /* ── Modal ──────────────────────────────────────────────── */
 .dg-modal-overlay {

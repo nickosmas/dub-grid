@@ -1114,6 +1114,8 @@ export interface GridmasterBillingSummary {
   riskOrganizations: GridmasterBillingOrgSummary[];
   missingStripeCustomer: GridmasterBillingOrgSummary[];
   seatMismatches: GridmasterBillingOrgSummary[];
+  /** Which Stripe dashboard links open; set by the billing route. */
+  stripeMode?: "test" | "live" | null;
 }
 
 export interface GridmasterComplianceSummary {

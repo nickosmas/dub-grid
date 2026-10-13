@@ -102,8 +102,10 @@ Item 44 is split:
 - **44a - Billing safety fixes:** shipped; a sync no longer locks a trialing
   organization, a canceled one can subscribe again, and webhooks, checkout,
   and Gridmaster billing writes can no longer leave the wrong state.
-- **44b - Gridmaster billing controls:** planned; risky actions are refused
-  by the server where impossible and ask for fresh proof otherwise.
+- **44b - Gridmaster billing controls:** shipped; overrides need a reason and
+  say what they do, disabled actions explain themselves, one End trial control
+  offers the grace period or locking now, and the Billing tab loads only its
+  organization.
 - **44c - Customer billing clarity:** planned; customers see support changes
   that affect them, never upkeep or raw payment-provider details.
 - **44d to 44g - Policy settings, pause and resume, past-due deadlines and

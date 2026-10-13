@@ -10,6 +10,7 @@ import type {
   EmployeeActivityEntry,
   GridmasterAccount,
   GridmasterAuditExportResult,
+  GridmasterBillingOrgSummary,
   GridmasterBillingSummary,
   GridmasterComplianceSummary,
   GridmasterOrgHealthSummary,
@@ -531,6 +532,15 @@ export function fetchGridmasterBilling(): Promise<GridmasterBillingSummary> {
   return requestGridmasterJson("/api/gridmaster/billing");
 }
 
+export interface GridmasterOrgBilling {
+  organization: GridmasterBillingOrgSummary;
+  stripeMode: "test" | "live" | null;
+}
+
+export function fetchGridmasterOrgBilling(orgId: string): Promise<GridmasterOrgBilling> {
+  return requestGridmasterJson(`/api/gridmaster/billing?orgId=${encodeURIComponent(orgId)}`);
+}
+
 export function syncGridmasterBilling(orgId: string): Promise<{ success: true }> {
   return requestGridmasterJson("/api/gridmaster/stripe-sync", {
     method: "POST",
@@ -546,7 +556,7 @@ export type GridmasterSubscriptionInput =
   | { orgId: string; action: "cancel" }
   | { orgId: string; action: "cancel_at_period_end" }
   | { orgId: string; action: "sync_seats" }
-  | { orgId: string; action: "override_status"; status: string };
+  | { orgId: string; action: "override_status"; status: string; reason: string };
 
 export function updateGridmasterSubscription(
   input: GridmasterSubscriptionInput,

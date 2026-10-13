@@ -833,7 +833,7 @@
         back; Extend trial adds to the current end date instead of replacing
         it; seat true-up refreshes cached access; Stripe sync never invents a
         trial end; the billing summary reads suspension.
-  - [ ] 44b. **Gridmaster billing controls** - the server refuses extending a
+  - [x] 44b. **Gridmaster billing controls** - the server refuses extending a
         paying organization's trial and an immediate cancel without a
         subscription, and asks for fresh proof before an immediate cancel or a
         status override (owner decision, 2026-10-12). Status override states

@@ -379,31 +379,57 @@ describe("POST /api/gridmaster/subscription", () => {
     );
   });
 
-  it("sets a trial end date when overriding an organization back to trialing", async () => {
+  it("leaves the trial's dates alone when overriding back to trialing", async () => {
     const response = await POST(
       makeRequest({
         orgId: ORG_ID,
         action: "override_status",
         status: "trialing",
+        reason: "Restoring after a mistaken cancel",
       }),
     );
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ success: true });
-    expect(organizationUpdate).toHaveBeenCalledWith({
-      subscription_status: "trialing",
-      trial_ends_at: expect.any(String),
-    });
+    expect(organizationUpdate).toHaveBeenCalledWith({ subscription_status: "trialing" });
     expect(invalidateCache).toHaveBeenCalledWith(ORG_ID);
   });
 
-  it("invalidates organization access after overriding billing to active", async () => {
+  it("records the previous status and the reason for an override", async () => {
     const response = await POST(
-      makeRequest({ orgId: ORG_ID, action: "override_status", status: "active" }),
+      makeRequest({
+        orgId: ORG_ID,
+        action: "override_status",
+        status: "active",
+        reason: "  Comped for the pilot  ",
+      }),
     );
 
     expect(response.status).toBe(200);
     expect(invalidateCache).toHaveBeenCalledWith(ORG_ID);
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "billing.status_overridden",
+        details: expect.objectContaining({
+          previous_status: "trialing",
+          new_status: "active",
+          reason: "Comped for the pilot",
+        }),
+      }),
+    );
+  });
+
+  it.each([
+    ["missing", undefined],
+    ["blank", "   "],
+    ["too long", "x".repeat(501)],
+  ])("refuses an override with a %s reason", async (_name, reason) => {
+    const response = await POST(
+      makeRequest({ orgId: ORG_ID, action: "override_status", status: "active", reason }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(organizationUpdate).not.toHaveBeenCalled();
   });
 
   it("syncs Stripe seats to app users and audits the action", async () => {
@@ -514,7 +540,7 @@ describe("POST /api/gridmaster/subscription", () => {
     ["cancel", { action: "cancel" }],
     ["cancel_at_period_end", { action: "cancel_at_period_end" }],
     ["sync_seats", { action: "sync_seats" }],
-    ["override_status", { action: "override_status", status: "active" }],
+    ["override_status", { action: "override_status", status: "active", reason: "Test" }],
   ])("reports a failed %s write instead of auditing it", async (_name, body) => {
     subscriptionSingle.mockResolvedValueOnce({
       data: { stripe_subscription_id: "sub_123" },

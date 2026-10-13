@@ -102,6 +102,17 @@ function createQueryClient(
                         action: "billing.subscription_created",
                         created_at: "2026-05-03T00:00:00Z",
                       },
+                      {
+                        id: 4,
+                        action: "billing.status_overridden",
+                        details: {
+                          initiated_by: "gridmaster",
+                          previous_status: "trialing",
+                          new_status: "active",
+                          reason: "Internal note",
+                        },
+                        created_at: "2026-05-02T12:00:00Z",
+                      },
                       { id: 2, action: "billing.seats_synced", created_at: "2026-05-02T00:00:00Z" },
                       {
                         id: 3,
@@ -146,9 +157,16 @@ describe("loadOrganizationBillingSummary", () => {
     expect(summary.subscriptionSeats).toBe(5);
     expect(summary.recentOperations?.map((operation) => operation.label)).toEqual([
       "Subscription started",
+      "Billing status overridden",
       "Seats synced",
       "Billing portal opened",
     ]);
+    // Support's note stays with DubGrid; the organization sees what changed.
+    expect(summary.recentOperations?.[1]?.details).toEqual({
+      initiated_by: "gridmaster",
+      previous_status: "trialing",
+      new_status: "active",
+    });
   });
 
   it("offers a new subscription once the old one has ended", async () => {
