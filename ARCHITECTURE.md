@@ -226,7 +226,7 @@ A new organization's 14-day trial clock starts on the **first super admin login*
 
 ### Migration Strategy
 
-Database history is an immutable, ordered migration stream under `supabase/migrations/`. Migrations `001`-`004` are the frozen baseline; every later schema change is a new, retry-safe `NNN_snake_case.sql` at the next number (currently through `075`), and `checksums.sha256` locks every reviewed file (`npm run db:migrations:check`). Never edit an applied migration and never mirror a change back into the baseline.
+Database history is an immutable, ordered migration stream under `supabase/migrations/`. Migrations `001`-`004` are the frozen baseline; every later schema change is a new, retry-safe `NNN_snake_case.sql` at the next number (the checksum manifest lists the current range), and `checksums.sha256` locks every reviewed file (`npm run db:migrations:check`). Never edit an applied migration and never mirror a change back into the baseline.
 
 | File                         | Contents                                                                                                                                                                                                                                    |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -234,9 +234,9 @@ Database history is an immutable, ordered migration stream under `supabase/migra
 | `002_functions_triggers.sql` | Baseline: functions, triggers, auth hooks, RPCs                                                                                                                                                                                             |
 | `003_rls_policies.sql`       | Baseline: RLS enable statements + all policies                                                                                                                                                                                              |
 | `004_grants.sql`             | Baseline: grants for anon, authenticated, service_role, supabase_auth_admin                                                                                                                                                                 |
-| `005`-`075`                  | Forward migrations: membership and invitation hardening, draft and schedule recovery, mobile and notification writes, session and credential controls, tenant authorization, schedule notes, requests, publishing, and Gridmaster authority |
+| `005` onward                 | Forward migrations: membership and invitation hardening, draft and schedule recovery, mobile and notification writes, session and credential controls, tenant authorization, schedule notes, requests, publishing, and Gridmaster authority |
 
-Migrations are applied by ledger (`supabase db push`, Supabase branching, or the local `db:reset`), never by dropping and replaying the schema on production. `supabase/patches/` holds historical one-time production patches as evidence only. The runbook is `internal/operations/production-migration-safety.md`; `npm run db:migrations:inspect` is the read-only ledger and invariant check.
+Migrations are applied by ledger (`supabase db push`, or the local `db:reset`), never by dropping and replaying the schema on production. `npm run db:migrations:rehearse` rehearses a forward suffix on a throwaway local stack before a release. `supabase/patches/` holds historical one-time production patches as evidence only. The runbook is `internal/operations/production-migration-safety.md`; `npm run db:migrations:inspect` is the read-only ledger and invariant check.
 
 Seeds: root `seed.ts` orchestrates the SQL seed fixtures `supabase/seed_arden_wood.sql`, `supabase/seed_calm_haven.sql`, and `supabase/seed_gridmaster.sql` (local, staging, and preview branches only; never production).
 

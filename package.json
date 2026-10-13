@@ -52,6 +52,7 @@
     "docs:verify": "npm run docs:check:closed && npm run docs:validate && npm run docs:links",
     "db:migrations:inspect": "npx tsx --env-file=.env.remote scripts/inspect-migration-readiness.ts",
     "db:migrations:inspect:local": "npx tsx --env-file=.env.local scripts/inspect-migration-readiness.ts --local",
+    "db:migrations:rehearse": "npx tsx scripts/rehearse-migrations.ts",
     "auth:templates:check": "npx tsx --env-file=.env.remote scripts/push-auth-templates.ts",
     "auth:templates:push": "npx tsx --env-file=.env.remote scripts/push-auth-templates.ts --apply",
     "test:load": "k6 run load-tests/schedule-load.js",

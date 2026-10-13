@@ -173,11 +173,11 @@ These constraints break the app or create security issues if violated:
 
 Database history is an immutable, ordered migration stream under `supabase/migrations/`:
 
-| File                                            | Contents                                                    |
-| ----------------------------------------------- | ----------------------------------------------------------- |
-| `001_schema.sql` through `004_grants.sql`       | Frozen historical baseline (schema, functions, RLS, grants) |
-| `005_*.sql` and later (currently through `075`) | One retry-safe forward migration per schema change          |
-| `checksums.sha256`                              | Locks every reviewed migration                              |
+| File                                      | Contents                                                    |
+| ----------------------------------------- | ----------------------------------------------------------- |
+| `001_schema.sql` through `004_grants.sql` | Frozen historical baseline (schema, functions, RLS, grants) |
+| `005_*.sql` and later                     | One retry-safe forward migration per schema change          |
+| `checksums.sha256`                        | Locks every reviewed migration                              |
 
 **Every schema change is a new `NNN_snake_case.sql` at the next number.** Make it idempotent, add its hash to `checksums.sha256` in the same change, and run `npm run db:migrations:check`. Never edit an applied migration (including `001`-`004`), and never replay `supabase/patches/` as a migration stream. See [supabase/AGENTS.md](supabase/AGENTS.md).
 

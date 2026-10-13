@@ -91,8 +91,11 @@ Item 40 is split:
   references:** shipped.
 - **40e - Cross-platform runtime qualification and permanent drift gates:**
   in progress; requires recorded iOS and Android evidence.
-  - **40e1 - Closed documentation contract and drift gates:** in progress.
-  - **40e2 - Isolated migration readiness qualification:** planned.
+  - **40e1 - Closed documentation contract and drift gates:** shipped.
+  - **40e2 - Isolated migration readiness qualification:** shipped;
+    `npm run db:migrations:rehearse` rehearses a ledger suffix on a throwaway
+    local stack, and 001 to 079 is qualified as a clean install, an upgrade
+    from 075, and a seeded upgrade with a signed-in smoke.
   - **40e3 - Web browser role and state qualification:** planned.
   - **40e4 - Native iOS and Android qualification:** planned; Android evidence
     is mandatory.

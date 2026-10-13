@@ -15,7 +15,7 @@ supabase/
     002_functions_triggers.sql    # Functions, triggers, RPCs, JWT hook implementation
     003_rls_policies.sql          # RLS ENABLE + all row-level security policies
     004_grants.sql                # Grants + default privileges + supabase_auth_admin grants
-    005_*.sql ... 040_*.sql       # Ordered, idempotent forward migrations
+    005_*.sql and later           # Ordered, idempotent forward migrations
                                   # (030 holds the canonical resolve_shift_request text)
     checksums.sha256              # Locks every reviewed migration (db:migrations:check)
   patches/                        # Historical one-time production patches (evidence only, never replayed)
@@ -68,12 +68,13 @@ from the sequence rather than from any one file being complete.
 
 `npm run db:migrations:inspect` (remote) and `npm run db:migrations:inspect:local`
 are read-only: they compare the ledger with the local sequence and check schema,
-RLS, grant, hook, historical-patch, and scheduler-calloff invariants. The release
+RLS, grant, hook, historical-patch, scheduler-calloff, and billing invariants.
+`npm run db:migrations:rehearse` builds the release rehearsal on a throwaway
+local stack (it never reaches a remote project). The release
 runbook is `internal/operations/production-migration-safety.md`.
 
-This holds because migrations are applied by ledger now, through Supabase
-branching or `supabase db push`, rather than by dropping and replaying the
-whole schema.
+This holds because migrations are applied by ledger now, through
+`supabase db push`, rather than by dropping and replaying the whole schema.
 
 ## Preview branches
 
@@ -94,7 +95,8 @@ A preview branch proves a clean install. It does not prove the upgrade from
 production's real state, which is where the risk lives. DubGrid does not use
 branching for releases (decided 2026-09-19, no PITR yet either): rehearse the
 upgrade on a scratch local stack whose ledger matches production, then push
-the missing suffix onto it. The release runbook has the exact steps.
+the missing suffix onto it. `npm run db:migrations:rehearse -- --from <NNN>`
+does exactly that; the release runbook has the steps around it.
 
 ## config.toml: JWT Hook (CRITICAL)
 

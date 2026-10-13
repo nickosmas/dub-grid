@@ -809,7 +809,7 @@
           strict contract check the canonical fast gate, run the full Mintlify
           verification before a push and in CI, and reconcile the living
           Blueprint overview with the completed documentation work.
-    - [ ] 40e2. **Isolated migration readiness qualification** - rehearse the
+    - [x] 40e2. **Isolated migration readiness qualification** - rehearse the
           contiguous checksum-locked migration ledger against a local scratch
           database and record reproducible evidence without touching a remote
           project.

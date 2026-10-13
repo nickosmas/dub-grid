@@ -17,11 +17,18 @@ interface QualificationRow {
   detail: string;
 }
 
-const CHECK_INTRODUCED_BY: Readonly<Record<string, string>> = {
+export const CHECK_INTRODUCED_BY: Readonly<Record<string, string>> = {
   caller_org_id_validates_live_state: "016",
   scheduler_calloff_function: "019",
   scheduler_calloff_trigger: "019",
   publish_schedule_split_times: "020",
+  billing_policy_settings_locked: "076",
+  start_trial_for_org_uses_billing_policy: "076",
+  billing_pause_readable_by_members: "077",
+  payment_grace_readable_by_members: "078",
+  lock_alert_notification_type: "078",
+  billing_history_locked: "079",
+  billing_history_append_only: "079",
   // scheduler_calloff_json_null_safe is deliberately absent: it passes when
   // 019's trigger is missing and fails only when the trigger is present in its
   // original form, which is exactly the state that must never be deferred.
@@ -43,6 +50,28 @@ WITH org_tables_without_rls AS (
         AND column_info.column_name = 'org_id'
     )
     AND NOT relation.relrowsecurity
+), billing_tables AS (
+  SELECT relation.oid,
+         relation.relname,
+         relation.relrowsecurity
+           AND NOT has_table_privilege('anon', relation.oid, 'SELECT, INSERT, UPDATE, DELETE')
+           AND NOT has_table_privilege('authenticated', relation.oid, 'SELECT, INSERT, UPDATE, DELETE')
+           AS locked
+  FROM pg_class relation
+  JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
+  WHERE namespace.nspname = 'public'
+    AND relation.relkind = 'r'
+    AND relation.relname IN (
+      'platform_billing_settings', 'subscription_seat_history', 'billing_invoice_events'
+    )
+), organization_columns AS (
+  SELECT attribute.attname,
+         has_column_privilege('authenticated', attribute.attrelid, attribute.attnum, 'SELECT')
+           AS readable
+  FROM pg_attribute attribute
+  WHERE attribute.attrelid = to_regclass('public.organizations')
+    AND attribute.attname IN ('billing_paused_at', 'payment_grace_started_at')
+    AND NOT attribute.attisdropped
 ), checks AS (
   SELECT 'org_scoped_tables_have_rls' AS check_name,
          count = 0 AS passed,
@@ -129,6 +158,55 @@ WITH org_tables_without_rls AS (
                      to_regprocedure('public.publish_schedule(uuid,date,date,uuid)')))
                    LIKE '%split_part(COALESCE(c->>''toCustomStart''%'
               THEN 'repaired' ELSE 'casts delimited times to TIME' END
+  UNION ALL
+  -- 076 and 079 keep the billing policy and history tables away from the
+  -- browser roles, which default privileges would otherwise reach.
+  SELECT 'billing_policy_settings_locked', count(*) = 1 AND COALESCE(bool_and(locked), false),
+         count(*)::text || ' table'
+  FROM billing_tables
+  WHERE relname = 'platform_billing_settings'
+  UNION ALL
+  SELECT 'billing_history_locked', count(*) = 2 AND COALESCE(bool_and(locked), false),
+         count(*)::text || ' tables'
+  FROM billing_tables
+  WHERE relname IN ('subscription_seat_history', 'billing_invoice_events')
+  UNION ALL
+  SELECT 'billing_history_append_only',
+         count(*) = 2 AND COALESCE(bool_and(NOT has_table_privilege('service_role', oid,
+           'UPDATE, DELETE, TRUNCATE')), false),
+         count(*)::text || ' tables'
+  FROM billing_tables
+  WHERE relname IN ('subscription_seat_history', 'billing_invoice_events')
+  UNION ALL
+  SELECT 'start_trial_for_org_uses_billing_policy',
+         COALESCE(bool_and(
+           prosecdef
+           AND array_to_string(proconfig, ',') LIKE '%search_path=%'
+           AND has_function_privilege('authenticated', oid, 'EXECUTE')
+           AND pg_get_functiondef(oid) LIKE '%platform_billing_settings%'
+         ), false),
+         CASE WHEN count(*) = 0 THEN 'missing' ELSE 'present' END
+  FROM pg_proc
+  WHERE oid = to_regprocedure('public.start_trial_for_org(uuid)')
+  UNION ALL
+  SELECT 'billing_pause_readable_by_members',
+         count(*) = 1 AND COALESCE(bool_and(readable), false),
+         count(*)::text || ' column'
+  FROM organization_columns
+  WHERE attname = 'billing_paused_at'
+  UNION ALL
+  SELECT 'payment_grace_readable_by_members',
+         count(*) = 1 AND COALESCE(bool_and(readable), false),
+         count(*)::text || ' column'
+  FROM organization_columns
+  WHERE attname = 'payment_grace_started_at'
+  UNION ALL
+  SELECT 'lock_alert_notification_type',
+         COALESCE(bool_and(pg_get_constraintdef(oid) LIKE '%billing_access_locked%'), false),
+         count(*)::text || ' constraint'
+  FROM pg_constraint
+  WHERE conname = 'notifications_type_check'
+    AND conrelid = to_regclass('public.notifications')
 )
 SELECT check_name, passed, detail FROM checks ORDER BY check_name
 `;
