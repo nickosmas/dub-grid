@@ -640,8 +640,10 @@ export default function Header({ orgName }: HeaderProps) {
             >
               {initials}
             </div>
-            {!isTablet && !isHeaderNarrow && (
-              <>
+            {!isTablet && (
+              // Hidden by CSS at the narrow-header width, not by the hook, so it
+              // goes in the same frame as a resize instead of a render later.
+              <span className="dg-header-account-detail">
                 <div style={{ textAlign: "left", maxWidth: 120 }}>
                   <div
                     style={{
@@ -679,7 +681,7 @@ export default function Header({ orgName }: HeaderProps) {
                     transform: menuOpen ? "rotate(180deg)" : "rotate(0deg)",
                   }}
                 />
-              </>
+              </span>
             )}
           </Button>
 

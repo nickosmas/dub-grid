@@ -1735,6 +1735,19 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 }
 /* App header icon button: the alerts bell's geometry and hover, so a theme
    toggle beside it reads as the same control. */
+.dg-header-account-detail {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Matches HEADER_NARROW in useMediaQuery.ts. */
+@media (max-width: 1200px) {
+  .dg-header-account-detail {
+    display: none;
+  }
+}
+
 .dg-header-icon-btn {
   display: flex;
   align-items: center;
