@@ -1,5 +1,5 @@
 import { PageShell } from "@/components/auth/AuthCard";
-import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { DubGridStackedLockup } from "@/components/Logo";
 import { RunLogoutTeardown, type LogoutReason, type LogoutScope } from "./RunLogoutTeardown";
 
 const HEADLINES: ReadonlyArray<string> = [
@@ -94,8 +94,7 @@ export default async function GoodbyePage({
             WebkitTapHighlightColor: "transparent",
           }}
         >
-          <DubGridLogo size={72} />
-          <DubGridWordmark />
+          <DubGridStackedLockup />
         </a>
 
         <h1

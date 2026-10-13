@@ -76,6 +76,7 @@ export default function TrialWelcomeModal() {
     enabled,
     staleTime: 60_000,
   });
+  const graceDays = data?.trialGraceDays ?? TRIAL_GRACE_DAYS;
 
   const dismiss = useMutation({
     mutationFn: dismissTrialWelcome,
@@ -219,8 +220,9 @@ export default function TrialWelcomeModal() {
                 If you need more time
               </div>
               <div style={{ fontSize: 12, color: "var(--dg-color-text-muted)", lineHeight: 1.4 }}>
-                No rush, you&rsquo;ll still have {TRIAL_GRACE_DAYS} extra days to add billing before
-                the organization loses access.
+                No rush, you&rsquo;ll still have {graceDays} extra{" "}
+                {graceDays === 1 ? "day" : "days"} to add billing before the organization loses
+                access.
               </div>
             </div>
           </div>

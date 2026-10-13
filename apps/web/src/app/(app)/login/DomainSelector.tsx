@@ -8,7 +8,7 @@ import { PublicRoute } from "@/components/RouteGuards";
 import { Form } from "@/components/Form";
 import { Button } from "@/components/Button";
 import { getValidPort, buildSubdomainHost, RESERVED_SUBDOMAINS } from "@/lib/subdomain";
-import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { DubGridStackedLockup } from "@/components/Logo";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { SubdomainField } from "@/components/auth/SubdomainField";
@@ -162,8 +162,7 @@ export default function DomainSelector() {
             onClick={handleLogoTap}
             className="dg-auth-logo-block dg-auth-logo-block--spacious"
           >
-            <DubGridLogo size={52} />
-            <DubGridWordmark />
+            <DubGridStackedLockup />
           </Link>
 
           <p className="dg-auth-selector-description">

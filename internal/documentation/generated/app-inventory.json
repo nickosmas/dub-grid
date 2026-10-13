@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:318bafd0c22cfc5a58db93f8f8468625ad598db54a38fcc488325c7d0befcba8",
+  "sourceDigest": "sha256:d43cc56d72835cbf309cfdffd57e6ad1e0874e67913bd2e3787b0f7eb58ab6da",
   "webRoutes": [
     {
       "id": "web:/",
@@ -1329,6 +1329,24 @@
       }
     },
     {
+      "id": "http:GET:/api/gridmaster/billing-history",
+      "method": "GET",
+      "path": "/api/gridmaster/billing-history",
+      "scope": "api",
+      "source": {
+        "path": "apps/web/src/app/api/gridmaster/billing-history/route.ts"
+      }
+    },
+    {
+      "id": "http:GET:/api/gridmaster/billing-policy",
+      "method": "GET",
+      "path": "/api/gridmaster/billing-policy",
+      "scope": "api",
+      "source": {
+        "path": "apps/web/src/app/api/gridmaster/billing-policy/route.ts"
+      }
+    },
+    {
       "id": "http:GET:/api/gridmaster/compliance",
       "method": "GET",
       "path": "/api/gridmaster/compliance",
@@ -2424,6 +2442,15 @@
       "scope": "api",
       "source": {
         "path": "apps/web/src/app/api/gridmaster/audit-log/export/route.ts"
+      }
+    },
+    {
+      "id": "http:POST:/api/gridmaster/billing-policy",
+      "method": "POST",
+      "path": "/api/gridmaster/billing-policy",
+      "scope": "api",
+      "source": {
+        "path": "apps/web/src/app/api/gridmaster/billing-policy/route.ts"
       }
     },
     {
@@ -4500,6 +4527,46 @@
       "source": {
         "path": "supabase/migrations/075_gridmaster_writes_need_impersonation.sql"
       }
+    },
+    {
+      "id": "migration:076_billing_policy.sql",
+      "version": "076",
+      "name": "billing_policy",
+      "file": "076_billing_policy.sql",
+      "sha256": "3a504bd88cc4d26b6a656e6168e3b9db097267aa8fd8eb885fa012c7a7739388",
+      "source": {
+        "path": "supabase/migrations/076_billing_policy.sql"
+      }
+    },
+    {
+      "id": "migration:077_billing_pause.sql",
+      "version": "077",
+      "name": "billing_pause",
+      "file": "077_billing_pause.sql",
+      "sha256": "94b2ed0a9012af5ade94f83e83ad5e0e4bdc3275ee7269f93a2063b05d24a654",
+      "source": {
+        "path": "supabase/migrations/077_billing_pause.sql"
+      }
+    },
+    {
+      "id": "migration:078_payment_grace.sql",
+      "version": "078",
+      "name": "payment_grace",
+      "file": "078_payment_grace.sql",
+      "sha256": "18196ca512f8932d5b2c2bf7beab29a0e0b3aeb47d252d3d6e1fe31f61d84f9c",
+      "source": {
+        "path": "supabase/migrations/078_payment_grace.sql"
+      }
+    },
+    {
+      "id": "migration:079_billing_history.sql",
+      "version": "079",
+      "name": "billing_history",
+      "file": "079_billing_history.sql",
+      "sha256": "0b3f332b58a84fd01852492e9a523493e9588b8b7be4418eefcb3dc8efd33d92",
+      "source": {
+        "path": "supabase/migrations/079_billing_history.sql"
+      }
     }
   ],
   "rlsTables": [
@@ -4525,6 +4592,18 @@
       },
       "enabledIn": {
         "path": "supabase/migrations/003_rls_policies.sql"
+      }
+    },
+    {
+      "id": "rls:public.billing_invoice_events",
+      "schema": "public",
+      "table": "billing_invoice_events",
+      "enabled": true,
+      "createdIn": {
+        "path": "supabase/migrations/079_billing_history.sql"
+      },
+      "enabledIn": {
+        "path": "supabase/migrations/079_billing_history.sql"
       }
     },
     {
@@ -4756,6 +4835,18 @@
       }
     },
     {
+      "id": "rls:public.platform_billing_settings",
+      "schema": "public",
+      "table": "platform_billing_settings",
+      "enabled": true,
+      "createdIn": {
+        "path": "supabase/migrations/076_billing_policy.sql"
+      },
+      "enabledIn": {
+        "path": "supabase/migrations/076_billing_policy.sql"
+      }
+    },
+    {
       "id": "rls:public.platform_feature_flags",
       "schema": "public",
       "table": "platform_feature_flags",
@@ -4969,6 +5060,18 @@
       },
       "enabledIn": {
         "path": "supabase/migrations/003_rls_policies.sql"
+      }
+    },
+    {
+      "id": "rls:public.subscription_seat_history",
+      "schema": "public",
+      "table": "subscription_seat_history",
+      "enabled": true,
+      "createdIn": {
+        "path": "supabase/migrations/079_billing_history.sql"
+      },
+      "enabledIn": {
+        "path": "supabase/migrations/079_billing_history.sql"
       }
     },
     {

@@ -5,7 +5,14 @@ import { loadOrganizationBillingSummary } from "./server";
 // real source org's data (the route resolves it with ignoreSandbox). So this
 // exercises the real mapping for a normal organization: org row + subscription
 // + billable app-user count + recent billing audit-log operations.
-function createQueryClient() {
+const auditActionFilter: string[] = [];
+
+function createQueryClient(
+  overrides: {
+    org?: Record<string, unknown>;
+    subscription?: Record<string, unknown>;
+  } = {},
+) {
   return {
     from(table: string) {
       if (table === "organizations") {
@@ -22,6 +29,8 @@ function createQueryClient() {
                   subscription_status: "active",
                   trial_ends_at: null,
                   subscription_seats: 5,
+                  suspended_at: null,
+                  ...overrides.org,
                 },
                 error: null,
               }),
@@ -43,6 +52,7 @@ function createQueryClient() {
                   cancel_at: null,
                   canceled_at: null,
                   trial_end: null,
+                  ...overrides.subscription,
                 },
                 error: null,
               }),
@@ -85,27 +95,51 @@ function createQueryClient() {
         return {
           select: () => ({
             eq: () => ({
-              like: () => ({
-                order: () => ({
-                  limit: async () => ({
-                    data: [
-                      {
-                        id: 1,
-                        action: "billing.subscription_created",
-                        created_at: "2026-05-03T00:00:00Z",
-                      },
-                      { id: 2, action: "billing.seats_synced", created_at: "2026-05-02T00:00:00Z" },
-                      {
-                        id: 3,
-                        action: "billing.portal_opened",
-                        created_at: "2026-05-01T00:00:00Z",
-                      },
-                    ],
-                    error: null,
+              in: (_column: string, actions: string[]) => {
+                auditActionFilter.push(...actions);
+                return {
+                  order: () => ({
+                    limit: async () => ({
+                      data: [
+                        {
+                          id: 1,
+                          action: "billing.subscription_created",
+                          actor_email: "Stripe",
+                          details: {
+                            initiated_by: "stripe",
+                            stripe_event_id: "evt_123",
+                            stripe_event_type: "customer.subscription.created",
+                            customer_id: "cus_123",
+                            status: "active",
+                            quantity: 5,
+                          },
+                          created_at: "2026-05-03T00:00:00Z",
+                        },
+                        {
+                          id: 4,
+                          action: "billing.status_overridden",
+                          details: {
+                            initiated_by: "gridmaster",
+                            previous_status: "trialing",
+                            new_status: "active",
+                            reason: "Internal note",
+                          },
+                          created_at: "2026-05-02T12:00:00Z",
+                        },
+                      ],
+                      error: null,
+                    }),
                   }),
-                }),
-              }),
+                };
+              },
             }),
+          }),
+        };
+      }
+      if (table === "platform_billing_settings") {
+        return {
+          select: () => ({
+            eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }),
           }),
         };
       }
@@ -138,8 +172,103 @@ describe("loadOrganizationBillingSummary", () => {
     expect(summary.subscriptionSeats).toBe(5);
     expect(summary.recentOperations?.map((operation) => operation.label)).toEqual([
       "Subscription started",
-      "Seats synced",
-      "Billing portal opened",
+      "Billing status overridden",
     ]);
+    // Upkeep is left out of the query, so it never takes a row.
+    expect(auditActionFilter).toContain("billing.subscription_created");
+    expect(auditActionFilter).not.toContain("billing.seats_synced");
+    expect(auditActionFilter).not.toContain("billing.synced");
+    expect(auditActionFilter).not.toContain("billing.portal_opened");
+    // Only display fields reach the browser; provider ids and support notes don't.
+    expect(summary.recentOperations?.[0]).toMatchObject({
+      actorLabel: "Payment provider",
+      details: { status: "active", quantity: 5 },
+    });
+    expect(summary.recentOperations?.[0]?.details).not.toHaveProperty("stripe_event_id");
+    expect(summary.recentOperations?.[0]?.details).not.toHaveProperty("customer_id");
+    expect(summary.recentOperations?.[1]?.details).toEqual({
+      previous_status: "trialing",
+      new_status: "active",
+    });
+  });
+
+  it("offers a new subscription once the old one has ended", async () => {
+    const summary = await loadOrganizationBillingSummary(
+      createQueryClient({
+        org: { subscription_status: "canceled" },
+        subscription: { status: "canceled", canceled_at: "2026-05-10T00:00:00Z" },
+      }) as unknown as Parameters<typeof loadOrganizationBillingSummary>[0],
+      "org-1",
+      { canManageBilling: true },
+    );
+
+    expect(summary.hasStripeCustomer).toBe(true);
+    expect(summary.hasStripeSubscription).toBe(false);
+  });
+
+  it("reads a suspension as suspended, whatever the billing status", async () => {
+    const summary = await loadOrganizationBillingSummary(
+      createQueryClient({
+        org: { suspended_at: "2026-05-10T00:00:00Z" },
+      }) as unknown as Parameters<typeof loadOrganizationBillingSummary>[0],
+      "org-1",
+      { canManageBilling: true },
+    );
+
+    expect(summary.billingAccess).toMatchObject({ state: "suspended", isLocked: true });
+  });
+
+  it("keeps an organization open through its own longer grace period", async () => {
+    const fiveDaysAgo = new Date(Date.now() - 5 * 86_400_000).toISOString();
+    const summary = await loadOrganizationBillingSummary(
+      createQueryClient({
+        org: {
+          subscription_status: "trialing",
+          trial_ends_at: fiveDaysAgo,
+          trial_grace_days_override: 10,
+        },
+        subscription: { stripe_subscription_id: null, status: null },
+      }) as unknown as Parameters<typeof loadOrganizationBillingSummary>[0],
+      "org-1",
+      { canManageBilling: true },
+    );
+
+    expect(summary.billingAccess).toMatchObject({ state: "trial_grace", isLocked: false });
+  });
+
+  it("locks a past-due organization once its payment grace runs out", async () => {
+    const twentyDaysAgo = new Date(Date.now() - 20 * 86_400_000).toISOString();
+    const summary = await loadOrganizationBillingSummary(
+      createQueryClient({
+        org: { subscription_status: "past_due", payment_grace_started_at: twentyDaysAgo },
+        subscription: { stripe_subscription_id: "sub_123", status: "past_due" },
+      }) as unknown as Parameters<typeof loadOrganizationBillingSummary>[0],
+      "org-1",
+      { canManageBilling: true },
+    );
+
+    expect(summary.billingAccess).toMatchObject({
+      state: "locked",
+      reason: "payment_grace_expired",
+      isLocked: true,
+    });
+  });
+
+  it("reads a paused organization as paused and open", async () => {
+    const monthAgo = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    const summary = await loadOrganizationBillingSummary(
+      createQueryClient({
+        org: {
+          subscription_status: "trialing",
+          trial_ends_at: monthAgo,
+          billing_paused_at: monthAgo,
+        },
+        subscription: { stripe_subscription_id: null, status: null },
+      }) as unknown as Parameters<typeof loadOrganizationBillingSummary>[0],
+      "org-1",
+      { canManageBilling: true },
+    );
+
+    expect(summary.billingAccess).toMatchObject({ state: "paused", isLocked: false });
   });
 });

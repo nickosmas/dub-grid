@@ -1007,6 +1007,7 @@ export const mobileBillingAccessStateSchema = z.enum([
   "payment_attention_required",
   "locked",
   "suspended",
+  "paused",
 ]);
 
 export const mobileOrgStatusStateSchema = z.union([
@@ -1204,6 +1205,7 @@ export const mobileNotificationSchema = z.object({
     "billing_payment_succeeded",
     "billing_trial_ending_soon",
     "billing_trial_expired",
+    "billing_access_locked",
     // security
     "security_email_changed",
     "security_password_changed",

@@ -418,6 +418,37 @@ function amountRows(d: AuditDetails, key: string): DetailItem[] {
   return [{ label: "Amount", value: formatMinorUnits(amount, currency) }];
 }
 
+function trialEndRows(d: AuditDetails): DetailItem[] {
+  const rows: DetailItem[] = [];
+  const before = d.text("previous_trial_ends_at");
+  const after = d.text("trial_ends_at");
+  if (before) rows.push({ label: "Previous end", value: formatShortDate(before) });
+  if (after) rows.push({ label: "New end", value: formatShortDate(after) });
+  return rows;
+}
+
+const POLICY_LABELS: Record<string, string> = {
+  trialDays: "Trial length",
+  trialGraceDays: "Grace after the trial",
+  trialReminderDays: "Trial reminder",
+  paymentGraceDays: "Payment grace",
+};
+
+function policyValue(value: unknown): string {
+  return typeof value === "number" ? pluralize(value, "day") : "Platform default";
+}
+
+function policyRows(previous: unknown, next: unknown): DetailItem[] {
+  if (!next || typeof next !== "object") return [];
+  const before = (previous ?? {}) as Record<string, unknown>;
+  return Object.entries(next as Record<string, unknown>)
+    .filter(([key, value]) => before[key] !== value)
+    .map(([key, value]) => ({
+      label: POLICY_LABELS[key] ?? key,
+      value: `${policyValue(before[key])} → ${policyValue(value)}`,
+    }));
+}
+
 export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
   // ── People ─────────────────────────────────────────────────────────────────
   "employee.created": {
@@ -1087,6 +1118,24 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     severity: "update",
     headline: () => "Extended the trial",
   },
+  "billing.trial_changed": {
+    category: "billing",
+    severity: "update",
+    headline: () => "Changed the trial end date",
+    details: (d) => trialEndRows(d),
+  },
+  "billing.trial_ended": {
+    category: "billing",
+    severity: "warning",
+    headline: () => "Ended the trial early",
+    details: (d) => trialEndRows(d),
+  },
+  "billing.trial_expired": {
+    category: "billing",
+    severity: "delete",
+    headline: () => "Expired the trial",
+    details: (d) => trialEndRows(d),
+  },
   "billing.payment_failed": {
     category: "billing",
     severity: "delete",
@@ -1132,11 +1181,83 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     },
     suppressKeys: ["seats", "quantity"],
   },
+  "billing.policy_updated": {
+    audience: "platform",
+    category: "billing",
+    severity: "warning",
+    headline: () => "Changed the platform billing policy",
+    details: (d) => policyRows(d.rawValue("previous"), d.rawValue("next")),
+  },
+  "billing.policy_overridden": {
+    audience: "platform",
+    category: "billing",
+    severity: "warning",
+    headline: () => "Changed this organization's billing policy",
+    details: (d) => {
+      const changes = d.rawValue("changes");
+      if (!changes || typeof changes !== "object") return [];
+      return Object.entries(changes as Record<string, { from: unknown; to: unknown }>).map(
+        ([key, change]) => ({
+          label: POLICY_LABELS[key] ?? key,
+          value: `${policyValue(change?.from)} → ${policyValue(change?.to)}`,
+        }),
+      );
+    },
+  },
+  "billing.paused": {
+    audience: "platform",
+    category: "billing",
+    severity: "warning",
+    headline: () => "Paused billing",
+    details: (d) => {
+      const reason = d.text("reason");
+      return reason ? [{ label: "Reason", value: reason }] : [];
+    },
+  },
+  "billing.resumed": {
+    audience: "platform",
+    category: "billing",
+    severity: "update",
+    headline: () => "Resumed billing",
+    details: (d) => {
+      const rows: DetailItem[] = [];
+      const pausedAt = d.text("paused_at");
+      if (pausedAt) rows.push({ label: "Paused since", value: formatShortDate(pausedAt) });
+      return [...rows, ...trialEndRows(d)];
+    },
+  },
+  "billing.grace_extended": {
+    audience: "platform",
+    category: "billing",
+    severity: "warning",
+    headline: () => "Extended the trial grace period",
+    details: (d) => {
+      const rows: DetailItem[] = [];
+      const before = d.rawValue("previous_grace_days");
+      const after = d.rawValue("grace_days");
+      const reason = d.text("reason");
+      if (typeof before === "number" && typeof after === "number") {
+        rows.push({ label: "Grace", value: `${policyValue(before)} → ${policyValue(after)}` });
+      }
+      if (reason) rows.push({ label: "Reason", value: reason });
+      return rows;
+    },
+  },
   "billing.status_overridden": {
     audience: "platform",
     category: "billing",
     severity: "warning",
     headline: () => "Overrode the billing status",
+    details: (d) => {
+      const rows: DetailItem[] = [];
+      const before = d.text("previous_status");
+      const after = d.text("new_status");
+      const reason = d.text("reason");
+      if (before) rows.push({ label: "Was", value: formatBillingStatusLabel(before) });
+      if (after) rows.push({ label: "Now", value: formatBillingStatusLabel(after) });
+      if (reason) rows.push({ label: "Reason", value: reason });
+      return rows;
+    },
   },
   "billing.synced": {
     audience: "platform",

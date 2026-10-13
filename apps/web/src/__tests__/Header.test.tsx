@@ -359,13 +359,20 @@ describe("Header permission-based tab visibility", () => {
 
   it("shows trial time left to super admins in the app header", async () => {
     mockPermissions.isSuperAdmin = true;
+    // The fixture trial ends 2026-05-16T00:00Z; the countdown reads the clock.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-02T00:00:00.000Z"));
 
-    renderHeader(<Header />);
+    try {
+      renderHeader(<Header />);
 
-    expect(await screen.findByRole("link", { name: "Trial ends in 14 days" })).toHaveAttribute(
-      "href",
-      "/settings?section=org-billing",
-    );
+      expect(await screen.findByRole("link", { name: "Trial ends in 14 days" })).toHaveAttribute(
+        "href",
+        "/settings?section=org-billing",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("does not load billing status for regular admins", () => {

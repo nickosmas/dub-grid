@@ -21,8 +21,7 @@ vi.mock("@/components/auth/ApexLandingLink", () => ({
   ApexLandingLink: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 vi.mock("@/components/Logo", () => ({
-  DubGridLogo: () => null,
-  DubGridWordmark: () => null,
+  DubGridStackedLockup: () => null,
 }));
 
 describe("AuthVerifyPage", () => {

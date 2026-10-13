@@ -15,7 +15,7 @@ import { ACCOUNT_DISABLED_CODE } from "@dubgrid/domain";
 import { withThemeParam } from "@/lib/theme-preference";
 import { consumeAuthTransition, markAuthTransition } from "@/lib/auth-transition";
 import { setUserViewActive } from "@/hooks";
-import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { DubGridStackedLockup } from "@/components/Logo";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { EmailPasswordForm } from "@/components/auth/EmailPasswordForm";
 import { MFAVerify } from "@/components/profile/MFAVerify";
@@ -596,8 +596,7 @@ export default function OrgLogin({
           <Card>
             {/* Logo — links to apex landing page */}
             <a href={apexHref} className="dg-auth-logo-block dg-auth-logo-block--spacious">
-              <DubGridLogo size={52} />
-              <DubGridWordmark />
+              <DubGridStackedLockup />
             </a>
 
             {orgLockout ? (

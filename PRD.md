@@ -642,7 +642,7 @@ Route files stay thin; the components below live under `apps/web/src/components/
     ├── Button.tsx / ButtonSpinner.tsx (ButtonLoading: spinner replaces the icon, label unchanged), ProgressBar.tsx
     ├── ui/ (switch, sheet, number-field, numeric-badge, status-pill, selectable-tag, editor-action-row,
     │   table, pagination, popover, tooltip, menu, calendar-date-picker, skeleton, ...)
-    ├── Logo.tsx / AnimatedDubGridLogo.tsx (the animated 16-cell mark), ThemeProvider.tsx
+    ├── Logo.tsx / AnimatedDubGridLogo.tsx (the two-card mark, static until its animations land), ThemeProvider.tsx
     └── CookieConsent.tsx, ConsentGatedAnalytics.tsx, PostHogProvider.tsx, WebVitals.tsx, RouteBoundary.tsx
 ```
 
@@ -782,7 +782,7 @@ User management, role assignment, and admin permission configuration live on the
 - **Accept Invite** - Invitation token validation, pre-confirmed account creation, employee linking
 - **Accept Terms** - Blocks entry until the current terms version is accepted
 - **Step-up** - A `StepUpDialog` asks for a fresh password or TOTP code before a sensitive action when the last proof is older than five minutes
-- All auth pages use consistent `AuthCard` layout with branded styling; the animated 16-cell mark bridges the post-login transition
+- All auth pages use consistent `AuthCard` layout with branded styling; the two-card mark bridges the post-login transition
 
 ### 10.10 Landing Page
 

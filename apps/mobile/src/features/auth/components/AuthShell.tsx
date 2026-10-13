@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
-import { Image, Platform, StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { getActionItems } from "../../../shared/components/action-button-layout";
-import { DubGridWordmark } from "../../../shared/components/DubGridWordmark";
+import { DubGridLockup } from "../../../shared/components/BrandMark";
 import { GradientBackdrop } from "../../../shared/components/GradientBackdrop";
 import { Pressable } from "../../../shared/components/Pressable";
 import { getScreenBottomPadding } from "../../../shared/components/screen-layout";
@@ -56,13 +56,7 @@ export function AuthShell({
           edge lines up with the copy instead of drifting out on wide screens. */}
         <View style={styles.brandRow}>
           <Pressable style={styles.brandHeader} onLongPress={onBrandLongPress}>
-            <Image
-              accessibilityIgnoresInvertColors
-              accessibilityLabel="DubGrid logo"
-              source={require("../../../../assets/images/logo-blue.png")}
-              style={styles.brandMark}
-            />
-            <DubGridWordmark color={mobileColors.textPrimary} fontSize={20} />
+            <DubGridLockup color={mobileColors.textPrimary} fontSize={20} />
           </Pressable>
         </View>
         {/* One scroll view that knows about the keyboard, in place of a
@@ -155,11 +149,6 @@ const styles = StyleSheet.create({
     maxWidth: MAX_COLUMN_WIDTH,
     flexDirection: "row",
     alignItems: "center",
-    gap: mobileSpace.sm,
-  },
-  brandMark: {
-    width: 28,
-    height: 28,
   },
   keyboardArea: {
     flex: 1,

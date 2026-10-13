@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
+import { BILLING_ACCESS_SELECT, evaluateOrgBillingAccess } from "@/lib/billing-policy";
 import { createNameMismatchResponseBody } from "@/lib/account-linking";
 import { getServiceClient } from "@/lib/supabase-service";
 import { isCallerInactive } from "@/app/api/shared/permissions";
@@ -76,7 +76,7 @@ export async function canManageEmployees(
       serviceClient.from("profiles").select("platform_role").eq("id", actorId).single(),
       serviceClient
         .from("organizations")
-        .select("suspended_at, subscription_status, trial_ends_at")
+        .select(`suspended_at, subscription_status, trial_ends_at, ${BILLING_ACCESS_SELECT}`)
         .eq("id", orgId)
         .is("archived_at", null)
         .maybeSingle(),
@@ -89,11 +89,7 @@ export async function canManageEmployees(
   if (!organization && !isGridmaster) {
     return false;
   }
-  const billingAccess = evaluateOrganizationBillingAccess({
-    suspendedAt: organization?.suspended_at ?? null,
-    subscriptionStatus: organization?.subscription_status ?? null,
-    trialEndsAt: organization?.trial_ends_at ?? null,
-  });
+  const billingAccess = await evaluateOrgBillingAccess(serviceClient, organization);
   if (billingAccess.isLocked && !isGridmaster && !isSuperAdmin) {
     return false;
   }

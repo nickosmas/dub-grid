@@ -51,8 +51,7 @@ vi.mock("@/components/auth/AuthStateCard", () => ({
   ),
 }));
 vi.mock("@/components/Logo", () => ({
-  DubGridLogo: () => <span>DubGrid logo</span>,
-  DubGridWordmark: () => <span>DubGrid</span>,
+  DubGridStackedLockup: () => <span>DubGrid</span>,
 }));
 vi.mock("@/components/auth/ApexLandingLink", () => ({
   ApexLandingLink: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,

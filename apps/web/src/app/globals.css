@@ -307,6 +307,7 @@
   --dg-color-on-brand-surface: #ffffff;
   --dg-color-brand: #2563eb;
   --dg-color-brand-light: #3b82f6;
+  --dg-color-brand-mark: var(--dg-color-primary);
   --dg-color-brand-bg: #eff6ff;
   --dg-color-brand-border: #bfdbfe;
   --dg-color-nav-active-bg: #e5e5e5;
@@ -441,6 +442,7 @@
   --dg-color-text-inverse: #ffffff;
   --dg-color-brand: #2075ff;
   --dg-color-brand-light: #4a9bff;
+  --dg-color-brand-mark: var(--dg-color-primary);
   --dg-color-brand-bg: #152238;
   --dg-color-brand-border: #1e3a5f;
   --dg-color-nav-active-bg: #26262b;
@@ -1034,6 +1036,25 @@ button {
   opacity: 0.5;
   cursor: default;
   pointer-events: none;
+}
+/* A table row's name as a plain-text button: the row opens on click, and this
+   is the way in from the keyboard. */
+.dg-table-row-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.dg-table-row-link:hover {
+  text-decoration: underline;
+}
+.dg-table-row-link:focus-visible {
+  outline: 2px solid var(--dg-color-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--dg-radius-xs);
 }
 /* ── Address Autocomplete ─────────────────────────────── */
 /* ── Modal ──────────────────────────────────────────────── */
@@ -1714,6 +1735,19 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 }
 /* App header icon button: the alerts bell's geometry and hover, so a theme
    toggle beside it reads as the same control. */
+.dg-header-account-detail {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Matches HEADER_NARROW in useMediaQuery.ts. */
+@media (max-width: 1200px) {
+  .dg-header-account-detail {
+    display: none;
+  }
+}
+
 .dg-header-icon-btn {
   display: flex;
   align-items: center;

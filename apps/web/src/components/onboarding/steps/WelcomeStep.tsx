@@ -1,6 +1,6 @@
 "use client";
 
-import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { DubGridStackedLockup } from "@/components/Logo";
 import { Button } from "@/components/Button";
 import { useOrganizationData, useOrgClaims } from "@/hooks";
 import { DashboardIcon, ScheduleIcon, PeopleIcon, ShieldIcon } from "@/components/icons/NavIcons";
@@ -109,8 +109,7 @@ export default function WelcomeStep({ role, onNext, isOrgSetup }: WelcomeStepPro
           marginBottom: 32,
         }}
       >
-        <DubGridLogo size={52} />
-        <DubGridWordmark />
+        <DubGridStackedLockup />
       </div>
 
       {/* Heading */}

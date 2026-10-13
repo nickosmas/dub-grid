@@ -20,6 +20,9 @@ export function formatClientLabel(value: string | null | undefined): string {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+/** Who customers see behind a change a Gridmaster made; the role name stays internal. */
+export const DUBGRID_SUPPORT_ACTOR_LABEL = "DubGrid Support";
+
 const ORGANIZATION_ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
   gridmaster: "Gridmaster",
@@ -48,12 +51,14 @@ export { formatShiftRequestStatusLabel } from "@dubgrid/domain";
 
 const BILLING_STATUS_LABELS: Record<string, string> = {
   active: "Active",
+  billing_paused: "Billing paused",
   canceled: "Canceled",
   incomplete: "Setup incomplete",
   incomplete_expired: "Setup expired",
   past_due: "Past due",
   paused: "Paused",
   trial_grace: "Trial grace period",
+  trial_pending: "Trial pending",
   trial_ending_soon: "Trial ending soon",
   trial_expired: "Trial expired",
   trialing: "Trial active",

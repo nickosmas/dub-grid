@@ -13,6 +13,7 @@ import {
   formatClientLabel,
   formatOrganizationRoleLabel,
 } from "@/lib/client-facing";
+import { effectiveBillingStatus } from "@dubgrid/domain";
 import { queryKeys } from "@/lib/query-keys";
 import { sectionStyle } from "@/lib/styles";
 import { gmHeaderStyle, gmTableStyle, gmThStyle } from "@/components/gridmaster/table-styles";
@@ -416,7 +417,14 @@ export default function GridmasterDashboard({
                               borderBottom: "1px solid var(--dg-color-border-light)",
                             }}
                           >
-                            {formatBillingStatusLabel(org.billing.subscriptionStatus)}
+                            {formatBillingStatusLabel(
+                              effectiveBillingStatus(
+                                org.billing.subscriptionStatus,
+                                org.billing.trialEndsAt,
+                                undefined,
+                                org.billing.trialGraceDays,
+                              ),
+                            )}
                           </td>
                         </tr>
                       ))}

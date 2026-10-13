@@ -59,7 +59,7 @@ describe("activity log display formatting", () => {
       details: { initiated_by: "gridmaster" },
     });
 
-    expect(getAuditActorLabel(entry)).toBe("Gridmaster");
+    expect(getAuditActorLabel(entry)).toBe("DubGrid Support");
     expect(getAuditActorSecondaryLabel(entry)).toBeNull();
   });
 

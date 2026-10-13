@@ -8,6 +8,7 @@ const loadGridmasterOrgHealth = vi.fn();
 const loadGridmasterSecurity = vi.fn();
 const loadGridmasterBilling = vi.fn();
 const loadGridmasterCompliance = vi.fn();
+const loadGridmasterOrgBilling = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
   requireGridmasterSession: (req: NextRequest) => requireGridmasterSession(req),
@@ -23,7 +24,10 @@ vi.mock("@/app/api/gridmaster/_lib/oversight", () => ({
   loadGridmasterSecurity: (...args: unknown[]) => loadGridmasterSecurity(...args),
   loadGridmasterBilling: (...args: unknown[]) => loadGridmasterBilling(...args),
   loadGridmasterCompliance: (...args: unknown[]) => loadGridmasterCompliance(...args),
+  loadGridmasterOrgBilling: (...args: unknown[]) => loadGridmasterOrgBilling(...args),
 }));
+
+vi.mock("@/lib/stripe", () => ({ stripeMode: () => "test" }));
 
 import { GET as getOverview } from "./overview/route";
 import { GET as getOrgHealth } from "./org-health/route";
@@ -86,5 +90,40 @@ describe("gridmaster oversight read APIs", () => {
     );
     expect(valid.status).toBe(200);
     expect(loadGridmasterOrgHealth).toHaveBeenCalledWith(serviceClient, orgId);
+  });
+
+  describe("one organization's billing", () => {
+    const ORG_ID = "11111111-1111-4111-8111-111111111111";
+    const url = (orgId: string) =>
+      new NextRequest(`http://localhost/api/gridmaster/billing?orgId=${orgId}`);
+
+    it("returns just that organization, with the Stripe mode for links", async () => {
+      loadGridmasterOrgBilling.mockResolvedValueOnce({ orgId: ORG_ID, orgName: "Acme" });
+
+      const response = await getBilling(url(ORG_ID));
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        organization: { orgId: ORG_ID, orgName: "Acme" },
+        stripeMode: "test",
+      });
+      expect(loadGridmasterOrgBilling).toHaveBeenCalledWith(serviceClient, ORG_ID);
+      expect(loadGridmasterBilling).not.toHaveBeenCalled();
+    });
+
+    it("refuses a malformed id and reports an unknown organization", async () => {
+      expect((await getBilling(url("not-a-uuid"))).status).toBe(400);
+      loadGridmasterOrgBilling.mockResolvedValueOnce(null);
+      expect((await getBilling(url(ORG_ID))).status).toBe(404);
+    });
+
+    it("stays Gridmaster-only", async () => {
+      requireGridmasterSession.mockResolvedValueOnce({
+        response: NextResponse.json({ error: "Unauthorized" }, { status: 403 }),
+      });
+
+      expect((await getBilling(url(ORG_ID))).status).toBe(403);
+      expect(loadGridmasterOrgBilling).not.toHaveBeenCalled();
+    });
   });
 });

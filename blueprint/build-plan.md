@@ -819,3 +819,50 @@
     - [ ] 40e4. **Native iOS and Android qualification** - record real-device
           evidence for the required mobile roles and states, including the
           mandatory Android pass; do not infer unavailable device evidence.
+- [x] 44. **Billing safety and Gridmaster billing controls** - fix the billing
+      defects that can lock out or strand a customer, give Gridmasters safe,
+      explained billing actions, show customers only the billing activity that
+      concerns them, and add configurable trial and grace policy, pause and
+      resume, past-due deadlines, an alert when access locks, and seat and
+      revenue history. Ended-trial display shipped separately in 9ce24309.
+  - [x] 44a. **Billing safety fixes** - Sync Stripe never cancels an
+        organization that has a payment customer but no subscription; a
+        canceled organization can start a new subscription; Gridmaster billing
+        writes check their result before reporting success; checkout refuses a
+        second subscription; out-of-order webhook events cannot roll a status
+        back; Extend trial adds to the current end date instead of replacing
+        it; seat true-up refreshes cached access; Stripe sync never invents a
+        trial end; the billing summary reads suspension.
+  - [x] 44b. **Gridmaster billing controls** - the server refuses extending a
+        paying organization's trial and an immediate cancel without a
+        subscription, and asks for fresh proof before an immediate cancel or a
+        status override (owner decision, 2026-10-12). Status override states
+        its side effects, records a reason and the previous status, and stops
+        resetting the trial. Disabled actions say why, "End period" is named
+        for what it does, trial extensions have an upper bound, the
+        organization Billing tab loads only its own organization, billing
+        table rows work from the keyboard, and payment-provider links respect
+        test mode.
+  - [x] 44c. **Customer billing clarity** - the billing activity feed shows
+        changes that affect the customer (trial extended, status changed,
+        cancellation) without raw payment-provider details and hides upkeep
+        such as syncs and seat counts (owner decision, 2026-10-12); plain
+        wording for the seat and app-user figures and the unconfigured-billing
+        notice; mobile locked-screen copy for suspension and trial start.
+  - [x] 44d. **Billing policy settings** - platform defaults plus
+        per-organization overrides for trial length, grace days, reminder
+        days, and payment grace, stored with database range checks and read
+        without extra per-request queries, plus a check constraint on the
+        stored subscription status. Gridmaster settings show each value and
+        whether it comes from the platform or an override. Needs a migration.
+  - [x] 44e. **Pause and resume** - an access-preserving billing hold that
+        stops the trial clock, and manual grace extension through the
+        per-organization override. Needs a migration.
+  - [x] 44f. **Past-due deadlines and lock alerts** - a payment-grace deadline
+        for past-due subscriptions that never locks without a recorded start,
+        an alert at the moment access locks, and handling for the
+        trial-will-end and checkout-completed payment events. Needs a
+        migration.
+  - [x] 44g. **Seat and revenue history** - append-only seat and invoice
+        history and a report that states its own start date. Needs a
+        migration.

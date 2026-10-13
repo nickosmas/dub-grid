@@ -1,4 +1,5 @@
 import { AnimatedDubGridLogo } from "@/components/AnimatedDubGridLogo";
+import { DelayedReveal } from "@/components/DelayedReveal";
 
 /**
  * Full-screen branded loading state for the schedule grid. Shared by the
@@ -20,7 +21,10 @@ export function ScheduleLoadingScreen() {
         zIndex: 50,
       }}
     >
-      <AnimatedDubGridLogo />
+      {/* Most schedules load faster than this, so the logo never shows. */}
+      <DelayedReveal afterMs={400}>
+        <AnimatedDubGridLogo animation="shuffle" />
+      </DelayedReveal>
     </div>
   );
 }

@@ -52,6 +52,7 @@ beforeEach(() => {
   vi.mocked(fetchTrialWelcomeState).mockResolvedValue({
     shouldShowWelcome: true,
     trialEndsAt: "2026-10-01T00:00:00.000Z",
+    trialGraceDays: 3,
   });
 });
 
@@ -59,6 +60,20 @@ describe("TrialWelcomeModal", () => {
   it("shows the welcome once onboarding is complete", async () => {
     renderModal();
     expect(await screen.findByText("Your trial has started!")).toBeInTheDocument();
+  });
+
+  it("names the organization's own grace period", async () => {
+    vi.mocked(fetchTrialWelcomeState).mockResolvedValue({
+      shouldShowWelcome: true,
+      trialEndsAt: "2026-10-01T00:00:00.000Z",
+      trialGraceDays: 5,
+    });
+
+    renderModal();
+
+    expect(
+      await screen.findByText(/you’ll still have 5 extra days to add billing/),
+    ).toBeInTheDocument();
   });
 
   // The trial clock starts on the super admin's first sign-in, which is the

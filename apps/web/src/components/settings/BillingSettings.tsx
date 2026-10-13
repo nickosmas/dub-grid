@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CalendarClock,
@@ -28,16 +28,20 @@ import {
   openBillingPortal,
   startBillingCheckout,
 } from "@/features/billing/client";
+import {
+  billingToneColors,
+  describeBillingNotice,
+  describeBillingStatus,
+  describeSeatDifference,
+  describeTrialMetrics,
+  type BillingTone,
+} from "@/features/billing/trial-status";
 import { useClientFeatureFlags, useIsInSandbox, useLogout, useSandboxSourceOrgId } from "@/hooks";
 import { describeAction, formatDetails, formatRelativeTime } from "@/lib/activity-log-utils";
-import { formatBillingStatusLabel, formatClientErrorMessage } from "@/lib/client-facing";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
 import { sectionBodyStyle, sectionHeaderStyle, sectionStyle, tdStyle, thStyle } from "@/lib/styles";
-import type {
-  BillingOperationSummary,
-  FullAuditLogEntry,
-  OrganizationBillingSummary,
-} from "@/types";
+import type { BillingOperationSummary, FullAuditLogEntry } from "@/types";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 
 function formatDate(value: string | null): string {
@@ -49,45 +53,8 @@ function formatDate(value: string | null): string {
   });
 }
 
-function statusTone(status: string | null): {
-  bg: string;
-  text: string;
-  border: string;
-} {
-  switch (status) {
-    case "active":
-    case "trialing":
-      return {
-        bg: "var(--dg-color-success-bg)",
-        text: "var(--dg-color-success)",
-        border: "var(--dg-color-success-border)",
-      };
-    case "past_due":
-    case "incomplete":
-      return {
-        bg: "var(--dg-color-warning-bg)",
-        text: "var(--dg-color-warning)",
-        border: "var(--dg-color-warning-border)",
-      };
-    case "canceled":
-    case "unpaid":
-    case "incomplete_expired":
-      return {
-        bg: "var(--dg-color-danger-bg)",
-        text: "var(--dg-color-danger)",
-        border: "var(--dg-color-danger-border)",
-      };
-    default:
-      return {
-        bg: "var(--dg-color-bg-secondary)",
-        text: "var(--dg-color-text-muted)",
-        border: "var(--dg-color-border)",
-      };
-  }
-}
-
-function StatusBadge({ status }: { status: string | null }) {
-  const tone = statusTone(status);
+function StatusBadge({ label, tone }: { label: string; tone: BillingTone }) {
+  const colors = billingToneColors(tone);
   return (
     <span
       style={{
@@ -96,16 +63,36 @@ function StatusBadge({ status }: { status: string | null }) {
         minHeight: 24,
         padding: "0 9px",
         borderRadius: "9999px",
-        border: `1px solid ${tone.border}`,
-        background: tone.bg,
-        color: tone.text,
+        border: `1px solid ${colors.border}`,
+        background: colors.bg,
+        color: colors.text,
         fontSize: "var(--dg-fs-caption)",
         fontWeight: 600,
-        textTransform: "capitalize",
+        whiteSpace: "nowrap",
       }}
     >
-      {formatBillingStatusLabel(status)}
+      {label}
     </span>
+  );
+}
+
+function NoticeBanner({ tone, children }: { tone: BillingTone; children: ReactNode }) {
+  const colors = billingToneColors(tone);
+  return (
+    <div
+      role={tone === "danger" ? "alert" : "status"}
+      style={{
+        padding: "10px 12px",
+        borderRadius: "var(--dg-radius-md)",
+        border: `1px solid ${colors.border}`,
+        background: colors.bg,
+        color: colors.text,
+        fontSize: "var(--dg-fs-label)",
+        fontWeight: 600,
+      }}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -118,20 +105,11 @@ function BillingMetric({
   icon: LucideIcon;
   label: string;
   value: string | number;
-  tone?: "danger" | "warning";
+  tone?: BillingTone;
 }) {
-  const color =
-    tone === "danger"
-      ? "var(--dg-color-danger)"
-      : tone === "warning"
-        ? "var(--dg-color-warning)"
-        : "var(--dg-color-text-primary)";
-  const iconAccent =
-    tone === "danger"
-      ? { bg: "var(--dg-color-danger-bg)", color: "var(--dg-color-danger)" }
-      : tone === "warning"
-        ? { bg: "var(--dg-color-warning-bg)", color: "var(--dg-color-warning)" }
-        : { bg: "var(--dg-color-info-bg)", color: "var(--dg-color-info)" };
+  const accent = billingToneColors(tone ?? "info");
+  const color = tone ? accent.text : "var(--dg-color-text-primary)";
+  const iconAccent = { bg: accent.bg, color: accent.text };
 
   return (
     <div
@@ -443,79 +421,15 @@ type BillingMetricConfig = {
   icon: LucideIcon;
   label: string;
   value: string | number;
-  tone?: "danger" | "warning";
+  tone?: BillingTone;
 };
 
-function billingNoticeCopy(billingAccess: OrganizationBillingSummary["billingAccess"]) {
-  switch (billingAccess.state) {
-    case "trial_ending_soon":
-      return billingAccess.daysUntilTrialEnd === 1
-        ? "Trial access ends tomorrow. Add billing to keep the organization active."
-        : `Trial access ends in ${billingAccess.daysUntilTrialEnd ?? "a few"} days. Add billing to keep the organization active.`;
-    case "trial_grace":
-      return "Trial access has ended. Add billing before the grace period ends to keep the organization active.";
-    case "payment_attention_required":
-      return "Billing needs attention. Update payment details to keep the organization active.";
-    case "locked":
-      return "Organization access is locked until billing is restored.";
-    default:
-      return null;
-  }
-}
-
-function formatTrialTimeLeft(billing: OrganizationBillingSummary): {
-  value: string;
-  detail: string;
-  tone?: "danger" | "warning";
-} | null {
-  const days = billing.billingAccess.daysUntilTrialEnd;
-
-  if (days == null) {
-    if (billing.status === "trialing" || !billing.status) {
-      return null;
-    }
-
-    return null;
-  }
-
-  if (days > 1) {
-    return {
-      value: `${days} days`,
-      detail: `Ends ${formatDate(billing.trialEndsAt)}`,
-      tone: billing.billingAccess.shouldNotifyAdmins ? "warning" : undefined,
-    };
-  }
-
-  if (days === 1) {
-    return {
-      value: "1 day",
-      detail: `Ends ${formatDate(billing.trialEndsAt)}`,
-      tone: "warning",
-    };
-  }
-
-  if (days === 0) {
-    return {
-      value: "Today",
-      detail: `Ends ${formatDate(billing.trialEndsAt)}`,
-      tone: "warning",
-    };
-  }
-
-  if (billing.billingAccess.state === "trial_grace") {
-    return {
-      value: "Grace",
-      detail: `Grace ends ${formatDate(billing.billingAccess.trialGraceEndsAt)}`,
-      tone: "warning",
-    };
-  }
-
-  return {
-    value: "Expired",
-    detail: `${Math.abs(days)} days ago`,
-    tone: "danger",
-  };
-}
+const TRIAL_METRIC_ICONS: Record<string, LucideIcon> = {
+  "trial-time-left": Clock,
+  "trial-ends": CalendarDays,
+  "trial-ended": CalendarDays,
+  "access-ends": CalendarClock,
+};
 
 export default function BillingSettings({ organization }: { organization: { id: string } }) {
   const queryClient = useQueryClient();
@@ -625,20 +539,22 @@ export default function BillingSettings({ organization }: { organization: { id: 
     }
   }
 
-  const seatTone = billing?.seatDelta != null && billing.seatDelta < 0 ? "danger" : undefined;
+  const seatTone: BillingTone | undefined =
+    billing?.seatDelta != null && billing.seatDelta < 0 ? "danger" : undefined;
   const isTrialPending = Boolean(billing) && billing!.billingAccess.state === "trial_pending";
   const primaryAction =
     billing?.hasStripeCustomer && billing.hasStripeSubscription
       ? "Manage billing"
       : "Start subscription";
   const showSignOut = billing?.billingAccess.isLocked === true;
-  const trialTimeLeft = billing ? formatTrialTimeLeft(billing) : null;
+  const statusBadge = billing ? describeBillingStatus(billing) : null;
+  const billingNotice = billing ? describeBillingNotice(billing) : null;
   const billingMetrics: BillingMetricConfig[] = [];
   if (billing) {
     billingMetrics.push({
       key: "app-users",
       icon: Users,
-      label: "App users",
+      label: "Billable users",
       value: billing.appUserCount,
     });
     if (billing.subscriptionSeats != null) {
@@ -654,26 +570,15 @@ export default function BillingSettings({ organization }: { organization: { id: 
       billingMetrics.push({
         key: "seat-delta",
         icon: Scale,
-        label: "Seat delta",
-        value: billing.seatDelta,
+        label: "Seat difference",
+        value: describeSeatDifference(billing.seatDelta),
         tone: seatTone,
       });
     }
-    if (trialTimeLeft) {
+    for (const metric of describeTrialMetrics(billing)) {
       billingMetrics.push({
-        key: "trial-time-left",
-        icon: Clock,
-        label: "Trial time left",
-        value: trialTimeLeft.value,
-        tone: trialTimeLeft.tone,
-      });
-    }
-    if (billing.trialEndsAt) {
-      billingMetrics.push({
-        key: "trial-ends",
-        icon: CalendarDays,
-        label: "Trial ends",
-        value: formatDate(billing.trialEndsAt),
+        ...metric,
+        icon: TRIAL_METRIC_ICONS[metric.key] ?? CalendarDays,
       });
     }
     if (billing.currentPeriodEnd) {
@@ -710,7 +615,7 @@ export default function BillingSettings({ organization }: { organization: { id: 
             <CreditCard size={17} />
             <span>Billing</span>
           </div>
-          {billing && <StatusBadge status={billing.status} />}
+          {statusBadge && <StatusBadge label={statusBadge.label} tone={statusBadge.tone} />}
         </div>
 
         <div
@@ -722,21 +627,12 @@ export default function BillingSettings({ organization }: { organization: { id: 
           }}
         >
           {billingQuery.error instanceof Error && (
-            <div
-              style={{
-                padding: "10px 12px",
-                borderRadius: "var(--dg-radius-md)",
-                background: "var(--dg-color-danger-bg)",
-                color: "var(--dg-color-danger)",
-                fontSize: "var(--dg-fs-label)",
-                fontWeight: 700,
-              }}
-            >
+            <NoticeBanner tone="danger">
               {formatClientErrorMessage(
                 billingQuery.error,
                 "We couldn't load your billing details. Refresh and try again.",
               )}
-            </div>
+            </NoticeBanner>
           )}
 
           <ProgressBar loading={billingQuery.isLoading || !billing} />
@@ -794,84 +690,32 @@ export default function BillingSettings({ organization }: { organization: { id: 
               </div>
 
               {billing.cancelAt && (
-                <div
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: "var(--dg-radius-md)",
-                    border: "1px solid var(--dg-color-warning-border)",
-                    background: "var(--dg-color-warning-bg)",
-                    color: "var(--dg-color-warning)",
-                    fontSize: "var(--dg-fs-label)",
-                    fontWeight: 700,
-                  }}
-                >
+                <NoticeBanner tone="warning">
                   Cancellation is scheduled for {formatDate(billing.cancelAt)}.
-                </div>
+                </NoticeBanner>
               )}
 
               {billing.canceledAt && (
-                <div
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: "var(--dg-radius-md)",
-                    border: "1px solid var(--dg-color-danger-border)",
-                    background: "var(--dg-color-danger-bg)",
-                    color: "var(--dg-color-danger)",
-                    fontSize: "var(--dg-fs-label)",
-                    fontWeight: 700,
-                  }}
-                >
+                <NoticeBanner tone="danger">
                   Subscription was canceled on {formatDate(billing.canceledAt)}.
-                </div>
+                </NoticeBanner>
               )}
 
               {!billing.stripeConfigured && (
-                <div
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: "var(--dg-radius-md)",
-                    border: "1px solid var(--dg-color-warning-border)",
-                    background: "var(--dg-color-warning-bg)",
-                    color: "var(--dg-color-warning)",
-                    fontSize: "var(--dg-fs-label)",
-                    fontWeight: 700,
-                  }}
-                >
-                  Stripe billing is not configured for this environment.
-                </div>
+                <NoticeBanner tone="warning">
+                  Online billing isn&apos;t set up here. Contact DubGrid Support to subscribe.
+                </NoticeBanner>
               )}
 
-              {billing.billingAccess.shouldNotifyAdmins && (
-                <div
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: "var(--dg-radius-md)",
-                    border: "1px solid var(--dg-color-warning-border)",
-                    background: "var(--dg-color-warning-bg)",
-                    color: "var(--dg-color-warning)",
-                    fontSize: "var(--dg-fs-label)",
-                    fontWeight: 700,
-                  }}
-                >
-                  {billingNoticeCopy(billing.billingAccess)}
-                </div>
+              {billingNotice && (
+                <NoticeBanner tone={billingNotice.tone}>{billingNotice.message}</NoticeBanner>
               )}
 
               {isTrialPending && (
-                <div
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: "var(--dg-radius-md)",
-                    border: "1px solid var(--dg-color-info-border)",
-                    background: "var(--dg-color-info-bg)",
-                    color: "var(--dg-color-info-text)",
-                    fontSize: "var(--dg-fs-label)",
-                    fontWeight: 700,
-                  }}
-                >
+                <NoticeBanner tone="info">
                   Your trial starts the first time an administrator signs in. The countdown begins
                   then. Refresh this page to see your trial end date.
-                </div>
+                </NoticeBanner>
               )}
 
               <div

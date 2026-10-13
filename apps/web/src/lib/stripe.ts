@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
-import { DEFAULT_TRIAL_DAYS } from "@dubgrid/domain";
+import { isLiveSubscriptionStatus, needsPaymentAttention } from "@dubgrid/domain";
 import logger from "@/lib/logger";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import { createClient } from "@supabase/supabase-js";
@@ -8,6 +8,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseSecretKey, getSupabaseUrl } from "@/lib/supabase-keys";
 import { serverEnv } from "@/lib/env.server";
 import { cacheDel, CacheKey } from "@/lib/cache";
+import { recordSeatChange, type SeatHistorySource } from "@/lib/billing-history";
 
 let _stripe: Stripe | null | undefined;
 
@@ -24,6 +25,15 @@ export async function requireStripeEnabled(): Promise<NextResponse | null> {
 }
 
 type BillingSyncClient = Pick<SupabaseClient, "from">;
+
+const SEAT_HISTORY_SOURCE: Record<
+  NonNullable<StripeSubscriptionSyncOptions["audit"]>["source"],
+  SeatHistorySource
+> = {
+  stripe_webhook: "stripe",
+  checkout_sync: "checkout",
+  gridmaster_sync: "gridmaster",
+};
 
 type StripeSubscriptionSyncOptions = {
   audit?: {
@@ -66,15 +76,8 @@ function withCheckoutSessionPlaceholder(returnUrl: string) {
   return `${successUrl}${separator}stripe_checkout_session_id={CHECKOUT_SESSION_ID}`;
 }
 
-function defaultTrialEndFrom(date: Date): string {
-  return new Date(date.getTime() + DEFAULT_TRIAL_DAYS * 86_400_000).toISOString();
-}
-
 function resolveStripeTrialEnd(sub: Stripe.Subscription): string | null {
-  if (sub.trial_end) {
-    return new Date(sub.trial_end * 1000).toISOString();
-  }
-  return sub.status === "trialing" ? defaultTrialEndFrom(new Date()) : null;
+  return sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null;
 }
 
 function stripeCustomerId(
@@ -93,6 +96,14 @@ function getStripe(): Stripe | null {
   }
   _stripe = new Stripe(serverEnv?.STRIPE_SECRET_KEY, { apiVersion: "2026-03-25.dahlia" });
   return _stripe;
+}
+
+/** Which Stripe dashboard the configured key belongs to; null when none is set. */
+export function stripeMode(): "test" | "live" | null {
+  const key = serverEnv?.STRIPE_SECRET_KEY ?? "";
+  if (/^(sk|rk)_test_/.test(key)) return "test";
+  if (/^(sk|rk)_live_/.test(key)) return "live";
+  return null;
 }
 
 /** Lazily-initialized Stripe instance. Returns null if STRIPE_SECRET_KEY is not set. */
@@ -120,6 +131,18 @@ export async function createStripeCustomer(orgId: string, orgName: string, email
     name: orgName,
     email,
   });
+}
+
+/** The id of a subscription Stripe can still change for this customer, if any. */
+export async function findLiveStripeSubscription(customerId: string): Promise<string | null> {
+  const s = getStripe();
+  if (!s) throw new Error("Stripe not configured");
+  const subscriptions = await s.subscriptions.list({
+    customer: customerId,
+    status: "all",
+    limit: 10,
+  });
+  return subscriptions.data.find((sub) => isLiveSubscriptionStatus(sub.status))?.id ?? null;
 }
 
 /**
@@ -242,6 +265,27 @@ export async function extendTrial(
 }
 
 /**
+ * Stop collecting payment while a Gridmaster holds billing. Invoices made
+ * during the hold are voided, so resuming never bills for the paused time.
+ */
+export async function pauseSubscriptionCollection(
+  subscriptionId: string,
+): Promise<Stripe.Subscription> {
+  const s = getStripe();
+  if (!s) throw new Error("Stripe not configured");
+  return s.subscriptions.update(subscriptionId, { pause_collection: { behavior: "void" } });
+}
+
+/** Collect payment again after a hold. */
+export async function resumeSubscriptionCollection(
+  subscriptionId: string,
+): Promise<Stripe.Subscription> {
+  const s = getStripe();
+  if (!s) throw new Error("Stripe not configured");
+  return s.subscriptions.update(subscriptionId, { pause_collection: "" });
+}
+
+/**
  * Retrieve a Stripe subscription by ID.
  */
 export async function getSubscription(subscriptionId: string): Promise<Stripe.Subscription> {
@@ -255,7 +299,7 @@ export async function getSubscription(subscriptionId: string): Promise<Stripe.Su
 // it: a payment that unlocked the organization still sent people to billing
 // until those copies expired. Deleting the organization entry also drops the
 // bootstrap's copy.
-async function invalidateOrganizationBillingCache(orgId: string): Promise<void> {
+export async function invalidateOrganizationBillingCache(orgId: string): Promise<void> {
   await cacheDel(CacheKey.mwOrgAccess(orgId), CacheKey.organization(orgId));
 }
 
@@ -290,6 +334,20 @@ export async function upsertStripeSubscriptionToDb(
   const cancelAt = sub.cancel_at ? new Date(sub.cancel_at * 1000).toISOString() : null;
   const canceledAt = sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString() : null;
   const previous = await loadPreviousSubscriptionForAudit(serviceClient, orgId);
+  // An older subscription ending (say, a duplicate checkout) must not overwrite
+  // the newer one the organization is billed on.
+  if (
+    previous?.stripe_subscription_id &&
+    previous.stripe_subscription_id !== sub.id &&
+    isLiveSubscriptionStatus(previous.status) &&
+    !isLiveSubscriptionStatus(sub.status)
+  ) {
+    logger.warn(
+      { orgId, subscriptionId: sub.id, liveSubscriptionId: previous.stripe_subscription_id },
+      "Ignoring an ended subscription that is not the organization's live one",
+    );
+    return;
+  }
 
   const { error: subError } = await serviceClient.from("subscriptions").upsert(
     {
@@ -318,11 +376,33 @@ export async function upsertStripeSubscriptionToDb(
       stripe_customer_id: customerId,
       subscription_status: sub.status,
       subscription_seats: item?.quantity ?? null,
-      trial_ends_at: trialEnd,
+      // The trial clock is DubGrid's: a trialing subscription that names no end
+      // leaves the organization's own end date where it is.
+      ...(trialEnd !== null || sub.status !== "trialing" ? { trial_ends_at: trialEnd } : {}),
+      ...(needsPaymentAttention(sub.status) ? {} : { payment_grace_started_at: null }),
     })
     .eq("id", orgId);
   if (orgError) throw orgError;
+  if (needsPaymentAttention(sub.status)) {
+    // Only while none is recorded: a redelivered event, or the next event for
+    // an organization that was already past due, never moves the deadline.
+    const { error: graceError } = await serviceClient
+      .from("organizations")
+      .update({ payment_grace_started_at: new Date().toISOString() })
+      .eq("id", orgId)
+      .is("payment_grace_started_at", null);
+    if (graceError) throw graceError;
+  }
   await invalidateOrganizationBillingCache(orgId);
+
+  const seats = item?.quantity ?? 1;
+  if (previous?.quantity !== seats) {
+    await recordSeatChange(serviceClient, {
+      orgId,
+      seats,
+      source: SEAT_HISTORY_SOURCE[options.audit?.source ?? "stripe_webhook"],
+    });
+  }
 
   await writeStripeSubscriptionAuditLog(serviceClient, {
     orgId,
@@ -421,7 +501,17 @@ export async function syncSubscriptionToDb(orgId: string): Promise<void> {
 
   const sub = subscriptions.data[0];
   if (!sub) {
-    // No subscription found — keep the org summary aligned with the local subscription record.
+    // A customer with no subscription is usually an abandoned checkout, and the
+    // organization is still on its trial. Only a subscription we recorded and
+    // Stripe no longer has means billing ended.
+    const { data: recorded, error: recordedError } = await adminClient
+      .from("subscriptions")
+      .select("stripe_subscription_id")
+      .eq("org_id", orgId)
+      .maybeSingle();
+    if (recordedError) throw recordedError;
+    if (!recorded?.stripe_subscription_id) return;
+
     const { error: subUpdateError } = await adminClient
       .from("subscriptions")
       .update({
@@ -509,7 +599,7 @@ async function resolveStripeSubscriptionOrgId(
   }
 }
 
-async function resolveStripeCustomerOrgId(
+export async function resolveStripeCustomerOrgId(
   serviceClient: BillingSyncClient,
   customerId: string,
 ): Promise<string | null> {

@@ -31,13 +31,13 @@ export function EmailLayout({ logoUrl, preview, children }: EmailLayoutProps) {
         <Container style={styles.container}>
           <Section style={styles.card}>
             <Section style={styles.header}>
-              {/* Lockup is a pre-rendered image (grid + DM Sans wordmark) so the
+              {/* Lockup is a pre-rendered image (symbol + DM Sans wordmark) so the
                   brand mark is identical even in clients that strip web fonts.
-                  Source is 4x (668x184); displayed at 167x46. See
+                  Source is 8x (1344x368); displayed at 168x46. See
                   scripts/generate-wordmark-lockup.mts. */}
               <Img
                 src={`${logoUrl}/email-lockup.png`}
-                width={167}
+                width={168}
                 height={46}
                 alt="dubgrid"
                 style={{ display: "inline-block" }}

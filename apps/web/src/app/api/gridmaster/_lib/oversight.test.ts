@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   OVERSIGHT_PAGE_SIZE,
+  loadGridmasterOrgBilling,
   buildPlatformActivitySummary,
   loadGridmasterOrgHealth,
   resetOversightFactsMemoForTests,
@@ -241,6 +242,44 @@ describe("gridmaster organization health facts", () => {
     expect(summaries[0].supportSnapshot.activeSessions).toBe(1);
   });
 
+  it("flags a trial that has ended as a billing risk", async () => {
+    const daysFromNow = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString();
+    const flagsFor = async (trialEndsAt: string) => {
+      resetOversightFactsMemoForTests();
+      const [summary] = await loadGridmasterOrgHealth(
+        mockServiceClient({
+          organizations: [{ ...organizationRow(), trial_ends_at: trialEndsAt }],
+        }),
+        orgId,
+      );
+      return summary.riskFlags;
+    };
+
+    expect(await flagsFor(daysFromNow(5))).not.toContain("billing_risk");
+    expect(await flagsFor(daysFromNow(-1))).toContain("billing_risk");
+    expect(await flagsFor(daysFromNow(-10))).toContain("billing_risk");
+  });
+
+  it("doesn't flag a paused trial that has run out", async () => {
+    resetOversightFactsMemoForTests();
+    const tenDaysAgo = new Date(Date.now() - 10 * 86_400_000).toISOString();
+    const [summary] = await loadGridmasterOrgHealth(
+      mockServiceClient({
+        organizations: [
+          {
+            ...organizationRow(),
+            trial_ends_at: tenDaysAgo,
+            billing_paused_at: tenDaysAgo,
+            billing_paused_reason: "Contract renewal",
+          },
+        ],
+      }),
+      orgId,
+    );
+
+    expect(summary.riskFlags).not.toContain("billing_risk");
+  });
+
   it("pages past PostgREST's row cap so a large tenant is counted in full", async () => {
     const total = OVERSIGHT_PAGE_SIZE * 2 + 7;
     const memberships = Array.from({ length: total }, (_, index) => ({
@@ -282,5 +321,69 @@ describe("gridmaster organization health facts", () => {
     await loadGridmasterOrgHealth(client);
 
     expect(client.reads.length).toBe(readsAfterFirst);
+  });
+});
+
+describe("loadGridmasterOrgBilling", () => {
+  function singleOrgClient(tables: Record<string, { data: unknown; error: null }>) {
+    const filters: Array<[string, string, unknown]> = [];
+    return {
+      filters,
+      from(table: string) {
+        const result = tables[table] ?? { data: null, error: null };
+        const query: Record<string, unknown> = {
+          select: () => query,
+          eq: (column: string, value: unknown) => {
+            filters.push([table, column, value]);
+            return query;
+          },
+          is: () => query,
+          maybeSingle: async () => result,
+          then: (resolve: (value: unknown) => unknown) => resolve(result),
+        };
+        return query;
+      },
+    };
+  }
+
+  it("builds one organization's billing row from its own records", async () => {
+    const client = singleOrgClient({
+      organizations: {
+        data: { ...organizationRow(), stripe_customer_id: "cus_1", subscription_seats: 4 },
+        error: null,
+      },
+      subscriptions: {
+        data: { stripe_subscription_id: "sub_1", status: "active", quantity: 4 },
+        error: null,
+      },
+      employees: {
+        data: [
+          { status: "active", archived_at: null, user_id: "u1" },
+          { status: "active", archived_at: null, user_id: null },
+          { status: "removed", archived_at: now.toISOString(), user_id: null },
+        ],
+        error: null,
+      },
+      organization_memberships: { data: [{ user_id: "u1" }, { user_id: "u2" }], error: null },
+    });
+
+    const summary = await loadGridmasterOrgBilling(client, orgId);
+
+    expect(summary).toMatchObject({
+      orgId,
+      stripeCustomerId: "cus_1",
+      stripeSubscriptionId: "sub_1",
+      seats: 4,
+      appUsers: 3,
+      employeeCount: 2,
+      seatDelta: 1,
+    });
+    expect(client.filters).toContainEqual(["organizations", "workspace_kind", "real"]);
+  });
+
+  it("returns nothing for an unknown or sandbox organization", async () => {
+    const client = singleOrgClient({});
+
+    await expect(loadGridmasterOrgBilling(client, orgId)).resolves.toBeNull();
   });
 });

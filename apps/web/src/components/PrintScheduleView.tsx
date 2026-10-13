@@ -54,46 +54,26 @@ const MONTH_NAMES = [
 const BRAND_MUTED = "#4A607F";
 const BRAND_SEPARATOR = "#94A3B8";
 
+// public/lockup.png is the symbol and a 16 px wordmark at 8x (664x192),
+// padded so its center is the wordmark's optical center: centering it in a
+// row lines it up with the separator and the organization name.
+const LOCKUP_HEIGHT_EM = 192 / 128;
+
 function PrintBrandLockup({
   orgName,
-  logoSize,
-  wordmarkWidth,
-  wordmarkHeight,
+  wordmarkSize,
   separatorHeight,
   orgFontSize,
 }: {
   orgName?: string;
-  logoSize: number;
-  wordmarkWidth: number;
-  wordmarkHeight: number;
+  wordmarkSize: number;
   separatorHeight: number;
   orgFontSize: number;
 }) {
+  const height = wordmarkSize * LOCKUP_HEIGHT_EM;
   return (
     <div style={{ display: "flex", alignItems: "center", lineHeight: 1 }}>
-      <img
-        src="/logo.png"
-        alt=""
-        aria-hidden="true"
-        style={{
-          display: "block",
-          width: logoSize,
-          height: logoSize,
-          objectFit: "contain",
-        }}
-      />
-      <img
-        src="/wordmark-white.png"
-        alt="dubgrid"
-        style={{
-          display: "block",
-          width: wordmarkWidth,
-          height: wordmarkHeight,
-          objectFit: "contain",
-          marginLeft: 8,
-          filter: "brightness(0) saturate(100%)",
-        }}
-      />
+      <img src="/lockup.png" alt="dubgrid" style={{ display: "block", width: "auto", height }} />
       {orgName && (
         <>
           <span
@@ -103,8 +83,8 @@ function PrintBrandLockup({
               width: 0.8,
               height: separatorHeight,
               background: BRAND_SEPARATOR,
-              marginLeft: 5,
-              marginRight: 5,
+              marginLeft: 7,
+              marginRight: 7,
               flex: "0 0 auto",
             }}
           />
@@ -1229,9 +1209,7 @@ export default function PrintScheduleView({
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <PrintBrandLockup
             orgName={orgName}
-            logoSize={32}
-            wordmarkWidth={96}
-            wordmarkHeight={34}
+            wordmarkSize={22}
             separatorHeight={18}
             orgFontSize={13}
           />
@@ -1332,9 +1310,7 @@ export default function PrintScheduleView({
               <div style={{ marginBottom: "0.7em" }}>
                 <PrintBrandLockup
                   orgName={orgName}
-                  logoSize={24}
-                  wordmarkWidth={72}
-                  wordmarkHeight={25.5}
+                  wordmarkSize={17}
                   separatorHeight={16}
                   orgFontSize={11}
                 />

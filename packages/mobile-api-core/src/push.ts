@@ -48,6 +48,7 @@ const PUSH_ELIGIBLE_TYPES = new Set([
   "billing_payment_failed",
   "billing_trial_ending_soon",
   "billing_trial_expired",
+  "billing_access_locked",
   // security — always push so users notice quickly
   "security_email_changed",
   "security_password_changed",

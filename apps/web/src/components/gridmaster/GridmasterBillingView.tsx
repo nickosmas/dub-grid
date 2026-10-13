@@ -1,27 +1,30 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { Fragment, useId, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { fetchGridmasterBilling } from "@/features/gridmaster/client";
 import {
-  fetchGridmasterBilling,
-  syncGridmasterBilling,
-  updateGridmasterSubscription,
-} from "@/features/gridmaster/client";
-import {
-  BillingConfirmDialog,
-  ExtendTrialDialog,
-  type BillingConfirmAction,
-} from "@/components/gridmaster/BillingActionDialogs";
+  useGridmasterBillingActions,
+  type GridmasterBillingActions,
+} from "@/components/gridmaster/useGridmasterBillingActions";
 import { Button } from "@/components/Button";
 import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
 import { EmptyState } from "@/components/EmptyState";
 import ProgressBar from "@/components/ProgressBar";
 import { queryKeys } from "@/lib/query-keys";
 import { formatBillingStatusLabel, formatClientErrorMessage } from "@/lib/client-facing";
+import { trialControls } from "@dubgrid/domain";
+import {
+  billingActionStates,
+  displayStatusFor,
+  stripeDashboardUrl,
+  trialActionReasons,
+} from "@/components/gridmaster/gridmaster-billing-rules";
 import { sectionStyle } from "@/lib/styles";
 import type { GridmasterBillingOrgSummary } from "@/types";
 import { gmTableStyle, gmTdStyle, gmThStyle } from "@/components/gridmaster/table-styles";
+import { PlatformBillingPolicyCard } from "@/components/gridmaster/BillingPolicyCards";
+import { BillingHistoryCard } from "@/components/gridmaster/BillingHistoryCards";
 
 const BILLING_STATUSES = [
   "trialing",
@@ -65,9 +68,9 @@ function MiniCard({
 }) {
   const color =
     tone === "danger"
-      ? "var(--dg-color-danger)"
+      ? "var(--dg-color-danger-text)"
       : tone === "warning"
-        ? "var(--dg-color-warning)"
+        ? "var(--dg-color-warning-text)"
         : "var(--dg-color-text-primary)";
   return (
     <div style={{ ...sectionStyle, padding: "14px 16px", flex: "1 1 160px" }}>
@@ -108,26 +111,30 @@ function formatTrialEnds(org: GridmasterBillingOrgSummary) {
 }
 
 function statusTone(status: string | null) {
-  if (status === "active" || status === "trialing") return "var(--dg-color-success)";
-  if (status === "past_due" || status === "incomplete") return "var(--dg-color-warning)";
-  if (status === "canceled" || status === "unpaid" || status === "incomplete_expired")
-    return "var(--dg-color-danger)";
+  if (status === "active" || status === "trialing") return "var(--dg-color-success-text)";
+  if (status === "billing_paused") return "var(--dg-color-info-text)";
+  if (status === "past_due" || status === "incomplete" || status === "trial_grace")
+    return "var(--dg-color-warning-text)";
+  if (
+    status === "canceled" ||
+    status === "unpaid" ||
+    status === "incomplete_expired" ||
+    status === "trial_expired"
+  )
+    return "var(--dg-color-danger-text)";
   return "var(--dg-color-text-muted)";
 }
 
-// A trialing org with no end date hasn't started its trial yet (no super_admin
-// has intentionally accessed it). Surface that as a distinct "pending" status
-// instead of the green "Trial active" the bare status maps to.
 function isTrialPending(org: GridmasterBillingOrgSummary) {
   return org.status === "trialing" && !org.trialEndsAt;
 }
 
 function statusLabelFor(org: GridmasterBillingOrgSummary) {
-  return isTrialPending(org) ? "Trial pending" : formatBillingStatusLabel(org.status);
+  return formatBillingStatusLabel(displayStatusFor(org));
 }
 
 function statusToneFor(org: GridmasterBillingOrgSummary) {
-  return isTrialPending(org) ? "var(--dg-color-text-muted)" : statusTone(org.status);
+  return statusTone(displayStatusFor(org));
 }
 
 function BillingOversightSkeleton() {
@@ -189,55 +196,71 @@ function BillingOversightSkeleton() {
 function BillingRowActions({
   org,
   busy,
-  onSync,
-  onSyncSeats,
-  onExtendTrial,
-  onCancel,
-  onCancelAtPeriodEnd,
-  onOverrideStatus,
+  actions,
 }: {
   org: GridmasterBillingOrgSummary;
   busy: boolean;
-  onSync: (org: GridmasterBillingOrgSummary) => void;
-  onSyncSeats: (org: GridmasterBillingOrgSummary) => void;
-  onExtendTrial: (org: GridmasterBillingOrgSummary) => void;
-  onCancel: (org: GridmasterBillingOrgSummary) => void;
-  onCancelAtPeriodEnd: (org: GridmasterBillingOrgSummary) => void;
-  onOverrideStatus: (org: GridmasterBillingOrgSummary, status: string) => void;
+  actions: GridmasterBillingActions;
 }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const trial = trialControls({
+    status: org.status,
+    trialEndsAt: org.trialEndsAt,
+    hasStripeSubscription: Boolean(org.stripeSubscriptionId),
+    billingPausedAt: org.billingHold?.pausedAt ?? null,
+  });
 
   // One overflow menu per row, the control the schedule toolbar uses: seven
   // inline buttons and a status select made the Actions column wider than the
   // table and stacked them five deep on wide displays. The menu is portalled,
   // so the table's horizontal scroll container cannot clip it.
-  const items: Array<{ label: string; disabled: boolean; danger?: boolean; run: () => void }> = [
-    { label: "Sync Stripe", disabled: busy || !org.stripeCustomerId, run: () => onSync(org) },
+  const stripe = billingActionStates(org);
+  const trialReasons = trialActionReasons(trial);
+  const menuId = useId();
+  const items: Array<{
+    label: string;
+    disabled: boolean;
+    reason?: string | null;
+    danger?: boolean;
+    run: () => void;
+  }> = [
+    {
+      label: "Sync Stripe",
+      disabled: busy || !stripe.sync.enabled,
+      reason: stripe.sync.reason,
+      run: () => actions.confirm({ kind: "sync_billing", org }),
+    },
     {
       label: "True up seats",
-      disabled: busy || !org.stripeSubscriptionId || org.seats === org.appUsers,
-      run: () => onSyncSeats(org),
-    },
-    // Only a trialing org has a trial to extend; for active/canceled/past_due
-    // there is no trial clock, so the action would be a no-op.
-    {
-      label: "Extend trial",
-      disabled: busy || org.status !== "trialing",
-      run: () => onExtendTrial(org),
+      disabled: busy || !stripe.trueUp.enabled,
+      reason: stripe.trueUp.reason,
+      run: () => actions.confirm({ kind: "sync_seats", org }),
     },
     {
-      label: "End at period end",
-      disabled: busy || !org.stripeSubscriptionId || org.status === "canceled" || !!org.cancelAt,
-      run: () => onCancelAtPeriodEnd(org),
+      label: "Change trial",
+      disabled: busy || !trial.change,
+      reason: trialReasons.change,
+      run: () => actions.changeTrial(org),
     },
-    // No Stripe subscription = nothing to cancel; use a status override to
-    // change a local-only org's status instead.
+    {
+      label: "End trial…",
+      disabled: busy || Boolean(trialReasons.end),
+      reason: trialReasons.end,
+      run: () => actions.endTrial(org),
+    },
+    {
+      label: "Cancel at period end",
+      disabled: busy || !stripe.cancelAtPeriodEnd.enabled,
+      reason: stripe.cancelAtPeriodEnd.reason,
+      run: () => actions.confirm({ kind: "cancel_at_period_end", org }),
+    },
     {
       label: "Cancel subscription",
-      disabled: busy || org.status === "canceled" || !org.stripeSubscriptionId,
+      disabled: busy || !stripe.cancel.enabled,
+      reason: stripe.cancel.reason,
       danger: true,
-      run: () => onCancel(org),
+      run: () => actions.confirm({ kind: "cancel", org }),
     },
   ];
   const overrides = BILLING_STATUSES.filter((status) => status !== org.status);
@@ -268,16 +291,35 @@ function BillingRowActions({
             finalFocus={triggerRef}
             style={{ minWidth: 200 }}
           >
-            {items.map((item) => (
-              <MenuItem
-                key={item.label}
-                disabled={item.disabled}
-                className={item.danger ? "dg-menu-item--danger" : undefined}
-                onClick={item.run}
-              >
-                {item.label}
-              </MenuItem>
-            ))}
+            {items.map((item, index) => {
+              const reasonId =
+                item.disabled && item.reason ? `${menuId}-reason-${index}` : undefined;
+              return (
+                <Fragment key={item.label}>
+                  <MenuItem
+                    disabled={item.disabled}
+                    className={item.danger ? "dg-menu-item--danger" : undefined}
+                    aria-describedby={reasonId}
+                    onClick={item.run}
+                  >
+                    {item.label}
+                  </MenuItem>
+                  {/* Outside the item, which fades when disabled, so it stays readable. */}
+                  {reasonId && (
+                    <div
+                      id={reasonId}
+                      style={{
+                        padding: "0 10px 6px",
+                        fontSize: "var(--dg-fs-caption)",
+                        color: "var(--dg-color-text-muted)",
+                      }}
+                    >
+                      {item.reason}
+                    </div>
+                  )}
+                </Fragment>
+              );
+            })}
             <div className="dg-menu-divider" />
             <div
               style={{
@@ -290,7 +332,11 @@ function BillingRowActions({
               Override status
             </div>
             {overrides.map((status) => (
-              <MenuItem key={status} disabled={busy} onClick={() => onOverrideStatus(org, status)}>
+              <MenuItem
+                key={status}
+                disabled={busy}
+                onClick={() => actions.confirm({ kind: "override_status", org, status })}
+              >
                 {formatBillingStatusLabel(status)}
               </MenuItem>
             ))}
@@ -306,138 +352,14 @@ export default function GridmasterBillingView({
 }: {
   onSelectOrg: (orgId: string, initialTab?: "billing") => void;
 }) {
-  const queryClient = useQueryClient();
-  const [busyOrgId, setBusyOrgId] = useState<string | null>(null);
-  const [confirmAction, setConfirmAction] = useState<BillingConfirmAction | null>(null);
-  const [extendTrialOrg, setExtendTrialOrg] = useState<GridmasterBillingOrgSummary | null>(null);
-  const [trialDays, setTrialDays] = useState("14");
+  const actions = useGridmasterBillingActions();
+  const { busyOrgId } = actions;
   const billingQuery = useQuery({
     queryKey: queryKeys.gridmaster.billing(),
     queryFn: fetchGridmasterBilling,
     staleTime: 30_000,
   });
   const billing = billingQuery.data;
-
-  function invalidateBilling() {
-    queryClient.invalidateQueries({ queryKey: queryKeys.gridmaster.billing() });
-    queryClient.invalidateQueries({ queryKey: queryKeys.gridmaster.overview() });
-    queryClient.invalidateQueries({ queryKey: queryKeys.gridmaster.dashboard() });
-  }
-
-  const syncMutation = useMutation({
-    mutationFn: syncGridmasterBilling,
-    onSuccess: () => {
-      toast.success("Billing synced");
-      invalidateBilling();
-    },
-    onError: (error) => {
-      toast.error(
-        formatClientErrorMessage(error, "We couldn't refresh the billing details. Try again."),
-      );
-    },
-    onSettled: () => {
-      setBusyOrgId(null);
-      setConfirmAction(null);
-    },
-  });
-
-  const subscriptionMutation = useMutation({
-    mutationFn: updateGridmasterSubscription,
-    onSuccess: (_result, input) => {
-      toast.success(
-        input.action === "extend_trial"
-          ? "Trial extended"
-          : input.action === "cancel"
-            ? "Subscription canceled"
-            : input.action === "cancel_at_period_end"
-              ? "Cancellation scheduled"
-              : input.action === "sync_seats"
-                ? "Seats synced"
-                : "Billing status overridden",
-      );
-      invalidateBilling();
-    },
-    onError: (error) => {
-      toast.error(formatClientErrorMessage(error, "Billing action failed"));
-    },
-    onSettled: () => {
-      setBusyOrgId(null);
-      setConfirmAction(null);
-      setExtendTrialOrg(null);
-    },
-  });
-
-  function handleSync(org: GridmasterBillingOrgSummary) {
-    setConfirmAction({ kind: "sync_billing", org });
-  }
-
-  function handleExtendTrial(org: GridmasterBillingOrgSummary) {
-    setTrialDays("14");
-    setExtendTrialOrg(org);
-  }
-
-  function handleConfirmExtendTrial() {
-    if (!extendTrialOrg) return;
-
-    const days = Number.parseInt(trialDays, 10);
-    if (!Number.isFinite(days) || days < 1) {
-      toast.error("Trial extension must be at least 1 day");
-      return;
-    }
-
-    setBusyOrgId(extendTrialOrg.orgId);
-    subscriptionMutation.mutate({
-      orgId: extendTrialOrg.orgId,
-      action: "extend_trial",
-      trialDays: days,
-    });
-  }
-
-  function handleCancel(org: GridmasterBillingOrgSummary) {
-    setConfirmAction({ kind: "cancel", org });
-  }
-
-  function handleCancelAtPeriodEnd(org: GridmasterBillingOrgSummary) {
-    setConfirmAction({ kind: "cancel_at_period_end", org });
-  }
-
-  function handleSyncSeats(org: GridmasterBillingOrgSummary) {
-    setConfirmAction({ kind: "sync_seats", org });
-  }
-
-  function handleOverrideStatus(org: GridmasterBillingOrgSummary, status: string) {
-    setConfirmAction({ kind: "override_status", org, status });
-  }
-
-  function handleConfirmAction() {
-    if (!confirmAction) return;
-
-    setBusyOrgId(confirmAction.org.orgId);
-    switch (confirmAction.kind) {
-      case "sync_billing":
-        syncMutation.mutate(confirmAction.org.orgId);
-        break;
-      case "sync_seats":
-        subscriptionMutation.mutate({ orgId: confirmAction.org.orgId, action: "sync_seats" });
-        break;
-      case "cancel_at_period_end":
-        subscriptionMutation.mutate({
-          orgId: confirmAction.org.orgId,
-          action: "cancel_at_period_end",
-        });
-        break;
-      case "cancel":
-        subscriptionMutation.mutate({ orgId: confirmAction.org.orgId, action: "cancel" });
-        break;
-      case "override_status":
-        subscriptionMutation.mutate({
-          orgId: confirmAction.org.orgId,
-          action: "override_status",
-          status: confirmAction.status,
-        });
-        break;
-    }
-  }
 
   return (
     <>
@@ -489,7 +411,7 @@ export default function GridmasterBillingView({
           style={{
             padding: "12px 16px",
             background: "var(--dg-color-danger-bg)",
-            color: "var(--dg-color-danger)",
+            color: "var(--dg-color-danger-text)",
             borderRadius: "var(--dg-radius-lg)",
             fontSize: "var(--dg-fs-label)",
             fontWeight: 600,
@@ -531,6 +453,14 @@ export default function GridmasterBillingView({
               value={billing.seatMismatches.length}
               tone={billing.seatMismatches.length ? "danger" : "neutral"}
             />
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <PlatformBillingPolicyCard />
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <BillingHistoryCard />
           </div>
 
           <div style={sectionStyle}>
@@ -597,7 +527,19 @@ export default function GridmasterBillingView({
                             background: risky ? "var(--dg-color-danger-bg)" : undefined,
                           }}
                         >
-                          <td style={{ ...gmTdStyle, fontWeight: 700 }}>{org.orgName}</td>
+                          <td style={{ ...gmTdStyle, fontWeight: 700 }}>
+                            {/* The row opens on click; this is the keyboard way in. */}
+                            <button
+                              type="button"
+                              className="dg-table-row-link"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onSelectOrg(org.orgId, "billing");
+                              }}
+                            >
+                              {org.orgName}
+                            </button>
+                          </td>
                           <td style={{ ...gmTdStyle, color: statusToneFor(org), fontWeight: 600 }}>
                             {statusLabelFor(org)}
                           </td>
@@ -614,7 +556,7 @@ export default function GridmasterBillingView({
                             style={{
                               ...gmTdStyle,
                               color: org.cancelAt
-                                ? "var(--dg-color-warning)"
+                                ? "var(--dg-color-warning-text)"
                                 : "var(--dg-color-text-muted)",
                               fontWeight: org.cancelAt ? 700 : undefined,
                             }}
@@ -628,7 +570,7 @@ export default function GridmasterBillingView({
                               ...gmTdStyle,
                               color:
                                 org.seatDelta != null && org.seatDelta < 0
-                                  ? "var(--dg-color-danger)"
+                                  ? "var(--dg-color-danger-text)"
                                   : "var(--dg-color-text-muted)",
                               fontWeight: 700,
                             }}
@@ -638,7 +580,11 @@ export default function GridmasterBillingView({
                           <td style={gmTdStyle}>
                             {org.stripeCustomerId ? (
                               <a
-                                href={`https://dashboard.stripe.com/customers/${org.stripeCustomerId}`}
+                                href={stripeDashboardUrl(
+                                  billing?.stripeMode ?? null,
+                                  "customers",
+                                  org.stripeCustomerId,
+                                )}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(event) => event.stopPropagation()}
@@ -654,12 +600,7 @@ export default function GridmasterBillingView({
                             <BillingRowActions
                               org={org}
                               busy={busyOrgId === org.orgId}
-                              onSync={handleSync}
-                              onSyncSeats={handleSyncSeats}
-                              onExtendTrial={handleExtendTrial}
-                              onCancel={handleCancel}
-                              onCancelAtPeriodEnd={handleCancelAtPeriodEnd}
-                              onOverrideStatus={handleOverrideStatus}
+                              actions={actions}
                             />
                           </td>
                         </tr>
@@ -672,20 +613,7 @@ export default function GridmasterBillingView({
           </div>
         </>
       )}
-      <BillingConfirmDialog
-        action={confirmAction}
-        isLoading={subscriptionMutation.isPending || syncMutation.isPending}
-        onConfirm={handleConfirmAction}
-        onCancel={() => setConfirmAction(null)}
-      />
-      <ExtendTrialDialog
-        org={extendTrialOrg}
-        days={trialDays}
-        isLoading={subscriptionMutation.isPending}
-        onDaysChange={setTrialDays}
-        onConfirm={handleConfirmExtendTrial}
-        onCancel={() => setExtendTrialOrg(null)}
-      />
+      {actions.dialogs}
     </>
   );
 }

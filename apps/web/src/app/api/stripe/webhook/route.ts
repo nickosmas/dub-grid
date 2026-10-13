@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { recordInvoiceEvent } from "@/lib/billing-history";
 import {
   getStripe,
+  resolveStripeCustomerOrgId,
   upsertStripeSubscriptionToDb,
   writeStripeCustomerBillingActivityLog,
   writeStripePaymentFailedAuditLog,
@@ -21,9 +23,11 @@ function stripeObjectId(value: string | { id: string } | null | undefined) {
   return typeof value === "string" ? value : value.id;
 }
 
-async function upsertSubscription(sub: Stripe.Subscription, event: Stripe.Event) {
-  const supabase = getServiceClient();
-  await upsertStripeSubscriptionToDb(supabase, sub, {
+async function upsertSubscription(stripe: Stripe, subscriptionId: string, event: Stripe.Event) {
+  // Stripe delivers events out of order and retries late ones, so the payload
+  // can be older than what is stored. Write Stripe's current state instead.
+  const current = await stripe.subscriptions.retrieve(subscriptionId);
+  await upsertStripeSubscriptionToDb(getServiceClient(), current, {
     audit: {
       source: "stripe_webhook",
       stripeEventId: event.id,
@@ -90,9 +94,21 @@ export async function POST(req: NextRequest) {
     switch (event.type) {
       case "customer.subscription.created":
       case "customer.subscription.updated":
-      case "customer.subscription.deleted": {
+      case "customer.subscription.deleted":
+      // Three days before a Stripe trial ends; the trial cron sends the reminder,
+      // so this only keeps the stored trial current.
+      case "customer.subscription.trial_will_end": {
         const sub = event.data.object as Stripe.Subscription;
-        await upsertSubscription(sub, event);
+        await upsertSubscription(stripe, sub.id, event);
+        break;
+      }
+      case "checkout.session.completed": {
+        // Opens the organization even if the browser never returns from checkout.
+        const session = event.data.object as Stripe.Checkout.Session;
+        const subscriptionId = stripeObjectId(session.subscription);
+        if (session.mode === "subscription" && subscriptionId) {
+          await upsertSubscription(stripe, subscriptionId, event);
+        }
         break;
       }
       case "invoice.payment_failed": {
@@ -114,6 +130,14 @@ export async function POST(req: NextRequest) {
           { customerId: invoice.customer, invoiceId: invoice.id },
           "Invoice payment failed",
         );
+        if (result?.orgId) {
+          await recordInvoiceEvent(getServiceClient(), {
+            orgId: result.orgId,
+            invoice,
+            kind: "failed",
+            occurredAt: new Date(event.created * 1000),
+          });
+        }
         if (result?.orgId && invoice.id) {
           void dispatchNotificationEvent("stripe-webhook", {
             action: "billing_payment_failed",
@@ -131,6 +155,18 @@ export async function POST(req: NextRequest) {
           stripeEventId: event.id,
           stripeEventType: event.type,
         });
+        const customerId = stripeObjectId(invoice.customer);
+        const orgId = customerId
+          ? await resolveStripeCustomerOrgId(getServiceClient(), customerId)
+          : null;
+        if (orgId) {
+          await recordInvoiceEvent(getServiceClient(), {
+            orgId,
+            invoice,
+            kind: "paid",
+            occurredAt: new Date(event.created * 1000),
+          });
+        }
         break;
       }
       case "customer.updated": {

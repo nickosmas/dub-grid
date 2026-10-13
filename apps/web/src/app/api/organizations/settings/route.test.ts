@@ -47,6 +47,26 @@ vi.mock("@/lib/cache", () => ({
   },
 }));
 
+// The permission check reads the platform billing policy; this route doesn't
+// depend on it, so the built-in defaults stand in.
+vi.mock("@/lib/billing-policy", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/billing-policy")>();
+  const { evaluateBillingAccessWithPolicy } = await import("@dubgrid/domain");
+  return {
+    ...actual,
+    evaluateOrgBillingAccess: async (_client: unknown, org: Record<string, string | null> | null) =>
+      evaluateBillingAccessWithPolicy(
+        {
+          subscriptionStatus: org?.subscription_status ?? null,
+          trialEndsAt: org?.trial_ends_at ?? null,
+          suspendedAt: org?.suspended_at ?? null,
+        },
+        null,
+        null,
+      ),
+  };
+});
+
 vi.mock("@/lib/supabase-service", () => ({
   getServiceClient: () => ({
     from: (table: string) => {

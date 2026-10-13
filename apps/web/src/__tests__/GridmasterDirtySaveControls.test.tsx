@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import { resolveBillingPolicy } from "@dubgrid/domain";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,7 +9,10 @@ import {
   saveOrganizationSettingsWithRecovery,
   updateOrganizationSettings,
 } from "@/features/organization/client";
-import { fetchGridmasterBilling, updateGridmasterSubscription } from "@/features/gridmaster/client";
+import {
+  fetchGridmasterOrgBilling,
+  updateGridmasterSubscription,
+} from "@/features/gridmaster/client";
 import type { Organization } from "@/types";
 
 vi.mock("@/features/organization/client", () => ({
@@ -47,7 +51,8 @@ vi.mock("@/features/settings/client", () => ({
 }));
 
 vi.mock("@/features/gridmaster/client", () => ({
-  fetchGridmasterBilling: vi.fn(),
+  fetchGridmasterOrgBilling: vi.fn(),
+  fetchGridmasterOrgSeatHistory: vi.fn().mockResolvedValue({ seats: [] }),
   fetchGridmasterFullAuditLog: vi.fn().mockResolvedValue([]),
   fetchGridmasterInvitations: vi.fn().mockResolvedValue({ invitations: [] }),
   syncGridmasterBilling: vi.fn(),
@@ -57,6 +62,18 @@ vi.mock("@/features/gridmaster/client", () => ({
   suspendGridmasterOrganization: vi.fn(),
   unsuspendGridmasterOrganization: vi.fn(),
   assignGridmasterOrgRoleByEmail: vi.fn(),
+}));
+
+// The identity check needs a real browser session; run the action as if
+// the server accepted the current one.
+vi.mock("@/hooks/useStepUpAction", () => ({
+  useStepUpAction: () => ({
+    run: async (action: (accessToken: string) => Promise<unknown>) => {
+      await action("access-token");
+      return true;
+    },
+    dialog: null,
+  }),
 }));
 
 vi.mock("@/lib/notify", () => ({
@@ -130,33 +147,30 @@ describe("gridmaster dirty save controls", () => {
     vi.mocked(fetchOrganizationEmployeeCount).mockResolvedValue({
       employeeCount: 42,
     });
-    vi.mocked(fetchGridmasterBilling).mockResolvedValue({
-      generatedAt: "2026-05-02T00:00:00.000Z",
-      organizations: [
-        {
-          orgId: "org-1",
-          orgName: "Acme Health",
-          orgSlug: "acme-health",
-          status: "active",
-          stripeCustomerId: "cus_123",
-          stripeSubscriptionId: "sub_123",
-          trialStartedAt: null,
-          trialEndsAt: null,
-          currentPeriodEnd: "2026-06-01T00:00:00.000Z",
-          cancelAt: null,
-          canceledAt: null,
-          seats: 7,
-          appUsers: 9,
-          employeeCount: 8,
-          seatDelta: -2,
-          updatedAt: "2026-05-01T00:00:00.000Z",
-        },
-      ],
-      trialEndingSoon: [],
-      trialsNotStarted: [],
-      riskOrganizations: [],
-      missingStripeCustomer: [],
-      seatMismatches: [],
+    vi.mocked(fetchGridmasterOrgBilling).mockResolvedValue({
+      organization: {
+        orgId: "org-1",
+        orgName: "Acme Health",
+        orgSlug: "acme-health",
+        status: "active",
+        stripeCustomerId: "cus_123",
+        stripeSubscriptionId: "sub_123",
+        trialStartedAt: null,
+        trialEndsAt: null,
+        currentPeriodEnd: "2026-06-01T00:00:00.000Z",
+        cancelAt: null,
+        canceledAt: null,
+        seats: 7,
+        appUsers: 9,
+        employeeCount: 8,
+        seatDelta: -2,
+        updatedAt: "2026-05-01T00:00:00.000Z",
+        policy: resolveBillingPolicy(null, null),
+        suspendedAt: null,
+        billingHold: null,
+        paymentGraceStartedAt: null,
+      },
+      stripeMode: null,
     });
     vi.mocked(updateGridmasterSubscription).mockResolvedValue({ success: true });
   });

@@ -1,11 +1,16 @@
 /**
- * Shared grid logo renderer for all icon/OG image assets.
+ * Shared logo renderer for the OG and Twitter images.
  * Uses Satori-compatible inline styles (no Tailwind, no CSS modules).
  */
-
-export const COLORS = {
-  light: "#2563EB",
-} as const;
+import {
+  BRAND_MARK_BACK,
+  BRAND_MARK_BACK_STROKE,
+  BRAND_MARK_COLORS,
+  BRAND_MARK_FRONT,
+  BRAND_MARK_GAP,
+  BRAND_MARK_INK,
+  brandMarkCardPath,
+} from "@dubgrid/design-tokens";
 
 // DM Sans (ttf — Satori can't read woff2) for the OG/Twitter wordmark, so the
 // social cards render the wordmark in the brand font instead of a fallback.
@@ -36,51 +41,30 @@ export function loadDmSansFonts() {
   return dmSansFontsPromise;
 }
 
-interface GridProps {
-  size: number;
+const BACK_PATH = brandMarkCardPath(BRAND_MARK_BACK);
+const FRONT_PATH = brandMarkCardPath(BRAND_MARK_FRONT);
+
+interface MarkProps {
+  width: number;
+  /** The surface behind the mark, which the gap around the front card takes. */
+  background: string;
   color?: string;
 }
 
-export function LogoGrid({ size, color = COLORS.light }: GridProps) {
-  const cells = [];
-  for (let row = 0; row < 4; row++) {
-    for (let col = 0; col < 4; col++) {
-      let opacity = 0.3;
-      if (row === 0 || col === 0) opacity = 1;
-      else if (row + col <= 4) opacity = 0.75;
-      cells.push({ row, col, opacity });
-    }
-  }
-
-  const cell = size / 4;
-  const gap = cell * 0.1;
-  const r = cell * 0.2;
-
+/** The two-card symbol, cropped to its ink, `width` wide. */
+export function LogoMark({ width, background, color = BRAND_MARK_COLORS.light }: MarkProps) {
+  const { x, y, width: w, height: h } = BRAND_MARK_INK;
   return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        display: "flex",
-        position: "relative",
-        background: "transparent",
-      }}
-    >
-      {cells.map(({ row, col, opacity }) => (
-        <div
-          key={`${row}-${col}`}
-          style={{
-            position: "absolute",
-            left: col * cell + gap,
-            top: row * cell + gap,
-            width: cell - gap * 2,
-            height: cell - gap * 2,
-            borderRadius: r,
-            background: color,
-            opacity,
-          }}
-        />
-      ))}
-    </div>
+    <svg width={width} height={(width * h) / w} viewBox={`${x} ${y} ${w} ${h}`}>
+      <path d={BACK_PATH} fill="none" stroke={color} strokeWidth={BRAND_MARK_BACK_STROKE} />
+      <path
+        d={FRONT_PATH}
+        fill={background}
+        stroke={background}
+        strokeWidth={BRAND_MARK_GAP * 2}
+        strokeLinejoin="round"
+      />
+      <path d={FRONT_PATH} fill={color} />
+    </svg>
   );
 }

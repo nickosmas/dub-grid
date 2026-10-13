@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const constructEvent = vi.fn();
+const subscriptionsRetrieve = vi.fn();
 const serviceFrom = vi.fn();
 const subscriptionUpsert = vi.fn();
 const subscriptionMaybeSingle = vi.fn();
@@ -11,12 +12,18 @@ const organizationUpdate = vi.fn();
 const auditInsert = vi.fn();
 const dedupInsert = vi.fn();
 const dedupRelease = vi.fn();
+const organizationIs = vi.fn();
+const seatHistoryInsert = vi.fn();
+const invoiceEventUpsert = vi.fn();
 
 vi.mock("@/lib/stripe", async () => ({
   ...(await vi.importActual<typeof import("@/lib/stripe")>("@/lib/stripe")),
   getStripe: () => ({
     webhooks: {
       constructEvent,
+    },
+    subscriptions: {
+      retrieve: subscriptionsRetrieve,
     },
   }),
   requireStripeEnabled: async () => null,
@@ -64,12 +71,22 @@ describe("POST /api/stripe/webhook", () => {
       data: { id: "11111111-1111-4111-8111-111111111111" },
       error: null,
     });
-    organizationEq.mockResolvedValue({ error: null });
+    organizationIs.mockResolvedValue({ error: null });
+    seatHistoryInsert.mockResolvedValue({ error: null });
+    invoiceEventUpsert.mockResolvedValue({ error: null });
+    // Awaited for the main update; `.is()` narrows the payment-grace stamp.
+    organizationEq.mockImplementation(() =>
+      Object.assign(Promise.resolve({ error: null }), { is: organizationIs }),
+    );
     organizationUpdate.mockReturnValue({ eq: organizationEq });
     auditInsert.mockResolvedValue({ error: null });
     // First-time event by default (no prior row) — the replay-dedup insert succeeds.
     dedupInsert.mockResolvedValue({ error: null });
     dedupRelease.mockResolvedValue({ error: null });
+    // By default Stripe's current state is the event's own snapshot.
+    subscriptionsRetrieve.mockImplementation(
+      async () => constructEvent.mock.results.at(-1)?.value?.data?.object,
+    );
     serviceFrom.mockImplementation((table: string) => {
       if (table === "stripe_processed_events") {
         return { insert: dedupInsert, delete: vi.fn(() => ({ eq: dedupRelease })) };
@@ -96,6 +113,12 @@ describe("POST /api/stripe/webhook", () => {
       }
       if (table === "audit_log") {
         return { insert: auditInsert };
+      }
+      if (table === "subscription_seat_history") {
+        return { insert: seatHistoryInsert };
+      }
+      if (table === "billing_invoice_events") {
+        return { upsert: invoiceEventUpsert };
       }
       throw new Error(`Unexpected table: ${table}`);
     });
@@ -153,6 +176,7 @@ describe("POST /api/stripe/webhook", () => {
       subscription_status: "trialing",
       subscription_seats: 9,
       trial_ends_at: "2026-05-03T00:00:00.000Z",
+      payment_grace_started_at: null,
     });
     expect(organizationEq).toHaveBeenCalledWith("id", "11111111-1111-4111-8111-111111111111");
     expect(auditInsert).toHaveBeenCalledWith(
@@ -169,6 +193,156 @@ describe("POST /api/stripe/webhook", () => {
           status: "trialing",
         }),
       }),
+    );
+  });
+
+  function subscriptionEvent(type: string, status: string) {
+    return {
+      id: `evt_${status}`,
+      type,
+      data: {
+        object: {
+          id: "sub_123",
+          customer: "cus_123",
+          status,
+          metadata: { org_id: "11111111-1111-4111-8111-111111111111" },
+          items: { data: [{ price: { id: "price_123" }, quantity: 9 }] },
+          cancel_at: null,
+          canceled_at: null,
+          trial_end: null,
+        },
+      },
+    };
+  }
+
+  it("starts the payment grace only while none is recorded", async () => {
+    constructEvent.mockReturnValue(subscriptionEvent("customer.subscription.updated", "past_due"));
+
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(200);
+    const [mainUpdate] = organizationUpdate.mock.calls[0] as [Record<string, unknown>];
+    expect(mainUpdate).not.toHaveProperty("payment_grace_started_at");
+    expect(organizationUpdate).toHaveBeenCalledWith({
+      payment_grace_started_at: expect.any(String),
+    });
+    expect(organizationIs).toHaveBeenCalledWith("payment_grace_started_at", null);
+  });
+
+  it("clears the payment grace once payment recovers", async () => {
+    constructEvent.mockReturnValue(subscriptionEvent("customer.subscription.updated", "active"));
+
+    await POST(makeRequest());
+
+    expect(organizationUpdate).toHaveBeenCalledTimes(1);
+    expect(organizationUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ subscription_status: "active", payment_grace_started_at: null }),
+    );
+  });
+
+  it("syncs the subscription when Stripe says a trial is about to end", async () => {
+    constructEvent.mockReturnValue(
+      subscriptionEvent("customer.subscription.trial_will_end", "trialing"),
+    );
+
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(subscriptionsRetrieve).toHaveBeenCalledWith("sub_123");
+    expect(subscriptionUpsert).toHaveBeenCalled();
+  });
+
+  it("syncs a completed checkout's subscription", async () => {
+    const subscription = subscriptionEvent("customer.subscription.created", "active").data.object;
+    subscriptionsRetrieve.mockResolvedValueOnce(subscription);
+    constructEvent.mockReturnValue({
+      id: "evt_checkout",
+      type: "checkout.session.completed",
+      data: { object: { id: "cs_123", mode: "subscription", subscription: "sub_123" } },
+    });
+
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(subscriptionsRetrieve).toHaveBeenCalledWith("sub_123");
+    expect(organizationUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ subscription_status: "active" }),
+    );
+  });
+
+  it("ignores a completed one-time checkout", async () => {
+    constructEvent.mockReturnValue({
+      id: "evt_payment",
+      type: "checkout.session.completed",
+      data: { object: { id: "cs_456", mode: "payment", subscription: null } },
+    });
+
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(subscriptionsRetrieve).not.toHaveBeenCalled();
+  });
+
+  it("adds a seat row when the billed seats change, and none when they don't", async () => {
+    constructEvent.mockReturnValue(subscriptionEvent("customer.subscription.updated", "active"));
+    subscriptionMaybeSingle.mockResolvedValueOnce({
+      data: { stripe_subscription_id: "sub_123", status: "active", quantity: 7 },
+      error: null,
+    });
+
+    await POST(makeRequest());
+
+    expect(seatHistoryInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ seats: 9, source: "stripe" }),
+    );
+
+    seatHistoryInsert.mockClear();
+    subscriptionMaybeSingle.mockResolvedValueOnce({
+      data: { stripe_subscription_id: "sub_123", status: "active", quantity: 9 },
+      error: null,
+    });
+    await POST(makeRequest());
+
+    expect(seatHistoryInsert).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["invoice.payment_succeeded", "paid", 4200],
+    ["invoice.payment_failed", "failed", 5000],
+  ])("records %s as a %s invoice", async (type, kind, amount) => {
+    organizationMaybeSingle.mockResolvedValue({
+      data: { id: "11111111-1111-4111-8111-111111111111" },
+      error: null,
+    });
+    constructEvent.mockReturnValue({
+      id: `evt_${kind}`,
+      type,
+      created: 1_780_000_000,
+      data: {
+        object: {
+          id: "in_123",
+          customer: "cus_123",
+          currency: "usd",
+          amount_paid: 4200,
+          amount_due: 5000,
+          period_start: 1_777_000_000,
+          period_end: 1_779_592_000,
+        },
+      },
+    });
+
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(invoiceEventUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        org_id: "11111111-1111-4111-8111-111111111111",
+        stripe_invoice_id: "in_123",
+        kind,
+        amount_cents: amount,
+        occurred_at: new Date(1_780_000_000 * 1000).toISOString(),
+      }),
+      { onConflict: "stripe_invoice_id,kind", ignoreDuplicates: true },
     );
   });
 
@@ -204,12 +378,10 @@ describe("POST /api/stripe/webhook", () => {
     const response = await POST(makeRequest());
 
     expect(response.status).toBe(200);
-    expect(organizationUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        subscription_status: "trialing",
-        trial_ends_at: "2026-05-16T00:00:00.000Z",
-      }),
-    );
+    // Neither cleared nor replaced with a made-up date: the stored end stands.
+    const update = organizationUpdate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(update).toMatchObject({ subscription_status: "trialing" });
+    expect(update).not.toHaveProperty("trial_ends_at");
   });
 
   it("records a canceled billing operation when Stripe cancels a subscription", async () => {
@@ -395,6 +567,95 @@ describe("POST /api/stripe/webhook", () => {
         }),
       }),
     );
+  });
+
+  it("writes Stripe's current state when a late event carries an older snapshot", async () => {
+    constructEvent.mockReturnValue({
+      id: "evt_late",
+      type: "customer.subscription.updated",
+      data: {
+        object: {
+          id: "sub_123",
+          customer: "cus_123",
+          status: "past_due",
+          metadata: { org_id: "11111111-1111-4111-8111-111111111111" },
+          items: { data: [{ price: { id: "price_123" }, quantity: 4 }] },
+          cancel_at: null,
+          canceled_at: null,
+          trial_end: null,
+        },
+      },
+    });
+    subscriptionsRetrieve.mockResolvedValueOnce({
+      id: "sub_123",
+      customer: "cus_123",
+      status: "active",
+      metadata: { org_id: "11111111-1111-4111-8111-111111111111" },
+      items: { data: [{ price: { id: "price_123" }, quantity: 4 }] },
+      cancel_at: null,
+      canceled_at: null,
+      trial_end: null,
+    });
+
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(subscriptionsRetrieve).toHaveBeenCalledWith("sub_123");
+    expect(organizationUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ subscription_status: "active" }),
+    );
+  });
+
+  it("leaves the live subscription in place when an older one ends", async () => {
+    subscriptionMaybeSingle.mockResolvedValue({
+      data: {
+        stripe_subscription_id: "sub_new",
+        status: "active",
+        quantity: 4,
+        current_period_end: null,
+        cancel_at: null,
+        canceled_at: null,
+        trial_end: null,
+      },
+      error: null,
+    });
+    constructEvent.mockReturnValue({
+      id: "evt_old_deleted",
+      type: "customer.subscription.deleted",
+      data: {
+        object: {
+          id: "sub_old",
+          customer: "cus_123",
+          status: "canceled",
+          metadata: { org_id: "11111111-1111-4111-8111-111111111111" },
+          items: { data: [{ price: { id: "price_123" }, quantity: 4 }] },
+          cancel_at: null,
+          canceled_at: 1_780_876_800,
+          trial_end: null,
+        },
+      },
+    });
+
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(subscriptionUpsert).not.toHaveBeenCalled();
+    expect(organizationUpdate).not.toHaveBeenCalled();
+  });
+
+  it("asks Stripe to retry when the current state can't be read", async () => {
+    constructEvent.mockReturnValue({
+      id: "evt_123",
+      type: "customer.subscription.updated",
+      data: { object: { id: "sub_123", customer: "cus_123", status: "active" } },
+    });
+    subscriptionsRetrieve.mockRejectedValueOnce(new Error("Stripe unavailable"));
+
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(500);
+    expect(subscriptionUpsert).not.toHaveBeenCalled();
+    expect(dedupRelease).toHaveBeenCalledWith("event_id", "evt_123");
   });
 
   it("returns a retryable error when the subscription write fails", async () => {

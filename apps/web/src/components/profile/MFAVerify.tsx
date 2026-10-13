@@ -4,7 +4,7 @@ import { useCallback, useState, useEffect, useRef } from "react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { Form } from "@/components/Form";
 import { Button } from "@/components/Button";
-import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { DubGridStackedLockup } from "@/components/Logo";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { ApexLandingLink } from "@/components/auth/ApexLandingLink";
 import { OrganizationBadge } from "@/components/auth/OrganizationBadge";
@@ -134,8 +134,7 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
     <PageShell>
       <Card>
         <ApexLandingLink className="dg-auth-logo-block" style={{ marginBottom: 24 }}>
-          <DubGridLogo size={52} />
-          <DubGridWordmark />
+          <DubGridStackedLockup />
         </ApexLandingLink>
 
         {orgSlug && baseDomain && (

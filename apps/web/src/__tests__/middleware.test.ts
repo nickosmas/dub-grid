@@ -70,6 +70,16 @@ const mockGetSession = vi.fn();
 const mockSupabaseFrom = vi.fn();
 const mockCacheSet = vi.fn();
 
+// Service-role reads (the platform billing policy, sandbox lookups) use the
+// same table mock as the request client.
+vi.mock("@supabase/supabase-js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@supabase/supabase-js")>();
+  return {
+    ...actual,
+    createClient: () => ({ from: (table: string) => mockSupabaseFrom(table) }),
+  };
+});
+
 vi.mock("@supabase/ssr", () => ({
   createServerClient: () => ({
     auth: { getSession: () => mockGetSession() },
@@ -93,6 +103,7 @@ vi.mock("@/lib/cache", () => ({
     mwMembership: (userId: string, slug: string) => `dg:mw:membership:${userId}:${slug}`,
     mwOrgAccess: (orgId: string) => `dg:mw:orgAccess:${orgId}`,
     mwOrgSuspended: (orgId: string) => `dg:mw:orgSuspended:${orgId}`,
+    platformBillingPolicy: () => `dg:platform:billingPolicy`,
   },
   TTL: { MIDDLEWARE: 30 },
 }));
@@ -654,6 +665,126 @@ describe("middleware: route guards", () => {
 
     expect((res as { _type: string })._type).toBe("redirect");
     expect((res as { _redirectUrl: string })._redirectUrl).toBe(
+      "http://acme.localhost:3000/billing-required",
+    );
+  });
+
+  it("keeps an organization open through its own longer grace period", async () => {
+    mockSessionWithClaims({
+      platform_role: "none",
+      org_role: "user",
+      org_id: "org-grace",
+      org_slug: "acme",
+      sub: "user-1",
+    });
+    const fiveDaysAgo = new Date(Date.now() - 5 * 86_400_000).toISOString();
+    mockSupabaseFrom.mockImplementation((table: string) => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          maybeSingle: vi.fn().mockResolvedValue({
+            data:
+              table === "organizations"
+                ? {
+                    suspended_at: null,
+                    archived_at: null,
+                    subscription_status: "trialing",
+                    trial_ends_at: fiveDaysAgo,
+                    trial_grace_days_override: 10,
+                  }
+                : null,
+            error: null,
+          }),
+        })),
+      })),
+    }));
+
+    const res = await runMiddleware(
+      makeNextRequest("http://acme.localhost:3000/schedule", { host: "acme.localhost:3000" }),
+    );
+
+    expect((res as { _redirectUrl?: string })._redirectUrl).not.toBe(
+      "http://acme.localhost:3000/billing-required",
+    );
+  });
+
+  it.each([
+    [5, false],
+    [20, true],
+  ])(
+    "locks a past-due organization once its payment grace runs out (%i days in)",
+    async (daysIn, locked) => {
+      mockSessionWithClaims({
+        platform_role: "none",
+        org_role: "user",
+        org_id: `org-past-due-${daysIn}`,
+        org_slug: "acme",
+        sub: "user-1",
+      });
+      const started = new Date(Date.now() - daysIn * 86_400_000).toISOString();
+      mockSupabaseFrom.mockImplementation((table: string) => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            maybeSingle: vi.fn().mockResolvedValue({
+              data:
+                table === "organizations"
+                  ? {
+                      suspended_at: null,
+                      archived_at: null,
+                      subscription_status: "past_due",
+                      trial_ends_at: null,
+                      payment_grace_started_at: started,
+                    }
+                  : null,
+              error: null,
+            }),
+          })),
+        })),
+      }));
+
+      const res = await runMiddleware(
+        makeNextRequest("http://acme.localhost:3000/schedule", { host: "acme.localhost:3000" }),
+      );
+
+      const redirect = (res as { _redirectUrl?: string })._redirectUrl;
+      if (locked) expect(redirect).toBe("http://acme.localhost:3000/billing-required");
+      else expect(redirect).not.toBe("http://acme.localhost:3000/billing-required");
+    },
+  );
+
+  it("keeps a paused organization open after its trial ran out", async () => {
+    mockSessionWithClaims({
+      platform_role: "none",
+      org_role: "user",
+      org_id: "org-paused",
+      org_slug: "acme",
+      sub: "user-1",
+    });
+    const monthAgo = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    mockSupabaseFrom.mockImplementation((table: string) => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          maybeSingle: vi.fn().mockResolvedValue({
+            data:
+              table === "organizations"
+                ? {
+                    suspended_at: null,
+                    archived_at: null,
+                    subscription_status: "trialing",
+                    trial_ends_at: monthAgo,
+                    billing_paused_at: monthAgo,
+                  }
+                : null,
+            error: null,
+          }),
+        })),
+      })),
+    }));
+
+    const res = await runMiddleware(
+      makeNextRequest("http://acme.localhost:3000/schedule", { host: "acme.localhost:3000" }),
+    );
+
+    expect((res as { _redirectUrl?: string })._redirectUrl).not.toBe(
       "http://acme.localhost:3000/billing-required",
     );
   });

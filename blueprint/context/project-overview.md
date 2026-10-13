@@ -30,7 +30,7 @@ organization staff, managers, and platform operators.
 
 ## Features
 
-Items appear in build-plan order. Items 1 through 39 and 41 through 43 are
+Items appear in build-plan order. Items 1 through 39 and 41 through 44 are
 shipped. Item 40 is in progress.
 
 | Item | Status      | Outcome                                                                                                                         |
@@ -78,6 +78,7 @@ shipped. Item 40 is in progress.
 | 42   | Shipped     | Schedule notes on every schedule surface, each belonging to its shift.                                                          |
 | 43   | Shipped     | Complete person records for managers and one Gridmaster person page with two-factor lockout recovery.                           |
 | 40   | In progress | Public and internal documentation accurate for `dev`, with permanent drift gates.                                               |
+| 44   | Shipped     | Safe billing actions, Gridmaster billing controls and policy, and billing history.                                              |
 
 Item 40 is split:
 
@@ -95,6 +96,35 @@ Item 40 is split:
   - **40e3 - Web browser role and state qualification:** planned.
   - **40e4 - Native iOS and Android qualification:** planned; Android evidence
     is mandatory.
+
+Item 44 is split, and every part has shipped:
+
+- **44a - Billing safety fixes:** shipped; a sync no longer locks a trialing
+  organization, a canceled one can subscribe again, and webhooks, checkout,
+  and Gridmaster billing writes can no longer leave the wrong state.
+- **44b - Gridmaster billing controls:** shipped; overrides need a reason and
+  say what they do, disabled actions explain themselves, one End trial control
+  offers the grace period or locking now, and the Billing tab loads only its
+  organization.
+- **44c - Customer billing clarity:** shipped; the customer billing feed shows
+  only changes that affect the organization, without payment-provider data,
+  seat figures read in plain words, and the mobile locked screen offers billing
+  only when billing is the cause.
+- **44d - Billing policy settings:** shipped; trial length, trial grace,
+  reminder window, and payment grace are platform defaults a Gridmaster can
+  change, with per-organization overrides, and every access decision uses the
+  organization's effective values (migration 076).
+- **44e - Pause and resume:** shipped; a Gridmaster can pause an
+  organization's billing, which keeps it open, stops the trial clock and
+  Stripe collection, and gives the trial back the paused time on resume, and
+  can extend a trial's grace through its override (migration 077).
+- **44f - Past-due deadlines and lock alerts:** shipped; a subscription that
+  needs payment locks once its payment grace runs out, counted from when it
+  first needed attention (never without a recorded start), and Super Admins
+  are alerted when their organization locks (migration 078).
+- **44g - Seat and revenue history:** shipped; append-only seat and invoice
+  history and a Gridmaster revenue and seats report that states when its
+  history starts (migration 079).
 
 Public documentation covers customer behavior only. Gridmaster tooling, Test
 Sandbox, feature flags, migrations, environment variables, and internal HTTP
@@ -211,8 +241,9 @@ endpoints remain internal.
 ## Monetization
 
 DubGrid uses Stripe per-seat subscriptions, billed monthly. New organizations
-receive a 14-day trial beginning on the first Super Admin login, then 3 grace
-days before the organization locks.
+receive a trial beginning on the first Super Admin login, then grace days
+before the organization locks: 14 and 3 days by default, set by the platform
+billing policy with per-organization overrides.
 
 > TODO: exact per-seat prices and tier breaks remain unconfirmed.
 
@@ -257,7 +288,7 @@ Main mobile surfaces:
   build targets the Next.js web app.
 - **Database:** Supabase-hosted Postgres with an immutable ordered migration
   stream. Migrations `001` through `004` are frozen. The repository is
-  checksum-locked through `075`.
+  checksum-locked through `079`.
 - **Production boundary:** migration `075` was recorded as applied to production
   on 2026-09-28. Read the live ledger with `npm run db:migrations:inspect`
   (read-only) before any release rather than relying on this line.

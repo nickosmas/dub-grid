@@ -45,7 +45,7 @@ import {
 import logger from "@/lib/logger";
 import { CacheKey, cacheThrough, TTL } from "@/lib/cache";
 import { withTimeoutOrThrow } from "@/lib/with-timeout";
-import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
+import { BILLING_ACCESS_SELECT, evaluateOrganizationAccess } from "@/lib/billing-policy";
 
 // The bootstrap fan-out is the authenticated shell's only blocking request.
 // Four and a half seconds was short enough for a cold WebKit/Firefox navigation
@@ -227,7 +227,7 @@ async function handleGET(req: NextRequest, timer: Timer) {
               Promise.all([
                 serviceClient
                   .from("organizations")
-                  .select(ORGANIZATION_COLS)
+                  .select(`${ORGANIZATION_COLS}, ${BILLING_ACCESS_SELECT}`)
                   .eq("id", orgId)
                   .single(),
                 serviceClient
@@ -372,11 +372,7 @@ async function handleGET(req: NextRequest, timer: Timer) {
       includeArchived: true,
     });
     const billingLocked = orgAuth.permissions.isSuperAdmin
-      ? evaluateOrganizationBillingAccess({
-          suspendedAt: org.suspendedAt,
-          subscriptionStatus: org.subscriptionStatus,
-          trialEndsAt: org.trialEndsAt,
-        }).isLocked
+      ? (await evaluateOrganizationAccess(serviceClient, org)).isLocked
       : null;
 
     return NextResponse.json({

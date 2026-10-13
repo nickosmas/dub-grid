@@ -16,6 +16,26 @@ describe("proxy matcher", () => {
     expect(matches("/robots.txt")).toBe(false);
   });
 
+  it("lets link previews reach the Open Graph and Twitter images", () => {
+    // Metadata image routes have no extension, so the extension list never
+    // exempted them and an anonymous fetch answered 307 /login. The matcher
+    // sees only the pathname, so the ?<hash> Next appends does not matter.
+    expect(matches("/opengraph-image")).toBe(false);
+    expect(matches("/twitter-image")).toBe(false);
+  });
+
+  it("keeps paths that only start like a metadata image under the proxy", () => {
+    for (const pathname of [
+      "/opengraph-image-old",
+      "/opengraph-image/extra",
+      "/twitter-image2",
+      "/twitter-image/extra",
+      "/schedule/opengraph-image",
+    ]) {
+      expect(matches(pathname)).toBe(true);
+    }
+  });
+
   it("keeps every other .xml path under the proxy", () => {
     expect(matches("/reports/export.xml")).toBe(true);
     expect(matches("/sitemap.xml.bak")).toBe(true);

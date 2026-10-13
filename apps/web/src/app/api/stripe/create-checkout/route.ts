@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createStripeCustomer, createCheckoutSession, requireStripeEnabled } from "@/lib/stripe";
+import {
+  createStripeCustomer,
+  createCheckoutSession,
+  findLiveStripeSubscription,
+  requireStripeEnabled,
+} from "@/lib/stripe";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { forbidIfSandboxCookie } from "@/lib/api-auth";
@@ -10,6 +15,10 @@ import { countBillableAppUsers, resolveBillingReturnUrl } from "@/features/billi
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import { isLiveSubscriptionStatus } from "@dubgrid/domain";
+
+const ALREADY_SUBSCRIBED =
+  "Your organization already has a subscription. Use Manage billing to change it.";
 
 const bodySchema = z.object({
   orgId: z.string().uuid(),
@@ -90,6 +99,21 @@ export async function POST(req: NextRequest) {
 
     if (orgError || !org) {
       return NextResponse.json({ error: "Organization not found" }, { status: 404 });
+    }
+
+    // A second checkout would start a second subscription billed alongside the
+    // first; changes to a live one go through the billing portal instead.
+    const { data: recorded, error: recordedError } = await supabase
+      .from("subscriptions")
+      .select("status")
+      .eq("org_id", orgId)
+      .maybeSingle();
+    if (recordedError) throw recordedError;
+    if (
+      isLiveSubscriptionStatus(recorded?.status) ||
+      (org.stripe_customer_id && (await findLiveStripeSubscription(org.stripe_customer_id)))
+    ) {
+      return NextResponse.json({ error: ALREADY_SUBSCRIBED }, { status: 409 });
     }
 
     let customerId = org.stripe_customer_id;

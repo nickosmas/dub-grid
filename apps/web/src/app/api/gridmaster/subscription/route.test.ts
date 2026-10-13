@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const validateCsrfOrigin = vi.fn();
 const requireGridmasterSession = vi.fn();
+const requireSensitiveActionAuth = vi.fn();
 const serviceFrom = vi.fn();
 const subscriptionSingle = vi.fn();
 const subscriptionUpdateEq = vi.fn();
@@ -16,7 +17,10 @@ const auditInsert = vi.fn();
 const scheduleSubscriptionCancellation = vi.fn();
 const syncSubscriptionSeats = vi.fn();
 const extendTrial = vi.fn();
-const cacheDel = vi.fn();
+const pauseCollection = vi.fn();
+const resumeCollection = vi.fn();
+const invalidateCache = vi.fn();
+const seatHistoryInsert = vi.fn();
 
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
@@ -24,6 +28,7 @@ vi.mock("@/lib/csrf", () => ({
 
 vi.mock("@/lib/api-auth", () => ({
   requireGridmasterSession: (req: NextRequest) => requireGridmasterSession(req),
+  requireSensitiveActionAuth: (req: NextRequest) => requireSensitiveActionAuth(req),
 }));
 
 vi.mock("@/lib/supabase-service", () => ({
@@ -35,10 +40,24 @@ vi.mock("@/lib/supabase-service", () => ({
 vi.mock("@/lib/stripe", () => ({
   cancelSubscription: vi.fn(),
   extendTrial: (...args: unknown[]) => extendTrial(...args),
+  invalidateOrganizationBillingCache: (orgId: string) => invalidateCache(orgId),
+  pauseSubscriptionCollection: (...args: unknown[]) => pauseCollection(...args),
+  resumeSubscriptionCollection: (...args: unknown[]) => resumeCollection(...args),
   scheduleSubscriptionCancellation: (...args: unknown[]) =>
     scheduleSubscriptionCancellation(...args),
   syncSubscriptionSeats: (...args: unknown[]) => syncSubscriptionSeats(...args),
 }));
+
+vi.mock("@/lib/billing-policy", async () => {
+  const domain = await import("@dubgrid/domain");
+  return {
+    getOrgBillingPolicy: async (_client: unknown, row: Record<string, unknown>) =>
+      domain.resolveBillingPolicy(
+        domain.DEFAULT_BILLING_POLICY,
+        domain.billingPolicyOverridesFromRow(row),
+      ),
+  };
+});
 
 vi.mock("@/lib/logger", () => ({
   default: {
@@ -48,14 +67,6 @@ vi.mock("@/lib/logger", () => ({
 
 vi.mock("@/lib/sentry", () => ({
   captureException: vi.fn(),
-}));
-
-vi.mock("@/lib/cache", () => ({
-  cacheDel: (...args: unknown[]) => cacheDel(...args),
-  CacheKey: {
-    mwOrgAccess: (orgId: string) => `dg:mw:orgAccess:${orgId}`,
-    organization: (orgId: string) => `dg:org:${orgId}:organization`,
-  },
 }));
 
 import { POST } from "./route";
@@ -72,12 +83,13 @@ function makeRequest(body: unknown) {
 describe("POST /api/gridmaster/subscription", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    cacheDel.mockResolvedValue(undefined);
+    invalidateCache.mockResolvedValue(undefined);
     validateCsrfOrigin.mockReturnValue(null);
     requireGridmasterSession.mockResolvedValue({
       user: { id: "gridmaster-user", email: "gm@example.com" },
       session: { access_token: "token" },
     });
+    requireSensitiveActionAuth.mockResolvedValue({ user: { id: "gridmaster-user" } });
     subscriptionSingle.mockResolvedValue({ data: null, error: null });
     subscriptionUpdateEq.mockResolvedValue({ error: null });
     subscriptionUpdate.mockReturnValue({ eq: subscriptionUpdateEq });
@@ -101,7 +113,10 @@ describe("POST /api/gridmaster/subscription", () => {
     });
     organizationEq.mockResolvedValue({ error: null });
     organizationUpdate.mockReturnValue({ eq: organizationEq });
-    organizationSingle.mockResolvedValue({ data: { trial_started_at: null }, error: null });
+    organizationSingle.mockResolvedValue({
+      data: { subscription_status: "trialing", trial_started_at: null, trial_ends_at: null },
+      error: null,
+    });
     scheduleSubscriptionCancellation.mockResolvedValue({
       status: "active",
       cancel_at: 1_780_876_800,
@@ -111,7 +126,11 @@ describe("POST /api/gridmaster/subscription", () => {
       },
     });
     auditInsert.mockResolvedValue({ error: null });
+    seatHistoryInsert.mockResolvedValue({ error: null });
     serviceFrom.mockImplementation((table: string) => {
+      if (table === "subscription_seat_history") {
+        return { insert: seatHistoryInsert };
+      }
       if (table === "subscriptions") {
         return {
           select: vi.fn(() => ({
@@ -187,34 +206,181 @@ describe("POST /api/gridmaster/subscription", () => {
     expect(serviceFrom).not.toHaveBeenCalled();
   });
 
-  it("allows gridmasters to extend trials beyond one year", async () => {
+  it("sets the days left on a trial, beyond one year if asked", async () => {
+    const before = Date.now();
     const response = await POST(
-      makeRequest({ orgId: ORG_ID, action: "extend_trial", trialDays: 5000 }),
+      makeRequest({ orgId: ORG_ID, action: "set_trial_days", trialDays: 5000 }),
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ success: true });
-    expect(organizationUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        subscription_status: "trialing",
-        trial_ends_at: expect.any(String),
-        // Pending trial (trial_started_at null) gets its start stamped on extend.
-        trial_started_at: expect.any(String),
-      }),
-    );
+    const update = organizationUpdate.mock.calls[0]?.[0] as Record<string, string>;
+    expect(update).toMatchObject({
+      subscription_status: "trialing",
+      // A pending trial gets its start stamped with the change.
+      trial_started_at: expect.any(String),
+    });
+    expect(Date.parse(update.trial_ends_at) - before).toBeGreaterThanOrEqual(5000 * 86_400_000);
     expect(auditInsert).toHaveBeenCalledWith(
       expect.objectContaining({
         org_id: ORG_ID,
         actor_id: "gridmaster-user",
-        action: "billing.trial_extended",
-        resource_type: "organization",
-        resource_id: ORG_ID,
-        details: expect.objectContaining({ days: 5000 }),
+        action: "billing.trial_changed",
+        details: expect.objectContaining({ days: 5000, previous_trial_ends_at: null }),
       }),
     );
   });
 
+  it("shortens a trial as readily as it lengthens one", async () => {
+    organizationSingle.mockResolvedValueOnce({
+      data: {
+        subscription_status: "trialing",
+        trial_started_at: "2026-10-01T00:00:00Z",
+        trial_ends_at: new Date(Date.now() + 20 * 86_400_000).toISOString(),
+      },
+      error: null,
+    });
+
+    const response = await POST(
+      makeRequest({ orgId: ORG_ID, action: "set_trial_days", trialDays: 2 }),
+    );
+
+    expect(response.status).toBe(200);
+    const update = organizationUpdate.mock.calls[0]?.[0] as Record<string, string>;
+    expect(update.trial_started_at).toBe("2026-10-01T00:00:00Z");
+    expect(Date.parse(update.trial_ends_at) - Date.now()).toBeLessThan(3 * 86_400_000);
+  });
+
+  it("reopens an expired trial", async () => {
+    organizationSingle.mockResolvedValueOnce({
+      data: {
+        subscription_status: "trial_expired",
+        trial_started_at: "2026-09-01T00:00:00Z",
+        trial_ends_at: "2026-09-15T00:00:00Z",
+      },
+      error: null,
+    });
+
+    const response = await POST(
+      makeRequest({ orgId: ORG_ID, action: "set_trial_days", trialDays: 7 }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(organizationUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ subscription_status: "trialing" }),
+    );
+  });
+
+  it("refuses to put a paying organization back on a trial", async () => {
+    organizationSingle.mockResolvedValueOnce({
+      data: { subscription_status: "active", trial_started_at: null, trial_ends_at: null },
+      error: null,
+    });
+
+    const response = await POST(
+      makeRequest({ orgId: ORG_ID, action: "set_trial_days", trialDays: 7 }),
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "This organization isn't on a trial.",
+    });
+    expect(organizationUpdate).not.toHaveBeenCalled();
+    expect(auditInsert).not.toHaveBeenCalled();
+  });
+
+  it("ends a running trial now, leaving the grace period", async () => {
+    organizationSingle.mockResolvedValueOnce({
+      data: {
+        subscription_status: "trialing",
+        trial_started_at: "2026-10-01T00:00:00Z",
+        trial_ends_at: new Date(Date.now() + 5 * 86_400_000).toISOString(),
+      },
+      error: null,
+    });
+
+    const response = await POST(makeRequest({ orgId: ORG_ID, action: "end_trial" }));
+
+    expect(response.status).toBe(200);
+    const update = organizationUpdate.mock.calls[0]?.[0] as Record<string, string>;
+    expect(update.subscription_status).toBe("trialing");
+    expect(Math.abs(Date.parse(update.trial_ends_at) - Date.now())).toBeLessThan(60_000);
+    expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "billing.trial_ended" }),
+    );
+  });
+
+  it("expires a trial with fresh proof, keeping a past end date", async () => {
+    organizationSingle.mockResolvedValueOnce({
+      data: {
+        subscription_status: "trialing",
+        trial_started_at: "2026-09-25T00:00:00Z",
+        trial_ends_at: "2026-10-09T00:00:00Z",
+      },
+      error: null,
+    });
+
+    const response = await POST(makeRequest({ orgId: ORG_ID, action: "expire_trial" }));
+
+    expect(response.status).toBe(200);
+    expect(requireSensitiveActionAuth).toHaveBeenCalled();
+    expect(organizationUpdate).toHaveBeenCalledWith({
+      trial_started_at: "2026-09-25T00:00:00Z",
+      trial_ends_at: "2026-10-09T00:00:00Z",
+      subscription_status: "trial_expired",
+    });
+    expect(invalidateCache).toHaveBeenCalledWith(ORG_ID);
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "billing.trial_expired" }),
+    );
+  });
+
+  it("asks for fresh proof before expiring a trial", async () => {
+    requireSensitiveActionAuth.mockResolvedValueOnce({
+      response: NextResponse.json({ code: "STEP_UP_REQUIRED" }, { status: 403 }),
+    });
+
+    const response = await POST(makeRequest({ orgId: ORG_ID, action: "expire_trial" }));
+
+    expect(response.status).toBe(403);
+    expect(serviceFrom).not.toHaveBeenCalled();
+  });
+
+  it("leaves ending a Stripe-billed trial to Stripe", async () => {
+    subscriptionSingle.mockResolvedValueOnce({
+      data: { stripe_subscription_id: "sub_123" },
+      error: null,
+    });
+
+    const response = await POST(makeRequest({ orgId: ORG_ID, action: "end_trial" }));
+
+    expect(response.status).toBe(409);
+    expect(organizationUpdate).not.toHaveBeenCalled();
+  });
+
+  it("reports a failed trial write instead of auditing it", async () => {
+    organizationEq.mockResolvedValueOnce({ error: { message: "boom" } });
+
+    const response = await POST(
+      makeRequest({ orgId: ORG_ID, action: "set_trial_days", trialDays: 7 }),
+    );
+
+    expect(response.status).toBe(500);
+    expect(auditInsert).not.toHaveBeenCalled();
+  });
+
+  it("refuses an immediate cancel when there is no subscription", async () => {
+    const response = await POST(makeRequest({ orgId: ORG_ID, action: "cancel" }));
+
+    expect(response.status).toBe(409);
+    expect(organizationUpdate).not.toHaveBeenCalled();
+  });
+
   it("cancels an organization subscription status and audits the action", async () => {
+    subscriptionSingle.mockResolvedValueOnce({
+      data: { stripe_subscription_id: "sub_123" },
+      error: null,
+    });
     const response = await POST(makeRequest({ orgId: ORG_ID, action: "cancel" }));
 
     expect(response.status).toBe(200);
@@ -233,37 +399,61 @@ describe("POST /api/gridmaster/subscription", () => {
     );
   });
 
-  it("sets a trial end date when overriding an organization back to trialing", async () => {
+  it("leaves the trial's dates alone when overriding back to trialing", async () => {
     const response = await POST(
       makeRequest({
         orgId: ORG_ID,
         action: "override_status",
         status: "trialing",
+        reason: "Restoring after a mistaken cancel",
       }),
     );
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ success: true });
+    // A manual status never starts a payment deadline.
     expect(organizationUpdate).toHaveBeenCalledWith({
       subscription_status: "trialing",
-      trial_ends_at: expect.any(String),
+      payment_grace_started_at: null,
     });
-    expect(cacheDel).toHaveBeenCalledWith(
-      `dg:mw:orgAccess:${ORG_ID}`,
-      `dg:org:${ORG_ID}:organization`,
-    );
+    expect(invalidateCache).toHaveBeenCalledWith(ORG_ID);
   });
 
-  it("invalidates organization access after overriding billing to active", async () => {
+  it("records the previous status and the reason for an override", async () => {
     const response = await POST(
-      makeRequest({ orgId: ORG_ID, action: "override_status", status: "active" }),
+      makeRequest({
+        orgId: ORG_ID,
+        action: "override_status",
+        status: "active",
+        reason: "  Comped for the pilot  ",
+      }),
     );
 
     expect(response.status).toBe(200);
-    expect(cacheDel).toHaveBeenCalledWith(
-      `dg:mw:orgAccess:${ORG_ID}`,
-      `dg:org:${ORG_ID}:organization`,
+    expect(invalidateCache).toHaveBeenCalledWith(ORG_ID);
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "billing.status_overridden",
+        details: expect.objectContaining({
+          previous_status: "trialing",
+          new_status: "active",
+          reason: "Comped for the pilot",
+        }),
+      }),
     );
+  });
+
+  it.each([
+    ["missing", undefined],
+    ["blank", "   "],
+    ["too long", "x".repeat(501)],
+  ])("refuses an override with a %s reason", async (_name, reason) => {
+    const response = await POST(
+      makeRequest({ orgId: ORG_ID, action: "override_status", status: "active", reason }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(organizationUpdate).not.toHaveBeenCalled();
   });
 
   it("syncs Stripe seats to app users and audits the action", async () => {
@@ -287,6 +477,13 @@ describe("POST /api/gridmaster/subscription", () => {
       subscription_seats: 9,
     });
     expect(organizationEq).toHaveBeenCalledWith("id", ORG_ID);
+    // 8 active staff plus a management-only member: the history keeps the count.
+    expect(seatHistoryInsert).toHaveBeenCalledWith({
+      org_id: ORG_ID,
+      seats: 9,
+      billable_app_users: 9,
+      source: "gridmaster",
+    });
     expect(auditInsert).toHaveBeenCalledWith(
       expect.objectContaining({
         org_id: ORG_ID,
@@ -356,5 +553,224 @@ describe("POST /api/gridmaster/subscription", () => {
     });
     expect(syncSubscriptionSeats).not.toHaveBeenCalled();
     expect(organizationUpdate).not.toHaveBeenCalled();
+  });
+
+  it("refreshes cached access after truing up seats", async () => {
+    subscriptionSingle.mockResolvedValueOnce({
+      data: { stripe_subscription_id: "sub_123" },
+      error: null,
+    });
+
+    const response = await POST(makeRequest({ orgId: ORG_ID, action: "sync_seats" }));
+
+    expect(response.status).toBe(200);
+    expect(invalidateCache).toHaveBeenCalledWith(ORG_ID);
+  });
+
+  it.each([
+    ["cancel", { action: "cancel" }],
+    ["cancel_at_period_end", { action: "cancel_at_period_end" }],
+    ["sync_seats", { action: "sync_seats" }],
+    ["override_status", { action: "override_status", status: "active", reason: "Test" }],
+  ])("reports a failed %s write instead of auditing it", async (_name, body) => {
+    subscriptionSingle.mockResolvedValueOnce({
+      data: { stripe_subscription_id: "sub_123" },
+      error: null,
+    });
+    organizationEq.mockResolvedValue({ error: { message: "write failed" } });
+    subscriptionUpdateEq.mockResolvedValue({ error: { message: "write failed" } });
+
+    const response = await POST(makeRequest({ orgId: ORG_ID, ...body }));
+
+    expect(response.status).toBe(500);
+    expect(auditInsert).not.toHaveBeenCalled();
+  });
+
+  describe("billing holds", () => {
+    const DAY = 86_400_000;
+    const at = (days: number) => new Date(Date.now() + days * DAY).toISOString();
+
+    function orgRow(row: Record<string, unknown>) {
+      organizationSingle.mockResolvedValueOnce({
+        data: {
+          subscription_status: "trialing",
+          trial_started_at: at(-10),
+          trial_ends_at: at(4),
+          suspended_at: null,
+          billing_paused_at: null,
+          ...row,
+        },
+        error: null,
+      });
+    }
+
+    function billedThroughStripe() {
+      subscriptionSingle.mockResolvedValueOnce({
+        data: { stripe_subscription_id: "sub_123" },
+        error: null,
+      });
+    }
+
+    it("asks for fresh proof before pausing", async () => {
+      requireSensitiveActionAuth.mockResolvedValueOnce({
+        response: NextResponse.json({ code: "STEP_UP_REQUIRED" }, { status: 403 }),
+      });
+
+      const response = await POST(
+        makeRequest({ orgId: ORG_ID, action: "pause_billing", reason: "Contract renewal" }),
+      );
+
+      expect(response.status).toBe(403);
+      expect(serviceFrom).not.toHaveBeenCalled();
+    });
+
+    it("pauses a trial, recording who and why", async () => {
+      orgRow({});
+
+      const response = await POST(
+        makeRequest({ orgId: ORG_ID, action: "pause_billing", reason: "Contract renewal" }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(organizationUpdate).toHaveBeenCalledWith({
+        billing_paused_at: expect.any(String),
+        billing_paused_reason: "Contract renewal",
+        billing_paused_by: "gridmaster-user",
+      });
+      expect(pauseCollection).not.toHaveBeenCalled();
+      expect(invalidateCache).toHaveBeenCalledWith(ORG_ID);
+      expect(auditInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "billing.paused",
+          details: expect.objectContaining({ reason: "Contract renewal" }),
+        }),
+      );
+    });
+
+    it("stops Stripe collecting for a paying organization", async () => {
+      billedThroughStripe();
+      orgRow({ subscription_status: "active", trial_ends_at: null });
+
+      const response = await POST(
+        makeRequest({ orgId: ORG_ID, action: "pause_billing", reason: "Disputed invoice" }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(pauseCollection).toHaveBeenCalledWith("sub_123");
+    });
+
+    it.each<[Record<string, unknown>, string]>([
+      [{ subscription_status: "canceled" }, "locked"],
+      [{ billing_paused_at: at(-1) }, "already paused"],
+    ])("refuses to pause an organization that is %j (%s)", async (row) => {
+      orgRow(row);
+
+      const response = await POST(
+        makeRequest({ orgId: ORG_ID, action: "pause_billing", reason: "Contract renewal" }),
+      );
+
+      expect(response.status).toBe(409);
+      expect(organizationUpdate).not.toHaveBeenCalled();
+      expect(auditInsert).not.toHaveBeenCalled();
+    });
+
+    it("resumes without fresh proof and gives the trial back the paused time", async () => {
+      orgRow({ billing_paused_at: at(-4), trial_ends_at: at(2) });
+
+      const response = await POST(makeRequest({ orgId: ORG_ID, action: "resume_billing" }));
+
+      expect(response.status).toBe(200);
+      expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
+      const update = organizationUpdate.mock.calls[0]?.[0] as Record<string, string | null>;
+      expect(update).toMatchObject({
+        billing_paused_at: null,
+        billing_paused_reason: null,
+        billing_paused_by: null,
+      });
+      const movedBy = Date.parse(update.trial_ends_at as string) - Date.now();
+      expect(movedBy).toBeGreaterThan(5.9 * DAY);
+      expect(movedBy).toBeLessThan(6.1 * DAY);
+      expect(auditInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "billing.resumed",
+          details: expect.objectContaining({ trial_ends_at: update.trial_ends_at }),
+        }),
+      );
+    });
+
+    it("moves a Stripe trial too and collects again", async () => {
+      billedThroughStripe();
+      orgRow({ billing_paused_at: at(-4), trial_ends_at: at(2) });
+
+      const response = await POST(makeRequest({ orgId: ORG_ID, action: "resume_billing" }));
+
+      expect(response.status).toBe(200);
+      expect(extendTrial).toHaveBeenCalledWith("sub_123", expect.any(Date));
+      expect(resumeCollection).toHaveBeenCalledWith("sub_123");
+    });
+
+    it("refuses to resume billing that isn't paused", async () => {
+      orgRow({});
+
+      const response = await POST(makeRequest({ orgId: ORG_ID, action: "resume_billing" }));
+
+      expect(response.status).toBe(409);
+      expect(organizationUpdate).not.toHaveBeenCalled();
+    });
+
+    it("refuses trial changes while paused", async () => {
+      orgRow({ billing_paused_at: at(-1) });
+
+      const response = await POST(
+        makeRequest({ orgId: ORG_ID, action: "set_trial_days", trialDays: 30 }),
+      );
+
+      expect(response.status).toBe(409);
+      expect(organizationUpdate).not.toHaveBeenCalled();
+    });
+
+    it("extends grace with fresh proof by writing the grace override", async () => {
+      orgRow({ trial_ends_at: at(-5) });
+
+      const response = await POST(
+        makeRequest({ orgId: ORG_ID, action: "extend_grace", days: 4, reason: "Waiting on PO" }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(requireSensitiveActionAuth).toHaveBeenCalled();
+      expect(organizationUpdate).toHaveBeenCalledWith({ trial_grace_days_override: 7 });
+      expect(auditInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "billing.grace_extended",
+          details: expect.objectContaining({
+            previous_grace_days: 3,
+            grace_days: 7,
+            days: 4,
+            reason: "Waiting on PO",
+          }),
+        }),
+      );
+    });
+
+    it("keeps grace within its limit", async () => {
+      orgRow({ trial_ends_at: at(-5), trial_grace_days_override: 88 });
+
+      const response = await POST(
+        makeRequest({ orgId: ORG_ID, action: "extend_grace", days: 5, reason: "Waiting on PO" }),
+      );
+
+      expect(response.status).toBe(400);
+      expect(organizationUpdate).not.toHaveBeenCalled();
+    });
+
+    it("refuses to extend grace while the trial is still running", async () => {
+      orgRow({});
+
+      const response = await POST(
+        makeRequest({ orgId: ORG_ID, action: "extend_grace", days: 4, reason: "Waiting on PO" }),
+      );
+
+      expect(response.status).toBe(409);
+    });
   });
 });

@@ -14,6 +14,7 @@ import {
 import { checkRateLimit, loginIpLimiter, loginLimiter, loginSurgeLimiter } from "@/lib/rate-limit";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { getServiceClient } from "@/lib/supabase-service";
+import { getPlatformBillingPolicy } from "@/lib/billing-policy";
 import { RESERVED_SUBDOMAINS } from "@/lib/subdomain";
 import { createMobileOptionsHandler, withMobileCors } from "./cors";
 import { getSupabasePublishableKey, getSupabaseUrl } from "@/lib/supabase-keys";
@@ -139,10 +140,12 @@ async function handlePOST(req: NextRequest, timer: Timer) {
 
   try {
     const payload = await timer.time("login_flow", () =>
-      loginMobileUser(serviceClient, sessionClient, {
-        ...parsed.data,
-        orgSlug: normalizedOrgSlug,
-      }),
+      loginMobileUser(
+        serviceClient,
+        sessionClient,
+        { ...parsed.data, orgSlug: normalizedOrgSlug },
+        { loadPlatformBillingPolicy: () => getPlatformBillingPolicy(serviceClient) },
+      ),
     );
 
     if (clientHasGoneAway(req, startedAt)) {

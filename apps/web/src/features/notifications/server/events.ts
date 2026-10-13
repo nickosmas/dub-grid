@@ -3,6 +3,8 @@ import { summarizePermissionChanges } from "@/lib/permission-labels";
 import { formatOrganizationRoleLabel } from "@/lib/client-facing";
 import { fetchPublishedShiftRows } from "@/lib/published-shifts";
 import logger from "@/lib/logger";
+import { TRIAL_GRACE_DAYS } from "@dubgrid/domain";
+import { BILLING_POLICY_OVERRIDE_SELECT, getOrgBillingPolicy } from "@/lib/billing-policy";
 import { sendNotification } from "./sender";
 import type { NotificationType } from "@/types";
 import type { NotificationEmailDetail } from "@/emails/NotificationEmail";
@@ -175,6 +177,14 @@ export type NotificationEvent =
       action: "billing_trial_expired";
       orgId: string;
       trialEndsAt: string;
+    }
+  | {
+      action: "billing_access_locked";
+      orgId: string;
+      /** What ran out: the trial's grace or an overdue payment's grace. */
+      reason: "trial" | "payment";
+      /** When access locked; dedupes repeated cron runs. */
+      lockedAt: string;
     }
   // ── Expiry sweepers (cron-driven) ───────────────────────────────────────
   | {
@@ -422,6 +432,40 @@ function formatNotificationDateRange(start: string, end: string): string {
   const startYear = start.slice(0, 4);
   const openEnd = startYear === end.slice(0, 4) ? from.replace(`, ${startYear}`, "") : from;
   return `${openEnd} \u2013 ${to}`;
+}
+
+function validTimeZone(timeZone: string | null | undefined): string {
+  if (!timeZone) return "UTC";
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone });
+    return timeZone;
+  } catch {
+    return "UTC";
+  }
+}
+
+async function getOrgTimeZone(orgId: string): Promise<string> {
+  const db = getServiceClient();
+  const { data } = await db.from("organizations").select("timezone").eq("id", orgId).maybeSingle();
+  return validTimeZone(data?.timezone as string | null | undefined);
+}
+
+/** The org's time zone and its effective trial grace period, for trial alerts. */
+async function getOrgTrialContext(
+  orgId: string,
+): Promise<{ timeZone: string; trialGraceDays: number }> {
+  const db = getServiceClient();
+  const { data } = await db
+    .from("organizations")
+    .select(`timezone, ${BILLING_POLICY_OVERRIDE_SELECT}`)
+    .eq("id", orgId)
+    .maybeSingle();
+  const row = (data ?? null) as Record<string, unknown> | null;
+  const { values } = await getOrgBillingPolicy(db, row);
+  return {
+    timeZone: validTimeZone(row?.timezone as string | null | undefined),
+    trialGraceDays: values.trialGraceDays,
+  };
 }
 
 async function getOrgName(orgId: string): Promise<string> {
@@ -1156,6 +1200,7 @@ async function dispatchNotificationEventInternal(
         metadataValue: event.periodKey,
       });
       if (alreadySent) return;
+      const timeZone = await getOrgTimeZone(event.orgId);
       await Promise.all(
         superAdmins.map((userId) =>
           sendNotification(
@@ -1163,7 +1208,7 @@ async function dispatchNotificationEventInternal(
             event.orgId,
             "billing_trial_ending_soon" as NotificationType,
             "Your trial ends soon",
-            `Your trial ends on ${formatTrialDate(event.trialEndsAt)}. Add a payment method to keep your team on the schedule.`,
+            `Your free trial ends on ${formatTrialDate(event.trialEndsAt, timeZone)}. Add a payment method to keep your organization open.`,
             {
               trialEndsAt: event.trialEndsAt,
               periodKey: event.periodKey,
@@ -1182,6 +1227,8 @@ async function dispatchNotificationEventInternal(
         metadataValue: event.trialEndsAt,
       });
       if (alreadySent) return;
+      const { timeZone, trialGraceDays } = await getOrgTrialContext(event.orgId);
+      const body = trialExpiredBody(event.trialEndsAt, timeZone, new Date(), trialGraceDays);
       await Promise.all(
         superAdmins.map((userId) =>
           sendNotification(
@@ -1189,8 +1236,31 @@ async function dispatchNotificationEventInternal(
             event.orgId,
             "billing_trial_expired" as NotificationType,
             "Your trial has ended",
-            "Your free trial has ended. Add a payment method now to restore full access.",
+            body,
             { trialEndsAt: event.trialEndsAt },
+          ),
+        ),
+      );
+      return;
+    }
+
+    case "billing_access_locked": {
+      const superAdmins = await getOrgSuperAdmins(event.orgId);
+      const alreadySent = await hasExistingNotification(event.orgId, {
+        type: "billing_access_locked",
+        metadataKey: "lockedAt",
+        metadataValue: event.lockedAt,
+      });
+      if (alreadySent) return;
+      await Promise.all(
+        superAdmins.map((userId) =>
+          sendNotification(
+            userId,
+            event.orgId,
+            "billing_access_locked" as NotificationType,
+            "Your organization is on hold",
+            accessLockedBody(event.reason),
+            { reason: event.reason, lockedAt: event.lockedAt },
           ),
         ),
       );
@@ -1342,14 +1412,36 @@ function formatEventTime(iso: string): string {
   })} UTC`;
 }
 
-function formatTrialDate(iso: string): string {
+function formatTrialDate(iso: string, timeZone: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
   return date.toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
+    timeZone,
   });
+}
+
+/** Grace still running: say until when. Already past it: say how to reopen. */
+export function trialExpiredBody(
+  trialEndsAt: string,
+  timeZone: string,
+  now: Date,
+  trialGraceDays: number = TRIAL_GRACE_DAYS,
+): string {
+  const endedOn = formatTrialDate(trialEndsAt, timeZone);
+  const graceEndsAt = new Date(Date.parse(trialEndsAt) + trialGraceDays * 86_400_000);
+  if (graceEndsAt.getTime() > now.getTime()) {
+    return `Your free trial ended on ${endedOn}. Add a payment method by ${formatTrialDate(graceEndsAt.toISOString(), timeZone)} to keep your organization open.`;
+  }
+  return `Your free trial ended on ${endedOn}, so your organization is on hold. Add a payment method to reopen it.`;
+}
+
+export function accessLockedBody(reason: "trial" | "payment"): string {
+  return reason === "trial"
+    ? "Your free trial and its extra days are over, so your organization is on hold. Add a payment method to reopen it."
+    : "A payment is overdue, so your organization is on hold. Update your payment details to reopen it.";
 }
 
 async function hasExistingNotification(

@@ -1,5 +1,7 @@
 "use client";
 
+import type { BillingPolicy, BillingPolicyOverrides } from "@dubgrid/domain";
+import type { BillingHistoryReport } from "@/features/gridmaster/billing-history";
 import type {
   AuditLogEntry,
   FullAuditLogEntry,
@@ -10,6 +12,7 @@ import type {
   EmployeeActivityEntry,
   GridmasterAccount,
   GridmasterAuditExportResult,
+  GridmasterBillingOrgSummary,
   GridmasterBillingSummary,
   GridmasterComplianceSummary,
   GridmasterOrgHealthSummary,
@@ -531,6 +534,62 @@ export function fetchGridmasterBilling(): Promise<GridmasterBillingSummary> {
   return requestGridmasterJson("/api/gridmaster/billing");
 }
 
+export interface GridmasterOrgBilling {
+  organization: GridmasterBillingOrgSummary;
+  stripeMode: "test" | "live" | null;
+}
+
+export interface GridmasterPlatformBillingPolicy extends BillingPolicy {
+  updatedAt: string;
+}
+
+export function fetchGridmasterBillingPolicy(): Promise<{
+  platform: GridmasterPlatformBillingPolicy;
+}> {
+  return requestGridmasterJson("/api/gridmaster/billing-policy");
+}
+
+export function fetchGridmasterBillingHistory(): Promise<BillingHistoryReport> {
+  return requestGridmasterJson("/api/gridmaster/billing-history");
+}
+
+export interface GridmasterSeatHistoryRow {
+  seats: number;
+  billable_app_users: number | null;
+  source: "stripe" | "checkout" | "gridmaster" | "backfill";
+  recorded_at: string;
+}
+
+export function fetchGridmasterOrgSeatHistory(
+  orgId: string,
+): Promise<{ seats: GridmasterSeatHistoryRow[] }> {
+  return requestGridmasterJson(
+    `/api/gridmaster/billing-history?orgId=${encodeURIComponent(orgId)}`,
+  );
+}
+
+export type GridmasterBillingPolicyInput =
+  | { scope: "platform"; values: BillingPolicy; expectedUpdatedAt: string }
+  | { scope: "organization"; orgId: string; overrides: BillingPolicyOverrides };
+
+export function updateGridmasterBillingPolicy(
+  input: GridmasterBillingPolicyInput,
+  accessToken?: string,
+): Promise<unknown> {
+  return requestGridmasterJson("/api/gridmaster/billing-policy", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify(input),
+  });
+}
+
+export function fetchGridmasterOrgBilling(orgId: string): Promise<GridmasterOrgBilling> {
+  return requestGridmasterJson(`/api/gridmaster/billing?orgId=${encodeURIComponent(orgId)}`);
+}
+
 export function syncGridmasterBilling(orgId: string): Promise<{ success: true }> {
   return requestGridmasterJson("/api/gridmaster/stripe-sync", {
     method: "POST",
@@ -539,34 +598,28 @@ export function syncGridmasterBilling(orgId: string): Promise<{ success: true }>
   });
 }
 
+export type GridmasterSubscriptionInput =
+  | { orgId: string; action: "set_trial_days"; trialDays: number }
+  | { orgId: string; action: "end_trial" }
+  | { orgId: string; action: "expire_trial" }
+  | { orgId: string; action: "cancel" }
+  | { orgId: string; action: "cancel_at_period_end" }
+  | { orgId: string; action: "sync_seats" }
+  | { orgId: string; action: "override_status"; status: string; reason: string }
+  | { orgId: string; action: "pause_billing"; reason: string }
+  | { orgId: string; action: "resume_billing" }
+  | { orgId: string; action: "extend_grace"; days: number; reason: string };
+
 export function updateGridmasterSubscription(
-  input:
-    | {
-        orgId: string;
-        action: "extend_trial";
-        trialDays: number;
-      }
-    | {
-        orgId: string;
-        action: "cancel";
-      }
-    | {
-        orgId: string;
-        action: "cancel_at_period_end";
-      }
-    | {
-        orgId: string;
-        action: "sync_seats";
-      }
-    | {
-        orgId: string;
-        action: "override_status";
-        status: string;
-      },
+  input: GridmasterSubscriptionInput,
+  accessToken?: string,
 ): Promise<{ success: true }> {
   return requestGridmasterJson("/api/gridmaster/subscription", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify(input),
   });
 }

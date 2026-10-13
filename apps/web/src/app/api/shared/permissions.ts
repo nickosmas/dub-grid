@@ -1,14 +1,11 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { buildPermissionContext } from "@dubgrid/authz";
-import {
-  ACCOUNT_DISABLED_CODE,
-  ACCOUNT_DISABLED_MESSAGE,
-  evaluateOrganizationBillingAccess,
-} from "@dubgrid/domain";
+import { ACCOUNT_DISABLED_CODE, ACCOUNT_DISABLED_MESSAGE } from "@dubgrid/domain";
 import type { AdminPermissions, OrganizationRole } from "@/types";
 import { createRequestSupabaseClient, requireAuthenticatedUser } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
+import { BILLING_ACCESS_SELECT, evaluateOrgBillingAccess } from "@/lib/billing-policy";
 import { getSandboxFromCookie, SANDBOX_COOKIE_NAME } from "@/lib/sandbox-cookie";
 import { cacheGet, cacheSet, CacheKey, TTL } from "@/lib/cache";
 import { API_ERRORS } from "@dubgrid/client-errors";
@@ -481,7 +478,9 @@ export async function requireOrgPermissions(
         .maybeSingle(),
       serviceClient
         .from("organizations")
-        .select("archived_at, suspended_at, subscription_status, trial_ends_at")
+        .select(
+          `archived_at, suspended_at, subscription_status, trial_ends_at, ${BILLING_ACCESS_SELECT}`,
+        )
         .eq("id", orgId)
         .maybeSingle(),
       isCallerInactive(serviceClient, auth.user.id, orgId),
@@ -550,11 +549,7 @@ export async function requireOrgPermissions(
     { isInactive: inactive && !isGridmaster && !isSuperAdmin },
   );
 
-  const billingAccess = evaluateOrganizationBillingAccess({
-    suspendedAt: organization?.suspended_at ?? null,
-    subscriptionStatus: organization?.subscription_status ?? null,
-    trialEndsAt: organization?.trial_ends_at ?? null,
-  });
+  const billingAccess = await evaluateOrgBillingAccess(serviceClient, organization);
   if (billingAccess.isLocked && !options?.allowLockedOrganization && !permissions.isGridmaster) {
     return { response: lockedOrganizationResponse() };
   }

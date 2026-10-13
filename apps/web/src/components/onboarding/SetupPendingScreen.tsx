@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { Button } from "@/components/Button";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { AuthStateCard } from "@/components/auth/AuthStateCard";
-import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { DubGridStackedLockup } from "@/components/Logo";
 import { useLogout } from "@/hooks";
 
 const RECHECK_INTERVAL_MS = 30_000;
@@ -32,8 +32,7 @@ export default function SetupPendingScreen() {
     <PageShell>
       <Card>
         <div className="dg-auth-logo-block dg-auth-logo-block--spacious">
-          <DubGridLogo size={72} />
-          <DubGridWordmark />
+          <DubGridStackedLockup />
         </div>
 
         <AuthStateCard

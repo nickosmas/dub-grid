@@ -96,7 +96,7 @@ describe("OrganizationLockedScreen", () => {
   });
 
   it.each([
-    ["trial_pending", /Super Admin starts the trial on the web/i],
+    ["trial_pending", /next time a Super Admin signs in/i],
     ["trial_ending_soon", /trial is ending soon/i],
     ["payment_attention_required", /organization may still be available/i],
   ])("shows truthful recovery detail to a Super Admin for %s", (state, expectedCopy) => {
@@ -181,5 +181,69 @@ describe("OrganizationLockedScreen", () => {
     );
 
     expect(useQuery).toHaveBeenCalledWith(expect.objectContaining({ enabled: false }));
+  });
+
+  it("does not offer billing for a suspended organization", () => {
+    mockStatus({
+      state: "suspended",
+      isLocked: true,
+      trialGraceEndsAt: null,
+      orgRole: "super_admin",
+    });
+
+    render(
+      <OrganizationLockedScreen
+        accessToken="token-123"
+        message="Organization unavailable. Contact DubGrid support for help."
+        onRetry={onRetry}
+        onSignOut={onSignOut}
+      />,
+    );
+
+    expect(screen.queryByText("Manage billing on web")).not.toBeInTheDocument();
+  });
+
+  it("shows the sign-in message when the organization status can't be read", () => {
+    useQuery.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error("x"),
+    });
+
+    render(
+      <OrganizationLockedScreen
+        accessToken="token-123"
+        message="Organization unavailable. Sign in on the web to manage billing."
+        onRetry={onRetry}
+        onSignOut={onSignOut}
+      />,
+    );
+
+    expect(screen.getByText("Sign in on the web to manage billing.")).toBeInTheDocument();
+  });
+
+  it("says a pending trial starts at the next Super Admin sign-in", () => {
+    mockStatus({
+      state: "trial_pending",
+      isLocked: false,
+      trialGraceEndsAt: null,
+      orgRole: "super_admin",
+    });
+
+    render(
+      <OrganizationLockedScreen
+        accessToken="token-123"
+        message="Organization unavailable."
+        onRetry={onRetry}
+        onSignOut={onSignOut}
+      />,
+    );
+
+    expect(
+      screen.getByText(
+        "The trial starts the next time a Super Admin signs in. Try again to refresh access.",
+      ),
+    ).toBeInTheDocument();
   });
 });

@@ -1358,13 +1358,12 @@ describe("operations reports", () => {
 
     expect(text.startsWith("%PDF-1.4")).toBe(true);
     expect(text).toContain("/Subtype /Image");
-    expect(text).toContain("q 24.00 0 0 24.00 32.00 556.00 cm /Logo Do Q");
-    expect(text).toContain("q 72.00 0 0 25.50 64.00 555.25 cm /Wordmark Do Q");
+    expect(text).toContain("q 88.19 0 0 25.50 32.00 555.25 cm /Lockup Do Q");
     expect(text).toContain("q 0.059 0.090 0.141 rg 32.00 532.00 728.00 1.40 re f Q");
-    expect(text).not.toContain(`/F2 18 Tf 1 0 0 1 64.00 563.00 Tm <${pdfHex("dubgrid")}> Tj`);
-    expect(text).toContain("q 0.580 0.639 0.722 rg 141.80 560.00 0.80 16.00 re f Q");
+    expect(text).not.toContain(`<${pdfHex("dubgrid")}> Tj`);
+    expect(text).toContain("q 0.580 0.639 0.722 rg 127.99 560.00 0.80 16.00 re f Q");
     expect(text).not.toContain(`Tm <${pdfHex("|")}> Tj`);
-    expect(text).toContain(`/F1 11 Tf 1 0 0 1 148.40 564.15 Tm <${pdfHex("Acme Health")}> Tj`);
+    expect(text).toContain(`/F1 11 Tf 1 0 0 1 136.59 564.15 Tm <${pdfHex("Acme Health")}> Tj`);
     expect(text).toContain(pdfHex("Acme Health"));
     expect(text).toContain(pdfHex("Staff hours - May 3, 2026 to May 4, 2026"));
     expect(text).toContain(pdfHex("Printed May 4, 2026"));
@@ -1605,5 +1604,33 @@ describe("report reads page past the API row cap", () => {
     expect(employeeRanges.length).toBeGreaterThanOrEqual(2);
     expect(ranges).toContainEqual([0, pageSize - 1]);
     expect(ranges).toContainEqual([pageSize, pageSize * 2 - 1]);
+  });
+});
+
+describe("operations report PDF without the lockup image", () => {
+  it("draws the symbol and a text wordmark spaced by the lockup rule", async () => {
+    // The lockup is read relative to the working directory and cached per
+    // module, so a fresh module in a directory without it takes the fallback.
+    vi.resetModules();
+    const cwd = vi.spyOn(process, "cwd").mockReturnValue("/nonexistent");
+    try {
+      const fresh = await import("./operations");
+      const payload = fresh.buildOperationsReportPayload(buildSource(), {
+        startDate: "2026-05-03",
+        endDate: "2026-05-04",
+      });
+      const text = new TextDecoder().decode(fresh.buildOperationsReportPdf(payload, "staff-hours"));
+
+      expect(text).not.toContain("/Lockup");
+      expect(text).toMatch(/q 0\.059 0\.090 0\.141 RG [\d.]+ w .* h S Q/);
+      expect(text).toMatch(
+        /q 1\.000 1\.000 1\.000 rg 1\.000 1\.000 1\.000 RG [\d.]+ w 1 j .* h B Q/,
+      );
+      // 17 pt wordmark: the symbol's ink is 21.39 wide, then 0.23 em (3.91) to the text.
+      expect(text).toContain(`/F2 17 Tf 1 0 0 1 57.30 563.58 Tm <${pdfHex("dubgrid")}> Tj`);
+    } finally {
+      cwd.mockRestore();
+      vi.resetModules();
+    }
   });
 });

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { dispatchNotificationEvent } from "./events";
+import { accessLockedBody, dispatchNotificationEvent, trialExpiredBody } from "./events";
 import { sendNotification } from "./sender";
 
 const fromMock = vi.fn();
@@ -698,6 +698,18 @@ describe("dispatchNotificationEvent", () => {
     expect(sendNotification).not.toHaveBeenCalled();
   });
 
+  it("dates the trial-ended alert in the organization's time zone", () => {
+    const trialEndsAt = "2026-10-09T06:49:00Z";
+    expect(
+      trialExpiredBody(trialEndsAt, "America/Los_Angeles", new Date("2026-10-10T00:00:00Z")),
+    ).toBe(
+      "Your free trial ended on October 8, 2026. Add a payment method by October 11, 2026 to keep your organization open.",
+    );
+    expect(trialExpiredBody(trialEndsAt, "UTC", new Date("2026-10-13T00:00:00Z"))).toBe(
+      "Your free trial ended on October 9, 2026, so your organization is on hold. Add a payment method to reopen it.",
+    );
+  });
+
   it("fans out billing_trial_expired with trialEndsAt-based dedup", async () => {
     fromMock.mockImplementation(
       makeBillingFromMock({
@@ -719,6 +731,47 @@ describe("dispatchNotificationEvent", () => {
       { trialEndsAt: "2026-06-08T00:00:00Z" },
     );
   });
+  it("tells Super Admins their organization is on hold, once per lock", async () => {
+    fromMock.mockImplementation(
+      makeBillingFromMock({ superAdmins: [{ user_id: "sa-1" }], priorBillingRowExists: false }),
+    );
+    await dispatchNotificationEvent("trial-expiry-cron", {
+      action: "billing_access_locked",
+      orgId: "org-1",
+      reason: "payment",
+      lockedAt: "2026-06-03T12:00:00.000Z",
+    });
+    expect(sendNotification).toHaveBeenLastCalledWith(
+      "sa-1",
+      "org-1",
+      "billing_access_locked",
+      "Your organization is on hold",
+      accessLockedBody("payment"),
+      { reason: "payment", lockedAt: "2026-06-03T12:00:00.000Z" },
+    );
+
+    vi.mocked(sendNotification).mockClear();
+    fromMock.mockImplementation(
+      makeBillingFromMock({ superAdmins: [{ user_id: "sa-1" }], priorBillingRowExists: true }),
+    );
+    await dispatchNotificationEvent("trial-expiry-cron", {
+      action: "billing_access_locked",
+      orgId: "org-1",
+      reason: "payment",
+      lockedAt: "2026-06-03T12:00:00.000Z",
+    });
+    expect(sendNotification).not.toHaveBeenCalled();
+  });
+
+  it("says what ran out when access locks", () => {
+    expect(accessLockedBody("trial")).toBe(
+      "Your free trial and its extra days are over, so your organization is on hold. Add a payment method to reopen it.",
+    );
+    expect(accessLockedBody("payment")).toBe(
+      "A payment is overdue, so your organization is on hold. Update your payment details to reopen it.",
+    );
+  });
+
   it("notifies both the requester and the claimant when a claimed pickup is rejected", async () => {
     fromMock.mockImplementation((table: string) => {
       if (table === "shift_requests") {

@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
+import { isLiveSubscriptionStatus } from "@dubgrid/domain";
+import { BILLING_ACCESS_SELECT, evaluateOrgBillingAccess } from "@/lib/billing-policy";
 import type { BillingOperationSummary, OrganizationBillingSummary } from "@/types";
+import { DUBGRID_SUPPORT_ACTOR_LABEL } from "@/lib/client-facing";
 import { clientEnv } from "@/lib/env";
 import { serverEnv } from "@/lib/env.server";
 import { countBillableSeats, type SeatEmployee, type SeatMembership } from "./seats";
@@ -15,6 +17,7 @@ type OrganizationBillingRow = {
   subscription_status: string | null;
   trial_ends_at: string | null;
   subscription_seats: number | null;
+  suspended_at: string | null;
 };
 
 type SubscriptionBillingRow = {
@@ -101,6 +104,58 @@ export function resolveBillingReturnUrl(
   }
 }
 
+/**
+ * The billing changes an organization sees about itself. Upkeep (syncs, seat
+ * true-ups, billing portal visits) stays with DubGrid, and is left out of the
+ * query so it never takes one of the feed's few rows.
+ */
+export const CUSTOMER_BILLING_ACTIONS = [
+  "billing.subscription_created",
+  "billing.subscription_updated",
+  "billing.subscription_cancel_scheduled",
+  "billing.subscription_canceled",
+  "billing.payment_failed",
+  "billing.payment_succeeded",
+  "billing.payment_method_updated",
+  "billing.billing_details_updated",
+  "billing.trial_extended",
+  "billing.trial_changed",
+  "billing.trial_ended",
+  "billing.trial_expired",
+  "billing.status_overridden",
+  "billing.paused",
+  "billing.resumed",
+  "billing.grace_extended",
+] as const;
+
+// Only what the billing detail rows display. Payment-provider ids and event
+// names, and a Gridmaster's own note on an override, never reach the browser.
+const CUSTOMER_DETAIL_KEYS = new Set([
+  "status",
+  "previous_status",
+  "new_status",
+  "quantity",
+  "previous_quantity",
+  "current_period_end",
+  "cancel_at",
+  "amount_due",
+  "amount_paid",
+  "currency",
+  "payment_method_type",
+  "trial_ends_at",
+  "previous_trial_ends_at",
+  "paused_at",
+  "grace_days",
+  "previous_grace_days",
+  "days",
+]);
+
+function customerDetails(details: Record<string, unknown> | null): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(details ?? {}).filter(([key]) => CUSTOMER_DETAIL_KEYS.has(key)),
+  );
+}
+
 function describeBillingOperation(action: string): string {
   switch (action) {
     case "billing.subscription_created":
@@ -123,10 +178,22 @@ function describeBillingOperation(action: string): string {
       return "Billing portal opened";
     case "billing.trial_extended":
       return "Trial extended";
+    case "billing.trial_changed":
+      return "Trial end date changed";
+    case "billing.trial_ended":
+      return "Trial ended early";
+    case "billing.trial_expired":
+      return "Trial expired";
     case "billing.seats_synced":
       return "Seats synced";
     case "billing.status_overridden":
       return "Billing status overridden";
+    case "billing.paused":
+      return "Billing paused";
+    case "billing.resumed":
+      return "Billing resumed";
+    case "billing.grace_extended":
+      return "Grace period extended";
     case "billing.synced":
       return "Billing synced";
     default:
@@ -140,17 +207,18 @@ function describeBillingOperation(action: string): string {
 function actorLabelForBillingOperation(row: BillingAuditRow, actor: BillingActorContext): string {
   const initiatedBy = row.details?.initiated_by;
   if (initiatedBy === "gridmaster" || initiatedBy === "gridmaster_sync") {
-    return "Gridmaster";
+    return DUBGRID_SUPPORT_ACTOR_LABEL;
   }
   if (actor?.id && row.actor_id === actor.id) {
     const name = actorDisplayName(actor);
     return name ? `You (${name})` : "You";
   }
+  // Webhook rows also store "Stripe" as their actor email, so check first.
+  if (initiatedBy === "stripe" || initiatedBy === "stripe_webhook") {
+    return "Payment provider";
+  }
   if (typeof row.actor_email === "string" && row.actor_email.trim()) {
     return row.actor_email;
-  }
-  if (initiatedBy === "stripe" || initiatedBy === "stripe_webhook") {
-    return "Stripe";
   }
   return "System";
 }
@@ -165,7 +233,7 @@ async function loadRecentBillingOperations(
       .from("audit_log")
       .select("id, action, actor_id, actor_email, resource_type, resource_id, details, created_at")
       .eq("org_id", orgId)
-      .like("action", "billing.%")
+      .in("action", [...CUSTOMER_BILLING_ACTIONS])
       .order("created_at", { ascending: false })
       .limit(8);
 
@@ -177,8 +245,9 @@ async function loadRecentBillingOperations(
       label: describeBillingOperation(row.action),
       actorLabel: actorLabelForBillingOperation(row, actor),
       resourceType: row.resource_type ?? "billing",
-      resourceId: row.resource_id,
-      details: row.details ?? {},
+      // The page never shows it, and it is the payment provider's id.
+      resourceId: null,
+      details: customerDetails(row.details),
       createdAt: row.created_at,
     }));
   } catch {
@@ -220,7 +289,7 @@ export async function loadOrganizationBillingSummary(
       serviceClient
         .from("organizations")
         .select(
-          "id, name, slug, stripe_customer_id, subscription_status, trial_ends_at, subscription_seats",
+          `id, name, slug, stripe_customer_id, subscription_status, trial_ends_at, subscription_seats, suspended_at, ${BILLING_ACCESS_SELECT}`,
         )
         .eq("id", orgId)
         .single(),
@@ -257,10 +326,13 @@ export async function loadOrganizationBillingSummary(
     appUserCount,
     seatDelta,
     hasStripeCustomer: Boolean(orgRow.stripe_customer_id ?? subscriptionRow?.stripe_customer_id),
-    hasStripeSubscription: Boolean(subscriptionRow?.stripe_subscription_id),
+    // Only a live subscription can be managed; an ended one means subscribing again.
+    hasStripeSubscription:
+      Boolean(subscriptionRow?.stripe_subscription_id) &&
+      isLiveSubscriptionStatus(subscriptionRow?.status),
     stripeConfigured: isStripeBillingConfigured(),
     canManageBilling: options.canManageBilling,
-    billingAccess: evaluateOrganizationBillingAccess({
+    billingAccess: await evaluateOrgBillingAccess(serviceClient, orgRow, {
       subscriptionStatus: orgRow.subscription_status ?? subscriptionRow?.status ?? null,
       trialEndsAt: orgRow.trial_ends_at ?? subscriptionRow?.trial_end ?? null,
     }),

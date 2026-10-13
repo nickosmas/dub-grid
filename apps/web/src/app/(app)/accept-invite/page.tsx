@@ -5,7 +5,7 @@ import { PublicRoute } from "@/components/RouteGuards";
 import { Form } from "@/components/Form";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { AuthStateCard } from "@/components/auth/AuthStateCard";
-import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { DubGridStackedLockup } from "@/components/Logo";
 import { ApexLandingLink } from "@/components/auth/ApexLandingLink";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { PasswordInput } from "@/components/auth/PasswordInput";
@@ -285,8 +285,7 @@ function AcceptInviteContent() {
       <Card>
         {/* Logo */}
         <ApexLandingLink className="dg-auth-logo-block dg-auth-logo-block--compact">
-          <DubGridLogo size={44} />
-          <DubGridWordmark />
+          <DubGridStackedLockup />
         </ApexLandingLink>
 
         {state === "loading" || state === "processing" ? (

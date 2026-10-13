@@ -25,6 +25,7 @@ export function fetchOrganizationBilling(orgId: string): Promise<OrganizationBil
 export type TrialWelcomeState = {
   shouldShowWelcome: boolean;
   trialEndsAt: string | null;
+  trialGraceDays: number;
 };
 
 export function fetchTrialWelcomeState(): Promise<TrialWelcomeState> {

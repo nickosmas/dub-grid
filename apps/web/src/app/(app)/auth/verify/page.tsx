@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { Button } from "@/components/Button";
 import { AuthStateCard } from "@/components/auth/AuthStateCard";
-import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { DubGridStackedLockup } from "@/components/Logo";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { verifyBrowserOtp } from "@/features/account/client";
 import { ApexLandingLink } from "@/components/auth/ApexLandingLink";
@@ -66,8 +66,7 @@ export default function AuthVerifyPage() {
     <PageShell>
       <Card>
         <ApexLandingLink className="dg-auth-logo-block dg-auth-logo-block--compact">
-          <DubGridLogo size={44} />
-          <DubGridWordmark />
+          <DubGridStackedLockup />
         </ApexLandingLink>
 
         {!tokenHash || !authAction || error ? (

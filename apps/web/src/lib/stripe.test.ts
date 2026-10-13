@@ -171,6 +171,7 @@ describe("syncSubscriptionToDb", () => {
       subscription_status: "active",
       subscription_seats: 7,
       trial_ends_at: "2026-05-03T00:00:00.000Z",
+      payment_grace_started_at: null,
     });
     expect(organizationEq).toHaveBeenCalledWith("id", ORG_ID);
     expect(auditInsert).toHaveBeenCalledWith(
@@ -266,6 +267,7 @@ describe("syncSubscriptionToDb", () => {
       subscription_status: "trialing",
       subscription_seats: 9,
       trial_ends_at: "2026-05-03T00:00:00.000Z",
+      payment_grace_started_at: null,
     });
     expect(auditInsert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -277,8 +279,12 @@ describe("syncSubscriptionToDb", () => {
     );
   });
 
-  it("marks the organization canceled when Stripe has no subscriptions", async () => {
+  it("marks the organization canceled when Stripe no longer has its subscription", async () => {
     subscriptionsList.mockResolvedValue({ data: [] });
+    subscriptionMaybeSingle.mockResolvedValue({
+      data: { stripe_subscription_id: "sub_gone" },
+      error: null,
+    });
     const { syncSubscriptionToDb } = await import("./stripe");
 
     await syncSubscriptionToDb(ORG_ID);
@@ -296,6 +302,72 @@ describe("syncSubscriptionToDb", () => {
     });
     expect(organizationEq).toHaveBeenCalledWith("id", ORG_ID);
     await expectBillingCacheCleared();
+  });
+
+  it("leaves a trial alone when the customer never finished checkout", async () => {
+    subscriptionsList.mockResolvedValue({ data: [] });
+    subscriptionMaybeSingle.mockResolvedValue({ data: null, error: null });
+    const { syncSubscriptionToDb } = await import("./stripe");
+
+    await syncSubscriptionToDb(ORG_ID);
+
+    expect(subscriptionUpdate).not.toHaveBeenCalled();
+    expect(organizationUpdate).not.toHaveBeenCalled();
+    expect(auditInsert).not.toHaveBeenCalled();
+  });
+
+  it("keeps the organization's trial end when a trialing subscription names none", async () => {
+    subscriptionsList.mockResolvedValue({
+      data: [
+        {
+          id: "sub_123",
+          customer: "cus_123",
+          status: "trialing",
+          items: { data: [{ price: { id: "price_123" }, quantity: 3 }] },
+          cancel_at: null,
+          canceled_at: null,
+          trial_end: null,
+        },
+      ],
+    });
+    const { syncSubscriptionToDb } = await import("./stripe");
+
+    await syncSubscriptionToDb(ORG_ID);
+
+    expect(organizationUpdate).toHaveBeenCalledWith({
+      stripe_customer_id: "cus_123",
+      subscription_status: "trialing",
+      subscription_seats: 3,
+      payment_grace_started_at: null,
+    });
+    expect(subscriptionUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "trialing", trial_end: null }),
+      { onConflict: "org_id" },
+    );
+  });
+
+  it("finds a live subscription among a customer's ended ones", async () => {
+    subscriptionsList.mockResolvedValue({
+      data: [
+        { id: "sub_old", status: "canceled" },
+        { id: "sub_live", status: "past_due" },
+      ],
+    });
+    const { findLiveStripeSubscription } = await import("./stripe");
+
+    await expect(findLiveStripeSubscription("cus_123")).resolves.toBe("sub_live");
+    expect(subscriptionsList).toHaveBeenCalledWith({
+      customer: "cus_123",
+      status: "all",
+      limit: 10,
+    });
+  });
+
+  it("finds nothing when every subscription has ended", async () => {
+    subscriptionsList.mockResolvedValue({ data: [{ id: "sub_old", status: "canceled" }] });
+    const { findLiveStripeSubscription } = await import("./stripe");
+
+    await expect(findLiveStripeSubscription("cus_123")).resolves.toBeNull();
   });
 
   it("schedules a subscription cancellation at period end", async () => {

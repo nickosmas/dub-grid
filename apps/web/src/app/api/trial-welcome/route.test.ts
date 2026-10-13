@@ -118,6 +118,7 @@ describe("GET /api/trial-welcome", () => {
     await expect(res.json()).resolves.toEqual({
       shouldShowWelcome: true,
       trialEndsAt: "2026-06-05T00:00:00Z",
+      trialGraceDays: 3,
     });
   });
 
@@ -137,6 +138,7 @@ describe("GET /api/trial-welcome", () => {
     await expect(res.json()).resolves.toEqual({
       shouldShowWelcome: false,
       trialEndsAt: "2026-06-05T00:00:00Z",
+      trialGraceDays: 3,
     });
   });
 
@@ -156,6 +158,7 @@ describe("GET /api/trial-welcome", () => {
     await expect(res.json()).resolves.toEqual({
       shouldShowWelcome: false,
       trialEndsAt: null,
+      trialGraceDays: 3,
     });
     expect(sendResendEmail).not.toHaveBeenCalled();
   });

@@ -8,6 +8,7 @@
  */
 
 import type { FullAuditLogEntry } from "@/types";
+import { DUBGRID_SUPPORT_ACTOR_LABEL } from "@/lib/client-facing";
 import { addDaysToIsoDate, formatDate, getIsoDateInTimeZone } from "@dubgrid/schedule-core";
 import {
   AuditDetails,
@@ -129,13 +130,13 @@ export function summarizeDetails(entry: ActivityEntryLike & { action: string }):
 export function getAuditActorLabel(entry: ActivityEntryLike): string {
   const initiatedBy = detailsOf(entry).initiated_by;
   if (initiatedBy === "gridmaster" || initiatedBy === "gridmaster_sync") {
-    return "Gridmaster";
+    return DUBGRID_SUPPORT_ACTOR_LABEL;
   }
   return entry.actorName ?? entry.actorEmail ?? "System";
 }
 
 export function getAuditActorSecondaryLabel(entry: ActivityEntryLike): string | null {
-  if (getAuditActorLabel(entry) === "Gridmaster") return null;
+  if (getAuditActorLabel(entry) === DUBGRID_SUPPORT_ACTOR_LABEL) return null;
   return entry.actorName ? (entry.actorEmail ?? null) : null;
 }
 

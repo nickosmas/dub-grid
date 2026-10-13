@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
-import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { DubGridLockup, DubGridLogo } from "@/components/Logo";
 import { Button } from "@/components/Button";
 import {
   DashboardIcon,
@@ -29,6 +29,7 @@ import {
 import { useAuth } from "@/components/AuthProvider";
 import { fetchAccountIdentity } from "@/features/account/client";
 import { organizationBillingQueryOptions } from "@/features/billing/queries";
+import { billingToneColors, describeHeaderBillingNotice } from "@/features/billing/trial-status";
 import MobileNavSheet from "@/components/MobileNavSheet";
 import { queryKeys } from "@/lib/query-keys";
 import { getAvatarInitials } from "@/lib/utils";
@@ -37,7 +38,6 @@ import * as Sentry from "@/lib/sentry";
 import NotificationBell from "@/components/NotificationBell";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
 import { MaybeHint } from "@/components/ui/hint";
-import type { OrganizationBillingSummary } from "@/types";
 import SandboxBanner from "@/components/test-sandbox/SandboxBanner";
 import CreateSandboxDialog from "@/components/test-sandbox/CreateSandboxDialog";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -66,109 +66,19 @@ const ROLE_LABELS: Record<string, string> = {
   user: "User",
 };
 
-type BillingNoticeTone = "info" | "warning" | "danger";
-
-interface BillingNotice {
-  label: string;
-  compactLabel: string;
-  ariaLabel: string;
-  tone: BillingNoticeTone;
-}
-
-function formatHeaderBillingNotice(billing: OrganizationBillingSummary): BillingNotice | null {
-  const { billingAccess } = billing;
-
-  if (billingAccess.isLocked) {
-    return {
-      label: "Billing locked",
-      compactLabel: "Locked",
-      ariaLabel: "Billing locked",
-      tone: "danger",
-    };
-  }
-
-  if (billingAccess.state === "payment_attention_required") {
-    return {
-      label: "Billing attention",
-      compactLabel: "Billing",
-      ariaLabel: "Billing attention required",
-      tone: "warning",
-    };
-  }
-
-  if (billingAccess.state === "trial_grace") {
-    return {
-      label: "Trial in grace period",
-      compactLabel: "Grace",
-      ariaLabel: "Trial is in grace period",
-      tone: "danger",
-    };
-  }
-
-  // Trial clock has not started yet (no super_admin has signed in). Neutral,
-  // not a misconfiguration warning.
-  if (billingAccess.state === "trial_pending") {
-    return {
-      label: "Trial starting",
-      compactLabel: "Trial",
-      ariaLabel: "Trial is starting",
-      tone: "info",
-    };
-  }
-
-  const days = billingAccess.daysUntilTrialEnd;
-  if (days == null) {
-    return null;
-  }
-
-  if (days <= 0) {
-    return {
-      label: "Trial ends today",
-      compactLabel: "Today",
-      ariaLabel: "Trial ends today",
-      tone: "danger",
-    };
-  }
-
-  const tone: BillingNoticeTone = days <= 3 ? "danger" : days <= 7 ? "warning" : "info";
-  const dayWord = days === 1 ? "day" : "days";
-  return {
-    label: `Trial ends in ${days} ${dayWord}`,
-    compactLabel: `Trial ${days}d`,
-    ariaLabel: `Trial ends in ${days} ${dayWord}`,
-    tone,
-  };
-}
-
 function HeaderBillingNotice({ orgId, compact = false }: { orgId: string; compact?: boolean }) {
   const billingQuery = useQuery(organizationBillingQueryOptions(orgId));
-  const notice = billingQuery.data ? formatHeaderBillingNotice(billingQuery.data) : null;
+  const notice = billingQuery.data ? describeHeaderBillingNotice(billingQuery.data) : null;
 
   if (!notice) return null;
 
-  const colors =
-    notice.tone === "danger"
-      ? {
-          bg: "var(--dg-color-danger-bg)",
-          border: "var(--dg-color-danger-border)",
-          text: "var(--dg-color-danger)",
-        }
-      : notice.tone === "warning"
-        ? {
-            bg: "var(--dg-color-warning-bg)",
-            border: "var(--dg-color-warning-border)",
-            text: "var(--dg-color-warning)",
-          }
-        : {
-            bg: "var(--dg-color-info-bg)",
-            border: "var(--dg-color-info-border)",
-            text: "var(--dg-color-info-text)",
-          };
+  const colors = billingToneColors(notice.tone);
 
   return (
     <Link
       href="/settings?section=org-billing"
       aria-label={notice.ariaLabel}
+      title={notice.ariaLabel}
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -448,7 +358,7 @@ export default function Header({ orgName }: HeaderProps) {
         >
           {/* Logo + Org Name */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
-            <DubGridLogo size={26} />
+            <DubGridLogo size={36} />
             {orgName && (
               <>
                 <span
@@ -559,8 +469,11 @@ export default function Header({ orgName }: HeaderProps) {
       >
         {/* Logo + Org Anchor */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flexShrink: 0 }}>
-          <DubGridLogo size={30} />
-          {!isTablet && <DubGridWordmark fontSize={18} color="var(--dg-color-text-primary)" />}
+          {isTablet ? (
+            <DubGridLogo size={40} />
+          ) : (
+            <DubGridLockup fontSize={24} color="var(--dg-color-text-primary)" />
+          )}
           {orgName && (
             <>
               <span
@@ -727,8 +640,10 @@ export default function Header({ orgName }: HeaderProps) {
             >
               {initials}
             </div>
-            {!isTablet && !isHeaderNarrow && (
-              <>
+            {!isTablet && (
+              // Hidden by CSS at the narrow-header width, not by the hook, so it
+              // goes in the same frame as a resize instead of a render later.
+              <span className="dg-header-account-detail">
                 <div style={{ textAlign: "left", maxWidth: 120 }}>
                   <div
                     style={{
@@ -766,7 +681,7 @@ export default function Header({ orgName }: HeaderProps) {
                     transform: menuOpen ? "rotate(180deg)" : "rotate(0deg)",
                   }}
                 />
-              </>
+              </span>
             )}
           </Button>
 

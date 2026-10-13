@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
+import { evaluateOrgBillingAccess, ORG_ACCESS_SELECT } from "@/lib/billing-policy";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
 import { CacheKey, cacheDel, cacheSet, TTL } from "@/lib/cache";
@@ -18,6 +18,8 @@ type OrgAccessRow = {
   archived_at: string | null;
   subscription_status: string | null;
   trial_ends_at: string | null;
+  /** The billing policy override columns (see ORG_ACCESS_SELECT). */
+  [column: string]: unknown;
 } | null;
 
 /**
@@ -68,7 +70,7 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await serviceClient
       .from("organizations")
-      .select("suspended_at, archived_at, subscription_status, trial_ends_at")
+      .select(ORG_ACCESS_SELECT)
       .eq("id", orgId)
       .maybeSingle();
     if (error) throw error;
@@ -94,11 +96,7 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const billingAccess = evaluateOrganizationBillingAccess({
-    suspendedAt: org?.suspended_at ?? null,
-    subscriptionStatus: org?.subscription_status ?? null,
-    trialEndsAt: org?.trial_ends_at ?? null,
-  });
+  const billingAccess = await evaluateOrgBillingAccess(getServiceClient(), org);
 
   // Mirrors the proxy: a super admin can recover billing themselves, so it
   // never parks them on the gate page while the trial clock is unstarted.

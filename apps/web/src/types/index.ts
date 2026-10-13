@@ -16,6 +16,7 @@ import type {
   ShiftDisplayMode,
   ShiftRequestStatus,
   ShiftRequestType,
+  ResolvedBillingPolicy,
 } from "@dubgrid/domain";
 export type {
   AdminPermissions,
@@ -779,6 +780,7 @@ export type NotificationType =
   | "billing_payment_succeeded"
   | "billing_trial_ending_soon"
   | "billing_trial_expired"
+  | "billing_access_locked"
   // security
   | "security_email_changed"
   | "security_password_changed"
@@ -1016,6 +1018,8 @@ export interface GridmasterOrgHealthSummary {
     trialEndsAt: string | null;
     subscriptionSeats: number | null;
     stripeCustomerId: string | null;
+    /** The organization's effective grace after its trial, in days. */
+    trialGraceDays: number;
   };
   featureOverrides: Record<string, boolean>;
 }
@@ -1103,6 +1107,13 @@ export interface GridmasterBillingOrgSummary {
   employeeCount: number;
   seatDelta: number | null;
   updatedAt: string | null;
+  /** The organization's effective billing policy and where each value comes from. */
+  policy: ResolvedBillingPolicy;
+  suspendedAt: string | null;
+  /** Set while a Gridmaster has paused this organization's billing. */
+  billingHold: { pausedAt: string; reason: string | null } | null;
+  /** When payment attention began; its grace runs from here. */
+  paymentGraceStartedAt: string | null;
 }
 
 export interface GridmasterBillingSummary {
@@ -1114,6 +1125,8 @@ export interface GridmasterBillingSummary {
   riskOrganizations: GridmasterBillingOrgSummary[];
   missingStripeCustomer: GridmasterBillingOrgSummary[];
   seatMismatches: GridmasterBillingOrgSummary[];
+  /** Which Stripe dashboard links open; set by the billing route. */
+  stripeMode?: "test" | "live" | null;
 }
 
 export interface GridmasterComplianceSummary {
