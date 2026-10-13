@@ -843,7 +843,7 @@
         organization Billing tab loads only its own organization, billing
         table rows work from the keyboard, and payment-provider links respect
         test mode.
-  - [ ] 44c. **Customer billing clarity** - the billing activity feed shows
+  - [x] 44c. **Customer billing clarity** - the billing activity feed shows
         changes that affect the customer (trial extended, status changed,
         cancellation) without raw payment-provider details and hides upkeep
         such as syncs and seat counts (owner decision, 2026-10-12); plain

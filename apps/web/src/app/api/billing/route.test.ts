@@ -166,7 +166,7 @@ describe("GET /api/billing", () => {
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
-              like: vi.fn(() => ({
+              in: vi.fn(() => ({
                 order: vi.fn(() => ({
                   limit: auditLimit,
                 })),
@@ -243,10 +243,10 @@ describe("GET /api/billing", () => {
           id: "42",
           action: "billing.subscription_canceled",
           label: "Subscription canceled",
-          actorLabel: "Stripe",
+          actorLabel: "Payment provider",
           resourceType: "billing",
-          resourceId: "sub_123",
-          details: { initiated_by: "stripe" },
+          resourceId: null,
+          details: {},
           createdAt: "2026-05-03T12:00:00.000Z",
         },
         {
@@ -256,7 +256,7 @@ describe("GET /api/billing", () => {
           actorLabel: "DubGrid Support",
           resourceType: "billing",
           resourceId: null,
-          details: { initiated_by: "gridmaster", days: 14 },
+          details: { days: 14 },
           createdAt: "2026-05-03T11:00:00.000Z",
         },
         {
@@ -265,8 +265,8 @@ describe("GET /api/billing", () => {
           label: "Subscription started",
           actorLabel: "You (Olivia Chen)",
           resourceType: "billing",
-          resourceId: "sub_456",
-          details: { initiated_by: "checkout_sync" },
+          resourceId: null,
+          details: {},
           createdAt: "2026-05-03T10:00:00.000Z",
         },
       ],

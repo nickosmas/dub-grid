@@ -141,12 +141,12 @@ describe("BillingSettings", () => {
 
     expect(await screen.findByText("Trial time left")).toBeInTheDocument();
     expect(screen.getByText("14 days")).toBeInTheDocument();
-    expect(screen.getByText("App users")).toBeInTheDocument();
+    expect(screen.getByText("Billable users")).toBeInTheDocument();
     expect(screen.getByText("6")).toBeInTheDocument();
     expect(screen.queryByText("Active organization users")).not.toBeInTheDocument();
     expect(screen.queryByText("Ends May 16, 2026")).not.toBeInTheDocument();
     expect(screen.queryByText("Billed seats")).not.toBeInTheDocument();
-    expect(screen.queryByText("Seat delta")).not.toBeInTheDocument();
+    expect(screen.queryByText("Seat difference")).not.toBeInTheDocument();
     expect(screen.queryByText("Renewal")).not.toBeInTheDocument();
     expect(screen.getByText("Trial ends")).toBeInTheDocument();
     expect(screen.getByText("May 16, 2026")).toBeInTheDocument();
@@ -210,7 +210,7 @@ describe("BillingSettings", () => {
 
     renderBillingSettings();
 
-    expect(await screen.findByText("App users")).toBeInTheDocument();
+    expect(await screen.findByText("Billable users")).toBeInTheDocument();
     expect(screen.queryByText("Trial time left")).not.toBeInTheDocument();
     expect(
       screen.getByText(
@@ -222,7 +222,7 @@ describe("BillingSettings", () => {
   it("does not show sign out while billing is available", async () => {
     renderBillingSettings();
 
-    expect(await screen.findByText("App users")).toBeInTheDocument();
+    expect(await screen.findByText("Billable users")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Sign out" })).not.toBeInTheDocument();
   });
 
@@ -302,5 +302,45 @@ describe("BillingSettings", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Start subscription" }));
 
     await vi.waitFor(() => expect(toast.error).toHaveBeenCalledWith(message));
+  });
+
+  it("says how seats compare with billable users", async () => {
+    vi.mocked(fetchOrganizationBilling).mockResolvedValueOnce({
+      ...billingSummary,
+      status: "active",
+      subscriptionSeats: 4,
+      seatDelta: -2,
+      hasStripeCustomer: true,
+      hasStripeSubscription: true,
+      billingAccess: {
+        state: "active",
+        reason: "active_subscription",
+        isLocked: false,
+        shouldNotifyAdmins: false,
+        daysUntilTrialEnd: null,
+        trialGraceEndsAt: null,
+      },
+    });
+
+    renderBillingSettings();
+
+    expect(await screen.findByText("Seat difference")).toBeInTheDocument();
+    expect(screen.getByText("2 without a seat")).toBeInTheDocument();
+    expect(screen.getByText("Billed seats")).toBeInTheDocument();
+  });
+
+  it("explains in plain words when online billing isn't set up", async () => {
+    vi.mocked(fetchOrganizationBilling).mockResolvedValueOnce({
+      ...billingSummary,
+      stripeConfigured: false,
+    });
+
+    renderBillingSettings();
+
+    expect(
+      await screen.findByText(
+        "Online billing isn't set up here. Contact DubGrid Support to subscribe.",
+      ),
+    ).toBeInTheDocument();
   });
 });

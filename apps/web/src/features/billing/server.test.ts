@@ -5,6 +5,8 @@ import { loadOrganizationBillingSummary } from "./server";
 // real source org's data (the route resolves it with ignoreSandbox). So this
 // exercises the real mapping for a normal organization: org row + subscription
 // + billable app-user count + recent billing audit-log operations.
+const auditActionFilter: string[] = [];
+
 function createQueryClient(
   overrides: {
     org?: Record<string, unknown>;
@@ -93,37 +95,43 @@ function createQueryClient(
         return {
           select: () => ({
             eq: () => ({
-              like: () => ({
-                order: () => ({
-                  limit: async () => ({
-                    data: [
-                      {
-                        id: 1,
-                        action: "billing.subscription_created",
-                        created_at: "2026-05-03T00:00:00Z",
-                      },
-                      {
-                        id: 4,
-                        action: "billing.status_overridden",
-                        details: {
-                          initiated_by: "gridmaster",
-                          previous_status: "trialing",
-                          new_status: "active",
-                          reason: "Internal note",
+              in: (_column: string, actions: string[]) => {
+                auditActionFilter.push(...actions);
+                return {
+                  order: () => ({
+                    limit: async () => ({
+                      data: [
+                        {
+                          id: 1,
+                          action: "billing.subscription_created",
+                          actor_email: "Stripe",
+                          details: {
+                            initiated_by: "stripe",
+                            stripe_event_id: "evt_123",
+                            stripe_event_type: "customer.subscription.created",
+                            customer_id: "cus_123",
+                            status: "active",
+                            quantity: 5,
+                          },
+                          created_at: "2026-05-03T00:00:00Z",
                         },
-                        created_at: "2026-05-02T12:00:00Z",
-                      },
-                      { id: 2, action: "billing.seats_synced", created_at: "2026-05-02T00:00:00Z" },
-                      {
-                        id: 3,
-                        action: "billing.portal_opened",
-                        created_at: "2026-05-01T00:00:00Z",
-                      },
-                    ],
-                    error: null,
+                        {
+                          id: 4,
+                          action: "billing.status_overridden",
+                          details: {
+                            initiated_by: "gridmaster",
+                            previous_status: "trialing",
+                            new_status: "active",
+                            reason: "Internal note",
+                          },
+                          created_at: "2026-05-02T12:00:00Z",
+                        },
+                      ],
+                      error: null,
+                    }),
                   }),
-                }),
-              }),
+                };
+              },
             }),
           }),
         };
@@ -158,12 +166,20 @@ describe("loadOrganizationBillingSummary", () => {
     expect(summary.recentOperations?.map((operation) => operation.label)).toEqual([
       "Subscription started",
       "Billing status overridden",
-      "Seats synced",
-      "Billing portal opened",
     ]);
-    // Support's note stays with DubGrid; the organization sees what changed.
+    // Upkeep is left out of the query, so it never takes a row.
+    expect(auditActionFilter).toContain("billing.subscription_created");
+    expect(auditActionFilter).not.toContain("billing.seats_synced");
+    expect(auditActionFilter).not.toContain("billing.synced");
+    expect(auditActionFilter).not.toContain("billing.portal_opened");
+    // Only display fields reach the browser; provider ids and support notes don't.
+    expect(summary.recentOperations?.[0]).toMatchObject({
+      actorLabel: "Payment provider",
+      details: { status: "active", quantity: 5 },
+    });
+    expect(summary.recentOperations?.[0]?.details).not.toHaveProperty("stripe_event_id");
+    expect(summary.recentOperations?.[0]?.details).not.toHaveProperty("customer_id");
     expect(summary.recentOperations?.[1]?.details).toEqual({
-      initiated_by: "gridmaster",
       previous_status: "trialing",
       new_status: "active",
     });

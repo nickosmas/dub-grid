@@ -4,6 +4,7 @@ import {
   describeBillingNotice,
   describeBillingStatus,
   describeHeaderBillingNotice,
+  describeSeatDifference,
   describeTrialMetrics,
   type BillingStateInput,
 } from "./trial-status";
@@ -153,5 +154,13 @@ describe("describeTrialMetrics", () => {
     expect(describeTrialMetrics(expired, now).map((metric) => metric.label)).toEqual([
       "Trial ended",
     ]);
+  });
+});
+
+describe("describeSeatDifference", () => {
+  it("says how many users lack a seat, or how many seats go unused", () => {
+    expect(describeSeatDifference(-2)).toBe("2 without a seat");
+    expect(describeSeatDifference(3)).toBe("3 unused");
+    expect(describeSeatDifference(0)).toBe("None");
   });
 });

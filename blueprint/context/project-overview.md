@@ -106,8 +106,10 @@ Item 44 is split:
   say what they do, disabled actions explain themselves, one End trial control
   offers the grace period or locking now, and the Billing tab loads only its
   organization.
-- **44c - Customer billing clarity:** planned; customers see support changes
-  that affect them, never upkeep or raw payment-provider details.
+- **44c - Customer billing clarity:** shipped; the customer billing feed shows
+  only changes that affect the organization, without payment-provider data,
+  seat figures read in plain words, and the mobile locked screen offers billing
+  only when billing is the cause.
 - **44d to 44g - Policy settings, pause and resume, past-due deadlines and
   lock alerts, seat and revenue history:** planned; each needs a migration.
 

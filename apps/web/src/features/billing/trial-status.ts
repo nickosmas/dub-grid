@@ -308,3 +308,10 @@ export function describeTrialMetrics(
 
   return [];
 }
+
+/** Billed seats minus billable users, said the way an admin reads it. */
+export function describeSeatDifference(seatDelta: number): string {
+  if (seatDelta < 0) return `${-seatDelta} without a seat`;
+  if (seatDelta > 0) return `${seatDelta} unused`;
+  return "None";
+}

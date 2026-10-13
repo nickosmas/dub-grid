@@ -32,6 +32,7 @@ import {
   billingToneColors,
   describeBillingNotice,
   describeBillingStatus,
+  describeSeatDifference,
   describeTrialMetrics,
   type BillingTone,
 } from "@/features/billing/trial-status";
@@ -553,7 +554,7 @@ export default function BillingSettings({ organization }: { organization: { id: 
     billingMetrics.push({
       key: "app-users",
       icon: Users,
-      label: "App users",
+      label: "Billable users",
       value: billing.appUserCount,
     });
     if (billing.subscriptionSeats != null) {
@@ -569,8 +570,8 @@ export default function BillingSettings({ organization }: { organization: { id: 
       billingMetrics.push({
         key: "seat-delta",
         icon: Scale,
-        label: "Seat delta",
-        value: billing.seatDelta,
+        label: "Seat difference",
+        value: describeSeatDifference(billing.seatDelta),
         tone: seatTone,
       });
     }
@@ -702,7 +703,7 @@ export default function BillingSettings({ organization }: { organization: { id: 
 
               {!billing.stripeConfigured && (
                 <NoticeBanner tone="warning">
-                  Stripe billing is not configured for this environment.
+                  Online billing isn&apos;t set up here. Contact DubGrid Support to subscribe.
                 </NoticeBanner>
               )}
 

@@ -45,7 +45,7 @@ function getDetailLine(
   }
 
   if (status.state === "trial_pending") {
-    return "Your organization opens once a Super Admin starts the trial on the web.";
+    return "The trial starts the next time a Super Admin signs in. Try again to refresh access.";
   }
 
   if (status.state === "trial_grace") {
@@ -89,9 +89,14 @@ export function OrganizationLockedScreen({
   });
   const status = statusQuery.data ?? null;
   const isSuperAdmin = status?.orgRole === "super_admin";
-  const body = isSuperAdmin
-    ? formatLockedMessage(message)
-    : "This organization is currently unavailable. Please try again later.";
+  // The sign-in message is already written for the person's role, so when the
+  // status can't be read it is the best thing to show.
+  const body =
+    isSuperAdmin || (statusQuery.isError && !status)
+      ? formatLockedMessage(message)
+      : "This organization is currently unavailable. Please try again later.";
+  // A suspension isn't a billing problem, so billing can't fix it.
+  const showBillingLink = isSuperAdmin && status?.state !== "suspended";
   const detailLine = isSuperAdmin ? getDetailLine(status) : null;
   const graceDate =
     isSuperAdmin && status?.state === "trial_grace"
@@ -123,7 +128,7 @@ export function OrganizationLockedScreen({
           }
           style={styles.actions}
         >
-          {isSuperAdmin ? (
+          {showBillingLink ? (
             <Button
               label="Manage billing on web"
               onPress={() => {

@@ -103,13 +103,49 @@ export function resolveBillingReturnUrl(
   }
 }
 
-// A Gridmaster's own note on an action, such as an override reason, is for
-// DubGrid staff; the organization sees what changed, not why support did it.
-const INTERNAL_DETAIL_KEYS = new Set(["reason"]);
+/**
+ * The billing changes an organization sees about itself. Upkeep (syncs, seat
+ * true-ups, billing portal visits) stays with DubGrid, and is left out of the
+ * query so it never takes one of the feed's few rows.
+ */
+export const CUSTOMER_BILLING_ACTIONS = [
+  "billing.subscription_created",
+  "billing.subscription_updated",
+  "billing.subscription_cancel_scheduled",
+  "billing.subscription_canceled",
+  "billing.payment_failed",
+  "billing.payment_succeeded",
+  "billing.payment_method_updated",
+  "billing.billing_details_updated",
+  "billing.trial_extended",
+  "billing.trial_changed",
+  "billing.trial_ended",
+  "billing.trial_expired",
+  "billing.status_overridden",
+] as const;
 
-function withoutInternalNotes(details: Record<string, unknown> | null): Record<string, unknown> {
+// Only what the billing detail rows display. Payment-provider ids and event
+// names, and a Gridmaster's own note on an override, never reach the browser.
+const CUSTOMER_DETAIL_KEYS = new Set([
+  "status",
+  "previous_status",
+  "new_status",
+  "quantity",
+  "previous_quantity",
+  "current_period_end",
+  "cancel_at",
+  "amount_due",
+  "amount_paid",
+  "currency",
+  "payment_method_type",
+  "trial_ends_at",
+  "previous_trial_ends_at",
+  "days",
+]);
+
+function customerDetails(details: Record<string, unknown> | null): Record<string, unknown> {
   return Object.fromEntries(
-    Object.entries(details ?? {}).filter(([key]) => !INTERNAL_DETAIL_KEYS.has(key)),
+    Object.entries(details ?? {}).filter(([key]) => CUSTOMER_DETAIL_KEYS.has(key)),
   );
 }
 
@@ -164,11 +200,12 @@ function actorLabelForBillingOperation(row: BillingAuditRow, actor: BillingActor
     const name = actorDisplayName(actor);
     return name ? `You (${name})` : "You";
   }
+  // Webhook rows also store "Stripe" as their actor email, so check first.
+  if (initiatedBy === "stripe" || initiatedBy === "stripe_webhook") {
+    return "Payment provider";
+  }
   if (typeof row.actor_email === "string" && row.actor_email.trim()) {
     return row.actor_email;
-  }
-  if (initiatedBy === "stripe" || initiatedBy === "stripe_webhook") {
-    return "Stripe";
   }
   return "System";
 }
@@ -183,7 +220,7 @@ async function loadRecentBillingOperations(
       .from("audit_log")
       .select("id, action, actor_id, actor_email, resource_type, resource_id, details, created_at")
       .eq("org_id", orgId)
-      .like("action", "billing.%")
+      .in("action", [...CUSTOMER_BILLING_ACTIONS])
       .order("created_at", { ascending: false })
       .limit(8);
 
@@ -195,8 +232,9 @@ async function loadRecentBillingOperations(
       label: describeBillingOperation(row.action),
       actorLabel: actorLabelForBillingOperation(row, actor),
       resourceType: row.resource_type ?? "billing",
-      resourceId: row.resource_id,
-      details: withoutInternalNotes(row.details),
+      // The page never shows it, and it is the payment provider's id.
+      resourceId: null,
+      details: customerDetails(row.details),
       createdAt: row.created_at,
     }));
   } catch {
