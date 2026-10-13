@@ -41,7 +41,7 @@ export function TwoFactorReenrollGate({ children }: { children: ReactNode }) {
   if (!applies || !status.data?.reenrollRequired) return <>{children}</>;
 
   return (
-    <main className="flex min-h-screen items-start justify-center bg-[var(--dg-color-bg)] px-4 py-16">
+    <main className="flex min-h-dvh items-start justify-center bg-[var(--dg-color-bg)] px-4 py-16">
       <div className="flex w-full max-w-[520px] flex-col gap-5">
         <div className="flex flex-col gap-2">
           <h1 className="dg-type-page-title">Set up two-factor again</h1>

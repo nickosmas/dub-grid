@@ -6662,7 +6662,7 @@ function SchedulerContent({
       style={{
         fontFamily: "var(--font-sans)",
         background: "var(--dg-color-bg)",
-        minHeight: "100vh",
+        minHeight: "calc(100dvh - var(--dg-app-shell-header-height))",
         color: "var(--dg-color-text-primary)",
       }}
     >

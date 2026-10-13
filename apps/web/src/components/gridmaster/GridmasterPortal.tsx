@@ -628,7 +628,12 @@ export default function GridmasterPortal() {
 
   if (permLoading || signingOut || (isGridmaster && dashboardQuery.isLoading)) {
     return (
-      <div style={{ minHeight: "100vh", background: "var(--dg-color-bg)" }}>
+      <div
+        style={{
+          minHeight: "calc(100dvh - var(--dg-app-shell-header-height))",
+          background: "var(--dg-color-bg)",
+        }}
+      >
         <ProgressBar loading />
       </div>
     );
@@ -638,7 +643,7 @@ export default function GridmasterPortal() {
     return (
       <div
         style={{
-          minHeight: "100vh",
+          minHeight: "calc(100dvh - var(--dg-app-shell-header-height))",
           background: "var(--dg-color-bg)",
           display: "grid",
           placeItems: "center",

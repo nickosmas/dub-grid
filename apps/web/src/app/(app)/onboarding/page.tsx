@@ -64,7 +64,7 @@ export default function OnboardingPage() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          minHeight: "100vh",
+          minHeight: "calc(100dvh - var(--dg-app-shell-header-height))",
           fontFamily: "var(--font-sans)",
         }}
       >
@@ -79,7 +79,7 @@ export default function OnboardingPage() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        minHeight: "100vh",
+        minHeight: "calc(100dvh - var(--dg-app-shell-header-height))",
         padding: "24px",
         fontFamily: "var(--font-sans)",
         background:

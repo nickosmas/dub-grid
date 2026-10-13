@@ -7,7 +7,7 @@ import { Button } from "@/components/Button";
 import { DubGridLogo } from "@/components/Logo";
 
 const shellStyle = {
-  minHeight: "100vh",
+  minHeight: "calc(100dvh - var(--dg-app-shell-header-height))",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",

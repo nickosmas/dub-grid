@@ -18,7 +18,7 @@ export default function TermsOfServicePage() {
   return (
     <div
       style={{
-        minHeight: "100vh",
+        minHeight: "100dvh",
         background: "var(--dg-color-surface)",
         fontFamily: "var(--font-sans)",
         color: "var(--dg-color-text-primary)",

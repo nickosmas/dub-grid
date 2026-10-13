@@ -1147,7 +1147,7 @@ export default function DashboardView({
           ? {
               display: "flex",
               flexDirection: "column",
-              height: "calc(100vh - var(--dg-app-shell-header-height))",
+              height: "calc(100dvh - var(--dg-app-shell-header-height))",
               overflow: "hidden",
             }
           : {}),

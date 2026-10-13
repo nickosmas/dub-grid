@@ -690,7 +690,7 @@ function ReportsContent() {
   return (
     <main
       style={{
-        minHeight: "calc(100vh - var(--dg-app-shell-header-height))",
+        minHeight: "calc(100dvh - var(--dg-app-shell-header-height))",
         background: "var(--dg-color-bg)",
         color: "var(--dg-color-text-primary)",
         padding: "clamp(16px, 3vw, 32px) var(--dg-page-gutter)",

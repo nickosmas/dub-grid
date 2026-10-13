@@ -53,7 +53,7 @@ export default function SetupGuard({ children }: { children: React.ReactNode }) 
     return (
       <div
         style={{
-          minHeight: "100vh",
+          minHeight: "calc(100dvh - var(--dg-app-shell-header-height))",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
