@@ -707,6 +707,44 @@ describe("middleware: route guards", () => {
     );
   });
 
+  it("keeps a paused organization open after its trial ran out", async () => {
+    mockSessionWithClaims({
+      platform_role: "none",
+      org_role: "user",
+      org_id: "org-paused",
+      org_slug: "acme",
+      sub: "user-1",
+    });
+    const monthAgo = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    mockSupabaseFrom.mockImplementation((table: string) => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          maybeSingle: vi.fn().mockResolvedValue({
+            data:
+              table === "organizations"
+                ? {
+                    suspended_at: null,
+                    archived_at: null,
+                    subscription_status: "trialing",
+                    trial_ends_at: monthAgo,
+                    billing_paused_at: monthAgo,
+                  }
+                : null,
+            error: null,
+          }),
+        })),
+      })),
+    }));
+
+    const res = await runMiddleware(
+      makeNextRequest("http://acme.localhost:3000/schedule", { host: "acme.localhost:3000" }),
+    );
+
+    expect((res as { _redirectUrl?: string })._redirectUrl).not.toBe(
+      "http://acme.localhost:3000/billing-required",
+    );
+  });
+
   it("bypasses the in-process access memo when a regular user retries the gate", async () => {
     mockSessionWithClaims({
       platform_role: "none",

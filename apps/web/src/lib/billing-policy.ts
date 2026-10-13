@@ -1,4 +1,5 @@
 import {
+  BILLING_ACCESS_SELECT,
   BILLING_POLICY_OVERRIDE_SELECT,
   DEFAULT_BILLING_POLICY,
   billingPolicyOverridesFromRow,
@@ -14,13 +15,13 @@ import * as Sentry from "@/lib/sentry";
 
 type QueryClient = { from: (table: string) => any };
 
-export { BILLING_POLICY_OVERRIDE_SELECT };
+export { BILLING_ACCESS_SELECT, BILLING_POLICY_OVERRIDE_SELECT };
 
 /**
  * The organization access record the proxy and access-status both cache under
  * one key; they must select the same columns or each overwrites the other.
  */
-export const ORG_ACCESS_SELECT = `suspended_at, archived_at, subscription_status, trial_ends_at, ${BILLING_POLICY_OVERRIDE_SELECT}`;
+export const ORG_ACCESS_SELECT = `suspended_at, archived_at, subscription_status, trial_ends_at, ${BILLING_ACCESS_SELECT}`;
 
 const PLATFORM_SELECT =
   "default_trial_days, trial_grace_days, trial_reminder_days, payment_grace_days, updated_at";
@@ -109,6 +110,7 @@ export interface OrgBillingRow {
   subscription_status?: string | null;
   trial_ends_at?: string | null;
   suspended_at?: string | null;
+  billing_paused_at?: string | null;
   [column: string]: unknown;
 }
 
@@ -123,6 +125,7 @@ export async function evaluateOrgBillingAccess(
       subscriptionStatus: options.subscriptionStatus ?? org?.subscription_status ?? null,
       trialEndsAt: options.trialEndsAt ?? org?.trial_ends_at ?? null,
       suspendedAt: org?.suspended_at ?? null,
+      billingPausedAt: org?.billing_paused_at ?? null,
       now: options.now,
     },
     await getPlatformBillingPolicy(client),
@@ -135,7 +138,11 @@ export async function evaluateOrganizationAccess(
   client: QueryClient,
   org: Pick<
     Organization,
-    "subscriptionStatus" | "trialEndsAt" | "suspendedAt" | "billingPolicyOverrides"
+    | "subscriptionStatus"
+    | "trialEndsAt"
+    | "suspendedAt"
+    | "billingPolicyOverrides"
+    | "billingPausedAt"
   >,
 ): Promise<BillingAccessResult> {
   return evaluateBillingAccessWithPolicy(
@@ -143,6 +150,7 @@ export async function evaluateOrganizationAccess(
       subscriptionStatus: org.subscriptionStatus ?? null,
       trialEndsAt: org.trialEndsAt ?? null,
       suspendedAt: org.suspendedAt ?? null,
+      billingPausedAt: org.billingPausedAt ?? null,
     },
     await getPlatformBillingPolicy(client),
     org.billingPolicyOverrides,

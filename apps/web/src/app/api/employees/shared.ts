@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { BILLING_POLICY_OVERRIDE_SELECT, evaluateOrgBillingAccess } from "@/lib/billing-policy";
+import { BILLING_ACCESS_SELECT, evaluateOrgBillingAccess } from "@/lib/billing-policy";
 import { createNameMismatchResponseBody } from "@/lib/account-linking";
 import { getServiceClient } from "@/lib/supabase-service";
 import { isCallerInactive } from "@/app/api/shared/permissions";
@@ -76,9 +76,7 @@ export async function canManageEmployees(
       serviceClient.from("profiles").select("platform_role").eq("id", actorId).single(),
       serviceClient
         .from("organizations")
-        .select(
-          `suspended_at, subscription_status, trial_ends_at, ${BILLING_POLICY_OVERRIDE_SELECT}`,
-        )
+        .select(`suspended_at, subscription_status, trial_ends_at, ${BILLING_ACCESS_SELECT}`)
         .eq("id", orgId)
         .is("archived_at", null)
         .maybeSingle(),

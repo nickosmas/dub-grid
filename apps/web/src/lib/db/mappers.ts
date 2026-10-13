@@ -165,6 +165,8 @@ export function rowToOrganization(row: DbOrganization): Organization {
     billingPolicyOverrides: billingPolicyOverridesFromRow(
       row as unknown as Record<string, unknown>,
     ),
+    billingPausedAt: row.billing_paused_at ?? null,
+    billingPausedReason: row.billing_paused_reason ?? null,
     trialStartedAt: row.trial_started_at ?? null,
     subscriptionSeats: row.subscription_seats ?? null,
     dataRetentionDays: row.data_retention_days ?? 365,

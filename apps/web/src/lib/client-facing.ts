@@ -51,6 +51,7 @@ export { formatShiftRequestStatusLabel } from "@dubgrid/domain";
 
 const BILLING_STATUS_LABELS: Record<string, string> = {
   active: "Active",
+  billing_paused: "Billing paused",
   canceled: "Canceled",
   incomplete: "Setup incomplete",
   incomplete_expired: "Setup expired",

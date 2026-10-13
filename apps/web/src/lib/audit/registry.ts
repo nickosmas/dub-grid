@@ -1204,6 +1204,45 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
       );
     },
   },
+  "billing.paused": {
+    audience: "platform",
+    category: "billing",
+    severity: "warning",
+    headline: () => "Paused billing",
+    details: (d) => {
+      const reason = d.text("reason");
+      return reason ? [{ label: "Reason", value: reason }] : [];
+    },
+  },
+  "billing.resumed": {
+    audience: "platform",
+    category: "billing",
+    severity: "update",
+    headline: () => "Resumed billing",
+    details: (d) => {
+      const rows: DetailItem[] = [];
+      const pausedAt = d.text("paused_at");
+      if (pausedAt) rows.push({ label: "Paused since", value: formatShortDate(pausedAt) });
+      return [...rows, ...trialEndRows(d)];
+    },
+  },
+  "billing.grace_extended": {
+    audience: "platform",
+    category: "billing",
+    severity: "warning",
+    headline: () => "Extended the trial grace period",
+    details: (d) => {
+      const rows: DetailItem[] = [];
+      const before = d.rawValue("previous_grace_days");
+      const after = d.rawValue("grace_days");
+      const reason = d.text("reason");
+      if (typeof before === "number" && typeof after === "number") {
+        rows.push({ label: "Grace", value: `${policyValue(before)} → ${policyValue(after)}` });
+      }
+      if (reason) rows.push({ label: "Reason", value: reason });
+      return rows;
+    },
+  },
   "billing.status_overridden": {
     audience: "platform",
     category: "billing",

@@ -585,7 +585,10 @@ export type GridmasterSubscriptionInput =
   | { orgId: string; action: "cancel" }
   | { orgId: string; action: "cancel_at_period_end" }
   | { orgId: string; action: "sync_seats" }
-  | { orgId: string; action: "override_status"; status: string; reason: string };
+  | { orgId: string; action: "override_status"; status: string; reason: string }
+  | { orgId: string; action: "pause_billing"; reason: string }
+  | { orgId: string; action: "resume_billing" }
+  | { orgId: string; action: "extend_grace"; days: number; reason: string };
 
 export function updateGridmasterSubscription(
   input: GridmasterSubscriptionInput,

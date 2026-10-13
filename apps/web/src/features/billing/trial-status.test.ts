@@ -164,3 +164,45 @@ describe("describeSeatDifference", () => {
     expect(describeSeatDifference(0)).toBe("None");
   });
 });
+
+describe("a paused organization", () => {
+  const paused = (status: string, daysUntilTrialEnd: number | null): BillingStateInput => ({
+    status,
+    trialEndsAt: status === "trialing" ? at(9, 15) : null,
+    billingAccess: {
+      state: "paused",
+      reason: "billing_paused",
+      trialGraceEndsAt: null,
+      daysUntilTrialEnd,
+    },
+  });
+
+  it("reads as paused and says what that means", () => {
+    expect(describeBillingStatus(paused("trialing", 3))).toEqual({
+      label: "Billing paused",
+      tone: "info",
+    });
+    expect(describeBillingNotice(paused("trialing", 3))?.message).toBe(
+      "Billing is paused. Your organization stays open, and your trial days don't count down while it's paused.",
+    );
+    expect(describeBillingNotice(paused("active", null))?.message).toBe(
+      "Billing is paused. Your organization stays open, and you won't be charged while it's paused.",
+    );
+  });
+
+  it("names the grace days when the trial had ended before the pause", () => {
+    expect(describeBillingNotice(paused("trialing", -2))?.message).toBe(
+      "Billing is paused. Your organization stays open, and your days to add billing don't count down while it's paused.",
+    );
+  });
+
+  it("shows the trial days it has left, not an end date that will move", () => {
+    expect(describeTrialMetrics(paused("trialing", 3), now)).toEqual([
+      { key: "trial-time-left", label: "Trial time left", value: "3 days, paused" },
+    ]);
+  });
+
+  it("puts nothing in the header", () => {
+    expect(describeHeaderBillingNotice(paused("trialing", 3), now)).toBeNull();
+  });
+});

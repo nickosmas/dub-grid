@@ -93,6 +93,10 @@ export interface Organization {
   trialEndsAt?: string | null;
   /** Per-organization billing policy overrides; null fields use the platform default. */
   billingPolicyOverrides?: BillingPolicyOverrides | null;
+  /** Set while billing is paused; a paused organization stays open. */
+  billingPausedAt?: string | null;
+  /** Why billing was paused; read only by service-role code. */
+  billingPausedReason?: string | null;
   trialStartedAt?: string | null;
   subscriptionSeats?: number | null;
   dataRetentionDays: number;

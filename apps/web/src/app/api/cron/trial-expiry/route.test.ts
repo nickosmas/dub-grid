@@ -12,9 +12,10 @@ vi.mock("@/features/notifications/server/events", () => ({
 
 // Track which query is being built across .from() calls. The route's first
 // .from("organizations") build is the ending-soon query (uses .gte/.lt); the
-// second is the expired query (uses .lt/.in). We dispatch the terminating
-// .is().is() resolution to the right mock based on whether .in() was called.
+// second is the expired query (uses .lt/.in). Awaiting the builder resolves
+// to the matching mock.
 let fromCallIndex = 0;
+const isFilter = vi.fn();
 vi.mock("@/lib/supabase-service", () => ({
   getServiceClient: () => ({
     from: () => {
@@ -28,11 +29,12 @@ vi.mock("@/lib/supabase-service", () => ({
         if (myIndex === 0) endingSoonEq(column, value);
         return builder;
       });
-      builder.is = vi.fn(() => {
-        const inner: Record<string, unknown> = {};
-        inner.is = vi.fn(() => (myIndex === 0 ? endingSoonQuery() : expiredQuery()));
-        return inner;
+      builder.is = vi.fn((column: string, value: unknown) => {
+        isFilter(myIndex, column, value);
+        return builder;
       });
+      builder.then = (resolve: (value: unknown) => unknown, reject: (error: unknown) => unknown) =>
+        Promise.resolve(myIndex === 0 ? endingSoonQuery() : expiredQuery()).then(resolve, reject);
       return builder;
     },
   }),
@@ -162,6 +164,13 @@ describe("GET /api/cron/trial-expiry", () => {
 
     expect(res.status).toBe(200);
     expect(endingSoonEq).toHaveBeenCalledWith("subscription_status", "trialing");
+  });
+
+  it("skips paused organizations in both passes", async () => {
+    await GET(makeReq({ authorization: `Bearer ${SECRET}` }));
+
+    expect(isFilter).toHaveBeenCalledWith(0, "billing_paused_at", null);
+    expect(isFilter).toHaveBeenCalledWith(1, "billing_paused_at", null);
   });
 
   it("dispatches billing_trial_expired for orgs whose trial expired with no paid status", async () => {

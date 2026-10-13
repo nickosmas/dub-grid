@@ -1,5 +1,9 @@
 import {
+  billingHoldControls,
+  displayBillingStatus,
   evaluateOrganizationBillingAccess,
+  resumedTrialEndsAt,
+  type BillingHoldControls,
   type BillingPolicyKey,
   type TrialControls,
 } from "@dubgrid/domain";
@@ -132,6 +136,92 @@ export function trialActionReasons(trial: TrialControls): {
     grace,
     lock,
   };
+}
+
+type HoldOrg = Pick<
+  GridmasterBillingOrgSummary,
+  "status" | "trialEndsAt" | "suspendedAt" | "billingHold" | "policy"
+>;
+
+/** Which hold and grace actions apply to an organization, as the server decides. */
+export function holdControlsFor(org: HoldOrg, now: Date = new Date()): BillingHoldControls {
+  return billingHoldControls({
+    status: org.status,
+    trialEndsAt: org.trialEndsAt,
+    suspendedAt: org.suspendedAt,
+    billingPausedAt: org.billingHold?.pausedAt ?? null,
+    trialGraceDays: org.policy.values.trialGraceDays,
+    now,
+  });
+}
+
+/** The status a Gridmaster view shows, with a billing hold applied. */
+export function displayStatusFor(
+  org: Pick<GridmasterBillingOrgSummary, "status" | "trialEndsAt" | "billingHold" | "policy">,
+  now: Date = new Date(),
+): string | null {
+  return displayBillingStatus(org.status, org.trialEndsAt, {
+    now,
+    trialGraceDays: org.policy.values.trialGraceDays,
+    billingPausedAt: org.billingHold?.pausedAt ?? null,
+  });
+}
+
+function formatDay(value: string): string {
+  return new Date(value).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+/** What pausing does to the organization, said before it happens. */
+export function describePauseOutcome(
+  org: Pick<GridmasterBillingOrgSummary, "status" | "trialEndsAt" | "stripeSubscriptionId">,
+  now: Date = new Date(),
+): string[] {
+  const lines = ["The organization keeps full access while billing is paused."];
+  if ((org.status === "trialing" || !org.status) && org.trialEndsAt) {
+    lines.push(
+      Date.parse(org.trialEndsAt) > now.getTime()
+        ? "The trial stops counting down. Resuming gives back the paused days."
+        : "The grace period stops counting down. Resuming gives back the paused days.",
+    );
+  }
+  if (org.stripeSubscriptionId) {
+    lines.push("Stripe stops collecting payment, and invoices made while paused are voided.");
+  }
+  return lines;
+}
+
+/** What resuming does to the organization, said before it happens. */
+export function describeResumeOutcome(
+  org: Pick<
+    GridmasterBillingOrgSummary,
+    "status" | "trialEndsAt" | "trialStartedAt" | "stripeSubscriptionId" | "billingHold"
+  >,
+  now: Date = new Date(),
+): string[] {
+  if (!org.billingHold) return [];
+  const lines: string[] = [];
+  const trialEndsAt = resumedTrialEndsAt({
+    status: org.status,
+    trialEndsAt: org.trialEndsAt,
+    trialStartedAt: org.trialStartedAt,
+    billingPausedAt: org.billingHold.pausedAt,
+    now,
+  });
+  if (trialEndsAt && org.trialEndsAt) {
+    const days = Math.round((Date.parse(trialEndsAt) - Date.parse(org.trialEndsAt)) / 86_400_000);
+    lines.push(
+      days >= 1
+        ? `The trial end moves ${formatPolicyDays(days)} later, to ${formatDay(trialEndsAt)}, giving back the paused time.`
+        : "The trial end moves later by the paused time, which is less than half a day.",
+    );
+  }
+  if (org.stripeSubscriptionId) lines.push("Stripe starts collecting payment again.");
+  if (lines.length === 0) lines.push("Billing picks up where it left off.");
+  return lines;
 }
 
 export type StripeMode = "test" | "live" | null;

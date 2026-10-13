@@ -5,7 +5,7 @@ import { ACCOUNT_DISABLED_CODE, ACCOUNT_DISABLED_MESSAGE } from "@dubgrid/domain
 import type { AdminPermissions, OrganizationRole } from "@/types";
 import { createRequestSupabaseClient, requireAuthenticatedUser } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
-import { BILLING_POLICY_OVERRIDE_SELECT, evaluateOrgBillingAccess } from "@/lib/billing-policy";
+import { BILLING_ACCESS_SELECT, evaluateOrgBillingAccess } from "@/lib/billing-policy";
 import { getSandboxFromCookie, SANDBOX_COOKIE_NAME } from "@/lib/sandbox-cookie";
 import { cacheGet, cacheSet, CacheKey, TTL } from "@/lib/cache";
 import { API_ERRORS } from "@dubgrid/client-errors";
@@ -479,7 +479,7 @@ export async function requireOrgPermissions(
       serviceClient
         .from("organizations")
         .select(
-          `archived_at, suspended_at, subscription_status, trial_ends_at, ${BILLING_POLICY_OVERRIDE_SELECT}`,
+          `archived_at, suspended_at, subscription_status, trial_ends_at, ${BILLING_ACCESS_SELECT}`,
         )
         .eq("id", orgId)
         .maybeSingle(),

@@ -1108,6 +1108,9 @@ export interface GridmasterBillingOrgSummary {
   updatedAt: string | null;
   /** The organization's effective billing policy and where each value comes from. */
   policy: ResolvedBillingPolicy;
+  suspendedAt: string | null;
+  /** Set while a Gridmaster has paused this organization's billing. */
+  billingHold: { pausedAt: string; reason: string | null } | null;
 }
 
 export interface GridmasterBillingSummary {

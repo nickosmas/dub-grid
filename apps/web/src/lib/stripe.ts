@@ -255,6 +255,27 @@ export async function extendTrial(
 }
 
 /**
+ * Stop collecting payment while a Gridmaster holds billing. Invoices made
+ * during the hold are voided, so resuming never bills for the paused time.
+ */
+export async function pauseSubscriptionCollection(
+  subscriptionId: string,
+): Promise<Stripe.Subscription> {
+  const s = getStripe();
+  if (!s) throw new Error("Stripe not configured");
+  return s.subscriptions.update(subscriptionId, { pause_collection: { behavior: "void" } });
+}
+
+/** Collect payment again after a hold. */
+export async function resumeSubscriptionCollection(
+  subscriptionId: string,
+): Promise<Stripe.Subscription> {
+  const s = getStripe();
+  if (!s) throw new Error("Stripe not configured");
+  return s.subscriptions.update(subscriptionId, { pause_collection: "" });
+}
+
+/**
  * Retrieve a Stripe subscription by ID.
  */
 export async function getSubscription(subscriptionId: string): Promise<Stripe.Subscription> {

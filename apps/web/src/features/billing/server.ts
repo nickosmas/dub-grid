@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isLiveSubscriptionStatus } from "@dubgrid/domain";
-import { BILLING_POLICY_OVERRIDE_SELECT, evaluateOrgBillingAccess } from "@/lib/billing-policy";
+import { BILLING_ACCESS_SELECT, evaluateOrgBillingAccess } from "@/lib/billing-policy";
 import type { BillingOperationSummary, OrganizationBillingSummary } from "@/types";
 import { DUBGRID_SUPPORT_ACTOR_LABEL } from "@/lib/client-facing";
 import { clientEnv } from "@/lib/env";
@@ -123,6 +123,9 @@ export const CUSTOMER_BILLING_ACTIONS = [
   "billing.trial_ended",
   "billing.trial_expired",
   "billing.status_overridden",
+  "billing.paused",
+  "billing.resumed",
+  "billing.grace_extended",
 ] as const;
 
 // Only what the billing detail rows display. Payment-provider ids and event
@@ -141,6 +144,9 @@ const CUSTOMER_DETAIL_KEYS = new Set([
   "payment_method_type",
   "trial_ends_at",
   "previous_trial_ends_at",
+  "paused_at",
+  "grace_days",
+  "previous_grace_days",
   "days",
 ]);
 
@@ -182,6 +188,12 @@ function describeBillingOperation(action: string): string {
       return "Seats synced";
     case "billing.status_overridden":
       return "Billing status overridden";
+    case "billing.paused":
+      return "Billing paused";
+    case "billing.resumed":
+      return "Billing resumed";
+    case "billing.grace_extended":
+      return "Grace period extended";
     case "billing.synced":
       return "Billing synced";
     default:
@@ -277,7 +289,7 @@ export async function loadOrganizationBillingSummary(
       serviceClient
         .from("organizations")
         .select(
-          `id, name, slug, stripe_customer_id, subscription_status, trial_ends_at, subscription_seats, suspended_at, ${BILLING_POLICY_OVERRIDE_SELECT}`,
+          `id, name, slug, stripe_customer_id, subscription_status, trial_ends_at, subscription_seats, suspended_at, ${BILLING_ACCESS_SELECT}`,
         )
         .eq("id", orgId)
         .single(),

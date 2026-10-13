@@ -260,6 +260,26 @@ describe("gridmaster organization health facts", () => {
     expect(await flagsFor(daysFromNow(-10))).toContain("billing_risk");
   });
 
+  it("doesn't flag a paused trial that has run out", async () => {
+    resetOversightFactsMemoForTests();
+    const tenDaysAgo = new Date(Date.now() - 10 * 86_400_000).toISOString();
+    const [summary] = await loadGridmasterOrgHealth(
+      mockServiceClient({
+        organizations: [
+          {
+            ...organizationRow(),
+            trial_ends_at: tenDaysAgo,
+            billing_paused_at: tenDaysAgo,
+            billing_paused_reason: "Contract renewal",
+          },
+        ],
+      }),
+      orgId,
+    );
+
+    expect(summary.riskFlags).not.toContain("billing_risk");
+  });
+
   it("pages past PostgREST's row cap so a large tenant is counted in full", async () => {
     const total = OVERSIGHT_PAGE_SIZE * 2 + 7;
     const memberships = Array.from({ length: total }, (_, index) => ({

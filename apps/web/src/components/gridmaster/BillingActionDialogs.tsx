@@ -1,12 +1,14 @@
 "use client";
 
-import { TRIAL_GRACE_DAYS } from "@dubgrid/domain";
+import { BILLING_POLICY_LIMITS, TRIAL_GRACE_DAYS } from "@dubgrid/domain";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { formatBillingStatusLabel } from "@/lib/client-facing";
 import type { GridmasterBillingOrgSummary } from "@/types";
 import { NumberField } from "@/components/ui/number-field";
 import {
   describeOverrideOutcome,
+  describePauseOutcome,
+  describeResumeOutcome,
   OVERRIDE_REASON_MAX_LENGTH,
 } from "@/components/gridmaster/gridmaster-billing-rules";
 
@@ -15,6 +17,7 @@ export type BillingConfirmAction =
   | { kind: "sync_seats"; org: GridmasterBillingOrgSummary }
   | { kind: "cancel_at_period_end"; org: GridmasterBillingOrgSummary }
   | { kind: "cancel"; org: GridmasterBillingOrgSummary }
+  | { kind: "resume_billing"; org: GridmasterBillingOrgSummary }
   | { kind: "override_status"; org: GridmasterBillingOrgSummary; status: string };
 
 function formatDay(date: Date): string {
@@ -50,6 +53,22 @@ function getConfirmDialogCopy(action: Exclude<BillingConfirmAction, { kind: "ove
         message: `Cancel the Stripe subscription for ${action.org.orgName} now? The organization locks immediately.`,
         confirmLabel: "Cancel Billing",
         variant: "danger" as const,
+      };
+    case "resume_billing":
+      return {
+        title: "Resume billing",
+        message: (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <span>Resume billing for {action.org.orgName}?</span>
+            {describeResumeOutcome(action.org).map((line) => (
+              <span key={line} style={{ color: "var(--dg-color-text-secondary)" }}>
+                {line}
+              </span>
+            ))}
+          </div>
+        ),
+        confirmLabel: "Resume billing",
+        variant: "warning" as const,
       };
   }
 }
@@ -313,6 +332,152 @@ export function TrialDaysDialog({
       variant="warning"
       isLoading={isLoading}
       confirmDisabled={!valid}
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+    />
+  );
+}
+
+function ReasonField({
+  id,
+  value,
+  placeholder,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  placeholder: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <>
+      <label htmlFor={id} style={{ fontWeight: 600 }}>
+        Reason <span style={{ color: "var(--dg-color-danger-text)" }}>*</span>
+      </label>
+      <textarea
+        id={id}
+        className="dg-input"
+        value={value}
+        maxLength={OVERRIDE_REASON_MAX_LENGTH}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        rows={3}
+        style={{ resize: "vertical", width: "100%" }}
+      />
+    </>
+  );
+}
+
+export function PauseBillingDialog({
+  org,
+  reason,
+  isLoading,
+  onReasonChange,
+  onConfirm,
+  onCancel,
+}: {
+  org: GridmasterBillingOrgSummary | null;
+  reason: string;
+  isLoading: boolean;
+  onReasonChange: (reason: string) => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  if (!org) return null;
+
+  return (
+    <ConfirmDialog
+      title="Pause billing"
+      message={
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <span>Pause billing for {org.orgName}?</span>
+          {describePauseOutcome(org).map((line) => (
+            <span key={line} style={{ color: "var(--dg-color-text-secondary)" }}>
+              {line}
+            </span>
+          ))}
+          <ReasonField
+            id={`pause-reason-${org.orgId}`}
+            value={reason}
+            placeholder="Why are you pausing this organization's billing?"
+            onChange={onReasonChange}
+          />
+        </div>
+      }
+      confirmLabel="Pause billing"
+      variant="warning"
+      isLoading={isLoading}
+      confirmDisabled={!reason.trim()}
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+    />
+  );
+}
+
+export function ExtendGraceDialog({
+  org,
+  days,
+  reason,
+  isLoading,
+  onDaysChange,
+  onReasonChange,
+  onConfirm,
+  onCancel,
+}: {
+  org: GridmasterBillingOrgSummary | null;
+  days: number | null;
+  reason: string;
+  isLoading: boolean;
+  onDaysChange: (days: number | null) => void;
+  onReasonChange: (reason: string) => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  if (!org) return null;
+
+  const current = org.policy.values.trialGraceDays;
+  const maxDays = BILLING_POLICY_LIMITS.trialGraceDays.max - current;
+  const valid = days !== null && days >= 1 && days <= maxDays;
+  const opensUntil =
+    valid && org.trialEndsAt
+      ? formatDay(new Date(Date.parse(org.trialEndsAt) + (current + days) * 86_400_000))
+      : null;
+
+  return (
+    <ConfirmDialog
+      title="Extend grace"
+      message={
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <span>
+            How many days should {org.orgName} get on top of its {current}-day grace period?
+          </span>
+          <NumberField
+            nullable
+            min={1}
+            max={maxDays}
+            value={days}
+            onChange={onDaysChange}
+            aria-label="Grace days to add"
+          />
+          <span className="dg-tabular-nums" style={{ color: "var(--dg-color-text-muted)" }}>
+            {maxDays < 1
+              ? "Grace is already at its limit. Change the trial instead."
+              : opensUntil
+                ? `The organization stays open until ${opensUntil}. This sets its grace override.`
+                : `Enter 1 to ${maxDays} days.`}
+          </span>
+          <ReasonField
+            id={`grace-reason-${org.orgId}`}
+            value={reason}
+            placeholder="Why does this organization need more time?"
+            onChange={onReasonChange}
+          />
+        </div>
+      }
+      confirmLabel="Extend grace"
+      variant="warning"
+      isLoading={isLoading}
+      confirmDisabled={!valid || !reason.trim()}
       onConfirm={onConfirm}
       onCancel={onCancel}
     />

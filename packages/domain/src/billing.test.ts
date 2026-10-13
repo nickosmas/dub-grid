@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  billingHoldControls,
   effectiveBillingStatus,
   evaluateOrganizationBillingAccess,
   isLiveSubscriptionStatus,
+  resumedTrialEndsAt,
   trialControls,
 } from "./billing";
 
@@ -118,5 +120,165 @@ describe("isLiveSubscriptionStatus", () => {
     expect(isLiveSubscriptionStatus("canceled")).toBe(false);
     expect(isLiveSubscriptionStatus("incomplete_expired")).toBe(false);
     expect(isLiveSubscriptionStatus(null)).toBe(false);
+  });
+});
+
+describe("a paused organization", () => {
+  const pausedAt = "2026-10-02T12:00:00Z";
+
+  it("stays open after its trial and grace would have ended", () => {
+    const access = evaluateOrganizationBillingAccess({
+      subscriptionStatus: "trialing",
+      trialEndsAt: "2026-10-05T12:00:00Z",
+      billingPausedAt: pausedAt,
+      now,
+    });
+    expect(access).toMatchObject({
+      state: "paused",
+      reason: "billing_paused",
+      isLocked: false,
+      shouldNotifyAdmins: false,
+      trialGraceEndsAt: null,
+    });
+  });
+
+  it("freezes the trial days left at the pause", () => {
+    const access = evaluateOrganizationBillingAccess({
+      subscriptionStatus: "trialing",
+      trialEndsAt: "2026-10-05T12:00:00Z",
+      billingPausedAt: pausedAt,
+      now,
+    });
+    expect(access.daysUntilTrialEnd).toBe(3);
+  });
+
+  it("reads as paused for a paying subscriber", () => {
+    const access = evaluateOrganizationBillingAccess({
+      subscriptionStatus: "active",
+      billingPausedAt: pausedAt,
+      now,
+    });
+    expect(access).toMatchObject({ state: "paused", isLocked: false, daysUntilTrialEnd: null });
+  });
+
+  it.each(["canceled", "unpaid", "incomplete_expired", "trial_expired"])(
+    "still locks when the status is %s",
+    (status) => {
+      const access = evaluateOrganizationBillingAccess({
+        subscriptionStatus: status,
+        billingPausedAt: pausedAt,
+        now,
+      });
+      expect(access.isLocked).toBe(true);
+    },
+  );
+
+  it("still locks when suspended", () => {
+    const access = evaluateOrganizationBillingAccess({
+      subscriptionStatus: "active",
+      suspendedAt: "2026-10-03T00:00:00Z",
+      billingPausedAt: pausedAt,
+      now,
+    });
+    expect(access.state).toBe("suspended");
+  });
+
+  it("can't have its trial changed", () => {
+    expect(
+      trialControls({
+        status: "trialing",
+        trialEndsAt: "2026-10-20T00:00:00Z",
+        hasStripeSubscription: false,
+        billingPausedAt: pausedAt,
+        now,
+      }),
+    ).toEqual({
+      change: false,
+      end: false,
+      expire: false,
+      reason: "Billing is paused. Resume it to change the trial.",
+    });
+  });
+});
+
+describe("billingHoldControls", () => {
+  const trialing = { status: "trialing", trialEndsAt: "2026-10-20T00:00:00Z", now };
+
+  it("pauses an open organization and nothing else", () => {
+    const controls = billingHoldControls(trialing);
+    expect(controls.pause).toEqual({ allowed: true, reason: null });
+    expect(controls.resume).toEqual({ allowed: false, reason: "Billing isn't paused." });
+    expect(controls.extendGrace).toEqual({
+      allowed: false,
+      reason: "The trial hasn't ended yet.",
+    });
+  });
+
+  it("only resumes a paused organization", () => {
+    const controls = billingHoldControls({ ...trialing, billingPausedAt: "2026-10-01T00:00:00Z" });
+    expect(controls.pause.allowed).toBe(false);
+    expect(controls.resume.allowed).toBe(true);
+    expect(controls.extendGrace.allowed).toBe(false);
+  });
+
+  it("won't pause a locked or suspended organization", () => {
+    expect(billingHoldControls({ status: "canceled", trialEndsAt: null, now }).pause.reason).toBe(
+      "This organization is locked. Reopen it before pausing billing.",
+    );
+    expect(
+      billingHoldControls({ ...trialing, suspendedAt: "2026-10-01T00:00:00Z" }).pause.reason,
+    ).toBe("This organization is suspended.");
+  });
+
+  it("extends grace for a trial in grace or one that ran out", () => {
+    const inGrace = { status: "trialing", trialEndsAt: "2026-10-11T12:00:00Z", now };
+    const ranOut = { status: "trialing", trialEndsAt: "2026-09-01T00:00:00Z", now };
+    expect(billingHoldControls(inGrace).extendGrace.allowed).toBe(true);
+    expect(billingHoldControls(ranOut).extendGrace.allowed).toBe(true);
+    expect(billingHoldControls(ranOut).pause.allowed).toBe(false);
+  });
+
+  it("won't extend grace for an expired trial or a subscriber", () => {
+    expect(
+      billingHoldControls({ status: "trial_expired", trialEndsAt: "2026-10-01T00:00:00Z", now })
+        .extendGrace.reason,
+    ).toBe("The trial was expired with no grace period. Change the trial to reopen it.");
+    expect(
+      billingHoldControls({ status: "active", trialEndsAt: null, now }).extendGrace.reason,
+    ).toBe("This organization isn't on a trial.");
+  });
+});
+
+describe("resumedTrialEndsAt", () => {
+  it("gives the trial back the paused time", () => {
+    expect(
+      resumedTrialEndsAt({
+        status: "trialing",
+        trialEndsAt: "2026-10-05T12:00:00Z",
+        trialStartedAt: "2026-09-21T12:00:00Z",
+        billingPausedAt: "2026-10-02T12:00:00Z",
+        now,
+      }),
+    ).toBe("2026-10-15T12:00:00.000Z");
+  });
+
+  it("gives back only the time since a trial that started during the pause", () => {
+    expect(
+      resumedTrialEndsAt({
+        status: "trialing",
+        trialEndsAt: "2026-10-22T12:00:00Z",
+        trialStartedAt: "2026-10-08T12:00:00Z",
+        billingPausedAt: "2026-10-02T12:00:00Z",
+        now,
+      }),
+    ).toBe("2026-10-26T12:00:00.000Z");
+  });
+
+  it("moves nothing for a subscriber or a trial that never started", () => {
+    const base = { trialStartedAt: null, billingPausedAt: "2026-10-02T12:00:00Z", now };
+    expect(
+      resumedTrialEndsAt({ ...base, status: "active", trialEndsAt: "2026-10-05T00:00:00Z" }),
+    ).toBe(null);
+    expect(resumedTrialEndsAt({ ...base, status: "trialing", trialEndsAt: null })).toBe(null);
   });
 });

@@ -114,8 +114,12 @@ Item 44 is split:
   reminder window, and payment grace are platform defaults a Gridmaster can
   change, with per-organization overrides, and every access decision uses the
   organization's effective values (migration 076).
-- **44e to 44g - Pause and resume, past-due deadlines and lock alerts, seat
-  and revenue history:** planned; each needs a migration.
+- **44e - Pause and resume:** shipped; a Gridmaster can pause an
+  organization's billing, which keeps it open, stops the trial clock and
+  Stripe collection, and gives the trial back the paused time on resume, and
+  can extend a trial's grace through its override (migration 077).
+- **44f and 44g - Past-due deadlines and lock alerts, seat and revenue
+  history:** planned; each needs a migration.
 
 Public documentation covers customer behavior only. Gridmaster tooling, Test
 Sandbox, feature flags, migrations, environment variables, and internal HTTP
@@ -279,7 +283,7 @@ Main mobile surfaces:
   build targets the Next.js web app.
 - **Database:** Supabase-hosted Postgres with an immutable ordered migration
   stream. Migrations `001` through `004` are frozen. The repository is
-  checksum-locked through `076`.
+  checksum-locked through `077`.
 - **Production boundary:** migration `075` was recorded as applied to production
   on 2026-09-28. Read the live ledger with `npm run db:migrations:inspect`
   (read-only) before any release rather than relying on this line.

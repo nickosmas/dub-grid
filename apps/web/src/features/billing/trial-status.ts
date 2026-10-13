@@ -45,7 +45,8 @@ export function billingToneColors(tone: BillingTone): BillingToneColors {
 export interface BillingStateInput {
   status: string | null;
   trialEndsAt: string | null;
-  billingAccess: Pick<BillingAccessResult, "state" | "reason" | "trialGraceEndsAt">;
+  billingAccess: Pick<BillingAccessResult, "state" | "reason" | "trialGraceEndsAt"> &
+    Partial<Pick<BillingAccessResult, "daysUntilTrialEnd">>;
 }
 
 const ENDING_SOON_DAYS = 7;
@@ -110,6 +111,8 @@ export function describeBillingStatus(
         : { label: formatBillingStatusLabel(input.status), tone: "danger" };
     case "suspended":
       return { label: "Suspended", tone: "danger" };
+    case "paused":
+      return { label: "Billing paused", tone: "info" };
     default:
       return { label: formatBillingStatusLabel(input.status), tone: "warning" };
   }
@@ -252,9 +255,22 @@ export function describeBillingNotice(
         message: "Your organization is suspended. Contact DubGrid Support for help.",
         tone: "danger",
       };
+    case "paused":
+      return { message: pausedNotice(input), tone: "info" };
     default:
       return null;
   }
+}
+
+function pausedNotice(input: BillingStateInput): string {
+  if (input.status && input.status !== "trialing") {
+    return "Billing is paused. Your organization stays open, and you won't be charged while it's paused.";
+  }
+  const days = input.billingAccess.daysUntilTrialEnd;
+  if (days == null) return "Billing is paused, and your organization stays open.";
+  return days > 0
+    ? "Billing is paused. Your organization stays open, and your trial days don't count down while it's paused."
+    : "Billing is paused. Your organization stays open, and your days to add billing don't count down while it's paused.";
 }
 
 export interface TrialMetric {
@@ -269,9 +285,22 @@ export function describeTrialMetrics(
   input: BillingStateInput,
   now: Date = new Date(),
 ): TrialMetric[] {
-  const { state, reason, trialGraceEndsAt } = input.billingAccess;
+  const { state, reason, trialGraceEndsAt, daysUntilTrialEnd } = input.billingAccess;
   if (!input.trialEndsAt) return [];
   const trialEnds = formatBillingDate(input.trialEndsAt);
+
+  // The end date moves when billing resumes, so a paused trial shows only the
+  // days it has left.
+  if (state === "paused") {
+    if (daysUntilTrialEnd == null || daysUntilTrialEnd <= 0) return [];
+    return [
+      {
+        key: "trial-time-left",
+        label: "Trial time left",
+        value: `${daysUntilTrialEnd === 1 ? "1 day" : `${daysUntilTrialEnd} days`}, paused`,
+      },
+    ];
+  }
 
   const days = trialDaysLeft(input, now);
   if (days != null) {

@@ -121,7 +121,7 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
   "apps/web/src/app/api/gridmaster/subscription/route.ts": {
     policy: "conditional-sensitive",
     assertions: [
-      /\brequireGridmasterSession\s*\([\s\S]*?if \(action === "expire_trial" \|\| action === "cancel" \|\| action === "override_status"\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\bcancelSubscription\(/,
+      /\brequireGridmasterSession\s*\([\s\S]*?if \(\s*action === "expire_trial" \|\|\s*action === "cancel" \|\|\s*action === "override_status" \|\|\s*action === "pause_billing" \|\|\s*action === "extend_grace"\s*\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\bcancelSubscription\(/,
     ],
   },
   "apps/web/src/app/api/gridmaster/password-reset/route.ts": {

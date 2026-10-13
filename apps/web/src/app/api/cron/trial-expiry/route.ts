@@ -63,7 +63,9 @@ export async function GET(req: NextRequest) {
     // ending anything.
     .eq("subscription_status", "trialing")
     .is("archived_at", null)
-    .is("suspended_at", null);
+    .is("suspended_at", null)
+    // A paused trial isn't counting down.
+    .is("billing_paused_at", null);
   if (endingError) {
     logger.error({ error: endingError }, "trial-expiry: ending-soon query failed");
   }
@@ -100,7 +102,8 @@ export async function GET(req: NextRequest) {
     .lt("trial_ends_at", now.toISOString())
     .in("subscription_status", ["trialing", "trial_pending"])
     .is("archived_at", null)
-    .is("suspended_at", null);
+    .is("suspended_at", null)
+    .is("billing_paused_at", null);
   if (expiredError) {
     logger.error({ error: expiredError }, "trial-expiry: expired query failed");
   }

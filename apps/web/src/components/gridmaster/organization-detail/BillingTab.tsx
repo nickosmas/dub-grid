@@ -6,6 +6,8 @@ import { OrganizationBillingPolicyCard } from "@/components/gridmaster/BillingPo
 import {
   billingActionStates,
   disabledActionSummary,
+  displayStatusFor,
+  holdControlsFor,
   stripeDashboardUrl,
   summarizeReasons,
   trialActionReasons,
@@ -13,11 +15,7 @@ import {
 import { InfoRow } from "@/components/gridmaster/organization-detail/shared";
 import { fetchGridmasterOrgBilling } from "@/features/gridmaster/client";
 import { formatBillingStatusLabel, formatClientErrorMessage } from "@/lib/client-facing";
-import {
-  effectiveBillingStatus,
-  evaluateOrganizationBillingAccess,
-  trialControls,
-} from "@dubgrid/domain";
+import { evaluateOrganizationBillingAccess, trialControls } from "@dubgrid/domain";
 import { queryKeys } from "@/lib/query-keys";
 import { sectionBodyStyle, sectionHeaderStyle, sectionStyle } from "@/lib/styles";
 import { type Organization } from "@/types";
@@ -42,6 +40,7 @@ export function formatBillingDate(value: string | null) {
 
 export function billingStatusTone(status: string | null) {
   if (status === "active" || status === "trialing") return "var(--dg-color-success-text)";
+  if (status === "billing_paused") return "var(--dg-color-info-text)";
   if (status === "past_due" || status === "incomplete" || status === "trial_grace")
     return "var(--dg-color-warning-text)";
   if (
@@ -185,15 +184,12 @@ export function BillingTab({ organization }: { organization: Organization }) {
   }
 
   const { values: policy } = billingOrg.policy;
-  const displayStatus = effectiveBillingStatus(
-    billingOrg.status,
-    billingOrg.trialEndsAt,
-    undefined,
-    policy.trialGraceDays,
-  );
+  const displayStatus = displayStatusFor(billingOrg);
+  const hold = billingOrg.billingHold;
   const access = evaluateOrganizationBillingAccess({
     subscriptionStatus: billingOrg.status,
     trialEndsAt: billingOrg.trialEndsAt,
+    billingPausedAt: hold?.pausedAt ?? null,
     trialGraceDays: policy.trialGraceDays,
     trialAdminNoticeDays: policy.trialReminderDays,
   });
@@ -204,8 +200,14 @@ export function BillingTab({ organization }: { organization: Organization }) {
     status: billingOrg.status,
     trialEndsAt: billingOrg.trialEndsAt,
     hasStripeSubscription: Boolean(billingOrg.stripeSubscriptionId),
+    billingPausedAt: hold?.pausedAt ?? null,
   });
   const trialReasons = trialActionReasons(trial);
+  const holdControls = holdControlsFor(billingOrg);
+  const holdNotes = summarizeReasons([
+    [hold ? "Resume billing" : "Pause billing", hold ? null : holdControls.pause.reason],
+    ["Extend grace", holdControls.extendGrace.reason],
+  ]);
   const trialNotes = summarizeReasons([
     ["Change trial", trialReasons.change],
     ["End trial", trialReasons.end],
@@ -295,11 +297,28 @@ export function BillingTab({ organization }: { organization: Organization }) {
               value={
                 access.isLocked
                   ? "Locked"
-                  : access.state === "trial_grace" && access.trialGraceEndsAt
-                    ? `Open until ${formatBillingDate(access.trialGraceEndsAt)}, then locks`
-                    : "Open"
+                  : access.state === "paused"
+                    ? "Open while billing is paused"
+                    : access.state === "trial_grace" && access.trialGraceEndsAt
+                      ? `Open until ${formatBillingDate(access.trialGraceEndsAt)}, then locks`
+                      : "Open"
               }
             />
+            {hold && (
+              <InfoRow
+                label="Paused"
+                value={
+                  <span>
+                    Since {formatBillingDate(hold.pausedAt)}
+                    {hold.reason && (
+                      <span style={{ display: "block", color: "var(--dg-color-text-muted)" }}>
+                        {hold.reason}
+                      </span>
+                    )}
+                  </span>
+                }
+              />
+            )}
             <InfoRow
               label="Trial started"
               value={
@@ -442,6 +461,43 @@ export function BillingTab({ organization }: { organization: Organization }) {
               </Button>
             </div>
             {trialNotes.map((note) => (
+              <p key={note} style={actionNoteStyle}>
+                {note}
+              </p>
+            ))}
+          </div>
+
+          <div style={{ display: "grid", gap: 6 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              {hold ? (
+                <Button
+                  type="button"
+                  className="dg-btn dg-btn-secondary dg-btn-sm"
+                  disabled={busy}
+                  onClick={() => actions.confirm({ kind: "resume_billing", org: billingOrg })}
+                >
+                  Resume billing
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  className="dg-btn dg-btn-secondary dg-btn-sm"
+                  disabled={busy || !holdControls.pause.allowed}
+                  onClick={() => actions.pauseBilling(billingOrg)}
+                >
+                  Pause billing…
+                </Button>
+              )}
+              <Button
+                type="button"
+                className="dg-btn dg-btn-secondary dg-btn-sm"
+                disabled={busy || !holdControls.extendGrace.allowed}
+                onClick={() => actions.extendGrace(billingOrg)}
+              >
+                Extend grace…
+              </Button>
+            </div>
+            {holdNotes.map((note) => (
               <p key={note} style={actionNoteStyle}>
                 {note}
               </p>

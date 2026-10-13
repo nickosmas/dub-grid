@@ -13,9 +13,10 @@ import { EmptyState } from "@/components/EmptyState";
 import ProgressBar from "@/components/ProgressBar";
 import { queryKeys } from "@/lib/query-keys";
 import { formatBillingStatusLabel, formatClientErrorMessage } from "@/lib/client-facing";
-import { effectiveBillingStatus, trialControls } from "@dubgrid/domain";
+import { trialControls } from "@dubgrid/domain";
 import {
   billingActionStates,
+  displayStatusFor,
   stripeDashboardUrl,
   trialActionReasons,
 } from "@/components/gridmaster/gridmaster-billing-rules";
@@ -110,6 +111,7 @@ function formatTrialEnds(org: GridmasterBillingOrgSummary) {
 
 function statusTone(status: string | null) {
   if (status === "active" || status === "trialing") return "var(--dg-color-success-text)";
+  if (status === "billing_paused") return "var(--dg-color-info-text)";
   if (status === "past_due" || status === "incomplete" || status === "trial_grace")
     return "var(--dg-color-warning-text)";
   if (
@@ -127,25 +129,11 @@ function isTrialPending(org: GridmasterBillingOrgSummary) {
 }
 
 function statusLabelFor(org: GridmasterBillingOrgSummary) {
-  return formatBillingStatusLabel(
-    effectiveBillingStatus(
-      org.status,
-      org.trialEndsAt,
-      undefined,
-      org.policy.values.trialGraceDays,
-    ),
-  );
+  return formatBillingStatusLabel(displayStatusFor(org));
 }
 
 function statusToneFor(org: GridmasterBillingOrgSummary) {
-  return statusTone(
-    effectiveBillingStatus(
-      org.status,
-      org.trialEndsAt,
-      undefined,
-      org.policy.values.trialGraceDays,
-    ),
-  );
+  return statusTone(displayStatusFor(org));
 }
 
 function BillingOversightSkeleton() {
@@ -219,6 +207,7 @@ function BillingRowActions({
     status: org.status,
     trialEndsAt: org.trialEndsAt,
     hasStripeSubscription: Boolean(org.stripeSubscriptionId),
+    billingPausedAt: org.billingHold?.pausedAt ?? null,
   });
 
   // One overflow menu per row, the control the schedule toolbar uses: seven

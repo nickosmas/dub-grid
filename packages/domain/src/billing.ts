@@ -10,7 +10,8 @@ export type BillingAccessState =
   | "trial_grace"
   | "payment_attention_required"
   | "locked"
-  | "suspended";
+  | "suspended"
+  | "paused";
 
 export type BillingAccessReason =
   | "active_subscription"
@@ -20,12 +21,15 @@ export type BillingAccessReason =
   | "trial_grace"
   | "trial_expired"
   | "payment_status"
-  | "suspended";
+  | "suspended"
+  | "billing_paused";
 
 export interface BillingAccessInput {
   subscriptionStatus?: string | null;
   trialEndsAt?: string | null;
   suspendedAt?: string | null;
+  /** Set while a Gridmaster holds the organization's billing; see `paused`. */
+  billingPausedAt?: string | null;
   now?: Date;
   trialGraceDays?: number;
   trialAdminNoticeDays?: number;
@@ -109,6 +113,20 @@ export function evaluateOrganizationBillingAccess(input: BillingAccessInput): Bi
       shouldNotifyAdmins: true,
       daysUntilTrialEnd: trialEndsAt ? daysUntil(now, trialEndsAt) : null,
       trialGraceEndsAt: trialEndsAt ? addDays(trialEndsAt, graceDays).toISOString() : null,
+    };
+  }
+
+  // A hold keeps access open and stops the trial clock, so the days left stay
+  // where they were at the pause. It never reopens a hard-locked organization.
+  const pausedAt = parseDate(input.billingPausedAt);
+  if (pausedAt) {
+    return {
+      state: "paused",
+      reason: "billing_paused",
+      isLocked: false,
+      shouldNotifyAdmins: false,
+      daysUntilTrialEnd: trialEndsAt ? daysUntil(pausedAt, trialEndsAt) : null,
+      trialGraceEndsAt: null,
     };
   }
 
@@ -220,10 +238,31 @@ export function effectiveBillingStatus(
   return "trialing";
 }
 
+/** The display status for a held organization that isn't otherwise locked. */
+export const BILLING_PAUSED_STATUS = "billing_paused";
+
+/**
+ * `effectiveBillingStatus` with the billing hold applied: a paused organization
+ * reads as paused unless its status locks it anyway.
+ */
+export function displayBillingStatus(
+  status: string | null | undefined,
+  trialEndsAt: string | null | undefined,
+  options: { now?: Date; trialGraceDays?: number; billingPausedAt?: string | null } = {},
+): string | null {
+  const stored = status ?? null;
+  const hardLocked =
+    stored !== null && (LOCKED_STATUSES.has(stored) || stored === TRIAL_EXPIRED_STATUS);
+  if (options.billingPausedAt && !hardLocked) return BILLING_PAUSED_STATUS;
+  return effectiveBillingStatus(stored, trialEndsAt, options.now, options.trialGraceDays);
+}
+
 export interface TrialControlInput {
   status: string | null | undefined;
   trialEndsAt: string | null | undefined;
   hasStripeSubscription: boolean;
+  /** A paused organization's trial isn't running, so it can't be changed. */
+  billingPausedAt?: string | null;
   now?: Date;
 }
 
@@ -244,6 +283,14 @@ export interface TrialControls {
  * organization billed through Stripe never has its trial ended from here.
  */
 export function trialControls(input: TrialControlInput): TrialControls {
+  if (input.billingPausedAt) {
+    return {
+      change: false,
+      end: false,
+      expire: false,
+      reason: "Billing is paused. Resume it to change the trial.",
+    };
+  }
   const status = input.status ?? null;
   if (status !== null && status !== "trialing" && status !== TRIAL_EXPIRED_STATUS) {
     return {
@@ -268,4 +315,100 @@ export function trialControls(input: TrialControlInput): TrialControls {
   const endsAt = input.trialEndsAt ? new Date(input.trialEndsAt).getTime() : null;
   const running = endsAt === null || endsAt > now.getTime();
   return { change: true, end: running, expire: true, reason: null };
+}
+
+export interface BillingActionGate {
+  allowed: boolean;
+  /** Why the action is off; null when it applies. */
+  reason: string | null;
+}
+
+export interface BillingHoldInput {
+  status: string | null | undefined;
+  trialEndsAt: string | null | undefined;
+  suspendedAt?: string | null;
+  billingPausedAt?: string | null;
+  trialGraceDays?: number;
+  now?: Date;
+}
+
+export interface BillingHoldControls {
+  pause: BillingActionGate;
+  resume: BillingActionGate;
+  extendGrace: BillingActionGate;
+}
+
+function gate(reason: string | null): BillingActionGate {
+  return { allowed: reason === null, reason };
+}
+
+/**
+ * Which hold and grace actions a Gridmaster may take. The server enforces the
+ * same answer. A pause keeps access open, so it only applies to an
+ * organization that is open now; grace only extends a trial that has ended.
+ */
+export function billingHoldControls(input: BillingHoldInput): BillingHoldControls {
+  const now = input.now ?? new Date();
+  const status = input.status ?? null;
+  const paused = Boolean(input.billingPausedAt);
+  const access = evaluateOrganizationBillingAccess({
+    subscriptionStatus: status,
+    trialEndsAt: input.trialEndsAt,
+    suspendedAt: input.suspendedAt,
+    trialGraceDays: input.trialGraceDays,
+    now,
+  });
+
+  const pauseReason = paused
+    ? "Billing is already paused."
+    : access.state === "suspended"
+      ? "This organization is suspended."
+      : access.isLocked
+        ? "This organization is locked. Reopen it before pausing billing."
+        : null;
+
+  const trialEndsAt = input.trialEndsAt ? Date.parse(input.trialEndsAt) : null;
+  const graceReason = paused
+    ? "Billing is paused, so the trial isn't counting down."
+    : input.suspendedAt
+      ? "This organization is suspended."
+      : status === TRIAL_EXPIRED_STATUS
+        ? "The trial was expired with no grace period. Change the trial to reopen it."
+        : status !== null && status !== "trialing"
+          ? "This organization isn't on a trial."
+          : trialEndsAt === null || trialEndsAt > now.getTime()
+            ? "The trial hasn't ended yet."
+            : null;
+
+  return {
+    pause: gate(pauseReason),
+    resume: gate(paused ? null : "Billing isn't paused."),
+    extendGrace: gate(graceReason),
+  };
+}
+
+export interface ResumeTrialInput {
+  status: string | null | undefined;
+  trialEndsAt: string | null | undefined;
+  trialStartedAt: string | null | undefined;
+  billingPausedAt: string;
+  now?: Date;
+}
+
+/**
+ * The trial end after a resume, moved later by the time the trial spent
+ * paused, or null when there is no trial to move. A trial that started during
+ * the pause only gives back the time since it started.
+ */
+export function resumedTrialEndsAt(input: ResumeTrialInput): string | null {
+  const status = input.status ?? null;
+  if (status !== null && status !== "trialing") return null;
+  const trialEndsAt = parseDate(input.trialEndsAt);
+  const pausedAt = parseDate(input.billingPausedAt);
+  if (!trialEndsAt || !pausedAt) return null;
+  const startedAt = parseDate(input.trialStartedAt);
+  const heldFrom = startedAt && startedAt > pausedAt ? startedAt : pausedAt;
+  const now = input.now ?? new Date();
+  const held = Math.max(0, now.getTime() - heldFrom.getTime());
+  return new Date(trialEndsAt.getTime() + held).toISOString();
 }

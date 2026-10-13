@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:0eedcc886613c23d5ed97b075db6ccad082b727088f8584c39bafe977f900286",
+  "sourceDigest": "sha256:07e686d06a170fa3a75281e81374450fcbe2bb57001148c92e2fe5ac61a296f5",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4527,6 +4527,16 @@
       "sha256": "3a504bd88cc4d26b6a656e6168e3b9db097267aa8fd8eb885fa012c7a7739388",
       "source": {
         "path": "supabase/migrations/076_billing_policy.sql"
+      }
+    },
+    {
+      "id": "migration:077_billing_pause.sql",
+      "version": "077",
+      "name": "billing_pause",
+      "file": "077_billing_pause.sql",
+      "sha256": "94b2ed0a9012af5ade94f83e83ad5e0e4bdc3275ee7269f93a2063b05d24a654",
+      "source": {
+        "path": "supabase/migrations/077_billing_pause.sql"
       }
     }
   ],

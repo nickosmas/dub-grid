@@ -292,6 +292,43 @@ describe("BillingSettings", () => {
     ).toBeInTheDocument();
   });
 
+  it("says billing is paused and lists the pause in the activity", async () => {
+    vi.mocked(fetchOrganizationBilling).mockResolvedValueOnce({
+      ...billingSummary,
+      recentOperations: [
+        {
+          id: "50",
+          action: "billing.paused",
+          label: "Billing paused",
+          actorLabel: "DubGrid Support",
+          resourceType: "organization",
+          resourceId: null,
+          details: {},
+          createdAt: "2026-05-02T10:00:00.000Z",
+        },
+      ],
+      billingAccess: {
+        state: "paused",
+        reason: "billing_paused",
+        isLocked: false,
+        shouldNotifyAdmins: false,
+        daysUntilTrialEnd: 9,
+        trialGraceEndsAt: null,
+      },
+    });
+
+    renderBillingSettings();
+
+    expect(
+      await screen.findByText(
+        "Billing is paused. Your organization stays open, and your trial days don't count down while it's paused.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("9 days, paused")).toBeInTheDocument();
+    const row = screen.getAllByText("Billing paused").find((node) => node.closest("tr"));
+    expect(row?.closest("tr")).toHaveTextContent("DubGrid Support");
+  });
+
   it("tells an admin who tries to subscribe twice to use Manage billing", async () => {
     const message =
       "Your organization already has a subscription. Use Manage billing to change it.";

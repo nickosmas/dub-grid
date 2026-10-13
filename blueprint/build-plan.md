@@ -855,7 +855,7 @@
         without extra per-request queries, plus a check constraint on the
         stored subscription status. Gridmaster settings show each value and
         whether it comes from the platform or an override. Needs a migration.
-  - [ ] 44e. **Pause and resume** - an access-preserving billing hold that
+  - [x] 44e. **Pause and resume** - an access-preserving billing hold that
         stops the trial clock, and manual grace extension through the
         per-organization override. Needs a migration.
   - [ ] 44f. **Past-due deadlines and lock alerts** - a payment-grace deadline

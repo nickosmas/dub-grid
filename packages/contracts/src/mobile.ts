@@ -1007,6 +1007,7 @@ export const mobileBillingAccessStateSchema = z.enum([
   "payment_attention_required",
   "locked",
   "suspended",
+  "paused",
 ]);
 
 export const mobileOrgStatusStateSchema = z.union([

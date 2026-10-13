@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_BILLING_POLICY, resolveBillingPolicy } from "@dubgrid/domain";
 import {
   billingActionStates,
   describeOverrideOutcome,
+  describePauseOutcome,
+  describeResumeOutcome,
+  displayStatusFor,
+  holdControlsFor,
   disabledActionSummary,
   stripeDashboardUrl,
   trialActionReasons,
@@ -153,5 +158,77 @@ describe("trialActionReasons", () => {
       grace: reason,
       lock: reason,
     });
+  });
+});
+
+describe("billing holds in Gridmaster views", () => {
+  const policy = resolveBillingPolicy(DEFAULT_BILLING_POLICY, {});
+  const hold = { pausedAt: "2026-10-02T12:00:00Z", reason: "Renewal" };
+
+  it("shows a paused organization as paused unless its status locks it", () => {
+    expect(
+      displayStatusFor(
+        { status: "trialing", trialEndsAt: "2026-09-01T00:00:00Z", billingHold: hold, policy },
+        now,
+      ),
+    ).toBe("billing_paused");
+    expect(
+      displayStatusFor({ status: "canceled", trialEndsAt: null, billingHold: hold, policy }, now),
+    ).toBe("canceled");
+  });
+
+  it("offers resume, not pause, while paused", () => {
+    const controls = holdControlsFor(
+      {
+        status: "trialing",
+        trialEndsAt: "2026-10-20T00:00:00Z",
+        suspendedAt: null,
+        billingHold: hold,
+        policy,
+      },
+      now,
+    );
+    expect(controls.pause.allowed).toBe(false);
+    expect(controls.resume.allowed).toBe(true);
+  });
+
+  it("says which clock a pause stops", () => {
+    const org = { status: "trialing", stripeSubscriptionId: null };
+    expect(describePauseOutcome({ ...org, trialEndsAt: "2026-10-20T00:00:00Z" }, now)[1]).toBe(
+      "The trial stops counting down. Resuming gives back the paused days.",
+    );
+    expect(describePauseOutcome({ ...org, trialEndsAt: "2026-10-11T00:00:00Z" }, now)[1]).toBe(
+      "The grace period stops counting down. Resuming gives back the paused days.",
+    );
+  });
+
+  it("says when a short pause moves the trial by under a day", () => {
+    expect(
+      describeResumeOutcome(
+        {
+          status: "trialing",
+          trialEndsAt: "2026-10-20T00:00:00Z",
+          trialStartedAt: "2026-10-06T00:00:00Z",
+          stripeSubscriptionId: null,
+          billingHold: { pausedAt: "2026-10-12T11:58:00Z", reason: null },
+        },
+        now,
+      ),
+    ).toEqual(["The trial end moves later by the paused time, which is less than half a day."]);
+  });
+
+  it("says a subscriber's resume collects again", () => {
+    expect(
+      describeResumeOutcome(
+        {
+          status: "active",
+          trialEndsAt: null,
+          trialStartedAt: null,
+          stripeSubscriptionId: "sub_123",
+          billingHold: hold,
+        },
+        now,
+      ),
+    ).toEqual(["Stripe starts collecting payment again."]);
   });
 });

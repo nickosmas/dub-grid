@@ -1,5 +1,5 @@
 import {
-  effectiveBillingStatus,
+  displayBillingStatus,
   resolveBillingPolicy,
   type ResolvedBillingPolicy,
 } from "@dubgrid/domain";
@@ -489,6 +489,7 @@ function buildOrgHealthSummaries(facts: OversightFacts): GridmasterOrgHealthSumm
         org.trialEndsAt ?? null,
         facts.now,
         policy.values.trialGraceDays,
+        org.billingPausedAt ?? null,
       )
     ) {
       riskFlags.push("billing_risk");
@@ -597,6 +598,10 @@ function toBillingOrgSummary(
     seatDelta: seats == null ? null : seats - counts.appUsers,
     updatedAt: stringOrNull(subscription?.updated_at),
     policy,
+    suspendedAt: org.suspendedAt ?? null,
+    billingHold: org.billingPausedAt
+      ? { pausedAt: org.billingPausedAt, reason: org.billingPausedReason ?? null }
+      : null,
   };
 }
 
@@ -670,7 +675,8 @@ function buildBillingSummary(
   );
   const nowMs = facts.now.getTime();
   const trialEndingSoon = organizations.filter((row) => {
-    if (!row.trialEndsAt) return false;
+    // A paused trial isn't counting down.
+    if (!row.trialEndsAt || row.billingHold) return false;
     const diff = Date.parse(row.trialEndsAt) - nowMs;
     return diff >= 0 && diff <= 14 * DAY_MS;
   });
@@ -680,7 +686,13 @@ function buildBillingSummary(
     (row) => !row.trialEndsAt && (row.status === "trialing" || !row.status),
   );
   const riskOrganizations = organizations.filter((row) =>
-    isBillingRisk(row.status, row.trialEndsAt, facts.now, row.policy.values.trialGraceDays),
+    isBillingRisk(
+      row.status,
+      row.trialEndsAt,
+      facts.now,
+      row.policy.values.trialGraceDays,
+      row.billingHold?.pausedAt ?? null,
+    ),
   );
   const missingStripeCustomer = organizations.filter((row) => !row.stripeCustomerId);
   const seatMismatches = organizations.filter((row) => row.seatDelta != null && row.seatDelta < 0);
@@ -899,9 +911,10 @@ function isBillingRisk(
   trialEndsAt: string | null,
   now: Date,
   trialGraceDays: number,
+  billingPausedAt: string | null,
 ) {
   return BILLING_RISK_STATUSES.has(
-    effectiveBillingStatus(status, trialEndsAt, now, trialGraceDays) ?? "",
+    displayBillingStatus(status, trialEndsAt, { now, trialGraceDays, billingPausedAt }) ?? "",
   );
 }
 

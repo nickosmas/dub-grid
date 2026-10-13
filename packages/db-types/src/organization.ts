@@ -39,6 +39,9 @@ export interface DbOrganization {
   trial_grace_days_override?: number | null;
   trial_reminder_days_override?: number | null;
   payment_grace_days_override?: number | null;
+  billing_paused_at?: string | null;
+  billing_paused_reason?: string | null;
+  billing_paused_by?: string | null;
   trial_started_at: string | null;
   subscription_seats: number | null;
   data_retention_days: number;

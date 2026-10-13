@@ -689,7 +689,7 @@ export async function fetchMobileOrganizationRowById(
   const { data, error } = await serviceClient
     .from("organizations")
     .select(
-      "id, name, slug, address, address_line_1, address_line_2, address_city, address_state, address_postal_code, address_country, phone, employee_count, focus_area_label, certification_label, role_label, department_label, shift_display_mode, timezone, pay_period_start_date, archived_at, suspended_at, suspended_reason, enforce_conflict_prevention, subscription_status, trial_ends_at, data_retention_days, feature_overrides, updated_at, trial_length_days_override, trial_grace_days_override, trial_reminder_days_override, payment_grace_days_override",
+      "id, name, slug, address, address_line_1, address_line_2, address_city, address_state, address_postal_code, address_country, phone, employee_count, focus_area_label, certification_label, role_label, department_label, shift_display_mode, timezone, pay_period_start_date, archived_at, suspended_at, suspended_reason, enforce_conflict_prevention, subscription_status, trial_ends_at, data_retention_days, feature_overrides, updated_at, trial_length_days_override, trial_grace_days_override, trial_reminder_days_override, payment_grace_days_override, billing_paused_at",
     )
     .eq("id", orgId)
     .maybeSingle();

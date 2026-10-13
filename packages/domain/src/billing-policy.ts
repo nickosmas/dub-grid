@@ -86,6 +86,10 @@ export const BILLING_POLICY_OVERRIDE_COLUMNS: Record<BillingPolicyKey, string> =
 export const BILLING_POLICY_OVERRIDE_SELECT =
   "trial_length_days_override, trial_grace_days_override, trial_reminder_days_override, payment_grace_days_override";
 
+/** The override columns plus the billing hold: every select that decides access. */
+export const BILLING_ACCESS_SELECT =
+  "trial_length_days_override, trial_grace_days_override, trial_reminder_days_override, payment_grace_days_override, billing_paused_at";
+
 /** Billing access with an organization's effective policy applied. */
 export function evaluateBillingAccessWithPolicy(
   input: Omit<BillingAccessInput, "trialGraceDays" | "trialAdminNoticeDays">,

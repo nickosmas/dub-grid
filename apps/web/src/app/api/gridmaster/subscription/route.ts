@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { API_ERRORS } from "@dubgrid/client-errors";
-import { TRIAL_EXPIRED_STATUS, trialControls } from "@dubgrid/domain";
+import {
+  BILLING_POLICY_LIMITS,
+  BILLING_POLICY_OVERRIDE_SELECT,
+  TRIAL_EXPIRED_STATUS,
+  billingHoldControls,
+  isLiveSubscriptionStatus,
+  resumedTrialEndsAt,
+  trialControls,
+} from "@dubgrid/domain";
 import { requireGridmasterSession, requireSensitiveActionAuth } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
@@ -10,10 +18,13 @@ import {
   cancelSubscription,
   extendTrial,
   invalidateOrganizationBillingCache,
+  pauseSubscriptionCollection,
+  resumeSubscriptionCollection,
   scheduleSubscriptionCancellation,
   syncSubscriptionSeats,
 } from "@/lib/stripe";
 import { getServiceClient } from "@/lib/supabase-service";
+import { getOrgBillingPolicy } from "@/lib/billing-policy";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
@@ -62,7 +73,24 @@ const bodySchema = z.discriminatedUnion("action", [
     status: billingStatusSchema,
     reason: z.string().trim().min(1).max(500),
   }),
+  z.object({
+    orgId: orgIdSchema,
+    action: z.literal("pause_billing"),
+    reason: z.string().trim().min(1).max(500),
+  }),
+  z.object({
+    orgId: orgIdSchema,
+    action: z.literal("resume_billing"),
+  }),
+  z.object({
+    orgId: orgIdSchema,
+    action: z.literal("extend_grace"),
+    days: z.number().int().min(1).max(BILLING_POLICY_LIMITS.trialGraceDays.max),
+    reason: z.string().trim().min(1).max(500),
+  }),
 ]);
+
+const HOLD_SELECT = `subscription_status, trial_started_at, trial_ends_at, suspended_at, billing_paused_at, ${BILLING_POLICY_OVERRIDE_SELECT}`;
 
 /** Runs a database write and fails the action, before any audit row, if it failed. */
 async function write(query: PromiseLike<{ error: unknown }>): Promise<void> {
@@ -92,8 +120,15 @@ export async function POST(req: NextRequest) {
   const { orgId, action } = parsed.data;
   const admin = getServiceClient();
 
-  // Each of these locks an organization or rewrites its billing outright.
-  if (action === "expire_trial" || action === "cancel" || action === "override_status") {
+  // Each of these locks an organization, rewrites its billing outright, or
+  // keeps it open without payment.
+  if (
+    action === "expire_trial" ||
+    action === "cancel" ||
+    action === "override_status" ||
+    action === "pause_billing" ||
+    action === "extend_grace"
+  ) {
     const assurance = await requireSensitiveActionAuth(req);
     if ("response" in assurance) return assurance.response;
   }
@@ -128,7 +163,7 @@ export async function POST(req: NextRequest) {
     if (action === "set_trial_days" || action === "end_trial" || action === "expire_trial") {
       const { data: orgRow, error: orgError } = await admin
         .from("organizations")
-        .select("subscription_status, trial_started_at, trial_ends_at")
+        .select("subscription_status, trial_started_at, trial_ends_at, billing_paused_at")
         .eq("id", orgId)
         .single();
       if (orgError || !orgRow) {
@@ -139,6 +174,7 @@ export async function POST(req: NextRequest) {
         status: orgRow.subscription_status as string | null,
         trialEndsAt: previousTrialEndsAt,
         hasStripeSubscription: Boolean(sub?.stripe_subscription_id),
+        billingPausedAt: (orgRow.billing_paused_at as string | null) ?? null,
       });
       const allowed =
         action === "set_trial_days"
@@ -206,6 +242,14 @@ export async function POST(req: NextRequest) {
         request: req,
       });
       return NextResponse.json({ success: true, trialEndsAt });
+    }
+
+    if (action === "pause_billing" || action === "resume_billing" || action === "extend_grace") {
+      return await holdAction(req, parsed.data, {
+        admin,
+        user,
+        stripeSubscriptionId: sub?.stripe_subscription_id ?? null,
+      });
     }
 
     if (action === "cancel") {
@@ -353,4 +397,157 @@ export async function POST(req: NextRequest) {
     logger.error({ err, path: "/api/gridmaster/subscription" }, "Subscription action failed");
     return NextResponse.json({ error: "Action failed" }, { status: 500 });
   }
+}
+
+type HoldBody = Extract<
+  z.infer<typeof bodySchema>,
+  { action: "pause_billing" | "resume_billing" | "extend_grace" }
+>;
+
+async function holdAction(
+  req: NextRequest,
+  body: HoldBody,
+  context: {
+    admin: ReturnType<typeof getServiceClient>;
+    user: { id: string; email?: string | null };
+    stripeSubscriptionId: string | null;
+  },
+): Promise<NextResponse> {
+  const { admin, user, stripeSubscriptionId } = context;
+  const { orgId } = body;
+  const { data, error: orgError } = await admin
+    .from("organizations")
+    .select(HOLD_SELECT)
+    .eq("id", orgId)
+    .single();
+  if (orgError || !data) {
+    return NextResponse.json({ error: "Organization not found." }, { status: 404 });
+  }
+  const org = data as unknown as Record<string, string | number | null>;
+  const status = (org.subscription_status as string | null) ?? null;
+  const pausedAt = (org.billing_paused_at as string | null) ?? null;
+  const policy = await getOrgBillingPolicy(admin, org);
+  const controls = billingHoldControls({
+    status,
+    trialEndsAt: org.trial_ends_at as string | null,
+    suspendedAt: org.suspended_at as string | null,
+    billingPausedAt: pausedAt,
+    trialGraceDays: policy.values.trialGraceDays,
+  });
+  const gate =
+    body.action === "pause_billing"
+      ? controls.pause
+      : body.action === "resume_billing"
+        ? controls.resume
+        : controls.extendGrace;
+  if (!gate.allowed) {
+    return NextResponse.json({ error: gate.reason }, { status: 409 });
+  }
+  const billsThroughStripe = Boolean(stripeSubscriptionId) && isLiveSubscriptionStatus(status);
+  const now = new Date();
+
+  if (body.action === "pause_billing") {
+    if (billsThroughStripe) await pauseSubscriptionCollection(stripeSubscriptionId as string);
+    await write(
+      admin
+        .from("organizations")
+        .update({
+          billing_paused_at: now.toISOString(),
+          billing_paused_reason: body.reason,
+          billing_paused_by: user.id,
+        })
+        .eq("id", orgId),
+    );
+    await invalidateOrganizationBillingCache(orgId);
+    await writeGridmasterAuditLog({
+      serviceClient: admin,
+      actor: user,
+      action: "billing.paused",
+      resourceType: "organization",
+      resourceId: orgId,
+      orgId,
+      details: { reason: body.reason },
+      request: req,
+    });
+    return NextResponse.json({ success: true });
+  }
+
+  if (body.action === "resume_billing") {
+    const previousTrialEndsAt = (org.trial_ends_at as string | null) ?? null;
+    const trialEndsAt = resumedTrialEndsAt({
+      status,
+      trialEndsAt: previousTrialEndsAt,
+      trialStartedAt: org.trial_started_at as string | null,
+      billingPausedAt: pausedAt as string,
+      now,
+    });
+    if (billsThroughStripe) {
+      // Stripe only takes a trial end in the future; a trial that ran out
+      // before the pause has nothing left there to move.
+      if (status === "trialing" && trialEndsAt && Date.parse(trialEndsAt) > now.getTime()) {
+        await extendTrial(stripeSubscriptionId as string, new Date(trialEndsAt));
+      }
+      await resumeSubscriptionCollection(stripeSubscriptionId as string);
+    }
+    await write(
+      admin
+        .from("organizations")
+        .update({
+          billing_paused_at: null,
+          billing_paused_reason: null,
+          billing_paused_by: null,
+          ...(trialEndsAt ? { trial_ends_at: trialEndsAt } : {}),
+        })
+        .eq("id", orgId),
+    );
+    await invalidateOrganizationBillingCache(orgId);
+    await writeGridmasterAuditLog({
+      serviceClient: admin,
+      actor: user,
+      action: "billing.resumed",
+      resourceType: "organization",
+      resourceId: orgId,
+      orgId,
+      details: {
+        paused_at: pausedAt,
+        ...(trialEndsAt
+          ? { previous_trial_ends_at: previousTrialEndsAt, trial_ends_at: trialEndsAt }
+          : {}),
+      },
+      request: req,
+    });
+    return NextResponse.json({ success: true, trialEndsAt });
+  }
+
+  const previousGraceDays = policy.values.trialGraceDays;
+  const graceDays = previousGraceDays + body.days;
+  const maxGrace = BILLING_POLICY_LIMITS.trialGraceDays.max;
+  if (graceDays > maxGrace) {
+    return NextResponse.json(
+      {
+        error: `Grace can be at most ${maxGrace} days in total; it's ${previousGraceDays} now. Change the trial instead.`,
+      },
+      { status: 400 },
+    );
+  }
+  await write(
+    admin.from("organizations").update({ trial_grace_days_override: graceDays }).eq("id", orgId),
+  );
+  await invalidateOrganizationBillingCache(orgId);
+  await writeGridmasterAuditLog({
+    serviceClient: admin,
+    actor: user,
+    action: "billing.grace_extended",
+    resourceType: "organization",
+    resourceId: orgId,
+    orgId,
+    details: {
+      previous_grace_days: previousGraceDays,
+      grace_days: graceDays,
+      days: body.days,
+      reason: body.reason,
+    },
+    request: req,
+  });
+  return NextResponse.json({ success: true, graceDays });
 }
