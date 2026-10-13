@@ -17,6 +17,10 @@ describe("effectiveBillingStatus", () => {
     expect(effectiveBillingStatus("trialing", "2026-10-10T00:00:00Z", now)).toBe("trial_grace");
   });
 
+  it("honors an organization's own grace length", () => {
+    expect(effectiveBillingStatus("trialing", "2026-10-09T00:00:00Z", now, 10)).toBe("trial_grace");
+  });
+
   it("reads a trial past its grace period as expired", () => {
     expect(effectiveBillingStatus("trialing", "2026-10-09T00:00:00Z", now)).toBe("trial_expired");
     expect(effectiveBillingStatus(null, "2026-10-01T00:00:00Z", now)).toBe("trial_expired");

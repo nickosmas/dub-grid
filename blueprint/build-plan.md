@@ -849,7 +849,7 @@
         such as syncs and seat counts (owner decision, 2026-10-12); plain
         wording for the seat and app-user figures and the unconfigured-billing
         notice; mobile locked-screen copy for suspension and trial start.
-  - [ ] 44d. **Billing policy settings** - platform defaults plus
+  - [x] 44d. **Billing policy settings** - platform defaults plus
         per-organization overrides for trial length, grace days, reminder
         days, and payment grace, stored with database range checks and read
         without extra per-request queries, plus a check constraint on the

@@ -129,6 +129,7 @@ export const queryKeys = {
     billing: () => ["gm", "billing"] as const,
     // Under the billing prefix, so refreshing billing refreshes it too.
     orgBilling: (orgId: string) => ["gm", "billing", "org", orgId] as const,
+    billingPolicy: () => ["gm", "billing", "policy"] as const,
     compliance: () => ["gm", "compliance"] as const,
     orgHealth: (orgId: string | null) => ["gm", "org-health", orgId ?? "all"] as const,
     personAll: () => ["gm", "person"] as const,

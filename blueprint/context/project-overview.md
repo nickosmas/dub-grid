@@ -110,8 +110,12 @@ Item 44 is split:
   only changes that affect the organization, without payment-provider data,
   seat figures read in plain words, and the mobile locked screen offers billing
   only when billing is the cause.
-- **44d to 44g - Policy settings, pause and resume, past-due deadlines and
-  lock alerts, seat and revenue history:** planned; each needs a migration.
+- **44d - Billing policy settings:** shipped; trial length, trial grace,
+  reminder window, and payment grace are platform defaults a Gridmaster can
+  change, with per-organization overrides, and every access decision uses the
+  organization's effective values (migration 076).
+- **44e to 44g - Pause and resume, past-due deadlines and lock alerts, seat
+  and revenue history:** planned; each needs a migration.
 
 Public documentation covers customer behavior only. Gridmaster tooling, Test
 Sandbox, feature flags, migrations, environment variables, and internal HTTP
@@ -228,8 +232,9 @@ endpoints remain internal.
 ## Monetization
 
 DubGrid uses Stripe per-seat subscriptions, billed monthly. New organizations
-receive a 14-day trial beginning on the first Super Admin login, then 3 grace
-days before the organization locks.
+receive a trial beginning on the first Super Admin login, then grace days
+before the organization locks: 14 and 3 days by default, set by the platform
+billing policy with per-organization overrides.
 
 > TODO: exact per-seat prices and tier breaks remain unconfirmed.
 
@@ -274,7 +279,7 @@ Main mobile surfaces:
   build targets the Next.js web app.
 - **Database:** Supabase-hosted Postgres with an immutable ordered migration
   stream. Migrations `001` through `004` are frozen. The repository is
-  checksum-locked through `075`.
+  checksum-locked through `076`.
 - **Production boundary:** migration `075` was recorded as applied to production
   on 2026-09-28. Read the live ledger with `npm run db:migrations:inspect`
   (read-only) before any release rather than relying on this line.

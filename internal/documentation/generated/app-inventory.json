@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:318bafd0c22cfc5a58db93f8f8468625ad598db54a38fcc488325c7d0befcba8",
+  "sourceDigest": "sha256:0eedcc886613c23d5ed97b075db6ccad082b727088f8584c39bafe977f900286",
   "webRoutes": [
     {
       "id": "web:/",
@@ -1329,6 +1329,15 @@
       }
     },
     {
+      "id": "http:GET:/api/gridmaster/billing-policy",
+      "method": "GET",
+      "path": "/api/gridmaster/billing-policy",
+      "scope": "api",
+      "source": {
+        "path": "apps/web/src/app/api/gridmaster/billing-policy/route.ts"
+      }
+    },
+    {
       "id": "http:GET:/api/gridmaster/compliance",
       "method": "GET",
       "path": "/api/gridmaster/compliance",
@@ -2424,6 +2433,15 @@
       "scope": "api",
       "source": {
         "path": "apps/web/src/app/api/gridmaster/audit-log/export/route.ts"
+      }
+    },
+    {
+      "id": "http:POST:/api/gridmaster/billing-policy",
+      "method": "POST",
+      "path": "/api/gridmaster/billing-policy",
+      "scope": "api",
+      "source": {
+        "path": "apps/web/src/app/api/gridmaster/billing-policy/route.ts"
       }
     },
     {
@@ -4500,6 +4518,16 @@
       "source": {
         "path": "supabase/migrations/075_gridmaster_writes_need_impersonation.sql"
       }
+    },
+    {
+      "id": "migration:076_billing_policy.sql",
+      "version": "076",
+      "name": "billing_policy",
+      "file": "076_billing_policy.sql",
+      "sha256": "3a504bd88cc4d26b6a656e6168e3b9db097267aa8fd8eb885fa012c7a7739388",
+      "source": {
+        "path": "supabase/migrations/076_billing_policy.sql"
+      }
     }
   ],
   "rlsTables": [
@@ -4753,6 +4781,18 @@
       },
       "enabledIn": {
         "path": "supabase/migrations/003_rls_policies.sql"
+      }
+    },
+    {
+      "id": "rls:public.platform_billing_settings",
+      "schema": "public",
+      "table": "platform_billing_settings",
+      "enabled": true,
+      "createdIn": {
+        "path": "supabase/migrations/076_billing_policy.sql"
+      },
+      "enabledIn": {
+        "path": "supabase/migrations/076_billing_policy.sql"
       }
     },
     {

@@ -427,6 +427,28 @@ function trialEndRows(d: AuditDetails): DetailItem[] {
   return rows;
 }
 
+const POLICY_LABELS: Record<string, string> = {
+  trialDays: "Trial length",
+  trialGraceDays: "Grace after the trial",
+  trialReminderDays: "Trial reminder",
+  paymentGraceDays: "Payment grace",
+};
+
+function policyValue(value: unknown): string {
+  return typeof value === "number" ? pluralize(value, "day") : "Platform default";
+}
+
+function policyRows(previous: unknown, next: unknown): DetailItem[] {
+  if (!next || typeof next !== "object") return [];
+  const before = (previous ?? {}) as Record<string, unknown>;
+  return Object.entries(next as Record<string, unknown>)
+    .filter(([key, value]) => before[key] !== value)
+    .map(([key, value]) => ({
+      label: POLICY_LABELS[key] ?? key,
+      value: `${policyValue(before[key])} → ${policyValue(value)}`,
+    }));
+}
+
 export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
   // ── People ─────────────────────────────────────────────────────────────────
   "employee.created": {
@@ -1158,6 +1180,29 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
         : `Updated the billed seat count to ${pluralize(seats, "seat")}`;
     },
     suppressKeys: ["seats", "quantity"],
+  },
+  "billing.policy_updated": {
+    audience: "platform",
+    category: "billing",
+    severity: "warning",
+    headline: () => "Changed the platform billing policy",
+    details: (d) => policyRows(d.rawValue("previous"), d.rawValue("next")),
+  },
+  "billing.policy_overridden": {
+    audience: "platform",
+    category: "billing",
+    severity: "warning",
+    headline: () => "Changed this organization's billing policy",
+    details: (d) => {
+      const changes = d.rawValue("changes");
+      if (!changes || typeof changes !== "object") return [];
+      return Object.entries(changes as Record<string, { from: unknown; to: unknown }>).map(
+        ([key, change]) => ({
+          label: POLICY_LABELS[key] ?? key,
+          value: `${policyValue(change?.from)} → ${policyValue(change?.to)}`,
+        }),
+      );
+    },
   },
   "billing.status_overridden": {
     audience: "platform",

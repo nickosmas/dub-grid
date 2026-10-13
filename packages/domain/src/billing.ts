@@ -203,6 +203,7 @@ export function effectiveBillingStatus(
   status: string | null | undefined,
   trialEndsAt: string | null | undefined,
   now: Date = new Date(),
+  trialGraceDays?: number,
 ): string | null {
   const stored = status ?? null;
   if (stored !== null && stored !== "trialing") return stored;
@@ -212,6 +213,7 @@ export function effectiveBillingStatus(
     subscriptionStatus: stored,
     trialEndsAt,
     now,
+    trialGraceDays,
   });
   if (reason === "trial_grace") return "trial_grace";
   if (reason === "trial_expired") return "trial_expired";

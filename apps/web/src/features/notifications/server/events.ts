@@ -4,6 +4,7 @@ import { formatOrganizationRoleLabel } from "@/lib/client-facing";
 import { fetchPublishedShiftRows } from "@/lib/published-shifts";
 import logger from "@/lib/logger";
 import { TRIAL_GRACE_DAYS } from "@dubgrid/domain";
+import { BILLING_POLICY_OVERRIDE_SELECT, getOrgBillingPolicy } from "@/lib/billing-policy";
 import { sendNotification } from "./sender";
 import type { NotificationType } from "@/types";
 import type { NotificationEmailDetail } from "@/emails/NotificationEmail";
@@ -425,10 +426,7 @@ function formatNotificationDateRange(start: string, end: string): string {
   return `${openEnd} \u2013 ${to}`;
 }
 
-async function getOrgTimeZone(orgId: string): Promise<string> {
-  const db = getServiceClient();
-  const { data } = await db.from("organizations").select("timezone").eq("id", orgId).maybeSingle();
-  const timeZone = data?.timezone as string | null | undefined;
+function validTimeZone(timeZone: string | null | undefined): string {
   if (!timeZone) return "UTC";
   try {
     new Intl.DateTimeFormat("en-US", { timeZone });
@@ -436,6 +434,30 @@ async function getOrgTimeZone(orgId: string): Promise<string> {
   } catch {
     return "UTC";
   }
+}
+
+async function getOrgTimeZone(orgId: string): Promise<string> {
+  const db = getServiceClient();
+  const { data } = await db.from("organizations").select("timezone").eq("id", orgId).maybeSingle();
+  return validTimeZone(data?.timezone as string | null | undefined);
+}
+
+/** The org's time zone and its effective trial grace period, for trial alerts. */
+async function getOrgTrialContext(
+  orgId: string,
+): Promise<{ timeZone: string; trialGraceDays: number }> {
+  const db = getServiceClient();
+  const { data } = await db
+    .from("organizations")
+    .select(`timezone, ${BILLING_POLICY_OVERRIDE_SELECT}`)
+    .eq("id", orgId)
+    .maybeSingle();
+  const row = (data ?? null) as Record<string, unknown> | null;
+  const { values } = await getOrgBillingPolicy(db, row);
+  return {
+    timeZone: validTimeZone(row?.timezone as string | null | undefined),
+    trialGraceDays: values.trialGraceDays,
+  };
 }
 
 async function getOrgName(orgId: string): Promise<string> {
@@ -1197,8 +1219,8 @@ async function dispatchNotificationEventInternal(
         metadataValue: event.trialEndsAt,
       });
       if (alreadySent) return;
-      const timeZone = await getOrgTimeZone(event.orgId);
-      const body = trialExpiredBody(event.trialEndsAt, timeZone, new Date());
+      const { timeZone, trialGraceDays } = await getOrgTrialContext(event.orgId);
+      const body = trialExpiredBody(event.trialEndsAt, timeZone, new Date(), trialGraceDays);
       await Promise.all(
         superAdmins.map((userId) =>
           sendNotification(
@@ -1371,9 +1393,14 @@ function formatTrialDate(iso: string, timeZone: string): string {
 }
 
 /** Grace still running: say until when. Already past it: say how to reopen. */
-export function trialExpiredBody(trialEndsAt: string, timeZone: string, now: Date): string {
+export function trialExpiredBody(
+  trialEndsAt: string,
+  timeZone: string,
+  now: Date,
+  trialGraceDays: number = TRIAL_GRACE_DAYS,
+): string {
   const endedOn = formatTrialDate(trialEndsAt, timeZone);
-  const graceEndsAt = new Date(Date.parse(trialEndsAt) + TRIAL_GRACE_DAYS * 86_400_000);
+  const graceEndsAt = new Date(Date.parse(trialEndsAt) + trialGraceDays * 86_400_000);
   if (graceEndsAt.getTime() > now.getTime()) {
     return `Your free trial ended on ${endedOn}. Add a payment method by ${formatTrialDate(graceEndsAt.toISOString(), timeZone)} to keep your organization open.`;
   }

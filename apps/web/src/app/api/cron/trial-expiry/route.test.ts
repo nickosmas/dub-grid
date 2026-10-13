@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const dispatchNotificationEvent = vi.fn();
 const endingSoonQuery = vi.fn();
@@ -47,6 +47,12 @@ vi.mock("@/lib/feature-flags", () => ({
   isFeatureEnabled: (key: string) => isFeatureEnabled(key),
 }));
 
+vi.mock("@/lib/billing-policy", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/billing-policy")>();
+  const { DEFAULT_BILLING_POLICY } = await import("@dubgrid/domain");
+  return { ...actual, getPlatformBillingPolicy: async () => DEFAULT_BILLING_POLICY };
+});
+
 import { GET } from "./route";
 
 const SECRET = "test-cron-secret";
@@ -64,6 +70,13 @@ describe("GET /api/cron/trial-expiry", () => {
     dispatchNotificationEvent.mockResolvedValue({ success: true });
     endingSoonQuery.mockResolvedValue({ data: [], error: null });
     expiredQuery.mockResolvedValue({ data: [], error: null });
+    // Fixtures end on 2026-06-11: the first day of a 7-day reminder window.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-06-04T14:00:00Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("returns 503 when CRON_SECRET is not configured", async () => {
@@ -116,6 +129,32 @@ describe("GET /api/cron/trial-expiry", () => {
         orgId: "org-b",
       }),
     );
+  });
+
+  it("reminds each organization on its own reminder window", async () => {
+    endingSoonQuery.mockResolvedValueOnce({
+      data: [
+        { id: "org-default", trial_ends_at: "2026-06-11T00:00:00Z" },
+        { id: "org-short", trial_ends_at: "2026-06-07T00:00:00Z", trial_reminder_days_override: 3 },
+        {
+          id: "org-short-later",
+          trial_ends_at: "2026-06-11T00:00:00Z",
+          trial_reminder_days_override: 3,
+        },
+        { id: "org-not-yet", trial_ends_at: "2026-06-13T00:00:00Z" },
+      ],
+      error: null,
+    });
+
+    await GET(makeReq({ authorization: `Bearer ${SECRET}` }));
+
+    const reminded = dispatchNotificationEvent.mock.calls
+      .map(([, event]) => event as { action: string; orgId: string; periodKey?: string })
+      .filter((event) => event.action === "billing_trial_ending_soon");
+    expect(reminded).toEqual([
+      expect.objectContaining({ orgId: "org-default", periodKey: "2026-06-11" }),
+      expect.objectContaining({ orgId: "org-short", periodKey: "2026-06-07" }),
+    ]);
   });
 
   it("reminds only organizations still on their trial", async () => {

@@ -1,4 +1,9 @@
-import { effectiveBillingStatus } from "@dubgrid/domain";
+import {
+  effectiveBillingStatus,
+  resolveBillingPolicy,
+  type ResolvedBillingPolicy,
+} from "@dubgrid/domain";
+import { getPlatformBillingPolicy } from "@/lib/billing-policy";
 import { getRateLimitConfigStatus } from "@/lib/rate-limit";
 import { ORGANIZATION_WITH_BILLING_COLS } from "@/lib/db/shared";
 import { rowToOrganization } from "@/lib/db/mappers";
@@ -210,6 +215,7 @@ function loadOversightFacts(serviceClient: QueryClient): Promise<OversightFacts>
 
 async function loadOversightFactsUncached(serviceClient: QueryClient) {
   const now = new Date();
+  const platformPolicy = await getPlatformBillingPolicy(serviceClient);
   const thirtyDaysAgo = new Date(now.getTime() - 30 * DAY_MS).toISOString();
   const [
     organizations,
@@ -311,6 +317,7 @@ async function loadOversightFactsUncached(serviceClient: QueryClient) {
 
   return {
     now,
+    platformPolicy,
     organizations,
     memberships,
     employees: employeeRecords.filter((row) => !row.archived_at),
@@ -475,7 +482,15 @@ function buildOrgHealthSummaries(facts: OversightFacts): GridmasterOrgHealthSumm
     }
     if (pendingInvites.get(org.id) ?? 0) riskFlags.push("pending_invites");
     if (openRequests.get(org.id) ?? 0) riskFlags.push("open_requests");
-    if (isBillingRisk(org.subscriptionStatus ?? null, org.trialEndsAt ?? null, facts.now)) {
+    const policy = resolveBillingPolicy(facts.platformPolicy, org.billingPolicyOverrides);
+    if (
+      isBillingRisk(
+        org.subscriptionStatus ?? null,
+        org.trialEndsAt ?? null,
+        facts.now,
+        policy.values.trialGraceDays,
+      )
+    ) {
       riskFlags.push("billing_risk");
     }
 
@@ -511,6 +526,7 @@ function buildOrgHealthSummaries(facts: OversightFacts): GridmasterOrgHealthSumm
         trialEndsAt: org.trialEndsAt ?? null,
         subscriptionSeats: org.subscriptionSeats ?? null,
         stripeCustomerId: org.stripeCustomerId ?? null,
+        trialGraceDays: policy.values.trialGraceDays,
       },
       featureOverrides: org.featureOverrides ?? {},
     };
@@ -560,6 +576,7 @@ function toBillingOrgSummary(
   org: Organization,
   subscription: Row | undefined,
   counts: { appUsers: number; employeeCount: number },
+  policy: ResolvedBillingPolicy,
 ): GridmasterBillingOrgSummary {
   const seats = org.subscriptionSeats ?? numberOrNull(subscription?.quantity);
   return {
@@ -579,6 +596,7 @@ function toBillingOrgSummary(
     employeeCount: counts.employeeCount,
     seatDelta: seats == null ? null : seats - counts.appUsers,
     updatedAt: stringOrNull(subscription?.updated_at),
+    policy,
   };
 }
 
@@ -613,10 +631,11 @@ export async function loadGridmasterOrgBilling(
     if (result.error) throw result.error;
   }
   if (!orgResult.data) return null;
+  const organization = rowToOrganization(orgResult.data as unknown as DbOrganization);
 
   const employees = (employeesResult.data ?? []) as Row[];
   return toBillingOrgSummary(
-    rowToOrganization(orgResult.data as unknown as DbOrganization),
+    organization,
     (subscriptionResult.data as Row | null) ?? undefined,
     {
       appUsers: countBillableSeats(
@@ -625,6 +644,10 @@ export async function loadGridmasterOrgBilling(
       ),
       employeeCount: employees.filter((row) => !row.archived_at).length,
     },
+    resolveBillingPolicy(
+      await getPlatformBillingPolicy(serviceClient),
+      organization.billingPolicyOverrides,
+    ),
   );
 }
 
@@ -634,11 +657,16 @@ function buildBillingSummary(
 ): GridmasterBillingSummary {
   const subscriptionByOrg = new Map(facts.subscriptions.map((row) => [String(row.org_id), row]));
   const organizations = facts.organizations.map((org) =>
-    toBillingOrgSummary(org, subscriptionByOrg.get(org.id), {
-      appUsers: billableAppUserCountForOrg(facts, org.id),
-      employeeCount:
-        orgHealth.find((summary) => summary.orgId === org.id)?.supportSnapshot.employeeCount ?? 0,
-    }),
+    toBillingOrgSummary(
+      org,
+      subscriptionByOrg.get(org.id),
+      {
+        appUsers: billableAppUserCountForOrg(facts, org.id),
+        employeeCount:
+          orgHealth.find((summary) => summary.orgId === org.id)?.supportSnapshot.employeeCount ?? 0,
+      },
+      resolveBillingPolicy(facts.platformPolicy, org.billingPolicyOverrides),
+    ),
   );
   const nowMs = facts.now.getTime();
   const trialEndingSoon = organizations.filter((row) => {
@@ -652,7 +680,7 @@ function buildBillingSummary(
     (row) => !row.trialEndsAt && (row.status === "trialing" || !row.status),
   );
   const riskOrganizations = organizations.filter((row) =>
-    isBillingRisk(row.status, row.trialEndsAt, facts.now),
+    isBillingRisk(row.status, row.trialEndsAt, facts.now, row.policy.values.trialGraceDays),
   );
   const missingStripeCustomer = organizations.filter((row) => !row.stripeCustomerId);
   const seatMismatches = organizations.filter((row) => row.seatDelta != null && row.seatDelta < 0);
@@ -866,8 +894,15 @@ const BILLING_RISK_STATUSES = new Set([
   "trial_expired",
 ]);
 
-function isBillingRisk(status: string | null, trialEndsAt: string | null, now: Date) {
-  return BILLING_RISK_STATUSES.has(effectiveBillingStatus(status, trialEndsAt, now) ?? "");
+function isBillingRisk(
+  status: string | null,
+  trialEndsAt: string | null,
+  now: Date,
+  trialGraceDays: number,
+) {
+  return BILLING_RISK_STATUSES.has(
+    effectiveBillingStatus(status, trialEndsAt, now, trialGraceDays) ?? "",
+  );
 }
 
 function riskPenalty(flag: GridmasterOrgHealthSummary["riskFlags"][number]) {

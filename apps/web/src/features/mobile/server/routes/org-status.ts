@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { mobileOrgStatusResponseSchema } from "@dubgrid/contracts";
-import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
+import { evaluateOrganizationAccess } from "@/lib/billing-policy";
 import {
   fetchMobileOrganizationMembershipRows,
   fetchMobileOrganizationRowById,
@@ -87,11 +87,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
   }
 
-  const billingAccess = evaluateOrganizationBillingAccess({
-    suspendedAt: org.suspendedAt,
-    subscriptionStatus: org.subscriptionStatus,
-    trialEndsAt: org.trialEndsAt,
-  });
+  const billingAccess = await evaluateOrganizationAccess(serviceClient, org);
 
   const orgRole = currentMembership.org_role ?? "user";
   const canViewAccessDetails = orgRole === "super_admin";

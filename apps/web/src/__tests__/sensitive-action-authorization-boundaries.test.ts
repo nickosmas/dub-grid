@@ -109,6 +109,13 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
       /if \(action === "start"\)[\s\S]*?const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.rpc\("start_impersonation"/,
     ],
   },
+  // Trial, grace, and reminder lengths decide when organizations lock.
+  "apps/web/src/app/api/gridmaster/billing-policy/route.ts": {
+    policy: "sensitive",
+    assertions: [
+      /\brequireGridmasterSession\s*\([\s\S]*?const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.from\("platform_billing_settings"\)\s*\.update\(/,
+    ],
+  },
   // Locking an organization or rewriting its billing needs a recent sign-in;
   // changing a trial's length, syncing, or scheduling a cancellation never does.
   "apps/web/src/app/api/gridmaster/subscription/route.ts": {

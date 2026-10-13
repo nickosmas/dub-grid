@@ -1,5 +1,6 @@
 "use client";
 
+import type { BillingPolicy, BillingPolicyOverrides } from "@dubgrid/domain";
 import type {
   AuditLogEntry,
   FullAuditLogEntry,
@@ -535,6 +536,34 @@ export function fetchGridmasterBilling(): Promise<GridmasterBillingSummary> {
 export interface GridmasterOrgBilling {
   organization: GridmasterBillingOrgSummary;
   stripeMode: "test" | "live" | null;
+}
+
+export interface GridmasterPlatformBillingPolicy extends BillingPolicy {
+  updatedAt: string;
+}
+
+export function fetchGridmasterBillingPolicy(): Promise<{
+  platform: GridmasterPlatformBillingPolicy;
+}> {
+  return requestGridmasterJson("/api/gridmaster/billing-policy");
+}
+
+export type GridmasterBillingPolicyInput =
+  | { scope: "platform"; values: BillingPolicy; expectedUpdatedAt: string }
+  | { scope: "organization"; orgId: string; overrides: BillingPolicyOverrides };
+
+export function updateGridmasterBillingPolicy(
+  input: GridmasterBillingPolicyInput,
+  accessToken?: string,
+): Promise<unknown> {
+  return requestGridmasterJson("/api/gridmaster/billing-policy", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify(input),
+  });
 }
 
 export function fetchGridmasterOrgBilling(orgId: string): Promise<GridmasterOrgBilling> {

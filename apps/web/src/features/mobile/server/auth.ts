@@ -1,3 +1,4 @@
+import { getPlatformBillingPolicy } from "@/lib/billing-policy";
 import { NextRequest, NextResponse } from "next/server";
 import {
   createSensitiveActionStepUpRequired,
@@ -74,6 +75,7 @@ async function resolveMobileRequestAuth(
         };
       },
       isRevoked: (token) => isSessionRevoked(token),
+      loadPlatformBillingPolicy: () => getPlatformBillingPolicy(getServiceClient()),
       allowAal1ForStepUp,
     });
   } catch (error) {

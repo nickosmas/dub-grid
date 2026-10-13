@@ -22,6 +22,7 @@ import {
 import { sectionStyle } from "@/lib/styles";
 import type { GridmasterBillingOrgSummary } from "@/types";
 import { gmTableStyle, gmTdStyle, gmThStyle } from "@/components/gridmaster/table-styles";
+import { PlatformBillingPolicyCard } from "@/components/gridmaster/BillingPolicyCards";
 
 const BILLING_STATUSES = [
   "trialing",
@@ -126,11 +127,25 @@ function isTrialPending(org: GridmasterBillingOrgSummary) {
 }
 
 function statusLabelFor(org: GridmasterBillingOrgSummary) {
-  return formatBillingStatusLabel(effectiveBillingStatus(org.status, org.trialEndsAt));
+  return formatBillingStatusLabel(
+    effectiveBillingStatus(
+      org.status,
+      org.trialEndsAt,
+      undefined,
+      org.policy.values.trialGraceDays,
+    ),
+  );
 }
 
 function statusToneFor(org: GridmasterBillingOrgSummary) {
-  return statusTone(effectiveBillingStatus(org.status, org.trialEndsAt));
+  return statusTone(
+    effectiveBillingStatus(
+      org.status,
+      org.trialEndsAt,
+      undefined,
+      org.policy.values.trialGraceDays,
+    ),
+  );
 }
 
 function BillingOversightSkeleton() {
@@ -448,6 +463,10 @@ export default function GridmasterBillingView({
               value={billing.seatMismatches.length}
               tone={billing.seatMismatches.length ? "danger" : "neutral"}
             />
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <PlatformBillingPolicyCard />
           </div>
 
           <div style={sectionStyle}>

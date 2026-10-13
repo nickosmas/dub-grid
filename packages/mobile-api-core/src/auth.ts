@@ -6,6 +6,7 @@ import {
 } from "@dubgrid/authz";
 import type {
   BillingAccessResult,
+  BillingPolicy,
   AdminPermissions,
   Organization,
   PlatformRole,
@@ -13,7 +14,7 @@ import type {
 import {
   ACCOUNT_DISABLED_CODE,
   ACCOUNT_DISABLED_MESSAGE,
-  evaluateOrganizationBillingAccess,
+  evaluateBillingAccessWithPolicy,
   isAccountDisabledMessage,
 } from "@dubgrid/domain";
 import { createClient, type Factor, type SupabaseClient, type User } from "@supabase/supabase-js";
@@ -325,7 +326,12 @@ export async function resolveMobileAuthContext<
   TOrganizationRow,
   TOrganization extends Pick<
     Organization,
-    "id" | "archivedAt" | "suspendedAt" | "subscriptionStatus" | "trialEndsAt"
+    | "id"
+    | "archivedAt"
+    | "suspendedAt"
+    | "subscriptionStatus"
+    | "trialEndsAt"
+    | "billingPolicyOverrides"
   > = Organization,
 >(input: {
   accessToken: string;
@@ -368,6 +374,11 @@ export async function resolveMobileAuthContext<
   }) => Promise<boolean>;
   /** Lets the sensitive-action adapter turn AAL1 into its structured step-up response. */
   allowAal1ForStepUp?: boolean;
+  /**
+   * The platform's billing defaults. Injected so this package stays
+   * platform-neutral; without it the built-in defaults apply.
+   */
+  loadPlatformBillingPolicy?: () => Promise<BillingPolicy>;
 }): Promise<ResolvedMobileAuthContext<TOrganization>> {
   const verified = await input.verifyToken(input.accessToken);
   if (!verified) {
@@ -456,11 +467,15 @@ export async function resolveMobileAuthContext<
   if (currentOrg.archivedAt) {
     throw new MobileApiRequestError(403, "Organization unavailable. Please try again later.");
   }
-  const billingAccess = evaluateOrganizationBillingAccess({
-    suspendedAt: currentOrg.suspendedAt,
-    subscriptionStatus: currentOrg.subscriptionStatus,
-    trialEndsAt: currentOrg.trialEndsAt,
-  });
+  const billingAccess = evaluateBillingAccessWithPolicy(
+    {
+      suspendedAt: currentOrg.suspendedAt,
+      subscriptionStatus: currentOrg.subscriptionStatus,
+      trialEndsAt: currentOrg.trialEndsAt,
+    },
+    await input.loadPlatformBillingPolicy?.(),
+    currentOrg.billingPolicyOverrides,
+  );
 
   if (billingAccess.isLocked) {
     throw new MobileApiRequestError(403, getLockedOrgMessage(orgRole, billingAccess));
@@ -511,6 +526,7 @@ export async function loginMobileUser(
   serviceClient: SupabaseClient,
   sessionClient: SupabaseClient,
   input: MobileAuthLoginBody,
+  deps: { loadPlatformBillingPolicy?: () => Promise<BillingPolicy> } = {},
 ): Promise<MobileAuthLoginResponse> {
   const organization = await requireMobileOrganization(serviceClient, input.orgSlug);
   const { session, user, mfaFactor } = await signInMobileUser(sessionClient, input);
@@ -525,11 +541,15 @@ export async function loginMobileUser(
     throw new MobileApiRequestError(403, "Your account is not associated with that organization.");
   }
 
-  const loginBillingAccess = evaluateOrganizationBillingAccess({
-    suspendedAt: organization.suspendedAt,
-    subscriptionStatus: organization.subscriptionStatus,
-    trialEndsAt: organization.trialEndsAt,
-  });
+  const loginBillingAccess = evaluateBillingAccessWithPolicy(
+    {
+      suspendedAt: organization.suspendedAt,
+      subscriptionStatus: organization.subscriptionStatus,
+      trialEndsAt: organization.trialEndsAt,
+    },
+    await deps.loadPlatformBillingPolicy?.(),
+    organization.billingPolicyOverrides,
+  );
 
   if (loginBillingAccess.isLocked) {
     throw new MobileApiRequestError(

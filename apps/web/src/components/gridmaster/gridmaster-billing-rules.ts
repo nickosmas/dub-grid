@@ -1,11 +1,17 @@
-import { evaluateOrganizationBillingAccess, type TrialControls } from "@dubgrid/domain";
+import {
+  evaluateOrganizationBillingAccess,
+  type BillingPolicyKey,
+  type TrialControls,
+} from "@dubgrid/domain";
 import type { GridmasterBillingOrgSummary } from "@/types";
 
 export const OVERRIDE_REASON_MAX_LENGTH = 500;
 
 /** What overriding to `status` does to the organization, said before it happens. */
 export function describeOverrideOutcome(
-  org: Pick<GridmasterBillingOrgSummary, "trialEndsAt" | "stripeSubscriptionId">,
+  org: Pick<GridmasterBillingOrgSummary, "trialEndsAt" | "stripeSubscriptionId"> & {
+    policy?: GridmasterBillingOrgSummary["policy"];
+  },
   status: string,
   now: Date = new Date(),
 ): string[] {
@@ -13,6 +19,8 @@ export function describeOverrideOutcome(
     subscriptionStatus: status,
     trialEndsAt: org.trialEndsAt,
     now,
+    trialGraceDays: org.policy?.values.trialGraceDays,
+    trialAdminNoticeDays: org.policy?.values.trialReminderDays,
   });
   const lines: string[] = [];
   if (access.isLocked) {
@@ -135,4 +143,24 @@ export function stripeDashboardUrl(
   id: string,
 ): string {
   return `https://dashboard.stripe.com/${mode === "test" ? "test/" : ""}${kind}/${encodeURIComponent(id)}`;
+}
+
+export const BILLING_POLICY_LABELS: Record<BillingPolicyKey, { label: string; help: string }> = {
+  trialDays: { label: "Trial length", help: "How long a new organization's trial lasts." },
+  trialGraceDays: {
+    label: "Grace after the trial",
+    help: "How long an organization stays open after its trial ends.",
+  },
+  trialReminderDays: {
+    label: "Trial reminder",
+    help: "How many days before the trial ends admins are reminded.",
+  },
+  paymentGraceDays: {
+    label: "Payment grace",
+    help: "How long a past-due subscription stays open.",
+  },
+};
+
+export function formatPolicyDays(days: number): string {
+  return `${days} ${days === 1 ? "day" : "days"}`;
 }

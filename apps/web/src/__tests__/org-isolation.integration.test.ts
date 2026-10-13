@@ -281,6 +281,7 @@ describe.runIf(dbReachable)("caller_org_id / caller_org_role SQL layer", () => {
     // Service-role only by design: each revokes anon and authenticated.
     expect(policylessTables.map((row) => row.table_name)).toEqual([
       "calendar_feed_tokens",
+      "platform_billing_settings",
       "user_known_devices",
     ]);
 

@@ -1,3 +1,4 @@
+import type { BillingPolicyOverrides } from "./billing-policy";
 export type ShiftDisplayMode = "code" | "name";
 export type WorkspaceKind = "real" | "sandbox";
 
@@ -90,6 +91,8 @@ export interface Organization {
   stripeCustomerId?: string | null;
   subscriptionStatus?: string | null;
   trialEndsAt?: string | null;
+  /** Per-organization billing policy overrides; null fields use the platform default. */
+  billingPolicyOverrides?: BillingPolicyOverrides | null;
   trialStartedAt?: string | null;
   subscriptionSeats?: number | null;
   dataRetentionDays: number;

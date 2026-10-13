@@ -421,6 +421,8 @@ export default function GridmasterDashboard({
                               effectiveBillingStatus(
                                 org.billing.subscriptionStatus,
                                 org.billing.trialEndsAt,
+                                undefined,
+                                org.billing.trialGraceDays,
                               ),
                             )}
                           </td>

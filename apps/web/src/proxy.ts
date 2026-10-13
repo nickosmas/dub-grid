@@ -5,7 +5,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { getSandboxFromCookie } from "@/lib/sandbox-cookie";
 import { endImpersonationOnEscape, verifyImpersonationSession } from "@/lib/impersonation-server";
-import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
+import { evaluateOrgBillingAccess, ORG_ACCESS_SELECT } from "@/lib/billing-policy";
 import { evaluateMfaClaimState } from "@dubgrid/authz";
 import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
 import { THEME_COOKIE_NAME, withThemeParam } from "@/lib/theme-preference";
@@ -57,8 +57,29 @@ type MwOrgAccess = {
   archived_at: string | null;
   subscription_status: string | null;
   trial_ends_at: string | null;
+  /** The billing policy override columns (see ORG_ACCESS_SELECT). */
+  [column: string]: unknown;
 } | null;
 const mwOrgAccessMemo = new Map<string, { value: MwOrgAccess; expiresAt: number }>();
+
+// The platform billing policy is service-only; the org row above is read as the
+// member. The client is built only when the policy memo and Redis both miss.
+let platformPolicyServiceClient: ReturnType<typeof createClient> | null = null;
+function platformPolicyClient(): { from: (table: string) => any } {
+  return {
+    from: (table: string) => {
+      if (!platformPolicyServiceClient) {
+        const url = getSupabaseUrl();
+        const key = getSupabaseSecretKey();
+        if (!url || !key) throw new Error("Supabase service credentials are not configured");
+        platformPolicyServiceClient = createClient(url, key, {
+          auth: { autoRefreshToken: false, persistSession: false },
+        });
+      }
+      return platformPolicyServiceClient.from(table);
+    },
+  };
+}
 
 /** Test seam: clears the in-process org-access memo between cases. */
 export function resetMiddlewareOrgAccessMemo(): void {
@@ -647,7 +668,7 @@ export async function proxy(req: NextRequest) {
           async () => {
             const { data, error } = await supabase
               .from("organizations")
-              .select("suspended_at, archived_at, subscription_status, trial_ends_at")
+              .select(ORG_ACCESS_SELECT)
               .eq("id", claims.org_id!)
               .maybeSingle();
             // A lookup failure is an outage, handled below as best-effort; an
@@ -682,10 +703,7 @@ export async function proxy(req: NextRequest) {
         return NextResponse.redirect(loginUrl);
       }
 
-      const billingAccess = evaluateOrganizationBillingAccess({
-        subscriptionStatus: orgAccess?.subscription_status ?? null,
-        trialEndsAt: orgAccess?.trial_ends_at ?? null,
-      });
+      const billingAccess = await evaluateOrgBillingAccess(platformPolicyClient(), orgAccess);
 
       const canRecoverBilling = getRoleLevel(effectiveRole) >= ROLE_HIERARCHY.super_admin;
 

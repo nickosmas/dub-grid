@@ -2,6 +2,7 @@ import AuditLogView from "@/components/gridmaster/AuditLogView";
 import CustomSelect from "@/components/CustomSelect";
 import { Button } from "@/components/Button";
 import { useGridmasterBillingActions } from "@/components/gridmaster/useGridmasterBillingActions";
+import { OrganizationBillingPolicyCard } from "@/components/gridmaster/BillingPolicyCards";
 import {
   billingActionStates,
   disabledActionSummary,
@@ -183,10 +184,18 @@ export function BillingTab({ organization }: { organization: Organization }) {
     );
   }
 
-  const displayStatus = effectiveBillingStatus(billingOrg.status, billingOrg.trialEndsAt);
+  const { values: policy } = billingOrg.policy;
+  const displayStatus = effectiveBillingStatus(
+    billingOrg.status,
+    billingOrg.trialEndsAt,
+    undefined,
+    policy.trialGraceDays,
+  );
   const access = evaluateOrganizationBillingAccess({
     subscriptionStatus: billingOrg.status,
     trialEndsAt: billingOrg.trialEndsAt,
+    trialGraceDays: policy.trialGraceDays,
+    trialAdminNoticeDays: policy.trialReminderDays,
   });
   const mode = billingQuery.data?.stripeMode ?? null;
   const stripeActions = billingActionStates(billingOrg);
@@ -363,6 +372,8 @@ export function BillingTab({ organization }: { organization: Organization }) {
           </div>
         </div>
       </div>
+
+      <OrganizationBillingPolicyCard org={billingOrg} />
 
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>Billing Actions</div>

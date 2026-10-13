@@ -16,6 +16,7 @@ import type {
   ShiftDisplayMode,
   ShiftRequestStatus,
   ShiftRequestType,
+  ResolvedBillingPolicy,
 } from "@dubgrid/domain";
 export type {
   AdminPermissions,
@@ -1016,6 +1017,8 @@ export interface GridmasterOrgHealthSummary {
     trialEndsAt: string | null;
     subscriptionSeats: number | null;
     stripeCustomerId: string | null;
+    /** The organization's effective grace after its trial, in days. */
+    trialGraceDays: number;
   };
   featureOverrides: Record<string, boolean>;
 }
@@ -1103,6 +1106,8 @@ export interface GridmasterBillingOrgSummary {
   employeeCount: number;
   seatDelta: number | null;
   updatedAt: string | null;
+  /** The organization's effective billing policy and where each value comes from. */
+  policy: ResolvedBillingPolicy;
 }
 
 export interface GridmasterBillingSummary {

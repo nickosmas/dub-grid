@@ -171,7 +171,8 @@ export function EndTrialDialog({
 }) {
   if (!org) return null;
 
-  const accessEnds = formatDay(new Date(Date.now() + TRIAL_GRACE_DAYS * 86_400_000));
+  const graceDays = org.policy?.values.trialGraceDays ?? TRIAL_GRACE_DAYS;
+  const accessEnds = formatDay(new Date(Date.now() + graceDays * 86_400_000));
   const options: Array<{
     value: EndTrialChoice;
     title: string;
@@ -181,7 +182,7 @@ export function EndTrialDialog({
   }> = [
     {
       value: "grace",
-      title: `Give the usual ${TRIAL_GRACE_DAYS} days to add billing`,
+      title: `Give the usual ${graceDays} ${graceDays === 1 ? "day" : "days"} to add billing`,
       detail: `The organization stays open until ${accessEnds}, then locks unless it subscribes.`,
       reason: graceReason,
       checkedClass:

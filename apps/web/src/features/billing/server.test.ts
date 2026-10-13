@@ -136,6 +136,13 @@ function createQueryClient(
           }),
         };
       }
+      if (table === "platform_billing_settings") {
+        return {
+          select: () => ({
+            eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }),
+          }),
+        };
+      }
       throw new Error(`Unexpected table: ${table}`);
     },
   };
@@ -209,5 +216,23 @@ describe("loadOrganizationBillingSummary", () => {
     );
 
     expect(summary.billingAccess).toMatchObject({ state: "suspended", isLocked: true });
+  });
+
+  it("keeps an organization open through its own longer grace period", async () => {
+    const fiveDaysAgo = new Date(Date.now() - 5 * 86_400_000).toISOString();
+    const summary = await loadOrganizationBillingSummary(
+      createQueryClient({
+        org: {
+          subscription_status: "trialing",
+          trial_ends_at: fiveDaysAgo,
+          trial_grace_days_override: 10,
+        },
+        subscription: { stripe_subscription_id: null, status: null },
+      }) as unknown as Parameters<typeof loadOrganizationBillingSummary>[0],
+      "org-1",
+      { canManageBilling: true },
+    );
+
+    expect(summary.billingAccess).toMatchObject({ state: "trial_grace", isLocked: false });
   });
 });

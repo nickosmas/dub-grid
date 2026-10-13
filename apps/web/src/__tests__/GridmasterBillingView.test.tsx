@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { resolveBillingPolicy } from "@dubgrid/domain";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,6 +14,16 @@ vi.mock("@/features/gridmaster/client", () => ({
   fetchGridmasterBilling: () => mockFetchGridmasterBilling(),
   syncGridmasterBilling: (orgId: string) => mockSyncGridmasterBilling(orgId),
   updateGridmasterSubscription: (input: unknown) => mockUpdateGridmasterSubscription(input),
+  fetchGridmasterBillingPolicy: async () => ({
+    platform: {
+      trialDays: 14,
+      trialGraceDays: 3,
+      trialReminderDays: 7,
+      paymentGraceDays: 14,
+      updatedAt: "2026-05-01T00:00:00.000Z",
+    },
+  }),
+  updateGridmasterBillingPolicy: vi.fn(),
 }));
 
 // The identity check needs a real browser session; run the action as if
@@ -54,6 +65,7 @@ const billingSummary: GridmasterBillingSummary = {
       employeeCount: 20,
       seatDelta: 1,
       updatedAt: "2026-05-01T00:00:00.000Z",
+      policy: resolveBillingPolicy(null, null),
     },
   ],
   trialEndingSoon: [],

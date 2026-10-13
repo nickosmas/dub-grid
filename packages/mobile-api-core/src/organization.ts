@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { billingPolicyOverridesFromRow, type BillingPolicyOverrides } from "@dubgrid/domain";
 
 export type MobileOrganizationLookup = {
   id: string;
@@ -7,6 +8,7 @@ export type MobileOrganizationLookup = {
   suspendedAt: string | null;
   subscriptionStatus: string | null;
   trialEndsAt: string | null;
+  billingPolicyOverrides: BillingPolicyOverrides;
 };
 
 export function normalizeMobileOrgSlug(slug: string | null | undefined): string {
@@ -23,7 +25,9 @@ export async function findMobileOrganizationBySlug(
 ): Promise<MobileOrganizationLookup | null> {
   const { data, error } = await serviceClient
     .from("organizations")
-    .select("id, name, slug, suspended_at, subscription_status, trial_ends_at")
+    .select(
+      "id, name, slug, suspended_at, subscription_status, trial_ends_at, trial_length_days_override, trial_grace_days_override, trial_reminder_days_override, payment_grace_days_override",
+    )
     .eq("slug", slug)
     .maybeSingle();
 
@@ -42,5 +46,6 @@ export async function findMobileOrganizationBySlug(
     suspendedAt: (data.suspended_at as string | null | undefined) ?? null,
     subscriptionStatus: (data.subscription_status as string | null | undefined) ?? null,
     trialEndsAt: (data.trial_ends_at as string | null | undefined) ?? null,
+    billingPolicyOverrides: billingPolicyOverridesFromRow(data as Record<string, unknown>),
   };
 }

@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import { resolveBillingPolicy } from "@dubgrid/domain";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -163,6 +164,7 @@ describe("gridmaster dirty save controls", () => {
         employeeCount: 8,
         seatDelta: -2,
         updatedAt: "2026-05-01T00:00:00.000Z",
+        policy: resolveBillingPolicy(null, null),
       },
       stripeMode: null,
     });

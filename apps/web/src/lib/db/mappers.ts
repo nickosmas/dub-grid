@@ -1,3 +1,4 @@
+import { billingPolicyOverridesFromRow } from "@dubgrid/domain";
 import type {
   Department,
   DepartmentType,
@@ -161,6 +162,9 @@ export function rowToOrganization(row: DbOrganization): Organization {
     stripeCustomerId: row.stripe_customer_id ?? null,
     subscriptionStatus: row.subscription_status ?? null,
     trialEndsAt: row.trial_ends_at ?? null,
+    billingPolicyOverrides: billingPolicyOverridesFromRow(
+      row as unknown as Record<string, unknown>,
+    ),
     trialStartedAt: row.trial_started_at ?? null,
     subscriptionSeats: row.subscription_seats ?? null,
     dataRetentionDays: row.data_retention_days ?? 365,

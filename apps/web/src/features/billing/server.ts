@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { evaluateOrganizationBillingAccess, isLiveSubscriptionStatus } from "@dubgrid/domain";
+import { isLiveSubscriptionStatus } from "@dubgrid/domain";
+import { BILLING_POLICY_OVERRIDE_SELECT, evaluateOrgBillingAccess } from "@/lib/billing-policy";
 import type { BillingOperationSummary, OrganizationBillingSummary } from "@/types";
 import { DUBGRID_SUPPORT_ACTOR_LABEL } from "@/lib/client-facing";
 import { clientEnv } from "@/lib/env";
@@ -276,7 +277,7 @@ export async function loadOrganizationBillingSummary(
       serviceClient
         .from("organizations")
         .select(
-          "id, name, slug, stripe_customer_id, subscription_status, trial_ends_at, subscription_seats, suspended_at",
+          `id, name, slug, stripe_customer_id, subscription_status, trial_ends_at, subscription_seats, suspended_at, ${BILLING_POLICY_OVERRIDE_SELECT}`,
         )
         .eq("id", orgId)
         .single(),
@@ -319,10 +320,9 @@ export async function loadOrganizationBillingSummary(
       isLiveSubscriptionStatus(subscriptionRow?.status),
     stripeConfigured: isStripeBillingConfigured(),
     canManageBilling: options.canManageBilling,
-    billingAccess: evaluateOrganizationBillingAccess({
+    billingAccess: await evaluateOrgBillingAccess(serviceClient, orgRow, {
       subscriptionStatus: orgRow.subscription_status ?? subscriptionRow?.status ?? null,
       trialEndsAt: orgRow.trial_ends_at ?? subscriptionRow?.trial_end ?? null,
-      suspendedAt: orgRow.suspended_at,
     }),
     recentOperations,
   };

@@ -70,6 +70,16 @@ const mockGetSession = vi.fn();
 const mockSupabaseFrom = vi.fn();
 const mockCacheSet = vi.fn();
 
+// Service-role reads (the platform billing policy, sandbox lookups) use the
+// same table mock as the request client.
+vi.mock("@supabase/supabase-js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@supabase/supabase-js")>();
+  return {
+    ...actual,
+    createClient: () => ({ from: (table: string) => mockSupabaseFrom(table) }),
+  };
+});
+
 vi.mock("@supabase/ssr", () => ({
   createServerClient: () => ({
     auth: { getSession: () => mockGetSession() },
@@ -93,6 +103,7 @@ vi.mock("@/lib/cache", () => ({
     mwMembership: (userId: string, slug: string) => `dg:mw:membership:${userId}:${slug}`,
     mwOrgAccess: (orgId: string) => `dg:mw:orgAccess:${orgId}`,
     mwOrgSuspended: (orgId: string) => `dg:mw:orgSuspended:${orgId}`,
+    platformBillingPolicy: () => `dg:platform:billingPolicy`,
   },
   TTL: { MIDDLEWARE: 30 },
 }));
@@ -654,6 +665,44 @@ describe("middleware: route guards", () => {
 
     expect((res as { _type: string })._type).toBe("redirect");
     expect((res as { _redirectUrl: string })._redirectUrl).toBe(
+      "http://acme.localhost:3000/billing-required",
+    );
+  });
+
+  it("keeps an organization open through its own longer grace period", async () => {
+    mockSessionWithClaims({
+      platform_role: "none",
+      org_role: "user",
+      org_id: "org-grace",
+      org_slug: "acme",
+      sub: "user-1",
+    });
+    const fiveDaysAgo = new Date(Date.now() - 5 * 86_400_000).toISOString();
+    mockSupabaseFrom.mockImplementation((table: string) => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          maybeSingle: vi.fn().mockResolvedValue({
+            data:
+              table === "organizations"
+                ? {
+                    suspended_at: null,
+                    archived_at: null,
+                    subscription_status: "trialing",
+                    trial_ends_at: fiveDaysAgo,
+                    trial_grace_days_override: 10,
+                  }
+                : null,
+            error: null,
+          }),
+        })),
+      })),
+    }));
+
+    const res = await runMiddleware(
+      makeNextRequest("http://acme.localhost:3000/schedule", { host: "acme.localhost:3000" }),
+    );
+
+    expect((res as { _redirectUrl?: string })._redirectUrl).not.toBe(
       "http://acme.localhost:3000/billing-required",
     );
   });

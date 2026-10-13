@@ -35,6 +35,10 @@ export interface DbOrganization {
   stripe_customer_id: string | null;
   subscription_status: string | null;
   trial_ends_at: string | null;
+  trial_length_days_override?: number | null;
+  trial_grace_days_override?: number | null;
+  trial_reminder_days_override?: number | null;
+  payment_grace_days_override?: number | null;
   trial_started_at: string | null;
   subscription_seats: number | null;
   data_retention_days: number;

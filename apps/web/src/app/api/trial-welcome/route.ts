@@ -10,6 +10,8 @@ import { sendResendEmail } from "@/lib/resend";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import { DEFAULT_BILLING_POLICY } from "@dubgrid/domain";
+import { BILLING_POLICY_OVERRIDE_SELECT, getOrgBillingPolicy } from "@/lib/billing-policy";
 import { serverEnv } from "@/lib/env.server";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +19,8 @@ export const dynamic = "force-dynamic";
 type TrialWelcomeState = {
   shouldShowWelcome: boolean;
   trialEndsAt: string | null;
+  /** Days the organization stays open after its trial: its override or the platform default. */
+  trialGraceDays: number;
 };
 
 function formatTrialEndDate(value: string | null): string {
@@ -47,7 +51,11 @@ export async function GET(req: NextRequest) {
   if ("response" in auth) return auth.response;
   const { user, claims } = auth;
 
-  const empty: TrialWelcomeState = { shouldShowWelcome: false, trialEndsAt: null };
+  const empty: TrialWelcomeState = {
+    shouldShowWelcome: false,
+    trialEndsAt: null,
+    trialGraceDays: DEFAULT_BILLING_POLICY.trialGraceDays,
+  };
 
   if (typeof claims.org_id !== "string") {
     return NextResponse.json(empty);
@@ -71,7 +79,7 @@ export async function GET(req: NextRequest) {
   const { data: org, error } = await service
     .from("organizations")
     .select(
-      "name, subscription_status, trial_ends_at, trial_welcome_email_sent_at, trial_welcome_seen_at",
+      `name, subscription_status, trial_ends_at, trial_welcome_email_sent_at, trial_welcome_seen_at, ${BILLING_POLICY_OVERRIDE_SELECT}`,
     )
     .eq("id", orgId)
     .maybeSingle();
@@ -147,6 +155,8 @@ export async function GET(req: NextRequest) {
   const state: TrialWelcomeState = {
     shouldShowWelcome: !org.trial_welcome_seen_at,
     trialEndsAt: org.trial_ends_at,
+    trialGraceDays: (await getOrgBillingPolicy(service, org as unknown as Record<string, unknown>))
+      .values.trialGraceDays,
   };
   return NextResponse.json(state);
 }
