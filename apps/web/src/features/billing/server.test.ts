@@ -236,6 +236,24 @@ describe("loadOrganizationBillingSummary", () => {
     expect(summary.billingAccess).toMatchObject({ state: "trial_grace", isLocked: false });
   });
 
+  it("locks a past-due organization once its payment grace runs out", async () => {
+    const twentyDaysAgo = new Date(Date.now() - 20 * 86_400_000).toISOString();
+    const summary = await loadOrganizationBillingSummary(
+      createQueryClient({
+        org: { subscription_status: "past_due", payment_grace_started_at: twentyDaysAgo },
+        subscription: { stripe_subscription_id: "sub_123", status: "past_due" },
+      }) as unknown as Parameters<typeof loadOrganizationBillingSummary>[0],
+      "org-1",
+      { canManageBilling: true },
+    );
+
+    expect(summary.billingAccess).toMatchObject({
+      state: "locked",
+      reason: "payment_grace_expired",
+      isLocked: true,
+    });
+  });
+
   it("reads a paused organization as paused and open", async () => {
     const monthAgo = new Date(Date.now() - 30 * 86_400_000).toISOString();
     const summary = await loadOrganizationBillingSummary(

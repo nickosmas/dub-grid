@@ -206,3 +206,34 @@ describe("a paused organization", () => {
     expect(describeHeaderBillingNotice(paused("trialing", 3), now)).toBeNull();
   });
 });
+
+describe("payment grace", () => {
+  it("gives the date to update payment by", () => {
+    expect(
+      describeBillingNotice({
+        status: "past_due",
+        trialEndsAt: null,
+        billingAccess: {
+          state: "payment_attention_required",
+          reason: "payment_status",
+          trialGraceEndsAt: null,
+          paymentGraceEndsAt: at(9, 20),
+        },
+      })?.message,
+    ).toBe(
+      `Billing needs attention. Update your payment details by ${new Date(at(9, 20)).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} to keep your organization open.`,
+    );
+  });
+
+  it("says an overdue payment put the organization on hold", () => {
+    expect(
+      describeBillingNotice({
+        status: "past_due",
+        trialEndsAt: null,
+        billingAccess: { state: "locked", reason: "payment_grace_expired", trialGraceEndsAt: null },
+      })?.message,
+    ).toBe(
+      "A payment is overdue, so your organization is on hold. Update your payment details to reopen it.",
+    );
+  });
+});

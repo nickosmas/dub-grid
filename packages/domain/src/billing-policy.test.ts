@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  evaluateBillingAccessWithPolicy,
   BILLING_POLICY_OVERRIDE_COLUMNS,
   BILLING_POLICY_OVERRIDE_SELECT,
   DEFAULT_BILLING_POLICY,
@@ -62,5 +63,20 @@ describe("BILLING_POLICY_OVERRIDE_SELECT", () => {
     expect(BILLING_POLICY_OVERRIDE_SELECT.split(", ")).toEqual(
       Object.values(BILLING_POLICY_OVERRIDE_COLUMNS),
     );
+  });
+});
+
+describe("evaluateBillingAccessWithPolicy", () => {
+  it("applies the organization's payment grace", () => {
+    const input = {
+      subscriptionStatus: "past_due",
+      paymentGraceStartedAt: "2026-10-01T00:00:00Z",
+      now: new Date("2026-10-20T00:00:00Z"),
+    };
+    expect(evaluateBillingAccessWithPolicy(input, DEFAULT_BILLING_POLICY, {}).isLocked).toBe(true);
+    expect(
+      evaluateBillingAccessWithPolicy(input, DEFAULT_BILLING_POLICY, { paymentGraceDays: 30 })
+        .isLocked,
+    ).toBe(false);
   });
 });

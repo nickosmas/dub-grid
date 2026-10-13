@@ -780,6 +780,7 @@ export type NotificationType =
   | "billing_payment_succeeded"
   | "billing_trial_ending_soon"
   | "billing_trial_expired"
+  | "billing_access_locked"
   // security
   | "security_email_changed"
   | "security_password_changed"
@@ -1111,6 +1112,8 @@ export interface GridmasterBillingOrgSummary {
   suspendedAt: string | null;
   /** Set while a Gridmaster has paused this organization's billing. */
   billingHold: { pausedAt: string; reason: string | null } | null;
+  /** When payment attention began; its grace runs from here. */
+  paymentGraceStartedAt: string | null;
 }
 
 export interface GridmasterBillingSummary {

@@ -1,5 +1,6 @@
 import {
   DEFAULT_TRIAL_DAYS,
+  PAYMENT_GRACE_DAYS,
   TRIAL_ADMIN_NOTICE_DAYS,
   TRIAL_GRACE_DAYS,
   evaluateOrganizationBillingAccess,
@@ -31,7 +32,7 @@ export const DEFAULT_BILLING_POLICY: BillingPolicy = {
   trialDays: DEFAULT_TRIAL_DAYS,
   trialGraceDays: TRIAL_GRACE_DAYS,
   trialReminderDays: TRIAL_ADMIN_NOTICE_DAYS,
-  paymentGraceDays: 14,
+  paymentGraceDays: PAYMENT_GRACE_DAYS,
 };
 
 /** The ranges the database enforces; the forms use the same ones. */
@@ -88,11 +89,11 @@ export const BILLING_POLICY_OVERRIDE_SELECT =
 
 /** The override columns plus the billing hold: every select that decides access. */
 export const BILLING_ACCESS_SELECT =
-  "trial_length_days_override, trial_grace_days_override, trial_reminder_days_override, payment_grace_days_override, billing_paused_at";
+  "trial_length_days_override, trial_grace_days_override, trial_reminder_days_override, payment_grace_days_override, billing_paused_at, payment_grace_started_at";
 
 /** Billing access with an organization's effective policy applied. */
 export function evaluateBillingAccessWithPolicy(
-  input: Omit<BillingAccessInput, "trialGraceDays" | "trialAdminNoticeDays">,
+  input: Omit<BillingAccessInput, "trialGraceDays" | "trialAdminNoticeDays" | "paymentGraceDays">,
   platform: BillingPolicy | null | undefined,
   overrides: BillingPolicyOverrides | null | undefined,
 ): BillingAccessResult {
@@ -101,6 +102,7 @@ export function evaluateBillingAccessWithPolicy(
     ...input,
     trialGraceDays: values.trialGraceDays,
     trialAdminNoticeDays: values.trialReminderDays,
+    paymentGraceDays: values.paymentGraceDays,
   });
 }
 

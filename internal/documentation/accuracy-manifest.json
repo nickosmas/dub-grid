@@ -161,7 +161,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:c27ca5092595c4d3c6059234c64c2e51bde05dc75aad524465f2bdf6611d836b"
+      "evidenceFingerprint": "sha256:aed92625b6f2a2c1310ab8dfa1b802339bcbe7d74edc15c3688d8d91d8204bc2"
     },
     {
       "id": "quickstart",
@@ -440,7 +440,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:44b90f9f3550a4a4dfd4de8a546ff38b7a9da8ad2a0c4b57ae677e112b3ad20b"
+      "evidenceFingerprint": "sha256:c46539703d3ee7fddf8bf436ffac9ac18bea57e85e6367a800f98909a339e3cb"
     },
     {
       "id": "recurring-shifts",
@@ -603,7 +603,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:bd2c30dbf492ffd67c2d05428499be3f9e77afacd143c0bcf17c6c8e1009b583"
+      "evidenceFingerprint": "sha256:a56bcb3add05467f99368ae441745b01aa412aea859b7118b78e0ab5c87f3dfe"
     },
     {
       "id": "dashboard",
@@ -1029,7 +1029,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:c9bc7ad2264d7d2169c12887646a8276d3a068faf03f51c8226e1f5c5e6d6cfb"
+      "evidenceFingerprint": "sha256:21ce6e4bb03e644fd20acddab537eee960aac22dbbdd116c268d1e6795cd08a7"
     },
     {
       "id": "roles",
@@ -1184,7 +1184,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:69669480c9e5c347083619425a9fb41bf208bce675a012fbac2241b2638012f7"
+      "evidenceFingerprint": "sha256:e064e3796af5a7aedaf3e41f93126175e53907da4e539d2a21e612748f599f32"
     },
     {
       "id": "mobile-navigation",
@@ -1329,7 +1329,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:27ff5d531c0f48bb34dc9df8b60c589f5af84ad9c8b9babb1530292f0dc192c2"
+      "evidenceFingerprint": "sha256:2f5b229c1bc0869b1cab84bce27c0714db68acb4dbaa1f1994698467f4cf6ac6"
     },
     {
       "id": "reports",
@@ -1529,7 +1529,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:c0fd4fbae472af5a20073b6f43010ccc8a44c383650a2df732e0213bc0c832f5"
+      "evidenceFingerprint": "sha256:3a3c7eac2f1858b791b137de9ec6dac6c87baf5610d6c233b159fdde981e4579"
     },
     {
       "id": "privacy-controls",
@@ -1591,7 +1591,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:b0a8b7771147f63ec7c1386206d97183286f36d81ed391c8ce2ef848f69923ac"
+      "evidenceFingerprint": "sha256:8441b93d0a3589fccfc7c3c00c376d1169bf2505825650ed6483f41a8e817c62"
     },
     {
       "id": "schedule-rules-display",

@@ -49,6 +49,7 @@ export const NOTIFICATION_CATEGORIES: Record<string, string> = {
   billing_payment_succeeded: "billing",
   billing_trial_ending_soon: "billing",
   billing_trial_expired: "billing",
+  billing_access_locked: "billing",
   // security
   security_email_changed: "security",
   security_password_changed: "security",

@@ -49,6 +49,7 @@ function makeOrg(
     policy: resolveBillingPolicy(DEFAULT_BILLING_POLICY, {}),
     suspendedAt: null,
     billingHold: null,
+    paymentGraceStartedAt: null,
     ...overrides,
   };
 }

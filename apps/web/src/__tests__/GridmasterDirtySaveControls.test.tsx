@@ -167,6 +167,7 @@ describe("gridmaster dirty save controls", () => {
         policy: resolveBillingPolicy(null, null),
         suspendedAt: null,
         billingHold: null,
+        paymentGraceStartedAt: null,
       },
       stripeMode: null,
     });

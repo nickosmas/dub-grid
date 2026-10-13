@@ -282,3 +282,67 @@ describe("resumedTrialEndsAt", () => {
     expect(resumedTrialEndsAt({ ...base, status: "trialing", trialEndsAt: null })).toBe(null);
   });
 });
+
+describe("payment grace", () => {
+  const started = "2026-10-01T12:00:00Z";
+  const pastDue = (input: Record<string, unknown> = {}) =>
+    evaluateOrganizationBillingAccess({
+      subscriptionStatus: "past_due",
+      paymentGraceStartedAt: started,
+      now,
+      ...input,
+    });
+
+  it("stays open until the grace runs out, then locks", () => {
+    expect(pastDue({ now: new Date("2026-10-15T11:59:59Z") })).toMatchObject({
+      state: "payment_attention_required",
+      isLocked: false,
+      paymentGraceEndsAt: "2026-10-15T12:00:00.000Z",
+    });
+    expect(pastDue({ now: new Date("2026-10-15T12:00:00Z") })).toMatchObject({
+      state: "locked",
+      reason: "payment_grace_expired",
+      isLocked: true,
+    });
+  });
+
+  it("uses the organization's payment grace", () => {
+    expect(pastDue({ paymentGraceDays: 30 }).isLocked).toBe(false);
+    expect(pastDue({ paymentGraceDays: 5 }).isLocked).toBe(true);
+  });
+
+  it("never locks without a recorded start", () => {
+    expect(
+      pastDue({ paymentGraceStartedAt: null, now: new Date("2027-01-01T00:00:00Z") }),
+    ).toMatchObject({
+      state: "payment_attention_required",
+      isLocked: false,
+      paymentGraceEndsAt: null,
+    });
+  });
+
+  it.each(["incomplete", "paused"])("times %s the same way", (status) => {
+    expect(pastDue({ subscriptionStatus: status, paymentGraceDays: 5 }).isLocked).toBe(true);
+  });
+
+  it("stays open while billing is paused", () => {
+    expect(pastDue({ paymentGraceDays: 5, billingPausedAt: "2026-10-02T00:00:00Z" })).toMatchObject(
+      {
+        state: "paused",
+        isLocked: false,
+      },
+    );
+  });
+
+  it("won't let a pause reopen an organization locked for an overdue payment", () => {
+    expect(
+      billingHoldControls({
+        status: "past_due",
+        trialEndsAt: null,
+        paymentGraceStartedAt: started,
+        paymentGraceDays: 5,
+        now,
+      }).pause.allowed,
+    ).toBe(false);
+  });
+});

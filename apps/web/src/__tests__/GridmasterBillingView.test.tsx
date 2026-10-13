@@ -68,6 +68,7 @@ const billingSummary: GridmasterBillingSummary = {
       policy: resolveBillingPolicy(null, null),
       suspendedAt: null,
       billingHold: null,
+      paymentGraceStartedAt: null,
     },
   ],
   trialEndingSoon: [],

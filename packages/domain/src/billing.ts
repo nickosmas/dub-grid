@@ -1,6 +1,7 @@
 export const TRIAL_ADMIN_NOTICE_DAYS = 7;
 export const TRIAL_GRACE_DAYS = 3;
 export const DEFAULT_TRIAL_DAYS = 14;
+export const PAYMENT_GRACE_DAYS = 14;
 
 export type BillingAccessState =
   | "active"
@@ -22,7 +23,8 @@ export type BillingAccessReason =
   | "trial_expired"
   | "payment_status"
   | "suspended"
-  | "billing_paused";
+  | "billing_paused"
+  | "payment_grace_expired";
 
 export interface BillingAccessInput {
   subscriptionStatus?: string | null;
@@ -30,8 +32,11 @@ export interface BillingAccessInput {
   suspendedAt?: string | null;
   /** Set while a Gridmaster holds the organization's billing; see `paused`. */
   billingPausedAt?: string | null;
+  /** When the organization first needed payment attention; none never locks. */
+  paymentGraceStartedAt?: string | null;
   now?: Date;
   trialGraceDays?: number;
+  paymentGraceDays?: number;
   trialAdminNoticeDays?: number;
 }
 
@@ -42,6 +47,8 @@ export interface BillingAccessResult {
   shouldNotifyAdmins: boolean;
   daysUntilTrialEnd: number | null;
   trialGraceEndsAt: string | null;
+  /** When a payment-attention organization locks, if its grace has a start. */
+  paymentGraceEndsAt?: string | null;
 }
 
 const ENDED_SUBSCRIPTION_STATUSES = new Set(["canceled", "incomplete_expired"]);
@@ -59,7 +66,14 @@ export const TRIAL_EXPIRED_STATUS = "trial_expired";
 
 const LOCKED_STATUSES = new Set(["canceled", "incomplete_expired", "unpaid"]);
 
-const PAYMENT_ATTENTION_STATUSES = new Set(["incomplete", "past_due", "paused"]);
+/** Stored statuses that ask for payment; each starts the payment grace. */
+export const PAYMENT_ATTENTION_STATUSES = ["incomplete", "past_due", "paused"] as const;
+const PAYMENT_ATTENTION = new Set<string>(PAYMENT_ATTENTION_STATUSES);
+
+/** Whether a stored status asks for payment, which starts the payment grace. */
+export function needsPaymentAttention(status: string | null | undefined): boolean {
+  return Boolean(status) && PAYMENT_ATTENTION.has(status as string);
+}
 
 function parseDate(value: string | null | undefined): Date | null {
   if (!value) return null;
@@ -141,14 +155,22 @@ export function evaluateOrganizationBillingAccess(input: BillingAccessInput): Bi
     };
   }
 
-  if (status && PAYMENT_ATTENTION_STATUSES.has(status)) {
+  if (needsPaymentAttention(status)) {
+    // Stripe keeps retrying the payment; DubGrid decides when access stops,
+    // and only from a recorded start, so a missing one never locks.
+    const graceStartedAt = parseDate(input.paymentGraceStartedAt);
+    const paymentGraceEndsAt = graceStartedAt
+      ? addDays(graceStartedAt, input.paymentGraceDays ?? PAYMENT_GRACE_DAYS)
+      : null;
+    const overdue = paymentGraceEndsAt !== null && now.getTime() >= paymentGraceEndsAt.getTime();
     return {
-      state: "payment_attention_required",
-      reason: "payment_status",
-      isLocked: false,
+      state: overdue ? "locked" : "payment_attention_required",
+      reason: overdue ? "payment_grace_expired" : "payment_status",
+      isLocked: overdue,
       shouldNotifyAdmins: true,
       daysUntilTrialEnd: trialEndsAt ? daysUntil(now, trialEndsAt) : null,
       trialGraceEndsAt: trialEndsAt ? addDays(trialEndsAt, graceDays).toISOString() : null,
+      paymentGraceEndsAt: paymentGraceEndsAt?.toISOString() ?? null,
     };
   }
 
@@ -328,7 +350,9 @@ export interface BillingHoldInput {
   trialEndsAt: string | null | undefined;
   suspendedAt?: string | null;
   billingPausedAt?: string | null;
+  paymentGraceStartedAt?: string | null;
   trialGraceDays?: number;
+  paymentGraceDays?: number;
   now?: Date;
 }
 
@@ -355,7 +379,9 @@ export function billingHoldControls(input: BillingHoldInput): BillingHoldControl
     subscriptionStatus: status,
     trialEndsAt: input.trialEndsAt,
     suspendedAt: input.suspendedAt,
+    paymentGraceStartedAt: input.paymentGraceStartedAt,
     trialGraceDays: input.trialGraceDays,
+    paymentGraceDays: input.paymentGraceDays,
     now,
   });
 

@@ -333,6 +333,7 @@ export async function resolveMobileAuthContext<
     | "trialEndsAt"
     | "billingPolicyOverrides"
     | "billingPausedAt"
+    | "paymentGraceStartedAt"
   > = Organization,
 >(input: {
   accessToken: string;
@@ -474,6 +475,7 @@ export async function resolveMobileAuthContext<
       subscriptionStatus: currentOrg.subscriptionStatus,
       trialEndsAt: currentOrg.trialEndsAt,
       billingPausedAt: currentOrg.billingPausedAt,
+      paymentGraceStartedAt: currentOrg.paymentGraceStartedAt,
     },
     await input.loadPlatformBillingPolicy?.(),
     currentOrg.billingPolicyOverrides,
@@ -549,6 +551,7 @@ export async function loginMobileUser(
       subscriptionStatus: organization.subscriptionStatus,
       trialEndsAt: organization.trialEndsAt,
       billingPausedAt: organization.billingPausedAt,
+      paymentGraceStartedAt: organization.paymentGraceStartedAt,
     },
     await deps.loadPlatformBillingPolicy?.(),
     organization.billingPolicyOverrides,

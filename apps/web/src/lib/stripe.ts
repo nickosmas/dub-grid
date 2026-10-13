@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
-import { isLiveSubscriptionStatus } from "@dubgrid/domain";
+import { isLiveSubscriptionStatus, needsPaymentAttention } from "@dubgrid/domain";
 import logger from "@/lib/logger";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import { createClient } from "@supabase/supabase-js";
@@ -369,9 +369,20 @@ export async function upsertStripeSubscriptionToDb(
       // The trial clock is DubGrid's: a trialing subscription that names no end
       // leaves the organization's own end date where it is.
       ...(trialEnd !== null || sub.status !== "trialing" ? { trial_ends_at: trialEnd } : {}),
+      ...(needsPaymentAttention(sub.status) ? {} : { payment_grace_started_at: null }),
     })
     .eq("id", orgId);
   if (orgError) throw orgError;
+  if (needsPaymentAttention(sub.status)) {
+    // Only while none is recorded: a redelivered event, or the next event for
+    // an organization that was already past due, never moves the deadline.
+    const { error: graceError } = await serviceClient
+      .from("organizations")
+      .update({ payment_grace_started_at: new Date().toISOString() })
+      .eq("id", orgId)
+      .is("payment_grace_started_at", null);
+    if (graceError) throw graceError;
+  }
   await invalidateOrganizationBillingCache(orgId);
 
   await writeStripeSubscriptionAuditLog(serviceClient, {

@@ -406,7 +406,11 @@ describe("POST /api/gridmaster/subscription", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ success: true });
-    expect(organizationUpdate).toHaveBeenCalledWith({ subscription_status: "trialing" });
+    // A manual status never starts a payment deadline.
+    expect(organizationUpdate).toHaveBeenCalledWith({
+      subscription_status: "trialing",
+      payment_grace_started_at: null,
+    });
     expect(invalidateCache).toHaveBeenCalledWith(ORG_ID);
   });
 

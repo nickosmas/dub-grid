@@ -42,6 +42,7 @@ export interface DbOrganization {
   billing_paused_at?: string | null;
   billing_paused_reason?: string | null;
   billing_paused_by?: string | null;
+  payment_grace_started_at?: string | null;
   trial_started_at: string | null;
   subscription_seats: number | null;
   data_retention_days: number;

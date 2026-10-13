@@ -111,6 +111,7 @@ export interface OrgBillingRow {
   trial_ends_at?: string | null;
   suspended_at?: string | null;
   billing_paused_at?: string | null;
+  payment_grace_started_at?: string | null;
   [column: string]: unknown;
 }
 
@@ -126,6 +127,7 @@ export async function evaluateOrgBillingAccess(
       trialEndsAt: options.trialEndsAt ?? org?.trial_ends_at ?? null,
       suspendedAt: org?.suspended_at ?? null,
       billingPausedAt: org?.billing_paused_at ?? null,
+      paymentGraceStartedAt: org?.payment_grace_started_at ?? null,
       now: options.now,
     },
     await getPlatformBillingPolicy(client),
@@ -143,6 +145,7 @@ export async function evaluateOrganizationAccess(
     | "suspendedAt"
     | "billingPolicyOverrides"
     | "billingPausedAt"
+    | "paymentGraceStartedAt"
   >,
 ): Promise<BillingAccessResult> {
   return evaluateBillingAccessWithPolicy(
@@ -151,6 +154,7 @@ export async function evaluateOrganizationAccess(
       trialEndsAt: org.trialEndsAt ?? null,
       suspendedAt: org.suspendedAt ?? null,
       billingPausedAt: org.billingPausedAt ?? null,
+      paymentGraceStartedAt: org.paymentGraceStartedAt ?? null,
     },
     await getPlatformBillingPolicy(client),
     org.billingPolicyOverrides,

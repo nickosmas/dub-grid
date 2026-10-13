@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { dispatchNotificationEvent, trialExpiredBody } from "./events";
+import { accessLockedBody, dispatchNotificationEvent, trialExpiredBody } from "./events";
 import { sendNotification } from "./sender";
 
 const fromMock = vi.fn();
@@ -731,6 +731,47 @@ describe("dispatchNotificationEvent", () => {
       { trialEndsAt: "2026-06-08T00:00:00Z" },
     );
   });
+  it("tells Super Admins their organization is on hold, once per lock", async () => {
+    fromMock.mockImplementation(
+      makeBillingFromMock({ superAdmins: [{ user_id: "sa-1" }], priorBillingRowExists: false }),
+    );
+    await dispatchNotificationEvent("trial-expiry-cron", {
+      action: "billing_access_locked",
+      orgId: "org-1",
+      reason: "payment",
+      lockedAt: "2026-06-03T12:00:00.000Z",
+    });
+    expect(sendNotification).toHaveBeenLastCalledWith(
+      "sa-1",
+      "org-1",
+      "billing_access_locked",
+      "Your organization is on hold",
+      accessLockedBody("payment"),
+      { reason: "payment", lockedAt: "2026-06-03T12:00:00.000Z" },
+    );
+
+    vi.mocked(sendNotification).mockClear();
+    fromMock.mockImplementation(
+      makeBillingFromMock({ superAdmins: [{ user_id: "sa-1" }], priorBillingRowExists: true }),
+    );
+    await dispatchNotificationEvent("trial-expiry-cron", {
+      action: "billing_access_locked",
+      orgId: "org-1",
+      reason: "payment",
+      lockedAt: "2026-06-03T12:00:00.000Z",
+    });
+    expect(sendNotification).not.toHaveBeenCalled();
+  });
+
+  it("says what ran out when access locks", () => {
+    expect(accessLockedBody("trial")).toBe(
+      "Your free trial and its extra days are over, so your organization is on hold. Add a payment method to reopen it.",
+    );
+    expect(accessLockedBody("payment")).toBe(
+      "A payment is overdue, so your organization is on hold. Update your payment details to reopen it.",
+    );
+  });
+
   it("notifies both the requester and the claimant when a claimed pickup is rejected", async () => {
     fromMock.mockImplementation((table: string) => {
       if (table === "shift_requests") {

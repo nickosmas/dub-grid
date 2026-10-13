@@ -95,6 +95,8 @@ export interface Organization {
   billingPolicyOverrides?: BillingPolicyOverrides | null;
   /** Set while billing is paused; a paused organization stays open. */
   billingPausedAt?: string | null;
+  /** When the organization first needed payment attention; null never locks. */
+  paymentGraceStartedAt?: string | null;
   /** Why billing was paused; read only by service-role code. */
   billingPausedReason?: string | null;
   trialStartedAt?: string | null;

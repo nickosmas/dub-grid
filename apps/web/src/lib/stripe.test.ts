@@ -171,6 +171,7 @@ describe("syncSubscriptionToDb", () => {
       subscription_status: "active",
       subscription_seats: 7,
       trial_ends_at: "2026-05-03T00:00:00.000Z",
+      payment_grace_started_at: null,
     });
     expect(organizationEq).toHaveBeenCalledWith("id", ORG_ID);
     expect(auditInsert).toHaveBeenCalledWith(
@@ -266,6 +267,7 @@ describe("syncSubscriptionToDb", () => {
       subscription_status: "trialing",
       subscription_seats: 9,
       trial_ends_at: "2026-05-03T00:00:00.000Z",
+      payment_grace_started_at: null,
     });
     expect(auditInsert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -336,6 +338,7 @@ describe("syncSubscriptionToDb", () => {
       stripe_customer_id: "cus_123",
       subscription_status: "trialing",
       subscription_seats: 3,
+      payment_grace_started_at: null,
     });
     expect(subscriptionUpsert).toHaveBeenCalledWith(
       expect.objectContaining({ status: "trialing", trial_end: null }),

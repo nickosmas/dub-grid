@@ -141,7 +141,8 @@ export function trialActionReasons(trial: TrialControls): {
 type HoldOrg = Pick<
   GridmasterBillingOrgSummary,
   "status" | "trialEndsAt" | "suspendedAt" | "billingHold" | "policy"
->;
+> &
+  Partial<Pick<GridmasterBillingOrgSummary, "paymentGraceStartedAt">>;
 
 /** Which hold and grace actions apply to an organization, as the server decides. */
 export function holdControlsFor(org: HoldOrg, now: Date = new Date()): BillingHoldControls {
@@ -150,7 +151,9 @@ export function holdControlsFor(org: HoldOrg, now: Date = new Date()): BillingHo
     trialEndsAt: org.trialEndsAt,
     suspendedAt: org.suspendedAt,
     billingPausedAt: org.billingHold?.pausedAt ?? null,
+    paymentGraceStartedAt: org.paymentGraceStartedAt ?? null,
     trialGraceDays: org.policy.values.trialGraceDays,
+    paymentGraceDays: org.policy.values.paymentGraceDays,
     now,
   });
 }

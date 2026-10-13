@@ -707,6 +707,50 @@ describe("middleware: route guards", () => {
     );
   });
 
+  it.each([
+    [5, false],
+    [20, true],
+  ])(
+    "locks a past-due organization once its payment grace runs out (%i days in)",
+    async (daysIn, locked) => {
+      mockSessionWithClaims({
+        platform_role: "none",
+        org_role: "user",
+        org_id: `org-past-due-${daysIn}`,
+        org_slug: "acme",
+        sub: "user-1",
+      });
+      const started = new Date(Date.now() - daysIn * 86_400_000).toISOString();
+      mockSupabaseFrom.mockImplementation((table: string) => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            maybeSingle: vi.fn().mockResolvedValue({
+              data:
+                table === "organizations"
+                  ? {
+                      suspended_at: null,
+                      archived_at: null,
+                      subscription_status: "past_due",
+                      trial_ends_at: null,
+                      payment_grace_started_at: started,
+                    }
+                  : null,
+              error: null,
+            }),
+          })),
+        })),
+      }));
+
+      const res = await runMiddleware(
+        makeNextRequest("http://acme.localhost:3000/schedule", { host: "acme.localhost:3000" }),
+      );
+
+      const redirect = (res as { _redirectUrl?: string })._redirectUrl;
+      if (locked) expect(redirect).toBe("http://acme.localhost:3000/billing-required");
+      else expect(redirect).not.toBe("http://acme.localhost:3000/billing-required");
+    },
+  );
+
   it("keeps a paused organization open after its trial ran out", async () => {
     mockSessionWithClaims({
       platform_role: "none",

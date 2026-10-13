@@ -858,7 +858,7 @@
   - [x] 44e. **Pause and resume** - an access-preserving billing hold that
         stops the trial clock, and manual grace extension through the
         per-organization override. Needs a migration.
-  - [ ] 44f. **Past-due deadlines and lock alerts** - a payment-grace deadline
+  - [x] 44f. **Past-due deadlines and lock alerts** - a payment-grace deadline
         for past-due subscriptions that never locks without a recorded start,
         an alert at the moment access locks, and handling for the
         trial-will-end and checkout-completed payment events. Needs a

@@ -190,8 +190,10 @@ export function BillingTab({ organization }: { organization: Organization }) {
     subscriptionStatus: billingOrg.status,
     trialEndsAt: billingOrg.trialEndsAt,
     billingPausedAt: hold?.pausedAt ?? null,
+    paymentGraceStartedAt: billingOrg.paymentGraceStartedAt,
     trialGraceDays: policy.trialGraceDays,
     trialAdminNoticeDays: policy.trialReminderDays,
+    paymentGraceDays: policy.paymentGraceDays,
   });
   const mode = billingQuery.data?.stripeMode ?? null;
   const stripeActions = billingActionStates(billingOrg);
@@ -299,9 +301,11 @@ export function BillingTab({ organization }: { organization: Organization }) {
                   ? "Locked"
                   : access.state === "paused"
                     ? "Open while billing is paused"
-                    : access.state === "trial_grace" && access.trialGraceEndsAt
-                      ? `Open until ${formatBillingDate(access.trialGraceEndsAt)}, then locks`
-                      : "Open"
+                    : access.state === "payment_attention_required" && access.paymentGraceEndsAt
+                      ? `Open until ${formatBillingDate(access.paymentGraceEndsAt)}, then locks`
+                      : access.state === "trial_grace" && access.trialGraceEndsAt
+                        ? `Open until ${formatBillingDate(access.trialGraceEndsAt)}, then locks`
+                        : "Open"
               }
             />
             {hold && (

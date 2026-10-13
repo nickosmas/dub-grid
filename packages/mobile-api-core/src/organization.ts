@@ -10,6 +10,7 @@ export type MobileOrganizationLookup = {
   trialEndsAt: string | null;
   billingPolicyOverrides: BillingPolicyOverrides;
   billingPausedAt: string | null;
+  paymentGraceStartedAt: string | null;
 };
 
 export function normalizeMobileOrgSlug(slug: string | null | undefined): string {
@@ -27,7 +28,7 @@ export async function findMobileOrganizationBySlug(
   const { data, error } = await serviceClient
     .from("organizations")
     .select(
-      "id, name, slug, suspended_at, subscription_status, trial_ends_at, trial_length_days_override, trial_grace_days_override, trial_reminder_days_override, payment_grace_days_override, billing_paused_at",
+      "id, name, slug, suspended_at, subscription_status, trial_ends_at, trial_length_days_override, trial_grace_days_override, trial_reminder_days_override, payment_grace_days_override, billing_paused_at, payment_grace_started_at",
     )
     .eq("slug", slug)
     .maybeSingle();
@@ -49,5 +50,6 @@ export async function findMobileOrganizationBySlug(
     trialEndsAt: (data.trial_ends_at as string | null | undefined) ?? null,
     billingPolicyOverrides: billingPolicyOverridesFromRow(data as Record<string, unknown>),
     billingPausedAt: (data.billing_paused_at as string | null | undefined) ?? null,
+    paymentGraceStartedAt: (data.payment_grace_started_at as string | null | undefined) ?? null,
   };
 }

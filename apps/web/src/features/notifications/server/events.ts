@@ -178,6 +178,14 @@ export type NotificationEvent =
       orgId: string;
       trialEndsAt: string;
     }
+  | {
+      action: "billing_access_locked";
+      orgId: string;
+      /** What ran out: the trial's grace or an overdue payment's grace. */
+      reason: "trial" | "payment";
+      /** When access locked; dedupes repeated cron runs. */
+      lockedAt: string;
+    }
   // ── Expiry sweepers (cron-driven) ───────────────────────────────────────
   | {
       action: "shift_request_expired";
@@ -1236,6 +1244,29 @@ async function dispatchNotificationEventInternal(
       return;
     }
 
+    case "billing_access_locked": {
+      const superAdmins = await getOrgSuperAdmins(event.orgId);
+      const alreadySent = await hasExistingNotification(event.orgId, {
+        type: "billing_access_locked",
+        metadataKey: "lockedAt",
+        metadataValue: event.lockedAt,
+      });
+      if (alreadySent) return;
+      await Promise.all(
+        superAdmins.map((userId) =>
+          sendNotification(
+            userId,
+            event.orgId,
+            "billing_access_locked" as NotificationType,
+            "Your organization is on hold",
+            accessLockedBody(event.reason),
+            { reason: event.reason, lockedAt: event.lockedAt },
+          ),
+        ),
+      );
+      return;
+    }
+
     // ── Expiry sweepers (cron-driven) ──────────────────────────────────
 
     case "shift_request_expired": {
@@ -1405,6 +1436,12 @@ export function trialExpiredBody(
     return `Your free trial ended on ${endedOn}. Add a payment method by ${formatTrialDate(graceEndsAt.toISOString(), timeZone)} to keep your organization open.`;
   }
   return `Your free trial ended on ${endedOn}, so your organization is on hold. Add a payment method to reopen it.`;
+}
+
+export function accessLockedBody(reason: "trial" | "payment"): string {
+  return reason === "trial"
+    ? "Your free trial and its extra days are over, so your organization is on hold. Add a payment method to reopen it."
+    : "A payment is overdue, so your organization is on hold. Update your payment details to reopen it.";
 }
 
 async function hasExistingNotification(

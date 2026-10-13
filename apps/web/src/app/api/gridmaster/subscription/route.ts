@@ -90,7 +90,7 @@ const bodySchema = z.discriminatedUnion("action", [
   }),
 ]);
 
-const HOLD_SELECT = `subscription_status, trial_started_at, trial_ends_at, suspended_at, billing_paused_at, ${BILLING_POLICY_OVERRIDE_SELECT}`;
+const HOLD_SELECT = `subscription_status, trial_started_at, trial_ends_at, suspended_at, billing_paused_at, payment_grace_started_at, ${BILLING_POLICY_OVERRIDE_SELECT}`;
 
 /** Runs a database write and fails the action, before any audit row, if it failed. */
 async function write(query: PromiseLike<{ error: unknown }>): Promise<void> {
@@ -370,8 +370,13 @@ export async function POST(req: NextRequest) {
       }
       // Only the status changes; the trial keeps its own dates, which Change
       // trial sets.
+      // A manual status never starts a payment deadline; the next Stripe event
+      // for a subscription that needs payment does.
       await write(
-        admin.from("organizations").update({ subscription_status: status }).eq("id", orgId),
+        admin
+          .from("organizations")
+          .update({ subscription_status: status, payment_grace_started_at: null })
+          .eq("id", orgId),
       );
       await invalidateOrganizationBillingCache(orgId);
       await writeGridmasterAuditLog({
@@ -432,7 +437,9 @@ async function holdAction(
     trialEndsAt: org.trial_ends_at as string | null,
     suspendedAt: org.suspended_at as string | null,
     billingPausedAt: pausedAt,
+    paymentGraceStartedAt: org.payment_grace_started_at as string | null,
     trialGraceDays: policy.values.trialGraceDays,
+    paymentGraceDays: policy.values.paymentGraceDays,
   });
   const gate =
     body.action === "pause_billing"

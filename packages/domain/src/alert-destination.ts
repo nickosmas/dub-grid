@@ -63,6 +63,7 @@ const FIXED_DESTINATIONS: Record<string, AlertDestination> = {
   billing_payment_succeeded: BILLING,
   billing_trial_ending_soon: BILLING,
   billing_trial_expired: BILLING,
+  billing_access_locked: BILLING,
   security_email_changed: SECURITY,
   security_password_changed: SECURITY,
   security_mfa_changed: SECURITY,

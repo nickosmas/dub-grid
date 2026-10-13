@@ -12,6 +12,7 @@ const organizationUpdate = vi.fn();
 const auditInsert = vi.fn();
 const dedupInsert = vi.fn();
 const dedupRelease = vi.fn();
+const organizationIs = vi.fn();
 
 vi.mock("@/lib/stripe", async () => ({
   ...(await vi.importActual<typeof import("@/lib/stripe")>("@/lib/stripe")),
@@ -68,7 +69,11 @@ describe("POST /api/stripe/webhook", () => {
       data: { id: "11111111-1111-4111-8111-111111111111" },
       error: null,
     });
-    organizationEq.mockResolvedValue({ error: null });
+    organizationIs.mockResolvedValue({ error: null });
+    // Awaited for the main update; `.is()` narrows the payment-grace stamp.
+    organizationEq.mockImplementation(() =>
+      Object.assign(Promise.resolve({ error: null }), { is: organizationIs }),
+    );
     organizationUpdate.mockReturnValue({ eq: organizationEq });
     auditInsert.mockResolvedValue({ error: null });
     // First-time event by default (no prior row) — the replay-dedup insert succeeds.
@@ -161,6 +166,7 @@ describe("POST /api/stripe/webhook", () => {
       subscription_status: "trialing",
       subscription_seats: 9,
       trial_ends_at: "2026-05-03T00:00:00.000Z",
+      payment_grace_started_at: null,
     });
     expect(organizationEq).toHaveBeenCalledWith("id", "11111111-1111-4111-8111-111111111111");
     expect(auditInsert).toHaveBeenCalledWith(
@@ -178,6 +184,93 @@ describe("POST /api/stripe/webhook", () => {
         }),
       }),
     );
+  });
+
+  function subscriptionEvent(type: string, status: string) {
+    return {
+      id: `evt_${status}`,
+      type,
+      data: {
+        object: {
+          id: "sub_123",
+          customer: "cus_123",
+          status,
+          metadata: { org_id: "11111111-1111-4111-8111-111111111111" },
+          items: { data: [{ price: { id: "price_123" }, quantity: 9 }] },
+          cancel_at: null,
+          canceled_at: null,
+          trial_end: null,
+        },
+      },
+    };
+  }
+
+  it("starts the payment grace only while none is recorded", async () => {
+    constructEvent.mockReturnValue(subscriptionEvent("customer.subscription.updated", "past_due"));
+
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(200);
+    const [mainUpdate] = organizationUpdate.mock.calls[0] as [Record<string, unknown>];
+    expect(mainUpdate).not.toHaveProperty("payment_grace_started_at");
+    expect(organizationUpdate).toHaveBeenCalledWith({
+      payment_grace_started_at: expect.any(String),
+    });
+    expect(organizationIs).toHaveBeenCalledWith("payment_grace_started_at", null);
+  });
+
+  it("clears the payment grace once payment recovers", async () => {
+    constructEvent.mockReturnValue(subscriptionEvent("customer.subscription.updated", "active"));
+
+    await POST(makeRequest());
+
+    expect(organizationUpdate).toHaveBeenCalledTimes(1);
+    expect(organizationUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ subscription_status: "active", payment_grace_started_at: null }),
+    );
+  });
+
+  it("syncs the subscription when Stripe says a trial is about to end", async () => {
+    constructEvent.mockReturnValue(
+      subscriptionEvent("customer.subscription.trial_will_end", "trialing"),
+    );
+
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(subscriptionsRetrieve).toHaveBeenCalledWith("sub_123");
+    expect(subscriptionUpsert).toHaveBeenCalled();
+  });
+
+  it("syncs a completed checkout's subscription", async () => {
+    const subscription = subscriptionEvent("customer.subscription.created", "active").data.object;
+    subscriptionsRetrieve.mockResolvedValueOnce(subscription);
+    constructEvent.mockReturnValue({
+      id: "evt_checkout",
+      type: "checkout.session.completed",
+      data: { object: { id: "cs_123", mode: "subscription", subscription: "sub_123" } },
+    });
+
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(subscriptionsRetrieve).toHaveBeenCalledWith("sub_123");
+    expect(organizationUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ subscription_status: "active" }),
+    );
+  });
+
+  it("ignores a completed one-time checkout", async () => {
+    constructEvent.mockReturnValue({
+      id: "evt_payment",
+      type: "checkout.session.completed",
+      data: { object: { id: "cs_456", mode: "payment", subscription: null } },
+    });
+
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(subscriptionsRetrieve).not.toHaveBeenCalled();
   });
 
   it("keeps trialing webhook updates from clearing the trial end date", async () => {

@@ -602,6 +602,7 @@ function toBillingOrgSummary(
     billingHold: org.billingPausedAt
       ? { pausedAt: org.billingPausedAt, reason: org.billingPausedReason ?? null }
       : null,
+    paymentGraceStartedAt: org.paymentGraceStartedAt ?? null,
   };
 }
 

@@ -46,7 +46,7 @@ export interface BillingStateInput {
   status: string | null;
   trialEndsAt: string | null;
   billingAccess: Pick<BillingAccessResult, "state" | "reason" | "trialGraceEndsAt"> &
-    Partial<Pick<BillingAccessResult, "daysUntilTrialEnd">>;
+    Partial<Pick<BillingAccessResult, "daysUntilTrialEnd" | "paymentGraceEndsAt">>;
 }
 
 const ENDING_SOON_DAYS = 7;
@@ -234,6 +234,13 @@ export function describeBillingNotice(
       };
     }
     case "locked":
+      if (reason === "payment_grace_expired") {
+        return {
+          message:
+            "A payment is overdue, so your organization is on hold. Update your payment details to reopen it.",
+          tone: "danger",
+        };
+      }
       return reason === "trial_expired"
         ? {
             message: `Your free trial ended${endedOn}, so your organization is on hold. Add a payment method to reopen it.`,
@@ -244,12 +251,14 @@ export function describeBillingNotice(
               "Your organization is on hold until billing is restored. Update your payment details to reopen it.",
             tone: "danger",
           };
-    case "payment_attention_required":
+    case "payment_attention_required": {
+      const { paymentGraceEndsAt } = input.billingAccess;
+      const by = paymentGraceEndsAt ? ` by ${formatBillingDate(paymentGraceEndsAt)}` : "";
       return {
-        message:
-          "Billing needs attention. Update your payment details to keep your organization open.",
+        message: `Billing needs attention. Update your payment details${by} to keep your organization open.`,
         tone: "warning",
       };
+    }
     case "suspended":
       return {
         message: "Your organization is suspended. Contact DubGrid Support for help.",

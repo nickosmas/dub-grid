@@ -167,6 +167,7 @@ export function rowToOrganization(row: DbOrganization): Organization {
     ),
     billingPausedAt: row.billing_paused_at ?? null,
     billingPausedReason: row.billing_paused_reason ?? null,
+    paymentGraceStartedAt: row.payment_grace_started_at ?? null,
     trialStartedAt: row.trial_started_at ?? null,
     subscriptionSeats: row.subscription_seats ?? null,
     dataRetentionDays: row.data_retention_days ?? 365,
