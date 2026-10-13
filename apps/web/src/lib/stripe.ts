@@ -8,6 +8,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseSecretKey, getSupabaseUrl } from "@/lib/supabase-keys";
 import { serverEnv } from "@/lib/env.server";
 import { cacheDel, CacheKey } from "@/lib/cache";
+import { recordSeatChange, type SeatHistorySource } from "@/lib/billing-history";
 
 let _stripe: Stripe | null | undefined;
 
@@ -24,6 +25,15 @@ export async function requireStripeEnabled(): Promise<NextResponse | null> {
 }
 
 type BillingSyncClient = Pick<SupabaseClient, "from">;
+
+const SEAT_HISTORY_SOURCE: Record<
+  NonNullable<StripeSubscriptionSyncOptions["audit"]>["source"],
+  SeatHistorySource
+> = {
+  stripe_webhook: "stripe",
+  checkout_sync: "checkout",
+  gridmaster_sync: "gridmaster",
+};
 
 type StripeSubscriptionSyncOptions = {
   audit?: {
@@ -385,6 +395,15 @@ export async function upsertStripeSubscriptionToDb(
   }
   await invalidateOrganizationBillingCache(orgId);
 
+  const seats = item?.quantity ?? 1;
+  if (previous?.quantity !== seats) {
+    await recordSeatChange(serviceClient, {
+      orgId,
+      seats,
+      source: SEAT_HISTORY_SOURCE[options.audit?.source ?? "stripe_webhook"],
+    });
+  }
+
   await writeStripeSubscriptionAuditLog(serviceClient, {
     orgId,
     previous,
@@ -580,7 +599,7 @@ async function resolveStripeSubscriptionOrgId(
   }
 }
 
-async function resolveStripeCustomerOrgId(
+export async function resolveStripeCustomerOrgId(
   serviceClient: BillingSyncClient,
   customerId: string,
 ): Promise<string | null> {

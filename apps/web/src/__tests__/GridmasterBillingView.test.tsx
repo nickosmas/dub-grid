@@ -24,6 +24,7 @@ vi.mock("@/features/gridmaster/client", () => ({
     },
   }),
   updateGridmasterBillingPolicy: vi.fn(),
+  fetchGridmasterBillingHistory: async () => ({ since: null, months: [] }),
 }));
 
 // The identity check needs a real browser session; run the action as if

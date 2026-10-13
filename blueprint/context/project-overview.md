@@ -30,8 +30,8 @@ organization staff, managers, and platform operators.
 
 ## Features
 
-Items appear in build-plan order. Items 1 through 39 and 41 through 43 are
-shipped. Items 40 and 44 are in progress.
+Items appear in build-plan order. Items 1 through 39 and 41 through 44 are
+shipped. Item 40 is in progress.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -78,7 +78,7 @@ shipped. Items 40 and 44 are in progress.
 | 42   | Shipped     | Schedule notes on every schedule surface, each belonging to its shift.                                                          |
 | 43   | Shipped     | Complete person records for managers and one Gridmaster person page with two-factor lockout recovery.                           |
 | 40   | In progress | Public and internal documentation accurate for `dev`, with permanent drift gates.                                               |
-| 44   | In progress | Safe billing actions, Gridmaster billing controls and policy, and billing history.                                              |
+| 44   | Shipped     | Safe billing actions, Gridmaster billing controls and policy, and billing history.                                              |
 
 Item 40 is split:
 
@@ -97,7 +97,7 @@ Item 40 is split:
   - **40e4 - Native iOS and Android qualification:** planned; Android evidence
     is mandatory.
 
-Item 44 is split:
+Item 44 is split, and every part has shipped:
 
 - **44a - Billing safety fixes:** shipped; a sync no longer locks a trialing
   organization, a canceled one can subscribe again, and webhooks, checkout,
@@ -122,7 +122,9 @@ Item 44 is split:
   needs payment locks once its payment grace runs out, counted from when it
   first needed attention (never without a recorded start), and Super Admins
   are alerted when their organization locks (migration 078).
-- **44g - Seat and revenue history:** planned; needs a migration.
+- **44g - Seat and revenue history:** shipped; append-only seat and invoice
+  history and a Gridmaster revenue and seats report that states when its
+  history starts (migration 079).
 
 Public documentation covers customer behavior only. Gridmaster tooling, Test
 Sandbox, feature flags, migrations, environment variables, and internal HTTP
@@ -286,7 +288,7 @@ Main mobile surfaces:
   build targets the Next.js web app.
 - **Database:** Supabase-hosted Postgres with an immutable ordered migration
   stream. Migrations `001` through `004` are frozen. The repository is
-  checksum-locked through `078`.
+  checksum-locked through `079`.
 - **Production boundary:** migration `075` was recorded as applied to production
   on 2026-09-28. Read the live ledger with `npm run db:migrations:inspect`
   (read-only) before any release rather than relying on this line.

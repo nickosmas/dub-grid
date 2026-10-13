@@ -1,6 +1,7 @@
 "use client";
 
 import type { BillingPolicy, BillingPolicyOverrides } from "@dubgrid/domain";
+import type { BillingHistoryReport } from "@/features/gridmaster/billing-history";
 import type {
   AuditLogEntry,
   FullAuditLogEntry,
@@ -546,6 +547,25 @@ export function fetchGridmasterBillingPolicy(): Promise<{
   platform: GridmasterPlatformBillingPolicy;
 }> {
   return requestGridmasterJson("/api/gridmaster/billing-policy");
+}
+
+export function fetchGridmasterBillingHistory(): Promise<BillingHistoryReport> {
+  return requestGridmasterJson("/api/gridmaster/billing-history");
+}
+
+export interface GridmasterSeatHistoryRow {
+  seats: number;
+  billable_app_users: number | null;
+  source: "stripe" | "checkout" | "gridmaster" | "backfill";
+  recorded_at: string;
+}
+
+export function fetchGridmasterOrgSeatHistory(
+  orgId: string,
+): Promise<{ seats: GridmasterSeatHistoryRow[] }> {
+  return requestGridmasterJson(
+    `/api/gridmaster/billing-history?orgId=${encodeURIComponent(orgId)}`,
+  );
 }
 
 export type GridmasterBillingPolicyInput =

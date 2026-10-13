@@ -24,6 +24,7 @@ import { sectionStyle } from "@/lib/styles";
 import type { GridmasterBillingOrgSummary } from "@/types";
 import { gmTableStyle, gmTdStyle, gmThStyle } from "@/components/gridmaster/table-styles";
 import { PlatformBillingPolicyCard } from "@/components/gridmaster/BillingPolicyCards";
+import { BillingHistoryCard } from "@/components/gridmaster/BillingHistoryCards";
 
 const BILLING_STATUSES = [
   "trialing",
@@ -456,6 +457,10 @@ export default function GridmasterBillingView({
 
           <div style={{ marginBottom: 16 }}>
             <PlatformBillingPolicyCard />
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <BillingHistoryCard />
           </div>
 
           <div style={sectionStyle}>

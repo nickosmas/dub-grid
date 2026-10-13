@@ -20,6 +20,7 @@ const extendTrial = vi.fn();
 const pauseCollection = vi.fn();
 const resumeCollection = vi.fn();
 const invalidateCache = vi.fn();
+const seatHistoryInsert = vi.fn();
 
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
@@ -125,7 +126,11 @@ describe("POST /api/gridmaster/subscription", () => {
       },
     });
     auditInsert.mockResolvedValue({ error: null });
+    seatHistoryInsert.mockResolvedValue({ error: null });
     serviceFrom.mockImplementation((table: string) => {
+      if (table === "subscription_seat_history") {
+        return { insert: seatHistoryInsert };
+      }
       if (table === "subscriptions") {
         return {
           select: vi.fn(() => ({
@@ -472,6 +477,13 @@ describe("POST /api/gridmaster/subscription", () => {
       subscription_seats: 9,
     });
     expect(organizationEq).toHaveBeenCalledWith("id", ORG_ID);
+    // 8 active staff plus a management-only member: the history keeps the count.
+    expect(seatHistoryInsert).toHaveBeenCalledWith({
+      org_id: ORG_ID,
+      seats: 9,
+      billable_app_users: 9,
+      source: "gridmaster",
+    });
     expect(auditInsert).toHaveBeenCalledWith(
       expect.objectContaining({
         org_id: ORG_ID,

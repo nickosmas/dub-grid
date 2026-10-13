@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:f8a9386a41b01420945069f1f2e30c732da3dbc515aab151a57bb2cec6571d41",
+  "sourceDigest": "sha256:d43cc56d72835cbf309cfdffd57e6ad1e0874e67913bd2e3787b0f7eb58ab6da",
   "webRoutes": [
     {
       "id": "web:/",
@@ -1326,6 +1326,15 @@
       "scope": "api",
       "source": {
         "path": "apps/web/src/app/api/gridmaster/billing/route.ts"
+      }
+    },
+    {
+      "id": "http:GET:/api/gridmaster/billing-history",
+      "method": "GET",
+      "path": "/api/gridmaster/billing-history",
+      "scope": "api",
+      "source": {
+        "path": "apps/web/src/app/api/gridmaster/billing-history/route.ts"
       }
     },
     {
@@ -4548,6 +4557,16 @@
       "source": {
         "path": "supabase/migrations/078_payment_grace.sql"
       }
+    },
+    {
+      "id": "migration:079_billing_history.sql",
+      "version": "079",
+      "name": "billing_history",
+      "file": "079_billing_history.sql",
+      "sha256": "0b3f332b58a84fd01852492e9a523493e9588b8b7be4418eefcb3dc8efd33d92",
+      "source": {
+        "path": "supabase/migrations/079_billing_history.sql"
+      }
     }
   ],
   "rlsTables": [
@@ -4573,6 +4592,18 @@
       },
       "enabledIn": {
         "path": "supabase/migrations/003_rls_policies.sql"
+      }
+    },
+    {
+      "id": "rls:public.billing_invoice_events",
+      "schema": "public",
+      "table": "billing_invoice_events",
+      "enabled": true,
+      "createdIn": {
+        "path": "supabase/migrations/079_billing_history.sql"
+      },
+      "enabledIn": {
+        "path": "supabase/migrations/079_billing_history.sql"
       }
     },
     {
@@ -5029,6 +5060,18 @@
       },
       "enabledIn": {
         "path": "supabase/migrations/003_rls_policies.sql"
+      }
+    },
+    {
+      "id": "rls:public.subscription_seat_history",
+      "schema": "public",
+      "table": "subscription_seat_history",
+      "enabled": true,
+      "createdIn": {
+        "path": "supabase/migrations/079_billing_history.sql"
+      },
+      "enabledIn": {
+        "path": "supabase/migrations/079_billing_history.sql"
       }
     },
     {

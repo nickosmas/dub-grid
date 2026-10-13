@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { recordInvoiceEvent } from "@/lib/billing-history";
 import {
   getStripe,
+  resolveStripeCustomerOrgId,
   upsertStripeSubscriptionToDb,
   writeStripeCustomerBillingActivityLog,
   writeStripePaymentFailedAuditLog,
@@ -128,6 +130,14 @@ export async function POST(req: NextRequest) {
           { customerId: invoice.customer, invoiceId: invoice.id },
           "Invoice payment failed",
         );
+        if (result?.orgId) {
+          await recordInvoiceEvent(getServiceClient(), {
+            orgId: result.orgId,
+            invoice,
+            kind: "failed",
+            occurredAt: new Date(event.created * 1000),
+          });
+        }
         if (result?.orgId && invoice.id) {
           void dispatchNotificationEvent("stripe-webhook", {
             action: "billing_payment_failed",
@@ -145,6 +155,18 @@ export async function POST(req: NextRequest) {
           stripeEventId: event.id,
           stripeEventType: event.type,
         });
+        const customerId = stripeObjectId(invoice.customer);
+        const orgId = customerId
+          ? await resolveStripeCustomerOrgId(getServiceClient(), customerId)
+          : null;
+        if (orgId) {
+          await recordInvoiceEvent(getServiceClient(), {
+            orgId,
+            invoice,
+            kind: "paid",
+            occurredAt: new Date(event.created * 1000),
+          });
+        }
         break;
       }
       case "customer.updated": {

@@ -52,6 +52,7 @@ vi.mock("@/features/settings/client", () => ({
 
 vi.mock("@/features/gridmaster/client", () => ({
   fetchGridmasterOrgBilling: vi.fn(),
+  fetchGridmasterOrgSeatHistory: vi.fn().mockResolvedValue({ seats: [] }),
   fetchGridmasterFullAuditLog: vi.fn().mockResolvedValue([]),
   fetchGridmasterInvitations: vi.fn().mockResolvedValue({ invitations: [] }),
   syncGridmasterBilling: vi.fn(),

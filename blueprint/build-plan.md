@@ -819,7 +819,7 @@
     - [ ] 40e4. **Native iOS and Android qualification** - record real-device
           evidence for the required mobile roles and states, including the
           mandatory Android pass; do not infer unavailable device evidence.
-- [ ] 44. **Billing safety and Gridmaster billing controls** - fix the billing
+- [x] 44. **Billing safety and Gridmaster billing controls** - fix the billing
       defects that can lock out or strand a customer, give Gridmasters safe,
       explained billing actions, show customers only the billing activity that
       concerns them, and add configurable trial and grace policy, pause and
@@ -863,6 +863,6 @@
         an alert at the moment access locks, and handling for the
         trial-will-end and checkout-completed payment events. Needs a
         migration.
-  - [ ] 44g. **Seat and revenue history** - append-only seat and invoice
+  - [x] 44g. **Seat and revenue history** - append-only seat and invoice
         history and a report that states its own start date. Needs a
         migration.

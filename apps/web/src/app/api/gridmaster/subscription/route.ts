@@ -25,6 +25,7 @@ import {
 } from "@/lib/stripe";
 import { getServiceClient } from "@/lib/supabase-service";
 import { getOrgBillingPolicy } from "@/lib/billing-policy";
+import { recordSeatChange } from "@/lib/billing-history";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
@@ -332,7 +333,8 @@ export async function POST(req: NextRequest) {
       if (!sub?.stripe_subscription_id) {
         return NextResponse.json({ error: "Stripe subscription required" }, { status: 400 });
       }
-      const seats = Math.max(await countBillableAppUsers(admin, orgId), 1);
+      const billableAppUsers = await countBillableAppUsers(admin, orgId);
+      const seats = Math.max(billableAppUsers, 1);
       await syncSubscriptionSeats(sub.stripe_subscription_id, seats);
       await write(
         admin
@@ -343,6 +345,7 @@ export async function POST(req: NextRequest) {
       await write(
         admin.from("organizations").update({ subscription_seats: seats }).eq("id", orgId),
       );
+      await recordSeatChange(admin, { orgId, seats, billableAppUsers, source: "gridmaster" });
       // Seats feed the access check's cached organization like any billing field.
       await invalidateOrganizationBillingCache(orgId);
       await writeGridmasterAuditLog({

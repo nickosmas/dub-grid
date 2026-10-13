@@ -3,6 +3,7 @@ import CustomSelect from "@/components/CustomSelect";
 import { Button } from "@/components/Button";
 import { useGridmasterBillingActions } from "@/components/gridmaster/useGridmasterBillingActions";
 import { OrganizationBillingPolicyCard } from "@/components/gridmaster/BillingPolicyCards";
+import { OrgSeatHistoryCard } from "@/components/gridmaster/BillingHistoryCards";
 import {
   billingActionStates,
   disabledActionSummary,
@@ -397,6 +398,8 @@ export function BillingTab({ organization }: { organization: Organization }) {
       </div>
 
       <OrganizationBillingPolicyCard org={billingOrg} />
+
+      <OrgSeatHistoryCard orgId={billingOrg.orgId} />
 
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>Billing Actions</div>

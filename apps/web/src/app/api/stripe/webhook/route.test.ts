@@ -13,6 +13,8 @@ const auditInsert = vi.fn();
 const dedupInsert = vi.fn();
 const dedupRelease = vi.fn();
 const organizationIs = vi.fn();
+const seatHistoryInsert = vi.fn();
+const invoiceEventUpsert = vi.fn();
 
 vi.mock("@/lib/stripe", async () => ({
   ...(await vi.importActual<typeof import("@/lib/stripe")>("@/lib/stripe")),
@@ -70,6 +72,8 @@ describe("POST /api/stripe/webhook", () => {
       error: null,
     });
     organizationIs.mockResolvedValue({ error: null });
+    seatHistoryInsert.mockResolvedValue({ error: null });
+    invoiceEventUpsert.mockResolvedValue({ error: null });
     // Awaited for the main update; `.is()` narrows the payment-grace stamp.
     organizationEq.mockImplementation(() =>
       Object.assign(Promise.resolve({ error: null }), { is: organizationIs }),
@@ -109,6 +113,12 @@ describe("POST /api/stripe/webhook", () => {
       }
       if (table === "audit_log") {
         return { insert: auditInsert };
+      }
+      if (table === "subscription_seat_history") {
+        return { insert: seatHistoryInsert };
+      }
+      if (table === "billing_invoice_events") {
+        return { upsert: invoiceEventUpsert };
       }
       throw new Error(`Unexpected table: ${table}`);
     });
@@ -271,6 +281,69 @@ describe("POST /api/stripe/webhook", () => {
 
     expect(response.status).toBe(200);
     expect(subscriptionsRetrieve).not.toHaveBeenCalled();
+  });
+
+  it("adds a seat row when the billed seats change, and none when they don't", async () => {
+    constructEvent.mockReturnValue(subscriptionEvent("customer.subscription.updated", "active"));
+    subscriptionMaybeSingle.mockResolvedValueOnce({
+      data: { stripe_subscription_id: "sub_123", status: "active", quantity: 7 },
+      error: null,
+    });
+
+    await POST(makeRequest());
+
+    expect(seatHistoryInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ seats: 9, source: "stripe" }),
+    );
+
+    seatHistoryInsert.mockClear();
+    subscriptionMaybeSingle.mockResolvedValueOnce({
+      data: { stripe_subscription_id: "sub_123", status: "active", quantity: 9 },
+      error: null,
+    });
+    await POST(makeRequest());
+
+    expect(seatHistoryInsert).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["invoice.payment_succeeded", "paid", 4200],
+    ["invoice.payment_failed", "failed", 5000],
+  ])("records %s as a %s invoice", async (type, kind, amount) => {
+    organizationMaybeSingle.mockResolvedValue({
+      data: { id: "11111111-1111-4111-8111-111111111111" },
+      error: null,
+    });
+    constructEvent.mockReturnValue({
+      id: `evt_${kind}`,
+      type,
+      created: 1_780_000_000,
+      data: {
+        object: {
+          id: "in_123",
+          customer: "cus_123",
+          currency: "usd",
+          amount_paid: 4200,
+          amount_due: 5000,
+          period_start: 1_777_000_000,
+          period_end: 1_779_592_000,
+        },
+      },
+    });
+
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(invoiceEventUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        org_id: "11111111-1111-4111-8111-111111111111",
+        stripe_invoice_id: "in_123",
+        kind,
+        amount_cents: amount,
+        occurred_at: new Date(1_780_000_000 * 1000).toISOString(),
+      }),
+      { onConflict: "stripe_invoice_id,kind", ignoreDuplicates: true },
+    );
   });
 
   it("keeps trialing webhook updates from clearing the trial end date", async () => {
