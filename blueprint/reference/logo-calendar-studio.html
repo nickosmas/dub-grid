@@ -910,14 +910,11 @@
       function content(p, c, gap = p.gap) {
         const layers = geometry(p);
         const front = layers[layers.length - 1];
-        const halo = (d, mask) =>
-          gap > 0
-            ? `<path d="${d}" fill="${c.surface}" stroke="${c.surface}" stroke-width="${fmt(gap * 2)}" stroke-linejoin="round"${mask ? ` mask="url(#${mask})"` : ""}/>`
-            : "";
-        // Half holes: semicircles punched out of a card's top edge. Each is a
-        // mask on that card alone, so the card behind shows through the
-        // notch. The card's gap follows the notch, so its mask cuts smaller
-        // circles, leaving the gap ring along the curve.
+        const halo = (d) =>
+          gap > 0 ? `<path d="${d}" fill="${c.surface}" stroke="${c.surface}" stroke-width="${fmt(gap * 2)}" stroke-linejoin="round"/>` : "";
+        // Half holes: semicircles punched out of a card's top edge, as a mask
+        // on that card alone. The card's gap still fills the notch, so a
+        // front card's punch reads as a clean notch in the surface color.
         const punchMasks = (pg, scale) => {
           const r = (p.ringW / 2) * scale;
           const xs = ringXs(pg, p);
@@ -926,11 +923,9 @@
           const circles = (radius) =>
             radius > 0 ? xs.map((x) => `<circle cx="${fmt(x)}" cy="${fmt(pg.topY(x))}" r="${fmt(radius)}" fill="black"/>`).join("") : "";
           const card = `pc${punchId++}`;
-          const haloMask = `ph${punchId++}`;
           return {
             card,
-            haloMask,
-            defs: `<mask id="${card}" maskUnits="userSpaceOnUse" ${region}><rect ${region} fill="white"/>${circles(r)}</mask><mask id="${haloMask}" maskUnits="userSpaceOnUse" ${region}><rect ${region} fill="white"/>${circles(r - gap)}</mask>`,
+            defs: `<mask id="${card}" maskUnits="userSpaceOnUse" ${region}><rect ${region} fill="white"/>${circles(r)}</mask>`,
           };
         };
         const ring = (pg, scale, x) => {
@@ -1010,7 +1005,7 @@
             const scale = pg.w / 100;
             const fill = mixHex(c.front, c.back, depth);
             const punch = p.ringStyle === "punch" ? punchMasks(pg, scale) : null;
-            let out = `${punch ? punch.defs : ""}${i ? halo(pg.d, punch?.haloMask) : ""}<path d="${pg.d}" fill="${fill}"${punch ? ` mask="url(#${punch.card})"` : ""}/>`;
+            let out = `${punch ? punch.defs : ""}${i ? halo(pg.d) : ""}<path d="${pg.d}" fill="${fill}"${punch ? ` mask="url(#${punch.card})"` : ""}/>`;
             if (p.cells && layer === front) out += cellGrid(pg, scale, fill);
             const isFront = layer === front;
             if (p.ringStyle === "holes" && isFront) out += ringXs(pg, p).map((x) => hole(pg, scale, x)).join("");
