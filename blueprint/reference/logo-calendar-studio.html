@@ -503,6 +503,10 @@
           <section class="panel" aria-labelledby="h-cards">
             <h2 id="h-cards">Pages</h2>
             <div class="ctl">
+              <span class="lbl">Stacking</span>
+              <div class="chips" id="stacking" role="group" aria-label="Stacking"></div>
+            </div>
+            <div class="ctl">
               <span class="lbl">Darker page</span>
               <div class="chips" id="darkPage" role="group" aria-label="Darker page"></div>
             </div>
@@ -598,6 +602,12 @@
         ringAnchor: "edge",
         ringShift: 0,
         darkPage: "back",
+        stacking: "offset",
+        reveal: 14,
+        fan: 0,
+        sheets: 3,
+        splay: 16,
+        tuck: 0.15,
       };
       const PRESETS = [
         { name: "Stem rings", p: {} },
@@ -614,6 +624,11 @@
           ["aspect", "Page height (of width)", 0.6, 1.3, 0.01, (v) => `${Math.round(v * 100)}%`],
           ["stepX", "Step along the slant", 0.15, 0.7, 0.01, (v) => `${Math.round(v * 100)}%`],
           ["stepY", "Step up", 0, 0.7, 0.01, (v) => `${Math.round(v * 100)}%`],
+          ["reveal", "Back page shows below", 0, 45, 0.5, (v) => `${v}`],
+          ["fan", "Fan from the binding", -15, 15, 0.5, (v) => `${v}°`],
+          ["sheets", "Sheets", 2, 4, 1, (v) => `${v}`],
+          ["splay", "Outer sheets tip out", 0, 40, 0.5, (v) => `${v}°`],
+          ["tuck", "Outer sheets tuck behind", 0, 0.5, 0.01, (v) => `${Math.round(v * 100)}%`],
           ["shrink", "Front page size", 0.75, 1, 0.01, (v) => `${Math.round(v * 100)}%`],
           ["radius", "Corner radius", 2, 30, 0.5, (v) => `${v}`],
           ["gap", "Gap between pages", 0, 9, 0.5, (v) => (v ? `${v}` : "none")],
@@ -641,6 +656,13 @@
         ["deep", "Deep"],
         ["front", "Light blue"],
       ];
+      // Settings that only apply to one stacking mode.
+      const ONLY_FOR = { stepX: "offset", stepY: "offset", reveal: "top", fan: "top", sheets: "tent", splay: "tent", tuck: "tent" };
+      const STACKINGS = [
+        ["tent", "Tent"],
+        ["top", "Bound at top"],
+        ["offset", "Offset"],
+      ];
       const DARK_PAGES = [
         ["back", "Back"],
         ["front", "Front"],
@@ -665,6 +687,7 @@
         if (RING_COLORS.some(([k]) => k === raw.ringColor)) out.ringColor = raw.ringColor;
         if (ANCHORS.some(([k]) => k === raw.ringAnchor)) out.ringAnchor = raw.ringAnchor;
         if (DARK_PAGES.some(([k]) => k === raw.darkPage)) out.darkPage = raw.darkPage;
+        if (STACKINGS.some(([k]) => k === raw.stacking)) out.stacking = raw.stacking;
         for (const theme of ["light", "dark"]) {
           for (const k of ["back", "front", "deep"]) {
             const v = raw.colors?.[theme]?.[k];
@@ -706,9 +729,9 @@
       function geometry(p) {
         const rad = (p.angle * Math.PI) / 180;
         const tan = Math.tan(rad);
-        const page = (cx, cy, s) => {
+        const page = (cx, cy, s, height) => {
           const w = 100 * s;
-          const h = p.aspect * 100 * s;
+          const h = height ?? p.aspect * 100 * s;
           // The top-left corner is acute and the top-right obtuse, so their
           // roundings eat unequal lengths of the top edge. The straight part
           // left between them is what the eye measures the rings against.
@@ -735,10 +758,52 @@
           };
         };
         const H = p.aspect * 100;
+        // Layers run back to front; `depth` 0 is the front sheet and 1 the
+        // deepest, which sets each sheet's shade.
+        if (p.stacking === "tent") {
+          // A desk calendar standing open, seen as an inverted V: every
+          // sheet hangs from one peak at the top. The middle sheet hangs
+          // straight down in front; the others hang from their inner top
+          // corner (tucked behind it by `tuck`) and tip outward by `splay`,
+          // so their top edges slope down away from the peak.
+          const n = p.sheets;
+          const mid = (n - 1) / 2;
+          const reach = Math.max(mid, 0.5);
+          const order = [...Array(n).keys()].sort((x, y) => Math.abs(y - mid) - Math.abs(x - mid) || x - y);
+          return order.map((i) => {
+            const o = i - mid;
+            const s = o === 0 ? p.shrink : 1;
+            const w = 100 * s;
+            const h = p.aspect * 100 * s;
+            const cx = o === 0 ? 0 : Math.sign(o) * (0.5 - p.tuck) * w;
+            const pg = page(cx, h / 2 + cx * tan, s);
+            const turn = Math.sign(o) * (Math.abs(o) / reach) * p.splay;
+            return { pg, transform: turn ? `rotate(${fmt(turn)} 0 0)` : "", depth: Math.abs(o) / reach };
+          });
+        }
+        if (p.stacking === "top") {
+          // A pad: both sheets hang from one top edge, the back sheet longer
+          // so it shows below, and the front sheet can fan out from the
+          // binding.
+          const back = page(0, 0, 1, H + p.reveal);
+          const binding = -(H + p.reveal) / 2;
+          const front = page(0, binding + (H * p.shrink) / 2, p.shrink);
+          return [
+            { pg: back, transform: "", depth: 1 },
+            { pg: front, transform: p.fan ? `rotate(${fmt(p.fan)} 0 ${fmt(binding)})` : "", depth: 0 },
+          ];
+        }
         const back = page(0, 0, 1);
         const front = page(p.stepX * 100, p.stepX * 100 * tan - p.stepY * H, p.shrink);
-        return { back, front };
+        return [
+          { pg: back, transform: "", depth: 1 },
+          { pg: front, transform: "", depth: 0 },
+        ];
       }
+
+      const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+      const mixHex = (a, b, t) =>
+        "#" + hexRgb(a).map((v, i) => Math.round(v + (hexRgb(b)[i] - v) * t).toString(16).padStart(2, "0")).join("");
 
       function ringXs(pg, p) {
         const c = pg.cx + (p.ringAnchor === "edge" ? pg.straightShift : 0) + p.ringShift * (pg.w / 100);
@@ -750,25 +815,34 @@
       }
 
       // SVG content for the design. `c` holds back, front, ring and surface
-      // colors; `gap` overrides the cut width (one color widens it).
+      // colors; `gap` overrides the cut width (one color widens it). Each
+      // sheet cuts a surface-colored gap into the sheets behind it.
       function content(p, c, gap = p.gap) {
-        const { back, front } = geometry(p);
+        const layers = geometry(p);
+        const front = layers[layers.length - 1];
         const halo = (d) =>
           gap > 0 ? `<path d="${d}" fill="${c.surface}" stroke="${c.surface}" stroke-width="${fmt(gap * 2)}" stroke-linejoin="round"/>` : "";
-        const ring = (pg, x) => {
+        const ring = (pg, scale, x) => {
           const y = pg.topY(x);
-          const w = p.ringW * (pg === front ? p.shrink : 1);
+          const w = p.ringW * scale;
           const r = `x="${fmt(x - w / 2)}" y="${fmt(y - p.ringUp)}" width="${fmt(w)}" height="${fmt(p.ringUp + p.ringDown)}" rx="${fmt(w / 2)}"`;
           const ringHalo = gap > 0 ? `<rect ${r} fill="${c.surface}" stroke="${c.surface}" stroke-width="${fmt(gap * 2)}"/>` : "";
           return `${ringHalo}<rect ${r} fill="${c.ring}"/>`;
         };
-        const hole = (pg, x) => `<circle cx="${fmt(x)}" cy="${fmt(pg.topY(x))}" r="${fmt((p.ringW / 2) * (pg === front ? p.shrink : 1))}" fill="${c.surface}"/>`;
-        let s = `<path d="${back.d}" fill="${c.back}"/>`;
-        if (p.ringStyle === "perpage") s += ringXs(back, p).map((x) => ring(back, x)).join("");
-        s += `${halo(front.d)}<path d="${front.d}" fill="${c.front}"/>`;
-        if (p.ringStyle === "holes") s += ringXs(front, p).map((x) => hole(front, x)).join("");
-        else s += ringXs(front, p).map((x) => ring(front, x)).join("");
-        return s;
+        const hole = (pg, scale, x) => `<circle cx="${fmt(x)}" cy="${fmt(pg.topY(x))}" r="${fmt((p.ringW / 2) * scale)}" fill="${c.surface}"/>`;
+        return layers
+          .map((layer, i) => {
+            const { pg, transform, depth } = layer;
+            const scale = pg.w / 100;
+            const fill = mixHex(c.front, c.back, depth);
+            let out = `${i ? halo(pg.d) : ""}<path d="${pg.d}" fill="${fill}"/>`;
+            const isFront = layer === front;
+            if (p.ringStyle === "holes" && isFront) out += ringXs(pg, p).map((x) => hole(pg, scale, x)).join("");
+            else if (p.ringStyle === "rings" && isFront) out += ringXs(pg, p).map((x) => ring(pg, scale, x)).join("");
+            else if (p.ringStyle === "perpage") out += ringXs(pg, p).map((x) => ring(pg, scale, x)).join("");
+            return transform ? `<g transform="${transform}">${out}</g>` : out;
+          })
+          .join("");
       }
 
       // `back` and `front` in the color settings are the dark and light
@@ -851,6 +925,8 @@
         document.querySelectorAll("[data-ring-color]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.ringColor === state.ringColor)));
         document.querySelectorAll("[data-anchor]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.anchor === state.ringAnchor)));
         document.querySelectorAll("[data-dark-page]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.darkPage === state.darkPage)));
+        document.querySelectorAll("[data-stacking]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.stacking === state.stacking)));
+        for (const [key, mode] of Object.entries(ONLY_FOR)) $(`in-${key}`).closest(".ctl").hidden = state.stacking !== mode;
         for (const theme of ["light", "dark"]) {
           for (const k of ["back", "front", "deep"]) {
             const input = $(`color-${theme}-${k}`);
@@ -858,17 +934,20 @@
           }
         }
         const match = PRESETS.find(
-          (pr) => JSON.stringify(sanitize({ ...BASE, ...pr.p, colors: state.colors, darkPage: state.darkPage })) === JSON.stringify(state),
+          (pr) =>
+            JSON.stringify(sanitize({ ...BASE, ...pr.p, colors: state.colors, darkPage: state.darkPage, stacking: state.stacking })) ===
+            JSON.stringify(state),
         );
         document.querySelectorAll("[data-preset]").forEach((b) => b.setAttribute("aria-pressed", String(match?.name === b.dataset.preset)));
       }
 
+      const DRAFT_KEY = "calendar-mark-draft-v2";
       let draftTimer = null;
       function rememberDraft() {
         clearTimeout(draftTimer);
         draftTimer = setTimeout(() => {
           try {
-            localStorage.setItem("calendar-mark-draft", JSON.stringify(state));
+            localStorage.setItem(DRAFT_KEY, JSON.stringify(state));
           } catch {
             /* Storage is a convenience; the page works without it. */
           }
@@ -896,7 +975,7 @@
         document.querySelectorAll("[data-preset]").forEach((b) =>
           b.addEventListener("click", () => {
             const pr = PRESETS.find((x) => x.name === b.dataset.preset);
-            state = sanitize({ ...BASE, ...pr.p, colors: state.colors, darkPage: state.darkPage });
+            state = sanitize({ ...BASE, ...pr.p, colors: state.colors, darkPage: state.darkPage, stacking: state.stacking });
             render();
           }),
         );
@@ -904,6 +983,13 @@
         document.querySelectorAll("[data-style]").forEach((b) =>
           b.addEventListener("click", () => {
             state.ringStyle = b.dataset.style;
+            render();
+          }),
+        );
+        $("stacking").innerHTML = STACKINGS.map(([k, l]) => `<button class="chip" type="button" data-stacking="${k}">${l}</button>`).join("");
+        document.querySelectorAll("[data-stacking]").forEach((b) =>
+          b.addEventListener("click", () => {
+            state.stacking = b.dataset.stacking;
             render();
           }),
         );
@@ -980,9 +1066,13 @@
         rows.push(["ringColor", "Ring color", pick(RING_COLORS)]);
         rows.push(["ringAnchor", "Rings centered on", pick(ANCHORS)]);
         rows.push(["darkPage", "Darker page", pick(DARK_PAGES)]);
+        rows.push(["stacking", "Stacking", pick(STACKINGS)]);
         return rows;
       }
-      const relevant = (p, key) => !(p.ringStyle === "holes" && (key === "ringUp" || key === "ringDown")) && !(p.ringCount === 0 && key.startsWith("ring"));
+      const relevant = (p, key) =>
+        !(p.ringStyle === "holes" && (key === "ringUp" || key === "ringDown")) &&
+        !(p.ringCount === 0 && key.startsWith("ring")) &&
+        !(ONLY_FOR[key] && ONLY_FOR[key] !== p.stacking);
 
       function renderCompare() {
         const section = $("compareSection");
@@ -1120,11 +1210,14 @@
       $("copyJson").addEventListener("click", (e) => copy(JSON.stringify(state, null, 2), e.currentTarget, "Copied"));
 
       buildControls();
+      state = sanitize({ stacking: "tent" });
       try {
-        const draft = localStorage.getItem("calendar-mark-draft");
+        const draft = localStorage.getItem(DRAFT_KEY);
+        const older = localStorage.getItem("calendar-mark-draft");
         if (draft) state = sanitize(JSON.parse(draft));
+        else if (older) state = sanitize({ ...JSON.parse(older), stacking: "tent", sheets: 3 });
       } catch {
-        state = sanitize(null);
+        state = sanitize({ stacking: "tent" });
       }
       render();
       document.fonts?.ready.then(render);
