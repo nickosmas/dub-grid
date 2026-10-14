@@ -298,8 +298,8 @@
           <div class="tile dark"><span class="cap">Schedule loading, dark</span><span data-anim="shuffle" data-theme="dark" data-size="64"></span><span class="msg" data-msg="shuffle">Loading your schedule</span></div>
         </div>
         <div class="controls">
-          <button class="chip" id="finishShuffle">Finish loading</button>
-          <button class="chip" id="restartShuffle">Start again</button>
+          <button class="chip" data-finish="shuffle">Finish loading</button>
+          <button class="chip" data-restart="shuffle">Start again</button>
         </div>
       </section>
 
@@ -316,13 +316,17 @@
         <div class="cand">
           <div class="anim-head">
             <h3>Climb</h3>
-            <span>1.6 s cycle: 1.0 s move, 0.6 s rest</span>
+            <span>1.6 s cycle: 1.0 s step, 0.6 s rest</span>
           </div>
-          <p>The stack steps up the slant: the back card rises into the front's place and turns light, the front card shrinks away into its far corner, and a new back card grows in below. It reads as work moving forward, and echoes the cascade in the reference image.</p>
+          <p>The stack steps up the slant as a ripple, front to back. The front card leaves first, stepping forward and shrinking into its far corner; the back card rises into its place and turns light; a new back card arrives last, doing the exact reverse of the leaving card. The step is symmetric under a half turn, like the mark. When syncing ends it finishes the step and rests.</p>
           <div class="stage">
             <div class="tile light"><span class="cap">160 px</span><span data-anim="climb" data-theme="light" data-size="160"></span></div>
-            <div class="tile light"><span class="cap">Syncing, light</span><span data-anim="climb" data-theme="light" data-size="64"></span><span class="msg">Syncing changes</span></div>
-            <div class="tile dark"><span class="cap">Syncing, dark</span><span data-anim="climb" data-theme="dark" data-size="64"></span><span class="msg">Syncing changes</span></div>
+            <div class="tile light"><span class="cap">Syncing, light</span><span data-anim="climb" data-theme="light" data-size="64"></span><span class="msg" data-msg="climb">Syncing changes</span></div>
+            <div class="tile dark"><span class="cap">Syncing, dark</span><span data-anim="climb" data-theme="dark" data-size="64"></span><span class="msg" data-msg="climb">Syncing changes</span></div>
+          </div>
+          <div class="controls">
+            <button class="chip" data-finish="climb">Finish syncing</button>
+            <button class="chip" data-restart="climb">Start again</button>
           </div>
         </div>
         <div class="cand">
@@ -501,22 +505,36 @@
         scale,
       });
 
-      // The back card rises into the front's place while the front card moves
-      // on and shrinks away and a new back card grows in, so each cycle ends
-      // on the static mark. Scaling rather than fading keeps every card solid.
-      function climb(t) {
-        const u = clamp((t % DURATION.climb) / CLIMB_MOVE);
-        const e = quartInOut(u);
-        const leaving = 1 - smoothstep(0, 0.6, u);
-        const arriving = smoothstep(0.15, 0.85, u);
+      // One step of the climb as a ripple up the stack: the front card leaves
+      // first, the back card rises next, and a new back card arrives last. The
+      // leaving card steps forward and shrinks into its far corner; the
+      // arriving card does the exact reverse at the back, so the step is
+      // symmetric under a half turn, like the mark. Every card stays solid.
+      const window01 = (u, from, to) => clamp((u - from) / (to - from));
+      const CLIMB_DRIFT = 0.35;
+      // Fade a card only while it is very small, when it no longer overlaps
+      // another, so it never shows as a speck and never turns see-through.
+      const speck = (scale) => smoothstep(0, 0.3, scale);
+
+      function climbAt(u) {
+        const lead = window01(u, 0, 0.8);
+        const rise = quartInOut(window01(u, 0.1, 0.9));
+        const tail = window01(u, 0.2, 1);
+        const leaving = smoothstep(0, 1, lead);
+        const arriving = smoothstep(0, 1, tail);
+        const along = (at, k) => ({ x: at.x + CLIMB_DRIFT * STEP.x * k, y: at.y + CLIMB_DRIFT * STEP.y * k });
         return {
           cards: [
-            { ...scaledFrom(BACK, BOTTOM_LEFT, arriving), color: 0 },
-            { x: lerp(BACK.x, FRONT.x, e), y: lerp(BACK.y, FRONT.y, e), scale: 1, color: e },
-            { ...scaledFrom(FRONT, TOP_RIGHT, leaving), color: 1 },
+            { ...scaledFrom(along(BACK, arriving - 1), BOTTOM_LEFT, arriving), color: 0, opacity: speck(arriving) },
+            { x: lerp(BACK.x, FRONT.x, rise), y: lerp(BACK.y, FRONT.y, rise), scale: 1, color: rise },
+            { ...scaledFrom(along(FRONT, leaving), TOP_RIGHT, 1 - leaving), color: 1, opacity: speck(1 - leaving) },
           ].filter((k) => k.scale > 0.01),
           gap: 1,
         };
+      }
+
+      function climb(t) {
+        return climbAt((t % DURATION.climb) / CLIMB_MOVE);
       }
 
       function swap(t) {
@@ -590,23 +608,28 @@
       }
       let clock = 0;
       let last = null;
-      // Shuffle stops gracefully: once asked, it finishes the current move.
-      let shuffleStopAt = null;
-      let shuffleStartedAt = 0;
+      // Shuffle and Climb stop gracefully: once asked, they finish the current
+      // move and rest on the static mark.
+      const STEPPED = {
+        shuffle: { at: shuffleAt, move: SHUFFLE_MOVE, stopAt: null, startedAt: 0 },
+        climb: { at: climbAt, move: CLIMB_MOVE, stopAt: null, startedAt: 0 },
+      };
 
-      function shuffleFrame() {
-        const t = clock - shuffleStartedAt;
-        if (shuffleStopAt === null) return shuffle(t);
-        const cycleStart = Math.floor(shuffleStopAt / DURATION.shuffle) * DURATION.shuffle;
-        const u = (t - cycleStart) / SHUFFLE_MOVE;
-        return u >= 1 ? rest() : shuffleAt(u);
+      function steppedFrame(name) {
+        const s = STEPPED[name];
+        const t = clock - s.startedAt;
+        const cycle = DURATION[name];
+        const cycleStart = Math.floor((s.stopAt ?? t) / cycle) * cycle;
+        const u = (t - cycleStart) / s.move;
+        if (s.stopAt !== null && u >= 1) return rest();
+        return s.at(Math.min(u, 1));
       }
 
       function draw() {
         for (const p of players) {
           let f;
           if (reduced) f = rest();
-          else if (p.anim === "shuffle") f = shuffleFrame();
+          else if (STEPPED[p.anim]) f = steppedFrame(p.anim);
           else f = FRAMES[p.anim](clock);
           p.el.innerHTML = frameSvg(f, p.theme, p.size, p.ids);
         }
@@ -634,16 +657,27 @@
       );
       press("[data-motion]", (x) => (x.dataset.motion === "reduced") === reduced);
 
-      const setMsg = (text) => document.querySelectorAll('[data-msg="shuffle"]').forEach((m) => (m.textContent = text));
-      document.getElementById("finishShuffle").addEventListener("click", () => {
-        if (shuffleStopAt === null) shuffleStopAt = clock - shuffleStartedAt;
-        setMsg("Schedule ready");
-      });
-      document.getElementById("restartShuffle").addEventListener("click", () => {
-        shuffleStopAt = null;
-        shuffleStartedAt = clock;
-        setMsg("Loading your schedule");
-      });
+      const MESSAGES = {
+        shuffle: ["Loading your schedule", "Schedule ready"],
+        climb: ["Syncing changes", "All changes saved"],
+      };
+      const setMsg = (name, done) =>
+        document.querySelectorAll(`[data-msg="${name}"]`).forEach((m) => (m.textContent = MESSAGES[name][done ? 1 : 0]));
+      document.querySelectorAll("[data-finish]").forEach((b) =>
+        b.addEventListener("click", () => {
+          const s = STEPPED[b.dataset.finish];
+          if (s.stopAt === null) s.stopAt = clock - s.startedAt;
+          setMsg(b.dataset.finish, true);
+        }),
+      );
+      document.querySelectorAll("[data-restart]").forEach((b) =>
+        b.addEventListener("click", () => {
+          const s = STEPPED[b.dataset.restart];
+          s.stopAt = null;
+          s.startedAt = clock;
+          setMsg(b.dataset.restart, false);
+        }),
+      );
 
       draw();
       requestAnimationFrame(tick);
