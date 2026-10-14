@@ -938,11 +938,22 @@
         // variation: positive mixes toward the lighter target, negative toward
         // the deep blue. A seeded sequence keeps a pattern stable.
         const tones = cellTones(p);
-        // The first cell can sit almost on the card's own color: there, but
-        // only just, like an open slot.
-        const FAINT = 0.05;
+        // With `cellFirstFaint`, the cell whose tone lands closest to the
+        // card's own color trades places with the first cell, so the first
+        // cell is the one that nearly disappears. If no cell lands close
+        // enough, the first cell takes a hair darker than the card.
+        const FAINT = -0.03;
+        const cellTone = (() => {
+          const t = tones.map((r) => p.cellStrength + p.cellVary * r);
+          if (p.cellFirstFaint && t.length) {
+            const k = t.reduce((best, v, i) => (Math.abs(v) < Math.abs(t[best]) ? i : best), 0);
+            [t[0], t[k]] = [t[k], t[0]];
+            if (Math.abs(t[0]) > 0.04) t[0] = FAINT;
+          }
+          return t;
+        })();
         const cellColor = (fill, k) => {
-          const t = k === 0 && p.cellFirstFaint ? FAINT : p.cellStrength + p.cellVary * tones[k];
+          const t = cellTone[k];
           return t >= 0 ? mixHex(fill, c.cellLight, Math.min(t, 1)) : mixHex(fill, c.cellDark, Math.min(-t, 1));
         };
         const cellGrid = (pg, scale, fill) => {
