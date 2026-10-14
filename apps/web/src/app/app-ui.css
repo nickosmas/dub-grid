@@ -1192,6 +1192,13 @@
 .dg-app-shell-header-placeholder {
   height: var(--header-height);
 }
+/* Set by useClipTrailingWhitespace when the only thing left to scroll to is
+   bottom padding. Screen only, so printing never clips a page. */
+@media screen {
+  [data-dg-scroll-fits] {
+    overflow-y: hidden !important;
+  }
+}
 .dg-modal {
   position: relative;
   background: var(--dg-color-surface);

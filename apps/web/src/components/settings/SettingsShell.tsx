@@ -4,6 +4,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 
 import { useMediaQuery, MOBILE, TABLET } from "@/hooks";
+import { useClipTrailingWhitespace } from "@/hooks/useClipTrailingWhitespace";
 import { useSetMobileSubNav, SubNavItem } from "@/components/MobileSubNavContext";
 import {
   SidebarProvider,
@@ -79,6 +80,7 @@ export function SettingsShell<TId extends string = string>({
   children,
 }: SettingsShellProps<TId>) {
   const isMobile = useMediaQuery(MOBILE);
+  const contentScrollerRef = useClipTrailingWhitespace();
   const isTablet = useMediaQuery(TABLET);
 
   const contentGroups = useMemo(
@@ -278,6 +280,7 @@ export function SettingsShell<TId extends string = string>({
         )}
 
         <div
+          ref={contentScrollerRef}
           data-tour="settings-content"
           style={{
             flex: 1,

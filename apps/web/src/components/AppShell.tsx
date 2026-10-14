@@ -3,6 +3,7 @@
 import { useLayoutEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import { useClipPageTrailingWhitespace } from "@/hooks/useClipTrailingWhitespace";
 import Header from "@/components/Header";
 import ImpersonationBanner from "@/components/ImpersonationBanner";
 import UserViewBanner from "@/components/UserViewBanner";
@@ -93,6 +94,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { isGridmaster, isLoading, orgId } = usePermissions();
   const shellRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
+  useClipPageTrailingWhitespace();
 
   // Banners are conditional, so a fixed 56px offset is wrong whenever one is
   // visible. Measure the sticky shell itself and publish its real height for
