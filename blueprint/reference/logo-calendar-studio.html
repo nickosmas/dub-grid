@@ -606,8 +606,7 @@
         reveal: 14,
         fan: 0,
         sheets: 3,
-        splay: 16,
-        tuck: 0.15,
+        splay: 24,
       };
       const PRESETS = [
         { name: "Stem rings", p: {} },
@@ -627,8 +626,7 @@
           ["reveal", "Back page shows below", 0, 45, 0.5, (v) => `${v}`],
           ["fan", "Fan from the binding", -15, 15, 0.5, (v) => `${v}°`],
           ["sheets", "Sheets", 2, 4, 1, (v) => `${v}`],
-          ["splay", "Outer sheets tip out", 0, 40, 0.5, (v) => `${v}°`],
-          ["tuck", "Outer sheets tuck behind", 0, 0.5, 0.01, (v) => `${Math.round(v * 100)}%`],
+          ["splay", "How far the book opens", 0, 70, 0.5, (v) => `${v}°`],
           ["shrink", "Front page size", 0.75, 1, 0.01, (v) => `${Math.round(v * 100)}%`],
           ["radius", "Corner radius", 2, 30, 0.5, (v) => `${v}`],
           ["gap", "Gap between pages", 0, 9, 0.5, (v) => (v ? `${v}` : "none")],
@@ -646,6 +644,7 @@
         ["rings", "Rings"],
         ["perpage", "Ring per page"],
         ["holes", "Holes"],
+        ["spine", "Spine bar"],
       ];
       const ANCHORS = [
         ["edge", "Straight edge"],
@@ -657,9 +656,9 @@
         ["front", "Light blue"],
       ];
       // Settings that only apply to one stacking mode.
-      const ONLY_FOR = { stepX: "offset", stepY: "offset", reveal: "top", fan: "top", sheets: "tent", splay: "tent", tuck: "tent" };
+      const ONLY_FOR = { stepX: "offset", stepY: "offset", reveal: "top", fan: "top", sheets: "book", splay: "book" };
       const STACKINGS = [
-        ["tent", "Tent"],
+        ["book", "Book"],
         ["top", "Bound at top"],
         ["offset", "Offset"],
       ];
@@ -687,7 +686,8 @@
         if (RING_COLORS.some(([k]) => k === raw.ringColor)) out.ringColor = raw.ringColor;
         if (ANCHORS.some(([k]) => k === raw.ringAnchor)) out.ringAnchor = raw.ringAnchor;
         if (DARK_PAGES.some(([k]) => k === raw.darkPage)) out.darkPage = raw.darkPage;
-        if (STACKINGS.some(([k]) => k === raw.stacking)) out.stacking = raw.stacking;
+        const stacking = raw.stacking === "tent" ? "book" : raw.stacking;
+        if (STACKINGS.some(([k]) => k === stacking)) out.stacking = stacking;
         for (const theme of ["light", "dark"]) {
           for (const k of ["back", "front", "deep"]) {
             const v = raw.colors?.[theme]?.[k];
@@ -760,12 +760,12 @@
         const H = p.aspect * 100;
         // Layers run back to front; `depth` 0 is the front sheet and 1 the
         // deepest, which sets each sheet's shade.
-        if (p.stacking === "tent") {
-          // A desk calendar standing open, seen as an inverted V: every
-          // sheet hangs from one peak at the top. The middle sheet hangs
-          // straight down in front; the others hang from their inner top
-          // corner (tucked behind it by `tuck`) and tip outward by `splay`,
-          // so their top edges slope down away from the peak.
+        if (p.stacking === "book") {
+          // An open book lying face down: every sheet shares one top edge,
+          // the spine, and hangs from it at its own angle. A sheet opened by
+          // an angle hangs that far out, so its bottom edge moves sideways by
+          // height x sin(angle) and rises to height x cos(angle). The middle
+          // sheet hangs straight down in front.
           const n = p.sheets;
           const mid = (n - 1) / 2;
           const reach = Math.max(mid, 0.5);
@@ -775,10 +775,14 @@
             const s = o === 0 ? p.shrink : 1;
             const w = 100 * s;
             const h = p.aspect * 100 * s;
-            const cx = o === 0 ? 0 : Math.sign(o) * (0.5 - p.tuck) * w;
-            const pg = page(cx, h / 2 + cx * tan, s);
-            const turn = Math.sign(o) * (Math.abs(o) / reach) * p.splay;
-            return { pg, transform: turn ? `rotate(${fmt(turn)} 0 0)` : "", depth: Math.abs(o) / reach };
+            const pg = page(0, h / 2, s);
+            const open = ((o / reach) * p.splay * Math.PI) / 180;
+            const dx = h * Math.sin(open);
+            const hh = h * Math.cos(open);
+            const tl = [-w / 2, -(w / 2) * tan];
+            const tr = [w / 2, (w / 2) * tan];
+            pg.d = roundedPolygon([tl, tr, [tr[0] + dx, tr[1] + hh], [tl[0] + dx, tl[1] + hh]], p.radius * s);
+            return { pg, transform: "", depth: Math.abs(o) / reach };
           });
         }
         if (p.stacking === "top") {
@@ -829,6 +833,19 @@
           const ringHalo = gap > 0 ? `<rect ${r} fill="${c.surface}" stroke="${c.surface}" stroke-width="${fmt(gap * 2)}"/>` : "";
           return `${ringHalo}<rect ${r} fill="${c.ring}"/>`;
         };
+        // A solid spine along the top edge: as thick as a ring, centered on
+        // the rings' center, as long as twice the spread.
+        const spine = (pg, scale) => {
+          const c0 = pg.cx + (p.ringAnchor === "edge" ? pg.straightShift : 0) + p.ringShift * scale;
+          const half = Math.max(p.ringSpread * pg.w, 0.5);
+          const lift = (p.ringDown - p.ringUp) / 2;
+          const x1 = c0 - half;
+          const x2 = c0 + half;
+          const line = `x1="${fmt(x1)}" y1="${fmt(pg.topY(x1) + lift)}" x2="${fmt(x2)}" y2="${fmt(pg.topY(x2) + lift)}" stroke-linecap="round"`;
+          const w = p.ringW * scale;
+          const spineHalo = gap > 0 ? `<line ${line} stroke="${c.surface}" stroke-width="${fmt(w + gap * 2)}"/>` : "";
+          return `${spineHalo}<line ${line} stroke="${c.ring}" stroke-width="${fmt(w)}"/>`;
+        };
         const hole = (pg, scale, x) => `<circle cx="${fmt(x)}" cy="${fmt(pg.topY(x))}" r="${fmt((p.ringW / 2) * scale)}" fill="${c.surface}"/>`;
         return layers
           .map((layer, i) => {
@@ -840,6 +857,7 @@
             if (p.ringStyle === "holes" && isFront) out += ringXs(pg, p).map((x) => hole(pg, scale, x)).join("");
             else if (p.ringStyle === "rings" && isFront) out += ringXs(pg, p).map((x) => ring(pg, scale, x)).join("");
             else if (p.ringStyle === "perpage") out += ringXs(pg, p).map((x) => ring(pg, scale, x)).join("");
+            else if (p.ringStyle === "spine" && isFront) out += spine(pg, scale);
             return transform ? `<g transform="${transform}">${out}</g>` : out;
           })
           .join("");
@@ -941,7 +959,7 @@
         document.querySelectorAll("[data-preset]").forEach((b) => b.setAttribute("aria-pressed", String(match?.name === b.dataset.preset)));
       }
 
-      const DRAFT_KEY = "calendar-mark-draft-v2";
+      const DRAFT_KEY = "calendar-mark-draft-v3";
       let draftTimer = null;
       function rememberDraft() {
         clearTimeout(draftTimer);
@@ -1210,14 +1228,14 @@
       $("copyJson").addEventListener("click", (e) => copy(JSON.stringify(state, null, 2), e.currentTarget, "Copied"));
 
       buildControls();
-      state = sanitize({ stacking: "tent" });
+      state = sanitize({ stacking: "book" });
       try {
         const draft = localStorage.getItem(DRAFT_KEY);
         const older = localStorage.getItem("calendar-mark-draft");
         if (draft) state = sanitize(JSON.parse(draft));
-        else if (older) state = sanitize({ ...JSON.parse(older), stacking: "tent", sheets: 3 });
+        else if (older) state = sanitize({ ...JSON.parse(older), stacking: "book", sheets: 3 });
       } catch {
-        state = sanitize({ stacking: "tent" });
+        state = sanitize({ stacking: "book" });
       }
       render();
       document.fonts?.ready.then(render);
