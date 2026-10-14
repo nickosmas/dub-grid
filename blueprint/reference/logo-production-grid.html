@@ -409,7 +409,7 @@
             <div id="cardControls"></div>
             <div class="ctl chips">
               <button class="chip" type="button" id="resetCorners">Shipped corners</button>
-              <button class="chip" type="button" id="resetPosition">Shipped overlap</button>
+              <button class="chip" type="button" id="resetPosition">Shipped overlap and space</button>
             </div>
           </section>
           <section class="panel" aria-labelledby="h-grid">
@@ -530,7 +530,7 @@
         ].join("");
       }
       const SHIPPED_CORNERS = { backR: Number(BACK.r.toFixed(2)), frontR: Number(FRONT.r.toFixed(2)), smooth: SMOOTHING };
-      const SHIPPED_POSITION = { showing: BACK_SHOWING, lift: 0 };
+      const SHIPPED_POSITION = { showing: BACK_SHOWING, lift: 0, cardGap: GAP };
       const backPath = (p) => cardPath(geo(p).back, p.smooth);
       const frontPath = (p) => cardPath(geo(p).front, p.smooth);
 
@@ -555,6 +555,7 @@
         ["smooth", "Corner smoothing", 0, 1, 0.05, (v) => (v ? `${fmt(v)}` : "round")],
         ["showing", "Back card showing (horizontal)", 0.05, 0.8, 0.01, (v) => `${Math.round(v * 100)}%`],
         ["lift", "Back card raised (vertical)", -0.5, 0.5, 0.01, (v) => (v > 0 ? `+${Math.round(v * 100)}%` : `${Math.round(v * 100)}%`)],
+        ["cardGap", "Space between cards", 0, 14, 0.5, (v) => (v ? `${fmt(v)}` : "none")],
       ];
       const SLIDERS = [
         ["cols", "Columns", 1, 6, 1, (v) => `${v}`],
@@ -649,7 +650,7 @@
         return `<svg width="${fmt(w)}" height="${fmt(h)}" viewBox="${vb.map(fmt).join(" ")}" aria-hidden="true" style="display:block;flex:none">
           <mask id="${id}" maskUnits="userSpaceOnUse" x="-60" y="-60" width="220" height="220">
             <rect x="-60" y="-60" width="220" height="220" fill="white"/>
-            <path d="${frontPath(p)}" fill="black" stroke="black" stroke-width="${GAP * 2}"/>
+            <path d="${frontPath(p)}" fill="black" stroke="black" stroke-width="${fmt(p.cardGap * 2)}"/>
           </mask>
           <path d="${backPath(p)}" fill="none" stroke="${c.mark}" stroke-width="${STROKE}" mask="url(#${id})"/>
           <path d="${frontPath(p)}" fill="${c.mark}"/>
@@ -718,7 +719,7 @@
         $("resetCorners").setAttribute("aria-pressed", String(shippedCorners));
         $("resetPosition").setAttribute("aria-pressed", String(Object.entries(SHIPPED_POSITION).every(([k, v]) => state[k] === v)));
         document.querySelectorAll("[data-first]").forEach((b) => b.setAttribute("aria-pressed", String((b.dataset.first === "true") === state.firstFaint)));
-        const corners = { backR: state.backR, frontR: state.frontR, smooth: state.smooth, showing: state.showing, lift: state.lift };
+        const corners = { backR: state.backR, frontR: state.frontR, smooth: state.smooth, showing: state.showing, lift: state.lift, cardGap: state.cardGap };
         const match = PRESETS.find((pr) => JSON.stringify(sanitize({ ...BASE, ...corners, ...pr.p })) === JSON.stringify(state));
         document.querySelectorAll("[data-preset]").forEach((b) => b.setAttribute("aria-pressed", String(match?.name === b.dataset.preset)));
       }
@@ -752,7 +753,7 @@
       $("presets").innerHTML = PRESETS.map((pr) => `<button class="chip" type="button" data-preset="${pr.name}">${pr.name}</button>`).join("");
       document.querySelectorAll("[data-preset]").forEach((b) =>
         b.addEventListener("click", () => {
-          const corners = { backR: state.backR, frontR: state.frontR, smooth: state.smooth, showing: state.showing, lift: state.lift };
+          const corners = { backR: state.backR, frontR: state.frontR, smooth: state.smooth, showing: state.showing, lift: state.lift, cardGap: state.cardGap };
           state = sanitize({ ...BASE, ...corners, ...PRESETS.find((x) => x.name === b.dataset.preset).p });
           render();
         }),
