@@ -404,6 +404,11 @@
             <h2 id="h-start">Start from</h2>
             <div class="chips" id="presets"></div>
           </section>
+          <section class="panel" aria-labelledby="h-cards">
+            <h2 id="h-cards">Cards</h2>
+            <div id="cardControls"></div>
+            <div class="ctl"><button class="chip" type="button" id="resetCorners">Shipped corners</button></div>
+          </section>
           <section class="panel" aria-labelledby="h-grid">
             <h2 id="h-grid">Grid</h2>
             <div id="gridControls"></div>
@@ -486,10 +491,10 @@
 
       // brandMarkCardPath: each corner starts radius * (1 + smoothing) from
       // the vertex and is one cubic, for a continuous squircle corner.
-      function cardPath({ x, y, w, h, r: radius }) {
+      function cardPath({ x, y, w, h, r: radius }, smoothing = SMOOTHING) {
         const half = Math.min(w, h) / 2;
         const r = Math.max(0, Math.min(radius, half));
-        const p = Math.min(r * (1 + SMOOTHING), half);
+        const p = Math.min(r * (1 + smoothing), half);
         const q = Math.max(0, (2.343 * r - p) / 3);
         const c = (...pts) => pts.map(fmt).join(",");
         return [
@@ -505,8 +510,9 @@
           "Z",
         ].join("");
       }
-      const BACK_PATH = cardPath(BACK);
-      const FRONT_PATH = cardPath(FRONT);
+      const SHIPPED_CORNERS = { backR: Number(BACK.r.toFixed(2)), frontR: Number(FRONT.r.toFixed(2)), smooth: SMOOTHING };
+      const backPath = (p) => cardPath({ ...BACK, r: p.backR }, p.smooth);
+      const frontPath = (p) => cardPath({ ...FRONT, r: p.frontR }, p.smooth);
 
       const BASE = {
         cells: true,
@@ -520,7 +526,13 @@
         vary: 0,
         seed: 1,
         firstFaint: false,
+        ...SHIPPED_CORNERS,
       };
+      const CARD_SLIDERS = [
+        ["backR", "Back card corner radius", 0, Number((BACK.h / 2).toFixed(2)), 0.25, (v) => `${fmt(v)}`],
+        ["frontR", "Front card corner radius", 0, Number((FRONT.h / 2).toFixed(2)), 0.25, (v) => `${fmt(v)}`],
+        ["smooth", "Corner smoothing", 0, 1, 0.05, (v) => (v ? `${fmt(v)}` : "round")],
+      ];
       const SLIDERS = [
         ["cols", "Columns", 1, 6, 1, (v) => `${v}`],
         ["rows", "Rows", 1, 4, 1, (v) => `${v}`],
@@ -543,7 +555,7 @@
       function sanitize(raw) {
         const out = { ...BASE };
         if (!raw || typeof raw !== "object") return out;
-        for (const [key, , min, max] of SLIDERS) {
+        for (const [key, , min, max] of [...SLIDERS, ...CARD_SLIDERS]) {
           const v = Number(raw[key]);
           if (Number.isFinite(v)) out[key] = Math.min(max, Math.max(min, v));
         }
@@ -586,6 +598,8 @@
         if (cw <= 0 || ch <= 0) return "";
         const t = tones(p);
         let out = "";
+        const clip = `cc${uid++}`;
+        out += `<clipPath id="${clip}"><path d="${frontPath(p)}"/></clipPath><g clip-path="url(#${clip})">`;
         for (let row = 0; row < p.rows; row++) {
           for (let col = 0; col < p.cols; col++) {
             const k = row * p.cols + col;
@@ -594,7 +608,7 @@
             out += `<rect x="${fmt(FRONT.x + p.inset + col * (cw + p.gap))}" y="${fmt(FRONT.y + top + row * (ch + p.gap))}" width="${fmt(cw)}" height="${fmt(ch)}" rx="${fmt(p.radius)}" fill="${fill}"/>`;
           }
         }
-        return out;
+        return out + "</g>";
       }
 
       let uid = 0;
@@ -610,10 +624,10 @@
         return `<svg width="${fmt(w)}" height="${fmt(h)}" viewBox="${vb.map(fmt).join(" ")}" aria-hidden="true" style="display:block;flex:none">
           <mask id="${id}" maskUnits="userSpaceOnUse" x="-10" y="-10" width="120" height="120">
             <rect x="-10" y="-10" width="120" height="120" fill="white"/>
-            <path d="${FRONT_PATH}" fill="black" stroke="black" stroke-width="${GAP * 2}"/>
+            <path d="${frontPath(p)}" fill="black" stroke="black" stroke-width="${GAP * 2}"/>
           </mask>
-          <path d="${BACK_PATH}" fill="none" stroke="${c.mark}" stroke-width="${STROKE}" mask="url(#${id})"/>
-          <path d="${FRONT_PATH}" fill="${c.mark}"/>
+          <path d="${backPath(p)}" fill="none" stroke="${c.mark}" stroke-width="${STROKE}" mask="url(#${id})"/>
+          <path d="${frontPath(p)}" fill="${c.mark}"/>
           ${cells(p, mode)}
         </svg>`;
       }
@@ -651,7 +665,7 @@
         $("mono").innerHTML = [64, 32, 16].map((s) => mark(state, "mono", s)).join("");
         $("lockLight").innerHTML = `<span class="cap">Light: header 24 px, 44 px, stacked</span>${lockup(state, "light", 24)}${lockup(state, "light", 44)}${stacked(state, "light", 26)}`;
         $("lockDark").innerHTML = `<span class="cap">Dark</span>${lockup(state, "dark", 24)}${lockup(state, "dark", 44)}${stacked(state, "dark", 26)}`;
-        const shipped = sanitize({ cells: false });
+        const shipped = sanitize({ cells: false, ...SHIPPED_CORNERS });
         $("beforeAfter").innerHTML = `<figure>${lockup(shipped, "light", 24)}<figcaption>Shipped</figcaption></figure><figure>${lockup(state, "light", 24)}<figcaption>With grid</figcaption></figure><figure>${mark(shipped, "light", 40)}<figcaption>40 px</figcaption></figure><figure>${mark(state, "light", 40)}<figcaption>40 px</figcaption></figure>`;
         sync();
         try {
@@ -668,11 +682,32 @@
           $(`out-${key}`).textContent = label(state[key]);
           input.disabled = !state.cells;
         }
+        for (const [key, , , , , label] of CARD_SLIDERS) {
+          const input = $(`in-${key}`);
+          if (Number(input.value) !== state[key]) input.value = state[key];
+          $(`out-${key}`).textContent = label(state[key]);
+        }
+        const shippedCorners = Object.entries(SHIPPED_CORNERS).every(([k, v]) => state[k] === v);
+        $("resetCorners").setAttribute("aria-pressed", String(shippedCorners));
         document.querySelectorAll("[data-first]").forEach((b) => b.setAttribute("aria-pressed", String((b.dataset.first === "true") === state.firstFaint)));
-        const match = PRESETS.find((pr) => JSON.stringify(sanitize({ ...BASE, ...pr.p })) === JSON.stringify(state));
+        const corners = { backR: state.backR, frontR: state.frontR, smooth: state.smooth };
+        const match = PRESETS.find((pr) => JSON.stringify(sanitize({ ...BASE, ...corners, ...pr.p })) === JSON.stringify(state));
         document.querySelectorAll("[data-preset]").forEach((b) => b.setAttribute("aria-pressed", String(match?.name === b.dataset.preset)));
       }
 
+      $("cardControls").innerHTML = CARD_SLIDERS.map(
+        ([key, label, min, max, step]) => `<div class="ctl"><label for="in-${key}">${label} <output id="out-${key}"></output></label><input id="in-${key}" type="range" min="${min}" max="${max}" step="${step}" /></div>`,
+      ).join("");
+      for (const [key] of CARD_SLIDERS) {
+        $(`in-${key}`).addEventListener("input", (e) => {
+          state[key] = Number(e.target.value);
+          render();
+        });
+      }
+      $("resetCorners").addEventListener("click", () => {
+        Object.assign(state, SHIPPED_CORNERS);
+        render();
+      });
       $("gridControls").innerHTML = SLIDERS.map(
         ([key, label, min, max, step]) => `<div class="ctl"><label for="in-${key}">${label} <output id="out-${key}"></output></label><input id="in-${key}" type="range" min="${min}" max="${max}" step="${step}" /></div>`,
       ).join("");
@@ -685,7 +720,8 @@
       $("presets").innerHTML = PRESETS.map((pr) => `<button class="chip" type="button" data-preset="${pr.name}">${pr.name}</button>`).join("");
       document.querySelectorAll("[data-preset]").forEach((b) =>
         b.addEventListener("click", () => {
-          state = sanitize({ ...BASE, ...PRESETS.find((x) => x.name === b.dataset.preset).p });
+          const corners = { backR: state.backR, frontR: state.frontR, smooth: state.smooth };
+          state = sanitize({ ...BASE, ...corners, ...PRESETS.find((x) => x.name === b.dataset.preset).p });
           render();
         }),
       );
