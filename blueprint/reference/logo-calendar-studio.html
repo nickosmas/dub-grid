@@ -610,6 +610,7 @@
         ringSpread: 0.2,
         ringAnchor: "edge",
         ringShift: 0,
+        ringGap: 3.5,
         darkPage: "back",
         stacking: "offset",
         reveal: 14,
@@ -620,6 +621,7 @@
         cellCols: 3,
         cellRows: 2,
         cellInset: 12,
+        cellTop: 0,
         cellGap: 6,
         cellRadius: 4,
         cellStrength: 0.22,
@@ -633,13 +635,39 @@
         { name: "Short rings", p: { ringUp: 9, ringDown: 17 } },
         { name: "Plain stack", p: { ringCount: 0 } },
         { name: "Shift cells", p: { stacking: "offset", darkPage: "front", ringCount: 0, cells: true } },
+        {
+          name: "Sketch",
+          p: {
+            stacking: "offset",
+            angle: 0,
+            aspect: 0.75,
+            stepX: 0.21,
+            stepY: -0.2,
+            radius: 7,
+            darkPage: "front",
+            ringStyle: "perpage",
+            ringCount: 2,
+            ringW: 7.5,
+            ringUp: 5,
+            ringDown: 3.5,
+            ringGap: 1.5,
+            ringSpread: 0.27,
+            ringColor: "deep",
+            cells: true,
+            cellInset: 7,
+            cellTop: 9,
+            cellRows: 3,
+            cellGap: 6,
+            cellRadius: 3,
+          },
+        },
       ];
       const SLIDERS = {
         cardControls: [
           ["angle", "Slant", -45, 45, 1, (v) => `${v}°`],
           ["aspect", "Page height (of width)", 0.6, 1.3, 0.01, (v) => `${Math.round(v * 100)}%`],
           ["stepX", "Step along the slant", 0.15, 0.7, 0.01, (v) => `${Math.round(v * 100)}%`],
-          ["stepY", "Step up", 0, 0.7, 0.01, (v) => `${Math.round(v * 100)}%`],
+          ["stepY", "Step up (negative steps down)", -0.5, 0.7, 0.01, (v) => `${Math.round(v * 100)}%`],
           ["reveal", "Back page shows below", 0, 45, 0.5, (v) => `${v}`],
           ["fan", "Fan from the binding", -15, 15, 0.5, (v) => `${v}°`],
           ["sheets", "Sheets", 2, 4, 1, (v) => `${v}`],
@@ -652,6 +680,7 @@
           ["cellCols", "Columns", 1, 6, 1, (v) => `${v}`],
           ["cellRows", "Rows", 1, 4, 1, (v) => `${v}`],
           ["cellInset", "Inset from the card edge", 2, 26, 0.5, (v) => `${v}`],
+          ["cellTop", "Extra space above the cells", 0, 30, 0.5, (v) => `${v}`],
           ["cellGap", "Gap between cells", 1, 16, 0.5, (v) => `${v}`],
           ["cellRadius", "Cell corner radius", 0, 12, 0.5, (v) => `${v}`],
           ["cellStrength", "Strength", 0.04, 0.7, 0.01, (v) => `${Math.round(v * 100)}%`],
@@ -663,6 +692,7 @@
           ["ringDown", "Below the edge", 0, 34, 0.5, (v) => `${v}`],
           ["ringSpread", "Spread from center", 0, 0.42, 0.01, (v) => `${Math.round(v * 100)}%`],
           ["ringShift", "Shift by eye", -20, 20, 0.5, (v) => (v > 0 ? `+${v}` : `${v}`)],
+          ["ringGap", "Gap around rings", 0, 8, 0.5, (v) => (v ? `${v}` : "none")],
         ],
       };
       const STYLES = [
@@ -856,7 +886,9 @@
           const y = pg.topY(x);
           const w = p.ringW * scale;
           const r = `x="${fmt(x - w / 2)}" y="${fmt(y - p.ringUp)}" width="${fmt(w)}" height="${fmt(p.ringUp + p.ringDown)}" rx="${fmt(w / 2)}"`;
-          const ringHalo = gap > 0 ? `<rect ${r} fill="${c.surface}" stroke="${c.surface}" stroke-width="${fmt(gap * 2)}"/>` : "";
+          // One color widens the card gap; a ring needs less to stay apart.
+          const rg = gap === p.gap ? p.ringGap : Math.max(p.ringGap, 2.5);
+          const ringHalo = rg > 0 ? `<rect ${r} fill="${c.surface}" stroke="${c.surface}" stroke-width="${fmt(rg * 2)}"/>` : "";
           return `${ringHalo}<rect ${r} fill="${c.ring}"/>`;
         };
         // A solid spine along the top edge: as thick as a ring, centered on
@@ -878,14 +910,15 @@
           const inset = p.cellInset * scale;
           const g = p.cellGap * scale;
           const cw = (pg.w - 2 * inset - (p.cellCols - 1) * g) / p.cellCols;
-          const ch = (pg.h - 2 * inset - (p.cellRows - 1) * g) / p.cellRows;
+          const top = inset + p.cellTop * scale;
+          const ch = (pg.h - inset - top - (p.cellRows - 1) * g) / p.cellRows;
           if (cw <= 0 || ch <= 0) return "";
           let out = "";
           for (let col = 0; col < p.cellCols; col++) {
             const x0 = pg.cx - pg.w / 2 + inset + col * (cw + g);
             const x1 = x0 + cw;
             for (let row = 0; row < p.cellRows; row++) {
-              const down = inset + row * (ch + g);
+              const down = top + row * (ch + g);
               const pts = [
                 [x0, pg.topY(x0) + down],
                 [x1, pg.topY(x1) + down],
@@ -1016,7 +1049,7 @@
         document.querySelectorAll("[data-preset]").forEach((b) => b.setAttribute("aria-pressed", String(match?.name === b.dataset.preset)));
       }
 
-      const DRAFT_KEY = "calendar-mark-draft-v4";
+      const DRAFT_KEY = "calendar-mark-draft-v5";
       let draftTimer = null;
       function rememberDraft() {
         clearTimeout(draftTimer);
@@ -1299,11 +1332,11 @@
       $("copyJson").addEventListener("click", (e) => copy(JSON.stringify(state, null, 2), e.currentTarget, "Copied"));
 
       buildControls();
-      const SHIFT_CELLS = PRESETS.find((pr) => pr.name === "Shift cells").p;
+      const SHIFT_CELLS = PRESETS.find((pr) => pr.name === "Sketch").p;
       state = sanitize({ ...BASE, ...SHIFT_CELLS });
       try {
         const draft = localStorage.getItem(DRAFT_KEY);
-        const older = localStorage.getItem("calendar-mark-draft-v3");
+        const older = localStorage.getItem("calendar-mark-draft-v4");
         if (draft) state = sanitize(JSON.parse(draft));
         else if (older) state = sanitize({ ...BASE, colors: JSON.parse(older).colors, ...SHIFT_CELLS });
       } catch {
