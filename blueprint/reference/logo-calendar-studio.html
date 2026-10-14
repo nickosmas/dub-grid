@@ -652,9 +652,9 @@
             stepY: -0.2,
             radius: 7,
             darkPage: "front",
-            ringStyle: "perpage",
+            ringStyle: "punch",
             ringCount: 2,
-            ringW: 7.5,
+            ringW: 11,
             ringUp: 5,
             ringDown: 3.5,
             ringGap: 1.5,
@@ -713,6 +713,7 @@
         ["perpage", "Ring per page"],
         ["holes", "Holes"],
         ["spine", "Spine bar"],
+        ["punch", "Half holes"],
       ];
       const ANCHORS = [
         ["edge", "Straight edge"],
@@ -905,11 +906,33 @@
       // SVG content for the design. `c` holds back, front, ring and surface
       // colors; `gap` overrides the cut width (one color widens it). Each
       // sheet cuts a surface-colored gap into the sheets behind it.
+      let punchId = 0;
       function content(p, c, gap = p.gap) {
         const layers = geometry(p);
         const front = layers[layers.length - 1];
-        const halo = (d) =>
-          gap > 0 ? `<path d="${d}" fill="${c.surface}" stroke="${c.surface}" stroke-width="${fmt(gap * 2)}" stroke-linejoin="round"/>` : "";
+        const halo = (d, mask) =>
+          gap > 0
+            ? `<path d="${d}" fill="${c.surface}" stroke="${c.surface}" stroke-width="${fmt(gap * 2)}" stroke-linejoin="round"${mask ? ` mask="url(#${mask})"` : ""}/>`
+            : "";
+        // Half holes: semicircles punched out of a card's top edge. Each is a
+        // mask on that card alone, so the card behind shows through the
+        // notch. The card's gap follows the notch, so its mask cuts smaller
+        // circles, leaving the gap ring along the curve.
+        const punchMasks = (pg, scale) => {
+          const r = (p.ringW / 2) * scale;
+          const xs = ringXs(pg, p);
+          if (!xs.length) return null;
+          const region = `x="-400" y="-400" width="800" height="800"`;
+          const circles = (radius) =>
+            radius > 0 ? xs.map((x) => `<circle cx="${fmt(x)}" cy="${fmt(pg.topY(x))}" r="${fmt(radius)}" fill="black"/>`).join("") : "";
+          const card = `pc${punchId++}`;
+          const haloMask = `ph${punchId++}`;
+          return {
+            card,
+            haloMask,
+            defs: `<mask id="${card}" maskUnits="userSpaceOnUse" ${region}><rect ${region} fill="white"/>${circles(r)}</mask><mask id="${haloMask}" maskUnits="userSpaceOnUse" ${region}><rect ${region} fill="white"/>${circles(r - gap)}</mask>`,
+          };
+        };
         const ring = (pg, scale, x) => {
           const y = pg.topY(x);
           const w = p.ringW * scale;
@@ -986,7 +1009,8 @@
             const { pg, transform, depth } = layer;
             const scale = pg.w / 100;
             const fill = mixHex(c.front, c.back, depth);
-            let out = `${i ? halo(pg.d) : ""}<path d="${pg.d}" fill="${fill}"/>`;
+            const punch = p.ringStyle === "punch" ? punchMasks(pg, scale) : null;
+            let out = `${punch ? punch.defs : ""}${i ? halo(pg.d, punch?.haloMask) : ""}<path d="${pg.d}" fill="${fill}"${punch ? ` mask="url(#${punch.card})"` : ""}/>`;
             if (p.cells && layer === front) out += cellGrid(pg, scale, fill);
             const isFront = layer === front;
             if (p.ringStyle === "holes" && isFront) out += ringXs(pg, p).map((x) => hole(pg, scale, x)).join("");
@@ -1107,7 +1131,7 @@
         document.querySelectorAll("[data-preset]").forEach((b) => b.setAttribute("aria-pressed", String(match?.name === b.dataset.preset)));
       }
 
-      const DRAFT_KEY = "calendar-mark-draft-v7";
+      const DRAFT_KEY = "calendar-mark-draft-v8";
       let draftTimer = null;
       function rememberDraft() {
         clearTimeout(draftTimer);
@@ -1407,7 +1431,7 @@
       state = sanitize({ ...BASE, ...SHIFT_CELLS });
       try {
         const draft = localStorage.getItem(DRAFT_KEY);
-        const older = localStorage.getItem("calendar-mark-draft-v6");
+        const older = localStorage.getItem("calendar-mark-draft-v7");
         if (draft) state = sanitize(JSON.parse(draft));
         else if (older) state = sanitize({ ...BASE, colors: JSON.parse(older).colors, ...SHIFT_CELLS });
       } catch {
