@@ -1,0 +1,713 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Stacked card logo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@700&family=Inter:wght@400;500;600&display=swap"
+    />
+    <style>
+      /* Layout: controls beside a light and a dark proof sheet, then candidates and tokens. */
+      :root {
+        --text-primary: #111827;
+        --text-secondary: #6b7280;
+        --surface-1: #f4f4f5;
+        --surface-2: #ffffff;
+        --page: #fafafa;
+        --border: rgba(0, 0, 0, 0.1);
+        --border-strong: rgba(0, 0, 0, 0.18);
+        --accent: #2563eb;
+        --accent-soft: rgba(37, 99, 235, 0.1);
+        --tile-light: #ffffff;
+        --tile-dark: #111113;
+        --ink-light: #111827;
+        --ink-dark: #fafafa;
+        --radius: 8px;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --text-primary: #fafafa;
+          --text-secondary: #a1a1aa;
+          --surface-1: #18181b;
+          --surface-2: #202024;
+          --page: #0f0f11;
+          --border: rgba(255, 255, 255, 0.1);
+          --border-strong: rgba(255, 255, 255, 0.18);
+          --accent: #4a9bff;
+          --accent-soft: rgba(74, 155, 255, 0.18);
+        }
+      }
+      :root[data-theme="dark"] {
+        --text-primary: #fafafa;
+        --text-secondary: #a1a1aa;
+        --surface-1: #18181b;
+        --surface-2: #202024;
+        --page: #0f0f11;
+        --border: rgba(255, 255, 255, 0.1);
+        --border-strong: rgba(255, 255, 255, 0.18);
+        --accent: #4a9bff;
+        --accent-soft: rgba(74, 155, 255, 0.18);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 24px 16px 48px;
+        background: var(--page);
+        color: var(--text-primary);
+        font-family: Inter, system-ui, sans-serif;
+        font-size: 14px;
+      }
+      main {
+        max-width: 1000px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 20px;
+        font-weight: 600;
+        margin: 0 0 4px;
+        text-wrap: balance;
+      }
+      h2 {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 28px 0 10px;
+      }
+      .sub {
+        color: var(--text-secondary);
+        margin: 0 0 18px;
+        line-height: 1.5;
+        max-width: 680px;
+      }
+      .panel {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+        min-width: 0;
+      }
+      .workbench {
+        display: grid;
+        grid-template-columns: minmax(0, 290px) minmax(0, 1fr);
+        gap: 16px;
+      }
+      @media (max-width: 780px) {
+        .workbench {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .ctl {
+        margin-bottom: 12px;
+      }
+      .ctl label {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-bottom: 4px;
+      }
+      .ctl output {
+        font-variant-numeric: tabular-nums;
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+      .ctl input[type="range"] {
+        width: 100%;
+        accent-color: var(--accent);
+      }
+      .check {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin: 4px 0 14px;
+      }
+      .check input {
+        accent-color: var(--accent);
+      }
+      .presets {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 16px;
+      }
+      .chip {
+        font: inherit;
+        font-size: 12px;
+        font-weight: 500;
+        padding: 5px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border-strong);
+        background: transparent;
+        color: var(--text-primary);
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .chip[aria-pressed="true"] {
+        background: var(--accent-soft);
+        border-color: var(--accent);
+      }
+      .chip:focus-visible,
+      .cand:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      .stat {
+        font-size: 12px;
+        color: var(--text-secondary);
+        font-variant-numeric: tabular-nums;
+        line-height: 1.6;
+      }
+      .stat b {
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+      .compare {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+      @media (max-width: 520px) {
+        .compare {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .tile {
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        min-width: 0;
+      }
+      .tile.light {
+        background: var(--tile-light);
+        color: var(--ink-light);
+      }
+      .tile.dark {
+        background: var(--tile-dark);
+        color: var(--ink-dark);
+      }
+      .tile-label {
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        opacity: 0.6;
+      }
+      .hero {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 190px;
+      }
+      .sizes {
+        display: flex;
+        align-items: flex-end;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+      .size {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+      }
+      .size small {
+        font-size: 10px;
+        opacity: 0.55;
+        font-variant-numeric: tabular-nums;
+      }
+      .lockup {
+        display: flex;
+        align-items: center;
+        white-space: nowrap;
+        overflow: hidden;
+      }
+      .word {
+        font-family: "DM Sans", sans-serif;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1;
+      }
+      .icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 13px;
+        background: #2563eb;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex: none;
+      }
+      .cands {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+      @media (max-width: 780px) {
+        .cands {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      @media (max-width: 480px) {
+        .cands {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .cand {
+        cursor: pointer;
+        text-align: left;
+        font: inherit;
+        color: inherit;
+      }
+      .cand[aria-pressed="true"] {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      .cand h3 {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .cand p {
+        margin: 0;
+        font-size: 12px;
+        opacity: 0.7;
+        line-height: 1.45;
+      }
+      .cand .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      pre {
+        margin: 0;
+        padding: 12px;
+        border-radius: var(--radius);
+        background: var(--surface-1);
+        font-size: 12px;
+        overflow-x: auto;
+        line-height: 1.55;
+      }
+      .note {
+        font-size: 12px;
+        color: var(--text-secondary);
+        line-height: 1.5;
+        margin: 10px 0 0;
+        max-width: 760px;
+      }
+      #measure {
+        position: absolute;
+        width: 0;
+        height: 0;
+        overflow: hidden;
+        visibility: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Stacked card logo</h1>
+      <p class="sub">
+        A new direction for the DubGrid symbol: flat, slanted cards that step up and to the right,
+        shading from deep blue at the back to cyan at the front. Pick a candidate or drag the
+        sliders. Each proof shows the full-color mark, the small sizes, the app icon, the one-color
+        version used for print and favicons, and the lockup with the wordmark.
+      </p>
+
+      <div class="workbench">
+        <section class="panel" aria-label="Controls">
+          <div class="presets" id="presets"></div>
+          <div class="ctl">
+            <label for="n">Cards <output id="nOut"></output></label>
+            <input id="n" type="range" min="2" max="4" step="1" />
+          </div>
+          <div class="ctl">
+            <label for="angle">Slant <output id="angleOut"></output></label>
+            <input id="angle" type="range" min="0" max="45" step="1" />
+          </div>
+          <div class="ctl">
+            <label for="aspect">Card height (of width) <output id="aspectOut"></output></label>
+            <input id="aspect" type="range" min="0.6" max="1.3" step="0.01" />
+          </div>
+          <div class="ctl">
+            <label for="stepX">Step sideways <output id="stepXOut"></output></label>
+            <input id="stepX" type="range" min="0.2" max="0.7" step="0.01" />
+          </div>
+          <div class="ctl">
+            <label for="stepY">Step up <output id="stepYOut"></output></label>
+            <input id="stepY" type="range" min="0" max="0.7" step="0.01" />
+          </div>
+          <div class="ctl">
+            <label for="shrink">Each card's size vs the one behind <output id="shrinkOut"></output></label>
+            <input id="shrink" type="range" min="0.7" max="1" step="0.01" />
+          </div>
+          <div class="ctl">
+            <label for="radius">Corner radius <output id="radiusOut"></output></label>
+            <input id="radius" type="range" min="0.04" max="0.3" step="0.01" />
+          </div>
+          <div class="ctl">
+            <label for="gap">Gap between cards <output id="gapOut"></output></label>
+            <input id="gap" type="range" min="0" max="0.08" step="0.005" />
+          </div>
+          <label class="check" for="lightFront">
+            <input id="lightFront" type="checkbox" /> Lightest card in front
+          </label>
+          <div class="stat" id="stats"></div>
+        </section>
+
+        <section class="compare" aria-label="Preview">
+          <div class="tile light" id="tileLight"></div>
+          <div class="tile dark" id="tileDark"></div>
+        </section>
+      </div>
+
+      <h2>Candidates</h2>
+      <div class="cands" id="cands"></div>
+
+      <h2>Token values</h2>
+      <pre id="tokens"></pre>
+      <p class="note">
+        One color: print, one-color favicons and monochrome app icons can't show the shading, so
+        that version cuts a gap around each card instead. With the gap at 0 it uses 0.05 so the
+        cards stay apart.
+      </p>
+      <p class="note">
+        Recognition risk: stacked, slanted cards are a common "layers" and "stack" icon, and
+        the reference image may itself be another company's mark. Change the card count, slant,
+        steps and colors until it isn't a copy, then Lens-check it on its own and in the lockup
+        before adopting it.
+      </p>
+    </main>
+    <svg id="measure" aria-hidden="true"><path id="measurePath" /></svg>
+
+    <script>
+      const BRAND = "#2563EB";
+      const RAMPS = {
+        light: ["#1534D6", "#2563EB", "#5E9BF7", "#9FE1F6"],
+        dark: ["#2563EB", "#3B82F6", "#7DB7FF", "#B4EDFA"],
+      };
+      const MONO = { light: "#2563EB", dark: "#4A9BFF", print: "#111827" };
+      const MONO_MIN_GAP = 0.05;
+
+      const CANDIDATES = [
+        {
+          id: "ref",
+          name: "Reference",
+          note: "Measured from the image: four cards, 37° slant, each 83% of the one behind.",
+          n: 4, angle: 37, aspect: 1, stepX: 0.33, stepY: 0.34, shrink: 0.83, radius: 0.1, gap: 0, lightFront: true,
+        },
+        {
+          id: "a",
+          name: "A - Three cards",
+          note: "Three cards, gentler slant, softer corners and a thin gap for 16 px.",
+          n: 3, angle: 30, aspect: 0.95, stepX: 0.36, stepY: 0.38, shrink: 0.86, radius: 0.14, gap: 0.03, lightFront: true,
+        },
+        {
+          id: "b",
+          name: "B - Two cards",
+          note: "Keeps the two-card idea of the current mark in the new style.",
+          n: 2, angle: 32, aspect: 0.95, stepX: 0.4, stepY: 0.42, shrink: 0.85, radius: 0.14, gap: 0.035, lightFront: true,
+        },
+        {
+          id: "c",
+          name: "C - Schedule cells",
+          note: "Wider, shallower cards like schedule cells, no shrinking.",
+          n: 3, angle: 22, aspect: 0.72, stepX: 0.32, stepY: 0.45, shrink: 1, radius: 0.14, gap: 0.03, lightFront: true,
+        },
+        {
+          id: "d",
+          name: "D - Steep four",
+          note: "Four cards, a steeper slant and a stronger size drop, no gap.",
+          n: 4, angle: 40, aspect: 1.05, stepX: 0.3, stepY: 0.3, shrink: 0.8, radius: 0.12, gap: 0, lightFront: true,
+        },
+        {
+          id: "e",
+          name: "E - Deep in front",
+          note: "Three cards with the darkest one in front instead.",
+          n: 3, angle: 32, aspect: 0.95, stepX: 0.36, stepY: 0.38, shrink: 0.86, radius: 0.14, gap: 0.03, lightFront: false,
+        },
+      ];
+
+      const fmt = (n) => Number(n.toFixed(2)).toString();
+      const hexToRgb = (h) => {
+        const n = parseInt(h.slice(1), 16);
+        return [n >> 16, (n >> 8) & 255, n & 255];
+      };
+      const rgbToHex = (c) =>
+        "#" + c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
+      const mix = (a, b, t) => {
+        const A = hexToRgb(a);
+        const B = hexToRgb(b);
+        return rgbToHex(A.map((v, i) => v + (B[i] - v) * t));
+      };
+      function sampleRamp(stops, t) {
+        const s = t * (stops.length - 1);
+        const i = Math.min(Math.floor(s), stops.length - 2);
+        return mix(stops[i], stops[i + 1], s - i);
+      }
+
+      // Colors back to front. Fewer cards start further up the ramp, so two
+      // cards read as brand blue and cyan rather than navy and cyan.
+      function cardColors(p, mode) {
+        const start = (4 - p.n) / 6;
+        return Array.from({ length: p.n }, (_, i) => {
+          const t = p.n === 1 ? 1 : i / (p.n - 1);
+          const shade = p.lightFront ? t : 1 - t;
+          if (mode === "onBrand") return mix(BRAND, "#FFFFFF", 0.35 + 0.65 * shade);
+          return sampleRamp(RAMPS[mode], start + (1 - start) * shade);
+        });
+      }
+
+      // A closed polygon with every corner rounded to `r` (an exact circular
+      // arc tangent to both edges), clockwise in screen space.
+      function roundedPolygon(pts, r) {
+        const n = pts.length;
+        const corners = pts.map((v, k) => {
+          const prev = pts[(k + n - 1) % n];
+          const next = pts[(k + 1) % n];
+          const a = [prev[0] - v[0], prev[1] - v[1]];
+          const b = [next[0] - v[0], next[1] - v[1]];
+          const la = Math.hypot(...a);
+          const lb = Math.hypot(...b);
+          const ua = [a[0] / la, a[1] / la];
+          const ub = [b[0] / lb, b[1] / lb];
+          const angle = Math.acos(Math.max(-1, Math.min(1, ua[0] * ub[0] + ua[1] * ub[1])));
+          let t = r / Math.tan(angle / 2);
+          t = Math.min(t, la / 2, lb / 2);
+          const rr = t * Math.tan(angle / 2);
+          return {
+            s: [v[0] + ua[0] * t, v[1] + ua[1] * t],
+            e: [v[0] + ub[0] * t, v[1] + ub[1] * t],
+            r: rr,
+          };
+        });
+        let d = `M${fmt(corners[0].e[0])},${fmt(corners[0].e[1])}`;
+        for (let k = 1; k <= n; k++) {
+          const c = corners[k % n];
+          d += `L${fmt(c.s[0])},${fmt(c.s[1])}A${fmt(c.r)},${fmt(c.r)} 0 0 1 ${fmt(c.e[0])},${fmt(c.e[1])}`;
+        }
+        return d + "Z";
+      }
+
+      // The back card is 100 units wide. Each step moves the next card along
+      // the slanted edge and up its vertical edge, by shares of the card
+      // behind it, and scales it by `shrink`, so the stack climbs the slant.
+      function geometry(p) {
+        const w = 100;
+        const tan = Math.tan((p.angle * Math.PI) / 180);
+        const cards = [];
+        let x = 0;
+        let v = 0;
+        let cw = w;
+        for (let i = 0; i < p.n; i++) {
+          const ch = p.aspect * cw;
+          const y = v + x * tan;
+          cards.push(
+            roundedPolygon(
+              [
+                [x, y],
+                [x + cw, y + cw * tan],
+                [x + cw, y + cw * tan + ch],
+                [x, y + ch],
+              ],
+              p.radius * cw,
+            ),
+          );
+          x += p.stepX * cw;
+          v -= p.stepY * ch;
+          cw *= p.shrink;
+        }
+        const measure = document.getElementById("measurePath");
+        measure.setAttribute("d", cards.join(""));
+        const bb = measure.getBBox();
+        const ink = { x: bb.x, y: bb.y, w: bb.width, h: bb.height };
+        const g = { cards, ink, gap: p.gap * w, w };
+        g.optical = opticalCenter(g);
+        return g;
+      }
+
+      const massCanvas = document.createElement("canvas");
+      massCanvas.width = massCanvas.height = 200;
+      // Midway between the ink box's center and the ink's center of mass,
+      // the rule the shipped mark is centered by.
+      function opticalCenter(g) {
+        const ctx = massCanvas.getContext("2d", { willReadFrequently: true });
+        const s = 200 / Math.max(g.ink.w, g.ink.h);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, 200, 200);
+        ctx.setTransform(s, 0, 0, s, -g.ink.x * s, -g.ink.y * s);
+        ctx.fillStyle = "#000";
+        g.cards.forEach((d) => ctx.fill(new Path2D(d)));
+        const { data } = ctx.getImageData(0, 0, 200, 200);
+        let m = 0;
+        let mx = 0;
+        let my = 0;
+        for (let i = 3, px = 0; i < data.length; i += 4, px++) {
+          const a = data[i];
+          if (!a) continue;
+          m += a;
+          mx += a * ((px % 200) + 0.5);
+          my += a * (Math.floor(px / 200) + 0.5);
+        }
+        const mass = { x: mx / m / s + g.ink.x, y: my / m / s + g.ink.y };
+        const box = { x: g.ink.x + g.ink.w / 2, y: g.ink.y + g.ink.h / 2 };
+        return { x: (mass.x + box.x) / 2, y: (mass.y + box.y) / 2 };
+      }
+
+      let uid = 0;
+      function markSvg(g, { size, colors, crop = "ink", gap = g.gap }) {
+        let vb;
+        if (crop === "square") {
+          const side = Math.max(g.ink.w, g.ink.h) * 1.08;
+          vb = [g.optical.x - side / 2, g.optical.y - side / 2, side, side];
+        } else {
+          vb = [g.ink.x, g.ink.y, g.ink.w, g.ink.h];
+        }
+        const ratio = vb[3] / vb[2];
+        const width = crop === "height" ? size / ratio : size;
+        const height = crop === "height" ? size : size * ratio;
+        const pad = Math.max(g.ink.w, g.ink.h);
+        const region = `x="${fmt(g.ink.x - pad)}" y="${fmt(g.ink.y - pad)}" width="${fmt(g.ink.w + 2 * pad)}" height="${fmt(g.ink.h + 2 * pad)}"`;
+        let defs = "";
+        const paths = g.cards.map((d, i) => {
+          const ahead = g.cards.slice(i + 1);
+          if (!gap || !ahead.length) return `<path d="${d}" fill="${colors[i]}"/>`;
+          const id = `cut${uid++}`;
+          defs += `<mask id="${id}" maskUnits="userSpaceOnUse" ${region}>
+            <rect ${region} fill="white"/>
+            ${ahead.map((f) => `<path d="${f}" fill="black" stroke="black" stroke-width="${fmt(gap * 2)}" stroke-linejoin="round"/>`).join("")}
+          </mask>`;
+          return `<path d="${d}" fill="${colors[i]}" mask="url(#${id})"/>`;
+        });
+        return `<svg width="${fmt(width)}" height="${fmt(height)}" viewBox="${vb.map(fmt).join(" ")}" aria-hidden="true"><defs>${defs}</defs>${paths.join("")}</svg>`;
+      }
+
+      // The symbol's ink is 0.95 em tall and centered on the wordmark's
+      // optical center, 0.256 em above the baseline.
+      function lockup(g, p, fontSize, theme) {
+        const ink = theme === "light" ? "var(--ink-light)" : "var(--ink-dark)";
+        const height = 0.95 * fontSize;
+        const below = height / 2 - 0.256 * fontSize;
+        const svg = markSvg(g, { size: height, colors: cardColors(p, theme), crop: "height" });
+        return `<span class="lockup" style="font-size:${fontSize}px">
+          <span style="display:inline-block;margin-right:${0.25 * fontSize}px;transform:translateY(${fmt(below)}px)">${svg}</span>
+          <span class="word" style="color:${ink}">dubgrid</span>
+        </span>`;
+      }
+
+      const sized = (label, svg) => `<span class="size">${svg}<small>${label}</small></span>`;
+
+      function tileHtml(g, p, theme) {
+        const colors = cardColors(p, theme);
+        const monoColors = colors.map(() => MONO[theme]);
+        const monoGap = Math.max(g.gap, MONO_MIN_GAP * g.w);
+        return `<span class="tile-label">${theme === "light" ? "Light" : "Dark"}</span>
+          <div class="hero">${markSvg(g, { size: 180, colors, crop: "height" })}</div>
+          <div class="sizes">
+            ${sized("48", markSvg(g, { size: 48, colors, crop: "square" }))}
+            ${sized("32", markSvg(g, { size: 32, colors, crop: "square" }))}
+            ${sized("16", markSvg(g, { size: 16, colors, crop: "square" }))}
+            ${sized("icon", `<span class="icon">${markSvg(g, { size: 44, colors: cardColors(p, "onBrand"), crop: "square" })}</span>`)}
+            ${sized("1 color", markSvg(g, { size: 32, colors: monoColors, crop: "square", gap: monoGap }))}
+            ${sized("16", markSvg(g, { size: 16, colors: monoColors, crop: "square", gap: monoGap }))}
+          </div>
+          ${lockup(g, p, 24, theme)}
+          ${lockup(g, p, 40, theme)}`;
+      }
+
+      const $ = (id) => document.getElementById(id);
+      const inputs = ["n", "angle", "aspect", "stepX", "stepY", "shrink", "radius", "gap"];
+      let state = { ...CANDIDATES[1] };
+
+      function render() {
+        const g = geometry(state);
+        $("nOut").textContent = state.n;
+        $("angleOut").textContent = `${state.angle}°`;
+        $("aspectOut").textContent = `${Math.round(state.aspect * 100)}%`;
+        $("stepXOut").textContent = `${Math.round(state.stepX * 100)}%`;
+        $("stepYOut").textContent = `${Math.round(state.stepY * 100)}%`;
+        $("shrinkOut").textContent = `${Math.round(state.shrink * 100)}%`;
+        $("radiusOut").textContent = `${Math.round(state.radius * 100)}%`;
+        $("gapOut").textContent = state.gap ? `${fmt(state.gap * 100)}%` : "none";
+        $("stats").innerHTML = `Footprint <b>${(g.ink.w / g.ink.h).toFixed(2)} : 1</b> (shipped mark 1.73 : 1)<br>
+          Colors back to front: ${cardColors(state, "light").map((c) => `<b>${c}</b>`).join(" ")}`;
+        $("tileLight").innerHTML = tileHtml(g, state, "light");
+        $("tileDark").innerHTML = tileHtml(g, state, "dark");
+        const match = CANDIDATES.find(
+          (c) => inputs.every((k) => Math.abs(c[k] - state[k]) < 1e-3) && c.lightFront === state.lightFront,
+        );
+        document.querySelectorAll("[data-cand]").forEach((el) => {
+          el.setAttribute("aria-pressed", String(match?.id === el.dataset.cand));
+        });
+        $("tokens").textContent = `// packages/design-tokens/src/brand-mark.ts (proposed)
+export const BRAND_STACK = {
+  cards: ${state.n},
+  slantDeg: ${state.angle},
+  cardHeight: ${fmt(state.aspect)}, // of card width
+  stepAlong: ${fmt(state.stepX)}, // of card width, along the slant
+  stepUp: ${fmt(state.stepY)}, // of card height
+  shrink: ${fmt(state.shrink)}, // each card's size vs the one behind
+  cornerRadius: ${fmt(state.radius)}, // of card width
+  gap: ${fmt(state.gap)}, // of card width; one-color uses at least ${MONO_MIN_GAP}
+  lightestInFront: ${state.lightFront},
+} as const;
+export const BRAND_STACK_COLORS = {
+  light: ${JSON.stringify(cardColors(state, "light"))},
+  dark: ${JSON.stringify(cardColors(state, "dark"))},
+  onBrand: ${JSON.stringify(cardColors(state, "onBrand"))},
+};`;
+      }
+
+      function setState(next) {
+        state = { ...state, ...next };
+        inputs.forEach((k) => ($(k).value = state[k]));
+        $("lightFront").checked = state.lightFront;
+        render();
+      }
+
+      inputs.forEach((k) =>
+        $(k).addEventListener("input", (e) => {
+          state[k] = Number(e.target.value);
+          render();
+        }),
+      );
+      $("lightFront").addEventListener("change", (e) => {
+        state.lightFront = e.target.checked;
+        render();
+      });
+
+      $("presets").innerHTML = CANDIDATES.map(
+        (c) => `<button class="chip" data-cand="${c.id}" aria-pressed="false">${c.name.split(" - ")[0]}</button>`,
+      ).join("");
+      $("cands").innerHTML = CANDIDATES.map((c) => {
+        const g = geometry(c);
+        const mono = cardColors(c, "light").map(() => MONO.light);
+        const monoGap = Math.max(g.gap, MONO_MIN_GAP * g.w);
+        return `<button class="tile light cand" data-cand="${c.id}" aria-pressed="false">
+          <h3>${c.name}</h3>
+          <div class="hero" style="min-height:130px">${markSvg(g, { size: 120, colors: cardColors(c, "light"), crop: "square" })}</div>
+          <div class="row">
+            ${lockup(g, c, 22, "light")}
+            ${markSvg(g, { size: 22, colors: mono, crop: "square", gap: monoGap })}
+          </div>
+          <p>${c.note} Footprint ${(g.ink.w / g.ink.h).toFixed(2)} : 1.</p>
+        </button>`;
+      }).join("");
+      document.querySelectorAll("[data-cand]").forEach((el) =>
+        el.addEventListener("click", () => setState(CANDIDATES.find((c) => c.id === el.dataset.cand))),
+      );
+
+      setState(state);
+      document.fonts?.ready.then(render);
+    </script>
+  </body>
+</html>
