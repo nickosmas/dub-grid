@@ -431,6 +431,10 @@
               <div class="chips" id="ringStyle" role="group" aria-label="Ring style"></div>
             </div>
             <div class="ctl">
+              <span class="lbl">Center rings on</span>
+              <div class="chips" id="ringAnchor" role="group" aria-label="Center rings on"></div>
+            </div>
+            <div class="ctl">
               <span class="lbl">Color</span>
               <div class="chips" id="ringColor" role="group" aria-label="Ring color"></div>
             </div>
@@ -500,6 +504,8 @@
         ringUp: 15,
         ringDown: 15,
         ringSpread: 0.2,
+        ringAnchor: "edge",
+        ringShift: 0,
       };
       const PRESETS = [
         { name: "Stem rings", p: {} },
@@ -526,12 +532,17 @@
           ["ringUp", "Above the edge", 0, 34, 0.5, (v) => `${v}`],
           ["ringDown", "Below the edge", 0, 34, 0.5, (v) => `${v}`],
           ["ringSpread", "Spread from center", 0, 0.42, 0.01, (v) => `${Math.round(v * 100)}%`],
+          ["ringShift", "Shift by eye", -20, 20, 0.5, (v) => (v > 0 ? `+${v}` : `${v}`)],
         ],
       };
       const STYLES = [
         ["rings", "Rings"],
         ["perpage", "Ring per page"],
         ["holes", "Holes"],
+      ];
+      const ANCHORS = [
+        ["edge", "Straight edge"],
+        ["page", "Page center"],
       ];
       const RING_COLORS = [
         ["back", "Back blue"],
@@ -556,6 +567,7 @@
         }
         if (STYLES.some(([k]) => k === raw.ringStyle)) out.ringStyle = raw.ringStyle;
         if (RING_COLORS.some(([k]) => k === raw.ringColor)) out.ringColor = raw.ringColor;
+        if (ANCHORS.some(([k]) => k === raw.ringAnchor)) out.ringAnchor = raw.ringAnchor;
         for (const theme of ["light", "dark"]) {
           for (const k of ["back", "front", "deep"]) {
             const v = raw.colors?.[theme]?.[k];
@@ -595,11 +607,20 @@
       // The pages: the back page 100 wide, the front page offset along the
       // slant and up, scaled about its own center.
       function geometry(p) {
-        const tan = Math.tan((p.angle * Math.PI) / 180);
+        const rad = (p.angle * Math.PI) / 180;
+        const tan = Math.tan(rad);
         const page = (cx, cy, s) => {
           const w = 100 * s;
           const h = p.aspect * 100 * s;
+          // The top-left corner is acute and the top-right obtuse, so their
+          // roundings eat unequal lengths of the top edge. The straight part
+          // left between them is what the eye measures the rings against.
+          const r = p.radius * s;
+          const edge = w / Math.cos(rad);
+          const eaten = (deg) => Math.min(r / Math.tan((deg * Math.PI) / 360), edge / 2, h / 2);
+          const straightShift = ((eaten(90 - p.angle) - eaten(90 + p.angle)) / 2) * Math.cos(rad);
           return {
+            straightShift,
             cx,
             cy,
             w,
@@ -623,9 +644,11 @@
       }
 
       function ringXs(pg, p) {
-        if (p.ringCount === 1) return [pg.cx];
-        if (p.ringCount === 2) return [pg.cx - p.ringSpread * pg.w, pg.cx + p.ringSpread * pg.w];
-        if (p.ringCount === 3) return [pg.cx - p.ringSpread * pg.w, pg.cx, pg.cx + p.ringSpread * pg.w];
+        const c = pg.cx + (p.ringAnchor === "edge" ? pg.straightShift : 0) + p.ringShift * (pg.w / 100);
+        const d = p.ringSpread * pg.w;
+        if (p.ringCount === 1) return [c];
+        if (p.ringCount === 2) return [c - d, c + d];
+        if (p.ringCount === 3) return [c - d, c, c + d];
         return [];
       }
 
@@ -720,6 +743,7 @@
         }
         document.querySelectorAll("[data-style]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.style === state.ringStyle)));
         document.querySelectorAll("[data-ring-color]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.ringColor === state.ringColor)));
+        document.querySelectorAll("[data-anchor]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.anchor === state.ringAnchor)));
         for (const theme of ["light", "dark"]) {
           for (const k of ["back", "front", "deep"]) {
             const input = $(`color-${theme}-${k}`);
@@ -771,6 +795,13 @@
         document.querySelectorAll("[data-style]").forEach((b) =>
           b.addEventListener("click", () => {
             state.ringStyle = b.dataset.style;
+            render();
+          }),
+        );
+        $("ringAnchor").innerHTML = ANCHORS.map(([k, l]) => `<button class="chip" type="button" data-anchor="${k}">${l}</button>`).join("");
+        document.querySelectorAll("[data-anchor]").forEach((b) =>
+          b.addEventListener("click", () => {
+            state.ringAnchor = b.dataset.anchor;
             render();
           }),
         );
