@@ -201,16 +201,6 @@
         letter-spacing: -0.02em;
         line-height: 1;
       }
-      .cand + .cand {
-        margin-top: 18px;
-        padding-top: 16px;
-        border-top: 1px solid var(--border);
-      }
-      .cand h3 {
-        margin: 0;
-        font-size: 14px;
-        font-weight: 600;
-      }
       .controls {
         display: flex;
         gap: 8px;
@@ -242,8 +232,8 @@
     <main>
       <h1>Stacked logo animations</h1>
       <p class="sub">
-        Breathe and Shuffle rebuilt for the refined two-card mark, and three candidates to
-        replace Trace for sync and long waits. The rules carry over: the logo stays static wherever it
+        Breathe, Shuffle and Climb for the refined two-card mark. Climb replaces Trace for
+        sync and long waits. The rules carry over: the logo stays static wherever it
         identifies the product, these play only on full-screen waits, and reduced motion shows
         the static mark.
       </p>
@@ -303,55 +293,27 @@
         </div>
       </section>
 
-      <section class="anim" aria-labelledby="h-sync">
+      <section class="anim" aria-labelledby="h-climb">
         <div class="anim-head">
-          <h2 id="h-sync">Sync and long waits: pick one</h2>
-          <span>Replaces Trace</span>
+          <h2 id="h-climb">Climb</h2>
+          <span>1.6 s cycle: 1.0 s step, 0.6 s rest</span>
         </div>
         <p>
-          Three replacements for Trace, each different enough from Breathe and Shuffle to tell
-          the states apart. Dropping the third animation is also an option: sync would then use
-          Shuffle.
+          Sync and long-running waits; replaces Trace. The stack steps up the slant as a
+          ripple, front to back. The front card leaves first, stepping forward and
+          shrinking into its far corner; the back card rises into its place and turns
+          light; a new back card arrives last, doing the exact reverse of the leaving
+          card. The step is symmetric under a half turn, like the mark. When syncing
+          ends it finishes the step and rests.
         </p>
-        <div class="cand">
-          <div class="anim-head">
-            <h3>Climb</h3>
-            <span>1.6 s cycle: 1.0 s step, 0.6 s rest</span>
-          </div>
-          <p>The stack steps up the slant as a ripple, front to back. The front card leaves first, stepping forward and shrinking into its far corner; the back card rises into its place and turns light; a new back card arrives last, doing the exact reverse of the leaving card. The step is symmetric under a half turn, like the mark. When syncing ends it finishes the step and rests.</p>
-          <div class="stage">
-            <div class="tile light"><span class="cap">160 px</span><span data-anim="climb" data-theme="light" data-size="160"></span></div>
-            <div class="tile light"><span class="cap">Syncing, light</span><span data-anim="climb" data-theme="light" data-size="64"></span><span class="msg" data-msg="climb">Syncing changes</span></div>
-            <div class="tile dark"><span class="cap">Syncing, dark</span><span data-anim="climb" data-theme="dark" data-size="64"></span><span class="msg" data-msg="climb">Syncing changes</span></div>
-          </div>
-          <div class="controls">
-            <button class="chip" data-finish="climb">Finish syncing</button>
-            <button class="chip" data-restart="climb">Start again</button>
-          </div>
+        <div class="stage">
+          <div class="tile light"><span class="cap">160 px</span><span data-anim="climb" data-theme="light" data-size="160"></span></div>
+          <div class="tile light"><span class="cap">Syncing, light</span><span data-anim="climb" data-theme="light" data-size="64"></span><span class="msg" data-msg="climb">Syncing changes</span></div>
+          <div class="tile dark"><span class="cap">Syncing, dark</span><span data-anim="climb" data-theme="dark" data-size="64"></span><span class="msg" data-msg="climb">Syncing changes</span></div>
         </div>
-        <div class="cand">
-          <div class="anim-head">
-            <h3>Swap colors</h3>
-            <span>2.4 s loop</span>
-          </div>
-          <p>Nothing moves. The two cards trade blues and back in a slow sine wave, so the mark looks like it is thinking. The quietest of the three.</p>
-          <div class="stage">
-            <div class="tile light"><span class="cap">160 px</span><span data-anim="swap" data-theme="light" data-size="160"></span></div>
-            <div class="tile light"><span class="cap">Syncing, light</span><span data-anim="swap" data-theme="light" data-size="64"></span><span class="msg">Syncing changes</span></div>
-            <div class="tile dark"><span class="cap">Syncing, dark</span><span data-anim="swap" data-theme="dark" data-size="64"></span><span class="msg">Syncing changes</span></div>
-          </div>
-        </div>
-        <div class="cand">
-          <div class="anim-head">
-            <h3>Flip</h3>
-            <span>1.8 s cycle: 0.8 s flip, 1.0 s rest</span>
-          </div>
-          <p>The front card turns over once about its upright axis, showing its brand-blue back halfway through, then rests. Like a schedule card being turned to check the other side.</p>
-          <div class="stage">
-            <div class="tile light"><span class="cap">160 px</span><span data-anim="flip" data-theme="light" data-size="160"></span></div>
-            <div class="tile light"><span class="cap">Syncing, light</span><span data-anim="flip" data-theme="light" data-size="64"></span><span class="msg">Syncing changes</span></div>
-            <div class="tile dark"><span class="cap">Syncing, dark</span><span data-anim="flip" data-theme="dark" data-size="64"></span><span class="msg">Syncing changes</span></div>
-          </div>
+        <div class="controls">
+          <button class="chip" data-finish="climb">Finish syncing</button>
+          <button class="chip" data-restart="climb">Start again</button>
         </div>
       </section>
 
@@ -372,10 +334,9 @@
       // The refined mark: equal cards, 32° slant, the front card 40% of a card
       // along the slant and 42% of its height up from the back one.
       const SPEC = { angle: 32, aspect: 0.95, stepX: 0.4, stepY: 0.42, radius: 0.14, gap: 0.035 };
-      const DURATION = { breathe: 2.4, shuffle: 1.8, climb: 1.6, swap: 2.4, flip: 1.8 };
+      const DURATION = { breathe: 2.4, shuffle: 1.8, climb: 1.6 };
       const SHUFFLE_MOVE = 1.0;
       const CLIMB_MOVE = 1.0;
-      const FLIP_MOVE = 0.8;
 
       const fmt = (n) => Number(n.toFixed(2)).toString();
       const clamp = (x) => Math.max(0, Math.min(1, x));
@@ -453,8 +414,8 @@
       const GAP = SPEC.gap * W;
 
       // Frames: cards back to front, each { x, y, scale, color } where color
-      // runs 0 (back blue) to 1 (front blue), with optional `opacity` and a
-      // horizontal `sx` for a card turning over; `gap` scales the cut.
+      // runs 0 (back blue) to 1 (front blue), with an optional `opacity`;
+      // `gap` scales the cut.
       const rest = () => ({
         cards: [
           { ...BACK, scale: 1, color: 0 },
@@ -537,34 +498,14 @@
         return climbAt((t % DURATION.climb) / CLIMB_MOVE);
       }
 
-      function swap(t) {
-        const k = 0.5 - 0.5 * Math.cos((2 * Math.PI * (t % DURATION.swap)) / DURATION.swap);
-        const f = rest();
-        f.cards[0].color = k;
-        f.cards[1].color = 1 - k;
-        return f;
-      }
-
-      // One full turn about the upright axis; the face showing past a quarter
-      // turn is the card's brand-blue back.
-      function flip(t) {
-        const e = quartInOut(clamp((t % DURATION.flip) / FLIP_MOVE));
-        const turn = Math.cos(2 * Math.PI * e);
-        const f = rest();
-        f.cards[1].sx = turn;
-        f.cards[1].scale = 1 + 0.04 * Math.sin(Math.PI * e);
-        f.cards[1].color = turn >= 0 ? 1 : 0;
-        return f;
-      }
-
-      const FRAMES = { breathe, shuffle, climb, swap, flip };
+      const FRAMES = { breathe, shuffle, climb };
 
       let uid = 0;
       function frameSvg(f, theme, size, ids) {
         const c = COLORS[theme];
         const vb = [CENTER.x - SIDE / 2, CENTER.y - SIDE / 2, SIDE, SIDE].map(fmt).join(" ");
         const place = (k) =>
-          `translate(${fmt(k.x)} ${fmt(k.y)}) scale(${fmt(k.scale * (k.sx ?? 1))} ${fmt(k.scale)})`;
+          `translate(${fmt(k.x)} ${fmt(k.y)}) scale(${fmt(k.scale)})`;
         const region = `x="${fmt(CENTER.x - SIDE)}" y="${fmt(CENTER.y - SIDE)}" width="${fmt(SIDE * 2)}" height="${fmt(SIDE * 2)}"`;
         const gap = GAP * f.gap;
         const cutBy = (k) => {
