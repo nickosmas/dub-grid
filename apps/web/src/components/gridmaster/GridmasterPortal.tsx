@@ -21,6 +21,7 @@ import { DubGridLogo } from "@/components/Logo";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { getAvatarInitials } from "@/lib/utils";
 import { useAvatarTone } from "@/hooks/useAvatarTone";
+import { useClipTrailingWhitespace } from "@/hooks/useClipTrailingWhitespace";
 import {
   SidebarProvider,
   Sidebar,
@@ -369,6 +370,7 @@ export default function GridmasterPortal() {
   const { signOut } = useLogout();
   const { user: authUser } = useAuth();
   const isMobile = useMediaQuery(MOBILE);
+  const mainScrollerRef = useClipTrailingWhitespace();
   const [signingOut, setSigningOut] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -1067,6 +1069,7 @@ export default function GridmasterPortal() {
 
         {/* Main content */}
         <main
+          ref={mainScrollerRef}
           aria-label="Gridmaster content"
           style={{
             flex: 1,
