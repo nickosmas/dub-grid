@@ -421,6 +421,10 @@
 
           <section class="panel" aria-labelledby="h-cards">
             <h2 id="h-cards">Pages</h2>
+            <div class="ctl">
+              <span class="lbl">Darker page</span>
+              <div class="chips" id="darkPage" role="group" aria-label="Darker page"></div>
+            </div>
             <div id="cardControls"></div>
           </section>
 
@@ -506,6 +510,7 @@
         ringSpread: 0.2,
         ringAnchor: "edge",
         ringShift: 0,
+        darkPage: "back",
       };
       const PRESETS = [
         { name: "Stem rings", p: {} },
@@ -545,9 +550,13 @@
         ["page", "Page center"],
       ];
       const RING_COLORS = [
-        ["back", "Back blue"],
+        ["back", "Dark blue"],
         ["deep", "Deep"],
-        ["front", "Front blue"],
+        ["front", "Light blue"],
+      ];
+      const DARK_PAGES = [
+        ["back", "Back"],
+        ["front", "Front"],
       ];
 
       const fmt = (n) => Number(Number(n).toFixed(2)).toString();
@@ -568,6 +577,7 @@
         if (STYLES.some(([k]) => k === raw.ringStyle)) out.ringStyle = raw.ringStyle;
         if (RING_COLORS.some(([k]) => k === raw.ringColor)) out.ringColor = raw.ringColor;
         if (ANCHORS.some(([k]) => k === raw.ringAnchor)) out.ringAnchor = raw.ringAnchor;
+        if (DARK_PAGES.some(([k]) => k === raw.darkPage)) out.darkPage = raw.darkPage;
         for (const theme of ["light", "dark"]) {
           for (const k of ["back", "front", "deep"]) {
             const v = raw.colors?.[theme]?.[k];
@@ -674,13 +684,22 @@
         return s;
       }
 
+      // `back` and `front` in the color settings are the dark and light
+      // shades; `darkPage` decides which page wears the dark one.
       function colorsFor(p, mode) {
         if (mode === "mono") return { back: "#111827", front: "#111827", ring: "#111827", surface: "#ffffff" };
+        let shades;
+        let surface;
         if (mode === "brand") {
-          return { back: "#7199f2", front: "#ffffff", ring: p.ringColor === "front" ? "#7199f2" : "#ffffff", surface: "#2563eb" };
+          shades = { back: "#7199f2", front: "#ffffff", deep: "#ffffff" };
+          surface = "#2563eb";
+        } else {
+          shades = p.colors[mode];
+          surface = mode === "light" ? "#ffffff" : "#0b0f17";
         }
-        const t = p.colors[mode];
-        return { back: t.back, front: t.front, ring: t[p.ringColor], surface: mode === "light" ? "#ffffff" : "#0b0f17" };
+        const ring = mode === "brand" && p.ringColor !== "front" ? "#ffffff" : shades[p.ringColor];
+        const swap = p.darkPage === "front";
+        return { back: swap ? shades.front : shades.back, front: swap ? shades.back : shades.front, ring, surface };
       }
 
       function bbox(p) {
@@ -744,13 +763,16 @@
         document.querySelectorAll("[data-style]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.style === state.ringStyle)));
         document.querySelectorAll("[data-ring-color]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.ringColor === state.ringColor)));
         document.querySelectorAll("[data-anchor]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.anchor === state.ringAnchor)));
+        document.querySelectorAll("[data-dark-page]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.darkPage === state.darkPage)));
         for (const theme of ["light", "dark"]) {
           for (const k of ["back", "front", "deep"]) {
             const input = $(`color-${theme}-${k}`);
             if (input.value.toLowerCase() !== state.colors[theme][k]) input.value = state.colors[theme][k];
           }
         }
-        const match = PRESETS.find((pr) => JSON.stringify(sanitize({ ...BASE, ...pr.p, colors: state.colors })) === JSON.stringify(state));
+        const match = PRESETS.find(
+          (pr) => JSON.stringify(sanitize({ ...BASE, ...pr.p, colors: state.colors, darkPage: state.darkPage })) === JSON.stringify(state),
+        );
         document.querySelectorAll("[data-preset]").forEach((b) => b.setAttribute("aria-pressed", String(match?.name === b.dataset.preset)));
       }
 
@@ -787,7 +809,7 @@
         document.querySelectorAll("[data-preset]").forEach((b) =>
           b.addEventListener("click", () => {
             const pr = PRESETS.find((x) => x.name === b.dataset.preset);
-            state = sanitize({ ...BASE, ...pr.p, colors: state.colors });
+            state = sanitize({ ...BASE, ...pr.p, colors: state.colors, darkPage: state.darkPage });
             render();
           }),
         );
@@ -795,6 +817,13 @@
         document.querySelectorAll("[data-style]").forEach((b) =>
           b.addEventListener("click", () => {
             state.ringStyle = b.dataset.style;
+            render();
+          }),
+        );
+        $("darkPage").innerHTML = DARK_PAGES.map(([k, l]) => `<button class="chip" type="button" data-dark-page="${k}">${l}</button>`).join("");
+        document.querySelectorAll("[data-dark-page]").forEach((b) =>
+          b.addEventListener("click", () => {
+            state.darkPage = b.dataset.darkPage;
             render();
           }),
         );
@@ -814,8 +843,8 @@
         );
         for (const theme of ["light", "dark"]) {
           $(`${theme}Colors`).innerHTML = [
-            ["back", "Back page"],
-            ["front", "Front page"],
+            ["back", "Dark blue"],
+            ["front", "Light blue"],
             ["deep", "Deep"],
           ]
             .map(([k, l]) => `<label class="swatch" for="color-${theme}-${k}">${l}<input id="color-${theme}-${k}" type="color" /></label>`)
