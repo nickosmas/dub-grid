@@ -537,6 +537,10 @@
               <div class="chips" id="cellsToggle" role="group" aria-label="Grid on the front card"></div>
             </div>
             <div id="cellControls"></div>
+            <div class="ctl" id="firstFaintCtl">
+              <span class="lbl">First cell almost invisible</span>
+              <div class="chips" id="firstFaint" role="group" aria-label="First cell almost invisible"></div>
+            </div>
           </section>
 
           <section class="panel" aria-labelledby="h-colors">
@@ -627,6 +631,7 @@
         cellStrength: 0.22,
         cellVary: 0,
         cellSeed: 1,
+        cellFirstFaint: false,
       };
       const PRESETS = [
         { name: "Stem rings", p: {} },
@@ -663,6 +668,7 @@
             cellStrength: 0.12,
             cellVary: 0.3,
             cellSeed: 1,
+            cellFirstFaint: true,
             cellRadius: 3,
           },
         },
@@ -749,6 +755,7 @@
         if (ANCHORS.some(([k]) => k === raw.ringAnchor)) out.ringAnchor = raw.ringAnchor;
         if (DARK_PAGES.some(([k]) => k === raw.darkPage)) out.darkPage = raw.darkPage;
         if (typeof raw.cells === "boolean") out.cells = raw.cells;
+        if (typeof raw.cellFirstFaint === "boolean") out.cellFirstFaint = raw.cellFirstFaint;
         const stacking = raw.stacking === "tent" ? "book" : raw.stacking;
         if (STACKINGS.some(([k]) => k === stacking)) out.stacking = stacking;
         for (const theme of ["light", "dark"]) {
@@ -931,8 +938,11 @@
         // variation: positive mixes toward the lighter target, negative toward
         // the deep blue. A seeded sequence keeps a pattern stable.
         const tones = cellTones(p);
+        // The first cell can sit almost on the card's own color: there, but
+        // only just, like an open slot.
+        const FAINT = 0.05;
         const cellColor = (fill, k) => {
-          const t = p.cellStrength + p.cellVary * tones[k];
+          const t = k === 0 && p.cellFirstFaint ? FAINT : p.cellStrength + p.cellVary * tones[k];
           return t >= 0 ? mixHex(fill, c.cellLight, Math.min(t, 1)) : mixHex(fill, c.cellDark, Math.min(-t, 1));
         };
         const cellGrid = (pg, scale, fill) => {
@@ -1067,6 +1077,10 @@
         document.querySelectorAll("[data-stacking]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.stacking === state.stacking)));
         document.querySelectorAll("[data-cells]").forEach((b) => b.setAttribute("aria-pressed", String((b.dataset.cells === "true") === state.cells)));
         $("cellControls").hidden = !state.cells;
+        $("firstFaintCtl").hidden = !state.cells;
+        document.querySelectorAll("[data-first-faint]").forEach((b) =>
+          b.setAttribute("aria-pressed", String((b.dataset.firstFaint === "true") === state.cellFirstFaint)),
+        );
         for (const [key, mode] of Object.entries(ONLY_FOR)) $(`in-${key}`).closest(".ctl").hidden = state.stacking !== mode;
         for (const theme of ["light", "dark"]) {
           for (const k of ["back", "front", "deep"]) {
@@ -1082,7 +1096,7 @@
         document.querySelectorAll("[data-preset]").forEach((b) => b.setAttribute("aria-pressed", String(match?.name === b.dataset.preset)));
       }
 
-      const DRAFT_KEY = "calendar-mark-draft-v6";
+      const DRAFT_KEY = "calendar-mark-draft-v7";
       let draftTimer = null;
       function rememberDraft() {
         clearTimeout(draftTimer);
@@ -1124,6 +1138,18 @@
         document.querySelectorAll("[data-style]").forEach((b) =>
           b.addEventListener("click", () => {
             state.ringStyle = b.dataset.style;
+            render();
+          }),
+        );
+        $("firstFaint").innerHTML = [
+          [true, "On"],
+          [false, "Off"],
+        ]
+          .map(([k, l]) => `<button class="chip" type="button" data-first-faint="${k}">${l}</button>`)
+          .join("");
+        document.querySelectorAll("[data-first-faint]").forEach((b) =>
+          b.addEventListener("click", () => {
+            state.cellFirstFaint = b.dataset.firstFaint === "true";
             render();
           }),
         );
@@ -1221,6 +1247,7 @@
         rows.push(["darkPage", "Darker page", pick(DARK_PAGES)]);
         rows.push(["stacking", "Stacking", pick(STACKINGS)]);
         rows.push(["cells", "Shift cells", (v) => (v ? "On" : "Off")]);
+        rows.push(["cellFirstFaint", "First cell almost invisible", (v) => (v ? "On" : "Off")]);
         return rows;
       }
       const relevant = (p, key) =>
@@ -1369,7 +1396,7 @@
       state = sanitize({ ...BASE, ...SHIFT_CELLS });
       try {
         const draft = localStorage.getItem(DRAFT_KEY);
-        const older = localStorage.getItem("calendar-mark-draft-v5");
+        const older = localStorage.getItem("calendar-mark-draft-v6");
         if (draft) state = sanitize(JSON.parse(draft));
         else if (older) state = sanitize({ ...BASE, colors: JSON.parse(older).colors, ...SHIFT_CELLS });
       } catch {
