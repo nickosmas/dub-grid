@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Stacked card ideas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@700&family=Inter:wght@400;500;600&display=swap"
+    />
+    <style>
+      /* Layout: the brief and my picks up top, then a two-column grid of idea sheets, then all ten at small size on dark. */
+      :root {
+        --text-primary: #111827;
+        --text-secondary: #5b6472;
+        --page: #f7f8fa;
+        --panel: #ffffff;
+        --border: rgba(15, 23, 42, 0.1);
+        --accent: #2563eb;
+        --chip: rgba(37, 99, 235, 0.08);
+        --chip-text: #1d4ed8;
+        --warn: #b45309;
+        --tile-light: #ffffff;
+        --tile-dark: #0b0f17;
+        --ink-light: #0f172a;
+        --ink-dark: #fafafa;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --text-primary: #f4f4f5;
+          --text-secondary: #a1a1aa;
+          --page: #0e0f12;
+          --panel: #17181c;
+          --border: rgba(255, 255, 255, 0.1);
+          --accent: #4a9bff;
+          --chip: rgba(74, 155, 255, 0.14);
+          --chip-text: #93c5fd;
+          --warn: #fbbf24;
+          color-scheme: dark;
+        }
+      }
+      :root[data-theme="dark"] {
+        --text-primary: #f4f4f5;
+        --text-secondary: #a1a1aa;
+        --page: #0e0f12;
+        --panel: #17181c;
+        --border: rgba(255, 255, 255, 0.1);
+        --accent: #4a9bff;
+        --chip: rgba(74, 155, 255, 0.14);
+        --chip-text: #93c5fd;
+        --warn: #fbbf24;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 28px 16px 64px;
+        background: var(--page);
+        color: var(--text-primary);
+        font-family: Inter, system-ui, sans-serif;
+        font-size: 14px;
+      }
+      main {
+        max-width: 1040px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 22px;
+        font-weight: 600;
+        margin: 0 0 6px;
+        text-wrap: balance;
+      }
+      h2 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 34px 0 12px;
+      }
+      .lede {
+        color: var(--text-secondary);
+        line-height: 1.55;
+        max-width: 720px;
+        margin: 0 0 18px;
+      }
+      .brief {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+      @media (max-width: 760px) {
+        .brief {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 14px 16px;
+        min-width: 0;
+      }
+      .panel h3 {
+        margin: 0 0 8px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .panel ul {
+        margin: 0;
+        padding-left: 18px;
+        line-height: 1.6;
+        color: var(--text-secondary);
+      }
+      .panel b {
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+      .concepts {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+      @media (max-width: 760px) {
+        .concepts {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .concept {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+      .concept.pick {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 1px var(--accent);
+      }
+      .stage {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+        min-height: 190px;
+      }
+      .tile {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        padding: 16px;
+        min-width: 0;
+      }
+      .tile.light {
+        --m1: #2563eb;
+        --m2: #a8c4fc;
+        --m3: #1e3a8a;
+        --bgc: var(--tile-light);
+        background: var(--tile-light);
+        color: var(--ink-light);
+      }
+      .tile.dark {
+        --m1: #3b82f6;
+        --m2: #bcd2ff;
+        --m3: #1d4ed8;
+        --bgc: var(--tile-dark);
+        background: var(--tile-dark);
+        color: var(--ink-dark);
+      }
+      .side {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 16px;
+        border-left: 1px solid var(--border);
+      }
+      .sizes {
+        display: flex;
+        align-items: flex-end;
+        gap: 12px;
+      }
+      .lockup {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.24em;
+        white-space: nowrap;
+      }
+      .word {
+        font-family: "DM Sans", sans-serif;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1;
+      }
+      .body {
+        padding: 14px 16px 16px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        flex: 1;
+      }
+      .head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .head h3 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 600;
+      }
+      .tag {
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        color: var(--chip-text);
+        background: var(--chip);
+        padding: 3px 8px;
+        border-radius: 999px;
+        white-space: nowrap;
+      }
+      .body p {
+        margin: 0;
+        line-height: 1.5;
+        color: var(--text-secondary);
+        font-size: 13px;
+      }
+      .body p b {
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+      .body p.risk b {
+        color: var(--warn);
+      }
+      .strip {
+        background: var(--tile-dark);
+        border-radius: 12px;
+        padding: 18px;
+        display: grid;
+        grid-template-columns: repeat(10, minmax(0, 1fr));
+        gap: 10px;
+      }
+      @media (max-width: 760px) {
+        .strip {
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+        }
+      }
+      .strip figure {
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        color: #a1a1aa;
+        font-size: 11px;
+        text-align: center;
+      }
+      #measure {
+        position: absolute;
+        width: 0;
+        height: 0;
+        overflow: hidden;
+        visibility: hidden;
+      }
+      .strip .tile {
+        padding: 0;
+        background: transparent;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Stacked card ideas</h1>
+      <p class="lede">
+        Ten ways to give the stacked cards a meaning only DubGrid has. Every idea keeps the refined
+        mark (two equal cards, 32° slant, brand blue behind, light blue in front) and adds one
+        thing to it.
+      </p>
+
+      <div class="brief">
+        <div class="panel">
+          <h3>What each idea has to do</h3>
+          <ul>
+            <li>Keep the two slanted cards recognizable, so the work so far carries over.</li>
+            <li>Add one idea from the product: shifts, handoffs, care, weeks, people, or the name.</li>
+            <li>Survive 16 px and one color, where small details disappear first.</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>My picks to develop</h3>
+          <ul>
+            <li><b>Care home:</b> the cards lean together into a roof. Says care facility at a glance, and the silhouette is new.</li>
+            <li><b>Handoff:</b> the overlap becomes its own color, the shift handover. Costs nothing at small sizes.</li>
+            <li><b>Shift card:</b> a punched hole turns the card into a time card. A small detail with a lot of meaning.</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2>The ten</h2>
+      <div class="concepts" id="concepts"></div>
+
+      <h2>All ten at 40 px on dark</h2>
+      <div class="strip" id="strip"></div>
+    </main>
+    <svg id="measure" aria-hidden="true"><g id="measureGroup"></g></svg>
+
+    <script>
+      // The refined stacked mark: equal parallelogram cards 100 wide and 95
+      // tall, slanted 32°, the front card 40% along the slant and 42% up.
+      const W = 100;
+      const H = 95;
+      const TAN = Math.tan((32 * Math.PI) / 180);
+      const RADIUS = 14;
+      const GAP = 3.5;
+
+      const fmt = (n) => Number(n.toFixed(2)).toString();
+
+      function roundedPolygon(pts, r) {
+        const n = pts.length;
+        const corners = pts.map((v, k) => {
+          const prev = pts[(k + n - 1) % n];
+          const next = pts[(k + 1) % n];
+          const a = [prev[0] - v[0], prev[1] - v[1]];
+          const b = [next[0] - v[0], next[1] - v[1]];
+          const la = Math.hypot(...a);
+          const lb = Math.hypot(...b);
+          const ua = [a[0] / la, a[1] / la];
+          const ub = [b[0] / lb, b[1] / lb];
+          const angle = Math.acos(Math.max(-1, Math.min(1, ua[0] * ub[0] + ua[1] * ub[1])));
+          const t = Math.min(r / Math.tan(angle / 2), la / 2, lb / 2);
+          return {
+            s: [v[0] + ua[0] * t, v[1] + ua[1] * t],
+            e: [v[0] + ub[0] * t, v[1] + ub[1] * t],
+            r: t * Math.tan(angle / 2),
+          };
+        });
+        let d = `M${fmt(corners[0].e[0])},${fmt(corners[0].e[1])}`;
+        for (let k = 1; k <= n; k++) {
+          const c = corners[k % n];
+          const sweep = 1;
+          d += `L${fmt(c.s[0])},${fmt(c.s[1])}A${fmt(c.r)},${fmt(c.r)} 0 0 ${sweep} ${fmt(c.e[0])},${fmt(c.e[1])}`;
+        }
+        return d + "Z";
+      }
+
+      // A card centered at (cx, cy). `slant` 1 has the top edge falling to the
+      // right, as in the mark; -1 mirrors it.
+      function corners(cx, cy, slant = 1) {
+        const t = TAN * slant;
+        return [
+          [cx - W / 2, cy - H / 2 - (W / 2) * t],
+          [cx + W / 2, cy - H / 2 + (W / 2) * t],
+          [cx + W / 2, cy + H / 2 + (W / 2) * t],
+          [cx - W / 2, cy + H / 2 - (W / 2) * t],
+        ];
+      }
+      const card = (cx, cy, slant = 1) => {
+        const pts = corners(cx, cy, slant);
+        // Keep the points clockwise on screen whichever way the card slants.
+        return roundedPolygon(pts, RADIUS);
+      };
+      const topY = (cx, cy, x, slant = 1) => cy - H / 2 + (x - cx) * TAN * slant;
+
+      const BACK = [0, 0];
+      const FRONT = [40, 40 * TAN - 0.42 * H];
+      const backPath = card(...BACK);
+      const frontPath = card(...FRONT);
+
+      let uid = 0;
+      const next = () => `s${uid++}`;
+      // A path drawn with a surface-colored halo first, so it cuts a gap into
+      // whatever is behind it.
+      const cut = (d, fill, gap = GAP) =>
+        `<path d="${d}" fill="var(--bgc)" stroke="var(--bgc)" stroke-width="${gap * 2}" stroke-linejoin="round"/><path d="${d}" fill="${fill}"/>`;
+      const base = () => `<path d="${backPath}" fill="var(--m1)"/>${cut(frontPath, "var(--m2)")}`;
+
+      const IDEAS = [
+        {
+          name: "Care home",
+          tag: "Care",
+          pick: true,
+          says: "The two cards lean into each other so their top edges meet in a roof: a house made of two schedule cards. A care facility, built from its schedule, by two people.",
+          risk: "House marks are common in real estate. Here the cards stay slanted and offset, which keeps it from reading as a plain house icon.",
+          svg: () => {
+            const left = card(-34, 0, -1);
+            const right = card(34 + 6, 0, 1);
+            return `<path d="${left}" fill="var(--m1)"/>${cut(right, "var(--m2)")}`;
+          },
+        },
+        {
+          name: "Handoff",
+          tag: "Product",
+          pick: true,
+          says: "Where the cards overlap, the overlap takes its own deep blue: the handover window where one shift passes to the next. The stack becomes about continuity of care.",
+          risk: "Overlap marks exist (Mastercard is the famous one), but the slant and the card shape keep this one distinct. Needs a gap in one color.",
+          svg: () => {
+            const c = next();
+            return `<clipPath id="${c}"><path d="${backPath}"/></clipPath>
+              <path d="${backPath}" fill="var(--m1)"/><path d="${frontPath}" fill="var(--m2)"/>
+              <path d="${frontPath}" fill="var(--m3)" clip-path="url(#${c})"/>`;
+          },
+        },
+        {
+          name: "Shift card",
+          tag: "Product",
+          pick: true,
+          says: "A round hole punched near the top of the front card makes it a time card. Every shift is a card someone clocks in on, and the hole is the moment they do.",
+          risk: "The hole fills in below 20 px, leaving the plain stack, which is a graceful fallback. Hole punches also suggest tickets or tags.",
+          svg: () => {
+            const c = next();
+            const hx = FRONT[0] - 24;
+            const hy = topY(...FRONT, hx) + 19;
+            return `${base()}<clipPath id="${c}"><circle cx="${fmt(hx)}" cy="${fmt(hy)}" r="8.5"/></clipPath>
+              <circle cx="${fmt(hx)}" cy="${fmt(hy)}" r="8.5" fill="var(--bgc)"/>
+              <path d="${backPath}" fill="var(--m1)" clip-path="url(#${c})"/>`;
+          },
+        },
+        {
+          name: "Open shift",
+          tag: "Product",
+          says: "The back card is an open slot, drawn dashed, and the solid card is moving into it. The moment the product exists for: an open shift getting covered.",
+          risk: "Dashes turn to a gray smudge at 16 px; the small sizes need a solid outline, which brings back the old outlined mark.",
+          svg: () => `<path d="${backPath}" fill="none" stroke="var(--m1)" stroke-width="5" stroke-dasharray="12 7" stroke-linecap="round"/>${cut(card(FRONT[0] - 10, FRONT[1] + 4), "var(--m1)")}`,
+        },
+        {
+          name: "The d",
+          tag: "Name",
+          says: "A stem rises from the front card's right edge, turning it into a lowercase \"d\": the first letter of dubgrid, sitting on its second card.",
+          risk: "Letter marks are only as good as the letter; at a glance this could read as a flag or a tag. Strongest beside the wordmark.",
+          svg: () => {
+            const sx = FRONT[0] + W / 2;
+            const top = topY(...FRONT, sx) - 62;
+            const stemTop = topY(...FRONT, sx - 9) + 30;
+            const stem = `M${fmt(sx - 18)},${fmt(stemTop)} L${fmt(sx - 18)},${fmt(top + 9)} Q${fmt(sx - 18)},${fmt(top)} ${fmt(sx - 9)},${fmt(top)} Q${fmt(sx)},${fmt(top)} ${fmt(sx)},${fmt(top + 9)} L${fmt(sx)},${fmt(stemTop)} Z`;
+            return `<path d="${backPath}" fill="var(--m1)"/><path d="${frontPath}" fill="var(--bgc)" stroke="var(--bgc)" stroke-width="${GAP * 2}"/><path d="${stem}" fill="var(--bgc)" stroke="var(--bgc)" stroke-width="${GAP * 2}" stroke-linejoin="round"/><path d="${frontPath}" fill="var(--m2)"/><path d="${stem}" fill="var(--m2)"/>`;
+          },
+        },
+        {
+          name: "Calendar",
+          tag: "Product",
+          says: "Two binder tabs on the front card's top edge make the stack two calendar pages: this week, and next week behind it. Two tabs, \"dub\".",
+          risk: "Calendar icons are generic; the slant and the second page are what make it ours. The tabs need weight to survive 16 px.",
+          svg: () => {
+            const tab = (x) => {
+              const y = topY(...FRONT, x);
+              return `<rect x="${fmt(x - 6)}" y="${fmt(y - 14)}" width="12" height="28" rx="6" fill="var(--m1)" stroke="var(--bgc)" stroke-width="${GAP * 2}" paint-order="stroke"/>`;
+            };
+            return base() + tab(FRONT[0] - 20) + tab(FRONT[0] + 18);
+          },
+        },
+        {
+          name: "Next week",
+          tag: "Product",
+          says: "The front card's top corner folds over, showing brand blue on its back: a schedule page turning to the next week. Planning ahead, made visible.",
+          risk: "Folded corners are the classic document icon. Keep the fold large and the slant strong so it stays a card, not a file.",
+          svg: () => {
+            const [vx, vy] = corners(...FRONT)[1];
+            const f = 34;
+            const ux = Math.cos(Math.atan(TAN));
+            const uy = Math.sin(Math.atan(TAN));
+            const p1 = [vx - f * ux, vy - f * uy];
+            const p2 = [vx, vy + f];
+            const mx = (p1[0] + p2[0]) / 2;
+            const my = (p1[1] + p2[1]) / 2;
+            const fold = [2 * mx - vx, 2 * my - vy];
+            const pts = (a) => a.map((p) => `${fmt(p[0])},${fmt(p[1])}`).join(" ");
+            return `${base()}<polygon points="${pts([p1, [vx + 8, vy - 8], [vx + 8, p2[1] + 2], p2])}" fill="var(--bgc)"/>
+              <polygon points="${pts([p1, p2, fold])}" fill="var(--m1)" stroke="var(--m1)" stroke-width="4" stroke-linejoin="round"/>`;
+          },
+        },
+        {
+          name: "Covered",
+          tag: "Product",
+          says: "Flip the slant so the edges rise to the right, and the part of the back card left showing becomes a tick: the shift is covered. Shown here in deep blue to make the tick read.",
+          risk: "Check marks are the to-do app cliché, but this one is implied rather than drawn, which is more interesting and harder to copy.",
+          svg: () => {
+            const back = card(0, 0, -1);
+            const front = card(30, -44, -1);
+            return `<path d="${back}" fill="var(--m3)"/>${cut(front, "var(--m2)")}`;
+          },
+        },
+        {
+          name: "On shift",
+          tag: "People",
+          says: "A round head sits above the front card, so the card becomes a person: someone on shift, with the next shift behind them. Puts staff at the center.",
+          risk: "Closest to the standard \"user\" icon of the ten. The slanted card body is what keeps it from being an avatar.",
+          svg: () => {
+            const hx = FRONT[0] - 4;
+            const hy = topY(...FRONT, hx) - 20;
+            return `${base()}<circle cx="${fmt(hx)}" cy="${fmt(hy)}" r="${fmt(15 + GAP)}" fill="var(--bgc)"/><circle cx="${fmt(hx)}" cy="${fmt(hy)}" r="15" fill="var(--m2)"/>`;
+          },
+        },
+        {
+          name: "Echo",
+          tag: "Name",
+          says: "Fading outlines trail behind the stack, like the echo in dub music: shifts that repeat week after week. Gives the \"dub\" in the name a story and the mark a sense of motion.",
+          risk: "The echoes vanish at small sizes, leaving the plain stack. Motion trails can also read as speed or a shipping brand.",
+          svg: () => {
+            const echo = (k, op) => `<path d="${card(-k * 40, -k * (40 * TAN - 0.42 * H))}" fill="none" stroke="var(--m1)" stroke-width="4" opacity="${op}"/>`;
+            return `${echo(2, 0.25)}${echo(1, 0.5)}${cut(backPath, "var(--m1)")}${cut(frontPath, "var(--m2)")}`;
+          },
+        },
+      ];
+
+      const boxes = new Map();
+      function viewBox(idea) {
+        if (boxes.has(idea.name)) return boxes.get(idea.name);
+        const g = document.getElementById("measureGroup");
+        g.innerHTML = idea.svg();
+        const b = g.getBBox();
+        const side = Math.max(b.width, b.height) * 1.08;
+        const vb = [b.x + b.width / 2 - side / 2, b.y + b.height / 2 - side / 2, side, side].map(fmt).join(" ");
+        boxes.set(idea.name, vb);
+        return vb;
+      }
+      const mark = (idea, size) =>
+        `<svg width="${size}" height="${size}" viewBox="${viewBox(idea)}" aria-hidden="true">${idea.svg()}</svg>`;
+
+      document.getElementById("concepts").innerHTML = IDEAS.map(
+        (c) => `<article class="concept${c.pick ? " pick" : ""}">
+          <div class="stage">
+            <div class="tile light">${mark(c, 140)}</div>
+            <div class="side">
+              <div class="tile light" style="flex-direction:column;align-items:flex-start;gap:14px">
+                <div class="sizes">${mark(c, 40)}${mark(c, 24)}${mark(c, 16)}</div>
+                <span class="lockup" style="font-size:22px">${mark(c, 26)}<span class="word">dubgrid</span></span>
+              </div>
+              <div class="tile dark" style="justify-content:flex-start">
+                <span class="lockup" style="font-size:20px">${mark(c, 24)}<span class="word">dubgrid</span></span>
+              </div>
+            </div>
+          </div>
+          <div class="body">
+            <div class="head"><h3>${c.name}${c.pick ? " (pick)" : ""}</h3><span class="tag">${c.tag}</span></div>
+            <p><b>What it says.</b> ${c.says}</p>
+            <p class="risk"><b>Watch out.</b> ${c.risk}</p>
+          </div>
+        </article>`,
+      ).join("");
+
+      document.getElementById("strip").innerHTML = IDEAS.map(
+        (c) => `<figure><span class="tile dark">${mark(c, 40)}</span><figcaption>${c.name}</figcaption></figure>`,
+      ).join("");
+    </script>
+  </body>
+</html>
