@@ -318,7 +318,7 @@
       <h1>Stacked card logo</h1>
       <p class="sub">
         A new direction for the DubGrid symbol: flat, slanted cards that step up and to the right,
-        shading from deep blue at the back to cyan at the front. Pick a candidate or drag the
+        shading from deep blue at the back to light blue at the front. Pick a candidate or drag the
         sliders. Each proof shows the full-color mark, the small sizes, the app icon, the one-color
         version used for print and favicons, and the lockup with the wordmark.
       </p>
@@ -392,8 +392,8 @@
     <script>
       const BRAND = "#2563EB";
       const RAMPS = {
-        light: ["#1534D6", "#2563EB", "#5E9BF7", "#9FE1F6"],
-        dark: ["#2563EB", "#3B82F6", "#7DB7FF", "#B4EDFA"],
+        light: ["#1534D6", "#2563EB", "#5B8DF6", "#A8C4FC"],
+        dark: ["#2563EB", "#3B82F6", "#7AA8FF", "#BCD2FF"],
       };
       const MONO = { light: "#2563EB", dark: "#4A9BFF", print: "#111827" };
       const MONO_MIN_GAP = 0.05;
@@ -456,7 +456,7 @@
       }
 
       // Colors back to front. Fewer cards start further up the ramp, so two
-      // cards read as brand blue and cyan rather than navy and cyan.
+      // cards read as brand blue and light blue rather than navy and light blue.
       function cardColors(p, mode) {
         const start = (4 - p.n) / 6;
         return Array.from({ length: p.n }, (_, i) => {
