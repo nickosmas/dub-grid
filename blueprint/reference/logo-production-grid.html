@@ -407,7 +407,10 @@
           <section class="panel" aria-labelledby="h-cards">
             <h2 id="h-cards">Cards</h2>
             <div id="cardControls"></div>
-            <div class="ctl"><button class="chip" type="button" id="resetCorners">Shipped corners</button></div>
+            <div class="ctl chips">
+              <button class="chip" type="button" id="resetCorners">Shipped corners</button>
+              <button class="chip" type="button" id="resetPosition">Shipped overlap</button>
+            </div>
           </section>
           <section class="panel" aria-labelledby="h-grid">
             <h2 id="h-grid">Grid</h2>
@@ -474,12 +477,28 @@
       INK.w = FRONT.x + FRONT.w - INK.x;
       INK.h = Math.max(BACK.y + BACK.h + STROKE / 2, FRONT.y + FRONT.h) - INK.y;
       const OPTICAL_OFFSET_X = 3.01;
-      const SQUARE_SIZE = INK.w + 2 * (OPTICAL_OFFSET_X + 1.5);
-      const SQUARE = {
-        x: INK.x - (SQUARE_SIZE - INK.w) / 2 + OPTICAL_OFFSET_X,
-        y: INK.y + INK.h / 2 - SQUARE_SIZE / 2,
-        size: SQUARE_SIZE,
-      };
+
+      // The geometry for a design: how much of the back card shows beside
+      // the front one (`showing`, a share of its width) and how far it rises
+      // above center (`lift`, a share of its height). As in brand-mark.ts, the
+      // pair is fitted to the 100-unit box with a 3-unit inset, so showing
+      // more of the back card makes both cards smaller.
+      function geo(p) {
+        const fW = (100 - 2 * INSET) / (BACK_SCALE * p.showing + 1);
+        const fH = fW / ASPECT;
+        const bW = BACK_SCALE * fW;
+        const bH = BACK_SCALE * fH;
+        const back = { x: INSET, y: 50 - bH / 2 - p.lift * bH, w: bW, h: bH, r: p.backR };
+        const front = { x: INSET + p.showing * bW, y: 50 - fH / 2, w: fW, h: fH, r: p.frontR };
+        const ink = { x: back.x - STROKE / 2, y: Math.min(back.y - STROKE / 2, front.y) };
+        ink.w = Math.max(front.x + front.w, back.x + back.w + STROKE / 2) - ink.x;
+        ink.h = Math.max(back.y + back.h + STROKE / 2, front.y + front.h) - ink.y;
+        // The shipped optical shift, scaled with the cards.
+        const shift = OPTICAL_OFFSET_X * (fW / frontW);
+        const size = Math.max(ink.w, ink.h) + 2 * (shift + 1.5);
+        const square = { x: ink.x + ink.w / 2 - size / 2 + shift, y: ink.y + ink.h / 2 - size / 2, size };
+        return { back, front, ink, square, shift };
+      }
       const COLORS = {
         light: { mark: "#2563eb", light: "#ffffff", deep: "#1e3a8a" },
         dark: { mark: "#2075ff", light: "#ffffff", deep: "#1e3a8a" },
@@ -511,8 +530,9 @@
         ].join("");
       }
       const SHIPPED_CORNERS = { backR: Number(BACK.r.toFixed(2)), frontR: Number(FRONT.r.toFixed(2)), smooth: SMOOTHING };
-      const backPath = (p) => cardPath({ ...BACK, r: p.backR }, p.smooth);
-      const frontPath = (p) => cardPath({ ...FRONT, r: p.frontR }, p.smooth);
+      const SHIPPED_POSITION = { showing: BACK_SHOWING, lift: 0 };
+      const backPath = (p) => cardPath(geo(p).back, p.smooth);
+      const frontPath = (p) => cardPath(geo(p).front, p.smooth);
 
       const BASE = {
         cells: true,
@@ -527,11 +547,14 @@
         seed: 1,
         firstFaint: false,
         ...SHIPPED_CORNERS,
+        ...SHIPPED_POSITION,
       };
       const CARD_SLIDERS = [
         ["backR", "Back card corner radius", 0, Number((BACK.h / 2).toFixed(2)), 0.25, (v) => `${fmt(v)}`],
         ["frontR", "Front card corner radius", 0, Number((FRONT.h / 2).toFixed(2)), 0.25, (v) => `${fmt(v)}`],
         ["smooth", "Corner smoothing", 0, 1, 0.05, (v) => (v ? `${fmt(v)}` : "round")],
+        ["showing", "Back card showing (horizontal)", 0.05, 0.8, 0.01, (v) => `${Math.round(v * 100)}%`],
+        ["lift", "Back card raised (vertical)", -0.5, 0.5, 0.01, (v) => (v > 0 ? `+${Math.round(v * 100)}%` : `${Math.round(v * 100)}%`)],
       ];
       const SLIDERS = [
         ["cols", "Columns", 1, 6, 1, (v) => `${v}`],
@@ -592,6 +615,7 @@
       function cells(p, mode) {
         if (!p.cells) return "";
         const c = COLORS[mode];
+        const FRONT = geo(p).front;
         const cw = (FRONT.w - 2 * p.inset - (p.cols - 1) * p.gap) / p.cols;
         const top = p.inset + p.top;
         const ch = (FRONT.h - p.inset - top - (p.rows - 1) * p.gap) / p.rows;
@@ -617,13 +641,14 @@
       function mark(p, mode, size, crop = "square") {
         const id = `gap${uid++}`;
         const c = COLORS[mode];
-        const vb = crop === "square" ? [SQUARE.x, SQUARE.y, SQUARE.size, SQUARE.size] : [INK.x, INK.y, INK.w, INK.h];
+        const { ink, square } = geo(p);
+        const vb = crop === "square" ? [square.x, square.y, square.size, square.size] : [ink.x, ink.y, ink.w, ink.h];
         const ratio = vb[3] / vb[2];
         const w = crop === "height" ? size / ratio : size;
         const h = crop === "height" ? size : size * ratio;
         return `<svg width="${fmt(w)}" height="${fmt(h)}" viewBox="${vb.map(fmt).join(" ")}" aria-hidden="true" style="display:block;flex:none">
-          <mask id="${id}" maskUnits="userSpaceOnUse" x="-10" y="-10" width="120" height="120">
-            <rect x="-10" y="-10" width="120" height="120" fill="white"/>
+          <mask id="${id}" maskUnits="userSpaceOnUse" x="-60" y="-60" width="220" height="220">
+            <rect x="-60" y="-60" width="220" height="220" fill="white"/>
             <path d="${frontPath(p)}" fill="black" stroke="black" stroke-width="${GAP * 2}"/>
           </mask>
           <path d="${backPath(p)}" fill="none" stroke="${c.mark}" stroke-width="${STROKE}" mask="url(#${id})"/>
@@ -637,8 +662,9 @@
       // (0.256 em), 0.23 em to the word's origin. Stacked: ink 2 em wide,
       // 0.42 em of clear space above the ascenders.
       function lockup(p, mode, fs) {
-        const unit = (0.72 * fs) / frontH;
-        const height = INK.h * unit;
+        const { front, ink } = geo(p);
+        const unit = (0.72 * fs) / front.h;
+        const height = ink.h * unit;
         const below = height / 2 - 0.256 * fs;
         return `<span class="lockup" style="font-size:${fs}px"><span style="display:inline-block;margin-right:${fmt(0.23 * fs)}px;vertical-align:${fmt(-below)}px">${mark(p, mode, height, "height")}</span><span class="word">dubgrid</span></span>`;
       }
@@ -646,10 +672,11 @@
       // 0.992, descent 0.31) centered, so its top sits 0.841 em up.
       function stacked(p, mode, fs) {
         const width = 2 * fs;
-        const unit = width / INK.w;
+        const { ink, shift: opticalShift } = geo(p);
+        const unit = width / ink.w;
         const boxTop = 0.992 + (1 - 0.992 - 0.31) / 2;
-        const shift = 0.016 * fs - OPTICAL_OFFSET_X * unit;
-        return `<span class="stacked" style="font-size:${fs}px;gap:${fmt((0.42 - (boxTop - 0.72)) * fs)}px"><span style="transform:translateX(${fmt(shift)}px)">${mark(p, mode, INK.h * unit, "height")}</span><span class="word">dubgrid</span></span>`;
+        const shift = 0.016 * fs - opticalShift * unit;
+        return `<span class="stacked" style="font-size:${fs}px;gap:${fmt((0.42 - (boxTop - 0.72)) * fs)}px"><span style="transform:translateX(${fmt(shift)}px)">${mark(p, mode, ink.h * unit, "height")}</span><span class="word">dubgrid</span></span>`;
       }
 
       const $ = (id) => document.getElementById(id);
@@ -665,7 +692,7 @@
         $("mono").innerHTML = [64, 32, 16].map((s) => mark(state, "mono", s)).join("");
         $("lockLight").innerHTML = `<span class="cap">Light: header 24 px, 44 px, stacked</span>${lockup(state, "light", 24)}${lockup(state, "light", 44)}${stacked(state, "light", 26)}`;
         $("lockDark").innerHTML = `<span class="cap">Dark</span>${lockup(state, "dark", 24)}${lockup(state, "dark", 44)}${stacked(state, "dark", 26)}`;
-        const shipped = sanitize({ cells: false, ...SHIPPED_CORNERS });
+        const shipped = sanitize({ cells: false, ...SHIPPED_CORNERS, ...SHIPPED_POSITION });
         $("beforeAfter").innerHTML = `<figure>${lockup(shipped, "light", 24)}<figcaption>Shipped</figcaption></figure><figure>${lockup(state, "light", 24)}<figcaption>With grid</figcaption></figure><figure>${mark(shipped, "light", 40)}<figcaption>40 px</figcaption></figure><figure>${mark(state, "light", 40)}<figcaption>40 px</figcaption></figure>`;
         sync();
         try {
@@ -689,8 +716,9 @@
         }
         const shippedCorners = Object.entries(SHIPPED_CORNERS).every(([k, v]) => state[k] === v);
         $("resetCorners").setAttribute("aria-pressed", String(shippedCorners));
+        $("resetPosition").setAttribute("aria-pressed", String(Object.entries(SHIPPED_POSITION).every(([k, v]) => state[k] === v)));
         document.querySelectorAll("[data-first]").forEach((b) => b.setAttribute("aria-pressed", String((b.dataset.first === "true") === state.firstFaint)));
-        const corners = { backR: state.backR, frontR: state.frontR, smooth: state.smooth };
+        const corners = { backR: state.backR, frontR: state.frontR, smooth: state.smooth, showing: state.showing, lift: state.lift };
         const match = PRESETS.find((pr) => JSON.stringify(sanitize({ ...BASE, ...corners, ...pr.p })) === JSON.stringify(state));
         document.querySelectorAll("[data-preset]").forEach((b) => b.setAttribute("aria-pressed", String(match?.name === b.dataset.preset)));
       }
@@ -704,6 +732,10 @@
           render();
         });
       }
+      $("resetPosition").addEventListener("click", () => {
+        Object.assign(state, SHIPPED_POSITION);
+        render();
+      });
       $("resetCorners").addEventListener("click", () => {
         Object.assign(state, SHIPPED_CORNERS);
         render();
@@ -720,7 +752,7 @@
       $("presets").innerHTML = PRESETS.map((pr) => `<button class="chip" type="button" data-preset="${pr.name}">${pr.name}</button>`).join("");
       document.querySelectorAll("[data-preset]").forEach((b) =>
         b.addEventListener("click", () => {
-          const corners = { backR: state.backR, frontR: state.frontR, smooth: state.smooth };
+          const corners = { backR: state.backR, frontR: state.frontR, smooth: state.smooth, showing: state.showing, lift: state.lift };
           state = sanitize({ ...BASE, ...corners, ...PRESETS.find((x) => x.name === b.dataset.preset).p });
           render();
         }),
