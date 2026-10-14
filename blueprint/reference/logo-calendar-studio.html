@@ -395,6 +395,87 @@
         letter-spacing: -0.02em;
         line-height: 1;
       }
+      .compare {
+        margin-top: 28px;
+      }
+      .compare h2 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      .compare-note {
+        color: var(--text-secondary);
+        margin: 0 0 12px;
+        font-size: 13px;
+      }
+      .compare-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+      }
+      .cmp {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+      .cmp .tile {
+        border: 0;
+        border-radius: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+      }
+      .cmp .big {
+        min-height: 170px;
+      }
+      .cmp .strip {
+        justify-content: flex-start;
+        align-items: flex-end;
+        border-top: 1px solid var(--border);
+        padding: 12px 14px;
+      }
+      .cmp .info {
+        padding: 12px 14px 14px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        flex: 1;
+      }
+      .cmp .info-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .cmp h3 {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 600;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .cmp dl {
+        margin: 0;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 3px 10px;
+        font-size: 12px;
+      }
+      .cmp dt {
+        color: var(--text-secondary);
+      }
+      .cmp dd {
+        margin: 0;
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+      }
       #measure {
         position: absolute;
         width: 0;
@@ -485,6 +566,12 @@
           </div>
         </div>
       </div>
+
+      <section class="compare" id="compareSection" hidden aria-labelledby="h-compare">
+        <h2 id="h-compare">Saved designs side by side</h2>
+        <p class="compare-note">Only the settings that differ between them are listed. Load one to keep editing it.</p>
+        <div class="compare-grid" id="compareGrid"></div>
+      </section>
     </main>
     <svg id="measure" aria-hidden="true"><g id="measureGroup"></g></svg>
 
@@ -883,6 +970,74 @@
       let db = null;
       let designs = [];
 
+      // What to show for each setting when designs differ. Ring height above
+      // and below the edge mean nothing for holes, so holes skip them.
+      function settingRows() {
+        const rows = [];
+        for (const list of Object.values(SLIDERS)) for (const [key, label, , , , f] of list) rows.push([key, label, f]);
+        const pick = (pairs) => (v) => (pairs.find(([k]) => k === v) || [, v])[1];
+        rows.push(["ringStyle", "Ring style", pick(STYLES)]);
+        rows.push(["ringColor", "Ring color", pick(RING_COLORS)]);
+        rows.push(["ringAnchor", "Rings centered on", pick(ANCHORS)]);
+        rows.push(["darkPage", "Darker page", pick(DARK_PAGES)]);
+        return rows;
+      }
+      const relevant = (p, key) => !(p.ringStyle === "holes" && (key === "ringUp" || key === "ringDown")) && !(p.ringCount === 0 && key.startsWith("ring"));
+
+      function renderCompare() {
+        const section = $("compareSection");
+        if (designs.length < 2) {
+          section.hidden = true;
+          return;
+        }
+        section.hidden = false;
+        const items = designs
+          .map((d) => ({ d, p: sanitize(d.settings) }))
+          .sort((a, b) => String(a.d.name).localeCompare(String(b.d.name), undefined, { numeric: true }));
+        const rows = settingRows().filter(([key]) => {
+          const values = items.filter((it) => relevant(it.p, key)).map((it) => JSON.stringify(it.p[key]));
+          return new Set(values).size > 1;
+        });
+        $("compareGrid").innerHTML = items
+          .map(({ d, p }) => {
+            const b = bbox(p);
+            const diffs = rows
+              .map(([key, label, f]) => `<dt>${label}</dt><dd>${relevant(p, key) ? f(p[key]) : "n/a"}</dd>`)
+              .join("");
+            return `<article class="cmp">
+              <div class="tile light big">${svg(p, b, "light", 130)}</div>
+              <div class="tile light strip">${svg(p, b, "light", 32)}${svg(p, b, "light", 16)}${lockup(p, b, "light", 20)}</div>
+              <div class="tile dark strip">${svg(p, b, "dark", 32)}${svg(p, b, "dark", 16)}${lockup(p, b, "dark", 20)}</div>
+              <div class="tile light strip">${svg(p, b, "mono", 32)}${svg(p, b, "mono", 16)}<span class="icon" style="width:40px;height:40px;border-radius:10px">${svg(p, b, "brand", 30)}</span></div>
+              <div class="info">
+                <div class="info-head"><h3 data-name></h3><button class="link" type="button" data-load="${d.id}">Load</button></div>
+                ${diffs ? `<dl>${diffs}</dl>` : `<p class="status" style="margin:0">Same settings as the others.</p>`}
+              </div>
+            </article>`;
+          })
+          .join("");
+        $("compareGrid").querySelectorAll("[data-name]").forEach((el, i) => (el.textContent = items[i].d.name));
+        $("compareGrid").querySelectorAll("[data-load]").forEach((btn) =>
+          btn.addEventListener("click", () => loadDesign(btn.dataset.load)),
+        );
+      }
+
+      function loadDesign(id) {
+        const d = designs.find((x) => x.id === id);
+        if (!d) return;
+        state = sanitize(d.settings);
+        $("designName").value = d.name;
+        render();
+        setStatus(`Loaded "${d.name}".`);
+        let still = false;
+        try {
+          still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        } catch {
+          still = false;
+        }
+        window.scrollTo({ top: 0, behavior: still ? "auto" : "smooth" });
+      }
+
       function renderSaved() {
         const list = $("savedList");
         if (!designs.length) {
@@ -896,16 +1051,7 @@
           })
           .join("");
         list.querySelectorAll(".name").forEach((el, i) => (el.textContent = designs[i].name));
-        list.querySelectorAll("[data-load]").forEach((b) =>
-          b.addEventListener("click", () => {
-            const d = designs.find((x) => x.id === b.dataset.load);
-            if (!d) return;
-            state = sanitize(d.settings);
-            $("designName").value = d.name;
-            render();
-            setStatus(`Loaded "${d.name}".`);
-          }),
-        );
+        list.querySelectorAll("[data-load]").forEach((b) => b.addEventListener("click", () => loadDesign(b.dataset.load)));
         list.querySelectorAll("[data-del]").forEach((b) => {
           let armed = false;
           b.addEventListener("click", async () => {
@@ -947,6 +1093,7 @@
             (snap) => {
               designs = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
               renderSaved();
+              renderCompare();
               setStatus(designs.length ? `${designs.length} saved. Claude can read these.` : "No saved designs yet. Name one and save it.");
             },
             () => setStatus("Saved designs are unavailable right now."),
