@@ -63,7 +63,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body
         suppressHydrationWarning
-        className="min-h-screen bg-[var(--dg-color-bg)] text-[var(--dg-color-text-primary)] antialiased"
+        className="min-h-dvh bg-[var(--dg-color-bg)] text-[var(--dg-color-text-primary)] antialiased"
       >
         <ThemeProvider>
           {/* Only what every page needs. The auth, query and nav-shell

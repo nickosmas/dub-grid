@@ -1551,7 +1551,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 }
 /* ── Auth Form System ──────────────────────────────────── */
 .dg-auth-shell {
-  min-height: 100vh;
+  min-height: 100dvh;
   background: var(--dg-color-auth-shell-bg);
   display: flex;
   flex-direction: column;

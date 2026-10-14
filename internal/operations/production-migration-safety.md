@@ -89,7 +89,22 @@ revenue). The rehearsal is a scratch local Supabase stack that starts at
 production's exact ledger and takes the same forward suffix production will.
 
 Build it from the reviewed candidate, never from the shared local stack that
-other sessions use on ports 5432x:
+other sessions use on ports 5432x. One command does sections 2 and 3 on a
+throwaway stack and tears it down, even after a failure:
+
+```bash
+npm run db:migrations:rehearse -- --from <production's last version> \
+  --evidence internal/operations/migration-rehearsals/<date>-<from>-to-<last>.md \
+  --production-boundary <version> --boundary-source "<where that version came from>"
+```
+
+It refuses a busy port (`--port-base` moves it), any non-local database
+address, and a boundary that is not a checked-in version. `--from 0` rehearses
+a clean install. Add `--seeded` to seed the boundary database with `seed.ts`
+from the commit where the ledger ended there and leave the upgraded stack
+running for the signed-in smoke below; end it with
+`npm run db:migrations:rehearse -- --stop --smoke "<result>"`. The steps it
+runs, for review or a manual rehearsal:
 
 1. Copy `supabase/config.toml`, `supabase/migrations/` and `supabase/templates/`
    into a scratch directory. Give it a new `project_id`, shift every port
@@ -136,6 +151,13 @@ disclose that this evidence is unavailable. Additive migrations that touch
 neither need no app smoke beyond the inspector.
 
 Stop the scratch stack afterwards: `npx supabase stop --workdir <scratch>`.
+
+Recorded rehearsals live in `internal/operations/migration-rehearsals/`. The
+2026-10-13 qualification of 001 to 079, assuming production at 075:
+
+- [clean install](migration-rehearsals/2026-10-13-000-to-079.md)
+- [upgrade from 075](migration-rehearsals/2026-10-13-075-to-079.md)
+- [seeded upgrade from 075 with a signed-in smoke](migration-rehearsals/2026-10-13-075-to-079-seeded.md)
 
 Capture pass/fail facts, not personal or tenant data. Fix rehearsal failures
 with a new forward migration; never edit an applied file.

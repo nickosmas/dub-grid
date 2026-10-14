@@ -63,6 +63,59 @@ const ALLOWLIST = [
       "copycat declares. Forcing it through an override would hand the seed tooling a data " +
       "generator API it was never built against. Revisit when copycat publishes on a patched faker.",
   },
+  {
+    ids: ["GHSA-vfj7-8cjw-p6xm"],
+    package: "braces",
+    reviewBy: "2026-12-01",
+    reason:
+      "Stack exhaustion when expanding a deeply nested brace pattern. braces turns glob patterns " +
+      "into regexes for micromatch, and every copy here sits in build or developer tooling: Metro " +
+      "and Jest's transforms under expo and react-native (bundling the mobile app on a developer " +
+      "machine or in CI), eslint-config-next, the shadcn CLI, and chokidar under @snaplet/seed. " +
+      "The patterns come from our own config files, so the trigger is a hostile pattern in a change " +
+      "we review, and the worst case is a crashed build. Nothing ships it: it is not in the mobile " +
+      "bundle or the web server. No fix exists to take: 3.0.3 is the newest release and the " +
+      "advisory covers <= 3.0.3. Revisit when braces publishes a fix or the Expo SDK upgrade moves " +
+      "Metro and Jest off it (F-127).",
+  },
+  {
+    ids: ["GHSA-86w9-cpqp-85rv"],
+    package: "node-forge",
+    reviewBy: "2026-12-01",
+    reason:
+      "RSA PKCS#1 v1.5 signature verification accepts extra nested data. The only copy is under " +
+      "@expo/cli, which uses it through @expo/code-signing-certificates to sign and verify " +
+      "expo-updates manifests. The mobile app does not configure code signing (no " +
+      "codeSigningCertificate in apps/mobile/app.json), so no signature is ever verified with it, " +
+      "and the CLI runs on developer machines and CI, not in the app. No fix exists: 1.4.0 is the " +
+      "newest release and the advisory covers <= 1.4.0. Revisit with the Expo SDK upgrade (F-127).",
+  },
+  {
+    ids: ["GHSA-hp3w-g68c-fv3c"],
+    package: "sprintf-js",
+    reviewBy: "2026-12-01",
+    reason:
+      "Denial of service through an unbounded precision specifier in a format string. The one copy " +
+      "is sprintf-js 1.0.3 under argparse 1, under js-yaml 3, under babel-plugin-istanbul inside " +
+      "react-native's babel-jest: coverage instrumentation that reads our own nyc config at build " +
+      "or test time. argparse 1 declares sprintf-js ~1.0.2, and the fixed 1.1.4 is outside that " +
+      "range, so an override would hand argparse an API it was not built against. Moderate on its " +
+      "own; it is listed because it shares react-native's chain with braces. Revisit with the Expo " +
+      "SDK upgrade (F-127).",
+  },
+  {
+    ids: ["GHSA-82fw-gwwq-j7x9", "GHSA-5gmw-xhrv-c9v3", "GHSA-85c8-ppgw-ccpr"],
+    package: "vitest",
+    reviewBy: "2026-11-15",
+    reason:
+      "Path traversal in @vitest/mocker's redirect mock, and prototype-pollution gadgets that reach " +
+      "code execution through tinypool's worker options. Vitest and its tinypool run only on " +
+      "developer machines and in CI over this repository's own test files, so each needs a crafted " +
+      "test, mock path or polluted prototype in a change we review. The fixes are Vitest 4.1.11 " +
+      "(the mocker) and tinypool 2.1.2, which Vitest 3 cannot take, so all three wait on the Vitest " +
+      "major upgrade across web, mobile and the packages (F-125). The short review date reflects " +
+      "the critical rating: schedule that upgrade rather than re-dating this entry.",
+  },
 ];
 
 /** Every GHSA id in `via`, following the chains npm nests inside each other. */

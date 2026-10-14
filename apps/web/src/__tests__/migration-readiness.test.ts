@@ -15,7 +15,10 @@ import {
   protectedProductionRefs,
   type MigrationFile,
 } from "../../../../scripts/lib/migration-readiness";
-import { QUALIFICATION_SQL } from "../../../../scripts/inspect-migration-readiness";
+import {
+  CHECK_INTRODUCED_BY,
+  QUALIFICATION_SQL,
+} from "../../../../scripts/inspect-migration-readiness";
 
 function migration(version: string, name: string): MigrationFile {
   return { version, name, file: `${version}_${name}.sql`, sha256: "a".repeat(64) };
@@ -147,11 +150,28 @@ describe("production migration readiness", () => {
   });
 
   it("keeps remote qualification SQL read-only and aggregate-only", () => {
-    expect(QUALIFICATION_SQL).not.toMatch(
+    // Privilege names such as 'UPDATE' are string arguments, not statements.
+    const statements = QUALIFICATION_SQL.replace(/--.*$/gm, "").replace(/'[^']*'/g, "''");
+    expect(statements).not.toMatch(
       /\b(insert|update|delete|drop|alter|create|truncate|grant|revoke|notify|call)\b/i,
     );
     expect(QUALIFICATION_SQL).not.toMatch(/\b(email|phone|first_name|last_name)\b/i);
     expect(QUALIFICATION_SQL).toContain("count(*)");
+  });
+
+  it("defers each billing invariant until the migration that adds it is applied", () => {
+    expect(CHECK_INTRODUCED_BY).toMatchObject({
+      billing_policy_settings_locked: "076",
+      start_trial_for_org_uses_billing_policy: "076",
+      billing_pause_readable_by_members: "077",
+      payment_grace_readable_by_members: "078",
+      lock_alert_notification_type: "078",
+      billing_history_locked: "079",
+      billing_history_append_only: "079",
+    });
+    for (const check of Object.keys(CHECK_INTRODUCED_BY)) {
+      expect(QUALIFICATION_SQL).toContain(`'${check}'`);
+    }
   });
 
   it("bounds Management API inspection requests", async () => {

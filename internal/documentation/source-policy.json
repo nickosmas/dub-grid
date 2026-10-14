@@ -9,6 +9,7 @@
     "script:root:db:migrations:check": { "audience": "ci", "status": "supported" },
     "script:root:db:migrations:inspect": { "audience": "operations", "status": "internal" },
     "script:root:db:migrations:inspect:local": { "audience": "developer", "status": "supported" },
+    "script:root:db:migrations:rehearse": { "audience": "operations", "status": "internal" },
     "script:root:db:reset": { "audience": "developer", "status": "supported" },
     "script:root:db:reset:mobile": { "audience": "developer", "status": "supported" },
     "script:root:db:reset:remote": { "audience": "operations", "status": "internal" },

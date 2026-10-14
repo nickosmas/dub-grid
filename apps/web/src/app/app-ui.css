@@ -2343,7 +2343,7 @@
   border-radius: var(--dg-radius-md);
 }
 .dg-auth-loading {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;

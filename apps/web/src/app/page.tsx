@@ -262,7 +262,7 @@ export default function RootPage() {
     return (
       <div
         style={{
-          minHeight: "100vh",
+          minHeight: "100dvh",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -275,7 +275,7 @@ export default function RootPage() {
   }
 
   return (
-    <div className="landing-page min-h-screen text-[var(--dg-color-text-primary)] font-sans overflow-x-hidden">
+    <div className="landing-page min-h-dvh text-[var(--dg-color-text-primary)] font-sans overflow-x-hidden">
       <div className="landing-hero-gradient" aria-hidden="true" />
       {/* ── Navbar ── */}
       <nav className="landing-nav fixed top-0 left-0 right-0 z-50 backdrop-blur-xl">

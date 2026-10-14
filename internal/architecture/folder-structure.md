@@ -241,7 +241,7 @@ supabase/
 │   ├── 002_functions_triggers.sql  # Functions, triggers, JWT hook, RPCs
 │   ├── 003_rls_policies.sql    # RLS enable + all policies
 │   ├── 004_grants.sql          # Grants + default privileges
-│   ├── 005_*.sql ... 075_*.sql # Immutable numbered forward migrations
+│   ├── 005_*.sql and later     # Immutable numbered forward migrations
 │   └── checksums.sha256        # Locks every reviewed migration
 ├── patches/                    # Historical one-time production patches (evidence only)
 ├── seed_arden_wood.sql, seed_calm_haven.sql, seed_gridmaster.sql  # Local seed SQL (run by root seed.ts)

@@ -52,6 +52,7 @@
     "docs:verify": "npm run docs:check:closed && npm run docs:validate && npm run docs:links",
     "db:migrations:inspect": "npx tsx --env-file=.env.remote scripts/inspect-migration-readiness.ts",
     "db:migrations:inspect:local": "npx tsx --env-file=.env.local scripts/inspect-migration-readiness.ts --local",
+    "db:migrations:rehearse": "npx tsx scripts/rehearse-migrations.ts",
     "auth:templates:check": "npx tsx --env-file=.env.remote scripts/push-auth-templates.ts",
     "auth:templates:push": "npx tsx --env-file=.env.remote scripts/push-auth-templates.ts --apply",
     "test:load": "k6 run load-tests/schedule-load.js",
@@ -78,7 +79,7 @@
       "js-yaml": "^3.15.2"
     },
     "@react-email/ui": {
-      "next": "16.3.5"
+      "next": "16.3.8"
     },
     "@sentry/nextjs": {
       "fast-uri": "^3.1.6"
@@ -92,14 +93,14 @@
     "ajv": {
       "fast-uri": "^3.1.6"
     },
-    "axios": "1.19.0",
+    "axios": "1.20.0",
     "dompurify": "3.4.13",
     "fast-uri": "^3.1.6",
     "follow-redirects": "1.16.0",
     "hono": "4.13.8",
     "ip-address": "^10.4.0",
     "js-yaml": "^4.3.2",
-    "next": "16.3.5",
+    "next": "16.3.8",
     "postcss": "8.5.25",
     "posthog-js": {
       "dompurify": "3.4.13"
@@ -110,7 +111,7 @@
       "socket.io-parser": "^4.2.7",
       "fast-uri": "^3.1.6"
     },
-    "sharp": "^0.35.4",
+    "sharp": "^0.35.5",
     "socket.io-parser": "^4.2.7",
     "tar": "^7.5.22",
     "tmp": ">=0.2.3",

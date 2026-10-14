@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:d43cc56d72835cbf309cfdffd57e6ad1e0874e67913bd2e3787b0f7eb58ab6da",
+  "sourceDigest": "sha256:4cc95cd40f0b231abae45772edc09438075e437fd2a1f6834f74a7b6c23e18d0",
   "webRoutes": [
     {
       "id": "web:/",
@@ -7558,6 +7558,16 @@
       }
     },
     {
+      "id": "script:root:db:migrations:rehearse",
+      "package": "root",
+      "workspacePath": ".",
+      "name": "db:migrations:rehearse",
+      "command": "npx tsx scripts/rehearse-migrations.ts",
+      "source": {
+        "path": "package.json"
+      }
+    },
+    {
       "id": "script:root:db:reset",
       "package": "root",
       "workspacePath": ".",
@@ -8094,6 +8104,13 @@
       "invocation": "npm run db:migrations:inspect:local",
       "audience": "developer",
       "status": "supported"
+    },
+    {
+      "id": "command:root:db:migrations:rehearse",
+      "scriptId": "script:root:db:migrations:rehearse",
+      "invocation": "npm run db:migrations:rehearse",
+      "audience": "operations",
+      "status": "internal"
     },
     {
       "id": "command:root:db:reset",

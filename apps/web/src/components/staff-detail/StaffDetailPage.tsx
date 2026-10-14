@@ -793,7 +793,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
 
   if (error && !employee) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-[calc(100dvh-var(--dg-app-shell-header-height))]">
         <div className="text-center">
           <p className="text-muted-foreground mb-4">{error}</p>
           <Button

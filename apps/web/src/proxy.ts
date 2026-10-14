@@ -6,6 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getSandboxFromCookie } from "@/lib/sandbox-cookie";
 import { endImpersonationOnEscape, verifyImpersonationSession } from "@/lib/impersonation-server";
 import { evaluateOrgBillingAccess, ORG_ACCESS_SELECT } from "@/lib/billing-policy";
+import { localSupabaseConnectSources } from "@/lib/local-supabase-csp";
 import { evaluateMfaClaimState } from "@dubgrid/authz";
 import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
 import { THEME_COOKIE_NAME, withThemeParam } from "@/lib/theme-preference";
@@ -211,12 +212,7 @@ export async function proxy(req: NextRequest) {
   // deployment. Without it, the client-side Supabase SDK's own calls (session
   // refresh, getUser, etc.) are silently blocked by CSP after a successful
   // server-side login, leaving the user stuck on the login page.
-  const isLocalSupabase = /^https?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(
-    getSupabaseUrl() ?? "",
-  );
-  const devConnectExtras = isLocalSupabase
-    ? "http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321"
-    : "";
+  const devConnectExtras = localSupabaseConnectSources(getSupabaseUrl());
   const buildCsp = (scriptSrc: string) =>
     `
     default-src 'self';
