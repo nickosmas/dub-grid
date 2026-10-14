@@ -1,0 +1,927 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Calendar mark studio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@700&family=Inter:wght@400;500;600&display=swap"
+    />
+    <style>
+      /* Layout: a sticky control column beside a proof sheet (large mark, sizes, icon, one color, lockups), saved designs under the controls. */
+      :root {
+        --text-primary: #111827;
+        --text-secondary: #5b6472;
+        --page: #f5f6f8;
+        --panel: #ffffff;
+        --field: #f1f3f6;
+        --border: rgba(15, 23, 42, 0.1);
+        --border-strong: rgba(15, 23, 42, 0.2);
+        --accent: #2563eb;
+        --accent-soft: rgba(37, 99, 235, 0.1);
+        --danger: #b91c1c;
+        --tile-light: #ffffff;
+        --tile-dark: #0b0f17;
+        --ink-light: #0f172a;
+        --ink-dark: #fafafa;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --text-primary: #f4f4f5;
+          --text-secondary: #a1a1aa;
+          --page: #0e0f12;
+          --panel: #17181c;
+          --field: #202127;
+          --border: rgba(255, 255, 255, 0.1);
+          --border-strong: rgba(255, 255, 255, 0.2);
+          --accent: #4a9bff;
+          --accent-soft: rgba(74, 155, 255, 0.16);
+          --danger: #f87171;
+          color-scheme: dark;
+        }
+      }
+      :root[data-theme="dark"] {
+        --text-primary: #f4f4f5;
+        --text-secondary: #a1a1aa;
+        --page: #0e0f12;
+        --panel: #17181c;
+        --field: #202127;
+        --border: rgba(255, 255, 255, 0.1);
+        --border-strong: rgba(255, 255, 255, 0.2);
+        --accent: #4a9bff;
+        --accent-soft: rgba(74, 155, 255, 0.16);
+        --danger: #f87171;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 24px 16px 56px;
+        background: var(--page);
+        color: var(--text-primary);
+        font-family: Inter, system-ui, sans-serif;
+        font-size: 13px;
+      }
+      main {
+        max-width: 1180px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 20px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      .lede {
+        color: var(--text-secondary);
+        margin: 0 0 18px;
+        line-height: 1.5;
+        max-width: 720px;
+        font-size: 14px;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+        gap: 16px;
+        align-items: start;
+      }
+      @media (max-width: 860px) {
+        .layout {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .controls {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        position: sticky;
+        top: calc(env(safe-area-inset-top, 0px) + 12px);
+        max-height: calc(100vh - 24px);
+        overflow-y: auto;
+        padding-right: 2px;
+      }
+      @media (max-width: 860px) {
+        .controls {
+          position: static;
+          max-height: none;
+        }
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px 14px;
+        min-width: 0;
+      }
+      .panel h2 {
+        margin: 0 0 10px;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .chip {
+        font: inherit;
+        font-size: 12px;
+        font-weight: 500;
+        padding: 5px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border-strong);
+        background: transparent;
+        color: var(--text-primary);
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .chip[aria-pressed="true"] {
+        background: var(--accent-soft);
+        border-color: var(--accent);
+      }
+      .chip:focus-visible,
+      .btn:focus-visible,
+      input:focus-visible,
+      select:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      .ctl {
+        margin-bottom: 10px;
+      }
+      .ctl:last-child {
+        margin-bottom: 0;
+      }
+      .ctl label,
+      .ctl .lbl {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-bottom: 4px;
+      }
+      .ctl output {
+        color: var(--text-primary);
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+      }
+      .ctl input[type="range"] {
+        width: 100%;
+        accent-color: var(--accent);
+      }
+      .swatches {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .swatch {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 11px;
+        color: var(--text-secondary);
+      }
+      .swatch input {
+        width: 100%;
+        height: 30px;
+        border: 1px solid var(--border-strong);
+        border-radius: 8px;
+        background: var(--field);
+        padding: 2px;
+        cursor: pointer;
+      }
+      .theme-label {
+        font-size: 11px;
+        color: var(--text-secondary);
+        margin: 10px 0 6px;
+      }
+      .theme-label:first-of-type {
+        margin-top: 0;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .text {
+        flex: 1;
+        min-width: 0;
+        font: inherit;
+        padding: 7px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--border-strong);
+        background: var(--field);
+        color: var(--text-primary);
+      }
+      .btn {
+        font: inherit;
+        font-weight: 500;
+        padding: 7px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--accent);
+        background: var(--accent);
+        color: #ffffff;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .btn.ghost {
+        background: transparent;
+        color: var(--text-primary);
+        border-color: var(--border-strong);
+      }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      .saved {
+        list-style: none;
+        margin: 10px 0 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .saved li {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 8px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--field);
+      }
+      .saved .name {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 500;
+      }
+      .saved .meta {
+        color: var(--text-secondary);
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+      }
+      .link {
+        font: inherit;
+        font-size: 12px;
+        background: none;
+        border: 0;
+        padding: 2px 4px;
+        color: var(--accent);
+        cursor: pointer;
+      }
+      .link.del {
+        color: var(--danger);
+      }
+      .status {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin: 8px 0 0;
+        min-height: 1em;
+      }
+      .sheet {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-width: 0;
+      }
+      .tile {
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        padding: 16px;
+        min-width: 0;
+      }
+      .tile.light {
+        background: var(--tile-light);
+        color: var(--ink-light);
+      }
+      .tile.dark {
+        background: var(--tile-dark);
+        color: var(--ink-dark);
+      }
+      .cap {
+        display: block;
+        font-size: 11px;
+        font-weight: 500;
+        opacity: 0.6;
+        margin-bottom: 10px;
+      }
+      .hero {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+      @media (max-width: 560px) {
+        .hero {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .hero .tile {
+        display: flex;
+        flex-direction: column;
+      }
+      .hero .stage {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 230px;
+      }
+      .grid4 {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+      @media (max-width: 760px) {
+        .grid4 {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      .sizes {
+        display: flex;
+        align-items: flex-end;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 15px;
+        background: #2563eb;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .lockups {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+      @media (max-width: 560px) {
+        .lockups {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .lockups .tile {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 18px;
+        overflow: hidden;
+      }
+      .lockup {
+        display: inline-flex;
+        align-items: center;
+        white-space: nowrap;
+      }
+      .stacked {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .word {
+        font-family: "DM Sans", sans-serif;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1;
+      }
+      #measure {
+        position: absolute;
+        width: 0;
+        height: 0;
+        overflow: hidden;
+        visibility: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Calendar mark studio</h1>
+      <p class="lede">
+        Shape the stacked calendar mark: two slanted pages bound by rings. Every change updates
+        the proofs at once. Save a design and Claude can read it straight from this page.
+      </p>
+
+      <div class="layout">
+        <div class="controls">
+          <section class="panel" aria-labelledby="h-presets">
+            <h2 id="h-presets">Start from</h2>
+            <div class="chips" id="presets"></div>
+          </section>
+
+          <section class="panel" aria-labelledby="h-cards">
+            <h2 id="h-cards">Pages</h2>
+            <div id="cardControls"></div>
+          </section>
+
+          <section class="panel" aria-labelledby="h-rings">
+            <h2 id="h-rings">Rings</h2>
+            <div class="ctl">
+              <span class="lbl">Style</span>
+              <div class="chips" id="ringStyle" role="group" aria-label="Ring style"></div>
+            </div>
+            <div class="ctl">
+              <span class="lbl">Color</span>
+              <div class="chips" id="ringColor" role="group" aria-label="Ring color"></div>
+            </div>
+            <div id="ringControls"></div>
+          </section>
+
+          <section class="panel" aria-labelledby="h-colors">
+            <h2 id="h-colors">Colors</h2>
+            <div class="theme-label">Light</div>
+            <div class="swatches" id="lightColors"></div>
+            <div class="theme-label">Dark</div>
+            <div class="swatches" id="darkColors"></div>
+          </section>
+
+          <section class="panel" aria-labelledby="h-save">
+            <h2 id="h-save">Saved designs</h2>
+            <div class="row">
+              <input class="text" id="designName" type="text" maxlength="60" placeholder="Name this design" aria-label="Design name" />
+              <button class="btn" id="saveBtn" type="button">Save</button>
+            </div>
+            <p class="status" id="saveStatus">Connecting to saved designs</p>
+            <ul class="saved" id="savedList"></ul>
+            <div class="row" style="margin-top: 10px">
+              <button class="btn ghost" id="copySvg" type="button">Copy SVG</button>
+              <button class="btn ghost" id="copyJson" type="button">Copy settings</button>
+            </div>
+          </section>
+        </div>
+
+        <div class="sheet">
+          <div class="hero">
+            <div class="tile light"><span class="cap">Light</span><div class="stage" id="heroLight"></div></div>
+            <div class="tile dark"><span class="cap">Dark</span><div class="stage" id="heroDark"></div></div>
+          </div>
+          <div class="grid4">
+            <div class="tile light"><span class="cap">64, 32, 16 px</span><div class="sizes" id="sizesLight"></div></div>
+            <div class="tile dark"><span class="cap">64, 32, 16 px</span><div class="sizes" id="sizesDark"></div></div>
+            <div class="tile light"><span class="cap">App icon</span><div class="sizes" id="icon"></div></div>
+            <div class="tile light"><span class="cap">One color</span><div class="sizes" id="mono"></div></div>
+          </div>
+          <div class="lockups">
+            <div class="tile light" id="lockLight"></div>
+            <div class="tile dark" id="lockDark"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+    <svg id="measure" aria-hidden="true"><g id="measureGroup"></g></svg>
+
+    <script>
+      const DEFAULT_COLORS = {
+        light: { back: "#2563eb", front: "#a8c4fc", deep: "#1e3a8a" },
+        dark: { back: "#3b82f6", front: "#bcd2ff", deep: "#1d4ed8" },
+      };
+      const BASE = {
+        angle: 32,
+        aspect: 0.95,
+        stepX: 0.4,
+        stepY: 0.42,
+        shrink: 1,
+        radius: 14,
+        gap: 3.5,
+        ringCount: 2,
+        ringStyle: "rings",
+        ringColor: "back",
+        ringW: 20,
+        ringUp: 15,
+        ringDown: 15,
+        ringSpread: 0.2,
+      };
+      const PRESETS = [
+        { name: "Stem rings", p: {} },
+        { name: "Slim rings", p: { ringW: 12, ringUp: 20 } },
+        { name: "Ring per page", p: { ringStyle: "perpage", ringCount: 1, ringW: 18, ringUp: 16, ringDown: 14, ringSpread: 0 } },
+        { name: "Ring holes", p: { ringStyle: "holes", ringW: 19 } },
+        { name: "Deep rings", p: { ringColor: "deep" } },
+        { name: "Short rings", p: { ringUp: 9, ringDown: 17 } },
+        { name: "Plain stack", p: { ringCount: 0 } },
+      ];
+      const SLIDERS = {
+        cardControls: [
+          ["angle", "Slant", 0, 45, 1, (v) => `${v}°`],
+          ["aspect", "Page height (of width)", 0.6, 1.3, 0.01, (v) => `${Math.round(v * 100)}%`],
+          ["stepX", "Step along the slant", 0.15, 0.7, 0.01, (v) => `${Math.round(v * 100)}%`],
+          ["stepY", "Step up", 0, 0.7, 0.01, (v) => `${Math.round(v * 100)}%`],
+          ["shrink", "Front page size", 0.75, 1, 0.01, (v) => `${Math.round(v * 100)}%`],
+          ["radius", "Corner radius", 2, 30, 0.5, (v) => `${v}`],
+          ["gap", "Gap between pages", 0, 9, 0.5, (v) => (v ? `${v}` : "none")],
+        ],
+        ringControls: [
+          ["ringCount", "Rings", 0, 3, 1, (v) => `${v}`],
+          ["ringW", "Thickness", 6, 32, 0.5, (v) => `${v}`],
+          ["ringUp", "Above the edge", 0, 34, 0.5, (v) => `${v}`],
+          ["ringDown", "Below the edge", 0, 34, 0.5, (v) => `${v}`],
+          ["ringSpread", "Spread from center", 0, 0.42, 0.01, (v) => `${Math.round(v * 100)}%`],
+        ],
+      };
+      const STYLES = [
+        ["rings", "Rings"],
+        ["perpage", "Ring per page"],
+        ["holes", "Holes"],
+      ];
+      const RING_COLORS = [
+        ["back", "Back blue"],
+        ["deep", "Deep"],
+        ["front", "Front blue"],
+      ];
+
+      const fmt = (n) => Number(Number(n).toFixed(2)).toString();
+      const clone = (o) => JSON.parse(JSON.stringify(o));
+      const HEX = /^#[0-9a-f]{6}$/i;
+
+      // Accept only known keys with sane values, so a saved or stored design
+      // can never break rendering.
+      function sanitize(raw) {
+        const out = { ...BASE, colors: clone(DEFAULT_COLORS) };
+        if (!raw || typeof raw !== "object") return out;
+        for (const list of Object.values(SLIDERS)) {
+          for (const [key, , min, max] of list) {
+            const v = Number(raw[key]);
+            if (Number.isFinite(v)) out[key] = Math.min(max, Math.max(min, v));
+          }
+        }
+        if (STYLES.some(([k]) => k === raw.ringStyle)) out.ringStyle = raw.ringStyle;
+        if (RING_COLORS.some(([k]) => k === raw.ringColor)) out.ringColor = raw.ringColor;
+        for (const theme of ["light", "dark"]) {
+          for (const k of ["back", "front", "deep"]) {
+            const v = raw.colors?.[theme]?.[k];
+            if (typeof v === "string" && HEX.test(v)) out.colors[theme][k] = v.toLowerCase();
+          }
+        }
+        return out;
+      }
+
+      function roundedPolygon(pts, r) {
+        const n = pts.length;
+        const corners = pts.map((v, k) => {
+          const prev = pts[(k + n - 1) % n];
+          const next = pts[(k + 1) % n];
+          const a = [prev[0] - v[0], prev[1] - v[1]];
+          const b = [next[0] - v[0], next[1] - v[1]];
+          const la = Math.hypot(...a);
+          const lb = Math.hypot(...b);
+          const ua = [a[0] / la, a[1] / la];
+          const ub = [b[0] / lb, b[1] / lb];
+          const angle = Math.acos(Math.max(-1, Math.min(1, ua[0] * ub[0] + ua[1] * ub[1])));
+          const t = Math.min(r / Math.tan(angle / 2), la / 2, lb / 2);
+          return {
+            s: [v[0] + ua[0] * t, v[1] + ua[1] * t],
+            e: [v[0] + ub[0] * t, v[1] + ub[1] * t],
+            r: t * Math.tan(angle / 2),
+          };
+        });
+        let d = `M${fmt(corners[0].e[0])},${fmt(corners[0].e[1])}`;
+        for (let k = 1; k <= n; k++) {
+          const c = corners[k % n];
+          d += `L${fmt(c.s[0])},${fmt(c.s[1])}A${fmt(c.r)},${fmt(c.r)} 0 0 1 ${fmt(c.e[0])},${fmt(c.e[1])}`;
+        }
+        return d + "Z";
+      }
+
+      // The pages: the back page 100 wide, the front page offset along the
+      // slant and up, scaled about its own center.
+      function geometry(p) {
+        const tan = Math.tan((p.angle * Math.PI) / 180);
+        const page = (cx, cy, s) => {
+          const w = 100 * s;
+          const h = p.aspect * 100 * s;
+          return {
+            cx,
+            cy,
+            w,
+            h,
+            d: roundedPolygon(
+              [
+                [cx - w / 2, cy - h / 2 - (w / 2) * tan],
+                [cx + w / 2, cy - h / 2 + (w / 2) * tan],
+                [cx + w / 2, cy + h / 2 + (w / 2) * tan],
+                [cx - w / 2, cy + h / 2 - (w / 2) * tan],
+              ],
+              p.radius * s,
+            ),
+            topY: (x) => cy - h / 2 + (x - cx) * tan,
+          };
+        };
+        const H = p.aspect * 100;
+        const back = page(0, 0, 1);
+        const front = page(p.stepX * 100, p.stepX * 100 * tan - p.stepY * H, p.shrink);
+        return { back, front };
+      }
+
+      function ringXs(pg, p) {
+        if (p.ringCount === 1) return [pg.cx];
+        if (p.ringCount === 2) return [pg.cx - p.ringSpread * pg.w, pg.cx + p.ringSpread * pg.w];
+        if (p.ringCount === 3) return [pg.cx - p.ringSpread * pg.w, pg.cx, pg.cx + p.ringSpread * pg.w];
+        return [];
+      }
+
+      // SVG content for the design. `c` holds back, front, ring and surface
+      // colors; `gap` overrides the cut width (one color widens it).
+      function content(p, c, gap = p.gap) {
+        const { back, front } = geometry(p);
+        const halo = (d) =>
+          gap > 0 ? `<path d="${d}" fill="${c.surface}" stroke="${c.surface}" stroke-width="${fmt(gap * 2)}" stroke-linejoin="round"/>` : "";
+        const ring = (pg, x) => {
+          const y = pg.topY(x);
+          const w = p.ringW * (pg === front ? p.shrink : 1);
+          const r = `x="${fmt(x - w / 2)}" y="${fmt(y - p.ringUp)}" width="${fmt(w)}" height="${fmt(p.ringUp + p.ringDown)}" rx="${fmt(w / 2)}"`;
+          const ringHalo = gap > 0 ? `<rect ${r} fill="${c.surface}" stroke="${c.surface}" stroke-width="${fmt(gap * 2)}"/>` : "";
+          return `${ringHalo}<rect ${r} fill="${c.ring}"/>`;
+        };
+        const hole = (pg, x) => `<circle cx="${fmt(x)}" cy="${fmt(pg.topY(x))}" r="${fmt((p.ringW / 2) * (pg === front ? p.shrink : 1))}" fill="${c.surface}"/>`;
+        let s = `<path d="${back.d}" fill="${c.back}"/>`;
+        if (p.ringStyle === "perpage") s += ringXs(back, p).map((x) => ring(back, x)).join("");
+        s += `${halo(front.d)}<path d="${front.d}" fill="${c.front}"/>`;
+        if (p.ringStyle === "holes") s += ringXs(front, p).map((x) => hole(front, x)).join("");
+        else s += ringXs(front, p).map((x) => ring(front, x)).join("");
+        return s;
+      }
+
+      function colorsFor(p, mode) {
+        if (mode === "mono") return { back: "#111827", front: "#111827", ring: "#111827", surface: "#ffffff" };
+        if (mode === "brand") {
+          return { back: "#7199f2", front: "#ffffff", ring: p.ringColor === "front" ? "#7199f2" : "#ffffff", surface: "#2563eb" };
+        }
+        const t = p.colors[mode];
+        return { back: t.back, front: t.front, ring: t[p.ringColor], surface: mode === "light" ? "#ffffff" : "#0b0f17" };
+      }
+
+      function bbox(p) {
+        const g = document.getElementById("measureGroup");
+        g.innerHTML = content(p, colorsFor(p, "light"));
+        const b = g.getBBox();
+        return { x: b.x, y: b.y, w: b.width, h: b.height };
+      }
+
+      function svg(p, b, mode, size, { crop = "square", by = "width", gap } = {}) {
+        let vb;
+        if (crop === "square") {
+          const side = Math.max(b.w, b.h) * 1.08;
+          vb = [b.x + b.w / 2 - side / 2, b.y + b.h / 2 - side / 2, side, side];
+        } else {
+          vb = [b.x, b.y, b.w, b.h];
+        }
+        const ratio = vb[3] / vb[2];
+        const w = by === "height" ? size / ratio : size;
+        const h = by === "height" ? size : size * ratio;
+        const monoGap = mode === "mono" ? Math.max(p.gap, 5) : p.gap;
+        return `<svg width="${fmt(w)}" height="${fmt(h)}" viewBox="${vb.map(fmt).join(" ")}" aria-hidden="true" style="display:block;flex:none">${content(p, colorsFor(p, mode), gap ?? monoGap)}</svg>`;
+      }
+
+      // Lockup rules from the refined mark: ink as tall as the word
+      // (0.957 em) on its optical center (0.256 em), 0.22 em away; stacked
+      // twice the word's height, 0.42 em above the ascenders.
+      function lockup(p, b, mode, fontSize) {
+        const h = 0.957 * fontSize;
+        const below = h / 2 - 0.256 * fontSize;
+        return `<span class="lockup" style="font-size:${fontSize}px;gap:${fmt(0.22 * fontSize)}px"><span style="transform:translateY(${fmt(below)}px)">${svg(p, b, mode, h, { crop: "ink", by: "height" })}</span><span class="word">dubgrid</span></span>`;
+      }
+      const stacked = (p, b, mode, fontSize) =>
+        `<span class="stacked" style="font-size:${fontSize}px;gap:${fmt(0.42 * fontSize)}px">${svg(p, b, mode, 1.914 * fontSize, { crop: "ink", by: "height" })}<span class="word">dubgrid</span></span>`;
+
+      const $ = (id) => document.getElementById(id);
+      let state = sanitize(null);
+
+      function render() {
+        const b = bbox(state);
+        $("heroLight").innerHTML = svg(state, b, "light", 210);
+        $("heroDark").innerHTML = svg(state, b, "dark", 210);
+        $("sizesLight").innerHTML = [64, 32, 16].map((s) => svg(state, b, "light", s)).join("");
+        $("sizesDark").innerHTML = [64, 32, 16].map((s) => svg(state, b, "dark", s)).join("");
+        $("icon").innerHTML = `<span class="icon">${svg(state, b, "brand", 48)}</span>`;
+        $("mono").innerHTML = [64, 32, 16].map((s) => svg(state, b, "mono", s)).join("");
+        $("lockLight").innerHTML = `<span class="cap">Light: header 24 px, 44 px, stacked</span>${lockup(state, b, "light", 24)}${lockup(state, b, "light", 44)}${stacked(state, b, "light", 26)}`;
+        $("lockDark").innerHTML = `<span class="cap">Dark</span>${lockup(state, b, "dark", 24)}${lockup(state, b, "dark", 44)}${stacked(state, b, "dark", 26)}`;
+        syncControls();
+        rememberDraft();
+      }
+
+      function syncControls() {
+        for (const list of Object.values(SLIDERS)) {
+          for (const [key, , , , , label] of list) {
+            const input = $(`in-${key}`);
+            if (Number(input.value) !== state[key]) input.value = state[key];
+            $(`out-${key}`).textContent = label(state[key]);
+          }
+        }
+        document.querySelectorAll("[data-style]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.style === state.ringStyle)));
+        document.querySelectorAll("[data-ring-color]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.ringColor === state.ringColor)));
+        for (const theme of ["light", "dark"]) {
+          for (const k of ["back", "front", "deep"]) {
+            const input = $(`color-${theme}-${k}`);
+            if (input.value.toLowerCase() !== state.colors[theme][k]) input.value = state.colors[theme][k];
+          }
+        }
+        const match = PRESETS.find((pr) => JSON.stringify(sanitize({ ...BASE, ...pr.p, colors: state.colors })) === JSON.stringify(state));
+        document.querySelectorAll("[data-preset]").forEach((b) => b.setAttribute("aria-pressed", String(match?.name === b.dataset.preset)));
+      }
+
+      let draftTimer = null;
+      function rememberDraft() {
+        clearTimeout(draftTimer);
+        draftTimer = setTimeout(() => {
+          try {
+            localStorage.setItem("calendar-mark-draft", JSON.stringify(state));
+          } catch {
+            /* Storage is a convenience; the page works without it. */
+          }
+        }, 300);
+      }
+
+      function buildControls() {
+        for (const [host, list] of Object.entries(SLIDERS)) {
+          $(host).innerHTML = list
+            .map(
+              ([key, label, min, max, step]) => `<div class="ctl">
+                <label for="in-${key}">${label} <output id="out-${key}"></output></label>
+                <input id="in-${key}" type="range" min="${min}" max="${max}" step="${step}" />
+              </div>`,
+            )
+            .join("");
+          for (const [key] of list) {
+            $(`in-${key}`).addEventListener("input", (e) => {
+              state[key] = Number(e.target.value);
+              render();
+            });
+          }
+        }
+        $("presets").innerHTML = PRESETS.map((pr) => `<button class="chip" type="button" data-preset="${pr.name}">${pr.name}</button>`).join("");
+        document.querySelectorAll("[data-preset]").forEach((b) =>
+          b.addEventListener("click", () => {
+            const pr = PRESETS.find((x) => x.name === b.dataset.preset);
+            state = sanitize({ ...BASE, ...pr.p, colors: state.colors });
+            render();
+          }),
+        );
+        $("ringStyle").innerHTML = STYLES.map(([k, l]) => `<button class="chip" type="button" data-style="${k}">${l}</button>`).join("");
+        document.querySelectorAll("[data-style]").forEach((b) =>
+          b.addEventListener("click", () => {
+            state.ringStyle = b.dataset.style;
+            render();
+          }),
+        );
+        $("ringColor").innerHTML = RING_COLORS.map(([k, l]) => `<button class="chip" type="button" data-ring-color="${k}">${l}</button>`).join("");
+        document.querySelectorAll("[data-ring-color]").forEach((b) =>
+          b.addEventListener("click", () => {
+            state.ringColor = b.dataset.ringColor;
+            render();
+          }),
+        );
+        for (const theme of ["light", "dark"]) {
+          $(`${theme}Colors`).innerHTML = [
+            ["back", "Back page"],
+            ["front", "Front page"],
+            ["deep", "Deep"],
+          ]
+            .map(([k, l]) => `<label class="swatch" for="color-${theme}-${k}">${l}<input id="color-${theme}-${k}" type="color" /></label>`)
+            .join("");
+          for (const k of ["back", "front", "deep"]) {
+            $(`color-${theme}-${k}`).addEventListener("input", (e) => {
+              state.colors[theme][k] = e.target.value.toLowerCase();
+              render();
+            });
+          }
+        }
+      }
+
+      function exportSvg() {
+        const b = bbox(state);
+        const side = Math.max(b.w, b.h) * 1.08;
+        const vb = [b.x + b.w / 2 - side / 2, b.y + b.h / 2 - side / 2, side, side].map(fmt).join(" ");
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" width="512" height="512"><rect x="${vb.split(" ")[0]}" y="${vb.split(" ")[1]}" width="${fmt(side)}" height="${fmt(side)}" fill="#ffffff"/>${content(state, colorsFor(state, "light"))}</svg>`;
+      }
+
+      async function copy(text, button, done) {
+        try {
+          await navigator.clipboard.writeText(text);
+          const old = button.textContent;
+          button.textContent = done;
+          setTimeout(() => (button.textContent = old), 1400);
+        } catch {
+          setStatus("Copy isn't available here. Save the design instead, and ask Claude to read it.");
+        }
+      }
+
+      const setStatus = (t) => ($("saveStatus").textContent = t);
+
+      // Saved designs live in this artifact's database, collection
+      // "designs": { name, settings, savedAt }. Claude reads them from there.
+      let db = null;
+      let designs = [];
+
+      function renderSaved() {
+        const list = $("savedList");
+        if (!designs.length) {
+          list.innerHTML = "";
+          return;
+        }
+        list.innerHTML = designs
+          .map((d) => {
+            const when = d.savedAt ? new Date(d.savedAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+            return `<li><span class="name"></span><span class="meta">${when}</span><button class="link" type="button" data-load="${d.id}">Load</button><button class="link del" type="button" data-del="${d.id}">Delete</button></li>`;
+          })
+          .join("");
+        list.querySelectorAll(".name").forEach((el, i) => (el.textContent = designs[i].name));
+        list.querySelectorAll("[data-load]").forEach((b) =>
+          b.addEventListener("click", () => {
+            const d = designs.find((x) => x.id === b.dataset.load);
+            if (!d) return;
+            state = sanitize(d.settings);
+            $("designName").value = d.name;
+            render();
+            setStatus(`Loaded "${d.name}".`);
+          }),
+        );
+        list.querySelectorAll("[data-del]").forEach((b) => {
+          let armed = false;
+          b.addEventListener("click", async () => {
+            if (!armed) {
+              armed = true;
+              b.textContent = "Confirm";
+              setTimeout(() => {
+                armed = false;
+                b.textContent = "Delete";
+              }, 2500);
+              return;
+            }
+            try {
+              await db.collection("designs").doc(b.dataset.del).delete();
+              setStatus("Deleted.");
+            } catch {
+              setStatus("That design couldn't be deleted. Try again in a moment.");
+            }
+          });
+        });
+      }
+
+      async function connect() {
+        try {
+          db = window.claude?.use ? await window.claude.use("db") : null;
+        } catch {
+          db = null;
+        }
+        if (!db) {
+          setStatus("Saving needs this page open on claude.ai while signed in. Copy settings still works.");
+          $("saveBtn").disabled = true;
+          return;
+        }
+        setStatus("No saved designs yet. Name one and save it.");
+        db.collection("designs")
+          .orderBy("savedAt", "desc")
+          .limit(50)
+          .onSnapshot(
+            (snap) => {
+              designs = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+              renderSaved();
+              setStatus(designs.length ? `${designs.length} saved. Claude can read these.` : "No saved designs yet. Name one and save it.");
+            },
+            () => setStatus("Saved designs are unavailable right now."),
+          );
+      }
+
+      $("saveBtn").addEventListener("click", async () => {
+        if (!db) return;
+        const name = $("designName").value.trim() || `Design ${designs.length + 1}`;
+        const existing = designs.find((d) => d.name === name);
+        $("saveBtn").disabled = true;
+        try {
+          const body = { name, settings: clone(state), savedAt: new Date().toISOString() };
+          if (existing) await db.collection("designs").doc(existing.id).set(body);
+          else await db.collection("designs").add(body);
+          setStatus(`Saved "${name}".`);
+        } catch (e) {
+          setStatus(e?.code === "invalid_argument" ? "You can view designs here, but not save them." : "Couldn't save. Try again in a moment.");
+        } finally {
+          $("saveBtn").disabled = false;
+        }
+      });
+      $("copySvg").addEventListener("click", (e) => copy(exportSvg(), e.currentTarget, "Copied"));
+      $("copyJson").addEventListener("click", (e) => copy(JSON.stringify(state, null, 2), e.currentTarget, "Copied"));
+
+      buildControls();
+      try {
+        const draft = localStorage.getItem("calendar-mark-draft");
+        if (draft) state = sanitize(JSON.parse(draft));
+      } catch {
+        state = sanitize(null);
+      }
+      render();
+      document.fonts?.ready.then(render);
+      connect();
+    </script>
+  </body>
+</html>
