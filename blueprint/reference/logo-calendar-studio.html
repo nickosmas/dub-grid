@@ -625,6 +625,8 @@
         cellGap: 6,
         cellRadius: 4,
         cellStrength: 0.22,
+        cellVary: 0,
+        cellSeed: 1,
       };
       const PRESETS = [
         { name: "Stem rings", p: {} },
@@ -658,6 +660,9 @@
             cellTop: 9,
             cellRows: 3,
             cellGap: 6,
+            cellStrength: 0.12,
+            cellVary: 0.3,
+            cellSeed: 1,
             cellRadius: 3,
           },
         },
@@ -683,7 +688,9 @@
           ["cellTop", "Extra space above the cells", 0, 30, 0.5, (v) => `${v}`],
           ["cellGap", "Gap between cells", 1, 16, 0.5, (v) => `${v}`],
           ["cellRadius", "Cell corner radius", 0, 12, 0.5, (v) => `${v}`],
-          ["cellStrength", "Strength", 0.04, 0.7, 0.01, (v) => `${Math.round(v * 100)}%`],
+          ["cellStrength", "Strength", -0.4, 0.7, 0.01, (v) => `${Math.round(v * 100)}%`],
+          ["cellVary", "Variation between cells", 0, 0.6, 0.01, (v) => (v ? `±${Math.round(v * 100)}%` : "none")],
+          ["cellSeed", "Pattern", 1, 40, 1, (v) => `${v}`],
         ],
         ringControls: [
           ["ringCount", "Rings", 0, 3, 1, (v) => `${v}`],
@@ -861,6 +868,20 @@
         ];
       }
 
+      // A small seeded generator (mulberry32), so each pattern number always
+      // gives the same light and dark cells.
+      function cellTones(p) {
+        let a = (p.cellSeed * 2654435761) >>> 0;
+        const next = () => {
+          a = (a + 0x6d2b79f5) >>> 0;
+          let t = a;
+          t = Math.imul(t ^ (t >>> 15), t | 1);
+          t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+        return Array.from({ length: p.cellCols * p.cellRows }, () => next() * 2 - 1);
+      }
+
       const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
       const mixHex = (a, b, t) =>
         "#" + hexRgb(a).map((v, i) => Math.round(v + (hexRgb(b)[i] - v) * t).toString(16).padStart(2, "0")).join("");
@@ -906,7 +927,15 @@
         };
         // A faint grid of shift cells on the front card. Columns stand
         // upright like the card's sides; rows follow its slanted top edge.
-        const cellGrid = (pg, scale, color) => {
+        // Each cell's tone is the base strength plus its share of the
+        // variation: positive mixes toward the lighter target, negative toward
+        // the deep blue. A seeded sequence keeps a pattern stable.
+        const tones = cellTones(p);
+        const cellColor = (fill, k) => {
+          const t = p.cellStrength + p.cellVary * tones[k];
+          return t >= 0 ? mixHex(fill, c.cellLight, Math.min(t, 1)) : mixHex(fill, c.cellDark, Math.min(-t, 1));
+        };
+        const cellGrid = (pg, scale, fill) => {
           const inset = p.cellInset * scale;
           const g = p.cellGap * scale;
           const cw = (pg.w - 2 * inset - (p.cellCols - 1) * g) / p.cellCols;
@@ -925,7 +954,7 @@
                 [x1, pg.topY(x1) + down + ch],
                 [x0, pg.topY(x0) + down + ch],
               ];
-              out += `<path d="${roundedPolygon(pts, p.cellRadius * scale)}" fill="${color}"/>`;
+              out += `<path d="${roundedPolygon(pts, p.cellRadius * scale)}" fill="${cellColor(fill, row * p.cellCols + col)}"/>`;
             }
           }
           return out;
@@ -937,7 +966,7 @@
             const scale = pg.w / 100;
             const fill = mixHex(c.front, c.back, depth);
             let out = `${i ? halo(pg.d) : ""}<path d="${pg.d}" fill="${fill}"/>`;
-            if (p.cells && layer === front) out += cellGrid(pg, scale, mixHex(fill, c.cell, p.cellStrength));
+            if (p.cells && layer === front) out += cellGrid(pg, scale, fill);
             const isFront = layer === front;
             if (p.ringStyle === "holes" && isFront) out += ringXs(pg, p).map((x) => hole(pg, scale, x)).join("");
             else if (p.ringStyle === "rings" && isFront) out += ringXs(pg, p).map((x) => ring(pg, scale, x)).join("");
@@ -951,22 +980,26 @@
       // `back` and `front` in the color settings are the dark and light
       // shades; `darkPage` decides which page wears the dark one.
       function colorsFor(p, mode) {
-        if (mode === "mono") return { back: "#111827", front: "#111827", ring: "#111827", surface: "#ffffff", cell: "#ffffff" };
+        if (mode === "mono") {
+          return { back: "#111827", front: "#111827", ring: "#111827", surface: "#ffffff", cellLight: "#ffffff", cellDark: "#000000" };
+        }
         let shades;
         let surface;
         if (mode === "brand") {
-          shades = { back: "#7199f2", front: "#ffffff", deep: "#ffffff" };
+          shades = { back: "#7199f2", front: "#ffffff", deep: "#1e40af" };
           surface = "#2563eb";
         } else {
           shades = p.colors[mode];
           surface = mode === "light" ? "#ffffff" : "#0b0f17";
         }
-        const ring = mode === "brand" && p.ringColor !== "front" ? "#ffffff" : shades[p.ringColor];
+        const ring = mode === "brand" && p.ringColor !== "front" ? "#ffffff" : mode === "brand" ? shades.back : shades[p.ringColor];
         const swap = p.darkPage === "front";
         const back = swap ? shades.front : shades.back;
         const front = swap ? shades.back : shades.front;
-        // Cells tint the front card toward the back card's shade.
-        return { back, front, ring, surface, cell: back };
+        // Lighter cells head for the light shade on a dark card, or white on
+        // a light one; darker cells head for the deep blue.
+        const cellLight = swap ? shades.front : "#ffffff";
+        return { back, front, ring, surface, cellLight, cellDark: shades.deep };
       }
 
       function bbox(p) {
@@ -1049,7 +1082,7 @@
         document.querySelectorAll("[data-preset]").forEach((b) => b.setAttribute("aria-pressed", String(match?.name === b.dataset.preset)));
       }
 
-      const DRAFT_KEY = "calendar-mark-draft-v5";
+      const DRAFT_KEY = "calendar-mark-draft-v6";
       let draftTimer = null;
       function rememberDraft() {
         clearTimeout(draftTimer);
@@ -1336,7 +1369,7 @@
       state = sanitize({ ...BASE, ...SHIFT_CELLS });
       try {
         const draft = localStorage.getItem(DRAFT_KEY);
-        const older = localStorage.getItem("calendar-mark-draft-v4");
+        const older = localStorage.getItem("calendar-mark-draft-v5");
         if (draft) state = sanitize(JSON.parse(draft));
         else if (older) state = sanitize({ ...BASE, colors: JSON.parse(older).colors, ...SHIFT_CELLS });
       } catch {
