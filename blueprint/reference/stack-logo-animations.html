@@ -201,6 +201,16 @@
         letter-spacing: -0.02em;
         line-height: 1;
       }
+      .cand + .cand {
+        margin-top: 18px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+      }
+      .cand h3 {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 600;
+      }
       .controls {
         display: flex;
         gap: 8px;
@@ -232,8 +242,8 @@
     <main>
       <h1>Stacked logo animations</h1>
       <p class="sub">
-        Breathe, Shuffle and Trace, the three animations the previous approach kept, rebuilt for
-        the refined two-card mark. The rules carry over: the logo stays static wherever it
+        Breathe and Shuffle rebuilt for the refined two-card mark, and three candidates to
+        replace Trace for sync and long waits. The rules carry over: the logo stays static wherever it
         identifies the product, these play only on full-screen waits, and reduced motion shows
         the static mark.
       </p>
@@ -293,21 +303,51 @@
         </div>
       </section>
 
-      <section class="anim" aria-labelledby="h-trace">
+      <section class="anim" aria-labelledby="h-sync">
         <div class="anim-head">
-          <h2 id="h-trace">Trace</h2>
-          <span>1.4 s per lap</span>
+          <h2 id="h-sync">Sync and long waits: pick one</h2>
+          <span>Replaces Trace</span>
         </div>
         <p>
-          Sync and long-running waits. A band in the back card's blue, half as thick as the
-          wordmark's stem, runs around the inside edge of the front card at a constant speed, a
-          third of the edge long. The front card is used because it is the one fully in view;
-          the back card's edge is mostly hidden behind it.
+          Three replacements for Trace, each different enough from Breathe and Shuffle to tell
+          the states apart. Dropping the third animation is also an option: sync would then use
+          Shuffle.
         </p>
-        <div class="stage">
-          <div class="tile light"><span class="cap">160 px</span><span data-anim="trace" data-theme="light" data-size="160"></span></div>
-          <div class="tile light"><span class="cap">Syncing, light</span><span data-anim="trace" data-theme="light" data-size="64"></span><span class="msg">Syncing changes</span></div>
-          <div class="tile dark"><span class="cap">Syncing, dark</span><span data-anim="trace" data-theme="dark" data-size="64"></span><span class="msg">Syncing changes</span></div>
+        <div class="cand">
+          <div class="anim-head">
+            <h3>Climb</h3>
+            <span>1.6 s cycle: 1.0 s move, 0.6 s rest</span>
+          </div>
+          <p>The stack steps up the slant: the back card rises into the front's place and turns light, the front card shrinks away into its far corner, and a new back card grows in below. It reads as work moving forward, and echoes the cascade in the reference image.</p>
+          <div class="stage">
+            <div class="tile light"><span class="cap">160 px</span><span data-anim="climb" data-theme="light" data-size="160"></span></div>
+            <div class="tile light"><span class="cap">Syncing, light</span><span data-anim="climb" data-theme="light" data-size="64"></span><span class="msg">Syncing changes</span></div>
+            <div class="tile dark"><span class="cap">Syncing, dark</span><span data-anim="climb" data-theme="dark" data-size="64"></span><span class="msg">Syncing changes</span></div>
+          </div>
+        </div>
+        <div class="cand">
+          <div class="anim-head">
+            <h3>Swap colors</h3>
+            <span>2.4 s loop</span>
+          </div>
+          <p>Nothing moves. The two cards trade blues and back in a slow sine wave, so the mark looks like it is thinking. The quietest of the three.</p>
+          <div class="stage">
+            <div class="tile light"><span class="cap">160 px</span><span data-anim="swap" data-theme="light" data-size="160"></span></div>
+            <div class="tile light"><span class="cap">Syncing, light</span><span data-anim="swap" data-theme="light" data-size="64"></span><span class="msg">Syncing changes</span></div>
+            <div class="tile dark"><span class="cap">Syncing, dark</span><span data-anim="swap" data-theme="dark" data-size="64"></span><span class="msg">Syncing changes</span></div>
+          </div>
+        </div>
+        <div class="cand">
+          <div class="anim-head">
+            <h3>Flip</h3>
+            <span>1.8 s cycle: 0.8 s flip, 1.0 s rest</span>
+          </div>
+          <p>The front card turns over once about its upright axis, showing its brand-blue back halfway through, then rests. Like a schedule card being turned to check the other side.</p>
+          <div class="stage">
+            <div class="tile light"><span class="cap">160 px</span><span data-anim="flip" data-theme="light" data-size="160"></span></div>
+            <div class="tile light"><span class="cap">Syncing, light</span><span data-anim="flip" data-theme="light" data-size="64"></span><span class="msg">Syncing changes</span></div>
+            <div class="tile dark"><span class="cap">Syncing, dark</span><span data-anim="flip" data-theme="dark" data-size="64"></span><span class="msg">Syncing changes</span></div>
+          </div>
         </div>
       </section>
 
@@ -328,10 +368,10 @@
       // The refined mark: equal cards, 32° slant, the front card 40% of a card
       // along the slant and 42% of its height up from the back one.
       const SPEC = { angle: 32, aspect: 0.95, stepX: 0.4, stepY: 0.42, radius: 0.14, gap: 0.035 };
-      // The wordmark's stem (0.135 em) over the symbol's height in the lockup (0.957 em).
-      const STEM_SHARE = 0.135 / 0.957;
-      const DURATION = { breathe: 2.4, shuffle: 1.8, trace: 1.4 };
+      const DURATION = { breathe: 2.4, shuffle: 1.8, climb: 1.6, swap: 2.4, flip: 1.8 };
       const SHUFFLE_MOVE = 1.0;
+      const CLIMB_MOVE = 1.0;
+      const FLIP_MOVE = 0.8;
 
       const fmt = (n) => Number(n.toFixed(2)).toString();
       const clamp = (x) => Math.max(0, Math.min(1, x));
@@ -395,7 +435,6 @@
 
       const measure = document.getElementById("measurePath");
       measure.setAttribute("d", CARD);
-      const PERIMETER = measure.getTotalLength();
       const cardBox = measure.getBBox();
       const INK = {
         x: Math.min(BACK.x, FRONT.x) + cardBox.x,
@@ -408,11 +447,10 @@
       const CENTER = { x: (INK.x + INK.r) / 2, y: (INK.y + INK.b) / 2 };
       const SIDE = Math.max(INK.r - INK.x, INK.b - INK.y) * 1.22;
       const GAP = SPEC.gap * W;
-      const TRACE_WIDTH = 0.5 * STEM_SHARE * (INK.b - INK.y);
 
       // Frames: cards back to front, each { x, y, scale, color } where color
-      // runs 0 (back blue) to 1 (front blue); `gap` scales the cut; `trace`
-      // is the share of a lap the band has run.
+      // runs 0 (back blue) to 1 (front blue), with optional `opacity` and a
+      // horizontal `sx` for a card turning over; `gap` scales the cut.
       const rest = () => ({
         cards: [
           { ...BACK, scale: 1, color: 0 },
@@ -452,36 +490,87 @@
         return shuffleAt((t % DURATION.shuffle) / SHUFFLE_MOVE);
       }
 
-      function trace(t) {
-        return { ...rest(), trace: (t % DURATION.trace) / DURATION.trace };
+      // Corners the climbing cards scale from: the leaving card shrinks into its
+      // top-right corner and the arriving card grows out of its bottom-left,
+      // so neither covers the card rising between them.
+      const TOP_RIGHT = { x: W / 2, y: -H / 2 + (W / 2) * tan };
+      const BOTTOM_LEFT = { x: -W / 2, y: H / 2 - (W / 2) * tan };
+      const scaledFrom = (at, corner, scale) => ({
+        x: at.x + corner.x * (1 - scale),
+        y: at.y + corner.y * (1 - scale),
+        scale,
+      });
+
+      // The back card rises into the front's place while the front card moves
+      // on and shrinks away and a new back card grows in, so each cycle ends
+      // on the static mark. Scaling rather than fading keeps every card solid.
+      function climb(t) {
+        const u = clamp((t % DURATION.climb) / CLIMB_MOVE);
+        const e = quartInOut(u);
+        const leaving = 1 - smoothstep(0, 0.6, u);
+        const arriving = smoothstep(0.15, 0.85, u);
+        return {
+          cards: [
+            { ...scaledFrom(BACK, BOTTOM_LEFT, arriving), color: 0 },
+            { x: lerp(BACK.x, FRONT.x, e), y: lerp(BACK.y, FRONT.y, e), scale: 1, color: e },
+            { ...scaledFrom(FRONT, TOP_RIGHT, leaving), color: 1 },
+          ].filter((k) => k.scale > 0.01),
+          gap: 1,
+        };
       }
 
-      const FRAMES = { breathe, shuffle, trace };
+      function swap(t) {
+        const k = 0.5 - 0.5 * Math.cos((2 * Math.PI * (t % DURATION.swap)) / DURATION.swap);
+        const f = rest();
+        f.cards[0].color = k;
+        f.cards[1].color = 1 - k;
+        return f;
+      }
+
+      // One full turn about the upright axis; the face showing past a quarter
+      // turn is the card's brand-blue back.
+      function flip(t) {
+        const e = quartInOut(clamp((t % DURATION.flip) / FLIP_MOVE));
+        const turn = Math.cos(2 * Math.PI * e);
+        const f = rest();
+        f.cards[1].sx = turn;
+        f.cards[1].scale = 1 + 0.04 * Math.sin(Math.PI * e);
+        f.cards[1].color = turn >= 0 ? 1 : 0;
+        return f;
+      }
+
+      const FRAMES = { breathe, shuffle, climb, swap, flip };
 
       let uid = 0;
       function frameSvg(f, theme, size, ids) {
         const c = COLORS[theme];
         const vb = [CENTER.x - SIDE / 2, CENTER.y - SIDE / 2, SIDE, SIDE].map(fmt).join(" ");
-        const place = (card) => `translate(${fmt(card.x)} ${fmt(card.y)}) scale(${fmt(card.scale)})`;
-        const [back, front] = f.cards;
+        const place = (k) =>
+          `translate(${fmt(k.x)} ${fmt(k.y)}) scale(${fmt(k.scale * (k.sx ?? 1))} ${fmt(k.scale)})`;
         const region = `x="${fmt(CENTER.x - SIDE)}" y="${fmt(CENTER.y - SIDE)}" width="${fmt(SIDE * 2)}" height="${fmt(SIDE * 2)}"`;
         const gap = GAP * f.gap;
-        const cut = gap > 0.05
-          ? `<path d="${CARD}" transform="${place(front)}" fill="black" stroke="black" stroke-width="${fmt((gap * 2) / front.scale)}" stroke-linejoin="round"/>`
-          : `<path d="${CARD}" transform="${place(front)}" fill="black"/>`;
-        let band = "";
-        if (f.trace !== undefined) {
-          const len = PERIMETER / 3;
-          band = `<clipPath id="${ids.clip}"><path d="${CARD}" transform="${place(front)}"/></clipPath>
-            <g clip-path="url(#${ids.clip})"><path d="${CARD}" transform="${place(front)}" fill="none" stroke="${c.back}" stroke-width="${fmt(TRACE_WIDTH * 2)}"
-              stroke-dasharray="${fmt(len)} ${fmt(PERIMETER - len)}" stroke-dashoffset="${fmt(-f.trace * PERIMETER)}"/></g>`;
-        }
-        return `<svg width="${size}" height="${size}" viewBox="${vb}" aria-hidden="true" style="display:block">
-          <mask id="${ids.mask}" maskUnits="userSpaceOnUse" ${region}><rect ${region} fill="white"/>${cut}</mask>
-          <path d="${CARD}" transform="${place(back)}" fill="${mix(c.back, c.front, back.color)}" mask="url(#${ids.mask})"/>
-          <path d="${CARD}" transform="${place(front)}" fill="${mix(c.back, c.front, front.color)}"/>
-          ${band}
-        </svg>`;
+        const cutBy = (k) => {
+          const op = fmt(k.opacity ?? 1);
+          return gap > 0.05
+            ? `<path d="${CARD}" transform="${place(k)}" fill="black" fill-opacity="${op}" stroke="black" stroke-opacity="${op}" stroke-width="${fmt((gap * 2) / k.scale)}" stroke-linejoin="round"/>`
+            : `<path d="${CARD}" transform="${place(k)}" fill="black" fill-opacity="${op}"/>`;
+        };
+        let defs = "";
+        let body = "";
+        f.cards.forEach((k, i) => {
+          const op = k.opacity ?? 1;
+          if (op < 0.01) return;
+          const fill = mix(c.back, c.front, k.color);
+          const ahead = f.cards.slice(i + 1).filter((a) => (a.opacity ?? 1) >= 0.01);
+          let mask = "";
+          if (ahead.length) {
+            const id = `${ids.mask}-${i}`;
+            defs += `<mask id="${id}" maskUnits="userSpaceOnUse" ${region}><rect ${region} fill="white"/>${ahead.map(cutBy).join("")}</mask>`;
+            mask = ` mask="url(#${id})"`;
+          }
+          body += `<path d="${CARD}" transform="${place(k)}" fill="${fill}" opacity="${fmt(op)}"${mask}/>`;
+        });
+        return `<svg width="${size}" height="${size}" viewBox="${vb}" aria-hidden="true" style="display:block"><defs>${defs}</defs>${body}</svg>`;
       }
 
       const players = [...document.querySelectorAll("[data-anim]")].map((el) => ({
@@ -489,7 +578,7 @@
         anim: el.dataset.anim,
         theme: el.dataset.theme,
         size: Number(el.dataset.size),
-        ids: { mask: `m${uid++}`, clip: `c${uid++}` },
+        ids: { mask: `m${uid++}` },
       }));
 
       let speed = 1;
