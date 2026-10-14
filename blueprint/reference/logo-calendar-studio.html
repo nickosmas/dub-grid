@@ -489,8 +489,8 @@
     <main>
       <h1>Calendar mark studio</h1>
       <p class="lede">
-        Shape the stacked calendar mark: two slanted pages bound by rings. Every change updates
-        the proofs at once. Save a design and Claude can read it straight from this page.
+        Shape the stacked mark: slanted cards, shift cells, rings and stacking. Every change
+        updates the proofs at once. Save a design and Claude can read it straight from this page.
       </p>
 
       <div class="layout">
@@ -528,6 +528,15 @@
               <div class="chips" id="ringColor" role="group" aria-label="Ring color"></div>
             </div>
             <div id="ringControls"></div>
+          </section>
+
+          <section class="panel" aria-labelledby="h-cells">
+            <h2 id="h-cells">Shift cells</h2>
+            <div class="ctl">
+              <span class="lbl">Grid on the front card</span>
+              <div class="chips" id="cellsToggle" role="group" aria-label="Grid on the front card"></div>
+            </div>
+            <div id="cellControls"></div>
           </section>
 
           <section class="panel" aria-labelledby="h-colors">
@@ -607,6 +616,13 @@
         fan: 0,
         sheets: 3,
         splay: 24,
+        cells: false,
+        cellCols: 3,
+        cellRows: 2,
+        cellInset: 12,
+        cellGap: 6,
+        cellRadius: 4,
+        cellStrength: 0.22,
       };
       const PRESETS = [
         { name: "Stem rings", p: {} },
@@ -616,6 +632,7 @@
         { name: "Deep rings", p: { ringColor: "deep" } },
         { name: "Short rings", p: { ringUp: 9, ringDown: 17 } },
         { name: "Plain stack", p: { ringCount: 0 } },
+        { name: "Shift cells", p: { stacking: "offset", darkPage: "front", ringCount: 0, cells: true } },
       ];
       const SLIDERS = {
         cardControls: [
@@ -630,6 +647,14 @@
           ["shrink", "Front page size", 0.75, 1, 0.01, (v) => `${Math.round(v * 100)}%`],
           ["radius", "Corner radius", 2, 30, 0.5, (v) => `${v}`],
           ["gap", "Gap between pages", 0, 9, 0.5, (v) => (v ? `${v}` : "none")],
+        ],
+        cellControls: [
+          ["cellCols", "Columns", 1, 6, 1, (v) => `${v}`],
+          ["cellRows", "Rows", 1, 4, 1, (v) => `${v}`],
+          ["cellInset", "Inset from the card edge", 2, 26, 0.5, (v) => `${v}`],
+          ["cellGap", "Gap between cells", 1, 16, 0.5, (v) => `${v}`],
+          ["cellRadius", "Cell corner radius", 0, 12, 0.5, (v) => `${v}`],
+          ["cellStrength", "Strength", 0.04, 0.7, 0.01, (v) => `${Math.round(v * 100)}%`],
         ],
         ringControls: [
           ["ringCount", "Rings", 0, 3, 1, (v) => `${v}`],
@@ -686,6 +711,7 @@
         if (RING_COLORS.some(([k]) => k === raw.ringColor)) out.ringColor = raw.ringColor;
         if (ANCHORS.some(([k]) => k === raw.ringAnchor)) out.ringAnchor = raw.ringAnchor;
         if (DARK_PAGES.some(([k]) => k === raw.darkPage)) out.darkPage = raw.darkPage;
+        if (typeof raw.cells === "boolean") out.cells = raw.cells;
         const stacking = raw.stacking === "tent" ? "book" : raw.stacking;
         if (STACKINGS.some(([k]) => k === stacking)) out.stacking = stacking;
         for (const theme of ["light", "dark"]) {
@@ -846,6 +872,31 @@
           const spineHalo = gap > 0 ? `<line ${line} stroke="${c.surface}" stroke-width="${fmt(w + gap * 2)}"/>` : "";
           return `${spineHalo}<line ${line} stroke="${c.ring}" stroke-width="${fmt(w)}"/>`;
         };
+        // A faint grid of shift cells on the front card. Columns stand
+        // upright like the card's sides; rows follow its slanted top edge.
+        const cellGrid = (pg, scale, color) => {
+          const inset = p.cellInset * scale;
+          const g = p.cellGap * scale;
+          const cw = (pg.w - 2 * inset - (p.cellCols - 1) * g) / p.cellCols;
+          const ch = (pg.h - 2 * inset - (p.cellRows - 1) * g) / p.cellRows;
+          if (cw <= 0 || ch <= 0) return "";
+          let out = "";
+          for (let col = 0; col < p.cellCols; col++) {
+            const x0 = pg.cx - pg.w / 2 + inset + col * (cw + g);
+            const x1 = x0 + cw;
+            for (let row = 0; row < p.cellRows; row++) {
+              const down = inset + row * (ch + g);
+              const pts = [
+                [x0, pg.topY(x0) + down],
+                [x1, pg.topY(x1) + down],
+                [x1, pg.topY(x1) + down + ch],
+                [x0, pg.topY(x0) + down + ch],
+              ];
+              out += `<path d="${roundedPolygon(pts, p.cellRadius * scale)}" fill="${color}"/>`;
+            }
+          }
+          return out;
+        };
         const hole = (pg, scale, x) => `<circle cx="${fmt(x)}" cy="${fmt(pg.topY(x))}" r="${fmt((p.ringW / 2) * scale)}" fill="${c.surface}"/>`;
         return layers
           .map((layer, i) => {
@@ -853,6 +904,7 @@
             const scale = pg.w / 100;
             const fill = mixHex(c.front, c.back, depth);
             let out = `${i ? halo(pg.d) : ""}<path d="${pg.d}" fill="${fill}"/>`;
+            if (p.cells && layer === front) out += cellGrid(pg, scale, mixHex(fill, c.cell, p.cellStrength));
             const isFront = layer === front;
             if (p.ringStyle === "holes" && isFront) out += ringXs(pg, p).map((x) => hole(pg, scale, x)).join("");
             else if (p.ringStyle === "rings" && isFront) out += ringXs(pg, p).map((x) => ring(pg, scale, x)).join("");
@@ -866,7 +918,7 @@
       // `back` and `front` in the color settings are the dark and light
       // shades; `darkPage` decides which page wears the dark one.
       function colorsFor(p, mode) {
-        if (mode === "mono") return { back: "#111827", front: "#111827", ring: "#111827", surface: "#ffffff" };
+        if (mode === "mono") return { back: "#111827", front: "#111827", ring: "#111827", surface: "#ffffff", cell: "#ffffff" };
         let shades;
         let surface;
         if (mode === "brand") {
@@ -878,7 +930,10 @@
         }
         const ring = mode === "brand" && p.ringColor !== "front" ? "#ffffff" : shades[p.ringColor];
         const swap = p.darkPage === "front";
-        return { back: swap ? shades.front : shades.back, front: swap ? shades.back : shades.front, ring, surface };
+        const back = swap ? shades.front : shades.back;
+        const front = swap ? shades.back : shades.front;
+        // Cells tint the front card toward the back card's shade.
+        return { back, front, ring, surface, cell: back };
       }
 
       function bbox(p) {
@@ -944,6 +999,8 @@
         document.querySelectorAll("[data-anchor]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.anchor === state.ringAnchor)));
         document.querySelectorAll("[data-dark-page]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.darkPage === state.darkPage)));
         document.querySelectorAll("[data-stacking]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.stacking === state.stacking)));
+        document.querySelectorAll("[data-cells]").forEach((b) => b.setAttribute("aria-pressed", String((b.dataset.cells === "true") === state.cells)));
+        $("cellControls").hidden = !state.cells;
         for (const [key, mode] of Object.entries(ONLY_FOR)) $(`in-${key}`).closest(".ctl").hidden = state.stacking !== mode;
         for (const theme of ["light", "dark"]) {
           for (const k of ["back", "front", "deep"]) {
@@ -953,13 +1010,13 @@
         }
         const match = PRESETS.find(
           (pr) =>
-            JSON.stringify(sanitize({ ...BASE, ...pr.p, colors: state.colors, darkPage: state.darkPage, stacking: state.stacking })) ===
+            JSON.stringify(sanitize({ ...BASE, colors: state.colors, darkPage: state.darkPage, stacking: state.stacking, ...pr.p })) ===
             JSON.stringify(state),
         );
         document.querySelectorAll("[data-preset]").forEach((b) => b.setAttribute("aria-pressed", String(match?.name === b.dataset.preset)));
       }
 
-      const DRAFT_KEY = "calendar-mark-draft-v3";
+      const DRAFT_KEY = "calendar-mark-draft-v4";
       let draftTimer = null;
       function rememberDraft() {
         clearTimeout(draftTimer);
@@ -993,7 +1050,7 @@
         document.querySelectorAll("[data-preset]").forEach((b) =>
           b.addEventListener("click", () => {
             const pr = PRESETS.find((x) => x.name === b.dataset.preset);
-            state = sanitize({ ...BASE, ...pr.p, colors: state.colors, darkPage: state.darkPage, stacking: state.stacking });
+            state = sanitize({ ...BASE, colors: state.colors, darkPage: state.darkPage, stacking: state.stacking, ...pr.p });
             render();
           }),
         );
@@ -1001,6 +1058,18 @@
         document.querySelectorAll("[data-style]").forEach((b) =>
           b.addEventListener("click", () => {
             state.ringStyle = b.dataset.style;
+            render();
+          }),
+        );
+        $("cellsToggle").innerHTML = [
+          [true, "On"],
+          [false, "Off"],
+        ]
+          .map(([k, l]) => `<button class="chip" type="button" data-cells="${k}">${l}</button>`)
+          .join("");
+        document.querySelectorAll("[data-cells]").forEach((b) =>
+          b.addEventListener("click", () => {
+            state.cells = b.dataset.cells === "true";
             render();
           }),
         );
@@ -1085,12 +1154,14 @@
         rows.push(["ringAnchor", "Rings centered on", pick(ANCHORS)]);
         rows.push(["darkPage", "Darker page", pick(DARK_PAGES)]);
         rows.push(["stacking", "Stacking", pick(STACKINGS)]);
+        rows.push(["cells", "Shift cells", (v) => (v ? "On" : "Off")]);
         return rows;
       }
       const relevant = (p, key) =>
         !(p.ringStyle === "holes" && (key === "ringUp" || key === "ringDown")) &&
         !(p.ringCount === 0 && key.startsWith("ring")) &&
-        !(ONLY_FOR[key] && ONLY_FOR[key] !== p.stacking);
+        !(ONLY_FOR[key] && ONLY_FOR[key] !== p.stacking) &&
+        !(key.startsWith("cell") && key !== "cells" && !p.cells);
 
       function renderCompare() {
         const section = $("compareSection");
@@ -1228,14 +1299,15 @@
       $("copyJson").addEventListener("click", (e) => copy(JSON.stringify(state, null, 2), e.currentTarget, "Copied"));
 
       buildControls();
-      state = sanitize({ stacking: "book" });
+      const SHIFT_CELLS = PRESETS.find((pr) => pr.name === "Shift cells").p;
+      state = sanitize({ ...BASE, ...SHIFT_CELLS });
       try {
         const draft = localStorage.getItem(DRAFT_KEY);
-        const older = localStorage.getItem("calendar-mark-draft");
+        const older = localStorage.getItem("calendar-mark-draft-v3");
         if (draft) state = sanitize(JSON.parse(draft));
-        else if (older) state = sanitize({ ...JSON.parse(older), stacking: "book", sheets: 3 });
+        else if (older) state = sanitize({ ...BASE, colors: JSON.parse(older).colors, ...SHIFT_CELLS });
       } catch {
-        state = sanitize({ stacking: "book" });
+        state = sanitize({ ...BASE, ...SHIFT_CELLS });
       }
       render();
       document.fonts?.ready.then(render);
