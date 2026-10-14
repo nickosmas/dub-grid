@@ -406,6 +406,10 @@
           </section>
           <section class="panel" aria-labelledby="h-cards">
             <h2 id="h-cards">Cards</h2>
+            <div class="ctl">
+              <span class="lbl">Back card</span>
+              <div class="chips" id="backStyle" role="group" aria-label="Back card style"></div>
+            </div>
             <div id="cardControls"></div>
             <div class="ctl chips">
               <button class="chip" type="button" id="resetCorners">Shipped corners</button>
@@ -490,9 +494,10 @@
         const bH = BACK_SCALE * fH;
         const back = { x: INSET, y: 50 - bH / 2 - p.lift * bH, w: bW, h: bH, r: p.backR };
         const front = { x: INSET + p.showing * bW, y: 50 - fH / 2, w: fW, h: fH, r: p.frontR };
-        const ink = { x: back.x - STROKE / 2, y: Math.min(back.y - STROKE / 2, front.y) };
-        ink.w = Math.max(front.x + front.w, back.x + back.w + STROKE / 2) - ink.x;
-        ink.h = Math.max(back.y + back.h + STROKE / 2, front.y + front.h) - ink.y;
+        const edge = p.backStyle === "solid" ? 0 : STROKE / 2;
+        const ink = { x: back.x - edge, y: Math.min(back.y - edge, front.y) };
+        ink.w = Math.max(front.x + front.w, back.x + back.w + edge) - ink.x;
+        ink.h = Math.max(back.y + back.h + edge, front.y + front.h) - ink.y;
         // The shipped optical shift, scaled with the cards.
         const shift = OPTICAL_OFFSET_X * (fW / frontW);
         const size = Math.max(ink.w, ink.h) + 2 * (shift + 1.5);
@@ -548,6 +553,8 @@
         firstFaint: false,
         ...SHIPPED_CORNERS,
         ...SHIPPED_POSITION,
+        backStyle: "outline",
+        backOpacity: 0.5,
       };
       const CARD_SLIDERS = [
         ["backR", "Back card corner radius", 0, Number((BACK.h / 2).toFixed(2)), 0.25, (v) => `${fmt(v)}`],
@@ -556,6 +563,7 @@
         ["showing", "Back card showing (horizontal)", 0.05, 0.8, 0.01, (v) => `${Math.round(v * 100)}%`],
         ["lift", "Back card raised (vertical)", -0.5, 0.5, 0.01, (v) => (v > 0 ? `+${Math.round(v * 100)}%` : `${Math.round(v * 100)}%`)],
         ["cardGap", "Space between cards", 0, 14, 0.5, (v) => (v ? `${fmt(v)}` : "none")],
+        ["backOpacity", "Solid back card opacity", 0.1, 1, 0.05, (v) => `${Math.round(v * 100)}%`],
       ];
       const SLIDERS = [
         ["cols", "Columns", 1, 6, 1, (v) => `${v}`],
@@ -585,6 +593,7 @@
         }
         if (typeof raw.cells === "boolean") out.cells = raw.cells;
         if (typeof raw.firstFaint === "boolean") out.firstFaint = raw.firstFaint;
+        if (raw.backStyle === "outline" || raw.backStyle === "solid") out.backStyle = raw.backStyle;
         return out;
       }
 
@@ -652,7 +661,11 @@
             <rect x="-60" y="-60" width="220" height="220" fill="white"/>
             <path d="${frontPath(p)}" fill="black" stroke="black" stroke-width="${fmt(p.cardGap * 2)}"/>
           </mask>
-          <path d="${backPath(p)}" fill="none" stroke="${c.mark}" stroke-width="${STROKE}" mask="url(#${id})"/>
+          ${
+            p.backStyle === "solid"
+              ? `<path d="${backPath(p)}" fill="${c.mark}" fill-opacity="${fmt(p.backOpacity)}" mask="url(#${id})"/>`
+              : `<path d="${backPath(p)}" fill="none" stroke="${c.mark}" stroke-width="${STROKE}" mask="url(#${id})"/>`
+          }
           <path d="${frontPath(p)}" fill="${c.mark}"/>
           ${cells(p, mode)}
         </svg>`;
@@ -717,9 +730,20 @@
         }
         const shippedCorners = Object.entries(SHIPPED_CORNERS).every(([k, v]) => state[k] === v);
         $("resetCorners").setAttribute("aria-pressed", String(shippedCorners));
+        document.querySelectorAll("[data-back]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.back === state.backStyle)));
+        $("in-backOpacity").closest(".ctl").hidden = state.backStyle !== "solid";
         $("resetPosition").setAttribute("aria-pressed", String(Object.entries(SHIPPED_POSITION).every(([k, v]) => state[k] === v)));
         document.querySelectorAll("[data-first]").forEach((b) => b.setAttribute("aria-pressed", String((b.dataset.first === "true") === state.firstFaint)));
-        const corners = { backR: state.backR, frontR: state.frontR, smooth: state.smooth, showing: state.showing, lift: state.lift, cardGap: state.cardGap };
+        const corners = {
+          backR: state.backR,
+          frontR: state.frontR,
+          smooth: state.smooth,
+          showing: state.showing,
+          lift: state.lift,
+          cardGap: state.cardGap,
+          backStyle: state.backStyle,
+          backOpacity: state.backOpacity,
+        };
         const match = PRESETS.find((pr) => JSON.stringify(sanitize({ ...BASE, ...corners, ...pr.p })) === JSON.stringify(state));
         document.querySelectorAll("[data-preset]").forEach((b) => b.setAttribute("aria-pressed", String(match?.name === b.dataset.preset)));
       }
@@ -733,6 +757,18 @@
           render();
         });
       }
+      $("backStyle").innerHTML = [
+        ["outline", "Outline"],
+        ["solid", "Solid"],
+      ]
+        .map(([k, l]) => `<button class="chip" type="button" data-back="${k}">${l}</button>`)
+        .join("");
+      document.querySelectorAll("[data-back]").forEach((b) =>
+        b.addEventListener("click", () => {
+          state.backStyle = b.dataset.back;
+          render();
+        }),
+      );
       $("resetPosition").addEventListener("click", () => {
         Object.assign(state, SHIPPED_POSITION);
         render();
@@ -753,7 +789,16 @@
       $("presets").innerHTML = PRESETS.map((pr) => `<button class="chip" type="button" data-preset="${pr.name}">${pr.name}</button>`).join("");
       document.querySelectorAll("[data-preset]").forEach((b) =>
         b.addEventListener("click", () => {
-          const corners = { backR: state.backR, frontR: state.frontR, smooth: state.smooth, showing: state.showing, lift: state.lift, cardGap: state.cardGap };
+          const corners = {
+            backR: state.backR,
+            frontR: state.frontR,
+            smooth: state.smooth,
+            showing: state.showing,
+            lift: state.lift,
+            cardGap: state.cardGap,
+            backStyle: state.backStyle,
+            backOpacity: state.backOpacity,
+          };
           state = sanitize({ ...BASE, ...corners, ...PRESETS.find((x) => x.name === b.dataset.preset).p });
           render();
         }),
