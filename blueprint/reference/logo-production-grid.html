@@ -413,7 +413,9 @@
             <div id="cardControls"></div>
             <div class="ctl chips">
               <button class="chip" type="button" id="resetCorners">Shipped corners</button>
-              <button class="chip" type="button" id="resetPosition">Shipped overlap and space</button>
+              <button class="chip" type="button" id="resetPosition">
+                Shipped overlap and space
+              </button>
             </div>
           </section>
           <section class="panel" aria-labelledby="h-detail">
@@ -429,13 +431,25 @@
             <div id="gridControls"></div>
             <div class="ctl">
               <span class="lbl">First cell almost invisible</span>
-              <div class="chips" id="firstFaint" role="group" aria-label="First cell almost invisible"></div>
+              <div
+                class="chips"
+                id="firstFaint"
+                role="group"
+                aria-label="First cell almost invisible"
+              ></div>
             </div>
           </section>
           <section class="panel" aria-labelledby="h-save">
             <h2 id="h-save">Saved designs</h2>
             <div class="row">
-              <input class="text" id="designName" type="text" maxlength="60" placeholder="Name this design" aria-label="Design name" />
+              <input
+                class="text"
+                id="designName"
+                type="text"
+                maxlength="60"
+                placeholder="Name this design"
+                aria-label="Design name"
+              />
               <button class="btn" id="saveBtn" type="button">Save</button>
             </div>
             <p class="status" id="saveStatus">Connecting to saved designs</p>
@@ -445,14 +459,32 @@
 
         <div class="sheet">
           <div class="hero">
-            <div class="tile light"><span class="cap">Light</span><div class="stage" id="heroLight"></div></div>
-            <div class="tile dark"><span class="cap">Dark</span><div class="stage" id="heroDark"></div></div>
+            <div class="tile light">
+              <span class="cap">Light</span>
+              <div class="stage" id="heroLight"></div>
+            </div>
+            <div class="tile dark">
+              <span class="cap">Dark</span>
+              <div class="stage" id="heroDark"></div>
+            </div>
           </div>
           <div class="grid4">
-            <div class="tile light"><span class="cap">64, 32, 16 px</span><div class="sizes" id="sizesLight"></div></div>
-            <div class="tile dark"><span class="cap">64, 32, 16 px</span><div class="sizes" id="sizesDark"></div></div>
-            <div class="tile light"><span class="cap">App icon</span><div class="sizes" id="icon"></div></div>
-            <div class="tile light"><span class="cap">One color</span><div class="sizes" id="mono"></div></div>
+            <div class="tile light">
+              <span class="cap">64, 32, 16 px</span>
+              <div class="sizes" id="sizesLight"></div>
+            </div>
+            <div class="tile dark">
+              <span class="cap">64, 32, 16 px</span>
+              <div class="sizes" id="sizesDark"></div>
+            </div>
+            <div class="tile light">
+              <span class="cap">App icon</span>
+              <div class="sizes" id="icon"></div>
+            </div>
+            <div class="tile light">
+              <span class="cap">One color</span>
+              <div class="sizes" id="mono"></div>
+            </div>
           </div>
           <div class="lockups">
             <div class="tile light" id="lockLight"></div>
@@ -481,7 +513,13 @@
       const backW = BACK_SCALE * frontW;
       const backH = BACK_SCALE * frontH;
       const BACK = { x: INSET, y: 50 - backH / 2, w: backW, h: backH, r: 0.25 * backH };
-      const FRONT = { x: INSET + BACK_SHOWING * backW, y: 50 - frontH / 2, w: frontW, h: frontH, r: 0.274 * frontH };
+      const FRONT = {
+        x: INSET + BACK_SHOWING * backW,
+        y: 50 - frontH / 2,
+        w: frontW,
+        h: frontH,
+        r: 0.274 * frontH,
+      };
       const INK = {
         x: BACK.x - STROKE / 2,
         y: Math.min(BACK.y - STROKE / 2, FRONT.y),
@@ -509,7 +547,11 @@
         // The shipped optical shift, scaled with the cards.
         const shift = OPTICAL_OFFSET_X * (fW / frontW);
         const size = Math.max(ink.w, ink.h) + 2 * (shift + 1.5);
-        const square = { x: ink.x + ink.w / 2 - size / 2 + shift, y: ink.y + ink.h / 2 - size / 2, size };
+        const square = {
+          x: ink.x + ink.w / 2 - size / 2 + shift,
+          y: ink.y + ink.h / 2 - size / 2,
+          size,
+        };
         return { back, front, ink, square, shift };
       }
       const COLORS = {
@@ -542,7 +584,11 @@
           "Z",
         ].join("");
       }
-      const SHIPPED_CORNERS = { backR: Number(BACK.r.toFixed(2)), frontR: Number(FRONT.r.toFixed(2)), smooth: SMOOTHING };
+      const SHIPPED_CORNERS = {
+        backR: Number(BACK.r.toFixed(2)),
+        frontR: Number(FRONT.r.toFixed(2)),
+        smooth: SMOOTHING,
+      };
       const SHIPPED_POSITION = { showing: BACK_SHOWING, lift: 0, cardGap: GAP };
       const backPath = (p) => cardPath(geo(p).back, p.smooth);
       const frontPath = (p) => cardPath(geo(p).front, p.smooth);
@@ -583,14 +629,49 @@
         ["dotFill", "Slots assigned", 0, 1, 0.05, (v) => `${Math.round(v * 100)}%`],
         ["dotSeed", "Pattern", 1, 40, 1, (v) => `${v}`],
         ["dotOn", "Assigned dot strength", 0.2, 1, 0.01, (v) => `${Math.round(v * 100)}%`],
-        ["dotOff", "Open slot strength", 0, 0.6, 0.01, (v) => (v ? `${Math.round(v * 100)}%` : "hidden")],
+        [
+          "dotOff",
+          "Open slot strength",
+          0,
+          0.6,
+          0.01,
+          (v) => (v ? `${Math.round(v * 100)}%` : "hidden"),
+        ],
       ];
       const CARD_SLIDERS = [
-        ["backR", "Back card corner radius", 0, Number((BACK.h / 2).toFixed(2)), 0.25, (v) => `${fmt(v)}`],
-        ["frontR", "Front card corner radius", 0, Number((FRONT.h / 2).toFixed(2)), 0.25, (v) => `${fmt(v)}`],
+        [
+          "backR",
+          "Back card corner radius",
+          0,
+          Number((BACK.h / 2).toFixed(2)),
+          0.25,
+          (v) => `${fmt(v)}`,
+        ],
+        [
+          "frontR",
+          "Front card corner radius",
+          0,
+          Number((FRONT.h / 2).toFixed(2)),
+          0.25,
+          (v) => `${fmt(v)}`,
+        ],
         ["smooth", "Corner smoothing", 0, 1, 0.05, (v) => (v ? `${fmt(v)}` : "round")],
-        ["showing", "Back card showing (horizontal)", 0.05, 0.8, 0.01, (v) => `${Math.round(v * 100)}%`],
-        ["lift", "Back card raised (vertical)", -0.5, 0.5, 0.01, (v) => (v > 0 ? `+${Math.round(v * 100)}%` : `${Math.round(v * 100)}%`)],
+        [
+          "showing",
+          "Back card showing (horizontal)",
+          0.05,
+          0.8,
+          0.01,
+          (v) => `${Math.round(v * 100)}%`,
+        ],
+        [
+          "lift",
+          "Back card raised (vertical)",
+          -0.5,
+          0.5,
+          0.01,
+          (v) => (v > 0 ? `+${Math.round(v * 100)}%` : `${Math.round(v * 100)}%`),
+        ],
         ["cardGap", "Space between cards", 0, 14, 0.5, (v) => (v ? `${fmt(v)}` : "none")],
         ["backOpacity", "Solid back card opacity", 0.1, 1, 0.05, (v) => `${Math.round(v * 100)}%`],
       ];
@@ -602,7 +683,14 @@
         ["gap", "Gap between cells", 1, 12, 0.5, (v) => `${v}`],
         ["radius", "Cell corner radius", 0, 8, 0.5, (v) => `${v}`],
         ["strength", "Strength", -0.4, 0.7, 0.01, (v) => `${Math.round(v * 100)}%`],
-        ["vary", "Variation between cells", 0, 0.6, 0.01, (v) => (v ? `±${Math.round(v * 100)}%` : "none")],
+        [
+          "vary",
+          "Variation between cells",
+          0,
+          0.6,
+          0.01,
+          (v) => (v ? `±${Math.round(v * 100)}%` : "none"),
+        ],
         ["seed", "Pattern", 1, 40, 1, (v) => `${v}`],
       ];
       const PRESETS = [
@@ -610,11 +698,39 @@
         { name: "3 × 2 faint", p: {} },
         { name: "3 × 3 faint", p: { rows: 3, gap: 4 } },
         { name: "3 × 2 varied", p: { strength: 0.12, vary: 0.3, firstFaint: true } },
-        { name: "3 × 3 varied", p: { rows: 3, gap: 4, strength: 0.12, vary: 0.3, firstFaint: true } },
+        {
+          name: "3 × 3 varied",
+          p: { rows: 3, gap: 4, strength: 0.12, vary: 0.3, firstFaint: true },
+        },
         { name: "Dots 4 × 2", p: { cells: false, dots: true } },
-        { name: "Dots 5 × 3", p: { cells: false, dots: true, dotCols: 5, dotRows: 3, dotSize: 6.5, dotInset: 10 } },
-        { name: "Dots 3 × 2", p: { cells: false, dots: true, dotCols: 3, dotRows: 2, dotSize: 9.5, dotInset: 14, dotFill: 0.5 } },
-        { name: "Dots, assigned only", p: { cells: false, dots: true, dotCols: 5, dotRows: 3, dotSize: 6.5, dotInset: 10, dotOff: 0 } },
+        {
+          name: "Dots 5 × 3",
+          p: { cells: false, dots: true, dotCols: 5, dotRows: 3, dotSize: 6.5, dotInset: 10 },
+        },
+        {
+          name: "Dots 3 × 2",
+          p: {
+            cells: false,
+            dots: true,
+            dotCols: 3,
+            dotRows: 2,
+            dotSize: 9.5,
+            dotInset: 14,
+            dotFill: 0.5,
+          },
+        },
+        {
+          name: "Dots, assigned only",
+          p: {
+            cells: false,
+            dots: true,
+            dotCols: 5,
+            dotRows: 3,
+            dotSize: 6.5,
+            dotInset: 10,
+            dotOff: 0,
+          },
+        },
       ];
 
       function sanitize(raw) {
@@ -634,7 +750,14 @@
 
       const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
       const mixHex = (a, b, t) =>
-        "#" + hexRgb(a).map((v, i) => Math.round(v + (hexRgb(b)[i] - v) * t).toString(16).padStart(2, "0")).join("");
+        "#" +
+        hexRgb(a)
+          .map((v, i) =>
+            Math.round(v + (hexRgb(b)[i] - v) * t)
+              .toString(16)
+              .padStart(2, "0"),
+          )
+          .join("");
 
       // Seeded tones (mulberry32): each pattern number always gives the same
       // lighter and darker cells. With `firstFaint`, the cell closest to the
@@ -648,7 +771,10 @@
           t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
           return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
         };
-        const t = Array.from({ length: p.cols * p.rows }, () => p.strength + p.vary * (next() * 2 - 1));
+        const t = Array.from(
+          { length: p.cols * p.rows },
+          () => p.strength + p.vary * (next() * 2 - 1),
+        );
         if (p.firstFaint && t.length) {
           const k = t.reduce((best, v, i) => (Math.abs(v) < Math.abs(t[best]) ? i : best), 0);
           [t[0], t[k]] = [t[k], t[0]];
@@ -673,7 +799,10 @@
           for (let col = 0; col < p.cols; col++) {
             const k = row * p.cols + col;
             const tone = t[k];
-            const fill = tone >= 0 ? mixHex(c.mark, c.light, Math.min(tone, 1)) : mixHex(c.mark, c.deep, Math.min(-tone, 1));
+            const fill =
+              tone >= 0
+                ? mixHex(c.mark, c.light, Math.min(tone, 1))
+                : mixHex(c.mark, c.deep, Math.min(-tone, 1));
             out += `<rect x="${fmt(FRONT.x + p.inset + col * (cw + p.gap))}" y="${fmt(FRONT.y + top + row * (ch + p.gap))}" width="${fmt(cw)}" height="${fmt(ch)}" rx="${fmt(p.radius)}" fill="${fill}"/>`;
           }
         }
@@ -704,7 +833,10 @@
           t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
           return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
         };
-        const order = [...Array(n).keys()].map((k) => [rand(), k]).sort((x, y) => x[0] - y[0]).map(([, k]) => k);
+        const order = [...Array(n).keys()]
+          .map((k) => [rand(), k])
+          .sort((x, y) => x[0] - y[0])
+          .map(([, k]) => k);
         const assigned = new Set(order.slice(0, Math.round(p.dotFill * n)));
         const on = mixHex(c.mark, target, p.dotOn);
         const off = mixHex(c.mark, target, p.dotOff);
@@ -727,7 +859,10 @@
         const id = `gap${uid++}`;
         const c = COLORS[mode];
         const { ink, square } = geo(p);
-        const vb = crop === "square" ? [square.x, square.y, square.size, square.size] : [ink.x, ink.y, ink.w, ink.h];
+        const vb =
+          crop === "square"
+            ? [square.x, square.y, square.size, square.size]
+            : [ink.x, ink.y, ink.w, ink.h];
         const ratio = vb[3] / vb[2];
         const w = crop === "height" ? size / ratio : size;
         const h = crop === "height" ? size : size * ratio;
@@ -780,10 +915,13 @@
         $("sizesDark").innerHTML = [64, 32, 16].map((s) => mark(state, "dark", s)).join("");
         $("icon").innerHTML = `<span class="icon">${mark(state, "brand", 50)}</span>`;
         $("mono").innerHTML = [64, 32, 16].map((s) => mark(state, "mono", s)).join("");
-        $("lockLight").innerHTML = `<span class="cap">Light: header 24 px, 44 px, stacked</span>${lockup(state, "light", 24)}${lockup(state, "light", 44)}${stacked(state, "light", 26)}`;
-        $("lockDark").innerHTML = `<span class="cap">Dark</span>${lockup(state, "dark", 24)}${lockup(state, "dark", 44)}${stacked(state, "dark", 26)}`;
+        $("lockLight").innerHTML =
+          `<span class="cap">Light: header 24 px, 44 px, stacked</span>${lockup(state, "light", 24)}${lockup(state, "light", 44)}${stacked(state, "light", 26)}`;
+        $("lockDark").innerHTML =
+          `<span class="cap">Dark</span>${lockup(state, "dark", 24)}${lockup(state, "dark", 44)}${stacked(state, "dark", 26)}`;
         const shipped = sanitize({ cells: false, ...SHIPPED_CORNERS, ...SHIPPED_POSITION });
-        $("beforeAfter").innerHTML = `<figure>${lockup(shipped, "light", 24)}<figcaption>Shipped</figcaption></figure><figure>${lockup(state, "light", 24)}<figcaption>With grid</figcaption></figure><figure>${mark(shipped, "light", 40)}<figcaption>40 px</figcaption></figure><figure>${mark(state, "light", 40)}<figcaption>40 px</figcaption></figure>`;
+        $("beforeAfter").innerHTML =
+          `<figure>${lockup(shipped, "light", 24)}<figcaption>Shipped</figcaption></figure><figure>${lockup(state, "light", 24)}<figcaption>With grid</figcaption></figure><figure>${mark(shipped, "light", 40)}<figcaption>40 px</figcaption></figure><figure>${mark(state, "light", 40)}<figcaption>40 px</figcaption></figure>`;
         sync();
         try {
           localStorage.setItem(DRAFT_KEY, JSON.stringify(state));
@@ -812,13 +950,29 @@
         const shippedCorners = Object.entries(SHIPPED_CORNERS).every(([k, v]) => state[k] === v);
         $("resetCorners").setAttribute("aria-pressed", String(shippedCorners));
         const detail = state.dots ? "dots" : state.cells ? "cells" : "none";
-        document.querySelectorAll("[data-detail]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.detail === detail)));
+        document
+          .querySelectorAll("[data-detail]")
+          .forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.detail === detail)));
         $("dotPanel").hidden = detail !== "dots";
         $("gridPanel").hidden = detail !== "cells";
-        document.querySelectorAll("[data-back]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.back === state.backStyle)));
+        document
+          .querySelectorAll("[data-back]")
+          .forEach((b) =>
+            b.setAttribute("aria-pressed", String(b.dataset.back === state.backStyle)),
+          );
         $("in-backOpacity").closest(".ctl").hidden = state.backStyle !== "solid";
-        $("resetPosition").setAttribute("aria-pressed", String(Object.entries(SHIPPED_POSITION).every(([k, v]) => state[k] === v)));
-        document.querySelectorAll("[data-first]").forEach((b) => b.setAttribute("aria-pressed", String((b.dataset.first === "true") === state.firstFaint)));
+        $("resetPosition").setAttribute(
+          "aria-pressed",
+          String(Object.entries(SHIPPED_POSITION).every(([k, v]) => state[k] === v)),
+        );
+        document
+          .querySelectorAll("[data-first]")
+          .forEach((b) =>
+            b.setAttribute(
+              "aria-pressed",
+              String((b.dataset.first === "true") === state.firstFaint),
+            ),
+          );
         const corners = {
           backR: state.backR,
           frontR: state.frontR,
@@ -829,12 +983,18 @@
           backStyle: state.backStyle,
           backOpacity: state.backOpacity,
         };
-        const match = PRESETS.find((pr) => JSON.stringify(sanitize({ ...BASE, ...corners, ...pr.p })) === JSON.stringify(state));
-        document.querySelectorAll("[data-preset]").forEach((b) => b.setAttribute("aria-pressed", String(match?.name === b.dataset.preset)));
+        const match = PRESETS.find(
+          (pr) =>
+            JSON.stringify(sanitize({ ...BASE, ...corners, ...pr.p })) === JSON.stringify(state),
+        );
+        document
+          .querySelectorAll("[data-preset]")
+          .forEach((b) => b.setAttribute("aria-pressed", String(match?.name === b.dataset.preset)));
       }
 
       $("dotControls").innerHTML = DOT_SLIDERS.map(
-        ([key, label, min, max, step]) => `<div class="ctl"><label for="in-${key}">${label} <output id="out-${key}"></output></label><input id="in-${key}" type="range" min="${min}" max="${max}" step="${step}" /></div>`,
+        ([key, label, min, max, step]) =>
+          `<div class="ctl"><label for="in-${key}">${label} <output id="out-${key}"></output></label><input id="in-${key}" type="range" min="${min}" max="${max}" step="${step}" /></div>`,
       ).join("");
       for (const [key] of DOT_SLIDERS) {
         $(`in-${key}`).addEventListener("input", (e) => {
@@ -847,7 +1007,9 @@
         ["cells", "Grid", { cells: true, dots: false }],
         ["dots", "Dots", { cells: false, dots: true }],
       ];
-      $("detail").innerHTML = DETAILS.map(([k, l]) => `<button class="chip" type="button" data-detail="${k}">${l}</button>`).join("");
+      $("detail").innerHTML = DETAILS.map(
+        ([k, l]) => `<button class="chip" type="button" data-detail="${k}">${l}</button>`,
+      ).join("");
       document.querySelectorAll("[data-detail]").forEach((b) =>
         b.addEventListener("click", () => {
           Object.assign(state, DETAILS.find(([k]) => k === b.dataset.detail)[2]);
@@ -855,7 +1017,8 @@
         }),
       );
       $("cardControls").innerHTML = CARD_SLIDERS.map(
-        ([key, label, min, max, step]) => `<div class="ctl"><label for="in-${key}">${label} <output id="out-${key}"></output></label><input id="in-${key}" type="range" min="${min}" max="${max}" step="${step}" /></div>`,
+        ([key, label, min, max, step]) =>
+          `<div class="ctl"><label for="in-${key}">${label} <output id="out-${key}"></output></label><input id="in-${key}" type="range" min="${min}" max="${max}" step="${step}" /></div>`,
       ).join("");
       for (const [key] of CARD_SLIDERS) {
         $(`in-${key}`).addEventListener("input", (e) => {
@@ -884,7 +1047,8 @@
         render();
       });
       $("gridControls").innerHTML = SLIDERS.map(
-        ([key, label, min, max, step]) => `<div class="ctl"><label for="in-${key}">${label} <output id="out-${key}"></output></label><input id="in-${key}" type="range" min="${min}" max="${max}" step="${step}" /></div>`,
+        ([key, label, min, max, step]) =>
+          `<div class="ctl"><label for="in-${key}">${label} <output id="out-${key}"></output></label><input id="in-${key}" type="range" min="${min}" max="${max}" step="${step}" /></div>`,
       ).join("");
       for (const [key] of SLIDERS) {
         $(`in-${key}`).addEventListener("input", (e) => {
@@ -892,7 +1056,9 @@
           render();
         });
       }
-      $("presets").innerHTML = PRESETS.map((pr) => `<button class="chip" type="button" data-preset="${pr.name}">${pr.name}</button>`).join("");
+      $("presets").innerHTML = PRESETS.map(
+        (pr) => `<button class="chip" type="button" data-preset="${pr.name}">${pr.name}</button>`,
+      ).join("");
       document.querySelectorAll("[data-preset]").forEach((b) =>
         b.addEventListener("click", () => {
           const corners = {
@@ -905,7 +1071,11 @@
             backStyle: state.backStyle,
             backOpacity: state.backOpacity,
           };
-          state = sanitize({ ...BASE, ...corners, ...PRESETS.find((x) => x.name === b.dataset.preset).p });
+          state = sanitize({
+            ...BASE,
+            ...corners,
+            ...PRESETS.find((x) => x.name === b.dataset.preset).p,
+          });
           render();
         }),
       );
@@ -930,39 +1100,48 @@
 
       function renderSaved() {
         $("savedList").innerHTML = designs
-          .map((d) => `<li><span class="name"></span><button class="link" type="button" data-load="${d.id}">Load</button><button class="link del" type="button" data-del="${d.id}">Delete</button></li>`)
+          .map(
+            (d) =>
+              `<li><span class="name"></span><button class="link" type="button" data-load="${d.id}">Load</button><button class="link del" type="button" data-del="${d.id}">Delete</button></li>`,
+          )
           .join("");
-        $("savedList").querySelectorAll(".name").forEach((el, i) => (el.textContent = designs[i].name));
-        $("savedList").querySelectorAll("[data-load]").forEach((b) =>
-          b.addEventListener("click", () => {
-            const d = designs.find((x) => x.id === b.dataset.load);
-            if (!d) return;
-            state = sanitize(d.settings);
-            $("designName").value = d.name;
-            render();
-            setStatus(`Loaded "${d.name}".`);
-          }),
-        );
-        $("savedList").querySelectorAll("[data-del]").forEach((b) => {
-          let armed = false;
-          b.addEventListener("click", async () => {
-            if (!armed) {
-              armed = true;
-              b.textContent = "Confirm";
-              setTimeout(() => {
-                armed = false;
-                b.textContent = "Delete";
-              }, 2500);
-              return;
-            }
-            try {
-              await db.collection("designs").doc(b.dataset.del).delete();
-              setStatus("Deleted.");
-            } catch {
-              setStatus("That design couldn't be deleted. Try again in a moment.");
-            }
+        $("savedList")
+          .querySelectorAll(".name")
+          .forEach((el, i) => (el.textContent = designs[i].name));
+        $("savedList")
+          .querySelectorAll("[data-load]")
+          .forEach((b) =>
+            b.addEventListener("click", () => {
+              const d = designs.find((x) => x.id === b.dataset.load);
+              if (!d) return;
+              state = sanitize(d.settings);
+              $("designName").value = d.name;
+              render();
+              setStatus(`Loaded "${d.name}".`);
+            }),
+          );
+        $("savedList")
+          .querySelectorAll("[data-del]")
+          .forEach((b) => {
+            let armed = false;
+            b.addEventListener("click", async () => {
+              if (!armed) {
+                armed = true;
+                b.textContent = "Confirm";
+                setTimeout(() => {
+                  armed = false;
+                  b.textContent = "Delete";
+                }, 2500);
+                return;
+              }
+              try {
+                await db.collection("designs").doc(b.dataset.del).delete();
+                setStatus("Deleted.");
+              } catch {
+                setStatus("That design couldn't be deleted. Try again in a moment.");
+              }
+            });
           });
-        });
       }
 
       async function connect() {
@@ -984,7 +1163,11 @@
             (snap) => {
               designs = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
               renderSaved();
-              setStatus(designs.length ? `${designs.length} saved. Claude can read these.` : "No saved designs yet. Name one and save it.");
+              setStatus(
+                designs.length
+                  ? `${designs.length} saved. Claude can read these.`
+                  : "No saved designs yet. Name one and save it.",
+              );
             },
             () => setStatus("Saved designs are unavailable right now."),
           );
@@ -1001,7 +1184,11 @@
           else await db.collection("designs").add(body);
           setStatus(`Saved "${name}".`);
         } catch (e) {
-          setStatus(e?.code === "invalid_argument" ? "You can view designs here, but not save them." : "Couldn't save. Try again in a moment.");
+          setStatus(
+            e?.code === "invalid_argument"
+              ? "You can view designs here, but not save them."
+              : "Couldn't save. Try again in a moment.",
+          );
         } finally {
           $("saveBtn").disabled = false;
         }

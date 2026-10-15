@@ -459,7 +459,9 @@
         ctx.fillStyle = "#000";
         ctx.fill(front);
         const { data } = ctx.getImageData(0, 0, 200, 200);
-        let m = 0, mx = 0, my = 0;
+        let m = 0,
+          mx = 0,
+          my = 0;
         for (let i = 3, p = 0; i < data.length; i += 4, p++) {
           const a = data[i];
           if (!a) continue;
@@ -551,7 +553,8 @@
         $("scaleOut").textContent = `${Math.round(state.scale * 100)}%`;
         const ratio = g.ink.w / g.ink.h;
         const shippedRatio = shippedGeom.ink.w / shippedGeom.ink.h;
-        $("stats").innerHTML = `Footprint <b>${ratio.toFixed(2)} : 1</b> (shipped ${shippedRatio.toFixed(2)} : 1)<br>
+        $("stats").innerHTML =
+          `Footprint <b>${ratio.toFixed(2)} : 1</b> (shipped ${shippedRatio.toFixed(2)} : 1)<br>
           Back card visible beside front: <b>${fmt(g.front.x - g.back.x)}</b> of ${fmt(g.ink.w)} units<br>
           Back card above front: <b>${fmt(Math.max(0, g.front.y - g.back.y))}</b> units`;
         $("tileLight").innerHTML = tileHtml(g, "light", "Light", guide);
@@ -599,7 +602,8 @@ const BACK_LIFT = ${fmt(state.lift)}; // new
       );
 
       $("presets").innerHTML = CANDIDATES.map(
-        (c) => `<button class="chip" data-cand="${c.id}" aria-pressed="false">${c.name.split(" - ")[0]}</button>`,
+        (c) =>
+          `<button class="chip" data-cand="${c.id}" aria-pressed="false">${c.name.split(" - ")[0]}</button>`,
       ).join("");
       $("cands").innerHTML = CANDIDATES.map((c) => {
         const g = geometry(c);
@@ -610,9 +614,13 @@ const BACK_LIFT = ${fmt(state.lift)}; // new
           <p>${c.note} Footprint ${(g.ink.w / g.ink.h).toFixed(2)} : 1.</p>
         </button>`;
       }).join("");
-      document.querySelectorAll("[data-cand]").forEach((el) =>
-        el.addEventListener("click", () => setState(CANDIDATES.find((c) => c.id === el.dataset.cand))),
-      );
+      document
+        .querySelectorAll("[data-cand]")
+        .forEach((el) =>
+          el.addEventListener("click", () =>
+            setState(CANDIDATES.find((c) => c.id === el.dataset.cand)),
+          ),
+        );
       $("guideBtn").addEventListener("click", (e) => {
         guide = !guide;
         e.currentTarget.setAttribute("aria-pressed", String(guide));

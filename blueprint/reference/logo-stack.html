@@ -347,7 +347,9 @@
             <input id="stepY" type="range" min="0" max="0.7" step="0.01" />
           </div>
           <div class="ctl">
-            <label for="shrink">Each card's size vs the one behind <output id="shrinkOut"></output></label>
+            <label for="shrink"
+              >Each card's size vs the one behind <output id="shrinkOut"></output
+            ></label>
             <input id="shrink" type="range" min="0.7" max="1" step="0.01" />
           </div>
           <div class="ctl">
@@ -381,10 +383,10 @@
         cards stay apart.
       </p>
       <p class="note">
-        Recognition risk: stacked, slanted cards are a common "layers" and "stack" icon, and
-        the reference image may itself be another company's mark. Change the card count, slant,
-        steps and colors until it isn't a copy, then Lens-check it on its own and in the lockup
-        before adopting it.
+        Recognition risk: stacked, slanted cards are a common "layers" and "stack" icon, and the
+        reference image may itself be another company's mark. Change the card count, slant, steps
+        and colors until it isn't a copy, then Lens-check it on its own and in the lockup before
+        adopting it.
       </p>
     </main>
     <svg id="measure" aria-hidden="true"><path id="measurePath" /></svg>
@@ -403,37 +405,85 @@
           id: "ref",
           name: "Reference",
           note: "Measured from the image: four cards, 37° slant, each 83% of the one behind.",
-          n: 4, angle: 37, aspect: 1, stepX: 0.33, stepY: 0.34, shrink: 0.83, radius: 0.1, gap: 0, lightFront: true,
+          n: 4,
+          angle: 37,
+          aspect: 1,
+          stepX: 0.33,
+          stepY: 0.34,
+          shrink: 0.83,
+          radius: 0.1,
+          gap: 0,
+          lightFront: true,
         },
         {
           id: "a",
           name: "A - Three cards",
           note: "Three cards, gentler slant, softer corners and a thin gap for 16 px.",
-          n: 3, angle: 30, aspect: 0.95, stepX: 0.36, stepY: 0.38, shrink: 0.86, radius: 0.14, gap: 0.03, lightFront: true,
+          n: 3,
+          angle: 30,
+          aspect: 0.95,
+          stepX: 0.36,
+          stepY: 0.38,
+          shrink: 0.86,
+          radius: 0.14,
+          gap: 0.03,
+          lightFront: true,
         },
         {
           id: "b",
           name: "B - Two cards",
           note: "Keeps the two-card idea of the current mark in the new style.",
-          n: 2, angle: 32, aspect: 0.95, stepX: 0.4, stepY: 0.42, shrink: 0.85, radius: 0.14, gap: 0.035, lightFront: true,
+          n: 2,
+          angle: 32,
+          aspect: 0.95,
+          stepX: 0.4,
+          stepY: 0.42,
+          shrink: 0.85,
+          radius: 0.14,
+          gap: 0.035,
+          lightFront: true,
         },
         {
           id: "c",
           name: "C - Schedule cells",
           note: "Wider, shallower cards like schedule cells, no shrinking.",
-          n: 3, angle: 22, aspect: 0.72, stepX: 0.32, stepY: 0.45, shrink: 1, radius: 0.14, gap: 0.03, lightFront: true,
+          n: 3,
+          angle: 22,
+          aspect: 0.72,
+          stepX: 0.32,
+          stepY: 0.45,
+          shrink: 1,
+          radius: 0.14,
+          gap: 0.03,
+          lightFront: true,
         },
         {
           id: "d",
           name: "D - Steep four",
           note: "Four cards, a steeper slant and a stronger size drop, no gap.",
-          n: 4, angle: 40, aspect: 1.05, stepX: 0.3, stepY: 0.3, shrink: 0.8, radius: 0.12, gap: 0, lightFront: true,
+          n: 4,
+          angle: 40,
+          aspect: 1.05,
+          stepX: 0.3,
+          stepY: 0.3,
+          shrink: 0.8,
+          radius: 0.12,
+          gap: 0,
+          lightFront: true,
         },
         {
           id: "e",
           name: "E - Deep in front",
           note: "Three cards with the darkest one in front instead.",
-          n: 3, angle: 32, aspect: 0.95, stepX: 0.36, stepY: 0.38, shrink: 0.86, radius: 0.14, gap: 0.03, lightFront: false,
+          n: 3,
+          angle: 32,
+          aspect: 0.95,
+          stepX: 0.36,
+          stepY: 0.38,
+          shrink: 0.86,
+          radius: 0.14,
+          gap: 0.03,
+          lightFront: false,
         },
       ];
 
@@ -638,12 +688,17 @@
         $("shrinkOut").textContent = `${Math.round(state.shrink * 100)}%`;
         $("radiusOut").textContent = `${Math.round(state.radius * 100)}%`;
         $("gapOut").textContent = state.gap ? `${fmt(state.gap * 100)}%` : "none";
-        $("stats").innerHTML = `Footprint <b>${(g.ink.w / g.ink.h).toFixed(2)} : 1</b> (shipped mark 1.73 : 1)<br>
-          Colors back to front: ${cardColors(state, "light").map((c) => `<b>${c}</b>`).join(" ")}`;
+        $("stats").innerHTML =
+          `Footprint <b>${(g.ink.w / g.ink.h).toFixed(2)} : 1</b> (shipped mark 1.73 : 1)<br>
+          Colors back to front: ${cardColors(state, "light")
+            .map((c) => `<b>${c}</b>`)
+            .join(" ")}`;
         $("tileLight").innerHTML = tileHtml(g, state, "light");
         $("tileDark").innerHTML = tileHtml(g, state, "dark");
         const match = CANDIDATES.find(
-          (c) => inputs.every((k) => Math.abs(c[k] - state[k]) < 1e-3) && c.lightFront === state.lightFront,
+          (c) =>
+            inputs.every((k) => Math.abs(c[k] - state[k]) < 1e-3) &&
+            c.lightFront === state.lightFront,
         );
         document.querySelectorAll("[data-cand]").forEach((el) => {
           el.setAttribute("aria-pressed", String(match?.id === el.dataset.cand));
@@ -686,7 +741,8 @@ export const BRAND_STACK_COLORS = {
       });
 
       $("presets").innerHTML = CANDIDATES.map(
-        (c) => `<button class="chip" data-cand="${c.id}" aria-pressed="false">${c.name.split(" - ")[0]}</button>`,
+        (c) =>
+          `<button class="chip" data-cand="${c.id}" aria-pressed="false">${c.name.split(" - ")[0]}</button>`,
       ).join("");
       $("cands").innerHTML = CANDIDATES.map((c) => {
         const g = geometry(c);
@@ -702,9 +758,13 @@ export const BRAND_STACK_COLORS = {
           <p>${c.note} Footprint ${(g.ink.w / g.ink.h).toFixed(2)} : 1.</p>
         </button>`;
       }).join("");
-      document.querySelectorAll("[data-cand]").forEach((el) =>
-        el.addEventListener("click", () => setState(CANDIDATES.find((c) => c.id === el.dataset.cand))),
-      );
+      document
+        .querySelectorAll("[data-cand]")
+        .forEach((el) =>
+          el.addEventListener("click", () =>
+            setState(CANDIDATES.find((c) => c.id === el.dataset.cand)),
+          ),
+        );
 
       setState(state);
       document.fonts?.ready.then(render);

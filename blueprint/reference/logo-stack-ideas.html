@@ -277,8 +277,8 @@
       <h1>Stacked card ideas</h1>
       <p class="lede">
         Ten ways to give the stacked cards a meaning only DubGrid has. Every idea keeps the refined
-        mark (two equal cards, 32° slant, brand blue behind, light blue in front) and adds one
-        thing to it.
+        mark (two equal cards, 32° slant, brand blue behind, light blue in front) and adds one thing
+        to it.
       </p>
 
       <div class="brief">
@@ -286,16 +286,27 @@
           <h3>What each idea has to do</h3>
           <ul>
             <li>Keep the two slanted cards recognizable, so the work so far carries over.</li>
-            <li>Add one idea from the product: shifts, handoffs, care, weeks, people, or the name.</li>
+            <li>
+              Add one idea from the product: shifts, handoffs, care, weeks, people, or the name.
+            </li>
             <li>Survive 16 px and one color, where small details disappear first.</li>
           </ul>
         </div>
         <div class="panel">
           <h3>My picks to develop</h3>
           <ul>
-            <li><b>Care home:</b> the cards lean together into a roof. Says care facility at a glance, and the silhouette is new.</li>
-            <li><b>Handoff:</b> the overlap becomes its own color, the shift handover. Costs nothing at small sizes.</li>
-            <li><b>Shift card:</b> a punched hole turns the card into a time card. A small detail with a lot of meaning.</li>
+            <li>
+              <b>Care home:</b> the cards lean together into a roof. Says care facility at a glance,
+              and the silhouette is new.
+            </li>
+            <li>
+              <b>Handoff:</b> the overlap becomes its own color, the shift handover. Costs nothing
+              at small sizes.
+            </li>
+            <li>
+              <b>Shift card:</b> a punched hole turns the card into a time card. A small detail with
+              a lot of meaning.
+            </li>
           </ul>
         </div>
       </div>
@@ -424,12 +435,13 @@
           tag: "Product",
           says: "The back card is an open slot, drawn dashed, and the solid card is moving into it. The moment the product exists for: an open shift getting covered.",
           risk: "Dashes turn to a gray smudge at 16 px; the small sizes need a solid outline, which brings back the old outlined mark.",
-          svg: () => `<path d="${backPath}" fill="none" stroke="var(--m1)" stroke-width="5" stroke-dasharray="12 7" stroke-linecap="round"/>${cut(card(FRONT[0] - 10, FRONT[1] + 4), "var(--m1)")}`,
+          svg: () =>
+            `<path d="${backPath}" fill="none" stroke="var(--m1)" stroke-width="5" stroke-dasharray="12 7" stroke-linecap="round"/>${cut(card(FRONT[0] - 10, FRONT[1] + 4), "var(--m1)")}`,
         },
         {
           name: "The d",
           tag: "Name",
-          says: "A stem rises from the front card's right edge, turning it into a lowercase \"d\": the first letter of dubgrid, sitting on its second card.",
+          says: 'A stem rises from the front card\'s right edge, turning it into a lowercase "d": the first letter of dubgrid, sitting on its second card.',
           risk: "Letter marks are only as good as the letter; at a glance this could read as a flag or a tag. Strongest beside the wordmark.",
           svg: () => {
             const sx = FRONT[0] + W / 2;
@@ -442,7 +454,7 @@
         {
           name: "Calendar",
           tag: "Product",
-          says: "Two binder tabs on the front card's top edge make the stack two calendar pages: this week, and next week behind it. Two tabs, \"dub\".",
+          says: 'Two binder tabs on the front card\'s top edge make the stack two calendar pages: this week, and next week behind it. Two tabs, "dub".',
           risk: "Calendar icons are generic; the slant and the second page are what make it ours. The tabs need weight to survive 16 px.",
           svg: () => {
             const tab = (x) => {
@@ -487,7 +499,7 @@
           name: "On shift",
           tag: "People",
           says: "A round head sits above the front card, so the card becomes a person: someone on shift, with the next shift behind them. Puts staff at the center.",
-          risk: "Closest to the standard \"user\" icon of the ten. The slanted card body is what keeps it from being an avatar.",
+          risk: 'Closest to the standard "user" icon of the ten. The slanted card body is what keeps it from being an avatar.',
           svg: () => {
             const hx = FRONT[0] - 4;
             const hy = topY(...FRONT, hx) - 20;
@@ -497,10 +509,11 @@
         {
           name: "Echo",
           tag: "Name",
-          says: "Fading outlines trail behind the stack, like the echo in dub music: shifts that repeat week after week. Gives the \"dub\" in the name a story and the mark a sense of motion.",
+          says: 'Fading outlines trail behind the stack, like the echo in dub music: shifts that repeat week after week. Gives the "dub" in the name a story and the mark a sense of motion.',
           risk: "The echoes vanish at small sizes, leaving the plain stack. Motion trails can also read as speed or a shipping brand.",
           svg: () => {
-            const echo = (k, op) => `<path d="${card(-k * 40, -k * (40 * TAN - 0.42 * H))}" fill="none" stroke="var(--m1)" stroke-width="4" opacity="${op}"/>`;
+            const echo = (k, op) =>
+              `<path d="${card(-k * 40, -k * (40 * TAN - 0.42 * H))}" fill="none" stroke="var(--m1)" stroke-width="4" opacity="${op}"/>`;
             return `${echo(2, 0.25)}${echo(1, 0.5)}${cut(backPath, "var(--m1)")}${cut(frontPath, "var(--m2)")}`;
           },
         },
@@ -513,7 +526,9 @@
         g.innerHTML = idea.svg();
         const b = g.getBBox();
         const side = Math.max(b.width, b.height) * 1.08;
-        const vb = [b.x + b.width / 2 - side / 2, b.y + b.height / 2 - side / 2, side, side].map(fmt).join(" ");
+        const vb = [b.x + b.width / 2 - side / 2, b.y + b.height / 2 - side / 2, side, side]
+          .map(fmt)
+          .join(" ");
         boxes.set(idea.name, vb);
         return vb;
       }
@@ -543,7 +558,8 @@
       ).join("");
 
       document.getElementById("strip").innerHTML = IDEAS.map(
-        (c) => `<figure><span class="tile dark">${mark(c, 40)}</span><figcaption>${c.name}</figcaption></figure>`,
+        (c) =>
+          `<figure><span class="tile dark">${mark(c, 40)}</span><figcaption>${c.name}</figcaption></figure>`,
       ).join("");
     </script>
   </body>

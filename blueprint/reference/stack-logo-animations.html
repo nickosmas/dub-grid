@@ -232,11 +232,11 @@
     <main>
       <h1>Stacked logo animations</h1>
       <p class="sub">
-        Breathe, Shuffle and Climb for the refined two-card mark. Climb replaces Trace for
-        sync and long waits. The rules carry over: the logo stays static wherever it
-        identifies the product, these play only on full-screen waits, and reduced motion shows
-        the static mark. The darker card is in front, as the owner chose; the bar can switch
-        to the light card and turn the gap off for comparison.
+        Breathe, Shuffle and Climb for the refined two-card mark. Climb replaces Trace for sync and
+        long waits. The rules carry over: the logo stays static wherever it identifies the product,
+        these play only on full-screen waits, and reduced motion shows the static mark. The darker
+        card is in front, as the owner chose; the bar can switch to the light card and turn the gap
+        off for comparison.
       </p>
 
       <div class="bar">
@@ -276,15 +276,25 @@
           <span>2.4 s loop</span>
         </div>
         <p>
-          Mobile splash and the web sign-in handoff while the session restores. A slow sine
-          pulse: the front card grows 4.5% while the back card eases away from it along the
-          stack. Every loop starts on the static frame, so the native launch image hands off
-          without a jump.
+          Mobile splash and the web sign-in handoff while the session restores. A slow sine pulse:
+          the front card grows 4.5% while the back card eases away from it along the stack. Every
+          loop starts on the static frame, so the native launch image hands off without a jump.
         </p>
         <div class="stage">
-          <div class="tile light"><span class="cap">160 px</span><span data-anim="breathe" data-theme="light" data-size="160"></span></div>
-          <div class="tile light"><span class="cap">Splash, light</span><span data-anim="breathe" data-theme="light" data-size="84"></span><span class="word" style="font-size:26px">dubgrid</span></div>
-          <div class="tile dark"><span class="cap">Splash, dark</span><span data-anim="breathe" data-theme="dark" data-size="84"></span><span class="word" style="font-size:26px">dubgrid</span></div>
+          <div class="tile light">
+            <span class="cap">160 px</span
+            ><span data-anim="breathe" data-theme="light" data-size="160"></span>
+          </div>
+          <div class="tile light">
+            <span class="cap">Splash, light</span
+            ><span data-anim="breathe" data-theme="light" data-size="84"></span
+            ><span class="word" style="font-size: 26px">dubgrid</span>
+          </div>
+          <div class="tile dark">
+            <span class="cap">Splash, dark</span
+            ><span data-anim="breathe" data-theme="dark" data-size="84"></span
+            ><span class="word" style="font-size: 26px">dubgrid</span>
+          </div>
         </div>
       </section>
 
@@ -296,14 +306,25 @@
         <p>
           Schedule and route-level loading. The cards trade places along one arc (the front card
           over the top to the back, the back card underneath to the front), with quartic
-          ease-in-out, then rest. Their colors cross between 30% and 70% of the move, and the
-          gap closes as they pass, so they read as one card shuffling through rather than a
-          snap. When loading ends they finish the current swap and rest on the static mark.
+          ease-in-out, then rest. Their colors cross between 30% and 70% of the move, and the gap
+          closes as they pass, so they read as one card shuffling through rather than a snap. When
+          loading ends they finish the current swap and rest on the static mark.
         </p>
         <div class="stage">
-          <div class="tile light"><span class="cap">160 px</span><span data-anim="shuffle" data-theme="light" data-size="160"></span></div>
-          <div class="tile light"><span class="cap">Schedule loading, light</span><span data-anim="shuffle" data-theme="light" data-size="64"></span><span class="msg" data-msg="shuffle">Loading your schedule</span></div>
-          <div class="tile dark"><span class="cap">Schedule loading, dark</span><span data-anim="shuffle" data-theme="dark" data-size="64"></span><span class="msg" data-msg="shuffle">Loading your schedule</span></div>
+          <div class="tile light">
+            <span class="cap">160 px</span
+            ><span data-anim="shuffle" data-theme="light" data-size="160"></span>
+          </div>
+          <div class="tile light">
+            <span class="cap">Schedule loading, light</span
+            ><span data-anim="shuffle" data-theme="light" data-size="64"></span
+            ><span class="msg" data-msg="shuffle">Loading your schedule</span>
+          </div>
+          <div class="tile dark">
+            <span class="cap">Schedule loading, dark</span
+            ><span data-anim="shuffle" data-theme="dark" data-size="64"></span
+            ><span class="msg" data-msg="shuffle">Loading your schedule</span>
+          </div>
         </div>
         <div class="controls">
           <button class="chip" data-finish="shuffle">Finish loading</button>
@@ -317,17 +338,27 @@
           <span>1.6 s cycle: 1.0 s step, 0.6 s rest</span>
         </div>
         <p>
-          Sync and long-running waits; replaces Trace. The stack steps up the slant as a
-          ripple, front to back. The front card leaves first, stepping forward and
-          shrinking into its far corner; the back card rises into its place and turns
-          light; a new back card arrives last, doing the exact reverse of the leaving
-          card. The step is symmetric under a half turn, like the mark. When syncing
-          ends it finishes the step and rests.
+          Sync and long-running waits; replaces Trace. The stack steps up the slant as a ripple,
+          front to back. The front card leaves first, stepping forward and shrinking into its far
+          corner; the back card rises into its place and turns light; a new back card arrives last,
+          doing the exact reverse of the leaving card. The step is symmetric under a half turn, like
+          the mark. When syncing ends it finishes the step and rests.
         </p>
         <div class="stage">
-          <div class="tile light"><span class="cap">160 px</span><span data-anim="climb" data-theme="light" data-size="160"></span></div>
-          <div class="tile light"><span class="cap">Syncing, light</span><span data-anim="climb" data-theme="light" data-size="64"></span><span class="msg" data-msg="climb">Syncing changes</span></div>
-          <div class="tile dark"><span class="cap">Syncing, dark</span><span data-anim="climb" data-theme="dark" data-size="64"></span><span class="msg" data-msg="climb">Syncing changes</span></div>
+          <div class="tile light">
+            <span class="cap">160 px</span
+            ><span data-anim="climb" data-theme="light" data-size="160"></span>
+          </div>
+          <div class="tile light">
+            <span class="cap">Syncing, light</span
+            ><span data-anim="climb" data-theme="light" data-size="64"></span
+            ><span class="msg" data-msg="climb">Syncing changes</span>
+          </div>
+          <div class="tile dark">
+            <span class="cap">Syncing, dark</span
+            ><span data-anim="climb" data-theme="dark" data-size="64"></span
+            ><span class="msg" data-msg="climb">Syncing changes</span>
+          </div>
         </div>
         <div class="controls">
           <button class="chip" data-finish="climb">Finish syncing</button>
@@ -336,10 +367,22 @@
       </section>
 
       <ul class="notes">
-        <li><b>Static everywhere else:</b> navbar, sign-in, onboarding, goodbye, emails and app icons keep the static mark.</li>
-        <li><b>Conventional progress elsewhere:</b> route changes keep the top progress bar, buttons their spinner, pull-to-refresh the native control.</li>
-        <li><b>Reduced motion:</b> every animation shows the static frame. Switch to "Reduced motion" above to check; the page also starts that way if your system asks for less motion.</li>
-        <li><b>Units:</b> distances are in the 100-unit box used for the shipped mark, scaled to this symbol's size, so 4 and 8 units move the same share of the symbol as before.</li>
+        <li>
+          <b>Static everywhere else:</b> navbar, sign-in, onboarding, goodbye, emails and app icons
+          keep the static mark.
+        </li>
+        <li>
+          <b>Conventional progress elsewhere:</b> route changes keep the top progress bar, buttons
+          their spinner, pull-to-refresh the native control.
+        </li>
+        <li>
+          <b>Reduced motion:</b> every animation shows the static frame. Switch to "Reduced motion"
+          above to check; the page also starts that way if your system asks for less motion.
+        </li>
+        <li>
+          <b>Units:</b> distances are in the 100-unit box used for the shipped mark, scaled to this
+          symbol's size, so 4 and 8 units move the same share of the symbol as before.
+        </li>
       </ul>
     </main>
     <svg id="measure" aria-hidden="true"><path id="measurePath" /></svg>
@@ -367,7 +410,14 @@
       };
       const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
       const mix = (a, b, t) =>
-        "#" + hex(a).map((v, i) => Math.round(lerp(v, hex(b)[i], t)).toString(16).padStart(2, "0")).join("");
+        "#" +
+        hex(a)
+          .map((v, i) =>
+            Math.round(lerp(v, hex(b)[i], t))
+              .toString(16)
+              .padStart(2, "0"),
+          )
+          .join("");
 
       function roundedPolygon(pts, r) {
         const n = pts.length;
@@ -506,12 +556,28 @@
         const tail = window01(u, 0.2, 1);
         const leaving = smoothstep(0, 1, lead);
         const arriving = smoothstep(0, 1, tail);
-        const along = (at, k) => ({ x: at.x + CLIMB_DRIFT * STEP.x * k, y: at.y + CLIMB_DRIFT * STEP.y * k });
+        const along = (at, k) => ({
+          x: at.x + CLIMB_DRIFT * STEP.x * k,
+          y: at.y + CLIMB_DRIFT * STEP.y * k,
+        });
         return {
           cards: [
-            { ...scaledFrom(along(BACK, arriving - 1), BOTTOM_LEFT, arriving), color: 0, opacity: speck(arriving) },
-            { x: lerp(BACK.x, FRONT.x, rise), y: lerp(BACK.y, FRONT.y, rise), scale: 1, color: rise },
-            { ...scaledFrom(along(FRONT, leaving), TOP_RIGHT, 1 - leaving), color: 1, opacity: speck(1 - leaving) },
+            {
+              ...scaledFrom(along(BACK, arriving - 1), BOTTOM_LEFT, arriving),
+              color: 0,
+              opacity: speck(arriving),
+            },
+            {
+              x: lerp(BACK.x, FRONT.x, rise),
+              y: lerp(BACK.y, FRONT.y, rise),
+              scale: 1,
+              color: rise,
+            },
+            {
+              ...scaledFrom(along(FRONT, leaving), TOP_RIGHT, 1 - leaving),
+              color: 1,
+              opacity: speck(1 - leaving),
+            },
           ].filter((k) => k.scale > 0.01),
           gap: 1,
         };
@@ -536,8 +602,7 @@
           ? { back: theme === "dark" ? darkBack : COLORS[theme].front, front: COLORS[theme].back }
           : COLORS[theme];
         const vb = [CENTER.x - SIDE / 2, CENTER.y - SIDE / 2, SIDE, SIDE].map(fmt).join(" ");
-        const place = (k) =>
-          `translate(${fmt(k.x)} ${fmt(k.y)}) scale(${fmt(k.scale)})`;
+        const place = (k) => `translate(${fmt(k.x)} ${fmt(k.y)}) scale(${fmt(k.scale)})`;
         const region = `x="${fmt(CENTER.x - SIDE)}" y="${fmt(CENTER.y - SIDE)}" width="${fmt(SIDE * 2)}" height="${fmt(SIDE * 2)}"`;
         const gap = cutOn ? GAP * f.gap : 0;
         const cutBy = (k) => {
@@ -615,7 +680,10 @@
         requestAnimationFrame(tick);
       }
 
-      const press = (sel, on) => document.querySelectorAll(sel).forEach((b) => b.setAttribute("aria-pressed", String(on(b))));
+      const press = (sel, on) =>
+        document
+          .querySelectorAll(sel)
+          .forEach((b) => b.setAttribute("aria-pressed", String(on(b))));
       document.querySelectorAll("[data-speed]").forEach((b) =>
         b.addEventListener("click", () => {
           speed = Number(b.dataset.speed);
@@ -656,7 +724,9 @@
         climb: ["Syncing changes", "All changes saved"],
       };
       const setMsg = (name, done) =>
-        document.querySelectorAll(`[data-msg="${name}"]`).forEach((m) => (m.textContent = MESSAGES[name][done ? 1 : 0]));
+        document
+          .querySelectorAll(`[data-msg="${name}"]`)
+          .forEach((m) => (m.textContent = MESSAGES[name][done ? 1 : 0]));
       document.querySelectorAll("[data-finish]").forEach((b) =>
         b.addEventListener("click", () => {
           const s = STEPPED[b.dataset.finish];

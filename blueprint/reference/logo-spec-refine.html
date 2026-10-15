@@ -255,22 +255,46 @@
 
       <h2>Large</h2>
       <div class="pair">
-        <div class="tile light"><span class="cap">Saved</span><div class="hero" id="heroSaved"></div></div>
-        <div class="tile light"><span class="cap">Refined</span><div class="hero" id="heroRefined"></div></div>
+        <div class="tile light">
+          <span class="cap">Saved</span>
+          <div class="hero" id="heroSaved"></div>
+        </div>
+        <div class="tile light">
+          <span class="cap">Refined</span>
+          <div class="hero" id="heroRefined"></div>
+        </div>
       </div>
 
       <h2>Small sizes, icon and one color</h2>
       <div class="pair">
-        <div class="tile light"><span class="cap">Saved</span><div class="sizes" id="smallSaved"></div></div>
-        <div class="tile light"><span class="cap">Refined</span><div class="sizes" id="smallRefined"></div></div>
-        <div class="tile dark"><span class="cap">Saved, dark</span><div class="sizes" id="darkSaved"></div></div>
-        <div class="tile dark"><span class="cap">Refined, dark</span><div class="sizes" id="darkRefined"></div></div>
+        <div class="tile light">
+          <span class="cap">Saved</span>
+          <div class="sizes" id="smallSaved"></div>
+        </div>
+        <div class="tile light">
+          <span class="cap">Refined</span>
+          <div class="sizes" id="smallRefined"></div>
+        </div>
+        <div class="tile dark">
+          <span class="cap">Saved, dark</span>
+          <div class="sizes" id="darkSaved"></div>
+        </div>
+        <div class="tile dark">
+          <span class="cap">Refined, dark</span>
+          <div class="sizes" id="darkRefined"></div>
+        </div>
       </div>
 
       <h2>Lockups</h2>
       <div class="pair">
-        <div class="tile light"><span class="cap">Saved</span><div class="lockups" id="lockSaved"></div></div>
-        <div class="tile light"><span class="cap">Refined</span><div class="lockups" id="lockRefined"></div></div>
+        <div class="tile light">
+          <span class="cap">Saved</span>
+          <div class="lockups" id="lockSaved"></div>
+        </div>
+        <div class="tile light">
+          <span class="cap">Refined</span>
+          <div class="lockups" id="lockRefined"></div>
+        </div>
       </div>
 
       <h2>Values for the spec</h2>
@@ -454,7 +478,10 @@
       }
 
       function refined() {
-        return REFINEMENTS.filter((r) => on.has(r.key)).reduce((acc, r) => r.apply(acc), structuredClone(SAVED));
+        return REFINEMENTS.filter((r) => on.has(r.key)).reduce(
+          (acc, r) => r.apply(acc),
+          structuredClone(SAVED),
+        );
       }
 
       function render() {
@@ -465,28 +492,52 @@
         document.getElementById("smallRefined").innerHTML = small(r, "light");
         document.getElementById("darkSaved").innerHTML = small(SAVED, "dark");
         document.getElementById("darkRefined").innerHTML = small(r, "dark");
-        document.getElementById("lockSaved").innerHTML = lockup(SAVED, 24) + lockup(SAVED, 44) + stacked(SAVED, 26);
-        document.getElementById("lockRefined").innerHTML = lockup(r, 24) + lockup(r, 44) + stacked(r, 26);
+        document.getElementById("lockSaved").innerHTML =
+          lockup(SAVED, 24) + lockup(SAVED, 44) + stacked(SAVED, 26);
+        document.getElementById("lockRefined").innerHTML =
+          lockup(r, 24) + lockup(r, 44) + stacked(r, 26);
         const a0 = arms(SAVED);
         const a1 = arms(r);
         const rr0 = radii(SAVED);
         const rr1 = radii(r);
         const rows = [
-          ["Step along the slant", `${Math.round(SAVED.stepX * 100)}%`, `${Math.round(r.stepX * 100)}%`],
+          [
+            "Step along the slant",
+            `${Math.round(SAVED.stepX * 100)}%`,
+            `${Math.round(r.stepX * 100)}%`,
+          ],
           ["Step up", `${Math.round(SAVED.stepY * 100)}%`, `${Math.round(r.stepY * 100)}%`],
-          ["Back card arms (upright / slanted)", `${fmt(a0.upright)} / ${fmt(a0.slanted)}`, `${fmt(a1.upright)} / ${fmt(a1.slanted)}`],
-          ["Corner radii (acute / obtuse)", `${fmt(rr0[0])} / ${fmt(rr0[1])}`, `${fmt(rr1[0])} / ${fmt(rr1[1])}`],
+          [
+            "Back card arms (upright / slanted)",
+            `${fmt(a0.upright)} / ${fmt(a0.slanted)}`,
+            `${fmt(a1.upright)} / ${fmt(a1.slanted)}`,
+          ],
+          [
+            "Corner radii (acute / obtuse)",
+            `${fmt(rr0[0])} / ${fmt(rr0[1])}`,
+            `${fmt(rr1[0])} / ${fmt(rr1[1])}`,
+          ],
           ["Gap (32 px and below)", `${SAVED.gap}`, `${r.smallGap ? 7 : r.gap}`],
           ["Front card, light", SAVED.front.light, r.front.light],
-          ["Footprint (width : height)", `${(inkBox(SAVED).w / inkBox(SAVED).h).toFixed(2)} : 1`, `${(inkBox(r).w / inkBox(r).h).toFixed(2)} : 1`],
+          [
+            "Footprint (width : height)",
+            `${(inkBox(SAVED).w / inkBox(SAVED).h).toFixed(2)} : 1`,
+            `${(inkBox(r).w / inkBox(r).h).toFixed(2)} : 1`,
+          ],
         ];
         document.getElementById("values").innerHTML =
           `<tr><th>Setting</th><th>Saved</th><th>Refined</th></tr>` +
-          rows.map(([k, a, b]) => `<tr><td>${k}</td><td>${a}</td><td class="${a === b ? "" : "changed"}">${b}</td></tr>`).join("");
+          rows
+            .map(
+              ([k, a, b]) =>
+                `<tr><td>${k}</td><td>${a}</td><td class="${a === b ? "" : "changed"}">${b}</td></tr>`,
+            )
+            .join("");
       }
 
       document.getElementById("toggles").innerHTML = REFINEMENTS.map(
-        (r) => `<label class="toggle" for="t-${r.key}"><input id="t-${r.key}" type="checkbox" ${on.has(r.key) ? "checked" : ""} /><div><b>${r.title}</b><span>${r.text}</span></div></label>`,
+        (r) =>
+          `<label class="toggle" for="t-${r.key}"><input id="t-${r.key}" type="checkbox" ${on.has(r.key) ? "checked" : ""} /><div><b>${r.title}</b><span>${r.text}</span></div></label>`,
       ).join("");
       for (const r of REFINEMENTS) {
         document.getElementById(`t-${r.key}`).addEventListener("change", (e) => {

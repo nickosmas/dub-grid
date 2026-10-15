@@ -724,8 +724,8 @@
 
       <h2>Landing page and link previews</h2>
       <p class="group-sub">
-        The marketing nav uses the lockup; the footer uses the symbol in the label gray, so it
-        takes the one-color version. Shared links show the social image.
+        The marketing nav uses the lockup; the footer uses the symbol in the label gray, so it takes
+        the one-color version. Shared links show the social image.
       </p>
       <div class="row">
         <figure>
@@ -775,20 +775,27 @@
       <h2>Before adopting it</h2>
       <p class="note">
         The light blue front card is soft on white (about 1.8 : 1). It holds up at header and
-        sign-in sizes, but the 16 px favicon and the light splash lean on the brand blue card.
-        If that reads too faint, deepen the front card on light surfaces only, for example to
+        sign-in sizes, but the 16 px favicon and the light splash lean on the brand blue card. If
+        that reads too faint, deepen the front card on light surfaces only, for example to
         <code>#7FA6F8</code>, and keep <code>#BCD2FF</code> on dark.
       </p>
       <p class="note">
-        One-color surfaces (footer, print, Android themed icon) cut a gap around the front card
-        so the two cards stay apart without the shading.
+        One-color surfaces (footer, print, Android themed icon) cut a gap around the front card so
+        the two cards stay apart without the shading.
       </p>
     </main>
     <svg id="measure" aria-hidden="true"><path id="measurePath" /></svg>
 
     <script>
       const SPEC = {
-        n: 2, angle: 32, aspect: 0.95, stepX: 0.4, stepY: 0.42, shrink: 0.85, radius: 0.14, gap: 0.035,
+        n: 2,
+        angle: 32,
+        aspect: 0.95,
+        stepX: 0.4,
+        stepY: 0.42,
+        shrink: 0.85,
+        radius: 0.14,
+        gap: 0.035,
       };
       const COLORS = {
         light: ["#2563EB", "#A8C4FC"],
@@ -908,7 +915,10 @@
           if (!gap || !ahead.length) return `<path d="${d}" fill="${colors[i]}"/>`;
           const id = `cut${uid++}`;
           defs += `<mask id="${id}" maskUnits="userSpaceOnUse" ${region}><rect ${region} fill="white"/>${ahead
-            .map((f) => `<path d="${f}" fill="black" stroke="black" stroke-width="${fmt(gap * 2)}" stroke-linejoin="round"/>`)
+            .map(
+              (f) =>
+                `<path d="${f}" fill="black" stroke="black" stroke-width="${fmt(gap * 2)}" stroke-linejoin="round"/>`,
+            )
             .join("")}</mask>`;
           return `<path d="${d}" fill="${colors[i]}" mask="url(#${id})"/>`;
         });
@@ -939,7 +949,9 @@
             <span class="avatar"></span>
           </div>
           <div class="body-fill">${"<i></i>".repeat(21)}</div>`,
-        phonebar: (t) => `<div class="phonebar">${mark(36, t, { crop: "ink" })}<span class="burger"></span></div>
+        phonebar: (
+          t,
+        ) => `<div class="phonebar">${mark(36, t, { crop: "ink" })}<span class="burger"></span></div>
           <div class="body-fill" style="grid-template-columns:repeat(3,1fr)">${"<i></i>".repeat(9)}</div>`,
         gridmaster: (t) => `<div class="gm">
             <aside><div class="gm-head">${mark(28, t, { crop: "ink" })}Gridmaster</div><span>Organizations</span><span>Accounts</span><span>Billing</span><span>Audit</span></aside>
@@ -950,7 +962,8 @@
             <div class="card"><h4>Sign in to Maple Grove Care</h4>
               <div class="field">Email</div><div class="field">Password</div><div class="btn">Sign in</div></div>
           </div>`,
-        loading: (t) => `<div class="loading">${mark(64, t, { crop: "ink" })}<span>Loading your schedule</span></div>`,
+        loading: (t) =>
+          `<div class="loading">${mark(64, t, { crop: "ink" })}<span>Loading your schedule</span></div>`,
         landing: (t) => `<div class="landing-nav">${lockup(22, t, "var(--tx)")}
             <nav><span>Features</span><span>Pricing</span><span class="btn">Request a demo</span></nav></div>
           <div class="hero-copy"><h3>Schedules your whole team can trust</h3><p>Built for care facilities.</p></div>
@@ -979,8 +992,13 @@
         el.innerHTML = SLOTS[el.dataset.slot](el.dataset.themeMode);
       });
 
-      const placeholders = (count) => Array.from({ length: count }, () => `<span class="app"><span class="ic"></span></span>`).join("");
-      const dgIcon = (cls = "") => `<span class="app"><span class="ic dg ${cls}">${mark(30, "onBrand")}</span>DubGrid</span>`;
+      const placeholders = (count) =>
+        Array.from(
+          { length: count },
+          () => `<span class="app"><span class="ic"></span></span>`,
+        ).join("");
+      const dgIcon = (cls = "") =>
+        `<span class="app"><span class="ic dg ${cls}">${mark(30, "onBrand")}</span>DubGrid</span>`;
       const themedIcon = `<span class="app"><span class="ic themed">${mark(27, { mono: "#1E3A8A" })}</span>DubGrid</span>`;
 
       document.getElementById("phones").innerHTML = `

@@ -270,8 +270,8 @@
       <h1>Logo concepts</h1>
       <p class="lede">
         Ten directions for a mark that could only belong to DubGrid. Each comes from one idea in the
-        product's world rather than from a shape. All use the brand blues, so the comparison is about
-        meaning and form, not color.
+        product's world rather than from a shape. All use the brand blues, so the comparison is
+        about meaning and form, not color.
       </p>
 
       <div class="brief">
@@ -286,7 +286,10 @@
         <div class="panel">
           <h3>My picks to develop</h3>
           <ul>
-            <li><b>Handoff:</b> keeps the two cards, and the overlap becomes the point: the shift handover.</li>
+            <li>
+              <b>Handoff:</b> keeps the two cards, and the overlap becomes the point: the shift
+              handover.
+            </li>
             <li><b>Open shift:</b> the product's core job, drawn literally, yet still simple.</li>
             <li><b>d|b:</b> built from the name, and as symmetric as the wordmark.</li>
           </ul>
@@ -342,7 +345,7 @@
           name: "d|b",
           tag: "Name",
           pick: true,
-          says: "The \"d\" and \"b\" of dubgrid share one stem: two shift cards hung either side of a day line. It is built from the name, symmetric like the wordmark, and reads as \"two sides of one schedule\".",
+          says: 'The "d" and "b" of dubgrid share one stem: two shift cards hung either side of a day line. It is built from the name, symmetric like the wordmark, and reads as "two sides of one schedule".',
           risk: "Abstract until you know the name; could read as a dumbbell at a glance. Strongest in the lockup, where the word explains it.",
           svg: () => `<rect x="12" y="44" width="34" height="42" rx="14" fill="var(--m2)"/>
             <rect x="54" y="44" width="34" height="42" rx="14" fill="var(--m2)"/>
@@ -352,7 +355,7 @@
         {
           name: "Care heart",
           tag: "Care",
-          says: "Two slanted cards lean into each other and make a heart. Two people (the \"dub\") covering one resident: care built out of scheduling. A direct evolution of the stacked cards.",
+          says: 'Two slanted cards lean into each other and make a heart. Two people (the "dub") covering one resident: care built out of scheduling. A direct evolution of the stacked cards.',
           risk: "Hearts are everywhere in health, dating and charity brands. Distinctive only if the card corners stay crisp and the gap between the two halves stays visible.",
           svg: () => `<line x1="51" y1="66" x2="28" y2="41" stroke="var(--m2)" stroke-width="32" stroke-linecap="round"/>
             <line x1="49" y1="66" x2="72" y2="41" stroke="var(--bgc)" stroke-width="38" stroke-linecap="round"/>
@@ -374,12 +377,16 @@
           risk: "Three-part rings read as loading spinners, recycling or pie charts. It animates beautifully, which is also why it looks like a spinner.",
           svg: () => {
             const arc = (a0, a1) => {
-              const p = (a) => [50 + 32 * Math.cos((a * Math.PI) / 180), 50 + 32 * Math.sin((a * Math.PI) / 180)];
+              const p = (a) => [
+                50 + 32 * Math.cos((a * Math.PI) / 180),
+                50 + 32 * Math.sin((a * Math.PI) / 180),
+              ];
               const [x0, y0] = p(a0);
               const [x1, y1] = p(a1);
               return `M${x0.toFixed(2)} ${y0.toFixed(2)} A32 32 0 0 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
             };
-            const seg = (a, color) => `<path d="${arc(a + 22, a + 98)}" fill="none" stroke="${color}" stroke-width="18" stroke-linecap="round"/>`;
+            const seg = (a, color) =>
+              `<path d="${arc(a + 22, a + 98)}" fill="none" stroke="${color}" stroke-width="18" stroke-linecap="round"/>`;
             return seg(-90, "var(--m2)") + seg(30, "var(--m1)") + seg(150, "var(--m3)");
           },
         },
@@ -387,7 +394,7 @@
           name: "Staff in the slot",
           tag: "People",
           says: "Each schedule card has a head: the cell is a person. Two of them overlap, like a shift and its relief. It puts staff, not boxes, at the center of the brand.",
-          risk: "This is very close to the standard \"team\" or \"users\" icon. Needs a distinctive card shape to escape it; probably the weakest for recognition.",
+          risk: 'This is very close to the standard "team" or "users" icon. Needs a distinctive card shape to escape it; probably the weakest for recognition.',
           svg: () => `<circle cx="34" cy="30" r="12" fill="var(--m2)"/>
             <rect x="12" y="46" width="44" height="40" rx="14" fill="var(--m2)"/>
             <circle cx="66" cy="22" r="15" fill="var(--bgc)"/>
@@ -398,8 +405,8 @@
         {
           name: "Cell d",
           tag: "Name",
-          says: "A lowercase \"d\" built from schedule cells, with one cell lit: your shift in the grid. Pairs naturally with the wordmark and carries the old grid idea forward in a letter.",
-          risk: "Pixel letters are common in dev tools and games. The lit cell must stay; without it this is just a bitmap \"d\".",
+          says: 'A lowercase "d" built from schedule cells, with one cell lit: your shift in the grid. Pairs naturally with the wordmark and carries the old grid idea forward in a letter.',
+          risk: 'Pixel letters are common in dev tools and games. The lit cell must stay; without it this is just a bitmap "d".',
           svg: () => {
             const on = ["..X", "..X", "XXX", "X.X", "XXX"];
             let s = "";
@@ -419,8 +426,15 @@
           says: "A plus made of five schedule cells, the center one brand blue. Health care and the grid in one sign; instantly says the industry.",
           risk: "The most generic of the ten: plus signs belong to every clinic and pharmacy. Never in red, which is a protected emblem.",
           svg: () => {
-            const cell = (x, y, c) => `<rect x="${x}" y="${y}" width="24" height="24" rx="7" fill="${c}"/>`;
-            return cell(38, 10, "var(--m2)") + cell(10, 38, "var(--m2)") + cell(66, 38, "var(--m2)") + cell(38, 66, "var(--m2)") + cell(38, 38, "var(--m1)");
+            const cell = (x, y, c) =>
+              `<rect x="${x}" y="${y}" width="24" height="24" rx="7" fill="${c}"/>`;
+            return (
+              cell(38, 10, "var(--m2)") +
+              cell(10, 38, "var(--m2)") +
+              cell(66, 38, "var(--m2)") +
+              cell(38, 66, "var(--m2)") +
+              cell(38, 38, "var(--m1)")
+            );
           },
         },
         {
@@ -434,7 +448,8 @@
         },
       ];
 
-      const mark = (c, size) => `<svg width="${size}" height="${size}" viewBox="0 0 100 100" aria-hidden="true">${c.svg()}</svg>`;
+      const mark = (c, size) =>
+        `<svg width="${size}" height="${size}" viewBox="0 0 100 100" aria-hidden="true">${c.svg()}</svg>`;
 
       document.getElementById("concepts").innerHTML = CONCEPTS.map(
         (c) => `<article class="concept${c.pick ? " pick" : ""}">
@@ -459,7 +474,8 @@
       ).join("");
 
       document.getElementById("strip").innerHTML = CONCEPTS.map(
-        (c) => `<figure><span class="tile dark">${mark(c, 40)}</span><figcaption>${c.name}</figcaption></figure>`,
+        (c) =>
+          `<figure><span class="tile dark">${mark(c, 40)}</span><figcaption>${c.name}</figcaption></figure>`,
       ).join("");
     </script>
   </body>

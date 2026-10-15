@@ -489,8 +489,8 @@
     <main>
       <h1>Calendar mark studio</h1>
       <p class="lede">
-        Shape the stacked mark: slanted cards, shift cells, rings and stacking. Every change
-        updates the proofs at once. Save a design and Claude can read it straight from this page.
+        Shape the stacked mark: slanted cards, shift cells, rings and stacking. Every change updates
+        the proofs at once. Save a design and Claude can read it straight from this page.
       </p>
 
       <div class="layout">
@@ -534,12 +534,22 @@
             <h2 id="h-cells">Shift cells</h2>
             <div class="ctl">
               <span class="lbl">Grid on the front card</span>
-              <div class="chips" id="cellsToggle" role="group" aria-label="Grid on the front card"></div>
+              <div
+                class="chips"
+                id="cellsToggle"
+                role="group"
+                aria-label="Grid on the front card"
+              ></div>
             </div>
             <div id="cellControls"></div>
             <div class="ctl" id="firstFaintCtl">
               <span class="lbl">First cell almost invisible</span>
-              <div class="chips" id="firstFaint" role="group" aria-label="First cell almost invisible"></div>
+              <div
+                class="chips"
+                id="firstFaint"
+                role="group"
+                aria-label="First cell almost invisible"
+              ></div>
             </div>
           </section>
 
@@ -554,7 +564,14 @@
           <section class="panel" aria-labelledby="h-save">
             <h2 id="h-save">Saved designs</h2>
             <div class="row">
-              <input class="text" id="designName" type="text" maxlength="60" placeholder="Name this design" aria-label="Design name" />
+              <input
+                class="text"
+                id="designName"
+                type="text"
+                maxlength="60"
+                placeholder="Name this design"
+                aria-label="Design name"
+              />
               <button class="btn" id="saveBtn" type="button">Save</button>
             </div>
             <p class="status" id="saveStatus">Connecting to saved designs</p>
@@ -568,14 +585,32 @@
 
         <div class="sheet">
           <div class="hero">
-            <div class="tile light"><span class="cap">Light</span><div class="stage" id="heroLight"></div></div>
-            <div class="tile dark"><span class="cap">Dark</span><div class="stage" id="heroDark"></div></div>
+            <div class="tile light">
+              <span class="cap">Light</span>
+              <div class="stage" id="heroLight"></div>
+            </div>
+            <div class="tile dark">
+              <span class="cap">Dark</span>
+              <div class="stage" id="heroDark"></div>
+            </div>
           </div>
           <div class="grid4">
-            <div class="tile light"><span class="cap">64, 32, 16 px</span><div class="sizes" id="sizesLight"></div></div>
-            <div class="tile dark"><span class="cap">64, 32, 16 px</span><div class="sizes" id="sizesDark"></div></div>
-            <div class="tile light"><span class="cap">App icon</span><div class="sizes" id="icon"></div></div>
-            <div class="tile light"><span class="cap">One color</span><div class="sizes" id="mono"></div></div>
+            <div class="tile light">
+              <span class="cap">64, 32, 16 px</span>
+              <div class="sizes" id="sizesLight"></div>
+            </div>
+            <div class="tile dark">
+              <span class="cap">64, 32, 16 px</span>
+              <div class="sizes" id="sizesDark"></div>
+            </div>
+            <div class="tile light">
+              <span class="cap">App icon</span>
+              <div class="sizes" id="icon"></div>
+            </div>
+            <div class="tile light">
+              <span class="cap">One color</span>
+              <div class="sizes" id="mono"></div>
+            </div>
           </div>
           <div class="lockups">
             <div class="tile light" id="lockLight"></div>
@@ -586,7 +621,9 @@
 
       <section class="compare" id="compareSection" hidden aria-labelledby="h-compare">
         <h2 id="h-compare">Saved designs side by side</h2>
-        <p class="compare-note">Only the settings that differ between them are listed. Load one to keep editing it.</p>
+        <p class="compare-note">
+          Only the settings that differ between them are listed. Load one to keep editing it.
+        </p>
         <div class="compare-grid" id="compareGrid"></div>
       </section>
     </main>
@@ -652,12 +689,25 @@
         { name: "Refined mark (spec)", p: REFINED },
         { name: "Stem rings", p: {} },
         { name: "Slim rings", p: { ringW: 12, ringUp: 20 } },
-        { name: "Ring per page", p: { ringStyle: "perpage", ringCount: 1, ringW: 18, ringUp: 16, ringDown: 14, ringSpread: 0 } },
+        {
+          name: "Ring per page",
+          p: {
+            ringStyle: "perpage",
+            ringCount: 1,
+            ringW: 18,
+            ringUp: 16,
+            ringDown: 14,
+            ringSpread: 0,
+          },
+        },
         { name: "Ring holes", p: { ringStyle: "holes", ringW: 19 } },
         { name: "Deep rings", p: { ringColor: "deep" } },
         { name: "Short rings", p: { ringUp: 9, ringDown: 17 } },
         { name: "Plain stack", p: { ringCount: 0 } },
-        { name: "Shift cells", p: { stacking: "offset", darkPage: "front", ringCount: 0, cells: true } },
+        {
+          name: "Shift cells",
+          p: { stacking: "offset", darkPage: "front", ringCount: 0, cells: true },
+        },
         {
           name: "Sketch",
           p: {
@@ -694,7 +744,14 @@
           ["angle", "Slant", -45, 45, 1, (v) => `${v}°`],
           ["aspect", "Page height (of width)", 0.6, 1.3, 0.01, (v) => `${Math.round(v * 100)}%`],
           ["stepX", "Step along the slant", 0.15, 0.7, 0.01, (v) => `${Math.round(v * 100)}%`],
-          ["stepY", "Step up (negative steps down)", -0.5, 0.7, 0.01, (v) => `${Math.round(v * 100)}%`],
+          [
+            "stepY",
+            "Step up (negative steps down)",
+            -0.5,
+            0.7,
+            0.01,
+            (v) => `${Math.round(v * 100)}%`,
+          ],
           ["reveal", "Back page shows below", 0, 45, 0.5, (v) => `${v}`],
           ["fan", "Fan from the binding", -15, 15, 0.5, (v) => `${v}°`],
           ["sheets", "Sheets", 2, 4, 1, (v) => `${v}`],
@@ -711,7 +768,14 @@
           ["cellGap", "Gap between cells", 1, 16, 0.5, (v) => `${v}`],
           ["cellRadius", "Cell corner radius", 0, 12, 0.5, (v) => `${v}`],
           ["cellStrength", "Strength", -0.4, 0.7, 0.01, (v) => `${Math.round(v * 100)}%`],
-          ["cellVary", "Variation between cells", 0, 0.6, 0.01, (v) => (v ? `±${Math.round(v * 100)}%` : "none")],
+          [
+            "cellVary",
+            "Variation between cells",
+            0,
+            0.6,
+            0.01,
+            (v) => (v ? `±${Math.round(v * 100)}%` : "none"),
+          ],
           ["cellSeed", "Pattern", 1, 40, 1, (v) => `${v}`],
         ],
         ringControls: [
@@ -741,7 +805,14 @@
         ["front", "Light blue"],
       ];
       // Settings that only apply to one stacking mode.
-      const ONLY_FOR = { stepX: "offset", stepY: "offset", reveal: "top", fan: "top", sheets: "book", splay: "book" };
+      const ONLY_FOR = {
+        stepX: "offset",
+        stepY: "offset",
+        reveal: "top",
+        fan: "top",
+        sheets: "book",
+        splay: "book",
+      };
       const STACKINGS = [
         ["book", "Book"],
         ["top", "Bound at top"],
@@ -856,7 +927,9 @@
           const n = p.sheets;
           const mid = (n - 1) / 2;
           const reach = Math.max(mid, 0.5);
-          const order = [...Array(n).keys()].sort((x, y) => Math.abs(y - mid) - Math.abs(x - mid) || x - y);
+          const order = [...Array(n).keys()].sort(
+            (x, y) => Math.abs(y - mid) - Math.abs(x - mid) || x - y,
+          );
           return order.map((i) => {
             const o = i - mid;
             const s = o === 0 ? p.shrink : 1;
@@ -868,7 +941,10 @@
             const hh = h * Math.cos(open);
             const tl = [-w / 2, -(w / 2) * tan];
             const tr = [w / 2, (w / 2) * tan];
-            pg.d = roundedPolygon([tl, tr, [tr[0] + dx, tr[1] + hh], [tl[0] + dx, tl[1] + hh]], p.radius * s);
+            pg.d = roundedPolygon(
+              [tl, tr, [tr[0] + dx, tr[1] + hh], [tl[0] + dx, tl[1] + hh]],
+              p.radius * s,
+            );
             return { pg, transform: "", depth: Math.abs(o) / reach };
           });
         }
@@ -881,7 +957,11 @@
           const front = page(0, binding + (H * p.shrink) / 2, p.shrink);
           return [
             { pg: back, transform: "", depth: 1 },
-            { pg: front, transform: p.fan ? `rotate(${fmt(p.fan)} 0 ${fmt(binding)})` : "", depth: 0 },
+            {
+              pg: front,
+              transform: p.fan ? `rotate(${fmt(p.fan)} 0 ${fmt(binding)})` : "",
+              depth: 0,
+            },
           ];
         }
         const back = page(0, 0, 1);
@@ -908,10 +988,18 @@
 
       const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
       const mixHex = (a, b, t) =>
-        "#" + hexRgb(a).map((v, i) => Math.round(v + (hexRgb(b)[i] - v) * t).toString(16).padStart(2, "0")).join("");
+        "#" +
+        hexRgb(a)
+          .map((v, i) =>
+            Math.round(v + (hexRgb(b)[i] - v) * t)
+              .toString(16)
+              .padStart(2, "0"),
+          )
+          .join("");
 
       function ringXs(pg, p) {
-        const c = pg.cx + (p.ringAnchor === "edge" ? pg.straightShift : 0) + p.ringShift * (pg.w / 100);
+        const c =
+          pg.cx + (p.ringAnchor === "edge" ? pg.straightShift : 0) + p.ringShift * (pg.w / 100);
         const d = p.ringSpread * pg.w;
         if (p.ringCount === 1) return [c];
         if (p.ringCount === 2) return [c - d, c + d];
@@ -927,7 +1015,9 @@
         const layers = geometry(p);
         const front = layers[layers.length - 1];
         const halo = (d) =>
-          gap > 0 ? `<path d="${d}" fill="${c.surface}" stroke="${c.surface}" stroke-width="${fmt(gap * 2)}" stroke-linejoin="round"/>` : "";
+          gap > 0
+            ? `<path d="${d}" fill="${c.surface}" stroke="${c.surface}" stroke-width="${fmt(gap * 2)}" stroke-linejoin="round"/>`
+            : "";
         // Half holes: semicircles punched out of a card's top edge, as a mask
         // on that card alone. The card's gap still fills the notch, so a
         // front card's punch reads as a clean notch in the surface color.
@@ -937,7 +1027,14 @@
           if (!xs.length) return null;
           const region = `x="-400" y="-400" width="800" height="800"`;
           const circles = (radius) =>
-            radius > 0 ? xs.map((x) => `<circle cx="${fmt(x)}" cy="${fmt(pg.topY(x))}" r="${fmt(radius)}" fill="black"/>`).join("") : "";
+            radius > 0
+              ? xs
+                  .map(
+                    (x) =>
+                      `<circle cx="${fmt(x)}" cy="${fmt(pg.topY(x))}" r="${fmt(radius)}" fill="black"/>`,
+                  )
+                  .join("")
+              : "";
           const card = `pc${punchId++}`;
           return {
             card,
@@ -950,7 +1047,10 @@
           const r = `x="${fmt(x - w / 2)}" y="${fmt(y - p.ringUp)}" width="${fmt(w)}" height="${fmt(p.ringUp + p.ringDown)}" rx="${fmt(w / 2)}"`;
           // One color widens the card gap; a ring needs less to stay apart.
           const rg = gap === p.gap ? p.ringGap : Math.max(p.ringGap, 2.5);
-          const ringHalo = rg > 0 ? `<rect ${r} fill="${c.surface}" stroke="${c.surface}" stroke-width="${fmt(rg * 2)}"/>` : "";
+          const ringHalo =
+            rg > 0
+              ? `<rect ${r} fill="${c.surface}" stroke="${c.surface}" stroke-width="${fmt(rg * 2)}"/>`
+              : "";
           return `${ringHalo}<rect ${r} fill="${c.ring}"/>`;
         };
         // A solid spine along the top edge: as thick as a ring, centered on
@@ -963,7 +1063,10 @@
           const x2 = c0 + half;
           const line = `x1="${fmt(x1)}" y1="${fmt(pg.topY(x1) + lift)}" x2="${fmt(x2)}" y2="${fmt(pg.topY(x2) + lift)}" stroke-linecap="round"`;
           const w = p.ringW * scale;
-          const spineHalo = gap > 0 ? `<line ${line} stroke="${c.surface}" stroke-width="${fmt(w + gap * 2)}"/>` : "";
+          const spineHalo =
+            gap > 0
+              ? `<line ${line} stroke="${c.surface}" stroke-width="${fmt(w + gap * 2)}"/>`
+              : "";
           return `${spineHalo}<line ${line} stroke="${c.ring}" stroke-width="${fmt(w)}"/>`;
         };
         // A faint grid of shift cells on the front card. Columns stand
@@ -988,7 +1091,9 @@
         })();
         const cellColor = (fill, k) => {
           const t = cellTone[k];
-          return t >= 0 ? mixHex(fill, c.cellLight, Math.min(t, 1)) : mixHex(fill, c.cellDark, Math.min(-t, 1));
+          return t >= 0
+            ? mixHex(fill, c.cellLight, Math.min(t, 1))
+            : mixHex(fill, c.cellDark, Math.min(-t, 1));
         };
         const cellGrid = (pg, scale, fill) => {
           const inset = p.cellInset * scale;
@@ -1014,7 +1119,8 @@
           }
           return out;
         };
-        const hole = (pg, scale, x) => `<circle cx="${fmt(x)}" cy="${fmt(pg.topY(x))}" r="${fmt((p.ringW / 2) * scale)}" fill="${c.surface}"/>`;
+        const hole = (pg, scale, x) =>
+          `<circle cx="${fmt(x)}" cy="${fmt(pg.topY(x))}" r="${fmt((p.ringW / 2) * scale)}" fill="${c.surface}"/>`;
         return layers
           .map((layer, i) => {
             const { pg, transform, depth } = layer;
@@ -1024,9 +1130,18 @@
             let out = `${punch ? punch.defs : ""}${i ? halo(pg.d) : ""}<path d="${pg.d}" fill="${fill}"${punch ? ` mask="url(#${punch.card})"` : ""}/>`;
             if (p.cells && layer === front) out += cellGrid(pg, scale, fill);
             const isFront = layer === front;
-            if (p.ringStyle === "holes" && isFront) out += ringXs(pg, p).map((x) => hole(pg, scale, x)).join("");
-            else if (p.ringStyle === "rings" && isFront) out += ringXs(pg, p).map((x) => ring(pg, scale, x)).join("");
-            else if (p.ringStyle === "perpage") out += ringXs(pg, p).map((x) => ring(pg, scale, x)).join("");
+            if (p.ringStyle === "holes" && isFront)
+              out += ringXs(pg, p)
+                .map((x) => hole(pg, scale, x))
+                .join("");
+            else if (p.ringStyle === "rings" && isFront)
+              out += ringXs(pg, p)
+                .map((x) => ring(pg, scale, x))
+                .join("");
+            else if (p.ringStyle === "perpage")
+              out += ringXs(pg, p)
+                .map((x) => ring(pg, scale, x))
+                .join("");
             else if (p.ringStyle === "spine" && isFront) out += spine(pg, scale);
             return transform ? `<g transform="${transform}">${out}</g>` : out;
           })
@@ -1037,7 +1152,14 @@
       // shades; `darkPage` decides which page wears the dark one.
       function colorsFor(p, mode) {
         if (mode === "mono") {
-          return { back: "#111827", front: "#111827", ring: "#111827", surface: "#ffffff", cellLight: "#ffffff", cellDark: "#000000" };
+          return {
+            back: "#111827",
+            front: "#111827",
+            ring: "#111827",
+            surface: "#ffffff",
+            cellLight: "#ffffff",
+            cellDark: "#000000",
+          };
         }
         let shades;
         let surface;
@@ -1048,7 +1170,12 @@
           shades = p.colors[mode];
           surface = mode === "light" ? "#ffffff" : "#0b0f17";
         }
-        const ring = mode === "brand" && p.ringColor !== "front" ? "#ffffff" : mode === "brand" ? shades.back : shades[p.ringColor];
+        const ring =
+          mode === "brand" && p.ringColor !== "front"
+            ? "#ffffff"
+            : mode === "brand"
+              ? shades.back
+              : shades[p.ringColor];
         const swap = p.darkPage === "front";
         const back = swap ? shades.front : shades.back;
         const front = swap ? shades.back : shades.front;
@@ -1102,8 +1229,10 @@
         $("sizesDark").innerHTML = [64, 32, 16].map((s) => svg(state, b, "dark", s)).join("");
         $("icon").innerHTML = `<span class="icon">${svg(state, b, "brand", 48)}</span>`;
         $("mono").innerHTML = [64, 32, 16].map((s) => svg(state, b, "mono", s)).join("");
-        $("lockLight").innerHTML = `<span class="cap">Light: header 24 px, 44 px, stacked</span>${lockup(state, b, "light", 24)}${lockup(state, b, "light", 44)}${stacked(state, b, "light", 26)}`;
-        $("lockDark").innerHTML = `<span class="cap">Dark</span>${lockup(state, b, "dark", 24)}${lockup(state, b, "dark", 44)}${stacked(state, b, "dark", 26)}`;
+        $("lockLight").innerHTML =
+          `<span class="cap">Light: header 24 px, 44 px, stacked</span>${lockup(state, b, "light", 24)}${lockup(state, b, "light", 44)}${stacked(state, b, "light", 26)}`;
+        $("lockDark").innerHTML =
+          `<span class="cap">Dark</span>${lockup(state, b, "dark", 24)}${lockup(state, b, "dark", 44)}${stacked(state, b, "dark", 26)}`;
         syncControls();
         rememberDraft();
       }
@@ -1116,30 +1245,70 @@
             $(`out-${key}`).textContent = label(state[key]);
           }
         }
-        document.querySelectorAll("[data-style]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.style === state.ringStyle)));
-        document.querySelectorAll("[data-ring-color]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.ringColor === state.ringColor)));
-        document.querySelectorAll("[data-anchor]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.anchor === state.ringAnchor)));
-        document.querySelectorAll("[data-dark-page]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.darkPage === state.darkPage)));
-        document.querySelectorAll("[data-stacking]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.stacking === state.stacking)));
-        document.querySelectorAll("[data-cells]").forEach((b) => b.setAttribute("aria-pressed", String((b.dataset.cells === "true") === state.cells)));
+        document
+          .querySelectorAll("[data-style]")
+          .forEach((b) =>
+            b.setAttribute("aria-pressed", String(b.dataset.style === state.ringStyle)),
+          );
+        document
+          .querySelectorAll("[data-ring-color]")
+          .forEach((b) =>
+            b.setAttribute("aria-pressed", String(b.dataset.ringColor === state.ringColor)),
+          );
+        document
+          .querySelectorAll("[data-anchor]")
+          .forEach((b) =>
+            b.setAttribute("aria-pressed", String(b.dataset.anchor === state.ringAnchor)),
+          );
+        document
+          .querySelectorAll("[data-dark-page]")
+          .forEach((b) =>
+            b.setAttribute("aria-pressed", String(b.dataset.darkPage === state.darkPage)),
+          );
+        document
+          .querySelectorAll("[data-stacking]")
+          .forEach((b) =>
+            b.setAttribute("aria-pressed", String(b.dataset.stacking === state.stacking)),
+          );
+        document
+          .querySelectorAll("[data-cells]")
+          .forEach((b) =>
+            b.setAttribute("aria-pressed", String((b.dataset.cells === "true") === state.cells)),
+          );
         $("cellControls").hidden = !state.cells;
         $("firstFaintCtl").hidden = !state.cells;
-        document.querySelectorAll("[data-first-faint]").forEach((b) =>
-          b.setAttribute("aria-pressed", String((b.dataset.firstFaint === "true") === state.cellFirstFaint)),
-        );
-        for (const [key, mode] of Object.entries(ONLY_FOR)) $(`in-${key}`).closest(".ctl").hidden = state.stacking !== mode;
+        document
+          .querySelectorAll("[data-first-faint]")
+          .forEach((b) =>
+            b.setAttribute(
+              "aria-pressed",
+              String((b.dataset.firstFaint === "true") === state.cellFirstFaint),
+            ),
+          );
+        for (const [key, mode] of Object.entries(ONLY_FOR))
+          $(`in-${key}`).closest(".ctl").hidden = state.stacking !== mode;
         for (const theme of ["light", "dark"]) {
           for (const k of ["back", "front", "deep"]) {
             const input = $(`color-${theme}-${k}`);
-            if (input.value.toLowerCase() !== state.colors[theme][k]) input.value = state.colors[theme][k];
+            if (input.value.toLowerCase() !== state.colors[theme][k])
+              input.value = state.colors[theme][k];
           }
         }
         const match = PRESETS.find(
           (pr) =>
-            JSON.stringify(sanitize({ ...BASE, colors: state.colors, darkPage: state.darkPage, stacking: state.stacking, ...pr.p })) ===
-            JSON.stringify(state),
+            JSON.stringify(
+              sanitize({
+                ...BASE,
+                colors: state.colors,
+                darkPage: state.darkPage,
+                stacking: state.stacking,
+                ...pr.p,
+              }),
+            ) === JSON.stringify(state),
         );
-        document.querySelectorAll("[data-preset]").forEach((b) => b.setAttribute("aria-pressed", String(match?.name === b.dataset.preset)));
+        document
+          .querySelectorAll("[data-preset]")
+          .forEach((b) => b.setAttribute("aria-pressed", String(match?.name === b.dataset.preset)));
       }
 
       const DRAFT_KEY = "calendar-mark-draft-v9";
@@ -1172,15 +1341,25 @@
             });
           }
         }
-        $("presets").innerHTML = PRESETS.map((pr) => `<button class="chip" type="button" data-preset="${pr.name}">${pr.name}</button>`).join("");
+        $("presets").innerHTML = PRESETS.map(
+          (pr) => `<button class="chip" type="button" data-preset="${pr.name}">${pr.name}</button>`,
+        ).join("");
         document.querySelectorAll("[data-preset]").forEach((b) =>
           b.addEventListener("click", () => {
             const pr = PRESETS.find((x) => x.name === b.dataset.preset);
-            state = sanitize({ ...BASE, colors: state.colors, darkPage: state.darkPage, stacking: state.stacking, ...pr.p });
+            state = sanitize({
+              ...BASE,
+              colors: state.colors,
+              darkPage: state.darkPage,
+              stacking: state.stacking,
+              ...pr.p,
+            });
             render();
           }),
         );
-        $("ringStyle").innerHTML = STYLES.map(([k, l]) => `<button class="chip" type="button" data-style="${k}">${l}</button>`).join("");
+        $("ringStyle").innerHTML = STYLES.map(
+          ([k, l]) => `<button class="chip" type="button" data-style="${k}">${l}</button>`,
+        ).join("");
         document.querySelectorAll("[data-style]").forEach((b) =>
           b.addEventListener("click", () => {
             state.ringStyle = b.dataset.style;
@@ -1193,7 +1372,9 @@
           [true, "On"],
           [false, "Off"],
         ]
-          .map(([k, l]) => `<button class="chip" type="button" data-first-faint="${k}">${l}</button>`)
+          .map(
+            ([k, l]) => `<button class="chip" type="button" data-first-faint="${k}">${l}</button>`,
+          )
           .join("");
         document.querySelectorAll("[data-first-faint]").forEach((b) =>
           b.addEventListener("click", () => {
@@ -1213,28 +1394,36 @@
             render();
           }),
         );
-        $("stacking").innerHTML = STACKINGS.map(([k, l]) => `<button class="chip" type="button" data-stacking="${k}">${l}</button>`).join("");
+        $("stacking").innerHTML = STACKINGS.map(
+          ([k, l]) => `<button class="chip" type="button" data-stacking="${k}">${l}</button>`,
+        ).join("");
         document.querySelectorAll("[data-stacking]").forEach((b) =>
           b.addEventListener("click", () => {
             state.stacking = b.dataset.stacking;
             render();
           }),
         );
-        $("darkPage").innerHTML = DARK_PAGES.map(([k, l]) => `<button class="chip" type="button" data-dark-page="${k}">${l}</button>`).join("");
+        $("darkPage").innerHTML = DARK_PAGES.map(
+          ([k, l]) => `<button class="chip" type="button" data-dark-page="${k}">${l}</button>`,
+        ).join("");
         document.querySelectorAll("[data-dark-page]").forEach((b) =>
           b.addEventListener("click", () => {
             state.darkPage = b.dataset.darkPage;
             render();
           }),
         );
-        $("ringAnchor").innerHTML = ANCHORS.map(([k, l]) => `<button class="chip" type="button" data-anchor="${k}">${l}</button>`).join("");
+        $("ringAnchor").innerHTML = ANCHORS.map(
+          ([k, l]) => `<button class="chip" type="button" data-anchor="${k}">${l}</button>`,
+        ).join("");
         document.querySelectorAll("[data-anchor]").forEach((b) =>
           b.addEventListener("click", () => {
             state.ringAnchor = b.dataset.anchor;
             render();
           }),
         );
-        $("ringColor").innerHTML = RING_COLORS.map(([k, l]) => `<button class="chip" type="button" data-ring-color="${k}">${l}</button>`).join("");
+        $("ringColor").innerHTML = RING_COLORS.map(
+          ([k, l]) => `<button class="chip" type="button" data-ring-color="${k}">${l}</button>`,
+        ).join("");
         document.querySelectorAll("[data-ring-color]").forEach((b) =>
           b.addEventListener("click", () => {
             state.ringColor = b.dataset.ringColor;
@@ -1247,7 +1436,10 @@
             ["front", "Light blue"],
             ["deep", "Deep"],
           ]
-            .map(([k, l]) => `<label class="swatch" for="color-${theme}-${k}">${l}<input id="color-${theme}-${k}" type="color" /></label>`)
+            .map(
+              ([k, l]) =>
+                `<label class="swatch" for="color-${theme}-${k}">${l}<input id="color-${theme}-${k}" type="color" /></label>`,
+            )
             .join("");
           for (const k of ["back", "front", "deep"]) {
             $(`color-${theme}-${k}`).addEventListener("input", (e) => {
@@ -1261,7 +1453,9 @@
       function exportSvg() {
         const b = bbox(state);
         const side = Math.max(b.w, b.h) * 1.08;
-        const vb = [b.x + b.w / 2 - side / 2, b.y + b.h / 2 - side / 2, side, side].map(fmt).join(" ");
+        const vb = [b.x + b.w / 2 - side / 2, b.y + b.h / 2 - side / 2, side, side]
+          .map(fmt)
+          .join(" ");
         return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" width="512" height="512"><rect x="${vb.split(" ")[0]}" y="${vb.split(" ")[1]}" width="${fmt(side)}" height="${fmt(side)}" fill="#ffffff"/>${content(state, colorsFor(state, "light"))}</svg>`;
       }
 
@@ -1272,7 +1466,9 @@
           button.textContent = done;
           setTimeout(() => (button.textContent = old), 1400);
         } catch {
-          setStatus("Copy isn't available here. Save the design instead, and ask Claude to read it.");
+          setStatus(
+            "Copy isn't available here. Save the design instead, and ask Claude to read it.",
+          );
         }
       }
 
@@ -1287,7 +1483,8 @@
       // and below the edge mean nothing for holes, so holes skip them.
       function settingRows() {
         const rows = [];
-        for (const list of Object.values(SLIDERS)) for (const [key, label, , , , f] of list) rows.push([key, label, f]);
+        for (const list of Object.values(SLIDERS))
+          for (const [key, label, , , , f] of list) rows.push([key, label, f]);
         const pick = (pairs) => (v) => (pairs.find(([k]) => k === v) || [, v])[1];
         rows.push(["ringStyle", "Ring style", pick(STYLES)]);
         rows.push(["ringColor", "Ring color", pick(RING_COLORS)]);
@@ -1313,16 +1510,23 @@
         section.hidden = false;
         const items = designs
           .map((d) => ({ d, p: sanitize(d.settings) }))
-          .sort((a, b) => String(a.d.name).localeCompare(String(b.d.name), undefined, { numeric: true }));
+          .sort((a, b) =>
+            String(a.d.name).localeCompare(String(b.d.name), undefined, { numeric: true }),
+          );
         const rows = settingRows().filter(([key]) => {
-          const values = items.filter((it) => relevant(it.p, key)).map((it) => JSON.stringify(it.p[key]));
+          const values = items
+            .filter((it) => relevant(it.p, key))
+            .map((it) => JSON.stringify(it.p[key]));
           return new Set(values).size > 1;
         });
         $("compareGrid").innerHTML = items
           .map(({ d, p }) => {
             const b = bbox(p);
             const diffs = rows
-              .map(([key, label, f]) => `<dt>${label}</dt><dd>${relevant(p, key) ? f(p[key]) : "n/a"}</dd>`)
+              .map(
+                ([key, label, f]) =>
+                  `<dt>${label}</dt><dd>${relevant(p, key) ? f(p[key]) : "n/a"}</dd>`,
+              )
               .join("");
             return `<article class="cmp">
               <div class="tile light big">${svg(p, b, "light", 130)}</div>
@@ -1336,10 +1540,12 @@
             </article>`;
           })
           .join("");
-        $("compareGrid").querySelectorAll("[data-name]").forEach((el, i) => (el.textContent = items[i].d.name));
-        $("compareGrid").querySelectorAll("[data-load]").forEach((btn) =>
-          btn.addEventListener("click", () => loadDesign(btn.dataset.load)),
-        );
+        $("compareGrid")
+          .querySelectorAll("[data-name]")
+          .forEach((el, i) => (el.textContent = items[i].d.name));
+        $("compareGrid")
+          .querySelectorAll("[data-load]")
+          .forEach((btn) => btn.addEventListener("click", () => loadDesign(btn.dataset.load)));
       }
 
       function loadDesign(id) {
@@ -1366,12 +1572,21 @@
         }
         list.innerHTML = designs
           .map((d) => {
-            const when = d.savedAt ? new Date(d.savedAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+            const when = d.savedAt
+              ? new Date(d.savedAt).toLocaleString([], {
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                })
+              : "";
             return `<li><span class="name"></span><span class="meta">${when}</span><button class="link" type="button" data-load="${d.id}">Load</button><button class="link del" type="button" data-del="${d.id}">Delete</button></li>`;
           })
           .join("");
         list.querySelectorAll(".name").forEach((el, i) => (el.textContent = designs[i].name));
-        list.querySelectorAll("[data-load]").forEach((b) => b.addEventListener("click", () => loadDesign(b.dataset.load)));
+        list
+          .querySelectorAll("[data-load]")
+          .forEach((b) => b.addEventListener("click", () => loadDesign(b.dataset.load)));
         list.querySelectorAll("[data-del]").forEach((b) => {
           let armed = false;
           b.addEventListener("click", async () => {
@@ -1401,7 +1616,9 @@
           db = null;
         }
         if (!db) {
-          setStatus("Saving needs this page open on claude.ai while signed in. Copy settings still works.");
+          setStatus(
+            "Saving needs this page open on claude.ai while signed in. Copy settings still works.",
+          );
           $("saveBtn").disabled = true;
           return;
         }
@@ -1414,7 +1631,11 @@
               designs = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
               renderSaved();
               renderCompare();
-              setStatus(designs.length ? `${designs.length} saved. Claude can read these.` : "No saved designs yet. Name one and save it.");
+              setStatus(
+                designs.length
+                  ? `${designs.length} saved. Claude can read these.`
+                  : "No saved designs yet. Name one and save it.",
+              );
             },
             () => setStatus("Saved designs are unavailable right now."),
           );
@@ -1431,13 +1652,19 @@
           else await db.collection("designs").add(body);
           setStatus(`Saved "${name}".`);
         } catch (e) {
-          setStatus(e?.code === "invalid_argument" ? "You can view designs here, but not save them." : "Couldn't save. Try again in a moment.");
+          setStatus(
+            e?.code === "invalid_argument"
+              ? "You can view designs here, but not save them."
+              : "Couldn't save. Try again in a moment.",
+          );
         } finally {
           $("saveBtn").disabled = false;
         }
       });
       $("copySvg").addEventListener("click", (e) => copy(exportSvg(), e.currentTarget, "Copied"));
-      $("copyJson").addEventListener("click", (e) => copy(JSON.stringify(state, null, 2), e.currentTarget, "Copied"));
+      $("copyJson").addEventListener("click", (e) =>
+        copy(JSON.stringify(state, null, 2), e.currentTarget, "Copied"),
+      );
 
       buildControls();
       const SHIFT_CELLS = REFINED;
@@ -1446,7 +1673,8 @@
         const draft = localStorage.getItem(DRAFT_KEY);
         const older = localStorage.getItem("calendar-mark-draft-v8");
         if (draft) state = sanitize(JSON.parse(draft));
-        else if (older) state = sanitize({ ...BASE, colors: JSON.parse(older).colors, ...SHIFT_CELLS });
+        else if (older)
+          state = sanitize({ ...BASE, colors: JSON.parse(older).colors, ...SHIFT_CELLS });
       } catch {
         state = sanitize({ ...BASE, ...SHIFT_CELLS });
       }
