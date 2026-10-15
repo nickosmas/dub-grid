@@ -235,7 +235,8 @@
         Breathe, Shuffle and Climb for the refined two-card mark. Climb replaces Trace for
         sync and long waits. The rules carry over: the logo stays static wherever it
         identifies the product, these play only on full-screen waits, and reduced motion shows
-        the static mark.
+        the static mark. Shown with the darker card in front; the bar switches back to the
+        light card and turns the gap off.
       </p>
 
       <div class="bar">
@@ -249,6 +250,16 @@
           Motion
           <button class="chip" data-motion="play" aria-pressed="true">Play</button>
           <button class="chip" data-motion="reduced" aria-pressed="false">Reduced motion</button>
+        </div>
+        <div class="group" role="group" aria-label="Card in front">
+          In front
+          <button class="chip" data-front="dark" aria-pressed="true">Darker card</button>
+          <button class="chip" data-front="light" aria-pressed="false">Light card (spec)</button>
+        </div>
+        <div class="group" role="group" aria-label="Between the cards">
+          Between
+          <button class="chip" data-cut="on" aria-pressed="true">Gap (spec)</button>
+          <button class="chip" data-cut="off" aria-pressed="false">No gap</button>
         </div>
       </div>
 
@@ -506,13 +517,17 @@
       const FRAMES = { breathe, shuffle, climb };
 
       let uid = 0;
+      // The darker card in front swaps the palette: the card that arrives at
+      // the front turns dark, and the one behind it is light.
+      let darkFront = true;
+      let cutOn = true;
       function frameSvg(f, theme, size, ids) {
-        const c = COLORS[theme];
+        const c = darkFront ? { back: COLORS[theme].front, front: COLORS[theme].back } : COLORS[theme];
         const vb = [CENTER.x - SIDE / 2, CENTER.y - SIDE / 2, SIDE, SIDE].map(fmt).join(" ");
         const place = (k) =>
           `translate(${fmt(k.x)} ${fmt(k.y)}) scale(${fmt(k.scale)})`;
         const region = `x="${fmt(CENTER.x - SIDE)}" y="${fmt(CENTER.y - SIDE)}" width="${fmt(SIDE * 2)}" height="${fmt(SIDE * 2)}"`;
-        const gap = GAP * f.gap;
+        const gap = cutOn ? GAP * f.gap : 0;
         const cutBy = (k) => {
           const op = fmt(k.opacity ?? 1);
           return gap > 0.05
@@ -602,6 +617,20 @@
         }),
       );
       press("[data-motion]", (x) => (x.dataset.motion === "reduced") === reduced);
+      document.querySelectorAll("[data-front]").forEach((b) =>
+        b.addEventListener("click", () => {
+          darkFront = b.dataset.front === "dark";
+          press("[data-front]", (x) => x === b);
+          draw();
+        }),
+      );
+      document.querySelectorAll("[data-cut]").forEach((b) =>
+        b.addEventListener("click", () => {
+          cutOn = b.dataset.cut === "on";
+          press("[data-cut]", (x) => x === b);
+          draw();
+        }),
+      );
 
       const MESSAGES = {
         shuffle: ["Loading your schedule", "Schedule ready"],
