@@ -106,7 +106,7 @@ Shuffle and Climb finish the current move when the wait ends.
 
 ### Build steps
 
-1. [ ] **Shared geometry in `@dubgrid/design-tokens`.** Rewrite
+1. [x] **Shared geometry in `@dubgrid/design-tokens`.** Rewrite
        `brand-mark.ts` for the stacked mark: card paths with per-corner radii,
        colors per use, the gap and its small-size value (with the 32 px
        threshold), ink box, optical center, square box, and the horizontal and
@@ -114,7 +114,7 @@ Shuffle and Climb finish the current move when the wait ends.
    - Done when the package builds and `brand-mark.test.ts` pins the card
      boxes, the equal 14-unit curve length at every corner, both gaps, the
      half-turn symmetry, and the lockup and stacked spacing.
-2. [ ] **Shared motion.** Rewrite `brand-motion.ts` as pure frame functions
+2. [x] **Shared motion.** Rewrite `brand-motion.ts` as pure frame functions
        for Breathe, Shuffle and Climb, plus the finish-the-move helper, and
        retire Trace.
    - Done when `brand-motion.test.ts` pins that:

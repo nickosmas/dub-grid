@@ -770,14 +770,19 @@ export function getMobileNavigationTheme(isDark: boolean) {
 export const mobileNavigationTheme = getMobileNavigationTheme(false);
 
 export {
-  BRAND_MOTION_ASPECT,
   BRAND_MOTION_DURATION,
+  BRAND_MOTION_FADE_BELOW,
+  BRAND_MOTION_MOVE,
   brandBreathe,
+  brandClimb,
+  brandClimbMove,
   brandMotionFrames,
   brandRestFrame,
+  brandSettlingFrame,
   brandShuffle,
-  brandTrace,
+  brandShuffleMove,
   type BrandAnimation,
   type BrandMotionCard,
   type BrandMotionFrame,
+  type BrandSteppedAnimation,
 } from "./brand-motion";
