@@ -253,6 +253,15 @@
       .tile.dark .combo {
         --combo-line: rgba(250, 250, 250, 0.16);
       }
+      .icon-row {
+        display: flex;
+        align-items: flex-end;
+        gap: 14px;
+      }
+      .combo-note {
+        font-size: 12px;
+        opacity: 0.7;
+      }
       .combo-label {
         font-size: 13px;
         font-weight: 500;
@@ -297,6 +306,14 @@
         <div class="tile light" id="combosLight"></div>
         <div class="tile dark" id="combosDark"></div>
       </div>
+
+      <h2>Dark-mode back card</h2>
+      <p class="sub">
+        On a dark surface the pale back card is brighter than the brand-blue front card, so it
+        pulls attention backward. A darker back card recedes instead, as the pale one does on
+        white. Click one to apply it to the rest of the page.
+      </p>
+      <div class="tile dark" id="darkBacks"></div>
 
       <h2>At real sizes</h2>
       <div class="pair">
@@ -405,14 +422,37 @@
           ],
         },
       ];
-      const BEFORE = { overshoot: 0, space: 0.22, stackGap: "lowest", front: "light", cardGap: "cut" };
+      // Toned-down back cards for dark mode, with their contrast against the
+      // #111113 surface and against the #3B82F6 front card. In light mode the
+      // back card is 2.16:1 to the surface and 2.4:1 to the front.
+      const DARK_BACKS = [
+        { v: "#BCD2FF", label: "Pale, #BCD2FF (spec)", note: "12.4:1 to the surface, 2.42:1 to the front" },
+        { v: "#1D4ED8", label: "Bright, #1D4ED8", note: "2.81:1 to the surface, 1.82:1 to the front" },
+        { v: "#1E40AF", label: "Mirror, #1E40AF", note: "2.16:1 to the surface, 2.37:1 to the front, as in light mode", rec: true },
+        { v: "#1E3A8A", label: "Deep, #1E3A8A", note: "1.82:1 to the surface, 2.82:1 to the front" },
+      ];
+      OPTIONS.push({ key: "darkBack", title: "Dark-mode back card (darker card in front)", choices: DARK_BACKS });
+      const BEFORE = { overshoot: 0, space: 0.22, stackGap: "lowest", front: "light", cardGap: "cut", darkBack: "#BCD2FF" };
       const COMBOS = [
         { front: "light", cardGap: "cut", label: "Light in front, gap" },
         { front: "light", cardGap: "none", label: "Light in front, no gap" },
         { front: "dark", cardGap: "cut", label: "Darker in front, gap (spec)" },
         { front: "dark", cardGap: "none", label: "Darker in front, no gap" },
       ];
-      const markColors = (s, theme) => (s.front === "dark" ? [...COLORS[theme]].reverse() : COLORS[theme]);
+      const markColors = (s, theme) => {
+        if (s.front !== "dark") return COLORS[theme];
+        return theme === "dark" ? [s.darkBack, COLORS.dark[0]] : [...COLORS[theme]].reverse();
+      };
+      // The symbol alone, centered in a square, as at icon sizes. At 32 px and
+      // below the gap is the small-size 7 units.
+      function symbolSvg(s, size, theme) {
+        const g = geometry(1);
+        const k = size / Math.max(g.ink.w, g.ink.h);
+        const w = g.ink.w * k;
+        const h = g.ink.h * k;
+        const gap = s.cardGap === "none" ? 0 : size <= 32 ? 7 : g.gap;
+        return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true" style="display:block">${symbolGroup(g, markColors(s, theme), (size - w) / 2, (size - h) / 2, h, gap)}</svg>`;
+      }
       const markGap = (s, g) => (s.cardGap === "none" ? 0 : g.gap);
       let state = Object.fromEntries(OPTIONS.map((o) => [o.key, o.choices.find((c) => c.rec).v]));
 
@@ -660,6 +700,17 @@
                 <div class="stack-row">${stackedSvg(s, 20, theme)}</div></button>`;
             }).join("")}</div>`;
         }
+        document.getElementById("darkBacks").innerHTML = `
+          <span class="label">Dark, darker card in front: header 28 px, stacked 20 px, icons 64, 32 and 16 px</span>
+          <div class="combos">${DARK_BACKS.map((c) => {
+            const s = { ...state, front: "dark", darkBack: c.v };
+            const on = state.front === "dark" && state.darkBack === c.v;
+            return `<button class="combo" data-darkback="${c.v}" aria-pressed="${on}">
+              <span class="combo-label">${c.label}${c.rec ? " (recommended)" : ""}</span>${lockupSvg(s, 28, "dark")}
+              <div class="stack-row">${stackedSvg(s, 20, "dark")}</div>
+              <div class="icon-row">${symbolSvg(s, 64, "dark")}${symbolSvg(s, 32, "dark")}${symbolSvg(s, 16, "dark")}</div>
+              <span class="combo-note">${c.note}</span></button>`;
+          }).join("")}</div>`;
         document.querySelectorAll("[data-key]").forEach((el) => {
           el.setAttribute("aria-pressed", String(String(state[el.dataset.key]) === el.dataset.v));
         });
@@ -689,6 +740,14 @@ export const BRAND_MARK_BOTTOM_LIFT = ${fmt(L.g.bottomLift)};` : ""}`;
           render();
         }),
       );
+
+      document.getElementById("darkBacks").addEventListener("click", (e) => {
+        const b = e.target.closest(".combo");
+        if (!b) return;
+        state.front = "dark";
+        state.darkBack = b.dataset.darkback;
+        render();
+      });
 
       for (const id of ["combosLight", "combosDark"]) {
         document.getElementById(id).addEventListener("click", (e) => {
