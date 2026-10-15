@@ -1184,6 +1184,8 @@
         document.querySelectorAll("[data-style]").forEach((b) =>
           b.addEventListener("click", () => {
             state.ringStyle = b.dataset.style;
+            // Picking a style with no rings would change nothing on screen.
+            if (state.ringCount === 0) state.ringCount = 2;
             render();
           }),
         );
