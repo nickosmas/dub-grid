@@ -152,7 +152,7 @@ Shuffle and Climb finish the current move when the wait ends.
      `AnimatedDubGridLogo` static at the same size.
    - Done when the mobile type-check and tests pass and the generator's
      launcher preview shows the new icon under circle and squircle masks.
-6. [ ] **Reference and docs.**
+6. [x] **Reference and docs.**
    - Mark `blueprint/reference/logo-animations.md` as superseded by
      `stack-logo-animations.md`.
    - Refresh the documentation fingerprints that the changed images affect.
