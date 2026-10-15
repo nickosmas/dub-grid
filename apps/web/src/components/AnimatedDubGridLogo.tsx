@@ -20,8 +20,8 @@ const VIEW_BOX = `${x} ${y} ${SIDE} ${SIDE}`;
 // Moving cards can pass the square's edge; the mask region leaves them room.
 const MASK_REGION = { x: x - SIDE / 2, y: y - SIDE / 2, width: SIDE * 2, height: SIDE * 2 };
 const REST = brandRestFrame();
-const BACK = "var(--dg-color-brand-mark-back)";
-const FRONT = "var(--dg-color-brand-mark-front)";
+const SIDE_COLOR = "var(--dg-color-brand-mark-side)";
+const CENTER_COLOR = "var(--dg-color-brand-mark-center)";
 
 function usePrefersReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
@@ -87,9 +87,9 @@ function useBrandAnimation(
 }
 
 const fill = (color: number) => {
-  if (color <= 0.002) return BACK;
-  if (color >= 0.998) return FRONT;
-  return `color-mix(in srgb, ${FRONT} ${(color * 100).toFixed(1)}%, ${BACK})`;
+  if (color <= 0.002) return SIDE_COLOR;
+  if (color >= 0.998) return CENTER_COLOR;
+  return `color-mix(in srgb, ${CENTER_COLOR} ${(color * 100).toFixed(1)}%, ${SIDE_COLOR})`;
 };
 
 const cardPath = (card: BrandMotionCard, grow = 0) =>

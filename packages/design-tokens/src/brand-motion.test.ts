@@ -35,14 +35,24 @@ describe("brand motion", () => {
     }
   });
 
-  it("loops Breathe on the static mark and peaks with the front card 4.5% larger", () => {
+  it("loops Breathe on the static mark and peaks with the center card 4.5% larger", () => {
     expect(rounded(brandBreathe(BRAND_MOTION_DURATION.breathe))).toEqual(rest);
-    const [back, front] = brandBreathe(BRAND_MOTION_DURATION.breathe / 2).cards;
-    expect(front.scale).toBeCloseTo(1.045, 6);
-    const [restBack] = brandRestFrame().cards;
-    // The back card eases away down the stack, to the lower left.
+    const [back, center, front] = brandBreathe(BRAND_MOTION_DURATION.breathe / 2).cards;
+    expect(center.scale).toBeCloseTo(1.045, 6);
+    const [restBack, , restFront] = brandRestFrame().cards;
+    // The side cards ease away from the center along the stack.
     expect(back.cx).toBeLessThan(restBack.cx);
     expect(back.cy).toBeGreaterThan(restBack.cy);
+    expect(front.cx).toBeGreaterThan(restFront.cx);
+    expect(front.cy).toBeLessThan(restFront.cy);
+  });
+
+  it("rests on three cards with the strongest color in the center", () => {
+    expect(brandRestFrame().cards.map((c) => [c.scale, c.color])).toEqual([
+      [0.75, 0],
+      [1, 1],
+      [0.75, 0],
+    ]);
   });
 
   it("ends each Shuffle and Climb move on the static mark and rests there until the next", () => {
@@ -59,39 +69,53 @@ describe("brand motion", () => {
   });
 
   it("crosses Shuffle's colors only between 30% and 70% of the move", () => {
-    for (const u of [0, 0.15, 0.3]) {
-      const [back, front] = brandShuffleMove(u).cards.map((c) => c.color);
-      expect(back).toBeCloseTo(0, 6);
-      expect(front).toBeCloseTo(1, 6);
-    }
-    for (const u of [0.7, 0.85, 1]) {
-      const [back, front] = brandShuffleMove(u).cards.map((c) => c.color);
-      expect(back).toBeCloseTo(0, 6);
-      expect(front).toBeCloseTo(1, 6);
-    }
-    const [a, b] = brandShuffleMove(0.5).cards.map((c) => c.color);
-    expect(a).toBeCloseTo(0.5, 6);
-    expect(b).toBeCloseTo(0.5, 6);
+    // The card stepping from the back to the center, and the one leaving it.
+    const colors = (u: number) => {
+      const cards = brandShuffleMove(u).cards;
+      const stepping = u < 0.5 ? cards.slice(0, 2) : cards.slice(1);
+      return stepping.map((c) => c.color);
+    };
+    for (const u of [0, 0.15, 0.3]) expect(colors(u).map((c) => +c.toFixed(6))).toEqual([0, 1]);
+    for (const u of [0.7, 0.85, 1]) expect(colors(u).map((c) => +c.toFixed(6))).toEqual([1, 0]);
+    for (const c of colors(0.5)) expect(c).toBeCloseTo(0.5, 6);
   });
 
-  it("closes Shuffle's gap while the cards pass and reopens it by 70%", () => {
+  it("closes Shuffle's gaps while the front card passes over the stack", () => {
     expect(brandShuffleMove(0.5).gap).toBe(0);
-    expect(brandShuffleMove(0.42).gap).toBeCloseTo(0, 6);
-    expect(brandShuffleMove(0.3).gap).toBeCloseTo(1, 6);
-    expect(brandShuffleMove(0.7).gap).toBeCloseTo(1, 6);
+    expect(brandShuffleMove(0.46).gap).toBeCloseTo(0, 6);
+    expect(brandShuffleMove(0.38).gap).toBeCloseTo(1, 6);
+    expect(brandShuffleMove(0.62).gap).toBeCloseTo(1, 6);
+  });
+
+  it("carries Shuffle's front card over the top to the back", () => {
+    const start = brandShuffleMove(0).cards;
+    const mid = brandShuffleMove(0.5).cards;
+    const end = brandShuffleMove(1).cards;
+    const passing = mid.find((c) => c.scale === 0.75 && c.color === 0);
+    expect(passing).toBeDefined();
+    // Up and to the left of the line through the stack.
+    const [restBack, , restFront] = brandRestFrame().cards;
+    const cross =
+      (restFront.cx - restBack.cx) * (passing!.cy - restBack.cy) -
+      (restFront.cy - restBack.cy) * (passing!.cx - restBack.cx);
+    expect(cross).toBeLessThan(0);
+    expect(rounded({ cards: [end[0]], gap: 1 })).toEqual(
+      rounded({ cards: [brandRestFrame().cards[0]], gap: 1 }),
+    );
+    expect(start[2].color).toBe(0);
   });
 
   it("mirrors Climb's arriving card with its leaving card under a half turn and time reversal", () => {
     const { width, height } = BRAND_SYMBOL_INK;
+    const isEdge = (c: { scale: number }) => c.scale < 0.75 - 1e-9;
     for (const u of samples(20)) {
       const now = brandClimbMove(u).cards;
       const mirror = brandClimbMove(1 - u).cards;
-      const arriving = now.find((c) => c.color === 0 && c.scale < 1);
-      const leaving = mirror.find((c) => c.color === 1 && c.scale < 1);
-      if (!arriving || !leaving) {
-        expect(Boolean(arriving)).toBe(Boolean(leaving));
-        continue;
-      }
+      const arriving = isEdge(now[0]) ? now[0] : undefined;
+      const last = mirror[mirror.length - 1];
+      const leaving = isEdge(last) ? last : undefined;
+      expect(Boolean(arriving)).toBe(Boolean(leaving));
+      if (!arriving || !leaving) continue;
       expect(arriving.scale).toBeCloseTo(leaving.scale, 6);
       expect(arriving.opacity).toBeCloseTo(leaving.opacity, 6);
       expect(arriving.cx).toBeCloseTo(width - leaving.cx, 6);
@@ -102,7 +126,7 @@ describe("brand motion", () => {
   it("never shows a card below the fade threshold at full opacity, or a larger one see-through", () => {
     for (const u of samples(200)) {
       for (const c of [...brandClimbMove(u).cards, ...brandShuffleMove(u).cards]) {
-        if (c.scale < BRAND_MOTION_FADE_BELOW) expect(c.opacity).toBeLessThan(1);
+        if (c.scale < BRAND_MOTION_FADE_BELOW * 0.75) expect(c.opacity).toBeLessThan(1);
         else expect(c.opacity).toBe(1);
       }
     }

@@ -1358,12 +1358,12 @@ describe("operations reports", () => {
 
     expect(text.startsWith("%PDF-1.4")).toBe(true);
     expect(text).toContain("/Subtype /Image");
-    expect(text).toContain("q 79.69 0 0 25.50 32.00 555.25 cm /Lockup Do Q");
+    expect(text).toContain("q 81.81 0 0 25.50 32.00 555.25 cm /Lockup Do Q");
     expect(text).toContain("q 0.059 0.090 0.141 rg 32.00 532.00 728.00 1.40 re f Q");
     expect(text).not.toContain(`<${pdfHex("dubgrid")}> Tj`);
-    expect(text).toContain("q 0.580 0.639 0.722 rg 119.49 560.00 0.80 16.00 re f Q");
+    expect(text).toContain("q 0.580 0.639 0.722 rg 121.61 560.00 0.80 16.00 re f Q");
     expect(text).not.toContain(`Tm <${pdfHex("|")}> Tj`);
-    expect(text).toContain(`/F1 11 Tf 1 0 0 1 128.09 564.15 Tm <${pdfHex("Acme Health")}> Tj`);
+    expect(text).toContain(`/F1 11 Tf 1 0 0 1 130.21 564.15 Tm <${pdfHex("Acme Health")}> Tj`);
     expect(text).toContain(pdfHex("Acme Health"));
     expect(text).toContain(pdfHex("Staff hours - May 3, 2026 to May 4, 2026"));
     expect(text).toContain(pdfHex("Printed May 4, 2026"));
@@ -1625,9 +1625,9 @@ describe("operations report PDF without the lockup image", () => {
       expect(text).toMatch(/q 0\.561 0\.690 0\.973 rg .* h f Q/);
       expect(text).toMatch(/q 1\.000 1\.000 1\.000 rg .* h f Q/);
       expect(text).toMatch(/q 0\.145 0\.388 0\.922 rg .* h f Q/);
-      // 17 pt wordmark: the symbol's ink is 13.97 wide, then 0.149 em (2.53) to
+      // 17 pt wordmark: the symbol's ink is 15.87 wide, then 0.149 em (2.53) to
       // the text's origin, so the word's ink starts 0.20 em past the symbol.
-      expect(text).toContain(`/F2 17 Tf 1 0 0 1 48.50 563.58 Tm <${pdfHex("dubgrid")}> Tj`);
+      expect(text).toContain(`/F2 17 Tf 1 0 0 1 50.40 563.58 Tm <${pdfHex("dubgrid")}> Tj`);
     } finally {
       cwd.mockRestore();
       vi.resetModules();

@@ -1,0 +1,587 @@
+<title>Symmetric stack motion</title>
+<meta name="claude:viewport-fit-sides" content="cover" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
+/>
+<style>
+  /* Layout: a control bar, then one row per animation with the mark on light and dark surfaces. */
+  :root {
+    --text-primary: #111827;
+    --text-secondary: #5b6472;
+    --page: #f6f7fb;
+    --panel: #ffffff;
+    --border: rgba(15, 23, 42, 0.1);
+    --accent: #2563eb;
+    --accent-soft: rgba(37, 99, 235, 0.1);
+    --tile-light: #ffffff;
+    --tile-dark: #02070f;
+    --label-light: #64748b;
+    --label-dark: #a1a1aa;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --text-primary: #fafafa;
+      --text-secondary: #a1a1aa;
+      --page: #0c0c0e;
+      --panel: #18181b;
+      --border: rgba(255, 255, 255, 0.1);
+      --accent: #4a9bff;
+      --accent-soft: rgba(74, 155, 255, 0.18);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --text-primary: #fafafa;
+    --text-secondary: #a1a1aa;
+    --page: #0c0c0e;
+    --panel: #18181b;
+    --border: rgba(255, 255, 255, 0.1);
+    --accent: #4a9bff;
+    --accent-soft: rgba(74, 155, 255, 0.18);
+    color-scheme: dark;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    padding-block: 24px 56px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: Inter, system-ui, sans-serif;
+    font-size: 14px;
+  }
+  main {
+    max-width: 1040px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0;
+  }
+  h2 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0;
+  }
+  .sub {
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.55;
+    max-width: 70ch;
+  }
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+    align-items: center;
+  }
+  .ctl {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .ctl > span {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+  .chip {
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 5px 11px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text-primary);
+    cursor: pointer;
+  }
+  .chip[aria-pressed="true"] {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
+  }
+  .chip:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 10px;
+  }
+  .pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  @media (max-width: 640px) {
+    .pair {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  .tile {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    min-height: 260px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 20px 12px;
+  }
+  .tile.light {
+    background: var(--tile-light);
+    color: var(--label-light);
+  }
+  .tile.dark {
+    background: var(--tile-dark);
+    color: var(--label-dark);
+  }
+  .tile small {
+    font-size: 13px;
+  }
+  .stage {
+    display: block;
+  }
+  .note {
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 1.55;
+    margin: 0;
+    max-width: 75ch;
+  }
+  #measure {
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+    visibility: hidden;
+  }
+</style>
+
+<main>
+  <h1>Symmetric stack motion</h1>
+  <p class="sub">
+    Breathe, Shuffle and Climb, adapted to the three-card stack (center card full size, front and
+    back cards 25% smaller, center strongest). Each one starts and ends on the static mark, and Stop
+    lets the current move finish before it rests, as the shipped versions do.
+  </p>
+  <div class="bar">
+    <div class="ctl" id="speed"><span>Speed</span></div>
+    <div class="ctl">
+      <span>Playback</span><button class="chip" id="play" aria-pressed="true">Playing</button>
+    </div>
+  </div>
+
+  <section>
+    <h2>Breathe</h2>
+    <p class="note">
+      Mobile splash and the web sign-in handoff. 2.4 s sine loop: the center card grows 4.5% while
+      the front and back cards ease 4 units away from it along the stack, one each way.
+    </p>
+    <div class="pair">
+      <div class="tile light"><svg class="stage" data-anim="breathe" data-theme="light"></svg></div>
+      <div class="tile dark"><svg class="stage" data-anim="breathe" data-theme="dark"></svg></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Shuffle</h2>
+    <p class="note">
+      Schedule and route-level loading. Per 1.8 s cycle, a 1.0 s move then 0.8 s rest: the front
+      card arcs over the top to the back, while the center card steps forward to the front and the
+      back card steps up to the center. Each card takes the size and color of the place it moves
+      into (colors cross between 30% and 70% of the move), and the gaps close while the traveling
+      card passes over the stack.
+    </p>
+    <div class="pair">
+      <div class="tile light">
+        <svg class="stage" data-anim="shuffle" data-theme="light"></svg
+        ><small>Loading your schedule</small>
+      </div>
+      <div class="tile dark">
+        <svg class="stage" data-anim="shuffle" data-theme="dark"></svg
+        ><small>Loading your schedule</small>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Climb</h2>
+    <p class="note">
+      Sync and long waits. Per 1.6 s cycle, a 1.0 s step then 0.6 s rest. The step ripples up the
+      stack from front to back: the front card steps on and shrinks into its top-right corner, the
+      center card moves up to the front, the back card rises to the center, and a new back card
+      grows out of its bottom-left corner. Leaving and arriving cards mirror each other, and each
+      fades only below 30% of its size, so no frame shows a speck.
+    </p>
+    <div class="pair">
+      <div class="tile light">
+        <svg class="stage" data-anim="climb" data-theme="light"></svg
+        ><small>Syncing your changes</small>
+      </div>
+      <div class="tile dark">
+        <svg class="stage" data-anim="climb" data-theme="dark"></svg
+        ><small>Syncing your changes</small>
+      </div>
+    </div>
+  </section>
+
+  <p class="note">
+    Reduced motion shows the static mark on every surface. Mobile keeps the static mark until its
+    renderer is built, as today.
+  </p>
+</main>
+<svg id="measure" aria-hidden="true"><path id="measurePath" /></svg>
+
+<script>
+  const ANGLE = 32;
+  const TAN = Math.tan((ANGLE * Math.PI) / 180);
+  const ASPECT = 0.95;
+  const CURVE = 14;
+  const STEP_X = 0.36;
+  const STEP_Y = 0.42;
+  const SCALE = 0.75;
+  const GAP = 3.5;
+  const COLORS = {
+    light: { strong: "#2563EB", side: "#8FB0F8" },
+    dark: { strong: "#3B82F6", side: "#1E40AF" },
+  };
+  const DURATION = { breathe: 2.4, shuffle: 1.8, climb: 1.6 };
+  const MOVE = 1.0;
+
+  const fmt = (n) => Number(n.toFixed(2)).toString();
+  const clamp01 = (x) => Math.max(0, Math.min(1, x));
+  const smooth = (x) => {
+    x = clamp01(x);
+    return x * x * (3 - 2 * x);
+  };
+  const quartic = (x) => {
+    x = clamp01(x);
+    return x < 0.5 ? 8 * x ** 4 : 1 - (-2 * x + 2) ** 4 / 2;
+  };
+  const window01 = (u, a, b) => clamp01((u - a) / (b - a));
+
+  function roundedPolygon(pts, radii) {
+    const n = pts.length;
+    const corners = pts.map((v, k) => {
+      const prev = pts[(k + n - 1) % n];
+      const next = pts[(k + 1) % n];
+      const a = [prev[0] - v[0], prev[1] - v[1]];
+      const b = [next[0] - v[0], next[1] - v[1]];
+      const la = Math.hypot(...a);
+      const lb = Math.hypot(...b);
+      const ua = [a[0] / la, a[1] / la];
+      const ub = [b[0] / lb, b[1] / lb];
+      const ang = Math.acos(Math.max(-1, Math.min(1, ua[0] * ub[0] + ua[1] * ub[1])));
+      const t = Math.min(radii[k] / Math.tan(ang / 2), la / 2, lb / 2);
+      return {
+        s: [v[0] + ua[0] * t, v[1] + ua[1] * t],
+        e: [v[0] + ub[0] * t, v[1] + ub[1] * t],
+        r: t * Math.tan(ang / 2),
+      };
+    });
+    let d = `M${fmt(corners[0].e[0])},${fmt(corners[0].e[1])}`;
+    for (let k = 1; k <= n; k++) {
+      const c = corners[k % n];
+      d += `L${fmt(c.s[0])},${fmt(c.s[1])}A${fmt(c.r)},${fmt(c.r)} 0 0 1 ${fmt(c.e[0])},${fmt(c.e[1])}`;
+    }
+    return d + "Z";
+  }
+
+  function cardPath(cx, cy, w) {
+    const h = ASPECT * w;
+    const x = cx - w / 2;
+    const y = cy - (w * TAN) / 2 - h / 2;
+    const radii = [90 - ANGLE, 90 + ANGLE, 90 - ANGLE, 90 + ANGLE].map(
+      (deg) => ((CURVE * w) / 100) * Math.tan((deg * Math.PI) / 360),
+    );
+    return roundedPolygon(
+      [
+        [x, y],
+        [x + w, y + w * TAN],
+        [x + w, y + w * TAN + h],
+        [x, y + h],
+      ],
+      radii,
+    );
+  }
+
+  // The static mark: back, center, front. One step between neighbours is
+  // sized by their average width, as in the static geometry.
+  const SIDE_W = 100 * SCALE;
+  const STEP_W = (100 + SIDE_W) / 2;
+  const STEP = { x: STEP_X * STEP_W, y: STEP_X * STEP_W * TAN - STEP_Y * ASPECT * STEP_W };
+  const STEP_LEN = Math.hypot(STEP.x, STEP.y);
+  const ALONG = { x: STEP.x / STEP_LEN, y: STEP.y / STEP_LEN };
+  const OVER = { x: ALONG.y, y: -ALONG.x };
+  // Corner offsets from a card's center, per unit of width.
+  const TOP_RIGHT = { x: 0.5, y: TAN / 2 - ASPECT / 2 };
+  const BOTTOM_LEFT = { x: -0.5, y: ASPECT / 2 - TAN / 2 };
+
+  // A card at slot s (-1 back, 0 center, 1 front): its width and color follow
+  // the slot, so a card that moves takes on the look of where it lands.
+  const widthAt = (s) => 100 - (100 - SIDE_W) * Math.min(1, Math.abs(s));
+  const posAt = (s) => ({ x: STEP.x * s, y: STEP.y * s });
+  const strengthAt = (s) => 1 - Math.min(1, Math.abs(s));
+
+  const REST = [
+    { s: -1, z: 0 },
+    { s: 0, z: 1 },
+    { s: 1, z: 2 },
+  ].map((c) => ({ ...posAt(c.s), w: widthAt(c.s), strength: strengthAt(c.s), z: c.z, opacity: 1 }));
+
+  function rest() {
+    return { cards: REST.map((c) => ({ ...c })), gap: 1 };
+  }
+
+  function breathe(t) {
+    const f = (1 - Math.cos((2 * Math.PI * t) / DURATION.breathe)) / 2;
+    const frame = rest();
+    frame.cards[1].w *= 1 + 0.045 * f;
+    for (const [i, dir] of [
+      [0, -1],
+      [2, 1],
+    ]) {
+      frame.cards[i].x += ALONG.x * 4 * f * dir;
+      frame.cards[i].y += ALONG.y * 4 * f * dir;
+    }
+    return frame;
+  }
+
+  // u is the move's progress, 0 to 1.
+  function shuffleAt(u) {
+    const e = quartic(u);
+    const color = smooth(window01(u, 0.3, 0.7));
+    const cards = [];
+    // Back and center step forward one place.
+    for (const from of [-1, 0]) {
+      const s = from + e;
+      const p = posAt(s);
+      cards.push({
+        ...p,
+        w: widthAt(s),
+        strength: from === -1 ? color : 1 - color,
+        z: from + 1,
+        opacity: 1,
+      });
+    }
+    // The front card arcs over the top to the back.
+    const s = 1 - 2 * e;
+    const lift = Math.sin(Math.PI * e) * 60;
+    const p = posAt(s);
+    cards.push({
+      x: p.x + OVER.x * lift,
+      y: p.y + OVER.y * lift,
+      w: SIDE_W,
+      strength: 0,
+      z: e < 0.5 ? 3 : -1,
+      opacity: 1,
+    });
+    // Gaps close while it passes over the stack, so the change of which card
+    // is cut never shows.
+    const gap = 1 - smooth(window01(u, 0.38, 0.46)) + smooth(window01(u, 0.54, 0.62));
+    return { cards, gap: Math.min(1, gap) };
+  }
+
+  // A card leaving past the front (s > 1) or arriving from behind (s < -1)
+  // keeps its outer corner fixed while it shrinks or grows, and fades only
+  // below 30% of its size.
+  const DRIFT = 0.35;
+  function edgeCard(s, strength, z) {
+    const beyond = clamp01((Math.abs(s) - 1) / DRIFT);
+    const w = SIDE_W * (1 - beyond);
+    const sideways = Math.sign(s) * Math.min(Math.abs(s), 1 + DRIFT);
+    const anchorFrom = posAt(sideways);
+    const corner = s > 0 ? TOP_RIGHT : BOTTOM_LEFT;
+    return {
+      x: anchorFrom.x + corner.x * (SIDE_W - w),
+      y: anchorFrom.y + corner.y * (SIDE_W - w),
+      w: Math.max(0.01, w),
+      strength,
+      z,
+      opacity: clamp01(w / SIDE_W / 0.3),
+    };
+  }
+
+  function climbAt(u) {
+    // The step ripples from the front card back.
+    const front = smooth(window01(u, 0, 0.75));
+    const center = quartic(window01(u, 0.08, 0.83));
+    const back = quartic(window01(u, 0.16, 0.91));
+    const arrive = smooth(window01(u, 0.25, 1));
+    const cards = [];
+    cards.push(edgeCard(-1 - DRIFT * (1 - arrive), 0, -1));
+    for (const [from, e, z] of [
+      [-1, back, 0],
+      [0, center, 1],
+    ]) {
+      const s = from + e;
+      const p = posAt(s);
+      cards.push({ ...p, w: widthAt(s), strength: strengthAt(s), z, opacity: 1 });
+    }
+    const leaving = front < 1e-6 ? { ...REST[2] } : edgeCard(1 + DRIFT * front, 0, 2);
+    cards.push(leaving);
+    return { cards, gap: 1 };
+  }
+
+  function cycle(name, t) {
+    const u = (t % DURATION[name]) / MOVE;
+    if (u >= 1) return rest();
+    return name === "shuffle" ? shuffleAt(u) : climbAt(u);
+  }
+
+  const FRAMES = {
+    breathe,
+    shuffle: (t) => cycle("shuffle", t),
+    climb: (t) => cycle("climb", t),
+  };
+
+  function mixColor(a, b, k) {
+    const h = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+    const [x, y] = [h(a), h(b)];
+    return (
+      "#" +
+      x
+        .map((v, i) =>
+          Math.round(v + (y[i] - v) * k)
+            .toString(16)
+            .padStart(2, "0"),
+        )
+        .join("")
+    );
+  }
+
+  // A fixed viewBox around the resting mark with room for the moves.
+  const VIEW = (() => {
+    const el = document.getElementById("measurePath");
+    el.setAttribute("d", REST.map((c) => cardPath(c.x, c.y, c.w)).join(""));
+    const bb = el.getBBox();
+    const side = Math.max(bb.width, bb.height) * 1.75;
+    const cx = bb.x + bb.width / 2;
+    const cy = bb.y + bb.height / 2;
+    return { x: cx - side / 2, y: cy - side / 2, side, inkH: bb.height };
+  })();
+
+  let uid = 0;
+  function frameSvg(frame, theme) {
+    const colors = COLORS[theme];
+    const order = frame.cards
+      .map((c) => ({ ...c, d: cardPath(c.x, c.y, c.w) }))
+      .sort((a, b) => a.z - b.z);
+    const region = `x="${fmt(VIEW.x - 50)}" y="${fmt(VIEW.y - 50)}" width="${fmt(VIEW.side + 100)}" height="${fmt(VIEW.side + 100)}"`;
+    let defs = "";
+    const gap = GAP * frame.gap;
+    const paths = order.map((c, i) => {
+      const fill = mixColor(colors.side, colors.strong, c.strength);
+      const ahead = order.slice(i + 1).filter((a) => a.opacity > 0.02);
+      const op = c.opacity < 1 ? ` opacity="${fmt(c.opacity)}"` : "";
+      if (!ahead.length || gap < 0.05) return `<path d="${c.d}" fill="${fill}"${op}/>`;
+      const id = `m${uid++}`;
+      defs += `<mask id="${id}" maskUnits="userSpaceOnUse" ${region}><rect ${region} fill="white"/>${ahead
+        .map(
+          (a) =>
+            `<path d="${a.d}" fill="black" stroke="black" stroke-width="${fmt(gap * 2)}" stroke-linejoin="round"/>`,
+        )
+        .join("")}</mask>`;
+      return `<path d="${c.d}" fill="${fill}" mask="url(#${id})"${op}/>`;
+    });
+    return `<defs>${defs}</defs>${paths.join("")}`;
+  }
+
+  const SIZE = 190;
+  const stages = [...document.querySelectorAll(".stage")];
+  for (const el of stages) {
+    el.setAttribute("viewBox", `${fmt(VIEW.x)} ${fmt(VIEW.y)} ${fmt(VIEW.side)} ${fmt(VIEW.side)}`);
+    el.setAttribute("width", SIZE);
+    el.setAttribute("height", SIZE);
+  }
+
+  const SPEEDS = [
+    { v: 1, label: "1x" },
+    { v: 0.5, label: "0.5x" },
+    { v: 0.25, label: "0.25x" },
+  ];
+  let speed = 1;
+  let playing = true;
+  let stopRequested = false;
+  let clock = 0;
+  let last = null;
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // Stop lets each animation finish its current move: it keeps running until
+  // its own cycle reaches rest, then holds the static frame.
+  const stoppedAt = {};
+  function frameFor(name) {
+    if (reduced) return rest();
+    if (stopRequested) {
+      if (stoppedAt[name] === undefined) {
+        const d = DURATION[name];
+        const into = clock % d;
+        const end = name === "breathe" ? d : into < MOVE ? MOVE : into;
+        stoppedAt[name] = clock - into + end;
+      }
+      if (clock >= stoppedAt[name]) return rest();
+    }
+    return FRAMES[name](clock);
+  }
+
+  function draw() {
+    for (const el of stages) el.innerHTML = frameSvg(frameFor(el.dataset.anim), el.dataset.theme);
+  }
+
+  function tick(now) {
+    if (last !== null) clock += ((now - last) / 1000) * speed;
+    last = now;
+    draw();
+    requestAnimationFrame(tick);
+  }
+
+  const speedEl = document.getElementById("speed");
+  speedEl.insertAdjacentHTML(
+    "beforeend",
+    SPEEDS.map(
+      (s) =>
+        `<button class="chip" data-speed="${s.v}" aria-pressed="${s.v === speed}">${s.label}</button>`,
+    ).join(""),
+  );
+  speedEl.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-speed]");
+    if (!b) return;
+    speed = +b.dataset.speed;
+    speedEl
+      .querySelectorAll("[data-speed]")
+      .forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  });
+  const playEl = document.getElementById("play");
+  playEl.addEventListener("click", () => {
+    playing = !playing;
+    if (playing) {
+      stopRequested = false;
+      for (const k of Object.keys(stoppedAt)) delete stoppedAt[k];
+      clock = 0;
+    } else {
+      stopRequested = true;
+    }
+    playEl.textContent = playing ? "Playing" : "Stopped (finishing the move)";
+    playEl.setAttribute("aria-pressed", String(playing));
+  });
+
+  draw();
+  requestAnimationFrame(tick);
+</script>

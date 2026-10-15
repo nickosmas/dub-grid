@@ -1,9 +1,9 @@
 /**
  * Renders the mobile launcher, launch and logo images into
- * apps/mobile/assets/images/ from the shared stacked two-card geometry in
+ * apps/mobile/assets/images/ from the shared stacked three-card geometry in
  * @dubgrid/design-tokens.
  *
- * App icons are the symbol in its on-brand colors (white in front) on brand
+ * App icons are the symbol in its on-brand colors (a white center card) on brand
  * blue, centered (the outline is symmetric under a half turn):
  *   - icon.png                      iOS, opaque blue field behind Apple's squircle
  *   - adaptive-icon.png             Android foreground layer, on transparent
@@ -17,11 +17,12 @@
  *   - splash-icon.png / splash-icon-dark.png
  *
  * Logos:
- *   - brand-mark-back.png, brand-mark-back-small.png, brand-mark-front.png
- *                                   the two cards as white layers cropped to the
- *                                   ink, the gap cut into the back card (the
- *                                   small one for 32 px and below); the app
- *                                   tints each layer
+ *   - brand-mark-back.png, brand-mark-center.png, brand-mark-front.png
+ *                                   the three cards as white layers cropped to
+ *                                   the ink, each with the gap cut around the
+ *                                   cards in front of it (`-small` variants
+ *                                   for 32 px and below); the app tints each
+ *                                   layer
  *   - logo-blue.png / logo-white.png and icon-blue-on-white.png
  *
  * Build the packages first (`npm run build:packages`), then run `npm run
@@ -55,8 +56,8 @@ const SIZE = 1024;
 const WHITE = "#FFFFFF";
 const ON_BRAND = BRAND_SYMBOL_COLORS.onBrand;
 const LIGHT = BRAND_SYMBOL_COLORS.light;
-const BRAND_BLUE = LIGHT.front;
-const oneColor = (color) => ({ back: color, front: color });
+const BRAND_BLUE = LIGHT.center;
+const oneColor = (color) => ({ side: color, center: color });
 
 const ANDROID_VISIBLE = 72 / 108;
 const ANDROID_SAFE = 66 / 108;
@@ -73,19 +74,32 @@ const SPLASH_SCALE = 10;
 const { width: INK_W, height: INK_H } = BRAND_SYMBOL_INK;
 const MASK_REGION = `x="-20" y="-20" width="${INK_W + 40}" height="${INK_H + 40}"`;
 
-// The gap is masked out of the back card, so the images stay transparent
-// there and sit on any background. `parts` limits the drawing to one card,
-// for the layers the app tints separately.
-function symbolSvg({ viewBox, width, height, colors, gap = BRAND_SYMBOL_GAP.regular, parts }) {
-  const { back, front, cut } = getBrandSymbolPaths(gap);
-  const draw = (part) => !parts || parts.includes(part);
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox.join(" ")}" width="${width}" height="${height}">
-  <mask id="gap" maskUnits="userSpaceOnUse" ${MASK_REGION}>
+// The gaps are masked out of the cards behind, so the images stay transparent
+// there and sit on any background. `only` limits the drawing to one card (0
+// back, 1 center, 2 front), for the layers the app tints separately.
+function symbolSvg({ viewBox, width, height, colors, gap = BRAND_SYMBOL_GAP.regular, only }) {
+  const cards = getBrandSymbolPaths(gap);
+  const drawn = cards
+    .map((card, i) => ({ ...card, i }))
+    .filter(({ i }) => only === undefined || i === only);
+  const masks = drawn
+    .filter((card) => card.cut.length)
+    .map(
+      (card) => `<mask id="gap${card.i}" maskUnits="userSpaceOnUse" ${MASK_REGION}>
     <rect ${MASK_REGION} fill="#fff"/>
-    <path d="${cut}" fill="#000"/>
-  </mask>
-  ${draw("back") ? `<path d="${back}" fill="${colors.back}" mask="url(#gap)"/>` : ""}
-  ${draw("front") ? `<path d="${front}" fill="${colors.front}"/>` : ""}
+    ${card.cut.map((d) => `<path d="${d}" fill="#000"/>`).join("")}
+  </mask>`,
+    )
+    .join("\n  ");
+  const paths = drawn
+    .map(
+      (card) =>
+        `<path d="${card.path}" fill="${colors[card.tone]}"${card.cut.length ? ` mask="url(#gap${card.i})"` : ""}/>`,
+    )
+    .join("\n  ");
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox.join(" ")}" width="${width}" height="${height}">
+  ${masks}
+  ${paths}
 </svg>`;
 }
 
@@ -108,11 +122,11 @@ function iconBox({ visible, safe }) {
   return [INK_W / 2 - size / 2, INK_H / 2 - size / 2, size, size];
 }
 
-const layer = (name, parts, gap) => ({
+const layer = (name, only, gap) => ({
   name,
   size: 512,
   height: Math.round((512 * INK_H) / INK_W),
-  svg: { viewBox: INK_BOX, colors: oneColor(WHITE), gap, parts },
+  svg: { viewBox: INK_BOX, colors: oneColor(WHITE), gap, only },
 });
 
 const ANDROID_BOX = iconBox({ visible: ANDROID_VISIBLE, safe: ANDROID_SAFE });
@@ -148,9 +162,11 @@ const IMAGES = [
   },
   { name: "logo-blue.png", size: SIZE, svg: { viewBox: SQUARE_BOX, colors: LIGHT } },
   { name: "logo-white.png", size: SIZE, svg: { viewBox: SQUARE_BOX, colors: ON_BRAND } },
-  layer("brand-mark-back.png", ["back"], BRAND_SYMBOL_GAP.regular),
-  layer("brand-mark-back-small.png", ["back"], BRAND_SYMBOL_GAP.small),
-  layer("brand-mark-front.png", ["front"]),
+  layer("brand-mark-back.png", 0, BRAND_SYMBOL_GAP.regular),
+  layer("brand-mark-back-small.png", 0, BRAND_SYMBOL_GAP.small),
+  layer("brand-mark-center.png", 1, BRAND_SYMBOL_GAP.regular),
+  layer("brand-mark-center-small.png", 1, BRAND_SYMBOL_GAP.small),
+  layer("brand-mark-front.png", 2),
 ];
 
 function drawImage({ width, height, background, svg }) {

@@ -1,18 +1,18 @@
 export { BRAND_ANIMATED_LOGO_SIZE } from "./animated-logo";
 
 export {
-  BRAND_SYMBOL_BACK,
   BRAND_SYMBOL_BOTTOM_LIFT,
   BRAND_SYMBOL_CARD,
+  BRAND_SYMBOL_CARDS,
   BRAND_SYMBOL_COLORS,
   BRAND_SYMBOL_CORNER_RADII,
-  BRAND_SYMBOL_FRONT,
   BRAND_SYMBOL_GAP,
   BRAND_SYMBOL_INK,
   BRAND_SYMBOL_LOCKUP_EM,
   BRAND_SYMBOL_SMALL_MAX_PX,
   BRAND_SYMBOL_SQUARE,
   BRAND_SYMBOL_STACKED_EM,
+  BRAND_SYMBOL_VISIBLE_CENTER_DROP,
   BRAND_WORDMARK_INK_EM,
   BRAND_WORDMARK_METRICS_EM,
   BRAND_WORDMARK_OPTICAL_CENTER_EM,
@@ -22,10 +22,12 @@ export {
   getBrandSymbolLockupLayout,
   getBrandSymbolPaths,
   getBrandSymbolStackedLayout,
+  type BrandSymbolCard,
+  type BrandSymbolCardPaths,
   type BrandSymbolCardPlacement,
   type BrandSymbolLockupLayout,
-  type BrandSymbolPaths,
   type BrandSymbolStackedLayout,
+  type BrandSymbolTone,
 } from "./brand-mark";
 
 export { getAvatarTone, resolveAvatarSeed, type AvatarTone } from "./avatar-tone";
