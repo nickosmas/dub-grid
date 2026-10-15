@@ -108,7 +108,7 @@ export default function OnboardingPage() {
               boxShadow: "0 8px 16px rgba(37, 99, 235, 0.25)",
             }}
           >
-            <DubGridLogo size={40} color="var(--dg-color-text-inverse)" />
+            <DubGridLogo size={40} tone="onBrand" />
           </div>
         </div>
 

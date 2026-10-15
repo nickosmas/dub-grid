@@ -1,23 +1,27 @@
 "use client";
 
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import {
   BRAND_ANIMATED_LOGO_SIZE,
-  BRAND_MARK_BACK_STROKE,
-  BRAND_MARK_GAP,
-  BRAND_MARK_INK,
-  BRAND_MOTION_ASPECT,
-  brandMarkCardPath,
+  BRAND_SYMBOL_INK,
+  BRAND_SYMBOL_SQUARE,
   brandMotionFrames,
   brandRestFrame,
+  brandSettlingFrame,
+  brandSymbolCardPath,
+  brandSymbolGap,
   type BrandAnimation,
   type BrandMotionCard,
   type BrandMotionFrame,
 } from "@dubgrid/design-tokens";
 
-const VIEW_BOX = `${BRAND_MARK_INK.x} ${BRAND_MARK_INK.y} ${BRAND_MARK_INK.width} ${BRAND_MARK_INK.height}`;
-const ASPECT = BRAND_MARK_INK.height / BRAND_MARK_INK.width;
+const { x, y, size: SIDE } = BRAND_SYMBOL_SQUARE;
+const VIEW_BOX = `${x} ${y} ${SIDE} ${SIDE}`;
+// Moving cards can pass the square's edge; the mask region leaves them room.
+const MASK_REGION = { x: x - SIDE / 2, y: y - SIDE / 2, width: SIDE * 2, height: SIDE * 2 };
 const REST = brandRestFrame();
+const BACK = "var(--dg-color-brand-mark-back)";
+const FRONT = "var(--dg-color-brand-mark-front)";
 
 function usePrefersReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
@@ -33,137 +37,132 @@ function usePrefersReducedMotion(): boolean {
   return reduced;
 }
 
-/** Loops `animation` from mount; reduced motion and the server render rest. */
-function useBrandAnimation(animation: BrandAnimation): BrandMotionFrame {
+/**
+ * Loops `animation` from mount; reduced motion and the server render rest.
+ * Once `settling` turns true, Shuffle and Climb finish the move in progress,
+ * rest, and call `onSettled`; Breathe rests at once.
+ */
+function useBrandAnimation(
+  animation: BrandAnimation,
+  settling: boolean,
+  onSettled?: () => void,
+): BrandMotionFrame {
   const reduced = usePrefersReducedMotion();
   const [frame, setFrame] = useState<BrandMotionFrame>(REST);
+  const start = useRef<number | null>(null);
+  const settled = useRef(onSettled);
+  useEffect(() => {
+    settled.current = onSettled;
+  }, [onSettled]);
 
   useEffect(() => {
-    if (reduced) {
+    if (reduced || (settling && animation === "breathe")) {
       setFrame(REST);
+      if (settling) settled.current?.();
       return;
     }
     let raf = 0;
-    const start = performance.now();
+    start.current ??= performance.now();
+    const began = start.current;
+    const stoppedAt = settling ? (performance.now() - began) / 1000 : null;
     const tick = (now: number) => {
-      setFrame(brandMotionFrames[animation]((now - start) / 1000));
+      const t = (now - began) / 1000;
+      if (stoppedAt === null || animation === "breathe") {
+        setFrame(brandMotionFrames[animation](t));
+      } else {
+        const { frame: next, done } = brandSettlingFrame(animation, t, stoppedAt);
+        setFrame(next);
+        if (done) {
+          settled.current?.();
+          return;
+        }
+      }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [animation, reduced]);
+  }, [animation, reduced, settling]);
 
   return reduced ? REST : frame;
 }
 
-function cardPath(card: BrandMotionCard): string {
-  const width = card.width * card.scale;
-  const height = width * BRAND_MOTION_ASPECT;
-  return brandMarkCardPath({
-    x: card.cx - width / 2,
-    y: card.cy - height / 2,
-    width,
-    height,
-    radius: card.radius * card.scale,
-  });
-}
+const fill = (color: number) => {
+  if (color <= 0.002) return BACK;
+  if (color >= 0.998) return FRONT;
+  return `color-mix(in srgb, ${FRONT} ${(color * 100).toFixed(1)}%, ${BACK})`;
+};
+
+const cardPath = (card: BrandMotionCard, grow = 0) =>
+  brandSymbolCardPath({ cx: card.cx, cy: card.cy, scale: card.scale, grow });
 
 /**
- * Draws a frame back to front. Each card with any solid weight cuts its gap
- * out of the cards below it with a mask, as the static mark does, so the gap
- * stays transparent on any surface.
+ * Draws a frame back to front. Each card is masked by the cards in front of
+ * it grown by the gap, as the static mark is, so the gap stays transparent on
+ * any surface.
  */
-function BrandFrame({
-  frame,
-  width,
-  color,
-}: {
-  frame: BrandMotionFrame;
-  width: number;
-  color: string;
-}) {
+function BrandFrame({ frame, size }: { frame: BrandMotionFrame; size: number }) {
   const id = useId().replace(/[^\w-]/g, "");
-  let drawn: ReactNode = null;
+  const gap = brandSymbolGap((size * BRAND_SYMBOL_INK.height) / SIDE) * frame.gap;
+  const visible = frame.cards.filter((card) => card.opacity >= 0.01);
   const masks: ReactNode[] = [];
-
-  frame.forEach((card, index) => {
-    const d = cardPath(card);
-    if (drawn && card.solid > 0.02 && card.opacity > 0.003) {
+  const cards = visible.map((card, index) => {
+    const ahead = visible.slice(index + 1);
+    let mask: string | undefined;
+    if (ahead.length) {
       const maskId = `dg-motion-${id}-${index}`;
       masks.push(
-        <mask
-          key={maskId}
-          id={maskId}
-          maskUnits="userSpaceOnUse"
-          x="-60"
-          y="-60"
-          width="220"
-          height="220"
-        >
-          <rect x="-60" y="-60" width="220" height="220" fill="white" />
-          <path
-            d={d}
-            fill="none"
-            stroke="black"
-            strokeOpacity={card.opacity}
-            strokeWidth={BRAND_MARK_GAP * 2 * card.solid}
-            strokeLinejoin="round"
-          />
+        <mask key={maskId} id={maskId} maskUnits="userSpaceOnUse" {...MASK_REGION}>
+          <rect {...MASK_REGION} fill="white" />
+          {ahead.map((cutter, k) => (
+            <path key={k} d={cardPath(cutter, gap)} fill="black" fillOpacity={cutter.opacity} />
+          ))}
         </mask>,
       );
-      drawn = <g mask={`url(#${maskId})`}>{drawn}</g>;
+      mask = `url(#${maskId})`;
     }
-    const trace = card.trace
-      ? {
-          pathLength: 1,
-          strokeDasharray: `${card.trace.length} 1`,
-          strokeDashoffset: -card.trace.offset,
-        }
-      : {};
-    drawn = (
-      <>
-        {drawn}
-        <path
-          d={d}
-          fill={color}
-          fillOpacity={card.solid}
-          stroke={color}
-          strokeWidth={BRAND_MARK_BACK_STROKE * (1 - card.solid)}
-          opacity={card.opacity}
-          {...trace}
-        />
-      </>
+    return (
+      <path
+        key={index}
+        d={cardPath(card)}
+        fill={fill(card.color)}
+        opacity={card.opacity}
+        mask={mask}
+      />
     );
   });
 
   return (
     <svg
-      width={width}
-      height={width * ASPECT}
+      width={size}
+      height={size}
       viewBox={VIEW_BOX}
       fill="none"
       aria-hidden="true"
       style={{ overflow: "visible" }}
     >
       <defs>{masks}</defs>
-      {drawn}
+      {cards}
     </svg>
   );
 }
 
 /**
- * The full-screen loading mark, looping `animation`. The logo is static
- * everywhere else; only waits with nothing else on screen animate it.
+ * The full-screen loading mark, looping `animation` in a `size` square. The
+ * logo is static everywhere else; only waits with nothing else on screen
+ * animate it.
  */
 export function AnimatedDubGridLogo({
   animation = "breathe",
   size = BRAND_ANIMATED_LOGO_SIZE,
-  color = "var(--dg-color-brand-mark)",
+  settling = false,
+  onSettled,
 }: {
   animation?: BrandAnimation;
   size?: number;
-  color?: string;
+  /** The wait is over: finish the current move and rest. */
+  settling?: boolean;
+  onSettled?: () => void;
 }) {
-  const frame = useBrandAnimation(animation);
-  return <BrandFrame frame={frame} width={size} color={color} />;
+  const frame = useBrandAnimation(animation, settling, onSettled);
+  return <BrandFrame frame={frame} size={size} />;
 }

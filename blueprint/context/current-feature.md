@@ -123,7 +123,7 @@ Shuffle and Climb finish the current move when the wait ends.
      - Shuffle crosses colors between 30% and 70% of the move;
      - Climb's arriving card mirrors its leaving card;
      - no frame shows a card below the fade threshold at full opacity.
-3. [ ] **Web marks.** Make these changes:
+3. [x] **Web marks.** Make these changes:
    - Add `--dg-color-brand-mark-back` and `--dg-color-brand-mark-front` to
      `globals.css`, light and dark.
    - In `Logo.tsx`, draw the two-tone symbol (with a one-color option, and

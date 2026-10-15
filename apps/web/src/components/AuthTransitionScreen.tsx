@@ -75,7 +75,7 @@ export default function AuthTransitionScreen({
       <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
         {/* A long wait or a retry trades the calm pulse for a traced outline, so
             the screen visibly shows work still in progress. */}
-        <AnimatedDubGridLogo animation={isSlow || retrying ? "trace" : "breathe"} />
+        <AnimatedDubGridLogo animation={isSlow || retrying ? "climb" : "breathe"} />
       </div>
       <h1
         style={{
