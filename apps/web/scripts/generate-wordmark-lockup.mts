@@ -37,14 +37,14 @@ const previewStaticDir = join(scriptDir, "..", "src", "emails", "static");
 const SCALE = 8; // render at 8x so the images stay crisp even when zoomed
 
 interface SymbolColors {
-  readonly back: string;
-  readonly front: string;
+  readonly side: string;
+  readonly center: string;
 }
 
 const { width: INK_W, height: INK_H } = BRAND_SYMBOL_INK;
 const MASK_REGION = `x="-10" y="-10" width="${INK_W + 20}" height="${INK_H + 20}"`;
 
-// The gap is masked out of the back card, so every image keeps a transparent
+// The gaps are masked out of the cards behind, so every image keeps a transparent
 // background and sits on any surface. `inkHeight` is the symbol's drawn
 // height in CSS px, which picks the gap.
 function symbolSvg(
@@ -55,16 +55,29 @@ function symbolSvg(
   colors: SymbolColors,
   classes = false,
 ) {
-  const { back, front, cut } = getBrandSymbolPaths(brandSymbolGap(inkHeight));
+  const cards = getBrandSymbolPaths(brandSymbolGap(inkHeight));
   const fill = (part: keyof SymbolColors) =>
     classes ? `class="${part}"` : `fill="${colors[part]}"`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="${width}" height="${height}">
-  <mask id="gap" maskUnits="userSpaceOnUse" ${MASK_REGION}>
+  const masks = cards
+    .map((card, i) =>
+      card.cut.length
+        ? `<mask id="gap${i}" maskUnits="userSpaceOnUse" ${MASK_REGION}>
     <rect ${MASK_REGION} fill="#fff"/>
-    <path d="${cut}" fill="#000"/>
-  </mask>
-  <path d="${back}" ${fill("back")} mask="url(#gap)"/>
-  <path d="${front}" ${fill("front")}/>
+    ${card.cut.map((d) => `<path d="${d}" fill="#000"/>`).join("\n    ")}
+  </mask>`
+        : "",
+    )
+    .filter(Boolean)
+    .join("\n  ");
+  const paths = cards
+    .map(
+      (card, i) =>
+        `<path d="${card.path}" ${fill(card.tone)}${card.cut.length ? ` mask="url(#gap${i})"` : ""}/>`,
+    )
+    .join("\n  ");
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="${width}" height="${height}">
+  ${masks}
+  ${paths}
 </svg>`;
 }
 
@@ -151,7 +164,7 @@ const SYMBOL_JOBS = [
 const { light, dark } = BRAND_SYMBOL_COLORS;
 const LOGO_SVG = symbolSvg(SQUARE_VIEWBOX, 128, 128, squareInk(128), light, true).replace(
   "<mask",
-  `<style>.back{fill:${light.back}}.front{fill:${light.front}}@media (prefers-color-scheme:dark){.back{fill:${dark.back}}.front{fill:${dark.front}}}</style>
+  `<style>.side{fill:${light.side}}.center{fill:${light.center}}@media (prefers-color-scheme:dark){.side{fill:${dark.side}}.center{fill:${dark.center}}}</style>
   <mask`,
 );
 

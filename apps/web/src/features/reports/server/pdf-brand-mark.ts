@@ -105,8 +105,9 @@ export function svgPathToPdf(d: string, map: (x: number, y: number) => [number, 
 }
 
 /**
- * The two-card symbol in its light colors, its ink `width` wide with the
- * ink's top left corner at (`x`, `top`). The gap is painted in `background`.
+ * The three-card symbol in its light colors, its ink `width` wide with the
+ * ink's top left corner at (`x`, `top`). Each gap is painted in `background`
+ * just before the card it surrounds.
  */
 export function pdfBrandMarkCommands(
   x: number,
@@ -116,11 +117,14 @@ export function pdfBrandMarkCommands(
 ): string[] {
   const scale = width / BRAND_SYMBOL_INK.width;
   const map = (px: number, py: number): [number, number] => [x + px * scale, top - py * scale];
-  const paths = getBrandSymbolPaths(brandSymbolGap(BRAND_SYMBOL_INK.height * scale));
+  const [back, ...ahead] = getBrandSymbolPaths(brandSymbolGap(BRAND_SYMBOL_INK.height * scale));
   const fill = (d: string, color: Rgb) => `q ${rgb(color)} rg ${svgPathToPdf(d, map)} f Q`;
+  const colors = BRAND_SYMBOL_COLORS.light;
   return [
-    fill(paths.back, hexToRgb(BRAND_SYMBOL_COLORS.light.back)),
-    fill(paths.cut, background),
-    fill(paths.front, hexToRgb(BRAND_SYMBOL_COLORS.light.front)),
+    fill(back.path, hexToRgb(colors[back.tone])),
+    ...ahead.flatMap((card, k) => [
+      fill(back.cut[k], background),
+      fill(card.path, hexToRgb(colors[card.tone])),
+    ]),
   ];
 }

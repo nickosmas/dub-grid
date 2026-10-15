@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
-  BRAND_SYMBOL_BACK,
   BRAND_SYMBOL_BOTTOM_LIFT,
   BRAND_SYMBOL_CARD,
+  BRAND_SYMBOL_CARDS,
   BRAND_SYMBOL_CORNER_RADII,
-  BRAND_SYMBOL_FRONT,
   BRAND_SYMBOL_GAP,
   BRAND_SYMBOL_INK,
   BRAND_SYMBOL_SQUARE,
+  BRAND_SYMBOL_VISIBLE_CENTER_DROP,
   BRAND_WORDMARK_INK_EM,
   BRAND_WORDMARK_OPTICAL_CENTER_EM,
   brandSymbolCardPath,
@@ -27,19 +27,28 @@ const points = (d: string) =>
 const xs = (d: string) => points(d).map(([x]) => x);
 const ys = (d: string) => points(d).map(([, y]) => y);
 
+const [BACK, CENTER, FRONT] = BRAND_SYMBOL_CARDS;
+
 describe("stacked symbol geometry", () => {
   it("pins the ink box and card centers approved on 2026-10-15", () => {
-    expect([BRAND_SYMBOL_INK.width, BRAND_SYMBOL_INK.height].map(round)).toEqual([136, 162.41]);
-    expect([BRAND_SYMBOL_BACK.cx, BRAND_SYMBOL_BACK.cy].map(round)).toEqual([50, 89.91]);
-    expect([BRAND_SYMBOL_FRONT.cx, BRAND_SYMBOL_FRONT.cy].map(round)).toEqual([86, 72.5]);
+    expect([BRAND_SYMBOL_INK.width, BRAND_SYMBOL_INK.height].map(round)).toEqual([138, 145.01]);
+    expect(BRAND_SYMBOL_CARDS.map((c) => [round(c.cx), round(c.cy), c.scale, c.tone])).toEqual([
+      [37.5, 87.73, 0.75, "side"],
+      [69, 72.5, 1, "center"],
+      [100.5, 57.27, 0.75, "side"],
+    ]);
   });
 
-  it("offsets the front card 36 units along the slant and 42% of a card's height up", () => {
+  it("steps each card 36% along the slant and 42% of a card's height up, at the pair's average width", () => {
     const tan = Math.tan((BRAND_SYMBOL_CARD.slantDeg * Math.PI) / 180);
-    const dx = BRAND_SYMBOL_FRONT.cx - BRAND_SYMBOL_BACK.cx;
-    const dy = BRAND_SYMBOL_FRONT.cy - BRAND_SYMBOL_BACK.cy;
-    expect(dx).toBeCloseTo(36, 10);
-    expect(dy).toBeCloseTo(36 * tan - 0.42 * BRAND_SYMBOL_CARD.height, 10);
+    const w = 87.5;
+    for (const [from, to] of [
+      [BACK, CENTER],
+      [CENTER, FRONT],
+    ]) {
+      expect(to.cx - from.cx).toBeCloseTo(0.36 * w, 10);
+      expect(to.cy - from.cy).toBeCloseTo(0.36 * w * tan - 0.42 * 0.95 * w, 10);
+    }
   });
 
   it("curves every corner over the same 14 units of edge", () => {
@@ -50,25 +59,31 @@ describe("stacked symbol geometry", () => {
     });
   });
 
-  it("is symmetric under a half turn about the ink box's center", () => {
-    expect(BRAND_SYMBOL_BACK.cx + BRAND_SYMBOL_FRONT.cx).toBeCloseTo(BRAND_SYMBOL_INK.width, 10);
-    expect(BRAND_SYMBOL_BACK.cy + BRAND_SYMBOL_FRONT.cy).toBeCloseTo(BRAND_SYMBOL_INK.height, 10);
+  it("is symmetric under a half turn about the ink box's center, which is the center card's", () => {
+    expect(CENTER.cx).toBeCloseTo(BRAND_SYMBOL_INK.width / 2, 10);
+    expect(CENTER.cy).toBeCloseTo(BRAND_SYMBOL_INK.height / 2, 10);
+    expect(BACK.cx + FRONT.cx).toBeCloseTo(BRAND_SYMBOL_INK.width, 10);
+    expect(BACK.cy + FRONT.cy).toBeCloseTo(BRAND_SYMBOL_INK.height, 10);
+    expect(BACK.scale).toBe(FRONT.scale);
     const [tl, tr, br, bl] = BRAND_SYMBOL_CORNER_RADII;
     expect(tl).toBeCloseTo(br, 10);
     expect(tr).toBeCloseTo(bl, 10);
   });
 
-  it("puts the ink box's edges on the back card's left side and the front card's right", () => {
-    const { back, front } = getBrandSymbolPaths();
+  it("puts the ink box's sides on the back and front cards and its top and bottom on the center card", () => {
+    const [back, center, front] = getBrandSymbolPaths().map((c) => c.path);
     expect(Math.min(...xs(back))).toBe(0);
-    expect(Math.max(...xs(front))).toBe(136);
-    // The extremes in y fall inside the acute corners' arcs, not on an endpoint.
-    expect(Math.min(...ys(front))).toBeGreaterThan(0);
-    expect(Math.max(...ys(back))).toBeLessThan(BRAND_SYMBOL_INK.height);
+    expect(Math.max(...xs(front))).toBe(138);
+    expect(Math.min(...ys(front))).toBeGreaterThan(Math.min(...ys(center)));
+    expect(Math.max(...ys(back))).toBeLessThan(Math.max(...ys(center)));
   });
 
-  it("averages the bottom edge 0.154 of the ink's height above the lowest corner", () => {
-    expect(BRAND_SYMBOL_BOTTOM_LIFT).toBeCloseTo(0.154, 3);
+  it("averages the bottom edge 0.135 of the ink's height above the lowest corner", () => {
+    expect(BRAND_SYMBOL_BOTTOM_LIFT).toBeCloseTo(0.135, 3);
+  });
+
+  it("reads the center card's visible part 2.5% of the ink's height below its middle", () => {
+    expect(BRAND_SYMBOL_VISIBLE_CENTER_DROP).toBeCloseTo(0.025, 3);
   });
 
   it("holds the ink centered in the square box", () => {
@@ -88,13 +103,17 @@ describe("the gap", () => {
     expect(BRAND_SYMBOL_GAP).toEqual({ regular: 3.5, small: 7, oneColor: 5 });
   });
 
-  it("cuts the front card's outline grown by the gap, with each corner keeping its center", () => {
-    const cut = brandSymbolCardPath({ ...BRAND_SYMBOL_FRONT, grow: 3.5 });
-    expect(getBrandSymbolPaths(3.5).cut).toBe(cut);
-    const radii = [...cut.matchAll(/A([\d.]+),/g)].map((m) => Number(m[1]));
-    expect(radii).toEqual([28.76, 11.26, 28.76, 11.26]);
-    expect(Math.min(...xs(cut))).toBe(32.5);
-    expect(Math.max(...xs(cut))).toBe(139.5);
+  it("cuts every card ahead, grown by the gap, out of each card", () => {
+    const paths = getBrandSymbolPaths(3.5);
+    expect(paths.map((c) => c.tone)).toEqual(["side", "center", "side"]);
+    expect(paths.map((c) => c.cut.length)).toEqual([2, 1, 0]);
+    const frontCut = brandSymbolCardPath({ ...FRONT, grow: 3.5 });
+    expect(paths[0].cut).toEqual([brandSymbolCardPath({ ...CENTER, grow: 3.5 }), frontCut]);
+    expect(paths[1].cut).toEqual([frontCut]);
+    // Each corner keeps its center: the grown radius is the scaled one plus the gap.
+    const radii = [...frontCut.matchAll(/A([\d.]+),/g)].map((m) => Number(m[1]));
+    expect(radii).toEqual([22.44, 9.32, 22.44, 9.32]);
+    expect(Math.max(...xs(frontCut))).toBe(141.5);
   });
 
   it("scales a card about its center", () => {
@@ -110,9 +129,12 @@ describe("getBrandSymbolLockupLayout", () => {
     expect(width / height).toBeCloseTo(BRAND_SYMBOL_INK.width / BRAND_SYMBOL_INK.height, 10);
   });
 
-  it("centers the symbol on the wordmark's optical center", () => {
+  it("meets the wordmark's optical center with the center card's visible middle", () => {
     const { height, belowBaseline } = getBrandSymbolLockupLayout(1000);
-    expect(height / 2 - belowBaseline).toBeCloseTo(256, 10);
+    const inkCenter = height / 2 - belowBaseline;
+    expect(inkCenter - BRAND_SYMBOL_VISIBLE_CENTER_DROP * height).toBeCloseTo(256, 10);
+    // The word sits about 0.025 em lower against the mark than at its ink center.
+    expect(inkCenter / 1000 - 0.256).toBeCloseTo(0.025, 3);
   });
 
   it("sits 0.20 em from the word, ink to ink", () => {
@@ -138,7 +160,7 @@ describe("getBrandSymbolStackedLayout", () => {
 
   it("keeps 0.42 em above the ascenders from the bottom edge on average, whatever the line box", () => {
     const lowestAboveAscender = 0.42 - BRAND_SYMBOL_BOTTOM_LIFT * 1.962;
-    expect(lowestAboveAscender).toBeCloseTo(0.117, 3);
+    expect(lowestAboveAscender).toBeCloseTo(0.155, 3);
     // Web sets line-height 1: the box top sits 0.841 em above the baseline, 0.116 over the ascenders.
     expect(getBrandSymbolStackedLayout(1000, 1).gap).toBeCloseTo(
       1000 * (lowestAboveAscender - 0.116),

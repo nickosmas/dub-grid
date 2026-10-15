@@ -1,0 +1,1349 @@
+<title>Symmetric stack surfaces</title>
+<meta name="claude:viewport-fit-sides" content="cover" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@700&family=Inter:wght@400;500;600&display=swap"
+/>
+<style>
+  /* Layout: one column of labeled surface groups (web, email and print, mobile), each a row of mock frames. */
+  :root {
+    --text-primary: #111827;
+    --text-secondary: #6b7280;
+    --page: #f6f7f9;
+    --panel: #ffffff;
+    --border: rgba(0, 0, 0, 0.1);
+    --accent: #2563eb;
+
+    /* DubGrid app surfaces, from @dubgrid/design-tokens */
+    --app-light-surface: #ffffff;
+    --app-light-surface-2: #f1f5f9;
+    --app-light-text: #0f172a;
+    --app-light-label: #64748b;
+    --app-light-border: #e2e8f0;
+    --app-dark-surface: #121214;
+    --app-dark-surface-2: #1c1c1f;
+    --app-dark-text: #fafafa;
+    --app-dark-label: #a1a1aa;
+    --app-dark-border: #2a2a2e;
+    --brand: #2563eb;
+    --brand-dark: #2075ff;
+    --splash-dark: #02070f;
+    --print-ink: #111827;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --text-primary: #fafafa;
+      --text-secondary: #a1a1aa;
+      --page: #0c0c0e;
+      --panel: #18181b;
+      --border: rgba(255, 255, 255, 0.1);
+      --accent: #4a9bff;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --text-primary: #fafafa;
+    --text-secondary: #a1a1aa;
+    --page: #0c0c0e;
+    --panel: #18181b;
+    --border: rgba(255, 255, 255, 0.1);
+    --accent: #4a9bff;
+    color-scheme: dark;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    padding: 24px 16px 56px;
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: Inter, system-ui, sans-serif;
+    font-size: 14px;
+  }
+  main {
+    max-width: 1040px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 4px;
+  }
+  h2 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 36px 0 4px;
+  }
+  .sub,
+  .group-sub {
+    color: var(--text-secondary);
+    line-height: 1.5;
+    max-width: 700px;
+  }
+  .sub {
+    margin: 0 0 8px;
+  }
+  .group-sub {
+    margin: 0 0 14px;
+    font-size: 13px;
+  }
+  .row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+  .row.three {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  @media (max-width: 760px) {
+    .row,
+    .row.three {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  figure {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+  }
+  figcaption {
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  figcaption b {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+  .frame {
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    min-width: 0;
+  }
+  .word {
+    font-family: "DM Sans", sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .lockup {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+  }
+  .stacked {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* Themes for app mocks */
+  .t-light {
+    --s: var(--app-light-surface);
+    --s2: var(--app-light-surface-2);
+    --tx: var(--app-light-text);
+    --lb: var(--app-light-label);
+    --bd: var(--app-light-border);
+    --br: var(--brand);
+    background: var(--s);
+    color: var(--tx);
+  }
+  .t-dark {
+    --s: var(--app-dark-surface);
+    --s2: var(--app-dark-surface-2);
+    --tx: var(--app-dark-text);
+    --lb: var(--app-dark-label);
+    --bd: var(--app-dark-border);
+    --br: var(--brand-dark);
+    background: var(--s);
+    color: var(--tx);
+  }
+
+  /* Browser tab */
+  .tabs {
+    background: var(--s2);
+    padding: 8px 10px 0;
+    display: flex;
+    gap: 6px;
+    align-items: flex-end;
+  }
+  .tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 8px 8px 0 0;
+    font-size: 12px;
+    min-width: 0;
+    max-width: 230px;
+    color: var(--lb);
+  }
+  .tab.on {
+    background: var(--s);
+    color: var(--tx);
+  }
+  .tab span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .urlbar {
+    background: var(--s);
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--bd);
+  }
+  .urlbar div {
+    background: var(--s2);
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-size: 12px;
+    color: var(--lb);
+  }
+
+  /* App header */
+  .appbar {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--bd);
+    min-width: 0;
+  }
+  .appbar nav {
+    display: flex;
+    gap: 14px;
+    font-size: 13px;
+    color: var(--lb);
+    overflow: hidden;
+    min-width: 0;
+  }
+  .appbar nav b {
+    color: var(--tx);
+    font-weight: 500;
+  }
+  .avatar {
+    margin-left: auto;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--s2);
+    border: 1px solid var(--bd);
+    flex: none;
+  }
+  .body-fill {
+    padding: 14px 16px 18px;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+  .body-fill i {
+    height: 16px;
+    border-radius: 4px;
+    background: var(--s2);
+  }
+  .phonebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--bd);
+  }
+  .burger {
+    width: 20px;
+    height: 14px;
+    border-top: 2px solid var(--tx);
+    border-bottom: 2px solid var(--tx);
+    position: relative;
+  }
+  .burger::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 4px;
+    border-top: 2px solid var(--tx);
+  }
+
+  /* Sign-in */
+  .signin {
+    padding: 34px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 22px;
+    background: var(--s2);
+  }
+  .card {
+    width: 100%;
+    max-width: 300px;
+    background: var(--s);
+    border: 1px solid var(--bd);
+    border-radius: 12px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .card h4 {
+    margin: 0 0 4px;
+    font-size: 15px;
+    font-weight: 600;
+    text-align: center;
+  }
+  .field {
+    height: 34px;
+    border-radius: 8px;
+    border: 1px solid var(--bd);
+    font-size: 12px;
+    color: var(--lb);
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+  }
+  .btn {
+    height: 36px;
+    border-radius: 8px;
+    background: var(--br);
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .loading {
+    min-height: 220px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    font-size: 13px;
+    color: var(--lb);
+  }
+
+  /* Landing */
+  .landing-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    gap: 12px;
+  }
+  .landing-nav nav {
+    display: flex;
+    gap: 14px;
+    font-size: 13px;
+    color: var(--lb);
+    align-items: center;
+  }
+  .landing-nav .btn {
+    height: 30px;
+    padding: 0 12px;
+    font-size: 12px;
+  }
+  .hero-copy {
+    padding: 18px 18px 26px;
+  }
+  .hero-copy h3 {
+    font-family: "DM Sans", sans-serif;
+    font-size: 24px;
+    margin: 0 0 6px;
+    letter-spacing: -0.02em;
+  }
+  .hero-copy p {
+    margin: 0;
+    color: var(--lb);
+    font-size: 13px;
+  }
+  .footer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 18px;
+    border-top: 1px solid var(--bd);
+    font-size: 12px;
+    color: var(--lb);
+  }
+
+  /* Gridmaster */
+  .gm {
+    display: grid;
+    grid-template-columns: 170px minmax(0, 1fr);
+    min-height: 200px;
+  }
+  .gm aside {
+    background: var(--s2);
+    border-right: 1px solid var(--bd);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--lb);
+  }
+  .gm .gm-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--tx);
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: 6px;
+  }
+  .gm section {
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .gm section i {
+    display: block;
+    height: 14px;
+    border-radius: 4px;
+    background: var(--s2);
+  }
+
+  /* Link preview */
+  .og {
+    aspect-ratio: 1200 / 630;
+    max-width: 100%;
+    background: var(--brand);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .og .word {
+    color: #ffffff;
+  }
+  .preview {
+    padding: 12px;
+    background: var(--s2);
+  }
+  .preview .bubble {
+    background: var(--s);
+    border: 1px solid var(--bd);
+    border-radius: 12px;
+    overflow: hidden;
+    max-width: 360px;
+  }
+  .preview .meta {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+  .preview .meta b {
+    display: block;
+    font-size: 13px;
+    margin-bottom: 2px;
+  }
+  .preview .meta span {
+    color: var(--lb);
+  }
+
+  /* Email */
+  .email {
+    background: #f1f5f9;
+    padding: 22px 14px;
+    display: flex;
+    justify-content: center;
+  }
+  .email .sheet {
+    background: #ffffff;
+    color: #0f172a;
+    border-radius: 10px;
+    width: 100%;
+    max-width: 380px;
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    border: 1px solid #e2e8f0;
+  }
+  .email h4 {
+    margin: 6px 0 0;
+    font-size: 16px;
+  }
+  .email p {
+    margin: 0;
+    font-size: 13px;
+    color: #475569;
+    line-height: 1.5;
+  }
+  .email .btn {
+    background: var(--brand);
+    align-self: flex-start;
+    padding: 0 16px;
+  }
+
+  /* Print */
+  .print {
+    background: #e5e7eb;
+    padding: 18px;
+    display: flex;
+    justify-content: center;
+  }
+  .page {
+    background: #ffffff;
+    color: var(--print-ink);
+    width: 100%;
+    max-width: 420px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .page header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    border-bottom: 1px solid #111827;
+    padding-bottom: 10px;
+  }
+  .page header span {
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+  .page table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+  .page td,
+  .page th {
+    border: 1px solid #d1d5db;
+    padding: 4px;
+    text-align: left;
+    font-weight: 500;
+  }
+
+  /* Phones */
+  .phones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+  }
+  .phone {
+    width: 220px;
+    height: 440px;
+    border-radius: 34px;
+    border: 8px solid #1f2937;
+    overflow: hidden;
+    position: relative;
+    flex: none;
+    max-width: 100%;
+  }
+  .phone .notch {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 70px;
+    height: 18px;
+    border-radius: 999px;
+    background: #000000;
+    z-index: 2;
+  }
+  .home {
+    height: 100%;
+    background: linear-gradient(160deg, #3b4a6b, #1d2433 60%, #3c2f4f);
+    padding: 46px 14px 14px;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-rows: 62px;
+    gap: 4px 6px;
+  }
+  .home.android {
+    background: linear-gradient(170deg, #2f3e34, #1b2420 60%, #2c3b3a);
+  }
+  .app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    font-size: 9px;
+    color: #ffffff;
+  }
+  .app .ic {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .home.android .ic {
+    border-radius: 50%;
+  }
+  .home.android .ic.squircle {
+    border-radius: 34%;
+  }
+  .app .ic.dg {
+    background: var(--brand);
+  }
+  .app .ic.themed {
+    background: #dce4ff;
+  }
+  .ph-screen {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+  }
+  .ph-auth {
+    height: 100%;
+    padding: 58px 16px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: var(--s);
+  }
+  .ph-auth .head {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 18px;
+  }
+  .ph-auth h4 {
+    margin: 0 0 4px;
+    font-size: 18px;
+    font-weight: 600;
+  }
+  .ph-auth p {
+    margin: 0 0 6px;
+    font-size: 12px;
+    color: var(--lb);
+  }
+  .ph-auth .field {
+    height: 40px;
+  }
+  .ph-auth .btn {
+    height: 42px;
+    border-radius: 10px;
+  }
+  .note {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin: 6px 0 0;
+    max-width: 760px;
+  }
+  #measure {
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+    visibility: hidden;
+  }
+
+  body {
+    padding: 0;
+    padding-block: 0 56px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .bar {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 5;
+    background: var(--page);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 0;
+    margin-bottom: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+    align-items: center;
+  }
+  .ctl {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .ctl > span {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+  .chip {
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text-primary);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .chip[aria-pressed="true"] {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
+  }
+  .chip:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .chip:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .intro {
+    padding-top: 24px;
+  }
+</style>
+<main>
+  <div class="intro">
+    <h1>Symmetric stack on every surface</h1>
+    <p class="sub">
+      The symmetric mark (a full-size center card with smaller cards in front and behind) on every
+      surface that shows the DubGrid logo, at the sizes those surfaces use. Set the bar to the
+      preset you picked and every surface redraws. Switch to Shipped to compare with today's mark.
+      The mark is unchanged. Only the wordmark moves: its visual center (measured from the rendered
+      letters) lines up with the visible center of the strongest card, which the eye reads as the
+      mark. Word height nudges it from there.
+    </p>
+  </div>
+  <div class="bar" id="bar"></div>
+  <h2>Web app</h2>
+  <p class="group-sub">
+    Favicon, the in-app header (symbol 40 px with the 24 px lockup; symbol alone 36 px on phones),
+    sign-in pages (stacked lockup), and the loading screens.
+  </p>
+  <div class="row">
+    <figure>
+      <div class="frame t-light" data-slot="tabs" data-theme-mode="light"></div>
+      <figcaption><b>Browser tab</b>, favicon at 16 px, light</figcaption>
+    </figure>
+    <figure>
+      <div class="frame t-dark" data-slot="tabs" data-theme-mode="dark"></div>
+      <figcaption><b>Browser tab</b>, favicon at 16 px, dark</figcaption>
+    </figure>
+  </div>
+  <div class="row">
+    <figure>
+      <div class="frame t-light" data-slot="appbar" data-theme-mode="light"></div>
+      <figcaption><b>App header</b>, light</figcaption>
+    </figure>
+    <figure>
+      <div class="frame t-dark" data-slot="appbar" data-theme-mode="dark"></div>
+      <figcaption><b>App header</b>, dark</figcaption>
+    </figure>
+  </div>
+  <div class="row three">
+    <figure>
+      <div class="frame t-light" data-slot="phonebar" data-theme-mode="light"></div>
+      <figcaption><b>App header on a phone</b>, symbol 36 px</figcaption>
+    </figure>
+    <figure>
+      <div class="frame t-dark" data-slot="phonebar" data-theme-mode="dark"></div>
+      <figcaption><b>App header on a phone</b>, dark</figcaption>
+    </figure>
+    <figure>
+      <div class="frame t-dark" data-slot="gridmaster" data-theme-mode="dark"></div>
+      <figcaption><b>Gridmaster portal</b>, symbol 28 px</figcaption>
+    </figure>
+  </div>
+  <div class="row">
+    <figure>
+      <div class="frame t-light" data-slot="signin" data-theme-mode="light"></div>
+      <figcaption><b>Sign-in</b>, stacked lockup, light</figcaption>
+    </figure>
+    <figure>
+      <div class="frame t-dark" data-slot="signin" data-theme-mode="dark"></div>
+      <figcaption><b>Sign-in</b>, stacked lockup, dark</figcaption>
+    </figure>
+  </div>
+  <div class="row">
+    <figure>
+      <div class="frame t-light" data-slot="loading" data-theme-mode="light"></div>
+      <figcaption><b>Loading screen</b> (sign-in handoff, schedule load), light</figcaption>
+    </figure>
+    <figure>
+      <div class="frame t-dark" data-slot="loading" data-theme-mode="dark"></div>
+      <figcaption><b>Loading screen</b>, dark</figcaption>
+    </figure>
+  </div>
+
+  <h2>Landing page and link previews</h2>
+  <p class="group-sub">
+    The marketing nav uses the lockup; the footer uses the symbol in the label gray, so it takes the
+    one-color version. Shared links show the social image.
+  </p>
+  <div class="row">
+    <figure>
+      <div class="frame t-light" data-slot="landing" data-theme-mode="light"></div>
+      <figcaption><b>Landing nav and footer</b>, light</figcaption>
+    </figure>
+    <figure>
+      <div class="frame t-dark" data-slot="landing" data-theme-mode="dark"></div>
+      <figcaption><b>Landing nav and footer</b>, dark</figcaption>
+    </figure>
+  </div>
+  <div class="row">
+    <figure>
+      <div class="frame" data-slot="og"></div>
+      <figcaption><b>Social image</b> (1200 x 630), on brand blue</figcaption>
+    </figure>
+    <figure>
+      <div class="frame t-light" data-slot="preview" data-theme-mode="light"></div>
+      <figcaption><b>Link preview</b> in a chat app</figcaption>
+    </figure>
+  </div>
+
+  <h2>Email and print</h2>
+  <p class="group-sub">
+    Emails use a PNG of the lockup on white. The printed schedule and PDF report print in one color.
+  </p>
+  <div class="row">
+    <figure>
+      <div class="frame" data-slot="email"></div>
+      <figcaption><b>Invitation email</b>, lockup header</figcaption>
+    </figure>
+    <figure>
+      <div class="frame" data-slot="print"></div>
+      <figcaption><b>Printed schedule and PDF report</b>, one color</figcaption>
+    </figure>
+  </div>
+
+  <h2>Mobile app</h2>
+  <p class="group-sub">
+    App icons are white on brand blue. Android also crops the icon to the launcher's shape and tints
+    the themed icon to the wallpaper. The splash shows the symbol over the wordmark.
+  </p>
+
+  <div class="phones" id="phones"></div>
+</main>
+<svg id="measure" aria-hidden="true"><path id="measurePath" /></svg>
+<script>
+  const ANGLE = 32;
+  const TAN = Math.tan((ANGLE * Math.PI) / 180);
+  const ASPECT = 0.95;
+  const CURVE = 14;
+  const STEP_X = 0.36;
+  const STEP_Y = 0.42;
+
+  const PALETTE = {
+    light: { strong: "#2563EB", mid: "#8FB0F8", far: "#C6D7FC" },
+    dark: { strong: "#3B82F6", mid: "#1E40AF", far: "#1A2D6B" },
+    onBrand: { strong: "#FFFFFF", mid: "#9DBBF7", far: "#5F8EEF" },
+  };
+  const SHIPPED = {
+    light: ["#8FB0F8", "#2563EB"],
+    dark: ["#1E40AF", "#3B82F6"],
+    onBrand: ["#7199F2", "#FFFFFF"],
+  };
+
+  const CONTROLS = [
+    {
+      key: "mark",
+      title: "Mark",
+      choices: [
+        { v: "new", label: "Proposal" },
+        { v: "shipped", label: "Shipped" },
+      ],
+    },
+    {
+      key: "count",
+      title: "Cards",
+      choices: [
+        { v: 3, label: "3" },
+        { v: 5, label: "5" },
+      ],
+    },
+    {
+      key: "scale",
+      title: "Smaller by",
+      choices: [
+        { v: 0.85, label: "15%" },
+        { v: 0.75, label: "25%" },
+        { v: 0.65, label: "35%" },
+      ],
+    },
+    {
+      key: "spread",
+      title: "Spread",
+      choices: [
+        { v: 0.8, label: "Tight" },
+        { v: 1, label: "Shipped step" },
+        { v: 1.25, label: "Wide" },
+      ],
+    },
+    {
+      key: "color",
+      title: "Color",
+      choices: [
+        { v: "center", label: "Center strongest" },
+        { v: "ramp", label: "Ramp to front" },
+        { v: "one", label: "One color" },
+      ],
+    },
+    {
+      key: "gap",
+      title: "Gap",
+      choices: [
+        { v: true, label: "On" },
+        { v: false, label: "Off" },
+      ],
+    },
+    {
+      key: "nudge",
+      title: "Word height",
+      choices: [
+        { v: -0.04, label: "-0.04 em" },
+        { v: -0.02, label: "-0.02 em" },
+        { v: 0, label: "Centered" },
+        { v: 0.02, label: "+0.02 em" },
+        { v: 0.04, label: "+0.04 em" },
+      ],
+    },
+  ];
+
+  let state = {
+    mark: "new",
+    count: 3,
+    scale: 0.75,
+    spread: 1,
+    color: "center",
+    gap: true,
+    nudge: 0,
+  };
+
+  const fmt = (n) => Number(n.toFixed(3)).toString();
+
+  function roundedPolygon(pts, radii) {
+    const n = pts.length;
+    const corners = pts.map((v, k) => {
+      const prev = pts[(k + n - 1) % n];
+      const next = pts[(k + 1) % n];
+      const a = [prev[0] - v[0], prev[1] - v[1]];
+      const b = [next[0] - v[0], next[1] - v[1]];
+      const la = Math.hypot(...a);
+      const lb = Math.hypot(...b);
+      const ua = [a[0] / la, a[1] / la];
+      const ub = [b[0] / lb, b[1] / lb];
+      const ang = Math.acos(Math.max(-1, Math.min(1, ua[0] * ub[0] + ua[1] * ub[1])));
+      const t = Math.min(radii[k] / Math.tan(ang / 2), la / 2, lb / 2);
+      return {
+        s: [v[0] + ua[0] * t, v[1] + ua[1] * t],
+        e: [v[0] + ub[0] * t, v[1] + ub[1] * t],
+        r: t * Math.tan(ang / 2),
+      };
+    });
+    let d = `M${fmt(corners[0].e[0])},${fmt(corners[0].e[1])}`;
+    for (let k = 1; k <= n; k++) {
+      const c = corners[k % n];
+      d += `L${fmt(c.s[0])},${fmt(c.s[1])}A${fmt(c.r)},${fmt(c.r)} 0 0 1 ${fmt(c.e[0])},${fmt(c.e[1])}`;
+    }
+    return d + "Z";
+  }
+
+  function card(cx, cy, w) {
+    const h = ASPECT * w;
+    const x = cx - w / 2;
+    const y = cy - (w * TAN) / 2 - h / 2;
+    const radii = [90 - ANGLE, 90 + ANGLE, 90 - ANGLE, 90 + ANGLE].map(
+      (deg) => ((CURVE * w) / 100) * Math.tan((deg * Math.PI) / 360),
+    );
+    return roundedPolygon(
+      [
+        [x, y],
+        [x + w, y + w * TAN],
+        [x + w, y + w * TAN + h],
+        [x, y + h],
+      ],
+      radii,
+    );
+  }
+
+  // Cards from back to front, each one step from the last, centered on the
+  // middle of the stack so the outline is symmetric under a half turn.
+  function stack(widths, spread) {
+    const centers = [[0, 0]];
+    for (let i = 1; i < widths.length; i++) {
+      const w = (widths[i - 1] + widths[i]) / 2;
+      const p = centers[i - 1];
+      centers.push([
+        p[0] + STEP_X * w * spread,
+        p[1] + (STEP_X * w * TAN - STEP_Y * ASPECT * w) * spread,
+      ]);
+    }
+    const first = centers[0];
+    const last = centers[centers.length - 1];
+    const mid = [(first[0] + last[0]) / 2, (first[1] + last[1]) / 2];
+    const cards = widths.map((w, i) => card(centers[i][0] - mid[0], centers[i][1] - mid[1], w));
+    const el = document.getElementById("measurePath");
+    el.setAttribute("d", cards.join(""));
+    const bb = el.getBBox();
+    return { cards, ink: { x: bb.x, y: bb.y, w: bb.width, h: bb.height } };
+  }
+
+  function mix(a, b) {
+    const h = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+    const [x, y] = [h(a), h(b)];
+    return (
+      "#" +
+      x
+        .map((v, i) =>
+          Math.round((v + y[i]) / 2)
+            .toString(16)
+            .padStart(2, "0"),
+        )
+        .join("")
+    );
+  }
+
+  let G;
+  function current() {
+    if (state.mark === "shipped") return { g: stack([100, 100], 1), shipped: true };
+    const k = (state.count - 1) / 2;
+    const widths = Array.from(
+      { length: state.count },
+      (_, i) => 100 * state.scale ** Math.abs(i - k),
+    );
+    return { g: stack(widths, state.spread), shipped: false };
+  }
+
+  function colorsFor(paint) {
+    const n = G.g.cards.length;
+    if (paint.mono) return Array(n).fill(paint.mono);
+    if (G.shipped) return SHIPPED[paint];
+    const p = PALETTE[paint];
+    const k = (n - 1) / 2;
+    if (state.color === "one") return Array(n).fill(p.strong);
+    if (state.color === "center")
+      return Array.from({ length: n }, (_, i) => [p.strong, p.mid, p.far][Math.abs(i - k)]);
+    return n === 3
+      ? [p.mid, mix(p.mid, p.strong), p.strong]
+      : [p.far, mix(p.far, p.mid), p.mid, mix(p.mid, p.strong), p.strong];
+  }
+
+  // Gap in center-card units: 3.5, 5 for one color, 7 at 32 px and below.
+  function gapFor(paint, px) {
+    if (!G.shipped && !state.gap) return 0;
+    if (px <= 32) return 7;
+    return paint.mono || (!G.shipped && state.color === "one") ? 5 : 3.5;
+  }
+
+  let uid = 0;
+  // `paint` is a theme key from PALETTE, or { mono: color } for one-color use.
+  function mark(size, paint, { crop = "square", by = "width", x = null, y = null } = {}) {
+    const g = G.g;
+    const colors = colorsFor(paint);
+    let vb;
+    if (crop === "square") {
+      const side = Math.max(g.ink.w, g.ink.h) * 1.08;
+      const cx = g.ink.x + g.ink.w / 2;
+      const cy = g.ink.y + g.ink.h / 2;
+      vb = [cx - side / 2, cy - side / 2, side, side];
+    } else {
+      vb = [g.ink.x, g.ink.y, g.ink.w, g.ink.h];
+    }
+    const ratio = vb[3] / vb[2];
+    const width = by === "height" ? size / ratio : size;
+    const height = by === "height" ? size : size * ratio;
+    const gap = gapFor(paint, Math.max(width, height));
+    const pad = 200;
+    const region = `x="${fmt(g.ink.x - pad)}" y="${fmt(g.ink.y - pad)}" width="${fmt(g.ink.w + 2 * pad)}" height="${fmt(g.ink.h + 2 * pad)}"`;
+    let defs = "";
+    const paths = g.cards.map((d, i) => {
+      const ahead = g.cards.slice(i + 1);
+      if (!gap || !ahead.length) return `<path d="${d}" fill="${colors[i]}"/>`;
+      const id = `cut${uid++}`;
+      defs += `<mask id="${id}" maskUnits="userSpaceOnUse" ${region}><rect ${region} fill="white"/>${ahead
+        .map(
+          (f) =>
+            `<path d="${f}" fill="black" stroke="black" stroke-width="${fmt(gap * 2)}" stroke-linejoin="round"/>`,
+        )
+        .join("")}</mask>`;
+      return `<path d="${d}" fill="${colors[i]}" mask="url(#${id})"/>`;
+    });
+    const at = x === null ? "" : ` x="${fmt(x)}" y="${fmt(y)}"`;
+    return `<svg${at} width="${fmt(width)}" height="${fmt(height)}" viewBox="${vb.map(fmt).join(" ")}" aria-hidden="true" style="display:block;flex:none"><defs>${defs}</defs>${paths.join("")}</svg>`;
+  }
+
+  // DubGrid wordmark metrics in DM Sans Bold, em from the origin and baseline.
+  const WORD = {
+    inkLeft: 0.051,
+    inkRight: 3.64,
+    ascender: 0.725,
+    xHeight: 0.504,
+    descender: -0.232,
+    opticalX: 1.86,
+    opticalY: 0.256,
+  };
+
+  const wordText = (x, y, F, color) =>
+    `<text x="${fmt(x)}" y="${fmt(y)}" font-family="'DM Sans', sans-serif" font-weight="700" font-size="${fmt(F)}" letter-spacing="${fmt(-0.02 * F)}" fill="${color}">dubgrid</text>`;
+
+  // The word's visual vertical center, measured from the rendered DM Sans Bold
+  // ink: midway between the ink box's center and the ink's center of mass (the
+  // convention the mark uses). "dubgrid" has three ascenders and one descender,
+  // so its mass sits above the middle of its box. Em above the baseline.
+  let wordCenter = null;
+  function measureWordCenter() {
+    const F = 200;
+    const canvas = document.createElement("canvas");
+    canvas.width = 900;
+    canvas.height = 300;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    ctx.font = `700 ${F}px "DM Sans"`;
+    if ("letterSpacing" in ctx) ctx.letterSpacing = `${-0.02 * F}px`;
+    const base = 220;
+    ctx.fillText("dubgrid", 10, base);
+    const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    let m = 0;
+    let my = 0;
+    let top = canvas.height;
+    let bottom = 0;
+    for (let i = 3, px = 0; i < data.length; i += 4, px++) {
+      if (!data[i]) continue;
+      const y = Math.floor(px / canvas.width) + 0.5;
+      m += data[i];
+      my += data[i] * y;
+      top = Math.min(top, y);
+      bottom = Math.max(bottom, y);
+    }
+    if (!m) return null;
+    const toEm = (y) => (base - y) / F;
+    return {
+      mass: toEm(my / m),
+      box: (toEm(top) + toEm(bottom)) / 2,
+      optical: (toEm(my / m) + (toEm(top) + toEm(bottom)) / 2) / 2,
+    };
+  }
+
+  // How far the bottom edge sits above the lowest corner on average, as a share
+  // of the ink height, so the stacked gap reads evenly across a slanted edge.
+  function bottomLift() {
+    const g = G.g;
+    const size = 300;
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = size;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const k = size / Math.max(g.ink.w, g.ink.h);
+    ctx.setTransform(k, 0, 0, k, -g.ink.x * k, -g.ink.y * k);
+    g.cards.forEach((d) => ctx.fill(new Path2D(d)));
+    const { data } = ctx.getImageData(0, 0, size, size);
+    let sum = 0;
+    let cols = 0;
+    let lowest = 0;
+    for (let x = 0; x < size; x++) {
+      for (let y = size - 1; y >= 0; y--) {
+        if (data[(y * size + x) * 4 + 3] > 127) {
+          sum += y;
+          cols++;
+          lowest = Math.max(lowest, y);
+          break;
+        }
+      }
+    }
+    return (lowest - sum / cols) / (g.ink.h * k);
+  }
+
+  // Where the mark reads as centered, as a share of its ink height below the
+  // ink box's center. The eye takes the strongest card as the mark, and only the
+  // part of it that shows: the card in front covers its upper right, so its
+  // visible part sits a little low. With one color, every card weighs the same
+  // and the ink box's center stands.
+  const anchorCache = new Map();
+  function markAnchor() {
+    const key = JSON.stringify(state);
+    if (anchorCache.has(key)) return anchorCache.get(key);
+    const g = G.g;
+    let result = 0;
+    if (G.shipped || state.color !== "one") {
+      const strongest =
+        G.shipped || state.color === "ramp" ? g.cards.length - 1 : (g.cards.length - 1) / 2;
+      const ctx = document.createElement("canvas").getContext("2d");
+      const paths = g.cards.map((d) => new Path2D(d));
+      const step = Math.max(g.ink.w, g.ink.h) / 200;
+      let n = 0;
+      let sy = 0;
+      for (let y = g.ink.y + step / 2; y < g.ink.y + g.ink.h; y += step) {
+        for (let x = g.ink.x + step / 2; x < g.ink.x + g.ink.w; x += step) {
+          for (let i = paths.length - 1; i >= 0; i--) {
+            if (ctx.isPointInPath(paths[i], x, y)) {
+              if (i === strongest) {
+                n++;
+                sy += y;
+              }
+              break;
+            }
+          }
+        }
+      }
+      result = (sy / n - (g.ink.y + g.ink.h / 2)) / g.ink.h;
+    }
+    anchorCache.set(key, result);
+    return result;
+  }
+
+  // The mark is fixed: ink 0.981 em tall, 0.20 em from the word ink to ink.
+  // Only the word moves: its visual center (measured from the rendered
+  // letters) lines up with where the mark reads as centered, plus the nudge
+  // chosen in the bar.
+  function lockup(F, paint, textColor) {
+    const g = G.g;
+    const h = 0.981;
+    const w = (g.ink.w / g.ink.h) * h;
+    const left = WORD.inkLeft - 0.2 - w;
+    const center = (wordCenter ? wordCenter.optical : WORD.opticalY) - state.nudge;
+    const top = center + h / 2 + markAnchor() * h;
+    const topY = Math.max(top, WORD.ascender);
+    const botY = Math.min(top - h, WORD.descender);
+    const W = (WORD.inkRight - left) * F;
+    const H = (topY - botY) * F;
+    const X = (em) => (em - left) * F;
+    const Y = (em) => (topY - em) * F;
+    return `<svg class="lk" width="${fmt(W)}" height="${fmt(H)}" viewBox="0 0 ${fmt(W)} ${fmt(H)}" aria-hidden="true" style="display:block;flex:none;overflow:visible">${mark(h * F, paint, { crop: "ink", by: "height", x: X(left), y: Y(top) })}${wordText(X(0), Y(0), F, textColor)}</svg>`;
+  }
+
+  // Stacked lockup: symbol ink twice as tall, centered over the word's optical
+  // center, with 0.42 em above the ascenders measured from its bottom edge on
+  // average.
+  function stacked(F, paint, textColor) {
+    const h = 1.962;
+    const w = (G.g.ink.w / G.g.ink.h) * h;
+    const left = WORD.opticalX - w / 2;
+    const top = WORD.ascender + 0.42 - bottomLift() * h + h;
+    const minX = Math.min(left, WORD.inkLeft);
+    const maxX = Math.max(left + w, WORD.inkRight);
+    const W = (maxX - minX) * F;
+    const H = (top - WORD.descender) * F;
+    const X = (em) => (em - minX) * F;
+    const Y = (em) => (top - em) * F;
+    return `<svg class="st" width="${fmt(W)}" height="${fmt(H)}" viewBox="0 0 ${fmt(W)} ${fmt(H)}" aria-hidden="true" style="display:block;flex:none;overflow:visible">${mark(h * F, paint, { crop: "ink", by: "height", x: X(left), y: Y(top) })}${wordText(X(0), Y(0), F, textColor)}</svg>`;
+  }
+
+  const SLOTS = {
+    tabs: (t) => `<div class="tabs">
+      <div class="tab on">${mark(16, t)}<span>Schedule - Maple Grove Care</span></div>
+      <div class="tab">${mark(16, t)}<span>People</span></div>
+    </div>
+    <div class="urlbar"><div>maplegrove / schedule</div></div>`,
+    appbar: (t) => `<div class="appbar">
+      ${lockup(24, t, "var(--tx)")}
+      <nav><span>Dashboard</span><b>Schedule</b><span>People</span><span>Reports</span><span>Settings</span></nav>
+      <span class="avatar"></span>
+    </div>
+    <div class="body-fill">${"<i></i>".repeat(21)}</div>`,
+    phonebar: (
+      t,
+    ) => `<div class="phonebar">${mark(36, t, { crop: "ink" })}<span class="burger"></span></div>
+    <div class="body-fill" style="grid-template-columns:repeat(3,1fr)">${"<i></i>".repeat(9)}</div>`,
+    gridmaster: (t) => `<div class="gm">
+      <aside><div class="gm-head">${mark(28, t, { crop: "ink" })}Gridmaster</div><span>Organizations</span><span>Accounts</span><span>Billing</span><span>Audit</span></aside>
+      <section><i></i><i></i><i style="width:70%"></i><i></i></section>
+    </div>`,
+    signin: (t) => `<div class="signin">
+      ${stacked(26, t, "var(--tx)")}
+      <div class="card"><h4>Sign in to Maple Grove Care</h4>
+        <div class="field">Email</div><div class="field">Password</div><div class="btn">Sign in</div></div>
+    </div>`,
+    loading: (t) =>
+      `<div class="loading">${mark(64, t, { crop: "ink" })}<span>Loading your schedule</span></div>`,
+    landing: (t) => `<div class="landing-nav">${lockup(22, t, "var(--tx)")}
+      <nav><span>Features</span><span>Pricing</span><span class="btn">Request a demo</span></nav></div>
+    <div class="hero-copy"><h3>Schedules your whole team can trust</h3><p>Built for care facilities.</p></div>
+    <div class="footer">${mark(20, { mono: "var(--lb)" }, { crop: "ink" })}<span>DubGrid, 2026</span></div>`,
+    og: () => `<div class="og">${lockup(54, "onBrand", "#FFFFFF")}</div>`,
+    preview: () => `<div class="preview"><div class="bubble">
+      <div class="og" style="aspect-ratio:1200/630">${lockup(34, "onBrand", "#FFFFFF")}</div>
+      <div class="meta"><b>DubGrid</b><span>Employee scheduling for care facilities</span></div>
+    </div></div>`,
+    email: () => `<div class="email"><div class="sheet">
+      ${lockup(22, "light", "#0F172A")}
+      <h4>You're invited to Maple Grove Care</h4>
+      <p>Jordan Lee added you to the schedule. Accept the invitation to see your shifts.</p>
+      <span class="btn">Accept invitation</span>
+    </div></div>`,
+    print: () => `<div class="print"><div class="page">
+      <header>${lockup(16, { mono: "#111827" }, "#111827")}<span>Week of Oct 12 - 18, 2026</span></header>
+      <table><tr><th>Name</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th></tr>
+        <tr><td>A. Rivera</td><td>7a - 3p</td><td>7a - 3p</td><td></td><td>3p - 11p</td></tr>
+        <tr><td>K. Osei</td><td></td><td>3p - 11p</td><td>3p - 11p</td><td>3p - 11p</td></tr>
+        <tr><td>M. Chen</td><td>11p - 7a</td><td></td><td>11p - 7a</td><td></td></tr></table>
+    </div></div>`,
+  };
+
+  const placeholders = (count) =>
+    Array.from({ length: count }, () => `<span class="app"><span class="ic"></span></span>`).join(
+      "",
+    );
+  const dgIcon = (cls = "") =>
+    `<span class="app"><span class="ic dg ${cls}">${mark(30, "onBrand")}</span>DubGrid</span>`;
+  const themedIcon = () =>
+    `<span class="app"><span class="ic themed">${mark(27, { mono: "#1E3A8A" })}</span>DubGrid</span>`;
+
+  function render() {
+    G = current();
+    document.querySelectorAll("[data-slot]").forEach((el) => {
+      el.innerHTML = SLOTS[el.dataset.slot](el.dataset.themeMode);
+    });
+    document.getElementById("phones").innerHTML = `
+    <figure><div class="phone"><span class="notch"></span><div class="home">${placeholders(5)}${dgIcon()}${placeholders(6)}</div></div>
+      <figcaption><b>iOS home screen</b></figcaption></figure>
+    <figure><div class="phone"><span class="notch"></span><div class="home android">${placeholders(5)}${dgIcon()}${placeholders(2)}${dgIcon("squircle")}${placeholders(1)}${themedIcon()}${placeholders(2)}</div></div>
+      <figcaption><b>Android</b>: circle, squircle, themed</figcaption></figure>
+    <figure><div class="phone"><span class="notch"></span><div class="ph-screen" style="background:#FFFFFF">${stacked(24, "light", "#0F172A")}</div></div>
+      <figcaption><b>Splash</b>, light</figcaption></figure>
+    <figure><div class="phone"><span class="notch"></span><div class="ph-screen" style="background:var(--splash-dark)">${stacked(24, "dark", "#FAFAFA")}</div></div>
+      <figcaption><b>Splash</b>, dark</figcaption></figure>
+    <figure><div class="phone t-light"><span class="notch"></span><div class="ph-auth">
+        <div class="head">${lockup(22, "light", "var(--tx)")}</div>
+        <h4>Welcome back</h4><p>Sign in to see your schedule.</p>
+        <div class="field">Email</div><div class="field">Password</div><div class="btn">Sign in</div></div></div>
+      <figcaption><b>Mobile sign-in</b>, light</figcaption></figure>
+    <figure><div class="phone t-dark"><span class="notch"></span><div class="ph-auth">
+        <div class="head">${lockup(22, "dark", "var(--tx)")}</div>
+        <h4>Welcome back</h4><p>Sign in to see your schedule.</p>
+        <div class="field">Email</div><div class="field">Password</div><div class="btn">Sign in</div></div></div>
+      <figcaption><b>Mobile sign-in</b>, dark</figcaption></figure>`;
+    document.querySelectorAll("[data-key]").forEach((el) => {
+      el.setAttribute("aria-pressed", String(String(state[el.dataset.key]) === el.dataset.v));
+      if (el.dataset.key !== "mark" && el.dataset.key !== "nudge")
+        el.disabled = state.mark === "shipped";
+    });
+  }
+
+  const bar = document.getElementById("bar");
+  bar.innerHTML = CONTROLS.map(
+    (c) =>
+      `<div class="ctl"><span>${c.title}</span>${c.choices
+        .map(
+          (o) =>
+            `<button class="chip" data-key="${c.key}" data-v="${o.v}" aria-pressed="false">${o.label}</button>`,
+        )
+        .join("")}</div>`,
+  ).join("");
+  bar.addEventListener("click", (e) => {
+    const el = e.target.closest("[data-key]");
+    if (!el || el.disabled) return;
+    const c = CONTROLS.find((x) => x.key === el.dataset.key);
+    state[c.key] = c.choices.find((o) => String(o.v) === el.dataset.v).v;
+    render();
+  });
+
+  render();
+  document.fonts?.ready.then(() => {
+    wordCenter = measureWordCenter();
+    render();
+  });
+</script>

@@ -1,6 +1,6 @@
 # Current Feature
 
-## Fix: Replace the logo with the stacked two-card identity and its motion
+## Fix: Replace the logo with the symmetric three-card stack and its motion
 
 **Type:** Fix
 **Status:** in progress
@@ -30,40 +30,50 @@ owner explored and approved a new direction, all prototyped under
   `logo-lockup.html` and `stack-logo-animations.html`, the owner put the
   darker card in front, keeping the gap, with a toned-down dark-mode back
   card ("Mirror") and the lockup refinements measured from DM Sans Bold.
+- **Symmetric stack** (`logo-symmetric-stack.html`,
+  `logo-symmetric-surfaces.html`, `logo-symmetric-motion.html`, 2026-10-15):
+  in production the two-card mark looked off for lack of symmetry, so the
+  owner chose three cards: a full-size center card in the strongest color,
+  with back and front cards 25% smaller in a receding color, at the shipped
+  step spacing and gap. The owner asked to keep the cards exactly as
+  configured and move only the wordmark: it sits level with the visible part
+  of the center card, with no further nudge. The three animations were
+  re-timed for three cards and approved.
 
 ### The fix
 
-**Geometry** (cards 100 units wide, in one shared module):
+**Geometry** (center card 100 units wide, in one shared module):
 
-| Part       | Value                                                                                                                                                                                                       |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Card       | Parallelogram 100 wide, vertical sides 95 tall, top and bottom edges slanted 32°                                                                                                                            |
-| Corners    | Exact circular arcs that each curve over 14 units of edge: radius 7.76 on the two acute (58°) corners, 25.26 on the two obtuse (122°) ones, so all four look equally soft                                   |
-| Front card | The same size as the back card, offset 36 units along the slant and 42% of its height up                                                                                                                    |
-| Gap        | 3.5 units, cut out of the back card around the front card, so it takes the surface's color. A small-size version draws it at 7 units at 32 px and below (favicons and small icons), so the cards stay apart |
-| Symmetry   | The outline is symmetric under a half turn, so the ink box center is the optical center                                                                                                                     |
+| Part     | Value                                                                                                                                                                        |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Card     | Parallelogram 100 wide, vertical sides 95 tall, top and bottom edges slanted 32°                                                                                             |
+| Corners  | Exact circular arcs that each curve over 14 units of a full card's edge: radius 7.76 on the two acute (58°) corners, 25.26 on the two obtuse (122°) ones, scaled with a card |
+| Cards    | Back, center and front. The back and front cards are 0.75 of the center card's size                                                                                          |
+| Step     | Each card sits 36% along the slant and 42% of a card's height up from the one behind it, measured at the pair's average width (87.5)                                         |
+| Gap      | 3.5 units, cut out of each card around every card in front of it, so it takes the surface's color. 7 units at 32 px and below (favicons and small icons)                     |
+| Symmetry | The outline is symmetric under a half turn about the center card's center, which is the ink box center                                                                       |
 
 **Colors:**
 
-| Use      | Back card | Front card |
-| -------- | --------- | ---------- |
-| Light    | `#8FB0F8` | `#2563EB`  |
-| Dark     | `#1E40AF` | `#3B82F6`  |
-| On brand | `#7199F2` | `#FFFFFF`  |
+| Use      | Back and front cards | Center card |
+| -------- | -------------------- | ----------- |
+| Light    | `#8FB0F8`            | `#2563EB`   |
+| Dark     | `#1E40AF`            | `#3B82F6`   |
+| On brand | `#9DBBF7`            | `#FFFFFF`   |
 
-The stronger card goes in front: brand blue on light and dark surfaces, and
-white on a brand-blue surface (app icons), where a blue card would vanish.
-The back card recedes by the same amount in both themes: 2.16:1 to its
-surface and about 2.4:1 to the front card.
-| One color | the given color for both, with the gap widened to 5 units (7 at the small size) |
+The center card is the strongest: brand blue on light and dark surfaces, and
+white on a brand-blue surface (app icons). One-color use draws every card in
+the given color, with the gap widened to 5 units (7 at the small size).
 
 **Lockup:**
 
 - **Horizontal:** the symbol's ink is 0.981 em tall: the word's full height
   (the 0.725 em ascenders of "d" and "b" to the -0.232 em descender of "g")
   plus 0.012 em at each end, the overshoot DM Sans gives its round letters.
-  It centers on the word's optical center, 0.256 em above the baseline, and
-  sits 0.20 em from the word ink to ink (two of the word's straight-to-round
+  The word's optical center, 0.256 em above the baseline, meets the visible
+  middle of the center card (the part the front card leaves showing), which
+  sits 2.5% of the ink height below the ink's center. The symbol sits 0.20 em
+  from the word ink to ink (two of the word's straight-to-round
   gaps; the "d" starts 0.051 em right of the word's origin).
 - **Stacked:** the symbol's ink is twice as tall (1.962 em), with 0.42 em of
   clear space above the ascenders measured from its bottom edge on average,

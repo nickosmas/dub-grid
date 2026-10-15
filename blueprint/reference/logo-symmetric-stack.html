@@ -1,0 +1,617 @@
+<title>Symmetric card stack</title>
+<meta name="claude:viewport-fit-sides" content="cover" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@700&family=Inter:wght@400;500;600&display=swap"
+/>
+<style>
+  /* Layout: option bar, one big light/dark proof, then lockups, icons and preset comparisons. */
+  :root {
+    --text-primary: #111827;
+    --text-secondary: #5b6472;
+    --page: #f6f7fb;
+    --panel: #ffffff;
+    --border: rgba(15, 23, 42, 0.1);
+    --border-strong: rgba(15, 23, 42, 0.2);
+    --accent: #2563eb;
+    --accent-soft: rgba(37, 99, 235, 0.1);
+    --tile-light: #ffffff;
+    --tile-dark: #111113;
+    --tile-brand: #2563eb;
+    --ink-light: #0f172a;
+    --ink-dark: #fafafa;
+    --font-ui: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-word: "DM Sans", Inter, system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --text-primary: #fafafa;
+      --text-secondary: #a1a1aa;
+      --page: #0c0c0e;
+      --panel: #18181b;
+      --border: rgba(255, 255, 255, 0.1);
+      --border-strong: rgba(255, 255, 255, 0.2);
+      --accent: #4a9bff;
+      --accent-soft: rgba(74, 155, 255, 0.18);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --text-primary: #fafafa;
+    --text-secondary: #a1a1aa;
+    --page: #0c0c0e;
+    --panel: #18181b;
+    --border: rgba(255, 255, 255, 0.1);
+    --border-strong: rgba(255, 255, 255, 0.2);
+    --accent: #4a9bff;
+    --accent-soft: rgba(74, 155, 255, 0.18);
+    color-scheme: dark;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    padding-block: 24px 56px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    font-size: 14px;
+  }
+  main {
+    max-width: 1040px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h2 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 18px 0 0;
+  }
+  .sub {
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.55;
+    max-width: 68ch;
+  }
+  .options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+  }
+  .opt {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    min-width: 0;
+  }
+  .opt h3 {
+    margin: 0 0 8px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .chip {
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border-strong);
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .chip[aria-pressed="true"] {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+  }
+  .chip:focus-visible,
+  .preset:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .tile {
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    padding: 16px;
+    min-width: 0;
+  }
+  .tile.light {
+    background: var(--tile-light);
+    color: var(--ink-light);
+  }
+  .tile.dark {
+    background: var(--tile-dark);
+    color: var(--ink-dark);
+  }
+  .tile.brand {
+    background: var(--tile-brand);
+    color: var(--ink-dark);
+  }
+  .pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .triple {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+  @media (max-width: 680px) {
+    .pair,
+    .triple {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  .label {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    opacity: 0.65;
+    margin-bottom: 12px;
+  }
+  .hero {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+    flex-wrap: wrap;
+    min-height: 240px;
+  }
+  .hero figure {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .hero figcaption {
+    font-size: 11px;
+    opacity: 0.6;
+  }
+  .proofs {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    align-items: flex-start;
+    overflow-x: auto;
+  }
+  .row {
+    display: flex;
+    gap: 18px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+  .appicon {
+    border-radius: 22%;
+    background: var(--tile-brand);
+    display: grid;
+    place-items: center;
+  }
+  .presets {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+  }
+  .preset {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 10px 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(15, 23, 42, 0.14);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .tile.dark .preset {
+    border-color: rgba(250, 250, 250, 0.16);
+  }
+  .preset[aria-pressed="true"] {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .note {
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 1.55;
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  #measure {
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+    visibility: hidden;
+  }
+</style>
+
+<main>
+  <h1>Symmetric card stack</h1>
+  <p class="sub">
+    A full-size center card with smaller cards stepping out in front (up and right) and behind (down
+    and left), so the mark balances around its middle. Same 32° slant, 0.95 height ratio and even
+    14-unit corners as the shipped mark. Pick options below, or click a preset at the bottom.
+  </p>
+
+  <div class="options" id="options"></div>
+
+  <div class="pair">
+    <div class="tile light">
+      <span class="label">Light: proposal, then the shipped mark at the same height</span>
+      <div class="hero" id="heroLight"></div>
+    </div>
+    <div class="tile dark">
+      <span class="label">Dark: proposal, then the shipped mark at the same height</span>
+      <div class="hero" id="heroDark"></div>
+    </div>
+  </div>
+
+  <h2>Lockups</h2>
+  <div class="pair">
+    <div class="tile light" id="lockLight"></div>
+    <div class="tile dark" id="lockDark"></div>
+  </div>
+
+  <h2>Icons</h2>
+  <div class="triple">
+    <div class="tile light" id="iconLight"></div>
+    <div class="tile dark" id="iconDark"></div>
+    <div class="tile light" id="iconApp"></div>
+  </div>
+
+  <h2>Presets</h2>
+  <p class="sub">Each preset applies its card count, size step and spread to the whole page.</p>
+  <div class="tile light"><div class="presets" id="presetsLight"></div></div>
+  <div class="tile dark"><div class="presets" id="presetsDark"></div></div>
+
+  <p class="note" id="stats"></p>
+</main>
+<svg id="measure" aria-hidden="true"><path id="measurePath" /></svg>
+
+<script>
+  const ANGLE = 32;
+  const TAN = Math.tan((ANGLE * Math.PI) / 180);
+  const ASPECT = 0.95;
+  const CURVE = 14;
+  // The shipped step: 36 units along the slant and 42% of the card height up.
+  const STEP_X = 0.36;
+  const STEP_Y = 0.42;
+  // Wordmark metrics, DM Sans Bold, em from origin and baseline.
+  const WORD = { inkLeft: 0.051, inkRight: 3.64, opticalY: 0.256, symbolH: 0.981, space: 0.2 };
+
+  const PALETTE = {
+    light: { strong: "#2563EB", mid: "#8FB0F8", far: "#C6D7FC", one: "#2563EB" },
+    dark: { strong: "#3B82F6", mid: "#1E40AF", far: "#1A2D6B", one: "#3B82F6" },
+    brand: { strong: "#FFFFFF", mid: "#9DBBF7", far: "#5F8EEF", one: "#FFFFFF" },
+  };
+
+  const OPTIONS = [
+    {
+      key: "count",
+      title: "Cards",
+      choices: [
+        { v: 3, label: "3" },
+        { v: 5, label: "5" },
+      ],
+    },
+    {
+      key: "scale",
+      title: "Each step smaller by",
+      choices: [
+        { v: 0.85, label: "15%" },
+        { v: 0.75, label: "25%" },
+        { v: 0.65, label: "35%" },
+      ],
+    },
+    {
+      key: "spread",
+      title: "Spread",
+      choices: [
+        { v: 0.8, label: "Tight" },
+        { v: 1, label: "Shipped step" },
+        { v: 1.25, label: "Wide" },
+      ],
+    },
+    {
+      key: "color",
+      title: "Color",
+      choices: [
+        { v: "center", label: "Center strongest" },
+        { v: "ramp", label: "Ramp to front" },
+        { v: "one", label: "One color" },
+      ],
+    },
+    {
+      key: "gap",
+      title: "Between cards",
+      choices: [
+        { v: true, label: "Surface-colored gap" },
+        { v: false, label: "No gap" },
+      ],
+    },
+  ];
+
+  const PRESETS = [
+    { count: 3, scale: 0.85, spread: 1, label: "3 cards, 15% steps" },
+    { count: 3, scale: 0.75, spread: 1, label: "3 cards, 25% steps" },
+    { count: 3, scale: 0.65, spread: 1.25, label: "3 cards, 35% steps, wide" },
+    { count: 5, scale: 0.85, spread: 0.8, label: "5 cards, 15% steps, tight" },
+    { count: 5, scale: 0.75, spread: 1, label: "5 cards, 25% steps" },
+    { count: 5, scale: 0.65, spread: 1.25, label: "5 cards, 35% steps, wide" },
+  ];
+
+  let state = { count: 3, scale: 0.75, spread: 1, color: "center", gap: true };
+
+  const fmt = (n) => Number(n.toFixed(3)).toString();
+
+  function roundedPolygon(pts, radii) {
+    const n = pts.length;
+    const corners = pts.map((v, k) => {
+      const prev = pts[(k + n - 1) % n];
+      const next = pts[(k + 1) % n];
+      const a = [prev[0] - v[0], prev[1] - v[1]];
+      const b = [next[0] - v[0], next[1] - v[1]];
+      const la = Math.hypot(...a);
+      const lb = Math.hypot(...b);
+      const ua = [a[0] / la, a[1] / la];
+      const ub = [b[0] / lb, b[1] / lb];
+      const ang = Math.acos(Math.max(-1, Math.min(1, ua[0] * ub[0] + ua[1] * ub[1])));
+      const t = Math.min(radii[k] / Math.tan(ang / 2), la / 2, lb / 2);
+      return {
+        s: [v[0] + ua[0] * t, v[1] + ua[1] * t],
+        e: [v[0] + ub[0] * t, v[1] + ub[1] * t],
+        r: t * Math.tan(ang / 2),
+      };
+    });
+    let d = `M${fmt(corners[0].e[0])},${fmt(corners[0].e[1])}`;
+    for (let k = 1; k <= n; k++) {
+      const c = corners[k % n];
+      d += `L${fmt(c.s[0])},${fmt(c.s[1])}A${fmt(c.r)},${fmt(c.r)} 0 0 1 ${fmt(c.e[0])},${fmt(c.e[1])}`;
+    }
+    return d + "Z";
+  }
+
+  // A card of width w centered on (cx, cy), y pointing down.
+  function card(cx, cy, w) {
+    const h = ASPECT * w;
+    const x = cx - w / 2;
+    const y = cy - (w * TAN) / 2 - h / 2;
+    const radii = [90 - ANGLE, 90 + ANGLE, 90 - ANGLE, 90 + ANGLE].map(
+      (deg) => ((CURVE * w) / 100) * Math.tan((deg * Math.PI) / 360),
+    );
+    return roundedPolygon(
+      [
+        [x, y],
+        [x + w, y + w * TAN],
+        [x + w, y + w * TAN + h],
+        [x, y + h],
+      ],
+      radii,
+    );
+  }
+
+  // Cards from back to front. Adjacent cards are one step apart, sized by
+  // their average width, so the stack is symmetric under a half turn.
+  function stack(widths, spread) {
+    const step = (w) => [STEP_X * w * spread, (STEP_X * w * TAN - STEP_Y * ASPECT * w) * spread];
+    const centers = [[0, 0]];
+    for (let i = 1; i < widths.length; i++) {
+      const [dx, dy] = step((widths[i - 1] + widths[i]) / 2);
+      const p = centers[i - 1];
+      centers.push([p[0] + dx, p[1] + dy]);
+    }
+    const mid = centers[(widths.length - 1) / 2] ?? [
+      (centers[0][0] + centers[centers.length - 1][0]) / 2,
+      (centers[0][1] + centers[centers.length - 1][1]) / 2,
+    ];
+    const cards = widths.map((w, i) => card(centers[i][0] - mid[0], centers[i][1] - mid[1], w));
+    const el = document.getElementById("measurePath");
+    el.setAttribute("d", cards.join(""));
+    const bb = el.getBBox();
+    return { cards, ink: { x: bb.x, y: bb.y, w: bb.width, h: bb.height } };
+  }
+
+  function widthsFor(s) {
+    const k = (s.count - 1) / 2;
+    return Array.from({ length: s.count }, (_, i) => 100 * s.scale ** Math.abs(i - k));
+  }
+
+  function colorsFor(s, theme) {
+    const p = PALETTE[theme];
+    const n = s.count;
+    const k = (n - 1) / 2;
+    if (s.color === "one") return Array(n).fill(p.one);
+    if (s.color === "center") {
+      return Array.from({ length: n }, (_, i) => [p.strong, p.mid, p.far][Math.abs(i - k)]);
+    }
+    return n === 3
+      ? [p.mid, mix(p.mid, p.strong), p.strong]
+      : [p.far, mix(p.far, p.mid), p.mid, mix(p.mid, p.strong), p.strong];
+  }
+  function mix(a, b) {
+    const h = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+    const [x, y] = [h(a), h(b)];
+    return (
+      "#" +
+      x
+        .map((v, i) =>
+          Math.round((v + y[i]) / 2)
+            .toString(16)
+            .padStart(2, "0"),
+        )
+        .join("")
+    );
+  }
+
+  const SHIPPED = {
+    light: ["#8FB0F8", "#2563EB"],
+    dark: ["#1E40AF", "#3B82F6"],
+    brand: ["#7199F2", "#FFFFFF"],
+  };
+
+  let uid = 0;
+  // The stack as an SVG group whose ink box is h tall at (x, y).
+  function group(g, colors, x, y, h, gap) {
+    const k = h / g.ink.h;
+    const pad = 200;
+    const region = `x="${fmt(g.ink.x - pad)}" y="${fmt(g.ink.y - pad)}" width="${fmt(g.ink.w + 2 * pad)}" height="${fmt(g.ink.h + 2 * pad)}"`;
+    let defs = "";
+    const paths = g.cards.map((d, i) => {
+      const ahead = g.cards.slice(i + 1);
+      if (!ahead.length || gap <= 0) return `<path d="${d}" fill="${colors[i]}"/>`;
+      const id = `cut${uid++}`;
+      defs += `<mask id="${id}" maskUnits="userSpaceOnUse" ${region}><rect ${region} fill="white"/>${ahead
+        .map(
+          (f) =>
+            `<path d="${f}" fill="black" stroke="black" stroke-width="${fmt(gap * 2)}" stroke-linejoin="round"/>`,
+        )
+        .join("")}</mask>`;
+      return `<path d="${d}" fill="${colors[i]}" mask="url(#${id})"/>`;
+    });
+    return `<defs>${defs}</defs><g transform="translate(${fmt(x)} ${fmt(y)}) scale(${fmt(k)}) translate(${fmt(-g.ink.x)} ${fmt(-g.ink.y)})">${paths.join("")}</g>`;
+  }
+
+  function markOf(s, theme, shipped) {
+    if (shipped)
+      return { g: stack([100, 100], 1), colors: SHIPPED[theme], gapOn: true, one: false };
+    return {
+      g: stack(widthsFor(s), s.spread),
+      colors: colorsFor(s, theme),
+      gapOn: s.gap,
+      one: s.color === "one",
+    };
+  }
+  // Gap in center-card units: 3.5, widened for one color, 7 at 32 px and below.
+  const gapUnits = (m, px) => (!m.gapOn ? 0 : px <= 32 ? 7 : m.one ? 5 : 3.5);
+
+  // The mark fitted by height, or into a square box when square is set.
+  function markSvg(s, theme, size, { shipped = false, square = false } = {}) {
+    const m = markOf(s, theme, shipped);
+    const r = m.g.ink.w / m.g.ink.h;
+    let h = size;
+    let w = size * r;
+    if (square && w > size) {
+      w = size;
+      h = size / r;
+    }
+    const W = square ? size : w;
+    const H = square ? size : h;
+    const longest = Math.max(w, h);
+    return `<svg width="${fmt(W)}" height="${fmt(H)}" viewBox="0 0 ${fmt(W)} ${fmt(H)}" aria-hidden="true" style="display:block">${group(m.g, m.colors, (W - w) / 2, (H - h) / 2, h, gapUnits(m, longest))}</svg>`;
+  }
+
+  function lockupSvg(s, theme, F, shipped = false) {
+    const m = markOf(s, theme, shipped);
+    const h = WORD.symbolH;
+    const w = (m.g.ink.w / m.g.ink.h) * h;
+    const left = WORD.inkLeft - WORD.space - w;
+    const top = WORD.opticalY + h / 2;
+    const minX = left;
+    const maxX = WORD.inkRight + 0.05;
+    const topY = Math.max(top, 0.76);
+    const botY = Math.min(top - h, -0.26);
+    const W = (maxX - minX) * F;
+    const H = (topY - botY) * F;
+    const X = (em) => (em - minX) * F;
+    const Y = (em) => (topY - em) * F;
+    const ink = theme === "light" ? "#0F172A" : "#FAFAFA";
+    return `<svg width="${fmt(W)}" height="${fmt(H)}" viewBox="0 0 ${fmt(W)} ${fmt(H)}" aria-hidden="true" style="display:block">${group(m.g, m.colors, X(left), Y(top), h * F, gapUnits(m, h * F))}<text x="${fmt(X(0))}" y="${fmt(Y(0))}" font-family="'DM Sans', sans-serif" font-weight="700" font-size="${fmt(F)}" letter-spacing="${fmt(-0.02 * F)}" fill="${ink}">dubgrid</text></svg>`;
+  }
+
+  function render() {
+    for (const theme of ["light", "dark"]) {
+      const cap = theme === "light" ? "Light" : "Dark";
+      document.getElementById(`hero${cap}`).innerHTML = `
+        <figure>${markSvg(state, theme, 170)}<figcaption>Proposal</figcaption></figure>
+        <figure>${markSvg(state, theme, 170, { shipped: true })}<figcaption>Shipped</figcaption></figure>`;
+      document.getElementById(`lock${cap}`).innerHTML = `
+        <span class="label">${cap}: header 24 px and landing 40 px, proposal then shipped</span>
+        <div class="proofs">${lockupSvg(state, theme, 24)}${lockupSvg(state, theme, 40)}
+          ${lockupSvg(state, theme, 40, true)}</div>`;
+      document.getElementById(`icon${cap}`).innerHTML = `
+        <span class="label">${cap}: 64, 32 and 16 px (small-size gap at 32 and below)</span>
+        <div class="row">${[64, 32, 16].map((px) => markSvg(state, theme, px, { square: true })).join("")}</div>
+        <div class="row" style="margin-top:12px;opacity:.85">${[64, 32, 16].map((px) => markSvg(state, theme, px, { square: true, shipped: true })).join("")}</div>
+        <span class="label" style="margin:8px 0 0">Bottom row: shipped</span>`;
+      document.getElementById(`presets${cap}`).innerHTML = PRESETS.map((p, i) => {
+        const s = { ...state, ...p };
+        const on = p.count === state.count && p.scale === state.scale && p.spread === state.spread;
+        return `<button class="preset" data-preset="${i}" aria-pressed="${on}">${markSvg(s, theme, 64, { square: true })}<span>${p.label}</span></button>`;
+      }).join("");
+    }
+    const app = (s, shipped) =>
+      `<div class="appicon" style="width:96px;height:96px">${markSvg(s, "brand", 60, { square: true, shipped })}</div>`;
+    document.getElementById("iconApp").innerHTML = `
+      <span class="label">App icon on brand blue: proposal, then shipped</span>
+      <div class="row">${app(state, false)}${app(state, true)}</div>`;
+
+    const g = stack(widthsFor(state), state.spread);
+    const ship = stack([100, 100], 1);
+    document.getElementById("stats").textContent =
+      `Ink box ${fmt(g.ink.w)} x ${fmt(g.ink.h)} units (ratio ${fmt(g.ink.w / g.ink.h)}), shipped ${fmt(ship.ink.w)} x ${fmt(ship.ink.h)} (ratio ${fmt(ship.ink.w / ship.ink.h)}). ` +
+      `Card widths ${widthsFor(state)
+        .map((w) => fmt(w))
+        .join(", ")}. The outline is symmetric under a half turn about the center card.`;
+
+    document.querySelectorAll("[data-key]").forEach((el) => {
+      el.setAttribute("aria-pressed", String(String(state[el.dataset.key]) === el.dataset.v));
+    });
+  }
+
+  document.getElementById("options").innerHTML = OPTIONS.map(
+    (o) =>
+      `<div class="opt"><h3>${o.title}</h3><div class="chips">${o.choices
+        .map(
+          (c) =>
+            `<button class="chip" data-key="${o.key}" data-v="${c.v}" aria-pressed="false">${c.label}</button>`,
+        )
+        .join("")}</div></div>`,
+  ).join("");
+  document.getElementById("options").addEventListener("click", (e) => {
+    const el = e.target.closest("[data-key]");
+    if (!el) return;
+    const o = OPTIONS.find((x) => x.key === el.dataset.key);
+    state[o.key] = o.choices.find((c) => String(c.v) === el.dataset.v).v;
+    render();
+  });
+  for (const id of ["presetsLight", "presetsDark"]) {
+    document.getElementById(id).addEventListener("click", (e) => {
+      const b = e.target.closest("[data-preset]");
+      if (!b) return;
+      const { label, ...p } = PRESETS[+b.dataset.preset];
+      state = { ...state, ...p };
+      render();
+    });
+  }
+
+  render();
+  document.fonts?.ready.then(render);
+</script>
