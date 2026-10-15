@@ -317,7 +317,8 @@
           apply: (d) => ({ ...d, front: { ...d.front, light: "#8fb0f8" } }),
         },
       ];
-      let on = new Set(REFINEMENTS.map((r) => r.key));
+      // The owner kept three refinements and left arm balancing off (2026-10-15).
+      let on = new Set(["corners", "smallGap", "contrast"]);
 
       const fmt = (n) => Number(Number(n).toFixed(2)).toString();
       const rad = (deg) => (deg * Math.PI) / 180;
@@ -485,7 +486,7 @@
       }
 
       document.getElementById("toggles").innerHTML = REFINEMENTS.map(
-        (r) => `<label class="toggle" for="t-${r.key}"><input id="t-${r.key}" type="checkbox" checked /><div><b>${r.title}</b><span>${r.text}</span></div></label>`,
+        (r) => `<label class="toggle" for="t-${r.key}"><input id="t-${r.key}" type="checkbox" ${on.has(r.key) ? "checked" : ""} /><div><b>${r.title}</b><span>${r.text}</span></div></label>`,
       ).join("");
       for (const r of REFINEMENTS) {
         document.getElementById(`t-${r.key}`).addEventListener("change", (e) => {

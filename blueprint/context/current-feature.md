@@ -22,6 +22,11 @@ owner explored and approved a new direction, all prototyped under
   the logo.
 - **Motion** (`stack-logo-animations.html` and `.md`): Breathe, Shuffle and
   Climb. Climb replaces Trace, which the owner rejected.
+- **Refinement** (`logo-spec-refine.html`, 2026-10-15): the owner saved the
+  mark with the front card 36% along the slant ("Spec Design" in the studio)
+  and kept three optical refinements: even corners, a wider gap at small
+  sizes and a deeper light-mode front card. Balancing the back card's arms
+  was left off, to keep the footprint.
 
 ### The fix
 
@@ -29,19 +34,20 @@ owner explored and approved a new direction, all prototyped under
 
 | Part         | Value                                                                                               |
 | ------------ | --------------------------------------------------------------------------------------------------- |
-| Card         | Parallelogram 100 wide, vertical sides 95 tall, top and bottom edges slanted 32°, every corner an exact circular arc of radius 14 |
-| Front card   | The same size as the back card, offset 40 units along the slant and 42% of its height up            |
-| Gap          | 3.5 units, cut out of the back card around the front card, so it takes the surface's color          |
+| Card         | Parallelogram 100 wide, vertical sides 95 tall, top and bottom edges slanted 32° |
+| Corners      | Exact circular arcs that each curve over 14 units of edge: radius 7.76 on the two acute (58°) corners, 25.26 on the two obtuse (122°) ones, so all four look equally soft |
+| Front card   | The same size as the back card, offset 36 units along the slant and 42% of its height up |
+| Gap          | 3.5 units, cut out of the back card around the front card, so it takes the surface's color. A small-size version draws it at 7 units at 32 px and below (favicons and small icons), so the cards stay apart |
 | Symmetry     | The outline is symmetric under a half turn, so the ink box center is the optical center             |
 
 **Colors:**
 
 | Use        | Back card | Front card |
 | ---------- | --------- | ---------- |
-| Light      | `#2563EB` | `#A8C4FC`  |
+| Light      | `#2563EB` | `#8FB0F8`  |
 | Dark       | `#3B82F6` | `#BCD2FF`  |
 | On brand   | `#7199F2` | `#FFFFFF`  |
-| One color  | the given color for both, with the gap widened to 5 units |
+| One color  | the given color for both, with the gap widened to 5 units (7 at the small size) |
 
 **Lockup:**
 
@@ -90,12 +96,13 @@ Shuffle and Climb finish the current move when the wait ends.
 ### Build steps
 
 1. [ ] **Shared geometry in `@dubgrid/design-tokens`.** Rewrite
-       `brand-mark.ts` for the stacked mark: card paths, colors per use, ink
-       box, optical center, square box, and the horizontal and stacked lockup
-       layouts.
+       `brand-mark.ts` for the stacked mark: card paths with per-corner radii,
+       colors per use, the gap and its small-size value (with the 32 px
+       threshold), ink box, optical center, square box, and the horizontal and
+       stacked lockup layouts.
    - Done when the package builds and `brand-mark.test.ts` pins the card
-     boxes, the gap, the half-turn symmetry, and the lockup and stacked
-     spacing.
+     boxes, the equal 14-unit curve length at every corner, both gaps, the
+     half-turn symmetry, and the lockup and stacked spacing.
 2. [ ] **Shared motion.** Rewrite `brand-motion.ts` as pure frame functions
        for Breathe, Shuffle and Climb, plus the finish-the-move helper, and
        retire Trace.
@@ -108,8 +115,9 @@ Shuffle and Climb finish the current move when the wait ends.
 3. [ ] **Web marks.** Make these changes:
    - Add `--dg-color-brand-mark-back` and `--dg-color-brand-mark-front` to
      `globals.css`, light and dark.
-   - In `Logo.tsx`, draw the two-tone symbol (with a one-color option),
-     `DubGridLockup` and `DubGridStackedLockup` from the new layouts.
+   - In `Logo.tsx`, draw the two-tone symbol (with a one-color option, and
+     the small-size gap at 32 px and below), `DubGridLockup` and
+     `DubGridStackedLockup` from the new layouts.
    - In `AnimatedDubGridLogo`, draw the three animations.
    - In `AuthTransitionScreen`, change `trace` to `climb`.
    - Give the landing footer the one-color mark.
@@ -119,7 +127,7 @@ Shuffle and Climb finish the current move when the wait ends.
    - Re-render everything `scripts/generate-wordmark-lockup.mts` produces:
      the email lockup and wordmark, `lockup.png`, `logo.png`,
      `logo-white.png`, `logo.svg`, `app/icon.png`, `app/apple-icon.png` and
-     `docs/favicon.png`.
+     `docs/favicon.png`. Favicons at 32 px and below use the small-size gap.
    - Update `logo-grid.tsx` (social images) and the report PDF mark
      (`pdf-brand-mark.ts`).
    - Regenerate the auth email templates.

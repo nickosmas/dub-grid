@@ -23,10 +23,11 @@ Unchanged from the 2026-10-11 decision:
 
 ## The mark they move
 
-Two equal cards, slanted 32°, 0.95 of a card tall. The front card sits 40% of
-a card along the slant and 42% of its height up from the back card. Back
-`#2563EB` and front `#A8C4FC` on light, `#3B82F6` and `#BCD2FF` on dark. A
-surface-colored gap is cut around the front card.
+Two equal cards, slanted 32°, 0.95 of a card tall, every corner curving over
+the same 14 units. The front card sits 36% of a card along the slant and 42%
+of its height up from the back card. Back `#2563EB` and front `#8FB0F8` on
+light, `#3B82F6` and `#BCD2FF` on dark. A surface-colored gap is cut around
+the front card. (Geometry as finalized in `blueprint/context/current-feature.md`.)
 
 | Animation | Where                                                            | Motion                                                                                                                                                                                                                                                                                                                                                                                                 |
 | --------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

@@ -328,12 +328,13 @@
 
     <script>
       const COLORS = {
-        light: { back: "#2563EB", front: "#A8C4FC" },
+        light: { back: "#2563EB", front: "#8FB0F8" },
         dark: { back: "#3B82F6", front: "#BCD2FF" },
       };
-      // The refined mark: equal cards, 32° slant, the front card 40% of a card
-      // along the slant and 42% of its height up from the back one.
-      const SPEC = { angle: 32, aspect: 0.95, stepX: 0.4, stepY: 0.42, radius: 0.14, gap: 0.035 };
+      // The mark as finalized in the fix spec: equal cards, 32° slant, the
+      // front card 36% of a card along the slant and 42% of its height up,
+      // every corner curving over 14 units.
+      const SPEC = { angle: 32, aspect: 0.95, stepX: 0.36, stepY: 0.42, curve: 14, gap: 0.035 };
       const DURATION = { breathe: 2.4, shuffle: 1.8, climb: 1.6 };
       const SHUFFLE_MOVE = 1.0;
       const CLIMB_MOVE = 1.0;
@@ -362,7 +363,7 @@
           const ua = [a[0] / la, a[1] / la];
           const ub = [b[0] / lb, b[1] / lb];
           const angle = Math.acos(Math.max(-1, Math.min(1, ua[0] * ub[0] + ua[1] * ub[1])));
-          const t = Math.min(r / Math.tan(angle / 2), la / 2, lb / 2);
+          const t = Math.min((Array.isArray(r) ? r[k] : r) / Math.tan(angle / 2), la / 2, lb / 2);
           return {
             s: [v[0] + ua[0] * t, v[1] + ua[1] * t],
             e: [v[0] + ub[0] * t, v[1] + ub[1] * t],
@@ -388,7 +389,11 @@
           [W / 2, H / 2 + (W / 2) * tan],
           [-W / 2, H / 2 - (W / 2) * tan],
         ],
-        SPEC.radius * W,
+        // Radius = curve length x tan(corner / 2): acute corners at top left
+        // and bottom right, obtuse ones at top right and bottom left.
+        [90 - SPEC.angle, 90 + SPEC.angle, 90 - SPEC.angle, 90 + SPEC.angle].map(
+          (deg) => SPEC.curve * Math.tan((deg * Math.PI) / 360),
+        ),
       );
       const BACK = { x: 0, y: 0 };
       const FRONT = { x: SPEC.stepX * W, y: SPEC.stepX * W * tan - SPEC.stepY * H };
