@@ -633,7 +633,23 @@
         cellSeed: 1,
         cellFirstFaint: false,
       };
+      // The mark the fix spec describes (blueprint/context/current-feature.md):
+      // two equal cards at 32°, brand blue behind, light blue in front.
+      const REFINED = {
+        stacking: "offset",
+        angle: 32,
+        aspect: 0.95,
+        stepX: 0.4,
+        stepY: 0.42,
+        shrink: 1,
+        radius: 14,
+        gap: 3.5,
+        darkPage: "back",
+        ringCount: 0,
+        cells: false,
+      };
       const PRESETS = [
+        { name: "Refined mark (spec)", p: REFINED },
         { name: "Stem rings", p: {} },
         { name: "Slim rings", p: { ringW: 12, ringUp: 20 } },
         { name: "Ring per page", p: { ringStyle: "perpage", ringCount: 1, ringW: 18, ringUp: 16, ringDown: 14, ringSpread: 0 } },
@@ -1126,7 +1142,7 @@
         document.querySelectorAll("[data-preset]").forEach((b) => b.setAttribute("aria-pressed", String(match?.name === b.dataset.preset)));
       }
 
-      const DRAFT_KEY = "calendar-mark-draft-v8";
+      const DRAFT_KEY = "calendar-mark-draft-v9";
       let draftTimer = null;
       function rememberDraft() {
         clearTimeout(draftTimer);
@@ -1422,11 +1438,11 @@
       $("copyJson").addEventListener("click", (e) => copy(JSON.stringify(state, null, 2), e.currentTarget, "Copied"));
 
       buildControls();
-      const SHIFT_CELLS = PRESETS.find((pr) => pr.name === "Sketch").p;
+      const SHIFT_CELLS = REFINED;
       state = sanitize({ ...BASE, ...SHIFT_CELLS });
       try {
         const draft = localStorage.getItem(DRAFT_KEY);
-        const older = localStorage.getItem("calendar-mark-draft-v7");
+        const older = localStorage.getItem("calendar-mark-draft-v8");
         if (draft) state = sanitize(JSON.parse(draft));
         else if (older) state = sanitize({ ...BASE, colors: JSON.parse(older).colors, ...SHIFT_CELLS });
       } catch {
