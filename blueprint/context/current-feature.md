@@ -144,7 +144,7 @@ Shuffle and Climb finish the current move when the wait ends.
    - Regenerate the auth email templates.
    - Done when each image shows the new mark, and the email, report and PDF
      tests pass.
-5. [ ] **Mobile static mark and icons.**
+5. [x] **Mobile static mark and icons.**
    - Have `generate-app-icons.mjs` render the two card layers (white, gap cut
      into the back card), the app, adaptive and monochrome icons, and the
      light and dark splash images.

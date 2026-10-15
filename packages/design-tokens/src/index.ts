@@ -1,29 +1,6 @@
 export { BRAND_ANIMATED_LOGO_SIZE } from "./animated-logo";
 
 export {
-  BRAND_LOCKUP_GAP_EM,
-  BRAND_LOCKUP_SYMBOL_EM,
-  BRAND_MARK_BACK,
-  BRAND_MARK_BACK_STROKE,
-  BRAND_MARK_COLORS,
-  BRAND_MARK_CORNER_SMOOTHING,
-  BRAND_MARK_FRONT,
-  BRAND_MARK_GAP,
-  BRAND_MARK_INK,
-  BRAND_MARK_OPTICAL_OFFSET_X,
-  BRAND_MARK_SQUARE,
-  BRAND_MARK_VIEWBOX,
-  BRAND_STACKED_GAP_EM,
-  BRAND_STACKED_SYMBOL_EM,
-  brandMarkCardPath,
-  getBrandLockupSymbolLayout,
-  getBrandStackedLayout,
-  type BrandStackedLayout,
-  type BrandLockupSymbolLayout,
-  type BrandMarkCard,
-} from "./brand-mark-outline";
-
-export {
   BRAND_SYMBOL_BACK,
   BRAND_SYMBOL_BOTTOM_LIFT,
   BRAND_SYMBOL_CARD,
