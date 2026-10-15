@@ -270,11 +270,11 @@
     <main>
       <h1>Logo lockup symmetry</h1>
       <p class="sub">
-        The final stacked mark (36% along the slant, even corners, the deeper light-mode front
-        card) aligned to the <code>dubgrid</code> wordmark. Every line and value below is measured
-        from the app's DM Sans Bold file. The recommended refinements are selected; "Spec" in each
-        group is what the fix spec says today. The last two groups try the darker card in front
-        and the cards with no gap between them.
+        The final stacked mark (36% along the slant, even corners, the darker card in front)
+        aligned to the <code>dubgrid</code> wordmark. Every line and value below is measured from
+        the app's DM Sans Bold file. The recommended refinements are selected; "Spec" in each
+        group is what the fix spec says today. The last two groups compare the card order and
+        the gap between the cards.
       </p>
 
       <div class="options" id="options"></div>
@@ -392,8 +392,8 @@
           key: "front",
           title: "Card in front",
           choices: [
-            { v: "light", label: "Light card in front (spec)", rec: true },
-            { v: "dark", label: "Darker card in front" },
+            { v: "dark", label: "Darker card in front (spec)", rec: true },
+            { v: "light", label: "Light card in front" },
           ],
         },
         {
@@ -407,9 +407,9 @@
       ];
       const BEFORE = { overshoot: 0, space: 0.22, stackGap: "lowest", front: "light", cardGap: "cut" };
       const COMBOS = [
-        { front: "light", cardGap: "cut", label: "Light in front, gap (spec)" },
+        { front: "light", cardGap: "cut", label: "Light in front, gap" },
         { front: "light", cardGap: "none", label: "Light in front, no gap" },
-        { front: "dark", cardGap: "cut", label: "Darker in front, gap" },
+        { front: "dark", cardGap: "cut", label: "Darker in front, gap (spec)" },
         { front: "dark", cardGap: "none", label: "Darker in front, no gap" },
       ];
       const markColors = (s, theme) => (s.front === "dark" ? [...COLORS[theme]].reverse() : COLORS[theme]);

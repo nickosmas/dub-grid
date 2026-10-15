@@ -14,8 +14,8 @@ owner explored and approved a new direction, all prototyped under
 `blueprint/reference/`:
 
 - **Symbol** (`logo-stack.html`, candidate B; `logo-lockup.html`): two equal,
-  solid, slanted cards that step up and to the right. Brand blue behind,
-  light blue in front, with a surface-colored gap cut around the front card.
+  solid, slanted cards that step up and to the right, with a surface-colored
+  gap cut around the front card.
 - **Lockup** (`logo-lockup.html`): refined to the wordmark's measured DM Sans
   Bold metrics.
 - **Surfaces** (`logo-surfaces.html`): how it reads on every surface that shows
@@ -25,8 +25,10 @@ owner explored and approved a new direction, all prototyped under
 - **Refinement** (`logo-spec-refine.html`, 2026-10-15): the owner saved the
   mark with the front card 36% along the slant ("Spec Design" in the studio)
   and kept three optical refinements: even corners, a wider gap at small
-  sizes and a deeper light-mode front card. Balancing the back card's arms
-  was left off, to keep the footprint.
+  sizes and a deeper light-mode light card. Balancing the back card's arms
+  was left off, to keep the footprint. After comparing both card orders in
+  `logo-lockup.html` and `stack-logo-animations.html`, the owner put the
+  darker card in front, keeping the gap.
 
 ### The fix
 
@@ -44,9 +46,12 @@ owner explored and approved a new direction, all prototyped under
 
 | Use        | Back card | Front card |
 | ---------- | --------- | ---------- |
-| Light      | `#2563EB` | `#8FB0F8`  |
-| Dark       | `#3B82F6` | `#BCD2FF`  |
+| Light      | `#8FB0F8` | `#2563EB`  |
+| Dark       | `#BCD2FF` | `#3B82F6`  |
 | On brand   | `#7199F2` | `#FFFFFF`  |
+
+The stronger card goes in front: brand blue on light and dark surfaces, and
+white on a brand-blue surface (app icons), where a blue card would vanish.
 | One color  | the given color for both, with the gap widened to 5 units (7 at the small size) |
 
 **Lockup:**
