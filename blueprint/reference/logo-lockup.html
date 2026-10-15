@@ -224,6 +224,39 @@
         color: #0f172a;
         font-weight: 500;
       }
+      .combos {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 12px;
+      }
+      .combo {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 14px;
+        border: 1px solid var(--combo-line);
+        border-radius: 10px;
+        background: transparent;
+        cursor: pointer;
+        font: inherit;
+        color: inherit;
+        text-align: left;
+      }
+      .combo[aria-pressed="true"] {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 1px #2563eb;
+      }
+      .tile.light .combo {
+        --combo-line: rgba(15, 23, 42, 0.14);
+      }
+      .tile.dark .combo {
+        --combo-line: rgba(250, 250, 250, 0.16);
+      }
+      .combo-label {
+        font-size: 13px;
+        font-weight: 500;
+      }
       #measure {
         position: absolute;
         width: 0;
@@ -237,9 +270,11 @@
     <main>
       <h1>Logo lockup symmetry</h1>
       <p class="sub">
-        Candidate B refined to the <code>dubgrid</code> wordmark. Every line below is measured
-        from the app's DM Sans Bold file. The recommended options are selected; switch any of
-        them to compare with the version on the surfaces page.
+        The final stacked mark (36% along the slant, even corners, the deeper light-mode front
+        card) aligned to the <code>dubgrid</code> wordmark. Every line and value below is measured
+        from the app's DM Sans Bold file. The recommended refinements are selected; "Spec" in each
+        group is what the fix spec says today. The last two groups try the darker card in front
+        and the cards with no gap between them.
       </p>
 
       <div class="options" id="options"></div>
@@ -256,6 +291,13 @@
         <div class="tile dark" id="compareDark"></div>
       </div>
 
+      <h2>Card order and gap</h2>
+      <p class="sub">Click a combination to apply it to the rest of the page.</p>
+      <div class="pair">
+        <div class="tile light" id="combosLight"></div>
+        <div class="tile dark" id="combosDark"></div>
+      </div>
+
       <h2>At real sizes</h2>
       <div class="pair">
         <div class="tile light" id="realLight"></div>
@@ -265,24 +307,27 @@
       <h2>Why these choices</h2>
       <ul class="reasons">
         <li>
-          <b>Equal cards.</b> Two cards of the same size make the symbol's outline symmetric under
-          a half turn, so its center is its geometric center. The wordmark is nearly balanced too
-          ("d" and "b" mirror each other), so the two halves of the lockup now center the same
-          way.
+          <b>Overshoot at the rounded points.</b> The symbol's top and bottom are the rounded
+          tips of its acute corners. Set exactly on the ascender and descender they look short,
+          as an "o" would on the x-height. DM Sans lets round letters pass the line by 0.012 em,
+          so the symbol does too, at each end. It stays centered on the word's optical center.
         </li>
         <li>
-          <b>As tall as the word.</b> The symbol spans the word's full height, from the tops of
-          "d" and "b" to the bottom of "g", and centers on the word's optical center. Neither
-          part outranks the other, and the top of the front card lines up with the ascenders.
+          <b>Straight-to-round spacing.</b> The symbol's right edge is the front card's straight
+          side, facing the round bowl of the "d". In the wordmark, a straight stem sits 0.101 em
+          from a round bowl ("i" to "d") and 0.11 em from another stem. Two straight-to-round gaps
+          make 0.20 em.
         </li>
         <li>
-          <b>Spacing from the letters.</b> Letters sit about 0.11 em apart, ink to ink. The
-          symbol sits two of those from the "d", so the gap reads as part of the word's own
-          spacing rather than an extra rule.
+          <b>Stacked gap from the bottom edge.</b> The symbol's bottom edge slants down to one
+          corner on the right. Measured from that corner, 0.42 em leaves the rest of the gap
+          looking larger. Measured from the bottom edge on average, the gap reads 0.42 em across
+          the symbol, and the lowest corner sits over lowercase letters, not ascenders.
         </li>
         <li>
-          <b>Stacked lockup.</b> The symbol is twice the word's height and centers on the word's
-          optical center, the same rule the shipped stacked lockup uses.
+          <b>Unchanged.</b> The symbol still spans the word's height and centers on its optical
+          center (0.256 em); the stacked symbol is still twice the lockup symbol's height,
+          centered on the word.
         </li>
       </ul>
 
@@ -308,38 +353,67 @@
         dRight: 0.588,
         uLeft: 0.696,
       };
-      const COLORS = { light: ["#2563EB", "#A8C4FC"], dark: ["#3B82F6", "#BCD2FF"] };
-      const BASE = { n: 2, angle: 32, aspect: 0.95, stepX: 0.4, stepY: 0.42, radius: 0.14, gap: 0.035 };
+      const COLORS = { light: ["#2563EB", "#8FB0F8"], dark: ["#3B82F6", "#BCD2FF"] };
+      // The mark as finalized in the fix spec: every corner curves over 14
+      // units, so radius = 14 x tan(corner / 2).
+      const BASE = { n: 2, angle: 32, aspect: 0.95, stepX: 0.36, stepY: 0.42, curve: 14, gap: 0.035 };
+      // DM Sans Bold's overshoot: round letters pass the x-height and the
+      // baseline by 0.012 em ("o" spans -0.012 to 0.516); flat stems and the
+      // pointed "v" stop on the line.
+      const ROUND_OVERSHOOT = 0.012;
 
       const OPTIONS = [
         {
-          key: "shrink",
-          title: "Card sizes",
+          key: "overshoot",
+          title: "Overshoot at the rounded points",
           choices: [
-            { v: 1, label: "Equal (symmetric)", rec: true },
-            { v: 0.85, label: "Front 85% (before)" },
-          ],
-        },
-        {
-          key: "height",
-          title: "Symbol height",
-          choices: [
-            { v: "word", label: "Word height, 0.96 em", rec: true },
-            { v: "ascender", label: "Baseline to ascender, 0.73 em" },
-            { v: "before", label: "1.05 em (before)" },
+            { v: ROUND_OVERSHOOT, label: "Like round letters, 0.012 em", rec: true },
+            { v: 0, label: "None (spec)" },
+            { v: 0.024, label: "Double, 0.024 em" },
           ],
         },
         {
           key: "space",
           title: "Space to the word, ink to ink",
           choices: [
-            { v: 0.22, label: "Two letter gaps, 0.22 em", rec: true },
-            { v: 0.135, label: "One stem, 0.135 em" },
-            { v: 0.3, label: "0.30 em (before)" },
+            { v: 0.2, label: "Two straight-to-round gaps, 0.20 em", rec: true },
+            { v: 0.22, label: "Two letter gaps, 0.22 em (spec)" },
+          ],
+        },
+        {
+          key: "stackGap",
+          title: "Stacked gap, 0.42 em, measured from",
+          choices: [
+            { v: "average", label: "The bottom edge on average", rec: true },
+            { v: "lowest", label: "The lowest corner (spec)" },
+          ],
+        },
+        {
+          key: "front",
+          title: "Card in front",
+          choices: [
+            { v: "light", label: "Light card in front (spec)", rec: true },
+            { v: "dark", label: "Darker card in front" },
+          ],
+        },
+        {
+          key: "cardGap",
+          title: "Between the cards",
+          choices: [
+            { v: "cut", label: "Surface-colored gap (spec)", rec: true },
+            { v: "none", label: "No gap" },
           ],
         },
       ];
-      const BEFORE = { shrink: 0.85, height: "before", space: 0.3 };
+      const BEFORE = { overshoot: 0, space: 0.22, stackGap: "lowest", front: "light", cardGap: "cut" };
+      const COMBOS = [
+        { front: "light", cardGap: "cut", label: "Light in front, gap (spec)" },
+        { front: "light", cardGap: "none", label: "Light in front, no gap" },
+        { front: "dark", cardGap: "cut", label: "Darker in front, gap" },
+        { front: "dark", cardGap: "none", label: "Darker in front, no gap" },
+      ];
+      const markColors = (s, theme) => (s.front === "dark" ? [...COLORS[theme]].reverse() : COLORS[theme]);
+      const markGap = (s, g) => (s.cardGap === "none" ? 0 : g.gap);
       let state = Object.fromEntries(OPTIONS.map((o) => [o.key, o.choices.find((c) => c.rec).v]));
 
       const fmt = (n) => Number(n.toFixed(3)).toString();
@@ -356,7 +430,7 @@
           const ua = [a[0] / la, a[1] / la];
           const ub = [b[0] / lb, b[1] / lb];
           const angle = Math.acos(Math.max(-1, Math.min(1, ua[0] * ub[0] + ua[1] * ub[1])));
-          const t = Math.min(r / Math.tan(angle / 2), la / 2, lb / 2);
+          const t = Math.min((Array.isArray(r) ? r[k] : r) / Math.tan(angle / 2), la / 2, lb / 2);
           return {
             s: [v[0] + ua[0] * t, v[1] + ua[1] * t],
             e: [v[0] + ub[0] * t, v[1] + ub[1] * t],
@@ -391,7 +465,7 @@
                 [x + cw, y + cw * tan + ch],
                 [x, y + ch],
               ],
-              p.radius * cw,
+              [90 - p.angle, 90 + p.angle, 90 - p.angle, 90 + p.angle].map((deg) => ((p.curve * cw) / 100) * Math.tan((deg * Math.PI) / 360)),
             ),
           );
           x += p.stepX * cw;
@@ -403,6 +477,7 @@
         const bb = el.getBBox();
         const g = { cards, ink: { x: bb.x, y: bb.y, w: bb.width, h: bb.height }, gap: p.gap * 100 };
         g.optical = opticalCenter(g);
+        g.bottomLift = bottomLift(g);
         geomCache.set(shrink, g);
         return g;
       }
@@ -431,19 +506,47 @@
         };
       }
 
+      // How far the bottom edge sits above the lowest corner on average, as a
+      // share of the ink height: rasterize the mark and average the lowest
+      // inked row of every inked column.
+      function bottomLift(g) {
+        const size = 400;
+        const canvas = document.createElement("canvas");
+        canvas.width = canvas.height = size;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        const s = size / Math.max(g.ink.w, g.ink.h);
+        ctx.setTransform(s, 0, 0, s, -g.ink.x * s, -g.ink.y * s);
+        g.cards.forEach((d) => ctx.fill(new Path2D(d)));
+        const { data } = ctx.getImageData(0, 0, size, size);
+        let sum = 0;
+        let cols = 0;
+        let lowest = 0;
+        for (let x = 0; x < size; x++) {
+          for (let y = size - 1; y >= 0; y--) {
+            if (data[(y * size + x) * 4 + 3] > 127) {
+              sum += y;
+              cols++;
+              lowest = Math.max(lowest, y);
+              break;
+            }
+          }
+        }
+        return (lowest - sum / cols) / (g.ink.h * s);
+      }
+
       let uid = 0;
       // The symbol as an SVG group whose ink box is `w` x `h` at (x, y).
-      function symbolGroup(g, colors, x, y, h) {
+      function symbolGroup(g, colors, x, y, h, gap = g.gap) {
         const k = h / g.ink.h;
         const pad = 200;
         const region = `x="${fmt(g.ink.x - pad)}" y="${fmt(g.ink.y - pad)}" width="${fmt(g.ink.w + 2 * pad)}" height="${fmt(g.ink.h + 2 * pad)}"`;
         let defs = "";
         const paths = g.cards.map((d, i) => {
           const ahead = g.cards.slice(i + 1);
-          if (!ahead.length) return `<path d="${d}" fill="${colors[i]}"/>`;
+          if (!ahead.length || gap <= 0) return `<path d="${d}" fill="${colors[i]}"/>`;
           const id = `cut${uid++}`;
           defs += `<mask id="${id}" maskUnits="userSpaceOnUse" ${region}><rect ${region} fill="white"/>${ahead
-            .map((f) => `<path d="${f}" fill="black" stroke="black" stroke-width="${fmt(g.gap * 2)}" stroke-linejoin="round"/>`)
+            .map((f) => `<path d="${f}" fill="black" stroke="black" stroke-width="${fmt(gap * 2)}" stroke-linejoin="round"/>`)
             .join("")}</mask>`;
           return `<path d="${d}" fill="${colors[i]}" mask="url(#${id})"/>`;
         });
@@ -451,21 +554,13 @@
       }
 
       // Lockup layout in em, with the baseline at 0 and the word's origin at 0.
+      // The symbol spans the word's height plus the overshoot at each end and
+      // centers on the word's optical center (the mark is symmetric under a
+      // half turn, so its optical center is its middle).
       function layout(s) {
-        const g = geometry(s.shrink);
-        let top;
-        let h;
-        if (s.height === "word") {
-          h = WORD.ascender - WORD.descender;
-          const opticalFromTop = ((g.optical.y - g.ink.y) / g.ink.h) * h;
-          top = WORD.opticalY + opticalFromTop;
-        } else if (s.height === "ascender") {
-          h = WORD.ascender;
-          top = WORD.ascender;
-        } else {
-          h = 1.05;
-          top = WORD.opticalY + h / 2;
-        }
+        const g = geometry(1);
+        const h = WORD.ascender - WORD.descender + 2 * s.overshoot;
+        const top = WORD.opticalY + h / 2;
         const w = (g.ink.w / g.ink.h) * h;
         const right = WORD.inkLeft - s.space;
         return { g, h, w, top, left: right - w };
@@ -488,7 +583,7 @@
         const X = (em) => (em - minX) * F;
         const Y = (em) => (topY - em) * F;
         const ink = theme === "light" ? "#0F172A" : "#FAFAFA";
-        let out = symbolGroup(L.g, COLORS[theme], X(L.left), Y(L.top), L.h * F) + word(X(0), Y(0), F, ink);
+        let out = symbolGroup(L.g, markColors(s, theme), X(L.left), Y(L.top), L.h * F, markGap(s, L.g)) + word(X(0), Y(0), F, ink);
         if (guides) {
           const line = (em, label, dashed) =>
             `<line x1="0" x2="${fmt(W)}" y1="${fmt(Y(em))}" y2="${fmt(Y(em))}" stroke="var(--guide)" stroke-width="1" ${dashed ? 'stroke-dasharray="5 4"' : ""} opacity="0.75"/>` +
@@ -512,17 +607,18 @@
         return `<svg width="${fmt(W)}" height="${fmt(H + extra)}" viewBox="0 0 ${fmt(W)} ${fmt(H + extra)}" aria-hidden="true" style="display:block;overflow:visible${guides ? ";width:100%;min-width:560px;height:auto" : ""}">${out}</svg>`;
       }
 
-      // Stacked: symbol twice the word's height, 0.42 em above the ascenders,
-      // its optical center over the word's.
+      // Stacked: symbol twice the lockup's symbol height, 0.42 em above the
+      // ascenders (from its lowest corner, or from its bottom edge on
+      // average), its optical center over the word's.
       function stackedSvg(s, fontSize, theme) {
-        const g = geometry(s.shrink);
+        const g = geometry(1);
         const F = fontSize;
-        const wordH = WORD.ascender - WORD.descender;
-        const h = 2 * wordH;
+        const h = 2 * layout(s).h;
         const w = (g.ink.w / g.ink.h) * h;
         const opticalFromLeft = ((g.optical.x - g.ink.x) / g.ink.w) * w;
         const left = WORD.opticalX - opticalFromLeft;
-        const top = WORD.ascender + 0.42 + h;
+        const lowestAbove = 0.42 - (s.stackGap === "average" ? g.bottomLift * h : 0);
+        const top = WORD.ascender + lowestAbove + h;
         const minX = Math.min(left, WORD.inkLeft);
         const maxX = Math.max(left + w, WORD.inkRight);
         const W = (maxX - minX) * F;
@@ -530,18 +626,21 @@
         const X = (em) => (em - minX) * F;
         const Y = (em) => (top - em) * F;
         const ink = theme === "light" ? "#0F172A" : "#FAFAFA";
-        const svg = symbolGroup(g, COLORS[theme], X(left), Y(top), h * F) + word(X(0), Y(0), F, ink);
+        const svg = symbolGroup(g, markColors(s, theme), X(left), Y(top), h * F, markGap(s, g)) + word(X(0), Y(0), F, ink);
         return `<svg width="${fmt(W)}" height="${fmt(H)}" viewBox="0 0 ${fmt(W)} ${fmt(H)}" aria-hidden="true" style="display:block">${svg}</svg>`;
       }
 
       function render() {
         document.getElementById("guide").innerHTML = lockupSvg(state, 150, "light", { guides: true, pad: 0.12 });
         const L = layout(state);
-        const gapEm = (L.g.gap / L.g.ink.h) * L.h;
+        const gapEm = (markGap(state, L.g) / L.g.ink.h) * L.h;
+        const stackH = 2 * L.h;
+        const lowestGap = 0.42 - (state.stackGap === "average" ? L.g.bottomLift * stackH : 0);
         document.getElementById("legend").innerHTML = `
           <span>Symbol <b>${fmt(L.w)} x ${fmt(L.h)} em</b></span>
           <span>Symbol top <b>${fmt(L.top)}</b>, bottom <b>${fmt(L.top - L.h)}</b></span>
-          <span>Gap between cards <b>${fmt(gapEm)} em</b> (word stem ${WORD.stem})</span>`;
+          <span>Gap between cards <b>${gapEm ? `${fmt(gapEm)} em` : "none"}</b> (word stem ${WORD.stem})</span>
+          <span>Stacked: lowest corner <b>${fmt(lowestGap)} em</b> above the ascenders</span>`;
         for (const theme of ["light", "dark"]) {
           const cap = theme === "light" ? "Light" : "Dark";
           document.getElementById(`compare${cap}`).innerHTML = `
@@ -551,20 +650,31 @@
             <span class="label">${cap}: header 24 px, landing 40 px, sign-in stacked 26 px</span>
             <div class="proofs">${lockupSvg(state, 24, theme)}${lockupSvg(state, 40, theme)}
               <div class="stack-row">${stackedSvg(state, 26, theme)}${stackedSvg(state, 18, theme)}</div></div>`;
+          document.getElementById(`combos${cap}`).innerHTML = `
+            <span class="label">${cap}: the four combinations, header 28 px and stacked 20 px</span>
+            <div class="combos">${COMBOS.map((c) => {
+              const s = { ...state, front: c.front, cardGap: c.cardGap };
+              const on = c.front === state.front && c.cardGap === state.cardGap;
+              return `<button class="combo" data-front="${c.front}" data-gap="${c.cardGap}" aria-pressed="${on}">
+                <span class="combo-label">${c.label}</span>${lockupSvg(s, 28, theme)}
+                <div class="stack-row">${stackedSvg(s, 20, theme)}</div></button>`;
+            }).join("")}</div>`;
         }
         document.querySelectorAll("[data-key]").forEach((el) => {
           el.setAttribute("aria-pressed", String(String(state[el.dataset.key]) === el.dataset.v));
         });
         document.getElementById("tokens").textContent = `// packages/design-tokens/src/brand-mark.ts (proposed)
-const BACK_SCALE = ${state.shrink}; // front card ${state.shrink === 1 ? "the same size as" : `${state.shrink * 100}% of`} the back
-/** Symbol ink height in the lockup, in em${state.height === "word" ? ": the word's ascender to its descender" : ""}. */
+/** Symbol ink height in the lockup, in em: the word's ascender to its descender, plus ${fmt(state.overshoot)} em of overshoot at each end. */
 export const BRAND_LOCKUP_SYMBOL_EM = ${fmt(L.h)};
-/** Symbol ink to the wordmark's ink, in em: two of the word's letter gaps. */
+/** Symbol ink to the wordmark's ink, in em. */
 export const BRAND_LOCKUP_GAP_EM = ${fmt(state.space)}; // ink to ink, not to the word's origin
 export const BRAND_WORDMARK_OPTICAL_CENTER_EM = { x: 0.016, y: 0.256 } as const; // unchanged
-/** Stacked lockup: symbol ink twice the word's height, 0.42 em above the ascenders. */
-export const BRAND_STACKED_SYMBOL_EM = ${fmt(2 * (WORD.ascender - WORD.descender))}; // height, was width
-export const BRAND_STACKED_GAP_EM = 0.42; // unchanged`;
+/** Stacked lockup: symbol ink twice the lockup symbol's height. */
+export const BRAND_STACKED_SYMBOL_EM = ${fmt(stackH)};
+/** Clear space above the ascenders, in em, measured ${state.stackGap === "average" ? "from the symbol's bottom edge on average" : "from its lowest corner"}. */
+export const BRAND_STACKED_GAP_EM = 0.42;${state.stackGap === "average" ? `
+/** The bottom edge sits this share of the ink height above the lowest corner, on average. */
+export const BRAND_MARK_BOTTOM_LIFT = ${fmt(L.g.bottomLift)};` : ""}`;
       }
 
       document.getElementById("options").innerHTML = OPTIONS.map(
@@ -579,6 +689,16 @@ export const BRAND_STACKED_GAP_EM = 0.42; // unchanged`;
           render();
         }),
       );
+
+      for (const id of ["combosLight", "combosDark"]) {
+        document.getElementById(id).addEventListener("click", (e) => {
+          const b = e.target.closest(".combo");
+          if (!b) return;
+          state.front = b.dataset.front;
+          state.cardGap = b.dataset.gap;
+          render();
+        });
+      }
 
       render();
       document.fonts?.ready.then(render);
