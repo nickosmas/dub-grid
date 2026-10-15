@@ -4,7 +4,7 @@
  * everywhere else; these play only on full-screen waits. Each returns the
  * cards to draw back to front, in the symbol's 100-unit box.
  */
-import { BRAND_MARK_BACK, BRAND_MARK_FRONT, type BrandMarkCard } from "./brand-mark";
+import { BRAND_MARK_BACK, BRAND_MARK_FRONT, type BrandMarkCard } from "./brand-mark-outline";
 
 export interface BrandMotionCard {
   readonly cx: number;

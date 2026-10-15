@@ -3,7 +3,7 @@
 ## Fix: Replace the logo with the stacked two-card identity and its motion
 
 **Type:** Fix
-**Status:** not started
+**Status:** in progress
 
 ### The problem
 
@@ -28,41 +28,47 @@ owner explored and approved a new direction, all prototyped under
   sizes and a deeper light-mode light card. Balancing the back card's arms
   was left off, to keep the footprint. After comparing both card orders in
   `logo-lockup.html` and `stack-logo-animations.html`, the owner put the
-  darker card in front, keeping the gap.
+  darker card in front, keeping the gap, with a toned-down dark-mode back
+  card ("Mirror") and the lockup refinements measured from DM Sans Bold.
 
 ### The fix
 
 **Geometry** (cards 100 units wide, in one shared module):
 
-| Part         | Value                                                                                               |
-| ------------ | --------------------------------------------------------------------------------------------------- |
-| Card         | Parallelogram 100 wide, vertical sides 95 tall, top and bottom edges slanted 32° |
-| Corners      | Exact circular arcs that each curve over 14 units of edge: radius 7.76 on the two acute (58°) corners, 25.26 on the two obtuse (122°) ones, so all four look equally soft |
-| Front card   | The same size as the back card, offset 36 units along the slant and 42% of its height up |
-| Gap          | 3.5 units, cut out of the back card around the front card, so it takes the surface's color. A small-size version draws it at 7 units at 32 px and below (favicons and small icons), so the cards stay apart |
-| Symmetry     | The outline is symmetric under a half turn, so the ink box center is the optical center             |
+| Part       | Value                                                                                                                                                                                                       |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Card       | Parallelogram 100 wide, vertical sides 95 tall, top and bottom edges slanted 32°                                                                                                                            |
+| Corners    | Exact circular arcs that each curve over 14 units of edge: radius 7.76 on the two acute (58°) corners, 25.26 on the two obtuse (122°) ones, so all four look equally soft                                   |
+| Front card | The same size as the back card, offset 36 units along the slant and 42% of its height up                                                                                                                    |
+| Gap        | 3.5 units, cut out of the back card around the front card, so it takes the surface's color. A small-size version draws it at 7 units at 32 px and below (favicons and small icons), so the cards stay apart |
+| Symmetry   | The outline is symmetric under a half turn, so the ink box center is the optical center                                                                                                                     |
 
 **Colors:**
 
-| Use        | Back card | Front card |
-| ---------- | --------- | ---------- |
-| Light      | `#8FB0F8` | `#2563EB`  |
-| Dark       | `#BCD2FF` | `#3B82F6`  |
-| On brand   | `#7199F2` | `#FFFFFF`  |
+| Use      | Back card | Front card |
+| -------- | --------- | ---------- |
+| Light    | `#8FB0F8` | `#2563EB`  |
+| Dark     | `#1E40AF` | `#3B82F6`  |
+| On brand | `#7199F2` | `#FFFFFF`  |
 
 The stronger card goes in front: brand blue on light and dark surfaces, and
 white on a brand-blue surface (app icons), where a blue card would vanish.
-| One color  | the given color for both, with the gap widened to 5 units (7 at the small size) |
+The back card recedes by the same amount in both themes: 2.16:1 to its
+surface and about 2.4:1 to the front card.
+| One color | the given color for both, with the gap widened to 5 units (7 at the small size) |
 
 **Lockup:**
 
-- **Horizontal:** the symbol's ink is the word's full height, 0.957 em (the
-  ascenders of "d" and "b" to the descender of "g"). It centers on the word's
-  optical center, 0.256 em above the baseline, and sits 0.22 em from the word
-  ink to ink (two of the word's letter gaps).
-- **Stacked:** the symbol's ink is twice the word's height (1.914 em), 0.42 em
-  of clear space above the ascenders, centered horizontally on the word's
-  optical center.
+- **Horizontal:** the symbol's ink is 0.981 em tall: the word's full height
+  (the 0.725 em ascenders of "d" and "b" to the -0.232 em descender of "g")
+  plus 0.012 em at each end, the overshoot DM Sans gives its round letters.
+  It centers on the word's optical center, 0.256 em above the baseline, and
+  sits 0.20 em from the word ink to ink (two of the word's straight-to-round
+  gaps; the "d" starts 0.051 em right of the word's origin).
+- **Stacked:** the symbol's ink is twice as tall (1.962 em), with 0.42 em of
+  clear space above the ascenders measured from its bottom edge on average,
+  so its lowest corner sits about 0.115 em above them. It centers
+  horizontally on the word's optical center.
 
 **Motion** (spec in `blueprint/reference/stack-logo-animations.md`):
 
