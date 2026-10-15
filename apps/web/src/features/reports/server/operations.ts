@@ -12,7 +12,7 @@ import {
   type PublishedShiftRow,
 } from "@/lib/published-shifts";
 import { fetchAllRows } from "@/lib/db/shared";
-import { getBrandLockupSymbolLayout } from "@dubgrid/design-tokens";
+import { getBrandSymbolLockupLayout } from "@dubgrid/design-tokens";
 import { pdfBrandMarkCommands } from "./pdf-brand-mark";
 import {
   buildOperationsReportMetrics,
@@ -1919,10 +1919,10 @@ function addOperationsPdfHeader(
     commands.push(pdfImageCommand("Lockup", margin, lineCenterY + height / 2, width, height));
     brandRight = margin + width;
   } else {
-    const symbol = getBrandLockupSymbolLayout(brandSize);
+    const symbol = getBrandSymbolLockupLayout(brandSize);
     const inkTop = brandBaseline - symbol.belowBaseline + symbol.height;
     const wordmarkX = margin + symbol.width + symbol.marginRight;
-    commands.push(...pdfBrandMarkCommands(margin, inkTop, symbol.width, ink));
+    commands.push(...pdfBrandMarkCommands(margin, inkTop, symbol.width));
     commands.push(pdfTextCommand(wordmarkX, brandBaseline, brandSize, wordmark, ink, "F2"));
     brandRight = wordmarkX + estimatePdfTextWidth(wordmark, brandSize);
   }

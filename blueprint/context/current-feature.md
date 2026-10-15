@@ -134,7 +134,7 @@ Shuffle and Climb finish the current move when the wait ends.
    - Give the landing footer the one-color mark.
    - Done when no outline mark renders anywhere in the web app, in light or
      dark.
-4. [ ] **Web generated images.**
+4. [x] **Web generated images.**
    - Re-render everything `scripts/generate-wordmark-lockup.mts` produces:
      the email lockup and wordmark, `lockup.png`, `logo.png`,
      `logo-white.png`, `logo.svg`, `app/icon.png`, `app/apple-icon.png` and
