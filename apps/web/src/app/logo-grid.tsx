@@ -3,13 +3,10 @@
  * Uses Satori-compatible inline styles (no Tailwind, no CSS modules).
  */
 import {
-  BRAND_MARK_BACK,
-  BRAND_MARK_BACK_STROKE,
-  BRAND_MARK_COLORS,
-  BRAND_MARK_FRONT,
-  BRAND_MARK_GAP,
-  BRAND_MARK_INK,
-  brandMarkCardPath,
+  BRAND_SYMBOL_COLORS,
+  BRAND_SYMBOL_INK,
+  brandSymbolGap,
+  getBrandSymbolPaths,
 } from "@dubgrid/design-tokens";
 
 // DM Sans (ttf — Satori can't read woff2) for the OG/Twitter wordmark, so the
@@ -41,30 +38,23 @@ export function loadDmSansFonts() {
   return dmSansFontsPromise;
 }
 
-const BACK_PATH = brandMarkCardPath(BRAND_MARK_BACK);
-const FRONT_PATH = brandMarkCardPath(BRAND_MARK_FRONT);
-
 interface MarkProps {
-  width: number;
+  height: number;
   /** The surface behind the mark, which the gap around the front card takes. */
   background: string;
-  color?: string;
 }
 
-/** The two-card symbol, cropped to its ink, `width` wide. */
-export function LogoMark({ width, background, color = BRAND_MARK_COLORS.light }: MarkProps) {
-  const { x, y, width: w, height: h } = BRAND_MARK_INK;
+/** The two-card symbol, cropped to its ink, `height` tall. */
+export function LogoMark({ height, background }: MarkProps) {
+  const { width: w, height: h } = BRAND_SYMBOL_INK;
+  const { back, front, cut } = getBrandSymbolPaths(brandSymbolGap(height));
+  const colors = BRAND_SYMBOL_COLORS.light;
+  // Satori draws masks unreliably, so the gap is painted in the known surface color.
   return (
-    <svg width={width} height={(width * h) / w} viewBox={`${x} ${y} ${w} ${h}`}>
-      <path d={BACK_PATH} fill="none" stroke={color} strokeWidth={BRAND_MARK_BACK_STROKE} />
-      <path
-        d={FRONT_PATH}
-        fill={background}
-        stroke={background}
-        strokeWidth={BRAND_MARK_GAP * 2}
-        strokeLinejoin="round"
-      />
-      <path d={FRONT_PATH} fill={color} />
+    <svg width={(height * w) / h} height={height} viewBox={`0 0 ${w} ${h}`}>
+      <path d={back} fill={colors.back} />
+      <path d={cut} fill={background} />
+      <path d={front} fill={colors.front} />
     </svg>
   );
 }

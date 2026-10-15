@@ -14,32 +14,54 @@ describe("svgPathToPdf", () => {
     expect(svgPathToPdf("M1,2V7H4", (x, y) => [x, y])).toBe("1.00 2.00 m 1.00 7.00 l 4.00 7.00 l");
   });
 
+  it("draws lines to absolute points", () => {
+    expect(svgPathToPdf("M0,0L5,5", flip)).toBe("0.00 100.00 m 5.00 95.00 l");
+  });
+
+  it("turns a quarter-turn arc into one cubic that hugs the circle", () => {
+    expect(svgPathToPdf("M1,0A1,1 0 0 1 0,1", (x, y) => [x, y])).toBe(
+      "1.00 0.00 m 1.00 0.55 0.55 1.00 0.00 1.00 c",
+    );
+  });
+
+  it("splits an arc wider than a quarter turn into quarter-turn cubics", () => {
+    // A 122° corner arc, as on the symbol's acute corners.
+    const r = 10;
+    const a = (122 * Math.PI) / 180;
+    const d = `M${r},0A${r},${r} 0 0 1 ${(r * Math.cos(a)).toFixed(4)},${(r * Math.sin(a)).toFixed(4)}`;
+    const ops = svgPathToPdf(d, (x, y) => [x, y]);
+    expect(ops.match(/ c/g)).toHaveLength(2);
+    const ends = [...ops.matchAll(/(-?\d+\.\d{2}) (-?\d+\.\d{2}) c/g)].map(([, x, y]) =>
+      Math.hypot(Number(x), Number(y)),
+    );
+    for (const distance of ends) expect(distance).toBeCloseTo(r, 1);
+  });
+
   it("refuses commands it cannot place", () => {
-    expect(() => svgPathToPdf("M0,0L5,5", flip)).toThrow("Unsupported SVG path command: L");
+    expect(() => svgPathToPdf("M0,0Q5,5 10,0", flip)).toThrow("Unsupported SVG path command: Q");
   });
 });
 
 describe("pdfBrandMarkCommands", () => {
-  it("strokes the back card, cuts the gap in the background, then fills the front card", () => {
-    const [back, gap, front] = pdfBrandMarkCommands(32, 580, 97 / 4, [0, 0, 1]);
-    expect(back).toMatch(/^q 0\.000 0\.000 1\.000 RG 1\.50 w .* h S Q$/);
-    expect(gap).toMatch(/^q 1\.000 1\.000 1\.000 rg 1\.000 1\.000 1\.000 RG 3\.00 w 1 j .* h B Q$/);
-    expect(front).toMatch(/^q 0\.000 0\.000 1\.000 rg .* h f Q$/);
+  it("fills the back card, cuts the gap in the background, then fills the front card", () => {
+    const [back, gap, front] = pdfBrandMarkCommands(32, 580, 20);
+    expect(back).toMatch(/^q 0\.561 0\.690 0\.973 rg .* h f Q$/);
+    expect(gap).toMatch(/^q 1\.000 1\.000 1\.000 rg .* h f Q$/);
+    expect(front).toMatch(/^q 0\.145 0\.388 0\.922 rg .* h f Q$/);
   });
 
-  it("puts the back card's outline on the ink box's left edge and the front card on its right", () => {
+  it("puts the back card on the ink box's left edge and the front card on its right", () => {
     const points = (command: string) =>
       [...command.matchAll(/(-?\d+\.\d{2}) (-?\d+\.\d{2}) [mlc]/g)].map(([, x, y]) => [
         Number(x),
         Number(y),
       ]);
-    const [back, , front] = pdfBrandMarkCommands(100, 500, 97, [0, 0, 0]);
+    const [back, , front] = pdfBrandMarkCommands(100, 500, 136);
     const backXs = points(back).map(([x]) => x);
     const frontXs = points(front).map(([x]) => x);
     const frontYs = points(front).map(([, y]) => y);
-    // The back card's path runs along the middle of its 6-unit stroke.
-    expect(Math.min(...backXs)).toBeCloseTo(103, 1);
-    expect(Math.max(...frontXs)).toBeCloseTo(197, 1);
+    expect(Math.min(...backXs)).toBeCloseTo(100, 1);
+    expect(Math.max(...frontXs)).toBeCloseTo(236, 1);
     expect(Math.max(...frontYs)).toBeLessThanOrEqual(500);
   });
 });

@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Spec design refinement</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@700&family=Inter:wght@400;500;600&display=swap"
+    />
+    <style>
+      /* Layout: the four refinements as toggles, then saved and refined side by side at every proof size, then the values. */
+      :root {
+        --text-primary: #111827;
+        --text-secondary: #5b6472;
+        --page: #f5f6f8;
+        --panel: #ffffff;
+        --border: rgba(15, 23, 42, 0.1);
+        --border-strong: rgba(15, 23, 42, 0.2);
+        --accent: #2563eb;
+        --accent-soft: rgba(37, 99, 235, 0.1);
+        --code: #f1f3f6;
+        --tile-light: #ffffff;
+        --tile-dark: #0b0f17;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --text-primary: #f4f4f5;
+          --text-secondary: #a1a1aa;
+          --page: #0e0f12;
+          --panel: #17181c;
+          --border: rgba(255, 255, 255, 0.1);
+          --border-strong: rgba(255, 255, 255, 0.2);
+          --accent: #4a9bff;
+          --accent-soft: rgba(74, 155, 255, 0.16);
+          --code: #202127;
+          color-scheme: dark;
+        }
+      }
+      :root[data-theme="dark"] {
+        --text-primary: #f4f4f5;
+        --text-secondary: #a1a1aa;
+        --page: #0e0f12;
+        --panel: #17181c;
+        --border: rgba(255, 255, 255, 0.1);
+        --border-strong: rgba(255, 255, 255, 0.2);
+        --accent: #4a9bff;
+        --accent-soft: rgba(74, 155, 255, 0.16);
+        --code: #202127;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 24px 16px 56px;
+        background: var(--page);
+        color: var(--text-primary);
+        font-family: Inter, system-ui, sans-serif;
+        font-size: 13px;
+      }
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 20px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 28px 0 10px;
+      }
+      .lede {
+        color: var(--text-secondary);
+        margin: 0 0 16px;
+        line-height: 1.5;
+        max-width: 760px;
+        font-size: 14px;
+      }
+      .toggles {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+      @media (max-width: 720px) {
+        .toggles {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .toggle {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px 14px;
+        cursor: pointer;
+        min-width: 0;
+      }
+      .toggle input {
+        margin-top: 2px;
+        accent-color: var(--accent);
+        width: 16px;
+        height: 16px;
+        flex: none;
+      }
+      .toggle b {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 3px;
+      }
+      .toggle span {
+        color: var(--text-secondary);
+        line-height: 1.45;
+      }
+      .pair {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+      @media (max-width: 640px) {
+        .pair {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .tile {
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        padding: 16px;
+        min-width: 0;
+      }
+      .tile.light {
+        background: var(--tile-light);
+        color: #0f172a;
+      }
+      .tile.dark {
+        background: var(--tile-dark);
+        color: #fafafa;
+      }
+      .cap {
+        display: block;
+        font-size: 11px;
+        font-weight: 500;
+        opacity: 0.6;
+        margin-bottom: 10px;
+      }
+      .hero {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 220px;
+      }
+      .sizes {
+        display: flex;
+        align-items: flex-end;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+      .size {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        font-size: 10px;
+        opacity: 0.85;
+      }
+      .icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 13px;
+        background: #2563eb;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .lockups {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+      }
+      .lockup {
+        display: inline-flex;
+        align-items: center;
+        white-space: nowrap;
+      }
+      .stacked {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .word {
+        font-family: "DM Sans", sans-serif;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
+      }
+      .table-wrap {
+        overflow-x: auto;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 9px 12px;
+        border-bottom: 1px solid var(--border);
+        white-space: nowrap;
+      }
+      th {
+        font-weight: 600;
+        color: var(--text-secondary);
+        font-size: 12px;
+      }
+      tr:last-child td {
+        border-bottom: 0;
+      }
+      td.changed {
+        color: var(--accent);
+        font-weight: 600;
+      }
+      #measure {
+        position: absolute;
+        width: 0;
+        height: 0;
+        overflow: hidden;
+        visibility: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Spec design refinement</h1>
+      <p class="lede">
+        Your saved "Spec Design" (the refined stacked mark with the front card 36% along the slant),
+        with four optical refinements you can switch on and off. Saved is on the left, refined on
+        the right, at every size that matters.
+      </p>
+
+      <div class="toggles" id="toggles"></div>
+
+      <h2>Large</h2>
+      <div class="pair">
+        <div class="tile light">
+          <span class="cap">Saved</span>
+          <div class="hero" id="heroSaved"></div>
+        </div>
+        <div class="tile light">
+          <span class="cap">Refined</span>
+          <div class="hero" id="heroRefined"></div>
+        </div>
+      </div>
+
+      <h2>Small sizes, icon and one color</h2>
+      <div class="pair">
+        <div class="tile light">
+          <span class="cap">Saved</span>
+          <div class="sizes" id="smallSaved"></div>
+        </div>
+        <div class="tile light">
+          <span class="cap">Refined</span>
+          <div class="sizes" id="smallRefined"></div>
+        </div>
+        <div class="tile dark">
+          <span class="cap">Saved, dark</span>
+          <div class="sizes" id="darkSaved"></div>
+        </div>
+        <div class="tile dark">
+          <span class="cap">Refined, dark</span>
+          <div class="sizes" id="darkRefined"></div>
+        </div>
+      </div>
+
+      <h2>Lockups</h2>
+      <div class="pair">
+        <div class="tile light">
+          <span class="cap">Saved</span>
+          <div class="lockups" id="lockSaved"></div>
+        </div>
+        <div class="tile light">
+          <span class="cap">Refined</span>
+          <div class="lockups" id="lockRefined"></div>
+        </div>
+      </div>
+
+      <h2>Values for the spec</h2>
+      <div class="table-wrap"><table id="values"></table></div>
+    </main>
+    <svg id="measure" aria-hidden="true"><g id="measureGroup"></g></svg>
+
+    <script>
+      const SAVED = {
+        angle: 32,
+        aspect: 0.95,
+        stepX: 0.36,
+        stepY: 0.42,
+        radius: 14,
+        gap: 3.5,
+        evenCorners: false,
+        smallGap: false,
+        front: { light: "#a8c4fc", dark: "#bcd2ff" },
+        back: { light: "#2563eb", dark: "#3b82f6" },
+      };
+      const REFINEMENTS = [
+        {
+          key: "arms",
+          title: "Balance the back card's arms",
+          text: "Raise the front card to 52% (from 42%) and bring it in to 32% (from 36%), so the slanted bottom arm of the back card shows nearly as thick as its upright arm. Near-horizontal strokes read heavier, so the bottom arm is left slightly thinner.",
+          apply: (d) => ({ ...d, stepX: 0.32, stepY: 0.52 }),
+        },
+        {
+          key: "corners",
+          title: "Make every corner equally soft",
+          text: "Give all four corners the same 14-unit curve length instead of the same radius. Acute corners stop looking blunt, obtuse ones stop looking sharp, and the outline stays symmetric under a half turn.",
+          apply: (d) => ({ ...d, evenCorners: true }),
+        },
+        {
+          key: "smallGap",
+          title: "Widen the gap at small sizes",
+          text: "At 32 px and below, draw the gap at 7 units instead of 3.5, as a size-specific version of the mark, so the two cards stay apart in favicons and small icons.",
+          apply: (d) => ({ ...d, smallGap: true }),
+        },
+        {
+          key: "contrast",
+          title: "Deepen the front card on light",
+          text: "Use #8fb0f8 for the front card on light surfaces (about 2.2:1 against white, up from 1.8:1), keeping #bcd2ff on dark. It holds up on white without losing the two-tone.",
+          apply: (d) => ({ ...d, front: { ...d.front, light: "#8fb0f8" } }),
+        },
+      ];
+      // The owner kept three refinements and left arm balancing off (2026-10-15).
+      let on = new Set(["corners", "smallGap", "contrast"]);
+
+      const fmt = (n) => Number(Number(n).toFixed(2)).toString();
+      const rad = (deg) => (deg * Math.PI) / 180;
+
+      // A polygon with each corner rounded by its own radius (an exact arc).
+      function roundedPolygon(pts, radii) {
+        const n = pts.length;
+        const corners = pts.map((v, k) => {
+          const prev = pts[(k + n - 1) % n];
+          const next = pts[(k + 1) % n];
+          const a = [prev[0] - v[0], prev[1] - v[1]];
+          const b = [next[0] - v[0], next[1] - v[1]];
+          const la = Math.hypot(...a);
+          const lb = Math.hypot(...b);
+          const ua = [a[0] / la, a[1] / la];
+          const ub = [b[0] / lb, b[1] / lb];
+          const angle = Math.acos(Math.max(-1, Math.min(1, ua[0] * ub[0] + ua[1] * ub[1])));
+          const t = Math.min(radii[k] / Math.tan(angle / 2), la / 2, lb / 2);
+          return {
+            s: [v[0] + ua[0] * t, v[1] + ua[1] * t],
+            e: [v[0] + ub[0] * t, v[1] + ub[1] * t],
+            r: t * Math.tan(angle / 2),
+          };
+        });
+        let d = `M${fmt(corners[0].e[0])},${fmt(corners[0].e[1])}`;
+        for (let k = 1; k <= n; k++) {
+          const c = corners[k % n];
+          d += `L${fmt(c.s[0])},${fmt(c.s[1])}A${fmt(c.r)},${fmt(c.r)} 0 0 1 ${fmt(c.e[0])},${fmt(c.e[1])}`;
+        }
+        return d + "Z";
+      }
+
+      // Corner radii in the card's corner order (top-left, top-right,
+      // bottom-right, bottom-left). Even corners keep the curve length equal:
+      // a corner of angle a needs radius = length x tan(a / 2).
+      function radii(d) {
+        if (!d.evenCorners) return [d.radius, d.radius, d.radius, d.radius];
+        const acute = 90 - d.angle;
+        const obtuse = 90 + d.angle;
+        const r = (deg) => d.radius * Math.tan(rad(deg) / 2);
+        return [r(acute), r(obtuse), r(acute), r(obtuse)];
+      }
+
+      function geometry(d) {
+        const W = 100;
+        const H = d.aspect * W;
+        const tan = Math.tan(rad(d.angle));
+        const card = (cx, cy) =>
+          roundedPolygon(
+            [
+              [cx - W / 2, cy - H / 2 - (W / 2) * tan],
+              [cx + W / 2, cy - H / 2 + (W / 2) * tan],
+              [cx + W / 2, cy + H / 2 + (W / 2) * tan],
+              [cx - W / 2, cy + H / 2 - (W / 2) * tan],
+            ],
+            radii(d),
+          );
+        const fx = d.stepX * W;
+        const fy = fx * tan - d.stepY * H;
+        return { back: card(0, 0), front: card(fx, fy), fx, fy, H, tan };
+      }
+
+      const boxes = new Map();
+      function inkBox(d) {
+        const key = JSON.stringify(d);
+        if (boxes.has(key)) return boxes.get(key);
+        const g = geometry(d);
+        const el = document.getElementById("measureGroup");
+        el.innerHTML = `<path d="${g.back}"/><path d="${g.front}"/>`;
+        const b = el.getBBox();
+        const box = { x: b.x, y: b.y, w: b.width, h: b.height };
+        boxes.set(key, box);
+        return box;
+      }
+
+      const MODES = {
+        light: (d) => ({ back: d.back.light, front: d.front.light, surface: "#ffffff" }),
+        dark: (d) => ({ back: d.back.dark, front: d.front.dark, surface: "#0b0f17" }),
+        brand: () => ({ back: "#7199f2", front: "#ffffff", surface: "#2563eb" }),
+        mono: () => ({ back: "#111827", front: "#111827", surface: "#ffffff" }),
+      };
+
+      function svg(d, mode, size, crop = "square") {
+        const g = geometry(d);
+        const b = inkBox(d);
+        const c = MODES[mode](d);
+        let gap = d.smallGap && size <= 32 ? 7 : d.gap;
+        if (mode === "mono") gap = Math.max(gap, 5);
+        let vb;
+        if (crop === "square") {
+          const side = Math.max(b.w, b.h) * 1.08;
+          vb = [b.x + b.w / 2 - side / 2, b.y + b.h / 2 - side / 2, side, side];
+        } else {
+          vb = [b.x, b.y, b.w, b.h];
+        }
+        const ratio = vb[3] / vb[2];
+        const w = crop === "height" ? size / ratio : size;
+        const h = crop === "height" ? size : size * ratio;
+        return `<svg width="${fmt(w)}" height="${fmt(h)}" viewBox="${vb.map(fmt).join(" ")}" aria-hidden="true" style="display:block;flex:none">
+          <path d="${g.back}" fill="${c.back}"/>
+          <path d="${g.front}" fill="${c.surface}" stroke="${c.surface}" stroke-width="${fmt(gap * 2)}" stroke-linejoin="round"/>
+          <path d="${g.front}" fill="${c.front}"/>
+        </svg>`;
+      }
+
+      // The spec's lockup rules: ink as tall as the word (0.957 em) on its
+      // optical center (0.256 em), 0.22 em away; stacked twice the word's
+      // height, 0.42 em above the ascenders.
+      function lockup(d, fs) {
+        const h = 0.957 * fs;
+        const below = h / 2 - 0.256 * fs;
+        return `<span class="lockup" style="font-size:${fs}px;gap:${fmt(0.22 * fs)}px"><span style="transform:translateY(${fmt(below)}px)">${svg(d, "light", h, "height")}</span><span class="word">dubgrid</span></span>`;
+      }
+      const stacked = (d, fs) =>
+        `<span class="stacked" style="font-size:${fs}px;gap:${fmt(0.42 * fs)}px">${svg(d, "light", 1.914 * fs, "height")}<span class="word">dubgrid</span></span>`;
+
+      const sized = (label, html) => `<span class="size">${html}${label}</span>`;
+      function small(d, mode) {
+        const parts = [64, 32, 16].map((s) => sized(`${s}`, svg(d, mode, s)));
+        if (mode === "light") {
+          parts.push(sized("icon", `<span class="icon">${svg(d, "brand", 44)}</span>`));
+          parts.push(sized("1 color", svg(d, "mono", 32)));
+        }
+        return parts.join("");
+      }
+
+      // The visible arms of the back card, measured across each arm.
+      function arms(d) {
+        const g = geometry(d);
+        const upright = g.fx - d.gap;
+        const slanted = -g.fy * Math.cos(rad(d.angle)) - d.gap;
+        return { upright, slanted };
+      }
+
+      function refined() {
+        return REFINEMENTS.filter((r) => on.has(r.key)).reduce(
+          (acc, r) => r.apply(acc),
+          structuredClone(SAVED),
+        );
+      }
+
+      function render() {
+        const r = refined();
+        document.getElementById("heroSaved").innerHTML = svg(SAVED, "light", 210);
+        document.getElementById("heroRefined").innerHTML = svg(r, "light", 210);
+        document.getElementById("smallSaved").innerHTML = small(SAVED, "light");
+        document.getElementById("smallRefined").innerHTML = small(r, "light");
+        document.getElementById("darkSaved").innerHTML = small(SAVED, "dark");
+        document.getElementById("darkRefined").innerHTML = small(r, "dark");
+        document.getElementById("lockSaved").innerHTML =
+          lockup(SAVED, 24) + lockup(SAVED, 44) + stacked(SAVED, 26);
+        document.getElementById("lockRefined").innerHTML =
+          lockup(r, 24) + lockup(r, 44) + stacked(r, 26);
+        const a0 = arms(SAVED);
+        const a1 = arms(r);
+        const rr0 = radii(SAVED);
+        const rr1 = radii(r);
+        const rows = [
+          [
+            "Step along the slant",
+            `${Math.round(SAVED.stepX * 100)}%`,
+            `${Math.round(r.stepX * 100)}%`,
+          ],
+          ["Step up", `${Math.round(SAVED.stepY * 100)}%`, `${Math.round(r.stepY * 100)}%`],
+          [
+            "Back card arms (upright / slanted)",
+            `${fmt(a0.upright)} / ${fmt(a0.slanted)}`,
+            `${fmt(a1.upright)} / ${fmt(a1.slanted)}`,
+          ],
+          [
+            "Corner radii (acute / obtuse)",
+            `${fmt(rr0[0])} / ${fmt(rr0[1])}`,
+            `${fmt(rr1[0])} / ${fmt(rr1[1])}`,
+          ],
+          ["Gap (32 px and below)", `${SAVED.gap}`, `${r.smallGap ? 7 : r.gap}`],
+          ["Front card, light", SAVED.front.light, r.front.light],
+          [
+            "Footprint (width : height)",
+            `${(inkBox(SAVED).w / inkBox(SAVED).h).toFixed(2)} : 1`,
+            `${(inkBox(r).w / inkBox(r).h).toFixed(2)} : 1`,
+          ],
+        ];
+        document.getElementById("values").innerHTML =
+          `<tr><th>Setting</th><th>Saved</th><th>Refined</th></tr>` +
+          rows
+            .map(
+              ([k, a, b]) =>
+                `<tr><td>${k}</td><td>${a}</td><td class="${a === b ? "" : "changed"}">${b}</td></tr>`,
+            )
+            .join("");
+      }
+
+      document.getElementById("toggles").innerHTML = REFINEMENTS.map(
+        (r) =>
+          `<label class="toggle" for="t-${r.key}"><input id="t-${r.key}" type="checkbox" ${on.has(r.key) ? "checked" : ""} /><div><b>${r.title}</b><span>${r.text}</span></div></label>`,
+      ).join("");
+      for (const r of REFINEMENTS) {
+        document.getElementById(`t-${r.key}`).addEventListener("change", (e) => {
+          if (e.target.checked) on.add(r.key);
+          else on.delete(r.key);
+          render();
+        });
+      }
+      render();
+      document.fonts?.ready.then(render);
+    </script>
+  </body>
+</html>

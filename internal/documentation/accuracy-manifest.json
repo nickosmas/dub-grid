@@ -383,7 +383,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:e887525bfb33f511343328f4fcceb4c85ac95709e17f6efcf207319b69758ca2"
+      "evidenceFingerprint": "sha256:43b2cd16a0690694b0f3fd24c426d4828dba4f049591ba591fda094670bb369c"
     },
     {
       "id": "draft-publish",
@@ -1379,7 +1379,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:140dd1d3f94ca608904c70e1fd85b29a48ae0ffd9d931b9532e2be38158d8ea3"
+      "evidenceFingerprint": "sha256:c5d145cf410d97b1c657b7e45f0fe4fda9065880d5e1d2a6cf45d904738a7ff7"
     },
     {
       "id": "profile",
@@ -1914,7 +1914,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:fd03f18c6f2d6bed9cfc370256b93bf84f9bb1d8823809cd80e34e6d7acc1ca7"
+      "evidenceFingerprint": "sha256:2b8a6da68b97d04dee56a54afbe302974a231a35af55afea1bab65f799a50b46"
     },
     {
       "id": "coverage-open-shifts",

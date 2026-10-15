@@ -1,61 +1,54 @@
-import { Image, StyleSheet, View, type ImageStyle, type StyleProp } from "react-native";
+import { Image, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import {
-  BRAND_MARK_COLORS,
-  BRAND_MARK_INK,
-  getBrandLockupSymbolLayout,
+  BRAND_SYMBOL_COLORS,
+  BRAND_SYMBOL_INK,
+  BRAND_SYMBOL_SMALL_MAX_PX,
+  getBrandSymbolLockupLayout,
 } from "@dubgrid/design-tokens";
 import { useIsDarkMode } from "../providers/ThemeModeProvider";
 import { DubGridWordmark } from "./DubGridWordmark";
 
-// White and cropped to the symbol's ink; tinted per use. Rendered by
-// `npm run icons` from the shared geometry.
-const SOURCE = require("../../../assets/images/brand-mark.png");
-const ASPECT = BRAND_MARK_INK.height / BRAND_MARK_INK.width;
+// The two cards as white layers cropped to the symbol's ink, the gap cut into
+// the back card; tinted per use. Rendered by `npm run icons` from the shared
+// geometry, with a wider gap for 32 px and below.
+const BACK = require("../../../assets/images/brand-mark-back.png");
+const BACK_SMALL = require("../../../assets/images/brand-mark-back-small.png");
+const FRONT = require("../../../assets/images/brand-mark-front.png");
+const ASPECT = BRAND_SYMBOL_INK.width / BRAND_SYMBOL_INK.height;
 
-export function useBrandMarkColor(): string {
-  return useIsDarkMode() ? BRAND_MARK_COLORS.dark : BRAND_MARK_COLORS.light;
+export function useBrandMarkColors(): { back: string; front: string } {
+  return useIsDarkMode() ? BRAND_SYMBOL_COLORS.dark : BRAND_SYMBOL_COLORS.light;
 }
 
-/** The two-card symbol, cropped to its ink, `width` wide. */
-export function BrandSymbol({
-  width,
-  color,
-  style,
-}: {
-  width: number;
-  color?: string;
-  style?: StyleProp<ImageStyle>;
-}) {
-  const themeColor = useBrandMarkColor();
+/** The two-card symbol, cropped to its ink, `height` tall. */
+export function BrandSymbol({ height, style }: { height: number; style?: StyleProp<ViewStyle> }) {
+  const colors = useBrandMarkColors();
+  const size = { width: height * ASPECT, height };
   return (
-    <Image
+    <View
       accessibilityIgnoresInvertColors
       accessibilityLabel="DubGrid logo"
       accessibilityRole="image"
-      source={SOURCE}
-      style={[{ width, height: width * ASPECT, tintColor: color ?? themeColor }, style]}
-    />
+      style={[size, style]}
+    >
+      <Image
+        source={height <= BRAND_SYMBOL_SMALL_MAX_PX ? BACK_SMALL : BACK}
+        style={[StyleSheet.absoluteFill, { tintColor: colors.back }]}
+      />
+      <Image source={FRONT} style={[StyleSheet.absoluteFill, { tintColor: colors.front }]} />
+    </View>
   );
 }
 
 /** Symbol and wordmark on one line, the symbol centered on the word's optical center. */
-export function DubGridLockup({
-  fontSize = 20,
-  color,
-  markColor,
-}: {
-  fontSize?: number;
-  color?: string;
-  markColor?: string;
-}) {
-  const layout = getBrandLockupSymbolLayout(fontSize);
+export function DubGridLockup({ fontSize = 20, color }: { fontSize?: number; color?: string }) {
+  const layout = getBrandSymbolLockupLayout(fontSize);
   return (
     <View style={styles.row}>
-      {/* Baseline alignment sits the image's bottom on the text baseline; the
+      {/* Baseline alignment sits the symbol's bottom on the text baseline; the
           translate drops it to where its center meets the word's. */}
       <BrandSymbol
-        width={layout.width}
-        color={markColor}
+        height={layout.height}
         style={{
           marginRight: layout.marginRight,
           transform: [{ translateY: layout.belowBaseline }],

@@ -1,0 +1,1208 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Production logo grid</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@700&family=Inter:wght@400;500;600&display=swap"
+    />
+    <style>
+      /* Layout: a sticky control column beside a proof sheet of the shipped mark with a grid on its front card. */
+      :root {
+        --text-primary: #111827;
+        --text-secondary: #5b6472;
+        --page: #f5f6f8;
+        --panel: #ffffff;
+        --field: #f1f3f6;
+        --border: rgba(15, 23, 42, 0.1);
+        --border-strong: rgba(15, 23, 42, 0.2);
+        --accent: #2563eb;
+        --accent-soft: rgba(37, 99, 235, 0.1);
+        --danger: #b91c1c;
+        --warn: #b45309;
+        --tile-light: #ffffff;
+        --tile-dark: #121214;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --text-primary: #f4f4f5;
+          --text-secondary: #a1a1aa;
+          --page: #0e0f12;
+          --panel: #17181c;
+          --field: #202127;
+          --border: rgba(255, 255, 255, 0.1);
+          --border-strong: rgba(255, 255, 255, 0.2);
+          --accent: #4a9bff;
+          --accent-soft: rgba(74, 155, 255, 0.16);
+          --danger: #f87171;
+          --warn: #fbbf24;
+          color-scheme: dark;
+        }
+      }
+      :root[data-theme="dark"] {
+        --text-primary: #f4f4f5;
+        --text-secondary: #a1a1aa;
+        --page: #0e0f12;
+        --panel: #17181c;
+        --field: #202127;
+        --border: rgba(255, 255, 255, 0.1);
+        --border-strong: rgba(255, 255, 255, 0.2);
+        --accent: #4a9bff;
+        --accent-soft: rgba(74, 155, 255, 0.16);
+        --danger: #f87171;
+        --warn: #fbbf24;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 24px 16px 56px;
+        background: var(--page);
+        color: var(--text-primary);
+        font-family: Inter, system-ui, sans-serif;
+        font-size: 13px;
+      }
+      main {
+        max-width: 1180px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 20px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      .lede {
+        color: var(--text-secondary);
+        margin: 0 0 8px;
+        line-height: 1.5;
+        max-width: 760px;
+        font-size: 14px;
+      }
+      .warn {
+        color: var(--text-secondary);
+        margin: 0 0 18px;
+        line-height: 1.5;
+        max-width: 760px;
+        font-size: 13px;
+      }
+      .warn b {
+        color: var(--warn);
+        font-weight: 600;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 300px) minmax(0, 1fr);
+        gap: 16px;
+        align-items: start;
+      }
+      @media (max-width: 860px) {
+        .layout {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .controls {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        position: sticky;
+        top: calc(env(safe-area-inset-top, 0px) + 12px);
+        max-height: calc(100vh - 24px);
+        overflow-y: auto;
+      }
+      @media (max-width: 860px) {
+        .controls {
+          position: static;
+          max-height: none;
+        }
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px 14px;
+        min-width: 0;
+      }
+      .panel h2 {
+        margin: 0 0 10px;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .chip {
+        font: inherit;
+        font-size: 12px;
+        font-weight: 500;
+        padding: 5px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border-strong);
+        background: transparent;
+        color: var(--text-primary);
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .chip[aria-pressed="true"] {
+        background: var(--accent-soft);
+        border-color: var(--accent);
+      }
+      .chip:focus-visible,
+      .btn:focus-visible,
+      input:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      .ctl {
+        margin-bottom: 10px;
+      }
+      .ctl:last-child {
+        margin-bottom: 0;
+      }
+      .ctl label,
+      .ctl .lbl {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-bottom: 4px;
+      }
+      .ctl output {
+        color: var(--text-primary);
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+      }
+      .ctl input[type="range"] {
+        width: 100%;
+        accent-color: var(--accent);
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .text {
+        flex: 1;
+        min-width: 0;
+        font: inherit;
+        padding: 7px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--border-strong);
+        background: var(--field);
+        color: var(--text-primary);
+      }
+      .btn {
+        font: inherit;
+        font-weight: 500;
+        padding: 7px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--accent);
+        background: var(--accent);
+        color: #ffffff;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      .saved {
+        list-style: none;
+        margin: 10px 0 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .saved li {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 8px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--field);
+      }
+      .saved .name {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 500;
+      }
+      .link {
+        font: inherit;
+        font-size: 12px;
+        background: none;
+        border: 0;
+        padding: 2px 4px;
+        color: var(--accent);
+        cursor: pointer;
+      }
+      .link.del {
+        color: var(--danger);
+      }
+      .status {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin: 8px 0 0;
+      }
+      .sheet {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-width: 0;
+      }
+      .tile {
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        padding: 16px;
+        min-width: 0;
+      }
+      .tile.light {
+        background: var(--tile-light);
+        color: #0f172a;
+      }
+      .tile.dark {
+        background: var(--tile-dark);
+        color: #fafafa;
+      }
+      .cap {
+        display: block;
+        font-size: 11px;
+        font-weight: 500;
+        opacity: 0.6;
+        margin-bottom: 10px;
+      }
+      .hero {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+      @media (max-width: 560px) {
+        .hero {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .hero .tile {
+        display: flex;
+        flex-direction: column;
+      }
+      .hero .stage {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 200px;
+      }
+      .grid4 {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+      @media (max-width: 760px) {
+        .grid4 {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      .sizes {
+        display: flex;
+        align-items: flex-end;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 15px;
+        background: #2563eb;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .lockups {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+      @media (max-width: 560px) {
+        .lockups {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .lockups .tile {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 18px;
+        overflow: hidden;
+      }
+      .lockup {
+        display: inline-block;
+        white-space: nowrap;
+        line-height: 1;
+      }
+      .stacked {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        line-height: 1;
+      }
+      .word {
+        font-family: "DM Sans", sans-serif;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1;
+      }
+      .before-after {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+        flex-wrap: wrap;
+      }
+      .before-after figure {
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        font-size: 11px;
+        opacity: 0.85;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Production logo grid</h1>
+      <p class="lede">
+        The logo that ships today, drawn from the production geometry in
+        <code>@dubgrid/design-tokens</code>, with a grid of shift cells on its solid front card.
+        Nothing else changes: the outlined back card, the gap, the colors and the lockup spacing are
+        the shipped ones.
+      </p>
+      <p class="warn">
+        <b>Recognition risk.</b> When this logo was chosen, every detail tried inside the front card
+        (a shift bar, a note dot, two lines) made Google Lens match it to another brand's wallet,
+        chat or app icon. A grid was not among them; check the one you pick before adopting it.
+      </p>
+
+      <div class="layout">
+        <div class="controls">
+          <section class="panel" aria-labelledby="h-start">
+            <h2 id="h-start">Start from</h2>
+            <div class="chips" id="presets"></div>
+          </section>
+          <section class="panel" aria-labelledby="h-cards">
+            <h2 id="h-cards">Cards</h2>
+            <div class="ctl">
+              <span class="lbl">Back card</span>
+              <div class="chips" id="backStyle" role="group" aria-label="Back card style"></div>
+            </div>
+            <div id="cardControls"></div>
+            <div class="ctl chips">
+              <button class="chip" type="button" id="resetCorners">Shipped corners</button>
+              <button class="chip" type="button" id="resetPosition">
+                Shipped overlap and space
+              </button>
+            </div>
+          </section>
+          <section class="panel" aria-labelledby="h-detail">
+            <h2 id="h-detail">Detail on the front card</h2>
+            <div class="chips" id="detail" role="group" aria-label="Detail on the front card"></div>
+          </section>
+          <section class="panel" id="dotPanel" aria-labelledby="h-dots">
+            <h2 id="h-dots">Assignment dots</h2>
+            <div id="dotControls"></div>
+          </section>
+          <section class="panel" id="gridPanel" aria-labelledby="h-grid">
+            <h2 id="h-grid">Grid</h2>
+            <div id="gridControls"></div>
+            <div class="ctl">
+              <span class="lbl">First cell almost invisible</span>
+              <div
+                class="chips"
+                id="firstFaint"
+                role="group"
+                aria-label="First cell almost invisible"
+              ></div>
+            </div>
+          </section>
+          <section class="panel" aria-labelledby="h-save">
+            <h2 id="h-save">Saved designs</h2>
+            <div class="row">
+              <input
+                class="text"
+                id="designName"
+                type="text"
+                maxlength="60"
+                placeholder="Name this design"
+                aria-label="Design name"
+              />
+              <button class="btn" id="saveBtn" type="button">Save</button>
+            </div>
+            <p class="status" id="saveStatus">Connecting to saved designs</p>
+            <ul class="saved" id="savedList"></ul>
+          </section>
+        </div>
+
+        <div class="sheet">
+          <div class="hero">
+            <div class="tile light">
+              <span class="cap">Light</span>
+              <div class="stage" id="heroLight"></div>
+            </div>
+            <div class="tile dark">
+              <span class="cap">Dark</span>
+              <div class="stage" id="heroDark"></div>
+            </div>
+          </div>
+          <div class="grid4">
+            <div class="tile light">
+              <span class="cap">64, 32, 16 px</span>
+              <div class="sizes" id="sizesLight"></div>
+            </div>
+            <div class="tile dark">
+              <span class="cap">64, 32, 16 px</span>
+              <div class="sizes" id="sizesDark"></div>
+            </div>
+            <div class="tile light">
+              <span class="cap">App icon</span>
+              <div class="sizes" id="icon"></div>
+            </div>
+            <div class="tile light">
+              <span class="cap">One color</span>
+              <div class="sizes" id="mono"></div>
+            </div>
+          </div>
+          <div class="lockups">
+            <div class="tile light" id="lockLight"></div>
+            <div class="tile dark" id="lockDark"></div>
+          </div>
+          <div class="tile light">
+            <span class="cap">Shipped mark, then this, at header size</span>
+            <div class="before-after" id="beforeAfter"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      // The shipped geometry from packages/design-tokens/src/brand-mark.ts,
+      // in its 100-unit box.
+      const ASPECT = 4 / 3;
+      const BACK_SCALE = 0.9;
+      const BACK_SHOWING = 0.3;
+      const INSET = 3;
+      const STROKE = 6;
+      const GAP = 6;
+      const SMOOTHING = 0.6;
+      const frontW = (100 - 2 * INSET) / (BACK_SCALE * BACK_SHOWING + 1);
+      const frontH = frontW / ASPECT;
+      const backW = BACK_SCALE * frontW;
+      const backH = BACK_SCALE * frontH;
+      const BACK = { x: INSET, y: 50 - backH / 2, w: backW, h: backH, r: 0.25 * backH };
+      const FRONT = {
+        x: INSET + BACK_SHOWING * backW,
+        y: 50 - frontH / 2,
+        w: frontW,
+        h: frontH,
+        r: 0.274 * frontH,
+      };
+      const INK = {
+        x: BACK.x - STROKE / 2,
+        y: Math.min(BACK.y - STROKE / 2, FRONT.y),
+      };
+      INK.w = FRONT.x + FRONT.w - INK.x;
+      INK.h = Math.max(BACK.y + BACK.h + STROKE / 2, FRONT.y + FRONT.h) - INK.y;
+      const OPTICAL_OFFSET_X = 3.01;
+
+      // The geometry for a design: how much of the back card shows beside
+      // the front one (`showing`, a share of its width) and how far it rises
+      // above center (`lift`, a share of its height). As in brand-mark.ts, the
+      // pair is fitted to the 100-unit box with a 3-unit inset, so showing
+      // more of the back card makes both cards smaller.
+      function geo(p) {
+        const fW = (100 - 2 * INSET) / (BACK_SCALE * p.showing + 1);
+        const fH = fW / ASPECT;
+        const bW = BACK_SCALE * fW;
+        const bH = BACK_SCALE * fH;
+        const back = { x: INSET, y: 50 - bH / 2 - p.lift * bH, w: bW, h: bH, r: p.backR };
+        const front = { x: INSET + p.showing * bW, y: 50 - fH / 2, w: fW, h: fH, r: p.frontR };
+        const edge = p.backStyle === "solid" ? 0 : STROKE / 2;
+        const ink = { x: back.x - edge, y: Math.min(back.y - edge, front.y) };
+        ink.w = Math.max(front.x + front.w, back.x + back.w + edge) - ink.x;
+        ink.h = Math.max(back.y + back.h + edge, front.y + front.h) - ink.y;
+        // The shipped optical shift, scaled with the cards.
+        const shift = OPTICAL_OFFSET_X * (fW / frontW);
+        const size = Math.max(ink.w, ink.h) + 2 * (shift + 1.5);
+        const square = {
+          x: ink.x + ink.w / 2 - size / 2 + shift,
+          y: ink.y + ink.h / 2 - size / 2,
+          size,
+        };
+        return { back, front, ink, square, shift };
+      }
+      const COLORS = {
+        light: { mark: "#2563eb", light: "#ffffff", deep: "#1e3a8a" },
+        dark: { mark: "#2075ff", light: "#ffffff", deep: "#1e3a8a" },
+        brand: { mark: "#ffffff", light: "#bcd2ff", deep: "#2563eb" },
+        mono: { mark: "#111827", light: "#ffffff", deep: "#000000" },
+      };
+
+      const fmt = (n) => Number(Number(n).toFixed(2)).toString();
+
+      // brandMarkCardPath: each corner starts radius * (1 + smoothing) from
+      // the vertex and is one cubic, for a continuous squircle corner.
+      function cardPath({ x, y, w, h, r: radius }, smoothing = SMOOTHING) {
+        const half = Math.min(w, h) / 2;
+        const r = Math.max(0, Math.min(radius, half));
+        const p = Math.min(r * (1 + smoothing), half);
+        const q = Math.max(0, (2.343 * r - p) / 3);
+        const c = (...pts) => pts.map(fmt).join(",");
+        return [
+          `M${c(x + p, y)}`,
+          `H${fmt(x + w - p)}`,
+          `C${c(x + w - q, y)} ${c(x + w, y + q)} ${c(x + w, y + p)}`,
+          `V${fmt(y + h - p)}`,
+          `C${c(x + w, y + h - q)} ${c(x + w - q, y + h)} ${c(x + w - p, y + h)}`,
+          `H${fmt(x + p)}`,
+          `C${c(x + q, y + h)} ${c(x, y + h - q)} ${c(x, y + h - p)}`,
+          `V${fmt(y + p)}`,
+          `C${c(x, y + q)} ${c(x + q, y)} ${c(x + p, y)}`,
+          "Z",
+        ].join("");
+      }
+      const SHIPPED_CORNERS = {
+        backR: Number(BACK.r.toFixed(2)),
+        frontR: Number(FRONT.r.toFixed(2)),
+        smooth: SMOOTHING,
+      };
+      const SHIPPED_POSITION = { showing: BACK_SHOWING, lift: 0, cardGap: GAP };
+      const backPath = (p) => cardPath(geo(p).back, p.smooth);
+      const frontPath = (p) => cardPath(geo(p).front, p.smooth);
+
+      const BASE = {
+        cells: true,
+        cols: 3,
+        rows: 2,
+        inset: 7,
+        top: 0,
+        gap: 4.5,
+        radius: 2.5,
+        strength: 0.18,
+        vary: 0,
+        seed: 1,
+        firstFaint: false,
+        ...SHIPPED_CORNERS,
+        ...SHIPPED_POSITION,
+        backStyle: "outline",
+        backOpacity: 0.5,
+        dots: false,
+        dotCols: 4,
+        dotRows: 2,
+        dotSize: 8,
+        dotInset: 12,
+        dotTop: 0,
+        dotFill: 0.6,
+        dotSeed: 1,
+        dotOn: 0.85,
+        dotOff: 0.16,
+      };
+      const DOT_SLIDERS = [
+        ["dotCols", "Columns (days)", 1, 7, 1, (v) => `${v}`],
+        ["dotRows", "Rows (shifts)", 1, 4, 1, (v) => `${v}`],
+        ["dotSize", "Dot size", 2, 16, 0.5, (v) => `${fmt(v)}`],
+        ["dotInset", "Inset from the card edge", 3, 22, 0.5, (v) => `${fmt(v)}`],
+        ["dotTop", "Extra space above the dots", 0, 18, 0.5, (v) => `${fmt(v)}`],
+        ["dotFill", "Slots assigned", 0, 1, 0.05, (v) => `${Math.round(v * 100)}%`],
+        ["dotSeed", "Pattern", 1, 40, 1, (v) => `${v}`],
+        ["dotOn", "Assigned dot strength", 0.2, 1, 0.01, (v) => `${Math.round(v * 100)}%`],
+        [
+          "dotOff",
+          "Open slot strength",
+          0,
+          0.6,
+          0.01,
+          (v) => (v ? `${Math.round(v * 100)}%` : "hidden"),
+        ],
+      ];
+      const CARD_SLIDERS = [
+        [
+          "backR",
+          "Back card corner radius",
+          0,
+          Number((BACK.h / 2).toFixed(2)),
+          0.25,
+          (v) => `${fmt(v)}`,
+        ],
+        [
+          "frontR",
+          "Front card corner radius",
+          0,
+          Number((FRONT.h / 2).toFixed(2)),
+          0.25,
+          (v) => `${fmt(v)}`,
+        ],
+        ["smooth", "Corner smoothing", 0, 1, 0.05, (v) => (v ? `${fmt(v)}` : "round")],
+        [
+          "showing",
+          "Back card showing (horizontal)",
+          0.05,
+          0.8,
+          0.01,
+          (v) => `${Math.round(v * 100)}%`,
+        ],
+        [
+          "lift",
+          "Back card raised (vertical)",
+          -0.5,
+          0.5,
+          0.01,
+          (v) => (v > 0 ? `+${Math.round(v * 100)}%` : `${Math.round(v * 100)}%`),
+        ],
+        ["cardGap", "Space between cards", 0, 14, 0.5, (v) => (v ? `${fmt(v)}` : "none")],
+        ["backOpacity", "Solid back card opacity", 0.1, 1, 0.05, (v) => `${Math.round(v * 100)}%`],
+      ];
+      const SLIDERS = [
+        ["cols", "Columns", 1, 6, 1, (v) => `${v}`],
+        ["rows", "Rows", 1, 4, 1, (v) => `${v}`],
+        ["inset", "Inset from the card edge", 2, 18, 0.5, (v) => `${v}`],
+        ["top", "Extra space above the cells", 0, 18, 0.5, (v) => `${v}`],
+        ["gap", "Gap between cells", 1, 12, 0.5, (v) => `${v}`],
+        ["radius", "Cell corner radius", 0, 8, 0.5, (v) => `${v}`],
+        ["strength", "Strength", -0.4, 0.7, 0.01, (v) => `${Math.round(v * 100)}%`],
+        [
+          "vary",
+          "Variation between cells",
+          0,
+          0.6,
+          0.01,
+          (v) => (v ? `±${Math.round(v * 100)}%` : "none"),
+        ],
+        ["seed", "Pattern", 1, 40, 1, (v) => `${v}`],
+      ];
+      const PRESETS = [
+        { name: "Shipped (no detail)", p: { cells: false } },
+        { name: "3 × 2 faint", p: {} },
+        { name: "3 × 3 faint", p: { rows: 3, gap: 4 } },
+        { name: "3 × 2 varied", p: { strength: 0.12, vary: 0.3, firstFaint: true } },
+        {
+          name: "3 × 3 varied",
+          p: { rows: 3, gap: 4, strength: 0.12, vary: 0.3, firstFaint: true },
+        },
+        { name: "Dots 4 × 2", p: { cells: false, dots: true } },
+        {
+          name: "Dots 5 × 3",
+          p: { cells: false, dots: true, dotCols: 5, dotRows: 3, dotSize: 6.5, dotInset: 10 },
+        },
+        {
+          name: "Dots 3 × 2",
+          p: {
+            cells: false,
+            dots: true,
+            dotCols: 3,
+            dotRows: 2,
+            dotSize: 9.5,
+            dotInset: 14,
+            dotFill: 0.5,
+          },
+        },
+        {
+          name: "Dots, assigned only",
+          p: {
+            cells: false,
+            dots: true,
+            dotCols: 5,
+            dotRows: 3,
+            dotSize: 6.5,
+            dotInset: 10,
+            dotOff: 0,
+          },
+        },
+      ];
+
+      function sanitize(raw) {
+        const out = { ...BASE };
+        if (!raw || typeof raw !== "object") return out;
+        for (const [key, , min, max] of [...SLIDERS, ...CARD_SLIDERS, ...DOT_SLIDERS]) {
+          const v = Number(raw[key]);
+          if (Number.isFinite(v)) out[key] = Math.min(max, Math.max(min, v));
+        }
+        if (typeof raw.cells === "boolean") out.cells = raw.cells;
+        if (typeof raw.dots === "boolean") out.dots = raw.dots;
+        if (out.dots) out.cells = false;
+        if (typeof raw.firstFaint === "boolean") out.firstFaint = raw.firstFaint;
+        if (raw.backStyle === "outline" || raw.backStyle === "solid") out.backStyle = raw.backStyle;
+        return out;
+      }
+
+      const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+      const mixHex = (a, b, t) =>
+        "#" +
+        hexRgb(a)
+          .map((v, i) =>
+            Math.round(v + (hexRgb(b)[i] - v) * t)
+              .toString(16)
+              .padStart(2, "0"),
+          )
+          .join("");
+
+      // Seeded tones (mulberry32): each pattern number always gives the same
+      // lighter and darker cells. With `firstFaint`, the cell closest to the
+      // card's own color trades places with the first.
+      function tones(p) {
+        let a = (p.seed * 2654435761) >>> 0;
+        const next = () => {
+          a = (a + 0x6d2b79f5) >>> 0;
+          let t = a;
+          t = Math.imul(t ^ (t >>> 15), t | 1);
+          t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+        const t = Array.from(
+          { length: p.cols * p.rows },
+          () => p.strength + p.vary * (next() * 2 - 1),
+        );
+        if (p.firstFaint && t.length) {
+          const k = t.reduce((best, v, i) => (Math.abs(v) < Math.abs(t[best]) ? i : best), 0);
+          [t[0], t[k]] = [t[k], t[0]];
+          if (Math.abs(t[0]) > 0.04) t[0] = -0.03;
+        }
+        return t;
+      }
+
+      function cells(p, mode) {
+        if (!p.cells) return "";
+        const c = COLORS[mode];
+        const FRONT = geo(p).front;
+        const cw = (FRONT.w - 2 * p.inset - (p.cols - 1) * p.gap) / p.cols;
+        const top = p.inset + p.top;
+        const ch = (FRONT.h - p.inset - top - (p.rows - 1) * p.gap) / p.rows;
+        if (cw <= 0 || ch <= 0) return "";
+        const t = tones(p);
+        let out = "";
+        const clip = `cc${uid++}`;
+        out += `<clipPath id="${clip}"><path d="${frontPath(p)}"/></clipPath><g clip-path="url(#${clip})">`;
+        for (let row = 0; row < p.rows; row++) {
+          for (let col = 0; col < p.cols; col++) {
+            const k = row * p.cols + col;
+            const tone = t[k];
+            const fill =
+              tone >= 0
+                ? mixHex(c.mark, c.light, Math.min(tone, 1))
+                : mixHex(c.mark, c.deep, Math.min(-tone, 1));
+            out += `<rect x="${fmt(FRONT.x + p.inset + col * (cw + p.gap))}" y="${fmt(FRONT.y + top + row * (ch + p.gap))}" width="${fmt(cw)}" height="${fmt(ch)}" rx="${fmt(p.radius)}" fill="${fill}"/>`;
+          }
+        }
+        return out + "</g>";
+      }
+
+      // Assignment dots: a grid of schedule slots (columns are days, rows are
+      // shifts) evenly spread inside the front card. A seeded shuffle picks
+      // which slots are assigned; assigned dots are bright, open ones faint.
+      function dots(p, mode) {
+        if (!p.dots) return "";
+        const c = COLORS[mode];
+        const target = mode === "brand" ? c.deep : c.light;
+        const f = geo(p).front;
+        const r = p.dotSize / 2;
+        const x0 = f.x + p.dotInset + r;
+        const x1 = f.x + f.w - p.dotInset - r;
+        const y0 = f.y + p.dotInset + p.dotTop + r;
+        const y1 = f.y + f.h - p.dotInset - r;
+        if (x1 < x0 || y1 < y0) return "";
+        const at = (i, n, a, b) => (n === 1 ? (a + b) / 2 : a + (i * (b - a)) / (n - 1));
+        const n = p.dotCols * p.dotRows;
+        let a = (p.dotSeed * 2654435761) >>> 0;
+        const rand = () => {
+          a = (a + 0x6d2b79f5) >>> 0;
+          let t = a;
+          t = Math.imul(t ^ (t >>> 15), t | 1);
+          t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+        const order = [...Array(n).keys()]
+          .map((k) => [rand(), k])
+          .sort((x, y) => x[0] - y[0])
+          .map(([, k]) => k);
+        const assigned = new Set(order.slice(0, Math.round(p.dotFill * n)));
+        const on = mixHex(c.mark, target, p.dotOn);
+        const off = mixHex(c.mark, target, p.dotOff);
+        let out = "";
+        for (let row = 0; row < p.dotRows; row++) {
+          for (let col = 0; col < p.dotCols; col++) {
+            const k = row * p.dotCols + col;
+            const isOn = assigned.has(k);
+            if (!isOn && p.dotOff === 0) continue;
+            out += `<circle cx="${fmt(at(col, p.dotCols, x0, x1))}" cy="${fmt(at(row, p.dotRows, y0, y1))}" r="${fmt(r)}" fill="${isOn ? on : off}"/>`;
+          }
+        }
+        return out;
+      }
+
+      let uid = 0;
+      // The shipped drawing: the back card's outline with the front card's
+      // gap masked out of it, then the solid front card, then the grid.
+      function mark(p, mode, size, crop = "square") {
+        const id = `gap${uid++}`;
+        const c = COLORS[mode];
+        const { ink, square } = geo(p);
+        const vb =
+          crop === "square"
+            ? [square.x, square.y, square.size, square.size]
+            : [ink.x, ink.y, ink.w, ink.h];
+        const ratio = vb[3] / vb[2];
+        const w = crop === "height" ? size / ratio : size;
+        const h = crop === "height" ? size : size * ratio;
+        return `<svg width="${fmt(w)}" height="${fmt(h)}" viewBox="${vb.map(fmt).join(" ")}" aria-hidden="true" style="display:block;flex:none">
+          <mask id="${id}" maskUnits="userSpaceOnUse" x="-60" y="-60" width="220" height="220">
+            <rect x="-60" y="-60" width="220" height="220" fill="white"/>
+            <path d="${frontPath(p)}" fill="black" stroke="black" stroke-width="${fmt(p.cardGap * 2)}"/>
+          </mask>
+          ${
+            p.backStyle === "solid"
+              ? `<path d="${backPath(p)}" fill="${c.mark}" fill-opacity="${fmt(p.backOpacity)}" mask="url(#${id})"/>`
+              : `<path d="${backPath(p)}" fill="none" stroke="${c.mark}" stroke-width="${STROKE}" mask="url(#${id})"/>`
+          }
+          <path d="${frontPath(p)}" fill="${c.mark}"/>
+          ${cells(p, mode)}
+          ${dots(p, mode)}
+        </svg>`;
+      }
+
+      // The shipped lockup rules: front card as tall as an ascender
+      // (0.72 em), the symbol's center on the word's optical center
+      // (0.256 em), 0.23 em to the word's origin. Stacked: ink 2 em wide,
+      // 0.42 em of clear space above the ascenders.
+      function lockup(p, mode, fs) {
+        const { front, ink } = geo(p);
+        const unit = (0.72 * fs) / front.h;
+        const height = ink.h * unit;
+        const below = height / 2 - 0.256 * fs;
+        return `<span class="lockup" style="font-size:${fs}px"><span style="display:inline-block;margin-right:${fmt(0.23 * fs)}px;vertical-align:${fmt(-below)}px">${mark(p, mode, height, "height")}</span><span class="word">dubgrid</span></span>`;
+      }
+      // getBrandStackedLayout at line height 1: DM Sans's line box (ascent
+      // 0.992, descent 0.31) centered, so its top sits 0.841 em up.
+      function stacked(p, mode, fs) {
+        const width = 2 * fs;
+        const { ink, shift: opticalShift } = geo(p);
+        const unit = width / ink.w;
+        const boxTop = 0.992 + (1 - 0.992 - 0.31) / 2;
+        const shift = 0.016 * fs - opticalShift * unit;
+        return `<span class="stacked" style="font-size:${fs}px;gap:${fmt((0.42 - (boxTop - 0.72)) * fs)}px"><span style="transform:translateX(${fmt(shift)}px)">${mark(p, mode, ink.h * unit, "height")}</span><span class="word">dubgrid</span></span>`;
+      }
+
+      const $ = (id) => document.getElementById(id);
+      let state = sanitize({ ...BASE, cells: false, dots: true });
+      const DRAFT_KEY = "production-grid-draft-v2";
+
+      function render() {
+        $("heroLight").innerHTML = mark(state, "light", 240);
+        $("heroDark").innerHTML = mark(state, "dark", 240);
+        $("sizesLight").innerHTML = [64, 32, 16].map((s) => mark(state, "light", s)).join("");
+        $("sizesDark").innerHTML = [64, 32, 16].map((s) => mark(state, "dark", s)).join("");
+        $("icon").innerHTML = `<span class="icon">${mark(state, "brand", 50)}</span>`;
+        $("mono").innerHTML = [64, 32, 16].map((s) => mark(state, "mono", s)).join("");
+        $("lockLight").innerHTML =
+          `<span class="cap">Light: header 24 px, 44 px, stacked</span>${lockup(state, "light", 24)}${lockup(state, "light", 44)}${stacked(state, "light", 26)}`;
+        $("lockDark").innerHTML =
+          `<span class="cap">Dark</span>${lockup(state, "dark", 24)}${lockup(state, "dark", 44)}${stacked(state, "dark", 26)}`;
+        const shipped = sanitize({ cells: false, ...SHIPPED_CORNERS, ...SHIPPED_POSITION });
+        $("beforeAfter").innerHTML =
+          `<figure>${lockup(shipped, "light", 24)}<figcaption>Shipped</figcaption></figure><figure>${lockup(state, "light", 24)}<figcaption>With grid</figcaption></figure><figure>${mark(shipped, "light", 40)}<figcaption>40 px</figcaption></figure><figure>${mark(state, "light", 40)}<figcaption>40 px</figcaption></figure>`;
+        sync();
+        try {
+          localStorage.setItem(DRAFT_KEY, JSON.stringify(state));
+        } catch {
+          /* Storage is a convenience; the page works without it. */
+        }
+      }
+
+      function sync() {
+        for (const [key, , , , , label] of SLIDERS) {
+          const input = $(`in-${key}`);
+          if (Number(input.value) !== state[key]) input.value = state[key];
+          $(`out-${key}`).textContent = label(state[key]);
+          input.disabled = !state.cells;
+        }
+        for (const [key, , , , , label] of DOT_SLIDERS) {
+          const input = $(`in-${key}`);
+          if (Number(input.value) !== state[key]) input.value = state[key];
+          $(`out-${key}`).textContent = label(state[key]);
+        }
+        for (const [key, , , , , label] of CARD_SLIDERS) {
+          const input = $(`in-${key}`);
+          if (Number(input.value) !== state[key]) input.value = state[key];
+          $(`out-${key}`).textContent = label(state[key]);
+        }
+        const shippedCorners = Object.entries(SHIPPED_CORNERS).every(([k, v]) => state[k] === v);
+        $("resetCorners").setAttribute("aria-pressed", String(shippedCorners));
+        const detail = state.dots ? "dots" : state.cells ? "cells" : "none";
+        document
+          .querySelectorAll("[data-detail]")
+          .forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.detail === detail)));
+        $("dotPanel").hidden = detail !== "dots";
+        $("gridPanel").hidden = detail !== "cells";
+        document
+          .querySelectorAll("[data-back]")
+          .forEach((b) =>
+            b.setAttribute("aria-pressed", String(b.dataset.back === state.backStyle)),
+          );
+        $("in-backOpacity").closest(".ctl").hidden = state.backStyle !== "solid";
+        $("resetPosition").setAttribute(
+          "aria-pressed",
+          String(Object.entries(SHIPPED_POSITION).every(([k, v]) => state[k] === v)),
+        );
+        document
+          .querySelectorAll("[data-first]")
+          .forEach((b) =>
+            b.setAttribute(
+              "aria-pressed",
+              String((b.dataset.first === "true") === state.firstFaint),
+            ),
+          );
+        const corners = {
+          backR: state.backR,
+          frontR: state.frontR,
+          smooth: state.smooth,
+          showing: state.showing,
+          lift: state.lift,
+          cardGap: state.cardGap,
+          backStyle: state.backStyle,
+          backOpacity: state.backOpacity,
+        };
+        const match = PRESETS.find(
+          (pr) =>
+            JSON.stringify(sanitize({ ...BASE, ...corners, ...pr.p })) === JSON.stringify(state),
+        );
+        document
+          .querySelectorAll("[data-preset]")
+          .forEach((b) => b.setAttribute("aria-pressed", String(match?.name === b.dataset.preset)));
+      }
+
+      $("dotControls").innerHTML = DOT_SLIDERS.map(
+        ([key, label, min, max, step]) =>
+          `<div class="ctl"><label for="in-${key}">${label} <output id="out-${key}"></output></label><input id="in-${key}" type="range" min="${min}" max="${max}" step="${step}" /></div>`,
+      ).join("");
+      for (const [key] of DOT_SLIDERS) {
+        $(`in-${key}`).addEventListener("input", (e) => {
+          state[key] = Number(e.target.value);
+          render();
+        });
+      }
+      const DETAILS = [
+        ["none", "None", { cells: false, dots: false }],
+        ["cells", "Grid", { cells: true, dots: false }],
+        ["dots", "Dots", { cells: false, dots: true }],
+      ];
+      $("detail").innerHTML = DETAILS.map(
+        ([k, l]) => `<button class="chip" type="button" data-detail="${k}">${l}</button>`,
+      ).join("");
+      document.querySelectorAll("[data-detail]").forEach((b) =>
+        b.addEventListener("click", () => {
+          Object.assign(state, DETAILS.find(([k]) => k === b.dataset.detail)[2]);
+          render();
+        }),
+      );
+      $("cardControls").innerHTML = CARD_SLIDERS.map(
+        ([key, label, min, max, step]) =>
+          `<div class="ctl"><label for="in-${key}">${label} <output id="out-${key}"></output></label><input id="in-${key}" type="range" min="${min}" max="${max}" step="${step}" /></div>`,
+      ).join("");
+      for (const [key] of CARD_SLIDERS) {
+        $(`in-${key}`).addEventListener("input", (e) => {
+          state[key] = Number(e.target.value);
+          render();
+        });
+      }
+      $("backStyle").innerHTML = [
+        ["outline", "Outline"],
+        ["solid", "Solid"],
+      ]
+        .map(([k, l]) => `<button class="chip" type="button" data-back="${k}">${l}</button>`)
+        .join("");
+      document.querySelectorAll("[data-back]").forEach((b) =>
+        b.addEventListener("click", () => {
+          state.backStyle = b.dataset.back;
+          render();
+        }),
+      );
+      $("resetPosition").addEventListener("click", () => {
+        Object.assign(state, SHIPPED_POSITION);
+        render();
+      });
+      $("resetCorners").addEventListener("click", () => {
+        Object.assign(state, SHIPPED_CORNERS);
+        render();
+      });
+      $("gridControls").innerHTML = SLIDERS.map(
+        ([key, label, min, max, step]) =>
+          `<div class="ctl"><label for="in-${key}">${label} <output id="out-${key}"></output></label><input id="in-${key}" type="range" min="${min}" max="${max}" step="${step}" /></div>`,
+      ).join("");
+      for (const [key] of SLIDERS) {
+        $(`in-${key}`).addEventListener("input", (e) => {
+          state[key] = Number(e.target.value);
+          render();
+        });
+      }
+      $("presets").innerHTML = PRESETS.map(
+        (pr) => `<button class="chip" type="button" data-preset="${pr.name}">${pr.name}</button>`,
+      ).join("");
+      document.querySelectorAll("[data-preset]").forEach((b) =>
+        b.addEventListener("click", () => {
+          const corners = {
+            backR: state.backR,
+            frontR: state.frontR,
+            smooth: state.smooth,
+            showing: state.showing,
+            lift: state.lift,
+            cardGap: state.cardGap,
+            backStyle: state.backStyle,
+            backOpacity: state.backOpacity,
+          };
+          state = sanitize({
+            ...BASE,
+            ...corners,
+            ...PRESETS.find((x) => x.name === b.dataset.preset).p,
+          });
+          render();
+        }),
+      );
+      $("firstFaint").innerHTML = [
+        [true, "On"],
+        [false, "Off"],
+      ]
+        .map(([k, l]) => `<button class="chip" type="button" data-first="${k}">${l}</button>`)
+        .join("");
+      document.querySelectorAll("[data-first]").forEach((b) =>
+        b.addEventListener("click", () => {
+          state.firstFaint = b.dataset.first === "true";
+          render();
+        }),
+      );
+
+      // Saved designs live in this artifact's database, collection
+      // "designs": { name, settings, savedAt }. Claude reads them from there.
+      const setStatus = (t) => ($("saveStatus").textContent = t);
+      let db = null;
+      let designs = [];
+
+      function renderSaved() {
+        $("savedList").innerHTML = designs
+          .map(
+            (d) =>
+              `<li><span class="name"></span><button class="link" type="button" data-load="${d.id}">Load</button><button class="link del" type="button" data-del="${d.id}">Delete</button></li>`,
+          )
+          .join("");
+        $("savedList")
+          .querySelectorAll(".name")
+          .forEach((el, i) => (el.textContent = designs[i].name));
+        $("savedList")
+          .querySelectorAll("[data-load]")
+          .forEach((b) =>
+            b.addEventListener("click", () => {
+              const d = designs.find((x) => x.id === b.dataset.load);
+              if (!d) return;
+              state = sanitize(d.settings);
+              $("designName").value = d.name;
+              render();
+              setStatus(`Loaded "${d.name}".`);
+            }),
+          );
+        $("savedList")
+          .querySelectorAll("[data-del]")
+          .forEach((b) => {
+            let armed = false;
+            b.addEventListener("click", async () => {
+              if (!armed) {
+                armed = true;
+                b.textContent = "Confirm";
+                setTimeout(() => {
+                  armed = false;
+                  b.textContent = "Delete";
+                }, 2500);
+                return;
+              }
+              try {
+                await db.collection("designs").doc(b.dataset.del).delete();
+                setStatus("Deleted.");
+              } catch {
+                setStatus("That design couldn't be deleted. Try again in a moment.");
+              }
+            });
+          });
+      }
+
+      async function connect() {
+        try {
+          db = window.claude?.use ? await window.claude.use("db") : null;
+        } catch {
+          db = null;
+        }
+        if (!db) {
+          setStatus("Saving needs this page open on claude.ai while signed in.");
+          $("saveBtn").disabled = true;
+          return;
+        }
+        setStatus("No saved designs yet. Name one and save it.");
+        db.collection("designs")
+          .orderBy("savedAt", "desc")
+          .limit(50)
+          .onSnapshot(
+            (snap) => {
+              designs = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+              renderSaved();
+              setStatus(
+                designs.length
+                  ? `${designs.length} saved. Claude can read these.`
+                  : "No saved designs yet. Name one and save it.",
+              );
+            },
+            () => setStatus("Saved designs are unavailable right now."),
+          );
+      }
+
+      $("saveBtn").addEventListener("click", async () => {
+        if (!db) return;
+        const name = $("designName").value.trim() || `Grid ${designs.length + 1}`;
+        const existing = designs.find((d) => d.name === name);
+        $("saveBtn").disabled = true;
+        try {
+          const body = { name, settings: { ...state }, savedAt: new Date().toISOString() };
+          if (existing) await db.collection("designs").doc(existing.id).set(body);
+          else await db.collection("designs").add(body);
+          setStatus(`Saved "${name}".`);
+        } catch (e) {
+          setStatus(
+            e?.code === "invalid_argument"
+              ? "You can view designs here, but not save them."
+              : "Couldn't save. Try again in a moment.",
+          );
+        } finally {
+          $("saveBtn").disabled = false;
+        }
+      });
+
+      try {
+        const draft = localStorage.getItem(DRAFT_KEY);
+        if (draft) state = sanitize(JSON.parse(draft));
+      } catch {
+        state = sanitize({ ...BASE, cells: false, dots: true });
+      }
+      render();
+      document.fonts?.ready.then(render);
+      connect();
+    </script>
+  </body>
+</html>

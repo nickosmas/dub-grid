@@ -1,65 +1,123 @@
 import { describe, expect, it } from "vitest";
 import {
   BRAND_MOTION_DURATION,
+  BRAND_MOTION_FADE_BELOW,
+  BRAND_MOTION_MOVE,
   brandBreathe,
+  brandClimb,
+  brandClimbMove,
   brandMotionFrames,
   brandRestFrame,
+  brandSettlingFrame,
   brandShuffle,
-  brandTrace,
+  brandShuffleMove,
   type BrandMotionFrame,
 } from "./brand-motion";
+import { BRAND_SYMBOL_INK } from "./brand-mark";
 
-const rounded = (frame: BrandMotionFrame) =>
-  frame.map((c) => ({
+const rounded = (frame: BrandMotionFrame) => ({
+  gap: +frame.gap.toFixed(3),
+  cards: frame.cards.map((c) => ({
     cx: +c.cx.toFixed(3),
     cy: +c.cy.toFixed(3),
-    width: +c.width.toFixed(3),
-    radius: +c.radius.toFixed(3),
     scale: +c.scale.toFixed(3),
     opacity: +c.opacity.toFixed(3),
-    solid: +c.solid.toFixed(3),
-    trace: c.trace,
-  }));
+    color: +c.color.toFixed(3),
+  })),
+});
 const rest = rounded(brandRestFrame());
+const samples = (n: number) => Array.from({ length: n + 1 }, (_, i) => i / n);
 
 describe("brand motion", () => {
-  it("starts and loops Breathe on the static mark, so a launch image hands off without a jump", () => {
-    expect(rounded(brandBreathe(0))).toEqual(rest);
-    expect(rounded(brandBreathe(BRAND_MOTION_DURATION.breathe))).toEqual(rest);
-    const [, front] = brandBreathe(1.2);
-    expect(front.scale).toBeCloseTo(1.045, 6);
-  });
-
-  it("rests Shuffle on the static mark before and after each swap", () => {
-    expect(rounded(brandShuffle(0))).toEqual(rest);
-    expect(rounded(brandShuffle(1.4))).toEqual(rest);
-    expect(rounded(brandShuffle(BRAND_MOTION_DURATION.shuffle))).toEqual(rest);
-  });
-
-  it("switches Shuffle's cards between outline and solid only between 30% and 70% of the move", () => {
-    const solids = (t: number) => brandShuffle(t).map((c) => c.solid);
-    for (const t of [0.3, 0.7]) {
-      const [outline, solid] = solids(t);
-      expect(outline).toBeCloseTo(0, 6);
-      expect(solid).toBeCloseTo(1, 6);
+  it("starts every animation on the static mark", () => {
+    for (const frames of Object.values(brandMotionFrames)) {
+      expect(rounded(frames(0))).toEqual(rest);
     }
-    const [a, b] = solids(0.5);
+  });
+
+  it("loops Breathe on the static mark and peaks with the front card 4.5% larger", () => {
+    expect(rounded(brandBreathe(BRAND_MOTION_DURATION.breathe))).toEqual(rest);
+    const [back, front] = brandBreathe(BRAND_MOTION_DURATION.breathe / 2).cards;
+    expect(front.scale).toBeCloseTo(1.045, 6);
+    const [restBack] = brandRestFrame().cards;
+    // The back card eases away down the stack, to the lower left.
+    expect(back.cx).toBeLessThan(restBack.cx);
+    expect(back.cy).toBeGreaterThan(restBack.cy);
+  });
+
+  it("ends each Shuffle and Climb move on the static mark and rests there until the next", () => {
+    for (const [name, frames] of [
+      ["shuffle", brandShuffle],
+      ["climb", brandClimb],
+    ] as const) {
+      expect(rounded(frames(BRAND_MOTION_MOVE[name]))).toEqual(rest);
+      expect(rounded(frames((BRAND_MOTION_MOVE[name] + BRAND_MOTION_DURATION[name]) / 2))).toEqual(
+        rest,
+      );
+      expect(rounded(frames(BRAND_MOTION_DURATION[name]))).toEqual(rest);
+    }
+  });
+
+  it("crosses Shuffle's colors only between 30% and 70% of the move", () => {
+    for (const u of [0, 0.15, 0.3]) {
+      const [back, front] = brandShuffleMove(u).cards.map((c) => c.color);
+      expect(back).toBeCloseTo(0, 6);
+      expect(front).toBeCloseTo(1, 6);
+    }
+    for (const u of [0.7, 0.85, 1]) {
+      const [back, front] = brandShuffleMove(u).cards.map((c) => c.color);
+      expect(back).toBeCloseTo(0, 6);
+      expect(front).toBeCloseTo(1, 6);
+    }
+    const [a, b] = brandShuffleMove(0.5).cards.map((c) => c.color);
     expect(a).toBeCloseTo(0.5, 6);
     expect(b).toBeCloseTo(0.5, 6);
   });
 
-  it("swaps the cards along one arc with 8 units of lift", () => {
-    const heights = brandShuffle(0.5).map((c) => c.cy);
-    expect(Math.min(...heights)).toBeCloseTo(42, 6);
-    expect(Math.max(...heights)).toBeCloseTo(58, 6);
+  it("closes Shuffle's gap while the cards pass and reopens it by 70%", () => {
+    expect(brandShuffleMove(0.5).gap).toBe(0);
+    expect(brandShuffleMove(0.42).gap).toBeCloseTo(0, 6);
+    expect(brandShuffleMove(0.3).gap).toBeCloseTo(1, 6);
+    expect(brandShuffleMove(0.7).gap).toBeCloseTo(1, 6);
   });
 
-  it("traces a segment a third of the outline long over a faint track", () => {
-    const [track, segment, front] = brandTrace(0.7);
-    expect(track.opacity).toBeCloseTo(0.28, 6);
-    expect(segment.trace?.length).toBeCloseTo(0.32, 6);
-    expect(segment.trace?.offset).toBeCloseTo(0.5, 6);
-    expect(rounded([front])).toEqual([rest[1]]);
+  it("mirrors Climb's arriving card with its leaving card under a half turn and time reversal", () => {
+    const { width, height } = BRAND_SYMBOL_INK;
+    for (const u of samples(20)) {
+      const now = brandClimbMove(u).cards;
+      const mirror = brandClimbMove(1 - u).cards;
+      const arriving = now.find((c) => c.color === 0 && c.scale < 1);
+      const leaving = mirror.find((c) => c.color === 1 && c.scale < 1);
+      if (!arriving || !leaving) {
+        expect(Boolean(arriving)).toBe(Boolean(leaving));
+        continue;
+      }
+      expect(arriving.scale).toBeCloseTo(leaving.scale, 6);
+      expect(arriving.opacity).toBeCloseTo(leaving.opacity, 6);
+      expect(arriving.cx).toBeCloseTo(width - leaving.cx, 6);
+      expect(arriving.cy).toBeCloseTo(height - leaving.cy, 6);
+    }
+  });
+
+  it("never shows a card below the fade threshold at full opacity, or a larger one see-through", () => {
+    for (const u of samples(200)) {
+      for (const c of [...brandClimbMove(u).cards, ...brandShuffleMove(u).cards]) {
+        if (c.scale < BRAND_MOTION_FADE_BELOW) expect(c.opacity).toBeLessThan(1);
+        else expect(c.opacity).toBe(1);
+      }
+    }
+  });
+
+  it("finishes the move in progress when the wait ends, then rests", () => {
+    const stoppedAt = BRAND_MOTION_DURATION.climb + 0.4;
+    const mid = brandSettlingFrame("climb", stoppedAt + 0.2, stoppedAt);
+    expect(mid.done).toBe(false);
+    expect(rounded(mid.frame)).toEqual(rounded(brandClimbMove(0.6)));
+    const end = brandSettlingFrame("climb", BRAND_MOTION_DURATION.climb + 1, stoppedAt);
+    expect(end.done).toBe(true);
+    expect(rounded(end.frame)).toEqual(rest);
+    // Stopped while resting between moves: at rest at once.
+    expect(brandSettlingFrame("shuffle", 1.5, 1.5).done).toBe(true);
   });
 
   it("exposes a frame function for every timed animation", () => {
