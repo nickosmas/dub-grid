@@ -1,0 +1,750 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Stacked logo animations</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@700&family=Inter:wght@400;500;600&display=swap"
+    />
+    <style>
+      /* Layout: a control bar, then one section per animation with a large view and its real surface in light and dark. */
+      :root {
+        --text-primary: #111827;
+        --text-secondary: #6b7280;
+        --page: #fafafa;
+        --panel: #ffffff;
+        --border: rgba(0, 0, 0, 0.1);
+        --border-strong: rgba(0, 0, 0, 0.18);
+        --accent: #2563eb;
+        --accent-soft: rgba(37, 99, 235, 0.1);
+        --tile-light: #ffffff;
+        --tile-dark: #02070f;
+        --ink-light: #0f172a;
+        --ink-dark: #fafafa;
+        --label-light: #64748b;
+        --label-dark: #a1a1aa;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --text-primary: #fafafa;
+          --text-secondary: #a1a1aa;
+          --page: #0f0f11;
+          --panel: #18181b;
+          --border: rgba(255, 255, 255, 0.1);
+          --border-strong: rgba(255, 255, 255, 0.18);
+          --accent: #4a9bff;
+          --accent-soft: rgba(74, 155, 255, 0.18);
+          color-scheme: dark;
+        }
+      }
+      :root[data-theme="dark"] {
+        --text-primary: #fafafa;
+        --text-secondary: #a1a1aa;
+        --page: #0f0f11;
+        --panel: #18181b;
+        --border: rgba(255, 255, 255, 0.1);
+        --border-strong: rgba(255, 255, 255, 0.18);
+        --accent: #4a9bff;
+        --accent-soft: rgba(74, 155, 255, 0.18);
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 24px 16px 56px;
+        background: var(--page);
+        color: var(--text-primary);
+        font-family: Inter, system-ui, sans-serif;
+        font-size: 14px;
+      }
+      main {
+        max-width: 1000px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 20px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      .sub {
+        color: var(--text-secondary);
+        margin: 0 0 16px;
+        line-height: 1.5;
+        max-width: 700px;
+      }
+      .bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        align-items: center;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 10px 12px;
+        margin-bottom: 20px;
+      }
+      .bar .group {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+      .chip {
+        font: inherit;
+        font-size: 12px;
+        font-weight: 500;
+        padding: 5px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border-strong);
+        background: transparent;
+        color: var(--text-primary);
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .chip[aria-pressed="true"] {
+        background: var(--accent-soft);
+        border-color: var(--accent);
+      }
+      .chip:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      section.anim {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+      .anim-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 4px;
+      }
+      .anim-head h2 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 600;
+      }
+      .anim-head span {
+        font-size: 12px;
+        color: var(--text-secondary);
+        font-variant-numeric: tabular-nums;
+      }
+      .anim p {
+        margin: 0 0 12px;
+        font-size: 13px;
+        color: var(--text-secondary);
+        line-height: 1.5;
+        max-width: 760px;
+      }
+      .stage {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+      @media (max-width: 760px) {
+        .stage {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .tile {
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        min-height: 230px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        position: relative;
+        min-width: 0;
+      }
+      .tile.light {
+        background: var(--tile-light);
+        color: var(--ink-light);
+      }
+      .tile.dark {
+        background: var(--tile-dark);
+        color: var(--ink-dark);
+      }
+      .tile .cap {
+        position: absolute;
+        top: 10px;
+        left: 12px;
+        font-size: 11px;
+        font-weight: 500;
+        opacity: 0.55;
+      }
+      .tile .msg {
+        font-size: 13px;
+      }
+      .tile.light .msg {
+        color: var(--label-light);
+      }
+      .tile.dark .msg {
+        color: var(--label-dark);
+      }
+      .word {
+        font-family: "DM Sans", sans-serif;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1;
+      }
+      .controls {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+        flex-wrap: wrap;
+      }
+      .notes {
+        margin: 24px 0 0;
+        padding-left: 18px;
+        line-height: 1.6;
+        color: var(--text-secondary);
+        font-size: 13px;
+        max-width: 780px;
+      }
+      .notes b {
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+      #measure {
+        position: absolute;
+        width: 0;
+        height: 0;
+        overflow: hidden;
+        visibility: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Stacked logo animations</h1>
+      <p class="sub">
+        Breathe, Shuffle and Climb for the refined two-card mark. Climb replaces Trace for sync and
+        long waits. The rules carry over: the logo stays static wherever it identifies the product,
+        these play only on full-screen waits, and reduced motion shows the static mark. The darker
+        card is in front, as the owner chose; the bar can switch to the light card and turn the gap
+        off for comparison.
+      </p>
+
+      <div class="bar">
+        <div class="group" role="group" aria-label="Speed">
+          Speed
+          <button class="chip" data-speed="1" aria-pressed="true">1x</button>
+          <button class="chip" data-speed="0.5" aria-pressed="false">0.5x</button>
+          <button class="chip" data-speed="0.25" aria-pressed="false">0.25x</button>
+        </div>
+        <div class="group" role="group" aria-label="Motion">
+          Motion
+          <button class="chip" data-motion="play" aria-pressed="true">Play</button>
+          <button class="chip" data-motion="reduced" aria-pressed="false">Reduced motion</button>
+        </div>
+        <div class="group" role="group" aria-label="Card in front">
+          In front
+          <button class="chip" data-front="dark" aria-pressed="true">Darker card (spec)</button>
+          <button class="chip" data-front="light" aria-pressed="false">Light card</button>
+        </div>
+        <div class="group" role="group" aria-label="Between the cards">
+          Between
+          <button class="chip" data-cut="on" aria-pressed="true">Gap (spec)</button>
+          <button class="chip" data-cut="off" aria-pressed="false">No gap</button>
+        </div>
+        <div class="group" role="group" aria-label="Dark-mode back card">
+          Dark back
+          <button class="chip" data-darkback="#BCD2FF" aria-pressed="false">Pale (spec)</button>
+          <button class="chip" data-darkback="#1D4ED8" aria-pressed="false">Bright</button>
+          <button class="chip" data-darkback="#1E40AF" aria-pressed="true">Mirror</button>
+          <button class="chip" data-darkback="#1E3A8A" aria-pressed="false">Deep</button>
+        </div>
+      </div>
+
+      <section class="anim" aria-labelledby="h-breathe">
+        <div class="anim-head">
+          <h2 id="h-breathe">Breathe</h2>
+          <span>2.4 s loop</span>
+        </div>
+        <p>
+          Mobile splash and the web sign-in handoff while the session restores. A slow sine pulse:
+          the front card grows 4.5% while the back card eases away from it along the stack. Every
+          loop starts on the static frame, so the native launch image hands off without a jump.
+        </p>
+        <div class="stage">
+          <div class="tile light">
+            <span class="cap">160 px</span
+            ><span data-anim="breathe" data-theme="light" data-size="160"></span>
+          </div>
+          <div class="tile light">
+            <span class="cap">Splash, light</span
+            ><span data-anim="breathe" data-theme="light" data-size="84"></span
+            ><span class="word" style="font-size: 26px">dubgrid</span>
+          </div>
+          <div class="tile dark">
+            <span class="cap">Splash, dark</span
+            ><span data-anim="breathe" data-theme="dark" data-size="84"></span
+            ><span class="word" style="font-size: 26px">dubgrid</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="anim" aria-labelledby="h-shuffle">
+        <div class="anim-head">
+          <h2 id="h-shuffle">Shuffle</h2>
+          <span>1.8 s cycle: 1.0 s move, 0.8 s rest</span>
+        </div>
+        <p>
+          Schedule and route-level loading. The cards trade places along one arc (the front card
+          over the top to the back, the back card underneath to the front), with quartic
+          ease-in-out, then rest. Their colors cross between 30% and 70% of the move, and the gap
+          closes as they pass, so they read as one card shuffling through rather than a snap. When
+          loading ends they finish the current swap and rest on the static mark.
+        </p>
+        <div class="stage">
+          <div class="tile light">
+            <span class="cap">160 px</span
+            ><span data-anim="shuffle" data-theme="light" data-size="160"></span>
+          </div>
+          <div class="tile light">
+            <span class="cap">Schedule loading, light</span
+            ><span data-anim="shuffle" data-theme="light" data-size="64"></span
+            ><span class="msg" data-msg="shuffle">Loading your schedule</span>
+          </div>
+          <div class="tile dark">
+            <span class="cap">Schedule loading, dark</span
+            ><span data-anim="shuffle" data-theme="dark" data-size="64"></span
+            ><span class="msg" data-msg="shuffle">Loading your schedule</span>
+          </div>
+        </div>
+        <div class="controls">
+          <button class="chip" data-finish="shuffle">Finish loading</button>
+          <button class="chip" data-restart="shuffle">Start again</button>
+        </div>
+      </section>
+
+      <section class="anim" aria-labelledby="h-climb">
+        <div class="anim-head">
+          <h2 id="h-climb">Climb</h2>
+          <span>1.6 s cycle: 1.0 s step, 0.6 s rest</span>
+        </div>
+        <p>
+          Sync and long-running waits; replaces Trace. The stack steps up the slant as a ripple,
+          front to back. The front card leaves first, stepping forward and shrinking into its far
+          corner; the back card rises into its place and turns light; a new back card arrives last,
+          doing the exact reverse of the leaving card. The step is symmetric under a half turn, like
+          the mark. When syncing ends it finishes the step and rests.
+        </p>
+        <div class="stage">
+          <div class="tile light">
+            <span class="cap">160 px</span
+            ><span data-anim="climb" data-theme="light" data-size="160"></span>
+          </div>
+          <div class="tile light">
+            <span class="cap">Syncing, light</span
+            ><span data-anim="climb" data-theme="light" data-size="64"></span
+            ><span class="msg" data-msg="climb">Syncing changes</span>
+          </div>
+          <div class="tile dark">
+            <span class="cap">Syncing, dark</span
+            ><span data-anim="climb" data-theme="dark" data-size="64"></span
+            ><span class="msg" data-msg="climb">Syncing changes</span>
+          </div>
+        </div>
+        <div class="controls">
+          <button class="chip" data-finish="climb">Finish syncing</button>
+          <button class="chip" data-restart="climb">Start again</button>
+        </div>
+      </section>
+
+      <ul class="notes">
+        <li>
+          <b>Static everywhere else:</b> navbar, sign-in, onboarding, goodbye, emails and app icons
+          keep the static mark.
+        </li>
+        <li>
+          <b>Conventional progress elsewhere:</b> route changes keep the top progress bar, buttons
+          their spinner, pull-to-refresh the native control.
+        </li>
+        <li>
+          <b>Reduced motion:</b> every animation shows the static frame. Switch to "Reduced motion"
+          above to check; the page also starts that way if your system asks for less motion.
+        </li>
+        <li>
+          <b>Units:</b> distances are in the 100-unit box used for the shipped mark, scaled to this
+          symbol's size, so 4 and 8 units move the same share of the symbol as before.
+        </li>
+      </ul>
+    </main>
+    <svg id="measure" aria-hidden="true"><path id="measurePath" /></svg>
+
+    <script>
+      const COLORS = {
+        light: { back: "#2563EB", front: "#8FB0F8" },
+        dark: { back: "#3B82F6", front: "#BCD2FF" },
+      };
+      // The mark as finalized in the fix spec: equal cards, 32° slant, the
+      // front card 36% of a card along the slant and 42% of its height up,
+      // every corner curving over 14 units.
+      const SPEC = { angle: 32, aspect: 0.95, stepX: 0.36, stepY: 0.42, curve: 14, gap: 0.035 };
+      const DURATION = { breathe: 2.4, shuffle: 1.8, climb: 1.6 };
+      const SHUFFLE_MOVE = 1.0;
+      const CLIMB_MOVE = 1.0;
+
+      const fmt = (n) => Number(n.toFixed(2)).toString();
+      const clamp = (x) => Math.max(0, Math.min(1, x));
+      const lerp = (a, b, t) => a + (b - a) * t;
+      const quartInOut = (x) => (x < 0.5 ? 8 * x ** 4 : 1 - (-2 * x + 2) ** 4 / 2);
+      const smoothstep = (a, b, x) => {
+        const t = clamp((x - a) / (b - a));
+        return t * t * (3 - 2 * t);
+      };
+      const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+      const mix = (a, b, t) =>
+        "#" +
+        hex(a)
+          .map((v, i) =>
+            Math.round(lerp(v, hex(b)[i], t))
+              .toString(16)
+              .padStart(2, "0"),
+          )
+          .join("");
+
+      function roundedPolygon(pts, r) {
+        const n = pts.length;
+        const corners = pts.map((v, k) => {
+          const prev = pts[(k + n - 1) % n];
+          const next = pts[(k + 1) % n];
+          const a = [prev[0] - v[0], prev[1] - v[1]];
+          const b = [next[0] - v[0], next[1] - v[1]];
+          const la = Math.hypot(...a);
+          const lb = Math.hypot(...b);
+          const ua = [a[0] / la, a[1] / la];
+          const ub = [b[0] / lb, b[1] / lb];
+          const angle = Math.acos(Math.max(-1, Math.min(1, ua[0] * ub[0] + ua[1] * ub[1])));
+          const t = Math.min((Array.isArray(r) ? r[k] : r) / Math.tan(angle / 2), la / 2, lb / 2);
+          return {
+            s: [v[0] + ua[0] * t, v[1] + ua[1] * t],
+            e: [v[0] + ub[0] * t, v[1] + ub[1] * t],
+            r: t * Math.tan(angle / 2),
+          };
+        });
+        let d = `M${fmt(corners[0].e[0])},${fmt(corners[0].e[1])}`;
+        for (let k = 1; k <= n; k++) {
+          const c = corners[k % n];
+          d += `L${fmt(c.s[0])},${fmt(c.s[1])}A${fmt(c.r)},${fmt(c.r)} 0 0 1 ${fmt(c.e[0])},${fmt(c.e[1])}`;
+        }
+        return d + "Z";
+      }
+
+      // One card centered on the origin; poses place it.
+      const tan = Math.tan((SPEC.angle * Math.PI) / 180);
+      const W = 100;
+      const H = SPEC.aspect * W;
+      const CARD = roundedPolygon(
+        [
+          [-W / 2, -H / 2 - (W / 2) * tan],
+          [W / 2, -H / 2 + (W / 2) * tan],
+          [W / 2, H / 2 + (W / 2) * tan],
+          [-W / 2, H / 2 - (W / 2) * tan],
+        ],
+        // Radius = curve length x tan(corner / 2): acute corners at top left
+        // and bottom right, obtuse ones at top right and bottom left.
+        [90 - SPEC.angle, 90 + SPEC.angle, 90 - SPEC.angle, 90 + SPEC.angle].map(
+          (deg) => SPEC.curve * Math.tan((deg * Math.PI) / 360),
+        ),
+      );
+      const BACK = { x: 0, y: 0 };
+      const FRONT = { x: SPEC.stepX * W, y: SPEC.stepX * W * tan - SPEC.stepY * H };
+      const STEP = { x: FRONT.x - BACK.x, y: FRONT.y - BACK.y };
+      const STEP_LEN = Math.hypot(STEP.x, STEP.y);
+      const ALONG = { x: STEP.x / STEP_LEN, y: STEP.y / STEP_LEN };
+      // Perpendicular to the stack, pointing up and to the left: "over the top".
+      const OVER = { x: ALONG.y, y: -ALONG.x };
+
+      const measure = document.getElementById("measurePath");
+      measure.setAttribute("d", CARD);
+      const cardBox = measure.getBBox();
+      const INK = {
+        x: Math.min(BACK.x, FRONT.x) + cardBox.x,
+        y: Math.min(BACK.y, FRONT.y) + cardBox.y,
+        r: Math.max(BACK.x, FRONT.x) + cardBox.x + cardBox.width,
+        b: Math.max(BACK.y, FRONT.y) + cardBox.y + cardBox.height,
+      };
+      // The shipped motion was specified in a 100-unit box around 94 units of ink.
+      const UNIT = Math.max(INK.r - INK.x, INK.b - INK.y) / 94;
+      const CENTER = { x: (INK.x + INK.r) / 2, y: (INK.y + INK.b) / 2 };
+      const SIDE = Math.max(INK.r - INK.x, INK.b - INK.y) * 1.22;
+      const GAP = SPEC.gap * W;
+
+      // Frames: cards back to front, each { x, y, scale, color } where color
+      // runs 0 (back blue) to 1 (front blue), with an optional `opacity`;
+      // `gap` scales the cut.
+      const rest = () => ({
+        cards: [
+          { ...BACK, scale: 1, color: 0 },
+          { ...FRONT, scale: 1, color: 1 },
+        ],
+        gap: 1,
+      });
+
+      function breathe(t) {
+        const u = 0.5 - 0.5 * Math.cos((2 * Math.PI * (t % DURATION.breathe)) / DURATION.breathe);
+        const f = rest();
+        f.cards[0].x -= 4 * UNIT * u * ALONG.x;
+        f.cards[0].y -= 4 * UNIT * u * ALONG.y;
+        f.cards[1].scale = 1 + 0.045 * u;
+        return f;
+      }
+
+      function shuffleAt(u) {
+        const angle = Math.PI * quartInOut(clamp(u));
+        const swapped = smoothstep(0.3, 0.7, u);
+        const lift = 8 * UNIT;
+        const cards = [0, Math.PI].map((start) => {
+          const a = angle + start;
+          const k = (1 - Math.cos(a)) / 2;
+          return {
+            x: lerp(FRONT.x, BACK.x, k) + OVER.x * lift * Math.sin(a),
+            y: lerp(FRONT.y, BACK.y, k) + OVER.y * lift * Math.sin(a),
+            scale: 1,
+            color: start === 0 ? 1 - swapped : swapped,
+          };
+        });
+        cards.sort((a, b) => a.color - b.color);
+        return { cards, gap: smoothstep(0.08, 0.2, Math.abs(u - 0.5)) };
+      }
+
+      function shuffle(t) {
+        return shuffleAt((t % DURATION.shuffle) / SHUFFLE_MOVE);
+      }
+
+      // Corners the climbing cards scale from: the leaving card shrinks into its
+      // top-right corner and the arriving card grows out of its bottom-left,
+      // so neither covers the card rising between them.
+      const TOP_RIGHT = { x: W / 2, y: -H / 2 + (W / 2) * tan };
+      const BOTTOM_LEFT = { x: -W / 2, y: H / 2 - (W / 2) * tan };
+      const scaledFrom = (at, corner, scale) => ({
+        x: at.x + corner.x * (1 - scale),
+        y: at.y + corner.y * (1 - scale),
+        scale,
+      });
+
+      // One step of the climb as a ripple up the stack: the front card leaves
+      // first, the back card rises next, and a new back card arrives last. The
+      // leaving card steps forward and shrinks into its far corner; the
+      // arriving card does the exact reverse at the back, so the step is
+      // symmetric under a half turn, like the mark. Every card stays solid.
+      const window01 = (u, from, to) => clamp((u - from) / (to - from));
+      const CLIMB_DRIFT = 0.35;
+      // Fade a card only while it is very small, when it no longer overlaps
+      // another, so it never shows as a speck and never turns see-through.
+      const speck = (scale) => smoothstep(0, 0.3, scale);
+
+      function climbAt(u) {
+        const lead = window01(u, 0, 0.8);
+        const rise = quartInOut(window01(u, 0.1, 0.9));
+        const tail = window01(u, 0.2, 1);
+        const leaving = smoothstep(0, 1, lead);
+        const arriving = smoothstep(0, 1, tail);
+        const along = (at, k) => ({
+          x: at.x + CLIMB_DRIFT * STEP.x * k,
+          y: at.y + CLIMB_DRIFT * STEP.y * k,
+        });
+        return {
+          cards: [
+            {
+              ...scaledFrom(along(BACK, arriving - 1), BOTTOM_LEFT, arriving),
+              color: 0,
+              opacity: speck(arriving),
+            },
+            {
+              x: lerp(BACK.x, FRONT.x, rise),
+              y: lerp(BACK.y, FRONT.y, rise),
+              scale: 1,
+              color: rise,
+            },
+            {
+              ...scaledFrom(along(FRONT, leaving), TOP_RIGHT, 1 - leaving),
+              color: 1,
+              opacity: speck(1 - leaving),
+            },
+          ].filter((k) => k.scale > 0.01),
+          gap: 1,
+        };
+      }
+
+      function climb(t) {
+        return climbAt((t % DURATION.climb) / CLIMB_MOVE);
+      }
+
+      const FRAMES = { breathe, shuffle, climb };
+
+      let uid = 0;
+      // The darker card in front swaps the palette: the card that arrives at
+      // the front turns dark, and the one behind it is light.
+      let darkFront = true;
+      let cutOn = true;
+      // Dark mode's back card when the darker card is in front, toned down so
+      // it recedes rather than outshining the front card.
+      let darkBack = "#1E40AF";
+      function frameSvg(f, theme, size, ids) {
+        const c = darkFront
+          ? { back: theme === "dark" ? darkBack : COLORS[theme].front, front: COLORS[theme].back }
+          : COLORS[theme];
+        const vb = [CENTER.x - SIDE / 2, CENTER.y - SIDE / 2, SIDE, SIDE].map(fmt).join(" ");
+        const place = (k) => `translate(${fmt(k.x)} ${fmt(k.y)}) scale(${fmt(k.scale)})`;
+        const region = `x="${fmt(CENTER.x - SIDE)}" y="${fmt(CENTER.y - SIDE)}" width="${fmt(SIDE * 2)}" height="${fmt(SIDE * 2)}"`;
+        const gap = cutOn ? GAP * f.gap : 0;
+        const cutBy = (k) => {
+          const op = fmt(k.opacity ?? 1);
+          return gap > 0.05
+            ? `<path d="${CARD}" transform="${place(k)}" fill="black" fill-opacity="${op}" stroke="black" stroke-opacity="${op}" stroke-width="${fmt((gap * 2) / k.scale)}" stroke-linejoin="round"/>`
+            : `<path d="${CARD}" transform="${place(k)}" fill="black" fill-opacity="${op}"/>`;
+        };
+        let defs = "";
+        let body = "";
+        f.cards.forEach((k, i) => {
+          const op = k.opacity ?? 1;
+          if (op < 0.01) return;
+          const fill = mix(c.back, c.front, k.color);
+          const ahead = f.cards.slice(i + 1).filter((a) => (a.opacity ?? 1) >= 0.01);
+          let mask = "";
+          if (ahead.length) {
+            const id = `${ids.mask}-${i}`;
+            defs += `<mask id="${id}" maskUnits="userSpaceOnUse" ${region}><rect ${region} fill="white"/>${ahead.map(cutBy).join("")}</mask>`;
+            mask = ` mask="url(#${id})"`;
+          }
+          body += `<path d="${CARD}" transform="${place(k)}" fill="${fill}" opacity="${fmt(op)}"${mask}/>`;
+        });
+        return `<svg width="${size}" height="${size}" viewBox="${vb}" aria-hidden="true" style="display:block"><defs>${defs}</defs>${body}</svg>`;
+      }
+
+      const players = [...document.querySelectorAll("[data-anim]")].map((el) => ({
+        el,
+        anim: el.dataset.anim,
+        theme: el.dataset.theme,
+        size: Number(el.dataset.size),
+        ids: { mask: `m${uid++}` },
+      }));
+
+      let speed = 1;
+      let reduced = false;
+      try {
+        reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      } catch {
+        reduced = false;
+      }
+      let clock = 0;
+      let last = null;
+      // Shuffle and Climb stop gracefully: once asked, they finish the current
+      // move and rest on the static mark.
+      const STEPPED = {
+        shuffle: { at: shuffleAt, move: SHUFFLE_MOVE, stopAt: null, startedAt: 0 },
+        climb: { at: climbAt, move: CLIMB_MOVE, stopAt: null, startedAt: 0 },
+      };
+
+      function steppedFrame(name) {
+        const s = STEPPED[name];
+        const t = clock - s.startedAt;
+        const cycle = DURATION[name];
+        const cycleStart = Math.floor((s.stopAt ?? t) / cycle) * cycle;
+        const u = (t - cycleStart) / s.move;
+        if (s.stopAt !== null && u >= 1) return rest();
+        return s.at(Math.min(u, 1));
+      }
+
+      function draw() {
+        for (const p of players) {
+          let f;
+          if (reduced) f = rest();
+          else if (STEPPED[p.anim]) f = steppedFrame(p.anim);
+          else f = FRAMES[p.anim](clock);
+          p.el.innerHTML = frameSvg(f, p.theme, p.size, p.ids);
+        }
+      }
+
+      function tick(now) {
+        if (last !== null && !reduced) clock += ((now - last) / 1000) * speed;
+        last = now;
+        draw();
+        requestAnimationFrame(tick);
+      }
+
+      const press = (sel, on) =>
+        document
+          .querySelectorAll(sel)
+          .forEach((b) => b.setAttribute("aria-pressed", String(on(b))));
+      document.querySelectorAll("[data-speed]").forEach((b) =>
+        b.addEventListener("click", () => {
+          speed = Number(b.dataset.speed);
+          press("[data-speed]", (x) => x === b);
+        }),
+      );
+      document.querySelectorAll("[data-motion]").forEach((b) =>
+        b.addEventListener("click", () => {
+          reduced = b.dataset.motion === "reduced";
+          press("[data-motion]", (x) => x === b);
+        }),
+      );
+      press("[data-motion]", (x) => (x.dataset.motion === "reduced") === reduced);
+      document.querySelectorAll("[data-front]").forEach((b) =>
+        b.addEventListener("click", () => {
+          darkFront = b.dataset.front === "dark";
+          press("[data-front]", (x) => x === b);
+          draw();
+        }),
+      );
+      document.querySelectorAll("[data-darkback]").forEach((b) =>
+        b.addEventListener("click", () => {
+          darkBack = b.dataset.darkback;
+          press("[data-darkback]", (x) => x === b);
+          draw();
+        }),
+      );
+      document.querySelectorAll("[data-cut]").forEach((b) =>
+        b.addEventListener("click", () => {
+          cutOn = b.dataset.cut === "on";
+          press("[data-cut]", (x) => x === b);
+          draw();
+        }),
+      );
+
+      const MESSAGES = {
+        shuffle: ["Loading your schedule", "Schedule ready"],
+        climb: ["Syncing changes", "All changes saved"],
+      };
+      const setMsg = (name, done) =>
+        document
+          .querySelectorAll(`[data-msg="${name}"]`)
+          .forEach((m) => (m.textContent = MESSAGES[name][done ? 1 : 0]));
+      document.querySelectorAll("[data-finish]").forEach((b) =>
+        b.addEventListener("click", () => {
+          const s = STEPPED[b.dataset.finish];
+          if (s.stopAt === null) s.stopAt = clock - s.startedAt;
+          setMsg(b.dataset.finish, true);
+        }),
+      );
+      document.querySelectorAll("[data-restart]").forEach((b) =>
+        b.addEventListener("click", () => {
+          const s = STEPPED[b.dataset.restart];
+          s.stopAt = null;
+          s.startedAt = clock;
+          setMsg(b.dataset.restart, false);
+        }),
+      );
+
+      draw();
+      requestAnimationFrame(tick);
+    </script>
+  </body>
+</html>

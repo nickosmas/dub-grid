@@ -1,13 +1,13 @@
 /**
  * Renders the mobile launcher, launch and logo images into
- * apps/mobile/assets/images/ from the shared two-card geometry in
+ * apps/mobile/assets/images/ from the shared stacked two-card geometry in
  * @dubgrid/design-tokens.
  *
- * App icons are the white symbol on brand blue, optically centered (the solid
- * front card would otherwise pull it right of center):
+ * App icons are the symbol in its on-brand colors (white in front) on brand
+ * blue, centered (the outline is symmetric under a half turn):
  *   - icon.png                      iOS, opaque blue field behind Apple's squircle
- *   - adaptive-icon.png             Android foreground layer, white on transparent
- *   - adaptive-icon-monochrome.png  Android themed-icon layer, same shapes
+ *   - adaptive-icon.png             Android foreground layer, on transparent
+ *   - adaptive-icon-monochrome.png  Android themed-icon layer, one color
  * Android shows the central 72/108 of an adaptive icon and guarantees only the
  * inner 66/108 circle, so the symbol's corners are kept inside that circle.
  *
@@ -17,7 +17,11 @@
  *   - splash-icon.png / splash-icon-dark.png
  *
  * Logos:
- *   - brand-mark.png                white, cropped to the ink; the app tints it
+ *   - brand-mark-back.png, brand-mark-back-small.png, brand-mark-front.png
+ *                                   the two cards as white layers cropped to the
+ *                                   ink, the gap cut into the back card (the
+ *                                   small one for 32 px and below); the app
+ *                                   tints each layer
  *   - logo-blue.png / logo-white.png and icon-blue-on-white.png
  *
  * Build the packages first (`npm run build:packages`), then run `npm run
@@ -36,15 +40,11 @@ const imagesDir = join(scriptDir, "..", "assets", "images");
 // The package's index is bundler-only, but this module has no imports, so
 // plain Node can load it straight from the build output.
 const {
-  BRAND_MARK_BACK,
-  BRAND_MARK_BACK_STROKE,
-  BRAND_MARK_COLORS,
-  BRAND_MARK_FRONT,
-  BRAND_MARK_GAP,
-  BRAND_MARK_INK,
-  BRAND_MARK_OPTICAL_OFFSET_X,
-  BRAND_MARK_SQUARE,
-  brandMarkCardPath,
+  BRAND_SYMBOL_COLORS,
+  BRAND_SYMBOL_GAP,
+  BRAND_SYMBOL_INK,
+  BRAND_SYMBOL_SQUARE,
+  getBrandSymbolPaths,
 } = await import(
   pathToFileURL(
     join(scriptDir, "..", "..", "..", "packages", "design-tokens", "dist", "brand-mark.js"),
@@ -52,8 +52,11 @@ const {
 );
 
 const SIZE = 1024;
-const WHITE = BRAND_MARK_COLORS.onBrand;
-const BRAND_BLUE = BRAND_MARK_COLORS.light;
+const WHITE = "#FFFFFF";
+const ON_BRAND = BRAND_SYMBOL_COLORS.onBrand;
+const LIGHT = BRAND_SYMBOL_COLORS.light;
+const BRAND_BLUE = LIGHT.front;
+const oneColor = (color) => ({ back: color, front: color });
 
 const ANDROID_VISIBLE = 72 / 108;
 const ANDROID_SAFE = 66 / 108;
@@ -67,84 +70,87 @@ const SYMBOL_WIDTH = 0.62;
 const SPLASH_MARK_SIZE = 96;
 const SPLASH_SCALE = 10;
 
-const BACK_PATH = brandMarkCardPath(BRAND_MARK_BACK);
-const FRONT_PATH = brandMarkCardPath(BRAND_MARK_FRONT);
+const { width: INK_W, height: INK_H } = BRAND_SYMBOL_INK;
+const MASK_REGION = `x="-20" y="-20" width="${INK_W + 40}" height="${INK_H + 40}"`;
 
 // The gap is masked out of the back card, so the images stay transparent
-// there and sit on any background.
-function symbolSvg({ viewBox, width, height, color }) {
+// there and sit on any background. `parts` limits the drawing to one card,
+// for the layers the app tints separately.
+function symbolSvg({ viewBox, width, height, colors, gap = BRAND_SYMBOL_GAP.regular, parts }) {
+  const { back, front, cut } = getBrandSymbolPaths(gap);
+  const draw = (part) => !parts || parts.includes(part);
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox.join(" ")}" width="${width}" height="${height}">
-  <mask id="gap" maskUnits="userSpaceOnUse" x="-20" y="-20" width="140" height="140">
-    <rect x="-20" y="-20" width="140" height="140" fill="#fff"/>
-    <path d="${FRONT_PATH}" fill="#000" stroke="#000" stroke-width="${BRAND_MARK_GAP * 2}"/>
+  <mask id="gap" maskUnits="userSpaceOnUse" ${MASK_REGION}>
+    <rect ${MASK_REGION} fill="#fff"/>
+    <path d="${cut}" fill="#000"/>
   </mask>
-  <path d="${BACK_PATH}" fill="none" stroke="${color}" stroke-width="${BRAND_MARK_BACK_STROKE}" mask="url(#gap)"/>
-  <path d="${FRONT_PATH}" fill="${color}"/>
+  ${draw("back") ? `<path d="${back}" fill="${colors.back}" mask="url(#gap)"/>` : ""}
+  ${draw("front") ? `<path d="${front}" fill="${colors.front}"/>` : ""}
 </svg>`;
 }
 
 const SQUARE_BOX = [
-  BRAND_MARK_SQUARE.x,
-  BRAND_MARK_SQUARE.y,
-  BRAND_MARK_SQUARE.size,
-  BRAND_MARK_SQUARE.size,
+  BRAND_SYMBOL_SQUARE.x,
+  BRAND_SYMBOL_SQUARE.y,
+  BRAND_SYMBOL_SQUARE.size,
+  BRAND_SYMBOL_SQUARE.size,
 ];
-const INK_BOX = [BRAND_MARK_INK.x, BRAND_MARK_INK.y, BRAND_MARK_INK.width, BRAND_MARK_INK.height];
+const INK_BOX = [0, 0, INK_W, INK_H];
 
 /**
  * A square view box that puts the symbol's ink at `share` of the visible
- * width, optically centered, shrunk if its corners would leave the safe circle.
+ * width, centered, shrunk if its corners would leave the safe circle.
  */
 function iconBox({ visible, safe }) {
-  const half = Math.hypot(BRAND_MARK_INK.width / 2, BRAND_MARK_INK.height / 2);
-  const inkShare = Math.min(SYMBOL_WIDTH * visible, (safe / 2) * (BRAND_MARK_INK.width / half));
-  const size = BRAND_MARK_INK.width / inkShare;
-  const centerX = BRAND_MARK_INK.x + BRAND_MARK_INK.width / 2 + BRAND_MARK_OPTICAL_OFFSET_X;
-  const centerY = BRAND_MARK_INK.y + BRAND_MARK_INK.height / 2;
-  return [centerX - size / 2, centerY - size / 2, size, size];
+  const half = Math.hypot(INK_W / 2, INK_H / 2);
+  const inkShare = Math.min(SYMBOL_WIDTH * visible, (safe / 2) * (INK_W / half));
+  const size = INK_W / inkShare;
+  return [INK_W / 2 - size / 2, INK_H / 2 - size / 2, size, size];
 }
+
+const layer = (name, parts, gap) => ({
+  name,
+  size: 512,
+  height: Math.round((512 * INK_H) / INK_W),
+  svg: { viewBox: INK_BOX, colors: oneColor(WHITE), gap, parts },
+});
+
+const ANDROID_BOX = iconBox({ visible: ANDROID_VISIBLE, safe: ANDROID_SAFE });
 
 const IMAGES = [
   {
     name: "icon.png",
     size: SIZE,
     background: BRAND_BLUE,
-    svg: { viewBox: iconBox({ visible: 1, safe: 1 }), color: WHITE },
+    svg: { viewBox: iconBox({ visible: 1, safe: 1 }), colors: ON_BRAND },
   },
-  {
-    name: "adaptive-icon.png",
-    size: SIZE,
-    svg: { viewBox: iconBox({ visible: ANDROID_VISIBLE, safe: ANDROID_SAFE }), color: WHITE },
-  },
+  { name: "adaptive-icon.png", size: SIZE, svg: { viewBox: ANDROID_BOX, colors: ON_BRAND } },
   {
     name: "adaptive-icon-monochrome.png",
     size: SIZE,
-    svg: { viewBox: iconBox({ visible: ANDROID_VISIBLE, safe: ANDROID_SAFE }), color: WHITE },
+    svg: { viewBox: ANDROID_BOX, colors: oneColor(WHITE), gap: BRAND_SYMBOL_GAP.oneColor },
   },
   {
     name: "icon-blue-on-white.png",
     size: SIZE,
     background: WHITE,
-    svg: { viewBox: iconBox({ visible: 1, safe: 1 }), color: BRAND_BLUE },
+    svg: { viewBox: iconBox({ visible: 1, safe: 1 }), colors: LIGHT },
   },
   {
     name: "splash-icon.png",
     size: SPLASH_MARK_SIZE * SPLASH_SCALE,
-    svg: { viewBox: SQUARE_BOX, color: BRAND_MARK_COLORS.light },
+    svg: { viewBox: SQUARE_BOX, colors: LIGHT },
   },
   {
     name: "splash-icon-dark.png",
     size: SPLASH_MARK_SIZE * SPLASH_SCALE,
-    svg: { viewBox: SQUARE_BOX, color: BRAND_MARK_COLORS.dark },
+    svg: { viewBox: SQUARE_BOX, colors: BRAND_SYMBOL_COLORS.dark },
   },
-  { name: "logo-blue.png", size: SIZE, svg: { viewBox: SQUARE_BOX, color: BRAND_BLUE } },
-  { name: "logo-white.png", size: SIZE, svg: { viewBox: SQUARE_BOX, color: WHITE } },
-  {
-    name: "brand-mark.png",
-    size: 512,
-    height: Math.round((512 * BRAND_MARK_INK.height) / BRAND_MARK_INK.width),
-    svg: { viewBox: INK_BOX, color: WHITE },
-  },
+  { name: "logo-blue.png", size: SIZE, svg: { viewBox: SQUARE_BOX, colors: LIGHT } },
+  { name: "logo-white.png", size: SIZE, svg: { viewBox: SQUARE_BOX, colors: ON_BRAND } },
+  layer("brand-mark-back.png", ["back"], BRAND_SYMBOL_GAP.regular),
+  layer("brand-mark-back-small.png", ["back"], BRAND_SYMBOL_GAP.small),
+  layer("brand-mark-front.png", ["front"]),
 ];
 
 function drawImage({ width, height, background, svg }) {

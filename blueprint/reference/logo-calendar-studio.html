@@ -1,0 +1,1686 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Calendar mark studio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@700&family=Inter:wght@400;500;600&display=swap"
+    />
+    <style>
+      /* Layout: a sticky control column beside a proof sheet (large mark, sizes, icon, one color, lockups), saved designs under the controls. */
+      :root {
+        --text-primary: #111827;
+        --text-secondary: #5b6472;
+        --page: #f5f6f8;
+        --panel: #ffffff;
+        --field: #f1f3f6;
+        --border: rgba(15, 23, 42, 0.1);
+        --border-strong: rgba(15, 23, 42, 0.2);
+        --accent: #2563eb;
+        --accent-soft: rgba(37, 99, 235, 0.1);
+        --danger: #b91c1c;
+        --tile-light: #ffffff;
+        --tile-dark: #0b0f17;
+        --ink-light: #0f172a;
+        --ink-dark: #fafafa;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --text-primary: #f4f4f5;
+          --text-secondary: #a1a1aa;
+          --page: #0e0f12;
+          --panel: #17181c;
+          --field: #202127;
+          --border: rgba(255, 255, 255, 0.1);
+          --border-strong: rgba(255, 255, 255, 0.2);
+          --accent: #4a9bff;
+          --accent-soft: rgba(74, 155, 255, 0.16);
+          --danger: #f87171;
+          color-scheme: dark;
+        }
+      }
+      :root[data-theme="dark"] {
+        --text-primary: #f4f4f5;
+        --text-secondary: #a1a1aa;
+        --page: #0e0f12;
+        --panel: #17181c;
+        --field: #202127;
+        --border: rgba(255, 255, 255, 0.1);
+        --border-strong: rgba(255, 255, 255, 0.2);
+        --accent: #4a9bff;
+        --accent-soft: rgba(74, 155, 255, 0.16);
+        --danger: #f87171;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 24px 16px 56px;
+        background: var(--page);
+        color: var(--text-primary);
+        font-family: Inter, system-ui, sans-serif;
+        font-size: 13px;
+      }
+      main {
+        max-width: 1180px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 20px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      .lede {
+        color: var(--text-secondary);
+        margin: 0 0 18px;
+        line-height: 1.5;
+        max-width: 720px;
+        font-size: 14px;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+        gap: 16px;
+        align-items: start;
+      }
+      @media (max-width: 860px) {
+        .layout {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .controls {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        position: sticky;
+        top: calc(env(safe-area-inset-top, 0px) + 12px);
+        max-height: calc(100vh - 24px);
+        overflow-y: auto;
+        padding-right: 2px;
+      }
+      @media (max-width: 860px) {
+        .controls {
+          position: static;
+          max-height: none;
+        }
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px 14px;
+        min-width: 0;
+      }
+      .panel h2 {
+        margin: 0 0 10px;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .chip {
+        font: inherit;
+        font-size: 12px;
+        font-weight: 500;
+        padding: 5px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border-strong);
+        background: transparent;
+        color: var(--text-primary);
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .chip[aria-pressed="true"] {
+        background: var(--accent-soft);
+        border-color: var(--accent);
+      }
+      .chip:focus-visible,
+      .btn:focus-visible,
+      input:focus-visible,
+      select:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      .ctl {
+        margin-bottom: 10px;
+      }
+      .ctl:last-child {
+        margin-bottom: 0;
+      }
+      .ctl label,
+      .ctl .lbl {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-bottom: 4px;
+      }
+      .ctl output {
+        color: var(--text-primary);
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+      }
+      .ctl input[type="range"] {
+        width: 100%;
+        accent-color: var(--accent);
+      }
+      .swatches {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .swatch {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 11px;
+        color: var(--text-secondary);
+      }
+      .swatch input {
+        width: 100%;
+        height: 30px;
+        border: 1px solid var(--border-strong);
+        border-radius: 8px;
+        background: var(--field);
+        padding: 2px;
+        cursor: pointer;
+      }
+      .theme-label {
+        font-size: 11px;
+        color: var(--text-secondary);
+        margin: 10px 0 6px;
+      }
+      .theme-label:first-of-type {
+        margin-top: 0;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .text {
+        flex: 1;
+        min-width: 0;
+        font: inherit;
+        padding: 7px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--border-strong);
+        background: var(--field);
+        color: var(--text-primary);
+      }
+      .btn {
+        font: inherit;
+        font-weight: 500;
+        padding: 7px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--accent);
+        background: var(--accent);
+        color: #ffffff;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .btn.ghost {
+        background: transparent;
+        color: var(--text-primary);
+        border-color: var(--border-strong);
+      }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      .saved {
+        list-style: none;
+        margin: 10px 0 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .saved li {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 8px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--field);
+      }
+      .saved .name {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 500;
+      }
+      .saved .meta {
+        color: var(--text-secondary);
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+      }
+      .link {
+        font: inherit;
+        font-size: 12px;
+        background: none;
+        border: 0;
+        padding: 2px 4px;
+        color: var(--accent);
+        cursor: pointer;
+      }
+      .link.del {
+        color: var(--danger);
+      }
+      .status {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin: 8px 0 0;
+        min-height: 1em;
+      }
+      .sheet {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-width: 0;
+      }
+      .tile {
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        padding: 16px;
+        min-width: 0;
+      }
+      .tile.light {
+        background: var(--tile-light);
+        color: var(--ink-light);
+      }
+      .tile.dark {
+        background: var(--tile-dark);
+        color: var(--ink-dark);
+      }
+      .cap {
+        display: block;
+        font-size: 11px;
+        font-weight: 500;
+        opacity: 0.6;
+        margin-bottom: 10px;
+      }
+      .hero {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+      @media (max-width: 560px) {
+        .hero {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .hero .tile {
+        display: flex;
+        flex-direction: column;
+      }
+      .hero .stage {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 230px;
+      }
+      .grid4 {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+      @media (max-width: 760px) {
+        .grid4 {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      .sizes {
+        display: flex;
+        align-items: flex-end;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 15px;
+        background: #2563eb;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .lockups {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+      @media (max-width: 560px) {
+        .lockups {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .lockups .tile {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 18px;
+        overflow: hidden;
+      }
+      .lockup {
+        display: inline-flex;
+        align-items: center;
+        white-space: nowrap;
+      }
+      .stacked {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .word {
+        font-family: "DM Sans", sans-serif;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1;
+      }
+      .compare {
+        margin-top: 28px;
+      }
+      .compare h2 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      .compare-note {
+        color: var(--text-secondary);
+        margin: 0 0 12px;
+        font-size: 13px;
+      }
+      .compare-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+      }
+      .cmp {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+      .cmp .tile {
+        border: 0;
+        border-radius: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+      }
+      .cmp .big {
+        min-height: 170px;
+      }
+      .cmp .strip {
+        justify-content: flex-start;
+        align-items: flex-end;
+        border-top: 1px solid var(--border);
+        padding: 12px 14px;
+      }
+      .cmp .info {
+        padding: 12px 14px 14px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        flex: 1;
+      }
+      .cmp .info-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .cmp h3 {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 600;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .cmp dl {
+        margin: 0;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 3px 10px;
+        font-size: 12px;
+      }
+      .cmp dt {
+        color: var(--text-secondary);
+      }
+      .cmp dd {
+        margin: 0;
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+      }
+      #measure {
+        position: absolute;
+        width: 0;
+        height: 0;
+        overflow: hidden;
+        visibility: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Calendar mark studio</h1>
+      <p class="lede">
+        Shape the stacked mark: slanted cards, shift cells, rings and stacking. Every change updates
+        the proofs at once. Save a design and Claude can read it straight from this page.
+      </p>
+
+      <div class="layout">
+        <div class="controls">
+          <section class="panel" aria-labelledby="h-presets">
+            <h2 id="h-presets">Start from</h2>
+            <div class="chips" id="presets"></div>
+          </section>
+
+          <section class="panel" aria-labelledby="h-cards">
+            <h2 id="h-cards">Pages</h2>
+            <div class="ctl">
+              <span class="lbl">Stacking</span>
+              <div class="chips" id="stacking" role="group" aria-label="Stacking"></div>
+            </div>
+            <div class="ctl">
+              <span class="lbl">Darker page</span>
+              <div class="chips" id="darkPage" role="group" aria-label="Darker page"></div>
+            </div>
+            <div id="cardControls"></div>
+          </section>
+
+          <section class="panel" aria-labelledby="h-rings">
+            <h2 id="h-rings">Rings</h2>
+            <div class="ctl">
+              <span class="lbl">Style</span>
+              <div class="chips" id="ringStyle" role="group" aria-label="Ring style"></div>
+            </div>
+            <div class="ctl">
+              <span class="lbl">Center rings on</span>
+              <div class="chips" id="ringAnchor" role="group" aria-label="Center rings on"></div>
+            </div>
+            <div class="ctl">
+              <span class="lbl">Color</span>
+              <div class="chips" id="ringColor" role="group" aria-label="Ring color"></div>
+            </div>
+            <div id="ringControls"></div>
+          </section>
+
+          <section class="panel" aria-labelledby="h-cells">
+            <h2 id="h-cells">Shift cells</h2>
+            <div class="ctl">
+              <span class="lbl">Grid on the front card</span>
+              <div
+                class="chips"
+                id="cellsToggle"
+                role="group"
+                aria-label="Grid on the front card"
+              ></div>
+            </div>
+            <div id="cellControls"></div>
+            <div class="ctl" id="firstFaintCtl">
+              <span class="lbl">First cell almost invisible</span>
+              <div
+                class="chips"
+                id="firstFaint"
+                role="group"
+                aria-label="First cell almost invisible"
+              ></div>
+            </div>
+          </section>
+
+          <section class="panel" aria-labelledby="h-colors">
+            <h2 id="h-colors">Colors</h2>
+            <div class="theme-label">Light</div>
+            <div class="swatches" id="lightColors"></div>
+            <div class="theme-label">Dark</div>
+            <div class="swatches" id="darkColors"></div>
+          </section>
+
+          <section class="panel" aria-labelledby="h-save">
+            <h2 id="h-save">Saved designs</h2>
+            <div class="row">
+              <input
+                class="text"
+                id="designName"
+                type="text"
+                maxlength="60"
+                placeholder="Name this design"
+                aria-label="Design name"
+              />
+              <button class="btn" id="saveBtn" type="button">Save</button>
+            </div>
+            <p class="status" id="saveStatus">Connecting to saved designs</p>
+            <ul class="saved" id="savedList"></ul>
+            <div class="row" style="margin-top: 10px">
+              <button class="btn ghost" id="copySvg" type="button">Copy SVG</button>
+              <button class="btn ghost" id="copyJson" type="button">Copy settings</button>
+            </div>
+          </section>
+        </div>
+
+        <div class="sheet">
+          <div class="hero">
+            <div class="tile light">
+              <span class="cap">Light</span>
+              <div class="stage" id="heroLight"></div>
+            </div>
+            <div class="tile dark">
+              <span class="cap">Dark</span>
+              <div class="stage" id="heroDark"></div>
+            </div>
+          </div>
+          <div class="grid4">
+            <div class="tile light">
+              <span class="cap">64, 32, 16 px</span>
+              <div class="sizes" id="sizesLight"></div>
+            </div>
+            <div class="tile dark">
+              <span class="cap">64, 32, 16 px</span>
+              <div class="sizes" id="sizesDark"></div>
+            </div>
+            <div class="tile light">
+              <span class="cap">App icon</span>
+              <div class="sizes" id="icon"></div>
+            </div>
+            <div class="tile light">
+              <span class="cap">One color</span>
+              <div class="sizes" id="mono"></div>
+            </div>
+          </div>
+          <div class="lockups">
+            <div class="tile light" id="lockLight"></div>
+            <div class="tile dark" id="lockDark"></div>
+          </div>
+        </div>
+      </div>
+
+      <section class="compare" id="compareSection" hidden aria-labelledby="h-compare">
+        <h2 id="h-compare">Saved designs side by side</h2>
+        <p class="compare-note">
+          Only the settings that differ between them are listed. Load one to keep editing it.
+        </p>
+        <div class="compare-grid" id="compareGrid"></div>
+      </section>
+    </main>
+    <svg id="measure" aria-hidden="true"><g id="measureGroup"></g></svg>
+
+    <script>
+      const DEFAULT_COLORS = {
+        light: { back: "#2563eb", front: "#a8c4fc", deep: "#1e3a8a" },
+        dark: { back: "#3b82f6", front: "#bcd2ff", deep: "#1d4ed8" },
+      };
+      const BASE = {
+        angle: 32,
+        aspect: 0.95,
+        stepX: 0.4,
+        stepY: 0.42,
+        shrink: 1,
+        radius: 14,
+        gap: 3.5,
+        ringCount: 2,
+        ringStyle: "rings",
+        ringColor: "back",
+        ringW: 20,
+        ringUp: 15,
+        ringDown: 15,
+        ringSpread: 0.2,
+        ringAnchor: "edge",
+        ringShift: 0,
+        ringGap: 3.5,
+        darkPage: "back",
+        stacking: "offset",
+        reveal: 14,
+        fan: 0,
+        sheets: 3,
+        splay: 24,
+        cells: false,
+        cellCols: 3,
+        cellRows: 2,
+        cellInset: 12,
+        cellTop: 0,
+        cellGap: 6,
+        cellRadius: 4,
+        cellStrength: 0.22,
+        cellVary: 0,
+        cellSeed: 1,
+        cellFirstFaint: false,
+      };
+      // The mark the fix spec describes (blueprint/context/current-feature.md):
+      // two equal cards at 32°, brand blue behind, light blue in front.
+      const REFINED = {
+        stacking: "offset",
+        angle: 32,
+        aspect: 0.95,
+        stepX: 0.4,
+        stepY: 0.42,
+        shrink: 1,
+        radius: 14,
+        gap: 3.5,
+        darkPage: "back",
+        ringCount: 0,
+        cells: false,
+      };
+      const PRESETS = [
+        { name: "Refined mark (spec)", p: REFINED },
+        { name: "Stem rings", p: {} },
+        { name: "Slim rings", p: { ringW: 12, ringUp: 20 } },
+        {
+          name: "Ring per page",
+          p: {
+            ringStyle: "perpage",
+            ringCount: 1,
+            ringW: 18,
+            ringUp: 16,
+            ringDown: 14,
+            ringSpread: 0,
+          },
+        },
+        { name: "Ring holes", p: { ringStyle: "holes", ringW: 19 } },
+        { name: "Deep rings", p: { ringColor: "deep" } },
+        { name: "Short rings", p: { ringUp: 9, ringDown: 17 } },
+        { name: "Plain stack", p: { ringCount: 0 } },
+        {
+          name: "Shift cells",
+          p: { stacking: "offset", darkPage: "front", ringCount: 0, cells: true },
+        },
+        {
+          name: "Sketch",
+          p: {
+            stacking: "offset",
+            angle: 0,
+            aspect: 0.75,
+            stepX: 0.21,
+            stepY: -0.2,
+            radius: 7,
+            darkPage: "front",
+            ringStyle: "punch",
+            ringCount: 2,
+            ringW: 11,
+            ringUp: 5,
+            ringDown: 3.5,
+            ringGap: 1.5,
+            ringSpread: 0.27,
+            ringColor: "deep",
+            cells: true,
+            cellInset: 7,
+            cellTop: 9,
+            cellRows: 3,
+            cellGap: 6,
+            cellStrength: 0.12,
+            cellVary: 0.3,
+            cellSeed: 1,
+            cellFirstFaint: true,
+            cellRadius: 3,
+          },
+        },
+      ];
+      const SLIDERS = {
+        cardControls: [
+          ["angle", "Slant", -45, 45, 1, (v) => `${v}°`],
+          ["aspect", "Page height (of width)", 0.6, 1.3, 0.01, (v) => `${Math.round(v * 100)}%`],
+          ["stepX", "Step along the slant", 0.15, 0.7, 0.01, (v) => `${Math.round(v * 100)}%`],
+          [
+            "stepY",
+            "Step up (negative steps down)",
+            -0.5,
+            0.7,
+            0.01,
+            (v) => `${Math.round(v * 100)}%`,
+          ],
+          ["reveal", "Back page shows below", 0, 45, 0.5, (v) => `${v}`],
+          ["fan", "Fan from the binding", -15, 15, 0.5, (v) => `${v}°`],
+          ["sheets", "Sheets", 2, 4, 1, (v) => `${v}`],
+          ["splay", "How far the book opens", 0, 70, 0.5, (v) => `${v}°`],
+          ["shrink", "Front page size", 0.75, 1, 0.01, (v) => `${Math.round(v * 100)}%`],
+          ["radius", "Corner radius", 2, 30, 0.5, (v) => `${v}`],
+          ["gap", "Gap between pages", 0, 9, 0.5, (v) => (v ? `${v}` : "none")],
+        ],
+        cellControls: [
+          ["cellCols", "Columns", 1, 6, 1, (v) => `${v}`],
+          ["cellRows", "Rows", 1, 4, 1, (v) => `${v}`],
+          ["cellInset", "Inset from the card edge", 2, 26, 0.5, (v) => `${v}`],
+          ["cellTop", "Extra space above the cells", 0, 30, 0.5, (v) => `${v}`],
+          ["cellGap", "Gap between cells", 1, 16, 0.5, (v) => `${v}`],
+          ["cellRadius", "Cell corner radius", 0, 12, 0.5, (v) => `${v}`],
+          ["cellStrength", "Strength", -0.4, 0.7, 0.01, (v) => `${Math.round(v * 100)}%`],
+          [
+            "cellVary",
+            "Variation between cells",
+            0,
+            0.6,
+            0.01,
+            (v) => (v ? `±${Math.round(v * 100)}%` : "none"),
+          ],
+          ["cellSeed", "Pattern", 1, 40, 1, (v) => `${v}`],
+        ],
+        ringControls: [
+          ["ringCount", "Rings", 0, 3, 1, (v) => `${v}`],
+          ["ringW", "Thickness", 6, 32, 0.5, (v) => `${v}`],
+          ["ringUp", "Above the edge", 0, 34, 0.5, (v) => `${v}`],
+          ["ringDown", "Below the edge", 0, 34, 0.5, (v) => `${v}`],
+          ["ringSpread", "Spread from center", 0, 0.42, 0.01, (v) => `${Math.round(v * 100)}%`],
+          ["ringShift", "Shift by eye", -20, 20, 0.5, (v) => (v > 0 ? `+${v}` : `${v}`)],
+          ["ringGap", "Gap around rings", 0, 8, 0.5, (v) => (v ? `${v}` : "none")],
+        ],
+      };
+      const STYLES = [
+        ["rings", "Rings"],
+        ["perpage", "Ring per page"],
+        ["holes", "Holes"],
+        ["spine", "Spine bar"],
+        ["punch", "Half holes"],
+      ];
+      const ANCHORS = [
+        ["edge", "Straight edge"],
+        ["page", "Page center"],
+      ];
+      const RING_COLORS = [
+        ["back", "Dark blue"],
+        ["deep", "Deep"],
+        ["front", "Light blue"],
+      ];
+      // Settings that only apply to one stacking mode.
+      const ONLY_FOR = {
+        stepX: "offset",
+        stepY: "offset",
+        reveal: "top",
+        fan: "top",
+        sheets: "book",
+        splay: "book",
+      };
+      const STACKINGS = [
+        ["book", "Book"],
+        ["top", "Bound at top"],
+        ["offset", "Offset"],
+      ];
+      const DARK_PAGES = [
+        ["back", "Back"],
+        ["front", "Front"],
+      ];
+
+      const fmt = (n) => Number(Number(n).toFixed(2)).toString();
+      const clone = (o) => JSON.parse(JSON.stringify(o));
+      const HEX = /^#[0-9a-f]{6}$/i;
+
+      // Accept only known keys with sane values, so a saved or stored design
+      // can never break rendering.
+      function sanitize(raw) {
+        const out = { ...BASE, colors: clone(DEFAULT_COLORS) };
+        if (!raw || typeof raw !== "object") return out;
+        for (const list of Object.values(SLIDERS)) {
+          for (const [key, , min, max] of list) {
+            const v = Number(raw[key]);
+            if (Number.isFinite(v)) out[key] = Math.min(max, Math.max(min, v));
+          }
+        }
+        if (STYLES.some(([k]) => k === raw.ringStyle)) out.ringStyle = raw.ringStyle;
+        if (RING_COLORS.some(([k]) => k === raw.ringColor)) out.ringColor = raw.ringColor;
+        if (ANCHORS.some(([k]) => k === raw.ringAnchor)) out.ringAnchor = raw.ringAnchor;
+        if (DARK_PAGES.some(([k]) => k === raw.darkPage)) out.darkPage = raw.darkPage;
+        if (typeof raw.cells === "boolean") out.cells = raw.cells;
+        if (typeof raw.cellFirstFaint === "boolean") out.cellFirstFaint = raw.cellFirstFaint;
+        const stacking = raw.stacking === "tent" ? "book" : raw.stacking;
+        if (STACKINGS.some(([k]) => k === stacking)) out.stacking = stacking;
+        for (const theme of ["light", "dark"]) {
+          for (const k of ["back", "front", "deep"]) {
+            const v = raw.colors?.[theme]?.[k];
+            if (typeof v === "string" && HEX.test(v)) out.colors[theme][k] = v.toLowerCase();
+          }
+        }
+        return out;
+      }
+
+      function roundedPolygon(pts, r) {
+        const n = pts.length;
+        const corners = pts.map((v, k) => {
+          const prev = pts[(k + n - 1) % n];
+          const next = pts[(k + 1) % n];
+          const a = [prev[0] - v[0], prev[1] - v[1]];
+          const b = [next[0] - v[0], next[1] - v[1]];
+          const la = Math.hypot(...a);
+          const lb = Math.hypot(...b);
+          const ua = [a[0] / la, a[1] / la];
+          const ub = [b[0] / lb, b[1] / lb];
+          const angle = Math.acos(Math.max(-1, Math.min(1, ua[0] * ub[0] + ua[1] * ub[1])));
+          const t = Math.min(r / Math.tan(angle / 2), la / 2, lb / 2);
+          return {
+            s: [v[0] + ua[0] * t, v[1] + ua[1] * t],
+            e: [v[0] + ub[0] * t, v[1] + ub[1] * t],
+            r: t * Math.tan(angle / 2),
+          };
+        });
+        let d = `M${fmt(corners[0].e[0])},${fmt(corners[0].e[1])}`;
+        for (let k = 1; k <= n; k++) {
+          const c = corners[k % n];
+          d += `L${fmt(c.s[0])},${fmt(c.s[1])}A${fmt(c.r)},${fmt(c.r)} 0 0 1 ${fmt(c.e[0])},${fmt(c.e[1])}`;
+        }
+        return d + "Z";
+      }
+
+      // The pages: the back page 100 wide, the front page offset along the
+      // slant and up, scaled about its own center.
+      function geometry(p) {
+        const rad = (p.angle * Math.PI) / 180;
+        const tan = Math.tan(rad);
+        const page = (cx, cy, s, height) => {
+          const w = 100 * s;
+          const h = height ?? p.aspect * 100 * s;
+          // The top-left corner is acute and the top-right obtuse, so their
+          // roundings eat unequal lengths of the top edge. The straight part
+          // left between them is what the eye measures the rings against.
+          const r = p.radius * s;
+          const edge = w / Math.cos(rad);
+          const eaten = (deg) => Math.min(r / Math.tan((deg * Math.PI) / 360), edge / 2, h / 2);
+          const straightShift = ((eaten(90 - p.angle) - eaten(90 + p.angle)) / 2) * Math.cos(rad);
+          return {
+            straightShift,
+            cx,
+            cy,
+            w,
+            h,
+            d: roundedPolygon(
+              [
+                [cx - w / 2, cy - h / 2 - (w / 2) * tan],
+                [cx + w / 2, cy - h / 2 + (w / 2) * tan],
+                [cx + w / 2, cy + h / 2 + (w / 2) * tan],
+                [cx - w / 2, cy + h / 2 - (w / 2) * tan],
+              ],
+              p.radius * s,
+            ),
+            topY: (x) => cy - h / 2 + (x - cx) * tan,
+          };
+        };
+        const H = p.aspect * 100;
+        // Layers run back to front; `depth` 0 is the front sheet and 1 the
+        // deepest, which sets each sheet's shade.
+        if (p.stacking === "book") {
+          // An open book lying face down: every sheet shares one top edge,
+          // the spine, and hangs from it at its own angle. A sheet opened by
+          // an angle hangs that far out, so its bottom edge moves sideways by
+          // height x sin(angle) and rises to height x cos(angle). The middle
+          // sheet hangs straight down in front.
+          const n = p.sheets;
+          const mid = (n - 1) / 2;
+          const reach = Math.max(mid, 0.5);
+          const order = [...Array(n).keys()].sort(
+            (x, y) => Math.abs(y - mid) - Math.abs(x - mid) || x - y,
+          );
+          return order.map((i) => {
+            const o = i - mid;
+            const s = o === 0 ? p.shrink : 1;
+            const w = 100 * s;
+            const h = p.aspect * 100 * s;
+            const pg = page(0, h / 2, s);
+            const open = ((o / reach) * p.splay * Math.PI) / 180;
+            const dx = h * Math.sin(open);
+            const hh = h * Math.cos(open);
+            const tl = [-w / 2, -(w / 2) * tan];
+            const tr = [w / 2, (w / 2) * tan];
+            pg.d = roundedPolygon(
+              [tl, tr, [tr[0] + dx, tr[1] + hh], [tl[0] + dx, tl[1] + hh]],
+              p.radius * s,
+            );
+            return { pg, transform: "", depth: Math.abs(o) / reach };
+          });
+        }
+        if (p.stacking === "top") {
+          // A pad: both sheets hang from one top edge, the back sheet longer
+          // so it shows below, and the front sheet can fan out from the
+          // binding.
+          const back = page(0, 0, 1, H + p.reveal);
+          const binding = -(H + p.reveal) / 2;
+          const front = page(0, binding + (H * p.shrink) / 2, p.shrink);
+          return [
+            { pg: back, transform: "", depth: 1 },
+            {
+              pg: front,
+              transform: p.fan ? `rotate(${fmt(p.fan)} 0 ${fmt(binding)})` : "",
+              depth: 0,
+            },
+          ];
+        }
+        const back = page(0, 0, 1);
+        const front = page(p.stepX * 100, p.stepX * 100 * tan - p.stepY * H, p.shrink);
+        return [
+          { pg: back, transform: "", depth: 1 },
+          { pg: front, transform: "", depth: 0 },
+        ];
+      }
+
+      // A small seeded generator (mulberry32), so each pattern number always
+      // gives the same light and dark cells.
+      function cellTones(p) {
+        let a = (p.cellSeed * 2654435761) >>> 0;
+        const next = () => {
+          a = (a + 0x6d2b79f5) >>> 0;
+          let t = a;
+          t = Math.imul(t ^ (t >>> 15), t | 1);
+          t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+        return Array.from({ length: p.cellCols * p.cellRows }, () => next() * 2 - 1);
+      }
+
+      const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+      const mixHex = (a, b, t) =>
+        "#" +
+        hexRgb(a)
+          .map((v, i) =>
+            Math.round(v + (hexRgb(b)[i] - v) * t)
+              .toString(16)
+              .padStart(2, "0"),
+          )
+          .join("");
+
+      function ringXs(pg, p) {
+        const c =
+          pg.cx + (p.ringAnchor === "edge" ? pg.straightShift : 0) + p.ringShift * (pg.w / 100);
+        const d = p.ringSpread * pg.w;
+        if (p.ringCount === 1) return [c];
+        if (p.ringCount === 2) return [c - d, c + d];
+        if (p.ringCount === 3) return [c - d, c, c + d];
+        return [];
+      }
+
+      // SVG content for the design. `c` holds back, front, ring and surface
+      // colors; `gap` overrides the cut width (one color widens it). Each
+      // sheet cuts a surface-colored gap into the sheets behind it.
+      let punchId = 0;
+      function content(p, c, gap = p.gap) {
+        const layers = geometry(p);
+        const front = layers[layers.length - 1];
+        const halo = (d) =>
+          gap > 0
+            ? `<path d="${d}" fill="${c.surface}" stroke="${c.surface}" stroke-width="${fmt(gap * 2)}" stroke-linejoin="round"/>`
+            : "";
+        // Half holes: semicircles punched out of a card's top edge, as a mask
+        // on that card alone. The card's gap still fills the notch, so a
+        // front card's punch reads as a clean notch in the surface color.
+        const punchMasks = (pg, scale) => {
+          const r = (p.ringW / 2) * scale;
+          const xs = ringXs(pg, p);
+          if (!xs.length) return null;
+          const region = `x="-400" y="-400" width="800" height="800"`;
+          const circles = (radius) =>
+            radius > 0
+              ? xs
+                  .map(
+                    (x) =>
+                      `<circle cx="${fmt(x)}" cy="${fmt(pg.topY(x))}" r="${fmt(radius)}" fill="black"/>`,
+                  )
+                  .join("")
+              : "";
+          const card = `pc${punchId++}`;
+          return {
+            card,
+            defs: `<mask id="${card}" maskUnits="userSpaceOnUse" ${region}><rect ${region} fill="white"/>${circles(r)}</mask>`,
+          };
+        };
+        const ring = (pg, scale, x) => {
+          const y = pg.topY(x);
+          const w = p.ringW * scale;
+          const r = `x="${fmt(x - w / 2)}" y="${fmt(y - p.ringUp)}" width="${fmt(w)}" height="${fmt(p.ringUp + p.ringDown)}" rx="${fmt(w / 2)}"`;
+          // One color widens the card gap; a ring needs less to stay apart.
+          const rg = gap === p.gap ? p.ringGap : Math.max(p.ringGap, 2.5);
+          const ringHalo =
+            rg > 0
+              ? `<rect ${r} fill="${c.surface}" stroke="${c.surface}" stroke-width="${fmt(rg * 2)}"/>`
+              : "";
+          return `${ringHalo}<rect ${r} fill="${c.ring}"/>`;
+        };
+        // A solid spine along the top edge: as thick as a ring, centered on
+        // the rings' center, as long as twice the spread.
+        const spine = (pg, scale) => {
+          const c0 = pg.cx + (p.ringAnchor === "edge" ? pg.straightShift : 0) + p.ringShift * scale;
+          const half = Math.max(p.ringSpread * pg.w, 0.5);
+          const lift = (p.ringDown - p.ringUp) / 2;
+          const x1 = c0 - half;
+          const x2 = c0 + half;
+          const line = `x1="${fmt(x1)}" y1="${fmt(pg.topY(x1) + lift)}" x2="${fmt(x2)}" y2="${fmt(pg.topY(x2) + lift)}" stroke-linecap="round"`;
+          const w = p.ringW * scale;
+          const spineHalo =
+            gap > 0
+              ? `<line ${line} stroke="${c.surface}" stroke-width="${fmt(w + gap * 2)}"/>`
+              : "";
+          return `${spineHalo}<line ${line} stroke="${c.ring}" stroke-width="${fmt(w)}"/>`;
+        };
+        // A faint grid of shift cells on the front card. Columns stand
+        // upright like the card's sides; rows follow its slanted top edge.
+        // Each cell's tone is the base strength plus its share of the
+        // variation: positive mixes toward the lighter target, negative toward
+        // the deep blue. A seeded sequence keeps a pattern stable.
+        const tones = cellTones(p);
+        // With `cellFirstFaint`, the cell whose tone lands closest to the
+        // card's own color trades places with the first cell, so the first
+        // cell is the one that nearly disappears. If no cell lands close
+        // enough, the first cell takes a hair darker than the card.
+        const FAINT = -0.03;
+        const cellTone = (() => {
+          const t = tones.map((r) => p.cellStrength + p.cellVary * r);
+          if (p.cellFirstFaint && t.length) {
+            const k = t.reduce((best, v, i) => (Math.abs(v) < Math.abs(t[best]) ? i : best), 0);
+            [t[0], t[k]] = [t[k], t[0]];
+            if (Math.abs(t[0]) > 0.04) t[0] = FAINT;
+          }
+          return t;
+        })();
+        const cellColor = (fill, k) => {
+          const t = cellTone[k];
+          return t >= 0
+            ? mixHex(fill, c.cellLight, Math.min(t, 1))
+            : mixHex(fill, c.cellDark, Math.min(-t, 1));
+        };
+        const cellGrid = (pg, scale, fill) => {
+          const inset = p.cellInset * scale;
+          const g = p.cellGap * scale;
+          const cw = (pg.w - 2 * inset - (p.cellCols - 1) * g) / p.cellCols;
+          const top = inset + p.cellTop * scale;
+          const ch = (pg.h - inset - top - (p.cellRows - 1) * g) / p.cellRows;
+          if (cw <= 0 || ch <= 0) return "";
+          let out = "";
+          for (let col = 0; col < p.cellCols; col++) {
+            const x0 = pg.cx - pg.w / 2 + inset + col * (cw + g);
+            const x1 = x0 + cw;
+            for (let row = 0; row < p.cellRows; row++) {
+              const down = top + row * (ch + g);
+              const pts = [
+                [x0, pg.topY(x0) + down],
+                [x1, pg.topY(x1) + down],
+                [x1, pg.topY(x1) + down + ch],
+                [x0, pg.topY(x0) + down + ch],
+              ];
+              out += `<path d="${roundedPolygon(pts, p.cellRadius * scale)}" fill="${cellColor(fill, row * p.cellCols + col)}"/>`;
+            }
+          }
+          return out;
+        };
+        const hole = (pg, scale, x) =>
+          `<circle cx="${fmt(x)}" cy="${fmt(pg.topY(x))}" r="${fmt((p.ringW / 2) * scale)}" fill="${c.surface}"/>`;
+        return layers
+          .map((layer, i) => {
+            const { pg, transform, depth } = layer;
+            const scale = pg.w / 100;
+            const fill = mixHex(c.front, c.back, depth);
+            const punch = p.ringStyle === "punch" ? punchMasks(pg, scale) : null;
+            let out = `${punch ? punch.defs : ""}${i ? halo(pg.d) : ""}<path d="${pg.d}" fill="${fill}"${punch ? ` mask="url(#${punch.card})"` : ""}/>`;
+            if (p.cells && layer === front) out += cellGrid(pg, scale, fill);
+            const isFront = layer === front;
+            if (p.ringStyle === "holes" && isFront)
+              out += ringXs(pg, p)
+                .map((x) => hole(pg, scale, x))
+                .join("");
+            else if (p.ringStyle === "rings" && isFront)
+              out += ringXs(pg, p)
+                .map((x) => ring(pg, scale, x))
+                .join("");
+            else if (p.ringStyle === "perpage")
+              out += ringXs(pg, p)
+                .map((x) => ring(pg, scale, x))
+                .join("");
+            else if (p.ringStyle === "spine" && isFront) out += spine(pg, scale);
+            return transform ? `<g transform="${transform}">${out}</g>` : out;
+          })
+          .join("");
+      }
+
+      // `back` and `front` in the color settings are the dark and light
+      // shades; `darkPage` decides which page wears the dark one.
+      function colorsFor(p, mode) {
+        if (mode === "mono") {
+          return {
+            back: "#111827",
+            front: "#111827",
+            ring: "#111827",
+            surface: "#ffffff",
+            cellLight: "#ffffff",
+            cellDark: "#000000",
+          };
+        }
+        let shades;
+        let surface;
+        if (mode === "brand") {
+          shades = { back: "#7199f2", front: "#ffffff", deep: "#1e40af" };
+          surface = "#2563eb";
+        } else {
+          shades = p.colors[mode];
+          surface = mode === "light" ? "#ffffff" : "#0b0f17";
+        }
+        const ring =
+          mode === "brand" && p.ringColor !== "front"
+            ? "#ffffff"
+            : mode === "brand"
+              ? shades.back
+              : shades[p.ringColor];
+        const swap = p.darkPage === "front";
+        const back = swap ? shades.front : shades.back;
+        const front = swap ? shades.back : shades.front;
+        // Lighter cells head for the light shade on a dark card, or white on
+        // a light one; darker cells head for the deep blue.
+        const cellLight = swap ? shades.front : "#ffffff";
+        return { back, front, ring, surface, cellLight, cellDark: shades.deep };
+      }
+
+      function bbox(p) {
+        const g = document.getElementById("measureGroup");
+        g.innerHTML = content(p, colorsFor(p, "light"));
+        const b = g.getBBox();
+        return { x: b.x, y: b.y, w: b.width, h: b.height };
+      }
+
+      function svg(p, b, mode, size, { crop = "square", by = "width", gap } = {}) {
+        let vb;
+        if (crop === "square") {
+          const side = Math.max(b.w, b.h) * 1.08;
+          vb = [b.x + b.w / 2 - side / 2, b.y + b.h / 2 - side / 2, side, side];
+        } else {
+          vb = [b.x, b.y, b.w, b.h];
+        }
+        const ratio = vb[3] / vb[2];
+        const w = by === "height" ? size / ratio : size;
+        const h = by === "height" ? size : size * ratio;
+        const monoGap = mode === "mono" ? Math.max(p.gap, 5) : p.gap;
+        return `<svg width="${fmt(w)}" height="${fmt(h)}" viewBox="${vb.map(fmt).join(" ")}" aria-hidden="true" style="display:block;flex:none">${content(p, colorsFor(p, mode), gap ?? monoGap)}</svg>`;
+      }
+
+      // Lockup rules from the refined mark: ink as tall as the word
+      // (0.957 em) on its optical center (0.256 em), 0.22 em away; stacked
+      // twice the word's height, 0.42 em above the ascenders.
+      function lockup(p, b, mode, fontSize) {
+        const h = 0.957 * fontSize;
+        const below = h / 2 - 0.256 * fontSize;
+        return `<span class="lockup" style="font-size:${fontSize}px;gap:${fmt(0.22 * fontSize)}px"><span style="transform:translateY(${fmt(below)}px)">${svg(p, b, mode, h, { crop: "ink", by: "height" })}</span><span class="word">dubgrid</span></span>`;
+      }
+      const stacked = (p, b, mode, fontSize) =>
+        `<span class="stacked" style="font-size:${fontSize}px;gap:${fmt(0.42 * fontSize)}px">${svg(p, b, mode, 1.914 * fontSize, { crop: "ink", by: "height" })}<span class="word">dubgrid</span></span>`;
+
+      const $ = (id) => document.getElementById(id);
+      let state = sanitize(null);
+
+      function render() {
+        const b = bbox(state);
+        $("heroLight").innerHTML = svg(state, b, "light", 210);
+        $("heroDark").innerHTML = svg(state, b, "dark", 210);
+        $("sizesLight").innerHTML = [64, 32, 16].map((s) => svg(state, b, "light", s)).join("");
+        $("sizesDark").innerHTML = [64, 32, 16].map((s) => svg(state, b, "dark", s)).join("");
+        $("icon").innerHTML = `<span class="icon">${svg(state, b, "brand", 48)}</span>`;
+        $("mono").innerHTML = [64, 32, 16].map((s) => svg(state, b, "mono", s)).join("");
+        $("lockLight").innerHTML =
+          `<span class="cap">Light: header 24 px, 44 px, stacked</span>${lockup(state, b, "light", 24)}${lockup(state, b, "light", 44)}${stacked(state, b, "light", 26)}`;
+        $("lockDark").innerHTML =
+          `<span class="cap">Dark</span>${lockup(state, b, "dark", 24)}${lockup(state, b, "dark", 44)}${stacked(state, b, "dark", 26)}`;
+        syncControls();
+        rememberDraft();
+      }
+
+      function syncControls() {
+        for (const list of Object.values(SLIDERS)) {
+          for (const [key, , , , , label] of list) {
+            const input = $(`in-${key}`);
+            if (Number(input.value) !== state[key]) input.value = state[key];
+            $(`out-${key}`).textContent = label(state[key]);
+          }
+        }
+        document
+          .querySelectorAll("[data-style]")
+          .forEach((b) =>
+            b.setAttribute("aria-pressed", String(b.dataset.style === state.ringStyle)),
+          );
+        document
+          .querySelectorAll("[data-ring-color]")
+          .forEach((b) =>
+            b.setAttribute("aria-pressed", String(b.dataset.ringColor === state.ringColor)),
+          );
+        document
+          .querySelectorAll("[data-anchor]")
+          .forEach((b) =>
+            b.setAttribute("aria-pressed", String(b.dataset.anchor === state.ringAnchor)),
+          );
+        document
+          .querySelectorAll("[data-dark-page]")
+          .forEach((b) =>
+            b.setAttribute("aria-pressed", String(b.dataset.darkPage === state.darkPage)),
+          );
+        document
+          .querySelectorAll("[data-stacking]")
+          .forEach((b) =>
+            b.setAttribute("aria-pressed", String(b.dataset.stacking === state.stacking)),
+          );
+        document
+          .querySelectorAll("[data-cells]")
+          .forEach((b) =>
+            b.setAttribute("aria-pressed", String((b.dataset.cells === "true") === state.cells)),
+          );
+        $("cellControls").hidden = !state.cells;
+        $("firstFaintCtl").hidden = !state.cells;
+        document
+          .querySelectorAll("[data-first-faint]")
+          .forEach((b) =>
+            b.setAttribute(
+              "aria-pressed",
+              String((b.dataset.firstFaint === "true") === state.cellFirstFaint),
+            ),
+          );
+        for (const [key, mode] of Object.entries(ONLY_FOR))
+          $(`in-${key}`).closest(".ctl").hidden = state.stacking !== mode;
+        for (const theme of ["light", "dark"]) {
+          for (const k of ["back", "front", "deep"]) {
+            const input = $(`color-${theme}-${k}`);
+            if (input.value.toLowerCase() !== state.colors[theme][k])
+              input.value = state.colors[theme][k];
+          }
+        }
+        const match = PRESETS.find(
+          (pr) =>
+            JSON.stringify(
+              sanitize({
+                ...BASE,
+                colors: state.colors,
+                darkPage: state.darkPage,
+                stacking: state.stacking,
+                ...pr.p,
+              }),
+            ) === JSON.stringify(state),
+        );
+        document
+          .querySelectorAll("[data-preset]")
+          .forEach((b) => b.setAttribute("aria-pressed", String(match?.name === b.dataset.preset)));
+      }
+
+      const DRAFT_KEY = "calendar-mark-draft-v9";
+      let draftTimer = null;
+      function rememberDraft() {
+        clearTimeout(draftTimer);
+        draftTimer = setTimeout(() => {
+          try {
+            localStorage.setItem(DRAFT_KEY, JSON.stringify(state));
+          } catch {
+            /* Storage is a convenience; the page works without it. */
+          }
+        }, 300);
+      }
+
+      function buildControls() {
+        for (const [host, list] of Object.entries(SLIDERS)) {
+          $(host).innerHTML = list
+            .map(
+              ([key, label, min, max, step]) => `<div class="ctl">
+                <label for="in-${key}">${label} <output id="out-${key}"></output></label>
+                <input id="in-${key}" type="range" min="${min}" max="${max}" step="${step}" />
+              </div>`,
+            )
+            .join("");
+          for (const [key] of list) {
+            $(`in-${key}`).addEventListener("input", (e) => {
+              state[key] = Number(e.target.value);
+              render();
+            });
+          }
+        }
+        $("presets").innerHTML = PRESETS.map(
+          (pr) => `<button class="chip" type="button" data-preset="${pr.name}">${pr.name}</button>`,
+        ).join("");
+        document.querySelectorAll("[data-preset]").forEach((b) =>
+          b.addEventListener("click", () => {
+            const pr = PRESETS.find((x) => x.name === b.dataset.preset);
+            state = sanitize({
+              ...BASE,
+              colors: state.colors,
+              darkPage: state.darkPage,
+              stacking: state.stacking,
+              ...pr.p,
+            });
+            render();
+          }),
+        );
+        $("ringStyle").innerHTML = STYLES.map(
+          ([k, l]) => `<button class="chip" type="button" data-style="${k}">${l}</button>`,
+        ).join("");
+        document.querySelectorAll("[data-style]").forEach((b) =>
+          b.addEventListener("click", () => {
+            state.ringStyle = b.dataset.style;
+            // Picking a style with no rings would change nothing on screen.
+            if (state.ringCount === 0) state.ringCount = 2;
+            render();
+          }),
+        );
+        $("firstFaint").innerHTML = [
+          [true, "On"],
+          [false, "Off"],
+        ]
+          .map(
+            ([k, l]) => `<button class="chip" type="button" data-first-faint="${k}">${l}</button>`,
+          )
+          .join("");
+        document.querySelectorAll("[data-first-faint]").forEach((b) =>
+          b.addEventListener("click", () => {
+            state.cellFirstFaint = b.dataset.firstFaint === "true";
+            render();
+          }),
+        );
+        $("cellsToggle").innerHTML = [
+          [true, "On"],
+          [false, "Off"],
+        ]
+          .map(([k, l]) => `<button class="chip" type="button" data-cells="${k}">${l}</button>`)
+          .join("");
+        document.querySelectorAll("[data-cells]").forEach((b) =>
+          b.addEventListener("click", () => {
+            state.cells = b.dataset.cells === "true";
+            render();
+          }),
+        );
+        $("stacking").innerHTML = STACKINGS.map(
+          ([k, l]) => `<button class="chip" type="button" data-stacking="${k}">${l}</button>`,
+        ).join("");
+        document.querySelectorAll("[data-stacking]").forEach((b) =>
+          b.addEventListener("click", () => {
+            state.stacking = b.dataset.stacking;
+            render();
+          }),
+        );
+        $("darkPage").innerHTML = DARK_PAGES.map(
+          ([k, l]) => `<button class="chip" type="button" data-dark-page="${k}">${l}</button>`,
+        ).join("");
+        document.querySelectorAll("[data-dark-page]").forEach((b) =>
+          b.addEventListener("click", () => {
+            state.darkPage = b.dataset.darkPage;
+            render();
+          }),
+        );
+        $("ringAnchor").innerHTML = ANCHORS.map(
+          ([k, l]) => `<button class="chip" type="button" data-anchor="${k}">${l}</button>`,
+        ).join("");
+        document.querySelectorAll("[data-anchor]").forEach((b) =>
+          b.addEventListener("click", () => {
+            state.ringAnchor = b.dataset.anchor;
+            render();
+          }),
+        );
+        $("ringColor").innerHTML = RING_COLORS.map(
+          ([k, l]) => `<button class="chip" type="button" data-ring-color="${k}">${l}</button>`,
+        ).join("");
+        document.querySelectorAll("[data-ring-color]").forEach((b) =>
+          b.addEventListener("click", () => {
+            state.ringColor = b.dataset.ringColor;
+            render();
+          }),
+        );
+        for (const theme of ["light", "dark"]) {
+          $(`${theme}Colors`).innerHTML = [
+            ["back", "Dark blue"],
+            ["front", "Light blue"],
+            ["deep", "Deep"],
+          ]
+            .map(
+              ([k, l]) =>
+                `<label class="swatch" for="color-${theme}-${k}">${l}<input id="color-${theme}-${k}" type="color" /></label>`,
+            )
+            .join("");
+          for (const k of ["back", "front", "deep"]) {
+            $(`color-${theme}-${k}`).addEventListener("input", (e) => {
+              state.colors[theme][k] = e.target.value.toLowerCase();
+              render();
+            });
+          }
+        }
+      }
+
+      function exportSvg() {
+        const b = bbox(state);
+        const side = Math.max(b.w, b.h) * 1.08;
+        const vb = [b.x + b.w / 2 - side / 2, b.y + b.h / 2 - side / 2, side, side]
+          .map(fmt)
+          .join(" ");
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" width="512" height="512"><rect x="${vb.split(" ")[0]}" y="${vb.split(" ")[1]}" width="${fmt(side)}" height="${fmt(side)}" fill="#ffffff"/>${content(state, colorsFor(state, "light"))}</svg>`;
+      }
+
+      async function copy(text, button, done) {
+        try {
+          await navigator.clipboard.writeText(text);
+          const old = button.textContent;
+          button.textContent = done;
+          setTimeout(() => (button.textContent = old), 1400);
+        } catch {
+          setStatus(
+            "Copy isn't available here. Save the design instead, and ask Claude to read it.",
+          );
+        }
+      }
+
+      const setStatus = (t) => ($("saveStatus").textContent = t);
+
+      // Saved designs live in this artifact's database, collection
+      // "designs": { name, settings, savedAt }. Claude reads them from there.
+      let db = null;
+      let designs = [];
+
+      // What to show for each setting when designs differ. Ring height above
+      // and below the edge mean nothing for holes, so holes skip them.
+      function settingRows() {
+        const rows = [];
+        for (const list of Object.values(SLIDERS))
+          for (const [key, label, , , , f] of list) rows.push([key, label, f]);
+        const pick = (pairs) => (v) => (pairs.find(([k]) => k === v) || [, v])[1];
+        rows.push(["ringStyle", "Ring style", pick(STYLES)]);
+        rows.push(["ringColor", "Ring color", pick(RING_COLORS)]);
+        rows.push(["ringAnchor", "Rings centered on", pick(ANCHORS)]);
+        rows.push(["darkPage", "Darker page", pick(DARK_PAGES)]);
+        rows.push(["stacking", "Stacking", pick(STACKINGS)]);
+        rows.push(["cells", "Shift cells", (v) => (v ? "On" : "Off")]);
+        rows.push(["cellFirstFaint", "First cell almost invisible", (v) => (v ? "On" : "Off")]);
+        return rows;
+      }
+      const relevant = (p, key) =>
+        !(p.ringStyle === "holes" && (key === "ringUp" || key === "ringDown")) &&
+        !(p.ringCount === 0 && key.startsWith("ring")) &&
+        !(ONLY_FOR[key] && ONLY_FOR[key] !== p.stacking) &&
+        !(key.startsWith("cell") && key !== "cells" && !p.cells);
+
+      function renderCompare() {
+        const section = $("compareSection");
+        if (designs.length < 2) {
+          section.hidden = true;
+          return;
+        }
+        section.hidden = false;
+        const items = designs
+          .map((d) => ({ d, p: sanitize(d.settings) }))
+          .sort((a, b) =>
+            String(a.d.name).localeCompare(String(b.d.name), undefined, { numeric: true }),
+          );
+        const rows = settingRows().filter(([key]) => {
+          const values = items
+            .filter((it) => relevant(it.p, key))
+            .map((it) => JSON.stringify(it.p[key]));
+          return new Set(values).size > 1;
+        });
+        $("compareGrid").innerHTML = items
+          .map(({ d, p }) => {
+            const b = bbox(p);
+            const diffs = rows
+              .map(
+                ([key, label, f]) =>
+                  `<dt>${label}</dt><dd>${relevant(p, key) ? f(p[key]) : "n/a"}</dd>`,
+              )
+              .join("");
+            return `<article class="cmp">
+              <div class="tile light big">${svg(p, b, "light", 130)}</div>
+              <div class="tile light strip">${svg(p, b, "light", 32)}${svg(p, b, "light", 16)}${lockup(p, b, "light", 20)}</div>
+              <div class="tile dark strip">${svg(p, b, "dark", 32)}${svg(p, b, "dark", 16)}${lockup(p, b, "dark", 20)}</div>
+              <div class="tile light strip">${svg(p, b, "mono", 32)}${svg(p, b, "mono", 16)}<span class="icon" style="width:40px;height:40px;border-radius:10px">${svg(p, b, "brand", 30)}</span></div>
+              <div class="info">
+                <div class="info-head"><h3 data-name></h3><button class="link" type="button" data-load="${d.id}">Load</button></div>
+                ${diffs ? `<dl>${diffs}</dl>` : `<p class="status" style="margin:0">Same settings as the others.</p>`}
+              </div>
+            </article>`;
+          })
+          .join("");
+        $("compareGrid")
+          .querySelectorAll("[data-name]")
+          .forEach((el, i) => (el.textContent = items[i].d.name));
+        $("compareGrid")
+          .querySelectorAll("[data-load]")
+          .forEach((btn) => btn.addEventListener("click", () => loadDesign(btn.dataset.load)));
+      }
+
+      function loadDesign(id) {
+        const d = designs.find((x) => x.id === id);
+        if (!d) return;
+        state = sanitize(d.settings);
+        $("designName").value = d.name;
+        render();
+        setStatus(`Loaded "${d.name}".`);
+        let still = false;
+        try {
+          still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        } catch {
+          still = false;
+        }
+        window.scrollTo({ top: 0, behavior: still ? "auto" : "smooth" });
+      }
+
+      function renderSaved() {
+        const list = $("savedList");
+        if (!designs.length) {
+          list.innerHTML = "";
+          return;
+        }
+        list.innerHTML = designs
+          .map((d) => {
+            const when = d.savedAt
+              ? new Date(d.savedAt).toLocaleString([], {
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                })
+              : "";
+            return `<li><span class="name"></span><span class="meta">${when}</span><button class="link" type="button" data-load="${d.id}">Load</button><button class="link del" type="button" data-del="${d.id}">Delete</button></li>`;
+          })
+          .join("");
+        list.querySelectorAll(".name").forEach((el, i) => (el.textContent = designs[i].name));
+        list
+          .querySelectorAll("[data-load]")
+          .forEach((b) => b.addEventListener("click", () => loadDesign(b.dataset.load)));
+        list.querySelectorAll("[data-del]").forEach((b) => {
+          let armed = false;
+          b.addEventListener("click", async () => {
+            if (!armed) {
+              armed = true;
+              b.textContent = "Confirm";
+              setTimeout(() => {
+                armed = false;
+                b.textContent = "Delete";
+              }, 2500);
+              return;
+            }
+            try {
+              await db.collection("designs").doc(b.dataset.del).delete();
+              setStatus("Deleted.");
+            } catch {
+              setStatus("That design couldn't be deleted. Try again in a moment.");
+            }
+          });
+        });
+      }
+
+      async function connect() {
+        try {
+          db = window.claude?.use ? await window.claude.use("db") : null;
+        } catch {
+          db = null;
+        }
+        if (!db) {
+          setStatus(
+            "Saving needs this page open on claude.ai while signed in. Copy settings still works.",
+          );
+          $("saveBtn").disabled = true;
+          return;
+        }
+        setStatus("No saved designs yet. Name one and save it.");
+        db.collection("designs")
+          .orderBy("savedAt", "desc")
+          .limit(50)
+          .onSnapshot(
+            (snap) => {
+              designs = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+              renderSaved();
+              renderCompare();
+              setStatus(
+                designs.length
+                  ? `${designs.length} saved. Claude can read these.`
+                  : "No saved designs yet. Name one and save it.",
+              );
+            },
+            () => setStatus("Saved designs are unavailable right now."),
+          );
+      }
+
+      $("saveBtn").addEventListener("click", async () => {
+        if (!db) return;
+        const name = $("designName").value.trim() || `Design ${designs.length + 1}`;
+        const existing = designs.find((d) => d.name === name);
+        $("saveBtn").disabled = true;
+        try {
+          const body = { name, settings: clone(state), savedAt: new Date().toISOString() };
+          if (existing) await db.collection("designs").doc(existing.id).set(body);
+          else await db.collection("designs").add(body);
+          setStatus(`Saved "${name}".`);
+        } catch (e) {
+          setStatus(
+            e?.code === "invalid_argument"
+              ? "You can view designs here, but not save them."
+              : "Couldn't save. Try again in a moment.",
+          );
+        } finally {
+          $("saveBtn").disabled = false;
+        }
+      });
+      $("copySvg").addEventListener("click", (e) => copy(exportSvg(), e.currentTarget, "Copied"));
+      $("copyJson").addEventListener("click", (e) =>
+        copy(JSON.stringify(state, null, 2), e.currentTarget, "Copied"),
+      );
+
+      buildControls();
+      const SHIFT_CELLS = REFINED;
+      state = sanitize({ ...BASE, ...SHIFT_CELLS });
+      try {
+        const draft = localStorage.getItem(DRAFT_KEY);
+        const older = localStorage.getItem("calendar-mark-draft-v8");
+        if (draft) state = sanitize(JSON.parse(draft));
+        else if (older)
+          state = sanitize({ ...BASE, colors: JSON.parse(older).colors, ...SHIFT_CELLS });
+      } catch {
+        state = sanitize({ ...BASE, ...SHIFT_CELLS });
+      }
+      render();
+      document.fonts?.ready.then(render);
+      connect();
+    </script>
+  </body>
+</html>

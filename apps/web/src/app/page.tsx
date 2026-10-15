@@ -281,11 +281,7 @@ export default function RootPage() {
       <nav className="landing-nav fixed top-0 left-0 right-0 z-50 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <DubGridLockup
-              fontSize={24}
-              color="var(--dg-color-text-inverse)"
-              markColor="var(--dg-color-text-inverse)"
-            />
+            <DubGridLockup fontSize={24} color="var(--dg-color-text-inverse)" markTone="onBrand" />
           </div>
 
           <div className="hidden md:flex items-center gap-1">
@@ -325,7 +321,7 @@ export default function RootPage() {
               <DubGridLockup
                 fontSize={24}
                 color="var(--dg-color-text-inverse)"
-                markColor="var(--dg-color-text-inverse)"
+                markTone="onBrand"
               />
             </div>
             <div className="flex items-center gap-1">

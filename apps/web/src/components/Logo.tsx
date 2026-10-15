@@ -1,66 +1,81 @@
 import { useId, type CSSProperties } from "react";
 import {
-  BRAND_MARK_BACK,
-  BRAND_MARK_BACK_STROKE,
-  BRAND_MARK_FRONT,
-  BRAND_MARK_GAP,
-  BRAND_MARK_INK,
+  BRAND_SYMBOL_INK,
   BRAND_WORDMARK_TRACKING_EM,
-  brandMarkCardPath,
-  getBrandLockupSymbolLayout,
-  getBrandStackedLayout,
+  brandSymbolGap,
+  getBrandSymbolLockupLayout,
+  getBrandSymbolPaths,
+  getBrandSymbolStackedLayout,
 } from "@dubgrid/design-tokens";
 
-const BACK_PATH = brandMarkCardPath(BRAND_MARK_BACK);
-const FRONT_PATH = brandMarkCardPath(BRAND_MARK_FRONT);
-const VIEW_BOX = `${BRAND_MARK_INK.x} ${BRAND_MARK_INK.y} ${BRAND_MARK_INK.width} ${BRAND_MARK_INK.height}`;
-const ASPECT = BRAND_MARK_INK.height / BRAND_MARK_INK.width;
+/** `theme` follows light and dark; `onBrand` sits on a brand-blue surface. */
+export type BrandMarkTone = "theme" | "onBrand";
+
+const TONES: Record<BrandMarkTone, { back: string; front: string }> = {
+  theme: { back: "var(--dg-color-brand-mark-back)", front: "var(--dg-color-brand-mark-front)" },
+  onBrand: {
+    back: "var(--dg-color-brand-mark-on-brand-back)",
+    front: "var(--dg-color-brand-mark-on-brand-front)",
+  },
+};
+
+const VIEW_BOX = `0 0 ${BRAND_SYMBOL_INK.width} ${BRAND_SYMBOL_INK.height}`;
+const ASPECT = BRAND_SYMBOL_INK.width / BRAND_SYMBOL_INK.height;
+const MASK_REGION = {
+  x: -10,
+  y: -10,
+  width: BRAND_SYMBOL_INK.width + 20,
+  height: BRAND_SYMBOL_INK.height + 20,
+};
 
 function BrandSymbol({
-  width,
+  height,
+  tone = "theme",
   color,
   style,
 }: {
-  width: number;
-  color: string;
+  height: number;
+  tone?: BrandMarkTone;
+  /** Draws both cards in this one color, with the wider one-color gap. */
+  color?: string;
   style?: CSSProperties;
 }) {
   // The gap is masked out of the back card rather than painted in a surface
   // color, so the mark sits cleanly on any background.
   const maskId = `dg-mark-${useId().replace(/[^\w-]/g, "")}`;
+  const paths = getBrandSymbolPaths(brandSymbolGap(height, Boolean(color)));
+  const fill = color ? { back: color, front: color } : TONES[tone];
   return (
     <svg
-      width={width}
-      height={width * ASPECT}
+      width={height * ASPECT}
+      height={height}
       viewBox={VIEW_BOX}
       fill="none"
       aria-hidden="true"
       style={style}
     >
-      <mask id={maskId} maskUnits="userSpaceOnUse" x="-10" y="-10" width="120" height="120">
-        <rect x="-10" y="-10" width="120" height="120" fill="white" />
-        <path d={FRONT_PATH} fill="black" stroke="black" strokeWidth={BRAND_MARK_GAP * 2} />
+      <mask id={maskId} maskUnits="userSpaceOnUse" {...MASK_REGION}>
+        <rect {...MASK_REGION} fill="white" />
+        <path d={paths.cut} fill="black" />
       </mask>
-      <path
-        d={BACK_PATH}
-        stroke={color}
-        strokeWidth={BRAND_MARK_BACK_STROKE}
-        mask={`url(#${maskId})`}
-      />
-      <path d={FRONT_PATH} fill={color} />
+      <path d={paths.back} fill={fill.back} mask={`url(#${maskId})`} />
+      <path d={paths.front} fill={fill.front} />
     </svg>
   );
 }
 
-/** The two-card symbol, `size` wide. */
+/** The two-card symbol, `size` tall, so it fits a `size` square. */
 export function DubGridLogo({
   size = 48,
-  color = "var(--dg-color-brand-mark)",
+  tone,
+  color,
 }: {
   size?: number;
+  tone?: BrandMarkTone;
+  /** One color for both cards. */
   color?: string;
 }) {
-  return <BrandSymbol width={size} color={color} />;
+  return <BrandSymbol height={size} tone={tone} color={color} />;
 }
 
 export function DubGridWordmark({
@@ -88,21 +103,27 @@ export function DubGridWordmark({
   );
 }
 
+interface LockupProps {
+  fontSize?: number;
+  color?: string;
+  markTone?: BrandMarkTone;
+  /** One color for both cards. */
+  markColor?: string;
+}
+
 /** Symbol and wordmark on one line, the symbol centered on the word's optical center. */
 export function DubGridLockup({
   fontSize = 26,
   color = "var(--color-text-primary)",
-  markColor = "var(--dg-color-brand-mark)",
-}: {
-  fontSize?: number;
-  color?: string;
-  markColor?: string;
-}) {
-  const layout = getBrandLockupSymbolLayout(fontSize);
+  markTone,
+  markColor,
+}: LockupProps) {
+  const layout = getBrandSymbolLockupLayout(fontSize);
   return (
     <span style={{ whiteSpace: "nowrap", lineHeight: 1 }}>
       <BrandSymbol
-        width={layout.width}
+        height={layout.height}
+        tone={markTone}
         color={markColor}
         style={{
           display: "inline-block",
@@ -119,13 +140,10 @@ export function DubGridLockup({
 export function DubGridStackedLockup({
   fontSize = 26,
   color = "var(--color-text-primary)",
-  markColor = "var(--dg-color-brand-mark)",
-}: {
-  fontSize?: number;
-  color?: string;
-  markColor?: string;
-}) {
-  const layout = getBrandStackedLayout(fontSize, 1);
+  markTone,
+  markColor,
+}: LockupProps) {
+  const layout = getBrandSymbolStackedLayout(fontSize, 1);
   return (
     <span
       style={{
@@ -137,7 +155,8 @@ export function DubGridStackedLockup({
       }}
     >
       <BrandSymbol
-        width={layout.symbolWidth}
+        height={layout.symbolHeight}
+        tone={markTone}
         color={markColor}
         style={{ transform: `translateX(${layout.symbolOffsetX}px)` }}
       />

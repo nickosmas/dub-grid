@@ -20,7 +20,7 @@ export default async function OpenGraphImage() {
         fontFamily: "DM Sans",
       }}
     >
-      <LogoMark width={220} background="#F8FAFC" />
+      <LogoMark height={170} background="#F8FAFC" />
       <div
         style={{
           display: "flex",

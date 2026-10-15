@@ -54,7 +54,7 @@ const MONTH_NAMES = [
 const BRAND_MUTED = "#4A607F";
 const BRAND_SEPARATOR = "#94A3B8";
 
-// public/lockup.png is the symbol and a 16 px wordmark at 8x (664x192),
+// public/lockup.png is the symbol and a 16 px wordmark at 8x (600x192),
 // padded so its center is the wordmark's optical center: centering it in a
 // row lines it up with the separator and the organization name.
 const LOCKUP_HEIGHT_EM = 192 / 128;

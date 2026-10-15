@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Logo concepts</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@700&family=Inter:wght@400;500;600&display=swap"
+    />
+    <style>
+      /* Layout: the brief and my picks up top, then a two-column grid of concept sheets, then all ten at small size on dark. */
+      :root {
+        --text-primary: #111827;
+        --text-secondary: #5b6472;
+        --page: #f7f8fa;
+        --panel: #ffffff;
+        --border: rgba(15, 23, 42, 0.1);
+        --accent: #2563eb;
+        --chip: rgba(37, 99, 235, 0.08);
+        --chip-text: #1d4ed8;
+        --warn: #b45309;
+        --tile-light: #ffffff;
+        --tile-dark: #0b0f17;
+        --ink-light: #0f172a;
+        --ink-dark: #fafafa;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --text-primary: #f4f4f5;
+          --text-secondary: #a1a1aa;
+          --page: #0e0f12;
+          --panel: #17181c;
+          --border: rgba(255, 255, 255, 0.1);
+          --accent: #4a9bff;
+          --chip: rgba(74, 155, 255, 0.14);
+          --chip-text: #93c5fd;
+          --warn: #fbbf24;
+          color-scheme: dark;
+        }
+      }
+      :root[data-theme="dark"] {
+        --text-primary: #f4f4f5;
+        --text-secondary: #a1a1aa;
+        --page: #0e0f12;
+        --panel: #17181c;
+        --border: rgba(255, 255, 255, 0.1);
+        --accent: #4a9bff;
+        --chip: rgba(74, 155, 255, 0.14);
+        --chip-text: #93c5fd;
+        --warn: #fbbf24;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 28px 16px 64px;
+        background: var(--page);
+        color: var(--text-primary);
+        font-family: Inter, system-ui, sans-serif;
+        font-size: 14px;
+      }
+      main {
+        max-width: 1040px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 22px;
+        font-weight: 600;
+        margin: 0 0 6px;
+        text-wrap: balance;
+      }
+      h2 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 34px 0 12px;
+      }
+      .lede {
+        color: var(--text-secondary);
+        line-height: 1.55;
+        max-width: 720px;
+        margin: 0 0 18px;
+      }
+      .brief {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+      @media (max-width: 760px) {
+        .brief {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 14px 16px;
+        min-width: 0;
+      }
+      .panel h3 {
+        margin: 0 0 8px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .panel ul {
+        margin: 0;
+        padding-left: 18px;
+        line-height: 1.6;
+        color: var(--text-secondary);
+      }
+      .panel b {
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+      .concepts {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+      @media (max-width: 760px) {
+        .concepts {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .concept {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+      .concept.pick {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 1px var(--accent);
+      }
+      .stage {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+        min-height: 190px;
+      }
+      .tile {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        padding: 16px;
+        min-width: 0;
+      }
+      .tile.light {
+        --m1: #2563eb;
+        --m2: #a8c4fc;
+        --m3: #1e3a8a;
+        --bgc: var(--tile-light);
+        background: var(--tile-light);
+        color: var(--ink-light);
+      }
+      .tile.dark {
+        --m1: #3b82f6;
+        --m2: #bcd2ff;
+        --m3: #93c5fd;
+        --bgc: var(--tile-dark);
+        background: var(--tile-dark);
+        color: var(--ink-dark);
+      }
+      .side {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 16px;
+        border-left: 1px solid var(--border);
+      }
+      .sizes {
+        display: flex;
+        align-items: flex-end;
+        gap: 12px;
+      }
+      .lockup {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.24em;
+        white-space: nowrap;
+      }
+      .word {
+        font-family: "DM Sans", sans-serif;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1;
+      }
+      .body {
+        padding: 14px 16px 16px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        flex: 1;
+      }
+      .head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .head h3 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 600;
+      }
+      .tag {
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        color: var(--chip-text);
+        background: var(--chip);
+        padding: 3px 8px;
+        border-radius: 999px;
+        white-space: nowrap;
+      }
+      .body p {
+        margin: 0;
+        line-height: 1.5;
+        color: var(--text-secondary);
+        font-size: 13px;
+      }
+      .body p b {
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+      .body p.risk b {
+        color: var(--warn);
+      }
+      .strip {
+        background: var(--tile-dark);
+        border-radius: 12px;
+        padding: 18px;
+        display: grid;
+        grid-template-columns: repeat(10, minmax(0, 1fr));
+        gap: 10px;
+      }
+      @media (max-width: 760px) {
+        .strip {
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+        }
+      }
+      .strip figure {
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        color: #a1a1aa;
+        font-size: 11px;
+        text-align: center;
+      }
+      .strip .tile {
+        padding: 0;
+        background: transparent;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Logo concepts</h1>
+      <p class="lede">
+        Ten directions for a mark that could only belong to DubGrid. Each comes from one idea in the
+        product's world rather than from a shape. All use the brand blues, so the comparison is
+        about meaning and form, not color.
+      </p>
+
+      <div class="brief">
+        <div class="panel">
+          <h3>Why the stacked cards read as generic</h3>
+          <ul>
+            <li>Two offset cards is the stock "layers" or "copy" icon, in every design tool.</li>
+            <li>Nothing in it points to care, shifts, people or time.</li>
+            <li>The meaning lived in the explanation ("dub" means two), not in the drawing.</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>My picks to develop</h3>
+          <ul>
+            <li>
+              <b>Handoff:</b> keeps the two cards, and the overlap becomes the point: the shift
+              handover.
+            </li>
+            <li><b>Open shift:</b> the product's core job, drawn literally, yet still simple.</li>
+            <li><b>d|b:</b> built from the name, and as symmetric as the wordmark.</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2>The ten</h2>
+      <div class="concepts" id="concepts"></div>
+
+      <h2>All ten at 40 px on dark</h2>
+      <div class="strip" id="strip"></div>
+    </main>
+
+    <script>
+      let uid = 0;
+      const next = () => `k${uid++}`;
+
+      // Each concept draws in a 100-unit box with three tones: --m1 brand
+      // blue, --m2 light blue, --m3 deep blue, and --bgc for cut gaps.
+      const CONCEPTS = [
+        {
+          name: "Handoff",
+          tag: "Product",
+          pick: true,
+          says: "Two shift cards overlap, and the overlap is drawn in its own deep blue: the handover window where one shift passes to the next. Continuity of care is the whole job, and the mark shows it.",
+          risk: "Overlapping squares appear in some marks, so the deep overlap and the squarer cards have to carry it. Works in one color only with a gap at the overlap.",
+          svg: () => {
+            const c = next();
+            return `<clipPath id="${c}"><rect x="10" y="30" width="54" height="54" rx="15"/></clipPath>
+              <rect x="10" y="30" width="54" height="54" rx="15" fill="var(--m2)"/>
+              <rect x="36" y="16" width="54" height="54" rx="15" fill="var(--m1)"/>
+              <rect x="36" y="16" width="54" height="54" rx="15" fill="var(--m3)" clip-path="url(#${c})"/>`;
+          },
+        },
+        {
+          name: "Open shift",
+          tag: "Product",
+          pick: true,
+          says: "A week grid with one slot open and a card sliding in to fill it. It is the moment DubGrid exists for: an open shift getting covered by a qualified person.",
+          risk: "Grids are close to the old 16-cell mark and to calendar icons. Keep the grid light and let the arriving card do the talking; at 16 px it becomes a 3 x 3 block.",
+          svg: () => {
+            let s = "";
+            for (let r = 0; r < 3; r++)
+              for (let col = 0; col < 3; col++) {
+                if (r === 0 && col === 2) continue;
+                s += `<rect x="${11 + col * 28}" y="${11 + r * 28}" width="22" height="22" rx="6" fill="var(--m2)"/>`;
+              }
+            return `${s}<rect x="67" y="11" width="22" height="22" rx="6" fill="none" stroke="var(--m2)" stroke-width="2" stroke-dasharray="4 3.5"/>
+              <g transform="translate(83 19) rotate(14)"><rect x="-13" y="-13" width="26" height="26" rx="7" fill="var(--bgc)"/><rect x="-11" y="-11" width="22" height="22" rx="6" fill="var(--m1)"/></g>`;
+          },
+        },
+        {
+          name: "d|b",
+          tag: "Name",
+          pick: true,
+          says: 'The "d" and "b" of dubgrid share one stem: two shift cards hung either side of a day line. It is built from the name, symmetric like the wordmark, and reads as "two sides of one schedule".',
+          risk: "Abstract until you know the name; could read as a dumbbell at a glance. Strongest in the lockup, where the word explains it.",
+          svg: () => `<rect x="12" y="44" width="34" height="42" rx="14" fill="var(--m2)"/>
+            <rect x="54" y="44" width="34" height="42" rx="14" fill="var(--m2)"/>
+            <rect x="42" y="10" width="16" height="76" rx="8" fill="var(--bgc)"/>
+            <rect x="44" y="12" width="12" height="74" rx="6" fill="var(--m1)"/>`,
+        },
+        {
+          name: "Care heart",
+          tag: "Care",
+          says: 'Two slanted cards lean into each other and make a heart. Two people (the "dub") covering one resident: care built out of scheduling. A direct evolution of the stacked cards.',
+          risk: "Hearts are everywhere in health, dating and charity brands. Distinctive only if the card corners stay crisp and the gap between the two halves stays visible.",
+          svg: () => `<line x1="51" y1="66" x2="28" y2="41" stroke="var(--m2)" stroke-width="32" stroke-linecap="round"/>
+            <line x1="49" y1="66" x2="72" y2="41" stroke="var(--bgc)" stroke-width="38" stroke-linecap="round"/>
+            <line x1="49" y1="66" x2="72" y2="41" stroke="var(--m1)" stroke-width="32" stroke-linecap="round"/>`,
+        },
+        {
+          name: "Cover",
+          tag: "Product",
+          says: "Two L-shaped cells hook around each other to close a square. Each covers the other's open corner: swaps, pickups and call-offs, staff covering for staff.",
+          risk: "Interlocking corner marks are common in finance and construction. Works small; needs a distinct corner radius and proportion to own it.",
+          svg: () => `<path d="M24 72 V24 H70" fill="none" stroke="var(--m2)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M76 28 V76 H30" fill="none" stroke="var(--bgc)" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M76 28 V76 H30" fill="none" stroke="var(--m1)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>`,
+        },
+        {
+          name: "Round the clock",
+          tag: "Time",
+          says: "A ring in three shifts, day, evening and night, each its own blue. Care facilities run 24 hours, and the ring says no hour is left uncovered.",
+          risk: "Three-part rings read as loading spinners, recycling or pie charts. It animates beautifully, which is also why it looks like a spinner.",
+          svg: () => {
+            const arc = (a0, a1) => {
+              const p = (a) => [
+                50 + 32 * Math.cos((a * Math.PI) / 180),
+                50 + 32 * Math.sin((a * Math.PI) / 180),
+              ];
+              const [x0, y0] = p(a0);
+              const [x1, y1] = p(a1);
+              return `M${x0.toFixed(2)} ${y0.toFixed(2)} A32 32 0 0 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+            };
+            const seg = (a, color) =>
+              `<path d="${arc(a + 22, a + 98)}" fill="none" stroke="${color}" stroke-width="18" stroke-linecap="round"/>`;
+            return seg(-90, "var(--m2)") + seg(30, "var(--m1)") + seg(150, "var(--m3)");
+          },
+        },
+        {
+          name: "Staff in the slot",
+          tag: "People",
+          says: "Each schedule card has a head: the cell is a person. Two of them overlap, like a shift and its relief. It puts staff, not boxes, at the center of the brand.",
+          risk: 'This is very close to the standard "team" or "users" icon. Needs a distinctive card shape to escape it; probably the weakest for recognition.',
+          svg: () => `<circle cx="34" cy="30" r="12" fill="var(--m2)"/>
+            <rect x="12" y="46" width="44" height="40" rx="14" fill="var(--m2)"/>
+            <circle cx="66" cy="22" r="15" fill="var(--bgc)"/>
+            <circle cx="66" cy="22" r="12" fill="var(--m1)"/>
+            <rect x="41" y="35" width="50" height="46" rx="17" fill="var(--bgc)"/>
+            <rect x="44" y="38" width="44" height="40" rx="14" fill="var(--m1)"/>`,
+        },
+        {
+          name: "Cell d",
+          tag: "Name",
+          says: 'A lowercase "d" built from schedule cells, with one cell lit: your shift in the grid. Pairs naturally with the wordmark and carries the old grid idea forward in a letter.',
+          risk: 'Pixel letters are common in dev tools and games. The lit cell must stay; without it this is just a bitmap "d".',
+          svg: () => {
+            const on = ["..X", "..X", "XXX", "X.X", "XXX"];
+            let s = "";
+            on.forEach((row, r) =>
+              [...row].forEach((ch, col) => {
+                if (ch !== "X") return;
+                const lit = r === 0 && col === 2;
+                s += `<rect x="${23.5 + col * 19}" y="${4.5 + r * 19}" width="15" height="15" rx="4" fill="${lit ? "var(--m2)" : "var(--m1)"}"/>`;
+              }),
+            );
+            return s;
+          },
+        },
+        {
+          name: "Care cross",
+          tag: "Care",
+          says: "A plus made of five schedule cells, the center one brand blue. Health care and the grid in one sign; instantly says the industry.",
+          risk: "The most generic of the ten: plus signs belong to every clinic and pharmacy. Never in red, which is a protected emblem.",
+          svg: () => {
+            const cell = (x, y, c) =>
+              `<rect x="${x}" y="${y}" width="24" height="24" rx="7" fill="${c}"/>`;
+            return (
+              cell(38, 10, "var(--m2)") +
+              cell(10, 38, "var(--m2)") +
+              cell(66, 38, "var(--m2)") +
+              cell(38, 66, "var(--m2)") +
+              cell(38, 38, "var(--m1)")
+            );
+          },
+        },
+        {
+          name: "Covered",
+          tag: "Time",
+          says: "A schedule card whose clock hands form a check mark: the shift is covered, on time. The reassurance a manager wants at a glance.",
+          risk: "Check marks are the to-do app cliché. The hands need a visible pivot to read as a clock, or it is just a tick in a box.",
+          svg: () => `<rect x="10" y="10" width="80" height="80" rx="24" fill="var(--m2)"/>
+            <path d="M30 52 L44 66 L72 34" fill="none" stroke="var(--m1)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="44" cy="66" r="4.5" fill="var(--m3)"/>`,
+        },
+      ];
+
+      const mark = (c, size) =>
+        `<svg width="${size}" height="${size}" viewBox="0 0 100 100" aria-hidden="true">${c.svg()}</svg>`;
+
+      document.getElementById("concepts").innerHTML = CONCEPTS.map(
+        (c) => `<article class="concept${c.pick ? " pick" : ""}">
+          <div class="stage">
+            <div class="tile light">${mark(c, 130)}</div>
+            <div class="side">
+              <div class="tile light" style="flex-direction:column;align-items:flex-start;gap:14px">
+                <div class="sizes">${mark(c, 40)}${mark(c, 24)}${mark(c, 16)}</div>
+                <span class="lockup" style="font-size:22px">${mark(c, 24)}<span class="word">dubgrid</span></span>
+              </div>
+              <div class="tile dark" style="justify-content:flex-start">
+                <span class="lockup" style="font-size:20px">${mark(c, 22)}<span class="word">dubgrid</span></span>
+              </div>
+            </div>
+          </div>
+          <div class="body">
+            <div class="head"><h3>${c.name}${c.pick ? " (pick)" : ""}</h3><span class="tag">${c.tag}</span></div>
+            <p><b>What it says.</b> ${c.says}</p>
+            <p class="risk"><b>Watch out.</b> ${c.risk}</p>
+          </div>
+        </article>`,
+      ).join("");
+
+      document.getElementById("strip").innerHTML = CONCEPTS.map(
+        (c) =>
+          `<figure><span class="tile dark">${mark(c, 40)}</span><figcaption>${c.name}</figcaption></figure>`,
+      ).join("");
+    </script>
+  </body>
+</html>

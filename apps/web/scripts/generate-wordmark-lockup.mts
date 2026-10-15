@@ -1,5 +1,5 @@
 /**
- * Renders the brand images from the shared two-card geometry in
+ * Renders the brand images from the shared stacked two-card geometry in
  * @dubgrid/design-tokens, so no raster copy of the mark can drift:
  *   - public/email-lockup.png   - email header: symbol + lowercase "dubgrid" (dark)
  *   - public/email-wordmark.png - email footer: lowercase "dubgrid" only (muted)
@@ -13,20 +13,17 @@
  * Re-run if the logo, wordmark, or colors change.
  */
 import { chromium, type Page } from "@playwright/test";
-import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  BRAND_SYMBOL_COLORS,
+  BRAND_SYMBOL_INK,
+  BRAND_SYMBOL_SQUARE,
   BRAND_WORDMARK_OPTICAL_CENTER_EM,
-  BRAND_MARK_BACK,
-  BRAND_MARK_BACK_STROKE,
-  BRAND_MARK_COLORS,
-  BRAND_MARK_FRONT,
-  BRAND_MARK_GAP,
-  BRAND_MARK_INK,
-  BRAND_MARK_SQUARE,
-  brandMarkCardPath,
-  getBrandLockupSymbolLayout,
+  brandSymbolGap,
+  getBrandSymbolLockupLayout,
+  getBrandSymbolPaths,
 } from "@dubgrid/design-tokens";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -39,44 +36,64 @@ const previewStaticDir = join(scriptDir, "..", "src", "emails", "static");
 
 const SCALE = 8; // render at 8x so the images stay crisp even when zoomed
 
-const BACK_PATH = brandMarkCardPath(BRAND_MARK_BACK);
-const FRONT_PATH = brandMarkCardPath(BRAND_MARK_FRONT);
+interface SymbolColors {
+  readonly back: string;
+  readonly front: string;
+}
+
+const { width: INK_W, height: INK_H } = BRAND_SYMBOL_INK;
+const MASK_REGION = `x="-10" y="-10" width="${INK_W + 20}" height="${INK_H + 20}"`;
 
 // The gap is masked out of the back card, so every image keeps a transparent
-// background and sits on any surface.
-function symbolSvg(viewBox: string, width: number, height: number, color: string) {
+// background and sits on any surface. `inkHeight` is the symbol's drawn
+// height in CSS px, which picks the gap.
+function symbolSvg(
+  viewBox: string,
+  width: number,
+  height: number,
+  inkHeight: number,
+  colors: SymbolColors,
+  classes = false,
+) {
+  const { back, front, cut } = getBrandSymbolPaths(brandSymbolGap(inkHeight));
+  const fill = (part: keyof SymbolColors) =>
+    classes ? `class="${part}"` : `fill="${colors[part]}"`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="${width}" height="${height}">
-  <mask id="gap" maskUnits="userSpaceOnUse" x="-10" y="-10" width="120" height="120">
-    <rect x="-10" y="-10" width="120" height="120" fill="#fff"/>
-    <path d="${FRONT_PATH}" fill="#000" stroke="#000" stroke-width="${BRAND_MARK_GAP * 2}"/>
+  <mask id="gap" maskUnits="userSpaceOnUse" ${MASK_REGION}>
+    <rect ${MASK_REGION} fill="#fff"/>
+    <path d="${cut}" fill="#000"/>
   </mask>
-  <path d="${BACK_PATH}" fill="none" stroke="${color}" stroke-width="${BRAND_MARK_BACK_STROKE}" mask="url(#gap)"/>
-  <path d="${FRONT_PATH}" fill="${color}"/>
+  <path d="${back}" ${fill("back")} mask="url(#gap)"/>
+  <path d="${front}" ${fill("front")}/>
 </svg>`;
 }
 
-const INK_VIEWBOX = `${BRAND_MARK_INK.x} ${BRAND_MARK_INK.y} ${BRAND_MARK_INK.width} ${BRAND_MARK_INK.height}`;
-// The symbol optically centered in a square, for the favicons and standalone logos.
-const SQUARE_VIEWBOX = `${BRAND_MARK_SQUARE.x} ${BRAND_MARK_SQUARE.y} ${BRAND_MARK_SQUARE.size} ${BRAND_MARK_SQUARE.size}`;
+const INK_VIEWBOX = `0 0 ${INK_W} ${INK_H}`;
+// The symbol centered in a square, for the favicons and standalone logos.
+const SQUARE_VIEWBOX = `${BRAND_SYMBOL_SQUARE.x} ${BRAND_SYMBOL_SQUARE.y} ${BRAND_SYMBOL_SQUARE.size} ${BRAND_SYMBOL_SQUARE.size}`;
+const squareInk = (size: number) => (size * INK_H) / BRAND_SYMBOL_SQUARE.size;
 
-const FONT_LINKS = `
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@700&display=swap" rel="stylesheet">`;
+// The app's pinned DM Sans Bold (Latin), embedded so the render needs no
+// network and matches the web font byte for byte.
+const DM_SANS_BOLD = readFileSync(
+  join(publicDir, "fonts", "5c285b27cdda1fe8-s.p.2_mbdogr7ni8i.woff2"),
+).toString("base64");
+const FONT_LINKS = `<style>@font-face{font-family:'DM Sans';font-weight:700;src:url(data:font/woff2;base64,${DM_SANS_BOLD}) format('woff2');}</style>`;
 
 const wordStyle = (fontSize: number, color: string) =>
   `font-family:'DM Sans',sans-serif;font-weight:700;font-size:${fontSize}px;` +
   `line-height:1.25;letter-spacing:-0.02em;color:${color};`;
 
-// Symbol spanning baseline to ascender, then the dark wordmark, spaced by
+// The symbol spanning the word's height, then the dark wordmark, spaced by
 // the shared lockup rule.
 function lockupHtml(fontSize: number, padding: string, lineHeight: string) {
-  const layout = getBrandLockupSymbolLayout(fontSize);
+  const layout = getBrandSymbolLockupLayout(fontSize);
   return `<!doctype html><html><head><meta charset="utf-8">${FONT_LINKS}
 <style>html,body{margin:0;padding:0;background:transparent;}
   #target{display:inline-block;padding:${padding};white-space:nowrap;${wordStyle(fontSize, "#0F172A")}line-height:${lineHeight};}
   #target svg{display:inline-block;vertical-align:${-layout.belowBaseline}px;margin-right:${layout.marginRight}px;}
 </style></head>
-<body><div id="target">${symbolSvg(INK_VIEWBOX, layout.width, layout.height, BRAND_MARK_COLORS.light)}dubgrid</div></body></html>`;
+<body><div id="target">${symbolSvg(INK_VIEWBOX, layout.width, layout.height, layout.height, BRAND_SYMBOL_COLORS.light)}dubgrid</div></body></html>`;
 }
 
 // Email header, padded for the card.
@@ -116,24 +133,25 @@ const JOBS = [
   },
 ] as const;
 
-const symbolPage = (size: number, color: string) =>
+const symbolPage = (size: number, colors: SymbolColors) =>
   `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:transparent;}
   #target{display:block;width:${size}px;height:${size}px;}</style></head>
-<body><div id="target">${symbolSvg(SQUARE_VIEWBOX, size, size, color)}</div></body></html>`;
+<body><div id="target">${symbolSvg(SQUARE_VIEWBOX, size, size, squareInk(size), colors)}</div></body></html>`;
 
 // Rendered at 1x: each file is exactly its pixel size.
 const SYMBOL_JOBS = [
-  { dir: publicDir, name: "logo.png", size: 512, color: BRAND_MARK_COLORS.light },
-  { dir: publicDir, name: "logo-white.png", size: 512, color: BRAND_MARK_COLORS.onBrand },
-  { dir: appDir, name: "icon.png", size: 32, color: BRAND_MARK_COLORS.light },
-  { dir: appDir, name: "apple-icon.png", size: 180, color: BRAND_MARK_COLORS.light },
-  { dir: docsDir, name: "favicon.png", size: 32, color: BRAND_MARK_COLORS.light },
+  { dir: publicDir, name: "logo.png", size: 512, colors: BRAND_SYMBOL_COLORS.light },
+  { dir: publicDir, name: "logo-white.png", size: 512, colors: BRAND_SYMBOL_COLORS.onBrand },
+  { dir: appDir, name: "icon.png", size: 32, colors: BRAND_SYMBOL_COLORS.light },
+  { dir: appDir, name: "apple-icon.png", size: 180, colors: BRAND_SYMBOL_COLORS.light },
+  { dir: docsDir, name: "favicon.png", size: 32, colors: BRAND_SYMBOL_COLORS.light },
 ] as const;
 
 // Follows the viewer's color scheme where the SVG is shown on its own.
-const LOGO_SVG = symbolSvg(SQUARE_VIEWBOX, 128, 128, "currentColor").replace(
+const { light, dark } = BRAND_SYMBOL_COLORS;
+const LOGO_SVG = symbolSvg(SQUARE_VIEWBOX, 128, 128, squareInk(128), light, true).replace(
   "<mask",
-  `<style>svg{color:${BRAND_MARK_COLORS.light}}@media (prefers-color-scheme:dark){svg{color:${BRAND_MARK_COLORS.dark}}}</style>
+  `<style>.back{fill:${light.back}}.front{fill:${light.front}}@media (prefers-color-scheme:dark){.back{fill:${dark.back}}.front{fill:${dark.front}}}</style>
   <mask`,
 );
 
@@ -187,9 +205,9 @@ async function main() {
     );
   }
   const iconPage = await browser.newPage({ deviceScaleFactor: 1 });
-  for (const { dir, name, size, color } of SYMBOL_JOBS) {
+  for (const { dir, name, size, colors } of SYMBOL_JOBS) {
     if (!wanted(name)) continue;
-    await renderToPng(iconPage, symbolPage(size, color), join(dir, name));
+    await renderToPng(iconPage, symbolPage(size, colors), join(dir, name));
     console.log(`✓ ${name} — ${size}x${size}`);
   }
   if (wanted("logo.svg")) {

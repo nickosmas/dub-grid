@@ -1,0 +1,1027 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Stacked logo surfaces</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@700&family=Inter:wght@400;500;600&display=swap"
+    />
+    <style>
+      /* Layout: one column of labeled surface groups (web, email and print, mobile), each a row of mock frames. */
+      :root {
+        --text-primary: #111827;
+        --text-secondary: #6b7280;
+        --page: #f6f7f9;
+        --panel: #ffffff;
+        --border: rgba(0, 0, 0, 0.1);
+        --accent: #2563eb;
+
+        /* DubGrid app surfaces, from @dubgrid/design-tokens */
+        --app-light-surface: #ffffff;
+        --app-light-surface-2: #f1f5f9;
+        --app-light-text: #0f172a;
+        --app-light-label: #64748b;
+        --app-light-border: #e2e8f0;
+        --app-dark-surface: #121214;
+        --app-dark-surface-2: #1c1c1f;
+        --app-dark-text: #fafafa;
+        --app-dark-label: #a1a1aa;
+        --app-dark-border: #2a2a2e;
+        --brand: #2563eb;
+        --brand-dark: #2075ff;
+        --splash-dark: #02070f;
+        --print-ink: #111827;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --text-primary: #fafafa;
+          --text-secondary: #a1a1aa;
+          --page: #0c0c0e;
+          --panel: #18181b;
+          --border: rgba(255, 255, 255, 0.1);
+          --accent: #4a9bff;
+          color-scheme: dark;
+        }
+      }
+      :root[data-theme="dark"] {
+        --text-primary: #fafafa;
+        --text-secondary: #a1a1aa;
+        --page: #0c0c0e;
+        --panel: #18181b;
+        --border: rgba(255, 255, 255, 0.1);
+        --accent: #4a9bff;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 24px 16px 56px;
+        background: var(--page);
+        color: var(--text-primary);
+        font-family: Inter, system-ui, sans-serif;
+        font-size: 14px;
+      }
+      main {
+        max-width: 1040px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 20px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 36px 0 4px;
+      }
+      .sub,
+      .group-sub {
+        color: var(--text-secondary);
+        line-height: 1.5;
+        max-width: 700px;
+      }
+      .sub {
+        margin: 0 0 8px;
+      }
+      .group-sub {
+        margin: 0 0 14px;
+        font-size: 13px;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin-bottom: 14px;
+      }
+      .row.three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      @media (max-width: 760px) {
+        .row,
+        .row.three {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      figure {
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-width: 0;
+      }
+      figcaption {
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+      figcaption b {
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+      .frame {
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        overflow: hidden;
+        min-width: 0;
+      }
+      .word {
+        font-family: "DM Sans", sans-serif;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1;
+        white-space: nowrap;
+      }
+      .lockup {
+        display: inline-flex;
+        align-items: center;
+        white-space: nowrap;
+      }
+      .stacked {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      /* Themes for app mocks */
+      .t-light {
+        --s: var(--app-light-surface);
+        --s2: var(--app-light-surface-2);
+        --tx: var(--app-light-text);
+        --lb: var(--app-light-label);
+        --bd: var(--app-light-border);
+        --br: var(--brand);
+        background: var(--s);
+        color: var(--tx);
+      }
+      .t-dark {
+        --s: var(--app-dark-surface);
+        --s2: var(--app-dark-surface-2);
+        --tx: var(--app-dark-text);
+        --lb: var(--app-dark-label);
+        --bd: var(--app-dark-border);
+        --br: var(--brand-dark);
+        background: var(--s);
+        color: var(--tx);
+      }
+
+      /* Browser tab */
+      .tabs {
+        background: var(--s2);
+        padding: 8px 10px 0;
+        display: flex;
+        gap: 6px;
+        align-items: flex-end;
+      }
+      .tab {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 8px 8px 0 0;
+        font-size: 12px;
+        min-width: 0;
+        max-width: 230px;
+        color: var(--lb);
+      }
+      .tab.on {
+        background: var(--s);
+        color: var(--tx);
+      }
+      .tab span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .urlbar {
+        background: var(--s);
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--bd);
+      }
+      .urlbar div {
+        background: var(--s2);
+        border-radius: 999px;
+        padding: 6px 12px;
+        font-size: 12px;
+        color: var(--lb);
+      }
+
+      /* App header */
+      .appbar {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--bd);
+        min-width: 0;
+      }
+      .appbar nav {
+        display: flex;
+        gap: 14px;
+        font-size: 13px;
+        color: var(--lb);
+        overflow: hidden;
+        min-width: 0;
+      }
+      .appbar nav b {
+        color: var(--tx);
+        font-weight: 500;
+      }
+      .avatar {
+        margin-left: auto;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: var(--s2);
+        border: 1px solid var(--bd);
+        flex: none;
+      }
+      .body-fill {
+        padding: 14px 16px 18px;
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 4px;
+      }
+      .body-fill i {
+        height: 16px;
+        border-radius: 4px;
+        background: var(--s2);
+      }
+      .phonebar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--bd);
+      }
+      .burger {
+        width: 20px;
+        height: 14px;
+        border-top: 2px solid var(--tx);
+        border-bottom: 2px solid var(--tx);
+        position: relative;
+      }
+      .burger::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 4px;
+        border-top: 2px solid var(--tx);
+      }
+
+      /* Sign-in */
+      .signin {
+        padding: 34px 16px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 22px;
+        background: var(--s2);
+      }
+      .card {
+        width: 100%;
+        max-width: 300px;
+        background: var(--s);
+        border: 1px solid var(--bd);
+        border-radius: 12px;
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .card h4 {
+        margin: 0 0 4px;
+        font-size: 15px;
+        font-weight: 600;
+        text-align: center;
+      }
+      .field {
+        height: 34px;
+        border-radius: 8px;
+        border: 1px solid var(--bd);
+        font-size: 12px;
+        color: var(--lb);
+        display: flex;
+        align-items: center;
+        padding: 0 10px;
+      }
+      .btn {
+        height: 36px;
+        border-radius: 8px;
+        background: var(--br);
+        color: #ffffff;
+        font-size: 13px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .loading {
+        min-height: 220px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        font-size: 13px;
+        color: var(--lb);
+      }
+
+      /* Landing */
+      .landing-nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 18px;
+        gap: 12px;
+      }
+      .landing-nav nav {
+        display: flex;
+        gap: 14px;
+        font-size: 13px;
+        color: var(--lb);
+        align-items: center;
+      }
+      .landing-nav .btn {
+        height: 30px;
+        padding: 0 12px;
+        font-size: 12px;
+      }
+      .hero-copy {
+        padding: 18px 18px 26px;
+      }
+      .hero-copy h3 {
+        font-family: "DM Sans", sans-serif;
+        font-size: 24px;
+        margin: 0 0 6px;
+        letter-spacing: -0.02em;
+      }
+      .hero-copy p {
+        margin: 0;
+        color: var(--lb);
+        font-size: 13px;
+      }
+      .footer {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 18px;
+        border-top: 1px solid var(--bd);
+        font-size: 12px;
+        color: var(--lb);
+      }
+
+      /* Gridmaster */
+      .gm {
+        display: grid;
+        grid-template-columns: 170px minmax(0, 1fr);
+        min-height: 200px;
+      }
+      .gm aside {
+        background: var(--s2);
+        border-right: 1px solid var(--bd);
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        font-size: 12px;
+        color: var(--lb);
+      }
+      .gm .gm-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--tx);
+        font-weight: 600;
+        font-size: 13px;
+        margin-bottom: 6px;
+      }
+      .gm section {
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .gm section i {
+        display: block;
+        height: 14px;
+        border-radius: 4px;
+        background: var(--s2);
+      }
+
+      /* Link preview */
+      .og {
+        aspect-ratio: 1200 / 630;
+        max-width: 100%;
+        background: var(--brand);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .og .word {
+        color: #ffffff;
+      }
+      .preview {
+        padding: 12px;
+        background: var(--s2);
+      }
+      .preview .bubble {
+        background: var(--s);
+        border: 1px solid var(--bd);
+        border-radius: 12px;
+        overflow: hidden;
+        max-width: 360px;
+      }
+      .preview .meta {
+        padding: 10px 12px;
+        font-size: 12px;
+      }
+      .preview .meta b {
+        display: block;
+        font-size: 13px;
+        margin-bottom: 2px;
+      }
+      .preview .meta span {
+        color: var(--lb);
+      }
+
+      /* Email */
+      .email {
+        background: #f1f5f9;
+        padding: 22px 14px;
+        display: flex;
+        justify-content: center;
+      }
+      .email .sheet {
+        background: #ffffff;
+        color: #0f172a;
+        border-radius: 10px;
+        width: 100%;
+        max-width: 380px;
+        padding: 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        border: 1px solid #e2e8f0;
+      }
+      .email h4 {
+        margin: 6px 0 0;
+        font-size: 16px;
+      }
+      .email p {
+        margin: 0;
+        font-size: 13px;
+        color: #475569;
+        line-height: 1.5;
+      }
+      .email .btn {
+        background: var(--brand);
+        align-self: flex-start;
+        padding: 0 16px;
+      }
+
+      /* Print */
+      .print {
+        background: #e5e7eb;
+        padding: 18px;
+        display: flex;
+        justify-content: center;
+      }
+      .page {
+        background: #ffffff;
+        color: var(--print-ink);
+        width: 100%;
+        max-width: 420px;
+        padding: 20px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .page header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        border-bottom: 1px solid #111827;
+        padding-bottom: 10px;
+      }
+      .page header span {
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+      }
+      .page table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 10px;
+        font-variant-numeric: tabular-nums;
+      }
+      .page td,
+      .page th {
+        border: 1px solid #d1d5db;
+        padding: 4px;
+        text-align: left;
+        font-weight: 500;
+      }
+
+      /* Phones */
+      .phones {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 18px;
+      }
+      .phone {
+        width: 220px;
+        height: 440px;
+        border-radius: 34px;
+        border: 8px solid #1f2937;
+        overflow: hidden;
+        position: relative;
+        flex: none;
+        max-width: 100%;
+      }
+      .phone .notch {
+        position: absolute;
+        top: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 70px;
+        height: 18px;
+        border-radius: 999px;
+        background: #000000;
+        z-index: 2;
+      }
+      .home {
+        height: 100%;
+        background: linear-gradient(160deg, #3b4a6b, #1d2433 60%, #3c2f4f);
+        padding: 46px 14px 14px;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-auto-rows: 62px;
+        gap: 4px 6px;
+      }
+      .home.android {
+        background: linear-gradient(170deg, #2f3e34, #1b2420 60%, #2c3b3a);
+      }
+      .app {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        font-size: 9px;
+        color: #ffffff;
+      }
+      .app .ic {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.18);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+      }
+      .home.android .ic {
+        border-radius: 50%;
+      }
+      .home.android .ic.squircle {
+        border-radius: 34%;
+      }
+      .app .ic.dg {
+        background: var(--brand);
+      }
+      .app .ic.themed {
+        background: #dce4ff;
+      }
+      .ph-screen {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+      }
+      .ph-auth {
+        height: 100%;
+        padding: 58px 16px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        background: var(--s);
+      }
+      .ph-auth .head {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 18px;
+      }
+      .ph-auth h4 {
+        margin: 0 0 4px;
+        font-size: 18px;
+        font-weight: 600;
+      }
+      .ph-auth p {
+        margin: 0 0 6px;
+        font-size: 12px;
+        color: var(--lb);
+      }
+      .ph-auth .field {
+        height: 40px;
+      }
+      .ph-auth .btn {
+        height: 42px;
+        border-radius: 10px;
+      }
+      .note {
+        font-size: 12px;
+        color: var(--text-secondary);
+        line-height: 1.5;
+        margin: 6px 0 0;
+        max-width: 760px;
+      }
+      #measure {
+        position: absolute;
+        width: 0;
+        height: 0;
+        overflow: hidden;
+        visibility: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Stacked logo surfaces</h1>
+      <p class="sub">
+        Candidate B (two slanted cards, brand blue behind light blue) placed on every surface that
+        shows the DubGrid logo today, at the sizes those surfaces use. Light and dark where the
+        surface has both.
+      </p>
+
+      <h2>Web app</h2>
+      <p class="group-sub">
+        Favicon, the in-app header (symbol 40 px with the 24 px lockup; symbol alone 36 px on
+        phones), sign-in pages (stacked lockup), and the loading screens.
+      </p>
+      <div class="row">
+        <figure>
+          <div class="frame t-light" data-slot="tabs" data-theme-mode="light"></div>
+          <figcaption><b>Browser tab</b>, favicon at 16 px, light</figcaption>
+        </figure>
+        <figure>
+          <div class="frame t-dark" data-slot="tabs" data-theme-mode="dark"></div>
+          <figcaption><b>Browser tab</b>, favicon at 16 px, dark</figcaption>
+        </figure>
+      </div>
+      <div class="row">
+        <figure>
+          <div class="frame t-light" data-slot="appbar" data-theme-mode="light"></div>
+          <figcaption><b>App header</b>, light</figcaption>
+        </figure>
+        <figure>
+          <div class="frame t-dark" data-slot="appbar" data-theme-mode="dark"></div>
+          <figcaption><b>App header</b>, dark</figcaption>
+        </figure>
+      </div>
+      <div class="row three">
+        <figure>
+          <div class="frame t-light" data-slot="phonebar" data-theme-mode="light"></div>
+          <figcaption><b>App header on a phone</b>, symbol 36 px</figcaption>
+        </figure>
+        <figure>
+          <div class="frame t-dark" data-slot="phonebar" data-theme-mode="dark"></div>
+          <figcaption><b>App header on a phone</b>, dark</figcaption>
+        </figure>
+        <figure>
+          <div class="frame t-dark" data-slot="gridmaster" data-theme-mode="dark"></div>
+          <figcaption><b>Gridmaster portal</b>, symbol 28 px</figcaption>
+        </figure>
+      </div>
+      <div class="row">
+        <figure>
+          <div class="frame t-light" data-slot="signin" data-theme-mode="light"></div>
+          <figcaption><b>Sign-in</b>, stacked lockup, light</figcaption>
+        </figure>
+        <figure>
+          <div class="frame t-dark" data-slot="signin" data-theme-mode="dark"></div>
+          <figcaption><b>Sign-in</b>, stacked lockup, dark</figcaption>
+        </figure>
+      </div>
+      <div class="row">
+        <figure>
+          <div class="frame t-light" data-slot="loading" data-theme-mode="light"></div>
+          <figcaption><b>Loading screen</b> (sign-in handoff, schedule load), light</figcaption>
+        </figure>
+        <figure>
+          <div class="frame t-dark" data-slot="loading" data-theme-mode="dark"></div>
+          <figcaption><b>Loading screen</b>, dark</figcaption>
+        </figure>
+      </div>
+
+      <h2>Landing page and link previews</h2>
+      <p class="group-sub">
+        The marketing nav uses the lockup; the footer uses the symbol in the label gray, so it takes
+        the one-color version. Shared links show the social image.
+      </p>
+      <div class="row">
+        <figure>
+          <div class="frame t-light" data-slot="landing" data-theme-mode="light"></div>
+          <figcaption><b>Landing nav and footer</b>, light</figcaption>
+        </figure>
+        <figure>
+          <div class="frame t-dark" data-slot="landing" data-theme-mode="dark"></div>
+          <figcaption><b>Landing nav and footer</b>, dark</figcaption>
+        </figure>
+      </div>
+      <div class="row">
+        <figure>
+          <div class="frame" data-slot="og"></div>
+          <figcaption><b>Social image</b> (1200 x 630), on brand blue</figcaption>
+        </figure>
+        <figure>
+          <div class="frame t-light" data-slot="preview" data-theme-mode="light"></div>
+          <figcaption><b>Link preview</b> in a chat app</figcaption>
+        </figure>
+      </div>
+
+      <h2>Email and print</h2>
+      <p class="group-sub">
+        Emails use a PNG of the lockup on white. The printed schedule and PDF report print in one
+        color.
+      </p>
+      <div class="row">
+        <figure>
+          <div class="frame" data-slot="email"></div>
+          <figcaption><b>Invitation email</b>, lockup header</figcaption>
+        </figure>
+        <figure>
+          <div class="frame" data-slot="print"></div>
+          <figcaption><b>Printed schedule and PDF report</b>, one color</figcaption>
+        </figure>
+      </div>
+
+      <h2>Mobile app</h2>
+      <p class="group-sub">
+        App icons are white on brand blue. Android also crops the icon to the launcher's shape and
+        tints the themed icon to the wallpaper. The splash shows the symbol over the wordmark.
+      </p>
+      <div class="phones" id="phones"></div>
+      <p class="note" id="phoneNote"></p>
+
+      <h2>Before adopting it</h2>
+      <p class="note">
+        The light blue front card is soft on white (about 1.8 : 1). It holds up at header and
+        sign-in sizes, but the 16 px favicon and the light splash lean on the brand blue card. If
+        that reads too faint, deepen the front card on light surfaces only, for example to
+        <code>#7FA6F8</code>, and keep <code>#BCD2FF</code> on dark.
+      </p>
+      <p class="note">
+        One-color surfaces (footer, print, Android themed icon) cut a gap around the front card so
+        the two cards stay apart without the shading.
+      </p>
+    </main>
+    <svg id="measure" aria-hidden="true"><path id="measurePath" /></svg>
+
+    <script>
+      const SPEC = {
+        n: 2,
+        angle: 32,
+        aspect: 0.95,
+        stepX: 0.4,
+        stepY: 0.42,
+        shrink: 0.85,
+        radius: 0.14,
+        gap: 0.035,
+      };
+      const COLORS = {
+        light: ["#2563EB", "#A8C4FC"],
+        dark: ["#3B82F6", "#BCD2FF"],
+        onBrand: ["#7199F2", "#FFFFFF"],
+      };
+      const MONO_GAP = 0.05;
+
+      const fmt = (n) => Number(n.toFixed(2)).toString();
+
+      function roundedPolygon(pts, r) {
+        const n = pts.length;
+        const corners = pts.map((v, k) => {
+          const prev = pts[(k + n - 1) % n];
+          const next = pts[(k + 1) % n];
+          const a = [prev[0] - v[0], prev[1] - v[1]];
+          const b = [next[0] - v[0], next[1] - v[1]];
+          const la = Math.hypot(...a);
+          const lb = Math.hypot(...b);
+          const ua = [a[0] / la, a[1] / la];
+          const ub = [b[0] / lb, b[1] / lb];
+          const angle = Math.acos(Math.max(-1, Math.min(1, ua[0] * ub[0] + ua[1] * ub[1])));
+          const t = Math.min(r / Math.tan(angle / 2), la / 2, lb / 2);
+          return {
+            s: [v[0] + ua[0] * t, v[1] + ua[1] * t],
+            e: [v[0] + ub[0] * t, v[1] + ub[1] * t],
+            r: t * Math.tan(angle / 2),
+          };
+        });
+        let d = `M${fmt(corners[0].e[0])},${fmt(corners[0].e[1])}`;
+        for (let k = 1; k <= n; k++) {
+          const c = corners[k % n];
+          d += `L${fmt(c.s[0])},${fmt(c.s[1])}A${fmt(c.r)},${fmt(c.r)} 0 0 1 ${fmt(c.e[0])},${fmt(c.e[1])}`;
+        }
+        return d + "Z";
+      }
+
+      function buildGeometry(p) {
+        const tan = Math.tan((p.angle * Math.PI) / 180);
+        const cards = [];
+        let x = 0;
+        let v = 0;
+        let cw = 100;
+        for (let i = 0; i < p.n; i++) {
+          const ch = p.aspect * cw;
+          const y = v + x * tan;
+          cards.push(
+            roundedPolygon(
+              [
+                [x, y],
+                [x + cw, y + cw * tan],
+                [x + cw, y + cw * tan + ch],
+                [x, y + ch],
+              ],
+              p.radius * cw,
+            ),
+          );
+          x += p.stepX * cw;
+          v -= p.stepY * ch;
+          cw *= p.shrink;
+        }
+        const measure = document.getElementById("measurePath");
+        measure.setAttribute("d", cards.join(""));
+        const bb = measure.getBBox();
+        const g = { cards, ink: { x: bb.x, y: bb.y, w: bb.width, h: bb.height }, gap: p.gap * 100 };
+        g.optical = opticalCenter(g);
+        return g;
+      }
+
+      // Midway between the ink box's center and the ink's center of mass.
+      function opticalCenter(g) {
+        const canvas = document.createElement("canvas");
+        canvas.width = canvas.height = 200;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        const s = 200 / Math.max(g.ink.w, g.ink.h);
+        ctx.setTransform(s, 0, 0, s, -g.ink.x * s, -g.ink.y * s);
+        g.cards.forEach((d) => ctx.fill(new Path2D(d)));
+        const { data } = ctx.getImageData(0, 0, 200, 200);
+        let m = 0;
+        let mx = 0;
+        let my = 0;
+        for (let i = 3, px = 0; i < data.length; i += 4, px++) {
+          if (!data[i]) continue;
+          m += data[i];
+          mx += data[i] * ((px % 200) + 0.5);
+          my += data[i] * (Math.floor(px / 200) + 0.5);
+        }
+        const mass = { x: mx / m / s + g.ink.x, y: my / m / s + g.ink.y };
+        return {
+          x: (mass.x + g.ink.x + g.ink.w / 2) / 2,
+          y: (mass.y + g.ink.y + g.ink.h / 2) / 2,
+        };
+      }
+
+      const G = buildGeometry(SPEC);
+      let uid = 0;
+
+      // `paint` is a theme key from COLORS, or { mono: color } for one-color use.
+      function mark(size, paint, { crop = "square", by = "width" } = {}) {
+        const colors = paint.mono ? G.cards.map(() => paint.mono) : COLORS[paint];
+        const gap = paint.mono ? Math.max(G.gap, MONO_GAP * 100) : G.gap;
+        let vb;
+        if (crop === "square") {
+          const side = Math.max(G.ink.w, G.ink.h) * 1.08;
+          vb = [G.optical.x - side / 2, G.optical.y - side / 2, side, side];
+        } else {
+          vb = [G.ink.x, G.ink.y, G.ink.w, G.ink.h];
+        }
+        const ratio = vb[3] / vb[2];
+        const width = by === "height" ? size / ratio : size;
+        const height = by === "height" ? size : size * ratio;
+        const pad = 200;
+        const region = `x="${fmt(G.ink.x - pad)}" y="${fmt(G.ink.y - pad)}" width="${fmt(G.ink.w + 2 * pad)}" height="${fmt(G.ink.h + 2 * pad)}"`;
+        let defs = "";
+        const paths = G.cards.map((d, i) => {
+          const ahead = G.cards.slice(i + 1);
+          if (!gap || !ahead.length) return `<path d="${d}" fill="${colors[i]}"/>`;
+          const id = `cut${uid++}`;
+          defs += `<mask id="${id}" maskUnits="userSpaceOnUse" ${region}><rect ${region} fill="white"/>${ahead
+            .map(
+              (f) =>
+                `<path d="${f}" fill="black" stroke="black" stroke-width="${fmt(gap * 2)}" stroke-linejoin="round"/>`,
+            )
+            .join("")}</mask>`;
+          return `<path d="${d}" fill="${colors[i]}" mask="url(#${id})"/>`;
+        });
+        return `<svg width="${fmt(width)}" height="${fmt(height)}" viewBox="${vb.map(fmt).join(" ")}" aria-hidden="true" style="display:block;flex:none"><defs>${defs}</defs>${paths.join("")}</svg>`;
+      }
+
+      // Symbol ink 1.05 em tall, centered on the wordmark's optical center
+      // (0.256 em above the baseline), 0.25 em before the word.
+      function lockup(fontSize, paint, textColor) {
+        const h = 1.05 * fontSize;
+        const below = h / 2 - 0.256 * fontSize;
+        return `<span class="lockup" style="font-size:${fontSize}px"><span style="margin-right:${0.25 * fontSize}px;transform:translateY(${fmt(below)}px)">${mark(h, paint, { crop: "ink", by: "height" })}</span><span class="word" style="color:${textColor}">dubgrid</span></span>`;
+      }
+
+      function stacked(fontSize, paint, textColor) {
+        return `<span class="stacked" style="gap:${0.42 * fontSize}px">${mark(1.9 * fontSize, paint, { crop: "ink", by: "height" })}<span class="word" style="font-size:${fontSize}px;color:${textColor}">dubgrid</span></span>`;
+      }
+
+      const SLOTS = {
+        tabs: (t) => `<div class="tabs">
+            <div class="tab on">${mark(16, t)}<span>Schedule - Maple Grove Care</span></div>
+            <div class="tab">${mark(16, t)}<span>People</span></div>
+          </div>
+          <div class="urlbar"><div>maplegrove / schedule</div></div>`,
+        appbar: (t) => `<div class="appbar">
+            ${lockup(24, t, "var(--tx)")}
+            <nav><span>Dashboard</span><b>Schedule</b><span>People</span><span>Reports</span><span>Settings</span></nav>
+            <span class="avatar"></span>
+          </div>
+          <div class="body-fill">${"<i></i>".repeat(21)}</div>`,
+        phonebar: (
+          t,
+        ) => `<div class="phonebar">${mark(36, t, { crop: "ink" })}<span class="burger"></span></div>
+          <div class="body-fill" style="grid-template-columns:repeat(3,1fr)">${"<i></i>".repeat(9)}</div>`,
+        gridmaster: (t) => `<div class="gm">
+            <aside><div class="gm-head">${mark(28, t, { crop: "ink" })}Gridmaster</div><span>Organizations</span><span>Accounts</span><span>Billing</span><span>Audit</span></aside>
+            <section><i></i><i></i><i style="width:70%"></i><i></i></section>
+          </div>`,
+        signin: (t) => `<div class="signin">
+            ${stacked(26, t, "var(--tx)")}
+            <div class="card"><h4>Sign in to Maple Grove Care</h4>
+              <div class="field">Email</div><div class="field">Password</div><div class="btn">Sign in</div></div>
+          </div>`,
+        loading: (t) =>
+          `<div class="loading">${mark(64, t, { crop: "ink" })}<span>Loading your schedule</span></div>`,
+        landing: (t) => `<div class="landing-nav">${lockup(22, t, "var(--tx)")}
+            <nav><span>Features</span><span>Pricing</span><span class="btn">Request a demo</span></nav></div>
+          <div class="hero-copy"><h3>Schedules your whole team can trust</h3><p>Built for care facilities.</p></div>
+          <div class="footer">${mark(20, { mono: "var(--lb)" }, { crop: "ink" })}<span>DubGrid, 2026</span></div>`,
+        og: () => `<div class="og">${lockup(54, "onBrand", "#FFFFFF")}</div>`,
+        preview: () => `<div class="preview"><div class="bubble">
+            <div class="og" style="aspect-ratio:1200/630">${lockup(34, "onBrand", "#FFFFFF")}</div>
+            <div class="meta"><b>DubGrid</b><span>Employee scheduling for care facilities</span></div>
+          </div></div>`,
+        email: () => `<div class="email"><div class="sheet">
+            ${lockup(22, "light", "#0F172A")}
+            <h4>You're invited to Maple Grove Care</h4>
+            <p>Jordan Lee added you to the schedule. Accept the invitation to see your shifts.</p>
+            <span class="btn">Accept invitation</span>
+          </div></div>`,
+        print: () => `<div class="print"><div class="page">
+            <header>${lockup(16, { mono: "#111827" }, "#111827")}<span>Week of Oct 12 - 18, 2026</span></header>
+            <table><tr><th>Name</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th></tr>
+              <tr><td>A. Rivera</td><td>7a - 3p</td><td>7a - 3p</td><td></td><td>3p - 11p</td></tr>
+              <tr><td>K. Osei</td><td></td><td>3p - 11p</td><td>3p - 11p</td><td>3p - 11p</td></tr>
+              <tr><td>M. Chen</td><td>11p - 7a</td><td></td><td>11p - 7a</td><td></td></tr></table>
+          </div></div>`,
+      };
+
+      document.querySelectorAll("[data-slot]").forEach((el) => {
+        el.innerHTML = SLOTS[el.dataset.slot](el.dataset.themeMode);
+      });
+
+      const placeholders = (count) =>
+        Array.from(
+          { length: count },
+          () => `<span class="app"><span class="ic"></span></span>`,
+        ).join("");
+      const dgIcon = (cls = "") =>
+        `<span class="app"><span class="ic dg ${cls}">${mark(30, "onBrand")}</span>DubGrid</span>`;
+      const themedIcon = `<span class="app"><span class="ic themed">${mark(27, { mono: "#1E3A8A" })}</span>DubGrid</span>`;
+
+      document.getElementById("phones").innerHTML = `
+        <figure><div class="phone"><span class="notch"></span><div class="home">${placeholders(5)}${dgIcon()}${placeholders(6)}</div></div>
+          <figcaption><b>iOS home screen</b></figcaption></figure>
+        <figure><div class="phone"><span class="notch"></span><div class="home android">${placeholders(5)}${dgIcon()}${placeholders(2)}${dgIcon("squircle")}${placeholders(1)}${themedIcon}${placeholders(2)}</div></div>
+          <figcaption><b>Android</b>: circle, squircle, themed</figcaption></figure>
+        <figure><div class="phone"><span class="notch"></span><div class="ph-screen" style="background:#FFFFFF">${stacked(24, "light", "#0F172A")}</div></div>
+          <figcaption><b>Splash</b>, light</figcaption></figure>
+        <figure><div class="phone"><span class="notch"></span><div class="ph-screen" style="background:var(--splash-dark)">${stacked(24, "dark", "#FAFAFA")}</div></div>
+          <figcaption><b>Splash</b>, dark</figcaption></figure>
+        <figure><div class="phone t-light"><span class="notch"></span><div class="ph-auth">
+            <div class="head">${lockup(22, "light", "var(--tx)")}</div>
+            <h4>Welcome back</h4><p>Sign in to see your schedule.</p>
+            <div class="field">Email</div><div class="field">Password</div><div class="btn">Sign in</div></div></div>
+          <figcaption><b>Mobile sign-in</b>, light</figcaption></figure>
+        <figure><div class="phone t-dark"><span class="notch"></span><div class="ph-auth">
+            <div class="head">${lockup(22, "dark", "var(--tx)")}</div>
+            <h4>Welcome back</h4><p>Sign in to see your schedule.</p>
+            <div class="field">Email</div><div class="field">Password</div><div class="btn">Sign in</div></div></div>
+          <figcaption><b>Mobile sign-in</b>, dark</figcaption></figure>`;
+
+      document.fonts?.ready.then(() => document.body.offsetHeight);
+    </script>
+  </body>
+</html>

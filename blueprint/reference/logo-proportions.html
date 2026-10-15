@@ -1,0 +1,634 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Logo proportions</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@700&family=Inter:wght@400;500;600&display=swap"
+    />
+    <style>
+      :root {
+        --text-primary: #111827;
+        --text-secondary: #6b7280;
+        --surface-1: #f4f4f5;
+        --surface-2: #ffffff;
+        --page: #fafafa;
+        --border: rgba(0, 0, 0, 0.1);
+        --border-strong: rgba(0, 0, 0, 0.18);
+        --accent-soft: rgba(37, 99, 235, 0.1);
+        --mark-light: #2563eb;
+        --mark-dark: #2075ff;
+        --tile-light: #ffffff;
+        --tile-dark: #111113;
+        --ink-light: #111827;
+        --ink-dark: #fafafa;
+        --radius: 8px;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --text-primary: #fafafa;
+          --text-secondary: #a1a1aa;
+          --surface-1: #18181b;
+          --surface-2: #202024;
+          --page: #0f0f11;
+          --border: rgba(255, 255, 255, 0.1);
+          --border-strong: rgba(255, 255, 255, 0.18);
+          --accent-soft: rgba(32, 117, 255, 0.18);
+        }
+      }
+      :root[data-theme="dark"] {
+        --text-primary: #fafafa;
+        --text-secondary: #a1a1aa;
+        --surface-1: #18181b;
+        --surface-2: #202024;
+        --page: #0f0f11;
+        --border: rgba(255, 255, 255, 0.1);
+        --border-strong: rgba(255, 255, 255, 0.18);
+        --accent-soft: rgba(32, 117, 255, 0.18);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 24px 16px 48px;
+        background: var(--page);
+        color: var(--text-primary);
+        font-family: Inter, system-ui, sans-serif;
+        font-size: 14px;
+      }
+      main {
+        max-width: 980px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 20px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 28px 0 10px;
+      }
+      .sub {
+        color: var(--text-secondary);
+        margin: 0 0 18px;
+        line-height: 1.5;
+        max-width: 680px;
+      }
+      .panel {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+      }
+      .workbench {
+        display: grid;
+        grid-template-columns: minmax(0, 300px) minmax(0, 1fr);
+        gap: 16px;
+      }
+      @media (max-width: 760px) {
+        .workbench {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .ctl {
+        margin-bottom: 14px;
+      }
+      .ctl label {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-bottom: 4px;
+      }
+      .ctl output {
+        font-variant-numeric: tabular-nums;
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+      .ctl input {
+        width: 100%;
+        accent-color: var(--mark-light);
+      }
+      .presets {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 16px;
+      }
+      .chip {
+        font: inherit;
+        font-size: 12px;
+        font-weight: 500;
+        padding: 5px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border-strong);
+        background: transparent;
+        color: var(--text-primary);
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .chip[aria-pressed="true"] {
+        background: var(--accent-soft);
+        border-color: var(--mark-light);
+      }
+      .stat {
+        font-size: 12px;
+        color: var(--text-secondary);
+        font-variant-numeric: tabular-nums;
+        line-height: 1.6;
+      }
+      .stat b {
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+      .compare {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .tile {
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        min-width: 0;
+      }
+      .tile.light {
+        background: var(--tile-light);
+        color: var(--ink-light);
+      }
+      .tile.dark {
+        background: var(--tile-dark);
+        color: var(--ink-dark);
+      }
+      .tile-label {
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        opacity: 0.6;
+      }
+      .hero {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 170px;
+      }
+      .sizes {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+      .square-guide {
+        outline: 1px dashed currentColor;
+        outline-offset: 0;
+        opacity: 1;
+      }
+      .lockup {
+        display: flex;
+        align-items: center;
+        white-space: nowrap;
+        overflow: hidden;
+      }
+      .word {
+        font-family: "DM Sans", sans-serif;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1;
+      }
+      .icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 13px;
+        background: var(--mark-light);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex: none;
+      }
+      .cands {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 12px;
+      }
+      .cand {
+        cursor: pointer;
+        text-align: left;
+        font: inherit;
+        color: inherit;
+      }
+      .cand[aria-pressed="true"] {
+        outline: 2px solid var(--mark-light);
+        outline-offset: 2px;
+      }
+      .cand h3 {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .cand p {
+        margin: 0;
+        font-size: 12px;
+        opacity: 0.7;
+        line-height: 1.45;
+      }
+      pre {
+        margin: 0;
+        padding: 12px;
+        border-radius: var(--radius);
+        background: var(--surface-1);
+        font-size: 12px;
+        overflow-x: auto;
+        line-height: 1.55;
+      }
+      .note {
+        font-size: 12px;
+        color: var(--text-secondary);
+        line-height: 1.5;
+        margin: 10px 0 0;
+      }
+      .toggle-row {
+        display: flex;
+        gap: 6px;
+        margin: 0 0 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Logo proportions</h1>
+      <p class="sub">
+        Refining the two-card symbol: squarer cards so the mark is less long, and the back card
+        pulled further out from behind the front one. Pick a candidate or drag the sliders; the
+        shipped mark sits beside it for comparison. Stroke and gap stay proportional to the front
+        card's height, as today.
+      </p>
+
+      <div class="toggle-row" role="group" aria-label="Guides">
+        <button class="chip" id="guideBtn" aria-pressed="false">Show ink box</button>
+      </div>
+
+      <div class="workbench">
+        <section class="panel" aria-label="Controls">
+          <div class="presets" id="presets"></div>
+          <div class="ctl">
+            <label for="aspect">Card shape (width / height) <output id="aspectOut"></output></label>
+            <input id="aspect" type="range" min="1" max="1.3334" step="0.0001" />
+          </div>
+          <div class="ctl">
+            <label for="showX">Back card showing sideways <output id="showXOut"></output></label>
+            <input id="showX" type="range" min="0.2" max="0.6" step="0.01" />
+          </div>
+          <div class="ctl">
+            <label for="lift">Back card raised <output id="liftOut"></output></label>
+            <input id="lift" type="range" min="0" max="0.4" step="0.01" />
+          </div>
+          <div class="ctl">
+            <label for="scale">Back card size <output id="scaleOut"></output></label>
+            <input id="scale" type="range" min="0.8" max="1" step="0.01" />
+          </div>
+          <div class="stat" id="stats"></div>
+        </section>
+
+        <section class="compare" aria-label="Preview">
+          <div class="tile light" id="tileLight"></div>
+          <div class="tile dark" id="tileDark"></div>
+        </section>
+      </div>
+
+      <h2>Candidates</h2>
+      <div class="cands" id="cands"></div>
+
+      <h2>Against the shipped mark</h2>
+      <div class="compare">
+        <div class="tile light" id="vsLight"></div>
+        <div class="tile dark" id="vsDark"></div>
+      </div>
+
+      <h2>Token values</h2>
+      <pre id="tokens"></pre>
+      <p class="note">
+        <code>BACK_LIFT</code> is new: the share of the back card's height it rises above the front
+        card's center line. Square tiles here center the mark on its optical center (midpoint of the
+        ink box's center and the ink's center of mass), the rule the shipped mark uses; the real
+        offsets get recomputed in the fix.
+      </p>
+      <p class="note">
+        Recognition risk: the shipped history records that square and wider versions tried before
+        matched Kick, Klip and Bithat in Google Lens. Lens-check the chosen candidate on its own and
+        in the lockup before adopting it.
+      </p>
+    </main>
+
+    <script>
+      // Ratios of the front card's height, taken from the shipped mark
+      // (front card 55.51 units tall, 6-unit stroke, 6-unit gap).
+      const STROKE = 6 / 55.51;
+      const GAP = 6 / 55.51;
+      const SMOOTHING = 0.6;
+      const SHIPPED = { aspect: 4 / 3, showX: 0.3, lift: 0, scale: 0.9 };
+
+      const CANDIDATES = [
+        { id: "shipped", name: "Shipped", note: "4:3 cards, 30% showing, level.", ...SHIPPED },
+        {
+          id: "a",
+          name: "A - Squarer, more side",
+          note: "6:5 cards, 42% of the back card showing, level.",
+          aspect: 1.2,
+          showX: 0.42,
+          lift: 0,
+          scale: 0.9,
+        },
+        {
+          id: "b",
+          name: "B - Diagonal step",
+          note: "6:5 cards, back card out to the left and raised 18%.",
+          aspect: 1.2,
+          showX: 0.38,
+          lift: 0.18,
+          scale: 0.9,
+        },
+        {
+          id: "c",
+          name: "C - Near square",
+          note: "Square cards, back card raised 24%, close to a square footprint.",
+          aspect: 1,
+          showX: 0.36,
+          lift: 0.24,
+          scale: 0.9,
+        },
+        {
+          id: "d",
+          name: "D - Fuller back card",
+          note: "5:4 cards, back card 95% size, 45% showing, raised 12%.",
+          aspect: 1.25,
+          showX: 0.45,
+          lift: 0.12,
+          scale: 0.95,
+        },
+      ];
+
+      const fmt = (n) => Number(n.toFixed(2)).toString();
+
+      function cardPath({ x, y, w, h, r: radius }) {
+        const half = Math.min(w, h) / 2;
+        const r = Math.max(0, Math.min(radius, half));
+        const p = Math.min(r * (1 + SMOOTHING), half);
+        const q = Math.max(0, (2.343 * r - p) / 3);
+        const c = (...pts) => pts.map(fmt).join(",");
+        return [
+          `M${c(x + p, y)}`,
+          `H${fmt(x + w - p)}`,
+          `C${c(x + w - q, y)} ${c(x + w, y + q)} ${c(x + w, y + p)}`,
+          `V${fmt(y + h - p)}`,
+          `C${c(x + w, y + h - q)} ${c(x + w - q, y + h)} ${c(x + w - p, y + h)}`,
+          `H${fmt(x + p)}`,
+          `C${c(x + q, y + h)} ${c(x, y + h - q)} ${c(x, y + h - p)}`,
+          `V${fmt(y + p)}`,
+          `C${c(x, y + q)} ${c(x + q, y)} ${c(x + p, y)}`,
+          "Z",
+        ].join("");
+      }
+
+      // Geometry with the front card 1 unit tall, then scaled so the ink's
+      // longer side is 94 units, the shipped mark's 100-unit box less a 3-unit inset.
+      function geometry({ aspect, showX, lift, scale }) {
+        const fw = aspect;
+        const bw = scale * aspect;
+        const bh = scale;
+        const back = { x: 0, y: 0.5 - bh / 2 - lift * bh, w: bw, h: bh, r: 0.25 * bh };
+        const front = { x: showX * bw, y: 0, w: fw, h: 1, r: 0.274 };
+        const s = STROKE / 2;
+        const ink = {
+          x: back.x - s,
+          y: Math.min(back.y - s, front.y),
+          r: Math.max(front.x + front.w, back.x + back.w + s),
+          b: Math.max(front.y + front.h, back.y + back.h + s),
+        };
+        ink.w = ink.r - ink.x;
+        ink.h = ink.b - ink.y;
+        const k = 94 / Math.max(ink.w, ink.h);
+        const t = (c) => ({
+          x: (c.x - ink.x) * k + 3,
+          y: (c.y - ink.y) * k + 3,
+          w: c.w * k,
+          h: c.h * k,
+          r: c.r * k,
+        });
+        const g = {
+          back: t(back),
+          front: t(front),
+          stroke: STROKE * k,
+          gap: GAP * k,
+          ink: { x: 3, y: 3, w: ink.w * k, h: ink.h * k },
+        };
+        g.backPath = cardPath(g.back);
+        g.frontPath = cardPath(g.front);
+        g.optical = opticalCenter(g);
+        return g;
+      }
+
+      // The ink's center of mass, by rasterizing the mark.
+      const massCanvas = document.createElement("canvas");
+      massCanvas.width = massCanvas.height = 200;
+      function opticalCenter(g) {
+        const ctx = massCanvas.getContext("2d", { willReadFrequently: true });
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, 200, 200);
+        ctx.setTransform(2, 0, 0, 2, 0, 0);
+        const back = new Path2D(g.backPath);
+        const front = new Path2D(g.frontPath);
+        ctx.globalCompositeOperation = "source-over";
+        ctx.lineWidth = g.stroke;
+        ctx.strokeStyle = "#000";
+        ctx.stroke(back);
+        ctx.globalCompositeOperation = "destination-out";
+        ctx.lineWidth = g.gap * 2;
+        ctx.stroke(front);
+        ctx.fill(front);
+        ctx.globalCompositeOperation = "source-over";
+        ctx.fillStyle = "#000";
+        ctx.fill(front);
+        const { data } = ctx.getImageData(0, 0, 200, 200);
+        let m = 0,
+          mx = 0,
+          my = 0;
+        for (let i = 3, p = 0; i < data.length; i += 4, p++) {
+          const a = data[i];
+          if (!a) continue;
+          m += a;
+          mx += a * ((p % 200) + 0.5);
+          my += a * (Math.floor(p / 200) + 0.5);
+        }
+        const mass = { x: mx / m / 2, y: my / m / 2 };
+        const box = { x: g.ink.x + g.ink.w / 2, y: g.ink.y + g.ink.h / 2 };
+        return { x: (mass.x + box.x) / 2, y: (mass.y + box.y) / 2, box };
+      }
+
+      let uid = 0;
+      function markSvg(g, { size, color, crop = "ink", guide = false }) {
+        const id = `gap${uid++}`;
+        let vb;
+        if (crop === "square") {
+          const side = Math.max(g.ink.w, g.ink.h) + 9;
+          vb = [g.optical.x - side / 2, g.optical.y - side / 2, side, side];
+        } else {
+          vb = [g.ink.x, g.ink.y, g.ink.w, g.ink.h];
+        }
+        const aspect = vb[3] / vb[2];
+        const w = crop === "height" ? size / aspect : size;
+        const h = crop === "height" ? size : size * aspect;
+        const box = guide
+          ? `<rect x="${g.ink.x}" y="${g.ink.y}" width="${g.ink.w}" height="${g.ink.h}" fill="none" stroke="currentColor" stroke-opacity=".35" stroke-width="${vb[2] / w}" stroke-dasharray="${(3 * vb[2]) / w}"/>`
+          : "";
+        return `<svg width="${fmt(w)}" height="${fmt(h)}" viewBox="${vb.map(fmt).join(" ")}" fill="none" aria-hidden="true">
+          <mask id="${id}" maskUnits="userSpaceOnUse" x="-20" y="-20" width="140" height="140">
+            <rect x="-20" y="-20" width="140" height="140" fill="white"/>
+            <path d="${g.frontPath}" fill="black" stroke="black" stroke-width="${fmt(g.gap * 2)}"/>
+          </mask>
+          <path d="${g.backPath}" stroke="${color}" stroke-width="${fmt(g.stroke)}" mask="url(#${id})"/>
+          <path d="${g.frontPath}" fill="${color}"/>
+          ${box}
+        </svg>`;
+      }
+
+      // Header lockup rule: the front card as tall as an ascender (0.72 em),
+      // the symbol's center on the wordmark's optical center, 0.23 em gap.
+      function lockup(g, fontSize, color, ink) {
+        const unit = (0.72 * fontSize) / g.front.h;
+        const height = g.ink.h * unit;
+        const below = height / 2 - 0.256 * fontSize;
+        return `<span class="lockup" style="font-size:${fontSize}px">
+          <span style="display:inline-block;margin-right:${0.23 * fontSize}px;transform:translateY(${fmt(below)}px)">${markSvg(g, { size: height, color, crop: "height" })}</span>
+          <span class="word" style="color:${ink}">dubgrid</span>
+        </span>`;
+      }
+
+      function tileHtml(g, theme, label, guide) {
+        const color = theme === "light" ? "var(--mark-light)" : "var(--mark-dark)";
+        const ink = theme === "light" ? "var(--ink-light)" : "var(--ink-dark)";
+        return `<span class="tile-label">${label}</span>
+          <div class="hero">${markSvg(g, { size: 200, color, guide })}</div>
+          <div class="sizes">
+            ${markSvg(g, { size: 48, color, crop: "square" })}
+            ${markSvg(g, { size: 32, color, crop: "square" })}
+            ${markSvg(g, { size: 16, color, crop: "square" })}
+            <span class="icon">${markSvg(g, { size: 48, color: "#fff", crop: "square" })}</span>
+          </div>
+          ${lockup(g, 24, color, ink)}
+          ${lockup(g, 40, color, ink)}`;
+      }
+
+      const $ = (id) => document.getElementById(id);
+      const inputs = ["aspect", "showX", "lift", "scale"];
+      let state = { ...CANDIDATES[2] };
+      let guide = false;
+      const shippedGeom = geometry(SHIPPED);
+
+      function ratioLabel(a) {
+        const known = [
+          [4 / 3, "4:3"],
+          [1.25, "5:4"],
+          [1.2, "6:5"],
+          [1, "1:1"],
+        ];
+        const hit = known.find(([v]) => Math.abs(v - a) < 0.004);
+        return hit ? `${hit[1]} (${a.toFixed(2)})` : a.toFixed(2);
+      }
+
+      function render() {
+        const g = geometry(state);
+        $("aspectOut").textContent = ratioLabel(state.aspect);
+        $("showXOut").textContent = `${Math.round(state.showX * 100)}%`;
+        $("liftOut").textContent = `${Math.round(state.lift * 100)}%`;
+        $("scaleOut").textContent = `${Math.round(state.scale * 100)}%`;
+        const ratio = g.ink.w / g.ink.h;
+        const shippedRatio = shippedGeom.ink.w / shippedGeom.ink.h;
+        $("stats").innerHTML =
+          `Footprint <b>${ratio.toFixed(2)} : 1</b> (shipped ${shippedRatio.toFixed(2)} : 1)<br>
+          Back card visible beside front: <b>${fmt(g.front.x - g.back.x)}</b> of ${fmt(g.ink.w)} units<br>
+          Back card above front: <b>${fmt(Math.max(0, g.front.y - g.back.y))}</b> units`;
+        $("tileLight").innerHTML = tileHtml(g, "light", "Light", guide);
+        $("tileDark").innerHTML = tileHtml(g, "dark", "Dark", guide);
+        $("vsLight").innerHTML = vsHtml(g, "light");
+        $("vsDark").innerHTML = vsHtml(g, "dark");
+        const match = CANDIDATES.find((c) => inputs.every((k) => Math.abs(c[k] - state[k]) < 1e-3));
+        document.querySelectorAll("[data-cand]").forEach((el) => {
+          el.setAttribute("aria-pressed", String(match?.id === el.dataset.cand));
+        });
+        $("tokens").textContent = `// packages/design-tokens/src/brand-mark.ts
+const ASPECT = ${state.aspect === 4 / 3 ? "4 / 3" : fmt(state.aspect)};
+const BACK_SCALE = ${fmt(state.scale)};
+const BACK_SHOWING = ${fmt(state.showX)};
+const BACK_LIFT = ${fmt(state.lift)}; // new
+// Footprint ${ratio.toFixed(2)} : 1, front card ${fmt(g.front.w)} x ${fmt(g.front.h)} in the 100-unit box`;
+      }
+
+      function vsHtml(g, theme) {
+        const color = theme === "light" ? "var(--mark-light)" : "var(--mark-dark)";
+        const ink = theme === "light" ? "var(--ink-light)" : "var(--ink-dark)";
+        return `<span class="tile-label">${theme === "light" ? "Light" : "Dark"}: shipped, then this</span>
+          ${lockup(shippedGeom, 28, color, ink)}
+          ${lockup(g, 28, color, ink)}
+          <div class="sizes">
+            ${markSvg(shippedGeom, { size: 32, color, crop: "square" })}
+            ${markSvg(g, { size: 32, color, crop: "square" })}
+            <span style="width:12px"></span>
+            ${markSvg(shippedGeom, { size: 16, color, crop: "square" })}
+            ${markSvg(g, { size: 16, color, crop: "square" })}
+          </div>`;
+      }
+
+      function setState(next) {
+        state = { ...state, ...next };
+        inputs.forEach((k) => ($(k).value = state[k]));
+        render();
+      }
+
+      inputs.forEach((k) =>
+        $(k).addEventListener("input", (e) => {
+          state[k] = Number(e.target.value);
+          render();
+        }),
+      );
+
+      $("presets").innerHTML = CANDIDATES.map(
+        (c) =>
+          `<button class="chip" data-cand="${c.id}" aria-pressed="false">${c.name.split(" - ")[0]}</button>`,
+      ).join("");
+      $("cands").innerHTML = CANDIDATES.map((c) => {
+        const g = geometry(c);
+        return `<button class="tile light cand" data-cand="${c.id}" aria-pressed="false">
+          <h3>${c.name}</h3>
+          <div class="hero" style="min-height:110px">${markSvg(g, { size: 120, color: "var(--mark-light)", crop: "square" })}</div>
+          ${lockup(g, 22, "var(--mark-light)", "var(--ink-light)")}
+          <p>${c.note} Footprint ${(g.ink.w / g.ink.h).toFixed(2)} : 1.</p>
+        </button>`;
+      }).join("");
+      document
+        .querySelectorAll("[data-cand]")
+        .forEach((el) =>
+          el.addEventListener("click", () =>
+            setState(CANDIDATES.find((c) => c.id === el.dataset.cand)),
+          ),
+        );
+      $("guideBtn").addEventListener("click", (e) => {
+        guide = !guide;
+        e.currentTarget.setAttribute("aria-pressed", String(guide));
+        render();
+      });
+
+      setState(state);
+      document.fonts?.ready.then(render);
+    </script>
+  </body>
+</html>

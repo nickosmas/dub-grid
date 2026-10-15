@@ -1,9 +1,10 @@
 # Logo animations
 
-> **Status (2026-10-11):** the web animations shipped in
-> `blueprint/history/fixes/web-logo-animations.md`; mobile is still to do.
-> `logo-animations.html` beside this file plays the full set the owner
-> reviewed on 2026-10-09, including the six since dropped.
+> **Superseded (2026-10-15)** by `stack-logo-animations.md`, which moves the
+> stacked two-card mark: Breathe, Shuffle and Climb, Climb replacing Trace.
+> Kept as the record of the outline mark's animations, which shipped in
+> `blueprint/history/fixes/web-logo-animations.md`. `logo-animations.html`
+> beside this file plays the full set the owner reviewed on 2026-10-09.
 
 ## Rules
 
