@@ -43,25 +43,27 @@ describe("svgPathToPdf", () => {
 });
 
 describe("pdfBrandMarkCommands", () => {
-  it("fills the back card, cuts the gap in the background, then fills the front card", () => {
-    const [back, gap, front] = pdfBrandMarkCommands(32, 580, 20);
+  it("fills each card after painting the gap around it in the background", () => {
+    const [back, centerGap, center, frontGap, front] = pdfBrandMarkCommands(32, 580, 20);
     expect(back).toMatch(/^q 0\.561 0\.690 0\.973 rg .* h f Q$/);
-    expect(gap).toMatch(/^q 1\.000 1\.000 1\.000 rg .* h f Q$/);
-    expect(front).toMatch(/^q 0\.145 0\.388 0\.922 rg .* h f Q$/);
+    expect(centerGap).toMatch(/^q 1\.000 1\.000 1\.000 rg .* h f Q$/);
+    expect(center).toMatch(/^q 0\.145 0\.388 0\.922 rg .* h f Q$/);
+    expect(frontGap).toMatch(/^q 1\.000 1\.000 1\.000 rg .* h f Q$/);
+    expect(front).toMatch(/^q 0\.561 0\.690 0\.973 rg .* h f Q$/);
   });
 
-  it("puts the back card on the ink box's left edge and the front card on its right", () => {
+  it("puts the back card on the ink box's left edge, the front card on its right, and the center card on its top", () => {
     const points = (command: string) =>
       [...command.matchAll(/(-?\d+\.\d{2}) (-?\d+\.\d{2}) [mlc]/g)].map(([, x, y]) => [
         Number(x),
         Number(y),
       ]);
-    const [back, , front] = pdfBrandMarkCommands(100, 500, 136);
-    const backXs = points(back).map(([x]) => x);
-    const frontXs = points(front).map(([x]) => x);
-    const frontYs = points(front).map(([, y]) => y);
-    expect(Math.min(...backXs)).toBeCloseTo(100, 1);
-    expect(Math.max(...frontXs)).toBeCloseTo(236, 1);
-    expect(Math.max(...frontYs)).toBeLessThanOrEqual(500);
+    const [back, , center, , front] = pdfBrandMarkCommands(100, 500, 138);
+    expect(Math.min(...points(back).map(([x]) => x))).toBeCloseTo(100, 1);
+    expect(Math.max(...points(front).map(([x]) => x))).toBeCloseTo(238, 1);
+    expect(Math.max(...points(center).map(([, y]) => y))).toBeLessThanOrEqual(500);
+    expect(Math.max(...points(front).map(([, y]) => y))).toBeLessThan(
+      Math.max(...points(center).map(([, y]) => y)),
+    );
   });
 });

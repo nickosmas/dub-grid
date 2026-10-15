@@ -309,10 +309,10 @@
   --dg-color-brand-light: #3b82f6;
   /* The stacked logo: the stronger card in front, and a back card that
      recedes by the same 2.16:1 to its surface in both themes. */
-  --dg-color-brand-mark-back: #8fb0f8;
-  --dg-color-brand-mark-front: #2563eb;
-  --dg-color-brand-mark-on-brand-back: #7199f2;
-  --dg-color-brand-mark-on-brand-front: #ffffff;
+  --dg-color-brand-mark-side: #8fb0f8;
+  --dg-color-brand-mark-center: #2563eb;
+  --dg-color-brand-mark-on-brand-side: #9dbbf7;
+  --dg-color-brand-mark-on-brand-center: #ffffff;
   --dg-color-brand-bg: #eff6ff;
   --dg-color-brand-border: #bfdbfe;
   --dg-color-nav-active-bg: #e5e5e5;
@@ -447,8 +447,8 @@
   --dg-color-text-inverse: #ffffff;
   --dg-color-brand: #2075ff;
   --dg-color-brand-light: #4a9bff;
-  --dg-color-brand-mark-back: #1e40af;
-  --dg-color-brand-mark-front: #3b82f6;
+  --dg-color-brand-mark-side: #1e40af;
+  --dg-color-brand-mark-center: #3b82f6;
   --dg-color-brand-bg: #152238;
   --dg-color-brand-border: #1e3a5f;
   --dg-color-nav-active-bg: #26262b;

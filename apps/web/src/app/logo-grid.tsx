@@ -40,21 +40,25 @@ export function loadDmSansFonts() {
 
 interface MarkProps {
   height: number;
-  /** The surface behind the mark, which the gap around the front card takes. */
+  /** The surface behind the mark, which the gaps between the cards take. */
   background: string;
 }
 
-/** The two-card symbol, cropped to its ink, `height` tall. */
+/** The three-card symbol, cropped to its ink, `height` tall. */
 export function LogoMark({ height, background }: MarkProps) {
   const { width: w, height: h } = BRAND_SYMBOL_INK;
-  const { back, front, cut } = getBrandSymbolPaths(brandSymbolGap(height));
+  const [back, ...ahead] = getBrandSymbolPaths(brandSymbolGap(height));
   const colors = BRAND_SYMBOL_COLORS.light;
-  // Satori draws masks unreliably, so the gap is painted in the known surface color.
+  // Satori draws masks unreliably, so each gap is painted in the known surface
+  // color just before the card it surrounds. The back card's cuts are those
+  // grown outlines, front to back in its list.
   return (
     <svg width={(height * w) / h} height={height} viewBox={`0 0 ${w} ${h}`}>
-      <path d={back} fill={colors.back} />
-      <path d={cut} fill={background} />
-      <path d={front} fill={colors.front} />
+      <path d={back.path} fill={colors[back.tone]} />
+      {ahead.map((card, k) => [
+        <path key={`gap-${k}`} d={back.cut[k]} fill={background} />,
+        <path key={`card-${k}`} d={card.path} fill={colors[card.tone]} />,
+      ])}
     </svg>
   );
 }

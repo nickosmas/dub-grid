@@ -1,8 +1,8 @@
 /**
- * The stacked two-card DubGrid symbol and its lockups with the `dubgrid`
+ * The stacked three-card DubGrid symbol and its lockups with the `dubgrid`
  * wordmark, shared by web, mobile and the asset generators so every surface
- * draws the same mark. Cards are 100 units wide; coordinates are in the
- * symbol's ink box, whose top-left corner is the origin.
+ * draws the same mark. The center card is 100 units wide; coordinates are in
+ * the symbol's ink box, whose top-left corner is the origin.
  */
 
 /**
@@ -42,13 +42,18 @@ export const BRAND_WORDMARK_INK_EM = {
  */
 export const BRAND_SYMBOL_CARD = { width: 100, height: 95, slantDeg: 32, curve: 14 } as const;
 
-/** The front card sits this far along the slant and this share of a card's height up. */
-const FRONT_ALONG = 36;
-const FRONT_UP = 0.42;
+/** The back and front cards are this share of the center card's size. */
+const SIDE_SCALE = 0.75;
+/**
+ * Each card sits this far along the slant and this share of a card's height
+ * up from the one behind it, measured with the two cards' average width.
+ */
+const STEP_ALONG = 0.36;
+const STEP_UP = 0.42;
 
 /**
- * Width of the surface-colored gap cut out of the back card around the front
- * card. Below `BRAND_SYMBOL_SMALL_MAX_PX` the small gap keeps the cards apart;
+ * Width of the surface-colored gap cut out of each card around the cards in
+ * front of it. Below `BRAND_SYMBOL_SMALL_MAX_PX` the small gap keeps the cards apart;
  * a one-color symbol needs a wider gap, as its cards share a color.
  */
 export const BRAND_SYMBOL_GAP = { regular: 3.5, small: 7, oneColor: 5 } as const;
@@ -61,15 +66,16 @@ export function brandSymbolGap(heightPx: number, oneColor = false): number {
 }
 
 /**
- * The stronger card goes in front: brand blue on light and dark surfaces,
- * white on a brand-blue one. The back card recedes by the same amount in
- * both themes, 2.16:1 to its surface.
+ * The center card is the strongest: brand blue on light and dark surfaces,
+ * white on a brand-blue one. The back and front cards share a receding color.
  */
 export const BRAND_SYMBOL_COLORS = {
-  light: { back: "#8FB0F8", front: "#2563EB" },
-  dark: { back: "#1E40AF", front: "#3B82F6" },
-  onBrand: { back: "#7199F2", front: "#FFFFFF" },
+  light: { side: "#8FB0F8", center: "#2563EB" },
+  dark: { side: "#1E40AF", center: "#3B82F6" },
+  onBrand: { side: "#9DBBF7", center: "#FFFFFF" },
 } as const;
+
+export type BrandSymbolTone = keyof (typeof BRAND_SYMBOL_COLORS)["light"];
 
 type Point = readonly [number, number];
 
@@ -121,34 +127,48 @@ export const BRAND_SYMBOL_CORNER_RADII = CORNERS.map((c) => c.radius);
 
 // The card is the convex hull of its corner circles, so its extent in any
 // direction is the farthest circle's.
-const extent = (cx: number, cy: number) => ({
-  left: Math.min(...CORNERS.map((c) => cx + c.center[0] - c.radius)),
-  right: Math.max(...CORNERS.map((c) => cx + c.center[0] + c.radius)),
-  top: Math.min(...CORNERS.map((c) => cy + c.center[1] - c.radius)),
-  bottom: Math.max(...CORNERS.map((c) => cy + c.center[1] + c.radius)),
+const extent = (cx: number, cy: number, scale: number) => ({
+  left: Math.min(...CORNERS.map((c) => cx + (c.center[0] - c.radius) * scale)),
+  right: Math.max(...CORNERS.map((c) => cx + (c.center[0] + c.radius) * scale)),
+  top: Math.min(...CORNERS.map((c) => cy + (c.center[1] - c.radius) * scale)),
+  bottom: Math.max(...CORNERS.map((c) => cy + (c.center[1] + c.radius) * scale)),
 });
 
-const backRaw: Point = [0, 0];
-const frontRaw: Point = [FRONT_ALONG, FRONT_ALONG * tan - FRONT_UP * BRAND_SYMBOL_CARD.height];
-const backBox = extent(...backRaw);
-const frontBox = extent(...frontRaw);
-const origin: Point = [Math.min(backBox.left, frontBox.left), Math.min(backBox.top, frontBox.top)];
+const stepWidth = (BRAND_SYMBOL_CARD.width * (1 + SIDE_SCALE)) / 2;
+const STEP: Point = [
+  STEP_ALONG * stepWidth,
+  STEP_ALONG * stepWidth * tan -
+    STEP_UP * (BRAND_SYMBOL_CARD.height / BRAND_SYMBOL_CARD.width) * stepWidth,
+];
+const RAW = [
+  { at: [-STEP[0], -STEP[1]] as Point, scale: SIDE_SCALE, tone: "side" as const },
+  { at: [0, 0] as Point, scale: 1, tone: "center" as const },
+  { at: STEP, scale: SIDE_SCALE, tone: "side" as const },
+];
+const boxes = RAW.map((c) => extent(c.at[0], c.at[1], c.scale));
+const origin: Point = [Math.min(...boxes.map((b) => b.left)), Math.min(...boxes.map((b) => b.top))];
 
-/** The symbol's ink box. Its center is the optical center: the outline is symmetric under a half turn. */
+/** The symbol's ink box. Its center is the center card's: the outline is symmetric under a half turn. */
 export const BRAND_SYMBOL_INK = {
-  width: Math.max(backBox.right, frontBox.right) - origin[0],
-  height: Math.max(backBox.bottom, frontBox.bottom) - origin[1],
+  width: Math.max(...boxes.map((b) => b.right)) - origin[0],
+  height: Math.max(...boxes.map((b) => b.bottom)) - origin[1],
 } as const;
 
-/** Card centers in the ink box. */
-export const BRAND_SYMBOL_BACK = {
-  cx: backRaw[0] - origin[0],
-  cy: backRaw[1] - origin[1],
-} as const;
-export const BRAND_SYMBOL_FRONT = {
-  cx: frontRaw[0] - origin[0],
-  cy: frontRaw[1] - origin[1],
-} as const;
+export interface BrandSymbolCard {
+  /** Center in the ink box. */
+  readonly cx: number;
+  readonly cy: number;
+  readonly scale: number;
+  readonly tone: BrandSymbolTone;
+}
+
+/** The cards from back to front. */
+export const BRAND_SYMBOL_CARDS: readonly BrandSymbolCard[] = RAW.map((c) => ({
+  cx: c.at[0] - origin[0],
+  cy: c.at[1] - origin[1],
+  scale: c.scale,
+  tone: c.tone,
+}));
 
 const fmt = (n: number) => Number(n.toFixed(2)).toString();
 
@@ -182,19 +202,24 @@ export function brandSymbolCardPath({
   return `${d}Z`;
 }
 
-export interface BrandSymbolPaths {
-  readonly back: string;
-  readonly front: string;
-  /** The front card grown by the gap: mask it out of the back card. */
-  readonly cut: string;
+export interface BrandSymbolCardPaths {
+  readonly path: string;
+  /** The cards in front grown by the gap: mask them out of this card. Empty for the front card. */
+  readonly cut: readonly string[];
+  readonly tone: BrandSymbolTone;
 }
 
-export function getBrandSymbolPaths(gap: number = BRAND_SYMBOL_GAP.regular): BrandSymbolPaths {
-  return {
-    back: brandSymbolCardPath(BRAND_SYMBOL_BACK),
-    front: brandSymbolCardPath(BRAND_SYMBOL_FRONT),
-    cut: brandSymbolCardPath({ ...BRAND_SYMBOL_FRONT, grow: gap }),
-  };
+/** Each card's outline and cut, back to front. */
+export function getBrandSymbolPaths(
+  gap: number = BRAND_SYMBOL_GAP.regular,
+): readonly BrandSymbolCardPaths[] {
+  return BRAND_SYMBOL_CARDS.map((card, index) => ({
+    path: brandSymbolCardPath(card),
+    cut: BRAND_SYMBOL_CARDS.slice(index + 1).map((ahead) =>
+      brandSymbolCardPath({ ...ahead, grow: gap }),
+    ),
+    tone: card.tone,
+  }));
 }
 
 // Clear space around the ink in a square box, as a share of the ink's height.
@@ -222,9 +247,14 @@ function bottomLift(columns = 400): number {
     );
     lowest[i] = Math.max(lowest[i], y);
   };
-  for (const { cx, cy } of [BRAND_SYMBOL_BACK, BRAND_SYMBOL_FRONT]) {
-    CORNERS.forEach((c, k) => {
-      const next = CORNERS[(k + 1) % 4];
+  for (const { cx, cy, scale } of BRAND_SYMBOL_CARDS) {
+    const corners = CORNERS.map((c) => ({
+      ...c,
+      center: [c.center[0] * scale, c.center[1] * scale] as Point,
+      radius: c.radius * scale,
+    }));
+    corners.forEach((c, k) => {
+      const next = corners[(k + 1) % 4];
       const a0 = Math.atan2(c.inNormal[1], c.inNormal[0]);
       let a1 = Math.atan2(c.outNormal[1], c.outNormal[0]);
       if (a1 < a0) a1 += 2 * Math.PI;
@@ -251,6 +281,45 @@ function bottomLift(columns = 400): number {
 }
 
 export const BRAND_SYMBOL_BOTTOM_LIFT = bottomLift();
+
+// Whether a point lies inside a card: inside all four edges, and inside the
+// corner's circle where it is past both edges' tangent points.
+function insideCard(card: BrandSymbolCard, x: number, y: number): boolean {
+  return CORNERS.every((c) => {
+    const dx = x - (card.cx + c.center[0] * card.scale);
+    const dy = y - (card.cy + c.center[1] * card.scale);
+    const r = c.radius * card.scale;
+    const alongIn = dx * c.inNormal[0] + dy * c.inNormal[1];
+    const alongOut = dx * c.outNormal[0] + dy * c.outNormal[1];
+    if (alongIn > r || alongOut > r) return false;
+    return alongIn <= 0 || alongOut <= 0 || Math.hypot(dx, dy) <= r;
+  });
+}
+
+/**
+ * How far below the ink box's center the eye centers the mark, as a share of
+ * its ink height. The eye takes the strongest card as the mark, and only what
+ * shows of it: the front card covers its upper right, so the visible part
+ * sits a little low.
+ */
+function visibleCenterDrop(steps = 400): number {
+  const centerIndex = BRAND_SYMBOL_CARDS.findIndex((c) => c.tone === "center");
+  const center = BRAND_SYMBOL_CARDS[centerIndex];
+  const ahead = BRAND_SYMBOL_CARDS.slice(centerIndex + 1);
+  const step = Math.max(BRAND_SYMBOL_INK.width, BRAND_SYMBOL_INK.height) / steps;
+  let count = 0;
+  let sumY = 0;
+  for (let y = step / 2; y < BRAND_SYMBOL_INK.height; y += step) {
+    for (let x = step / 2; x < BRAND_SYMBOL_INK.width; x += step) {
+      if (!insideCard(center, x, y) || ahead.some((card) => insideCard(card, x, y))) continue;
+      count++;
+      sumY += y;
+    }
+  }
+  return (sumY / count - BRAND_SYMBOL_INK.height / 2) / BRAND_SYMBOL_INK.height;
+}
+
+export const BRAND_SYMBOL_VISIBLE_CENTER_DROP = visibleCenterDrop();
 
 /**
  * The horizontal lockup, in em of the wordmark: the symbol spans the word's
@@ -281,7 +350,10 @@ export interface BrandSymbolLockupLayout {
   readonly height: number;
   /** Space after the ink to the wordmark's origin, so the word's ink starts `gap` em past it. */
   readonly marginRight: number;
-  /** How far the ink's bottom sits below the baseline, centering it on the word's optical center. */
+  /**
+   * How far the ink's bottom sits below the baseline, so the word's optical
+   * center meets the visible center of the mark's strongest card.
+   */
   readonly belowBaseline: number;
 }
 
@@ -291,7 +363,10 @@ export function getBrandSymbolLockupLayout(fontSize: number): BrandSymbolLockupL
     width: (BRAND_SYMBOL_INK.width / BRAND_SYMBOL_INK.height) * height,
     height,
     marginRight: (BRAND_SYMBOL_LOCKUP_EM.gap - BRAND_WORDMARK_INK_EM.left) * fontSize,
-    belowBaseline: height / 2 - BRAND_WORDMARK_OPTICAL_CENTER_EM.y * fontSize,
+    belowBaseline:
+      height / 2 -
+      BRAND_WORDMARK_OPTICAL_CENTER_EM.y * fontSize -
+      BRAND_SYMBOL_VISIBLE_CENTER_DROP * height,
   };
 }
 

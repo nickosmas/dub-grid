@@ -6,16 +6,17 @@ import {
   getBrandSymbolLockupLayout,
   getBrandSymbolPaths,
   getBrandSymbolStackedLayout,
+  type BrandSymbolTone,
 } from "@dubgrid/design-tokens";
 
 /** `theme` follows light and dark; `onBrand` sits on a brand-blue surface. */
 export type BrandMarkTone = "theme" | "onBrand";
 
-const TONES: Record<BrandMarkTone, { back: string; front: string }> = {
-  theme: { back: "var(--dg-color-brand-mark-back)", front: "var(--dg-color-brand-mark-front)" },
+const TONES: Record<BrandMarkTone, Record<BrandSymbolTone, string>> = {
+  theme: { side: "var(--dg-color-brand-mark-side)", center: "var(--dg-color-brand-mark-center)" },
   onBrand: {
-    back: "var(--dg-color-brand-mark-on-brand-back)",
-    front: "var(--dg-color-brand-mark-on-brand-front)",
+    side: "var(--dg-color-brand-mark-on-brand-side)",
+    center: "var(--dg-color-brand-mark-on-brand-center)",
   },
 };
 
@@ -36,15 +37,14 @@ function BrandSymbol({
 }: {
   height: number;
   tone?: BrandMarkTone;
-  /** Draws both cards in this one color, with the wider one-color gap. */
+  /** Draws every card in this one color, with the wider one-color gap. */
   color?: string;
   style?: CSSProperties;
 }) {
-  // The gap is masked out of the back card rather than painted in a surface
-  // color, so the mark sits cleanly on any background.
+  // The gap is masked out of the cards behind rather than painted in a
+  // surface color, so the mark sits cleanly on any background.
   const maskId = `dg-mark-${useId().replace(/[^\w-]/g, "")}`;
-  const paths = getBrandSymbolPaths(brandSymbolGap(height, Boolean(color)));
-  const fill = color ? { back: color, front: color } : TONES[tone];
+  const cards = getBrandSymbolPaths(brandSymbolGap(height, Boolean(color)));
   return (
     <svg
       width={height * ASPECT}
@@ -54,17 +54,29 @@ function BrandSymbol({
       aria-hidden="true"
       style={style}
     >
-      <mask id={maskId} maskUnits="userSpaceOnUse" {...MASK_REGION}>
-        <rect {...MASK_REGION} fill="white" />
-        <path d={paths.cut} fill="black" />
-      </mask>
-      <path d={paths.back} fill={fill.back} mask={`url(#${maskId})`} />
-      <path d={paths.front} fill={fill.front} />
+      {cards.map((card, index) =>
+        card.cut.length ? (
+          <mask key={index} id={`${maskId}-${index}`} maskUnits="userSpaceOnUse" {...MASK_REGION}>
+            <rect {...MASK_REGION} fill="white" />
+            {card.cut.map((cut, k) => (
+              <path key={k} d={cut} fill="black" />
+            ))}
+          </mask>
+        ) : null,
+      )}
+      {cards.map((card, index) => (
+        <path
+          key={index}
+          d={card.path}
+          fill={color ?? TONES[tone][card.tone]}
+          mask={card.cut.length ? `url(#${maskId}-${index})` : undefined}
+        />
+      ))}
     </svg>
   );
 }
 
-/** The two-card symbol, `size` tall, so it fits a `size` square. */
+/** The three-card symbol, `size` tall, so it fits a `size` square. */
 export function DubGridLogo({
   size = 48,
   tone,
@@ -72,7 +84,7 @@ export function DubGridLogo({
 }: {
   size?: number;
   tone?: BrandMarkTone;
-  /** One color for both cards. */
+  /** One color for every card. */
   color?: string;
 }) {
   return <BrandSymbol height={size} tone={tone} color={color} />;
@@ -107,11 +119,14 @@ interface LockupProps {
   fontSize?: number;
   color?: string;
   markTone?: BrandMarkTone;
-  /** One color for both cards. */
+  /** One color for every card. */
   markColor?: string;
 }
 
-/** Symbol and wordmark on one line, the symbol centered on the word's optical center. */
+/**
+ * Symbol and wordmark on one line, the word's optical center level with the
+ * visible middle of the symbol's center card.
+ */
 export function DubGridLockup({
   fontSize = 26,
   color = "var(--color-text-primary)",
