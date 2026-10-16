@@ -969,6 +969,35 @@ describe("UserDashboard", () => {
     }
   });
 
+  it("holds the hero slot with an empty state when a browsed past week has nothing upcoming", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-20T18:00:00.000Z"));
+
+    try {
+      const pastDate = new Date("2026-05-11T12:00:00.000Z");
+      const shiftMap = makeShiftMap(formatDateKey(pastDate));
+
+      render(
+        <UserDashboard
+          {...makeProps({
+            allShifts: {},
+            currentPeriodShifts: shiftMap,
+            periodDates: [pastDate],
+            periodEnd: pastDate,
+            periodStart: pastDate,
+          })}
+        />,
+      );
+
+      expect(screen.queryByTestId("user-dashboard-hero")).not.toBeInTheDocument();
+      const heroEmpty = screen.getByTestId("user-dashboard-hero-empty");
+      expect(within(heroEmpty).getByText("No upcoming shifts")).toBeInTheDocument();
+      expect(screen.getByTestId("user-dashboard-cover-requests")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("shows the first future worked shift in the hero before future absences", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-08T18:00:00.000Z"));

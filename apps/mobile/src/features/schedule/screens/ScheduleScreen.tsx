@@ -3351,8 +3351,26 @@ function OpenShiftsSection({
     );
   };
 
-  if (requestsError || availableOpenShiftFeed.totalCount === 0) {
+  if (requestsError) {
     return null;
+  }
+
+  // An empty section still holds its place, as on web: the reader learns the
+  // page looked and found nothing, rather than wondering where the section went.
+  if (availableOpenShiftFeed.totalCount === 0) {
+    return (
+      <View style={styles.meSectionBlock} testID="me-open-shifts-empty">
+        <MeSectionHeader actionLabel="See all" onAction={onSeeAll} title="Open shifts" />
+        <View style={styles.requestCard}>
+          <EmptyStateCard
+            compact
+            iconName="calendar-outline"
+            title="No open shifts"
+            body="Available pickups and coverage gaps will appear here."
+          />
+        </View>
+      </View>
+    );
   }
 
   return (
@@ -3499,8 +3517,24 @@ function ShiftCoverRequestsSection({
     }
   }, [requestsError, pushToast]);
 
-  if (requestsError || requests.length === 0) {
+  if (requestsError) {
     return null;
+  }
+
+  if (requests.length === 0) {
+    return (
+      <View style={styles.meSectionBlock} testID="me-cover-requests-empty">
+        <MeSectionHeader title="Needs your response" />
+        <View style={styles.requestCard}>
+          <EmptyStateCard
+            compact
+            iconName="checkmark-circle"
+            title="All caught up"
+            body="Requests for your shifts will appear here."
+          />
+        </View>
+      </View>
+    );
   }
 
   return (
