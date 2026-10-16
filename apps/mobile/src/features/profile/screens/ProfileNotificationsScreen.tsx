@@ -1,7 +1,7 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { useMemo, useState, type ComponentProps } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { StyleSheet, View } from "react-native";
+import { Linking, StyleSheet, View } from "react-native";
+import { Button } from "../../../shared/components/Button";
 import { Text } from "../../../shared/components/Text";
 import { AppSwitch } from "../../../shared/components/AppSwitch";
 import { Screen } from "../../../shared/components/Screen";
@@ -21,6 +21,10 @@ import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import { usePushRegistration } from "../../notifications/hooks/usePushRegistration";
 import {
+  NOTIFICATION_CATEGORIES,
+  type NotificationCategoryKey,
+} from "../../notifications/lib/notification-categories";
+import {
   ProfileList,
   ProfileNavRow,
   ProfilePanel,
@@ -32,32 +36,11 @@ import {
   formatChannelSummary,
 } from "../components/NotificationCategorySheet";
 
-const CATEGORIES = [
-  {
-    key: "schedule",
-    label: "Schedule updates",
-    description: "When a schedule is published or one of your shifts changes.",
-  },
-  {
-    key: "shift_requests",
-    label: "Shift requests",
-    description: "New requests to approve and updates on your own pickup/swap requests.",
-  },
-  {
-    key: "system",
-    label: "System & account",
-    description: "Account-level activity such as role changes and impersonation alerts.",
-  },
-] as const;
+// The shared list, so these rows carry the names, glyphs and order the
+// tour's permission step promised.
+const CATEGORIES = NOTIFICATION_CATEGORIES;
 
-type CategoryKey = (typeof CATEGORIES)[number]["key"];
-
-/** One glyph per category, so the rows are told apart by shape as well as text. */
-const CATEGORY_ICONS: Record<CategoryKey, ComponentProps<typeof Ionicons>["name"]> = {
-  schedule: "calendar-outline",
-  shift_requests: "swap-horizontal-outline",
-  system: "settings-outline",
-};
+type CategoryKey = NotificationCategoryKey;
 
 type Channel = "in_app" | "email";
 
@@ -213,10 +196,24 @@ export default function ProfileNotificationsScreen() {
                   <Text style={styles.rowDescription}>
                     {push.isSupported
                       ? push.permissionState === "denied"
-                        ? "Permission was denied. Enable it from your device settings."
+                        ? "Notifications are off for DubGrid in your device settings."
                         : "Receive critical updates instantly even when the app isn't open."
                       : "Push notifications are not supported on this device."}
                   </Text>
+                  {/* The OS will not ask again once denied, so the only way
+                      forward is its settings page: offer it right here. */}
+                  {push.isSupported && push.permissionState === "denied" ? (
+                    <View style={styles.settingsLink}>
+                      <Button
+                        label="Open Settings"
+                        onPress={() => {
+                          void Linking.openSettings();
+                        }}
+                        size="sm"
+                        tone="link"
+                      />
+                    </View>
+                  ) : null}
                 </View>
                 <AppSwitch
                   accessibilityLabel="Push notifications"
@@ -238,9 +235,9 @@ export default function ProfileNotificationsScreen() {
               {CATEGORIES.map((cat, index) => (
                 <ProfileNavRow
                   key={cat.key}
-                  iconName={CATEGORY_ICONS[cat.key]}
+                  iconName={cat.icon}
                   isLast={index === CATEGORIES.length - 1}
-                  label={cat.label}
+                  label={cat.title}
                   value={formatChannelSummary(localPrefs[cat.key])}
                   onPress={() => setOpenCategoryKey(cat.key)}
                 />
@@ -254,8 +251,8 @@ export default function ProfileNotificationsScreen() {
           openCategory
             ? {
                 key: openCategory.key,
-                label: openCategory.label,
-                description: openCategory.description,
+                label: openCategory.title,
+                description: openCategory.detail,
                 channels: localPrefs[openCategory.key],
               }
             : null
@@ -290,5 +287,8 @@ const createStyles = (mobileColors: MobileColors) =>
     rowDescription: {
       ...mobileText.caption,
       color: mobileColors.textMuted,
+    },
+    settingsLink: {
+      alignSelf: "flex-start",
     },
   });

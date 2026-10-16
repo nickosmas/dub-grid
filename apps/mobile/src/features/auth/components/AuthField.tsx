@@ -68,7 +68,8 @@ export const AuthField = forwardRef<
           setFocused(true);
           onFocus?.(event);
         }}
-        placeholderTextColor={mobileColors.placeholderText}
+        placeholderTextColor={mobileColors.textSubtle}
+        selectionColor={mobileColors.brand}
         style={[styles.input, variant === "code" ? styles.inputCode : styles.inputFlex, style]}
       />
       {suffix ? (

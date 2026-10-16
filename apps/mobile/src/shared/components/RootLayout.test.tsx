@@ -191,7 +191,7 @@ describe("RootLayout", () => {
     fontState.result = [true, null];
   });
 
-  it("shows the mobile setup screen when env validation fails", () => {
+  it("shows the mobile setup screen when env validation fails", async () => {
     validateMobileEnvSpy.mockReturnValue({
       status: "invalid",
       issues: [
@@ -204,14 +204,15 @@ describe("RootLayout", () => {
 
     render(<RootLayout />);
 
-    expect(screen.getByText("Mobile configuration needs attention")).toBeInTheDocument();
+    // The theme provider holds its children until the stored choice is read.
+    expect(await screen.findByText("Mobile configuration needs attention")).toBeInTheDocument();
     expect(screen.getByText("Mobile connection")).toBeInTheDocument();
     expect(
       screen.getByText("This build is missing a reachable web connection."),
     ).toBeInTheDocument();
   });
 
-  it("renders the app shell when env validation passes", () => {
+  it("renders the app shell when env validation passes", async () => {
     validateMobileEnvSpy.mockReturnValue({
       status: "ready",
       config: {
@@ -223,7 +224,7 @@ describe("RootLayout", () => {
 
     render(<RootLayout />);
 
-    expect(screen.getByTestId("query-provider")).toBeInTheDocument();
+    expect(await screen.findByTestId("query-provider")).toBeInTheDocument();
     expect(screen.getByTestId("auth-provider")).toBeInTheDocument();
     expect(screen.getByTestId("app-lock-provider")).toBeInTheDocument();
     expect(screen.getByTestId("mobile-realtime-provider")).toBeInTheDocument();
@@ -243,7 +244,7 @@ describe("RootLayout", () => {
     });
   });
 
-  it("keeps the app usable when bundled font loading fails", () => {
+  it("keeps the app usable when bundled font loading fails", async () => {
     fontState.result = [false, new Error("font load failed")];
     validateMobileEnvSpy.mockReturnValue({
       status: "ready",
@@ -256,6 +257,6 @@ describe("RootLayout", () => {
 
     render(<RootLayout />);
 
-    expect(screen.getByTestId("stack")).toBeInTheDocument();
+    expect(await screen.findByTestId("stack")).toBeInTheDocument();
   });
 });

@@ -139,7 +139,7 @@ Sign-out must revoke this device's push token **before** dropping the session
 (`disablePushForCurrentDevice` in `shared/lib/auth-reset.ts`), or the phone
 keeps receiving the previous user's notifications.
 
-The first two slides of the first-run tour are live previews, not captures:
+The tour opens on a welcome step (`WelcomeVisual`, the symbol on a soft halo). The two slides after it are live previews, not captures:
 `features/onboarding/components/previews` renders `MeHeroCard` (exported from
 `schedule/screens/ScheduleScreen.tsx`) and `OpenShiftCard` (from
 `shift-requests/screens/RequestsScreen.tsx`) from sample data at real size,
@@ -148,7 +148,7 @@ them (scaled down only where a short screen cannot fit them), so a change to
 either card shows on the tour as well.
 
 The notification permission is asked for once, with context, on the last slide
-of the first-run tour (`features/onboarding`, via
+of the first-run tour (Skip lands there while the prompt can still be shown) (`features/onboarding`, via
 `features/notifications/lib/push-permission.ts`). That slide's
 `NotificationReasons` card names the categories Profile > Notifications
 controls; keep the two in step. `usePushRegistration`'s

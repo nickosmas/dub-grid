@@ -18,6 +18,7 @@ import { useNetworkStatus } from "./NetworkStateProvider";
 import { useNetworkRecovery } from "./NetworkRecoveryProvider";
 import { useMobileColors } from "./ThemeModeProvider";
 import {
+  mobileOnAccent,
   mobileRadii,
   mobileText,
   mobileTextWeighted,
@@ -40,7 +41,7 @@ type ToastDescriptor = ToastInput & {
 };
 
 const DEFAULT_TOAST_DURATION_MS = 4500;
-const TOAST_MESSAGE_COLOR = "rgba(255, 255, 255, 0.82)";
+const TOAST_MESSAGE_COLOR = mobileOnAccent.secondary;
 const TOAST_SWIPE_DISMISS_THRESHOLD = 32;
 const TOAST_HOST_GUTTER = 20;
 

@@ -25,6 +25,7 @@ import {
   type TextStyle,
 } from "react-native";
 import { Text } from "../../../shared/components/Text";
+import { AnimatedMeterFill } from "../../../shared/motion/AnimatedMeterFill";
 import { Pressable } from "../../../shared/components/Pressable";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -75,6 +76,7 @@ import { useMobileContentState } from "../../../shared/hooks/useMobileContentSta
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
+  mobileOnAccent,
   MAX_FONT_SCALE,
   mobileBorderColorFromText,
   mobileMotion,
@@ -2392,7 +2394,7 @@ function PreviousShiftRow({
   return (
     <View accessibilityLabel={`Previous shift: ${summary.text}`} style={styles.previousShiftRow}>
       <Ionicons
-        color={inverse ? "rgba(255, 255, 255, 0.74)" : mobileColors.textSubtle}
+        color={inverse ? mobileOnAccent.tertiary : mobileColors.textSubtle}
         name="arrow-undo-outline"
         size={14}
       />
@@ -2423,7 +2425,7 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
   return (
     <View style={[styles.meHeroCollaborators, collaboratorBackground]}>
       <View style={styles.meHeroCollaboratorLabelRow}>
-        <Ionicons color="rgba(255, 255, 255, 0.76)" name="people-outline" size={22} />
+        <Ionicons color={mobileOnAccent.tertiary} name="people-outline" size={22} />
         <Text style={styles.meHeroCollaboratorLabel}>Working with</Text>
       </View>
       <View style={styles.meHeroAvatarStack}>
@@ -2671,7 +2673,7 @@ export function MeHeroCard({
           {focusAreaName ? (
             <View style={styles.meHeroAreaRow}>
               <Ionicons
-                color="rgba(255, 255, 255, 0.82)"
+                color={mobileOnAccent.secondary}
                 name="location-outline"
                 size={HERO_ROW_ICON_SIZE}
               />
@@ -2684,7 +2686,7 @@ export function MeHeroCard({
             <View style={styles.meHeroScheduleRow}>
               <View style={styles.meHeroTimeRow}>
                 <Ionicons
-                  color="rgba(255, 255, 255, 0.82)"
+                  color={mobileOnAccent.secondary}
                   name="time-outline"
                   size={HERO_ROW_ICON_SIZE}
                 />
@@ -2695,11 +2697,9 @@ export function MeHeroCard({
           ) : null}
           {timing?.progress != null ? (
             <View style={styles.meHeroProgressTrack}>
-              <View
-                style={[
-                  styles.meHeroProgressFill,
-                  { width: `${Math.max(timing.progress, 0.08) * 100}%` },
-                ]}
+              <AnimatedMeterFill
+                percent={Math.max(timing.progress, 0.08) * 100}
+                style={styles.meHeroProgressFill}
               />
             </View>
           ) : null}
@@ -2709,7 +2709,7 @@ export function MeHeroCard({
         <View style={styles.meHeroNotesRow}>
           <MaterialCommunityIcons
             accessibilityElementsHidden
-            color="rgba(255, 255, 255, 0.82)"
+            color={mobileOnAccent.secondary}
             importantForAccessibility="no-hide-descendants"
             name="note-outline"
             size={HERO_ROW_ICON_SIZE}

@@ -26,8 +26,14 @@ import { OnboardingCard } from "../components/OnboardingCard";
 import { OnboardingPagination } from "../components/OnboardingPagination";
 import { CoverShiftsPreview } from "../components/previews/CoverShiftsPreview";
 import { UpcomingShiftPreview } from "../components/previews/UpcomingShiftPreview";
+import { WelcomeVisual } from "../components/WelcomeVisual";
 
 const SLIDES: Array<{ visual: ReactNode; title: string; body: string }> = [
+  {
+    visual: <WelcomeVisual />,
+    title: "Welcome to DubGrid",
+    body: "Your schedule, shift requests and team updates in one place. Here's a quick look before you sign in.",
+  },
   {
     visual: <UpcomingShiftPreview />,
     title: "Your schedule, always with you",
@@ -98,16 +104,25 @@ export default function OnboardingScreen() {
     router.replace("/(auth)/login");
   }, []);
 
-  const handleSkip = useCallback(() => {
+  const handleFinish = useCallback(() => {
     void completeOnboarding();
   }, [completeOnboarding]);
 
+  const goToSlide = useCallback(
+    (index: number) => {
+      scrollRef.current?.scrollTo({ x: index * pageWidth, animated: true });
+      // Set here rather than left to `onMomentumScrollEnd`, which a
+      // programmatic scroll does not reliably fire (Android, web): the footer
+      // stayed on the old slide's button and Continue only ever went one page.
+      lastIndexRef.current = index;
+      setActiveIndex(index);
+    },
+    [pageWidth],
+  );
+
   const handleAdvance = useCallback(() => {
-    scrollRef.current?.scrollTo({
-      x: (activeIndex + 1) * pageWidth,
-      animated: true,
-    });
-  }, [activeIndex, pageWidth]);
+    goToSlide(activeIndex + 1);
+  }, [activeIndex, goToSlide]);
 
   const handleEnableNotifications = useCallback(async () => {
     try {
@@ -119,11 +134,23 @@ export default function OnboardingScreen() {
     await completeOnboarding();
   }, [completeOnboarding]);
 
-  const isLast = activeIndex >= SLIDES.length - 1;
+  const lastIndex = SLIDES.length - 1;
+  const isLast = activeIndex >= lastIndex;
   // Only a device that has not answered yet gets the ask: the OS shows its
   // prompt once, so on a decided device the button would do nothing.
   const canAskForNotifications = pushPermission === "undetermined";
   const asksForNotifications = isLast && canAskForNotifications;
+
+  // Skip passes over the tour, not the one decision in it: while the prompt
+  // can still be shown it lands on the notification step, whose own "Not
+  // now" finishes.
+  const handleSkip = useCallback(() => {
+    if (canAskForNotifications) {
+      goToSlide(lastIndex);
+      return;
+    }
+    handleFinish();
+  }, [canAskForNotifications, goToSlide, handleFinish, lastIndex]);
 
   return (
     <View style={styles.root}>
@@ -138,7 +165,15 @@ export default function OnboardingScreen() {
           <View style={styles.brand}>
             <DubGridLockup color={mobileColors.textPrimary} fontSize={20} />
           </View>
-          <View style={styles.skipButton}>
+          {/* Hidden rather than removed on the last slide, where the footer's
+              own actions are the way on: unmounting it let the header row
+              shrink and nudged the logo. */}
+          <View
+            accessibilityElementsHidden={isLast}
+            importantForAccessibility={isLast ? "no-hide-descendants" : "auto"}
+            pointerEvents={isLast ? "none" : "auto"}
+            style={[styles.skipButton, isLast && styles.skipButtonHidden]}
+          >
             <Button label="Skip" onPress={handleSkip} tone="link" />
           </View>
         </View>
@@ -185,7 +220,7 @@ export default function OnboardingScreen() {
             ) : (
               <Button
                 label={isLast ? "Get started" : "Continue"}
-                onPress={isLast ? handleSkip : handleAdvance}
+                onPress={isLast ? handleFinish : handleAdvance}
               />
             )}
             {/* Reserved on every slide once the ask is possible, so the dots
@@ -193,7 +228,7 @@ export default function OnboardingScreen() {
             {canAskForNotifications ? (
               <View style={styles.secondarySlot}>
                 {asksForNotifications ? (
-                  <Button label="Not now" onPress={handleSkip} tone="link" />
+                  <Button label="Not now" onPress={handleFinish} tone="link" />
                 ) : null}
               </View>
             ) : null}
@@ -229,6 +264,9 @@ const createStyles = (mobileColors: MobileColors) =>
     skipButton: {
       minWidth: 64,
       alignItems: "flex-end",
+    },
+    skipButtonHidden: {
+      opacity: 0,
     },
     scroller: {
       flex: 1,

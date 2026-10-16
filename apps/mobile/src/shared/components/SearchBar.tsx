@@ -85,6 +85,7 @@ export function SearchBar({
         onSubmitEditing={onSubmitEditing}
         placeholder={placeholder}
         placeholderTextColor={mobileColors.textSubtle}
+        selectionColor={mobileColors.brand}
         returnKeyType={returnKeyType}
         style={styles.input}
         value={value}

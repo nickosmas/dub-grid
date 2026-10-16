@@ -442,23 +442,23 @@ export const mobileTypographyTokens = {
     },
     sectionTitle: {
       fontFamily: "Inter_700Bold",
-      fontSize: 16,
+      fontSize: 17,
       lineHeight: 22,
     },
     cardTitle: {
       fontFamily: "Inter_600SemiBold",
-      fontSize: 16,
+      fontSize: 17,
       lineHeight: 22,
     },
     rowTitle: {
       fontFamily: "Inter_600SemiBold",
-      fontSize: 15,
-      lineHeight: 21,
+      fontSize: 16,
+      lineHeight: 22,
     },
     body: {
       fontFamily: "Inter_400Regular",
-      fontSize: 14,
-      lineHeight: 21,
+      fontSize: 15,
+      lineHeight: 22,
     },
     /**
      * Editable text. A step above `body` so a field reads as something you
@@ -473,8 +473,8 @@ export const mobileTypographyTokens = {
     },
     bodyStrong: {
       fontFamily: "Inter_600SemiBold",
-      fontSize: 14,
-      lineHeight: 21,
+      fontSize: 15,
+      lineHeight: 22,
     },
     meta: {
       fontFamily: "Inter_400Regular",
@@ -498,8 +498,8 @@ export const mobileTypographyTokens = {
     },
     micro: {
       fontFamily: "Inter_600SemiBold",
-      fontSize: 10,
-      lineHeight: 12,
+      fontSize: 11,
+      lineHeight: 14,
     },
   },
 } as const;

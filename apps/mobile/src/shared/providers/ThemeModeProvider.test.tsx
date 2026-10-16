@@ -74,6 +74,71 @@ describe("ThemeModeProvider", () => {
     expect(screen.getByTestId("colors-match")).toHaveTextContent("yes");
   });
 
+  it("holds rendering until the stored preference is known, so no frame flips", async () => {
+    let resolveStored: (value: string) => void = () => {};
+    loadThemePreference.mockReturnValue(
+      new Promise((resolve) => {
+        resolveStored = resolve;
+      }),
+    );
+
+    render(
+      <ThemeModeProvider>
+        <ThemeProbe />
+      </ThemeModeProvider>,
+    );
+
+    expect(screen.queryByTestId("resolved")).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveStored("dark");
+    });
+
+    expect(screen.getByTestId("resolved")).toHaveTextContent("dark");
+  });
+
+  it("syncs Appearance with a restored explicit choice", async () => {
+    loadThemePreference.mockResolvedValue("dark");
+
+    render(
+      <ThemeModeProvider>
+        <ThemeProbe />
+      </ThemeModeProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("resolved")).toHaveTextContent("dark");
+    });
+    expect(setColorScheme).toHaveBeenCalledWith("dark");
+  });
+
+  it("leaves Appearance on the device setting when the restored choice is system", async () => {
+    render(
+      <ThemeModeProvider>
+        <ThemeProbe />
+      </ThemeModeProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("preference")).toHaveTextContent("system");
+    });
+    expect(setColorScheme).not.toHaveBeenCalled();
+  });
+
+  it("falls back to system when the stored preference cannot be read", async () => {
+    loadThemePreference.mockRejectedValue(new Error("storage unavailable"));
+
+    render(
+      <ThemeModeProvider>
+        <ThemeProbe />
+      </ThemeModeProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("preference")).toHaveTextContent("system");
+    });
+  });
+
   it("resolves 'system' preference from the device color scheme", async () => {
     useColorScheme.mockReturnValue("dark");
     loadThemePreference.mockResolvedValue("system");
