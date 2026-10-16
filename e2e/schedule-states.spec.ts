@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { loginAsQaSuperAdmin, QA_CALM_HAVEN_ORIGIN } from "./helpers/auth";
 
 test.describe("schedule states", () => {
-  test("shows the top progress bar while navigating to Schedule client-side", async ({
+  test("shows the Shuffle loading screen while navigating to Schedule client-side", async ({
     page,
   }, testInfo) => {
     test.skip(
@@ -39,7 +39,7 @@ test.describe("schedule states", () => {
 
     // Belt and braces with the throttle above: hold every RSC payload for
     // /schedule for a moment, so even when the prefetch has raced ahead of the
-    // click, the navigation is still pending when the bar is checked.
+    // click, the navigation is still pending when the screen is checked.
     await page.route(
       (url) => url.pathname === "/schedule" && url.searchParams.has("_rsc"),
       async (route) => {
@@ -52,9 +52,14 @@ test.describe("schedule states", () => {
 
     await page.getByRole("link", { name: "Schedule", exact: true }).click();
 
-    await expect(page.locator("[data-progress-bar]")).toBeVisible({ timeout: 15_000 });
+    // The route fallback is the schedule's own loading screen, so the mark
+    // appears once the wait passes its reveal delay and Shuffles until the
+    // grid is ready.
+    const loading = page.locator("[data-schedule-loading]");
+    await expect(loading).toBeVisible({ timeout: 15_000 });
+    await expect(loading.locator("svg")).toBeVisible({ timeout: 15_000 });
     await expect(page).toHaveURL(/\/schedule/, { timeout: 15_000 });
-    await expect(page.locator("[data-progress-bar]")).toHaveCount(0, { timeout: 15_000 });
+    await expect(loading).toHaveCount(0, { timeout: 15_000 });
   });
 
   test("opens and closes the Tools menu's Print dialog", async ({ page }) => {

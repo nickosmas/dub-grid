@@ -10,7 +10,7 @@ import { INVITATION_LIFETIME_HOURS } from "@dubgrid/domain";
 // the landing page's initial bundle for visitors who are not signed in.
 import { DubGridLockup, DubGridLogo } from "@/components/Logo";
 import { Button } from "@/components/Button";
-import ButtonSpinner from "@/components/ButtonSpinner";
+import { BrandLoadingScreen } from "@/components/BrandLoadingScreen";
 import { openConsentPreferences } from "@/components/CookieConsent";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { buildSubdomainHost, isApexHost, parseHost } from "@/lib/subdomain";
@@ -257,21 +257,8 @@ export default function RootPage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [mobileMenuOpen]);
 
-  /* Loading state */
   if (!ready) {
-    return (
-      <div
-        style={{
-          minHeight: "100dvh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "var(--dg-color-bg)",
-        }}
-      >
-        <ButtonSpinner color="var(--dg-color-brand)" size={32} />
-      </div>
-    );
+    return <BrandLoadingScreen animation="breathe" />;
   }
 
   return (

@@ -134,6 +134,20 @@ const extent = (cx: number, cy: number, scale: number) => ({
   bottom: Math.max(...CORNERS.map((c) => cy + (c.center[1] + c.radius) * scale)),
 });
 
+const CARD_EXTENT = extent(0, 0, 1);
+const CARD_BOX_MARGIN = 6;
+
+/**
+ * A full-size card's box about its center, with room for the gap grown around
+ * a side card: the common frame mobile's card and gap images are drawn in.
+ */
+export const BRAND_SYMBOL_CARD_BOX = {
+  x: CARD_EXTENT.left - CARD_BOX_MARGIN,
+  y: CARD_EXTENT.top - CARD_BOX_MARGIN,
+  width: CARD_EXTENT.right - CARD_EXTENT.left + 2 * CARD_BOX_MARGIN,
+  height: CARD_EXTENT.bottom - CARD_EXTENT.top + 2 * CARD_BOX_MARGIN,
+} as const;
+
 const stepWidth = (BRAND_SYMBOL_CARD.width * (1 + SIDE_SCALE)) / 2;
 const STEP: Point = [
   STEP_ALONG * stepWidth,

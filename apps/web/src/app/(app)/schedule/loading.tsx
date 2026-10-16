@@ -1,9 +1,8 @@
-import ProgressBar from "@/components/ProgressBar";
+import { ScheduleLoadingScreen } from "./ScheduleLoadingScreen";
 
-// Route-level Suspense fallback fired during a navigation TO /schedule.
-// Matches every other authed route's loading.tsx — a top progress bar, no
-// full-screen overlay, no dubgrid mark. The animating mark is reserved for
-// SchedulePageClient's data-loading state on the schedule page itself.
+// Route-level Suspense fallback fired during a navigation to /schedule. It
+// renders the same Shuffle as SchedulePageClient's data-loading state, so the
+// wait reads as one continuous load.
 export default function ScheduleLoading() {
-  return <ProgressBar loading />;
+  return <ScheduleLoadingScreen />;
 }

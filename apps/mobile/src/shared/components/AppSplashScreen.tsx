@@ -8,8 +8,8 @@ import {
   BRAND_SYMBOL_STACKED_EM,
   getBrandSymbolStackedLayout,
 } from "@dubgrid/design-tokens";
-import { type MobileColors } from "../theme/tokens";
-import { useMobileColors } from "../providers/ThemeModeProvider";
+import { mobileSoftGradientStops, type MobileColors } from "../theme/tokens";
+import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 import { useMotionPreference } from "../motion/useMotionPreference";
 import { mobileMotion } from "../theme/tokens";
 import { AnimatedDubGridLogo } from "./AnimatedDubGridLogo";
@@ -35,13 +35,16 @@ const WORDMARK_SHIFT_X = INK_CENTER_X - STACKED.symbolOffsetX - BRAND_ANIMATED_L
  * the static mark, `BRAND_ANIMATED_LOGO_SIZE` wide and centered on the whole
  * screen (see `expo-splash-screen` in app.json), so the mark here sits at the
  * same spot and everything else arrives around it: the wash and wordmark fade
- * in, and the wordmark takes its stacked-lockup place below the mark. The launch reads
- * as one splash coming alive rather than two splashes in a row.
+ * in, and the wordmark takes its stacked-lockup place below the mark, while
+ * the mark starts to Breathe from that same frame. The launch reads as one
+ * splash coming alive rather than two splashes in a row.
  */
 export function AppSplashScreen(_props?: { body?: string }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { d } = useMotionPreference();
+  // The wash's middle stop is the color around the centered mark.
+  const markSurface = mobileSoftGradientStops("brandWash", useIsDarkMode())[1];
 
   return (
     // Fades out on unmount so the handoff to login or onboarding is a
@@ -55,7 +58,7 @@ export function AppSplashScreen(_props?: { body?: string }) {
       </Animated.View>
       <View style={styles.center}>
         <View style={styles.mark}>
-          <AnimatedDubGridLogo />
+          <AnimatedDubGridLogo animation="breathe" surfaceColor={markSurface} />
           <Animated.View
             entering={FadeIn.duration(d(mobileMotion.duration.slow)).delay(d(200))}
             style={styles.wordmark}

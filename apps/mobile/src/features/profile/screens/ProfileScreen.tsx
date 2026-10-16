@@ -3,15 +3,10 @@ import { useMemo, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { MobileProfileChangeRequest } from "@dubgrid/contracts";
 import { getOrgRoleLabel } from "@dubgrid/domain";
-import {
-  ActivityIndicator,
-  StyleSheet,
-  View,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-} from "react-native";
+import { StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import Animated, { FadeIn } from "react-native-reanimated";
+import { AnimatedDubGridLogo } from "../../../shared/components/AnimatedDubGridLogo";
 import { AppText } from "../../../shared/components/AppText";
 import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
@@ -704,7 +699,7 @@ function OrganizationSwitchOverlay({ name }: { name: string }) {
       entering={FadeIn.duration(d(mobileMotion.duration.fast))}
       style={styles.switchOverlay}
     >
-      <ActivityIndicator color={mobileColors.brand} size="large" />
+      <AnimatedDubGridLogo animation="climb" surfaceColor={mobileColors.background} />
       <AppText align="center" variant="cardTitle">{`Switching to ${name}`}</AppText>
       <AppText align="center" tone="muted" variant="body">
         We're loading everything for this organization.

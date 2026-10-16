@@ -16,7 +16,8 @@ Unchanged from the 2026-10-11 decision:
 - **Animated only on full-screen waits with nothing else on screen:** Breathe,
   Shuffle and Climb.
 - **Everything else uses conventional progress patterns:** route changes use
-  the top progress bar, buttons their spinner, pull-to-refresh the native
+  the top progress bar (except a navigation into the schedule, which Shuffles
+  with the load it starts), buttons their spinner, pull-to-refresh the native
   control.
 - **Reduced motion:** every animation falls back to the static mark.
 - **Units:** distances are in the shipped mark's 100-unit box, scaled to this
@@ -35,11 +36,11 @@ surface-colored gap is cut around every card in front. A card's size and
 color follow its place in the stack, so a moving card takes on the look of
 where it lands.
 
-| Animation | Where                                                            | Motion                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| --------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Breathe   | Mobile splash and web auth transition while the session restores | 2.4 s sine loop: the center card grows 4.5% while the back and front cards ease 4 units away from it along the stack. Starts on the static frame so the native launch image hands off without a jump                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Shuffle   | Schedule loading and route-level loading                         | Per 1.8 s cycle: a 1.0 s move (quartic ease-in-out), then 0.8 s rest. The back and center cards step forward one place while the front card arcs over the top of the stack to the back, lifted 60 units across it at the middle of the move. Colors cross between 30% and 70% of the move (smoothstep), and the gaps close while the front card passes over: they narrow from 38%, are shut from 46% to 54%, and are back by 62%. When loading ends, the cards finish the current move and come to rest                                                                                                                                                                                                                           |
-| Climb     | Sync or in-progress states                                       | Per 1.6 s cycle: a 1.0 s step, then 0.6 s rest. The step ripples from the front card back: the front card steps forward 35% of a step and shrinks into its top-right corner (0% to 75%, smoothstep); the center card rises into the front place (8% to 83%) and the back card into the center (16% to 91%, both quartic ease-in-out), each taking on the look of its new place; a new back card grows out of its bottom-left corner from 35% of a step behind (25% to 100%, smoothstep). The leaving and arriving cards mirror each other under a half turn and time reversal. Each fades only below 30% of a side card's size, so no frame shows a speck or a see-through card. When syncing ends it finishes the step and rests |
+| Animation | Where                                              | Motion                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --------- | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Breathe   | Launch and full-screen auth waits (see below)      | 2.4 s sine loop: the center card grows 4.5% while the back and front cards ease 4 units away from it along the stack. Starts on the static frame so the native launch image hands off without a jump                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Shuffle   | Schedule loading, including the navigation into it | Per 1.8 s cycle: a 1.0 s move (quartic ease-in-out), then 0.8 s rest. The back and center cards step forward one place while the front card arcs over the top of the stack to the back, lifted 60 units across it at the middle of the move. Colors cross between 30% and 70% of the move (smoothstep), and the gaps close while the front card passes over: they narrow from 38%, are shut from 46% to 54%, and are back by 62%. When loading ends, the cards finish the current move and come to rest                                                                                                                                                                                                                           |
+| Climb     | Long waits and organization or sandbox switches    | Per 1.6 s cycle: a 1.0 s step, then 0.6 s rest. The step ripples from the front card back: the front card steps forward 35% of a step and shrinks into its top-right corner (0% to 75%, smoothstep); the center card rises into the front place (8% to 83%) and the back card into the center (16% to 91%, both quartic ease-in-out), each taking on the look of its new place; a new back card grows out of its bottom-left corner from 35% of a step behind (25% to 100%, smoothstep). The leaving and arriving cards mirror each other under a half turn and time reversal. Each fades only below 30% of a side card's size, so no frame shows a speck or a see-through card. When syncing ends it finishes the step and rests |
 
 ## What changed from the outline-mark versions
 
@@ -52,9 +53,34 @@ where it lands.
   rejected. Climb uses the stack itself: the cards step up the slant, which
   reads as work moving forward and stays distinct from Shuffle and Breathe.
 
+## Where each plays
+
+Every place is a full-screen wait with nothing else to act on (2026-10-16):
+
+- **Breathe (web):** the sign-in handoff, restoring a session behind the app's
+  route guard, the landing page's sign-in redirect, the onboarding page's
+  first check, and the loading states of the sign-in, recovery, verification
+  and invitation routes.
+- **Breathe (mobile):** the launch splash, which starts on the native launch
+  image's frame, and the app lock's device check, which shows the splash.
+- **Shuffle (web):** the schedule's data load and the route fallback for a
+  navigation into the schedule, so the two read as one wait.
+- **Climb (web):** the sign-in handoff once slow or retrying, and entering,
+  resetting or leaving the Test Sandbox until the page reloads.
+- **Climb (mobile):** the full-screen overlay while switching organizations.
+
+Waits that show a reveal delay (web `BrandLoadingScreen`, 400 ms by default)
+stay blank for a quick wait so the mark never flashes; waits the person
+started on purpose show it at once.
+
 ## Implementation
 
-Port the frame functions into `packages/design-tokens/src/brand-motion.ts`
-(pure functions of time, unit-tested), replacing the outline-mark frames.
-Web draws them in `AnimatedDubGridLogo`; mobile still needs its Reanimated
-renderer, per `logo-animations.md`.
+The frame functions live in `packages/design-tokens/src/brand-motion.ts`
+(pure functions of time, unit-tested). Web draws them in
+`AnimatedDubGridLogo` with SVG masks. Mobile has no SVG, so its
+`AnimatedDubGridLogo` places one white card image per card, tinted and
+scaled, and paints each gap as a halo image (the card grown by the gap) in
+the surface's color before every card that has cards behind it
+(`apps/mobile/src/shared/lib/brand-frame-layout.ts`). The images come from
+`npm run icons`; the halos are exact at rest, so the splash's first frame
+equals the launch image.

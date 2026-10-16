@@ -24,6 +24,12 @@
  *                                   for 32 px and below); the app tints each
  *                                   layer
  *   - logo-blue.png / logo-white.png and icon-blue-on-white.png
+ *   - brand-mark-card.png, brand-mark-halo.png, brand-mark-halo-side.png
+ *                                   one full-size white card in the shared
+ *                                   card box, alone and grown by the gap
+ *                                   (for a full card, and for a side card
+ *                                   drawn at its scale), for the animated
+ *                                   mark's frames
  *
  * Build the packages first (`npm run build:packages`), then run `npm run
  * icons` in apps/mobile, then `npx expo prebuild` and rebuild the dev client
@@ -41,10 +47,13 @@ const imagesDir = join(scriptDir, "..", "assets", "images");
 // The package's index is bundler-only, but this module has no imports, so
 // plain Node can load it straight from the build output.
 const {
+  BRAND_SYMBOL_CARD_BOX,
+  BRAND_SYMBOL_CARDS,
   BRAND_SYMBOL_COLORS,
   BRAND_SYMBOL_GAP,
   BRAND_SYMBOL_INK,
   BRAND_SYMBOL_SQUARE,
+  brandSymbolCardPath,
   getBrandSymbolPaths,
 } = await import(
   pathToFileURL(
@@ -129,6 +138,19 @@ const layer = (name, only, gap) => ({
   svg: { viewBox: INK_BOX, colors: oneColor(WHITE), gap, only },
 });
 
+// One full-size card in the shared card box, alone or grown by the gap, for
+// the animated mark, which places, scales and tints each card itself.
+const CARD_BOX = BRAND_SYMBOL_CARD_BOX;
+const cardImage = (name, grow) => ({
+  name,
+  size: 512,
+  height: Math.round((512 * CARD_BOX.height) / CARD_BOX.width),
+  draw: ({ width, height }) =>
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${[CARD_BOX.x, CARD_BOX.y, CARD_BOX.width, CARD_BOX.height].join(" ")}" width="${width}" height="${height}">
+  <path d="${brandSymbolCardPath({ cx: 0, cy: 0, grow })}" fill="${WHITE}"/>
+</svg>`,
+});
+
 const ANDROID_BOX = iconBox({ visible: ANDROID_VISIBLE, safe: ANDROID_SAFE });
 
 const IMAGES = [
@@ -167,6 +189,9 @@ const IMAGES = [
   layer("brand-mark-center.png", 1, BRAND_SYMBOL_GAP.regular),
   layer("brand-mark-center-small.png", 1, BRAND_SYMBOL_GAP.small),
   layer("brand-mark-front.png", 2),
+  cardImage("brand-mark-card.png", 0),
+  cardImage("brand-mark-halo.png", BRAND_SYMBOL_GAP.regular),
+  cardImage("brand-mark-halo-side.png", BRAND_SYMBOL_GAP.regular / BRAND_SYMBOL_CARDS[0].scale),
 ];
 
 function drawImage({ width, height, background, svg }) {
@@ -301,7 +326,7 @@ async function main() {
       width,
       height,
       background: image.background ?? null,
-      svg: symbolSvg({ ...image.svg, width, height }),
+      svg: image.draw ? image.draw({ width, height }) : symbolSvg({ ...image.svg, width, height }),
     });
     writeFileSync(join(imagesDir, image.name), pngBuffer(dataUrl));
     rendered[image.name] = dataUrl;
