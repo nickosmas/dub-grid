@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { BrandLoadingScreen } from "@/components/BrandLoadingScreen";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 
 interface CreateSandboxDialogProps {
@@ -76,6 +77,12 @@ export default function CreateSandboxDialog({ orgName, onClose }: CreateSandboxD
       ) : null}
     </div>
   );
+
+  // Cloning the organization takes a while and ends in a reload, so the
+  // dialog gives way to a full-screen Climb until then; an error brings it back.
+  if (isLoading) {
+    return <BrandLoadingScreen animation="climb" revealAfterMs={0} label="Entering sandbox" />;
+  }
 
   return (
     <ConfirmDialog
