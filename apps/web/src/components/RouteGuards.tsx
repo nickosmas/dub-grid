@@ -3,6 +3,7 @@
 import { useAuth } from "@/components/AuthProvider";
 import { useEffect, useRef } from "react";
 import AuthTransitionScreen from "@/components/AuthTransitionScreen";
+import { BrandLoadingScreen } from "@/components/BrandLoadingScreen";
 import {
   isAuthTransitionPending,
   useAuthTransitionPending,
@@ -88,9 +89,14 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   // A post-login session handoff is a real wait, not decorative chrome. Give
   // the user progress text and, after 30 seconds, a safe exit rather than an
-  // unlabeled blank frame.
+  // unlabeled blank frame. Restoring an existing session gets the plain mark,
+  // revealed only if it outlasts a blink.
   if (isLoading || !user) {
-    return authTransitionPending ? <AuthTransitionScreen phase="signing-in" /> : null;
+    return authTransitionPending ? (
+      <AuthTransitionScreen phase="signing-in" />
+    ) : (
+      <BrandLoadingScreen animation="breathe" />
+    );
   }
 
   return <>{children}</>;

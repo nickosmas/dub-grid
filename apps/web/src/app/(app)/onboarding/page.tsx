@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { DubGridLogo } from "@/components/Logo";
 import { fetchAccountIdentity } from "@/features/account/client";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { BrandLoadingScreen } from "@/components/BrandLoadingScreen";
 
 export default function OnboardingPage() {
   const { user, signOut, isLoading: isAuthLoading } = useAuth();
@@ -58,19 +59,7 @@ export default function OnboardingPage() {
   }, [user]);
 
   if (isAuthLoading || loading) {
-    return (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: "calc(100dvh - var(--dg-app-shell-header-height))",
-          fontFamily: "var(--font-sans)",
-        }}
-      >
-        Loading
-      </div>
-    );
+    return <BrandLoadingScreen animation="breathe" />;
   }
 
   return (

@@ -2349,12 +2349,6 @@
   height: 120px;
   border-radius: var(--dg-radius-md);
 }
-.dg-auth-loading {
-  min-height: 100dvh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
 .dg-auth-logo-block--compact {
   gap: 8px;
 }

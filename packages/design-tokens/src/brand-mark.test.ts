@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   BRAND_SYMBOL_BOTTOM_LIFT,
   BRAND_SYMBOL_CARD,
+  BRAND_SYMBOL_CARD_BOX,
   BRAND_SYMBOL_CARDS,
   BRAND_SYMBOL_CORNER_RADII,
   BRAND_SYMBOL_GAP,
@@ -114,6 +115,18 @@ describe("the gap", () => {
     const radii = [...frontCut.matchAll(/A([\d.]+),/g)].map((m) => Number(m[1]));
     expect(radii).toEqual([22.44, 9.32, 22.44, 9.32]);
     expect(Math.max(...xs(frontCut))).toBe(141.5);
+  });
+
+  it("fits a full card grown by a side card's gap in the card box", () => {
+    const grown = brandSymbolCardPath({ cx: 0, cy: 0, grow: BRAND_SYMBOL_GAP.regular / 0.75 });
+    const { x, y, width, height } = BRAND_SYMBOL_CARD_BOX;
+    expect(Math.min(...xs(grown))).toBeGreaterThan(x);
+    expect(Math.max(...xs(grown))).toBeLessThan(x + width);
+    expect(Math.min(...ys(grown))).toBeGreaterThan(y);
+    expect(Math.max(...ys(grown))).toBeLessThan(y + height);
+    // Centered on the card, so scaling the image about its middle scales the card.
+    expect(round(x + width / 2)).toBe(0);
+    expect(round(y + height / 2)).toBe(0);
   });
 
   it("scales a card about its center", () => {
