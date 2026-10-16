@@ -135,7 +135,7 @@ describe("ProfileNotificationsScreen", () => {
 
     expect(screen.getByText("Schedule updates")).toBeInTheDocument();
     expect(screen.getByText("Shift requests")).toBeInTheDocument();
-    expect(screen.getByText("System & account")).toBeInTheDocument();
+    expect(screen.getByText("Account and sign-in")).toBeInTheDocument();
 
     // The row says what is on; six switches no longer sit open on the page.
     expect(screen.getByText("In-app, Email")).toBeInTheDocument();
@@ -198,9 +198,50 @@ describe("ProfileNotificationsScreen", () => {
     render(<ProfileNotificationsScreen />);
 
     expect(
-      screen.getByText("Permission was denied. Enable it from your device settings."),
+      screen.getByText("Notifications are off for DubGrid in your device settings."),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Push notifications")).toBeDisabled();
+  });
+
+  // The OS never asks twice, so a denied device's only way back is the
+  // settings page, offered where the dead switch is.
+  it("offers the device settings when permission was denied", async () => {
+    const { linkingOpenSettingsMock } = await import("../../../test/native");
+    linkingOpenSettingsMock.mockClear();
+    usePushRegistration.mockReturnValue(defaultPush({ permissionState: "denied" }));
+    useQuery.mockReturnValue({
+      data: { prefs: {} },
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<ProfileNotificationsScreen />);
+    fireEvent.click(screen.getByRole("button", { name: "Open Settings" }));
+
+    await vi.waitFor(() => {
+      expect(linkingOpenSettingsMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("lists the categories in the tour's order, under its names", () => {
+    useQuery.mockReturnValue({
+      data: { prefs: {} },
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<ProfileNotificationsScreen />);
+
+    const rows = ["Schedule updates", "Shift requests", "Account and sign-in"].map((name) =>
+      screen.getByText(name),
+    );
+    for (let index = 1; index < rows.length; index += 1) {
+      expect(
+        rows[index - 1]!.compareDocumentPosition(rows[index]!) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
   });
 
   it("disables push when the switch is toggled off while granted", async () => {

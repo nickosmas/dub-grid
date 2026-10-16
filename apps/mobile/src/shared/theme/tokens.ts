@@ -247,6 +247,24 @@ const MOBILE_DARK = {
   overlay: "rgba(0, 0, 0, 0.72)",
 } as const;
 
+/**
+ * White at the few strengths that sit on a saturated fill: the hero card's
+ * blue, a solid toast, a split shift on the hero. Theme-independent, since the
+ * fill under them is. Before these the same roles were spelled with eleven
+ * different alphas (0.72 to 0.88 for text alone), which read as noise rather
+ * than as steps.
+ */
+export const mobileOnAccent = {
+  /** Supporting text and icons beside the white headline. */
+  secondary: "rgba(255, 255, 255, 0.84)",
+  /** A step quieter: a date tile's weekday, an idle glyph. */
+  tertiary: "rgba(255, 255, 255, 0.72)",
+  /** A tinted tile or chip on the fill. */
+  fill: "rgba(255, 255, 255, 0.16)",
+  /** Dividers and tile edges on the fill. */
+  hairline: "rgba(255, 255, 255, 0.24)",
+} as const;
+
 export const mobileColors = {
   ...colorTokens,
   ...MOBILE_LIGHT,

@@ -30,24 +30,44 @@ const DEFAULT_THEME_MODE_VALUE: ThemeModeContextValue = {
   setPreference: () => {},
 };
 
+const RESTORE_TIMEOUT_MS = 500;
+
 const ThemeModeContext = createContext<ThemeModeContextValue>(DEFAULT_THEME_MODE_VALUE);
 const MobileColorsContext = createContext<MobileColors>(mobileColors);
 
 export function ThemeModeProvider({ children }: PropsWithChildren) {
   const systemScheme = useColorScheme();
   const [preference, setPreferenceState] = useState<ThemePreference>("system");
+  // Nothing renders until the stored choice is known. The native splash is
+  // still up at that point, so holding back costs nothing, while rendering on
+  // the "system" default first painted a light frame and then flipped it for
+  // anyone who had chosen dark (or the reverse).
+  const [isRestored, setIsRestored] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
-    loadThemePreference().then((stored) => {
-      if (!cancelled) {
-        setPreferenceState(stored);
-      }
-    });
+    const restore = (stored: ThemePreference) => {
+      if (cancelled) return;
+      setPreferenceState(stored);
+      setIsRestored(true);
+      // Native surfaces (alerts, the keyboard, date pickers, the share
+      // sheet) follow `Appearance`, not this context. Only `setPreference`
+      // used to sync it, so after a restart a dark-mode choice on a light
+      // phone opened system dialogs in light.
+      if (stored !== "system") Appearance.setColorScheme(stored);
+    };
+
+    loadThemePreference().then(restore, () => restore("system"));
+    // A keychain read can stall (iOS before first unlock); a late answer still
+    // applies, but the app never waits on it past this.
+    const fallback = setTimeout(() => {
+      if (!cancelled) setIsRestored(true);
+    }, RESTORE_TIMEOUT_MS);
 
     return () => {
       cancelled = true;
+      clearTimeout(fallback);
     };
   }, []);
 
@@ -69,6 +89,8 @@ export function ThemeModeProvider({ children }: PropsWithChildren) {
     () => (resolvedTheme === "dark" ? darkMobileColors : mobileColors),
     [resolvedTheme],
   );
+
+  if (!isRestored) return null;
 
   return (
     <ThemeModeContext.Provider value={themeModeValue}>

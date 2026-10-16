@@ -254,10 +254,6 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       ...mobileText.body,
       color: mobileColors.textSecondary,
     },
-    detailGroup: {
-      gap: mobileSpace.md,
-      alignItems: "flex-start",
-    },
     detailDateTile: {
       alignSelf: "center",
       flexShrink: 0,
@@ -280,23 +276,6 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       ...mobileText.heroMetric,
       ...mobileTabularText,
       color: mobileColors.textPrimary,
-    },
-    detailShiftTitle: {
-      ...mobileText.rowTitle,
-      color: mobileColors.textPrimary,
-    },
-    detailSummaryText: {
-      ...mobileTextWeighted("body", "medium"),
-      color: mobileColors.textMuted,
-    },
-    detailFocusAreaRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: mobileSpace.sm,
-    },
-    detailFocusAreaText: {
-      ...mobileText.bodyStrong,
-      color: mobileColors.textSecondary,
     },
     detailFootnote: {
       ...mobileText.caption,
@@ -359,31 +338,8 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       ...mobileText.badge,
       color: mobileColors.textSecondary,
     },
-    detailSegmentList: {
-      gap: 12,
-    },
-    detailSegmentBlock: {
-      gap: mobileSpace.xs,
-    },
-    detailSegmentDivider: {
-      borderTopWidth: 1,
-      borderTopColor: mobileColors.borderSubtle,
-      paddingTop: 12,
-    },
-    detailSegmentTitle: {
-      ...mobileText.rowTitle,
-      color: mobileColors.textPrimary,
-    },
-    detailSegmentMeta: {
-      ...mobileTextWeighted("body", "medium"),
-      color: mobileColors.textMuted,
-    },
     sectionBlock: {
       gap: 12,
-    },
-    sectionBody: {
-      ...mobileText.body,
-      color: mobileColors.textMuted,
     },
     shiftmatesList: {
       gap: 0,
@@ -480,25 +436,6 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       justifyContent: "flex-start",
     },
     shiftmateMeta: {
-      ...mobileTextWeighted("meta", "medium"),
-      color: mobileColors.textMuted,
-    },
-    supportingSegmentList: {
-      gap: 8,
-    },
-    supportingSegmentBlock: {
-      gap: 4,
-    },
-    supportingSegmentDivider: {
-      borderTopWidth: 1,
-      borderTopColor: mobileColors.borderSubtle,
-      paddingTop: 8,
-    },
-    supportingSegmentTitle: {
-      ...mobileText.bodyStrong,
-      color: mobileColors.textSecondary,
-    },
-    supportingSegmentMeta: {
       ...mobileTextWeighted("meta", "medium"),
       color: mobileColors.textMuted,
     },

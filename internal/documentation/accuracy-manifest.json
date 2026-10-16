@@ -309,7 +309,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:7a1bba3ff63743df62728d96b8a58212d6f78212c4b405fd5c5d9e8f4bb692f0"
+      "evidenceFingerprint": "sha256:afd3f5bfc7b0b2e0a32703db8a70ba3915849f20cfb924a763f890f6e83b1bb3"
     },
     {
       "id": "schedule-grid",
@@ -1249,7 +1249,8 @@
             "apps/mobile/src/features/people/screens/PeopleScreen.tsx",
             "apps/mobile/src/features/notifications/lib/openNotificationAction.ts",
             "packages/domain/src/employment-status.ts",
-            "packages/client-errors/src/index.ts"
+            "packages/client-errors/src/index.ts",
+            "apps/mobile/src/features/notifications/lib/notification-categories.ts"
           ],
           "testFiles": [
             "apps/mobile/src/features/auth/hooks/useTabsGate.test.tsx",
@@ -1267,7 +1268,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:02631697e5bc88aada307b7c7532f34eaa96010bf6feaa3587ab9ace33dace35"
+      "evidenceFingerprint": "sha256:ea6e82c58e44299cab359997f85e210133fce18a88632e0f3f73e1f9d2f2af07"
     },
     {
       "id": "alerts",
@@ -1529,7 +1530,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:a2270b945d8d67985d690c87975e0213ae3335c0f63e54917576a10cdc90c982"
+      "evidenceFingerprint": "sha256:4809c7290e35cbfb55f42c390f8c88ac7aa8d34f17b54ea1a30503f87445c602"
     },
     {
       "id": "privacy-controls",
@@ -1575,7 +1576,8 @@
             "apps/mobile/src/features/profile/components/NotificationCategorySheet.tsx",
             "apps/mobile/src/features/profile/screens/ProfilePrivacyScreen.tsx",
             "apps/mobile/src/features/consent/components/ConsentGate.tsx",
-            "apps/mobile/src/features/consent/components/TermsGate.tsx"
+            "apps/mobile/src/features/consent/components/TermsGate.tsx",
+            "apps/mobile/src/features/notifications/lib/notification-categories.ts"
           ],
           "testFiles": [
             "apps/web/src/features/notifications/server/sender.categories.test.ts",
@@ -1591,7 +1593,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:a1d13bc3046e1ff45784df05565aad35e898944c5d66a55417b601231fa9a00a"
+      "evidenceFingerprint": "sha256:df7f8757b974869250b253c303d51b62029262d7a3df2e480f23658596e6a1a0"
     },
     {
       "id": "schedule-rules-display",
@@ -2017,7 +2019,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:616e22fb720dcd17c6807b26d8a359b63121d5123645d9431890283122139daf"
+      "evidenceFingerprint": "sha256:3d71dde471e8d6264bac803b1df41db683568a1984bb4efe554ae61a59e0bd51"
     },
     {
       "id": "integrations-exports",

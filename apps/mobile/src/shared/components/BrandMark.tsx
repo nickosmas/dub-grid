@@ -51,7 +51,10 @@ export function BrandSymbol({ height, style }: { height: number; style?: StylePr
         <Image
           key={index}
           source={small ? layer.small : layer.regular}
-          style={[StyleSheet.absoluteFill, { tintColor: colors[layer.tone] }]}
+          // Sized explicitly rather than by `absoluteFill`: react-native-web
+          // draws an unsized image at its 512 px source size whatever its
+          // offsets say.
+          style={[styles.layer, size, { tintColor: colors[layer.tone] }]}
         />
       ))}
     </View>
@@ -81,6 +84,11 @@ export function DubGridLockup({ fontSize = 20, color }: { fontSize?: number; col
 }
 
 const styles = StyleSheet.create({
+  layer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+  },
   row: {
     flexDirection: "row",
     alignItems: "baseline",

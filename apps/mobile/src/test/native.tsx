@@ -4,6 +4,7 @@ import { vi } from "vitest";
 type ReactModule = typeof ReactType;
 
 export const screenScrollToMock = vi.fn();
+export const linkingOpenSettingsMock = vi.fn(() => Promise.resolve());
 export const alertMock = vi.fn();
 export const keyboardDismissMock = vi.fn();
 export const announceForAccessibilityMock = vi.fn();
@@ -505,6 +506,7 @@ export function createReactNativeModule(
     },
     Linking: {
       openURL: () => Promise.resolve(),
+      openSettings: linkingOpenSettingsMock,
     },
     Modal,
     PixelRatio: {

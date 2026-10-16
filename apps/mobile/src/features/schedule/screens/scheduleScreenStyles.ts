@@ -1,6 +1,7 @@
 import { StyleSheet } from "react-native";
 import { createIconControlStyle } from "../../../shared/components/icon-control-style";
 import {
+  mobileOnAccent,
   mobilePillOverflow,
   mobileAvatarText,
   mobileElevation,
@@ -91,28 +92,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       justifyContent: "center",
       paddingTop: 0,
     },
-    meTopStack: {
-      gap: mobileSpace.lg,
-    },
-    meWelcomeRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 16,
-    },
-    meWelcomeCopy: {
-      flex: 1,
-      gap: 4,
-    },
-    meWelcomeDate: {
-      ...mobileText.bodyStrong,
-      ...mobileTabularText,
-      color: mobileColors.textSubtle,
-    },
-    meWelcomeTitle: {
-      ...mobileTextWeighted("title", "bold"),
-      color: mobileColors.textPrimary,
-    },
     meWeekNavigator: {
       flexDirection: "row",
       alignItems: "flex-start",
@@ -165,33 +144,8 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingHorizontal: mobileSpace.lg,
       paddingVertical: mobileSpace.lg,
     },
-    meHeroCardMuted: {
-      backgroundColor: "#E2E8F0",
-      shadowColor: mobileColors.shadow,
-    },
     meHeroCardPressed: {
       opacity: 0.94,
-    },
-    meHeroGlow: {
-      position: "absolute",
-      borderRadius: 999,
-      backgroundColor: "rgba(255, 255, 255, 0.12)",
-    },
-    meHeroGlowLarge: {
-      width: 180,
-      height: 180,
-      top: -72,
-      right: -58,
-    },
-    meHeroGlowSmall: {
-      width: 140,
-      height: 140,
-      bottom: -64,
-      left: -24,
-      backgroundColor: "rgba(15, 23, 42, 0.08)",
-    },
-    meHeroGlowMuted: {
-      backgroundColor: "rgba(255, 255, 255, 0.22)",
     },
     meHeroContent: {
       gap: 16,
@@ -219,9 +173,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexWrap: "wrap",
       gap: 8,
     },
-    meHeroBadgeMuted: {
-      backgroundColor: "rgba(255, 255, 255, 0.55)",
-    },
     meHeroBadgeDot: {
       width: 9,
       height: 9,
@@ -241,15 +192,12 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textInverse,
       textTransform: "uppercase",
     },
-    meHeroBadgeTextMuted: {
-      color: mobileColors.textPrimary,
-    },
     meHeroDateTile: {
       minWidth: 58,
       borderRadius: mobileRadii.control,
       borderWidth: 1,
-      borderColor: "rgba(255, 255, 255, 0.22)",
-      backgroundColor: "rgba(255, 255, 255, 0.14)",
+      borderColor: mobileOnAccent.hairline,
+      backgroundColor: mobileOnAccent.fill,
       alignItems: "center",
       justifyContent: "center",
       gap: 4,
@@ -258,17 +206,12 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     meHeroDateWeekday: {
       ...mobileText.label,
-      color: "rgba(255, 255, 255, 0.72)",
+      color: mobileOnAccent.tertiary,
     },
     meHeroDateDay: {
       ...mobileText.heroMetric,
       ...mobileTabularText,
       color: mobileColors.textInverse,
-    },
-    meHeroDateText: {
-      ...mobileTextWeighted("meta", "semibold"),
-      alignSelf: "flex-start",
-      color: "rgba(255, 255, 255, 0.86)",
     },
     meHeroTitle: {
       flexShrink: 1,
@@ -288,35 +231,9 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexWrap: "wrap",
       gap: mobileSpace.sm,
     },
-    meHeroHeading: {
-      ...mobileText.rowTitle,
-      color: mobileColors.textInverse,
-    },
-    meHeroHeadingMuted: {
-      color: mobileColors.textSecondary,
-    },
-    meHeroTitleMuted: {
-      color: mobileColors.textPrimary,
-    },
-    meHeroSupportingText: {
-      ...mobileTextWeighted("body", "medium"),
-      color: "rgba(255, 255, 255, 0.84)",
-    },
-    meHeroSupportingTextMuted: {
-      color: mobileColors.textMuted,
-    },
     meHeroAreaLabel: {
       ...mobileText.rowTitle,
-      color: "rgba(255, 255, 255, 0.86)",
-    },
-    meHeroAreaLabelMuted: {
-      color: mobileColors.textSecondary,
-    },
-    meHeroMetaRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      flexWrap: "wrap",
-      gap: 8,
+      color: mobileOnAccent.secondary,
     },
     meHeroAreaRow: {
       flexDirection: "row",
@@ -352,7 +269,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textSubtle,
     },
     previousShiftTextInverse: {
-      color: "rgba(255, 255, 255, 0.82)",
+      color: mobileOnAccent.secondary,
     },
     meHeroRoleRow: {
       flexDirection: "row",
@@ -377,7 +294,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       lineHeight: mobileText.heroMetric.lineHeight,
     },
     meTypePillLabelInverse: {
-      color: "rgba(255, 255, 255, 0.82)",
+      color: mobileOnAccent.secondary,
     },
     meHeroScheduleRow: {
       flexDirection: "row",
@@ -399,71 +316,9 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textInverse,
       flexShrink: 1,
     },
-    meHeroTimePill: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: mobileSpace.md,
-      alignSelf: "flex-start",
-      backgroundColor: "rgba(29, 78, 216, 0.22)",
-      borderRadius: mobileRadii.control,
-      paddingHorizontal: mobileSpace.md,
-      paddingVertical: mobileSpace.md,
-    },
-    meHeroTimePillMuted: {
-      backgroundColor: "rgba(255, 255, 255, 0.58)",
-    },
-    meHeroTimePillText: {
-      ...mobileText.bodyStrong,
-      ...mobileTabularText,
-      color: mobileColors.textInverse,
-    },
-    meHeroTimePillTextMuted: {
-      color: mobileColors.textSecondary,
-    },
-    meHeroActionIcon: {
-      width: 30,
-      height: 30,
-      borderRadius: 15,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: "rgba(255, 255, 255, 0.18)",
-    },
-    meHeroActionIconMuted: {
-      backgroundColor: "rgba(255, 255, 255, 0.55)",
-    },
-    meHeroEmptyText: {
-      ...mobileTextWeighted("body", "medium"),
-      color: "rgba(255, 255, 255, 0.84)",
-    },
-    meHeroEmptyBlock: {
-      gap: mobileSpace.md,
-    },
-    meHeroEmptyTextMuted: {
-      color: mobileColors.textSecondary,
-    },
-    meHeroDetails: {
-      gap: 8,
-    },
-    meHeroDetailText: {
-      ...mobileText.bodyStrong,
-      color: "rgba(255, 255, 255, 0.88)",
-    },
-    meHeroDetailTextMuted: {
-      color: mobileColors.textSecondary,
-    },
-    meHeroProgressBlock: {
-      gap: mobileSpace.md,
-      marginTop: 4,
-    },
-    meHeroProgressRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 12,
-    },
     meHeroProgressLabel: {
       ...mobileText.rowTitle,
-      color: "rgba(255, 255, 255, 0.86)",
+      color: mobileOnAccent.secondary,
       flexShrink: 0,
     },
     meHeroProgressTrack: {
@@ -480,7 +335,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     meHeroCollaborators: {
       borderRadius: mobileRadii.control,
       borderWidth: 1,
-      borderColor: "rgba(255, 255, 255, 0.14)",
+      borderColor: mobileOnAccent.hairline,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
@@ -499,7 +354,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     meHeroCollaboratorLabel: {
       ...mobileText.rowTitle,
-      color: "rgba(255, 255, 255, 0.84)",
+      color: mobileOnAccent.secondary,
       flexShrink: 1,
     },
     meHeroAvatarStack: {
@@ -626,10 +481,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileTextWeighted("cardTitle", "bold"),
       color: mobileColors.textSecondary,
     },
-    upcomingUnscheduledBody: {
-      ...mobileText.caption,
-      color: mobileColors.textSubtle,
-    },
     upcomingShiftRowBorder: {
       borderTopWidth: 1,
       borderTopColor: mobileColors.borderSubtle,
@@ -715,39 +566,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileText.bodyStrong,
       color: mobileColors.brand,
     },
-    meSurfaceCard: {
-      backgroundColor: mobileColors.surface,
-      borderRadius: mobileRadii.card,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      padding: mobileSpace.lg,
-      shadowColor: mobileColors.shadow,
-      shadowOffset: {
-        width: 0,
-        height: 8,
-      },
-      shadowOpacity: 1,
-      shadowRadius: 18,
-      elevation: 2,
-    },
-    meSectionBody: {
-      ...mobileTextWeighted("body", "medium"),
-      color: mobileColors.textMuted,
-    },
-    scheduleListRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 16,
-      paddingVertical: 16,
-    },
-    scheduleListRowBorder: {
-      borderTopWidth: 1,
-      borderTopColor: mobileColors.borderSubtle,
-    },
-    scheduleListCopy: {
-      flex: 1,
-      gap: 8,
-    },
     scheduleRowDate: {
       ...mobileText.bodyStrong,
       ...mobileTabularText,
@@ -785,16 +603,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileTextWeighted("rowTitle", "medium"),
       ...mobileTabularText,
       color: mobileColors.textMuted,
-    },
-    scheduleRowArrow: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      alignItems: "center",
-      justifyContent: "center",
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      backgroundColor: mobileColors.surfaceSecondary,
     },
     // A horizontal ScrollView clips to its bounds, so the card shadow needs
     // the token's own reach below the last card or it ends in a hard line.
@@ -1007,90 +815,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobilePillOverflow.displayText,
       color: mobileColors.textSecondary,
     },
-    meCollaboratorList: {
-      gap: 0,
-    },
-    meCollaboratorRow: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      gap: 12,
-      paddingVertical: 12,
-    },
-    meCollaboratorRowBorder: {
-      borderTopWidth: 1,
-      borderTopColor: mobileColors.borderSubtle,
-    },
-    meCollaboratorCopy: {
-      flex: 1,
-      gap: 8,
-    },
-    meCollaboratorName: {
-      ...mobileText.bodyStrong,
-      color: mobileColors.textPrimary,
-    },
-    timelineList: {
-      gap: mobileSpace.lg,
-    },
-    timelineSection: {
-      gap: 12,
-      paddingLeft: mobileSpace.lg,
-      marginLeft: 4,
-      borderLeftWidth: TIMELINE_RAIL_WIDTH,
-      borderLeftColor: mobileColors.borderSubtle,
-    },
-    timelineSectionHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: mobileSpace.md,
-      // Pulls the dot back over the section's rail: the section's own inset
-      // and border, half the dot, and one point so the dot centres on a 2pt
-      // line rather than sitting beside it.
-      marginLeft: -(mobileSpace.lg + TIMELINE_RAIL_WIDTH + TIMELINE_DOT_SIZE / 2 + 1),
-    },
-    timelineDot: {
-      width: TIMELINE_DOT_SIZE,
-      height: TIMELINE_DOT_SIZE,
-      borderRadius: 6,
-      borderWidth: 3,
-      borderColor: mobileColors.background,
-      backgroundColor: mobileColors.brand,
-    },
-    timelineSectionTitle: {
-      ...mobileText.rowTitle,
-      color: mobileColors.textPrimary,
-    },
-    timelineSectionEntries: {
-      gap: mobileSpace.md,
-    },
-    timelineEntryCard: {
-      backgroundColor: mobileColors.surface,
-      borderRadius: mobileRadii.card,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      padding: 16,
-      shadowColor: mobileColors.shadow,
-      shadowOffset: {
-        width: 0,
-        height: 6,
-      },
-      shadowOpacity: 1,
-      shadowRadius: 14,
-      elevation: 2,
-    },
-    timelineEntryCardPressed: {
-      opacity: 0.92,
-    },
-    meHeaderRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 12,
-    },
-    meHeaderActions: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: mobileSpace.md,
-    },
     teamHeaderUtilityRow: {
       flexDirection: "row",
       alignItems: "center",
@@ -1108,13 +832,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     teamHeaderTitleArea: {
       flex: 1,
       minWidth: 0,
-    },
-    meSelectedDateTitle: {
-      ...mobileText.screenTitle,
-      ...mobileTabularText,
-      flex: 1,
-      color: mobileColors.textPrimary,
-      textAlign: "left",
     },
     // `screenTitle`, not `display`: this title shares its row with the Today
     // button and the alerts bell, and at 28pt "Tomorrow, Sep 18" truncated to
@@ -1238,9 +955,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       top: -2,
       right: -2,
     },
-    groupsList: {
-      gap: mobileSpacing.sectionGap,
-    },
     shiftGroupsList: {
       gap: mobileSpace["3xl"],
       paddingTop: 24,
@@ -1279,32 +993,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     shiftGroupTimeStacked: {
       textAlign: "left",
-    },
-    weekDaySection: {
-      gap: 12,
-    },
-    weekDayHeader: {
-      gap: 4,
-    },
-    weekDayTitle: {
-      ...mobileTextWeighted("cardTitle", "bold"),
-      ...mobileTabularText,
-      color: mobileColors.textPrimary,
-    },
-    weekDayEmptyState: {
-      backgroundColor: mobileColors.surface,
-      borderRadius: mobileRadii.card,
-      borderWidth: 1,
-      borderColor: mobileColors.cardBorder,
-      paddingHorizontal: 16,
-      paddingVertical: mobileSpace.md,
-    },
-    weekDayEmptyText: {
-      ...mobileTextWeighted("body", "semibold"),
-      color: mobileColors.textMuted,
-    },
-    groupEntries: {
-      gap: mobileSpace.md,
     },
     teamGroupCard: {
       backgroundColor: mobileColors.surface,
@@ -1387,108 +1075,5 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // badge truncated beside it.
     teamMemberRoleRowStacked: {
       justifyContent: "flex-start",
-    },
-    teamMemberRoleChip: {
-      borderWidth: 1,
-      borderRadius: mobileRadius.md,
-      paddingHorizontal: mobileSpace.md,
-      paddingVertical: mobileSpace.sm,
-    },
-    teamMemberRoleChipTextStack: {
-      gap: mobileSpace.xs,
-    },
-    teamMemberRoleChipEyebrowText: {
-      ...mobileText.micro,
-    },
-    teamMemberRoleChipText: {
-      ...mobileText.badge,
-      textTransform: "uppercase",
-    },
-    teamMemberRoleChipValueText: {
-      ...mobileTextWeighted("caption", "semibold"),
-    },
-    compactSegmentList: {
-      gap: 8,
-    },
-    compactSegmentBlock: {
-      gap: mobileSpace.xs,
-    },
-    compactSegmentDivider: {
-      borderTopWidth: 1,
-      borderTopColor: mobileColors.borderSubtle,
-      paddingTop: 8,
-    },
-    compactSegmentTitle: {
-      ...mobileTextWeighted("meta", "bold"),
-      color: mobileColors.textSecondary,
-    },
-    compactSegmentMeta: {
-      ...mobileTextWeighted("meta", "semibold"),
-      color: mobileColors.textMuted,
-    },
-    heroSegmentList: {
-      gap: 12,
-    },
-    heroSegmentBlock: {
-      gap: mobileSpace.sm,
-    },
-    heroSegmentDivider: {
-      borderTopWidth: 1,
-      borderTopColor: "rgba(255, 255, 255, 0.18)",
-      paddingTop: 12,
-    },
-    heroSegmentTitle: {
-      ...mobileText.sectionTitle,
-      color: mobileColors.textInverse,
-    },
-    heroSegmentMeta: {
-      ...mobileTextWeighted("body", "medium"),
-      color: "rgba(255, 255, 255, 0.84)",
-    },
-    timelineSegmentList: {
-      gap: 12,
-    },
-    timelineSegmentBlock: {
-      gap: 4,
-    },
-    timelineSegmentDivider: {
-      borderTopWidth: 1,
-      borderTopColor: mobileColors.borderSubtle,
-      paddingTop: 12,
-    },
-    timelineSegmentTitle: {
-      ...mobileText.rowTitle,
-      color: mobileColors.textPrimary,
-    },
-    timelineSegmentMeta: {
-      ...mobileTextWeighted("meta", "medium"),
-      color: mobileColors.textMuted,
-    },
-    entryCard: {
-      backgroundColor: mobileColors.surface,
-      borderRadius: mobileRadii.card,
-      borderWidth: 1,
-      borderColor: mobileColors.cardBorder,
-      padding: 16,
-      gap: 12,
-    },
-    entrySegmentList: {
-      gap: 12,
-    },
-    entrySegmentBlock: {
-      gap: mobileSpace.sm,
-    },
-    entrySegmentDivider: {
-      borderTopWidth: 1,
-      borderTopColor: mobileColors.borderSubtle,
-      paddingTop: 12,
-    },
-    entryTitle: {
-      ...mobileText.sectionTitle,
-      color: mobileColors.textPrimary,
-    },
-    entryMetaText: {
-      ...mobileTextWeighted("meta", "medium"),
-      color: mobileColors.textMuted,
     },
   });
