@@ -12,6 +12,7 @@ import type { MobileDashboardResponse } from "@dubgrid/contracts";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { PressableRow } from "../../../shared/components/PressableRow";
+import { AnimatedMeterFill } from "../../../shared/motion/AnimatedMeterFill";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   MAX_FONT_SCALE,
@@ -77,7 +78,10 @@ export function CoverageSectionRow({ section }: { section: CoverageSection }) {
             </View>
           </View>
           <View style={styles.track}>
-            <View style={[styles.fill, { backgroundColor: pctColor, width: `${section.pct}%` }]} />
+            <AnimatedMeterFill
+              percent={section.pct}
+              style={[styles.fill, { backgroundColor: pctColor }]}
+            />
           </View>
         </View>
         <Ionicons color={mobileColors.textMuted} name="chevron-forward" size={CHEVRON_SIZE} />

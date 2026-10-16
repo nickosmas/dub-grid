@@ -359,6 +359,7 @@ export function ProfileTextInput({
             inputAccessoryViewID={inputAccessoryViewID}
             maxFontSizeMultiplier={MAX_FONT_SCALE}
             placeholderTextColor={mobileColors.textSubtle}
+            selectionColor={mobileColors.brand}
             style={[
               styles.input,
               styles.inputInShell,
@@ -376,6 +377,7 @@ export function ProfileTextInput({
           inputAccessoryViewID={inputAccessoryViewID}
           maxFontSizeMultiplier={MAX_FONT_SCALE}
           placeholderTextColor={mobileColors.textSubtle}
+          selectionColor={mobileColors.brand}
           style={[
             styles.input,
             resolvedInputProps.multiline && styles.inputMultiline,
@@ -650,14 +652,6 @@ const createProfilePrimitiveStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     actionsStack: {
       gap: mobileSpace.md,
-    },
-    supportingText: {
-      ...mobileText.body,
-      color: mobileColors.textMuted,
-    },
-    subtleText: {
-      ...mobileText.meta,
-      color: mobileColors.textMuted,
     },
   });
 

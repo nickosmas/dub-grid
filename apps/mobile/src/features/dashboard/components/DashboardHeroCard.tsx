@@ -2,6 +2,8 @@ import { useMemo } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
+import { AnimatedMeterFill } from "../../../shared/motion/AnimatedMeterFill";
+import { useAnimatedCount } from "../../../shared/motion/useAnimatedCount";
 import type { MobileDashboardResponse } from "@dubgrid/contracts";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Pressable } from "../../../shared/components/Pressable";
@@ -44,6 +46,7 @@ function MetricStat({
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const toneColors = useMemo(() => createToneTextColors(mobileColors), [mobileColors]);
   const color = value > 0 ? toneColors[tone] : mobileColors.textPrimary;
+  const displayedValue = useAnimatedCount(value);
 
   return (
     <Pressable
@@ -56,7 +59,7 @@ function MetricStat({
     >
       <View style={styles.statFigureRow}>
         <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={[styles.statValue, { color }]}>
-          {value}
+          {displayedValue}
         </Text>
         {onPress ? (
           <Ionicons color={mobileColors.textMuted} name="chevron-forward" size={14} />
@@ -99,6 +102,7 @@ export function DashboardHeroCard({
   const coverage = metrics.coveragePct;
   const configured = coverage != null;
   const meterColor = configured ? coverageColor(mobileColors, coverage) : mobileColors.textMuted;
+  const displayedCoverage = useAnimatedCount(coverage ?? 0);
 
   return (
     <DashboardCard
@@ -120,7 +124,7 @@ export function DashboardHeroCard({
               maxFontSizeMultiplier={MAX_FONT_SCALE}
               style={styles.coverageFigure}
             >
-              {coverage}%
+              {displayedCoverage}%
             </Text>
             <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.coverageLabel}>
               covered
@@ -131,11 +135,9 @@ export function DashboardHeroCard({
             accessibilityValue={{ min: 0, max: 100, now: coverage }}
             style={styles.track}
           >
-            <View
-              style={[
-                styles.fill,
-                { backgroundColor: meterColor, width: `${Math.min(100, Math.max(0, coverage))}%` },
-              ]}
+            <AnimatedMeterFill
+              percent={coverage}
+              style={[styles.fill, { backgroundColor: meterColor }]}
             />
           </View>
         </View>

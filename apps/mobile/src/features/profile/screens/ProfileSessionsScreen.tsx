@@ -345,7 +345,9 @@ function SessionRow({
       onPress={onPress}
     >
       <View style={styles.sessionIcon}>
-        <Text style={styles.sessionIconText}>{formatSessionPlatform(session.platform)}</Text>
+        <Text fit="fixed" style={styles.sessionIconText}>
+          {formatSessionPlatform(session.platform)}
+        </Text>
       </View>
       <View style={styles.sessionCopy}>
         <View style={styles.sessionTitleRow}>

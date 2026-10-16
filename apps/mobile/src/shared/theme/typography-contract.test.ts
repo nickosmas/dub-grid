@@ -66,6 +66,26 @@ describe("mobile typography contract", () => {
     }
   });
 
+  // One placeholder ink and one caret across every field. Sign-in used a
+  // lighter placeholder (2.6:1 on white) than the rest of the app.
+  it("gives every shared field the readable placeholder and the brand caret", () => {
+    for (const filePath of [
+      "src/features/auth/components/AuthField.tsx",
+      "src/features/profile/components/ProfilePrimitives.tsx",
+      "src/shared/components/SearchBar.tsx",
+    ]) {
+      const source = readFileSync(path.resolve(mobileRoot, filePath), "utf8");
+      const inputs = source.match(/<TextInput\b/g)?.length ?? 0;
+      expect(
+        source.match(/placeholderTextColor=\{mobileColors\.textSubtle\}/g)?.length,
+        filePath,
+      ).toBe(inputs);
+      expect(source.match(/selectionColor=\{mobileColors\.brand\}/g)?.length, filePath).toBe(
+        inputs,
+      );
+    }
+  });
+
   it("uses one cross-platform autofill hint per field", () => {
     const violations = productionFiles
       .filter((filePath) => /textContentType=/.test(readFileSync(filePath, "utf8")))

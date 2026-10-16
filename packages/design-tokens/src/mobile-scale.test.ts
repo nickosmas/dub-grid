@@ -22,9 +22,31 @@ describe("mobile type ramp", () => {
     }
   });
 
-  it("never drops below 10pt", () => {
+  // 11pt is the smallest size either platform's guidelines set for legible
+  // text (Apple's Caption 2); the tab labels and count dots sit on it.
+  it("never drops below 11pt", () => {
     for (const [name, style] of Object.entries(mobileTypographyTokens.text)) {
-      expect(style.fontSize, name).toBeGreaterThanOrEqual(10);
+      expect(style.fontSize, name).toBeGreaterThanOrEqual(11);
+    }
+  });
+
+  it("keeps reading text at the 15pt body size, with headings stepping above it", () => {
+    const { body, bodyStrong, rowTitle, cardTitle, sectionTitle, title, meta, caption } =
+      mobileTypographyTokens.text;
+
+    expect(body.fontSize).toBe(15);
+    expect(bodyStrong.fontSize).toBe(body.fontSize);
+    expect(rowTitle.fontSize).toBeGreaterThan(body.fontSize);
+    expect(cardTitle.fontSize).toBeGreaterThan(rowTitle.fontSize);
+    expect(sectionTitle.fontSize).toBe(cardTitle.fontSize);
+    expect(title.fontSize).toBeGreaterThan(cardTitle.fontSize);
+    expect(meta.fontSize).toBeLessThan(body.fontSize);
+    expect(caption.fontSize).toBeLessThan(meta.fontSize);
+  });
+
+  it("gives every step at least 1.2x its size in line height, so accents never clip", () => {
+    for (const [name, style] of Object.entries(mobileTypographyTokens.text)) {
+      expect(style.lineHeight / style.fontSize, name).toBeGreaterThanOrEqual(1.2);
     }
   });
 });

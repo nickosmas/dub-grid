@@ -1,6 +1,10 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { createReactNativeModule, createSafeAreaContextModule } from "../../../test/native";
+import {
+  createReactNativeModule,
+  createSafeAreaContextModule,
+  screenScrollToMock,
+} from "../../../test/native";
 
 const routerReplace = vi.fn();
 const markHasSeenOnboarding = vi.fn(() => Promise.resolve());
@@ -44,6 +48,9 @@ vi.mock("../components/previews/UpcomingShiftPreview", () => ({
 vi.mock("../components/previews/CoverShiftsPreview", () => ({
   CoverShiftsPreview: () => null,
 }));
+vi.mock("../components/WelcomeVisual", () => ({
+  WelcomeVisual: () => null,
+}));
 
 let OnboardingScreen: (typeof import("./OnboardingScreen"))["default"];
 let windowWidth = 0;
@@ -55,7 +62,7 @@ beforeAll(async () => {
   windowWidth = (await import("react-native")).Dimensions.get("window").width;
 });
 
-const SLIDE_COUNT = 3;
+const SLIDE_COUNT = 4;
 
 // The screen reads the device's notification answer on mount; flushing that
 // inside `act` keeps the state update out of the "not wrapped in act" log.
@@ -75,6 +82,7 @@ function swipeToLastSlide() {
 describe("OnboardingScreen", () => {
   beforeEach(() => {
     routerReplace.mockReset();
+    screenScrollToMock.mockClear();
     markHasSeenOnboarding.mockClear();
     getPushPermissionState.mockReset();
     requestPushPermission.mockReset();
@@ -82,7 +90,19 @@ describe("OnboardingScreen", () => {
     requestPushPermission.mockResolvedValue("granted");
   });
 
-  it("renders all three slides", async () => {
+  it("opens on a welcome step, then the tour, then the notification step", async () => {
+    await renderScreen();
+
+    const titles = screen.getAllByRole("header").map((heading) => heading.textContent);
+    expect(titles).toEqual([
+      "Welcome to DubGrid",
+      "Your schedule, always with you",
+      "Cover shifts on the go",
+      "Know when things change",
+    ]);
+  });
+
+  it("renders every slide", async () => {
     await renderScreen();
 
     expect(screen.getByText("Your schedule, always with you")).toBeInTheDocument();
@@ -100,7 +120,7 @@ describe("OnboardingScreen", () => {
     expect(screen.getByText("Account and sign-in")).toBeInTheDocument();
   });
 
-  it("Skip persists the seen flag and routes to login", async () => {
+  it("Skip persists the seen flag and routes to login when there is nothing to ask", async () => {
     await renderScreen();
 
     fireEvent.click(screen.getByRole("button", { name: "Skip" }));
@@ -131,6 +151,22 @@ describe("OnboardingScreen", () => {
     expect(routerReplace).not.toHaveBeenCalled();
   });
 
+  // A programmatic scroll does not reliably report where it landed, so
+  // Continue must move the tour on by itself, all the way to the end.
+  it("Continue walks every slide without waiting for a scroll event", async () => {
+    await renderScreen();
+
+    for (let index = 1; index < SLIDE_COUNT; index += 1) {
+      fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+      expect(screenScrollToMock).toHaveBeenLastCalledWith({
+        x: index * windowWidth,
+        animated: true,
+      });
+    }
+
+    expect(screen.getByRole("button", { name: "Get started" })).toBeInTheDocument();
+  });
+
   it("finishes with Get started when the device cannot show the notification prompt", async () => {
     getPushPermissionState.mockResolvedValue("denied");
     await renderScreen();
@@ -157,6 +193,29 @@ describe("OnboardingScreen", () => {
       ).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Not now" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Get started" })).not.toBeInTheDocument();
+    });
+
+    // Skipping the tour must not skip the one decision in it: the OS prompt
+    // can only be shown with context from here.
+    it("Skip goes to the notification step instead of leaving", async () => {
+      await renderScreen();
+
+      fireEvent.click(screen.getByRole("button", { name: "Skip" }));
+
+      expect(screenScrollToMock).toHaveBeenCalledWith({
+        x: (SLIDE_COUNT - 1) * windowWidth,
+        animated: true,
+      });
+      expect(markHasSeenOnboarding).not.toHaveBeenCalled();
+      expect(routerReplace).not.toHaveBeenCalled();
+    });
+
+    it("drops Skip on the notification step, where Not now finishes", async () => {
+      await renderScreen();
+      swipeToLastSlide();
+
+      await screen.findByRole("button", { name: "Not now" });
+      expect(screen.queryByRole("button", { name: "Skip" })).not.toBeInTheDocument();
     });
 
     it("keeps the ask off the earlier slides", async () => {

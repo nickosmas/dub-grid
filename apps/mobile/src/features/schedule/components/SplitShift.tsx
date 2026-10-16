@@ -11,6 +11,7 @@ import {
 } from "../lib/schedule";
 import { HERO_INVERSE_CHIP_BORDER, HERO_INVERSE_CHIP_FILL } from "../lib/heroCardTheme";
 import {
+  mobileOnAccent,
   mobileRadii,
   mobileText,
   mobileTextWeighted,
@@ -131,7 +132,7 @@ export function SplitShiftSegmentList({
         const heroCaption = getHeroSegmentCaption(segment);
         const focusAreaName =
           segment.shiftId === null ? null : segment.displayFocusAreaName?.trim() || null;
-        const metaIconColor = inverse ? "rgba(255, 255, 255, 0.82)" : mobileColors.textMuted;
+        const metaIconColor = inverse ? mobileOnAccent.secondary : mobileColors.textMuted;
         const hasDivider = index > 0;
         const segmentLabel = getSplitShiftSegmentLabel(
           segmentLabelIndices?.[index] ?? segmentLabelStartIndex + index,
@@ -406,7 +407,7 @@ const createStyles = (mobileColors: MobileColors) =>
       paddingTop: mobileSpace.md,
     },
     segmentDividerHero: {
-      borderTopColor: "rgba(255, 255, 255, 0.18)",
+      borderTopColor: mobileOnAccent.hairline,
       borderTopWidth: 1,
       paddingTop: 12,
     },
@@ -422,7 +423,7 @@ const createStyles = (mobileColors: MobileColors) =>
       backgroundColor: mobileColors.borderSubtle,
     },
     segmentDashedDividerSegmentInverse: {
-      backgroundColor: "rgba(255, 255, 255, 0.18)",
+      backgroundColor: mobileOnAccent.fill,
     },
     segmentHeroBody: {
       width: "100%",
@@ -479,7 +480,7 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textMuted,
     },
     segmentHeroCaptionTextInverse: {
-      color: "rgba(255, 255, 255, 0.82)",
+      color: mobileOnAccent.secondary,
     },
     segmentEyebrow: {
       ...mobileText.micro,
@@ -519,9 +520,6 @@ const createStyles = (mobileColors: MobileColors) =>
     segmentTitleDetail: {
       ...mobileTextWeighted("sectionTitle", "bold"),
     },
-    segmentTitleHero: {
-      ...mobileText.sectionTitle,
-    },
     segmentTitleInverse: {
       color: mobileColors.textInverse,
     },
@@ -533,18 +531,12 @@ const createStyles = (mobileColors: MobileColors) =>
       ...mobileTextWeighted("meta", "medium"),
       color: mobileColors.textMuted,
     },
-    segmentMetaHero: {
-      ...mobileText.body,
-    },
     segmentMetaInverse: {
-      color: "rgba(255, 255, 255, 0.82)",
+      color: mobileOnAccent.secondary,
     },
     segmentTiming: {
       ...mobileTextWeighted("meta", "bold"),
       color: mobileColors.brand,
-    },
-    segmentTimingHero: {
-      ...mobileText.body,
     },
     segmentTimingInverse: {
       color: mobileColors.textInverse,
