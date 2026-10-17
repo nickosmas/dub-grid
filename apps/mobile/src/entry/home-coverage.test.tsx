@@ -74,13 +74,33 @@ describe("CoverageExpandedScreen", () => {
 
   it("shows the empty state when there are no coverage sections", () => {
     useExpandedDashboardQuery.mockReturnValue({
-      dashboardQuery: { isLoading: false, isError: false, data: { coverageBySection: [] } },
+      dashboardQuery: {
+        isLoading: false,
+        isError: false,
+        data: { coverageBySection: [], metrics: { coverageWindow: "published" } },
+      },
       bootstrapQuery: { isLoading: false, data: { currentOrg: { labels: {} } } },
     });
 
     render(<CoverageExpandedScreen />);
 
     expect(screen.getByText("No coverage to track yet")).toBeInTheDocument();
+  });
+
+  it("says an unpublished period is not published yet", () => {
+    useExpandedDashboardQuery.mockReturnValue({
+      dashboardQuery: {
+        isLoading: false,
+        isError: false,
+        data: { coverageBySection: [], metrics: { coverageWindow: "unpublished" } },
+      },
+      bootstrapQuery: { isLoading: false, data: { currentOrg: { labels: {} } } },
+    });
+
+    render(<CoverageExpandedScreen />);
+
+    expect(screen.getByText("Not published yet")).toBeInTheDocument();
+    expect(screen.queryByText("No coverage to track yet")).not.toBeInTheDocument();
   });
 
   it("filters sections by focus area via the filter sheet", () => {

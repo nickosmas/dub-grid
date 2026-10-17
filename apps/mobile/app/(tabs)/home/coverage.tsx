@@ -118,11 +118,19 @@ export default function CoverageExpandedScreen() {
       </View>
 
       {filtered.length === 0 ? (
-        <EmptyStateCard
-          body="Coverage appears here once staffing requirements are configured and the period is published."
-          iconName="stats-chart-outline"
-          title="No coverage to track yet"
-        />
+        dashboardQuery.data.metrics.coverageWindow === "unpublished" ? (
+          <EmptyStateCard
+            body="Coverage details will appear after this period is published."
+            iconName="calendar-outline"
+            title="Not published yet"
+          />
+        ) : (
+          <EmptyStateCard
+            body="Coverage appears here once staffing requirements are configured and the period is published."
+            iconName="stats-chart-outline"
+            title="No coverage to track yet"
+          />
+        )
       ) : (
         <DashboardRowList
           items={filtered}

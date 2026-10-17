@@ -10,7 +10,10 @@ import {
   SelectionRow,
   SelectionSection,
 } from "../../../src/shared/components/FilterSheet";
-import { OpenShiftRow } from "../../../src/features/dashboard/components/OpenShiftsCard";
+import {
+  getOpenShiftsEmptyCopy,
+  OpenShiftRow,
+} from "../../../src/features/dashboard/components/OpenShiftsCard";
 import { DashboardListSkeleton } from "../../../src/features/dashboard/components/DashboardSkeleton";
 import { DashboardRowList } from "../../../src/features/dashboard/components/DashboardRowList";
 import { useExpandedDashboardQuery } from "../../../src/features/dashboard/hooks/useExpandedDashboardQuery";
@@ -148,7 +151,14 @@ export default function OpenShiftsExpandedScreen() {
       </View>
 
       {filtered.length === 0 ? (
-        <EmptyStateCard iconName="checkmark-circle" title="No open shifts match this filter" />
+        activeFilterCount > 0 ? (
+          <EmptyStateCard iconName="checkmark-circle" title="No open shifts match this filter" />
+        ) : (
+          <EmptyStateCard
+            {...getOpenShiftsEmptyCopy(dashboardQuery.data?.metrics.coverageWindow)}
+            iconName="checkmark-circle"
+          />
+        )
       ) : (
         <DashboardRowList
           items={filtered}
