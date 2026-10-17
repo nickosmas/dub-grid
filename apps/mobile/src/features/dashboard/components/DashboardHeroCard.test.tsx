@@ -65,7 +65,7 @@ describe("DashboardHeroCard", () => {
     expect(screen.getByText("pending approvals")).toBeInTheDocument();
   });
 
-  it("shows dashes and says the period is not published, as web does", () => {
+  it("says the period is not published in place of the figure", () => {
     render(
       <DashboardHeroCard
         metrics={{
@@ -78,8 +78,10 @@ describe("DashboardHeroCard", () => {
       />,
     );
 
-    expect(screen.getByLabelText("Coverage not published yet")).toHaveTextContent("\u2014");
-    expect(screen.getByText("not published yet")).toBeInTheDocument();
+    expect(screen.getByText("Not published yet")).toBeInTheDocument();
+    expect(
+      screen.getByText("Coverage and open gaps will appear after this period is published."),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Coverage requirements not configured")).not.toBeInTheDocument();
     expect(screen.queryByText("100%")).not.toBeInTheDocument();
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
