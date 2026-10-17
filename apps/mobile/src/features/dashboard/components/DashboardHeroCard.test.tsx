@@ -65,7 +65,7 @@ describe("DashboardHeroCard", () => {
     expect(screen.getByText("pending approvals")).toBeInTheDocument();
   });
 
-  it("says the period is not published and shows no figure or open gaps", () => {
+  it("shows dashes and says the period is not published, as web does", () => {
     render(
       <DashboardHeroCard
         metrics={{
@@ -78,11 +78,15 @@ describe("DashboardHeroCard", () => {
       />,
     );
 
-    expect(screen.getByText("Not published yet")).toBeInTheDocument();
+    expect(screen.getByLabelText("Coverage not published yet")).toHaveTextContent("\u2014");
+    expect(screen.getByText("not published yet")).toBeInTheDocument();
     expect(screen.queryByText("Coverage requirements not configured")).not.toBeInTheDocument();
     expect(screen.queryByText("100%")).not.toBeInTheDocument();
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
-    expect(screen.queryByText("open gaps")).not.toBeInTheDocument();
+    // Open gaps keeps its place with a dash rather than a zero, and opens nothing.
+    const gaps = screen.getByRole("button", { name: "open gaps, not published yet" });
+    expect(gaps).toHaveTextContent("\u2014");
+    expect(gaps).toBeDisabled();
   });
 
   it("qualifies a partly published period's figure", () => {

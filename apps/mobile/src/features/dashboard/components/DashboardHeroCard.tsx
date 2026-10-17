@@ -37,7 +37,8 @@ function MetricStat({
   onPress,
 }: {
   label: string;
-  value: number;
+  /** Null when there is nothing to count yet; the figure reads as a dash. */
+  value: number | null;
   /** Colours the figure only when it is non-zero; a zero is plain, not green. */
   tone: "warning" | "danger";
   onPress?: () => void;
@@ -45,12 +46,12 @@ function MetricStat({
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const toneColors = useMemo(() => createToneTextColors(mobileColors), [mobileColors]);
-  const color = value > 0 ? toneColors[tone] : mobileColors.textPrimary;
-  const displayedValue = useAnimatedCount(value);
+  const color = value != null && value > 0 ? toneColors[tone] : mobileColors.textPrimary;
+  const displayedValue = useAnimatedCount(value ?? 0);
 
   return (
     <Pressable
-      accessibilityLabel={`${value} ${label}`}
+      accessibilityLabel={value == null ? `${label}, not published yet` : `${value} ${label}`}
       accessibilityRole={onPress ? "button" : undefined}
       android_ripple={onPress ? { color: mobileColors.rippleNeutral } : undefined}
       disabled={!onPress}
@@ -59,7 +60,7 @@ function MetricStat({
     >
       <View style={styles.statFigureRow}>
         <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={[styles.statValue, { color }]}>
-          {displayedValue}
+          {value == null ? "\u2014" : displayedValue}
         </Text>
         {onPress ? (
           <Ionicons color={mobileColors.textMuted} name="chevron-forward" size={14} />
@@ -79,10 +80,11 @@ function MetricStat({
  * said the same thing twice, and "See all" opens the full breakdown, but
  * only while there are more focus areas than the card previews.
  *
- * A null percentage means there is nothing to measure: the period is not
- * published yet, or no coverage requirements exist. The card then says which
- * in place of the meter and the open-gap count, as web does: a figure there
- * would read as fully staffed rather than as nothing to measure.
+ * A null percentage means there is nothing to measure. For a period not
+ * published yet the figures read as dashes with the reason beside them, as
+ * web's tiles do; with no coverage requirements the card asks for them in
+ * place of the meter and the open-gap count. A figure in either case would
+ * read as fully staffed rather than as nothing to measure.
  */
 export function DashboardHeroCard({
   metrics,
@@ -102,6 +104,7 @@ export function DashboardHeroCard({
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const coverage = metrics.coveragePct;
   const coverageWindow = metrics.coverageWindow ?? "published";
+  const unpublished = coverageWindow === "unpublished";
   const configured = coverage != null;
   const meterColor = configured ? coverageColor(mobileColors, coverage) : mobileColors.textMuted;
   const displayedCoverage = useAnimatedCount(coverage ?? 0);
@@ -111,13 +114,24 @@ export function DashboardHeroCard({
       title="Coverage"
       onOpen={hasMoreDashboardRows(sections.length) ? onOpenCoverage : undefined}
     >
-      {coverageWindow === "unpublished" ? (
-        <EmptyStateCard
-          body="Coverage and open gaps will appear after this period is published."
-          compact
-          iconName="calendar-outline"
-          title="Not published yet"
-        />
+      {unpublished ? (
+        <View style={styles.coverage}>
+          <View style={styles.coverageFigureRow}>
+            <Text
+              accessibilityLabel="Coverage not published yet"
+              maxFontSizeMultiplier={MAX_FONT_SCALE}
+              style={styles.coverageFigure}
+            >
+              {"\u2014"}
+            </Text>
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.coverageLabel}>
+              not published yet
+            </Text>
+          </View>
+          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.coverageNote}>
+            Coverage and open gaps will appear after this period is published.
+          </Text>
+        </View>
       ) : !configured ? (
         <EmptyStateCard
           body="Set staffing requirements in Settings on the web to track coverage and open gaps here."
@@ -162,13 +176,13 @@ export function DashboardHeroCard({
         </View>
       ) : null}
       <View style={styles.statRow}>
-        {configured ? (
+        {configured || unpublished ? (
           <>
             <MetricStat
-              label={metrics.openGapCount === 1 ? "open gap" : "open gaps"}
-              onPress={metrics.openGapCount > 0 ? onOpenGaps : undefined}
+              label={!unpublished && metrics.openGapCount === 1 ? "open gap" : "open gaps"}
+              onPress={!unpublished && metrics.openGapCount > 0 ? onOpenGaps : undefined}
               tone="danger"
-              value={metrics.openGapCount}
+              value={unpublished ? null : metrics.openGapCount}
             />
             <View style={styles.statDivider} />
           </>
@@ -201,6 +215,10 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     coverageLabel: {
       ...mobileText.meta,
+      color: mobileColors.textMuted,
+    },
+    coverageNote: {
+      ...mobileText.caption,
       color: mobileColors.textMuted,
     },
     track: {
