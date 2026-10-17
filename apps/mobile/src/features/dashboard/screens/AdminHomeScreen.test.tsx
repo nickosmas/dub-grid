@@ -256,7 +256,7 @@ describe("AdminHomeScreen", () => {
     expect(screen.getByText("my-schedule-card")).toBeInTheDocument();
   });
 
-  it("omits empty summary cards on mobile", () => {
+  it("keeps empty summary cards with their empty states, as on web", () => {
     useBootstrap.mockReturnValue({
       isLoading: false,
       data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
@@ -276,8 +276,10 @@ describe("AdminHomeScreen", () => {
     expect(screen.queryByText("Casey Lee")).not.toBeInTheDocument();
     expect(screen.queryByText("my-schedule-card")).not.toBeInTheDocument();
     expect(screen.queryByText("No coverage to track yet")).not.toBeInTheDocument();
-    expect(screen.queryByText("No open shifts right now")).not.toBeInTheDocument();
-    expect(screen.queryByText("No recent activity")).not.toBeInTheDocument();
+    expect(screen.getByText("No requests are waiting on you")).toBeInTheDocument();
+    expect(screen.getByText("No open shifts right now")).toBeInTheDocument();
+    expect(screen.getByText(/No one is over \d+h this period/)).toBeInTheDocument();
+    expect(screen.getByText("No recent activity")).toBeInTheDocument();
   });
 
   it("shows unpublished draft changes only when the authorized summary is non-zero", () => {

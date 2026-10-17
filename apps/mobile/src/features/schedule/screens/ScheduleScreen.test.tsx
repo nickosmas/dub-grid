@@ -2371,14 +2371,27 @@ describe("ScheduleScreen", () => {
     expect(screen.getByLabelText("Job Lead")).toBeInTheDocument();
   });
 
-  it("does not render the open shifts section when there are no open items", () => {
+  it("keeps the open shifts section with an empty state when there are no open items", () => {
     shiftRequests = shiftRequests.filter((request) => request.type !== "pickup");
     openShifts = [];
 
     render(<HomeScheduleScreen />);
 
-    expect(screen.queryByText("Open shifts")).not.toBeInTheDocument();
+    const section = screen.getByTestId("me-open-shifts-empty");
+    expect(within(section).getByText("Open shifts")).toBeInTheDocument();
+    expect(within(section).getByText("No open shifts")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Open shifts carousel")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Claim" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the cover requests section with an empty state when nothing needs a response", () => {
+    shiftRequests = [];
+
+    render(<HomeScheduleScreen />);
+
+    const section = screen.getByTestId("me-cover-requests-empty");
+    expect(within(section).getByText("Needs your response")).toBeInTheDocument();
+    expect(within(section).getByText("All caught up")).toBeInTheDocument();
   });
 
   it("accepts and declines shift cover requests from Home", async () => {
