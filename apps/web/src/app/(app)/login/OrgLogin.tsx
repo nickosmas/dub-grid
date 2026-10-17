@@ -71,7 +71,7 @@ const LOCKOUT_COPY: Record<OrgLockout, { title: string; body: string }> = {
   },
   deleted: {
     title: "This organization has been deleted",
-    body: "Its subdomain no longer signs anyone in. Contact support if you believe this is a mistake.",
+    body: "Its domain no longer signs anyone in. Contact support if you believe this is a mistake.",
   },
 };
 

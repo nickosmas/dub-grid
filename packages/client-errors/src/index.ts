@@ -173,7 +173,7 @@ export const CLIENT_FRIENDLY_ERROR_PATTERNS: ReadonlyArray<{
   {
     pattern:
       /organization.*not found|could not find organization|no organization matched that slug/i,
-    message: "We couldn't find that organization. Check the subdomain and try again.",
+    message: "We couldn't find that organization. Check the domain and try again.",
   },
   {
     pattern: /email not confirmed/i,

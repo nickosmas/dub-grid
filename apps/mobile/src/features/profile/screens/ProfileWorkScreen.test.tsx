@@ -373,7 +373,7 @@ describe("ProfileWorkScreen", () => {
     // record lives in used to sit above the editable fields, making the first
     // thing on "Profile details" the one thing that isn't a profile detail.
     expect(screen.queryByText("Organization")).not.toBeInTheDocument();
-    expect(screen.queryByText("Subdomain")).not.toBeInTheDocument();
+    expect(screen.queryByText("Domain")).not.toBeInTheDocument();
   });
 
   it("keeps Save disabled (but visible) until a field changes, then saves", async () => {
