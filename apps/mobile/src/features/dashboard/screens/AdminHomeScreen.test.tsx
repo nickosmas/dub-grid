@@ -390,6 +390,63 @@ describe("AdminHomeScreen", () => {
     expect(screen.getByText("my-schedule-card")).toBeInTheDocument();
   });
 
+  it("hides Your schedule for an unpublished period", () => {
+    useBootstrap.mockReturnValue({
+      isLoading: false,
+      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
+    });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: {
+        ...EMPTY_DASHBOARD_DATA,
+        metrics: {
+          ...EMPTY_DASHBOARD_DATA.metrics,
+          coveragePct: null,
+          coverageWindow: "unpublished",
+        },
+      },
+    });
+    useMyScheduleQuery.mockReturnValue({
+      isLoading: false,
+      data: {
+        range: { startDate: "2026-05-11", endDate: "2026-05-17" },
+        entries: [{ id: "shift-1" }],
+      },
+    });
+
+    render(<AdminHomeScreen />);
+
+    expect(screen.queryByText("my-schedule-card")).not.toBeInTheDocument();
+  });
+
+  // Switching periods keeps the previous period's data on screen until the
+  // next one lands. Drawn from it, Your schedule would show and then vanish
+  // when the next period turns out to be unpublished.
+  it("does not draw Your schedule from the previous period while the next one loads", () => {
+    useBootstrap.mockReturnValue({
+      isLoading: false,
+      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
+    });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: EMPTY_DASHBOARD_DATA,
+    });
+    useMyScheduleQuery.mockReturnValue({
+      isLoading: false,
+      isPlaceholderData: true,
+      data: {
+        range: { startDate: "2026-05-11", endDate: "2026-05-17" },
+        entries: [{ id: "shift-1" }],
+      },
+    });
+
+    render(<AdminHomeScreen />);
+
+    expect(screen.queryByText("my-schedule-card")).not.toBeInTheDocument();
+  });
+
   it("navigates to the full personal schedule page when Your schedule is expanded", () => {
     useBootstrap.mockReturnValue({
       isLoading: false,
