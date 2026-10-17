@@ -2,6 +2,8 @@
  * Shared logo renderer for the OG and Twitter images.
  * Uses Satori-compatible inline styles (no Tailwind, no CSS modules).
  */
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import {
   BRAND_SYMBOL_COLORS,
   BRAND_SYMBOL_INK,
@@ -9,30 +11,28 @@ import {
   getBrandSymbolPaths,
 } from "@dubgrid/design-tokens";
 
-// DM Sans (ttf — Satori can't read woff2) for the OG/Twitter wordmark, so the
-// social cards render the wordmark in the brand font instead of a fallback.
-const DM_SANS_TTF = {
-  400: "https://cdn.jsdelivr.net/fontsource/fonts/dm-sans@latest/latin-400-normal.ttf",
-  700: "https://cdn.jsdelivr.net/fontsource/fonts/dm-sans@latest/latin-700-normal.ttf",
+// DM Sans (woff: Satori can't read woff2) for the OG/Twitter wordmark, so the
+// social cards render it in the brand font instead of a fallback. Bundled
+// rather than fetched: a CDN timeout while prerendering these images used to
+// fail the whole build. See assets/fonts/README.md.
+const DM_SANS_FILES = {
+  400: "dm-sans-latin-400-normal.woff",
+  700: "dm-sans-latin-700-normal.woff",
 } as const;
 
 let dmSansFontsPromise: Promise<
-  { name: "DM Sans"; data: ArrayBuffer; weight: 400 | 700; style: "normal" }[]
+  { name: "DM Sans"; data: Buffer; weight: 400 | 700; style: "normal" }[]
 > | null = null;
 
 export function loadDmSansFonts() {
   if (!dmSansFontsPromise) {
     dmSansFontsPromise = Promise.all(
-      ([400, 700] as const).map(async (weight) => {
-        const res = await fetch(DM_SANS_TTF[weight]);
-        if (!res.ok) throw new Error(`DM Sans ${weight} fetch failed: ${res.status}`);
-        return {
-          name: "DM Sans" as const,
-          data: await res.arrayBuffer(),
-          weight,
-          style: "normal" as const,
-        };
-      }),
+      ([400, 700] as const).map(async (weight) => ({
+        name: "DM Sans" as const,
+        data: await readFile(join(process.cwd(), "assets", "fonts", DM_SANS_FILES[weight])),
+        weight,
+        style: "normal" as const,
+      })),
     );
   }
   return dmSansFontsPromise;
