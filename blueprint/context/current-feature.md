@@ -84,7 +84,7 @@ of `yourorg.dubgrid.com`)".
    - Done when no customer-facing string in `apps/web/src` (outside the
      Gridmaster portal), `apps/mobile/src` or `packages/client-errors` says
      "subdomain", and the web and mobile tests pass.
-2. [ ] **Public docs.** Reword the 6 mentions in the 5 docs pages and refresh
+2. [x] **Public docs.** Reword the 6 mentions in the 5 docs pages and refresh
        their evidence fingerprints (`npm run docs:fingerprint`).
    - Done when `grep -ri subdomain docs` finds nothing and
      `npm run docs:check` passes.
