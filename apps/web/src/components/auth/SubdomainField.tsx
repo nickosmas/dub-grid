@@ -43,7 +43,7 @@ export function SubdomainField({
           value={value}
           onChange={(e) => onChange(e.target.value.toLowerCase().replace(/\s/g, ""))}
           placeholder="yourorg"
-          aria-label="Organization subdomain"
+          aria-label="Organization domain"
           aria-invalid={showError}
           aria-describedby={hint ? "organization-subdomain-hint" : undefined}
         />

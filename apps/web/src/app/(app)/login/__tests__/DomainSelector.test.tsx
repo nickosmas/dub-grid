@@ -27,7 +27,7 @@ vi.mock("next-themes", () => ({
 
 function submitSlug(slug: string) {
   act(() => {
-    const input = screen.getByLabelText("Organization subdomain");
+    const input = screen.getByLabelText("Organization domain");
     fireEvent.change(input, { target: { value: slug } });
     fireEvent.submit(input.closest("form")!);
   });
@@ -70,7 +70,7 @@ describe("DomainSelector", () => {
 
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith(
-        "No organization found for that subdomain. Please check and try again.",
+        "No organization found for that domain. Please check and try again.",
         { id: "login-error" },
       );
     });
@@ -90,7 +90,7 @@ describe("DomainSelector", () => {
     submitSlug("gridmaster");
 
     expect(
-      screen.getByText("That subdomain isn't available. Check your organization's URL."),
+      screen.getByText("That domain isn't available. Check it and try again."),
     ).toBeInTheDocument();
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(hrefSetter).not.toHaveBeenCalled();
@@ -162,7 +162,7 @@ describe("DomainSelector", () => {
 
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith(
-        "No organization found for that subdomain. Please check and try again.",
+        "No organization found for that domain. Please check and try again.",
         { id: "login-error" },
       );
     });
@@ -199,7 +199,7 @@ describe("DomainSelector", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockReturnValue(new Promise(() => {}));
 
     render(<DomainSelector />);
-    const input = screen.getByLabelText("Organization subdomain");
+    const input = screen.getByLabelText("Organization domain");
     fireEvent.change(input, { target: { value: "calmhaven" } });
     const form = input.closest("form")!;
     fireEvent.submit(form);

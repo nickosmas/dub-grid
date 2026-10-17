@@ -19,7 +19,7 @@ const pStyle = {
 
 const sectionStyle = { marginBottom: "32px" } as const;
 
-export const TERMS_LAST_UPDATED = "May 2026";
+export const TERMS_LAST_UPDATED = "October 2026";
 
 export default function TermsContent() {
   return (
@@ -59,10 +59,10 @@ export default function TermsContent() {
           jobs, and absence types (for example day, evening, night, PTO), and view shift counts and
           printed schedules. Access to features and data is determined by role (e.g., platform
           administrator, organization admin, scheduler, supervisor, or staff). Each organization
-          uses the Service under a unique subdomain and can only access its own data. The Service is
-          provided &ldquo;as is&rdquo; and is intended for internal scheduling and roster management
-          only; it does not include payroll, time-clock, or HR system integrations unless otherwise
-          stated.
+          uses the Service under its own unique domain and can only access its own data. The Service
+          is provided &ldquo;as is&rdquo; and is intended for internal scheduling and roster
+          management only; it does not include payroll, time-clock, or HR system integrations unless
+          otherwise stated.
         </p>
       </section>
 
@@ -74,8 +74,8 @@ export default function TermsContent() {
           activity that occurs under your account. You must provide accurate and complete
           information when registering or when invited. Access to organization data is granted by
           your organization&apos;s administrators; we do not guarantee that any particular user will
-          have access to any particular feature or dataset. You must use the correct subdomain for
-          your organization to access your organization.
+          have access to any particular feature or dataset. You must use the correct domain for your
+          organization to access your organization.
         </p>
       </section>
 

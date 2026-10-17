@@ -174,7 +174,7 @@ export default function LoginScreen() {
         if (!active) return;
         const nextError = getInlineErrorMessageOrToast(pushToast, {
           error: organizationError,
-          fallbackMessage: "We couldn't find that organization. Check the subdomain and try again.",
+          fallbackMessage: "We couldn't find that organization. Check the domain and try again.",
           preferInlineNetworkError: true,
         });
         setError(nextError);
@@ -310,7 +310,7 @@ export default function LoginScreen() {
     } catch (organizationError) {
       const nextError = getInlineErrorMessageOrToast(pushToast, {
         error: organizationError,
-        fallbackMessage: "We couldn't find that organization. Check the subdomain and try again.",
+        fallbackMessage: "We couldn't find that organization. Check the domain and try again.",
         preferInlineNetworkError: true,
       });
       setError(nextError);
@@ -486,7 +486,7 @@ export default function LoginScreen() {
               Sign in
             </Text>
             <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.subtitle}>
-              Enter the subdomain for your team.
+              Enter your organization's domain.
             </Text>
           </View>
 
@@ -524,7 +524,7 @@ export default function LoginScreen() {
             >
               <Button
                 expanded={showOrgHelp}
-                label="Need help with your subdomain?"
+                label="Need help with your domain?"
                 onPress={() => setShowOrgHelp((current) => !current)}
                 tone="link"
               />
@@ -543,13 +543,13 @@ export default function LoginScreen() {
 
             {showOrgHelp ? (
               <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.helperText}>
-                Your subdomain is the first part of your organization URL - for example, the{" "}
-                <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.helperStrong}>
-                  yourorg
-                </Text>{" "}
-                in{" "}
+                Your organization&apos;s domain is the address you use for DubGrid, such as{" "}
                 <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.helperStrong}>
                   yourorg{orgSuffix}
+                </Text>
+                . Enter the first part,{" "}
+                <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.helperStrong}>
+                  yourorg
                 </Text>
                 .
               </Text>

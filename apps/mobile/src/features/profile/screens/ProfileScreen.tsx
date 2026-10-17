@@ -524,7 +524,7 @@ export default function ProfileScreen() {
               <ProfileInfoRow
                 iconName="compass-outline"
                 isLast
-                label="Subdomain"
+                label="Domain"
                 value={formatProfileValue(profile.currentOrg.slug)}
               />
             </ProfileList>
