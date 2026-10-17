@@ -65,6 +65,43 @@ describe("DashboardHeroCard", () => {
     expect(screen.getByText("pending approvals")).toBeInTheDocument();
   });
 
+  it("says the period is not published and shows no figure or open gaps", () => {
+    render(
+      <DashboardHeroCard
+        metrics={{
+          coveragePct: null,
+          coverageWindow: "unpublished",
+          openGapCount: 0,
+          pendingApprovalsCount: 0,
+          draftSummary: null,
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Not published yet")).toBeInTheDocument();
+    expect(screen.queryByText("Coverage requirements not configured")).not.toBeInTheDocument();
+    expect(screen.queryByText("100%")).not.toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(screen.queryByText("open gaps")).not.toBeInTheDocument();
+  });
+
+  it("qualifies a partly published period's figure", () => {
+    render(
+      <DashboardHeroCard
+        metrics={{
+          coveragePct: 80,
+          coverageWindow: "partial",
+          openGapCount: 1,
+          pendingApprovalsCount: 0,
+          draftSummary: null,
+        }}
+      />,
+    );
+
+    expect(screen.getByText("80%")).toBeInTheDocument();
+    expect(screen.getByText("covered on published dates")).toBeInTheDocument();
+  });
+
   it("previews the first three focus areas above the stats", () => {
     const section = (id: number, name: string) =>
       ({

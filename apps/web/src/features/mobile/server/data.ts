@@ -77,6 +77,7 @@ import type {
   MobileFocusArea,
   MobileNamedItem,
   MobileBootstrapRole,
+  MobileCoverageWindow,
   MobileOpenShift,
   MobilePerson,
   MobileScheduleEntry,
@@ -1244,10 +1245,14 @@ async function buildMobileCoverageEngineInputs(
     }),
   ]);
 
-  const dates = getPublishedMobileDates(
-    getMobileDatesBetween(range.startDate, range.endDate),
-    publishHistory,
-  );
+  const rangeDates = getMobileDatesBetween(range.startDate, range.endDate);
+  const dates = getPublishedMobileDates(rangeDates, publishHistory);
+  const publishedWindow: MobileCoverageWindow =
+    rangeDates.length > 0 && dates.length === 0
+      ? "unpublished"
+      : dates.length < rangeDates.length
+        ? "partial"
+        : "published";
 
   const assignmentIdByPair = new Map(
     context.assignments.flatMap((assignment) =>
@@ -1335,6 +1340,7 @@ async function buildMobileCoverageEngineInputs(
 
   return {
     dates,
+    publishedWindow,
     context,
     scheduleRows,
     assignmentDetailsByPair,
@@ -1613,6 +1619,7 @@ export interface MobileCoverageSummary {
   byFocusArea: CoverageByFocusAreaEntry[];
   dailyByFocusArea: Map<number, CoverageDailyEntry[]>;
   hasCoverageRequirements: boolean;
+  publishedWindow: MobileCoverageWindow;
   scheduleRows: MobilePublishedScheduleRow[];
 }
 
@@ -1642,6 +1649,7 @@ export async function fetchMobileCoverageSummary(
       byFocusArea: [],
       dailyByFocusArea: new Map(),
       hasCoverageRequirements,
+      publishedWindow: inputs.publishedWindow,
       scheduleRows: inputs.scheduleRows,
     };
   }
@@ -1669,6 +1677,7 @@ export async function fetchMobileCoverageSummary(
       ]),
     ),
     hasCoverageRequirements,
+    publishedWindow: inputs.publishedWindow,
     scheduleRows: inputs.scheduleRows,
   };
 }

@@ -796,8 +796,17 @@ export const mobileDashboardDraftSummarySchema = z
     },
   );
 
+// How much of the period is published. Coverage is measured on published
+// dates only, so an unpublished period has nothing to measure.
+export const mobileCoverageWindowSchema = z.enum(["published", "partial", "unpublished"]);
+
 export const mobileDashboardMetricsSchema = z.object({
+  // Null when there is nothing to measure: no coverage requirements, or no
+  // published date in the period (coverageWindow says which).
   coveragePct: z.number().int().nullable(),
+  // Optional so a client keeps parsing a server that predates it; absent
+  // reads as "published".
+  coverageWindow: mobileCoverageWindowSchema.optional(),
   openGapCount: z.number().int(),
   pendingApprovalsCount: z.number().int(),
   // Null is intentional redaction for members without schedule-edit access.
@@ -1340,6 +1349,7 @@ export type MobileShiftRequestHistoryResponse = z.infer<
 >;
 export type MobileOpenShift = z.infer<typeof mobileOpenShiftSchema>;
 export type MobileDashboardResponse = z.infer<typeof mobileDashboardResponseSchema>;
+export type MobileCoverageWindow = z.infer<typeof mobileCoverageWindowSchema>;
 export type MobileNotification = z.infer<typeof mobileNotificationSchema>;
 export type MobileNotificationPriority = z.infer<typeof mobileNotificationPrioritySchema>;
 export type MobileNotificationsQuery = z.infer<typeof mobileNotificationsQuerySchema>;

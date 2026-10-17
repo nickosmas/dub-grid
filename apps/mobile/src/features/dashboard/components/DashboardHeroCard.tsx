@@ -79,9 +79,10 @@ function MetricStat({
  * said the same thing twice, and "See all" opens the full breakdown, but
  * only while there are more focus areas than the card previews.
  *
- * A null percentage means no coverage requirements exist yet. The card then
- * says so in place of the meter and the open-gap count: a zero there would
- * read as fully staffed rather than as nothing to measure.
+ * A null percentage means there is nothing to measure: the period is not
+ * published yet, or no coverage requirements exist. The card then says which
+ * in place of the meter and the open-gap count, as web does: a figure there
+ * would read as fully staffed rather than as nothing to measure.
  */
 export function DashboardHeroCard({
   metrics,
@@ -100,6 +101,7 @@ export function DashboardHeroCard({
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const coverage = metrics.coveragePct;
+  const coverageWindow = metrics.coverageWindow ?? "published";
   const configured = coverage != null;
   const meterColor = configured ? coverageColor(mobileColors, coverage) : mobileColors.textMuted;
   const displayedCoverage = useAnimatedCount(coverage ?? 0);
@@ -109,7 +111,14 @@ export function DashboardHeroCard({
       title="Coverage"
       onOpen={hasMoreDashboardRows(sections.length) ? onOpenCoverage : undefined}
     >
-      {!configured ? (
+      {coverageWindow === "unpublished" ? (
+        <EmptyStateCard
+          body="Coverage and open gaps will appear after this period is published."
+          compact
+          iconName="calendar-outline"
+          title="Not published yet"
+        />
+      ) : !configured ? (
         <EmptyStateCard
           body="Set staffing requirements in Settings on the web to track coverage and open gaps here."
           compact
@@ -127,7 +136,7 @@ export function DashboardHeroCard({
               {displayedCoverage}%
             </Text>
             <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.coverageLabel}>
-              covered
+              {coverageWindow === "partial" ? "covered on published dates" : "covered"}
             </Text>
           </View>
           <View

@@ -1,4 +1,5 @@
 import type {
+  MobileCoverageWindow,
   MobileDashboardResponse,
   MobileOpenShift,
   MobileScheduleRange,
@@ -141,6 +142,8 @@ export type MobileCoverageSummary = {
   byFocusArea: CoverageByFocusAreaEntry[];
   dailyByFocusArea?: ReadonlyMap<number, CoverageDailyEntry[]>;
   hasCoverageRequirements: boolean;
+  // Coverage counts published dates only; with none, its totals are empty.
+  publishedWindow: MobileCoverageWindow;
   // Draft-preferred ("effective") schedule rows for the same org/date range,
   // fetched once as part of the coverage-engine pass. Reused for
   // computeStaffHoursForPeriod below instead of a second, redundant fetch.
@@ -310,6 +313,7 @@ export function buildHeroSummary(input: {
   urgentGapCount: number;
   pendingApprovalsCount: number;
   hasCoverageRequirements: boolean;
+  coverageWindow: MobileCoverageWindow;
 }): MobileDashboardResponse["heroSummary"] {
   // Only high-urgency gaps escalate to the top-priority alert — matching
   // web's hero headline (DashboardView.tsx), where a couple of low-urgency
@@ -326,6 +330,15 @@ export function buildHeroSummary(input: {
       statusLabel: "Approval",
       title: `${input.pendingApprovalsCount} ${input.pendingApprovalsCount === 1 ? "request" : "requests"} awaiting approval`,
       description: "Review pending requests to keep your schedule up to date.",
+    };
+  }
+  if (input.coverageWindow === "unpublished") {
+    return {
+      statusLabel: "Pending publish",
+      title: "This period has not been published yet",
+      description: input.hasCoverageRequirements
+        ? "Coverage and open-gap metrics will appear after the first publish."
+        : "Publish this period so the schedule is visible to your team.",
     };
   }
   if (!input.hasCoverageRequirements) {
@@ -683,6 +696,7 @@ export async function loadMobileDashboardPayload(
     byFocusArea,
     dailyByFocusArea,
     hasCoverageRequirements,
+    publishedWindow,
     scheduleRows,
   } = coverageSummary;
   const openGapCount = openShifts.reduce((sum, shift) => sum + shift.needed, 0);
@@ -690,7 +704,10 @@ export async function loadMobileDashboardPayload(
     (sum, shift) => sum + (shift.urgency === "high" ? shift.needed : 0),
     0,
   );
-  const coveragePct = hasCoverageRequirements ? totals.pct : null;
+  // With no published date the engine measured nothing and reports 100%,
+  // which would read as fully staffed. Web shows a dash there too.
+  const coveragePct =
+    hasCoverageRequirements && publishedWindow !== "unpublished" ? totals.pct : null;
 
   return {
     range,
@@ -699,9 +716,11 @@ export async function loadMobileDashboardPayload(
       urgentGapCount,
       pendingApprovalsCount: pendingApprovalRequests.length,
       hasCoverageRequirements,
+      coverageWindow: publishedWindow,
     }),
     metrics: {
       coveragePct,
+      coverageWindow: publishedWindow,
       openGapCount,
       pendingApprovalsCount: pendingApprovalRequests.length,
       draftSummary: deps.fetchMobileDashboardDraftComparisons

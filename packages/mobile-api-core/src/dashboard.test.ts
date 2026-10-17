@@ -128,6 +128,7 @@ function makeCoverageSummary(
     totals: { totalRequired: 0, totalFilled: 0, pct: 100, openSlots: 0 },
     byFocusArea: [],
     hasCoverageRequirements: false,
+    publishedWindow: "published",
     scheduleRows: [],
     ...overrides,
   };
@@ -489,6 +490,7 @@ describe("buildHeroSummary", () => {
       urgentGapCount: 2,
       pendingApprovalsCount: 3,
       hasCoverageRequirements: true,
+      coverageWindow: "published",
     });
 
     expect(result.title).toBe("2 urgent coverage gaps");
@@ -503,6 +505,7 @@ describe("buildHeroSummary", () => {
       urgentGapCount: 0,
       pendingApprovalsCount: 0,
       hasCoverageRequirements: true,
+      coverageWindow: "published",
     });
 
     expect(result.statusLabel).toBe("Healthy");
@@ -513,6 +516,7 @@ describe("buildHeroSummary", () => {
       urgentGapCount: 0,
       pendingApprovalsCount: 1,
       hasCoverageRequirements: true,
+      coverageWindow: "published",
     });
 
     expect(result.title).toBe("1 request awaiting approval");
@@ -523,9 +527,21 @@ describe("buildHeroSummary", () => {
       urgentGapCount: 0,
       pendingApprovalsCount: 0,
       hasCoverageRequirements: false,
+      coverageWindow: "published",
     });
 
     expect(result.statusLabel).toBe("Setup");
+  });
+
+  it("says an unpublished period is pending publish before asking for setup", () => {
+    const result = buildHeroSummary({
+      urgentGapCount: 0,
+      pendingApprovalsCount: 0,
+      hasCoverageRequirements: false,
+      coverageWindow: "unpublished",
+    });
+
+    expect(result.statusLabel).toBe("Pending publish");
   });
 
   it("reports healthy when there is nothing to flag", () => {
@@ -533,6 +549,7 @@ describe("buildHeroSummary", () => {
       urgentGapCount: 0,
       pendingApprovalsCount: 0,
       hasCoverageRequirements: true,
+      coverageWindow: "published",
     });
 
     expect(result.statusLabel).toBe("Healthy");
@@ -800,6 +817,47 @@ describe("loadMobileDashboardPayload", () => {
 
     expect(payload.metrics.coveragePct).toBeNull();
     expect(payload.heroSummary.statusLabel).toBe("Setup");
+  });
+
+  it("reports no coverage figure for a period with no published date", async () => {
+    const deps = makeDeps();
+    // The engine measured no dates, so its totals read 100%; that is not a
+    // coverage figure, it is the absence of one.
+    deps.fetchMobileCoverageSummary.mockResolvedValue(
+      makeCoverageSummary({ hasCoverageRequirements: true, publishedWindow: "unpublished" }),
+    );
+    const auth = {
+      currentOrg: { id: "org-1" },
+      effectiveRole: "admin",
+      serviceClient: {} as never,
+    };
+
+    const payload = await loadMobileDashboardPayload(auth, range, deps);
+
+    expect(payload.metrics.coveragePct).toBeNull();
+    expect(payload.metrics.coverageWindow).toBe("unpublished");
+    expect(payload.heroSummary.statusLabel).toBe("Pending publish");
+  });
+
+  it("keeps the figure for a partly published period and says so", async () => {
+    const deps = makeDeps();
+    deps.fetchMobileCoverageSummary.mockResolvedValue(
+      makeCoverageSummary({
+        hasCoverageRequirements: true,
+        publishedWindow: "partial",
+        totals: { totalRequired: 10, totalFilled: 8, pct: 80, openSlots: 2 },
+      }),
+    );
+    const auth = {
+      currentOrg: { id: "org-1" },
+      effectiveRole: "admin",
+      serviceClient: {} as never,
+    };
+
+    const payload = await loadMobileDashboardPayload(auth, range, deps);
+
+    expect(payload.metrics.coveragePct).toBe(80);
+    expect(payload.metrics.coverageWindow).toBe("partial");
   });
 });
 

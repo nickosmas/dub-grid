@@ -523,6 +523,7 @@ function createServiceClientForOpenShifts(options?: {
   minStaff?: number;
   shiftRequests?: unknown[];
   scheduleCells?: unknown[];
+  publishHistory?: unknown[];
 }) {
   const assignments = [
     {
@@ -569,7 +570,7 @@ function createServiceClientForOpenShifts(options?: {
     error: null,
   });
   const publishHistoryQuery = createThenableQuery({
-    data: [
+    data: options?.publishHistory ?? [
       {
         published_by: "user-1",
         start_date: "2026-04-16",
@@ -2080,6 +2081,33 @@ describe("fetchMobileCoverageSummary", () => {
 
       expect(summary.totals).toEqual({ totalRequired: 1, totalFilled: 0, pct: 0, openSlots: 1 });
       expect(summary.openShifts).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("says how much of the period is published", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-15T18:00:00.000Z"));
+
+    try {
+      const summarize = (startDate: string, endDate: string, publishHistory?: unknown[]) =>
+        fetchMobileCoverageSummary(createServiceClientForOpenShifts({ publishHistory }) as never, {
+          orgId: "org-1",
+          showAll: true,
+          startDate,
+          endDate,
+          timeZone: "America/Los_Angeles",
+        });
+
+      expect((await summarize("2026-04-16", "2026-04-16")).publishedWindow).toBe("published");
+      expect((await summarize("2026-04-16", "2026-04-17")).publishedWindow).toBe("partial");
+
+      // Nothing published: the engine measures no dates and its totals read
+      // 100%, which is why the window has to travel with them.
+      const unpublished = await summarize("2026-04-16", "2026-04-16", []);
+      expect(unpublished.publishedWindow).toBe("unpublished");
+      expect(unpublished.totals.pct).toBe(100);
     } finally {
       vi.useRealTimers();
     }
