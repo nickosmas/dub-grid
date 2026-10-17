@@ -114,13 +114,11 @@ export function AdminHomeScreen() {
       >
         {contentState.showSkeleton ? (
           <DashboardSkeleton
-            // Until bootstrap resolves the most common shape is the admin one,
-            // and guessing wrong costs one card of silhouette rather than a
-            // layout jump. Your schedule gets no silhouette: whether it shows
-            // turns on the period being published, which nothing knows yet,
-            // and a placeholder that then vanishes reads as the card flashing.
+            // Both default to shown: until bootstrap resolves the most common
+            // shape is the admin one, and guessing wrong costs one card of
+            // silhouette rather than a layout jump.
             showActionQueue={role === undefined || role === "admin"}
-            showMySchedule={false}
+            showMySchedule={!managementOnly}
           />
         ) : null}
       </Screen>
