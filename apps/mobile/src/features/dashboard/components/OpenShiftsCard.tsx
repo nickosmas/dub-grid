@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
-import type { MobileDashboardResponse } from "@dubgrid/contracts";
+import type { MobileCoverageWindow, MobileDashboardResponse } from "@dubgrid/contracts";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { PressableRow } from "../../../shared/components/PressableRow";
@@ -74,13 +74,37 @@ export function OpenShiftRow({ shift }: { shift: OpenShift }) {
   );
 }
 
+// Open shifts count published dates only, so an empty list says which kind
+// of empty it is, in web's words (OpenShiftsCard.tsx).
+export function getOpenShiftsEmptyCopy(coverageWindow: MobileCoverageWindow = "published"): {
+  title: string;
+  body?: string;
+} {
+  if (coverageWindow === "unpublished") {
+    return {
+      title: "Not published yet",
+      body: "Open shifts will appear after this period is published.",
+    };
+  }
+  if (coverageWindow === "partial") {
+    return {
+      title: "No open shifts on published dates",
+      body: "Only published dates are counted here.",
+    };
+  }
+  return { title: "No open shifts right now" };
+}
+
 export function OpenShiftsCard({
   openShifts,
+  coverageWindow,
   onSeeAll,
 }: {
   openShifts: MobileDashboardResponse["openShifts"];
+  coverageWindow?: MobileCoverageWindow;
   onSeeAll?: () => void;
 }) {
+  const emptyCopy = getOpenShiftsEmptyCopy(coverageWindow);
   return (
     <DashboardCard
       title="Open shifts"
@@ -94,7 +118,12 @@ export function OpenShiftsCard({
           renderItem={(shift) => <OpenShiftRow shift={shift} />}
         />
       ) : (
-        <EmptyStateCard compact iconName="checkmark-circle" title="No open shifts right now" />
+        <EmptyStateCard
+          body={emptyCopy.body}
+          compact
+          iconName={coverageWindow === "unpublished" ? "calendar-outline" : "checkmark-circle"}
+          title={emptyCopy.title}
+        />
       )}
     </DashboardCard>
   );

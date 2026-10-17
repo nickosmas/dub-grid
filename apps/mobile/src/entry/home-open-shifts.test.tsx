@@ -78,13 +78,33 @@ describe("OpenShiftsExpandedScreen", () => {
 
   it("shows the empty state when there are no open shifts", () => {
     useExpandedDashboardQuery.mockReturnValue({
-      dashboardQuery: { isLoading: false, isError: false, data: { openShifts: [] } },
+      dashboardQuery: {
+        isLoading: false,
+        isError: false,
+        data: { openShifts: [], metrics: { coverageWindow: "published" } },
+      },
       bootstrapQuery: { isLoading: false, data: {} },
     });
 
     render(<OpenShiftsExpandedScreen />);
 
-    expect(screen.getByText("No open shifts match this filter")).toBeInTheDocument();
+    // No filter is set, so the empty list is not the filter's doing.
+    expect(screen.getByText("No open shifts right now")).toBeInTheDocument();
+  });
+
+  it("says an unpublished period is not published yet", () => {
+    useExpandedDashboardQuery.mockReturnValue({
+      dashboardQuery: {
+        isLoading: false,
+        isError: false,
+        data: { openShifts: [], metrics: { coverageWindow: "unpublished" } },
+      },
+      bootstrapQuery: { isLoading: false, data: {} },
+    });
+
+    render(<OpenShiftsExpandedScreen />);
+
+    expect(screen.getByText("Not published yet")).toBeInTheDocument();
   });
 
   it("filters shifts by urgency via the filter sheet", () => {
