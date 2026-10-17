@@ -270,6 +270,7 @@ export function AdminHomeScreen() {
       key: "open-shifts",
       node: (
         <OpenShiftsCard
+          coverageWindow={data.metrics.coverageWindow}
           openShifts={data.openShifts}
           onSeeAll={openExpanded("/(tabs)/home/open-shifts")}
         />

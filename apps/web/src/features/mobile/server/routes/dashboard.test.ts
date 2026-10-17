@@ -55,6 +55,7 @@ describe("mobile dashboard route", () => {
       totals: { totalRequired: 0, totalFilled: 0, pct: 100, openSlots: 0 },
       byFocusArea: [],
       hasCoverageRequirements: false,
+      publishedWindow: "published",
       scheduleRows: [],
     });
     fetchMobileShiftRequests.mockResolvedValue([]);
@@ -123,6 +124,7 @@ describe("mobile dashboard route", () => {
         { focusAreaId: 1, focusAreaName: "ICU", requiredTotal: 2, filledTotal: 0, pct: 0 },
       ],
       hasCoverageRequirements: false,
+      publishedWindow: "published",
       scheduleRows: [],
     });
 
