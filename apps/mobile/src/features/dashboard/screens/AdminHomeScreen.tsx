@@ -114,11 +114,13 @@ export function AdminHomeScreen() {
       >
         {contentState.showSkeleton ? (
           <DashboardSkeleton
-            // Both default to shown: until bootstrap resolves the most common
-            // shape is the admin one, and guessing wrong costs one card of
-            // silhouette rather than a layout jump.
+            // Until bootstrap resolves the most common shape is the admin one,
+            // and guessing wrong costs one card of silhouette rather than a
+            // layout jump. Your schedule gets no silhouette: whether it shows
+            // turns on the period being published, which nothing knows yet,
+            // and a placeholder that then vanishes reads as the card flashing.
             showActionQueue={role === undefined || role === "admin"}
-            showMySchedule={!managementOnly}
+            showMySchedule={false}
           />
         ) : null}
       </Screen>
@@ -174,6 +176,15 @@ export function AdminHomeScreen() {
   const draftSummary = data.metrics.draftSummary;
   const hasPersonalSchedule =
     Boolean(myScheduleQuery.error) || (myScheduleQuery.data?.entries.length ?? 0) > 0;
+  // Decided only from this period's own data. An unpublished period has no
+  // shifts of yours to show, and while the toggle's next period is still
+  // loading, the previous period's shifts would show and then vanish.
+  const showMySchedule =
+    !managementOnly &&
+    hasPersonalSchedule &&
+    data.metrics.coverageWindow !== "unpublished" &&
+    !myScheduleQuery.isPlaceholderData &&
+    !dashboardQuery.isPlaceholderData;
   // Prefer the linked employee record's name — it's always populated from the
   // employees table. auth user_metadata.first_name (user.firstName) is often
   // empty for invited accounts, and email is the last resort, mirroring web's
@@ -192,7 +203,7 @@ export function AdminHomeScreen() {
   // Your schedule leads when the person has one: the day ahead first, the
   // organisation's coverage second.
   const sections: Array<{ key: string; node: ReactNode }> = [
-    ...(!managementOnly && hasPersonalSchedule
+    ...(showMySchedule
       ? [
           {
             key: "my-schedule",
