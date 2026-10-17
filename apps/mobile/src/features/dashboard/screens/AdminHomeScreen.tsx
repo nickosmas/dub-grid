@@ -174,6 +174,15 @@ export function AdminHomeScreen() {
   const draftSummary = data.metrics.draftSummary;
   const hasPersonalSchedule =
     Boolean(myScheduleQuery.error) || (myScheduleQuery.data?.entries.length ?? 0) > 0;
+  // Decided only from this period's own data. An unpublished period has no
+  // shifts of yours to show, and while the toggle's next period is still
+  // loading, the previous period's shifts would show and then vanish.
+  const showMySchedule =
+    !managementOnly &&
+    hasPersonalSchedule &&
+    data.metrics.coverageWindow !== "unpublished" &&
+    !myScheduleQuery.isPlaceholderData &&
+    !dashboardQuery.isPlaceholderData;
   // Prefer the linked employee record's name — it's always populated from the
   // employees table. auth user_metadata.first_name (user.firstName) is often
   // empty for invited accounts, and email is the last resort, mirroring web's
@@ -192,7 +201,7 @@ export function AdminHomeScreen() {
   // Your schedule leads when the person has one: the day ahead first, the
   // organisation's coverage second.
   const sections: Array<{ key: string; node: ReactNode }> = [
-    ...(!managementOnly && hasPersonalSchedule
+    ...(showMySchedule
       ? [
           {
             key: "my-schedule",
