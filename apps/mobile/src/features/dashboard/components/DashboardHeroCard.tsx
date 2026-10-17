@@ -81,10 +81,10 @@ function MetricStat({
  * only while there are more focus areas than the card previews.
  *
  * A null percentage means there is nothing to measure. For a period not
- * published yet the figures read as dashes with the reason beside them, as
- * web's tiles do; with no coverage requirements the card asks for them in
- * place of the meter and the open-gap count. A figure in either case would
- * read as fully staffed rather than as nothing to measure.
+ * published yet the card says so in place of the meter, as the open shifts
+ * card does, and the open-gap count reads as a dash; with no coverage
+ * requirements the card asks for them in place of both. A figure in either
+ * case would read as fully staffed rather than as nothing to measure.
  */
 export function DashboardHeroCard({
   metrics,
@@ -115,23 +115,12 @@ export function DashboardHeroCard({
       onOpen={hasMoreDashboardRows(sections.length) ? onOpenCoverage : undefined}
     >
       {unpublished ? (
-        <View style={styles.coverage}>
-          <View style={styles.coverageFigureRow}>
-            <Text
-              accessibilityLabel="Coverage not published yet"
-              maxFontSizeMultiplier={MAX_FONT_SCALE}
-              style={styles.coverageFigure}
-            >
-              {"\u2014"}
-            </Text>
-            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.coverageLabel}>
-              not published yet
-            </Text>
-          </View>
-          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.coverageNote}>
-            Coverage and open gaps will appear after this period is published.
-          </Text>
-        </View>
+        <EmptyStateCard
+          body="Coverage and open gaps will appear after this period is published."
+          compact
+          iconName="calendar-outline"
+          title="Not published yet"
+        />
       ) : !configured ? (
         <EmptyStateCard
           body="Set staffing requirements in Settings on the web to track coverage and open gaps here."
@@ -215,10 +204,6 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     coverageLabel: {
       ...mobileText.meta,
-      color: mobileColors.textMuted,
-    },
-    coverageNote: {
-      ...mobileText.caption,
       color: mobileColors.textMuted,
     },
     track: {
