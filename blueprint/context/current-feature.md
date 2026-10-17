@@ -3,7 +3,7 @@
 ## Fix: Call the organization's address its "domain" in customer copy
 
 **Type:** Fix
-**Status:** not started
+**Status:** in progress
 
 ### The problem
 
@@ -38,6 +38,7 @@ Change the customer-facing wording only:
 | Web, check failed                  | Unable to verify that subdomain. Please try again.                          | Unable to verify that domain. Please try again.                                                                                                                                      |
 | Web, not found                     | No organization found for that subdomain. Please check and try again.       | No organization found for that domain. Please check and try again.                                                                                                                   |
 | Web, closed organization           | Its subdomain no longer signs anyone in. ...                                | Its domain no longer signs anyone in. ...                                                                                                                                            |
+| Web help link                      | Need help finding your subdomain?                                           | Need help finding your domain?                                                                                                                                                       |
 | Web help modal title               | How to find your subdomain                                                  | How to find your domain                                                                                                                                                              |
 | Web help modal body                | Your organization subdomain is the first part of your URL (e.g. yourorg...) | Your organization's domain is the address you use for DubGrid, such as **yourorg**.dubgrid.com. Enter the first part. If you don't know it, contact your organization administrator. |
 | Mobile subtitle                    | Enter the subdomain for your team.                                          | Enter your organization's domain.                                                                                                                                                    |
@@ -68,10 +69,13 @@ of `yourorg.dubgrid.com`)".
   sign-in field does next to its suffix. Showing the full address is a
   separate change.
 - **Code comments and test names** that say "subdomain".
+- **Terms of Service and Privacy Policy:** `TermsContent.tsx` and
+  `privacy/page.tsx` say "subdomain". Changing legal text is the owner's call,
+  separate from this fix.
 
 ### Build steps
 
-1. [ ] **Web and mobile copy.** Change the strings in the table in the web
+1. [x] **Web and mobile copy.** Change the strings in the table in the web
        sign-in files, `LoginScreen.tsx`, `ProfileScreen.tsx` and
        `client-errors`, and update the tests that pin them
        (`DomainSelector.test.tsx`, `LoginScreen.test.tsx`,

@@ -138,7 +138,7 @@ describe("LoginScreen", () => {
     await renderLogin();
 
     const primaryAction = screen.getByRole("button", { name: "Continue" });
-    const helpLink = screen.getByRole("button", { name: "Need help with your subdomain?" });
+    const helpLink = screen.getByRole("button", { name: "Need help with your domain?" });
 
     expect(primaryAction.compareDocumentPosition(helpLink)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
@@ -977,7 +977,7 @@ describe("LoginScreen", () => {
 
     expect(
       await screen.findByText(
-        "We couldn't find that organization. Check the subdomain and try again.",
+        "We couldn't find that organization. Check the domain and try again.",
       ),
     ).toBeInTheDocument();
     expect(routerReplace).not.toHaveBeenCalled();

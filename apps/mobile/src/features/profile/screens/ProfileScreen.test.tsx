@@ -421,7 +421,7 @@ describe("ProfileScreen", () => {
     // subdomain. It holds the organization's name again now that the hero has
     // no meta grid to carry it — otherwise the hub would name the organization
     // nowhere for anyone without a second one to switch to.
-    expect(screen.getByText("Subdomain")).toBeInTheDocument();
+    expect(screen.getByText("Domain")).toBeInTheDocument();
     expect(screen.getByText("Name")).toBeInTheDocument();
     // Exactly once, as the section heading. The word used to appear three
     // times: a hero meta label, this heading, and an info row beneath it.
