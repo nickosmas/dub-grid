@@ -187,7 +187,8 @@ export function AdminHomeScreen() {
     router.push({ pathname, params: { periodMode } });
 
   // Keyed so the stagger indexes the cards actually shown; a card that is
-  // absent for this role or period does not leave a gap in the sequence.
+  // absent for this role does not leave a gap in the sequence. As on web, an
+  // empty card stays and says so rather than dropping out of the page.
   // Your schedule leads when the person has one: the day ahead first, the
   // organisation's coverage second.
   const sections: Array<{ key: string; node: ReactNode }> = [
@@ -252,7 +253,7 @@ export function AdminHomeScreen() {
           },
         ]
       : []),
-    ...(role === "admin" && data.actionQueue.length > 0
+    ...(role === "admin"
       ? [
           {
             key: "approvals",
@@ -265,46 +266,31 @@ export function AdminHomeScreen() {
           },
         ]
       : []),
-    ...(data.openShifts.length > 0
-      ? [
-          {
-            key: "open-shifts",
-            node: (
-              <OpenShiftsCard
-                openShifts={data.openShifts}
-                onSeeAll={openExpanded("/(tabs)/home/open-shifts")}
-              />
-            ),
-          },
-        ]
-      : []),
-    ...(data.staffHours.length > 0
-      ? [
-          {
-            key: "staff-hours",
-            node: (
-              <StaffHoursCard
-                entries={data.staffHours}
-                thresholdHours={data.overtimeThresholdHours}
-                onSeeAll={openExpanded("/(tabs)/home/staff-hours")}
-              />
-            ),
-          },
-        ]
-      : []),
-    ...(data.activity.length > 0
-      ? [
-          {
-            key: "activity",
-            node: (
-              <ActivityFeedCard
-                items={data.activity}
-                onSeeAll={openExpanded("/(tabs)/home/activity")}
-              />
-            ),
-          },
-        ]
-      : []),
+    {
+      key: "open-shifts",
+      node: (
+        <OpenShiftsCard
+          openShifts={data.openShifts}
+          onSeeAll={openExpanded("/(tabs)/home/open-shifts")}
+        />
+      ),
+    },
+    {
+      key: "staff-hours",
+      node: (
+        <StaffHoursCard
+          entries={data.staffHours}
+          thresholdHours={data.overtimeThresholdHours}
+          onSeeAll={openExpanded("/(tabs)/home/staff-hours")}
+        />
+      ),
+    },
+    {
+      key: "activity",
+      node: (
+        <ActivityFeedCard items={data.activity} onSeeAll={openExpanded("/(tabs)/home/activity")} />
+      ),
+    },
   ];
 
   return (

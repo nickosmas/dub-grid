@@ -484,7 +484,18 @@ export default function UserDashboard(props: DashboardContentProps) {
             stretch={!stackLayout}
           />
         </div>
-      ) : null}
+      ) : (
+        // The hero looks ahead from today, not at the browsed period, so a past
+        // week with shifts can still have nothing upcoming (the next period is
+        // not published yet). Hold its slot rather than leave a blank column.
+        <HeroEmptyState
+          style={{
+            gridColumn: stackLayout ? undefined : "1",
+            gridRow: stackLayout ? undefined : "1 / span 2",
+            maxWidth: stackLayout ? "none" : `${HERO_MAX_WIDTH}px`,
+          }}
+        />
+      )}
 
       <CoverRequestsSection
         requests={coverRequests}
@@ -1986,6 +1997,36 @@ function ScheduleEmptyState({
         ...style,
       }}
     />
+  );
+}
+
+function HeroEmptyState({ style }: { style?: CSSProperties }) {
+  return (
+    <section
+      className="dg-card"
+      data-testid="user-dashboard-hero-empty"
+      style={{ display: "flex", flexDirection: "column", minWidth: 0, width: "100%", ...style }}
+    >
+      <SectionHeader subtitle="Nothing scheduled from today on" title="Up next" />
+      <div
+        className="dg-card-body"
+        style={{
+          display: "flex",
+          flex: 1,
+          flexDirection: "column",
+          justifyContent: "center",
+          padding: "16px 18px",
+        }}
+      >
+        <EmptyState
+          size="inline"
+          icon={<CalendarDays size={20} />}
+          title="No upcoming shifts"
+          description="Your next shift will show up here once it's published."
+          style={{ flex: 1 }}
+        />
+      </div>
+    </section>
   );
 }
 
