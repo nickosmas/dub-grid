@@ -38,6 +38,7 @@ Change the customer-facing wording only:
 | Web, check failed                  | Unable to verify that subdomain. Please try again.                          | Unable to verify that domain. Please try again.                                                                                                                                      |
 | Web, not found                     | No organization found for that subdomain. Please check and try again.       | No organization found for that domain. Please check and try again.                                                                                                                   |
 | Web, closed organization           | Its subdomain no longer signs anyone in. ...                                | Its domain no longer signs anyone in. ...                                                                                                                                            |
+| Web sign-in description            | Enter your organization's subdomain to sign in.                             | Enter your organization's domain to sign in.                                                                                                                                         |
 | Web help link                      | Need help finding your subdomain?                                           | Need help finding your domain?                                                                                                                                                       |
 | Web help modal title               | How to find your subdomain                                                  | How to find your domain                                                                                                                                                              |
 | Web help modal body                | Your organization subdomain is the first part of your URL (e.g. yourorg...) | Your organization's domain is the address you use for DubGrid, such as **yourorg**.dubgrid.com. Enter the first part. If you don't know it, contact your organization administrator. |
@@ -90,12 +91,15 @@ of `yourorg.dubgrid.com`)".
        `apps/web/src/app/terms/TermsContent.tsx`, "under a unique subdomain"
        becomes "under its own unique domain" and "the correct subdomain"
        becomes "the correct domain". In `apps/web/src/app/privacy/page.tsx`,
-       "subdomain identifier" becomes "domain". Both pages promise to update
-       their "Last updated" date when they change, so `TERMS_LAST_UPDATED` and
-       the Privacy Policy date move to October 2026. `CURRENT_TERMS_VERSION`
-       stays `1.0.0`: the wording is not a material change, and bumping it
-       would make every user accept the Terms again.
-   - Done when neither page says "subdomain", both show October 2026, the
+       "subdomain identifier" becomes "domain". In
+       `apps/web/src/app/cookie-policy/page.tsx`, the `dg-theme` cookie's
+       "your organization's subdomain" becomes "your organization's domain". The
+       Terms and the Privacy Policy promise to update their "Last updated"
+       date when they change, so `TERMS_LAST_UPDATED`, the Privacy Policy
+       date and, for consistency, the Cookie Policy date move to October 2026.
+       `CURRENT_TERMS_VERSION` stays `1.0.0`: the wording is not a material
+       change, and bumping it would make every user accept the Terms again.
+   - Done when none of the three pages says "subdomain", all show October 2026, the
      Terms acceptance card shows the new date, and the web tests and
      `npm run docs:check` pass.
 

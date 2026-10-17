@@ -164,7 +164,7 @@ export default function DomainSelector() {
           </Link>
 
           <p className="dg-auth-selector-description">
-            Enter your organization&apos;s subdomain to sign in.
+            Enter your organization&apos;s domain to sign in.
           </p>
 
           <Form onSubmit={handleContinue} className="dg-auth-form--narrow">

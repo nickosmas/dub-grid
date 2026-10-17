@@ -81,7 +81,7 @@ export default function CookiePolicyPage() {
             marginBottom: "40px",
           }}
         >
-          Last updated: September 2026
+          Last updated: October 2026
         </p>
 
         {/* Introduction */}
@@ -176,7 +176,7 @@ export default function CookiePolicyPage() {
                   </td>
                   <td style={tableCell}>
                     Remembers your appearance preference (light, dark, or follow your device) so it
-                    stays consistent across your organization&apos;s subdomain and the main site.
+                    stays consistent across your organization&apos;s domain and the main site.
                   </td>
                   <td style={tableCell}>1 year</td>
                 </tr>
