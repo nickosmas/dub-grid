@@ -51,7 +51,7 @@ export default function PrivacyPolicyPage() {
             marginBottom: "40px",
           }}
         >
-          Last updated: May 2026
+          Last updated: October 2026
         </p>
 
         <section style={{ marginBottom: "32px" }}>
@@ -138,8 +138,8 @@ export default function PrivacyPolicyPage() {
             </li>
             <li style={{ marginBottom: "8px" }}>
               <strong>Organization data.</strong> For each organization (tenant), we store the
-              organization name, subdomain identifier, and optional contact information such as
-              address and phone number that administrators may configure.
+              organization name, domain, and optional contact information such as address and phone
+              number that administrators may configure.
             </li>
             <li style={{ marginBottom: "8px" }}>
               <strong>Employee roster data.</strong> Organizations use DubGrid to manage staff

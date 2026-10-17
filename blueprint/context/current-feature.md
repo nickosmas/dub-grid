@@ -69,9 +69,6 @@ of `yourorg.dubgrid.com`)".
   sign-in field does next to its suffix. Showing the full address is a
   separate change.
 - **Code comments and test names** that say "subdomain".
-- **Terms of Service and Privacy Policy:** `TermsContent.tsx` and
-  `privacy/page.tsx` say "subdomain". Changing legal text is the owner's call,
-  separate from this fix.
 
 ### Build steps
 
@@ -88,6 +85,19 @@ of `yourorg.dubgrid.com`)".
        their evidence fingerprints (`npm run docs:fingerprint`).
    - Done when `grep -ri subdomain docs` finds nothing and
      `npm run docs:check` passes.
+
+3. [x] **Legal pages.** The owner asked to include them (2026-10-17). In
+       `apps/web/src/app/terms/TermsContent.tsx`, "under a unique subdomain"
+       becomes "under its own unique domain" and "the correct subdomain"
+       becomes "the correct domain". In `apps/web/src/app/privacy/page.tsx`,
+       "subdomain identifier" becomes "domain". Both pages promise to update
+       their "Last updated" date when they change, so `TERMS_LAST_UPDATED` and
+       the Privacy Policy date move to October 2026. `CURRENT_TERMS_VERSION`
+       stays `1.0.0`: the wording is not a material change, and bumping it
+       would make every user accept the Terms again.
+   - Done when neither page says "subdomain", both show October 2026, the
+     Terms acceptance card shows the new date, and the web tests and
+     `npm run docs:check` pass.
 
 ### Verify
 
