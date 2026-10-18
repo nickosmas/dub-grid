@@ -223,17 +223,36 @@ export function formatPublishedMetadata(args: {
   const publishedAt = new Date(publishedAtIso);
   const publishedDateTime = Number.isNaN(publishedAt.getTime())
     ? "Published at an unknown time"
-    : `Published ${publishedAt.toLocaleString(undefined, {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-        timeZoneName: "short",
-        ...(timeZone ? { timeZone } : {}),
-      })}`;
+    : `Published ${publishedAtFormatter(timeZone).format(publishedAt)}`;
   const summary = `${publishedDateTime}${publisherName ? ` by ${publisherName}` : ""}.`;
   return summary;
+}
+
+const PUBLISHED_AT_FORMAT: Intl.DateTimeFormatOptions = {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  timeZoneName: "short",
+};
+
+// Building the formatter is the expensive part of `toLocaleString`, and every
+// published cell on the grid formats a label on each render, so keep one per
+// time zone. The output matches `toLocaleString(undefined, options)`.
+const publishedAtFormatters = new Map<string, Intl.DateTimeFormat>();
+
+export function publishedAtFormatter(timeZone?: string | null): Intl.DateTimeFormat {
+  const key = timeZone || "";
+  let formatter = publishedAtFormatters.get(key);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(
+      undefined,
+      timeZone ? { ...PUBLISHED_AT_FORMAT, timeZone } : PUBLISHED_AT_FORMAT,
+    );
+    publishedAtFormatters.set(key, formatter);
+  }
+  return formatter;
 }
 
 export function timeRangesFromCustomTimes(args: {

@@ -589,6 +589,15 @@ function EmployeeDetailHoverCard({
   );
 }
 
+// Every shift cell renders a hover card, and constructing a formatter per call
+// (what `toLocaleDateString` with options does) was a large share of the grid's
+// render; the label is only built once the card is open.
+const SHIFT_DETAIL_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  weekday: "long",
+  month: "short",
+  day: "numeric",
+});
+
 function ShiftDetailHoverCard({
   enabled,
   employeeName,
@@ -620,11 +629,6 @@ function ShiftDetailHoverCard({
 
   if (!enabled) return children;
 
-  const dateLabel = date.toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-  });
   const trigger = React.cloneElement(children, {
     ref: (node: HTMLDivElement | null) => {
       triggerRef.current = node;
@@ -686,7 +690,7 @@ function ShiftDetailHoverCard({
                   color: "var(--dg-color-text-muted)",
                 }}
               >
-                {dateLabel}
+                {SHIFT_DETAIL_DATE_FORMATTER.format(date)}
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 12 }}>

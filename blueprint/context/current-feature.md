@@ -1,7 +1,7 @@
 # Fix: The Schedule grid's first render does less repeated work
 
 **Type:** Fix
-**Status:** not started
+**Status:** in progress
 
 ### The problem
 
@@ -71,7 +71,7 @@ off-screen rows), bundle size, and the schedule data fetches (PR #153).
 
 ### Build steps
 
-- [ ] **1. Baseline.** Profile and time cold loads of a production build of
+- [x] **1. Baseline.** Profile and time cold loads of a production build of
       `dev` on the realistic local data, as in the problem list.
       _Done when_ the baseline figures are written below.
 - [ ] **2. Cached date formatters (fix 1),** with unit tests in
@@ -102,3 +102,20 @@ off-screen rows), bundle size, and the schedule data fetches (PR #153).
 ### Measurements
 
 _Recorded during step 1 and step 5._
+
+**Baseline** (`dev` at `199fa3c5`, production build with source maps, 39 staff
+and 7,162 cells locally; self time in the first-paint CPU profile of 3 cold
+loads as a scheduler, ms):
+
+| Cost                                     | Run 1 | Run 2 | Run 3 |
+| ---------------------------------------- | ----- | ----- | ----- |
+| Main thread busy                         | 4,242 | 2,719 | 5,217 |
+| `ShiftDetailHoverCard`                   | 537   | 306   | 604   |
+| `formatPublishedMetadata`                | 423   | 313   | 456   |
+| `getBoundingClientRect` (forced layout)  | 356   | 185   | 412   |
+| `getPropertyValue` (style recalculation) | 168   | 73    | 176   |
+| `ScrollableTabs`                         | 238   | 76    | 193   |
+
+Cold-load medians of 5 to the grid: scheduler 3,782 ms, staff 5,418 ms
+(samples 3.2 to 5.9 s on a shared machine, so the profile figures are the
+steadier measure).
