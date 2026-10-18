@@ -6,6 +6,7 @@ import { render } from "@react-email/components";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { sanitizeHeaderValue, emailBaseUrl } from "@/lib/email";
 import { TrialWelcomeEmail } from "@/emails/TrialWelcomeEmail";
+import { formatEmailDate } from "@/emails/email-time";
 import { sendResendEmail } from "@/lib/resend";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
@@ -23,22 +24,20 @@ type TrialWelcomeState = {
   trialGraceDays: number;
 };
 
-function formatTrialEndDate(value: string | null): string {
-  if (!value) return "soon";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "soon";
-  return date.toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
+function formatTrialEndDate(value: string | null, timeZone: string | null): string {
+  if (!value || Number.isNaN(new Date(value).getTime())) return "soon";
+  return formatEmailDate(value, timeZone);
 }
 
-function buildTrialStartedEmail(orgName: string, trialEndsAt: string | null): Promise<string> {
+function buildTrialStartedEmail(
+  orgName: string,
+  trialEndsAt: string | null,
+  timeZone: string | null,
+): Promise<string> {
   return render(
     createElement(TrialWelcomeEmail, {
       orgName,
-      trialEndDate: formatTrialEndDate(trialEndsAt),
+      trialEndDate: formatTrialEndDate(trialEndsAt, timeZone),
       logoUrl: emailBaseUrl(),
     }),
   );
@@ -79,7 +78,7 @@ export async function GET(req: NextRequest) {
   const { data: org, error } = await service
     .from("organizations")
     .select(
-      `name, subscription_status, trial_ends_at, trial_welcome_email_sent_at, trial_welcome_seen_at, ${BILLING_POLICY_OVERRIDE_SELECT}`,
+      `name, timezone, subscription_status, trial_ends_at, trial_welcome_email_sent_at, trial_welcome_seen_at, ${BILLING_POLICY_OVERRIDE_SELECT}`,
     )
     .eq("id", orgId)
     .maybeSingle();
@@ -123,7 +122,7 @@ export async function GET(req: NextRequest) {
             from: fromEmail,
             to: user.email,
             subject: sanitizeHeaderValue(`Your DubGrid trial for ${org.name} has started`),
-            html: await buildTrialStartedEmail(org.name, org.trial_ends_at),
+            html: await buildTrialStartedEmail(org.name, org.trial_ends_at, org.timezone ?? null),
           });
         } catch (err) {
           // Roll the claim back (only if it's still ours) so a retry can send.

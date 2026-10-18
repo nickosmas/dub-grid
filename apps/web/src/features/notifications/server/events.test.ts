@@ -317,7 +317,20 @@ describe("dispatchNotificationEvent", () => {
 
   // ── Security (account-level) ──────────────────────────────────────────
 
+  function mockOrgTimeZone(timezone: string | null) {
+    fromMock.mockImplementation((table: string) => {
+      if (table !== "organizations") throw new Error(`unexpected table ${table}`);
+      const builder = {
+        select: vi.fn(() => builder),
+        eq: vi.fn(() => builder),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { timezone } }),
+      };
+      return builder;
+    });
+  }
+
   it("dispatches security_new_device with writeInApp:false (email + push only)", async () => {
+    mockOrgTimeZone("Africa/Nairobi");
     await dispatchNotificationEvent("user-1", {
       action: "security_new_device",
       orgId: "org-1",
@@ -337,8 +350,8 @@ describe("dispatchNotificationEvent", () => {
       "org-1",
       "security_new_device",
       "New sign-in to your DubGrid account",
-      // Where and when, stated outright, so the reader can tell whether it was them.
-      "There was a new sign-in to your DubGrid account on Pixel 8 (iOS device), near Nairobi, Kenya, on September 24, 2026 at 21:42 UTC. If this wasn't you, change your password, review your active sessions, and contact support@dubgrid.com.",
+      // Where and when, in the organization's zone, so the reader can tell whether it was them.
+      "There was a new sign-in to your DubGrid account on Pixel 8 (iOS device), near Nairobi, Kenya, on September 25, 2026 at 12:42 AM GMT+3. If this wasn't you, change your password, review your active sessions, and contact support@dubgrid.com.",
       expect.objectContaining({
         platform: "ios",
         deviceLabel: "Pixel 8",
@@ -367,7 +380,7 @@ describe("dispatchNotificationEvent", () => {
     const options = vi.mocked(sendNotification).mock.calls[0]?.[6];
     expect(options?.email?.details).toEqual([
       { label: "App", value: "Web" },
-      { label: "Time", value: "September 26, 2026 at 08:01 UTC" },
+      { label: "Time", value: "September 26, 2026 at 8:01 AM UTC" },
       { label: "Approximate location", value: "Kakamega, Kenya" },
       { label: "Device", value: "Chrome on Macintosh" },
     ]);
