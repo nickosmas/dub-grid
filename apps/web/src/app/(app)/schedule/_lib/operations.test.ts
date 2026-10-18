@@ -2,8 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   buildEmployeeNameById,
   daysBetweenDateKeys,
+  fetchWindowContains,
   formatImportPreviousSkipDescription,
+  getFirstPaintRange,
+  getFullFetchWindow,
+  getInitialFetchWindow,
   getSkipReasonLabel,
+  mergeLoadedWindows,
   summarizeImportPreviousOutcomes,
   widenFetchWindow,
 } from "./operations";
@@ -254,5 +259,132 @@ describe("daysBetweenDateKeys", () => {
 
   it("handles a span crossing a non-leap-year February", () => {
     expect(daysBetweenDateKeys("2026-02-01", "2026-03-01")).toBe(28);
+  });
+});
+
+describe("getInitialFetchWindow", () => {
+  it("covers a two-week view and a week either side", () => {
+    expect(getInitialFetchWindow({ startDateKey: "2026-10-12", endDateKey: "2026-10-25" })).toEqual(
+      { start: "2026-10-05", end: "2026-11-01" },
+    );
+  });
+
+  it("covers a one-week view and a week either side", () => {
+    expect(getInitialFetchWindow({ startDateKey: "2026-10-12", endDateKey: "2026-10-18" })).toEqual(
+      { start: "2026-10-05", end: "2026-10-25" },
+    );
+  });
+
+  it("covers a month view across a year boundary", () => {
+    expect(getInitialFetchWindow({ startDateKey: "2026-12-01", endDateKey: "2026-12-31" })).toEqual(
+      { start: "2026-11-24", end: "2027-01-07" },
+    );
+  });
+});
+
+describe("getFirstPaintRange", () => {
+  it("reaches back to where pay-period alignment will move the start", () => {
+    // A Wednesday pay period puts the period holding Sunday 2026-10-11 at 2026-09-30.
+    const range = getFirstPaintRange(
+      { startDateKey: "2026-10-11", endDateKey: "2026-10-24" },
+      "2026-09-30",
+    );
+    expect(range).toEqual({ startDateKey: "2026-09-30", endDateKey: "2026-10-24" });
+    const loaded = getInitialFetchWindow(range);
+    expect(loaded).toEqual({ start: "2026-09-23", end: "2026-10-31" });
+    expect(fetchWindowContains(loaded, { start: "2026-09-30", end: "2026-10-13" })).toBe(true);
+  });
+
+  it("keeps the visible start when alignment does not move it", () => {
+    expect(
+      getFirstPaintRange({ startDateKey: "2026-10-12", endDateKey: "2026-10-25" }, "2026-10-12"),
+    ).toEqual({ startDateKey: "2026-10-12", endDateKey: "2026-10-25" });
+  });
+});
+
+describe("getFullFetchWindow", () => {
+  const defaultWindow = { start: "2026-07-19", end: "2027-01-15" };
+
+  it("widens a first window near today to the default band", () => {
+    expect(
+      getFullFetchWindow({ start: "2026-10-05", end: "2026-11-01" }, defaultWindow, {
+        startDateKey: "2026-10-12",
+        endDateKey: "2026-10-25",
+      }),
+    ).toEqual(defaultWindow);
+  });
+
+  it("keeps a deep-linked window that sits just past the band", () => {
+    expect(
+      getFullFetchWindow({ start: "2027-01-25", end: "2027-02-21" }, defaultWindow, {
+        startDateKey: "2027-02-01",
+        endDateKey: "2027-02-14",
+      }),
+    ).toEqual({ start: "2026-07-19", end: "2027-02-21" });
+  });
+
+  it("recenters on the view when a deep link is too far from today", () => {
+    const full = getFullFetchWindow({ start: "2027-09-06", end: "2027-10-03" }, defaultWindow, {
+      startDateKey: "2027-09-13",
+      endDateKey: "2027-09-26",
+    });
+    expect(full).toEqual({ start: "2027-06-15", end: "2027-12-25" });
+    expect(daysBetweenDateKeys(full.start, full.end)).toBeLessThanOrEqual(300);
+  });
+});
+
+describe("fetchWindowContains", () => {
+  const outer = { start: "2026-10-01", end: "2026-10-31" };
+
+  it("holds for an equal or inner window", () => {
+    expect(fetchWindowContains(outer, outer)).toBe(true);
+    expect(fetchWindowContains(outer, { start: "2026-10-05", end: "2026-10-20" })).toBe(true);
+  });
+
+  it("fails when either edge is outside", () => {
+    expect(fetchWindowContains(outer, { start: "2026-09-30", end: "2026-10-20" })).toBe(false);
+    expect(fetchWindowContains(outer, { start: "2026-10-05", end: "2026-11-01" })).toBe(false);
+  });
+});
+
+describe("mergeLoadedWindows", () => {
+  const full = { start: "2026-07-19", end: "2027-01-15" };
+  const narrow = { start: "2026-10-05", end: "2026-11-01" };
+
+  it("takes the fetched window when it holds the latest one", () => {
+    expect(mergeLoadedWindows(narrow, full)).toEqual(full);
+  });
+
+  it("keeps a window that grew while a narrower fetch was in flight", () => {
+    expect(mergeLoadedWindows(full, narrow)).toEqual(full);
+  });
+
+  it("joins overlapping windows", () => {
+    expect(
+      mergeLoadedWindows(
+        { start: "2026-10-01", end: "2026-12-31" },
+        { start: "2026-12-01", end: "2027-02-28" },
+      ),
+    ).toEqual({ start: "2026-10-01", end: "2027-02-28" });
+  });
+
+  it("joins windows that meet on adjacent days", () => {
+    expect(
+      mergeLoadedWindows(
+        { start: "2026-10-01", end: "2026-10-31" },
+        { start: "2026-11-01", end: "2026-11-30" },
+      ),
+    ).toEqual({ start: "2026-10-01", end: "2026-11-30" });
+  });
+
+  it("keeps the latest window when the fetch is for somewhere it has left", () => {
+    const recentered = { start: "2027-06-01", end: "2027-12-31" };
+    expect(mergeLoadedWindows(recentered, narrow)).toEqual(recentered);
+  });
+
+  it("keeps the latest window when joining would pass the recenter threshold", () => {
+    const latest = { start: "2026-01-01", end: "2026-09-30" };
+    const fetched = { start: "2026-09-01", end: "2027-01-31" };
+    expect(mergeLoadedWindows(latest, fetched)).toEqual(latest);
   });
 });

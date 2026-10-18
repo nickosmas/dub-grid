@@ -8,6 +8,7 @@ import {
   markLocalWrite,
   reconcileFetchedWindow,
   removeScheduleNotesForCell,
+  replaceWithinWindow,
   scheduleNoteKey,
 } from "./schedule-window";
 
@@ -355,5 +356,48 @@ describe("reconcileFetchedWindow", () => {
     expect("emp-2_2026-08-03" in result.shifts).toBe(false);
     expect(result.notes["emp-2_2026-08-03_5"]).toBeUndefined();
     expect(result.shifts["emp-1_2026-08-03"]).toBe(stale);
+  });
+});
+
+describe("replaceWithinWindow", () => {
+  const window = { start: "2026-10-05", end: "2026-11-01" };
+  const emp = "3f2b8c1e-0000-4000-8000-000000000001";
+
+  it("keeps cells outside the fetched window", () => {
+    const current = {
+      [`${emp}_2026-09-20`]: "before",
+      [`${emp}_2026-10-10`]: "stale",
+      [`${emp}_2026-12-01`]: "after",
+    };
+    const fetched = { [`${emp}_2026-10-10`]: "fresh" };
+    expect(replaceWithinWindow(current, fetched, window)).toEqual({
+      [`${emp}_2026-09-20`]: "before",
+      [`${emp}_2026-10-10`]: "fresh",
+      [`${emp}_2026-12-01`]: "after",
+    });
+  });
+
+  it("drops a cell inside the window that the fetch no longer has", () => {
+    const current = { [`${emp}_2026-10-10`]: "deleted on the server" };
+    expect(replaceWithinWindow(current, {}, window)).toEqual({});
+  });
+
+  it("treats both window edges as inside", () => {
+    const current = { [`${emp}_2026-10-05`]: "start", [`${emp}_2026-11-01`]: "end" };
+    expect(replaceWithinWindow(current, {}, window)).toEqual({});
+  });
+
+  it("reads the date from a note key that carries a focus area", () => {
+    const current = {
+      [`${emp}_2026-09-20_4`]: ["outside"],
+      [`${emp}_2026-10-10_4`]: ["inside"],
+    };
+    expect(replaceWithinWindow(current, {}, window)).toEqual({
+      [`${emp}_2026-09-20_4`]: ["outside"],
+    });
+  });
+
+  it("replaces a key without a date, as a full replace did", () => {
+    expect(replaceWithinWindow({ unexpected: 1 }, {}, window)).toEqual({});
   });
 });

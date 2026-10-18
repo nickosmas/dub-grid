@@ -154,6 +154,30 @@ export function indicatorIdsInNotes(
   return ids;
 }
 
+const KEY_DATE = /_(\d{4}-\d{2}-\d{2})(?=_|$)/;
+
+/**
+ * `fetched` in place of `current` for the dates `fetchedWindow` covers, with
+ * `current` kept outside it. A fetch speaks only for the window it was made for,
+ * and the loaded window can grow while it is in flight (the cold load's widen,
+ * the window sync). Replacing the whole map then emptied weeks still marked as
+ * loaded, and a diff against it read every one of their cells as deleted.
+ * Shift keys (`empId_date`) and note keys (`empId_date[_focusAreaId]`) both
+ * carry the date; a key without one counts as inside, as a full replace did.
+ */
+export function replaceWithinWindow<Value>(
+  current: Record<string, Value>,
+  fetched: Record<string, Value>,
+  fetchedWindow: { start: string; end: string },
+): Record<string, Value> {
+  const merged: Record<string, Value> = {};
+  for (const [key, value] of Object.entries(current)) {
+    const date = KEY_DATE.exec(key)?.[1];
+    if (date && (date < fetchedWindow.start || date > fetchedWindow.end)) merged[key] = value;
+  }
+  return Object.assign(merged, fetched);
+}
+
 /**
  * The cells this tab has written, each stamped with the generation it was
  * written at. A fetch that began before a write can resolve after it with the
