@@ -35,6 +35,7 @@ import {
 } from "@/lib/colors";
 import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
 import { MaybeHint } from "@/components/ui/hint";
+import { printFontSizeLabel } from "@/components/print-font-sizes";
 
 const MONTH_NAMES = [
   "January",
@@ -318,8 +319,12 @@ function PrintSection({
 
   if (employees.length === 0) return null;
 
-  // em-based name column; day columns fill the rest equally
-  const nameColEm = 16;
+  // em-based name column; day columns fill the rest equally. A month leaves
+  // each day about 1/31 of the page, so it narrows the name column and the
+  // badge insets, which would otherwise clip the shift code at larger sizes.
+  const isDense = dates.length > 14;
+  const nameColEm = isDense ? 12 : 16;
+  const cellInsetX = isDense ? "0.12em" : "0.5em";
 
   const cellH = `${fontSize * 3.4}px`;
   const tallyH = `${fontSize * 2.8}px`;
@@ -398,7 +403,7 @@ function PrintSection({
                       letterSpacing: "0.05em",
                     }}
                   >
-                    {DAY_LABELS[date.getDay()]}
+                    {isDense ? DAY_LABELS[date.getDay()].slice(0, 2) : DAY_LABELS[date.getDay()]}
                   </div>
                   <div
                     style={{
@@ -611,9 +616,9 @@ function PrintSection({
                                   style={{
                                     position: "absolute",
                                     top: customTimes ? "0.25em" : "0.5em",
-                                    right: "0.5em",
+                                    right: cellInsetX,
                                     bottom: customTimes ? "0.25em" : "0.5em",
-                                    left: "0.5em",
+                                    left: cellInsetX,
                                     background: isCross ? "#ffffff" : style.color,
                                     border: `1px solid ${borderColor(singleForegroundColor)}`,
                                     borderRadius: "var(--dg-radius-xs)",
@@ -623,7 +628,7 @@ function PrintSection({
                                     alignItems: "center",
                                     justifyContent: "center",
                                     overflow: "hidden",
-                                    padding: isNameMode ? "2px 4px" : "2px 3px",
+                                    padding: isDense ? "1px" : isNameMode ? "2px 4px" : "2px 3px",
                                     paddingLeft: singleCrossFocusPill
                                       ? isNameMode
                                         ? "1.75em"
@@ -749,9 +754,9 @@ function PrintSection({
                                 style={{
                                   position: "absolute",
                                   top: "0.25em",
-                                  right: "0.5em",
+                                  right: cellInsetX,
                                   bottom: "0.25em",
-                                  left: "0.5em",
+                                  left: cellInsetX,
                                   display: "flex",
                                   flexDirection: "row",
                                   gap: "0.15em",
@@ -1142,8 +1147,9 @@ export default function PrintScheduleView({
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
-    @page { size: A3 landscape; margin: 0.5in; }
+    @page { size: landscape; margin: 0.5in; }
     html, body { margin: 0; padding: 0; background: #fff; font-family: 'Inter', system-ui, -apple-system, sans-serif; font-variant-numeric: tabular-nums; }
+    .print-schedule-content { padding: 0 !important; box-shadow: none !important; border-radius: 0 !important; }
   </style>
 </head><body>${contentEl.outerHTML}</body></html>`);
 
@@ -1239,8 +1245,7 @@ export default function PrintScheduleView({
               color: "#4D6080",
             }}
           >
-            {fontSize <= 7 ? "Small" : fontSize >= 9 ? "Large" : "Medium"} ·{" "}
-            {spanWeeks === "month" ? "Month" : `${spanWeeks}W`} ·{" "}
+            {printFontSizeLabel(fontSize)} · {spanWeeks === "month" ? "Month" : `${spanWeeks}W`} ·{" "}
             {selectedWings.length === focusAreas.length
               ? `All ${focusAreaLabel.toLowerCase()}`
               : selectedWings.join(", ")}
@@ -1310,9 +1315,9 @@ export default function PrintScheduleView({
               <div style={{ marginBottom: "0.7em" }}>
                 <PrintBrandLockup
                   orgName={orgName}
-                  wordmarkSize={17}
-                  separatorHeight={16}
-                  orgFontSize={11}
+                  wordmarkSize={fontSize * 1.6}
+                  separatorHeight={fontSize * 1.45}
+                  orgFontSize={fontSize}
                 />
               </div>
 

@@ -16,7 +16,7 @@ import { SelectableTag } from "@/components/ui/selectable-tag";
 import { StatusPill } from "@/components/ui/status-pill";
 import { SectionCard } from "./shared";
 import { getAdaptiveSettingsTableLayout } from "./settings-table-layout";
-import { useSmoothReorder } from "./useSmoothReorder";
+import { useSmoothReorder } from "@/hooks/useSmoothReorder";
 import type { DependencyInfo } from "@/features/settings/client";
 import {
   getCodeError,
@@ -190,7 +190,6 @@ export default function StringListSettings({
     enabled: isEditing,
     getId: useCallback((item: NamedItem) => item.id, []),
     onReorder: handleReorder,
-    fallbackHeight: 54,
   });
 
   const handleEnterEdit = () => {

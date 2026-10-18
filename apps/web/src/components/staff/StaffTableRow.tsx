@@ -1,7 +1,8 @@
 "use client";
 import { ChevronRight } from "lucide-react";
 
-import { useCallback, useId, type CSSProperties, type ReactNode } from "react";
+import { useId, type CSSProperties, type ReactNode } from "react";
+import type { ReorderHandleProps } from "@/hooks/useSmoothReorder";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { Employee, FocusArea, NamedItem, Invitation, OrganizationRole } from "@/types";
@@ -109,13 +110,13 @@ interface StaffRowSharedProps {
 interface StaffTableRowProps extends StaffRowSharedProps {}
 
 interface StaffReorderListRowProps extends StaffRowSharedProps {
-  onRowRef?: (employeeId: string, node: HTMLDivElement | null) => void;
+  onRowRef?: (node: HTMLDivElement | null) => void;
   dragOffsetY?: number;
-  dragPhase?: "dragging" | "settling";
-  onReorderPointerDown?: (event: React.PointerEvent<HTMLDivElement>, idx: number) => void;
-  onReorderPointerMove?: (event: React.PointerEvent<HTMLDivElement>) => void;
-  onReorderPointerEnd?: (event: React.PointerEvent<HTMLDivElement>) => void;
-  onReorderPointerCancel?: (event: React.PointerEvent<HTMLDivElement>) => void;
+  dragPhase?: "dragging" | "snap" | "settling";
+  /** Another row is stepping aside for the one being dragged. */
+  isMoving?: boolean;
+  /** The whole row is the drag handle while reordering. */
+  reorderHandleProps?: ReorderHandleProps;
 }
 
 interface StaffRowCellsProps extends StaffRowSharedProps {
@@ -507,42 +508,29 @@ export function StaffReorderListRow({
   emp,
   globalIndex,
   isDragging,
+  isMoving,
   isExpanded,
   isReordering,
   canManageEmployees,
   onRowRef,
   dragOffsetY = 0,
   dragPhase,
-  onReorderPointerDown,
-  onReorderPointerMove,
-  onReorderPointerEnd,
-  onReorderPointerCancel,
+  reorderHandleProps,
   ...props
 }: StaffReorderListRowProps) {
-  const setRowRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      onRowRef?.(emp.id, node);
-    },
-    [emp.id, onRowRef],
-  );
   const rowStyle = {
-    transform: `translate3d(0, ${dragOffsetY}px, 0)`,
+    "--dg-staff-reorder-offset": `${dragOffsetY}px`,
   } as CSSProperties;
 
   return (
     <div
-      ref={setRowRef}
+      ref={onRowRef}
       className="dg-staff-directory-row"
       data-dragging={isDragging ? "true" : undefined}
-      data-drag-phase={isDragging ? dragPhase : undefined}
-      data-moving={!isDragging && dragOffsetY !== 0 ? "true" : undefined}
+      data-drag-phase={dragPhase}
+      data-moving={isMoving ? "true" : undefined}
       draggable={false}
-      onPointerDown={
-        onReorderPointerDown ? (event) => onReorderPointerDown(event, globalIndex) : undefined
-      }
-      onPointerMove={onReorderPointerMove}
-      onPointerUp={onReorderPointerEnd}
-      onPointerCancel={onReorderPointerCancel}
+      {...reorderHandleProps}
       style={rowStyle}
     >
       <StaffRowCells

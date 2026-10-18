@@ -128,4 +128,17 @@ describe("GET /api/export", () => {
       }),
     ).toBe(false);
   });
+
+  it("refuses a schedule range that is not a calendar date", async () => {
+    const { GET } = await import("./route");
+    const url = new URL("http://localhost/api/export");
+    url.searchParams.set("type", "schedule");
+    url.searchParams.set("orgId", REQUESTED_ORG_ID);
+    url.searchParams.set("startDate", "next week");
+    url.searchParams.set("endDate", "2026-02-30");
+
+    const response = await GET(new NextRequest(url));
+
+    expect(response.status).toBe(400);
+  });
 });

@@ -7,6 +7,7 @@ import { Button } from "@/components/Button";
 import Modal from "@/components/Modal";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
+import { PRINT_FONT_SIZES, type PrintFontSizeKey } from "@/components/print-font-sizes";
 
 export interface PrintConfig {
   fontSize: number;
@@ -22,14 +23,6 @@ interface PrintOptionsModalProps {
   focusAreaLabel?: string;
 }
 
-const FONT_SIZES = [
-  { key: "small", label: "Small", value: 7 },
-  { key: "medium", label: "Medium", value: 9 },
-  { key: "large", label: "Large", value: 11 },
-] as const;
-
-type FontSizeKey = (typeof FONT_SIZES)[number]["key"];
-
 export default function PrintOptionsModal({
   focusAreas,
   currentSpanWeeks,
@@ -41,7 +34,7 @@ export default function PrintOptionsModal({
     focusAreas.map((w) => w.name),
   );
   const [spanWeeks, setSpanWeeks] = useState<1 | 2 | "month">(currentSpanWeeks);
-  const [fontSizeKey, setFontSizeKey] = useState<FontSizeKey>("medium");
+  const [fontSizeKey, setFontSizeKey] = useState<PrintFontSizeKey>("medium");
 
   // Confirming here unmounts this modal and mounts the preview, which is a much
   // larger separate chunk. Fetching it while the user is still choosing options
@@ -78,7 +71,7 @@ export default function PrintOptionsModal({
   }
 
   function handlePrint() {
-    const fontSize = FONT_SIZES.find((f) => f.key === fontSizeKey)!.value;
+    const fontSize = PRINT_FONT_SIZES.find((f) => f.key === fontSizeKey)!.value;
     onPrint({ fontSize, selectedFocusAreas, spanWeeks });
   }
 
@@ -111,7 +104,7 @@ export default function PrintOptionsModal({
         <div className="dg-modal-section">
           <div className="dg-modal-section-label">FONT SIZE</div>
           <div className="dg-span-tabs dg-span-tabs--light" style={{ display: "inline-flex" }}>
-            {FONT_SIZES.map((f) => (
+            {PRINT_FONT_SIZES.map((f) => (
               <Button
                 key={f.key}
                 onClick={() => setFontSizeKey(f.key)}

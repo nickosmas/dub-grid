@@ -8,6 +8,7 @@ import { BILLING_POLICY_OVERRIDE_SELECT, getOrgBillingPolicy } from "@/lib/billi
 import { sendNotification } from "./sender";
 import type { NotificationType } from "@/types";
 import type { NotificationEmailDetail } from "@/emails/NotificationEmail";
+import { formatEmailDate, formatEmailDateTime, resolveEmailTimeZone } from "@/emails/email-time";
 
 export type NotificationEvent =
   | {
@@ -434,20 +435,20 @@ function formatNotificationDateRange(start: string, end: string): string {
   return `${openEnd} \u2013 ${to}`;
 }
 
-function validTimeZone(timeZone: string | null | undefined): string {
-  if (!timeZone) return "UTC";
+/** Never throws: a failed lookup must not cost a security or billing alert its delivery. */
+async function getOrgTimeZone(orgId: string): Promise<string> {
   try {
-    new Intl.DateTimeFormat("en-US", { timeZone });
-    return timeZone;
-  } catch {
+    const db = getServiceClient();
+    const { data } = await db
+      .from("organizations")
+      .select("timezone")
+      .eq("id", orgId)
+      .maybeSingle();
+    return resolveEmailTimeZone(data?.timezone as string | null | undefined);
+  } catch (error) {
+    logger.error({ error, orgId }, "Failed to read organization time zone; using UTC");
     return "UTC";
   }
-}
-
-async function getOrgTimeZone(orgId: string): Promise<string> {
-  const db = getServiceClient();
-  const { data } = await db.from("organizations").select("timezone").eq("id", orgId).maybeSingle();
-  return validTimeZone(data?.timezone as string | null | undefined);
 }
 
 /** The org's time zone and its effective trial grace period, for trial alerts. */
@@ -463,7 +464,7 @@ async function getOrgTrialContext(
   const row = (data ?? null) as Record<string, unknown> | null;
   const { values } = await getOrgBillingPolicy(db, row);
   return {
-    timeZone: validTimeZone(row?.timezone as string | null | undefined),
+    timeZone: resolveEmailTimeZone(row?.timezone as string | null | undefined),
     trialGraceDays: values.trialGraceDays,
   };
 }
@@ -1107,6 +1108,8 @@ async function dispatchNotificationEventInternal(
     // Email + push (which reach out-of-band channels) still fire.
 
     case "security_new_device": {
+      const timeZone = event.orgId ? await getOrgTimeZone(event.orgId) : "UTC";
+      const occurredAt = formatEmailDateTime(event.occurredAt, timeZone);
       const platformLabel = formatPlatformLabel(event.platform);
       const device = event.deviceLabel ? `${event.deviceLabel} (${platformLabel})` : platformLabel;
       const browser = event.browserName ? `, using ${event.browserName}` : "";
@@ -1117,7 +1120,7 @@ async function dispatchNotificationEventInternal(
         event.orgId,
         "security_new_device" as NotificationType,
         "New sign-in to your DubGrid account",
-        `There was a new sign-in to your DubGrid account on ${device}${browser}${near}, on ${formatEventTime(event.occurredAt)}. If this wasn't you, change your password, review your active sessions, and contact support@dubgrid.com.`,
+        `There was a new sign-in to your DubGrid account on ${device}${browser}${near}, on ${occurredAt}. If this wasn't you, change your password, review your active sessions, and contact support@dubgrid.com.`,
         {
           platform: event.platform,
           deviceLabel: event.deviceLabel,
@@ -1132,7 +1135,7 @@ async function dispatchNotificationEventInternal(
           dedupeKey: `security_new_device:${event.supabaseSessionId}`,
           email: {
             intro: "We noticed a new sign-in to your DubGrid account. Here are the details:",
-            details: newSignInDetails(event),
+            details: newSignInDetails(event, occurredAt),
             closing:
               "If it was you, you don't need to do anything. If it wasn't you, change your password, sign out any sessions you don't recognize from your profile, and email support@dubgrid.com so we can help.",
           },
@@ -1208,7 +1211,7 @@ async function dispatchNotificationEventInternal(
             event.orgId,
             "billing_trial_ending_soon" as NotificationType,
             "Your trial ends soon",
-            `Your free trial ends on ${formatTrialDate(event.trialEndsAt, timeZone)}. Add a payment method to keep your organization open.`,
+            `Your free trial ends on ${formatEmailDate(event.trialEndsAt, timeZone)}. Add a payment method to keep your organization open.`,
             {
               trialEndsAt: event.trialEndsAt,
               periodKey: event.periodKey,
@@ -1383,6 +1386,7 @@ const SIGN_IN_APP_LABELS = { web: "Web", ios: "iOS", android: "Android" } as con
 
 function newSignInDetails(
   event: Extract<NotificationEvent, { action: "security_new_device" }>,
+  occurredAt: string,
 ): NotificationEmailDetail[] {
   const place = [event.locationCity, event.locationCountry].filter(Boolean).join(", ");
   const device =
@@ -1391,36 +1395,10 @@ function newSignInDetails(
       : (event.deviceLabel ?? formatPlatformLabel(event.platform));
   return [
     { label: "App", value: SIGN_IN_APP_LABELS[event.platform] },
-    { label: "Time", value: formatEventTime(event.occurredAt) },
+    { label: "Time", value: occurredAt },
     ...(place ? [{ label: "Approximate location", value: place }] : []),
     ...(device ? [{ label: "Device", value: device }] : []),
   ];
-}
-
-/** An explicit, zone-qualified time, since the reader may be anywhere. */
-function formatEventTime(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return `${date.toLocaleString("en-US", {
-    timeZone: "UTC",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  })} UTC`;
-}
-
-function formatTrialDate(iso: string, timeZone: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    timeZone,
-  });
 }
 
 /** Grace still running: say until when. Already past it: say how to reopen. */
@@ -1430,10 +1408,10 @@ export function trialExpiredBody(
   now: Date,
   trialGraceDays: number = TRIAL_GRACE_DAYS,
 ): string {
-  const endedOn = formatTrialDate(trialEndsAt, timeZone);
+  const endedOn = formatEmailDate(trialEndsAt, timeZone);
   const graceEndsAt = new Date(Date.parse(trialEndsAt) + trialGraceDays * 86_400_000);
   if (graceEndsAt.getTime() > now.getTime()) {
-    return `Your free trial ended on ${endedOn}. Add a payment method by ${formatTrialDate(graceEndsAt.toISOString(), timeZone)} to keep your organization open.`;
+    return `Your free trial ended on ${endedOn}. Add a payment method by ${formatEmailDate(graceEndsAt.toISOString(), timeZone)} to keep your organization open.`;
   }
   return `Your free trial ended on ${endedOn}, so your organization is on hold. Add a payment method to reopen it.`;
 }

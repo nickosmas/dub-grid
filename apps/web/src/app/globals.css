@@ -1923,7 +1923,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
    These styles are only for the fallback Ctrl+P case on the main page. */
 @media print {
   @page {
-    size: A3 landscape;
+    size: landscape;
     margin: 0.5in;
   }
   *,
