@@ -362,6 +362,27 @@ describe("dispatchNotificationEvent", () => {
     );
   });
 
+  it("still sends the new sign-in alert, in UTC, when the time zone lookup fails", async () => {
+    fromMock.mockImplementation(() => {
+      throw new Error("database unavailable");
+    });
+    await dispatchNotificationEvent("user-1", {
+      action: "security_new_device",
+      orgId: "org-1",
+      targetUserId: "user-1",
+      supabaseSessionId: "session-9",
+      platform: "web",
+      deviceLabel: null,
+      ipAddress: null,
+      occurredAt: "2026-09-24T21:42:00.000Z",
+    });
+
+    expect(sendNotification).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(sendNotification).mock.calls[0]?.[4]).toContain(
+      "September 24, 2026 at 9:42 PM UTC",
+    );
+  });
+
   it("gives the new sign-in email one labeled line per fact", async () => {
     await dispatchNotificationEvent("user-1", {
       action: "security_new_device",

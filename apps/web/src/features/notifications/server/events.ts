@@ -435,10 +435,20 @@ function formatNotificationDateRange(start: string, end: string): string {
   return `${openEnd} \u2013 ${to}`;
 }
 
+/** Never throws: a failed lookup must not cost a security or billing alert its delivery. */
 async function getOrgTimeZone(orgId: string): Promise<string> {
-  const db = getServiceClient();
-  const { data } = await db.from("organizations").select("timezone").eq("id", orgId).maybeSingle();
-  return resolveEmailTimeZone(data?.timezone as string | null | undefined);
+  try {
+    const db = getServiceClient();
+    const { data } = await db
+      .from("organizations")
+      .select("timezone")
+      .eq("id", orgId)
+      .maybeSingle();
+    return resolveEmailTimeZone(data?.timezone as string | null | undefined);
+  } catch (error) {
+    logger.error({ error, orgId }, "Failed to read organization time zone; using UTC");
+    return "UTC";
+  }
 }
 
 /** The org's time zone and its effective trial grace period, for trial alerts. */
