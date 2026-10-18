@@ -1,7 +1,7 @@
 # Fix: The Schedule page paints quickly on a cold load
 
 **Type:** Fix
-**Status:** in progress
+**Status:** verified
 
 ### The problem
 
@@ -91,7 +91,7 @@ schedule requests into one is also out.
 
 ### Build steps
 
-- [ ] **1. Baseline.** On a local Supabase stack with seed data, record cold-load
+- [x] **1. Baseline.** On a local Supabase stack with seed data, record cold-load
       timings for `/schedule` as a scheduler and as staff: time to the grid,
       number of requests before it, and rows fetched.
       _Done when_ the baseline numbers are written below.
@@ -105,7 +105,7 @@ schedule requests into one is also out.
       _Done when_ a scheduler's cold load issues exactly one cells request
       before the background widen, and the next return visit paints from the
       snapshot.
-- [ ] **4. After.** Repeat the step 1 measurements.
+- [x] **4. After.** Repeat the step 1 measurements.
       _Done when_ before and after are recorded side by side below.
 
 ### Verify
@@ -119,11 +119,56 @@ schedule requests into one is also out.
 
 ### Measurements
 
-_Recorded during step 1 and step 4._ Pending: the local Supabase stack
-cannot start in the cloud session while its network policy refuses the image
-hosts `pkg-containers.githubusercontent.com` and
-`d2glxqk2uabbnd.cloudfront.net`. The step 1 baseline is taken from `dev`
-(before this fix), so it can still be measured afterwards.
-Steps 2 and 3 were approved on unit tests, type-check, lint and build; their
-runtime done-whens (paint before the widen, one cells request, a return
-visit painting from the snapshot) are checked during step 4.
+Measured 2026-10-18 in the cloud session: production builds (`next start`)
+of the base commit (`199fa3c5`) and of this branch, against a local Supabase
+stack seeded as CI does, with a local Upstash-compatible proxy for the rate
+limiter. Each figure is the median of 5 cold loads (a full page load, so the
+React Query cache is empty) by Playwright Chromium, timed from navigation to
+the grid being visible. "150 ms" adds that round trip to every browser
+request through Chromium's network emulation; the server's own trips to
+Supabase stay local.
+
+**Realistic history** (Calm Haven's seeded fortnight repeated across +/-90
+days locally: 39 staff, 7,162 cells):
+
+| Role      | Latency | Before   | After    | Saved          |
+| --------- | ------- | -------- | -------- | -------------- |
+| Scheduler | 0 ms    | 3,756 ms | 2,399 ms | 1,357 ms (36%) |
+| Staff     | 0 ms    | 3,543 ms | 2,649 ms | 894 ms (25%)   |
+| Scheduler | 150 ms  | 3,940 ms | 2,534 ms | 1,406 ms (36%) |
+| Staff     | 150 ms  | 3,800 ms | 2,734 ms | 1,066 ms (28%) |
+
+Before, the grid waited on one cells request of 6,788 cells; after, on one of
+1,050 (2026-10-04 to 2026-10-31), with the +/-90-day widen landing after the
+paint.
+
+**Seed data as shipped** (525 cells, all inside the current fortnight, so both
+fetches return the same cells): no difference beyond noise (before 1.7 to 2.6 s,
+after 1.4 to 2.3 s, single samples up to 5.8 s on the shared machine).
+
+**Return visits** paint from the snapshot in both builds; medians 1.3 to 2.0 s
+before and 1.6 to 1.8 s after, with samples from 0.9 to 3.3 s in both, so
+unchanged within noise.
+
+**Runtime done-whens:** a scheduler's cold load makes exactly one cells
+request before the widen, which covers the default band (2026-07-20 to
+2027-01-16) and lands after the paint; published ranges are fetched once (a
+duplicate this fix introduced was found here and fixed in `6356984a`); a
+local draft shows on the first painted grid for a scheduler and never for
+staff; the publish dialog count matches the banner; paging twelve weeks back
+and forward fills the grid; a return visit paints before its refresh lands.
+
+**Still costly:** once the data lands, the main thread is busy rendering for
+1 to 2 s on this machine (one long task of about 2 s at first paint after,
+about 3.7 s of long tasks before). That is the larger share of what remains
+and is outside this fix.
+
+**Checks:** `npm run type-check` and `npm run lint` pass (2 existing warnings
+in untouched files). `npm run test:web` with the live stack running: 5,602
+pass; the 2 failures are `recovery-assurance.integration.test.ts`, whose
+recovery emails had no SMTP server because the local mail service was left
+out of the stack. The schedule Playwright specs (`schedule.spec.ts`,
+`schedule-states.spec.ts`) pass on Chromium. The first run after a re-seed
+failed once when a success toast covered the Schedule nav link (it showed on
+the first sign-in, most likely a one-time first-login notice); the spec
+passed on three reruns of this branch and once on the base commit.
