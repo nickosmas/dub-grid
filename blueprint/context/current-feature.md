@@ -91,22 +91,22 @@ schedule requests into one is also out.
 
 ### Build steps
 
-1. **Baseline.** On a local Supabase stack with seed data, record cold-load
-   timings for `/schedule` as a scheduler and as staff: time to the grid,
-   number of requests before it, and rows fetched.
-   _Done when_ the baseline numbers are written below.
-2. **Paint from the first window and widen after (fix 1), and stop awaiting
-   publish history (fix 2).** Extract the first-window bounds into a pure
-   helper in `_lib/operations.ts` with unit tests (2-week, 1-week, month,
-   deep-link date, pay-period alignment).
-   _Done when_ the helper tests pass, the grid paints before the ±90-day
-   fetch completes, and the loaded window reaches ±90 days afterwards.
-3. **Wait for permissions and remove the draft refetch (fix 3).**
-   _Done when_ a scheduler's cold load issues exactly one cells request
-   before the background widen, and the next return visit paints from the
-   snapshot.
-4. **After.** Repeat the step 1 measurements.
-   _Done when_ before and after are recorded side by side below.
+- [ ] **1. Baseline.** On a local Supabase stack with seed data, record cold-load
+      timings for `/schedule` as a scheduler and as staff: time to the grid,
+      number of requests before it, and rows fetched.
+      _Done when_ the baseline numbers are written below.
+- [x] **2. Paint from the first window and widen after (fix 1), and stop awaiting
+      publish history (fix 2).** Extract the first-window bounds into a pure
+      helper in `_lib/operations.ts` with unit tests (2-week, 1-week, month,
+      deep-link date, pay-period alignment).
+      _Done when_ the helper tests pass, the grid paints before the ±90-day
+      fetch completes, and the loaded window reaches ±90 days afterwards.
+- [x] **3. Wait for permissions and remove the draft refetch (fix 3).**
+      _Done when_ a scheduler's cold load issues exactly one cells request
+      before the background widen, and the next return visit paints from the
+      snapshot.
+- [ ] **4. After.** Repeat the step 1 measurements.
+      _Done when_ before and after are recorded side by side below.
 
 ### Verify
 
@@ -119,4 +119,11 @@ schedule requests into one is also out.
 
 ### Measurements
 
-_Recorded during step 1 and step 4._
+_Recorded during step 1 and step 4._ Pending: the local Supabase stack
+cannot start in the cloud session while its network policy refuses the image
+hosts `pkg-containers.githubusercontent.com` and
+`d2glxqk2uabbnd.cloudfront.net`. The step 1 baseline is taken from `dev`
+(before this fix), so it can still be measured afterwards.
+Steps 2 and 3 were approved on unit tests, type-check, lint and build; their
+runtime done-whens (paint before the widen, one cells request, a return
+visit painting from the snapshot) are checked during step 4.
