@@ -1,4 +1,5 @@
 import type { ImportPreviousScheduleOutcome } from "@/features/schedule/client";
+import { addDays, formatDateKey } from "@/lib/utils";
 
 export type { ScheduleCellInput } from "@/types";
 
@@ -85,6 +86,106 @@ export function daysBetweenDateKeys(startKey: string, endKey: string): number {
   const start = new Date(`${startKey}T00:00:00`);
   const end = new Date(`${endKey}T00:00:00`);
   return Math.round((end.getTime() - start.getTime()) / 86_400_000);
+}
+
+/**
+ * How long the initial load waits for permissions once org data is ready.
+ * They normally land first, since they load alongside the org data; the cap
+ * keeps a stalled permissions request from holding the grid indefinitely.
+ */
+export const PERMISSIONS_WAIT_MS = 3000;
+
+/**
+ * Days loaded either side of the visible range before the first paint, so the
+ * adjacent-day staffing checks still see their neighbours.
+ */
+export const INITIAL_FETCH_BUFFER_DAYS = 7;
+
+interface DateKeyRange {
+  startDateKey: string;
+  endDateKey: string;
+}
+
+function shiftDateKey(key: string, days: number): string {
+  return formatDateKey(addDays(new Date(`${key}T00:00:00`), days));
+}
+
+/**
+ * The dates the first paint may show: the visible range, reaching back to
+ * `alignedStartKey`, where the pay-period alignment moves the start a render
+ * later. Alignment only ever moves it earlier, by up to 13 days.
+ */
+export function getFirstPaintRange(visible: DateKeyRange, alignedStartKey: string): DateKeyRange {
+  return {
+    startDateKey: alignedStartKey < visible.startDateKey ? alignedStartKey : visible.startDateKey,
+    endDateKey: visible.endDateKey,
+  };
+}
+
+/**
+ * The window a cold load fetches before it paints: the first-paint range and a
+ * small buffer, rather than the whole default band.
+ */
+export function getInitialFetchWindow(range: DateKeyRange): { start: string; end: string } {
+  return {
+    start: shiftDateKey(range.startDateKey, -INITIAL_FETCH_BUFFER_DAYS),
+    end: shiftDateKey(range.endDateKey, INITIAL_FETCH_BUFFER_DAYS),
+  };
+}
+
+export function fetchWindowContains(
+  outer: { start: string; end: string },
+  inner: { start: string; end: string },
+): boolean {
+  return outer.start <= inner.start && inner.end <= outer.end;
+}
+
+/**
+ * The loaded window after a non-recentering fetch of `fetched` lands, when the
+ * window may have moved while it was in flight (`latest`). Overlapping windows
+ * join, unless that would pass the recenter threshold; a fetch for somewhere
+ * the window has since left keeps the window where it now is.
+ */
+export function mergeLoadedWindows(
+  latest: { start: string; end: string },
+  fetched: { start: string; end: string },
+): { start: string; end: string } {
+  if (fetchWindowContains(fetched, latest)) return fetched;
+  const overlaps =
+    daysBetweenDateKeys(fetched.end, latest.start) <= 1 &&
+    daysBetweenDateKeys(latest.end, fetched.start) <= 1;
+  if (!overlaps) return latest;
+  const union = widenFetchWindow(latest.start, latest.end, {
+    ensureStart: fetched.start,
+    ensureEnd: fetched.end,
+  });
+  return daysBetweenDateKeys(union.start, union.end) <= FETCH_WINDOW_RECENTER_THRESHOLD_DAYS
+    ? union
+    : latest;
+}
+
+/**
+ * The window to widen to once the first paint is done: the loaded window and
+ * the default band together. A deep link far from today would make that span
+ * pass the recenter threshold, so it recenters on the visible range instead,
+ * where the window-sync effect would have landed anyway.
+ */
+export function getFullFetchWindow(
+  loaded: { start: string; end: string },
+  defaultWindow: { start: string; end: string },
+  visible: DateKeyRange,
+): { start: string; end: string } {
+  const widened = widenFetchWindow(loaded.start, loaded.end, {
+    ensureStart: defaultWindow.start,
+    ensureEnd: defaultWindow.end,
+  });
+  if (daysBetweenDateKeys(widened.start, widened.end) <= FETCH_WINDOW_RECENTER_THRESHOLD_DAYS) {
+    return widened;
+  }
+  return {
+    start: shiftDateKey(visible.startDateKey, -FETCH_WINDOW_RECENTER_BUFFER_DAYS),
+    end: shiftDateKey(visible.endDateKey, FETCH_WINDOW_RECENTER_BUFFER_DAYS),
+  };
 }
 
 // ── Import Previous Schedule outcome aggregation ────────────────────────────
