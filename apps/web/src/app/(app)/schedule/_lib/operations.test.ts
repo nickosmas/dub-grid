@@ -3,6 +3,8 @@ import {
   buildEmployeeNameById,
   daysBetweenDateKeys,
   formatImportPreviousSkipDescription,
+  getFullFetchWindow,
+  getInitialFetchWindow,
   getSkipReasonLabel,
   summarizeImportPreviousOutcomes,
   widenFetchWindow,
@@ -254,5 +256,62 @@ describe("daysBetweenDateKeys", () => {
 
   it("handles a span crossing a non-leap-year February", () => {
     expect(daysBetweenDateKeys("2026-02-01", "2026-03-01")).toBe(28);
+  });
+});
+
+describe("getInitialFetchWindow", () => {
+  it("covers a two-week view and a week either side", () => {
+    expect(getInitialFetchWindow({ startDateKey: "2026-10-12", endDateKey: "2026-10-25" })).toEqual(
+      { start: "2026-10-05", end: "2026-11-01" },
+    );
+  });
+
+  it("covers a one-week view and a week either side", () => {
+    expect(getInitialFetchWindow({ startDateKey: "2026-10-12", endDateKey: "2026-10-18" })).toEqual(
+      { start: "2026-10-05", end: "2026-10-25" },
+    );
+  });
+
+  it("covers a month view across a year boundary", () => {
+    expect(getInitialFetchWindow({ startDateKey: "2026-12-01", endDateKey: "2026-12-31" })).toEqual(
+      { start: "2026-11-24", end: "2027-01-07" },
+    );
+  });
+
+  it("still contains the view after pay-period alignment moves it back a week", () => {
+    const loaded = getInitialFetchWindow({ startDateKey: "2026-10-12", endDateKey: "2026-10-25" });
+    const aligned = { startDateKey: "2026-10-05", endDateKey: "2026-10-18" };
+    expect(loaded.start <= aligned.startDateKey && aligned.endDateKey <= loaded.end).toBe(true);
+  });
+});
+
+describe("getFullFetchWindow", () => {
+  const defaultWindow = { start: "2026-07-19", end: "2027-01-15" };
+
+  it("widens a first window near today to the default band", () => {
+    expect(
+      getFullFetchWindow({ start: "2026-10-05", end: "2026-11-01" }, defaultWindow, {
+        startDateKey: "2026-10-12",
+        endDateKey: "2026-10-25",
+      }),
+    ).toEqual(defaultWindow);
+  });
+
+  it("keeps a deep-linked window that sits just past the band", () => {
+    expect(
+      getFullFetchWindow({ start: "2027-01-25", end: "2027-02-21" }, defaultWindow, {
+        startDateKey: "2027-02-01",
+        endDateKey: "2027-02-14",
+      }),
+    ).toEqual({ start: "2026-07-19", end: "2027-02-21" });
+  });
+
+  it("recenters on the view when a deep link is too far from today", () => {
+    const full = getFullFetchWindow({ start: "2027-09-06", end: "2027-10-03" }, defaultWindow, {
+      startDateKey: "2027-09-13",
+      endDateKey: "2027-09-26",
+    });
+    expect(full).toEqual({ start: "2027-06-15", end: "2027-12-25" });
+    expect(daysBetweenDateKeys(full.start, full.end)).toBeLessThanOrEqual(300);
   });
 });

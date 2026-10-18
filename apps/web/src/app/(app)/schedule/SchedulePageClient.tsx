@@ -227,6 +227,8 @@ import {
   FETCH_WINDOW_RECENTER_THRESHOLD_DAYS,
   FETCH_WINDOW_RETRY_LIMIT,
   formatImportPreviousSkipDescription,
+  getFullFetchWindow,
+  getInitialFetchWindow,
   OPERATION_MODAL_DISMISS_MS,
   PUBLISH_WINDOW_DATE_FORMATTER,
   SCHEDULE_DELETE_BATCH_SIZE,
@@ -1162,6 +1164,8 @@ function SchedulerContent({
   // fetched inside its own Promise.all (build plan item 28).
   const publishedRangesWindowRef = useRef<string | null>(null);
   const initialLoadUsedEditPerms = useRef(false);
+  const fullWindowLoadedRef = useRef(false);
+  const fullWindowFailuresRef = useRef(0);
   const prevOrgIdRef = useRef<string | null>(null);
   useEffect(() => {
     // Reset load guards when org changes (e.g. org switcher)
@@ -1169,6 +1173,8 @@ function SchedulerContent({
       prevOrgIdRef.current = org.id;
       scheduleLoadStarted.current = false;
       draftCheckStarted.current = false;
+      fullWindowLoadedRef.current = false;
+      fullWindowFailuresRef.current = 0;
       publishedRangesWindowRef.current = null;
       setLoadedShiftWindow({ start: defaultShiftFetchStart, end: defaultShiftFetchEnd });
       setPublicationRangeState(beginPublicationRangeLoad());
@@ -1177,10 +1183,6 @@ function SchedulerContent({
     scheduleLoadStarted.current = true;
     initialLoadUsedEditPerms.current = canEditShifts;
     const orgId = org.id;
-    // Claim this window before the fetch below runs, so the window-change
-    // effect treats the initial load as the fetch for it rather than issuing
-    // a second, identical request on every mount.
-    publishedRangesWindowRef.current = `${orgId}|${defaultShiftFetchStart}|${defaultShiftFetchEnd}`;
 
     // Paint the previous visit's grid immediately while the fetch below
     // refreshes it. Coming back to /schedule otherwise blocked on refetching
@@ -1195,10 +1197,35 @@ function SchedulerContent({
       setPaintedFromSnapshot(true);
     }
 
+    // With nothing painted yet, fetch only what is on screen and paint from
+    // that; the full-window effect below loads the rest afterwards. A painted
+    // snapshot is not waiting on this fetch, so it refreshes the default band.
+    const { start: initialStart, end: initialEnd } = cachedWindow
+      ? { start: defaultShiftFetchStart, end: defaultShiftFetchEnd }
+      : getInitialFetchWindow(publishWindowDateRange);
+    // Claim this window before the fetch below runs, so the window-change
+    // effect treats the initial load as the fetch for it rather than issuing
+    // a second, identical request on every mount.
+    publishedRangesWindowRef.current = `${orgId}|${initialStart}|${initialEnd}`;
+
     async function loadSchedule() {
       try {
         const startedAt = localWrites.current.generation;
-        // Fetch per-user last-viewed timestamp + critical data in parallel
+        const lastViewedPromise = getScheduleLastViewed(orgId).catch(() => null);
+        // Staff always need the current window's chips, including on a first
+        // visit when no last-viewed baseline exists. Publish-capable users keep
+        // the existing acknowledgement/history workflow instead. Nothing on the
+        // first paint needs it, so it runs beside the cells rather than after.
+        const recentPublishesPromise = lastViewedPromise.then((lastViewed) =>
+          fetchRecentPublishHistory(
+            orgId,
+            lastViewed,
+            !canNavigatePublishHistory,
+            !canNavigatePublishHistory
+              ? { startDate: defaultShiftFetchStart, endDate: defaultShiftFetchEnd }
+              : undefined,
+          ).catch(() => [] as PublishHistoryEntry[]),
+        );
         const [
           fetchedShifts,
           noteRows,
@@ -1212,42 +1239,39 @@ function SchedulerContent({
             canEditShifts,
             assignmentLabelMap,
             absenceTypeMap,
-            defaultShiftFetchStart,
-            defaultShiftFetchEnd,
+            initialStart,
+            initialEnd,
             segmentCompatibility,
           ),
-          fetchScheduleNotes(orgId, defaultShiftFetchStart, defaultShiftFetchEnd),
+          fetchScheduleNotes(orgId, initialStart, initialEnd),
           canViewRecurringShifts
             ? fetchRecurringShifts(orgId, undefined, assignmentLabelMap, false, absenceTypeMap)
             : Promise.resolve([] as RecurringShift[]),
-          getScheduleLastViewed(orgId).catch(() => null),
-          fetchCalloffOpenShifts(
-            orgId,
-            defaultShiftFetchStart,
-            defaultShiftFetchEnd,
-            assignmentLabelMap,
-          ).catch((err) => {
-            Sentry.captureException(err, {
-              tags: { component: "calloff_open_shifts" },
-              extra: {
-                context: "schedule.initial_calloff_open_shifts",
-                orgId,
-                startDate: defaultShiftFetchStart,
-                endDate: defaultShiftFetchEnd,
-              },
-            });
-            toast.error("We couldn't load the open shifts. Refresh and try again.");
-            return [] as GridOpenShift[];
-          }),
-          fetchPublishedDateRanges(orgId, defaultShiftFetchStart, defaultShiftFetchEnd)
+          lastViewedPromise,
+          fetchCalloffOpenShifts(orgId, initialStart, initialEnd, assignmentLabelMap).catch(
+            (err) => {
+              Sentry.captureException(err, {
+                tags: { component: "calloff_open_shifts" },
+                extra: {
+                  context: "schedule.initial_calloff_open_shifts",
+                  orgId,
+                  startDate: initialStart,
+                  endDate: initialEnd,
+                },
+              });
+              toast.error("We couldn't load the open shifts. Refresh and try again.");
+              return [] as GridOpenShift[];
+            },
+          ),
+          fetchPublishedDateRanges(orgId, initialStart, initialEnd)
             .then(completePublicationRangeLoad)
             .catch((err) => {
               Sentry.captureException(err, {
                 extra: {
                   context: "schedule.initial_published_ranges",
                   orgId,
-                  startDate: defaultShiftFetchStart,
-                  endDate: defaultShiftFetchEnd,
+                  startDate: initialStart,
+                  endDate: initialEnd,
                 },
               });
               return failPublicationRangeLoad();
@@ -1255,19 +1279,7 @@ function SchedulerContent({
         ]);
 
         lastViewedRef.current = lastViewed;
-        setLoadedShiftWindow({ start: defaultShiftFetchStart, end: defaultShiftFetchEnd });
-
-        // Staff always need the current window's chips, including on a first
-        // visit when no last-viewed baseline exists. Publish-capable users keep
-        // the existing acknowledgement/history workflow instead.
-        const recentPublishes = await fetchRecentPublishHistory(
-          orgId,
-          lastViewed,
-          !canNavigatePublishHistory,
-          !canNavigatePublishHistory
-            ? { startDate: defaultShiftFetchStart, endDate: defaultShiftFetchEnd }
-            : undefined,
-        ).catch(() => [] as PublishHistoryEntry[]);
+        setLoadedShiftWindow({ start: initialStart, end: initialEnd });
 
         // A save made on the cached grid painted above can land before this
         // fetch does.
@@ -1281,7 +1293,7 @@ function SchedulerContent({
         setShifts(shiftData);
         setNotes(noteMap);
         writeScheduleWindow(queryClient, orgId, {
-          window: { start: defaultShiftFetchStart, end: defaultShiftFetchEnd },
+          window: { start: initialStart, end: initialEnd },
           shifts: shiftData,
           notes: noteMap,
           canEditShifts,
@@ -1289,34 +1301,43 @@ function SchedulerContent({
         setRecurringShifts(recShifts);
         setCalloffOpenShifts(initialCalloffOpenShifts);
         setPublicationRangeState(initialPublishedDateRanges);
-        if (recentPublishes.length > 0) setPublishHistory(recentPublishes);
-
-        // Show "what changed" toast once per mount
-        if (recentPublishes.length > 0 && !hasShownChangeToast.current) {
-          hasShownChangeToast.current = true;
-          const allChanges = recentPublishes.flatMap((e) => e.changes);
-          const newCount = allChanges.filter((c) => c.kind === "new").length;
-          const modCount = allChanges.filter((c) => c.kind === "modified").length;
-          const delCount = allChanges.filter((c) => c.kind === "deleted").length;
-          const parts: string[] = [];
-          if (newCount > 0) parts.push(`${newCount} new`);
-          if (modCount > 0) parts.push(`${modCount} modified`);
-          if (delCount > 0) parts.push(`${delCount} removed`);
-          if (parts.length > 0) {
-            toast.info(
-              `${allChanges.length} shift${allChanges.length !== 1 ? "s" : ""} changed since your last visit: ${parts.join(", ")}`,
-              { duration: 6000 },
-            );
-          }
-        }
-
-        // Fire-and-forget: update last-viewed timestamp for this user
-        void updateScheduleLastViewed(orgId);
+        void recentPublishesPromise.then(applyInitialPublishHistory);
       } catch (err) {
         Sentry.captureException(err);
       } finally {
         setScheduleLoading(false);
       }
+    }
+
+    function applyInitialPublishHistory(recentPublishes: PublishHistoryEntry[]) {
+      if (recentPublishes.length > 0) {
+        // The grid is usable before this lands, so a publish or a picked
+        // history entry may have set the history first; that one is newer.
+        setPublishHistory((current) => (current.length > 0 ? current : recentPublishes));
+      }
+
+      // Show "what changed" toast once per mount
+      if (recentPublishes.length > 0 && !hasShownChangeToast.current) {
+        hasShownChangeToast.current = true;
+        const allChanges = recentPublishes.flatMap((e) => e.changes);
+        const newCount = allChanges.filter((c) => c.kind === "new").length;
+        const modCount = allChanges.filter((c) => c.kind === "modified").length;
+        const delCount = allChanges.filter((c) => c.kind === "deleted").length;
+        const parts: string[] = [];
+        if (newCount > 0) parts.push(`${newCount} new`);
+        if (modCount > 0) parts.push(`${modCount} modified`);
+        if (delCount > 0) parts.push(`${delCount} removed`);
+        if (parts.length > 0) {
+          toast.info(
+            `${allChanges.length} shift${allChanges.length !== 1 ? "s" : ""} changed since your last visit: ${parts.join(", ")}`,
+            { duration: 6000 },
+          );
+        }
+      }
+
+      // Fire-and-forget: update last-viewed timestamp for this user, only once
+      // the history above has been read against the old one.
+      void updateScheduleLastViewed(orgId);
     }
     loadSchedule();
   }, [orgLoading, org]);
@@ -2479,6 +2500,60 @@ function SchedulerContent({
     draftCheckComplete,
     publishWindowDateRange,
     loadedShiftWindow,
+    refetchScheduleData,
+    fetchWindowRetryToken,
+  ]);
+
+  // A cold load paints from the visible range alone. Once it has, widen the
+  // loaded window to the default band, so paging nearby, the out-of-window
+  // draft notice and the swap dates read the same data they always have.
+  useEffect(() => {
+    if (!org || scheduleLoading || !draftCheckComplete || fullWindowLoadedRef.current) return;
+    if (isSyncingFetchWindowRef.current) return;
+
+    const full = getFullFetchWindow(
+      loadedShiftWindow,
+      { start: defaultShiftFetchStart, end: defaultShiftFetchEnd },
+      publishWindowDateRange,
+    );
+    if (full.start >= loadedShiftWindow.start && full.end <= loadedShiftWindow.end) {
+      fullWindowLoadedRef.current = true;
+      return;
+    }
+
+    isSyncingFetchWindowRef.current = true;
+    const orgId = org.id;
+    void refetchScheduleData({ ensureStart: full.start, ensureEnd: full.end, recenter: true })
+      .then(() => {
+        fullWindowLoadedRef.current = true;
+        // The call-off list stands in while shift requests load or fail, so it
+        // has to cover the same window the grid now does.
+        return fetchCalloffOpenShifts(orgId, full.start, full.end, assignmentLabelMapRef.current)
+          .then(setCalloffOpenShifts)
+          .catch((err) => Sentry.captureException(err));
+      })
+      .catch((err) => {
+        Sentry.captureException(err);
+        fullWindowFailuresRef.current += 1;
+        if (fullWindowFailuresRef.current <= FETCH_WINDOW_RETRY_LIMIT) {
+          fetchWindowRetryTimerRef.current = setTimeout(() => {
+            setFetchWindowRetryToken((token) => token + 1);
+          }, 3000);
+        } else {
+          fullWindowLoadedRef.current = true;
+        }
+      })
+      .finally(() => {
+        isSyncingFetchWindowRef.current = false;
+      });
+  }, [
+    org,
+    scheduleLoading,
+    draftCheckComplete,
+    loadedShiftWindow,
+    defaultShiftFetchStart,
+    defaultShiftFetchEnd,
+    publishWindowDateRange,
     refetchScheduleData,
     fetchWindowRetryToken,
   ]);

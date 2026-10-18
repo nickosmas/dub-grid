@@ -1,4 +1,5 @@
 import type { ImportPreviousScheduleOutcome } from "@/features/schedule/client";
+import { addDays, formatDateKey } from "@/lib/utils";
 
 export type { ScheduleCellInput } from "@/types";
 
@@ -85,6 +86,56 @@ export function daysBetweenDateKeys(startKey: string, endKey: string): number {
   const start = new Date(`${startKey}T00:00:00`);
   const end = new Date(`${endKey}T00:00:00`);
   return Math.round((end.getTime() - start.getTime()) / 86_400_000);
+}
+
+/**
+ * Days loaded either side of the visible range before the first paint, so the
+ * adjacent-day staffing checks still see their neighbours.
+ */
+export const INITIAL_FETCH_BUFFER_DAYS = 7;
+
+interface DateKeyRange {
+  startDateKey: string;
+  endDateKey: string;
+}
+
+function shiftDateKey(key: string, days: number): string {
+  return formatDateKey(addDays(new Date(`${key}T00:00:00`), days));
+}
+
+/**
+ * The window a cold load fetches before it paints: the visible range and a
+ * small buffer, rather than the whole default band.
+ */
+export function getInitialFetchWindow(visible: DateKeyRange): { start: string; end: string } {
+  return {
+    start: shiftDateKey(visible.startDateKey, -INITIAL_FETCH_BUFFER_DAYS),
+    end: shiftDateKey(visible.endDateKey, INITIAL_FETCH_BUFFER_DAYS),
+  };
+}
+
+/**
+ * The window to widen to once the first paint is done: the loaded window and
+ * the default band together. A deep link far from today would make that span
+ * pass the recenter threshold, so it recenters on the visible range instead,
+ * where the window-sync effect would have landed anyway.
+ */
+export function getFullFetchWindow(
+  loaded: { start: string; end: string },
+  defaultWindow: { start: string; end: string },
+  visible: DateKeyRange,
+): { start: string; end: string } {
+  const widened = widenFetchWindow(loaded.start, loaded.end, {
+    ensureStart: defaultWindow.start,
+    ensureEnd: defaultWindow.end,
+  });
+  if (daysBetweenDateKeys(widened.start, widened.end) <= FETCH_WINDOW_RECENTER_THRESHOLD_DAYS) {
+    return widened;
+  }
+  return {
+    start: shiftDateKey(visible.startDateKey, -FETCH_WINDOW_RECENTER_BUFFER_DAYS),
+    end: shiftDateKey(visible.endDateKey, FETCH_WINDOW_RECENTER_BUFFER_DAYS),
+  };
 }
 
 // ── Import Previous Schedule outcome aggregation ────────────────────────────

@@ -1,7 +1,7 @@
 # Fix: The Schedule page paints quickly on a cold load
 
 **Type:** Fix
-**Status:** not started
+**Status:** in progress
 
 ### The problem
 
