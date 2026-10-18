@@ -74,7 +74,7 @@ off-screen rows), bundle size, and the schedule data fetches (PR #153).
 - [x] **1. Baseline.** Profile and time cold loads of a production build of
       `dev` on the realistic local data, as in the problem list.
       _Done when_ the baseline figures are written below.
-- [ ] **2. Cached date formatters (fix 1),** with unit tests in
+- [x] **2. Cached date formatters (fix 1),** with unit tests in
       `gridHelpers.test.ts` that compare against `toLocaleString` across
       time zones, cover the invalid date and the publisher variants, and show
       the formatter is reused.
