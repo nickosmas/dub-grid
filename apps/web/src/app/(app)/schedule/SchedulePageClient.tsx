@@ -21,6 +21,7 @@ import ScheduleGrid, {
 import type { ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
 import MonthView from "@/components/MonthView";
 import { EmptyState } from "@/components/EmptyState";
+import { settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
 import PrintLegend from "@/components/PrintLegend";
 import type { PrintConfig } from "@/components/PrintOptionsModal";
 import ChangeCountChips from "@/components/ChangeCountChips";
@@ -236,6 +237,7 @@ import {
   PERMISSIONS_WAIT_MS,
   PUBLISH_WINDOW_DATE_FORMATTER,
   SCHEDULE_DELETE_BATCH_SIZE,
+  SCHEDULE_LOAD_TIMEOUT_MS,
   widenFetchWindow,
   type ScheduleOperation,
 } from "./_lib/operations";
@@ -1215,6 +1217,13 @@ function SchedulerContent({
   // history, and a snapshot tagged as a viewer's. So it waits for them, up to
   // PERMISSIONS_WAIT_MS, and then loads as before.
   const [permissionsWaitExpiredFor, setPermissionsWaitExpiredFor] = useState<string | null>(null);
+  // A failed initial load is retried once on its own, then shown with a way to
+  // try again rather than as an empty grid. Each attempt re-runs the load.
+  const [scheduleLoadAttempt, setScheduleLoadAttempt] = useState(0);
+  const [scheduleLoadFailed, setScheduleLoadFailed] = useState(false);
+  const scheduleLoadAutoRetriedRef = useRef(false);
+  // What the initial load is still waiting on, for the loading screen's report.
+  const pendingScheduleLoadsRef = useRef(new Set<string>());
   useEffect(() => {
     if (!permsLoading || orgLoading || !org) return;
     const orgId = org.id;
@@ -1229,6 +1238,7 @@ function SchedulerContent({
       fullWindowLoadedRef.current = false;
       fullWindowFailuresRef.current = 0;
       publishedRangesWindowRef.current = null;
+      scheduleLoadAutoRetriedRef.current = false;
       commitLoadedShiftWindow({ start: defaultShiftFetchStart, end: defaultShiftFetchEnd });
       setPublicationRangeState(beginPublicationRangeLoad());
     }
@@ -1279,7 +1289,21 @@ function SchedulerContent({
     // a second, identical request on every mount.
     publishedRangesWindowRef.current = `${orgId}|${initialStart}|${initialEnd}`;
 
+    const attempt = scheduleLoadAttempt;
+    const track = <T,>(label: string, promise: Promise<T>): Promise<T> => {
+      const key = `${label}#${attempt}`;
+      pendingScheduleLoadsRef.current.add(key);
+      return promise.finally(() => pendingScheduleLoadsRef.current.delete(key));
+    };
+
+    // The deadline frees the loading screen. A painted snapshot shows no loading
+    // screen, and its refresh covers the whole default window, which can be
+    // slow for a large organization, so it is left to finish.
+    const withLoadingDeadline = <T,>(promise: Promise<T>): Promise<T> =>
+      cachedWindow ? promise : settleWithRequestTimeout(promise, SCHEDULE_LOAD_TIMEOUT_MS);
+
     async function loadSchedule() {
+      let retrying = false;
       try {
         const startedAt = localWrites.current.generation;
         const lastViewedPromise = getScheduleLastViewed(orgId).catch(() => null);
@@ -1304,50 +1328,64 @@ function SchedulerContent({
           lastViewed,
           initialCalloffOpenShifts,
           initialPublishedDateRanges,
-        ] = await Promise.all([
-          fetchShifts(
-            orgId,
-            canEditShifts,
-            assignmentLabelMap,
-            absenceTypeMap,
-            initialStart,
-            initialEnd,
-            segmentCompatibility,
-          ),
-          fetchScheduleNotes(orgId, initialStart, initialEnd),
-          canViewRecurringShifts
-            ? fetchRecurringShifts(orgId, undefined, assignmentLabelMap, false, absenceTypeMap)
-            : Promise.resolve([] as RecurringShift[]),
-          lastViewedPromise,
-          fetchCalloffOpenShifts(orgId, initialStart, initialEnd, assignmentLabelMap).catch(
-            (err) => {
-              Sentry.captureException(err, {
-                tags: { component: "calloff_open_shifts" },
-                extra: {
-                  context: "schedule.initial_calloff_open_shifts",
-                  orgId,
-                  startDate: initialStart,
-                  endDate: initialEnd,
+        ] = await withLoadingDeadline(
+          Promise.all([
+            track(
+              "shifts",
+              fetchShifts(
+                orgId,
+                canEditShifts,
+                assignmentLabelMap,
+                absenceTypeMap,
+                initialStart,
+                initialEnd,
+                segmentCompatibility,
+              ),
+            ),
+            track("notes", fetchScheduleNotes(orgId, initialStart, initialEnd)),
+            canViewRecurringShifts
+              ? track(
+                  "recurring",
+                  fetchRecurringShifts(orgId, undefined, assignmentLabelMap, false, absenceTypeMap),
+                )
+              : Promise.resolve([] as RecurringShift[]),
+            track("lastViewed", lastViewedPromise),
+            track(
+              "openShifts",
+              fetchCalloffOpenShifts(orgId, initialStart, initialEnd, assignmentLabelMap).catch(
+                (err) => {
+                  Sentry.captureException(err, {
+                    tags: { component: "calloff_open_shifts" },
+                    extra: {
+                      context: "schedule.initial_calloff_open_shifts",
+                      orgId,
+                      startDate: initialStart,
+                      endDate: initialEnd,
+                    },
+                  });
+                  toast.error("We couldn't load the open shifts. Refresh and try again.");
+                  return [] as GridOpenShift[];
                 },
-              });
-              toast.error("We couldn't load the open shifts. Refresh and try again.");
-              return [] as GridOpenShift[];
-            },
-          ),
-          fetchPublishedDateRanges(orgId, initialStart, initialEnd)
-            .then(completePublicationRangeLoad)
-            .catch((err) => {
-              Sentry.captureException(err, {
-                extra: {
-                  context: "schedule.initial_published_ranges",
-                  orgId,
-                  startDate: initialStart,
-                  endDate: initialEnd,
-                },
-              });
-              return failPublicationRangeLoad();
-            }),
-        ]);
+              ),
+            ),
+            track(
+              "publishedRanges",
+              fetchPublishedDateRanges(orgId, initialStart, initialEnd)
+                .then(completePublicationRangeLoad)
+                .catch((err) => {
+                  Sentry.captureException(err, {
+                    extra: {
+                      context: "schedule.initial_published_ranges",
+                      orgId,
+                      startDate: initialStart,
+                      endDate: initialEnd,
+                    },
+                  });
+                  return failPublicationRangeLoad();
+                }),
+            ),
+          ]),
+        );
 
         if (currentOrgIdRef.current !== orgId) return;
         lastViewedRef.current = lastViewed;
@@ -1380,11 +1418,30 @@ function SchedulerContent({
         setRecurringShifts(recShifts);
         setCalloffOpenShifts(initialCalloffOpenShifts);
         setPublicationRangeState(initialPublishedDateRanges);
+        setScheduleLoadFailed(false);
         void recentPublishesPromise.then(applyInitialPublishHistory);
       } catch (err) {
-        Sentry.captureException(err);
+        Sentry.captureException(err, {
+          tags: { component: "schedule_load" },
+          extra: { orgId, attempt, pending: [...pendingScheduleLoadsRef.current] },
+        });
+        if (currentOrgIdRef.current !== orgId) return;
+        if (!scheduleLoadAutoRetriedRef.current) {
+          // A dropped connection or a request that never answered usually
+          // succeeds the second time, so try once more before saying so.
+          scheduleLoadAutoRetriedRef.current = true;
+          retrying = true;
+          scheduleLoadStarted.current = false;
+          setScheduleLoadAttempt((n) => n + 1);
+          return;
+        }
+        if (cachedWindow) {
+          toast.error("We couldn't refresh the schedule. It may be out of date.");
+        } else {
+          setScheduleLoadFailed(true);
+        }
       } finally {
-        setScheduleLoading(false);
+        if (!retrying) setScheduleLoading(false);
       }
     }
 
@@ -1420,7 +1477,16 @@ function SchedulerContent({
       void updateScheduleLastViewed(orgId);
     }
     loadSchedule();
-  }, [orgLoading, org, permsLoading, permissionsWaitExpiredFor]);
+  }, [orgLoading, org, permsLoading, permissionsWaitExpiredFor, scheduleLoadAttempt]);
+
+  const retryScheduleLoad = useCallback(() => {
+    scheduleLoadStarted.current = false;
+    fullWindowLoadedRef.current = false;
+    fullWindowFailuresRef.current = 0;
+    setScheduleLoadFailed(false);
+    setScheduleLoading(true);
+    setScheduleLoadAttempt((n) => n + 1);
+  }, []);
 
   // Resolve a user UUID to a display name via profiles table (cached).
   const resolveUserName = useCallback(
@@ -2479,7 +2545,7 @@ function SchedulerContent({
   const fetchWindowRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [fetchWindowRetryToken, setFetchWindowRetryToken] = useState(0);
   useEffect(() => {
-    if (!org || scheduleLoading || !draftCheckComplete) return;
+    if (!org || scheduleLoading || scheduleLoadFailed || !draftCheckComplete) return;
     if (isSyncingFetchWindowRef.current) return;
 
     const needed = publishWindowDateRange;
@@ -2536,6 +2602,7 @@ function SchedulerContent({
   }, [
     org,
     scheduleLoading,
+    scheduleLoadFailed,
     draftCheckComplete,
     publishWindowDateRange,
     loadedShiftWindow,
@@ -2547,7 +2614,15 @@ function SchedulerContent({
   // loaded window to the default band, so paging nearby, the out-of-window
   // draft notice and the swap dates read the same data they always have.
   useEffect(() => {
-    if (!org || scheduleLoading || !draftCheckComplete || fullWindowLoadedRef.current) return;
+    if (
+      !org ||
+      scheduleLoading ||
+      scheduleLoadFailed ||
+      !draftCheckComplete ||
+      fullWindowLoadedRef.current
+    ) {
+      return;
+    }
     if (isSyncingFetchWindowRef.current) return;
 
     const full = getFullFetchWindow(
@@ -2601,6 +2676,7 @@ function SchedulerContent({
   }, [
     org,
     scheduleLoading,
+    scheduleLoadFailed,
     draftCheckComplete,
     loadedShiftWindow,
     defaultShiftFetchStart,
@@ -6501,6 +6577,7 @@ function SchedulerContent({
     rawPublishedWindowState === "unpublished";
   const hideGridForPublicationState =
     hideGridForUnpublishedViewer || showPublicationRangeErrorForViewer;
+  const hideScheduleGrid = hideGridForPublicationState || scheduleLoadFailed;
 
   const bulkDeleteSelectedTargets = useMemo(
     () =>
@@ -6773,8 +6850,20 @@ function SchedulerContent({
     };
   }, [isChromeMounted]);
 
+  // Read by the loading screen if the wait runs long, never during render.
+  const describeScheduleWait = () => ({
+    orgLoading,
+    employeesLoading: empLoading,
+    scheduleLoading,
+    permissionsLoading: permsLoading,
+    hasOrg: Boolean(org),
+    employeeCount: employees.length,
+    attempt: scheduleLoadAttempt,
+    pending: [...pendingScheduleLoadsRef.current],
+  });
+
   if (orgLoading || (scheduleLoading && !org)) {
-    return <ScheduleLoadingScreen />;
+    return <ScheduleLoadingScreen describeWait={describeScheduleWait} />;
   }
   if (loadError && !org) {
     return (
@@ -6795,7 +6884,9 @@ function SchedulerContent({
         color: "var(--dg-color-text-primary)",
       }}
     >
-      {isLoading && !canPaintFromSnapshot && employees.length > 0 && <ScheduleLoadingScreen />}
+      {isLoading && !canPaintFromSnapshot && employees.length > 0 && (
+        <ScheduleLoadingScreen describeWait={describeScheduleWait} />
+      )}
 
       {(!isLoading || canPaintFromSnapshot) && (
         <>
@@ -7305,7 +7396,23 @@ function SchedulerContent({
           </div>
 
           <div style={{ padding: isMobile ? "8px 0" : "16px 16px" }}>
-            {showPublicationRangeErrorForViewer && (
+            {scheduleLoadFailed && (
+              <EmptyState
+                heading="We couldn't load the schedule"
+                description="Check your connection and try again."
+                action={
+                  <Button
+                    type="button"
+                    className="dg-btn dg-btn-secondary"
+                    onClick={retryScheduleLoad}
+                  >
+                    Try again
+                  </Button>
+                }
+              />
+            )}
+
+            {showPublicationRangeErrorForViewer && !scheduleLoadFailed && (
               <EmptyState
                 heading="We couldn't confirm this period's publication status"
                 description="Check your connection and try loading the publication status again."
@@ -7321,7 +7428,7 @@ function SchedulerContent({
               />
             )}
 
-            {hideGridForUnpublishedViewer && (
+            {hideGridForUnpublishedViewer && !scheduleLoadFailed && (
               <EmptyState
                 heading="This period has not been published yet"
                 description="Your schedule will appear here once your manager publishes it."
@@ -7329,7 +7436,7 @@ function SchedulerContent({
             )}
 
             {/* Mobile Day View */}
-            {spanWeeks !== "month" && isMobile && !hideGridForPublicationState && (
+            {spanWeeks !== "month" && isMobile && !hideScheduleGrid && (
               <MobileDayView
                 filteredEmployees={filteredEmployees}
                 allEmployees={employees}
@@ -7358,7 +7465,7 @@ function SchedulerContent({
             )}
 
             {/* Desktop/Tablet Grid */}
-            {spanWeeks !== "month" && !isMobile && !hideGridForPublicationState && (
+            {spanWeeks !== "month" && !isMobile && !hideScheduleGrid && (
               <div data-tour="schedule-grid">
                 <ScheduleGrid
                   model={scheduleGridModel}
@@ -7788,7 +7895,7 @@ function SchedulerContent({
               />
             )}
 
-            {spanWeeks === "month" && !hideGridForPublicationState && (
+            {spanWeeks === "month" && !hideScheduleGrid && (
               <MonthView
                 monthStart={monthStart}
                 filteredEmployees={filteredEmployees}

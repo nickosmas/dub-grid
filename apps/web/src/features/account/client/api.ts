@@ -184,11 +184,13 @@ export function fetchAccountIdentity(): Promise<AccountIdentity> {
 }
 
 export function fetchAccountOrgContext(): Promise<AccountOrgContext> {
-  return requestJson<AccountOrgContext>("/api/account/org-context");
+  return requestJson<AccountOrgContext>("/api/account/org-context", undefined, { deadline: true });
 }
 
 export function fetchAccountPermissions(): Promise<AccountPermissionsResponse> {
-  return requestJson<AccountPermissionsResponse>("/api/account/permissions");
+  return requestJson<AccountPermissionsResponse>("/api/account/permissions", undefined, {
+    deadline: true,
+  });
 }
 
 export function fetchSelfProfileData(orgId: string | null): Promise<AccountSelfProfileData> {
