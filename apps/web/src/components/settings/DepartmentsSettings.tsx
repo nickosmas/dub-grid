@@ -25,7 +25,8 @@ import {
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { SectionCard } from "./shared";
 import { EmptyState } from "@/components/EmptyState";
-import { useSmoothReorder } from "./useSmoothReorder";
+import { useSmoothReorder } from "@/hooks/useSmoothReorder";
+import { orderFocusAreasByDepartment } from "@/lib/focus-area-order";
 import type { DependencyInfo } from "@/features/settings/client";
 import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { useRegisterWizardEditor, useWizardMode } from "@/components/onboarding/WizardModeContext";
@@ -136,7 +137,6 @@ function FocusAreaRows({
     enabled: isEditing,
     getId: useCallback((fa: FocusArea) => fa.id, []),
     onReorder: handleReorder,
-    fallbackHeight: 48,
   });
 
   return (
@@ -462,7 +462,6 @@ function DepartmentSection({
     enabled: isEditing,
     getId: useCallback((dept: Department) => dept.id, []),
     onReorder: handleDepartmentReorder,
-    fallbackHeight: type === "scheduled" ? 96 : 54,
   });
 
   // ── Enter / Cancel / Save ───────────────────────────────────────────────────
@@ -602,7 +601,16 @@ function DepartmentSection({
 
         // Upsert new and modified FAs
         const savedFAsList: FocusArea[] = [];
-        const cleanedFAs = localFAs
+        // Numbered in the order the departments now stand, so a focus area's
+        // stored order matches the schedule and print everywhere it is read.
+        const cleanedFAs = orderFocusAreasByDepartment(
+          localFAs,
+          cleaned.map((department, index) => ({
+            id: department.id,
+            type: department.type,
+            sortOrder: index,
+          })),
+        )
           .filter((focusArea) => focusArea.name.trim())
           .map((focusArea) => ({
             ...focusArea,

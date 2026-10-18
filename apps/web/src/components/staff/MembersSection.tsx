@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { getEmployeeProfileHref, isCurrentUsersEmployee } from "@/lib/profile-links";
@@ -94,6 +94,7 @@ import { StaffPagination } from "./StaffPagination";
 import { StaffReorderListRow, StaffTableRow } from "./StaffTableRow";
 import { STAFF_SORT_OPTIONS, useStaffFilters, type EmployeeTab } from "./useStaffFilters";
 import { useStaffReorder } from "./useStaffReorder";
+import { useSmoothReorder } from "@/hooks/useSmoothReorder";
 import { useStaffSelection } from "./useStaffSelection";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
@@ -101,6 +102,8 @@ import ScrollableTabs from "@/components/ScrollableTabs";
 import { mapInBatches } from "@/lib/async-batch";
 
 const REORDER_SETTLE_MS = 220;
+
+const getEmployeeId = (employee: Employee) => employee.id;
 
 type BulkStaffAction = "deactivate" | "activate" | "remove";
 
@@ -387,236 +390,22 @@ export function MembersSection({
     enterReorder: handleEnterReorder,
     saveOrder: handleSaveOrder,
     cancelReorder: handleCancelReorder,
-    draggedIdx,
-    dragOverIdx,
-    handleDragStart,
-    handleDragMove,
-    handleDrop,
-    handleDragEnd,
+    moveEmployee,
     displayList,
-    baseList,
   } = reorder;
 
-  const isDraggingRows = isReordering && draggedIdx !== null && dragOverIdx !== null;
   const paginatedList = useMemo(
-    () => (isReordering ? (isDraggingRows ? baseList : displayList) : filterPaginatedList),
-    [baseList, displayList, filterPaginatedList, isDraggingRows, isReordering],
+    () => (isReordering ? displayList : filterPaginatedList),
+    [displayList, filterPaginatedList, isReordering],
   );
-  const rowNodesRef = useRef(new Map<string, HTMLDivElement>());
-  const rowRectsRef = useRef(new Map<string, DOMRect>());
-  const [dragDeltaY, setDragDeltaY] = useState(0);
-  const [dragPhase, setDragPhase] = useState<"dragging" | "settling" | null>(null);
-  const settleFrameRef = useRef<number | null>(null);
-  const settleTimeoutRef = useRef<number | null>(null);
-  const dragSessionRef = useRef<{
-    pointerId: number;
-    draggedIdx: number;
-    startY: number;
-    dropIdx: number;
-    centers: number[];
-  } | null>(null);
-
-  const handleRowRef = useCallback((employeeId: string, node: HTMLDivElement | null) => {
-    if (node) {
-      rowNodesRef.current.set(employeeId, node);
-      return;
-    }
-
-    rowNodesRef.current.delete(employeeId);
-  }, []);
-
-  useLayoutEffect(() => {
-    const nextRects = new Map<string, DOMRect>();
-
-    for (const employee of paginatedList) {
-      const node = rowNodesRef.current.get(employee.id);
-      if (node) {
-        nextRects.set(employee.id, node.getBoundingClientRect());
-      }
-    }
-
-    rowRectsRef.current = nextRects;
-  }, [paginatedList]);
-
-  const cancelSettleAnimation = useCallback(() => {
-    if (settleFrameRef.current !== null) {
-      window.cancelAnimationFrame(settleFrameRef.current);
-      settleFrameRef.current = null;
-    }
-    if (settleTimeoutRef.current !== null) {
-      window.clearTimeout(settleTimeoutRef.current);
-      settleTimeoutRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => cancelSettleAnimation, [cancelSettleAnimation]);
-
-  const getRowHeight = useCallback(
-    (index: number) => {
-      const employee = baseList[index];
-      if (!employee) return 56;
-      return rowRectsRef.current.get(employee.id)?.height ?? 56;
-    },
-    [baseList],
-  );
-
-  const getDraggedTargetDelta = useCallback(
-    (sourceIdx: number, dropIdx: number) => {
-      if (sourceIdx === dropIdx) return 0;
-
-      let targetDelta = 0;
-      if (sourceIdx < dropIdx) {
-        for (let index = sourceIdx + 1; index <= dropIdx; index += 1) {
-          targetDelta += getRowHeight(index);
-        }
-        return targetDelta;
-      }
-
-      for (let index = dropIdx; index < sourceIdx; index += 1) {
-        targetDelta -= getRowHeight(index);
-      }
-      return targetDelta;
-    },
-    [getRowHeight],
-  );
-
-  const handleReorderPointerDown = useCallback(
-    (event: React.PointerEvent<HTMLDivElement>, index: number) => {
-      if (!isReordering || event.button !== 0) return;
-
-      const centers = baseList.map((employee) => {
-        const rect =
-          rowRectsRef.current.get(employee.id) ??
-          rowNodesRef.current.get(employee.id)?.getBoundingClientRect();
-
-        return rect ? rect.top + rect.height / 2 : null;
-      });
-
-      if (centers.some((center) => center === null)) return;
-
-      if (!baseList[index]) return;
-
-      event.preventDefault();
-      event.currentTarget.setPointerCapture(event.pointerId);
-
-      dragSessionRef.current = {
-        pointerId: event.pointerId,
-        draggedIdx: index,
-        startY: event.clientY,
-        dropIdx: index,
-        centers: centers as number[],
-      };
-
-      cancelSettleAnimation();
-      setDragDeltaY(0);
-      setDragPhase("dragging");
-      handleDragStart(index);
-    },
-    [baseList, cancelSettleAnimation, handleDragStart, isReordering],
-  );
-
-  const handleReorderPointerMove = useCallback(
-    (event: React.PointerEvent<HTMLDivElement>) => {
-      const session = dragSessionRef.current;
-      if (!session || session.pointerId !== event.pointerId) return;
-
-      event.preventDefault();
-
-      const deltaY = event.clientY - session.startY;
-      const draggedCenter = session.centers[session.draggedIdx] + deltaY;
-      let nextDropIdx = 0;
-
-      for (let index = 0; index < session.centers.length; index += 1) {
-        if (index !== session.draggedIdx && draggedCenter > session.centers[index]) {
-          nextDropIdx += 1;
-        }
-      }
-
-      session.dropIdx = nextDropIdx;
-      setDragDeltaY(deltaY);
-      handleDragMove(nextDropIdx);
-    },
-    [handleDragMove],
-  );
-
-  const handleReorderPointerEnd = useCallback(
-    (event: React.PointerEvent<HTMLDivElement>) => {
-      const session = dragSessionRef.current;
-      if (!session || session.pointerId !== event.pointerId) return;
-
-      event.preventDefault();
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-        event.currentTarget.releasePointerCapture(event.pointerId);
-      }
-      dragSessionRef.current = null;
-
-      const currentDelta = event.clientY - session.startY;
-      const targetDelta = getDraggedTargetDelta(session.draggedIdx, session.dropIdx);
-      setDragDeltaY(currentDelta);
-
-      settleFrameRef.current = window.requestAnimationFrame(() => {
-        settleFrameRef.current = null;
-        setDragPhase("settling");
-        setDragDeltaY(targetDelta);
-      });
-
-      settleTimeoutRef.current = window.setTimeout(() => {
-        settleTimeoutRef.current = null;
-        setDragPhase(null);
-        setDragDeltaY(0);
-        handleDrop(session.dropIdx, session.draggedIdx);
-      }, REORDER_SETTLE_MS + 10);
-    },
-    [getDraggedTargetDelta, handleDrop],
-  );
-
-  const handleReorderPointerCancel = useCallback(
-    (event: React.PointerEvent<HTMLDivElement>) => {
-      const session = dragSessionRef.current;
-      if (!session || session.pointerId !== event.pointerId) return;
-
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-        event.currentTarget.releasePointerCapture(event.pointerId);
-      }
-
-      dragSessionRef.current = null;
-      cancelSettleAnimation();
-      setDragPhase(null);
-      setDragDeltaY(0);
-      handleDragEnd();
-    },
-    [cancelSettleAnimation, handleDragEnd],
-  );
-
-  const rowDragOffsets = useMemo(() => {
-    const offsets = new Map<string, number>();
-    if (!isReordering || draggedIdx === null || dragOverIdx === null) {
-      return offsets;
-    }
-
-    const draggedEmployee = baseList[draggedIdx];
-    if (!draggedEmployee) return offsets;
-
-    const draggedHeight = rowRectsRef.current.get(draggedEmployee.id)?.height ?? 56;
-
-    if (draggedIdx < dragOverIdx) {
-      for (let index = draggedIdx + 1; index <= dragOverIdx; index += 1) {
-        const employee = baseList[index];
-        if (employee) {
-          offsets.set(employee.id, -draggedHeight);
-        }
-      }
-      return offsets;
-    }
-
-    for (let index = dragOverIdx; index < draggedIdx; index += 1) {
-      const employee = baseList[index];
-      if (employee) {
-        offsets.set(employee.id, draggedHeight);
-      }
-    }
-    return offsets;
-  }, [baseList, dragOverIdx, draggedIdx, isReordering]);
+  const rowReorder = useSmoothReorder({
+    items: displayList,
+    enabled: isReordering,
+    getId: getEmployeeId,
+    onReorder: moveEmployee,
+    offsetProperty: "--dg-staff-reorder-offset",
+    settleMs: REORDER_SETTLE_MS,
+  });
 
   useEffect(() => {
     clearSelection();
@@ -1835,11 +1624,7 @@ export function MembersSection({
                       </div>
                       <div className="dg-staff-directory-body">
                         {paginatedList.map((employee, index) => {
-                          const isDragging =
-                            draggedIdx !== null && baseList[draggedIdx]?.id === employee.id;
-                          const dragOffsetY = isDragging
-                            ? dragDeltaY
-                            : (rowDragOffsets.get(employee.id) ?? 0);
+                          const motion = rowReorder.getItemMotion(employee);
 
                           return (
                             <StaffReorderListRow
@@ -1848,8 +1633,9 @@ export function MembersSection({
                               globalIndex={index}
                               isExpanded={false}
                               isReordering
-                              isDragging={isDragging}
-                              dragPhase={isDragging ? (dragPhase ?? undefined) : undefined}
+                              isDragging={motion.isDragging}
+                              isMoving={motion.isMoving}
+                              dragPhase={motion.dragPhase ?? undefined}
                               canManageEmployees={canManageEmployees}
                               canViewEmployeeDetails={canViewEmployeeDetails}
                               showStatusColumn={false}
@@ -1864,12 +1650,9 @@ export function MembersSection({
                               pendingInviteByEmployeeId={pendingInviteByEmployeeId}
                               onToggleSelect={toggleSelect}
                               onRowClick={() => undefined}
-                              onRowRef={handleRowRef}
-                              dragOffsetY={dragOffsetY}
-                              onReorderPointerDown={handleReorderPointerDown}
-                              onReorderPointerMove={handleReorderPointerMove}
-                              onReorderPointerEnd={handleReorderPointerEnd}
-                              onReorderPointerCancel={handleReorderPointerCancel}
+                              onRowRef={(node) => rowReorder.setItemNode(employee, node)}
+                              dragOffsetY={motion.offsetY}
+                              reorderHandleProps={rowReorder.getHandleProps(index)}
                             />
                           );
                         })}
