@@ -589,6 +589,15 @@ function EmployeeDetailHoverCard({
   );
 }
 
+// Every shift cell renders a hover card, and constructing a formatter per call
+// (what `toLocaleDateString` with options does) was a large share of the grid's
+// render; the label is only built once the card is open.
+const SHIFT_DETAIL_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  weekday: "long",
+  month: "short",
+  day: "numeric",
+});
+
 function ShiftDetailHoverCard({
   enabled,
   employeeName,
@@ -620,11 +629,6 @@ function ShiftDetailHoverCard({
 
   if (!enabled) return children;
 
-  const dateLabel = date.toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-  });
   const trigger = React.cloneElement(children, {
     ref: (node: HTMLDivElement | null) => {
       triggerRef.current = node;
@@ -686,7 +690,7 @@ function ShiftDetailHoverCard({
                   color: "var(--dg-color-text-muted)",
                 }}
               >
-                {dateLabel}
+                {SHIFT_DETAIL_DATE_FORMATTER.format(date)}
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 12 }}>
@@ -930,18 +934,25 @@ const SectionBlock = memo(function SectionBlock({
       return Number.isFinite(value) ? value : 0;
     };
 
+    // Each read after a write lays the whole grid out again, and with thousands
+    // of cells that is the expensive part. The group's height can depend on its
+    // width, so that write goes first; the other reads come before the other
+    // writes (the sticky height only feeds scroll-margin-top, which moves
+    // nothing), and a value that has not changed is not written at all.
+    const setVar = (el: HTMLElement, name: string, value: string) => {
+      if (el.style.getPropertyValue(name) !== value) el.style.setProperty(name, value);
+    };
+
     const measure = () => {
-      group.style.setProperty("--dg-grid-body-width", `${gridEl.getBoundingClientRect().width}px`);
-      section.style.setProperty(
-        "--dg-grid-sticky-height",
-        `${group.getBoundingClientRect().height}px`,
-      );
+      setVar(group, "--dg-grid-body-width", `${gridEl.getBoundingClientRect().width}px`);
+      const stickyHeight = group.getBoundingClientRect().height;
       const releaseRow = gridEl.querySelector<HTMLElement>('[data-sticky-release="true"]');
       const inset = computeStickyReleaseInset({
         cardBottom: cardBody.getBoundingClientRect().bottom,
         releaseRowTop: releaseRow ? releaseRow.getBoundingClientRect().top : null,
       });
-      section.style.setProperty("--dg-grid-release-inset", `${inset}px`);
+      setVar(section, "--dg-grid-sticky-height", `${stickyHeight}px`);
+      setVar(section, "--dg-grid-release-inset", `${inset}px`);
     };
 
     let stickyTop = -1;
@@ -970,8 +981,9 @@ const SectionBlock = memo(function SectionBlock({
       stuckObserver.observe(sentinel);
     };
 
-    measure();
+    // watchStuck only reads styles, so it runs before measure writes any.
     watchStuck();
+    measure();
     const gridObserver = new ResizeObserver(measure);
     gridObserver.observe(gridEl);
     // A banner opening above the grid changes the sticky line without touching
