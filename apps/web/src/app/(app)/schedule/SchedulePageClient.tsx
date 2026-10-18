@@ -268,6 +268,7 @@ import {
   type PublicationRangeLoadState,
 } from "./_lib/publication-range-state";
 import { markOwnPublicationAsAdditions } from "./_lib/own-publication";
+import { orderFocusAreasByDepartment } from "@/lib/focus-area-order";
 import { readScheduleWindow, writeScheduleWindow } from "./_lib/schedule-cache";
 import { useScheduleImport } from "./_hooks/useScheduleImport";
 import {
@@ -588,6 +589,11 @@ function SchedulerContent({
   const [, setRecurringShifts] = useState<RecurringShift[]>([]);
   const [isApplyingRecurring, setIsApplyingRecurring] = useState(false);
   const [showPrintOptions, setShowPrintOptions] = useState(false);
+  // Print lists sections in the grid's order: by department, then within it.
+  const printFocusAreas = useMemo(
+    () => orderFocusAreasByDepartment(focusAreas, departments),
+    [departments, focusAreas],
+  );
   const [activePrintConfig, setActivePrintConfig] = useState<PrintConfig | null>(null);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
@@ -8037,7 +8043,7 @@ function SchedulerContent({
 
           {showPrintOptions && (
             <PrintOptionsModal
-              focusAreas={focusAreas}
+              focusAreas={printFocusAreas}
               currentSpanWeeks={spanWeeks}
               onPrint={(config) => {
                 setShowPrintOptions(false);
@@ -8055,7 +8061,7 @@ function SchedulerContent({
               config={activePrintConfig}
               employees={employees}
               allEmployees={employees}
-              focusAreas={focusAreas}
+              focusAreas={printFocusAreas}
               assignments={assignments}
               shiftCategories={shiftCategories}
               jobs={jobs}
