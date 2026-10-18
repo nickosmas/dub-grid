@@ -15,11 +15,20 @@ export default function ScrollableTabs({ children, className, style }: Scrollabl
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
 
+  const frameRef = useRef<number | null>(null);
+
+  // Reading the scroll geometry forces a layout, and the schedule toolbar
+  // re-renders this on every grid update, which laid out the whole page each
+  // time. Checks requested within one frame collapse into a single read.
   const checkScroll = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 1);
-    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+    if (frameRef.current !== null) return;
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = null;
+      const el = scrollRef.current;
+      if (!el) return;
+      setCanScrollLeft(el.scrollLeft > 1);
+      setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+    });
   }, []);
 
   useEffect(() => {
@@ -35,6 +44,10 @@ export default function ScrollableTabs({ children, className, style }: Scrollabl
     return () => {
       el.removeEventListener("scroll", checkScroll);
       ro?.disconnect();
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
     };
   }, [checkScroll]);
 

@@ -80,14 +80,14 @@ off-screen rows), bundle size, and the schedule data fetches (PR #153).
       the formatter is reused.
       _Done when_ the tests pass and the two functions drop out of the
       profile's top costs.
-- [ ] **3. Batched sticky measurement (fix 2).**
+- [x] **3. Batched sticky measurement (fix 2).**
       _Done when_ the profile shows fewer forced layouts and a browser check
       shows the sticky header pinning, matching widths, releasing and
       toggling `data-stuck` as before.
-- [ ] **4. `ScrollableTabs` once per frame (fix 3).**
+- [x] **4. `ScrollableTabs` once per frame (fix 3).**
       _Done when_ the toolbar tabs still show their fades and chevrons
       correctly in the browser and the profile no longer shows them.
-- [ ] **5. After.** Repeat step 1 on this branch.
+- [x] **5. After.** Repeat step 1 on this branch.
       _Done when_ before and after are recorded side by side below.
 
 ### Verify
@@ -119,3 +119,51 @@ loads as a scheduler, ms):
 Cold-load medians of 5 to the grid: scheduler 3,782 ms, staff 5,418 ms
 (samples 3.2 to 5.9 s on a shared machine, so the profile figures are the
 steadier measure).
+
+**After** (this branch, same data and method):
+
+| First-paint self time, scheduler (ms)    | Baseline       | After          |
+| ---------------------------------------- | -------------- | -------------- |
+| Main thread busy                         | 2,719 to 5,217 | 1,494 to 4,386 |
+| `ShiftDetailHoverCard`                   | 306 to 604     | 2 to 3         |
+| `formatPublishedMetadata`                | 313 to 456     | 7 to 14        |
+| `getBoundingClientRect` (forced layout)  | 185 to 412     | 43 to 151      |
+| `getPropertyValue` (style recalculation) | 73 to 176      | 100 to 372     |
+| `ScrollableTabs`                         | 76 to 238      | 0              |
+
+`getPropertyValue` rises because the page's first style recalculation, which
+used to run inside the first layout read, now runs inside the stuck check;
+the trace below counts the browser's total. The first run of each set is the slow one on this machine (busy 4,242 before,
+4,386 after); the other runs fell from 2,719 and 5,217 to 2,174 and 1,494.
+
+| First-paint self time, staff (ms) | Baseline       | After          |
+| --------------------------------- | -------------- | -------------- |
+| Main thread busy                  | 3,970 to 4,715 | 1,987 to 3,116 |
+| `ShiftDetailHoverCard`            | 367 to 652     | 2 to 17        |
+| `getBoundingClientRect`           | 338 to 548     | 57 to 66       |
+| `ScrollableTabs`                  | 82 to 245      | 0              |
+
+Staff never build the "Published ... by" label, so it costs nothing on either
+build.
+
+**Browser rendering work** (Chrome trace: every Layout and style
+recalculation until the grid is visible, median of 5 loads per round, five
+rounds interleaved): baseline round medians 333, 503, 333, 618 and 364 ms
+(median 364), after 348, 252, 276, 251 and 412 ms (median 276). Step 3 alone,
+against step 2 in two rounds: 399 and 388 ms down to 307 and 244 ms, almost
+all of it style recalculation; layout itself is about 50 ms.
+
+**Cold load to the grid** (10 loads per role per build, interleaved):
+scheduler median 4,366 ms before and 3,380 ms after (samples 3.2 to 7.0 s
+and 2.5 to 6.5 s); staff 3,326 ms and 3,384 ms (3.0 to 5.4 s and 2.6 to
+6.0 s), the same within this shared machine's noise even though the staff
+render's main-thread work fell, as above.
+
+**Behaviour, compared with the build before each change:** the sticky probe
+(CSS variables, header and body widths, group position and `data-stuck` at 12
+scroll positions across 4 sections, and after a resize) is identical after
+steps 3 and 4; the tabs probe (overflow, fades, chevrons and their tab order
+at four widths, scrolled to the end and back) is identical after step 4; and
+four hover cards read the same on `dev` and this branch, including "Published
+Oct 17, 2026, 9:33 PM PDT by Nic Kosmas.". A banner opening above the grid was
+not exercised; that path is unchanged apart from running first.
