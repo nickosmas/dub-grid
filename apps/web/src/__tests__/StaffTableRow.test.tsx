@@ -94,7 +94,7 @@ describe("StaffReorderListRow", () => {
     expect(ranks).toEqual(["1", "2"]);
   });
 
-  it("applies row movement as a direct transform so CSS can animate it", () => {
+  it("hands row movement to CSS through its offset property so it can animate", () => {
     const employee = makeEmployee({
       id: "emp-1",
       firstName: "Alice",
@@ -126,7 +126,8 @@ describe("StaffReorderListRow", () => {
 
     const row = container.querySelector(".dg-staff-directory-row") as HTMLElement;
 
-    expect(row.style.transform).toBe("translate3d(0, 56px, 0)");
+    expect(row.style.getPropertyValue("--dg-staff-reorder-offset")).toBe("56px");
+    expect(row.dataset.moving).toBeUndefined();
   });
 });
 

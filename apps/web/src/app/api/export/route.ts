@@ -18,8 +18,8 @@ import { isFeatureEnabled } from "@/lib/feature-flags";
 const querySchema = z.object({
   type: z.enum(["staff", "schedule"]),
   orgId: z.string().uuid(),
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
+  startDate: z.string().date().optional(),
+  endDate: z.string().date().optional(),
 });
 
 function escapeCsvField(value: string | number | null | undefined): string {
@@ -148,12 +148,14 @@ async function exportSchedule(
   );
 
   // Build date columns
+  // Walked in UTC throughout: local midnight read back through toISOString
+  // lands on the previous day on any server east of UTC.
   const dates: string[] = [];
-  const d = new Date(start + "T00:00:00");
-  const endD = new Date(end + "T00:00:00");
+  const d = new Date(start + "T00:00:00Z");
+  const endD = new Date(end + "T00:00:00Z");
   while (d <= endD) {
     dates.push(d.toISOString().split("T")[0]);
-    d.setDate(d.getDate() + 1);
+    d.setUTCDate(d.getUTCDate() + 1);
   }
 
   // Index shifts by emp_id:date
@@ -167,8 +169,9 @@ async function exportSchedule(
   const headers = [
     "Employee",
     ...dates.map((d) => {
-      const dt = new Date(d + "T00:00:00");
+      const dt = new Date(d + "T00:00:00Z");
       return dt.toLocaleDateString("en-US", {
+        timeZone: "UTC",
         weekday: "short",
         month: "short",
         day: "numeric",
