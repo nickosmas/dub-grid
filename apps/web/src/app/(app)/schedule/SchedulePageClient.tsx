@@ -2696,18 +2696,21 @@ function SchedulerContent({
 
   // Refetch the published ranges when the window (or org) genuinely changes.
   // This used to run unconditionally on mount as well, duplicating the fetch
-  // the initial load had already issued for the same window.
+  // the initial load had already issued for the same window. Until that load
+  // settles, the window state still holds the default band rather than the
+  // window being fetched, so comparing them would fetch the ranges twice.
   useEffect(() => {
     if (!org) {
       publishedRangesWindowRef.current = null;
       void refetchPublishedRanges();
       return;
     }
+    if (scheduleLoading) return;
     const windowKey = `${org.id}|${shiftFetchStart}|${shiftFetchEnd}`;
     if (publishedRangesWindowRef.current === windowKey) return;
     publishedRangesWindowRef.current = windowKey;
     void refetchPublishedRanges();
-  }, [org, shiftFetchStart, shiftFetchEnd, refetchPublishedRanges]);
+  }, [org, scheduleLoading, shiftFetchStart, shiftFetchEnd, refetchPublishedRanges]);
 
   // Register focus areas as sub-nav items for the mobile bottom sheet
   const focusAreaSubNav: SubNavItem[] = useMemo(
