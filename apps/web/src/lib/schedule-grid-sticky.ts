@@ -39,3 +39,62 @@ export function computeStickyReleaseInset({
   if (!Number.isFinite(cardBottom) || !Number.isFinite(releaseRowTop)) return 0;
   return Math.max(0, cardBottom - releaseRowTop);
 }
+
+/** One step of a layout task. Even steps only read layout; odd steps only write it. */
+export type LayoutStep = () => void;
+
+/** Builds a fresh set of steps each time its section is measured. */
+export type LayoutTask = () => readonly LayoutStep[];
+
+/**
+ * Runs every task's first step, then every task's second, and so on. With reads
+ * and writes on alternate steps, measuring N sections costs one style and
+ * layout pass per read step rather than one per section.
+ */
+export function runLayoutSteps(tasks: ReadonlyArray<readonly LayoutStep[]>): void {
+  const depth = tasks.reduce((max, task) => Math.max(max, task.length), 0);
+  for (let step = 0; step < depth; step += 1) {
+    for (const task of tasks) task[step]?.();
+  }
+}
+
+export interface StickyLayoutObserver {
+  /** Runs `task` whenever `target` resizes, and once when first observed. Returns a stop function. */
+  observe(target: Element, task: LayoutTask): () => void;
+}
+
+/**
+ * One ResizeObserver shared by every section. A delivery runs each affected
+ * section's task together through runLayoutSteps. ResizeObserver delivers after
+ * the browser lays the frame out and before it paints, so the first reads find
+ * layout done, the writes still land before the paint, and observing a new
+ * element delivers its initial size the same way.
+ */
+export function createStickyLayoutObserver(Observer: typeof ResizeObserver): StickyLayoutObserver {
+  const tasksByTarget = new Map<Element, Set<LayoutTask>>();
+  const observer = new Observer((entries) => {
+    const due = new Set<LayoutTask>();
+    for (const entry of entries) {
+      tasksByTarget.get(entry.target)?.forEach((task) => due.add(task));
+    }
+    runLayoutSteps([...due].map((task) => task()));
+  });
+
+  return {
+    observe(target, task) {
+      let tasks = tasksByTarget.get(target);
+      if (!tasks) {
+        tasks = new Set();
+        tasksByTarget.set(target, tasks);
+        observer.observe(target);
+      }
+      tasks.add(task);
+      return () => {
+        const current = tasksByTarget.get(target);
+        if (!current?.delete(task) || current.size > 0) return;
+        tasksByTarget.delete(target);
+        observer.unobserve(target);
+      };
+    },
+  };
+}
