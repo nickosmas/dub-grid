@@ -33,21 +33,38 @@ as a viewer's, so the scheduler's next return visit cannot paint from it.
 1. **First window, then the rest.** The initial load fetches cells, notes,
    call-off open shifts and published ranges for the visible publish window
    plus a 7-day buffer on each side, so adjacent-day staffing checks still
-   see their neighbours. Then the grid paints. Right after the paint, the
-   loaded window widens to the usual ±90 days through the existing
-   `refetchScheduleData` path, with the same in-flight guard the window-sync
-   effect uses, so the two never overlap. The snapshot is written for
-   whichever window is loaded, as today.
+   see their neighbours. The window reaches back to where the pay-period
+   alignment moves the week start a render later (up to 13 days earlier).
+   Then the grid paints. Right after the paint, the loaded window widens to
+   the usual ±90 days through the existing `refetchScheduleData` path, with
+   the same in-flight guard the window-sync effect uses, so the two never
+   overlap. The snapshot is written for whichever window is loaded, as today,
+   and is painted only if it covers the first window.
+   **Fetches that overlap the widen.** A fetch reads the live loaded window
+   when it starts, and when it lands it replaces cells only for the dates it
+   fetched (`replaceWithinWindow`), joining its window to the live one
+   (`mergeLoadedWindows`). This applies to `refetchScheduleData` (except a
+   recenter), the conflict reload, and repeating-series create and delete.
+   Replacing the whole grid emptied weeks still marked as loaded, and the
+   before-and-after diffs those callers broadcast read every such cell as
+   deleted.
 2. **Publish history off the critical path.** Start
    `fetchRecentPublishHistory` as soon as last-viewed resolves, alongside
    the cells request, and stop awaiting it before the paint. It applies the
    chips and toast when it lands. `updateScheduleLastViewed` still fires only
    after the history read, so the baseline it reads is never moved first.
 3. **No redundant draft refetch.** Start the initial load once both `org` and
-   permissions are known. Permissions load in parallel with the bootstrap, so
-   this should add no wait, and it should be measured. Remove the
+   permissions are known, waiting at most `PERMISSIONS_WAIT_MS` (3 s) after
+   org data so a stalled permissions request cannot hold the grid; past that
+   it loads as it does today. Permissions load in parallel with the
+   bootstrap, so this should add no wait, and it should be measured. With
+   permissions known, the load also fetches recurring shifts and publisher
+   history, which it skipped when they were unresolved. Remove the
    draft-visibility `fetchShifts` and keep `draftCheckComplete` meaning "the
-   initial load settled", so the window-sync effect is gated as before.
+   initial load settled and permissions are known", so the window-sync
+   effect is gated as before. No snapshot is written while permissions are
+   unresolved, and the initial load tags its snapshot with the live edit
+   permission.
 
 **Must not break:**
 
@@ -63,7 +80,9 @@ as a viewer's, so the scheduler's next return visit cannot paint from it.
 - **Deep links** (`?date=`, `?requests=`), Month view, mobile Day view, and
   far navigation (recenter past 300 days) behave as today.
 - **Viewer redaction:** staff still never receive draft cells. The server
-  rule is unchanged.
+  rule is unchanged, and no scheduler grid is stored under a viewer tag.
+- **Org switch:** a fetch that lands after the org changed is discarded. An
+  org switch is a full page load today, so this is defensive.
 
 **Out of scope (follow-up):** the server page's wasted session lookup
 (`page.tsx` verifies a token and discards the result), or using it to

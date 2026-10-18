@@ -226,10 +226,14 @@ import {
   FETCH_WINDOW_RECENTER_BUFFER_DAYS,
   FETCH_WINDOW_RECENTER_THRESHOLD_DAYS,
   FETCH_WINDOW_RETRY_LIMIT,
+  fetchWindowContains,
   formatImportPreviousSkipDescription,
+  getFirstPaintRange,
   getFullFetchWindow,
   getInitialFetchWindow,
+  mergeLoadedWindows,
   OPERATION_MODAL_DISMISS_MS,
+  PERMISSIONS_WAIT_MS,
   PUBLISH_WINDOW_DATE_FORMATTER,
   SCHEDULE_DELETE_BATCH_SIZE,
   widenFetchWindow,
@@ -252,6 +256,7 @@ import {
   indicatorIdsInNotes,
   markLocalWrite,
   reconcileFetchedWindow,
+  replaceWithinWindow,
   scheduleNoteKey,
   type ScheduleNoteMap,
 } from "./_lib/schedule-window";
@@ -521,6 +526,15 @@ function SchedulerContent({
   }));
   const shiftFetchStart = loadedShiftWindow.start;
   const shiftFetchEnd = loadedShiftWindow.end;
+  // The live window for fetches that outlast a render: a handler's closure can
+  // hold a window that has since grown. Set alongside the state, not only on
+  // render, so a fetch landing before the next render already sees it.
+  const loadedShiftWindowRef = useRef(loadedShiftWindow);
+  loadedShiftWindowRef.current = loadedShiftWindow;
+  const commitLoadedShiftWindow = useCallback((next: { start: string; end: string }) => {
+    loadedShiftWindowRef.current = next;
+    setLoadedShiftWindow(next);
+  }, []);
 
   const [weekStart, setWeekStart] = useState<Date>(() =>
     getWeekStart(initialDate ? parseLocalDateKey(initialDate) : todayAnchor),
@@ -1093,6 +1107,10 @@ function SchedulerContent({
   currentUserRef.current = currentUser;
   const canEditShiftsRef = useRef(canEditShifts);
   canEditShiftsRef.current = canEditShifts;
+  const permsLoadingRef = useRef(permsLoading);
+  permsLoadingRef.current = permsLoading;
+  const currentOrgIdRef = useRef(org?.id ?? null);
+  currentOrgIdRef.current = org?.id ?? null;
   const canEditNotesRef = useRef(canEditNotes);
   canEditNotesRef.current = canEditNotes;
   // Stable refs for map objects — avoids recreating callbacks when maps get new
@@ -1110,21 +1128,24 @@ function SchedulerContent({
   // replaces the loaded window with `[ensureStart, ensureEnd]` outright
   // instead of widening — used when a navigation jump is far enough that
   // widening would approach the server's 366-day range cap (see the
-  // "sync loaded window to current view" effect below). The default
-  // behavior is unchanged for callers that don't pass anything, and every
-  // fetch (widened, recentered, or default) persists its actual bounds into
-  // `loadedShiftWindow` so subsequent bare calls keep tracking the live window.
+  // "sync loaded window to current view" effect below). A bare call refetches
+  // the live loaded window, read when the call starts rather than from the
+  // caller's closure, and every fetch records its bounds in `loadedShiftWindow`.
   const refetchScheduleData = useCallback(
     async (opts?: { ensureStart?: string; ensureEnd?: string; recenter?: boolean }) => {
       if (!org) return;
-      const { start, end } =
-        opts?.recenter && opts.ensureStart && opts.ensureEnd
+      const orgId = org.id;
+      const loaded = loadedShiftWindowRef.current;
+      const recenter = Boolean(opts?.recenter && opts.ensureStart && opts.ensureEnd);
+      const fetchedWindow =
+        recenter && opts?.ensureStart && opts.ensureEnd
           ? { start: opts.ensureStart, end: opts.ensureEnd }
-          : widenFetchWindow(shiftFetchStart, shiftFetchEnd, opts);
+          : widenFetchWindow(loaded.start, loaded.end, opts);
+      const { start, end } = fetchedWindow;
       const startedAt = localWrites.current.generation;
       const [fetchedShifts, noteRows] = await Promise.all([
         fetchShifts(
-          org.id,
+          orgId,
           canEditShiftsRef.current,
           assignmentLabelMapRef.current,
           absenceTypeMapRef.current,
@@ -1132,77 +1153,121 @@ function SchedulerContent({
           end,
           segmentCompatibility,
         ),
-        fetchScheduleNotes(org.id, start, end),
+        fetchScheduleNotes(orgId, start, end),
       ]);
-      const { shifts: shiftData, notes: noteMap } = reconcileFetchedWindow({
+      // An org switch while this was in flight: these cells are not the new org's.
+      if (currentOrgIdRef.current !== orgId) return;
+      const reconciled = reconcileFetchedWindow({
         fetched: { shifts: fetchedShifts, notes: buildScheduleNoteMap(noteRows) },
         current: { shifts: shiftsRef.current, notes: notesRef.current },
         ledger: localWrites.current,
         startedAt,
         pendingCellKeys: pendingShiftWrites.current.keys(),
       });
+      // A recenter drops the old window on purpose. Anything else may land after
+      // the window grew, so it replaces only the dates it fetched.
+      const nextWindow = recenter
+        ? fetchedWindow
+        : mergeLoadedWindows(loadedShiftWindowRef.current, fetchedWindow);
+      const shiftData = recenter
+        ? reconciled.shifts
+        : replaceWithinWindow(shiftsRef.current, reconciled.shifts, fetchedWindow);
+      const noteMap = recenter
+        ? reconciled.notes
+        : replaceWithinWindow(notesRef.current, reconciled.notes, fetchedWindow);
+      shiftsRef.current = shiftData;
+      notesRef.current = noteMap;
       setShifts(shiftData);
       setNotes(noteMap);
-      setLoadedShiftWindow({ start, end });
-      writeScheduleWindow(queryClient, org.id, {
-        window: { start, end },
-        shifts: shiftData,
-        notes: noteMap,
-        canEditShifts: canEditShiftsRef.current,
-      });
+      commitLoadedShiftWindow(nextWindow);
+      if (!permsLoadingRef.current) {
+        writeScheduleWindow(queryClient, orgId, {
+          window: nextWindow,
+          shifts: shiftData,
+          notes: noteMap,
+          canEditShifts: canEditShiftsRef.current,
+        });
+      }
       lastRefetchAtRef.current = Date.now();
       return { shiftData, noteMap };
     },
-    [org, shiftFetchStart, shiftFetchEnd],
+    [org, commitLoadedShiftWindow],
   );
 
   // Load schedule-specific data (shifts, notes, recurring, publish history) once org data is ready.
   const scheduleLoadStarted = useRef(false);
-  const draftCheckStarted = useRef(false);
   // The org + window the published ranges have already been fetched for, so the
   // window-change effect below doesn't re-request what the initial load just
   // fetched inside its own Promise.all (build plan item 28).
   const publishedRangesWindowRef = useRef<string | null>(null);
-  const initialLoadUsedEditPerms = useRef(false);
   const fullWindowLoadedRef = useRef(false);
   const fullWindowFailuresRef = useRef(0);
+  const fullWindowRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevOrgIdRef = useRef<string | null>(null);
+  // The initial load reads edit, recurring and publish-history permissions, and
+  // with them unresolved it fetched as staff: no recurring shifts, staff-mode
+  // history, and a snapshot tagged as a viewer's. So it waits for them, up to
+  // PERMISSIONS_WAIT_MS, and then loads as before.
+  const [permissionsWaitExpiredFor, setPermissionsWaitExpiredFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!permsLoading || orgLoading || !org) return;
+    const orgId = org.id;
+    const timer = setTimeout(() => setPermissionsWaitExpiredFor(orgId), PERMISSIONS_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [permsLoading, orgLoading, org]);
   useEffect(() => {
     // Reset load guards when org changes (e.g. org switcher)
     if (org && org.id !== prevOrgIdRef.current) {
       prevOrgIdRef.current = org.id;
       scheduleLoadStarted.current = false;
-      draftCheckStarted.current = false;
       fullWindowLoadedRef.current = false;
       fullWindowFailuresRef.current = 0;
       publishedRangesWindowRef.current = null;
-      setLoadedShiftWindow({ start: defaultShiftFetchStart, end: defaultShiftFetchEnd });
+      commitLoadedShiftWindow({ start: defaultShiftFetchStart, end: defaultShiftFetchEnd });
       setPublicationRangeState(beginPublicationRangeLoad());
     }
     if (orgLoading || !org || scheduleLoadStarted.current) return;
+    if (permsLoading && permissionsWaitExpiredFor !== org.id) return;
     scheduleLoadStarted.current = true;
-    initialLoadUsedEditPerms.current = canEditShifts;
     const orgId = org.id;
+
+    // The week start is realigned to the pay period a render after org data
+    // arrives, so the first paint can show earlier dates than this render's.
+    const firstPaintRange = getFirstPaintRange(
+      publishWindowDateRange,
+      formatDateKey(realignTwoWeekScheduleStart(weekStart, spanWeeks, payPeriodStartDate)),
+    );
+    const firstWindow = getInitialFetchWindow(firstPaintRange);
 
     // Paint the previous visit's grid immediately while the fetch below
     // refreshes it. Coming back to /schedule otherwise blocked on refetching
     // the whole default window before anything rendered. readScheduleWindow
     // returns null unless the snapshot is this org's and was taken under the
-    // same edit permission, so a stale or wrong-shaped grid never shows.
-    const cachedWindow = readScheduleWindow(queryClient, orgId, canEditShifts);
+    // same edit permission, so a stale or wrong-shaped grid never shows. A
+    // snapshot of other weeks would show the ones on screen as empty, so it
+    // must also cover them.
+    const snapshot = readScheduleWindow(queryClient, orgId, canEditShifts);
+    const cachedWindow =
+      snapshot && fetchWindowContains(snapshot.window, firstWindow) ? snapshot : null;
     if (cachedWindow) {
+      shiftsRef.current = cachedWindow.shifts;
+      notesRef.current = cachedWindow.notes;
       setShifts(cachedWindow.shifts);
       setNotes(cachedWindow.notes);
-      setLoadedShiftWindow(cachedWindow.window);
+      commitLoadedShiftWindow(cachedWindow.window);
       setPaintedFromSnapshot(true);
     }
 
     // With nothing painted yet, fetch only what is on screen and paint from
     // that; the full-window effect below loads the rest afterwards. A painted
-    // snapshot is not waiting on this fetch, so it refreshes the default band.
+    // snapshot is not waiting on this fetch, so it refreshes the full window.
     const { start: initialStart, end: initialEnd } = cachedWindow
-      ? { start: defaultShiftFetchStart, end: defaultShiftFetchEnd }
-      : getInitialFetchWindow(publishWindowDateRange);
+      ? getFullFetchWindow(
+          firstWindow,
+          { start: defaultShiftFetchStart, end: defaultShiftFetchEnd },
+          firstPaintRange,
+        )
+      : firstWindow;
     // Claim this window before the fetch below runs, so the window-change
     // effect treats the initial load as the fetch for it rather than issuing
     // a second, identical request on every mount.
@@ -1278,8 +1343,9 @@ function SchedulerContent({
             }),
         ]);
 
+        if (currentOrgIdRef.current !== orgId) return;
         lastViewedRef.current = lastViewed;
-        setLoadedShiftWindow({ start: initialStart, end: initialEnd });
+        commitLoadedShiftWindow({ start: initialStart, end: initialEnd });
 
         // A save made on the cached grid painted above can land before this
         // fetch does.
@@ -1290,14 +1356,21 @@ function SchedulerContent({
           startedAt,
           pendingCellKeys: pendingShiftWrites.current.keys(),
         });
+        shiftsRef.current = shiftData;
+        notesRef.current = noteMap;
         setShifts(shiftData);
         setNotes(noteMap);
-        writeScheduleWindow(queryClient, orgId, {
-          window: { start: initialStart, end: initialEnd },
-          shifts: shiftData,
-          notes: noteMap,
-          canEditShifts,
-        });
+        // Tagged with a permission still unknown, a scheduler's grid (drafts and
+        // all) could later be painted for a viewer. The live value, not this
+        // load's: permissions can resolve while it is in flight.
+        if (!permsLoadingRef.current) {
+          writeScheduleWindow(queryClient, orgId, {
+            window: { start: initialStart, end: initialEnd },
+            shifts: shiftData,
+            notes: noteMap,
+            canEditShifts: canEditShiftsRef.current,
+          });
+        }
         setRecurringShifts(recShifts);
         setCalloffOpenShifts(initialCalloffOpenShifts);
         setPublicationRangeState(initialPublishedDateRanges);
@@ -1310,6 +1383,7 @@ function SchedulerContent({
     }
 
     function applyInitialPublishHistory(recentPublishes: PublishHistoryEntry[]) {
+      if (currentOrgIdRef.current !== orgId) return;
       if (recentPublishes.length > 0) {
         // The grid is usable before this lands, so a publish or a picked
         // history entry may have set the history first; that one is newer.
@@ -1340,7 +1414,7 @@ function SchedulerContent({
       void updateScheduleLastViewed(orgId);
     }
     loadSchedule();
-  }, [orgLoading, org]);
+  }, [orgLoading, org, permsLoading, permissionsWaitExpiredFor]);
 
   // Resolve a user UUID to a display name via profiles table (cached).
   const resolveUserName = useCallback(
@@ -2377,57 +2451,16 @@ function SchedulerContent({
     };
   }, [announceEditingCell, refreshPresence]);
 
-  // Re-fetch with scheduler visibility once permissions resolve, so editors
-  // see draft data even if the initial load ran before permissions were ready.
-  // Skip if the initial load already used canEditShifts=true (no extra fetch needed).
+  // Set once the initial load has landed and permissions are known. It gates
+  // the window sync and the full-window widen, so their snapshot writes carry
+  // the right edit permission, and the draft styling. Draft visibility is the
+  // server's to decide from the session, so the initial load already holds a
+  // scheduler's drafts and is never refetched for them.
   const [draftCheckComplete, setDraftCheckComplete] = useState(false);
   useEffect(() => {
-    if (permsLoading || !org || scheduleLoading || draftCheckStarted.current) return;
-    if (!canEditShifts || initialLoadUsedEditPerms.current) {
-      setDraftCheckComplete(true);
-      return;
-    }
-    draftCheckStarted.current = true;
-
-    (async () => {
-      try {
-        const startedAt = localWrites.current.generation;
-        const fetchedShifts = await fetchShifts(
-          org.id,
-          true,
-          assignmentLabelMapRef.current,
-          absenceTypeMapRef.current,
-          shiftFetchStart,
-          shiftFetchEnd,
-          segmentCompatibility,
-        );
-        const { shifts: draftShifts } = reconcileFetchedWindow({
-          fetched: { shifts: fetchedShifts, notes: notesRef.current },
-          current: { shifts: shiftsRef.current, notes: notesRef.current },
-          ledger: localWrites.current,
-          startedAt,
-          pendingCellKeys: pendingShiftWrites.current.keys(),
-        });
-        setShifts(draftShifts);
-        // Restamp the snapshot under the permission it was actually fetched
-        // with. Without this the entry keeps the canEditShifts=false written by
-        // the initial load, which ran before permissions resolved — and every
-        // later visit, arriving with permissions already cached and true, would
-        // mismatch and refetch the whole window. That is a guaranteed miss for
-        // exactly the schedulers and admins who use this page most.
-        writeScheduleWindow(queryClient, org.id, {
-          window: { start: shiftFetchStart, end: shiftFetchEnd },
-          shifts: draftShifts,
-          notes: notesRef.current,
-          canEditShifts: true,
-        });
-      } catch (err) {
-        Sentry.captureException(err);
-      } finally {
-        setDraftCheckComplete(true);
-      }
-    })();
-  }, [permsLoading, org, scheduleLoading, canEditShifts]);
+    if (permsLoading || !org || scheduleLoading) return;
+    setDraftCheckComplete(true);
+  }, [permsLoading, org, scheduleLoading]);
 
   // Sync the loaded shift/notes window to wherever the user has navigated.
   // Without this, `loadedShiftWindow` stays at its ±90-day default forever —
@@ -2516,31 +2549,44 @@ function SchedulerContent({
       { start: defaultShiftFetchStart, end: defaultShiftFetchEnd },
       publishWindowDateRange,
     );
-    if (full.start >= loadedShiftWindow.start && full.end <= loadedShiftWindow.end) {
+    if (fetchWindowContains(loadedShiftWindow, full)) {
       fullWindowLoadedRef.current = true;
       return;
     }
 
     isSyncingFetchWindowRef.current = true;
     const orgId = org.id;
-    void refetchScheduleData({ ensureStart: full.start, ensureEnd: full.end, recenter: true })
-      .then(() => {
+    // Widening keeps the merge that protects cells written meanwhile; only the
+    // far deep link, whose full window does not hold the loaded one, recenters.
+    const recenter = !fetchWindowContains(full, loadedShiftWindow);
+    void refetchScheduleData({ ensureStart: full.start, ensureEnd: full.end, recenter })
+      .then((refreshed) => {
+        if (!refreshed) {
+          // Discarded by an org switch mid-flight; look again for the new org.
+          setFetchWindowRetryToken((token) => token + 1);
+          return;
+        }
         fullWindowLoadedRef.current = true;
         // The call-off list stands in while shift requests load or fail, so it
         // has to cover the same window the grid now does.
         return fetchCalloffOpenShifts(orgId, full.start, full.end, assignmentLabelMapRef.current)
-          .then(setCalloffOpenShifts)
+          .then((openShifts) => {
+            if (currentOrgIdRef.current === orgId) setCalloffOpenShifts(openShifts);
+          })
           .catch((err) => Sentry.captureException(err));
       })
       .catch((err) => {
         Sentry.captureException(err);
         fullWindowFailuresRef.current += 1;
         if (fullWindowFailuresRef.current <= FETCH_WINDOW_RETRY_LIMIT) {
-          fetchWindowRetryTimerRef.current = setTimeout(() => {
+          fullWindowRetryTimerRef.current = setTimeout(() => {
             setFetchWindowRetryToken((token) => token + 1);
           }, 3000);
         } else {
+          // Navigation still fetches whatever it shows through the window sync,
+          // which skipped any move made while this held the in-flight guard.
           fullWindowLoadedRef.current = true;
+          setFetchWindowRetryToken((token) => token + 1);
         }
       })
       .finally(() => {
@@ -2561,6 +2607,7 @@ function SchedulerContent({
   useEffect(
     () => () => {
       if (fetchWindowRetryTimerRef.current) clearTimeout(fetchWindowRetryTimerRef.current);
+      if (fullWindowRetryTimerRef.current) clearTimeout(fullWindowRetryTimerRef.current);
     },
     [],
   );
@@ -3915,30 +3962,26 @@ function SchedulerContent({
 
     const refetch = (async () => {
       try {
+        const fetchWindow = loadedShiftWindowRef.current;
         const freshShifts = await fetchShifts(
           orgId,
           canEditShifts,
           assignmentLabelMapRef.current,
           absenceTypeMapRef.current,
-          shiftFetchStart,
-          shiftFetchEnd,
+          fetchWindow.start,
+          fetchWindow.end,
           segmentCompatibility,
         );
-        setShifts(freshShifts);
+        const merged = replaceWithinWindow(shiftsRef.current, freshShifts, fetchWindow);
+        shiftsRef.current = merged;
+        setShifts(merged);
       } finally {
         conflictRefetchRef.current = null;
       }
     })();
     conflictRefetchRef.current = refetch;
     await refetch;
-  }, [
-    broadcastDraftReconcile,
-    org?.id,
-    canEditShifts,
-    shiftFetchStart,
-    shiftFetchEnd,
-    segmentCompatibility,
-  ]);
+  }, [broadcastDraftReconcile, org?.id, canEditShifts, segmentCompatibility]);
 
   /**
    * Serializes a write behind every write already pending on the cells it
@@ -4865,17 +4908,22 @@ function SchedulerContent({
     if (!pendingSeriesDelete || !org) return;
     if (!guardActiveSession()) return;
     try {
-      const prevShifts = shifts;
       const { deletedCount } = await deleteShiftSeries(pendingSeriesDelete.seriesId, org.id);
-      const shiftData = await fetchShifts(
+      const fetchWindow = loadedShiftWindowRef.current;
+      const fetched = await fetchShifts(
         org.id,
         canEditShifts,
         assignmentLabelMapRef.current,
         absenceTypeMapRef.current,
-        shiftFetchStart,
-        shiftFetchEnd,
+        fetchWindow.start,
+        fetchWindow.end,
         segmentCompatibility,
       );
+      // Diffed against the grid as it is now, so the only differences are the
+      // fetched window's and peers are not told about cells it never covered.
+      const prevShifts = shiftsRef.current;
+      const shiftData = replaceWithinWindow(prevShifts, fetched, fetchWindow);
+      shiftsRef.current = shiftData;
       setShifts(shiftData);
       const shiftUpdates: Record<string, ShiftMap[string] | null> = {};
       // Detect removed shifts
@@ -4903,12 +4951,9 @@ function SchedulerContent({
     pendingSeriesDelete,
     org,
     canEditShifts,
-    shifts,
     broadcastDraftChanged,
     closeEditPanel,
     guardActiveSession,
-    shiftFetchStart,
-    shiftFetchEnd,
   ]);
 
   const handleRepeatConfirm = useCallback(
@@ -4997,16 +5042,19 @@ function SchedulerContent({
           progress: 95,
           detail: "Refreshing the schedule with the new repeating entries...",
         });
-        const prevShifts = shifts;
-        const shiftData = await fetchShifts(
+        const fetchWindow = loadedShiftWindowRef.current;
+        const fetched = await fetchShifts(
           org.id,
           canEditShifts,
           assignmentLabelMapRef.current,
           absenceTypeMapRef.current,
-          shiftFetchStart,
-          shiftFetchEnd,
+          fetchWindow.start,
+          fetchWindow.end,
           segmentCompatibility,
         );
+        const prevShifts = shiftsRef.current;
+        const shiftData = replaceWithinWindow(prevShifts, fetched, fetchWindow);
+        shiftsRef.current = shiftData;
         setShifts(shiftData);
         // Broadcast new/changed shifts to other editors
         const shiftUpdates: Record<string, ShiftMap[string] | null> = {};
@@ -5043,10 +5091,7 @@ function SchedulerContent({
       finishScheduleOperation,
       clearScheduleOperation,
       closeEditPanel,
-      shifts,
       broadcastDraftChanged,
-      shiftFetchStart,
-      shiftFetchEnd,
       guardActiveSession,
     ],
   );

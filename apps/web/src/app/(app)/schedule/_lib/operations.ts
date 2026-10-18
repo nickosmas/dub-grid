@@ -89,6 +89,13 @@ export function daysBetweenDateKeys(startKey: string, endKey: string): number {
 }
 
 /**
+ * How long the initial load waits for permissions once org data is ready.
+ * They normally land first, since they load alongside the org data; the cap
+ * keeps a stalled permissions request from holding the grid indefinitely.
+ */
+export const PERMISSIONS_WAIT_MS = 3000;
+
+/**
  * Days loaded either side of the visible range before the first paint, so the
  * adjacent-day staffing checks still see their neighbours.
  */
@@ -104,14 +111,57 @@ function shiftDateKey(key: string, days: number): string {
 }
 
 /**
- * The window a cold load fetches before it paints: the visible range and a
+ * The dates the first paint may show: the visible range, reaching back to
+ * `alignedStartKey`, where the pay-period alignment moves the start a render
+ * later. Alignment only ever moves it earlier, by up to 13 days.
+ */
+export function getFirstPaintRange(visible: DateKeyRange, alignedStartKey: string): DateKeyRange {
+  return {
+    startDateKey: alignedStartKey < visible.startDateKey ? alignedStartKey : visible.startDateKey,
+    endDateKey: visible.endDateKey,
+  };
+}
+
+/**
+ * The window a cold load fetches before it paints: the first-paint range and a
  * small buffer, rather than the whole default band.
  */
-export function getInitialFetchWindow(visible: DateKeyRange): { start: string; end: string } {
+export function getInitialFetchWindow(range: DateKeyRange): { start: string; end: string } {
   return {
-    start: shiftDateKey(visible.startDateKey, -INITIAL_FETCH_BUFFER_DAYS),
-    end: shiftDateKey(visible.endDateKey, INITIAL_FETCH_BUFFER_DAYS),
+    start: shiftDateKey(range.startDateKey, -INITIAL_FETCH_BUFFER_DAYS),
+    end: shiftDateKey(range.endDateKey, INITIAL_FETCH_BUFFER_DAYS),
   };
+}
+
+export function fetchWindowContains(
+  outer: { start: string; end: string },
+  inner: { start: string; end: string },
+): boolean {
+  return outer.start <= inner.start && inner.end <= outer.end;
+}
+
+/**
+ * The loaded window after a non-recentering fetch of `fetched` lands, when the
+ * window may have moved while it was in flight (`latest`). Overlapping windows
+ * join, unless that would pass the recenter threshold; a fetch for somewhere
+ * the window has since left keeps the window where it now is.
+ */
+export function mergeLoadedWindows(
+  latest: { start: string; end: string },
+  fetched: { start: string; end: string },
+): { start: string; end: string } {
+  if (fetchWindowContains(fetched, latest)) return fetched;
+  const overlaps =
+    daysBetweenDateKeys(fetched.end, latest.start) <= 1 &&
+    daysBetweenDateKeys(latest.end, fetched.start) <= 1;
+  if (!overlaps) return latest;
+  const union = widenFetchWindow(latest.start, latest.end, {
+    ensureStart: fetched.start,
+    ensureEnd: fetched.end,
+  });
+  return daysBetweenDateKeys(union.start, union.end) <= FETCH_WINDOW_RECENTER_THRESHOLD_DAYS
+    ? union
+    : latest;
 }
 
 /**
