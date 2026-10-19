@@ -6,6 +6,18 @@ const createClient = vi.fn();
 const writeSecurityAuditEvent = vi.fn();
 const endUserSession = vi.fn();
 const verifyAccessToken = vi.fn();
+// Collects each task so a test can run the deferred work, not just see that
+// after() was called.
+const scheduled: Array<() => unknown> = [];
+const after = vi.fn((task: () => unknown) => {
+  scheduled.push(task);
+});
+const runScheduled = () => Promise.all(scheduled.splice(0).map((task) => task()));
+
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (task: () => unknown) => after(task),
+}));
 
 vi.mock("@/lib/rate-limit", () => ({
   checkRateLimit,
@@ -249,6 +261,7 @@ function abandonedRequest() {
 describe("mobile auth login route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    scheduled.length = 0;
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "anon-key");
     writeSecurityAuditEvent.mockResolvedValue(undefined);
@@ -552,6 +565,8 @@ describe("mobile auth login route", () => {
     const payload = await response.json();
 
     expect(response.status).toBe(504);
+    // The refusal record is written before answering, unlike a success.
+    expect(after).not.toHaveBeenCalled();
     // No tokens: handing them back is what leaves the orphan behind.
     expect(payload.session).toBeUndefined();
     expect(endUserSession).toHaveBeenCalledWith(
@@ -614,6 +629,17 @@ describe("mobile auth login route", () => {
 
     expect(response.status).toBe(200);
     expect(endUserSession).not.toHaveBeenCalled();
+    // The success record is written after the response, not before it.
+    expect(after).toHaveBeenCalledOnce();
+    expect(writeSecurityAuditEvent).not.toHaveBeenCalled();
+    await runScheduled();
+    expect(writeSecurityAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "security.auth.login",
+        outcome: "succeeded",
+        reason: "accepted",
+      }),
+    );
   });
 
   it("returns an MFA-required login payload without rejecting verified TOTP users", async () => {
@@ -662,6 +688,7 @@ describe("mobile auth login route", () => {
         slug: "dubgrid-health",
       },
     });
+    await runScheduled();
     expect(writeSecurityAuditEvent).toHaveBeenLastCalledWith(
       expect.objectContaining({
         event: "security.auth.login",

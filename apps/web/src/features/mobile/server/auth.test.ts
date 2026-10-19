@@ -278,7 +278,9 @@ describe("mobile auth server boundaries", () => {
     },
   );
 
-  it("rejects a live Gridmaster account before resolving organization membership", async () => {
+  // The membership and organization reads start alongside the platform-role
+  // read, so these refusals are proven by their answers, not by reads skipped.
+  it("rejects a live Gridmaster account before checking organization membership", async () => {
     fetchMobileProfilePlatformRole.mockResolvedValue("gridmaster");
     getServiceClient.mockReturnValue(
       createServiceClient({
@@ -300,7 +302,6 @@ describe("mobile auth server boundaries", () => {
     expect(await result.response.json()).toEqual({
       error: "Gridmaster mobile access is not supported",
     });
-    expect(fetchMobileOrganizationMembershipRows).not.toHaveBeenCalled();
   });
 
   it("does not reject a regular account because of a stale Gridmaster claim", async () => {
@@ -324,7 +325,7 @@ describe("mobile auth server boundaries", () => {
   it.each([
     ["missing", undefined],
     ["malformed", "not-an-organization-id"],
-  ])("rejects a %s organization claim without reading organization data", async (_label, orgId) => {
+  ])("rejects a %s organization claim before using organization data", async (_label, orgId) => {
     getServiceClient.mockReturnValue(
       createServiceClient({ setupComplete: true, claims: { org_id: orgId } }),
     );
@@ -339,7 +340,12 @@ describe("mobile auth server boundaries", () => {
     expect("response" in result).toBe(true);
     if (!("response" in result)) return;
     expect(result.response.status).toBe(403);
-    expect(fetchMobileOrganizationRowById).not.toHaveBeenCalled();
+    expect(await result.response.json()).toEqual({
+      error: orgId
+        ? "Organization context does not match this user"
+        : "Your session is not tied to an organization. Sign in again to pick one.",
+    });
+    if (!orgId) expect(fetchMobileOrganizationRowById).not.toHaveBeenCalled();
   });
 
   it("rejects a removed or archived organization membership", async () => {
@@ -356,7 +362,9 @@ describe("mobile auth server boundaries", () => {
     expect("response" in result).toBe(true);
     if (!("response" in result)) return;
     expect(result.response.status).toBe(403);
-    expect(fetchMobileOrganizationRowById).not.toHaveBeenCalled();
+    expect(await result.response.json()).toEqual({
+      error: "No active organization membership found",
+    });
   });
 
   it("rejects an archived organization", async () => {

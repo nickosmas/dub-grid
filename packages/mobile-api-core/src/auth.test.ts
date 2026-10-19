@@ -167,3 +167,83 @@ describe("loginMobileUser org reconciliation", () => {
     expect(rpc).toHaveBeenCalledWith("switch_org", { target_org_id: ORG_B });
   });
 });
+
+describe("loginMobileUser read order", () => {
+  function profileClient(profile: Promise<{ data: unknown; error: unknown }>) {
+    const base = buildServiceClient();
+    return {
+      from: (table: string) =>
+        table === "profiles"
+          ? { select: () => ({ eq: () => ({ maybeSingle: () => profile }) }) }
+          : base.from(table),
+    } as unknown as SupabaseClient;
+  }
+
+  it("starts the membership read without waiting for the profile check", async () => {
+    let answerProfile: (value: { data: unknown; error: unknown }) => void = () => {};
+    const profile = new Promise<{ data: unknown; error: unknown }>((resolve) => {
+      answerProfile = resolve;
+    });
+    const { client, rpc } = buildSessionClient(ORG_B, false);
+
+    const pending = loginMobileUser(profileClient(profile), client, LOGIN_INPUT);
+    await vi.waitFor(() => expect(rpc).toHaveBeenCalledWith("get_my_organizations"));
+
+    answerProfile({ data: { platform_role: "none" }, error: null });
+    await expect(pending).resolves.toMatchObject({ organization: { id: ORG_B } });
+  });
+
+  it("starts the billing policy load before signing in", async () => {
+    const order: string[] = [];
+    const { client } = buildSessionClient(ORG_B, false);
+    const signIn = client.auth.signInWithPassword.bind(client.auth);
+    client.auth.signInWithPassword = (async (...args: Parameters<typeof signIn>) => {
+      order.push("sign-in");
+      return signIn(...args);
+    }) as typeof client.auth.signInWithPassword;
+
+    await loginMobileUser(buildServiceClient(), client, LOGIN_INPUT, {
+      loadPlatformBillingPolicy: async () => {
+        order.push("policy");
+        return undefined as never;
+      },
+    });
+
+    expect(order).toEqual(["policy", "sign-in"]);
+  });
+
+  it("refuses a Gridmaster first, even when the membership read fails", async () => {
+    const { client, rpc } = buildSessionClient(ORG_B, false);
+    rpc.mockImplementation((async () => ({ data: null, error: { message: "down" } })) as never);
+
+    await expect(
+      loginMobileUser(
+        profileClient(Promise.resolve({ data: { platform_role: "gridmaster" }, error: null })),
+        client,
+        LOGIN_INPUT,
+      ),
+    ).rejects.toMatchObject({
+      status: 403,
+      message: "Gridmaster accounts are not supported in the mobile app.",
+    });
+  });
+
+  it("refuses a non-member before a failed billing policy load is ever awaited", async () => {
+    const { client, rpc } = buildSessionClient(ORG_B, false);
+    rpc.mockImplementation((async () => ({
+      data: [{ org_id: ORG_A, org_name: "Alpha", org_slug: "alpha", is_active: true }],
+      error: null,
+    })) as never);
+
+    await expect(
+      loginMobileUser(buildServiceClient(), client, LOGIN_INPUT, {
+        loadPlatformBillingPolicy: async () => {
+          throw new Error("policy read failed");
+        },
+      }),
+    ).rejects.toMatchObject({
+      status: 403,
+      message: "Your account is not associated with that organization.",
+    });
+  });
+});

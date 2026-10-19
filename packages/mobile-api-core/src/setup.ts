@@ -10,7 +10,41 @@ function getSetupQueryError(results: SetupQueryResult[]): unknown {
   return results.find((result) => result.error)?.error ?? null;
 }
 
+/**
+ * In-process memo holding only `true`, the same policy as the web's
+ * `resetOrgSetupCompleteMemo` memo. The check reads seven tables and runs on
+ * every mobile request, for an answer that changes a few times in an org's
+ * life. `false` is never memoized: incomplete to complete is the transition an
+ * admin is waiting on, so an org mid-setup re-checks on every request.
+ * Complete to incomplete is bounded by the window, as on the web.
+ */
+const SETUP_COMPLETE_MEMO_TTL_MS = 60_000;
+const setupCompleteMemo = new Map<string, number>();
+
+/** Test seam: clears the in-process setup-complete memo between cases. */
+export function resetMobileOrgSetupCompleteMemo(): void {
+  setupCompleteMemo.clear();
+}
+
 export async function isMobileOrgSetupComplete(
+  serviceClient: SupabaseClient,
+  orgId: string,
+): Promise<boolean> {
+  const memoizedUntil = setupCompleteMemo.get(orgId);
+  if (memoizedUntil !== undefined && memoizedUntil > Date.now()) {
+    return true;
+  }
+
+  const complete = await readMobileOrgSetupComplete(serviceClient, orgId);
+  if (complete) {
+    setupCompleteMemo.set(orgId, Date.now() + SETUP_COMPLETE_MEMO_TTL_MS);
+  } else {
+    setupCompleteMemo.delete(orgId);
+  }
+  return complete;
+}
+
+async function readMobileOrgSetupComplete(
   serviceClient: SupabaseClient,
   orgId: string,
 ): Promise<boolean> {
