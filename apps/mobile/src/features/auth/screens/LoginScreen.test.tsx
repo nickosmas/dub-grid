@@ -143,6 +143,16 @@ describe("LoginScreen", () => {
     expect(primaryAction.compareDocumentPosition(helpLink)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
+  it("opens the privacy policy before sign-in", async () => {
+    const { openedUrls } = await import("../../../test/shims/expo-web-browser");
+    openedUrls.length = 0;
+    await renderLogin();
+
+    fireEvent.click(screen.getByRole("button", { name: "Privacy policy" }));
+
+    await waitFor(() => expect(openedUrls.at(-1)?.url).toBe("https://dubgrid.com/privacy"));
+  });
+
   it("auto-skips to the credentials stage when the remembered organization resolves", async () => {
     loadLastOrg.mockResolvedValue({ slug: "dubgrid-health", name: null });
     lookupOrganization.mockResolvedValue({

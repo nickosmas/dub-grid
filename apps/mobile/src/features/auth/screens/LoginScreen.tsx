@@ -18,7 +18,7 @@ import {
   useIsConsentDecisionPending,
   useRecheckConsentDecision,
 } from "../../consent/components/ConsentGate";
-import { clearStoredConsent } from "../../consent/lib/consent";
+import { clearStoredConsent, getLegalUrls } from "../../consent/lib/consent";
 import {
   getBootstrap,
   loginToOrganization,
@@ -38,6 +38,7 @@ import { loadLastOrg, saveLastOrg } from "../../../shared/lib/session";
 import { markHasSeenOnboarding } from "../hooks/useHasSeenOnboarding";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
+import { openInAppBrowser } from "../../../shared/lib/inAppBrowser";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
@@ -543,6 +544,11 @@ export default function LoginScreen() {
                 expanded={showOrgHelp}
                 label="Need help with your domain?"
                 onPress={() => setShowOrgHelp((current) => !current)}
+                tone="link"
+              />
+              <Button
+                label="Privacy policy"
+                onPress={() => void openInAppBrowser(getLegalUrls().privacy, mobileColors)}
                 tone="link"
               />
             </AuthActions>

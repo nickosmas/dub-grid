@@ -117,9 +117,29 @@ export function withDevServerHost(value: string, devServerHost: string | null): 
   return value.endsWith("/") ? rewritten : rewritten.replace(/\/$/, "");
 }
 
+/**
+ * Why a release bundle must not use this URL, or null when it may. Values are
+ * inlined at bundle time, so a build made with a dev `.env.local` would ship
+ * pointed at a laptop. The apex is refused because it 307s to www and iOS drops
+ * the Authorization header across that redirect.
+ */
+function releaseUrlProblem(url: URL, key: MobileEnvKey): string | null {
+  if (url.protocol !== "https:") return "A release build must use an https URL.";
+  if (isLoopbackHost(url.hostname) || isPrivateIpv4Host(url.hostname)) {
+    return "A release build cannot use a local or LAN address. Set the production values in the EAS environment.";
+  }
+  if (key === "EXPO_PUBLIC_API_BASE_URL" && url.hostname.toLowerCase() === "dubgrid.com") {
+    return "Use https://www.dubgrid.com, not the bare domain, which redirects.";
+  }
+  return null;
+}
+
 export function validateMobileEnv(
   platform: PlatformOSType = Platform.OS,
   devServerHost: string | null = getDevServerHost(),
+  // A real React Native release defines `__DEV__` as false; it is undefined only
+  // outside the app runtime, such as under Vitest.
+  isDevBuild: boolean = typeof __DEV__ === "undefined" || __DEV__,
 ): MobileEnvValidation {
   const supabaseUrl = withDevServerHost(readEnvValue("EXPO_PUBLIC_SUPABASE_URL"), devServerHost);
   const supabaseAnonKey = readEnvValue("EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
@@ -232,6 +252,18 @@ export function validateMobileEnv(
         message:
           "This is a local Supabase key but the Supabase URL points at the hosted project. Run `npm run use:mobile:remote`.",
       });
+    }
+  }
+
+  if (!isDevBuild) {
+    const urls: [MobileEnvKey, URL | null][] = [
+      ["EXPO_PUBLIC_SUPABASE_URL", supabaseUrlObject],
+      ["EXPO_PUBLIC_API_BASE_URL", apiBaseUrlObject],
+    ];
+    for (const [key, url] of urls) {
+      if (!url || issues.some((issue) => issue.key === key)) continue;
+      const message = releaseUrlProblem(url, key);
+      if (message) issues.push({ key, message });
     }
   }
 

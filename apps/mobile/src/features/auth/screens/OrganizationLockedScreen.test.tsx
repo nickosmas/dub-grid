@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule, createSafeAreaContextModule } from "../../../test/native";
 
@@ -18,10 +18,6 @@ const getOrgStatus = vi.fn();
 
 vi.mock("../../../shared/lib/api", () => ({
   getOrgStatus: (...args: unknown[]) => getOrgStatus(...args),
-}));
-
-vi.mock("../../../shared/lib/env", () => ({
-  getMobileEnvConfig: () => ({ apiBaseUrl: "https://app.dubgrid.com" }),
 }));
 
 import { OrganizationLockedScreen } from "./OrganizationLockedScreen";
@@ -55,7 +51,6 @@ describe("OrganizationLockedScreen", () => {
     expect(screen.getByText("Organization unavailable")).toBeInTheDocument();
     expect(screen.getByText(/currently unavailable/i)).toBeInTheDocument();
     expect(screen.queryByText(/Grace period ends/)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Manage billing on web")).not.toBeInTheDocument();
   });
 
   it("does not show suspension detail to a regular user", () => {
@@ -114,45 +109,32 @@ describe("OrganizationLockedScreen", () => {
     expect(screen.getByText(expectedCopy)).toBeInTheDocument();
   });
 
-  it("shows a Manage billing on web button only for super_admins, and opens the billing URL", async () => {
-    mockStatus({ state: "locked", isLocked: true, trialGraceEndsAt: null, orgRole: "super_admin" });
-    // Billing opens in an in-app browser, so a locked org can be paid for
-    // without leaving the app and losing the retry button behind it.
+  // Store payment rules forbid steering to an outside purchase, so the screen
+  // only says where billing lives, through the server's message.
+  it("never links out to billing, for any role or state", async () => {
     const { openedUrls } = await import("../../../test/shims/expo-web-browser");
     openedUrls.length = 0;
 
-    render(
-      <OrganizationLockedScreen
-        accessToken="token-123"
-        message="Organization unavailable."
-        onRetry={onRetry}
-        onSignOut={onSignOut}
-      />,
-    );
+    for (const orgRole of ["super_admin", "admin", "user"]) {
+      for (const state of ["locked", "suspended", "payment_attention_required"]) {
+        mockStatus({ state, isLocked: true, trialGraceEndsAt: null, orgRole });
+        const { unmount } = render(
+          <OrganizationLockedScreen
+            accessToken="token-123"
+            message="Organization unavailable. Sign in on the web to manage billing."
+            onRetry={onRetry}
+            onSignOut={onSignOut}
+          />,
+        );
 
-    const billingButton = screen.getByText("Manage billing on web");
-    fireEvent.click(billingButton);
+        expect(screen.queryByRole("button", { name: /billing/i })).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+        unmount();
+      }
+    }
 
-    await waitFor(() => {
-      expect(openedUrls.at(-1)?.url).toBe("https://app.dubgrid.com/settings?section=org-billing");
-    });
+    expect(openedUrls).toHaveLength(0);
   });
-
-  it("does not show the billing button for non-super-admins", () => {
-    mockStatus({ state: "locked", isLocked: true, trialGraceEndsAt: null, orgRole: "admin" });
-
-    render(
-      <OrganizationLockedScreen
-        accessToken="token-123"
-        message="Organization unavailable."
-        onRetry={onRetry}
-        onSignOut={onSignOut}
-      />,
-    );
-
-    expect(screen.queryByText("Manage billing on web")).not.toBeInTheDocument();
-  });
-
   it("calls onRetry and onSignOut when their buttons are pressed", () => {
     render(
       <OrganizationLockedScreen
@@ -181,26 +163,6 @@ describe("OrganizationLockedScreen", () => {
     );
 
     expect(useQuery).toHaveBeenCalledWith(expect.objectContaining({ enabled: false }));
-  });
-
-  it("does not offer billing for a suspended organization", () => {
-    mockStatus({
-      state: "suspended",
-      isLocked: true,
-      trialGraceEndsAt: null,
-      orgRole: "super_admin",
-    });
-
-    render(
-      <OrganizationLockedScreen
-        accessToken="token-123"
-        message="Organization unavailable. Contact DubGrid support for help."
-        onRetry={onRetry}
-        onSignOut={onSignOut}
-      />,
-    );
-
-    expect(screen.queryByText("Manage billing on web")).not.toBeInTheDocument();
   });
 
   it("shows the sign-in message when the organization status can't be read", () => {

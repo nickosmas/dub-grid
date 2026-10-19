@@ -1,8 +1,3 @@
-import { Platform } from "react-native";
-import {
-  getTrackingPermissionsAsync,
-  requestTrackingPermissionsAsync,
-} from "expo-tracking-transparency";
 import { secureStoreAdapter } from "../../../shared/lib/session";
 import { getMobileEnvConfig } from "../../../shared/lib/env";
 
@@ -119,28 +114,4 @@ export async function syncConsentToServer(prefs: ConsentPreferences): Promise<vo
   } catch {
     // Best-effort — ignore network failures.
   }
-}
-
-/**
- * Request iOS App Tracking Transparency authorization, but only when the user
- * has opted into analytics and the system prompt hasn't been answered yet.
- *
- * NOTE: This is scaffolding. No analytics/tracking SDK ships in the mobile app
- * today, so nothing calls this yet. When PostHog/Sentry (or any IDFA-using SDK)
- * is added, call this immediately BEFORE initializing that SDK on iOS 14.5+.
- * Returns true when tracking is authorized (always true on Android, which has
- * no ATT prompt).
- */
-export async function requestTrackingPermissionIfNeeded(): Promise<boolean> {
-  if (Platform.OS !== "ios") return true;
-
-  const consent = await getStoredConsent();
-  if (!consent?.analytics) return false;
-
-  const current = await getTrackingPermissionsAsync();
-  if (current.status === "granted") return true;
-  if (!current.canAskAgain) return false;
-
-  const result = await requestTrackingPermissionsAsync();
-  return result.status === "granted";
 }

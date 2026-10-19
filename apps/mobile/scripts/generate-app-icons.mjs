@@ -8,6 +8,7 @@
  *   - icon.png                      iOS, opaque blue field behind Apple's squircle
  *   - adaptive-icon.png             Android foreground layer, on transparent
  *   - adaptive-icon-monochrome.png  Android themed-icon layer, one color
+ *   - notification-icon.png         Android status bar icon, white on transparent
  * Android shows the central 72/108 of an adaptive icon and guarantees only the
  * inner 66/108 circle, so the symbol's corners are kept inside that circle.
  *
@@ -153,6 +154,17 @@ const cardImage = (name, grow) => ({
 
 const ANDROID_BOX = iconBox({ visible: ANDROID_VISIBLE, safe: ANDROID_SAFE });
 
+// Android draws the status bar icon from alpha only, inside a 22dp live area
+// of the 24dp canvas; 96px is the xxxhdpi size it scales down from.
+const NOTIFICATION_LIVE = 22 / 24;
+const notificationSide = Math.max(INK_W, INK_H) / NOTIFICATION_LIVE;
+const NOTIFICATION_BOX = [
+  INK_W / 2 - notificationSide / 2,
+  INK_H / 2 - notificationSide / 2,
+  notificationSide,
+  notificationSide,
+];
+
 const IMAGES = [
   {
     name: "icon.png",
@@ -165,6 +177,11 @@ const IMAGES = [
     name: "adaptive-icon-monochrome.png",
     size: SIZE,
     svg: { viewBox: ANDROID_BOX, colors: oneColor(WHITE), gap: BRAND_SYMBOL_GAP.oneColor },
+  },
+  {
+    name: "notification-icon.png",
+    size: 96,
+    svg: { viewBox: NOTIFICATION_BOX, colors: oneColor(WHITE), gap: BRAND_SYMBOL_GAP.oneColor },
   },
   {
     name: "icon-blue-on-white.png",

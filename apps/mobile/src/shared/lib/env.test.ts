@@ -235,6 +235,69 @@ describe("mobile env validation", () => {
     expect(withDevServerHost("not-a-url", "10.0.0.4")).toBe("not-a-url");
   });
 
+  describe("in a release build", () => {
+    const PRODUCTION = {
+      EXPO_PUBLIC_SUPABASE_URL: "https://example-project.supabase.co",
+      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_abc123",
+      EXPO_PUBLIC_API_BASE_URL: "https://www.dubgrid.com",
+    };
+
+    function stubProductionWith(overrides: Partial<typeof PRODUCTION>) {
+      for (const [key, value] of Object.entries({ ...PRODUCTION, ...overrides })) {
+        vi.stubEnv(key, value);
+      }
+    }
+
+    function releaseIssueKeys() {
+      const result = validateMobileEnv("ios", null, false);
+      return result.status === "invalid" ? result.issues.map((issue) => issue.key) : [];
+    }
+
+    it("accepts the production values", () => {
+      stubProductionWith({});
+
+      expect(validateMobileEnv("ios", null, false).status).toBe("ready");
+    });
+
+    it("refuses plain http", () => {
+      stubProductionWith({ EXPO_PUBLIC_API_BASE_URL: "http://www.dubgrid.com" });
+
+      expect(releaseIssueKeys()).toEqual(["EXPO_PUBLIC_API_BASE_URL"]);
+    });
+
+    it("refuses the bare apex for the API", () => {
+      stubProductionWith({ EXPO_PUBLIC_API_BASE_URL: "https://dubgrid.com" });
+
+      expect(releaseIssueKeys()).toEqual(["EXPO_PUBLIC_API_BASE_URL"]);
+    });
+
+    it("refuses a LAN stack, once per URL", () => {
+      vi.stubEnv("EXPO_PUBLIC_SUPABASE_URL", "http://192.168.1.10:54321");
+      vi.stubEnv(
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+        "eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIn0.x",
+      );
+      vi.stubEnv("EXPO_PUBLIC_API_BASE_URL", "http://192.168.1.10:3000");
+
+      expect(releaseIssueKeys()).toEqual(["EXPO_PUBLIC_SUPABASE_URL", "EXPO_PUBLIC_API_BASE_URL"]);
+      expect(validateMobileEnv("ios", null, true).status).toBe("ready");
+    });
+
+    it("refuses a private address even over https", () => {
+      stubProductionWith({ EXPO_PUBLIC_SUPABASE_URL: "https://10.0.0.5:54321" });
+
+      expect(releaseIssueKeys()).toContain("EXPO_PUBLIC_SUPABASE_URL");
+    });
+
+    it("does not repeat a loopback URL that is already refused", () => {
+      stubProductionWith({ EXPO_PUBLIC_API_BASE_URL: "http://localhost:3000" });
+
+      expect(releaseIssueKeys().filter((key) => key === "EXPO_PUBLIC_API_BASE_URL")).toHaveLength(
+        1,
+      );
+    });
+  });
+
   it("accepts a matched local URL and key", () => {
     vi.stubEnv("EXPO_PUBLIC_SUPABASE_URL", "http://192.168.1.10:54321");
     vi.stubEnv(
