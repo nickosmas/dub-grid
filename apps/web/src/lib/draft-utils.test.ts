@@ -37,8 +37,26 @@ describe("countShiftsAddedToPublishedCell", () => {
     expect(countShiftsAddedToPublishedCell(side([day]), side([evening]))).toBe(0);
   });
 
-  it("keeps a reorder an edit", () => {
-    expect(countShiftsAddedToPublishedCell(side([day]), side([evening, day]))).toBe(0);
+  it("counts a shift added in front of a published one as new", () => {
+    expect(countShiftsAddedToPublishedCell(side([evening]), side([day, evening]))).toBe(1);
+  });
+
+  it("follows the published shift's custom time to its new position", () => {
+    expect(
+      countShiftsAddedToPublishedCell(
+        side([evening], { customStartTime: "15:30", customEndTime: "23:00" }),
+        side([day, evening], { customStartTime: "|15:30", customEndTime: "|23:00" }),
+      ),
+    ).toBe(1);
+  });
+
+  it("keeps an added shift an edit when the moved published one was retimed", () => {
+    expect(
+      countShiftsAddedToPublishedCell(
+        side([evening], { customStartTime: "15:30", customEndTime: "23:00" }),
+        side([day, evening], { customStartTime: "15:30|", customEndTime: "23:00|" }),
+      ),
+    ).toBe(0);
   });
 
   it("keeps a removal an edit", () => {

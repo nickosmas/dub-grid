@@ -60,3 +60,47 @@ export function addOneHour(time: string): string {
   const newH = Math.min(23, h + 1);
   return `${String(newH).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
+
+/**
+ * Puts a cell's shifts in start-time order, moving each `|`-separated custom
+ * time with its shift. A shift with no start time sorts after a timed one, and
+ * equal starts keep their order. Returns the inputs untouched when the order
+ * already holds.
+ */
+export function orderSegmentsByStartTime<T>(
+  segments: T[],
+  customStartTime: string | null,
+  customEndTime: string | null,
+  defaultStartTime: (segment: T) => string | null | undefined,
+): { segments: T[]; customStartTime: string | null; customEndTime: string | null } {
+  const parts = (time: string | null) =>
+    segments.map((_, index) => (time ?? "").split("|")[index]?.trim() || null);
+  const starts = parts(customStartTime);
+  const ends = parts(customEndTime);
+  const startOf = (index: number) => {
+    const start = starts[index] ?? defaultStartTime(segments[index]);
+    return start ? normalizeTime(start) : null;
+  };
+
+  const order = segments
+    .map((_, index) => index)
+    .sort((left, right) => {
+      const leftStart = startOf(left);
+      const rightStart = startOf(right);
+      if (leftStart == null || rightStart == null) {
+        return (leftStart == null ? 1 : 0) - (rightStart == null ? 1 : 0);
+      }
+      return leftStart.localeCompare(rightStart);
+    });
+  if (order.every((index, position) => index === position)) {
+    return { segments, customStartTime, customEndTime };
+  }
+
+  const join = (times: (string | null)[]) =>
+    times.every((time) => !time) ? null : times.map((time) => time ?? "").join("|");
+  return {
+    segments: order.map((index) => segments[index]),
+    customStartTime: join(order.map((index) => starts[index])),
+    customEndTime: join(order.map((index) => ends[index])),
+  };
+}

@@ -270,6 +270,8 @@ function renderPanel(
     onClose?: ReturnType<typeof vi.fn>;
     modalOverride?: EditModalState;
     assignmentsOverride?: AssignmentDefinition[];
+    jobsOverride?: JobDefinition[];
+    absenceTypesOverride?: AbsenceType[];
     certificationsOverride?: NamedItem[];
     shiftDisplayMode?: ShiftDisplayMode;
     indicatorTypesOverride?: IndicatorType[];
@@ -308,7 +310,8 @@ function panelElement(
       currentAbsenceTypeId={overrides.currentAbsenceTypeId ?? null}
       assignments={overrides.assignmentsOverride ?? assignments}
       shiftCategories={shiftCategories}
-      jobs={jobs}
+      jobs={overrides.jobsOverride ?? jobs}
+      absenceTypes={overrides.absenceTypesOverride}
       customStartTime={overrides.customStartTime ?? null}
       customEndTime={overrides.customEndTime ?? null}
       draftKind={overrides.draftKind ?? null}
@@ -1048,6 +1051,190 @@ describe("ShiftEditPanel", () => {
           seriesId: null,
           fromRecurring: false,
         },
+        undefined,
+      );
+    });
+  });
+
+  describe("Adding a second shift", () => {
+    const medPassJob: JobDefinition = {
+      ...jobs[0],
+      id: 103,
+      name: "Med Pass",
+      abbr: "MP",
+      sortOrder: 2,
+    };
+    const medPassShift: AssignmentDefinition = {
+      ...generalShift,
+      id: 4,
+      label: "MP",
+      name: "Med Pass",
+      sortOrder: 4,
+      jobId: 103,
+    };
+    const daySegment: ShiftJobSegment = {
+      shiftId: 11,
+      jobId: 102,
+      position: 0,
+      label: "D",
+      isMentored: false,
+    };
+    const eveningSegment: ShiftJobSegment = { ...daySegment, shiftId: 12, label: "E" };
+    const crossWingSegment: ShiftJobSegment = {
+      ...daySegment,
+      shiftId: null,
+      jobId: 101,
+      label: "X",
+    };
+
+    function renderAddingSecondShift(
+      first: { id: number; label: string; segment: ShiftJobSegment },
+      dayTimes: [string, string] | null,
+      eveningTimes: [string, string] | null,
+      customTimes: { customStartTime: string; customEndTime: string } | null = null,
+    ) {
+      const timed = (shift: AssignmentDefinition, times: [string, string] | null) =>
+        times ? { ...shift, defaultStartTime: times[0], defaultEndTime: times[1] } : shift;
+      return renderPanel({
+        currentShift: first.label,
+        currentAssignmentIds: [first.id],
+        currentSegments: [first.segment],
+        assignmentsOverride: [
+          timed(northShift, dayTimes),
+          timed(southShift, eveningTimes),
+          generalShift,
+          medPassShift,
+        ],
+        jobsOverride: [...jobs, medPassJob],
+        absenceTypesOverride: absenceTypes,
+        ...customTimes,
+      });
+    }
+
+    async function openSecondShiftPicker() {
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: /add another shift/i }));
+      return user;
+    }
+
+    it("offers general shifts, earlier shifts and overlapping shifts after a regular shift", async () => {
+      renderAddingSecondShift(
+        { id: 2, label: "E", segment: eveningSegment },
+        ["07:00", "15:00"],
+        ["14:00", "23:00"],
+      );
+      await openSecondShiftPicker();
+
+      expect(screen.getByRole("button", { name: "Day Shift - Supervisor" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Cross Wing" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Med Pass" })).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Evening Shift - Supervisor" }),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /vacation/i })).not.toBeInTheDocument();
+    });
+
+    it("offers a shift without times after a regular shift", async () => {
+      renderAddingSecondShift({ id: 1, label: "D", segment: daySegment }, ["07:00", "15:00"], null);
+      await openSecondShiftPicker();
+
+      expect(
+        screen.getByRole("button", { name: "Evening Shift - Supervisor" }),
+      ).toBeInTheDocument();
+    });
+
+    it("lets a general shift without times take a regular or a different general shift", async () => {
+      renderAddingSecondShift({ id: 3, label: "X", segment: crossWingSegment }, null, null);
+      await openSecondShiftPicker();
+
+      expect(screen.getByRole("button", { name: "Day Shift - Supervisor" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Med Pass" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Cross Wing" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /vacation/i })).not.toBeInTheDocument();
+    });
+
+    it("puts an earlier shift added second in front of the first", async () => {
+      const { onSelect } = renderAddingSecondShift(
+        { id: 2, label: "E", segment: eveningSegment },
+        ["07:00", "15:00"],
+        ["15:00", "23:00"],
+      );
+      const user = await openSecondShiftPicker();
+      await user.click(screen.getByRole("button", { name: "Day Shift - Supervisor" }));
+
+      expect(onSelect).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          segments: [
+            { shiftId: 11, jobId: 102, position: 0, isMentored: false },
+            { shiftId: 12, jobId: 102, position: 1, isMentored: false },
+          ],
+          customStartTime: null,
+          customEndTime: null,
+        }),
+        undefined,
+      );
+    });
+
+    it("keeps the first shift's custom time on it when it moves second", async () => {
+      const { onSelect } = renderAddingSecondShift(
+        { id: 2, label: "E", segment: eveningSegment },
+        ["07:00", "15:00"],
+        ["15:00", "23:00"],
+        { customStartTime: "15:30", customEndTime: "23:00" },
+      );
+      const user = await openSecondShiftPicker();
+      await user.click(screen.getByRole("button", { name: "Day Shift - Supervisor" }));
+
+      expect(onSelect).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          segments: [
+            expect.objectContaining({ shiftId: 11, position: 0 }),
+            expect.objectContaining({ shiftId: 12, position: 1 }),
+          ],
+          customStartTime: "|15:30",
+          customEndTime: "|23:00",
+        }),
+        undefined,
+      );
+    });
+
+    it.each([
+      {
+        name: "a general shift beside a regular shift",
+        first: { id: 1, label: "D", segment: daySegment },
+        pick: "Cross Wing",
+        second: { shiftId: null, jobId: 101 },
+      },
+      {
+        name: "a different general shift beside a general shift",
+        first: { id: 3, label: "X", segment: crossWingSegment },
+        pick: "Med Pass",
+        second: { shiftId: null, jobId: 103 },
+      },
+      {
+        name: "a regular shift beside a general shift",
+        first: { id: 3, label: "X", segment: crossWingSegment },
+        pick: "Day Shift - Supervisor",
+        second: { shiftId: 11, jobId: 102 },
+      },
+    ])("saves $name as a double shift", async ({ first, pick, second }) => {
+      const { onSelect } = renderAddingSecondShift(first, null, null);
+      const user = await openSecondShiftPicker();
+      await user.click(screen.getByRole("button", { name: pick }));
+
+      expect(onSelect).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          kind: "worked",
+          segments: [
+            {
+              shiftId: first.segment.shiftId,
+              jobId: first.segment.jobId,
+              position: 0,
+              isMentored: false,
+            },
+            { ...second, position: 1, isMentored: false },
+          ],
+        }),
         undefined,
       );
     });
