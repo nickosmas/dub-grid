@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type * as Notifications from "expo-notifications";
 import { AppState, Platform } from "react-native";
+import { getUserIdFromAccessToken } from "../../../shared/lib/access-token";
 import { registerPushToken } from "../../../shared/lib/api";
 import {
   loadStoredPushDevice,
+  loadStoredPushRegistration,
   saveStoredPushDevice,
+  saveStoredPushRegistration,
   type StoredPushDevice,
+  type StoredPushRegistration,
 } from "../../../shared/lib/session";
 import {
   loadNotifications,
@@ -40,6 +44,36 @@ async function getStoredOrFreshPushDevice(
 
   await saveStoredPushDevice(device);
   return device;
+}
+
+/** How long a landed registration is trusted before a foreground renews it. */
+export const PUSH_REGISTRATION_REFRESH_MS = 24 * 60 * 60_000;
+
+export function buildPushRegistrationKey(
+  userId: string | null,
+  orgId: string,
+  expoPushToken: string,
+): string {
+  return JSON.stringify([userId, orgId, expoPushToken]);
+}
+
+/**
+ * Whether the last registration already covers this person, organization and
+ * device token. Re-registering on every foreground sent the same row again;
+ * a change to any of the three, or a day passing, sends it.
+ */
+export function isPushRegistrationCurrent(
+  stored: StoredPushRegistration | null,
+  key: string,
+  now: number,
+): boolean {
+  if (!stored || stored.key !== key) return false;
+  const age = now - stored.registeredAt;
+  return age >= 0 && age < PUSH_REGISTRATION_REFRESH_MS;
+}
+
+async function forgetPushRegistration(): Promise<void> {
+  await saveStoredPushRegistration(null).catch(() => undefined);
 }
 
 export function usePushRegistration(
@@ -94,6 +128,7 @@ export function usePushRegistration(
       setPermissionState(nextPermissionState);
 
       if (options?.disable) {
+        await forgetPushRegistration();
         const storedDevice = await loadStoredPushDevice();
         if (!storedDevice) {
           return true;
@@ -107,12 +142,29 @@ export function usePushRegistration(
       }
 
       if (!permissionSnapshot.granted) {
+        // So a permission granted again later registers at once.
+        await forgetPushRegistration();
         return false;
       }
 
       const device = await getStoredOrFreshPushDevice(notifications);
+      const registrationKey = buildPushRegistrationKey(
+        getUserIdFromAccessToken(accessToken),
+        currentOrgId,
+        device.expoPushToken,
+      );
+      const stored = options?.requestPermission
+        ? null
+        : await loadStoredPushRegistration().catch(() => null);
+      if (isPushRegistrationCurrent(stored, registrationKey, Date.now())) {
+        return true;
+      }
+
       await registerPushToken(accessToken, device);
       await saveStoredPushDevice(device);
+      await saveStoredPushRegistration({ key: registrationKey, registeredAt: Date.now() }).catch(
+        () => undefined,
+      );
       return true;
     } catch (registrationError) {
       setError(registrationError);
@@ -127,7 +179,9 @@ export function usePushRegistration(
       return;
     }
 
-    const nextKey = `${currentOrgId}:${accessToken.slice(0, 12)}`;
+    // The token's own first characters are its JWT header, the same for
+    // every account, so they never told one person from another.
+    const nextKey = `${getUserIdFromAccessToken(accessToken)}:${currentOrgId}`;
     if (attemptedKeyRef.current === nextKey) {
       return;
     }

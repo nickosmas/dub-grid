@@ -268,7 +268,9 @@ export default function ResetPasswordScreen() {
     } catch {
       revoked = false;
     }
-    await settleMobileAuthAction(supabase.auth.signOut({ scope: "local" })).catch(() => undefined);
+    // Not awaited, as in `leaveRecovery`: the global revoke above already ended
+    // this session, and the local sign-out only drops the ephemeral copy.
+    void settleMobileAuthAction(supabase.auth.signOut({ scope: "local" })).catch(() => undefined);
 
     if (!confirmed) {
       pushToast({

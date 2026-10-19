@@ -26,8 +26,12 @@ export function useMobilePermissionsRealtime({
   userId: string | null;
   queryClient: QueryClient;
 }) {
+  // Only whether there is a token: a refreshed one reaches the realtime
+  // socket through supabase-js, and rejoining on each refresh lost events.
+  const hasToken = accessToken !== null;
+
   useEffect(() => {
-    if (!accessToken || !userId) return;
+    if (!hasToken || !userId) return;
 
     const supabase = getSupabaseClient();
     if (
@@ -77,5 +81,5 @@ export function useMobilePermissionsRealtime({
       unsubscribeMembership();
       unsubscribeEmployee();
     };
-  }, [accessToken, queryClient, userId]);
+  }, [hasToken, queryClient, userId]);
 }

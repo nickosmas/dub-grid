@@ -240,6 +240,25 @@ describe("ResetPasswordScreen", () => {
     expect(routerReplace).toHaveBeenCalledWith("/(auth)/login");
   });
 
+  it("returns to sign in without waiting on the ephemeral sign-out", async () => {
+    signOut.mockReturnValue(new Promise(() => undefined));
+    render(<ResetPasswordScreen />);
+    await enterCode();
+
+    fireEvent.change(screen.getByPlaceholderText("New password"), {
+      target: { value: "Str0ng!Passphrase" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Confirm password"), {
+      target: { value: "Str0ng!Passphrase" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText("Update password"));
+    });
+
+    expect(signOut).toHaveBeenCalledWith({ scope: "local" });
+    expect(routerReplace).toHaveBeenCalledWith("/(auth)/login");
+  });
+
   it("clears the ephemeral session and returns to sign in when global revocation fails", async () => {
     signOutMobileSessions.mockRejectedValue(new Error("private"));
     render(<ResetPasswordScreen />);

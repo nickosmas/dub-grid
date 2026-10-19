@@ -26,8 +26,11 @@ vi.mock("./query-client", () => ({
   queryClient: { clear: (...args: unknown[]) => queryClientClear(...args) },
 }));
 
+const saveStoredPushRegistration = vi.fn();
+
 vi.mock("./session", () => ({
   loadStoredPushDevice: (...args: unknown[]) => loadStoredPushDevice(...args),
+  saveStoredPushRegistration: (...args: unknown[]) => saveStoredPushRegistration(...args),
 }));
 
 vi.mock("./supabase", () => ({
@@ -70,6 +73,16 @@ describe("auth-reset", () => {
       await disablePushForCurrentDevice();
 
       expect(disablePushToken).not.toHaveBeenCalled();
+    });
+
+    // The next sign-in on this phone must register again, or its push row
+    // stays disabled until the daily refresh.
+    it("forgets the last registration even when the revoke cannot be sent", async () => {
+      getSession.mockResolvedValue({ data: { session: null } });
+
+      await disablePushForCurrentDevice();
+
+      expect(saveStoredPushRegistration).toHaveBeenCalledWith(null);
     });
 
     it("no-ops when this device never registered for push", async () => {

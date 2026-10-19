@@ -1,4 +1,10 @@
 import type { QueryClient } from "@tanstack/react-query";
+import type { MobileBootstrapResponse } from "@dubgrid/contracts";
+import {
+  BOOTSTRAP_QUERY_KEY_PREFIX,
+  buildBootstrapQueryKey,
+} from "../../features/auth/hooks/useBootstrap";
+import { getOrgIdFromAccessToken } from "./access-token";
 import { mobileQueryKeys } from "./mobile-query-keys";
 
 export type MobileAccountRealtimeTable =
@@ -38,4 +44,65 @@ export function invalidateMobileAccountRealtimeQueries(
   for (const queryKey of getMobileAccountRealtimeInvalidationKeys(accessToken, table)) {
     void queryClient.invalidateQueries({ queryKey });
   }
+}
+
+export type NotificationInsertBootstrapEffect = "none" | "increment" | "invalidate";
+
+/**
+ * What an inserted notification does to bootstrap's unread count, by the rule
+ * `get_unread_notification_count` counts with. A row arriving already read or
+ * archived (the new-device alert does) changes nothing.
+ */
+export function getNotificationInsertBootstrapEffect(
+  row: Record<string, unknown> | undefined,
+  orgId: string | null,
+): NotificationInsertBootstrapEffect {
+  if (!row || !("read_at" in row) || !("archived_at" in row) || !("channel" in row)) {
+    return "invalidate";
+  }
+  if (row.read_at != null || row.archived_at != null || row.channel !== "in_app") {
+    return "none";
+  }
+  if (row.org_id != null && row.org_id !== orgId) {
+    return "none";
+  }
+  return "increment";
+}
+
+/**
+ * An insert refreshes the inbox and adds one to the cached unread count
+ * instead of refetching all of bootstrap. A bootstrap fetch already in flight
+ * may predate the row, so it is restarted rather than written over.
+ */
+export function applyMobileNotificationInsert(
+  queryClient: QueryClient,
+  accessToken: string,
+  row: Record<string, unknown> | undefined,
+): void {
+  for (const queryKey of [
+    mobileQueryKeys.notificationsPrefix(accessToken),
+    mobileQueryKeys.notificationFacets(accessToken),
+    mobileQueryKeys.notificationDetailPrefix(accessToken),
+  ]) {
+    void queryClient.invalidateQueries({ queryKey });
+  }
+
+  const effect = getNotificationInsertBootstrapEffect(row, getOrgIdFromAccessToken(accessToken));
+  if (effect === "none") return;
+
+  const bootstrapKey = buildBootstrapQueryKey(accessToken);
+  const canIncrement =
+    effect === "increment" &&
+    queryClient.getQueryData(bootstrapKey) !== undefined &&
+    queryClient.isFetching({ queryKey: bootstrapKey, exact: true }) === 0;
+  if (canIncrement) {
+    queryClient.setQueryData<MobileBootstrapResponse>(bootstrapKey, (current) =>
+      current
+        ? { ...current, unreadNotificationCount: current.unreadNotificationCount + 1 }
+        : current,
+    );
+    return;
+  }
+
+  void queryClient.invalidateQueries({ queryKey: BOOTSTRAP_QUERY_KEY_PREFIX });
 }

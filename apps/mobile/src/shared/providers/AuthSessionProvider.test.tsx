@@ -171,6 +171,32 @@ describe("AuthSessionProvider", () => {
     expect(clearQueryClient).not.toHaveBeenCalled();
   });
 
+  it("does not report a refresh within the same session again before half an hour", async () => {
+    const tokenFor = (sessionId: string, version: string) =>
+      `header.${btoa(JSON.stringify({ sub: "user-1", org_id: "org-1", session_id: sessionId }))}.${version}`;
+    const withToken = (token: string) =>
+      ({ ...sessionFor("user-1", "org-1", "v1"), access_token: token }) as Session;
+    getSession.mockResolvedValueOnce({ data: { session: withToken(tokenFor("s-1", "v1")) } });
+
+    render(
+      <AuthSessionProvider>
+        <SessionProbe />
+      </AuthSessionProvider>,
+    );
+    await waitFor(() => expect(registerMobileSessionPresence).toHaveBeenCalledTimes(1));
+
+    const authStateCallback = onAuthStateChange.mock.calls[0]?.[0];
+    act(() => {
+      authStateCallback?.("TOKEN_REFRESHED", withToken(tokenFor("s-1", "v2")));
+    });
+    expect(registerMobileSessionPresence).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      authStateCallback?.("SIGNED_IN", withToken(tokenFor("s-2", "v1")));
+    });
+    expect(registerMobileSessionPresence).toHaveBeenCalledTimes(2);
+  });
+
   it("keeps mounted content in place during a same-identity token rotation", async () => {
     const onMount = vi.fn();
     const onUnmount = vi.fn();

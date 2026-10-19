@@ -110,6 +110,8 @@ export function invalidateMobileRealtimeQueries(
  * Every query family the given tables feed, each invalidated once. For a
  * realtime catch-up after a dropped channel, when any of them may have
  * changed unseen; per-table calls would restart the same refetch many times.
+ * A refetch already in flight (usually the foreground's) is kept rather than
+ * cancelled and sent again.
  */
 export function invalidateMobileRealtimeQueriesForTables(
   queryClient: QueryClient,
@@ -122,7 +124,7 @@ export function invalidateMobileRealtimeQueriesForTables(
       const id = JSON.stringify(queryKey);
       if (seen.has(id)) continue;
       seen.add(id);
-      void queryClient.invalidateQueries({ queryKey });
+      void queryClient.invalidateQueries({ queryKey }, { cancelRefetch: false });
     }
   }
 }

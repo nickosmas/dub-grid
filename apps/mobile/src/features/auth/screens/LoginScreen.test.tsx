@@ -196,7 +196,8 @@ describe("LoginScreen", () => {
 
   // The subdomain is a last resort for when no name is coming. Showing it while
   // the lookup is still in flight flashes it, then replaces it with the name.
-  it("shows neither the subdomain form nor the credentials while the remembered organization resolves", async () => {
+  // The credential form itself shows at once; only signing in waits.
+  it("shows the credentials at once and holds Sign in until the remembered organization resolves", async () => {
     loadLastOrg.mockResolvedValue({ slug: "dubgrid-health", name: null });
     let resolveLookup: (value: unknown) => void = () => {};
     lookupOrganization.mockReturnValue(
@@ -207,9 +208,17 @@ describe("LoginScreen", () => {
 
     render(<LoginScreen />);
 
-    await waitFor(() => expect(lookupOrganization).toHaveBeenCalledWith("dubgrid-health"));
+    fireEvent.change(await screen.findByPlaceholderText("Email"), {
+      target: { value: "pat@example.com" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Password"), {
+      target: { value: "correct horse" },
+    });
     expect(screen.queryByPlaceholderText("yourorg")).not.toBeInTheDocument();
-    expect(screen.queryByPlaceholderText("Email")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Signing in at/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(loginToOrganization).not.toHaveBeenCalled();
 
     await act(async () => {
       resolveLookup({
@@ -221,8 +230,8 @@ describe("LoginScreen", () => {
       });
     });
 
-    expect(await screen.findByPlaceholderText("Email")).toBeInTheDocument();
     expect(screen.getByText(/Continue to/)).toHaveTextContent("Continue to DubGrid Health.");
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeEnabled();
   });
 
   it("does not let a stale remembered organization bypass lookup", async () => {
@@ -644,6 +653,10 @@ describe("LoginScreen", () => {
 
       await waitFor(() => expect(getBootstrap).toHaveBeenCalledWith("token-123"));
       expect(setSession).toHaveBeenCalled();
+      // The warm-up starts before the remembered organization is written.
+      expect(getBootstrap.mock.invocationCallOrder[0]).toBeLessThan(
+        saveLastOrg.mock.invocationCallOrder.at(-1) ?? 0,
+      );
 
       await act(async () => session.resolve({ error: null }));
       expect(routerReplace).not.toHaveBeenCalled();
@@ -765,6 +778,9 @@ describe("LoginScreen", () => {
         setSession,
       },
     } as never);
+    // Recording the completed sign-in is audit only: the handoff runs beside
+    // it, so one that never answers must not hold the user on this screen.
+    recordMobileSignInCompleted.mockReturnValue(new Promise(() => undefined));
 
     await renderLogin();
 
@@ -807,7 +823,7 @@ describe("LoginScreen", () => {
       refresh_token: "verified-refresh",
     });
     expect(registerMobileSessionPresence).not.toHaveBeenCalled();
-    expect(routerReplace).toHaveBeenCalledWith("/(tabs)/home");
+    await waitFor(() => expect(routerReplace).toHaveBeenCalledWith("/(tabs)/home"));
     // The password step was only challenged; the verified session records success.
     expect(recordMobileSignInCompleted).toHaveBeenCalledWith("verified-token");
   });
