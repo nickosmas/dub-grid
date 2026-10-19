@@ -12,6 +12,20 @@ const repeatOverwritesSchema = z.object({
   dates: z.array(dateKeySchema).min(1).max(366),
 });
 
+interface OverwriteCandidate {
+  date: string;
+  snapshots: Array<{ snapshot_kind: string; state_kind: string }> | null;
+}
+
+/** What an editor sees, the draft else the published state, is a shift or off day. */
+function holdsEntry(cell: OverwriteCandidate): boolean {
+  const snapshots = cell.snapshots ?? [];
+  const shown =
+    snapshots.find((snapshot) => snapshot.snapshot_kind === "draft") ??
+    snapshots.find((snapshot) => snapshot.snapshot_kind === "published");
+  return shown != null && shown.state_kind !== "deleted";
+}
+
 export async function POST(req: NextRequest) {
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) return csrfError;
@@ -43,7 +57,7 @@ export async function POST(req: NextRequest) {
     const supabase = createRequestSupabaseClient(req);
     const { data, error } = await supabase
       .from("schedule_cells")
-      .select("date")
+      .select("date, snapshots:schedule_cell_snapshots(snapshot_kind, state_kind)")
       .eq("emp_id", parsed.data.empId)
       .gte("date", minDate)
       .lte("date", maxDate);
@@ -52,8 +66,8 @@ export async function POST(req: NextRequest) {
       throw error;
     }
 
-    const overwriteCount = (data ?? []).filter((row: { date: string }) =>
-      datesToCheck.has(row.date),
+    const overwriteCount = ((data ?? []) as OverwriteCandidate[]).filter(
+      (row) => datesToCheck.has(row.date) && holdsEntry(row),
     ).length;
 
     return NextResponse.json({ overwriteCount });

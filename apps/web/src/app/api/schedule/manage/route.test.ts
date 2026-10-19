@@ -28,12 +28,21 @@ function stubSeriesCells(cells: Array<{ emp_id: string; date: string }>) {
   const previousFrom = serviceFrom.getMockImplementation()!;
   serviceFrom.mockImplementation((table: string) => {
     if (table !== "schedule_cells") return previousFrom(table);
+    let inRange = cells;
     const query = {
       select: () => query,
       eq: () => query,
+      gte: (_column: string, date: string) => {
+        inRange = inRange.filter((cell) => cell.date >= date);
+        return query;
+      },
+      lte: (_column: string, date: string) => {
+        inRange = inRange.filter((cell) => cell.date <= date);
+        return query;
+      },
       order: () => query,
       range: async (from: number, to: number) => ({
-        data: cells.slice(from, Math.min(to + 1, from + MAX_ROWS)),
+        data: inRange.slice(from, Math.min(to + 1, from + MAX_ROWS)),
         error: null,
       }),
     };
@@ -168,6 +177,26 @@ describe("POST /api/schedule/manage", () => {
         p_end_date: request.endDate,
         p_max_occurrences: request.maxOccurrences,
       }),
+    );
+  });
+
+  it("passes the keep-existing choice and the origin day to the series RPC", async () => {
+    const response = await POST(
+      makeRequest({ ...seriesRequest, keepExisting: true, originDate: "2026-09-23" }),
+    );
+    expect(response.status).toBe(200);
+    expect(userRpc).toHaveBeenCalledWith(
+      "create_shift_series",
+      expect.objectContaining({ p_keep_existing: true, p_origin_date: "2026-09-23" }),
+    );
+  });
+
+  it("overwrites by default when no keep-existing choice is sent", async () => {
+    const response = await POST(makeRequest(seriesRequest));
+    expect(response.status).toBe(200);
+    expect(userRpc).toHaveBeenCalledWith(
+      "create_shift_series",
+      expect.objectContaining({ p_keep_existing: false, p_origin_date: null }),
     );
   });
 
@@ -1238,6 +1267,60 @@ describe("POST /api/schedule/manage permission gates", () => {
       `${employeeId}_2026-08-03`,
       `${secondEmployeeId}_2026-08-10`,
     ]);
+  });
+
+  it("removes only the later part of a series and its notes", async () => {
+    grant({ canEditShifts: true, canManageShiftSeries: true });
+    const notes = captureNoteClearing();
+    stubSeriesCells([
+      { emp_id: employeeId, date: "2026-08-03" },
+      { emp_id: employeeId, date: "2026-08-10" },
+      { emp_id: employeeId, date: "2026-08-17" },
+    ]);
+
+    const response = await POST(
+      makeRequest({
+        action: "deleteShiftSeries",
+        orgId,
+        seriesId: "33333333-3333-4333-8333-333333333333",
+        fromDate: "2026-08-10",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(userRpc).toHaveBeenCalledWith("delete_shift_series", {
+      p_series_id: "33333333-3333-4333-8333-333333333333",
+      p_org_id: orgId,
+      p_from_date: "2026-08-10",
+      p_to_date: null,
+    });
+    expect(notes.deleted.map((row) => row.date).sort()).toEqual(["2026-08-10", "2026-08-17"]);
+  });
+
+  it("removes only the earlier part of a series and its notes", async () => {
+    grant({ canEditShifts: true, canManageShiftSeries: true });
+    const notes = captureNoteClearing();
+    stubSeriesCells([
+      { emp_id: employeeId, date: "2026-08-03" },
+      { emp_id: employeeId, date: "2026-08-10" },
+      { emp_id: employeeId, date: "2026-08-17" },
+    ]);
+
+    const response = await POST(
+      makeRequest({
+        action: "deleteShiftSeries",
+        orgId,
+        seriesId: "33333333-3333-4333-8333-333333333333",
+        toDate: "2026-08-10",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(userRpc).toHaveBeenCalledWith(
+      "delete_shift_series",
+      expect.objectContaining({ p_from_date: null, p_to_date: "2026-08-10" }),
+    );
+    expect(notes.deleted.map((row) => row.date).sort()).toEqual(["2026-08-03", "2026-08-10"]);
   });
 
   // PostgREST's max_rows (1,000) applies to the service role too, so an

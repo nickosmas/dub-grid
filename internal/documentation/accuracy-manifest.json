@@ -99,7 +99,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:225bce472d170c812d5b491cd80025d6a35c629e0b7cfa37eb20134ac3c0f534"
+      "evidenceFingerprint": "sha256:a03763b0294667aa820246ca777955ebaab267d768aa7f60acfb347b48ea208b"
     },
     {
       "id": "introduction",
@@ -161,7 +161,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:88610c5bf9be9eae66020ced72bb06fc3ac99adba2d7e3eb1c36a03b4c0022d5"
+      "evidenceFingerprint": "sha256:464c8e95f105b228d0803303ec677501165131aa2d741946366a7b40b875ccd6"
     },
     {
       "id": "quickstart",
@@ -237,7 +237,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:425cf4c85fb3f407bbfb4cca728b064d6178b19eaea3297b23f38ea06a24d87d"
+      "evidenceFingerprint": "sha256:4d075a3b23c4addc64ad15583d430d743a2afb7831e945c68add5efa9128acb1"
     },
     {
       "id": "onboarding",
@@ -383,7 +383,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:07dd4c05730120c7bc852a4ebe51461e4c765102903d8b8df2247ac1b81a1cd6"
+      "evidenceFingerprint": "sha256:986113477a6e9749ed2ac845b08f80b4883c4a6dd0ea461344b8c31ed1692bd1"
     },
     {
       "id": "draft-publish",
@@ -440,7 +440,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:9e247370a9e211dacfd7eb8e4ec01d813a478ee1abe2deef8d2b2a6af012afc9"
+      "evidenceFingerprint": "sha256:ff78b137fa280434092b79b8019ec97911f8b0515d5b55f6da0cde52df5e0e35"
     },
     {
       "id": "recurring-shifts",
@@ -467,7 +467,7 @@
             "recurring schedules on People > Recurring Shifts, Sunday to Saturday; profile card",
             "Save Draft, Save with confirmation, Discard",
             "Auto Fill fills empty slots in the period on screen as drafts, never overwriting",
-            "repeating shift fields; 183-occurrence cap; delete series marks for deletion",
+            "repeating shift fields; 183-occurrence cap; replace or keep days that already have a shift; edit scope this, earlier, later or all; removal marks for deletion",
             "permissions for each action; Super Admin all; Admin defaults"
           ],
           "sourceFiles": [
@@ -475,6 +475,7 @@
             "apps/web/src/components/staff-detail/RecurringScheduleCard.tsx",
             "apps/web/src/components/StaffView.tsx",
             "apps/web/src/components/RepeatForm.tsx",
+            "apps/web/src/components/ShiftEditPanel.tsx",
             "apps/web/src/components/Toolbar.tsx",
             "apps/web/src/app/api/schedule/manage/route.ts",
             "apps/web/src/lib/constants.ts",
@@ -485,13 +486,15 @@
             "apps/web/src/__tests__/RecurringScheduleSection.test.tsx",
             "apps/web/src/components/staff-detail/RecurringScheduleCard.test.tsx",
             "apps/web/src/__tests__/shift-series-bounds-sql.test.ts",
+            "apps/web/src/__tests__/shift-series-scope.integration.test.ts",
+            "apps/web/src/__tests__/ShiftEditPanel.test.tsx",
             "apps/web/src/app/api/schedule/manage/route.test.ts"
           ],
           "runtimeScenarios": [],
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:258d927943d53aa8333deb1ae8fdd60ca4af568cf0a984406c30410f5bb8eab4"
+      "evidenceFingerprint": "sha256:0cf31b596520bb0aec836e3734072efc680d5f706b2232699171c91a88dfc0df"
     },
     {
       "id": "realtime",
@@ -538,7 +541,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:6512694e0a7138c492808dea23b238404b284716478d4c9d5b963c88fef40055"
+      "evidenceFingerprint": "sha256:0957a596aaee77dec6f81c72fd595c8e3ad60b1774979aaaf61fc2cbeceef1d9"
     },
     {
       "id": "shift-requests",
@@ -603,7 +606,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:38df94166832b19988afe609c4869c3ad4dd4c1f421f1b533a1d536e2e29d560"
+      "evidenceFingerprint": "sha256:608f7fdc549a0285fb85ba3ab626e854b4d9ef5604c325004cbb02e539dbf854"
     },
     {
       "id": "dashboard",
@@ -1916,7 +1919,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:f1dc21d569dfbdfc09d70cb80da845c305409dce1b57309f046378aab2912b35"
+      "evidenceFingerprint": "sha256:744dd1ae3c907b7ba5c7770cba208238f98f1c162ccf6adc14e25f71ebec23b6"
     },
     {
       "id": "coverage-open-shifts",
@@ -1967,7 +1970,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:e14b93daad0b07fa540dc0c9bda004f3f6702ec497d6a59b199597d957d482d8"
+      "evidenceFingerprint": "sha256:de007f3e27896e0168560269015b53b9a1162fc790f48d698b6cb83985c8f434"
     },
     {
       "id": "mobile-schedule",
@@ -2076,7 +2079,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:d423e448ae4891ce9678a395d8a7d42d1b9c0f91f4082f9b77a3274a62a0eb25"
+      "evidenceFingerprint": "sha256:fc4c4cc524ec4bd53ffa904d9c1ebb5a454108e9054f63484883fbbfd142f3f9"
     }
   ],
   "surfaceExclusions": [

@@ -27,6 +27,7 @@ import * as Sentry from "@/lib/sentry";
 import { addDays, cn } from "@/lib/utils";
 import { generateSeriesDates } from "@/lib/series-dates";
 import ScrollableTabs from "@/components/ScrollableTabs";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { fetchRepeatOverwriteCount } from "@/features/schedule/client";
 
 const DAY_NAMES_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
@@ -70,6 +71,7 @@ interface RepeatFormProps {
     endDate: string | null,
     maxOccurrences: number | null,
     previewTotal: number,
+    keepExisting: boolean,
   ) => void;
   /** When set, the form is creating a repeating off day instead of a shift. */
   absenceType?: AbsenceType;
@@ -332,7 +334,12 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
   const [endType, setEndType] = useState<EndType>("never");
   const [endDate, setEndDate] = useState<string>("");
   const [afterN, setAfterN] = useState<number>(10);
-  const [overwrites, setOverwrites] = useState(0);
+  // Keyed by the dates it was counted for, so a submit never acts on a count
+  // that belongs to a different pattern or is still loading.
+  const [overwrites, setOverwrites] = useState<{ datesKey: string; count: number } | null>(null);
+  // Open while asking whether to replace existing shifts; `count` is null when
+  // it could not be counted.
+  const [overwritePrompt, setOverwritePrompt] = useState<{ count: number | null } | null>(null);
   const [submitAttempted, setSubmitAttempted] = useState(false);
 
   const primarySegment = selectionSegments[0] ?? null;
@@ -390,28 +397,24 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
     return countOccurrences(frequency, resolvedDays, start, resolvedEnd, resolvedMax);
   }, [frequency, daysOfWeek, resolvedDays, start, resolvedEnd, resolvedMax]);
 
+  // The day being repeated is never an overwrite: it is the shift itself.
+  const datesToCheck = useMemo(
+    () => [...new Set(generatedDates.filter((d) => d !== originDateKey))].sort(),
+    [generatedDates, originDateKey],
+  );
+  const datesKey = datesToCheck.join(",");
+
   useEffect(() => {
-    if (generatedDates.length === 0) {
-      setOverwrites(0);
-      return;
-    }
+    if (datesToCheck.length === 0) return;
 
     let cancelled = false;
-    const datesToCheck = new Set(generatedDates.filter((d) => d !== originDateKey));
-    if (datesToCheck.size === 0) {
-      setOverwrites(0);
-      return;
-    }
-
-    const sortedDates = [...datesToCheck].sort();
-
     (async () => {
       const { overwriteCount } = await fetchRepeatOverwriteCount({
         empId,
-        dates: sortedDates,
+        dates: datesToCheck,
       });
       if (cancelled) return;
-      setOverwrites(overwriteCount);
+      setOverwrites({ datesKey, count: overwriteCount });
     })().catch((error: unknown) => {
       if (cancelled) return;
       Sentry.captureException(error);
@@ -420,35 +423,59 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
     return () => {
       cancelled = true;
     };
-  }, [generatedDates, empId, originDateKey]);
+  }, [datesToCheck, datesKey, empId]);
 
-  const preview = { total: generatedDates.length, overwrites };
+  const currentOverwrites =
+    datesToCheck.length === 0 ? 0 : overwrites?.datesKey === datesKey ? overwrites.count : null;
+  const preview = { total: generatedDates.length, overwrites: currentOverwrites ?? 0 };
   const showDayPicker = frequency === "weekly" || frequency === "biweekly";
   const missingDays = showDayPicker && daysOfWeek.length === 0;
   const missingEndDate = endType === "on_date" && endDate === "";
   const endDateInvalid = endType === "on_date" && endDate !== "" && endDate < start;
 
-  const handleConfirm = useCallback(() => {
+  const create = useCallback(
+    (keepExisting: boolean) => {
+      setOverwritePrompt(null);
+      onConfirm(
+        frequency,
+        resolvedDays,
+        start,
+        resolvedEnd,
+        resolvedMax,
+        preview.total,
+        keepExisting,
+      );
+    },
+    [frequency, onConfirm, preview.total, resolvedDays, resolvedEnd, resolvedMax, start],
+  );
+
+  const handleConfirm = useCallback(async () => {
     setSubmitAttempted(true);
     if (missingDays || missingEndDate || endDateInvalid) return;
-    onConfirm(frequency, resolvedDays, start, resolvedEnd, resolvedMax, preview.total);
-  }, [
-    endDateInvalid,
-    frequency,
-    missingDays,
-    missingEndDate,
-    onConfirm,
-    preview.total,
-    resolvedDays,
-    resolvedEnd,
-    resolvedMax,
-    start,
-  ]);
+
+    let count = currentOverwrites;
+    if (count == null) {
+      try {
+        ({ overwriteCount: count } = await fetchRepeatOverwriteCount({
+          empId,
+          dates: datesToCheck,
+        }));
+      } catch (error) {
+        // Without a count, ask anyway rather than overwrite unasked.
+        Sentry.captureException(error);
+        setOverwritePrompt({ count: null });
+        return;
+      }
+    }
+
+    if (count > 0) setOverwritePrompt({ count });
+    else create(false);
+  }, [create, currentOverwrites, datesToCheck, empId, endDateInvalid, missingDays, missingEndDate]);
 
   useImperativeHandle(
     ref,
     () => ({
-      submit: handleConfirm,
+      submit: () => void handleConfirm(),
     }),
     [handleConfirm],
   );
@@ -727,15 +754,43 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
           )}
           {preview.overwrites > 0 && (
             <div style={{ marginTop: 4, color: "var(--dg-color-warning-text)", fontWeight: 500 }}>
-              {preview.overwrites} existing {isAbsence ? "entry" : "shift"}
-              {preview.overwrites === 1 ? "" : "s"} will be overwritten.
+              {overwriteCountText(preview.overwrites)} You can replace or keep{" "}
+              {preview.overwrites === 1 ? "it" : "them"}.
             </div>
           )}
         </div>
       )}
+
+      {overwritePrompt && (
+        <ConfirmDialog
+          title="Replace existing shifts?"
+          message={overwritePromptMessage(overwritePrompt.count, isAbsence)}
+          confirmLabel="Replace"
+          secondaryConfirmLabel="Keep existing"
+          variant="warning"
+          onConfirm={() => create(false)}
+          onSecondaryConfirm={() => create(true)}
+          onCancel={() => setOverwritePrompt(null)}
+        />
+      )}
     </div>
   );
 });
+
+function overwriteCountText(count: number): string {
+  return count === 1
+    ? "1 of these days already has a shift or off day."
+    : `${count} of these days already have a shift or off day.`;
+}
+
+function overwritePromptMessage(count: number | null, isAbsence: boolean): string {
+  const days =
+    count == null
+      ? "Some of these days may already have a shift or off day."
+      : overwriteCountText(count);
+  const them = count === 1 ? "it" : "them";
+  return `${days} Replace ${them} with the repeating ${isAbsence ? "off day" : "shift"}, or keep ${them} and skip ${count === 1 ? "that day" : "those days"}?`;
+}
 
 const formLayoutStyle: React.CSSProperties = {
   width: "100%",

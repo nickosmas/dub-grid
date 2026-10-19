@@ -204,12 +204,16 @@ const requestActionSchema = z.discriminatedUnion("action", [
     startDate: z.string().date(),
     endDate: z.string().date().nullable(),
     maxOccurrences: z.number().int().positive().max(MAX_SERIES_OCCURRENCES).nullable(),
+    keepExisting: z.boolean().optional(),
+    originDate: z.string().date().optional(),
   }),
   z.object({
     action: z.literal("updateSeriesAllShifts"),
     orgId: z.string().uuid(),
     seriesId: z.string().uuid(),
     input: scheduleCellStateSchema,
+    fromDate: z.string().date().optional(),
+    toDate: z.string().date().optional(),
     echoCell: z.object({ employeeId: z.string().uuid(), date: z.string().date() }).optional(),
     echo: cellEchoSchema.optional(),
   }),
@@ -217,6 +221,8 @@ const requestActionSchema = z.discriminatedUnion("action", [
     action: z.literal("deleteShiftSeries"),
     orgId: z.string().uuid(),
     seriesId: z.string().uuid(),
+    fromDate: z.string().date().optional(),
+    toDate: z.string().date().optional(),
     echoCell: z.object({ employeeId: z.string().uuid(), date: z.string().date() }).optional(),
     echo: cellEchoSchema.optional(),
   }),
@@ -1401,6 +1407,8 @@ export async function POST(req: NextRequest) {
           p_start_date: data.startDate,
           p_end_date: data.endDate,
           p_max_occurrences: data.maxOccurrences,
+          p_keep_existing: data.keepExisting ?? false,
+          p_origin_date: data.originDate ?? null,
         });
         if (error) {
           throw error;
@@ -1443,6 +1451,7 @@ export async function POST(req: NextRequest) {
             frequency: data.frequency,
             startDate: data.startDate,
             endDate: data.endDate,
+            keepExisting: data.keepExisting ?? false,
           },
         });
 
@@ -1478,6 +1487,8 @@ export async function POST(req: NextRequest) {
           p_series_id: data.seriesId,
           p_org_id: data.orgId,
           p_state: normalizedInput,
+          p_from_date: data.fromDate ?? null,
+          p_to_date: data.toDate ?? null,
         });
         if (error) {
           throw error;
@@ -1490,7 +1501,7 @@ export async function POST(req: NextRequest) {
           action: "shift_series.updated",
           resourceType: "shift_series",
           resourceId: data.seriesId,
-          details: { input: normalizedInput },
+          details: { input: normalizedInput, fromDate: data.fromDate, toDate: data.toDate },
         });
         return writeResponse(
           auth.serviceClient,
@@ -1525,6 +1536,8 @@ export async function POST(req: NextRequest) {
             .select("emp_id, date")
             .eq("org_id", data.orgId)
             .eq("series_id", data.seriesId)
+            .gte("date", data.fromDate ?? "0001-01-01")
+            .lte("date", data.toDate ?? "9999-12-31")
             .order("date", { ascending: true })
             .order("id", { ascending: true })
             .range(from, to),
@@ -1533,6 +1546,8 @@ export async function POST(req: NextRequest) {
         const { data: deletedCount, error } = await auth.userClient.rpc("delete_shift_series", {
           p_series_id: data.seriesId,
           p_org_id: data.orgId,
+          p_from_date: data.fromDate ?? null,
+          p_to_date: data.toDate ?? null,
         });
         if (error) {
           throw error;
@@ -1555,7 +1570,11 @@ export async function POST(req: NextRequest) {
           action: "shift_series.archived",
           resourceType: "shift_series",
           resourceId: data.seriesId,
-          details: { shiftsAffected: Number(deletedCount ?? 0) },
+          details: {
+            shiftsAffected: Number(deletedCount ?? 0),
+            fromDate: data.fromDate,
+            toDate: data.toDate,
+          },
         });
         const seriesEcho =
           data.echoCell && data.echo

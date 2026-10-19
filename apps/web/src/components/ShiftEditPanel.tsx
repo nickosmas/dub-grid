@@ -88,6 +88,7 @@ interface ShiftEditPanelProps {
     endDate: string | null,
     maxOccurrences: number | null,
     previewTotal: number,
+    keepExisting: boolean,
   ) => void;
   /** True while a repeating series is being created. */
   isCreatingRepeatSeries?: boolean;
@@ -185,6 +186,22 @@ interface ShiftEditPanelProps {
   defaultShiftEnabled?: boolean;
   /** Controls shift display: 'code' shows short labels, 'name' shows full names. */
   shiftDisplayMode?: ShiftDisplayMode;
+}
+
+// Ordered for the two-column grid: the single and whole-series choices on top,
+// the two partial ones below.
+const SERIES_SCOPE_OPTIONS: Array<{ scope: SeriesScope; label: string; absenceLabel?: string }> = [
+  { scope: "this", label: "This shift", absenceLabel: "This only" },
+  { scope: "all", label: "All in series" },
+  { scope: "previous", label: "This and earlier" },
+  { scope: "following", label: "This and later" },
+];
+
+function seriesScopeRemovalNote(scope: SeriesScope): string {
+  if (scope === "previous") return " This also applies to every earlier date in the series.";
+  if (scope === "following") return " This also applies to every later date in the series.";
+  if (scope === "all") return " This applies to every date in the series.";
+  return " Other dates in the series stay as they are.";
 }
 
 function formatTimeRangeLabel(range: TimeRange): string {
@@ -3749,21 +3766,22 @@ export default function ShiftEditPanel({
                   >
                     {isAbsence ? "Repeating: edit scope" : "Repeating shift: edit scope"}
                   </div>
-                  <div className="dg-segment" style={{ display: "flex" }}>
-                    <Button
-                      onClick={() => setSeriesScope("this")}
-                      className={`dg-segment-btn${seriesScope === "this" ? " active" : ""}`}
-                      style={{ flex: 1, fontSize: "var(--dg-fs-footnote)" }}
-                    >
-                      {isAbsence ? "This only" : "This shift"}
-                    </Button>
-                    <Button
-                      onClick={() => setSeriesScope("all")}
-                      className={`dg-segment-btn${seriesScope === "all" ? " active" : ""}`}
-                      style={{ flex: 1, fontSize: "var(--dg-fs-footnote)" }}
-                    >
-                      All in series
-                    </Button>
+                  <div
+                    className="dg-segment dg-segment-grid"
+                    role="group"
+                    aria-label="Apply changes to"
+                  >
+                    {SERIES_SCOPE_OPTIONS.map((option) => (
+                      <Button
+                        key={option.scope}
+                        onClick={() => setSeriesScope(option.scope)}
+                        aria-pressed={seriesScope === option.scope}
+                        className={`dg-segment-btn${seriesScope === option.scope ? " active" : ""}`}
+                        style={{ fontSize: "var(--dg-fs-footnote)" }}
+                      >
+                        {isAbsence ? (option.absenceLabel ?? option.label) : option.label}
+                      </Button>
+                    ))}
                   </div>
                 </div>
               )}
@@ -4247,13 +4265,14 @@ export default function ShiftEditPanel({
                 : "Remove Shift?"
           }
           message={
-            isAbsence
+            (isAbsence
               ? `Remove off day "${currentLabels[0]}" from ${modal.empName} on ${formatDate(modal.date)}?`
               : pendingDelete.type === "pill"
                 ? `Remove "${currentLabels[pendingDelete.index]}" from ${modal.empName} on ${formatDate(modal.date)}?`
                 : currentLabels.length > 1
                   ? `Remove all shifts (${currentLabels.join(", ")}) from ${modal.empName} on ${formatDate(modal.date)}?`
-                  : `Remove "${currentLabels[0]}" from ${modal.empName} on ${formatDate(modal.date)}?`
+                  : `Remove "${currentLabels[0]}" from ${modal.empName} on ${formatDate(modal.date)}?`) +
+            (seriesId ? seriesScopeRemovalNote(seriesScope) : "")
           }
           confirmLabel="Remove"
           variant="danger"

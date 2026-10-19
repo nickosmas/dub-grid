@@ -282,6 +282,7 @@ function renderPanel(
       shift: { shiftId: number | null; jobId: number } | null,
     ) => number[];
     onNoteToggle?: ReturnType<typeof vi.fn>;
+    seriesId?: string | null;
     auditInfo?: {
       createdByName: string | null;
       updatedByName: string | null;
@@ -331,6 +332,7 @@ function panelElement(
       allowShiftEdits={overrides.allowShiftEdits}
       getActiveIndicatorIds={overrides.getActiveIndicatorIds}
       onNoteToggle={overrides.onNoteToggle}
+      seriesId={overrides.seriesId}
     />
   );
 }
@@ -475,7 +477,7 @@ function derivePanelSelection(
   };
 }
 
-function RepeatFlowPanel() {
+function RepeatFlowPanel({ onRepeatConfirm = vi.fn() }: { onRepeatConfirm?: () => void }) {
   const [currentShift, setCurrentShift] = useState<string | null>("D");
   const [currentAssignmentIds, setCurrentAssignmentIds] = useState<number[]>([1]);
 
@@ -497,7 +499,7 @@ function RepeatFlowPanel() {
         setCurrentAssignmentIds(next.currentAssignmentIds);
       }}
       onClose={vi.fn()}
-      onRepeatConfirm={vi.fn()}
+      onRepeatConfirm={onRepeatConfirm}
     />
   );
 }
@@ -1595,6 +1597,103 @@ describe("ShiftEditPanel", () => {
 
       expect(preview).not.toBeNull();
       expect(within(preview!).getByText(/^Day Shift · Supervisor$/)).toBeInTheDocument();
+    });
+  });
+
+  describe("Repeat overwrites", () => {
+    async function submitRepeat(onRepeatConfirm: ReturnType<typeof vi.fn>) {
+      const user = userEvent.setup();
+      render(<RepeatFlowPanel onRepeatConfirm={onRepeatConfirm} />);
+      await user.click(screen.getByRole("button", { name: "Make this a repeating shift" }));
+      await user.click(screen.getByRole("button", { name: "Create Repeating Shift" }));
+      return user;
+    }
+
+    it("creates without asking when no day already has a shift", async () => {
+      const onRepeatConfirm = vi.fn();
+      await submitRepeat(onRepeatConfirm);
+
+      await waitFor(() => expect(onRepeatConfirm).toHaveBeenCalledTimes(1));
+      expect(onRepeatConfirm.mock.calls[0][6]).toBe(false);
+      expect(screen.queryByText("Replace existing shifts?")).not.toBeInTheDocument();
+    });
+
+    it.each([
+      { choice: "Keep existing", keepExisting: true },
+      { choice: "Replace", keepExisting: false },
+    ])("asks first when days already have shifts: $choice", async ({ choice, keepExisting }) => {
+      fetchRepeatOverwriteCountMock.mockResolvedValue({ overwriteCount: 2 });
+      const onRepeatConfirm = vi.fn();
+      const user = await submitRepeat(onRepeatConfirm);
+
+      const dialog = await screen.findByRole("dialog", { name: "Replace existing shifts?" });
+      expect(dialog).toHaveTextContent("2 of these days already have a shift or off day.");
+      expect(onRepeatConfirm).not.toHaveBeenCalled();
+
+      await user.click(within(dialog).getByRole("button", { name: choice }));
+
+      expect(onRepeatConfirm).toHaveBeenCalledTimes(1);
+      expect(onRepeatConfirm.mock.calls[0][6]).toBe(keepExisting);
+    });
+
+    it("still asks when the existing shifts cannot be counted", async () => {
+      fetchRepeatOverwriteCountMock.mockRejectedValue(new Error("offline"));
+      const onRepeatConfirm = vi.fn();
+      await submitRepeat(onRepeatConfirm);
+
+      const dialog = await screen.findByRole("dialog", { name: "Replace existing shifts?" });
+      expect(dialog).toHaveTextContent("Some of these days may already have a shift or off day.");
+      expect(onRepeatConfirm).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Repeating shift scope", () => {
+    it("offers this shift, all, earlier and later, and removes with the chosen scope", async () => {
+      const user = userEvent.setup();
+      const { onSelect } = renderPanel({
+        currentShift: "D",
+        currentAssignmentIds: [1],
+        allowShiftEdits: true,
+        seriesId: "series-1",
+      });
+
+      const scope = screen.getByRole("group", { name: "Apply changes to" });
+      expect(
+        within(scope)
+          .getAllByRole("button")
+          .map((button) => button.textContent),
+      ).toEqual(["This shift", "All in series", "This and earlier", "This and later"]);
+
+      await user.click(within(scope).getByRole("button", { name: "This and later" }));
+      expect(within(scope).getByRole("button", { name: "This and later" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+
+      await user.click(screen.getByRole("button", { name: "Remove shift" }));
+      const dialog = await screen.findByRole("dialog");
+      expect(dialog).toHaveTextContent("This also applies to every later date in the series.");
+      await user.click(within(dialog).getByRole("button", { name: "Remove" }));
+
+      expect(onSelect).toHaveBeenLastCalledWith(null, "following");
+    });
+
+    it("removes with the earlier scope", async () => {
+      const user = userEvent.setup();
+      const { onSelect } = renderPanel({
+        currentShift: "D",
+        currentAssignmentIds: [1],
+        allowShiftEdits: true,
+        seriesId: "series-1",
+      });
+
+      await user.click(screen.getByRole("button", { name: "This and earlier" }));
+      await user.click(screen.getByRole("button", { name: "Remove shift" }));
+      await user.click(
+        within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }),
+      );
+
+      expect(onSelect).toHaveBeenLastCalledWith(null, "previous");
     });
   });
 

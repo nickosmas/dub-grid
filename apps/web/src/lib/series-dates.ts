@@ -1,4 +1,4 @@
-import type { SeriesFrequency } from "@/types";
+import type { SeriesFrequency, SeriesScope } from "@/types";
 import { MAX_SERIES_OCCURRENCES } from "@/lib/constants";
 import { iterateDateRange } from "@/lib/utils";
 
@@ -36,4 +36,18 @@ export function generateSeriesDates(
   }
 
   return dates;
+}
+
+/**
+ * The inclusive date range a series-wide scope reaches from the occurrence on
+ * `date`; an omitted bound is open. "this" is a single-cell write, not a
+ * series write, so it has no range.
+ */
+export function seriesScopeRange(
+  scope: Exclude<SeriesScope, "this">,
+  date: string,
+): { fromDate?: string; toDate?: string } {
+  if (scope === "previous") return { toDate: date };
+  if (scope === "following") return { fromDate: date };
+  return {};
 }
