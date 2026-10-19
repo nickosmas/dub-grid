@@ -166,10 +166,6 @@ function AcceptInviteContent() {
         throw new Error(message, { cause: signInError });
       }
       signedInRef.current = true;
-      // Recorded before acceptance signs the session out. The server refuses
-      // a password alone on an account with a second factor, which records
-      // after the challenge instead.
-      await recordBrowserSignInCompleted();
 
       // 3. Accept the invitation (now authenticated)
       if ((await finishAcceptance()) === "needs-mfa") {
@@ -185,11 +181,43 @@ function AcceptInviteContent() {
   // verified TOTP factor is refused until it answers a challenge, so that
   // refusal hands over to the login page's MFAVerify screen and acceptance
   // resumes on the promoted session rather than failing as a dead link.
+  //
+  // The sign-in record and the terms record need only the signed-in session,
+  // not the acceptance, so they go out alongside it, and every path waits for
+  // both before the session is signed out. Both are best-effort, and the
+  // server refuses each on a password-only session that owes a second factor,
+  // so they land after the challenge for such an account.
   async function finishAcceptance(): Promise<"accepted" | "needs-mfa"> {
-    let slug: string | null = null;
+    const records = Promise.all([
+      recordBrowserSignInCompleted(),
+      recordCurrentTermsAcceptance().catch(() => {
+        // Login routes the user through /accept-terms if this didn't persist.
+      }),
+    ]);
+    let accepted: Awaited<ReturnType<typeof acceptOrLookUp>>;
+    try {
+      accepted = await acceptOrLookUp();
+    } finally {
+      await records;
+    }
+    if (accepted === "needs-mfa") return "needs-mfa";
+
+    // 4. Sign out so the user signs in again with fresh JWT claims. Local
+    // scope still revokes this session's refresh token on the auth server,
+    // and leaves the person's other devices signed in. The invitation is
+    // already accepted, so a failed sign-out is not an error whose retry
+    // would find the link spent (41d1); it still clears this browser.
+    await signOutFromBrowser("local").catch(() => {});
+
+    setOrgSlug(accepted.slug);
+    setState("success");
+    return "accepted";
+  }
+
+  async function acceptOrLookUp(): Promise<{ slug: string | null } | "needs-mfa"> {
     try {
       const result = await acceptInvitation(token!);
-      slug = result.orgSlug;
+      return { slug: result.orgSlug };
     } catch (acceptErr: unknown) {
       const failure = classifyAcceptFailure(acceptErr);
       if (failure === "step-up") return "needs-mfa";
@@ -199,32 +227,12 @@ function AcceptInviteContent() {
         throw new Error(describeAcceptFailure(failure), { cause: acceptErr });
       }
       try {
-        const lookup = await fetchInvitationLookup(token!);
-        slug = lookup.orgSlug;
+        return { slug: (await fetchInvitationLookup(token!)).orgSlug };
       } catch {
         // Best-effort
+        return { slug: null };
       }
     }
-
-    // 3b. Record terms acceptance (best-effort: the user is already authenticated)
-    try {
-      await recordCurrentTermsAcceptance();
-    } catch {
-      // Non-blocking: login will route the user through /accept-terms if
-      // this didn't persist for any reason.
-    }
-
-    // 4. Sign out so user re-authenticates with fresh JWT claims.
-    // Use global scope to revoke the server-side refresh token too,
-    // otherwise the login page will find a stale token in cookies. The
-    // invitation is already accepted, so a failed sign-out is not an error
-    // whose retry would find the link spent (41d1). The global sign-out still
-    // clears this browser's session when it fails.
-    await signOutFromBrowser("global").catch(() => {});
-
-    setOrgSlug(slug);
-    setState("success");
-    return "accepted";
   }
 
   function failAcceptance(err: unknown) {
@@ -260,7 +268,6 @@ function AcceptInviteContent() {
   async function handleMfaVerified() {
     setState("processing");
     try {
-      await recordBrowserSignInCompleted();
       if ((await finishAcceptance()) === "needs-mfa") {
         throw new Error(describeAcceptFailure("step-up"));
       }

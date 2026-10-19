@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { StrictMode } from "react";
 import { formatInvitationExpiry } from "@/emails/invitation-expiry";
@@ -195,7 +195,8 @@ describe("AcceptInvitePage", () => {
 
     expect(await screen.findByRole("heading", { name: "You're all set" })).toBeInTheDocument();
     expect(mocks.recordCurrentTermsAcceptance).toHaveBeenCalledOnce();
-    expect(mocks.signOutFromBrowser).toHaveBeenCalledWith("global");
+    // Local still revokes this session server-side; other devices stay signed in.
+    expect(mocks.signOutFromBrowser).toHaveBeenCalledExactlyOnceWith("local");
     // The acceptance's sign-in is recorded while its session still exists.
     expect(mocks.recordBrowserSignInCompleted).toHaveBeenCalledOnce();
     expect(mocks.recordBrowserSignInCompleted.mock.invocationCallOrder[0]).toBeLessThan(
@@ -206,15 +207,45 @@ describe("AcceptInvitePage", () => {
   it("still shows success when the sign-out after acceptance fails", async () => {
     setLocation("?token=invite-token&email=new.user%40example.com");
     mocks.signOutFromBrowser.mockImplementation(async (scope: string) => {
-      if (scope === "global") throw new Error("network unavailable");
+      if (scope === "local") throw new Error("network unavailable");
     });
     render(<AcceptInvitePage />);
 
     await submitNewPassword();
 
     expect(await screen.findByRole("heading", { name: "You're all set" })).toBeInTheDocument();
-    expect(mocks.signOutFromBrowser).toHaveBeenCalledWith("global");
+    expect(mocks.signOutFromBrowser).toHaveBeenCalledWith("local");
     expect(mocks.captureException).not.toHaveBeenCalled();
+  });
+
+  it("sends the sign-in and terms records alongside acceptance, signing out after all three", async () => {
+    setLocation("?token=invite-token&email=new.user%40example.com");
+    let finishAccept!: () => void;
+    mocks.acceptInvitation.mockReturnValue(
+      new Promise((resolve) => {
+        finishAccept = () => resolve({ orgSlug: "calm-haven" });
+      }),
+    );
+    let finishRecord!: () => void;
+    mocks.recordBrowserSignInCompleted.mockReturnValue(
+      new Promise<void>((resolve) => {
+        finishRecord = resolve;
+      }),
+    );
+    render(<AcceptInvitePage />);
+
+    await submitNewPassword();
+
+    await waitFor(() => expect(mocks.acceptInvitation).toHaveBeenCalledOnce());
+    expect(mocks.recordBrowserSignInCompleted).toHaveBeenCalledOnce();
+    expect(mocks.recordCurrentTermsAcceptance).toHaveBeenCalledOnce();
+
+    await act(async () => finishAccept());
+    expect(mocks.signOutFromBrowser).not.toHaveBeenCalled();
+
+    await act(async () => finishRecord());
+    expect(await screen.findByRole("heading", { name: "You're all set" })).toBeInTheDocument();
+    expect(mocks.signOutFromBrowser).toHaveBeenCalledExactlyOnceWith("local");
   });
 
   it("records no sign-in when the password is refused", async () => {
@@ -311,7 +342,7 @@ describe("AcceptInvitePage", () => {
     // Once after the password (which the server refuses for this account) and
     // once after the code, which it records.
     expect(mocks.recordBrowserSignInCompleted).toHaveBeenCalledTimes(2);
-    expect(mocks.signOutFromBrowser).toHaveBeenCalledWith("global");
+    expect(mocks.signOutFromBrowser).toHaveBeenCalledWith("local");
   });
 
   it("drops the password-only session when the invitee backs out of the challenge", async () => {

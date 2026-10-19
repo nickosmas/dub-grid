@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { decodeJwt } from "jose";
+import { decodeJwt, type JWTPayload } from "jose";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { PublicRoute } from "@/components/RouteGuards";
@@ -83,6 +83,23 @@ function initialLockout(seed: OrgLoginSeed, lockout: OrgLockout | null): OrgLock
   return null;
 }
 
+function readClaims(accessToken: string): JWTPayload | null {
+  try {
+    return decodeJwt(accessToken);
+  } catch {
+    return null;
+  }
+}
+
+// The start-trial route refuses anyone but this organization's Super Admin,
+// so asking for any other role only costs a round trip.
+function startTrialForSuperAdmin(claims: JWTPayload): Promise<unknown> | null {
+  if (claims.org_role !== "super_admin" || typeof claims.org_id !== "string") return null;
+  return settleWithRequestTimeout(startBrowserTrial(claims.org_id)).catch(() => {
+    // Non-fatal: never block sign-in on trial activation.
+  });
+}
+
 export default function OrgLogin({
   orgSlug,
   seed,
@@ -100,7 +117,10 @@ export default function OrgLogin({
   const flowGenerationRef = useRef(0);
   const mountedRef = useRef(true);
   const organizationHandoffActiveRef = useRef(false);
-  const switchAttemptRef = useRef<{ targetOrgId: string; promise: Promise<boolean> } | null>(null);
+  const switchAttemptRef = useRef<{
+    targetOrgId: string;
+    promise: Promise<JWTPayload | null>;
+  } | null>(null);
   const mfaProceedRef = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
@@ -152,13 +172,15 @@ export default function OrgLogin({
     }
   }
   // Switches to targetOrgId (already confirmed as one of the user's
-  // memberships), refreshes the session, starts the org's trial if
-  // applicable, and clears sandbox/query-cache state. Once switch_org commits,
-  // any incomplete handoff fails closed to a fresh sign-in surface. Shared by
-  // the fast-path (server said
-  // needsClientOrgSwitch) and the MFA-verified path (which can't go through
-  // the server route a second time — see handleMFAVerified).
-  async function switchToOrgAndPrepare(targetOrgId: string, generation: number): Promise<boolean> {
+  // memberships) and refreshes the session, resolving to the refreshed
+  // session's claims, or null once this flow is no longer current. Once
+  // switch_org commits, any incomplete handoff fails closed to a fresh sign-in
+  // surface. Only the MFA-verified path uses it, since that path can't go
+  // through the server route a second time (see handleMFAVerified).
+  async function switchToOrgAndPrepare(
+    targetOrgId: string,
+    generation: number,
+  ): Promise<JWTPayload | null> {
     const existing = switchAttemptRef.current;
     if (existing?.targetOrgId === targetOrgId) return existing.promise;
 
@@ -166,7 +188,7 @@ export default function OrgLogin({
       await settleWithRequestTimeout(switchBrowserOrganization(targetOrgId));
       if (!isCurrentFlow(generation)) {
         failClosedOrganizationHandoff();
-        return false;
+        return null;
       }
 
       // switch_org has committed. From this point onward no failure may put
@@ -183,44 +205,15 @@ export default function OrgLogin({
 
       if (!isCurrentFlow(generation)) {
         failClosedOrganizationHandoff();
-        return false;
+        return null;
       }
 
-      let refreshedOrganizationMatches = false;
-      try {
-        refreshedOrganizationMatches =
-          !!refreshedSession && decodeJwt(refreshedSession.access_token).org_id === targetOrgId;
-      } catch {
-        refreshedOrganizationMatches = false;
-      }
-      if (!refreshedOrganizationMatches) {
+      const refreshedClaims = refreshedSession ? readClaims(refreshedSession.access_token) : null;
+      if (!refreshedClaims || refreshedClaims.org_id !== targetOrgId) {
         failClosedOrganizationHandoff();
         throw new Error("organization_session_mismatch");
       }
-
-      // First super_admin login starts this org's trial (idempotent,
-      // self-gated server-side) and wiping any sandbox left over from the
-      // previous session (involuntary logout / browser close that never ran
-      // the explicit exit) are independent of each other, so run them
-      // concurrently rather than one after the other.
-      //
-      // Both stay awaited, not fire-and-forget: the caller hard-navigates
-      // immediately after this returns, which aborted the in-flight sandbox
-      // request often enough that the sandbox routinely survived the switch —
-      // and a surviving sandbox cookie pins every later request to a clone of
-      // the org the user just left, at an elevated role. Both are still
-      // non-fatal on failure: trial activation never blocks sign-in, and the
-      // switch route now clears the sandbox cookie server-side regardless, so
-      // this call is only what deletes the org row.
-      await Promise.all([
-        settleWithRequestTimeout(startBrowserTrial(targetOrgId)).catch(() => {
-          // Non-fatal: never block sign-in on trial activation.
-        }),
-        settleWithRequestTimeout(exitSandbox()).catch(() => {
-          // Non-fatal: never block sign-in on sandbox teardown.
-        }),
-      ]);
-      return isCurrentFlow(generation);
+      return refreshedClaims;
     })();
 
     switchAttemptRef.current = { targetOrgId, promise };
@@ -232,16 +225,16 @@ export default function OrgLogin({
   }
 
   // Looks up the user's membership in `orgSlug` and switches to it via
-  // switchToOrgAndPrepare. Returns false (having already shown a toast and
+  // switchToOrgAndPrepare. Returns null (having already shown a toast and
   // signed the user out) when the lookup fails or no membership exists.
-  async function findAndSwitchToOrg(generation: number): Promise<boolean> {
+  async function findAndSwitchToOrg(generation: number): Promise<JWTPayload | null> {
     const { organizations: orgs } = await settleWithRequestTimeout(fetchAccessibleOrganizations());
-    if (!isCurrentFlow(generation)) return false;
+    if (!isCurrentFlow(generation)) return null;
     const targetOrg = orgs.find((o) => o.org_slug === orgSlug);
     if (!targetOrg) {
       await signOutFromBrowser("local", { organizationAccessDenied: orgSlug });
       toast.error("Your account is not associated with this organization.");
-      return false;
+      return null;
     }
     return switchToOrgAndPrepare(targetOrg.org_id, generation);
   }
@@ -418,7 +411,6 @@ export default function OrgLogin({
         }
         void syncBrowserSessionInBackground(result.session);
         primeSignInQueries(queryClient, result.session.access_token);
-        void exitSandbox().catch(() => {});
         markAuthTransition();
         navigateToDashboard(result.destination, false);
         return;
@@ -449,17 +441,13 @@ export default function OrgLogin({
       // driven from here — the org lookup, switch_org, the refresh, the trial
       // start, the sandbox teardown, the terms check — already happened, and
       // the tokens set above are the post-switch ones. What is left is
-      // browser-local state the server cannot touch.
+      // browser-local state the server cannot touch. That holds without a
+      // switch too: the response cleared the sandbox cookie and the route
+      // tore down any sandbox, so the browser has nothing to exit.
       if (result.didSwitchOrg) {
         navigateToDashboard(result.destination, true);
         return;
       }
-
-      // Fresh login = previous session ended. Wipe any sandbox left over
-      // from that session (involuntary logout / browser close that never
-      // ran the explicit exit) so stale sandbox data is never resumed.
-      // Fire-and-forget: never block or fail sign-in.
-      void exitSandbox().catch(() => {});
 
       markAuthTransition();
       navigateToDashboard(result.destination, false);
@@ -491,41 +479,46 @@ export default function OrgLogin({
 
       const claims = decodeJwt(session.access_token);
       const isGridmaster = claims.platform_role === "gridmaster";
+      let organizationClaims: JWTPayload | null = null;
       let didSwitchOrg = false;
 
       if (!isGridmaster) {
         const userSlug = typeof claims.org_slug === "string" ? claims.org_slug : null;
-        const signedInOrgId = typeof claims.org_id === "string" ? claims.org_id : null;
 
         if (userSlug !== orgSlug) {
-          const switched = await findAndSwitchToOrg(generation);
-          if (!switched) {
+          organizationClaims = await findAndSwitchToOrg(generation);
+          if (!organizationClaims) {
             setMfaRequired(false);
             return;
           }
           didSwitchOrg = true;
         } else {
-          // Already in the right org — still start the trial if
-          // applicable and clear any leftover sandbox from a prior
-          // session, same as switchToOrgAndPrepare does for the switch
-          // case (see that function for why each step exists).
-          if (signedInOrgId) {
-            try {
-              await settleWithRequestTimeout(startBrowserTrial(signedInOrgId));
-            } catch {
-              // Non-fatal: never block sign-in on trial activation.
-            }
-          }
+          organizationClaims = claims;
+          // Fire-and-forget: the soft navigation below does not abort it.
           void exitSandbox().catch(() => {});
         }
       }
 
       if (!isCurrentFlow(generation)) return;
 
-      const destination = await settleWithRequestTimeout(resolvePostLoginDestination());
+      // The session is in its organization now, and none of these depends on
+      // another's answer. After a switch the sandbox exit stays awaited: the
+      // hard navigation that follows aborted it often enough that a sandbox
+      // survived the switch, and a surviving sandbox cookie pins every later
+      // request to a clone of the org the user just left. Unlike the password
+      // path, no login route teardown runs after a second factor.
+      const [destination] = await Promise.all([
+        settleWithRequestTimeout(resolvePostLoginDestination()),
+        recordBrowserSignInCompleted(),
+        organizationClaims ? startTrialForSuperAdmin(organizationClaims) : null,
+        didSwitchOrg
+          ? settleWithRequestTimeout(exitSandbox()).catch(() => {
+              // Non-fatal: never block sign-in on sandbox teardown.
+            })
+          : null,
+      ]);
       if (!isCurrentFlow(generation)) return;
 
-      await recordBrowserSignInCompleted();
       // What the shell fetched while this page waited for the code was
       // answered for the password-only session, and the organization bootstrap
       // refuses that as a step-up. Its retries run out long before a person has
