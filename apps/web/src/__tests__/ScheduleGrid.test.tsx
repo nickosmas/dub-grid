@@ -1496,8 +1496,10 @@ describe("ScheduleGrid", () => {
     const initialsBadge = within(firstCell).getByText("SC") as HTMLElement;
 
     expect(pill?.style.borderRadius).toBe("8px");
-    expect(pill?.style.paddingLeft).toBe("24px");
+    expect(pill?.style.paddingLeft).toBe("18px");
     expect(initialsBadge.style.position).toBe("absolute");
+    expect(initialsBadge.style.writingMode).toBe("vertical-rl");
+    expect(initialsBadge.style.textOrientation).toBe("upright");
     expect(initialsBadge.style.left).toBe("0px");
     expect(initialsBadge.style.borderRadius).toBe("7px 0 0 7px");
     expect(initialsBadge).toHaveStyle({
@@ -1546,8 +1548,9 @@ describe("ScheduleGrid", () => {
     const crossPill = initialsBadge.closest('[data-shift-pill="multi"]') as HTMLElement | null;
 
     expect(crossPill?.style.borderRadius).toBe("6px");
-    expect(crossPill?.style.paddingLeft).toBe("20px");
+    expect(crossPill?.style.paddingLeft).toBe("16px");
     expect(initialsBadge.style.position).toBe("absolute");
+    expect(initialsBadge.style.writingMode).toBe("vertical-rl");
     expect(initialsBadge.style.left).toBe("0px");
     expect(initialsBadge.style.borderRadius).toBe("5px 0 0 5px");
     expect(initialsBadge).toHaveStyle({
@@ -1677,7 +1680,7 @@ describe("ScheduleGrid", () => {
     const initialsBadge = within(firstCell).getByText("SC") as HTMLElement;
 
     expect(pill?.style.justifyContent).toBe("center");
-    expect(pill?.style.paddingLeft).toBe("24px");
+    expect(pill?.style.paddingLeft).toBe("18px");
     expect(initialsBadge.style.position).toBe("absolute");
     expect(initialsBadge).toHaveStyle({
       background: "#E5F3E8",
