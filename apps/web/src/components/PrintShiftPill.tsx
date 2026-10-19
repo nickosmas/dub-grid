@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 
+import { PRINT_FIT_LINE } from "@/components/print-fit";
 import { fmt12hShort } from "@/lib/utils";
 
 export interface PrintPillWing {
@@ -19,9 +20,7 @@ export interface PrintShiftPillProps {
   wing?: PrintPillWing | null;
   variant: "single" | "multi";
   isNameMode: boolean;
-  /** A month's ~31 columns leave each pill a few characters wide. */
-  isDense: boolean;
-  /** Puts the wing above the label, for a pill too narrow to share a row. */
+  /** Puts the wing above the label, as a double shift's pills are too narrow for a side wing. */
   wingOnTop: boolean;
 }
 
@@ -30,28 +29,16 @@ export interface PrintShiftPillProps {
 // corners than the grid's 8px and 6px.
 const PILL_RADIUS = { single: "0.35em", multi: "0.3em" } as const;
 
-const ONE_LINE: CSSProperties = {
-  whiteSpace: "nowrap",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  maxWidth: "100%",
-  minWidth: 0,
-};
+// A line that shrinks to fit rather than being cut off (see print-fit.ts).
+const FIT_LINE: CSSProperties = { ...PRINT_FIT_LINE, textAlign: "center" };
 
-// Wraps only between words: a name broken mid-word ("Eveni/ng") reads worse
-// than one shortened with an ellipsis.
-const TWO_LINES: CSSProperties = {
-  display: "-webkit-box",
-  WebkitBoxOrient: "vertical",
-  WebkitLineClamp: 2,
-  overflow: "hidden",
-  maxWidth: "100%",
-};
+// Spelled-out names wrap, but only between words; a word too long for the
+// pill shrinks instead of breaking.
+const FIT_WORDS: CSSProperties = { ...FIT_LINE, whiteSpace: "normal" };
 
 /**
  * One printed shift. The focus-area wing is a flex item rather than an
- * overlay, so a label can never run underneath it whatever font the print
- * window ends up with.
+ * overlay, so a label can never run underneath it.
  */
 export function PrintShiftPill({
   primaryLabel,
@@ -63,14 +50,13 @@ export function PrintShiftPill({
   wing,
   variant,
   isNameMode,
-  isDense,
   wingOnTop,
 }: PrintShiftPillProps) {
   const isMulti = variant === "multi";
   const hasTime = !!time && !!(time.start || time.end);
   const hasSecondary = !!secondaryLabel;
   const primarySize = isNameMode ? (isMulti ? "0.8em" : "0.88em") : isMulti ? "0.92em" : "1em";
-  const detailSize = isMulti || isDense ? "0.66em" : "0.72em";
+  const detailSize = isMulti ? "0.66em" : "0.72em";
 
   return (
     <div
@@ -89,24 +75,27 @@ export function PrintShiftPill({
     >
       {wing && (
         <span
-          data-print-pill-wing="true"
+          data-print-pill-wing={wingOnTop ? "top" : "side"}
           style={{
-            flex: "none",
+            // A side wing gives way in a narrow pill, its initials shrinking
+            // with it, so the shift label keeps most of the width.
+            flex: wingOnTop ? "none" : "0 1 auto",
+            minWidth: 0,
+            maxWidth: wingOnTop ? undefined : "45%",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             background: wing.background,
             color: wing.color,
-            fontSize: wingOnTop ? "0.58em" : isMulti ? "0.66em" : "0.72em",
             fontWeight: 700,
             lineHeight: 1,
             letterSpacing: "0.02em",
-            padding: wingOnTop ? "0.2em 0" : "0 0.35em",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
+            padding: wingOnTop ? "0.15em 0.1em" : "0 0.25em",
           }}
         >
-          {wing.initials}
+          <span data-print-fit="" style={FIT_LINE}>
+            <span style={{ fontSize: wingOnTop ? "0.58em" : "0.72em" }}>{wing.initials}</span>
+          </span>
         </span>
       )}
       <div
@@ -115,54 +104,38 @@ export function PrintShiftPill({
           minWidth: 0,
           display: "flex",
           flexDirection: "column",
-          alignItems: "center",
+          alignItems: "stretch",
           justifyContent: "center",
           gap: "0.1em",
-          padding: isDense ? "0.15em 0.1em" : isNameMode ? "0.2em 0.35em" : "0.2em 0.25em",
-          textAlign: "center",
+          padding: isNameMode ? "0.2em 0.3em" : "0.2em 0.2em",
           lineHeight: 1.15,
         }}
       >
         {isNameMode ? (
           <>
-            <span
-              style={{
-                fontSize: primarySize,
-                fontWeight: 700,
-                ...(hasSecondary || hasTime || isDense || isMulti ? ONE_LINE : TWO_LINES),
-              }}
-            >
-              {primaryLabel}
+            <span data-print-fit="" style={FIT_WORDS}>
+              <span style={{ fontSize: primarySize, fontWeight: 700 }}>{primaryLabel}</span>
             </span>
             {hasSecondary && (
-              <span style={{ fontSize: detailSize, fontWeight: 600, opacity: 0.8, ...ONE_LINE }}>
-                {secondaryLabel}
+              <span data-print-fit="" style={FIT_LINE}>
+                <span style={{ fontSize: detailSize, fontWeight: 600, opacity: 0.8 }}>
+                  {secondaryLabel}
+                </span>
               </span>
             )}
           </>
         ) : (
-          <span
-            style={{
-              display: "flex",
-              alignItems: "baseline",
-              justifyContent: "center",
-              gap: "0.2em",
-              maxWidth: "100%",
-              minWidth: 0,
-            }}
-          >
-            <span style={{ fontSize: primarySize, fontWeight: 700, flexShrink: 0, ...ONE_LINE }}>
-              {primaryLabel}
-            </span>
+          <span data-print-fit="" style={FIT_LINE}>
+            <span style={{ fontSize: primarySize, fontWeight: 700 }}>{primaryLabel}</span>
             {hasSecondary && (
               <>
                 <span
                   aria-hidden="true"
-                  style={{ fontSize: detailSize, opacity: 0.5, flex: "none" }}
+                  style={{ fontSize: detailSize, opacity: 0.5, margin: "0 0.1em" }}
                 >
                   ·
                 </span>
-                <span style={{ fontSize: detailSize, fontWeight: 600, opacity: 0.8, ...ONE_LINE }}>
+                <span style={{ fontSize: detailSize, fontWeight: 600, opacity: 0.8 }}>
                   {secondaryLabel}
                 </span>
               </>
@@ -170,30 +143,17 @@ export function PrintShiftPill({
           </span>
         )}
         {hasTime && (
-          <span
-            style={{
-              fontSize: detailSize,
-              fontWeight: 500,
-              opacity: 0.75,
-              letterSpacing: "0.01em",
-              ...(isDense
-                ? {
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    lineHeight: 1.1,
-                  }
-                : ONE_LINE),
-            }}
-          >
-            {isDense ? (
-              <>
-                <span>{fmt12hShort(time!.start)}</span>
-                <span>{fmt12hShort(time!.end)}</span>
-              </>
-            ) : (
-              `${fmt12hShort(time!.start)}–${fmt12hShort(time!.end)}`
-            )}
+          <span data-print-fit="" style={FIT_LINE}>
+            <span
+              style={{
+                fontSize: detailSize,
+                fontWeight: 500,
+                opacity: 0.75,
+                letterSpacing: "0.01em",
+              }}
+            >
+              {fmt12hShort(time!.start)}–{fmt12hShort(time!.end)}
+            </span>
           </span>
         )}
       </div>

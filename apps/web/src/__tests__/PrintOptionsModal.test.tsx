@@ -45,7 +45,7 @@ describe("PrintOptionsModal", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Month" }));
+    await user.click(screen.getByRole("button", { name: "2 Weeks" }));
     expect(screen.getByRole("button", { name: /^close$/i })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /^close$/i }));
@@ -74,11 +74,29 @@ describe("PrintOptionsModal", () => {
     );
 
     expect(screen.getByRole("button", { name: "2 Weeks" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Month" })).toBeDisabled();
     expect(screen.getByText("Full shift names print one week at a time.")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Preview & Print/i }));
 
     expect(onPrint).toHaveBeenCalledWith(expect.objectContaining({ spanWeeks: 1 }));
+  });
+
+  it("offers no month, and prints a month on screen as its first two weeks", async () => {
+    const user = userEvent.setup();
+    const onPrint = vi.fn();
+    render(
+      <PrintOptionsModal
+        focusAreas={focusAreas}
+        currentSpanWeeks="month"
+        onPrint={onPrint}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Month" })).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: /Preview & Print/i }));
+
+    expect(onPrint).toHaveBeenCalledWith(expect.objectContaining({ spanWeeks: 2 }));
   });
 });

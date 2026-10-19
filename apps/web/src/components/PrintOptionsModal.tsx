@@ -12,7 +12,7 @@ import { PRINT_FONT_SIZES, type PrintFontSizeKey } from "@/components/print-font
 export interface PrintConfig {
   fontSize: number;
   selectedFocusAreas: string[];
-  spanWeeks: 1 | 2 | "month";
+  spanWeeks: 1 | 2;
 }
 
 interface PrintOptionsModalProps {
@@ -34,11 +34,13 @@ export default function PrintOptionsModal({
 }: PrintOptionsModalProps) {
   // Spelled-out shift names only fit a week's columns on one page.
   const printsOneWeek = shiftDisplayMode === "name";
-  const defaultSpanWeeks = printsOneWeek ? 1 : currentSpanWeeks;
+  // A printed month is too narrow to read, so a month on screen prints its
+  // first two weeks.
+  const defaultSpanWeeks: 1 | 2 = printsOneWeek || currentSpanWeeks === 1 ? 1 : 2;
   const [selectedFocusAreas, setSelectedFocusAreas] = useState<string[]>(
     focusAreas.map((w) => w.name),
   );
-  const [spanWeeks, setSpanWeeks] = useState<1 | 2 | "month">(defaultSpanWeeks);
+  const [spanWeeks, setSpanWeeks] = useState<1 | 2>(defaultSpanWeeks);
   const [fontSizeKey, setFontSizeKey] = useState<PrintFontSizeKey>("medium");
 
   // Confirming here unmounts this modal and mounts the preview, which is a much
@@ -92,7 +94,7 @@ export default function PrintOptionsModal({
         <div className="dg-modal-section">
           <div className="dg-modal-section-label">VIEW</div>
           <div className="dg-span-tabs dg-span-tabs--light" style={{ display: "inline-flex" }}>
-            {([1, 2, "month"] as const).map((n) => (
+            {([1, 2] as const).map((n) => (
               <Button
                 key={n}
                 onClick={() => setSpanWeeks(n)}
@@ -100,7 +102,7 @@ export default function PrintOptionsModal({
                 className={`dg-span-tab${spanWeeks === n ? " active" : ""}`}
                 style={{ minWidth: 72 }}
               >
-                {n === "month" ? "Month" : n === 1 ? "1 Week" : "2 Weeks"}
+                {n === 1 ? "1 Week" : "2 Weeks"}
               </Button>
             ))}
           </div>
