@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import ScheduleGrid, {
   buildScheduleGridModel,
@@ -4453,6 +4453,240 @@ describe("ScheduleGrid", () => {
       expect(rowgroups).toHaveLength(2);
       expect(within(rowgroups[0]).getAllByRole("columnheader").length).toBeGreaterThan(0);
       expect(within(rowgroups[1]).getAllByRole("gridcell").length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("mounts the rows below the first screen after it", () => {
+    const manyEmployees: Employee[] = Array.from({ length: 12 }, (_, index) => ({
+      ...employees[0],
+      id: `emp-many-${index}`,
+      firstName: `Person${index}`,
+      lastName: "Many",
+      focusAreaIds: [index < 6 ? 1 : 2],
+    }));
+    const southCodes: AssignmentDefinition[] = [
+      ...assignments,
+      { ...assignments[0], id: 2, label: "E", focusAreaId: 2, sortOrder: 2 },
+    ];
+    let originalInnerHeight = 0;
+
+    beforeEach(() => {
+      originalInnerHeight = window.innerHeight;
+      // Room for the first section's chrome and a few rows only.
+      Object.defineProperty(window, "innerHeight", { configurable: true, value: 200 });
+    });
+
+    afterEach(() => {
+      Object.defineProperty(window, "innerHeight", {
+        configurable: true,
+        value: originalInnerHeight,
+      });
+    });
+
+    const rowCount = (name: string) =>
+      within(getGridBody(name))
+        .getAllByRole("row")
+        .filter((row) => row.querySelector('[role="rowheader"]')).length;
+
+    it("ends with every row of every section mounted", async () => {
+      const { container } = renderGrid({
+        filteredEmployees: manyEmployees,
+        allEmployees: manyEmployees,
+        assignments: southCodes,
+        // No shifts, so nobody also shows as a guest in the other section.
+        shiftForKey: () => null,
+        assignmentIdsForKey: () => [],
+      });
+
+      // The first screen holds space for the rest of North and all of South.
+      expect(rowCount("North schedule grid")).toBe(4);
+      expect(container.querySelector("[data-rows-pending]")).not.toBeNull();
+      expect(container.querySelector("[data-section-pending]")).not.toBeNull();
+
+      await waitFor(() => expect(container.querySelector("[data-section-pending]")).toBeNull());
+      expect(container.querySelector("[data-rows-pending]")).toBeNull();
+      expect(rowCount("North schedule grid")).toBe(6);
+      expect(rowCount("South schedule grid")).toBe(6);
+    });
+
+    it("mounts the searched-for row straight away", () => {
+      renderGrid({
+        filteredEmployees: manyEmployees,
+        allEmployees: manyEmployees,
+        assignments: southCodes,
+        // No shifts, so nobody also shows as a guest in the other section.
+        shiftForKey: () => null,
+        assignmentIdsForKey: () => [],
+        highlightEmpIds: new Set(["emp-many-11"]),
+        highlightScrollKey: "search-1",
+      });
+
+      const match = screen.getByText("Person11 Many").closest('[role="row"]');
+      expect(match).toHaveAttribute("data-search-highlight", "true");
+    });
+  });
+
+  describe("re-renders a section only when its cells change", () => {
+    const sectionEmployees: Employee[] = [
+      employees[0],
+      { ...employees[0], id: "emp-south", firstName: "Sam", lastName: "South", focusAreaIds: [2] },
+    ];
+    const southAssignments: AssignmentDefinition[] = [
+      ...assignments,
+      { ...assignments[0], id: 2, label: "E", name: "Evening", focusAreaId: 2, sortOrder: 2 },
+      { ...assignments[0], id: 3, label: "N", name: "Night", focusAreaId: 2, sortOrder: 3 },
+    ];
+    const interactionState: ScheduleGridInteractionState = {
+      activeCellId: null,
+      contextMenuCellId: null,
+      hasClipboard: false,
+    };
+    const handlers: ScheduleGridHandlers = { onActivateCell: vi.fn() };
+    const getShiftStyle = getShiftStyleFromCodes(southAssignments);
+    // The page keeps these in state, so a rebuilt model hands over the same ones.
+    const none: never[] = [];
+
+    function buildModel(labels: Record<string, string>, extra: { showAudit?: boolean } = {}) {
+      const labelFor = (empId: string, date: Date) => labels[`${empId}_${formatDateKey(date)}`];
+      const shiftForKey = vi.fn((empId: string, date: Date) => labelFor(empId, date) ?? null);
+      const model = buildScheduleGridModel({
+        filteredEmployees: sectionEmployees,
+        allEmployees: sectionEmployees,
+        week1,
+        week2,
+        spanWeeks: 2,
+        todayKey: formatDateKey(week1[0]),
+        focusAreas,
+        departments,
+        assignments: southAssignments,
+        historicalAssignments: none,
+        shiftCategories,
+        jobs: none,
+        indicatorTypes,
+        certifications: none,
+        orgRoles: none,
+        isCellInteractive: true,
+        shiftDisplayMode: "code",
+        showAudit: extra.showAudit,
+        accessors: {
+          shiftForKey,
+          assignmentIdsForKey: (empId, date) => {
+            const label = labelFor(empId, date);
+            return southAssignments.filter((code) => code.label === label).map((code) => code.id);
+          },
+          getShiftStyle,
+        },
+      });
+      return { model, shiftForKey };
+    }
+
+    function renderTwice(
+      firstLabels: Record<string, string>,
+      secondLabels: Record<string, string>,
+      extra?: { showAudit?: boolean },
+    ) {
+      const first = buildModel(firstLabels);
+      const { rerender } = render(
+        <ScheduleGrid
+          model={first.model}
+          interactionState={interactionState}
+          handlers={handlers}
+        />,
+      );
+      const firstReadsBefore = first.shiftForKey.mock.calls.length;
+      const second = buildModel(secondLabels, extra);
+      rerender(
+        <ScheduleGrid
+          model={second.model}
+          interactionState={interactionState}
+          handlers={handlers}
+        />,
+      );
+      return {
+        // Old accessors are only ever read again to compare; new ones are read
+        // to compare and again by every section that re-renders.
+        comparedWithOld: first.shiftForKey.mock.calls.length - firstReadsBefore,
+        newReads: second.shiftForKey.mock.calls.length,
+      };
+    }
+
+    const cellText = (gridName: string, index: number) =>
+      within(getGridBody(gridName)).getAllByRole("gridcell")[index].textContent;
+    const start = formatDateKey(week1[0]);
+    const initial = { [`emp-1_${start}`]: "D", [`emp-south_${start}`]: "E" };
+
+    it("skips both sections when new accessors read the same", () => {
+      const reads = renderTwice(initial, { ...initial });
+
+      // Each section's 14 cells read once to compare, and none again to render.
+      expect(reads).toEqual({ comparedWithOld: 2 * 14, newReads: 2 * 14 });
+      expect(cellText("North schedule grid", 0)).toContain("D");
+      expect(cellText("South schedule grid", 0)).toContain("E");
+    });
+
+    it("re-renders the section whose cell changed, and only that one", () => {
+      const reads = renderTwice(initial, { ...initial, [`emp-south_${start}`]: "N" });
+
+      // North compares its 14 cells and holds; South stops at its first and
+      // renders all 14.
+      expect(reads).toEqual({ comparedWithOld: 14 + 1, newReads: 14 + 1 + 14 });
+      expect(cellText("South schedule grid", 0)).toContain("N");
+      expect(cellText("South schedule grid", 0)).not.toContain("E");
+      expect(cellText("North schedule grid", 0)).toContain("D");
+    });
+
+    it("holds through new handlers, and a click reaches the latest one", () => {
+      const first = buildModel(initial);
+      const { rerender } = render(
+        <ScheduleGrid
+          model={first.model}
+          interactionState={interactionState}
+          handlers={handlers}
+        />,
+      );
+      const firstReadsBefore = first.shiftForKey.mock.calls.length;
+      const second = buildModel({ ...initial });
+      const latest: ScheduleGridHandlers = { onActivateCell: vi.fn() };
+      rerender(
+        <ScheduleGrid model={second.model} interactionState={interactionState} handlers={latest} />,
+      );
+
+      expect(first.shiftForKey.mock.calls.length - firstReadsBefore).toBe(2 * 14);
+      expect(second.shiftForKey).toHaveBeenCalledTimes(2 * 14);
+      fireEvent.click(within(getGridBody("South schedule grid")).getAllByRole("gridcell")[0]);
+      expect(latest.onActivateCell).toHaveBeenCalledWith(
+        expect.objectContaining({ emp: expect.objectContaining({ id: "emp-south" }) }),
+      );
+      expect(handlers.onActivateCell).not.toHaveBeenCalled();
+    });
+
+    it("holds through a rebuilt bulk selection set that selects the same cells", () => {
+      const selectable = () => new Set(week1.map((date) => `emp-south_${formatDateKey(date)}`));
+      const first = buildModel(initial);
+      const { rerender } = render(
+        <ScheduleGrid
+          model={first.model}
+          interactionState={{ ...interactionState, bulkSelectableCellKeys: selectable() }}
+          handlers={handlers}
+        />,
+      );
+      const firstReadsBefore = first.shiftForKey.mock.calls.length;
+      rerender(
+        <ScheduleGrid
+          model={first.model}
+          interactionState={{ ...interactionState, bulkSelectableCellKeys: selectable() }}
+          handlers={handlers}
+        />,
+      );
+
+      // Compared cell by cell (each read once more), and neither section rendered.
+      expect(first.shiftForKey.mock.calls.length - firstReadsBefore).toBe(2 * 2 * 14);
+    });
+
+    it("re-renders every section when a prop other than the accessors changes", () => {
+      const reads = renderTwice(initial, { ...initial }, { showAudit: true });
+
+      expect(reads).toEqual({ comparedWithOld: 0, newReads: 2 * 14 });
     });
   });
 });

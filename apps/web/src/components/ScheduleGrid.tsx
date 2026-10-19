@@ -115,6 +115,12 @@ import {
 } from "./schedule-grid/badges";
 import { NoteDots, type ScheduleNoteMark } from "./schedule-grid/noteDots";
 import {
+  initialGridMount,
+  nextGridMount,
+  sectionMount,
+  type GridMount,
+} from "./schedule-grid/progressiveMount";
+import {
   getFocusAreaInitials,
   getCrossFocusBadgePalette,
   isOvernightTimes,
@@ -144,6 +150,8 @@ import {
 import type { ShiftDragData } from "./DraggableShift";
 import type { CellDropData } from "./DroppableCell";
 import { useAuth } from "@/components/AuthProvider";
+import { useLatestRef } from "@/hooks/useLatestRef";
+import { isDeepEqual } from "@/lib/deep-equal";
 import {
   buildShiftDiffDescriptors,
   expandDelimitedTimeRanges,
@@ -273,6 +281,8 @@ interface SectionBlockProps {
   sectionName: string;
   exclusiveCodeIds: Set<number>;
   employees: Employee[];
+  /** Renders only the first rows, holding the rest's space, until the grid mounts them. */
+  renderedRows?: number;
   weekDates: Date[];
   todayKey: string;
   shiftForKey: (empId: string, date: Date) => string | null;
@@ -493,6 +503,21 @@ const EMPTY_ID_SET = new Set<number>();
 
 const ESTIMATED_SECTION_CHROME_PX = 120;
 const ESTIMATED_ROW_PX = 52;
+
+/**
+ * Runs `callback` once the main thread is idle, and within 300 ms regardless, so
+ * a scroll down soon after the first screen does not find the rest still
+ * missing. Returns a cancel.
+ */
+function whenIdle(callback: () => void): () => void {
+  if (typeof window.requestIdleCallback === "function") {
+    const handle = window.requestIdleCallback(callback, { timeout: 300 });
+    return () => window.cancelIdleCallback(handle);
+  }
+  // Safari has no idle callback.
+  const handle = window.setTimeout(callback, 50);
+  return () => window.clearTimeout(handle);
+}
 
 function estimateGridHeight(
   sections: ReadonlyMap<number, { employees: readonly Employee[] }>,
@@ -814,10 +839,124 @@ function ShiftDetailHoverCard({
   );
 }
 
+// Read once per visible cell. A widen of the loaded window, or an edit in
+// another section, hands every section new functions and sets; a section
+// re-renders only when one of its own cells would read differently.
+const CELL_READ_KEYS = new Set<keyof SectionBlockProps>([
+  "shiftForKey",
+  "assignmentIdsForKey",
+  "segmentsForKey",
+  "publishedSegmentsForKey",
+  "noteMarksForKey",
+  "getCustomShiftTimes",
+  "getPublishedCustomShiftTimes",
+  "draftKindForKey",
+  "publishedLabelForKey",
+  "publishedAssignmentIdsForKey",
+  "publishedAbsenceTypeIdForKey",
+  "publishDiffForKey",
+  "publishedMetadataForKey",
+  "createdByNameForKey",
+  "absenceTypeIdForKey",
+  "activeRequestForKey",
+  "resolvePublisherName",
+  "bulkSelectableCellKeys",
+  "bulkSelectedCellKeys",
+]);
+
+// Rebuilt by the grid's derivations on every data change, with the same contents.
+const CONTENT_COMPARED_KEYS = new Set<keyof SectionBlockProps>([
+  "employees",
+  "exclusiveCodeIds",
+  "openShifts",
+]);
+
+/** Everything a section's cell reads from those props, in the arguments it reads it with. */
+function readSectionCell(props: SectionBlockProps, empId: string, date: Date): unknown[] {
+  const focusAreaId = (
+    props.focusAreas.find((fa) => fa.id === props.sectionId) ??
+    props.focusAreas.find((fa) => fa.name === props.sectionName)
+  )?.id;
+  const segments = props.segmentsForKey?.(empId, date) ?? [];
+  const publishDiff = props.publishDiffForKey?.(empId, date);
+  const publishedMetadata = props.publishedMetadataForKey?.(empId, date);
+  // A cell names its publisher from these two, and only from these.
+  const publisherName = (userId: string | null | undefined) =>
+    userId ? props.resolvePublisherName?.(userId) : undefined;
+  const bulkCellKey = getGridCellKey({ empId, dateKey: formatDateKey(date) });
+  return [
+    props.shiftForKey(empId, date),
+    props.assignmentIdsForKey?.(empId, date),
+    segments,
+    props.publishedSegmentsForKey?.(empId, date),
+    props.noteMarksForKey?.(empId, date, focusAreaId),
+    segments.map((segment) =>
+      props.noteMarksForKey?.(empId, date, focusAreaId, {
+        shiftId: segment.shiftId,
+        jobId: segment.jobId,
+      }),
+    ),
+    props.getCustomShiftTimes?.(empId, date),
+    props.getPublishedCustomShiftTimes?.(empId, date),
+    props.draftKindForKey?.(empId, date),
+    props.publishedLabelForKey?.(empId, date),
+    props.publishedAssignmentIdsForKey?.(empId, date),
+    props.publishedAbsenceTypeIdForKey?.(empId, date),
+    publishDiff,
+    publishedMetadata,
+    publisherName(publishDiff?.publishedBy),
+    publisherName(publishedMetadata?.publishedBy),
+    props.createdByNameForKey?.(empId, date),
+    props.absenceTypeIdForKey?.(empId, date),
+    props.activeRequestForKey?.(empId, date),
+    !!props.bulkSelectableCellKeys?.has(bulkCellKey),
+    !!props.bulkSelectedCellKeys?.has(bulkCellKey),
+  ];
+}
+
+function sameItems<T>(a: readonly T[], b: readonly T[]): boolean {
+  return a.length === b.length && a.every((item, index) => item === b[index]);
+}
+
+/**
+ * SectionBlock's memo comparison. Props compare by identity, as React's default
+ * does, except the per-cell accessors and sets, which compare by what each of
+ * the section's cells reads from them, and the arrays the grid rebuilds with the
+ * same contents. A section only ever calls its accessors for its own employees
+ * and dates (and the note marks for its own focus area and its cells' shifts),
+ * so equal reads mean an identical render.
+ */
+function sectionBlockPropsAreEqual(prev: SectionBlockProps, next: SectionBlockProps): boolean {
+  let accessorsChanged = false;
+  const keys = new Set([...Object.keys(prev), ...Object.keys(next)]) as Set<
+    keyof SectionBlockProps
+  >;
+  for (const key of keys) {
+    if (Object.is(prev[key], next[key])) continue;
+    if (CELL_READ_KEYS.has(key)) {
+      accessorsChanged = true;
+    } else if (key === "employees") {
+      if (!sameItems(prev.employees, next.employees)) return false;
+    } else if (!CONTENT_COMPARED_KEYS.has(key) || !isDeepEqual(prev[key], next[key])) {
+      return false;
+    }
+  }
+  if (!accessorsChanged) return true;
+  for (const emp of next.employees) {
+    for (const date of next.weekDates) {
+      if (!isDeepEqual(readSectionCell(prev, emp.id, date), readSectionCell(next, emp.id, date))) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 const SectionBlock = memo(function SectionBlock({
   sectionId,
   sectionName,
   employees,
+  renderedRows,
   weekDates,
   todayKey,
   shiftForKey,
@@ -1322,6 +1461,8 @@ const SectionBlock = memo(function SectionBlock({
   // A section this short lands on row 0, so its date row never pins. That is
   // the right outcome: there is nothing to scroll past.
   const releaseRowIndex = Math.max(0, employees.length - STICKY_RELEASE_ROWS);
+  const renderedEmployees =
+    renderedRows === undefined ? employees : employees.slice(0, renderedRows);
 
   return (
     <div
@@ -1797,7 +1938,7 @@ const SectionBlock = memo(function SectionBlock({
             )}
 
             {/* Employee rows */}
-            {employees.map((emp, ri) => {
+            {renderedEmployees.map((emp, ri) => {
               const hasHighlightedSearch = !!(highlightEmpIds && highlightEmpIds.size > 0);
               const isHighlighted = hasHighlightedSearch
                 ? (highlightEmpIds?.has(emp.id) ?? false)
@@ -3747,6 +3888,16 @@ const SectionBlock = memo(function SectionBlock({
                 </div>
               );
             })}
+            {renderedEmployees.length < employees.length && (
+              <div
+                aria-hidden="true"
+                data-rows-pending
+                style={{
+                  gridColumn: "1 / -1",
+                  height: (employees.length - renderedEmployees.length) * ESTIMATED_ROW_PX,
+                }}
+              />
+            )}
 
             {hasAnyTotals &&
               totalRows.map((row, rowIndex) => {
@@ -3871,14 +4022,14 @@ const SectionBlock = memo(function SectionBlock({
             <ActiveCellOutline
               sectionId={sectionId}
               gridRef={gridRef}
-              remeasureKey={`${fitToContainer ? 1 : 0}|${colWidth}|${nameColWidth}|${shiftDisplayMode}|${weekDates.map((d) => d.getTime()).join(",")}|${employees.length}`}
+              remeasureKey={`${fitToContainer ? 1 : 0}|${colWidth}|${nameColWidth}|${shiftDisplayMode}|${weekDates.map((d) => d.getTime()).join(",")}|${employees.length}|${renderedRows ?? ""}`}
             />
           </div>
         </div>
       </div>
     </div>
   );
-});
+}, sectionBlockPropsAreEqual);
 
 const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   filteredEmployees,
@@ -4179,6 +4330,42 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   const hasAnySections = renderedDepartmentSections.length > 0;
   const hasHighlightedSearch = (highlightEmpIds?.size ?? 0) > 0;
 
+  const sectionIndexById = useMemo(() => {
+    const order = new Map<number, number>();
+    for (const { focusAreas: deptFAs } of renderedDepartmentSections) {
+      for (const fa of deptFAs) {
+        if (sectionRenderData.has(fa.id)) order.set(fa.id, order.size);
+      }
+    }
+    return order;
+  }, [renderedDepartmentSections, sectionRenderData]);
+
+  // The first render mounts what fills the screen, and half as much again for
+  // a quick scroll. The rest mounts after the first paint, a section a step,
+  // each when the main thread is next idle: mounting every cell at once held
+  // it for seconds on a slow machine before the grid showed. Not transitions:
+  // the updates still landing then would restart one over and over, redoing
+  // its work. Nothing mounted is ever unmounted again.
+  const [gridMount, setGridMount] = useState<GridMount>(() =>
+    typeof window === "undefined"
+      ? "all"
+      : initialGridMount(
+          [...sectionIndexById.keys()].map(
+            (id) => sectionRenderData.get(id)?.employees.length ?? 0,
+          ),
+          window.innerHeight * 1.5,
+          ESTIMATED_SECTION_CHROME_PX,
+          ESTIMATED_ROW_PX,
+        ),
+  );
+  // A search scrolls to its first match, wherever that is.
+  if (hasHighlightedSearch && gridMount !== "all") setGridMount("all");
+  const sectionCount = sectionIndexById.size;
+  useEffect(() => {
+    if (gridMount === "all" || containerWidth === null) return;
+    return whenIdle(() => setGridMount((mount) => nextGridMount(mount, sectionCount)));
+  }, [gridMount, containerWidth, sectionCount]);
+
   useEffect(() => {
     if (!highlightScrollKey || !hasHighlightedSearch) return;
 
@@ -4261,6 +4448,19 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                   openShifts: sectionOpenShifts,
                 } = section;
                 const sectionName = fa.name;
+                const mount = sectionMount(gridMount, sectionIndexById.get(fa.id) ?? 0);
+                if (mount === "pending") {
+                  return (
+                    <div
+                      key={fa.id}
+                      aria-hidden="true"
+                      data-section-pending
+                      style={{
+                        height: ESTIMATED_SECTION_CHROME_PX + sectionEmps.length * ESTIMATED_ROW_PX,
+                      }}
+                    />
+                  );
+                }
 
                 return (
                   <SectionBlock
@@ -4269,6 +4469,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                     sectionName={sectionName}
                     exclusiveCodeIds={exclusiveCodeIds}
                     employees={sectionEmps}
+                    renderedRows={mount === "full" ? undefined : mount.rows}
                     weekDates={allDates}
                     todayKey={todayKey}
                     shiftForKey={shiftForKey}
@@ -4360,32 +4561,37 @@ const ScheduleGrid = memo(function ScheduleGrid({
     [model.focusAreas],
   );
 
+  // Sections keep these for as long as their cells read the same, so they stay
+  // the same functions and read the latest handlers when called.
+  const handlersRef = useLatestRef(handlers);
+  const sectionIdByNameRef = useLatestRef(sectionIdByName);
+
   const handleLegacyCellClick = useCallback<LegacyScheduleGridProps["handleCellClick"]>(
     (emp, date, focusAreaName, trigger = "click") => {
       const fallbackSectionId = emp.focusAreaIds[0] ?? null;
       const sectionId =
-        (focusAreaName ? sectionIdByName.get(focusAreaName) : null) ?? fallbackSectionId;
+        (focusAreaName ? sectionIdByNameRef.current.get(focusAreaName) : null) ?? fallbackSectionId;
       if (sectionId == null) return;
       const cellId = {
         empId: emp.id,
         dateKey: formatDateKey(date),
         sectionId,
       };
-      handlers.onActivateCell({
+      handlersRef.current.onActivateCell({
         cellId,
         emp,
         date,
         trigger,
       });
     },
-    [handlers, sectionIdByName],
+    [handlersRef, sectionIdByNameRef],
   );
 
   const handleLegacyContextMenu = useCallback<
     NonNullable<LegacyScheduleGridProps["onCellContextMenu"]>
   >(
     (event, anchorEl, cellId, emp, date) => {
-      handlers.onOpenCellMenu?.({
+      handlersRef.current.onOpenCellMenu?.({
         event,
         anchorEl,
         cellId,
@@ -4394,7 +4600,17 @@ const ScheduleGrid = memo(function ScheduleGrid({
         trigger: event.type === "contextmenu" ? "contextmenu" : "keyboard",
       });
     },
-    [handlers],
+    [handlersRef],
+  );
+
+  const handleClaimOpenShift = useCallback(
+    (openShift: GridOpenShift) => handlersRef.current.onClaimOpenShift?.(openShift),
+    [handlersRef],
+  );
+
+  const handleToggleBulkDeleteCell = useCallback(
+    (cellId: GridCellId) => handlersRef.current.onToggleBulkDeleteCell?.(cellId),
+    [handlersRef],
   );
 
   const handleCellFocus = useCallback((cellId: GridCellId) => {
@@ -4536,11 +4752,13 @@ const ScheduleGrid = memo(function ScheduleGrid({
           showShiftDetailHoverCards={model.options.showShiftDetailHoverCards}
           resolvePublisherName={model.resolvePublisherName}
           openShifts={model.openShifts}
-          onClaimOpenShift={handlers.onClaimOpenShift}
+          onClaimOpenShift={handlers.onClaimOpenShift ? handleClaimOpenShift : undefined}
           bulkDeleteMode={bulkDeleteMode}
           bulkSelectedCellKeys={interactionState.bulkSelectedCellKeys}
           bulkSelectableCellKeys={interactionState.bulkSelectableCellKeys}
-          onToggleBulkDeleteCell={handlers.onToggleBulkDeleteCell}
+          onToggleBulkDeleteCell={
+            handlers.onToggleBulkDeleteCell ? handleToggleBulkDeleteCell : undefined
+          }
         />
       </ActiveCellContext.Provider>
       <DragOverlay dropAnimation={null}>

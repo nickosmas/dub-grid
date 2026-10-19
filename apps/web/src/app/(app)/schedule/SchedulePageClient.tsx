@@ -315,12 +315,6 @@ type ShiftDeleteUpdate = {
   expectedVersion: number | undefined;
 };
 
-export type SchedulePageInitialState = {
-  authenticatedUserId: string | null;
-  orgId: string | null;
-  serverLoadedAt: string;
-};
-
 function getFirstCustomTimeSegment(time: string | null | undefined): string | null {
   if (!time) return null;
   const segment = time.split("|")[0]?.trim();
@@ -8391,12 +8385,7 @@ function SchedulerContent({
   );
 }
 
-export default function SchedulerPageClient({
-  initialState,
-}: {
-  initialState: SchedulePageInitialState;
-}) {
-  void initialState;
+export default function SchedulerPageClient() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
