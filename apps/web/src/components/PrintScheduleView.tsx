@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
 import {
   AbsenceType,
   Employee,
@@ -36,26 +36,12 @@ import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
 import { MaybeHint } from "@/components/ui/hint";
 import { printFontSizeLabel } from "@/components/print-font-sizes";
 import { PrintShiftPill, type PrintShiftPillProps } from "@/components/PrintShiftPill";
+import { fitPrintText, PRINT_FIT_LINE as FIT_TEXT } from "@/components/print-fit";
 import {
   buildPrintDocument,
   collectFontFaceCss,
   whenPrintReady,
 } from "@/components/print-document";
-
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
 
 const BRAND_MUTED = "#4A607F";
 const BRAND_SEPARATOR = "#94A3B8";
@@ -109,6 +95,10 @@ function PrintBrandLockup({
       )}
     </div>
   );
+}
+
+function formatPrintedAt(date: Date): string {
+  return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
 }
 
 function getFocusAreaInitials(name: string): string {
@@ -306,19 +296,14 @@ function PrintSection({
 
   if (employees.length === 0) return null;
 
-  // em-based name column; day columns fill the rest equally. A month leaves
-  // each day about 1/31 of the page, so it narrows the name column and the
-  // badge insets, which would otherwise clip the shift code at larger sizes.
-  const isDense = dates.length > 14;
-  const nameColEm = isDense ? 12 : 16;
-  // A month column is too narrow for a double shift's pills side by side.
-  const stacksPills = isDense;
-  const cellInsetX = isDense ? "0.12em" : "0.4em";
+  // Two weeks leave each day half the room, so the pills sit closer to the
+  // cell edge.
+  const cellInsetX = dates.length > 7 ? "0.2em" : "0.4em";
 
   const cellH = `${fontSize * 3.4}px`;
   const tallyH = `${fontSize * 2.8}px`;
 
-  type CellPill = Omit<PrintShiftPillProps, "variant" | "isNameMode" | "isDense" | "wingOnTop">;
+  type CellPill = Omit<PrintShiftPillProps, "variant" | "isNameMode" | "wingOnTop">;
 
   function resolveCellPills(
     assignment: string,
@@ -405,7 +390,7 @@ function PrintSection({
         }}
       >
         <colgroup>
-          <col style={{ width: `${nameColEm}em` }} />
+          <col style={{ width: "16em" }} />
           {dates.map((date) => (
             <col key={formatDateKey(date)} />
           ))}
@@ -450,7 +435,7 @@ function PrintSection({
                       letterSpacing: "0.05em",
                     }}
                   >
-                    {isDense ? DAY_LABELS[date.getDay()].slice(0, 2) : DAY_LABELS[date.getDay()]}
+                    {DAY_LABELS[date.getDay()]}
                   </div>
                   <div
                     style={{
@@ -505,18 +490,13 @@ function PrintSection({
                       minHeight: cellH,
                     }}
                   >
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.3em" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span data-print-fit="" style={{ ...FIT_TEXT, whiteSpace: "normal" }}>
                         <span
                           style={{
                             fontWeight: 600,
                             color: "#1A2640",
-                            overflowWrap: "break-word",
                             lineHeight: 1.1,
-                            display: "-webkit-box",
-                            WebkitBoxOrient: "vertical",
-                            WebkitLineClamp: 2,
-                            overflow: "hidden",
                             fontSize:
                               getEmployeeDisplayName(emp).length > 25
                                 ? "0.85em"
@@ -527,20 +507,13 @@ function PrintSection({
                         >
                           {getEmployeeDisplayName(emp)}
                         </span>
-                      </div>
+                      </span>
                       {emp.roleIds.length > 0 && (
-                        <div
-                          style={{
-                            fontSize: "0.8em",
-                            color: "#4D6080",
-                            marginTop: "0.1em",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                        >
-                          {getRoleAbbrs(emp.roleIds, orgRoles, true).join(", ")}
-                        </div>
+                        <span data-print-fit="" style={{ ...FIT_TEXT, marginTop: "0.1em" }}>
+                          <span style={{ fontSize: "0.8em", color: "#4D6080" }}>
+                            {getRoleAbbrs(emp.roleIds, orgRoles, true).join(", ")}
+                          </span>
+                        </span>
                       )}
                     </div>
                     {certAbbr && certAbbr !== "—" && (
@@ -592,7 +565,7 @@ function PrintSection({
                         style={{
                           minHeight: cellH,
                           display: "flex",
-                          flexDirection: stacksPills ? "column" : "row",
+                          flexDirection: "row",
                           alignItems: "stretch",
                           justifyContent: "center",
                           gap: "0.15em",
@@ -613,8 +586,7 @@ function PrintSection({
                               {...pill}
                               variant={pills.length === 1 ? "single" : "multi"}
                               isNameMode={isNameMode}
-                              isDense={isDense}
-                              wingOnTop={isDense || (pills.length > 1 && !stacksPills)}
+                              wingOnTop={pills.length > 1}
                             />
                           ))
                         ) : (
@@ -707,21 +679,11 @@ function TallyRow({
             {entries.length === 0
               ? "-"
               : entries.map(([lbl, cnt]) => (
-                  // One line per count, so a long shift name shortens rather
+                  // One line per count, so a long shift name shrinks rather
                   // than wrapping into the next count.
                   <MaybeHint key={lbl} content={`${lbl}: ${cnt}`} side="top">
-                    <span style={{ display: "flex", justifyContent: "center", minWidth: 0 }}>
-                      <span
-                        style={{
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          minWidth: 0,
-                        }}
-                      >
-                        {lbl}
-                      </span>
-                      <span style={{ flex: "none", whiteSpace: "nowrap" }}>: {cnt}</span>
+                    <span data-print-fit="" style={{ ...FIT_TEXT, textAlign: "center" }}>
+                      {lbl}: {cnt}
                     </span>
                   </MaybeHint>
                 ))}
@@ -794,26 +756,17 @@ export default function PrintScheduleView({
   const isNameMode = shiftDisplayMode === "name";
   const { fontSize, selectedFocusAreas: selectedWings, spanWeeks } = config;
 
-  // Build date array
-  const dates = useMemo(() => {
-    if (spanWeeks === "month") {
-      const year = weekStart.getFullYear();
-      const month = weekStart.getMonth();
-      const daysInMonth = new Date(year, month + 1, 0).getDate();
-      return Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1));
-    }
-    return Array.from({ length: spanWeeks * 7 }, (_, i) => addDays(weekStart, i));
-  }, [weekStart, spanWeeks]);
+  const dates = useMemo(
+    () => Array.from({ length: spanWeeks * 7 }, (_, i) => addDays(weekStart, i)),
+    [weekStart, spanWeeks],
+  );
 
   const splitAtIndex = spanWeeks === 2 ? 7 : undefined;
 
-  // Date range label for header
-  const dateRangeLabel = useMemo(() => {
-    if (spanWeeks === "month") {
-      return `${MONTH_NAMES[weekStart.getMonth()]} ${weekStart.getFullYear()}`;
-    }
-    return `${formatDate(weekStart)} – ${formatDate(addDays(weekStart, spanWeeks * 7 - 1))}`;
-  }, [weekStart, spanWeeks]);
+  const dateRangeLabel = useMemo(
+    () => `${formatDate(weekStart)} – ${formatDate(addDays(weekStart, spanWeeks * 7 - 1))}`,
+    [weekStart, spanWeeks],
+  );
 
   // Filter focus areas to print
   const printFocusAreas = useMemo(
@@ -833,6 +786,21 @@ export default function PrintScheduleView({
 
   const contentRef = useRef<HTMLDivElement>(null);
 
+  // Labels are measured at the printed width and shrunk to fit, then again
+  // once Inter has loaded, since the fallback face has different widths.
+  useLayoutEffect(() => {
+    const contentEl = contentRef.current;
+    if (!contentEl) return;
+    fitPrintText(contentEl);
+    let cancelled = false;
+    void document.fonts?.ready.then(() => {
+      if (!cancelled) fitPrintText(contentEl);
+    });
+    return () => {
+      cancelled = true;
+    };
+  });
+
   // Returns its promise so the shared Button latch spins for as long as the
   // images the print window needs are still loading.
   function handlePrint() {
@@ -841,6 +809,10 @@ export default function PrintScheduleView({
 
     const printWindow = window.open("", "_blank", "toolbar=0,scrollbars=1,status=0");
     if (!printWindow) return;
+
+    const printedAt = contentEl.querySelector("[data-printed-at]");
+    if (printedAt) printedAt.textContent = `Printed ${formatPrintedAt(new Date())}`;
+    fitPrintText(contentEl);
 
     printWindow.document.write(
       buildPrintDocument({
@@ -941,7 +913,7 @@ export default function PrintScheduleView({
               color: "#4D6080",
             }}
           >
-            {printFontSizeLabel(fontSize)} · {spanWeeks === "month" ? "Month" : `${spanWeeks}W`} ·{" "}
+            {printFontSizeLabel(fontSize)} · {`${spanWeeks}W`} ·{" "}
             {selectedWings.length === focusAreas.length
               ? `All ${focusAreaLabel.toLowerCase()}`
               : selectedWings.join(", ")}
@@ -1032,13 +1004,14 @@ export default function PrintScheduleView({
               </div>
             </div>
             <div
+              data-printed-at=""
               style={{
                 fontSize: "0.9em",
                 color: "#4D6080",
                 textAlign: "right",
               }}
             >
-              Printed {new Date().toLocaleDateString()}
+              Printed {formatPrintedAt(new Date())}
             </div>
           </div>
 
@@ -1046,7 +1019,15 @@ export default function PrintScheduleView({
           {printFocusAreas.map((focusArea) => {
             const exclusiveCodeIds =
               exclusiveCodeIdsPerSection[focusArea.name] ?? new Set<number>();
-            const homeEmps = employees.filter((e) => e.focusAreaIds.includes(focusArea.id));
+            // A row with nothing scheduled in the printed range is left off.
+            const homeEmps = employees.filter(
+              (e) =>
+                e.focusAreaIds.includes(focusArea.id) &&
+                dates.some((date) => {
+                  const assignment = shiftForKey(e.id, date);
+                  return !!assignment && assignment !== "OFF";
+                }),
+            );
             const guestEmps = allEmployees.filter(
               (e) =>
                 e.focusAreaIds.length > 0 &&

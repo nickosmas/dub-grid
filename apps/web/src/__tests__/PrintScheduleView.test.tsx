@@ -252,6 +252,81 @@ describe("PrintScheduleView", () => {
       expect(wing?.parentElement?.style.display).toBe("flex");
       expect(wing?.nextElementSibling?.textContent).not.toBe("");
     });
+
+    it("sets a single shift's wing at its side and a double shift's on top", () => {
+      const single = render(
+        <PrintScheduleView
+          weekStart={new Date(2024, 0, 7)}
+          config={{ fontSize: 11, selectedFocusAreas: ["North"], spanWeeks: 2 }}
+          employees={employees}
+          allEmployees={employees}
+          focusAreas={[
+            ...focusAreas,
+            { id: 2, orgId: "org-1", departmentId: 1, name: "South Memory Care", sortOrder: 2 },
+          ]}
+          assignments={[assignments[0], nightSouth]}
+          shiftCategories={shiftCategories}
+          jobs={[]}
+          certifications={[]}
+          orgRoles={[]}
+          shiftForKey={() => "N"}
+          assignmentIdsForKey={() => [2]}
+          getShiftStyle={() => nightSouth}
+          onClose={() => {}}
+        />,
+      );
+      expect(
+        single.container
+          .querySelector("[data-print-pill-wing]")
+          ?.getAttribute("data-print-pill-wing"),
+      ).toBe("side");
+      single.unmount();
+
+      const { container } = renderCrossFocusDouble();
+      expect(
+        container.querySelector("[data-print-pill-wing]")?.getAttribute("data-print-pill-wing"),
+      ).toBe("top");
+    });
+
+    it("never cuts printed text off with an ellipsis or a line clamp", () => {
+      const { container } = renderCrossFocusDouble();
+
+      expect(container.innerHTML).not.toMatch(/ellipsis|line-clamp/);
+      expect(container.querySelectorAll("[data-print-fit]").length).toBeGreaterThan(0);
+    });
+  });
+
+  it("leaves off a row with nothing scheduled in the printed range", () => {
+    const idle = { ...employees[0], id: "emp-2", firstName: "Idle", lastName: "Person" };
+    const offOnly = { ...employees[0], id: "emp-3", firstName: "Off", lastName: "Only" };
+    const { container } = render(
+      <PrintScheduleView
+        weekStart={new Date(2024, 0, 7)}
+        config={{ fontSize: 11, selectedFocusAreas: ["North"], spanWeeks: 1 }}
+        employees={[employees[0], idle, offOnly]}
+        allEmployees={[employees[0], idle, offOnly]}
+        focusAreas={focusAreas}
+        assignments={assignments}
+        shiftCategories={shiftCategories}
+        jobs={[]}
+        certifications={[]}
+        orgRoles={[]}
+        shiftForKey={(empId) => (empId === "emp-1" ? "D" : empId === "emp-3" ? "OFF" : null)}
+        assignmentIdsForKey={(empId) => (empId === "emp-1" ? [1] : [])}
+        getShiftStyle={() => assignments[0]}
+        onClose={() => {}}
+      />,
+    );
+
+    expect(container.textContent).toContain("Alex Taylor");
+    expect(container.textContent).not.toContain("Idle Person");
+    expect(container.textContent).not.toContain("Off Only");
+  });
+
+  it("states the time the schedule was printed as well as the date", () => {
+    const { container } = renderPrintView();
+
+    expect(container.querySelector("[data-printed-at]")?.textContent).toMatch(/\d{1,2}:\d{2}/);
   });
 });
 
