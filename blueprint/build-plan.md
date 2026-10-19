@@ -866,3 +866,31 @@
   - [x] 44g. **Seat and revenue history** - append-only seat and invoice
         history and a report that states its own start date. Needs a
         migration.
+- [ ] 45. **A worked shift plus an off day in one cell** - someone who works
+      part of a day, including part of a double shift, can have an off day
+      (absence type) for the rest of it, shown and saved as one cell such as
+      D/Bereavement or D/E/Sick. The off day always comes last, and the last
+      worked shift can record when it actually ended. Worked parts keep their
+      times, hours and coverage; the off day counts as an absence in reports
+      with no hours. A cell with three items gets a taller row on screen and
+      in print. Owner decisions, 2026-10-19: at most two worked shifts plus
+      one off day; asking for time off from part of a shift in the app is
+      out of scope.
+  - [ ] 45a. **Data model** - a worked cell may carry one off day: contract,
+        a migration relaxing the snapshot check and keeping the off day in
+        the save, state, sync, import and publish functions, and the shared
+        accessors and mappers. A mixed cell round-trips through draft,
+        publish and publish history. Needs a migration.
+  - [ ] 45b. **Web editor and grid** - the panel adds an off day beside one
+        or two shifts and can record when the last shift ended; grid pills,
+        labels, publish-diff badges, copy, paste and drag keep every part;
+        the overlap check covers worked parts only; a three-item cell gets a
+        taller row. Needs an approved mockup first.
+  - [ ] 45c. **Other web surfaces** - Month view, the phone Day view, print
+        (a taller row for a three-item cell), dashboard, person page,
+        coverage tallies, reports, CSV export and calendar feed.
+  - [ ] 45d. **Mobile app** - schedule, shift detail and dashboard show
+        every part of a mixed cell.
+  - [ ] 45e. **Shift requests** - time off on half a double shift keeps the
+        off day; swap, pickup and open-shift staffing respect a mixed cell
+        instead of discarding it.

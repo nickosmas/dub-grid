@@ -31,7 +31,7 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Items 1 through 39 and 41 through 44 are
-shipped. Item 40 is in progress.
+shipped. Item 40 is in progress. Item 45 is planned.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -79,6 +79,7 @@ shipped. Item 40 is in progress.
 | 43   | Shipped     | Complete person records for managers and one Gridmaster person page with two-factor lockout recovery.                           |
 | 40   | In progress | Public and internal documentation accurate for `dev`, with permanent drift gates.                                               |
 | 44   | Shipped     | Safe billing actions, Gridmaster billing controls and policy, and billing history.                                              |
+| 45   | Planned     | A worked shift plus an off day in one cell, such as D/Bereavement or D/E/Sick.                                                  |
 
 Item 40 is split:
 
@@ -129,6 +130,22 @@ Item 44 is split, and every part has shipped:
   history and a Gridmaster revenue and seats report that states when its
   history starts (migration 079).
 
+Item 45 is split, and nothing has shipped:
+
+- **45a - Data model:** planned; a worked cell may carry one off day,
+  through draft, publish and publish history. Needs a migration.
+- **45b - Web editor and grid:** planned; the panel adds an off day beside
+  one or two shifts and can record when the last shift ended, and a
+  three-item cell gets a taller row. Needs an approved mockup first.
+- **45c - Other web surfaces:** planned; Month, phone Day, print (a taller
+  row), dashboard, person page, coverage, reports, export and calendar.
+- **45d - Mobile app:** planned.
+- **45e - Shift requests:** planned; time off on half a double shift keeps
+  the off day, and swap, pickup and open-shift staffing respect a mixed cell.
+
+The off day always comes last and carries no hours; at most two worked
+shifts share a cell with it (owner decisions, 2026-10-19).
+
 Public documentation covers customer behavior only. Gridmaster tooling, Test
 Sandbox, feature flags, migrations, environment variables, and internal HTTP
 endpoints remain internal.
@@ -177,6 +194,8 @@ endpoints remain internal.
 
 - organization, employee or open-shift identity, date, shift, job, and absence
   facts
+- a cell holds worked shifts, an off day, or (item 45, planned) up to two
+  worked shifts plus an off day for the rest of the day
 - draft and published state with optimistic versioning
 - snapshot fields are the source of truth for schedule-cell audit history
 - recurring shifts generate bounded series through the normal draft workflow
