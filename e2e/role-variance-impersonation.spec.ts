@@ -97,6 +97,11 @@ async function startImpersonation(page: Page) {
 
   await expect(page).toHaveURL(`${QA_GRIDMASTER_ORIGIN}/schedule`, { timeout: 20_000 });
   await expect(page.getByText(BANNER_TEXT)).toBeVisible({ timeout: 20_000 });
+  // Let the landing finish loading. Leaving it mid-load cancels its requests,
+  // and WebKit reports a cancelled auth request as a console error ("TypeError:
+  // Load failed", logged by supabase-js), which the runtime-failure checks
+  // below would count against the test.
+  await expect(page.locator("[data-schedule-loading]")).toHaveCount(0, { timeout: 30_000 });
 }
 
 test.describe("role variance: gridmaster impersonation", () => {

@@ -96,6 +96,13 @@ export function daysBetweenDateKeys(startKey: string, endKey: string): number {
 export const PERMISSIONS_WAIT_MS = 3000;
 
 /**
+ * How long the initial load may take before it counts as failed. None of its
+ * requests has a deadline of its own, so one that never answered held the
+ * loading screen up until the server gave up, which can be minutes.
+ */
+export const SCHEDULE_LOAD_TIMEOUT_MS = 25_000;
+
+/**
  * Days loaded either side of the visible range before the first paint, so the
  * adjacent-day staffing checks still see their neighbours.
  */
