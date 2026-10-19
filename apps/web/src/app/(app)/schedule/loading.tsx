@@ -4,5 +4,5 @@ import { ScheduleLoadingScreen } from "./ScheduleLoadingScreen";
 // renders the same Shuffle as SchedulePageClient's data-loading state, so the
 // wait reads as one continuous load.
 export default function ScheduleLoading() {
-  return <ScheduleLoadingScreen />;
+  return <ScheduleLoadingScreen source="route" />;
 }

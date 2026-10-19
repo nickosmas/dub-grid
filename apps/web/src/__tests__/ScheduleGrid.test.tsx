@@ -581,6 +581,10 @@ describe("ScheduleGrid", () => {
     expect(alexRow).toHaveStyle({ opacity: "1" });
     expect(alexName).toHaveStyle({ color: "var(--dg-color-brand)" });
     await waitFor(() => expect(scrollIntoViewMock).toHaveBeenCalled());
+    // The mocked layout gives the sticky group no height.
+    expect((alexRow as HTMLElement).style.scrollMarginTop).toBe(
+      "calc(var(--dg-app-shell-header-height, 56px) + var(--dg-schedule-chrome-height, 0px) + 0px)",
+    );
     for (const row of jordanRows) {
       expect(row).not.toBeNull();
       expect(row).toHaveStyle({ opacity: "0.35" });

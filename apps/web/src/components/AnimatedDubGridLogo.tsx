@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   BRAND_ANIMATED_LOGO_SIZE,
   BRAND_SYMBOL_INK,
@@ -38,17 +38,21 @@ function usePrefersReducedMotion(): boolean {
 }
 
 /**
- * Loops `animation` from mount; reduced motion and the server render rest.
- * Once `settling` turns true, Shuffle and Climb finish the move in progress,
- * rest, and call `onSettled`; Breathe rests at once.
+ * Loops `animation` from mount, handing each frame to `draw`; reduced motion
+ * rests. Once `settling` turns true, Shuffle and Climb finish the move in
+ * progress, rest, and call `onSettled`; Breathe rests at once.
+ *
+ * Frames go straight to `draw` rather than through React state. A state update
+ * every frame re-rendered on every frame for as long as a page was loading,
+ * and each of those updates outranks the render that reveals the page.
  */
 function useBrandAnimation(
   animation: BrandAnimation,
   settling: boolean,
-  onSettled?: () => void,
-): BrandMotionFrame {
+  onSettled: (() => void) | undefined,
+  draw: (frame: BrandMotionFrame) => void,
+): void {
   const reduced = usePrefersReducedMotion();
-  const [frame, setFrame] = useState<BrandMotionFrame>(REST);
   const start = useRef<number | null>(null);
   const settled = useRef(onSettled);
   useEffect(() => {
@@ -57,7 +61,7 @@ function useBrandAnimation(
 
   useEffect(() => {
     if (reduced || (settling && animation === "breathe")) {
-      setFrame(REST);
+      draw(REST);
       if (settling) settled.current?.();
       return;
     }
@@ -68,10 +72,10 @@ function useBrandAnimation(
     const tick = (now: number) => {
       const t = (now - began) / 1000;
       if (stoppedAt === null || animation === "breathe") {
-        setFrame(brandMotionFrames[animation](t));
+        draw(brandMotionFrames[animation](t));
       } else {
         const { frame: next, done } = brandSettlingFrame(animation, t, stoppedAt);
-        setFrame(next);
+        draw(next);
         if (done) {
           settled.current?.();
           return;
@@ -81,9 +85,7 @@ function useBrandAnimation(
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [animation, reduced, settling]);
-
-  return reduced ? REST : frame;
+  }, [animation, reduced, settling, draw]);
 }
 
 const fill = (color: number) => {
@@ -95,62 +97,51 @@ const fill = (color: number) => {
 const cardPath = (card: BrandMotionCard, grow = 0) =>
   brandSymbolCardPath({ cx: card.cx, cy: card.cy, scale: card.scale, grow });
 
+const attributes = (values: Record<string, string | number | undefined>) =>
+  Object.entries(values)
+    .filter(([, value]) => value !== undefined)
+    .map(([name, value]) => ` ${name}="${value}"`)
+    .join("");
+
 /**
- * Draws a frame back to front. Each card is masked by the cards in front of
- * it grown by the gap, as the static mark is, so the gap stays transparent on
- * any surface.
+ * The SVG for one frame, drawn back to front. Each card is masked by the cards
+ * in front of it grown by the gap, as the static mark is, so the gap stays
+ * transparent on any surface. Every value is a number or one of the constants
+ * above, so nothing in it needs escaping.
  */
-function BrandFrame({ frame, size }: { frame: BrandMotionFrame; size: number }) {
-  const id = useId().replace(/[^\w-]/g, "");
+export function brandFrameMarkup(frame: BrandMotionFrame, size: number, id: string): string {
   const gap = brandSymbolGap((size * BRAND_SYMBOL_INK.height) / SIDE) * frame.gap;
   const visible = frame.cards.filter((card) => card.opacity >= 0.01);
-  const masks: ReactNode[] = [];
-  const cards = visible.map((card, index) => {
+  const region = attributes(MASK_REGION);
+  let masks = "";
+  let cards = "";
+  visible.forEach((card, index) => {
     const ahead = visible.slice(index + 1);
     let mask: string | undefined;
     if (ahead.length) {
       const maskId = `dg-motion-${id}-${index}`;
-      masks.push(
-        <mask key={maskId} id={maskId} maskUnits="userSpaceOnUse" {...MASK_REGION}>
-          <rect {...MASK_REGION} fill="white" />
-          {ahead.map((cutter, k) => (
-            <path key={k} d={cardPath(cutter, gap)} fill="black" fillOpacity={cutter.opacity} />
-          ))}
-        </mask>,
-      );
+      const cutters = ahead
+        .map(
+          (cutter) =>
+            `<path${attributes({ d: cardPath(cutter, gap), fill: "black", "fill-opacity": cutter.opacity })}/>`,
+        )
+        .join("");
+      masks += `<mask${attributes({ id: maskId, maskUnits: "userSpaceOnUse" })}${region}><rect${region} fill="white"/>${cutters}</mask>`;
       mask = `url(#${maskId})`;
     }
-    return (
-      <path
-        key={index}
-        d={cardPath(card)}
-        fill={fill(card.color)}
-        opacity={card.opacity}
-        mask={mask}
-      />
-    );
+    cards += `<path${attributes({ d: cardPath(card), fill: fill(card.color), opacity: card.opacity, mask })}/>`;
   });
-
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox={VIEW_BOX}
-      fill="none"
-      aria-hidden="true"
-      style={{ overflow: "visible" }}
-    >
-      <defs>{masks}</defs>
-      {cards}
-    </svg>
-  );
+  const svg = attributes({
+    width: size,
+    height: size,
+    viewBox: VIEW_BOX,
+    fill: "none",
+    "aria-hidden": "true",
+    style: "overflow: visible",
+  });
+  return `<svg${svg}><defs>${masks}</defs>${cards}</svg>`;
 }
 
-/**
- * The full-screen loading mark, looping `animation` in a `size` square. The
- * logo is static everywhere else; only waits with nothing else on screen
- * animate it.
- */
 export function AnimatedDubGridLogo({
   animation = "breathe",
   size = BRAND_ANIMATED_LOGO_SIZE,
@@ -163,6 +154,24 @@ export function AnimatedDubGridLogo({
   settling?: boolean;
   onSettled?: () => void;
 }) {
-  const frame = useBrandAnimation(animation, settling, onSettled);
-  return <BrandFrame frame={frame} size={size} />;
+  const id = useId().replace(/[^\w-]/g, "");
+  const host = useRef<HTMLSpanElement>(null);
+  // React renders the resting mark once, on the server too; frames after it
+  // are written into the host directly, which React leaves alone because this
+  // markup does not change.
+  const restMarkup = useMemo(() => brandFrameMarkup(REST, size, id), [size, id]);
+  const draw = useCallback(
+    (frame: BrandMotionFrame) => {
+      if (host.current) host.current.innerHTML = brandFrameMarkup(frame, size, id);
+    },
+    [size, id],
+  );
+  useBrandAnimation(animation, settling, onSettled, draw);
+  return (
+    <span
+      ref={host}
+      style={{ display: "contents" }}
+      dangerouslySetInnerHTML={{ __html: restMarkup }}
+    />
+  );
 }

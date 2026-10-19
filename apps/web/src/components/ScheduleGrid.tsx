@@ -37,6 +37,9 @@ import {
   CHIP_OVERHANG_PX,
   STICKY_RELEASE_ROWS,
   computeStickyReleaseInset,
+  createStickyLayoutObserver,
+  type LayoutTask,
+  type StickyLayoutObserver,
 } from "@/lib/schedule-grid-sticky";
 import {
   Employee,
@@ -488,6 +491,22 @@ type ShiftDetailEntry = {
 
 const EMPTY_ID_SET = new Set<number>();
 
+const ESTIMATED_SECTION_CHROME_PX = 120;
+const ESTIMATED_ROW_PX = 52;
+
+function estimateGridHeight(
+  sections: ReadonlyMap<number, { employees: readonly Employee[] }>,
+): number {
+  let height = 0;
+  for (const { employees } of sections.values()) {
+    height += ESTIMATED_SECTION_CHROME_PX + employees.length * ESTIMATED_ROW_PX;
+  }
+  return height;
+}
+
+// Shared by every section on the page, so they measure in one pass.
+let stickyLayoutObserver: StickyLayoutObserver | null = null;
+
 function EmployeeDetailHoverCard({
   employeeName,
   certificationName,
@@ -909,9 +928,14 @@ const SectionBlock = memo(function SectionBlock({
     const sync = () => {
       header.scrollLeft = body.scrollLeft;
     };
-    sync();
+    // Reading scrollLeft lays the page out. In a frame callback that is the
+    // layout the frame does anyway, not an extra one forced during the commit.
+    const frame = window.requestAnimationFrame(sync);
     body.addEventListener("scroll", sync, { passive: true });
-    return () => body.removeEventListener("scroll", sync);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      body.removeEventListener("scroll", sync);
+    };
   }, [fitToContainer, weekDates.length]);
 
   // Everything the sticky group needs beyond CSS is discrete state measured when
@@ -934,25 +958,9 @@ const SectionBlock = memo(function SectionBlock({
       return Number.isFinite(value) ? value : 0;
     };
 
-    // Each read after a write lays the whole grid out again, and with thousands
-    // of cells that is the expensive part. The group's height can depend on its
-    // width, so that write goes first; the other reads come before the other
-    // writes (the sticky height only feeds scroll-margin-top, which moves
-    // nothing), and a value that has not changed is not written at all.
-    const setVar = (el: HTMLElement, name: string, value: string) => {
+    // A value that has not changed is not written, so it restyles nothing.
+    const setStyle = (el: HTMLElement, name: string, value: string) => {
       if (el.style.getPropertyValue(name) !== value) el.style.setProperty(name, value);
-    };
-
-    const measure = () => {
-      setVar(group, "--dg-grid-body-width", `${gridEl.getBoundingClientRect().width}px`);
-      const stickyHeight = group.getBoundingClientRect().height;
-      const releaseRow = gridEl.querySelector<HTMLElement>('[data-sticky-release="true"]');
-      const inset = computeStickyReleaseInset({
-        cardBottom: cardBody.getBoundingClientRect().bottom,
-        releaseRowTop: releaseRow ? releaseRow.getBoundingClientRect().top : null,
-      });
-      setVar(section, "--dg-grid-sticky-height", `${stickyHeight}px`);
-      setVar(section, "--dg-grid-release-inset", `${inset}px`);
     };
 
     let stickyTop = -1;
@@ -981,22 +989,48 @@ const SectionBlock = memo(function SectionBlock({
       stuckObserver.observe(sentinel);
     };
 
-    // watchStuck only reads styles, so it runs before measure writes any.
-    watchStuck();
-    measure();
-    const gridObserver = new ResizeObserver(measure);
-    gridObserver.observe(gridEl);
+    // Measured alongside every other section, after the browser has laid the
+    // frame out: all sections read, then all write. Measuring here in the effect
+    // forced a style and layout pass of the whole grid per section, before the
+    // page had even set the chrome height it reads. The inset goes straight
+    // onto the two elements that use it: as an inherited custom property on the
+    // section, every write restyled every cell below it. The header width is
+    // written before the card is read, since the header sits above it.
+    const measure: LayoutTask = () => {
+      let bodyWidth = 0;
+      let inset = 0;
+      return [
+        () => {
+          watchStuck();
+          bodyWidth = gridEl.getBoundingClientRect().width;
+        },
+        () => setStyle(group, "--dg-grid-body-width", `${bodyWidth}px`),
+        () => {
+          const releaseRow = gridEl.querySelector<HTMLElement>('[data-sticky-release="true"]');
+          inset = computeStickyReleaseInset({
+            cardBottom: cardBody.getBoundingClientRect().bottom,
+            releaseRowTop: releaseRow ? releaseRow.getBoundingClientRect().top : null,
+          });
+        },
+        () => {
+          setStyle(section, "padding-bottom", `${inset}px`);
+          setStyle(cardBody, "margin-bottom", `${-inset}px`);
+        },
+      ];
+    };
+
+    stickyLayoutObserver ??= createStickyLayoutObserver(ResizeObserver);
+    const stopGrid = stickyLayoutObserver.observe(gridEl, measure);
     // A banner opening above the grid changes the sticky line without touching
     // the grid itself.
-    const chromeObserver = new ResizeObserver(watchStuck);
-    chromeObserver.observe(document.body);
+    const stopChrome = stickyLayoutObserver.observe(document.body, measure);
     return () => {
-      gridObserver.disconnect();
-      chromeObserver.disconnect();
+      stopGrid();
+      stopChrome();
       stuckObserver?.disconnect();
       group.style.removeProperty("--dg-grid-body-width");
-      section.style.removeProperty("--dg-grid-sticky-height");
-      section.style.removeProperty("--dg-grid-release-inset");
+      section.style.removeProperty("padding-bottom");
+      cardBody.style.removeProperty("margin-bottom");
       delete group.dataset.stuck;
     };
   }, [employees.length, weekDates.length, fitToContainer]);
@@ -1303,8 +1337,8 @@ const SectionBlock = memo(function SectionBlock({
         // block is this wrapper. A sticky element is confined to its containing
         // block's content box, so padding the wrapper by the height of the last
         // rows (and pulling the card body back up by the same amount, so
-        // nothing moves) releases the group that early.
-        paddingBottom: "var(--dg-grid-release-inset, 0px)",
+        // nothing moves) releases the group that early. The sticky measurement
+        // writes both.
       }}
     >
       {/* Marks the group's resting position for the stuck-state observer. */}
@@ -1515,7 +1549,6 @@ const SectionBlock = memo(function SectionBlock({
           // to the scrollable narrow-grid path below.
           overflow: fitToContainer ? "visible" : "clip",
           boxShadow: BOX_SHADOW_CARD,
-          marginBottom: "calc(-1 * var(--dg-grid-release-inset, 0px))",
         }}
       >
         <div
@@ -1806,9 +1839,6 @@ const SectionBlock = memo(function SectionBlock({
                     opacity: isHighlighted ? 1 : 0.35,
                     transition: "opacity 150ms ease, background 150ms ease",
                     alignItems: "stretch",
-                    // Keep a searched-to row clear of the sticky label and date row.
-                    scrollMarginTop:
-                      "calc(var(--dg-app-shell-header-height, 56px) + var(--dg-schedule-chrome-height, 0px) + var(--dg-grid-sticky-height, 80px))",
                   }}
                 >
                   {/* Name cell */}
@@ -3963,7 +3993,10 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   );
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(0);
+  // Null until measured. The column widths depend on it, and rendering every
+  // section at a guessed width only to render them all again once it is known
+  // doubled the work before the grid first showed.
+  const [containerWidth, setContainerWidth] = useState<number | null>(null);
   useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -4138,7 +4171,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   const gridLayout = getScheduleGridLayout({
     spanWeeks,
     shiftDisplayMode,
-    containerWidth,
+    containerWidth: containerWidth ?? 0,
     hasOpenShifts,
     hasStackedCellContent: false,
   });
@@ -4153,7 +4186,16 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
       const firstHighlightedRow = containerRef.current?.querySelector<HTMLElement>(
         '[data-search-highlight="true"]',
       );
-      firstHighlightedRow?.scrollIntoView({
+      if (!firstHighlightedRow) return;
+      // Keep the row clear of the page header, the toolbar and its section's
+      // sticky label and date row. Set only on the row being scrolled to: as a
+      // margin on every row it took a section-wide custom property to feed.
+      const stickyGroup = firstHighlightedRow
+        .closest('[role="grid"]')
+        ?.querySelector<HTMLElement>(".dg-grid-sticky-group");
+      const stickyHeight = stickyGroup ? stickyGroup.getBoundingClientRect().height : 80;
+      firstHighlightedRow.style.scrollMarginTop = `calc(var(--dg-app-shell-header-height, 56px) + var(--dg-schedule-chrome-height, 0px) + ${stickyHeight}px)`;
+      firstHighlightedRow.scrollIntoView({
         block: "center",
         inline: "nearest",
         behavior: "smooth",
@@ -4199,6 +4241,11 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
           }
           style={{ marginTop: 34 }}
         />
+      ) : containerWidth === null ? (
+        // Stands in for one commit, before the first paint, while the width is
+        // measured. Roughly the grid's height, so a page that will scroll
+        // already shows its scrollbar and the width read is the final one.
+        <div aria-hidden="true" style={{ height: estimateGridHeight(sectionRenderData) }} />
       ) : (
         <>
           {/* Flat FA sections — departments provide ordering but don't appear visually */}
