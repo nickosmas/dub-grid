@@ -59,4 +59,26 @@ describe("PrintOptionsModal", () => {
       expect(onClose).toHaveBeenCalledOnce();
     });
   });
+
+  it("prints full shift names one week at a time", async () => {
+    const user = userEvent.setup();
+    const onPrint = vi.fn();
+    render(
+      <PrintOptionsModal
+        focusAreas={focusAreas}
+        currentSpanWeeks="month"
+        onPrint={onPrint}
+        onClose={vi.fn()}
+        shiftDisplayMode="name"
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "2 Weeks" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Month" })).toBeDisabled();
+    expect(screen.getByText("Full shift names print one week at a time.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Preview & Print/i }));
+
+    expect(onPrint).toHaveBeenCalledWith(expect.objectContaining({ spanWeeks: 1 }));
+  });
 });

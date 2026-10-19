@@ -53,6 +53,7 @@ const documentedNeutralOutputExceptions = new Set([
   "app/opengraph-image.tsx",
   "app/twitter-image.tsx",
   "components/PrintScheduleView.tsx",
+  "components/print-document.ts",
   "components/settings/AbsenceTypes.tsx",
 ]);
 

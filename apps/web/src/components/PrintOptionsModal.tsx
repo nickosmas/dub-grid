@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Printer } from "lucide-react";
-import { FocusArea } from "@/types";
+import type { FocusArea, ShiftDisplayMode } from "@/types";
 import { Button } from "@/components/Button";
 import Modal from "@/components/Modal";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
@@ -21,6 +21,7 @@ interface PrintOptionsModalProps {
   onPrint: (config: PrintConfig) => void;
   onClose: () => void;
   focusAreaLabel?: string;
+  shiftDisplayMode?: ShiftDisplayMode;
 }
 
 export default function PrintOptionsModal({
@@ -29,11 +30,15 @@ export default function PrintOptionsModal({
   onPrint,
   onClose,
   focusAreaLabel = "Focus Areas",
+  shiftDisplayMode = "code",
 }: PrintOptionsModalProps) {
+  // Spelled-out shift names only fit a week's columns on one page.
+  const printsOneWeek = shiftDisplayMode === "name";
+  const defaultSpanWeeks = printsOneWeek ? 1 : currentSpanWeeks;
   const [selectedFocusAreas, setSelectedFocusAreas] = useState<string[]>(
     focusAreas.map((w) => w.name),
   );
-  const [spanWeeks, setSpanWeeks] = useState<1 | 2 | "month">(currentSpanWeeks);
+  const [spanWeeks, setSpanWeeks] = useState<1 | 2 | "month">(defaultSpanWeeks);
   const [fontSizeKey, setFontSizeKey] = useState<PrintFontSizeKey>("medium");
 
   // Confirming here unmounts this modal and mounts the preview, which is a much
@@ -45,7 +50,7 @@ export default function PrintOptionsModal({
 
   const allSelected = selectedFocusAreas.length === focusAreas.length;
   const hasUnsavedChanges =
-    spanWeeks !== currentSpanWeeks ||
+    spanWeeks !== defaultSpanWeeks ||
     fontSizeKey !== "medium" ||
     JSON.stringify([...selectedFocusAreas].sort()) !==
       JSON.stringify([...focusAreas.map((focusArea) => focusArea.name)].sort());
@@ -91,6 +96,7 @@ export default function PrintOptionsModal({
               <Button
                 key={n}
                 onClick={() => setSpanWeeks(n)}
+                disabled={printsOneWeek && n !== 1}
                 className={`dg-span-tab${spanWeeks === n ? " active" : ""}`}
                 style={{ minWidth: 72 }}
               >
@@ -98,6 +104,11 @@ export default function PrintOptionsModal({
               </Button>
             ))}
           </div>
+          {printsOneWeek && (
+            <p className="dg-form-hint" style={{ margin: "8px 0 0" }}>
+              Full shift names print one week at a time.
+            </p>
+          )}
         </div>
 
         {/* Font Size */}
