@@ -5,7 +5,7 @@
  * cache, so a forged token would gain nothing here: every request the cache
  * keys is still authorized server-side.
  */
-function readStringClaim(accessToken: string | null, claim: string): string | null {
+function readClaim(accessToken: string | null, claim: string): unknown {
   if (!accessToken) {
     return null;
   }
@@ -20,15 +20,29 @@ function readStringClaim(accessToken: string | null, claim: string): string | nu
     const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
     const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
     const claims = JSON.parse(atob(padded)) as Record<string, unknown>;
-    const value = claims[claim];
-
-    return typeof value === "string" && value.length > 0 ? value : null;
+    return claims[claim];
   } catch {
     // A token we can't read still gets a usable (shared) cache key: sign-out
     // clears the whole query cache, so nothing of the previous account survives
     // to be read through it.
     return null;
   }
+}
+
+function readStringClaim(accessToken: string | null, claim: string): string | null {
+  const value = readClaim(accessToken, claim);
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+/** The token's `exp` claim in epoch seconds, or null when it has none. */
+export function getAccessTokenExpiry(accessToken: string | null): number | null {
+  const value = readClaim(accessToken, "exp");
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/** The Supabase auth session the token belongs to; stable across refreshes. */
+export function getSessionIdFromAccessToken(accessToken: string | null): string | null {
+  return readStringClaim(accessToken, "session_id");
 }
 
 export type MobileAuthIdentity =

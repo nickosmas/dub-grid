@@ -106,7 +106,7 @@ describe("DashboardPageContent", () => {
     expect(screen.queryByTestId("dashboard-view")).not.toBeInTheDocument();
   });
 
-  it("does not redirect a scheduled regular user", () => {
+  it("does not redirect a scheduled regular user", async () => {
     vi.mocked(usePermissions).mockReturnValue({
       ...basePermissions,
       isOnSchedule: true,
@@ -116,10 +116,10 @@ describe("DashboardPageContent", () => {
     renderDashboard();
 
     expect(mockReplace).not.toHaveBeenCalled();
-    expect(screen.getByTestId("dashboard-view")).toBeInTheDocument();
+    expect(await screen.findByTestId("dashboard-view")).toBeInTheDocument();
   });
 
-  it("does not redirect a management-only admin", () => {
+  it("does not redirect a management-only admin", async () => {
     vi.mocked(usePermissions).mockReturnValue({
       ...basePermissions,
       role: "admin",
@@ -130,10 +130,10 @@ describe("DashboardPageContent", () => {
     renderDashboard();
 
     expect(mockReplace).not.toHaveBeenCalled();
-    expect(screen.getByTestId("dashboard-view")).toBeInTheDocument();
+    expect(await screen.findByTestId("dashboard-view")).toBeInTheDocument();
   });
 
-  it("keeps tenant-safe cached content visible during a warm bootstrap failure", () => {
+  it("keeps tenant-safe cached content visible during a warm bootstrap failure", async () => {
     vi.mocked(useOrganizationData).mockReturnValue({
       ...organizationData,
       loadError: "Check your internet connection and try again.",
@@ -141,7 +141,7 @@ describe("DashboardPageContent", () => {
 
     renderDashboard();
 
-    expect(screen.getByTestId("dashboard-view")).toBeInTheDocument();
+    expect(await screen.findByTestId("dashboard-view")).toBeInTheDocument();
     expect(screen.queryByTestId("bootstrap-recovery")).not.toBeInTheDocument();
   });
 

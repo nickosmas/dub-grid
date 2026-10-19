@@ -25,12 +25,13 @@ import {
   ShiftDisplayMode,
   Employee,
   ScheduleCellInput,
+  ScheduleCellSegmentInput,
   ScheduleNoteShift,
   ShiftJobSegment,
 } from "@/types";
 import CustomSelect from "./CustomSelect";
 import ShiftPicker from "./ShiftPicker";
-import { fmt12h, subtractOneHour, addOneHour } from "./shiftEditTime";
+import { fmt12h, subtractOneHour, addOneHour, orderSegmentsByStartTime } from "./shiftEditTime";
 import { PillTimeEditor } from "./PillTimeEditor";
 import { buildAssignableShiftDisplayMap, buildShiftDisplayParts } from "@/lib/assignable-shifts";
 import ConfirmDialog from "./ConfirmDialog";
@@ -279,11 +280,6 @@ function getFirstTimeSegment(time: string | null | undefined): string | null {
   if (!time) return null;
   const segment = time.split("|")[0]?.trim();
   return segment ? segment : null;
-}
-
-function timeToMinutes(t: string): number {
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + m;
 }
 
 // ── Per-pill custom time editor (custom dropdown views, immediate save) ───
@@ -825,30 +821,51 @@ export default function ShiftEditPanel({
     };
   }
 
-  // ── Double-shift time-sequential filtering ──────────────────────────────
+  // Any other shift, general or regular, earlier or later, can be the second
+  // half of a double shift. Overlaps are left to the same-day overlap warning,
+  // which blocks saving only when the organization enforces conflicts.
   const isAddingSecondShift = showPicker && currentAssignmentIds.length === 1;
   const firstShiftId = isAddingSecondShift ? currentAssignmentIds[0] : null;
 
-  const firstShiftEndTime: string | null = (() => {
-    if (!isAddingSecondShift) return null;
-    const firstCode = assignments.find((sc) => sc.id === firstShiftId);
-    return resolveDefaultTimes(firstCode).end;
-  })();
-
-  const pickerAssignmentDefinitions =
-    isAddingSecondShift && firstShiftEndTime
-      ? assignments.filter((sc) => {
-          // Never show the already-selected first shift
-          if (sc.id === firstShiftId) return false;
-          if (sc.isGeneral) return false;
-          const { start } = resolveDefaultTimes(sc);
-          if (!start) return false;
-          // Candidate must start at or after first shift ends (prevents overlap + same-time)
-          return timeToMinutes(start) >= timeToMinutes(firstShiftEndTime);
-        })
-      : assignments;
+  const pickerAssignmentDefinitions = isAddingSecondShift
+    ? assignments.filter((sc) => sc.id !== firstShiftId)
+    : assignments;
 
   const pickerAbsenceTypes = isAddingSecondShift ? [] : absenceTypes;
+
+  // A double shift reads in time order whichever half was picked first.
+  function selectPickerSegments(segments: ScheduleCellSegmentInput[]) {
+    const ordered =
+      isAddingSecondShift && segments.length === 2
+        ? orderSegmentsByStartTime(
+            segments,
+            customStartTime ?? null,
+            customEndTime ?? null,
+            (segment) =>
+              resolveDefaultTimes(
+                assignments.find(
+                  (candidate) =>
+                    (candidate.shiftId ?? candidate.categoryId ?? null) ===
+                      (segment.shiftId ?? null) && candidate.jobId === segment.jobId,
+                ),
+              ).start,
+          )
+        : {
+            segments,
+            customStartTime: customStartTime ?? null,
+            customEndTime: customEndTime ?? null,
+          };
+    onSelect(
+      buildPanelInput({
+        segments: ordered.segments.map((segment, position) => ({ ...segment, position })),
+        absenceTypeId: null,
+        customStartTime: ordered.customStartTime,
+        customEndTime: ordered.customEndTime,
+      }),
+      seriesId ? seriesScope : undefined,
+    );
+    if (segments.length > 0) setShowPicker(false);
+  }
 
   // When shift is cleared externally, return to picker
   useEffect(() => {
@@ -3876,46 +3893,40 @@ export default function ShiftEditPanel({
                 </div>
               )}
 
-              {/* Add another shift — hidden when at max (2), absence type, or first shift has no resolvable end time */}
-              {allowShiftEdits &&
-                !isAbsence &&
-                currentLabels.length < 2 &&
-                (() => {
-                  const firstCode = assignments.find((sc) => sc.id === currentAssignmentIds[0]);
-                  return firstCode ? resolveDefaultTimes(firstCode).end != null : true;
-                })() && (
-                  <div style={{ marginTop: 8 }}>
-                    <Button
-                      onClick={() => setShowPicker(true)}
-                      className="dg-btn dg-btn-ghost"
-                      style={{
-                        width: "100%",
-                        fontSize: "var(--dg-fs-caption)",
-                        padding: "9px 12px",
-                        border: "1px dashed var(--dg-color-border)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 6,
-                      }}
+              {/* Add another shift: hidden at the maximum of two, or on an absence */}
+              {allowShiftEdits && !isAbsence && currentLabels.length < 2 && (
+                <div style={{ marginTop: 8 }}>
+                  <Button
+                    onClick={() => setShowPicker(true)}
+                    className="dg-btn dg-btn-ghost"
+                    style={{
+                      width: "100%",
+                      fontSize: "var(--dg-fs-caption)",
+                      padding: "9px 12px",
+                      border: "1px dashed var(--dg-color-border)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     >
-                      <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <line x1="12" y1="5" x2="12" y2="19" />
-                        <line x1="5" y1="12" x2="19" y2="12" />
-                      </svg>
-                      Add another shift
-                    </Button>
-                  </div>
-                )}
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    Add another shift
+                  </Button>
+                </div>
+              )}
 
               {/* ── Shift Request Actions (employee self-service) ─────────── */}
               {isOwnShift && hasActiveShift && !hasActiveRequest && !hasEdits && (
@@ -4063,7 +4074,7 @@ export default function ShiftEditPanel({
                     fontSize: "var(--dg-fs-label)",
                   }}
                 >
-                  No shifts start at or after {fmt12h(firstShiftEndTime)}.
+                  No other shifts to add.
                 </div>
               ) : (
                 <div data-tour="shift-picker">
@@ -4084,18 +4095,7 @@ export default function ShiftEditPanel({
                     }))}
                     currentAbsenceTypeId={currentAbsenceTypeId}
                     defaultShiftEnabled={defaultShiftEnabled}
-                    onSelect={(segments) => {
-                      onSelect(
-                        buildPanelInput({
-                          segments,
-                          absenceTypeId: null,
-                          customStartTime: customStartTime ?? null,
-                          customEndTime: customEndTime ?? null,
-                        }),
-                        seriesId ? seriesScope : undefined,
-                      );
-                      if (segments.length > 0) setShowPicker(false);
-                    }}
+                    onSelect={selectPickerSegments}
                     onAbsenceSelect={(at) => {
                       onSelect(
                         buildPanelInput({

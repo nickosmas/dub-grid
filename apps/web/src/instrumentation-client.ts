@@ -13,7 +13,6 @@ import {
   loadReplayIntegration,
 } from "@/lib/sentry";
 import { getAnalyticsConsentSnapshot, subscribeToConsentChanges } from "@/components/CookieConsent";
-import { clientEnv } from "@/lib/env";
 
 function beforeSend(event: Record<string, unknown>) {
   const exception = event.exception as
@@ -27,6 +26,11 @@ function beforeSend(event: Record<string, unknown>) {
   }
   return event;
 }
+
+// Read directly rather than through clientEnv, whose Zod schema would ship to
+// every page, the landing page included. Next inlines the value at build time.
+// eslint-disable-next-line no-restricted-syntax -- see above
+const SENTRY_DSN = process.env.NEXT_PUBLIC_SENTRY_DSN || undefined;
 
 const analyticsConsented = getAnalyticsConsentSnapshot();
 
@@ -50,8 +54,8 @@ async function attachSessionReplay(): Promise<void> {
 }
 
 init({
-  dsn: clientEnv?.NEXT_PUBLIC_SENTRY_DSN,
-  enabled: !!clientEnv?.NEXT_PUBLIC_SENTRY_DSN,
+  dsn: SENTRY_DSN,
+  enabled: !!SENTRY_DSN,
 
   // Never at boot. Error monitoring is what has to be up immediately; replay
   // is attached afterwards, and only for a consenting visitor.

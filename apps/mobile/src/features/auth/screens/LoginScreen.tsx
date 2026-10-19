@@ -18,7 +18,7 @@ import {
   useIsConsentDecisionPending,
   useRecheckConsentDecision,
 } from "../../consent/components/ConsentGate";
-import { clearStoredConsent } from "../../consent/lib/consent";
+import { clearStoredConsent, getLegalUrls } from "../../consent/lib/consent";
 import {
   getBootstrap,
   loginToOrganization,
@@ -28,6 +28,7 @@ import {
 } from "../../../shared/lib/api";
 import { buildBootstrapQueryKey } from "../hooks/useBootstrap";
 import { authEntryRecorder } from "../lib/auth-entry-measurement";
+import { prefetchHomeQueries } from "../lib/prefetch-home";
 import { settleMobileAuthAction } from "../lib/request-deadline";
 import { beginSignInHandoff, useSignInHandoffPending } from "../lib/sign-in-handoff";
 import { queryClient } from "../../../shared/lib/query-client";
@@ -37,6 +38,7 @@ import { loadLastOrg, saveLastOrg } from "../../../shared/lib/session";
 import { markHasSeenOnboarding } from "../hooks/useHasSeenOnboarding";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
+import { openInAppBrowser } from "../../../shared/lib/inAppBrowser";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
@@ -99,9 +101,13 @@ export default function LoginScreen() {
   // which is the one window where we don't yet know what to call it.
   const [isResolvingOrgName, setIsResolvingOrgName] = useState(false);
   const [stage, setStage] = useState<Stage>("organization");
-  // Until the remembered organization is read and confirmed, the stage stays
+  // Until the remembered organization is read from the device, the stage stays
   // blank: showing the subdomain form first flashed it on every return visit.
   const [checkingRememberedOrg, setCheckingRememberedOrg] = useState(true);
+  // The credential form shows as soon as a remembered organization is read;
+  // only signing in waits for the lookup to confirm it.
+  const [confirmingRememberedOrg, setConfirmingRememberedOrg] = useState(false);
+  const rememberedOrgLookupRef = useRef(0);
   const [slowRememberedOrg, setSlowRememberedOrg] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -156,32 +162,37 @@ export default function LoginScreen() {
       }
 
       // A remembered organization is convenience, not proof that the
-      // organization remains available. Keep its slug in the field so retrying
-      // is effortless, but do not expose credentials until the public lookup
-      // confirms an active organization target.
+      // organization remains available. The credential form shows at once, but
+      // Sign in stays disabled until the public lookup confirms an active
+      // organization (the server checks it again on sign-in). If the lookup
+      // fails, the slug stays in the subdomain field so retrying is effortless.
+      const lookupId = ++rememberedOrgLookupRef.current;
+      const isCurrentLookup = () => active && lookupId === rememberedOrgLookupRef.current;
       setOrgSlug(storedOrg.slug);
       setOrgName(storedOrg.name);
       setIsResolvingOrgName(!storedOrg.name);
+      setConfirmingRememberedOrg(true);
+      setStage("credentials");
+      setCheckingRememberedOrg(false);
       try {
         const result = await lookupOrganization(storedOrg.slug);
-        if (!active) return;
+        if (!isCurrentLookup()) return;
         setOrgName(result.organization.name);
         setOrgSlug(result.organization.slug);
         await saveLastOrg(result.organization);
-        if (!active) return;
-        setStage("credentials");
       } catch (organizationError) {
-        if (!active) return;
+        if (!isCurrentLookup()) return;
         const nextError = getInlineErrorMessageOrToast(pushToast, {
           error: organizationError,
           fallbackMessage: "We couldn't find that organization. Check the domain and try again.",
           preferInlineNetworkError: true,
         });
         setError(nextError);
+        setStage("organization");
       } finally {
-        if (active) {
+        if (isCurrentLookup()) {
           setIsResolvingOrgName(false);
-          setCheckingRememberedOrg(false);
+          setConfirmingRememberedOrg(false);
         }
       }
     })();
@@ -233,8 +244,6 @@ export default function LoginScreen() {
     response: MobileAuthLoginResponse,
     session = response.session,
   ): Promise<boolean> {
-    await saveLastOrg(response.organization);
-
     const releaseHandoff = beginSignInHandoff();
     releaseSignInHandoffRef.current = releaseHandoff;
     const bootstrapQueryKey = buildBootstrapQueryKey(session.accessToken);
@@ -254,6 +263,8 @@ export default function LoginScreen() {
         retry: false,
         networkMode: "always",
       });
+      // After the warm-up starts, so the device write does not delay it.
+      await saveLastOrg(response.organization);
 
       const stopSessionHandoff = authEntryRecorder.startPhase("session_handoff");
       const { error: sessionError } = await settleMobileAuthAction(
@@ -274,6 +285,7 @@ export default function LoginScreen() {
       }
 
       await bootstrapWarmed;
+      prefetchHomeQueries(session.accessToken, queryClient.getQueryData(bootstrapQueryKey));
       router.replace(postLoginDestination);
       handedOff = true;
       requestAnimationFrame(() => {
@@ -320,7 +332,7 @@ export default function LoginScreen() {
   }
 
   async function handleLogin() {
-    if (submitting || !orgSlug || !email || !password) return;
+    if (submitting || confirmingRememberedOrg || !orgSlug || !email || !password) return;
 
     setSubmitting(true);
     setError(null);
@@ -391,7 +403,8 @@ export default function LoginScreen() {
         }),
       );
 
-      await recordMobileSignInCompleted(verifiedSession.accessToken);
+      // Audit only and never rejects, so the handoff does not wait on it.
+      void recordMobileSignInCompleted(verifiedSession.accessToken);
       handedOff = await finishLogin(pendingMfaLogin, verifiedSession);
     } catch (mfaError) {
       const nextError = getInlineErrorMessageOrToast(pushToast, {
@@ -409,6 +422,11 @@ export default function LoginScreen() {
   }
 
   function switchOrganization() {
+    // A remembered-organization lookup still in flight must not land over
+    // what the user types next.
+    rememberedOrgLookupRef.current += 1;
+    setConfirmingRememberedOrg(false);
+    setIsResolvingOrgName(false);
     setStage("organization");
     setError(null);
     setPendingMfaLogin(null);
@@ -528,6 +546,11 @@ export default function LoginScreen() {
                 onPress={() => setShowOrgHelp((current) => !current)}
                 tone="link"
               />
+              <Button
+                label="Privacy policy"
+                onPress={() => void openInAppBrowser(getLegalUrls().privacy, mobileColors)}
+                tone="link"
+              />
             </AuthActions>
             {orgLoading ? (
               <Text
@@ -619,7 +642,9 @@ export default function LoginScreen() {
             <AuthActions
               primaryAction={
                 <Button
-                  disabled={submitting || !isValidEmail(email) || !password}
+                  disabled={
+                    submitting || confirmingRememberedOrg || !isValidEmail(email) || !password
+                  }
                   label="Sign in"
                   loading={submitting}
                   onPress={() => handleLogin()}

@@ -517,6 +517,42 @@ describe("POST /api/gridmaster/impersonation", () => {
       expect(scheduleImpersonationNotice).not.toHaveBeenCalled();
     });
 
+    it("checks fresh proof alongside the Gridmaster check", async () => {
+      let answerGridmaster: (value: unknown) => void = () => {};
+      requireGridmasterSession.mockReturnValueOnce(
+        new Promise((resolve) => {
+          answerGridmaster = resolve;
+        }),
+      );
+      requireSensitiveActionAuth.mockResolvedValueOnce(staleSession());
+
+      const pending = POST(
+        makePostRequest({
+          action: "start",
+          targetUserId: TARGET_USER_ID,
+          targetOrgId: ORG_ID,
+          justification: "Need support investigation",
+        }),
+      );
+      await vi.waitFor(() => expect(requireSensitiveActionAuth).toHaveBeenCalledOnce());
+      answerGridmaster({ response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) });
+      const response = await pending;
+
+      // The Gridmaster refusal still answers first.
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toEqual({ error: "Forbidden" });
+      expect(requestRpc).not.toHaveBeenCalled();
+    });
+
+    it("asks for no fresh proof on invalid start input", async () => {
+      const response = await POST(
+        makePostRequest({ action: "start", targetUserId: TARGET_USER_ID, justification: "short" }),
+      );
+
+      expect(response.status).toBe(400);
+      expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
+    });
+
     it("ends a session without asking for fresh proof", async () => {
       requestRpc.mockResolvedValue({ data: null, error: null });
 

@@ -13,6 +13,14 @@ import { getBootstrap } from "../../../shared/lib/api";
 export const BOOTSTRAP_QUERY_KEY_PREFIX = ["mobile", "bootstrap"] as const;
 
 /**
+ * Realtime invalidates bootstrap whenever a table it reads changes, and the
+ * reconnect catch-up invalidates it after a dropped channel, so a foreground
+ * refetch only needs to catch what both missed. Five minutes keeps a quick
+ * return to the app from refetching it.
+ */
+export const BOOTSTRAP_STALE_TIME_MS = 5 * 60_000;
+
+/**
  * The cache identity of one bootstrap payload: who the token is for, and which
  * organization it is scoped to.
  *
@@ -53,7 +61,7 @@ export function createBootstrapQueryOptions(accessToken: string | null) {
     retryDelay: (failureCount: number, error: unknown) =>
       getAuthRecoveryRetryDelay(error, failureCount),
     refetchOnReconnect: true,
-    refetchOnWindowFocus: true,
+    staleTime: BOOTSTRAP_STALE_TIME_MS,
   };
 }
 

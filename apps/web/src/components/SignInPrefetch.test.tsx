@@ -31,6 +31,36 @@ function requestedPaths(): string[] {
   return vi.mocked(fetch).mock.calls.map(([input]) => new URL(String(input), "http://x").pathname);
 }
 
+function answerAsReadyOrganization() {
+  vi.mocked(fetch).mockImplementation(async (input) => {
+    const path = new URL(String(input), "http://x").pathname;
+    if (path === "/api/organization/bootstrap") {
+      return json({
+        org: { id: ORG_ID, name: "Calm Haven", shiftDisplayMode: "code" },
+        isGridmaster: false,
+        entryGate: {
+          onboardingCompleted: true,
+          adminOnboardingCompleted: true,
+          billingLocked: false,
+        },
+        focusAreas: [],
+        allAssignmentDefinitions: [],
+        allAbsenceTypes: [],
+        shiftCategories: [],
+        jobs: [],
+      });
+    }
+    if (path === "/api/account/permissions") {
+      return json({
+        permissions: { role: "user", level: 1, canEditShifts: false },
+        isOnSchedule: true,
+        isManagementUser: false,
+      });
+    }
+    return json({});
+  });
+}
+
 describe("primeSignInQueries", () => {
   let queryClient: QueryClient;
 
@@ -66,6 +96,42 @@ describe("primeSignInQueries", () => {
       await waitFor(() => expect(queryClient.getQueryState(key)?.status).toBe("success"));
     }
     expect(queryClient.getQueryState(queryKeys.employees.all(ORG_ID))).toBeDefined();
+  });
+
+  it("starts the dashboard's default week once the organization and permissions answer", async () => {
+    answerAsReadyOrganization();
+
+    primeSignInQueries(queryClient, token({ org_id: ORG_ID, org_role: "user" }));
+
+    await waitFor(() =>
+      expect(
+        queryClient
+          .getQueryCache()
+          .getAll()
+          .some((query) => query.queryKey.includes("cells") && query.queryKey.includes("viewer")),
+      ).toBe(true),
+    );
+    expect(requestedPaths()).toContain("/api/schedule/manage");
+  });
+
+  it("leaves the dashboard alone when the sign-in lands somewhere else first", async () => {
+    answerAsReadyOrganization();
+
+    primeSignInQueries(queryClient, token({ org_id: ORG_ID, org_role: "user" }), {
+      dashboard: false,
+    });
+
+    await waitFor(() =>
+      expect(queryClient.getQueryState(queryKeys.org.bootstrap())?.status).toBe("success"),
+    );
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryState(queryKeys.account.permissions(USER_ID, ORG_ID))?.status,
+      ).toBe("success"),
+    );
+    // Give the priming that follows those two answers its turn to run.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(requestedPaths()).not.toContain("/api/schedule/manage");
   });
 
   it("adds a Super Admin's billing to the same wave, not ahead of employees", () => {

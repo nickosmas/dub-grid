@@ -7,8 +7,6 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { Button } from "../../../shared/components/Button";
 import { getScreenBottomPadding } from "../../../shared/components/screen-layout";
 import { getOrgStatus } from "../../../shared/lib/api";
-import { getMobileEnvConfig } from "../../../shared/lib/env";
-import { openInAppBrowser } from "../../../shared/lib/inAppBrowser";
 import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { mobileSpacing, mobileText, type MobileColors } from "../../../shared/theme/tokens";
@@ -95,8 +93,6 @@ export function OrganizationLockedScreen({
     isSuperAdmin || (statusQuery.isError && !status)
       ? formatLockedMessage(message)
       : "This organization is currently unavailable. Please try again later.";
-  // A suspension isn't a billing problem, so billing can't fix it.
-  const showBillingLink = isSuperAdmin && status?.state !== "suspended";
   const detailLine = isSuperAdmin ? getDetailLine(status) : null;
   const graceDate =
     isSuperAdmin && status?.state === "trial_grace"
@@ -128,18 +124,6 @@ export function OrganizationLockedScreen({
           }
           style={styles.actions}
         >
-          {showBillingLink ? (
-            <Button
-              label="Manage billing on web"
-              onPress={() => {
-                void openInAppBrowser(
-                  `${getMobileEnvConfig().apiBaseUrl}/settings?section=org-billing`,
-                  mobileColors,
-                );
-              }}
-              tone="secondary"
-            />
-          ) : null}
           <Button label="Sign out" onPress={onSignOut} tone="neutral" />
         </ActionButtons>
       </ScrollView>

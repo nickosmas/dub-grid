@@ -23,6 +23,16 @@ const mocks = vi.hoisted(() => ({
   recordMfaOff: vi.fn(),
   alert: vi.fn(),
 }));
+// Runs each after() task at once, so its writes can be asserted on return.
+const after = vi.hoisted(() =>
+  vi.fn((task: () => unknown) => {
+    void task();
+  }),
+);
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (task: () => unknown) => after(task),
+}));
 vi.mock("@/lib/api-auth", () => ({
   requireLiveAuthenticatedSession: mocks.live,
   requireSensitiveActionAuth: mocks.sensitive,
@@ -121,6 +131,10 @@ describe.each([
 
   it("enrolls with a user token and preserves the existing issuer/label", async () => {
     expect((await post(request({ action: "enroll" }))).status).toBe(200);
+    expect(after).toHaveBeenCalledOnce();
+    expect(mocks.audit).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: "factor_enrollment_started" }),
+    );
     expect(mocks.scoped).toHaveBeenCalledWith("original-session");
     expect(mocks.enroll).toHaveBeenCalledWith(
       surface === "web"

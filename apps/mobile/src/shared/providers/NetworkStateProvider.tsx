@@ -18,6 +18,10 @@ const NETWORK_RECONNECT_STABILITY_MS = 1_500;
 // above the screen that hides the native splash — so a probe that never settles
 // would strand the app on the splash forever. Assume online after this budget.
 const NETWORK_PROBE_TIMEOUT_MS = 2_000;
+// Focus waits for the session so foreground refetches carry a live token, but
+// never longer than this: a refresh stuck on a bad network must not leave the
+// app's queries unfocused.
+const FOREGROUND_SESSION_SETTLE_TIMEOUT_MS = 5_000;
 
 type NetworkStatusContextValue = {
   hasResolvedState: boolean;
@@ -166,6 +170,30 @@ export function NetworkStateProvider({ children }: PropsWithChildren) {
       setAuthRefreshActive(appStateRef.current === "active");
     }
 
+    // A token that expired in the background is refreshed by `getSession`.
+    // Focusing first sent every refetch with the expired token, and each one
+    // came back 401.
+    let focusGeneration = 0;
+    function focusOnceSessionSettles() {
+      const generation = ++focusGeneration;
+      let timeout: ReturnType<typeof setTimeout> | null = null;
+      const sessionSettled = authRefreshOperation
+        .then(() => auth.getSession())
+        .then(
+          () => undefined,
+          () => undefined,
+        );
+      const deadline = new Promise<void>((resolve) => {
+        timeout = setTimeout(resolve, FOREGROUND_SESSION_SETTLE_TIMEOUT_MS);
+      });
+      void Promise.race([sessionSettled, deadline]).then(() => {
+        if (timeout) clearTimeout(timeout);
+        if (generation === focusGeneration && appStateRef.current === "active") {
+          focusManager.setFocused(true);
+        }
+      });
+    }
+
     function onAppStateChange(status: AppStateStatus) {
       if (Platform.OS === "web") return;
 
@@ -174,14 +202,20 @@ export function NetworkStateProvider({ children }: PropsWithChildren) {
       appStateRef.current = status;
       if (wasActive === isActive) return;
 
-      focusManager.setFocused(isActive);
       setAuthRefreshActive(isActive);
-      if (isActive) recheckOfflineRef.current();
+      if (isActive) {
+        focusOnceSessionSettles();
+        recheckOfflineRef.current();
+      } else {
+        focusGeneration += 1;
+        focusManager.setFocused(false);
+      }
     }
 
     const subscription = AppState.addEventListener("change", onAppStateChange);
 
     return () => {
+      focusGeneration += 1;
       subscription.remove();
       if (Platform.OS !== "web") {
         setAuthRefreshActive(false);

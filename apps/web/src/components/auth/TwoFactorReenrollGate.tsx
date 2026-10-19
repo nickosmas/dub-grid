@@ -1,16 +1,22 @@
 "use client";
 
 import type { ReactNode } from "react";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/Button";
 import { useAuth } from "@/components/AuthProvider";
 import { isPublicRoute } from "@/components/onboarding/public-routes";
-import { MFASetup } from "@/components/profile/MFASetup";
 import { fetchMfaReenrollStatus } from "@/features/account/client";
 import { usePermissions } from "@/hooks";
 import { useLogout } from "@/hooks/useLogout";
 import { queryKeys } from "@/lib/query-keys";
+
+// Every app route mounts this gate, and almost nobody is ever held by it.
+const MFASetup = dynamic(
+  () => import("@/components/profile/MFASetup").then((module) => module.MFASetup),
+  { ssr: false },
+);
 
 /**
  * After DubGrid support resets someone's two-factor, holds every app route on

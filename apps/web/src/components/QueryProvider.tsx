@@ -5,9 +5,16 @@ import { useState, useEffect } from "react";
 import { listenForInvalidations } from "@/lib/cache-broadcast";
 import { clientEnv } from "@/lib/env";
 import AuthenticatedCacheBoundary from "@/components/AuthenticatedCacheBoundary";
+import type { ClientFeatureFlags } from "@/lib/feature-flags";
+import { queryKeys } from "@/lib/query-keys";
 
-function makeQueryClient(): QueryClient {
-  return new QueryClient({
+export interface InitialFeatureFlags {
+  flags: ClientFeatureFlags;
+  readAt: number;
+}
+
+export function makeQueryClient(initialFeatureFlags?: InitialFeatureFlags): QueryClient {
+  const client = new QueryClient({
     defaultOptions: {
       queries: {
         staleTime: 30_000, // 30s — matches previous module-cache TTL
@@ -17,6 +24,15 @@ function makeQueryClient(): QueryClient {
       },
     },
   });
+  // The layout already read the flags, so the first useClientFeatureFlags
+  // needs no request; its staleTime and focus refetching take over from there.
+  // Clamped so a server clock ahead of this one cannot keep them fresh longer.
+  if (initialFeatureFlags) {
+    client.setQueryData(queryKeys.featureFlags(), initialFeatureFlags.flags, {
+      updatedAt: Math.min(initialFeatureFlags.readAt, Date.now()),
+    });
+  }
+  return client;
 }
 
 const PERF_TIMING =
@@ -73,8 +89,14 @@ function attachPerfLogger(client: QueryClient): () => void {
   };
 }
 
-export default function QueryProvider({ children }: { children: React.ReactNode }) {
-  const [queryClient] = useState(makeQueryClient);
+export default function QueryProvider({
+  children,
+  initialFeatureFlags,
+}: {
+  children: React.ReactNode;
+  initialFeatureFlags?: InitialFeatureFlags;
+}) {
+  const [queryClient] = useState(() => makeQueryClient(initialFeatureFlags));
 
   useEffect(() => {
     return listenForInvalidations(queryClient);

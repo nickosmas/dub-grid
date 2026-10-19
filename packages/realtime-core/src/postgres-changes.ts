@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 /** Minimal shape of a Supabase postgres_changes payload the listeners can read. */
 export interface RealtimeChangePayload {
+  eventType?: "INSERT" | "UPDATE" | "DELETE";
   new?: Record<string, unknown>;
   old?: Record<string, unknown>;
 }

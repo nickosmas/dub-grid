@@ -5,7 +5,6 @@ import EnhancedImpersonation from "@/components/gridmaster/EnhancedImpersonation
 import type { Organization, OrganizationUser } from "@/types";
 
 const stepUpRun = vi.fn();
-const requireCredentialAssurance = vi.fn();
 const startGridmasterImpersonation = vi.fn();
 const endGridmasterImpersonation = vi.fn();
 const fetchOrganizationUsers = vi.fn();
@@ -16,9 +15,6 @@ const locationReplace = vi.fn();
 
 vi.mock("@/hooks/useStepUpAction", () => ({
   useStepUpAction: () => ({ run: stepUpRun, dialog: null }),
-}));
-vi.mock("@/features/account/client", () => ({
-  requireCredentialAssurance: (...args: unknown[]) => requireCredentialAssurance(...args),
 }));
 vi.mock("@/features/gridmaster/client", () => ({
   startGridmasterImpersonation: (...args: unknown[]) => startGridmasterImpersonation(...args),
@@ -85,7 +81,6 @@ describe("Starting an impersonation through step-up (41d7, F-75)", () => {
       await action("fresh-token");
       return true;
     });
-    requireCredentialAssurance.mockResolvedValue({ success: true });
     fetchOrganizationUsers.mockResolvedValue([target]);
     startGridmasterImpersonation.mockResolvedValue({
       sessionId: "session-1",
@@ -101,7 +96,6 @@ describe("Starting an impersonation through step-up (41d7, F-75)", () => {
     await requestStart();
 
     await waitFor(() => expect(setImpersonationCookie).toHaveBeenCalled());
-    expect(requireCredentialAssurance).toHaveBeenCalledWith("fresh-token");
     expect(startGridmasterImpersonation).toHaveBeenCalledWith(
       expect.objectContaining({
         targetUserId: TARGET_ID,
@@ -114,6 +108,32 @@ describe("Starting an impersonation through step-up (41d7, F-75)", () => {
       expect.objectContaining({ sessionId: "session-1", targetUserId: TARGET_ID }),
     );
     expect(locationReplace).toHaveBeenCalledWith("/schedule");
+  });
+
+  it("hands the start route's own step-up refusal to the prompt, with no preflight", async () => {
+    const refusal = Object.assign(new Error("Confirm your identity"), {
+      status: 403,
+      code: "STEP_UP_REQUIRED",
+      method: "password",
+    });
+    startGridmasterImpersonation.mockRejectedValueOnce(refusal);
+    let refused: unknown = null;
+    stepUpRun.mockImplementation(async (action: (token: string) => Promise<unknown>) => {
+      try {
+        await action("stale-token");
+      } catch (error) {
+        refused = error;
+        await action("fresh-token");
+      }
+      return true;
+    });
+
+    await requestStart();
+
+    await waitFor(() => expect(locationReplace).toHaveBeenCalledWith("/schedule"));
+    expect(refused).toBe(refusal);
+    expect(startGridmasterImpersonation).toHaveBeenCalledTimes(2);
+    expect(startGridmasterImpersonation).toHaveBeenLastCalledWith(expect.anything(), "fresh-token");
   });
 
   it("starts nothing and closes the confirmation when step-up is cancelled", async () => {

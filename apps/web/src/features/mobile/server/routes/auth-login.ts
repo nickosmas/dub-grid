@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
 import {
   MOBILE_LOGIN_SERVER_DEADLINE_MS,
   mobileAuthLoginBodySchema,
@@ -188,21 +188,25 @@ async function handlePOST(req: NextRequest, timer: Timer) {
 
     // With a second factor enrolled the password step is only challenged;
     // /api/mobile/v1/auth/sign-in-complete records the success. A success
-    // carries its session so no completion call records it again.
+    // carries its session so no completion call records it again. Written
+    // after the response: the write never changes the answer, and the phone
+    // should not wait on it.
     const sessionHash = payload.mfaRequired ? null : sessionHashOf(payload.session.accessToken);
-    await writeSecurityAuditEvent({
-      event: "security.auth.login",
-      outcome: payload.mfaRequired ? "challenged" : "succeeded",
-      reason: payload.mfaRequired ? "second_factor_required" : "accepted",
-      actorId: payload.user.id,
-      orgId: payload.organization.id,
-      metadata: {
-        targetHash: emailHash,
-        sourceHash,
-        surface: "mobile",
-        ...(sessionHash ? { sessionHash } : {}),
-      },
-    });
+    after(() =>
+      writeSecurityAuditEvent({
+        event: "security.auth.login",
+        outcome: payload.mfaRequired ? "challenged" : "succeeded",
+        reason: payload.mfaRequired ? "second_factor_required" : "accepted",
+        actorId: payload.user.id,
+        orgId: payload.organization.id,
+        metadata: {
+          targetHash: emailHash,
+          sourceHash,
+          surface: "mobile",
+          ...(sessionHash ? { sessionHash } : {}),
+        },
+      }),
+    );
 
     return json(mobileAuthLoginResponseSchema.parse(payload));
   } catch (error) {

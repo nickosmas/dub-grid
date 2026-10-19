@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:4cc95cd40f0b231abae45772edc09438075e437fd2a1f6834f74a7b6c23e18d0",
+  "sourceDigest": "sha256:b2f45224417bc2406c625685c01c03c18cfa4b500a426075c2d0c147f4c7da78",
   "webRoutes": [
     {
       "id": "web:/",
@@ -5822,7 +5822,11 @@
           "path": "apps/web/src/lib/env.ts"
         }
       ],
-      "usages": [],
+      "usages": [
+        {
+          "path": "apps/web/src/components/WebVitals.tsx"
+        }
+      ],
       "exampleFiles": []
     },
     {
@@ -5902,6 +5906,9 @@
       "usages": [
         {
           "path": "apps/web/next.config.ts"
+        },
+        {
+          "path": "apps/web/src/instrumentation-client.ts"
         }
       ],
       "exampleFiles": [

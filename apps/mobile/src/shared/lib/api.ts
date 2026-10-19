@@ -82,6 +82,11 @@ import {
   authEntryRecorder,
   type AuthEntryRequestKind,
 } from "../../features/auth/lib/auth-entry-measurement";
+import {
+  getAccessTokenExpiry,
+  getMobileAuthIdentity,
+  isSameMobileAuthIdentity,
+} from "./access-token";
 import { getMobileEnvConfig } from "./env";
 import { getStoredValue, setStoredValue } from "./local-storage";
 
@@ -123,12 +128,56 @@ function createNonJsonApiErrorMessage(baseUrl: string, path: string, response: R
   return "Please try again in a moment.";
 }
 
+const TOKEN_EXPIRY_MARGIN_SECONDS = 30;
+const LIVE_TOKEN_LOOKUP_TIMEOUT_MS = 3_000;
+
+/**
+ * A query function keeps the token of the render that built it, so a refetch
+ * on return to the foreground can still carry one that expired in the
+ * background, and it came back 401. An expired token is swapped for the live
+ * session's, but only when that session is the same person in the same
+ * organization, so a request can never cross an identity boundary.
+ */
+function isExpiringAccessToken(accessToken: string): boolean {
+  const expiresAt = getAccessTokenExpiry(accessToken);
+  return expiresAt !== null && expiresAt - Date.now() / 1000 <= TOKEN_EXPIRY_MARGIN_SECONDS;
+}
+
+async function resolveLiveAccessToken(accessToken: string): Promise<string> {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  try {
+    const { getSupabaseClient } = await import("./supabase");
+    const result = await Promise.race([
+      getSupabaseClient().auth.getSession(),
+      new Promise<null>((resolve) => {
+        timeout = setTimeout(() => resolve(null), LIVE_TOKEN_LOOKUP_TIMEOUT_MS);
+      }),
+    ]);
+    const liveToken = result?.data.session?.access_token ?? null;
+    if (!liveToken || liveToken === accessToken) return accessToken;
+    const sameIdentity = isSameMobileAuthIdentity(
+      getMobileAuthIdentity(liveToken),
+      getMobileAuthIdentity(accessToken),
+    );
+    return sameIdentity ? liveToken : accessToken;
+  } catch {
+    return accessToken;
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
 export async function mobileApiRequest<T>(
   path: string,
-  accessToken: string,
+  requestedToken: string,
   init: RequestInit,
   parse: (value: unknown) => T,
 ): Promise<T> {
+  // Only an expiring token waits on the lookup; every other request starts
+  // in the same tick, as before.
+  const accessToken = isExpiringAccessToken(requestedToken)
+    ? await resolveLiveAccessToken(requestedToken)
+    : requestedToken;
   const headers = createHeaders(init, {
     Authorization: `Bearer ${accessToken}`,
     "Content-Type": init.body !== undefined ? "application/json" : undefined,

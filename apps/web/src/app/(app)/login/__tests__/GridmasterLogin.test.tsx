@@ -29,21 +29,34 @@ vi.mock("@/components/SignInPrefetch", () => ({
 vi.mock("@/components/RouteGuards", () => ({
   PublicRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
+const getBrowserAuthSession = vi.fn();
+const refreshBrowserSession = vi.fn();
+const recordBrowserSignInCompleted = vi.fn();
+const resolvePostLoginDestination = vi.fn();
 vi.mock("@/features/account/client", () => ({
-  recordBrowserSignInCompleted: vi.fn().mockResolvedValue(undefined),
-  refreshBrowserSession: vi.fn().mockResolvedValue(undefined),
+  getBrowserAuthSession: (...args: unknown[]) => getBrowserAuthSession(...args),
+  recordBrowserSignInCompleted: (...args: unknown[]) => recordBrowserSignInCompleted(...args),
+  refreshBrowserSession: (...args: unknown[]) => refreshBrowserSession(...args),
   setBrowserSession: (...args: unknown[]) => setBrowserSession(...args),
   signOutFromBrowser: vi.fn().mockResolvedValue(undefined),
   syncBrowserSessionInBackground: (...args: unknown[]) => syncBrowserSessionInBackground(...args),
 }));
 vi.mock("../shared", () => ({
   AccountDisabledModal: () => <div>Account disabled</div>,
-  resolvePostLoginDestination: vi.fn().mockResolvedValue("/dashboard"),
+  resolvePostLoginDestination: (...args: unknown[]) => resolvePostLoginDestination(...args),
   useClientHost: () => ({
     parsed: { rootDomain: "localhost", port: "" },
     protocol: "http:",
   }),
   useSessionInvalidToast: vi.fn(),
+}));
+
+vi.mock("@/components/profile/MFAVerify", () => ({
+  MFAVerify: ({ onVerified }: { onVerified: () => Promise<void> }) => (
+    <button type="button" onClick={() => void onVerified()}>
+      Complete MFA
+    </button>
+  ),
 }));
 
 function submit() {
@@ -172,6 +185,71 @@ describe("GridmasterLogin with session cookies from the server", () => {
     await waitFor(() => expect(setBrowserSession).toHaveBeenCalledWith(SESSION));
     expect(replace).not.toHaveBeenCalled();
     expect(syncBrowserSessionInBackground).not.toHaveBeenCalled();
+  });
+});
+
+describe("GridmasterLogin second factor", () => {
+  function token(claims: Record<string, unknown>): string {
+    return `header.${btoa(JSON.stringify(claims))}.signature`;
+  }
+  const STAMPED = { access_token: token({ sub: "gm-1", platform_role: "gridmaster" }) };
+
+  beforeEach(() => {
+    signedInUser = null;
+    replace.mockReset();
+    setBrowserSession.mockReset().mockResolvedValue(undefined);
+    primeSignInQueries.mockReset();
+    getBrowserAuthSession.mockReset().mockResolvedValue(STAMPED);
+    refreshBrowserSession.mockReset().mockResolvedValue(STAMPED);
+    recordBrowserSignInCompleted.mockReset().mockResolvedValue(undefined);
+    resolvePostLoginDestination.mockReset().mockResolvedValue("/gridmaster");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: true,
+          session: { access_token: token({ sub: "gm-1" }), refresh_token: "refresh" },
+          user: { id: "gm-1", email_confirmed_at: "2026-01-01T00:00:00Z" },
+          mfa_required: true,
+          destination: null,
+          sessionCookieSet: false,
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+  });
+
+  async function completeSecondFactor() {
+    render(<GridmasterLogin />);
+    submit();
+    fireEvent.click(await screen.findByRole("button", { name: "Complete MFA" }));
+  }
+
+  it("lands on the portal without a refresh when the verified token carries the role", async () => {
+    let finishTerms!: (destination: string) => void;
+    resolvePostLoginDestination.mockReturnValue(
+      new Promise((resolve) => {
+        finishTerms = resolve;
+      }),
+    );
+    await completeSecondFactor();
+
+    await waitFor(() => expect(recordBrowserSignInCompleted).toHaveBeenCalledTimes(1));
+    expect(resolvePostLoginDestination).toHaveBeenCalledExactlyOnceWith("/gridmaster");
+    expect(primeSignInQueries).toHaveBeenCalledExactlyOnceWith(queryClient, STAMPED.access_token);
+    expect(replace).not.toHaveBeenCalled();
+
+    await act(async () => finishTerms("/gridmaster"));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/gridmaster"));
+    expect(refreshBrowserSession).not.toHaveBeenCalled();
+  });
+
+  it("refreshes once when the verified token lacks the role", async () => {
+    getBrowserAuthSession.mockResolvedValue({ access_token: token({ sub: "gm-1" }) });
+    await completeSecondFactor();
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/gridmaster"));
+    expect(refreshBrowserSession).toHaveBeenCalledTimes(1);
+    expect(primeSignInQueries).toHaveBeenCalledExactlyOnceWith(queryClient, STAMPED.access_token);
   });
 });
 

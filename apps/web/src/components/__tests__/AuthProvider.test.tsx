@@ -66,6 +66,7 @@ function accessToken(sessionId: string): string {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  sessionStorage.clear();
   vi.stubGlobal("fetch", mockFetch);
   mockFetch.mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
   // Default: no session
@@ -343,6 +344,59 @@ describe("AuthProvider — auth state changes", () => {
         mockFetch.mock.calls.filter(([url]) => url === "/api/auth/track-session"),
       ).toHaveLength(1);
     });
+  });
+});
+
+describe("AuthProvider restored session reports", () => {
+  function restoredSession(sessionId: string) {
+    return { ...fakeSession, access_token: accessToken(sessionId), refresh_token: "refresh-token" };
+  }
+
+  function trackSessionPosts() {
+    return mockFetch.mock.calls.filter(([url]) => url === "/api/auth/track-session");
+  }
+
+  it("does not report a restored session this tab reported in the last ten minutes", async () => {
+    sessionStorage.setItem(
+      "dg_session_reported",
+      JSON.stringify({ sessionId: "reloaded-session", at: Date.now() - 60_000 }),
+    );
+    mockGetSession.mockResolvedValue(restoredSession("reloaded-session"));
+    mockGetUser.mockResolvedValue(fakeUser);
+
+    render(
+      <AuthProvider>
+        <TestConsumer />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("user")).toHaveTextContent("user-123"));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(trackSessionPosts()).toHaveLength(0);
+  });
+
+  it("reports a restored session once the last report is older than ten minutes", async () => {
+    sessionStorage.setItem(
+      "dg_session_reported",
+      JSON.stringify({ sessionId: "stale-stamp-session", at: Date.now() - 11 * 60_000 }),
+    );
+    mockGetSession.mockResolvedValue(restoredSession("stale-stamp-session"));
+    mockGetUser.mockResolvedValue(fakeUser);
+
+    render(
+      <AuthProvider>
+        <TestConsumer />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => expect(trackSessionPosts()).toHaveLength(1));
+    await waitFor(() =>
+      expect(JSON.parse(sessionStorage.getItem("dg_session_reported") ?? "{}").sessionId).toBe(
+        "stale-stamp-session",
+      ),
+    );
   });
 });
 

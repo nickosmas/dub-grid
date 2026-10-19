@@ -106,6 +106,63 @@ export function createSessionRegistration(
   };
 }
 
+const REPORTED_SESSION_KEY = "dg_session_reported";
+export const RESTORED_SESSION_REPORT_INTERVAL_MS = 10 * 60_000;
+
+type ReportedSessionStorage = Pick<Storage, "getItem" | "setItem">;
+
+function browserSessionStorage(): ReportedSessionStorage | null {
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+function resolveStorage(options: {
+  storage?: ReportedSessionStorage | null;
+}): ReportedSessionStorage | null {
+  return "storage" in options ? (options.storage ?? null) : browserSessionStorage();
+}
+
+/**
+ * Whether a session restored on page load was reported from this tab recently
+ * enough to skip reporting it again. Every hard load used to post it. Storage
+ * that cannot be read answers false, so the report is sent.
+ */
+export function wasSessionReportedRecently(
+  session: SessionWithAccessToken,
+  options: { storage?: ReportedSessionStorage | null; now?: () => number } = {},
+): boolean {
+  const sessionId = readSupabaseSessionId(session.access_token);
+  if (!sessionId) return false;
+  try {
+    const raw = resolveStorage(options)?.getItem(REPORTED_SESSION_KEY);
+    if (!raw) return false;
+    const stamp = JSON.parse(raw) as { sessionId?: unknown; at?: unknown };
+    const age = (options.now ?? Date.now)() - Number(stamp.at);
+    return stamp.sessionId === sessionId && age >= 0 && age < RESTORED_SESSION_REPORT_INTERVAL_MS;
+  } catch {
+    return false;
+  }
+}
+
+export function markSessionReported(
+  session: SessionWithAccessToken,
+  options: { storage?: ReportedSessionStorage | null; now?: () => number } = {},
+): void {
+  const sessionId = readSupabaseSessionId(session.access_token);
+  if (!sessionId) return;
+  try {
+    resolveStorage(options)?.setItem(
+      REPORTED_SESSION_KEY,
+      JSON.stringify({ sessionId, at: (options.now ?? Date.now)() }),
+    );
+  } catch {
+    // A full or blocked store only means the next load reports again.
+  }
+}
+
 function readSupabaseSessionId(accessToken: string): string | null {
   try {
     const encodedPayload = accessToken.split(".")[1];

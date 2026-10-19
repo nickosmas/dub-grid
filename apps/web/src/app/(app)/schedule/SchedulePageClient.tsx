@@ -8152,6 +8152,7 @@ function SchedulerContent({
               }}
               onClose={() => setShowPrintOptions(false)}
               focusAreaLabel={org?.focusAreaLabel}
+              shiftDisplayMode={org?.shiftDisplayMode}
             />
           )}
 

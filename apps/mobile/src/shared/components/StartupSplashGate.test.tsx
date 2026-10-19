@@ -14,6 +14,7 @@ const useSessionState = vi.fn();
 const useBootstrap = vi.fn();
 const useHasSeenOnboarding = vi.fn();
 const hideAsync = vi.fn();
+const prefetchHomeQueries = vi.fn();
 
 vi.mock("expo-splash-screen", () => ({
   preventAutoHideAsync: () => Promise.resolve(),
@@ -32,6 +33,10 @@ vi.mock("../providers/AuthSessionProvider", () => ({
 vi.mock("../../features/auth/hooks/useBootstrap", () => ({
   BOOTSTRAP_QUERY_KEY_PREFIX: ["mobile", "bootstrap"],
   useBootstrap,
+}));
+
+vi.mock("../../features/auth/lib/prefetch-home", () => ({
+  prefetchHomeQueries: (...args: unknown[]) => prefetchHomeQueries(...args),
 }));
 
 vi.mock("../../features/auth/hooks/useHasSeenOnboarding", () => ({
@@ -72,10 +77,34 @@ describe("StartupSplashGate", () => {
     useBootstrap.mockReset();
     useHasSeenOnboarding.mockReset();
     hideAsync.mockReset();
+    prefetchHomeQueries.mockReset();
 
     useSessionState.mockReturnValue({ accessToken: "token", isLoading: false });
     useBootstrap.mockReturnValue({ isLoading: false });
     useHasSeenOnboarding.mockReturnValue({ data: true, isLoading: false });
+  });
+
+  it("starts Home's queries once, as soon as bootstrap lands", () => {
+    useBootstrap.mockReturnValue({ isLoading: true });
+    const view = renderGate();
+    expect(prefetchHomeQueries).not.toHaveBeenCalled();
+
+    const bootstrap = { effectiveRole: "user" };
+    useBootstrap.mockReturnValue({ data: bootstrap, isLoading: false });
+    view.rerender(
+      <StartupSplashGate>
+        <div>router</div>
+      </StartupSplashGate>,
+    );
+    useBootstrap.mockReturnValue({ data: { ...bootstrap }, isLoading: false });
+    view.rerender(
+      <StartupSplashGate>
+        <div>router</div>
+      </StartupSplashGate>,
+    );
+
+    expect(prefetchHomeQueries).toHaveBeenCalledTimes(1);
+    expect(prefetchHomeQueries).toHaveBeenCalledWith("token", bootstrap);
   });
 
   it("holds the splash over the router until startup resolves", () => {

@@ -2,7 +2,7 @@ import { router } from "expo-router";
 import { replaceAuthSession } from "../providers/AuthSessionProvider";
 import { disablePushToken, signOutMobileSessions } from "./api";
 import { queryClient } from "./query-client";
-import { loadStoredPushDevice } from "./session";
+import { loadStoredPushDevice, saveStoredPushRegistration } from "./session";
 import { getSupabaseClient } from "./supabase";
 
 let activeReset: Promise<void> | null = null;
@@ -26,6 +26,13 @@ async function settleWithin(promise: Promise<unknown>): Promise<void> {
  * path has no usable token and simply no-ops.
  */
 export async function disablePushForCurrentDevice(): Promise<void> {
+  // Forgotten first, so the next sign-in registers again even when the
+  // request below never lands.
+  try {
+    await saveStoredPushRegistration(null);
+  } catch {
+    // Storage failing must not block sign-out either.
+  }
   try {
     const {
       data: { session },

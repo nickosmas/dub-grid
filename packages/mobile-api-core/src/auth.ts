@@ -322,6 +322,18 @@ export function extractMobileBearerToken(authorizationHeader: string | null): st
   return authorizationHeader.slice("Bearer ".length).trim() || null;
 }
 
+/**
+ * Starts `read` now and returns its promise to await later. A refusal earlier
+ * in the chain means this one may never be awaited, so a no-op handler keeps
+ * its rejection from going unhandled; awaiting it still throws. A synchronous
+ * throw is turned into a rejection so it, too, waits for its turn.
+ */
+function startEarly<T>(read: () => PromiseLike<T> | T): Promise<T> {
+  const started = new Promise<T>((resolve) => resolve(read()));
+  started.catch(() => {});
+  return started;
+}
+
 export async function resolveMobileAuthContext<
   TOrganizationRow,
   TOrganization extends Pick<
@@ -388,31 +400,70 @@ export async function resolveMobileAuthContext<
   }
 
   const claims = verified.claims;
+  // The claim, or nothing. This used to fall back to `membershipRows[0]`, and
+  // that query has no ORDER BY, so a token whose org claim the access-token
+  // hook had stripped (its org archived or suspended, its membership revoked)
+  // silently adopted an arbitrary one of the user's other organizations and
+  // built the whole PermissionContext for it, which meant writes landed there
+  // too. Refusing (below, in its original place) is the only safe reading of
+  // "this token names no org": the client's answer is to switch deliberately,
+  // which re-mints the claim.
+  const currentOrgId =
+    typeof claims.org_id === "string" && claims.org_id.length > 0 ? claims.org_id : null;
 
-  if (
-    await input.isRevoked({
+  // Every read below needs only the verified token, so they all start now and
+  // are awaited one at a time in the order the checks have always run. Each
+  // request gets the same allow or deny answer, without paying for ten round
+  // trips in a row. Only a validly signed token reaches this point.
+  const revoked = startEarly(() =>
+    input.isRevoked({
       userId: verified.userId,
       sessionId: verified.sessionId,
       issuedAtMs: verified.issuedAtMs,
-    })
-  ) {
-    throw new MobileApiRequestError(401, "Invalid session");
-  }
-
+    }),
+  );
   // The one call to Supabase Auth still on this path, and it is load-bearing.
   //
   // Without it a password-only (aal1) token would satisfy a user who has TOTP
   // enrolled, which is an MFA bypass. Enrolled factors live in `auth.mfa_factors`,
-  // which PostgREST does not expose, and they are not carried in the JWT — so
+  // which PostgREST does not expose, and they are not carried in the JWT, so
   // there is no way to answer "does this user have a verified factor?" locally
   // today. `profiles.mfa_enabled` is NOT a substitute: the client writes it
   // after enrolling, so a client that skips that call leaves it false, and a
   // stale `false` is exactly the direction that reopens the bypass.
-  const { data: userData, error: userError } = await input.serviceClient.auth.getUser(
-    input.accessToken,
+  const userResult = startEarly(() => input.serviceClient.auth.getUser(input.accessToken));
+  const platformRoleResult = startEarly(() =>
+    input.fetchPlatformRole(input.serviceClient, verified.userId),
   );
+  const membershipRowsResult = startEarly(() =>
+    input.fetchMemberships(input.serviceClient, verified.userId),
+  );
+  const orgReads = currentOrgId
+    ? {
+        orgRow: startEarly(() => input.fetchOrganization(input.serviceClient, currentOrgId)),
+        billingPolicy: startEarly(async () => input.loadPlatformBillingPolicy?.()),
+        setupComplete: startEarly(() =>
+          isMobileOrgSetupComplete(input.serviceClient, currentOrgId),
+        ),
+        employee: startEarly(() =>
+          input.serviceClient
+            .from("employees")
+            .select("status")
+            .eq("user_id", verified.userId)
+            .eq("org_id", currentOrgId)
+            .maybeSingle(),
+        ),
+      }
+    : null;
 
-  if (userError || !userData.user) {
+  if (await revoked) {
+    throw new MobileApiRequestError(401, "Invalid session");
+  }
+
+  const { data: userData, error: userError } = await userResult;
+
+  // The reads above were keyed on the verified token's subject; Auth must agree.
+  if (userError || !userData.user || userData.user.id !== verified.userId) {
     throw new MobileApiRequestError(401, "Invalid session");
   }
 
@@ -424,27 +475,17 @@ export async function resolveMobileAuthContext<
     throw new MobileApiRequestError(401, "Two-factor authentication required");
   }
 
-  const platformRole = (await input.fetchPlatformRole(input.serviceClient, user.id)) ?? "none";
+  const platformRole = (await platformRoleResult) ?? "none";
   if (platformRole === "gridmaster") {
     throw new MobileApiRequestError(403, "Gridmaster mobile access is not supported");
   }
 
-  const membershipRows = await input.fetchMemberships(input.serviceClient, user.id);
+  const membershipRows = await membershipRowsResult;
   if (membershipRows.length === 0) {
     throw new MobileApiRequestError(403, "No active organization membership found");
   }
 
-  // The claim, or nothing. This used to fall back to `membershipRows[0]`, and
-  // that query has no ORDER BY — so a token whose org claim the access-token
-  // hook had stripped (its org archived or suspended, its membership revoked)
-  // silently adopted an arbitrary one of the user's other organizations and
-  // built the whole PermissionContext for it, which meant writes landed there
-  // too. Refusing is the only safe reading of "this token names no org": the
-  // client's answer is to switch deliberately, which re-mints the claim.
-  const currentOrgId =
-    typeof claims.org_id === "string" && claims.org_id.length > 0 ? claims.org_id : null;
-
-  if (!currentOrgId) {
+  if (!currentOrgId || !orgReads) {
     throw new MobileApiRequestError(
       403,
       "Your session is not tied to an organization. Sign in again to pick one.",
@@ -458,7 +499,7 @@ export async function resolveMobileAuthContext<
     throw new MobileApiRequestError(403, "Organization context does not match this user");
   }
 
-  const currentOrgRow = await input.fetchOrganization(input.serviceClient, currentOrgId);
+  const currentOrgRow = await orgReads.orgRow;
   if (!currentOrgRow) {
     throw new MobileApiRequestError(404, "Organization not found");
   }
@@ -477,7 +518,7 @@ export async function resolveMobileAuthContext<
       billingPausedAt: currentOrg.billingPausedAt,
       paymentGraceStartedAt: currentOrg.paymentGraceStartedAt,
     },
-    await input.loadPlatformBillingPolicy?.(),
+    await orgReads.billingPolicy,
     currentOrg.billingPolicyOverrides,
   );
 
@@ -485,7 +526,7 @@ export async function resolveMobileAuthContext<
     throw new MobileApiRequestError(403, getLockedOrgMessage(orgRole, billingAccess));
   }
 
-  const setupComplete = await isMobileOrgSetupComplete(input.serviceClient, currentOrgId);
+  const setupComplete = await orgReads.setupComplete;
   if (!setupComplete) {
     throw new MobileApiRequestError(403, getIncompleteSetupMessage(orgRole));
   }
@@ -493,12 +534,7 @@ export async function resolveMobileAuthContext<
   // Inactive employees keep their session but lose every manage capability —
   // mirror the web behavior. Gridmaster mobile login is blocked earlier, so the
   // only callers with no employees row are unlinked super_admins (kept as-is).
-  const { data: employeeRow } = await input.serviceClient
-    .from("employees")
-    .select("status")
-    .eq("user_id", user.id)
-    .eq("org_id", currentOrgId)
-    .maybeSingle();
+  const { data: employeeRow } = await orgReads.employee;
   const isInactive = (employeeRow?.status as string | null) === "inactive";
 
   return {
@@ -532,11 +568,17 @@ export async function loginMobileUser(
   input: MobileAuthLoginBody,
   deps: { loadPlatformBillingPolicy?: () => Promise<BillingPolicy> } = {},
 ): Promise<MobileAuthLoginResponse> {
+  // Started first and awaited where it was always used, so a refusal before
+  // then still answers first.
+  const billingPolicy = startEarly(async () => deps.loadPlatformBillingPolicy?.());
   const organization = await requireMobileOrganization(serviceClient, input.orgSlug);
   const { session, user, mfaFactor } = await signInMobileUser(sessionClient, input);
-  await assertMobileProfileSupported(serviceClient, user.id);
 
-  const memberships = await loadMobileMemberships(sessionClient);
+  // Both run on the new session, awaited in the order they always refused in.
+  const profileCheck = startEarly(() => assertMobileProfileSupported(serviceClient, user.id));
+  const membershipsResult = startEarly(() => loadMobileMemberships(sessionClient));
+  await profileCheck;
+  const memberships = await membershipsResult;
   const targetMembership = memberships.find(
     (membership) => membership.org_slug === organization.slug,
   );
@@ -553,7 +595,7 @@ export async function loginMobileUser(
       billingPausedAt: organization.billingPausedAt,
       paymentGraceStartedAt: organization.paymentGraceStartedAt,
     },
-    await deps.loadPlatformBillingPolicy?.(),
+    await billingPolicy,
     organization.billingPolicyOverrides,
   );
 

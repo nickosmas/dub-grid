@@ -161,7 +161,10 @@ export default function PrivacyPolicyPage() {
             <li style={{ marginBottom: "8px" }}>
               <strong>Technical and usage data.</strong> Our infrastructure (including
               authentication and database hosting) may log technical data such as IP address,
-              browser type, and request metadata to operate and secure the Service.
+              browser type, and request metadata to operate and secure the Service. When you sign in
+              to the DubGrid mobile app, we also record your device model, the app version, and an
+              identifier the app creates for that device, so you can see and sign out your signed-in
+              devices.
             </li>
             <li style={{ marginBottom: "8px" }}>
               <strong>Analytics data (with consent).</strong> If you accept analytics cookies, we
@@ -338,11 +341,11 @@ export default function PrivacyPolicyPage() {
               marginTop: "12px",
             }}
           >
-            You can request a copy of your personal data (data export) or its deletion at any time.
-            Account deletion removes your profile, memberships, sessions, preferences, and consent
-            records. It either deletes or anonymizes the personal data associated with your account,
-            subject to records we must keep by law. See Your California Privacy Rights below for how
-            to make a request.
+            You can request a copy of your personal data or its deletion at any time. For a copy,
+            email support@dubgrid.com and we will send it to you. Account deletion removes your
+            profile, memberships, sessions, preferences, and consent records. It either deletes or
+            anonymizes the personal data associated with your account, subject to records we must
+            keep by law. See Your California Privacy Rights below for how to make a request.
           </p>
         </section>
 
@@ -463,8 +466,9 @@ export default function PrivacyPolicyPage() {
               color: "var(--dg-color-text-secondary)",
             }}
           >
-            You can update profile details directly in the Service, and request a data export or
-            account deletion from your profile settings. To make any other request, email us at{" "}
+            You can update profile details directly in the Service, and request account deletion
+            from your profile settings. To request a copy of your data, or to make any other
+            request, email us at{" "}
             <a
               href="mailto:support@dubgrid.com"
               style={{ color: "var(--dg-color-brand)", textDecoration: "underline" }}

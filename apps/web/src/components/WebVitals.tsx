@@ -1,10 +1,12 @@
 "use client";
 
 import { useReportWebVitals } from "next/web-vitals";
-import { clientEnv } from "@/lib/env";
 
+// Read directly rather than through clientEnv, whose Zod schema would ship to
+// every page this is mounted on, the landing page included.
 const PERF_TIMING =
-  clientEnv?.NEXT_PUBLIC_PERF_TIMING === "1" || process.env.NODE_ENV === "development";
+  // eslint-disable-next-line no-restricted-syntax -- see above
+  process.env.NEXT_PUBLIC_PERF_TIMING === "1" || process.env.NODE_ENV === "development";
 
 /**
  * Perf-baseline Web Vitals capture (LCP / INP / TTFB / CLS / FCP).

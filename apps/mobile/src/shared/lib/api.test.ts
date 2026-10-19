@@ -2,10 +2,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const createEphemeralSupabaseClient = vi.hoisted(() => vi.fn());
 const handleRejectedMobileToken = vi.hoisted(() => vi.fn());
+const getSession = vi.hoisted(() => vi.fn());
 
 vi.mock("./supabase", () => ({
   createEphemeralSupabaseClient,
+  getSupabaseClient: () => ({ auth: { getSession } }),
 }));
+
+function encodeSegment(value: object): string {
+  return btoa(JSON.stringify(value)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function tokenWithClaims(claims: object): string {
+  return [encodeSegment({ alg: "HS256", typ: "JWT" }), encodeSegment(claims), "sig"].join(".");
+}
 vi.mock("./auth-reset", () => ({ handleRejectedMobileToken }));
 
 describe("mobileApiRequest", () => {
@@ -41,6 +51,47 @@ describe("mobileApiRequest", () => {
 
     await expect(registerPushToken("token-123", device)).rejects.toBeDefined();
     expect(handleRejectedMobileToken).toHaveBeenCalledWith("token-123");
+  });
+
+  describe("an expired bearer", () => {
+    const nowSeconds = () => Math.floor(Date.now() / 1000);
+    const expired = () =>
+      tokenWithClaims({ sub: "user-1", org_id: "org-1", exp: nowSeconds() - 5 });
+
+    async function sentBearer(token: string): Promise<string | null> {
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
+      vi.stubGlobal("fetch", fetchMock);
+      const { mobileApiRequest } = await import("./api");
+      await mobileApiRequest("/api/mobile/v1/ping", token, { method: "GET" }, (value) => value);
+      const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+      return new Headers(request.headers).get("Authorization");
+    }
+
+    beforeEach(() => {
+      getSession.mockReset();
+    });
+
+    it("is replaced by the live token of the same person and organization", async () => {
+      const live = tokenWithClaims({ sub: "user-1", org_id: "org-1", exp: nowSeconds() + 3600 });
+      getSession.mockResolvedValue({ data: { session: { access_token: live } }, error: null });
+
+      await expect(sentBearer(expired())).resolves.toBe(`Bearer ${live}`);
+    });
+
+    it("is kept when the live session belongs to another organization", async () => {
+      const token = expired();
+      const other = tokenWithClaims({ sub: "user-1", org_id: "org-2", exp: nowSeconds() + 3600 });
+      getSession.mockResolvedValue({ data: { session: { access_token: other } }, error: null });
+
+      await expect(sentBearer(token)).resolves.toBe(`Bearer ${token}`);
+    });
+
+    it("leaves a token that is still valid alone", async () => {
+      const token = tokenWithClaims({ sub: "user-1", org_id: "org-1", exp: nowSeconds() + 3600 });
+
+      await expect(sentBearer(token)).resolves.toBe(`Bearer ${token}`);
+      expect(getSession).not.toHaveBeenCalled();
+    });
   });
 
   it("adds bearer auth and parses a successful payload", async () => {

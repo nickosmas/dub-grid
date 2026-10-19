@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requireAuthenticatedUserWithClaims = vi.fn();
@@ -25,6 +25,10 @@ vi.mock("@/lib/cache", () => ({
 
 vi.mock("@/lib/with-timeout", () => ({
   withTimeoutOrThrow: (...args: unknown[]) => withTimeoutOrThrow(...args),
+}));
+
+vi.mock("@/lib/supabase-service", () => ({
+  getServiceClient: () => ({ from: (table: string) => serviceFrom(table) }),
 }));
 
 vi.mock("@/lib/logger", () => ({
@@ -72,6 +76,7 @@ describe("GET /api/organization/bootstrap", () => {
       permissions: { isSuperAdmin: false },
       serviceClient: { from: (table: string) => serviceFrom(table) },
       userClient: {},
+      orgId: ORG_ID,
     });
     queryCalls.length = 0;
     serviceFrom.mockImplementation((table: string) => hangingQuery(table));
@@ -160,5 +165,54 @@ describe("GET /api/organization/bootstrap", () => {
       expect.objectContaining({ orgId: ORG_ID, userId: USER_ID }),
       "organization bootstrap GET failed",
     );
+  });
+
+  it("loads the organization while its permission check is still running", async () => {
+    requireOrgPermissions.mockReturnValue(new Promise(() => {}));
+
+    void GET(
+      new NextRequest("http://acme.localhost/api/organization/bootstrap", {
+        headers: { host: "acme.localhost" },
+      }),
+    );
+
+    await vi.waitFor(() => expect(serviceFrom).toHaveBeenCalledWith("organizations"));
+    expect(queryCalls).toContainEqual({
+      table: "organizations",
+      method: "eq",
+      args: ["id", ORG_ID],
+    });
+  });
+
+  it("answers a refusal without reading what loaded alongside it", async () => {
+    const refusal = NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    requireOrgPermissions.mockResolvedValueOnce({ response: refusal });
+
+    const response = await GET(
+      new NextRequest("http://acme.localhost/api/organization/bootstrap", {
+        headers: { host: "acme.localhost" },
+      }),
+    );
+
+    expect(response).toBe(refusal);
+  });
+
+  it("waits for authorization before loading an organization named only by the host", async () => {
+    requireAuthenticatedUserWithClaims.mockResolvedValue({ user: { id: USER_ID }, claims: {} });
+    serviceFrom.mockImplementationOnce(() => ({
+      select: () => ({
+        eq: () => ({ maybeSingle: async () => ({ data: { id: ORG_ID }, error: null }) }),
+      }),
+    }));
+    requireOrgPermissions.mockReturnValue(new Promise(() => {}));
+
+    void GET(
+      new NextRequest("http://acme.localhost/api/organization/bootstrap", {
+        headers: { host: "acme.localhost" },
+      }),
+    );
+
+    await vi.waitFor(() => expect(requireOrgPermissions).toHaveBeenCalledOnce());
+    expect(serviceFrom).toHaveBeenCalledOnce();
   });
 });

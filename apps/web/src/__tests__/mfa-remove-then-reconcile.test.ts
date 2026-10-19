@@ -17,6 +17,16 @@ const identity = () => ({
   session: { access_token: "session-token" },
 });
 
+// Runs each after() task at once, so its writes can be asserted on return.
+const after = vi.hoisted(() =>
+  vi.fn((task: () => unknown) => {
+    void task();
+  }),
+);
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (task: () => unknown) => after(task),
+}));
 vi.mock("@/lib/api-auth", () => ({
   requireLiveAuthenticatedSession: async () => identity(),
   requireSensitiveActionAuth: async () => identity(),

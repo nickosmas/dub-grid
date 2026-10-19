@@ -13,6 +13,16 @@ const providerSignOut = vi.fn();
 const createTokenScopedClient = vi.fn();
 const revokeOtherUserSessions = vi.fn();
 
+// Runs each after() task at once, so its writes can be asserted on return.
+const after = vi.hoisted(() =>
+  vi.fn((task: () => unknown) => {
+    void task();
+  }),
+);
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (task: () => unknown) => after(task),
+}));
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (request: NextRequest) => validateCsrfOrigin(request),
 }));
@@ -111,6 +121,8 @@ describe("POST /api/auth/sign-out", () => {
     // Still the ordinary sensitive-action gate, not the recovery exception.
     expect(requireSensitiveActionAuth).toHaveBeenCalledOnce();
     expect(requireLiveAuthenticatedSession).not.toHaveBeenCalled();
+    // Recorded after the response, once the sessions have ended.
+    expect(after).toHaveBeenCalledOnce();
     expect(writeSecurityAuditEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         event: "security.auth.session",

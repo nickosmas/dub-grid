@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import PrintScheduleView from "@/components/PrintScheduleView";
+import { buildPrintDocument, collectFontFaceCss } from "@/components/print-document";
 import type { ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
 import { formatDateKey } from "@/lib/utils";
 import type {
@@ -47,6 +48,19 @@ const vacation: AbsenceType = {
   border: "#D97706",
   text: "#92400E",
   sortOrder: 1,
+};
+
+const nightSouth: AssignmentDefinition = {
+  id: 2,
+  orgId: "org-1",
+  label: "N",
+  name: "Night Shift",
+  color: "#EDE4FF",
+  border: "#3D1F7A",
+  text: "#3D1F7A",
+  categoryId: 1,
+  focusAreaId: 2,
+  sortOrder: 2,
 };
 
 const employees: Employee[] = [
@@ -157,5 +171,123 @@ describe("PrintScheduleView", () => {
       expect(markup).not.toContain("var(--");
       expect(markup).toContain('aria-label="Schedule note"');
     });
+  });
+
+  it("keys shift codes but prints no shift key for full shift names", () => {
+    const { container, unmount } = renderPrintView();
+    expect(container.textContent).toContain("Shift Key");
+    unmount();
+
+    const named = render(
+      <PrintScheduleView
+        weekStart={new Date(2024, 0, 7)}
+        config={{ fontSize: 12, selectedFocusAreas: ["North"], spanWeeks: 1 }}
+        employees={employees}
+        allEmployees={employees}
+        focusAreas={focusAreas}
+        assignments={assignments}
+        shiftCategories={shiftCategories}
+        jobs={[]}
+        certifications={[]}
+        orgRoles={[]}
+        shiftForKey={() => vacation.label}
+        assignmentIdsForKey={() => []}
+        absenceTypeIdForKey={() => vacation.id}
+        absenceTypeMap={new Map([[vacation.id, vacation]])}
+        getShiftStyle={() => assignments[0]}
+        onClose={() => {}}
+        shiftDisplayMode="name"
+        noteMarksForKey={() => [{ indicatorTypeId: 80, state: "published" }]}
+        indicatorTypes={indicatorTypes}
+      />,
+    );
+    expect(named.container.textContent).not.toContain("Shift Key");
+    expect(named.container.querySelector("[data-print-indicator-legend]")).not.toBeNull();
+  });
+
+  // A double shift whose second half is in another focus area.
+  describe("shift pills", () => {
+    function renderCrossFocusDouble() {
+      return render(
+        <PrintScheduleView
+          weekStart={new Date(2024, 0, 7)}
+          config={{ fontSize: 11, selectedFocusAreas: ["North"], spanWeeks: 1 }}
+          employees={employees}
+          allEmployees={employees}
+          focusAreas={[
+            ...focusAreas,
+            { id: 2, orgId: "org-1", departmentId: 1, name: "South Memory Care", sortOrder: 2 },
+          ]}
+          assignments={[assignments[0], nightSouth]}
+          shiftCategories={shiftCategories}
+          jobs={[]}
+          certifications={[]}
+          orgRoles={[]}
+          shiftForKey={() => "D/N"}
+          assignmentIdsForKey={() => [1, 2]}
+          getShiftStyle={(label) => (label === "N" ? nightSouth : assignments[0])}
+          onClose={() => {}}
+        />,
+      );
+    }
+
+    it("rounds every pill with literal radii, since the print window has no app CSS", () => {
+      const { container } = renderCrossFocusDouble();
+
+      const pills = Array.from(container.querySelectorAll<HTMLElement>("[data-print-pill]"));
+      expect(pills).toHaveLength(14);
+      for (const pill of pills) {
+        expect(pill.style.borderRadius).toBe("0.3em");
+        expect(pill.outerHTML).not.toContain("var(--");
+      }
+    });
+
+    it("gives the other focus area's initials their own part of the pill, never over the label", () => {
+      const { container } = renderCrossFocusDouble();
+
+      const wing = container.querySelector<HTMLElement>("[data-print-pill-wing]");
+      expect(wing?.textContent).toBe("SMC");
+      expect(wing?.style.position).toBe("");
+      expect(wing?.style.flex).toBe("0 0 auto");
+      expect(wing?.parentElement?.style.display).toBe("flex");
+      expect(wing?.nextElementSibling?.textContent).not.toBe("");
+    });
+  });
+});
+
+describe("print document", () => {
+  it("carries the app's font faces into the print window", () => {
+    // jsdom drops a font face's src, so the sheets are stubbed as a browser reports them.
+    const source = {
+      styleSheets: [
+        {
+          cssRules: [
+            { cssText: "@font-face { font-family: Inter; src: url(/fonts/inter.woff2); }" },
+            { cssText: "body { color: red; }" },
+          ],
+        },
+        {
+          get cssRules(): never {
+            throw new DOMException("cross-origin", "SecurityError");
+          },
+        },
+      ],
+    } as unknown as Document;
+
+    const fontFaceCss = collectFontFaceCss(source);
+
+    expect(fontFaceCss).toBe("@font-face { font-family: Inter; src: url(/fonts/inter.woff2); }");
+  });
+
+  it("escapes the title and keeps the schedule's own markup", () => {
+    const html = buildPrintDocument({
+      title: "Schedule: <1/7>",
+      fontFaceCss: "@font-face { font-family: Inter; }",
+      bodyHtml: '<div class="print-schedule-content">grid</div>',
+    });
+
+    expect(html).toContain("<title>Schedule: &lt;1/7&gt;</title>");
+    expect(html).toContain("@font-face { font-family: Inter; }");
+    expect(html).toContain('<div class="print-schedule-content">grid</div>');
   });
 });

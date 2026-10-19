@@ -142,7 +142,7 @@ export function ConsentGate({ children }: PropsWithChildren) {
         visible={needsDecision === true}
       >
         <SheetCopy
-          body="We use essential data to keep the app working, including error monitoring. With your consent we also collect analytics to help us improve the app. You can change this any time in Profile, Privacy & data."
+          body="DubGrid uses only the data it needs to run the app. You can also choose whether we may use analytics to improve it. You can change this any time in Profile, Privacy & data."
           error={error}
           linkLabel="Read our cookie policy"
           // In-app: leaving for Safari mid-decision would drop the user out of

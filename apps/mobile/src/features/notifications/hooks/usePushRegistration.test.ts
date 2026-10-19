@@ -41,6 +41,12 @@ vi.mock("expo-notifications", () => ({
 const registerPushToken = vi.fn();
 const loadStoredPushDevice = vi.fn();
 const saveStoredPushDevice = vi.fn();
+let storedRegistration: { key: string; registeredAt: number } | null = null;
+const saveStoredPushRegistration = vi.fn(
+  async (value: { key: string; registeredAt: number } | null) => {
+    storedRegistration = value;
+  },
+);
 
 vi.mock("../../../shared/lib/api", () => ({
   registerPushToken: (...a: unknown[]) => registerPushToken(...a),
@@ -49,9 +55,20 @@ vi.mock("../../../shared/lib/api", () => ({
 vi.mock("../../../shared/lib/session", () => ({
   loadStoredPushDevice: (...a: unknown[]) => loadStoredPushDevice(...a),
   saveStoredPushDevice: (...a: unknown[]) => saveStoredPushDevice(...a),
+  loadStoredPushRegistration: async () => storedRegistration,
+  saveStoredPushRegistration: (value: { key: string; registeredAt: number } | null) =>
+    saveStoredPushRegistration(value),
 }));
 
-import { usePushRegistration } from "./usePushRegistration";
+import {
+  PUSH_REGISTRATION_REFRESH_MS,
+  isPushRegistrationCurrent,
+  usePushRegistration,
+} from "./usePushRegistration";
+
+function tokenFor(userId: string, version = "v1") {
+  return `header.${btoa(JSON.stringify({ sub: userId, org_id: "org-1" }))}.${version}`;
+}
 
 const GRANTED = { granted: true, canAskAgain: false };
 const UNDETERMINED = { granted: false, canAskAgain: true };
@@ -60,6 +77,7 @@ const DENIED = { granted: false, canAskAgain: false };
 describe("usePushRegistration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    storedRegistration = null;
     addEventListener.mockReturnValue({ remove: vi.fn() });
     getPermissionsAsync.mockResolvedValue(GRANTED);
     requestPermissionsAsync.mockResolvedValue(GRANTED);
@@ -195,10 +213,28 @@ describe("usePushRegistration", () => {
     });
   });
 
-  it("keeps the registration fresh when the app returns to the foreground", async () => {
+  it("does not register again on a foreground within a day of the last one", async () => {
     renderHook(() => usePushRegistration("token-123", "org-1"));
 
     await waitFor(() => expect(registerPushToken).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(storedRegistration).not.toBeNull());
+
+    const handler = addEventListener.mock.calls.at(-1)?.[1] as (s: string) => void;
+    await act(async () => {
+      handler("active");
+    });
+
+    await waitFor(() => expect(getPermissionsAsync).toHaveBeenCalledTimes(2));
+    expect(registerPushToken).toHaveBeenCalledTimes(1);
+  });
+
+  it("renews the registration on a foreground once a day has passed", async () => {
+    renderHook(() => usePushRegistration("token-123", "org-1"));
+    await waitFor(() => expect(storedRegistration).not.toBeNull());
+    storedRegistration = {
+      key: storedRegistration!.key,
+      registeredAt: Date.now() - PUSH_REGISTRATION_REFRESH_MS,
+    };
 
     const handler = addEventListener.mock.calls.at(-1)?.[1] as (s: string) => void;
     await act(async () => {
@@ -206,6 +242,33 @@ describe("usePushRegistration", () => {
     });
 
     await waitFor(() => expect(registerPushToken).toHaveBeenCalledTimes(2));
+  });
+
+  it("registers again for another person on the same device and organization", async () => {
+    const { rerender } = renderHook(
+      ({ token }: { token: string }) => usePushRegistration(token, "org-1"),
+      { initialProps: { token: tokenFor("user-1") } },
+    );
+    await waitFor(() => expect(registerPushToken).toHaveBeenCalledTimes(1));
+
+    rerender({ token: tokenFor("user-1", "refreshed") });
+    rerender({ token: tokenFor("user-2") });
+
+    await waitFor(() => expect(registerPushToken).toHaveBeenCalledTimes(2));
+    expect(registerPushToken.mock.calls[1]?.[0]).toBe(tokenFor("user-2"));
+  });
+
+  it("forgets the registration when push is turned off", async () => {
+    storedRegistration = { key: "k", registeredAt: Date.now() };
+    const { result } = renderHook(() =>
+      usePushRegistration("token-123", "org-1", { autoRegister: false }),
+    );
+
+    await act(async () => {
+      await result.current.disablePush();
+    });
+
+    expect(storedRegistration).toBeNull();
   });
 
   it("surfaces a registration failure instead of throwing", async () => {
@@ -217,5 +280,28 @@ describe("usePushRegistration", () => {
       expect(result.current.error).toBeInstanceOf(Error);
     });
     expect(result.current.isRegistering).toBe(false);
+  });
+});
+
+describe("isPushRegistrationCurrent", () => {
+  const now = 1_800_000_000_000;
+
+  it("holds for the same key within a day", () => {
+    expect(isPushRegistrationCurrent({ key: "k", registeredAt: now - 1_000 }, "k", now)).toBe(true);
+  });
+
+  it("lapses for another key, after a day, or for a clock that went backwards", () => {
+    expect(isPushRegistrationCurrent({ key: "k", registeredAt: now }, "other", now)).toBe(false);
+    expect(
+      isPushRegistrationCurrent(
+        { key: "k", registeredAt: now - PUSH_REGISTRATION_REFRESH_MS },
+        "k",
+        now,
+      ),
+    ).toBe(false);
+    expect(isPushRegistrationCurrent({ key: "k", registeredAt: now + 1_000 }, "k", now)).toBe(
+      false,
+    );
+    expect(isPushRegistrationCurrent(null, "k", now)).toBe(false);
   });
 });

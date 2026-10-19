@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { QueryClient } from "@tanstack/react-query";
 import { subscribeOrgScopedRealtime } from "@dubgrid/realtime-core";
 import {
@@ -6,6 +6,7 @@ import {
   invalidateMobileRealtimeQueriesForTables,
   type MobileRealtimeTable,
 } from "../lib/mobile-realtime-invalidation";
+import { getUserIdFromAccessToken } from "../lib/access-token";
 import { getSupabaseClient } from "../lib/supabase";
 
 const ORG_FILTER_TABLES: MobileRealtimeTable[] = [
@@ -43,8 +44,19 @@ export function useMobileRealtimeInvalidation({
   orgId: string | null;
   queryClient: QueryClient;
 }) {
+  // Read when an event lands, not a dependency: supabase-js hands each
+  // refreshed token to the realtime socket itself, and rejoining the channel
+  // on every refresh dropped the events sent while it was down.
+  const accessTokenRef = useRef(accessToken);
   useEffect(() => {
-    if (!accessToken || !orgId) return;
+    accessTokenRef.current = accessToken;
+  }, [accessToken]);
+  const userId = getUserIdFromAccessToken(accessToken);
+  const hasToken = accessToken !== null;
+
+  // Rejoined for another person or organization, never for a refreshed token.
+  useEffect(() => {
+    if (!hasToken || !orgId) return;
 
     const supabase = getSupabaseClient();
     if (
@@ -65,15 +77,19 @@ export function useMobileRealtimeInvalidation({
       debounceMs: 150,
       channelNamePrefix: `mobile-freshness:${orgId}`,
       onFlush: (tables) => {
+        const token = accessTokenRef.current;
+        if (!token) return;
         for (const table of tables) {
-          invalidateMobileRealtimeQueries(queryClient, accessToken, table);
+          invalidateMobileRealtimeQueries(queryClient, token, table);
         }
       },
       // Events missed while the channel was down could be on any table it
       // watches, so the catch-up refreshes every family those tables feed
       // (bootstrap included, through the organizations row).
       onReconnectAfterError: () => {
-        invalidateMobileRealtimeQueriesForTables(queryClient, accessToken, [
+        const token = accessTokenRef.current;
+        if (!token) return;
+        invalidateMobileRealtimeQueriesForTables(queryClient, token, [
           "organizations",
           ...ORG_FILTER_TABLES,
         ]);
@@ -82,5 +98,5 @@ export function useMobileRealtimeInvalidation({
         console.error("Mobile realtime freshness channel error", error);
       },
     });
-  }, [accessToken, orgId, queryClient]);
+  }, [hasToken, orgId, queryClient, userId]);
 }
