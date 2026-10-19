@@ -110,10 +110,11 @@ import {
   LOCK_CORNER_CLEARANCE,
   RequestCornerFold,
   noteMarksWidth,
+  NOTE_LANE_INSET,
   AuthorBadge,
   type GridDiffBadgeConfig,
 } from "./schedule-grid/badges";
-import { NoteDots, type ScheduleNoteMark } from "./schedule-grid/noteDots";
+import { NoteDots, NoteDotsLine, type ScheduleNoteMark } from "./schedule-grid/noteDots";
 import {
   initialGridMount,
   nextGridMount,
@@ -2803,6 +2804,24 @@ const SectionBlock = memo(function SectionBlock({
                                     const singleDisplayLabel = displayParts.primaryLabel;
                                     const singleIsMentored =
                                       !isAbsence && (cellSegments[0]?.isMentored ?? false);
+                                    // A one-line pill keeps a strip along its bottom for its
+                                    // notes. A second line of text leaves no strip to spare,
+                                    // so that line ends with the dots instead.
+                                    const singleHasNotes = noteMarks.length > 0;
+                                    const singleNotesEndLine =
+                                      !!customTimes ||
+                                      (showSingleSecondaryLine && !singleInlinesSecondary);
+                                    const singleLineDots =
+                                      singleHasNotes && singleNotesEndLine ? (
+                                        <NoteDots
+                                          marks={noteMarks}
+                                          indicatorTypes={indicatorTypes}
+                                          rimColor={singleForegroundColor}
+                                          isDark={isDarkTheme}
+                                          placement="line"
+                                        />
+                                      ) : null;
+                                    const singleTimeMarginTop = singleIsThreeRow ? 2 : 4;
                                     return (
                                       <>
                                         {isBulkSelected && (
@@ -2933,7 +2952,6 @@ const SectionBlock = memo(function SectionBlock({
                                             {singleIsMentored && (
                                               <MentoredShiftBadge
                                                 rightInset={cornerLockClearance || undefined}
-                                                topInset={singlePillBadge ? 19 : undefined}
                                               />
                                             )}
                                             <div
@@ -2972,9 +2990,12 @@ const SectionBlock = memo(function SectionBlock({
                                                         overflowWrap: "break-word" as const,
                                                         display: "-webkit-box",
                                                         WebkitBoxOrient: "vertical" as const,
-                                                        WebkitLineClamp: showSingleSecondaryLine
-                                                          ? 1
-                                                          : customTimes
+                                                        // Notes take the strip a second
+                                                        // line would have used.
+                                                        WebkitLineClamp:
+                                                          showSingleSecondaryLine ||
+                                                          customTimes ||
+                                                          singleHasNotes
                                                             ? 1
                                                             : 2,
                                                         overflow: "hidden",
@@ -3020,69 +3041,83 @@ const SectionBlock = memo(function SectionBlock({
                                                 </span>
                                               )}
                                               {showSingleSecondaryLine ? (
+                                                <NoteDotsLine
+                                                  dots={
+                                                    !customTimes && !singleInlinesSecondary
+                                                      ? singleLineDots
+                                                      : null
+                                                  }
+                                                >
+                                                  <span
+                                                    style={{
+                                                      fontSize: singleIsThreeRow
+                                                        ? "var(--dg-fs-micro)"
+                                                        : "var(--dg-fs-footnote)",
+                                                      fontWeight: 700,
+                                                      lineHeight: singleIsThreeRow ? 1.2 : 1.3,
+                                                      opacity: 0.78,
+                                                      whiteSpace: "nowrap",
+                                                      overflow: "hidden",
+                                                      textOverflow: "ellipsis",
+                                                      maxWidth: "100%",
+                                                      minWidth: 0,
+                                                    }}
+                                                  >
+                                                    {displayParts.secondaryLabel}
+                                                  </span>
+                                                </NoteDotsLine>
+                                              ) : null}
+                                            </div>
+                                            {customTimes && (
+                                              <NoteDotsLine
+                                                dots={singleLineDots}
+                                                style={{ marginTop: singleTimeMarginTop }}
+                                              >
                                                 <span
                                                   style={{
                                                     fontSize: singleIsThreeRow
                                                       ? "var(--dg-fs-micro)"
                                                       : "var(--dg-fs-footnote)",
-                                                    fontWeight: 700,
-                                                    lineHeight: singleIsThreeRow ? 1.2 : 1.3,
-                                                    opacity: 0.78,
-                                                    whiteSpace: "nowrap",
-                                                    overflow: "hidden",
-                                                    textOverflow: "ellipsis",
-                                                    maxWidth: "100%",
-                                                    minWidth: 0,
+                                                    fontWeight: 500,
+                                                    lineHeight: 1,
+                                                    marginTop: singleLineDots
+                                                      ? 0
+                                                      : singleTimeMarginTop,
+                                                    opacity: 0.7,
+                                                    letterSpacing: "0.02em",
                                                   }}
                                                 >
-                                                  {displayParts.secondaryLabel}
+                                                  {fmt12hShort(customTimes.start)}–
+                                                  {fmt12hShort(customTimes.end)}
+                                                  {isOvernight && (
+                                                    <sup
+                                                      style={{
+                                                        fontSize: "0.7em",
+                                                        fontWeight: 700,
+                                                        marginLeft: 1,
+                                                        opacity: 1,
+                                                      }}
+                                                    >
+                                                      +1
+                                                    </sup>
+                                                  )}
                                                 </span>
-                                              ) : null}
-                                            </div>
-                                            {customTimes && (
-                                              <span
-                                                style={{
-                                                  fontSize: singleIsThreeRow
-                                                    ? "var(--dg-fs-micro)"
-                                                    : "var(--dg-fs-footnote)",
-                                                  fontWeight: 500,
-                                                  lineHeight: 1,
-                                                  marginTop: singleIsThreeRow ? 2 : 4,
-                                                  opacity: 0.7,
-                                                  letterSpacing: "0.02em",
-                                                }}
-                                              >
-                                                {fmt12hShort(customTimes.start)}–
-                                                {fmt12hShort(customTimes.end)}
-                                                {isOvernight && (
-                                                  <sup
-                                                    style={{
-                                                      fontSize: "0.7em",
-                                                      fontWeight: 700,
-                                                      marginLeft: 1,
-                                                      opacity: 1,
-                                                    }}
-                                                  >
-                                                    +1
-                                                  </sup>
-                                                )}
-                                              </span>
+                                              </NoteDotsLine>
                                             )}
-                                            <NoteDots
-                                              marks={noteMarks}
-                                              indicatorTypes={indicatorTypes}
-                                              rimColor={singleForegroundColor}
-                                              surfaceColor={
-                                                singleUsesShiftColor
-                                                  ? effectiveColor
-                                                  : "var(--dg-color-surface)"
-                                              }
-                                              isDark={isDarkTheme}
-                                              style={{
-                                                bottom: shouldShowAuthorName ? 18 : 4,
-                                                right: 5,
-                                              }}
-                                            />
+                                            {!singleNotesEndLine && (
+                                              <NoteDots
+                                                marks={noteMarks}
+                                                indicatorTypes={indicatorTypes}
+                                                rimColor={singleForegroundColor}
+                                                isDark={isDarkTheme}
+                                                // With the pill's own padding, the dots end
+                                                // NOTE_LANE_INSET inside its edge in either mode.
+                                                style={{
+                                                  paddingRight:
+                                                    NOTE_LANE_INSET - (isNameMode ? 6 : 3),
+                                                }}
+                                              />
+                                            )}
                                             {(draftBadge || publishBadge) && (
                                               <GridDiffBadge
                                                 badge={{
@@ -3100,9 +3135,15 @@ const SectionBlock = memo(function SectionBlock({
                                           <AuthorBadge
                                             name={auditName}
                                             leftInset={singleAuthorLeftInset}
+                                            // The name shares the pill's bottom row with a
+                                            // note strip, so it stops short of the dots.
                                             rightInset={
-                                              noteMarks.length > 0
-                                                ? 5 + noteMarksWidth(noteMarks.length) + 3
+                                              singleHasNotes && !singleNotesEndLine
+                                                ? singleSideInset +
+                                                  1 +
+                                                  NOTE_LANE_INSET +
+                                                  noteMarksWidth(noteMarks.length) +
+                                                  3
                                                 : 5
                                             }
                                             bottomInset={singleAuthorBottomInset}
@@ -3137,9 +3178,6 @@ const SectionBlock = memo(function SectionBlock({
                                   const multiSideInset = 3;
                                   const multiBottomInset = 3;
                                   const multiAuthorLeftInset = 4 + leadingDividerInset;
-                                  // Status chips own the top-right corner. Keep
-                                  // note dots on the bottom edge instead.
-                                  const multiNotesRightOffset = 2;
                                   // Each pill draws its own shift's notes when the
                                   // cell's segments line up with its pills.
                                   const notesPerPill =
@@ -3332,7 +3370,27 @@ const SectionBlock = memo(function SectionBlock({
                                                       jobId: pillSegment.jobId,
                                                     },
                                                   ) ?? [])
-                                                : [];
+                                                : // Segments that do not line up with the
+                                                  // pills leave the notes with the cell, so
+                                                  // the last pill carries them.
+                                                  li === labels.length - 1
+                                                  ? noteMarks
+                                                  : [];
+                                              const pillHasNotes = pillNoteMarks.length > 0;
+                                              const pillNotesEndLine =
+                                                !!hasTime ||
+                                                (showMultiSecondaryLine && !multiInlinesSecondary);
+                                              const pillLineDots =
+                                                pillHasNotes && pillNotesEndLine ? (
+                                                  <NoteDots
+                                                    marks={pillNoteMarks}
+                                                    indicatorTypes={indicatorTypes}
+                                                    rimColor={multiForegroundColor}
+                                                    isDark={isDarkTheme}
+                                                    narrow
+                                                    placement="line"
+                                                  />
+                                                ) : null;
 
                                               return (
                                                 <div
@@ -3438,7 +3496,6 @@ const SectionBlock = memo(function SectionBlock({
                                                           ? cornerLockClearance || undefined
                                                           : undefined
                                                       }
-                                                      topInset={pillBadge ? 19 : undefined}
                                                     />
                                                   )}
                                                   <div
@@ -3472,11 +3529,11 @@ const SectionBlock = memo(function SectionBlock({
                                                               display: "-webkit-box",
                                                               WebkitBoxOrient: "vertical" as const,
                                                               WebkitLineClamp:
-                                                                showMultiSecondaryLine
+                                                                showMultiSecondaryLine ||
+                                                                hasTime ||
+                                                                pillHasNotes
                                                                   ? 1
-                                                                  : hasTime
-                                                                    ? 1
-                                                                    : 2,
+                                                                  : 2,
                                                               overflow: "hidden",
                                                               lineHeight: 1.2,
                                                             }
@@ -3518,82 +3575,83 @@ const SectionBlock = memo(function SectionBlock({
                                                       </span>
                                                     )}
                                                     {showMultiSecondaryLine ? (
+                                                      <NoteDotsLine
+                                                        dots={
+                                                          !hasTime && !multiInlinesSecondary
+                                                            ? pillLineDots
+                                                            : null
+                                                        }
+                                                      >
+                                                        <span
+                                                          style={{
+                                                            fontSize: "var(--dg-fs-micro)",
+                                                            fontWeight: 700,
+                                                            opacity: 0.78,
+                                                            // A split shift is half the width but the
+                                                            // full cell height, so three rows fit on
+                                                            // the same budget as the single pill.
+                                                            lineHeight: multiIsThreeRow ? 1.2 : 1.3,
+                                                            whiteSpace: "nowrap",
+                                                            overflow: "hidden",
+                                                            textOverflow: "ellipsis",
+                                                            maxWidth: "100%",
+                                                            minWidth: 0,
+                                                          }}
+                                                        >
+                                                          {displayParts.secondaryLabel}
+                                                        </span>
+                                                      </NoteDotsLine>
+                                                    ) : null}
+                                                  </div>
+                                                  {hasTime && (
+                                                    <NoteDotsLine dots={pillLineDots}>
                                                       <span
                                                         style={{
                                                           fontSize: "var(--dg-fs-micro)",
-                                                          fontWeight: 700,
-                                                          opacity: 0.78,
-                                                          // A split shift is half the width but the
-                                                          // full cell height, so three rows fit on
-                                                          // the same budget as the single pill.
-                                                          lineHeight: multiIsThreeRow ? 1.2 : 1.3,
+                                                          fontWeight: 500,
+                                                          opacity: 0.7,
+                                                          lineHeight: 1,
                                                           whiteSpace: "nowrap",
                                                           overflow: "hidden",
                                                           textOverflow: "ellipsis",
                                                           maxWidth: "100%",
+                                                          minWidth: 0,
                                                         }}
                                                       >
-                                                        {displayParts.secondaryLabel}
+                                                        {fmt12hShort(pillTime!.start)}–
+                                                        {fmt12hShort(pillTime!.end)}
+                                                        {isPillOvernight && (
+                                                          <sup
+                                                            style={{
+                                                              fontSize: "0.65em",
+                                                              fontWeight: 700,
+                                                              marginLeft: 1,
+                                                              opacity: 1,
+                                                            }}
+                                                          >
+                                                            +1
+                                                          </sup>
+                                                        )}
                                                       </span>
-                                                    ) : null}
-                                                  </div>
-                                                  {hasTime && (
-                                                    <span
-                                                      style={{
-                                                        fontSize: "var(--dg-fs-micro)",
-                                                        fontWeight: 500,
-                                                        opacity: 0.7,
-                                                        lineHeight: 1,
-                                                        whiteSpace: "nowrap",
-                                                        overflow: "hidden",
-                                                        textOverflow: "ellipsis",
-                                                        maxWidth: "100%",
-                                                      }}
-                                                    >
-                                                      {fmt12hShort(pillTime!.start)}–
-                                                      {fmt12hShort(pillTime!.end)}
-                                                      {isPillOvernight && (
-                                                        <sup
-                                                          style={{
-                                                            fontSize: "0.65em",
-                                                            fontWeight: 700,
-                                                            marginLeft: 1,
-                                                            opacity: 1,
-                                                          }}
-                                                        >
-                                                          +1
-                                                        </sup>
-                                                      )}
-                                                    </span>
+                                                    </NoteDotsLine>
                                                   )}
-                                                  <NoteDots
-                                                    marks={pillNoteMarks}
-                                                    indicatorTypes={indicatorTypes}
-                                                    rimColor={multiForegroundColor}
-                                                    surfaceColor={
-                                                      multiUsesShiftColor
-                                                        ? effectiveColorLi
-                                                        : "var(--dg-color-surface)"
-                                                    }
-                                                    isDark={isDarkTheme}
-                                                    style={{ bottom: 2, right: 2 }}
-                                                  />
+                                                  {!pillNotesEndLine && (
+                                                    <NoteDots
+                                                      marks={pillNoteMarks}
+                                                      indicatorTypes={indicatorTypes}
+                                                      rimColor={multiForegroundColor}
+                                                      isDark={isDarkTheme}
+                                                      narrow
+                                                      style={{
+                                                        paddingRight:
+                                                          NOTE_LANE_INSET - (isNameMode ? 4 : 3),
+                                                      }}
+                                                    />
+                                                  )}
                                                 </div>
                                               );
                                             })}
                                           </div>
-                                          {!notesPerPill && (
-                                            <NoteDots
-                                              marks={noteMarks}
-                                              indicatorTypes={indicatorTypes}
-                                              isDark={isDarkTheme}
-                                              style={{
-                                                bottom: 2,
-                                                right: multiNotesRightOffset,
-                                                zIndex: 1,
-                                              }}
-                                            />
-                                          )}
                                           {(draftBadge || publishBadge) && (
                                             <GridDiffBadge
                                               badge={{
@@ -3773,7 +3831,6 @@ const SectionBlock = memo(function SectionBlock({
                                     {deletedWasMentored && (
                                       <MentoredShiftBadge
                                         rightInset={cornerLockClearance || undefined}
-                                        topInset={19}
                                       />
                                     )}
                                     <span
@@ -3785,6 +3842,19 @@ const SectionBlock = memo(function SectionBlock({
                                     >
                                       {deletedLabel}
                                     </span>
+                                    {/* Deleting the shift does not delete the
+                                        cell's notes — they outlive the draft and
+                                        come back the moment it publishes. This
+                                        branch used to drop them, so a note went
+                                        invisible for exactly as long as the
+                                        delete sat unpublished. */}
+                                    <NoteDots
+                                      marks={noteMarks}
+                                      indicatorTypes={indicatorTypes}
+                                      rimColor="var(--dg-color-danger-dark)"
+                                      isDark={isDarkTheme}
+                                      style={{ paddingRight: NOTE_LANE_INSET }}
+                                    />
                                   </div>
                                 );
                                 const deletedHoverEntries: ShiftDetailEntry[] = [
@@ -3815,23 +3885,19 @@ const SectionBlock = memo(function SectionBlock({
                                 return (
                                   <>
                                     {deletedShiftContent}
-                                    {/* Deleting the shift does not delete the
-                                        cell's notes — they outlive the draft and
-                                        come back the moment it publishes. This
-                                        branch used to drop them, so a note went
-                                        invisible for exactly as long as the
-                                        delete sat unpublished. */}
-                                    <NoteDots
-                                      marks={noteMarks}
-                                      indicatorTypes={indicatorTypes}
-                                      isDark={isDarkTheme}
-                                      style={{ top: 5, right: 5, zIndex: 7 }}
-                                    />
                                     {shouldShowAuthorName && auditName && (
                                       <AuthorBadge
                                         name={auditName}
                                         leftInset={5 + leadingDividerInset}
-                                        rightInset={5}
+                                        rightInset={
+                                          noteMarks.length > 0
+                                            ? 4 +
+                                              1 +
+                                              NOTE_LANE_INSET +
+                                              noteMarksWidth(noteMarks.length) +
+                                              3
+                                            : 5
+                                        }
                                         bottomInset={5}
                                       />
                                     )}
@@ -3857,7 +3923,8 @@ const SectionBlock = memo(function SectionBlock({
                                   marks={noteMarks}
                                   indicatorTypes={indicatorTypes}
                                   isDark={isDarkTheme}
-                                  style={{ top: 5, right: 5 }}
+                                  placement="line"
+                                  style={{ marginLeft: shiftLabel === "OFF" ? 4 : 0 }}
                                 />
                               </>
                             )}

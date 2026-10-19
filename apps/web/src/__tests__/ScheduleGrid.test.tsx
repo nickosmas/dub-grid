@@ -326,6 +326,13 @@ function getGridBody(name: string): HTMLElement {
   return body;
 }
 
+// Note dots sit in the pill's flow, so text has to make room for them.
+function expectNoteDotsInFlow(cell: HTMLElement) {
+  for (const dots of cell.querySelectorAll<HTMLElement>("[data-note-dots]")) {
+    expect(dots.style.position).toBe("");
+  }
+}
+
 function renderGrid(options: RenderGridOptions = {}) {
   const resolvedAssignmentDefinitions = options.assignments ?? assignments;
   const model = buildScheduleGridModel({
@@ -2020,8 +2027,11 @@ describe("ScheduleGrid", () => {
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
 
-    expect(firstCell.querySelector('[data-shift-pill="deleted"]')).not.toBeNull();
+    const deletedPill = firstCell.querySelector('[data-shift-pill="deleted"]') as HTMLElement;
+    expect(deletedPill).not.toBeNull();
     expect(firstCell.querySelectorAll("[data-note-mark]")).toHaveLength(1);
+    expect(deletedPill.querySelector('[data-note-dots="lane"] [data-note-mark]')).not.toBeNull();
+    expectNoteDotsInFlow(firstCell);
   });
 
   it("draws a note added but not yet published hollow in its own colour", () => {
@@ -2033,15 +2043,14 @@ describe("ScheduleGrid", () => {
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const added = firstCell.querySelector('[data-note-mark="draft_added"]') as SVGElement;
+    const added = firstCell.querySelector('[data-note-mark="draft_added"]') as HTMLElement;
 
-    expect(added?.getAttribute("aria-label")).toBe("Flag · Added, not published");
-    const body = added?.querySelector("path");
-    expect(body?.getAttribute("fill")).toBe("none");
-    expect(body?.getAttribute("stroke")).toBe("#ff0000");
+    expect(within(firstCell).getByLabelText("Flag · Added, not published")).toBeInTheDocument();
+    expect(added.style.background).toBe("transparent");
+    expect(added.style.boxShadow).toBe("inset 0 0 0 1.75px #ff0000");
   });
 
-  it("stacks several notes on a shift into one mark", () => {
+  it("draws two notes as dots and counts a third", () => {
     observedWidth = 1600;
 
     renderGrid({
@@ -2059,9 +2068,96 @@ describe("ScheduleGrid", () => {
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const marks = firstCell.querySelectorAll("[data-note-mark]");
 
-    expect(marks).toHaveLength(1);
-    expect(marks[0].getAttribute("data-note-mark")).toBe("stack");
-    expect(marks[0].getAttribute("aria-label")).toBe("3 notes: Note 1, Note 2, Note 3");
+    expect(marks).toHaveLength(2);
+    expect(firstCell.querySelector("[data-note-more]")?.textContent).toBe("+1");
+    expect(within(firstCell).getByLabelText("3 notes: Note 1, Note 2, Note 3")).toBeInTheDocument();
+    expectNoteDotsInFlow(firstCell);
+  });
+
+  it("keeps a one-line pill's notes in a strip along its bottom", () => {
+    observedWidth = 1600;
+
+    renderGrid({ noteMarksForKey: () => [{ indicatorTypeId: 1, state: "published" }] });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement;
+    const lane = pill.querySelector<HTMLElement>('[data-note-dots="lane"]');
+
+    expect(lane?.parentElement).toBe(pill);
+    expect(lane?.style.height).toBe("13px");
+    expect(lane?.style.justifyContent).toBe("flex-end");
+    expect(lane?.querySelectorAll("[data-note-mark]")).toHaveLength(1);
+    expectNoteDotsInFlow(firstCell);
+  });
+
+  it("ends a custom-time line with the notes, since it leaves no strip to spare", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      getCustomShiftTimes: () => ({ start: "08:00", end: "16:00" }),
+      noteMarksForKey: () => [{ indicatorTypeId: 1, state: "published" }],
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement;
+    const line = pill.querySelector<HTMLElement>('[data-note-dots="line"]');
+
+    expect(pill.querySelector('[data-note-dots="lane"]')).toBeNull();
+    expect(line?.parentElement?.textContent).toMatch(/–/);
+    expect(line?.parentElement?.style.display).toBe("flex");
+    expectNoteDotsInFlow(firstCell);
+  });
+
+  it("shows one dot and a count on a double shift's pill with more than two notes", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      assignments: twoPillAssignmentDefinitions,
+      indicatorTypes: [1, 2, 3].map((id) => ({
+        id,
+        orgId: "org-1",
+        name: `Note ${id}`,
+        color: "#ff0000",
+        sortOrder: id,
+      })),
+      shiftForKey: () => "D/N",
+      assignmentIdsForKey: () => [1, 2],
+      segmentsForKey: () => [
+        { shiftId: 1, jobId: 101, position: 0, isMentored: false },
+        { shiftId: 1, jobId: 102, position: 1, isMentored: false },
+      ],
+      noteMarksForKey: () =>
+        [1, 2, 3].map((indicatorTypeId) => ({ indicatorTypeId, state: "published" as const })),
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pill = firstCell.querySelectorAll('[data-shift-pill="multi"]')[0] as HTMLElement;
+
+    expect(pill.querySelectorAll("[data-note-mark]")).toHaveLength(1);
+    expect(pill.querySelector("[data-note-more]")?.textContent).toBe("+2");
+    expect(within(pill).getByLabelText("3 notes: Note 1, Note 2, Note 3")).toBeInTheDocument();
+  });
+
+  it("gives a double shift's cell notes to its last pill when segments do not line up", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      assignments: twoPillAssignmentDefinitions,
+      shiftForKey: () => "D/N",
+      assignmentIdsForKey: () => [1, 2],
+      segmentsForKey: () => [{ shiftId: 1, jobId: 101, position: 0, isMentored: false }],
+      noteMarksForKey: () => [{ indicatorTypeId: 1, state: "published" }],
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pills = Array.from(
+      firstCell.querySelectorAll('[data-shift-pill="multi"]'),
+    ) as HTMLElement[];
+
+    expect(pills).toHaveLength(2);
+    expect(pills[0].querySelector("[data-note-mark]")).toBeNull();
+    expect(pills[1].querySelectorAll("[data-note-mark]")).toHaveLength(1);
+    expectNoteDotsInFlow(firstCell);
   });
 
   it("draws each pill of a double shift with its own shift's notes, in its own focus area only", () => {
@@ -2255,6 +2351,102 @@ describe("ScheduleGrid", () => {
     expect(mentored?.style.right).toBe("0.5px");
   });
 
+  it("keeps the mentored circle at the top while a draft chip marks the pill", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      assignments: twoPillAssignmentDefinitions,
+      shiftForKey: () => "D",
+      assignmentIdsForKey: () => [1],
+      segmentsForKey: () => [{ shiftId: 1, jobId: 101, position: 0, isMentored: true }],
+      draftKindForKey: () => "modified",
+      publishedAssignmentIdsForKey: () => [2],
+      publishedLabelForKey: () => "N",
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement;
+    const mentored = pill.querySelector('[data-mentored-badge="true"]') as HTMLElement | null;
+
+    expect(pill.querySelector("[data-draft-badge]")).not.toBeNull();
+    expect(mentored?.style.top).toBe("0.5px");
+  });
+
+  it("keeps the mentored circle at the top while a publish chip marks the pill", () => {
+    observedWidth = 1600;
+    const workedState = (jobId: number) => ({
+      kind: "worked" as const,
+      segments: [{ shiftId: 1, jobId, position: 0 }],
+      absenceTypeId: null,
+      customStartTime: null,
+      customEndTime: null,
+      seriesId: null,
+      fromRecurring: false,
+    });
+
+    renderGrid({
+      showPublishDiffOverlay: true,
+      assignments: [
+        { ...assignments[0], jobId: 101 },
+        {
+          id: 2,
+          orgId: "org-1",
+          label: "N",
+          name: "Night Shift",
+          color: "#E0F2FE",
+          border: "#0284C7",
+          text: "#0C4A6E",
+          categoryId: 1,
+          focusAreaId: 1,
+          jobId: 102,
+          sortOrder: 2,
+        },
+      ],
+      segmentsForKey: () => [{ shiftId: 1, jobId: 101, position: 0, isMentored: true }],
+      publishDiffForKey: () => ({
+        empId: "emp-1",
+        date: "2024-01-07",
+        kind: "modified",
+        fromState: workedState(102),
+        toState: workedState(101),
+        publishedAt: "2024-01-07T12:00:00.000Z",
+        publishedBy: "user-1",
+      }),
+      resolvePublisherName: () => "Mina",
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement;
+    const mentored = pill.querySelector('[data-mentored-badge="true"]') as HTMLElement | null;
+
+    expect(firstCell.querySelector("[data-publish-badge]")).not.toBeNull();
+    expect(mentored?.style.top).toBe("0.5px");
+  });
+
+  it("keeps a double shift's mentored circle at the top while a draft chip marks its pill", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      assignments: twoPillAssignmentDefinitions,
+      shiftForKey: () => "D/N",
+      assignmentIdsForKey: () => [1, 2],
+      segmentsForKey: () => [
+        { shiftId: 1, jobId: 101, position: 0, isMentored: false },
+        { shiftId: 1, jobId: 102, position: 1, isMentored: true },
+      ],
+      draftKindForKey: () => "modified",
+      publishedAssignmentIdsForKey: () => [3, 4],
+      publishedLabelForKey: () => "E/S",
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const mentored = firstCell.querySelector('[data-mentored-badge="true"]') as HTMLElement | null;
+    const mentoredPill = mentored?.closest('[data-shift-pill="multi"]') as HTMLElement | null;
+
+    expect(mentoredPill?.querySelector("[data-draft-badge]")).not.toBeNull();
+    expect(mentored?.style.top).toBe("0.5px");
+  });
+
   it("keeps mentored and cross-focus context on a draft-deleted shift", () => {
     observedWidth = 1600;
 
@@ -2276,7 +2468,12 @@ describe("ScheduleGrid", () => {
     const deletedPill = firstCell.querySelector('[data-shift-pill="deleted"]') as HTMLElement;
 
     expect(deletedPill).not.toBeNull();
-    expect(deletedPill.querySelector('[data-mentored-badge="true"]')).not.toBeNull();
+    const mentored = deletedPill.querySelector(
+      '[data-mentored-badge="true"]',
+    ) as HTMLElement | null;
+    expect(mentored).not.toBeNull();
+    // The "Deleted" chip straddles the top-left edge, so the circle keeps its corner.
+    expect(mentored?.style.top).toBe("0.5px");
     const wing = within(deletedPill).getByText("SW") as HTMLElement;
     expect(wing).toHaveStyle({
       top: "0px",

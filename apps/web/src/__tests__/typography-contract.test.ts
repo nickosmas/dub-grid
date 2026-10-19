@@ -169,6 +169,7 @@ const documentedMicroTextCounts = {
   "app/globals.css": 1,
   "components/dashboard/DonutChart.tsx": 1,
   "components/schedule-grid/badges.tsx": 1,
+  "components/schedule-grid/noteDots.tsx": 1,
 };
 
 const documentedHeavyWeightCounts = {
