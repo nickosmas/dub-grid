@@ -119,7 +119,13 @@ export interface OrgBillingRow {
 export async function evaluateOrgBillingAccess(
   client: QueryClient,
   org: OrgBillingRow | null | undefined,
-  options: { now?: Date; subscriptionStatus?: string | null; trialEndsAt?: string | null } = {},
+  options: {
+    now?: Date;
+    subscriptionStatus?: string | null;
+    trialEndsAt?: string | null;
+    /** The platform policy, when the caller already read it alongside the row. */
+    policy?: BillingPolicy;
+  } = {},
 ): Promise<BillingAccessResult> {
   return evaluateBillingAccessWithPolicy(
     {
@@ -130,7 +136,7 @@ export async function evaluateOrgBillingAccess(
       paymentGraceStartedAt: org?.payment_grace_started_at ?? null,
       now: options.now,
     },
-    await getPlatformBillingPolicy(client),
+    options.policy ?? (await getPlatformBillingPolicy(client)),
     billingPolicyOverridesFromRow(org),
   );
 }

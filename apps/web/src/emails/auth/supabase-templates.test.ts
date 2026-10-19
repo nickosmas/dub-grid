@@ -121,12 +121,12 @@ describe("Supabase auth email templates", () => {
 
   // Every emailed link and code shares otp_expiry (41c3 added the last two).
   it.each([
-    ["recovery.html", "expire in 1 hour"],
-    ["email_change.html", "The link expires in 1 hour."],
-    ["reauthentication.html", "It expires in 1 hour."],
+    ["recovery.html", "expire in 15 minutes"],
+    ["email_change.html", "The link expires in 15 minutes."],
+    ["reauthentication.html", "It expires in 15 minutes."],
   ])("%s states the expiry that config.toml actually sets", (file, line) => {
     expect(templateText(file)).toContain(line);
-    expect(configToml).toMatch(/^otp_expiry = 3600$/m);
+    expect(configToml).toMatch(/^otp_expiry = 900$/m);
   });
 
   // A reset would ask for the new authenticator, which may be someone else's.

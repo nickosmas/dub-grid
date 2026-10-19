@@ -86,6 +86,8 @@ export const CacheKey = {
   mwMembership: (userId: string, slug: string) => `dg:mw:membership:${userId}:${slug}`,
   mwOrgSuspended: (orgId: string) => `dg:mw:orgSuspended:${orgId}`,
   mwOrgAccess: (orgId: string) => `dg:mw:orgAccess:${orgId}`,
+  /** Only ever holds `true`: a removed member must never read a cached yes. */
+  mwOrgVisible: (userId: string, orgId: string) => `dg:mw:orgVisible:${userId}:${orgId}`,
 
   // Public subdomain lookup (validate-domain)
   orgBySlug: (slug: string) => `dg:org:slug:${slug}`,

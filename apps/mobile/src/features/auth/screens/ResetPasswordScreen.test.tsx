@@ -8,7 +8,7 @@ const pushToast = vi.fn();
 const verifyOtp = vi.fn();
 const updateUser = vi.fn();
 const signOut = vi.fn();
-const resetPasswordForEmail = vi.fn();
+const requestPasswordRecovery = vi.fn();
 const createEphemeralSupabaseClient = vi.fn();
 const getSupabaseClient = vi.fn();
 const signOutMobileSessions = vi.fn();
@@ -33,6 +33,7 @@ vi.mock("../../../shared/lib/supabase", () => ({
 }));
 
 vi.mock("../../../shared/lib/api", () => ({
+  requestPasswordRecovery: (...args: unknown[]) => requestPasswordRecovery(...args),
   signOutMobileSessions: (...args: unknown[]) => signOutMobileSessions(...args),
 }));
 
@@ -60,7 +61,7 @@ beforeEach(() => {
   signOutMobileSessions.mockResolvedValue({ success: true });
   updateUser.mockResolvedValue({ error: null });
   signOut.mockResolvedValue({ error: null });
-  resetPasswordForEmail.mockResolvedValue({ error: null });
+  requestPasswordRecovery.mockResolvedValue({ success: true });
   getAuthenticatorAssuranceLevel.mockResolvedValue({
     data: { currentLevel: "aal1", nextLevel: "aal1" },
     error: null,
@@ -75,7 +76,6 @@ beforeEach(() => {
       verifyOtp,
       updateUser,
       signOut,
-      resetPasswordForEmail,
       mfa: { getAuthenticatorAssuranceLevel, listFactors, challengeAndVerify },
     },
   });
@@ -423,27 +423,50 @@ describe("ResetPasswordScreen", () => {
     expect(screen.getByText("Resend code in 60s")).toBeInTheDocument();
   });
 
-  /**
-   * `resetPasswordForEmail` resolves with `{ error }` rather than throwing, so
-   * ignoring the return value told the user "We sent a new code." for a resend
-   * the server had actually rejected.
-   */
-  it("surfaces a rejected resend instead of claiming a code was sent", async () => {
+  async function waitOutCooldown() {
+    // One act per tick: the cooldown reschedules its timer from an effect, so
+    // React has to commit each decrement before the next one is scheduled.
+    for (let i = 0; i < 60; i++) {
+      await act(async () => {
+        vi.advanceTimersByTime(1000);
+      });
+    }
+  }
+
+  // A resend goes through DubGrid's recovery request, like the first one, so
+  // it meets the same server limits instead of calling Supabase Auth directly.
+  it("resends through the server and promises nothing about the account", async () => {
     vi.useFakeTimers();
     try {
       render(<ResetPasswordScreen />);
+      await waitOutCooldown();
 
-      // One act per tick: the cooldown reschedules its timer from an effect, so
-      // React has to commit each decrement before the next one is scheduled.
-      for (let i = 0; i < 60; i++) {
-        await act(async () => {
-          vi.advanceTimersByTime(1000);
-        });
-      }
-
-      resetPasswordForEmail.mockResolvedValue({
-        error: { status: 429, message: "over_email_send_rate_limit" },
+      await act(async () => {
+        fireEvent.click(screen.getByText("Resend code"));
       });
+
+      expect(requestPasswordRecovery).toHaveBeenCalledWith("nurse@dubgrid.test");
+      expect(pushToast).toHaveBeenCalledWith({
+        message: "If an account uses this email, we sent a new code.",
+        tone: "info",
+      });
+      expect(screen.getByText("Resend code in 60s")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("surfaces a rate-limited resend instead of claiming a code was sent", async () => {
+    vi.useFakeTimers();
+    try {
+      render(<ResetPasswordScreen />);
+      await waitOutCooldown();
+
+      requestPasswordRecovery.mockRejectedValue(
+        Object.assign(new Error("Too many requests. Wait a few minutes and try again."), {
+          status: 429,
+        }),
+      );
 
       await act(async () => {
         fireEvent.click(screen.getByText("Resend code"));

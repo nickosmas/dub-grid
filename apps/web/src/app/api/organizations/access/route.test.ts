@@ -7,6 +7,7 @@ const checkRateLimit = vi.fn();
 const requireOrgPermissions = vi.fn();
 const dispatchNotificationEvent = vi.fn();
 const revokeAllUserSessions = vi.fn();
+const cacheDel = vi.fn();
 const membershipSelectEq2 = vi.fn();
 const membershipUpdateEq3 = vi.fn();
 const profileMaybeSingle = vi.fn();
@@ -55,6 +56,10 @@ vi.mock("@/features/notifications/server/events", () => ({
 }));
 vi.mock("@/lib/auth/revocation", () => ({
   revokeAllUserSessions: (userId: string) => revokeAllUserSessions(userId),
+}));
+vi.mock("@/lib/cache", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/cache")>()),
+  cacheDel: (...keys: string[]) => cacheDel(...keys),
 }));
 // Identity-ish mapper so tests can control the shape of `currentUser` directly
 // via the mocked membership row, instead of dealing with the real mapping.
@@ -152,6 +157,7 @@ describe("DELETE /api/organizations/access", () => {
     getUserById.mockResolvedValue({ data: { user: { email: "target@test.com" } } });
     auditInsert.mockResolvedValue({ error: null });
     revokeAllUserSessions.mockResolvedValue(undefined);
+    cacheDel.mockResolvedValue(undefined);
   });
 
   it("mutates the effective (sandbox-redirected) org and revokes the removed user's sessions", async () => {
@@ -187,6 +193,7 @@ describe("DELETE /api/organizations/access", () => {
     expect(membershipSelectEq2).toHaveBeenCalledWith(TARGET_USER_ID, SANDBOX_ORG_ID);
     expect(membershipUpdateEq3).toHaveBeenCalledWith(TARGET_USER_ID, SANDBOX_ORG_ID, UPDATED_AT);
     expect(revokeAllUserSessions).toHaveBeenCalledWith(TARGET_USER_ID);
+    expect(cacheDel).toHaveBeenCalledWith(`dg:mw:orgVisible:${TARGET_USER_ID}:${SANDBOX_ORG_ID}`);
     expect(auditInsert).toHaveBeenCalledWith(expect.objectContaining({ org_id: SANDBOX_ORG_ID }));
     expect(dispatchNotificationEvent).toHaveBeenCalledWith(
       ACTOR_ID,

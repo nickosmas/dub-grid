@@ -21,6 +21,7 @@ import type { DbOrganizationMembership } from "@/lib/db/types";
 import type { AdminPermissions, OrganizationUser, PlatformRole } from "@/types";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import { revokeAllUserSessions } from "@/lib/auth/revocation";
+import { cacheDel, CacheKey } from "@/lib/cache";
 import { SELF_ACTION_FORBIDDEN_CODE, SELF_ACTION_FORBIDDEN_MESSAGE } from "@dubgrid/domain";
 import { READ_ONLY_PERMS } from "@dubgrid/authz";
 import { API_ERRORS } from "@dubgrid/client-errors";
@@ -509,6 +510,10 @@ export async function DELETE(req: NextRequest) {
     // token that has already been issued. Revoke it before responding so the
     // former member cannot continue reading this organization with that token.
     await revokeAllUserSessions(userId);
+    // The proxy keeps a short-lived "still a member" answer per person; drop it
+    // so the next navigation asks the database. Other isolates' memos lapse in
+    // seconds.
+    await cacheDel(CacheKey.mwOrgVisible(userId, orgId));
 
     await writeAuditEntry({
       orgId,

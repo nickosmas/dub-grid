@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { calculateEffectiveRole, getRoleLevel, resetMiddlewareOrgAccessMemo } from "../proxy";
+import { resetBillingPolicyMemoForTests } from "@/lib/billing-policy";
 
 // ── Mock next/server ─────────────────────────────────────────────────────────
 // NextResponse.next() and NextResponse.redirect() need to return objects
@@ -70,13 +71,15 @@ const mockGetSession = vi.fn();
 const mockSupabaseFrom = vi.fn();
 const mockCacheSet = vi.fn();
 
-// Service-role reads (the platform billing policy, sandbox lookups) use the
-// same table mock as the request client.
+const mockCacheGet = vi.fn();
+// Service-role reads (organization state, the platform billing policy, sandbox
+// lookups) use the request client's table mock unless a test separates them.
+const mockServiceFrom = vi.fn();
 vi.mock("@supabase/supabase-js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@supabase/supabase-js")>();
   return {
     ...actual,
-    createClient: () => ({ from: (table: string) => mockSupabaseFrom(table) }),
+    createClient: () => ({ from: (table: string) => mockServiceFrom(table) }),
   };
 });
 
@@ -94,14 +97,17 @@ vi.mock("@/lib/impersonation-server", () => ({
 }));
 
 // ── Mock @/lib/cache ────────────────────────────────────────────────────────
-// Pass-through mock: cacheThrough just calls the fetcher directly.
+// Pass-through mock: cacheThrough just calls the fetcher directly, and
+// cacheGet misses unless a test says otherwise.
 vi.mock("@/lib/cache", () => ({
   cacheThrough: async (_key: string, _ttl: number, fetcher: () => Promise<unknown>) => fetcher(),
+  cacheGet: (...args: unknown[]) => mockCacheGet(...args),
   cacheSet: (...args: unknown[]) => mockCacheSet(...args),
   CacheKey: {
     mwProfile: (userId: string) => `dg:mw:profile:${userId}`,
     mwMembership: (userId: string, slug: string) => `dg:mw:membership:${userId}:${slug}`,
     mwOrgAccess: (orgId: string) => `dg:mw:orgAccess:${orgId}`,
+    mwOrgVisible: (userId: string, orgId: string) => `dg:mw:orgVisible:${userId}:${orgId}`,
     mwOrgSuspended: (orgId: string) => `dg:mw:orgSuspended:${orgId}`,
     platformBillingPolicy: () => `dg:platform:billingPolicy`,
   },
@@ -121,6 +127,9 @@ beforeEach(() => {
   process.env.SUPABASE_SECRET_KEY = "test-service-role-key";
   mockVerifyImpersonationSession.mockResolvedValue(null);
   mockCacheSet.mockResolvedValue(undefined);
+  mockCacheGet.mockResolvedValue(null);
+  mockServiceFrom.mockImplementation((table: string) => mockSupabaseFrom(table));
+  resetBillingPolicyMemoForTests();
   mockSupabaseFrom.mockImplementation((table: string) => ({
     select: vi.fn(() => ({
       eq: vi.fn(() => ({
@@ -632,6 +641,92 @@ describe("middleware: route guards", () => {
       makeNextRequest("http://acme.localhost:3000/schedule", { host: "acme.localhost:3000" }),
     );
     expect((res2 as { _type: string })._type).not.toBe("redirect");
+  });
+
+  it("sends a removed member to /login even while another member's organization state is memoized", async () => {
+    const orgRow = { suspended_at: null, archived_at: null, subscription_status: "active" };
+    const tableReturning = (data: unknown) => () => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({ maybeSingle: vi.fn().mockResolvedValue({ data, error: null }) })),
+      })),
+    });
+    mockServiceFrom.mockImplementation((table: string) =>
+      tableReturning(table === "organizations" ? orgRow : null)(),
+    );
+    const claimsFor = (sub: string) => ({
+      platform_role: "none",
+      org_role: "user",
+      org_id: "org-1",
+      org_slug: "acme",
+      sub,
+    });
+    const visit = () =>
+      runMiddleware(
+        makeNextRequest("http://acme.localhost:3000/schedule", { host: "acme.localhost:3000" }),
+      );
+
+    mockSessionWithClaims(claimsFor("member-1"));
+    mockSupabaseFrom.mockImplementation(tableReturning({ id: "org-1" }));
+    expect((await visit()) as { _type: string }).toMatchObject({ _type: "next" });
+    expect(mockCacheSet).toHaveBeenCalledWith("dg:mw:orgVisible:member-1:org-1", true, 30);
+
+    // The organization's state is now memoized; the removed member's own read
+    // as themselves finds no row.
+    mockSessionWithClaims(claimsFor("removed-1"));
+    mockSupabaseFrom.mockImplementation(tableReturning(null));
+    const res = await visit();
+
+    expect((res as { _redirectUrl: string })._redirectUrl).toBe("http://acme.localhost:3000/login");
+    expect(mockServiceFrom).toHaveBeenCalledTimes(2); // state and policy, first visit only
+    expect(mockCacheSet).not.toHaveBeenCalledWith(
+      "dg:mw:orgVisible:removed-1:org-1",
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  it("reads visibility, organization state and the billing policy in parallel", async () => {
+    mockSessionWithClaims({
+      platform_role: "none",
+      org_role: "user",
+      org_id: "org-1",
+      org_slug: "acme",
+      sub: "user-1",
+    });
+    const pending: Array<{ source: string; table: string; resolve: (data: unknown) => void }> = [];
+    const deferredTable = (source: string) => (table: string) => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          maybeSingle: vi.fn(
+            () =>
+              new Promise((resolve) => {
+                pending.push({ source, table, resolve: (data) => resolve({ data, error: null }) });
+              }),
+          ),
+        })),
+      })),
+    });
+    mockSupabaseFrom.mockImplementation(deferredTable("caller"));
+    mockServiceFrom.mockImplementation(deferredTable("service"));
+
+    const response = runMiddleware(
+      makeNextRequest("http://acme.localhost:3000/schedule", { host: "acme.localhost:3000" }),
+    );
+    await vi.waitFor(() => expect(pending).toHaveLength(3));
+
+    expect(pending.map(({ source, table }) => `${source}:${table}`).sort()).toEqual([
+      "caller:organizations",
+      "service:organizations",
+      "service:platform_billing_settings",
+    ]);
+    for (const read of pending) {
+      read.resolve(
+        read.table === "organizations"
+          ? { id: "org-1", suspended_at: null, archived_at: null, subscription_status: "active" }
+          : null,
+      );
+    }
+    expect((await response) as { _type: string }).toMatchObject({ _type: "next" });
   });
 
   it("redirects regular users to a neutral unavailable page after trial grace", async () => {
