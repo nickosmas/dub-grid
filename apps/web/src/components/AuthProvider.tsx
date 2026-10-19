@@ -16,7 +16,9 @@ import {
 import { getWebSessionMetadata } from "@/features/account/client/session-metadata";
 import {
   createSessionRegistration,
+  markSessionReported,
   SessionRegistrationError,
+  wasSessionReportedRecently,
 } from "@/features/account/client/session-registration";
 import { listenForBrowserSignOut } from "@/lib/auth-boundary-broadcast";
 
@@ -38,7 +40,12 @@ export async function sendSessionRegistration() {
   if (!response.ok) throw new SessionRegistrationError(response.status);
 }
 
-const trackSession = createSessionRegistration(sendSessionRegistration);
+const registerSession = createSessionRegistration(sendSessionRegistration);
+
+async function trackSession(session: Session): Promise<void> {
+  await registerSession(session);
+  markSessionReported(session);
+}
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -96,8 +103,13 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           : null;
         if (!commitAuthState(generation, initialSession, verifiedUser)) return;
 
-        // Track existing session on page load (session restored from cookies)
-        if (initialSession?.refresh_token && verifiedUser) {
+        // Track a session restored from cookies, unless this tab reported it in
+        // the last few minutes: every hard load used to post it again.
+        if (
+          initialSession?.refresh_token &&
+          verifiedUser &&
+          !wasSessionReportedRecently(initialSession)
+        ) {
           trackSession(initialSession).catch(() => {});
         }
       } catch (error) {

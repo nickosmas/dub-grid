@@ -240,26 +240,28 @@ export default function Header({ orgName }: HeaderProps) {
   // NOTE: drawer is NOT auto-closed on route change — the drill-down
   // navigation needs the sheet to stay open while switching pages.
 
+  // Keyed on the user id rather than the user object, which every token
+  // refresh replaces; the effect used to refetch the identity each time.
+  const authUserId = authUser?.id ?? null;
+  const emailName = authUser?.email?.split("@")[0] || null;
+  const identityQuery = useQuery({
+    queryKey: queryKeys.account.identity(authUserId ?? "anon"),
+    queryFn: fetchAccountIdentity,
+    enabled: Boolean(authUserId),
+    staleTime: 5 * 60_000,
+  });
+  const identity = identityQuery.data;
+  const identityFailed = identityQuery.isError;
+
   useEffect(() => {
-    if (!authUser) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const identity = await fetchAccountIdentity();
-        if (cancelled) return;
-        const name = identity.displayName || authUser.email?.split("@")[0] || null;
-        setUserName(name);
-        if (name) sessionStorage.setItem("dg_user_name", name);
-      } catch {
-        if (cancelled) return;
-        const fallbackName = authUser.email?.split("@")[0] || null;
-        setUserName(fallbackName);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [authUser]);
+    if (identity) {
+      const name = identity.displayName || emailName;
+      setUserName(name);
+      if (name) sessionStorage.setItem("dg_user_name", name);
+    } else if (identityFailed) {
+      setUserName(emailName);
+    }
+  }, [identity, identityFailed, emailName]);
 
   useEffect(() => {
     if (!menuOpen) return;

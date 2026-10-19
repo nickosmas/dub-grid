@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import Header from "@/components/Header";
 import { fetchOrganizationBilling } from "@/features/billing/client";
-import { exitSandbox } from "@/features/account/client";
+import { exitSandbox, fetchAccountIdentity } from "@/features/account/client";
 import { queryKeys } from "@/lib/query-keys";
 
 const mockSignOut = vi.fn().mockResolvedValue(undefined);
@@ -454,6 +454,39 @@ describe("Header sign out in sandbox mode", () => {
     expect(vi.mocked(exitSandbox).mock.invocationCallOrder[0]).toBeLessThan(
       mockSignOut.mock.invocationCallOrder[0],
     );
+  });
+});
+
+describe("Header identity", () => {
+  it("loads the account name once across a token refresh", async () => {
+    vi.mocked(fetchAccountIdentity).mockResolvedValue({
+      displayName: "Dana Reyes",
+      firstName: "Dana",
+      lastName: "Reyes",
+      orgSlug: null,
+      hasOrganizationMembership: true,
+    });
+    mockAuthUser = { id: "user-1", email: "dana@example.com" };
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const withClient = (ui: React.ReactElement) => (
+      <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+    );
+    const { rerender } = render(withClient(<Header />));
+    await waitFor(() => expect(screen.getAllByText("Dana Reyes").length).toBeGreaterThan(0));
+
+    // A refreshed token hands every consumer a new user object for the same id.
+    mockAuthUser = { id: "user-1", email: "dana@example.com" };
+    rerender(withClient(<Header orgName="Acme" />));
+    await screen.findByText("Acme");
+
+    expect(fetchAccountIdentity).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to the email name when the identity cannot load", async () => {
+    vi.mocked(fetchAccountIdentity).mockRejectedValueOnce(new Error("offline"));
+    mockAuthUser = { id: "user-2", email: "sam@example.com" };
+    renderHeader(<Header />);
+    await waitFor(() => expect(screen.getAllByText("sam").length).toBeGreaterThan(0));
   });
 });
 

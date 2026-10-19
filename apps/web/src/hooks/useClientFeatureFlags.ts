@@ -3,13 +3,9 @@ import { useAuth } from "@/components/AuthProvider";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
 
-export interface ClientFeatureFlags {
-  stripe: boolean;
-  csvImport: boolean;
-  csvExport: boolean;
-  reports: boolean;
-  printing: boolean;
-}
+import type { ClientFeatureFlags } from "@/lib/feature-flags";
+
+export type { ClientFeatureFlags };
 
 const DEFAULT_FLAGS: ClientFeatureFlags = {
   stripe: true,

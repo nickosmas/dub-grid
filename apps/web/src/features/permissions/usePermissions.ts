@@ -3,14 +3,10 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
-import {
-  createBrowserRealtimeChannel,
-  fetchAccountPermissions,
-  removeBrowserRealtimeChannel,
-  type BrowserRealtimeChannel,
-} from "@/features/account/client";
+import { fetchAccountPermissions } from "@/features/account/client";
 import { queryKeys } from "@/lib/query-keys";
 import { READ_ONLY_PERMS, ROLE_LEVEL } from "./core";
+import { acquirePermissionsSubscription } from "./permissionsRealtime";
 import { buildPerms, extractJwtClaims } from "./shared";
 import type { Permissions } from "./shared";
 
@@ -133,13 +129,6 @@ export function usePermissions(): WebPermissions {
   );
 
   const signedOut = !authLoading && (!accessToken || !userId);
-  // Memoised because the realtime effect below lists it: a fresh array every
-  // render tore both channels down and re-subscribed them on every render of
-  // every consumer.
-  const permissionsKey = useMemo(
-    () => queryKeys.account.permissions(userId, claims.orgId),
-    [userId, claims.orgId],
-  );
 
   const query = useQuery({
     ...accountPermissionsQueryOptions(userId, claims.orgId),
@@ -179,71 +168,16 @@ export function usePermissions(): WebPermissions {
     return claims.orgId ? { ...LOADING_PERMS, orgId: claims.orgId } : LOADING_PERMS;
   }, [authLoading, accessToken, userId, query.data, query.isError, claims]);
 
-  // ── Realtime: refresh permissions on membership changes ──
-  // When another session (e.g. super_admin) updates the current user's
-  // admin_permissions or org_role, a Postgres change event re-resolves them
-  // and triggers a re-render. (L-2: we no longer subscribe to `departments` —
-  // departments don't grant permissions, so those events only caused org-wide
-  // perms-refetch storms with zero permission impact.)
-  //
-  // Also subscribe to `employees` for this user: bench/activate flips the
-  // benched override (READ_ONLY_PERMS) in the permissions endpoint, and we
-  // want the open tab to drop into / out of read-only the moment an admin
-  // presses the button — not at next refresh. Terminated users get bounced at
-  // the JWT-hook level on the next token refresh, so no extra wiring needed.
+  // Membership and employees changes re-resolve permissions in the open tab.
+  // The channels are shared per user (see permissionsRealtime.ts), so a token
+  // refresh does not resubscribe them. The org is listed because an org change
+  // can remove every realtime channel (AuthenticatedCacheBoundary) while these
+  // consumers stay mounted; releasing and re-acquiring opens fresh ones.
+  const claimOrgId = claims.orgId;
   useEffect(() => {
-    if (!accessToken || !userId) return;
-
-    let membershipChannel: BrowserRealtimeChannel | null = null;
-    let employeeChannel: BrowserRealtimeChannel | null = null;
-    // Unique channel name per effect instance avoids reusing an already-subscribed
-    // channel during React strict-mode double-mounts.
-    const channelSuffix = `${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
-
-    // Invalidate rather than refetch-and-assign: React Query drops the stale
-    // mark, refetches once no matter how many consumers are mounted, and keeps
-    // the previous value on screen if the refetch fails. Every mounted
-    // consumer has its own channel, so one membership row update (opening the
-    // schedule writes its last-viewed stamp there) reaches this once per
-    // consumer at the same instant; with the default `cancelRefetch` each call
-    // cancelled the fetch the previous one had started, which sent ten
-    // requests for one answer and delayed it until the last of them.
-    const reResolve = () => {
-      void queryClient.invalidateQueries({ queryKey: permissionsKey }, { cancelRefetch: false });
-    };
-
-    membershipChannel = createBrowserRealtimeChannel(`perms:m:${channelSuffix}`)
-      .on(
-        "postgres_changes" as "system",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "organization_memberships",
-          filter: `user_id=eq.${userId}`,
-        } as Record<string, unknown>,
-        reResolve,
-      )
-      .subscribe();
-
-    employeeChannel = createBrowserRealtimeChannel(`perms:e:${channelSuffix}`)
-      .on(
-        "postgres_changes" as "system",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "employees",
-          filter: `user_id=eq.${userId}`,
-        } as Record<string, unknown>,
-        reResolve,
-      )
-      .subscribe();
-
-    return () => {
-      if (membershipChannel) void removeBrowserRealtimeChannel(membershipChannel);
-      if (employeeChannel) void removeBrowserRealtimeChannel(employeeChannel);
-    };
-    // permissionsKey is derived from userId + claims.orgId, both already listed.
-  }, [accessToken, userId, claims.orgId, queryClient, permissionsKey]);
+    if (!userId) return;
+    return acquirePermissionsSubscription(userId, queryClient);
+  }, [userId, claimOrgId, queryClient]);
   // ── User View override ──────────────────────────────────────────────
   // When active, return read-only permissions so admins see the user experience.
   // Preserve orgId so data fetching still works (user is still authenticated).
