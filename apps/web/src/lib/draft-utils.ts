@@ -1,3 +1,4 @@
+import { alignSegmentsToBefore } from "@dubgrid/schedule-core";
 import type { ShiftMap } from "@/types";
 import { expandDelimitedTimeRanges } from "@/lib/shift-diff-badges";
 
@@ -15,7 +16,9 @@ export interface CellChangeSide {
  * a double shift, and the grid already rings that pill green as "new"; the
  * cell-level `draftKind` still says "modified", so the banner used to count it
  * as an edit. Returns 0 when anything published changed (replaced, removed,
- * reordered, retimed, or an absence swapped), so those stay edits.
+ * retimed, or an absence swapped), so those stay edits. Published shifts are
+ * matched the way the pills are, by shift and job rather than position: an
+ * earlier shift added in front of a published one is still an addition.
  */
 export function countShiftsAddedToPublishedCell(
   before: CellChangeSide,
@@ -35,15 +38,22 @@ export function countShiftsAddedToPublishedCell(
     after.segments.length,
   );
 
+  const alignment = alignSegmentsToBefore(
+    before.segments,
+    after.segments,
+    (segment) => `${segment.shiftId ?? ""}:${segment.jobId}`,
+  );
+
   const preserved = before.segments.every((segment, index) => {
-    const other = after.segments[index];
+    const afterIndex = alignment.indexOf(index);
+    const other = after.segments[afterIndex];
     return (
       !!other &&
       (segment.shiftId ?? null) === (other.shiftId ?? null) &&
       segment.jobId === other.jobId &&
       (segment.isMentored ?? false) === (other.isMentored ?? false) &&
-      beforeTimes[index]?.start === afterTimes[index]?.start &&
-      beforeTimes[index]?.end === afterTimes[index]?.end
+      beforeTimes[index]?.start === afterTimes[afterIndex]?.start &&
+      beforeTimes[index]?.end === afterTimes[afterIndex]?.end
     );
   });
 
