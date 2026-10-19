@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { decodeJwt } from "jose";
 import { extractJwtClaims } from "@dubgrid/authz";
@@ -14,6 +15,7 @@ import { employeesQueryOptions } from "@/hooks/useEmployees";
 import { orgContextQueryOptions } from "@/hooks/useOrganizationData";
 import { termsAcceptanceQueryOptions } from "@/hooks/useTermsAcceptanceStatus";
 import { useAuthTransitionPending } from "@/lib/auth-transition";
+import { POST_LOGIN_DESTINATION } from "@/lib/auth/integrity-contract";
 import { queryKeys } from "@/lib/query-keys";
 
 interface SignInTarget {
@@ -50,7 +52,13 @@ function bootstrapQueryOptions() {
  * locked organization answers with an error nothing here displays, and its
  * members are sent to billing recovery before any screen reads the list.
  */
-export function primeSignInQueries(queryClient: QueryClient, accessToken: string): void {
+export function primeSignInQueries(
+  queryClient: QueryClient,
+  accessToken: string,
+  // Off when the sign-in lands somewhere else first (accept-terms), where
+  // the dashboard's data would only be thrown away.
+  { dashboard = true }: { dashboard?: boolean } = {},
+): void {
   if (extractJwtClaims(accessToken).effectiveRole === "gridmaster") {
     primeGridmasterPortal(queryClient);
     return;
@@ -66,7 +74,7 @@ export function primeSignInQueries(queryClient: QueryClient, accessToken: string
   if (target.isSuperAdmin) {
     void queryClient.prefetchQuery(organizationBillingQueryOptions(target.orgId));
   }
-  void primeDefaultDashboard(queryClient, target);
+  if (dashboard) void primeDefaultDashboard(queryClient, target);
 }
 
 /**
@@ -119,9 +127,10 @@ export default function SignInPrefetch() {
 
 function HoldSignInQueries({ accessToken }: { accessToken: string }) {
   const queryClient = useQueryClient();
+  const onDashboard = usePathname() === POST_LOGIN_DESTINATION;
   useEffect(() => {
-    primeSignInQueries(queryClient, accessToken);
-  }, [queryClient, accessToken]);
+    primeSignInQueries(queryClient, accessToken, { dashboard: onDashboard });
+  }, [queryClient, accessToken, onDashboard]);
   useQuery(bootstrapQueryOptions());
   return null;
 }

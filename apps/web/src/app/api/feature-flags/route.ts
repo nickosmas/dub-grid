@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
-import { isFeatureEnabled } from "@/lib/feature-flags";
+import { getClientFeatureFlags } from "@/lib/feature-flags";
 
 export const dynamic = "force-dynamic";
 
@@ -14,13 +14,5 @@ export async function GET(req: NextRequest) {
   const auth = await requireAuthenticatedUser(req);
   if ("response" in auth) return auth.response;
 
-  const [stripe, csvImport, csvExport, reports, printing] = await Promise.all([
-    isFeatureEnabled("stripe"),
-    isFeatureEnabled("csv_import"),
-    isFeatureEnabled("csv_export"),
-    isFeatureEnabled("reports"),
-    isFeatureEnabled("printing"),
-  ]);
-
-  return NextResponse.json({ stripe, csvImport, csvExport, reports, printing });
+  return NextResponse.json(await getClientFeatureFlags());
 }

@@ -11,7 +11,14 @@ import SignInPrefetch from "@/components/SignInPrefetch";
 import PostHogProvider from "@/components/PostHogProvider";
 import { preconnect, prefetchDNS } from "react-dom";
 import { getClientFeatureFlags, isFeatureEnabled } from "@/lib/feature-flags";
-import { getSupabaseUrl } from "@/lib/supabase-keys";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
+import { verifyAccessToken } from "@/lib/auth/verify-token";
+import {
+  getSupabaseUrl,
+  requireSupabasePublishableKey,
+  requireSupabaseUrl,
+} from "@/lib/supabase-keys";
 import "../app-ui.css";
 
 /**
@@ -48,6 +55,26 @@ function supabaseOrigin(): string | null {
   }
 }
 
+// /api/feature-flags answers signed-in callers only, so the layout seeds the
+// same answer only for a request carrying a validly signed session.
+async function hasVerifiedSession(): Promise<boolean> {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(requireSupabaseUrl(), requireSupabasePublishableKey(), {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll() {
+        // Server Components cannot mutate cookies.
+      },
+    },
+  });
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  return session?.access_token ? (await verifyAccessToken(session.access_token)) !== null : false;
+}
+
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // The first auth call and the realtime socket both go to Supabase; opening
   // the connection with the document saves their DNS and TLS round trips.
@@ -57,11 +84,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     preconnect(supabase, { crossOrigin: "anonymous" });
     prefetchDNS(supabase);
   }
-  const [posthogEnabled, clientFeatureFlags] = await Promise.all([
+  const [posthogEnabled, signedIn] = await Promise.all([
     isFeatureEnabled("posthog"),
-    getClientFeatureFlags(),
+    hasVerifiedSession().catch(() => false),
   ]);
-  const initialFeatureFlags = { flags: clientFeatureFlags, readAt: Date.now() };
+  const initialFeatureFlags = signedIn
+    ? { flags: await getClientFeatureFlags(), readAt: Date.now() }
+    : undefined;
 
   return (
     <AuthProvider>

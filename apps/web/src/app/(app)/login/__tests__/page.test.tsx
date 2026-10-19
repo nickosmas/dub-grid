@@ -207,6 +207,7 @@ describe("OrgLogin submit states", () => {
       expect(mockPrimeSignInQueries).toHaveBeenCalledExactlyOnceWith(
         expect.any(Object),
         sessionToken("user-1", TARGET_ORG_ID, "calmhaven"),
+        { dashboard: true },
       );
     });
 

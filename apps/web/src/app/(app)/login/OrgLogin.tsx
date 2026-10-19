@@ -44,6 +44,7 @@ import {
 import { fetchWithTimeout, settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
 import { getWebAuthRecoveryMessage } from "@/lib/auth-recovery";
 import { ACTION_SIGN_IN } from "@/lib/action-copy";
+import { POST_LOGIN_DESTINATION } from "@/lib/auth/integrity-contract";
 
 const GRIDMASTER_PORTAL_REQUIRED_CODE = "GRIDMASTER_PORTAL_REQUIRED";
 
@@ -410,7 +411,9 @@ export default function OrgLogin({
           return;
         }
         void syncBrowserSessionInBackground(result.session);
-        primeSignInQueries(queryClient, result.session.access_token);
+        primeSignInQueries(queryClient, result.session.access_token, {
+          dashboard: result.destination === POST_LOGIN_DESTINATION,
+        });
         markAuthTransition();
         navigateToDashboard(result.destination, false);
         return;

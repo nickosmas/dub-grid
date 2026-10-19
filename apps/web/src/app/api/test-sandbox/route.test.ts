@@ -8,16 +8,6 @@ const getServiceClient = vi.fn();
 const createSandboxForUser = vi.fn();
 const deleteSandboxForUser = vi.fn();
 const findActiveSandboxForUser = vi.fn();
-const scheduled: Array<Promise<unknown>> = [];
-const after = vi.fn((task: () => unknown) => {
-  scheduled.push(Promise.resolve(task()));
-});
-const settled = () => Promise.all(scheduled.splice(0));
-
-vi.mock("next/server", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("next/server")>()),
-  after: (task: () => unknown) => after(task),
-}));
 
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
@@ -244,33 +234,7 @@ describe("POST /api/test-sandbox", () => {
 
     expect(res.status).toBe(200);
     expect(checkRateLimit).not.toHaveBeenCalled();
-    await settled();
     expect(deleteSandboxForUser).toHaveBeenCalled();
-  });
-
-  it("leaves sandbox mode before the clone is deleted", async () => {
-    getServiceClient.mockReturnValue(buildServiceClient({ role: null }));
-    deleteSandboxForUser.mockReturnValueOnce(new Promise(() => {}));
-
-    const { POST } = await import("./route");
-    const res = await POST(makeRequest("exit"));
-
-    expect(res.status).toBe(200);
-    expect(res.cookies.get("dubgrid-sandbox")?.value).toBe("");
-    expect(after).toHaveBeenCalledOnce();
-    scheduled.splice(0);
-  });
-
-  it("still leaves sandbox mode when deleting the clone fails", async () => {
-    getServiceClient.mockReturnValue(buildServiceClient({ role: null }));
-    deleteSandboxForUser.mockRejectedValueOnce(new Error("database unavailable"));
-
-    const { POST } = await import("./route");
-    const res = await POST(makeRequest("exit"));
-    await settled();
-
-    expect(res.status).toBe(200);
-    expect(res.cookies.get("dubgrid-sandbox")?.value).toBe("");
   });
 
   it("clears the sandbox cookie on exit", async () => {

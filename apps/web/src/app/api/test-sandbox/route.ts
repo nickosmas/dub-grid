@@ -1,4 +1,4 @@
-import { after, NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
@@ -61,17 +61,10 @@ export async function POST(req: NextRequest) {
     if (parsed.data.action === "exit") {
       // Delete every sandbox owned by this user. Don't rely on the cookie
       // — if the cookie's stale or missing we still want a clean exit so
-      // orphans can't get re-attached on the next Enter. The cleared cookie
-      // is what ends sandbox mode, so the delete runs after the response; the
-      // daily sandbox-cleanup job reaps any clone it fails to remove.
-      const actor = auth.user;
-      after(async () => {
-        try {
-          await deleteSandboxForUser({ serviceClient, actor });
-        } catch (error) {
-          Sentry.captureException(error, { extra: { context: "test-sandbox-exit" } });
-          logger.error({ error }, "Failed to delete sandbox after exit");
-        }
+      // orphans can't get re-attached on the next Enter.
+      await deleteSandboxForUser({
+        serviceClient,
+        actor: auth.user,
       });
       const response = NextResponse.json({ success: true });
       response.cookies.set(SANDBOX_COOKIE_NAME, "", { path: "/", maxAge: 0 });
