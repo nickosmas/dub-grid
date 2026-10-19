@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createRequestSupabaseClient, requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
@@ -44,12 +44,16 @@ export async function POST(req: NextRequest) {
 
     const orgId = data.org_id as string;
     if (orgId) {
-      void dispatchNotificationEvent(auth.user.id, {
-        action: "invitation_accepted",
-        orgId,
-        acceptedUserId: auth.user.id,
-        invitationId: (data.invitation_id as string | null | undefined) ?? null,
-      });
+      const invitationId = (data.invitation_id as string | null | undefined) ?? null;
+      // A bare promise could be cut off when the serverless function finishes.
+      after(() =>
+        dispatchNotificationEvent(auth.user.id, {
+          action: "invitation_accepted",
+          orgId,
+          acceptedUserId: auth.user.id,
+          invitationId,
+        }),
+      );
     }
 
     return NextResponse.json({

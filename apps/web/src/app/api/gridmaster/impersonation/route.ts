@@ -141,17 +141,28 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // A valid start's step-up check reads only what the Gridmaster check
+    // reads, so it runs alongside it. Its answer is used after the Gridmaster
+    // check and the input checks, so the refusals keep their order.
+    const bodyRead = req.json().then(
+      (body: unknown) => ({ ok: true as const, body }),
+      () => ({ ok: false as const }),
+    );
+    const startAssurance = bodyRead.then((read) =>
+      read.ok && startSchema.safeParse(read.body).success ? requireSensitiveActionAuth(req) : null,
+    );
+    startAssurance.catch(() => {});
+
     const auth = await requireGridmasterSession(req);
     if ("response" in auth) {
       return auth.response;
     }
 
-    let body: unknown;
-    try {
-      body = await req.json();
-    } catch {
+    const read = await bodyRead;
+    if (!read.ok) {
       return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
     }
+    const body = read.body;
 
     const action =
       body && typeof body === "object" && "action" in body
@@ -167,7 +178,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
       }
       // Acting as someone else needs a recent sign-in; ending never does.
-      const assurance = await requireSensitiveActionAuth(req);
+      const assurance = (await startAssurance) ?? (await requireSensitiveActionAuth(req));
       if ("response" in assurance) return assurance.response;
 
       const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;

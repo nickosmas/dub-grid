@@ -21,8 +21,20 @@ interface CachedOrgLookup {
   suspendedAt?: string | null;
 }
 
-/** Resolve a valid organization wildcard subdomain without exposing DB errors. */
-export async function lookupOrgBySlug(rawSlug: string): Promise<OrgLookupResult> {
+/** Thrown inside the cache fetcher when the caller refuses a database read. */
+const MISS_REFUSED = Symbol("org lookup miss refused");
+
+/**
+ * Resolve a valid organization wildcard subdomain without exposing DB errors.
+ *
+ * `admitMiss` runs only when the cache has no answer, before the database is
+ * asked; returning false answers "error" instead. It lets a public caller put
+ * its rate limit in front of the database without paying for it on a warm hit.
+ */
+export async function lookupOrgBySlug(
+  rawSlug: string,
+  options: { admitMiss?: () => Promise<boolean> } = {},
+): Promise<OrgLookupResult> {
   const slug = rawSlug.trim().toLowerCase();
   if (!slug || !isValidOrgSlug(slug)) return { status: "not-found" };
 
@@ -35,8 +47,9 @@ export async function lookupOrgBySlug(rawSlug: string): Promise<OrgLookupResult>
     // why an organization is closed instead of behaving as if it never
     // existed (F-87). The gridmaster lifecycle route drops this key on every
     // state change.
-    const org = await cacheThrough(CacheKey.orgBySlug(slug), TTL.PUBLIC_LOOKUP, async () =>
-      withTimeoutOrThrow(
+    const org = await cacheThrough(CacheKey.orgBySlug(slug), TTL.PUBLIC_LOOKUP, async () => {
+      if (options.admitMiss && !(await options.admitMiss())) throw MISS_REFUSED;
+      return withTimeoutOrThrow(
         (async () => {
           const { data, error } = await getServiceClient()
             .from("organizations")
@@ -60,8 +73,8 @@ export async function lookupOrgBySlug(rawSlug: string): Promise<OrgLookupResult>
         })(),
         SUPABASE_LOOKUP_TIMEOUT_MS,
         "organization slug lookup",
-      ),
-    );
+      );
+    });
     if (!org) return { status: "not-found" };
     if (org.archivedAt) return { status: "archived", org: { name: org.name } };
     return {
@@ -69,6 +82,7 @@ export async function lookupOrgBySlug(rawSlug: string): Promise<OrgLookupResult>
       org: { id: org.id, name: org.name, suspendedAt: org.suspendedAt ?? null },
     };
   } catch (err) {
+    if (err === MISS_REFUSED) return { status: "error" };
     logger.error(
       { err: err instanceof Error ? err.message : err, slug },
       "Organization slug lookup failed",

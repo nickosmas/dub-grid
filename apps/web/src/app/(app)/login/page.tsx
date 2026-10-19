@@ -79,11 +79,12 @@ export default async function LoginPage({
     // Same IP limit /api/validate-domain applies, because this is now the same
     // unauthenticated org lookup: without it, a flood of made-up subdomains
     // would reach Supabase once each (misses aren't cached) with nothing in
-    // front of it — middleware doesn't rate-limit page requests. Prod-only, so
-    // local dev pays no round trip.
+    // front of it, since middleware doesn't rate-limit page requests. Only a
+    // cache miss reaches the database, so only a miss consults the limiter.
     const ip = headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-    const { limited } = await checkRateLimit(apiLimiter, ip);
-    const result = limited ? ({ status: "error" } as const) : await lookupOrgBySlug(subdomain);
+    const result = await lookupOrgBySlug(subdomain, {
+      admitMiss: async () => !(await checkRateLimit(apiLimiter, ip)).limited,
+    });
 
     // There is no organization here, so there is nothing to sign in to — send
     // the user to the domain selector instead of rendering a sign-in page that

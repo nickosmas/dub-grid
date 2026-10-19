@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const cacheMocks = vi.hoisted(() => ({
   cacheSetOrThrow: vi.fn(),
+  cacheGetMany: vi.fn(),
 }));
 
 const serviceMocks = vi.hoisted(() => ({
@@ -18,7 +19,11 @@ const serviceMocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/cache", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/cache")>();
-  return { ...actual, cacheSetOrThrow: cacheMocks.cacheSetOrThrow };
+  return {
+    ...actual,
+    cacheSetOrThrow: cacheMocks.cacheSetOrThrow,
+    cacheGetMany: cacheMocks.cacheGetMany,
+  };
 });
 
 vi.mock("@/lib/supabase-service", () => ({
@@ -28,6 +33,8 @@ vi.mock("@/lib/supabase-service", () => ({
 import {
   endUserSession,
   endUserSessions,
+  isSessionRevoked,
+  resetRevocationMemo,
   revokeAllUserSessions,
   revokeOtherUserSessions,
   revokeSession,
@@ -173,5 +180,86 @@ describe("session revocation persistence", () => {
     await expect(revokeOtherUserSessions("user-1", "current")).rejects.toThrow("lookup failed");
     expect(serviceMocks.delete).not.toHaveBeenCalled();
     expect(cacheMocks.cacheSetOrThrow).not.toHaveBeenCalled();
+  });
+
+  it("revokes the collected peers together rather than one after another", async () => {
+    serviceMocks.range.mockResolvedValueOnce({
+      data: [{ supabase_session_id: "peer-1" }, { supabase_session_id: "peer-2" }],
+      error: null,
+    });
+    let releaseFirst: () => void = () => {};
+    cacheMocks.cacheSetOrThrow.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseFirst = resolve;
+        }),
+    );
+
+    const revoking = revokeOtherUserSessions("user-1", "current");
+    await vi.waitFor(() => expect(cacheMocks.cacheSetOrThrow).toHaveBeenCalledTimes(2));
+    releaseFirst();
+    await revoking;
+
+    expect(serviceMocks.eq).toHaveBeenCalledWith("supabase_session_id", "peer-1");
+    expect(serviceMocks.eq).toHaveBeenCalledWith("supabase_session_id", "peer-2");
+  });
+
+  it("fails when any peer's marker cannot be written", async () => {
+    serviceMocks.range.mockResolvedValueOnce({
+      data: [{ supabase_session_id: "peer-1" }, { supabase_session_id: "peer-2" }],
+      error: null,
+    });
+    cacheMocks.cacheSetOrThrow
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("Cache write timed out"));
+
+    await expect(revokeOtherUserSessions("user-1", "current")).rejects.toThrow(
+      "Cache write timed out",
+    );
+  });
+});
+
+describe("revocation lookups", () => {
+  const token = { userId: "user-1", sessionId: "session-1", issuedAtMs: Date.now() };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetRevocationMemo();
+    cacheMocks.cacheGetMany.mockResolvedValue([null, null]);
+    cacheMocks.cacheSetOrThrow.mockResolvedValue(undefined);
+    serviceMocks.eq.mockResolvedValue({ error: null });
+    serviceMocks.delete.mockReturnValue({ eq: serviceMocks.eq });
+    serviceMocks.from.mockReturnValue({ delete: serviceMocks.delete });
+  });
+
+  it("answers a cold fan-out for one session with a single Redis read", async () => {
+    const answers = await Promise.all([
+      isSessionRevoked(token),
+      isSessionRevoked(token),
+      isSessionRevoked(token),
+    ]);
+
+    expect(answers).toEqual([false, false, false]);
+    expect(cacheMocks.cacheGetMany).toHaveBeenCalledOnce();
+  });
+
+  it("does not let a read begun before a revocation answer for after it", async () => {
+    let answerFirstRead: (markers: (number | null)[]) => void = () => {};
+    cacheMocks.cacheGetMany.mockReturnValueOnce(
+      new Promise((resolve) => {
+        answerFirstRead = resolve;
+      }),
+    );
+    const before = isSessionRevoked(token);
+
+    await revokeSession("session-1");
+    cacheMocks.cacheGetMany.mockResolvedValueOnce([null, Date.now()]);
+    const after = isSessionRevoked(token);
+    answerFirstRead([null, null]);
+
+    await expect(after).resolves.toBe(true);
+    await before;
+    await expect(isSessionRevoked(token)).resolves.toBe(true);
+    expect(cacheMocks.cacheGetMany).toHaveBeenCalledTimes(2);
   });
 });

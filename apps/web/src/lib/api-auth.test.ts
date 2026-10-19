@@ -644,5 +644,36 @@ describe("api auth helpers", () => {
       expect((await route(bearerRequest(freshToken))).status).toBe(200);
       expect(protectedOperation).toHaveBeenCalledOnce();
     });
+
+    it("asks Auth for the live user while the revocation check is still running", async () => {
+      let answerRevocation: (markers: (number | null)[]) => void = () => {};
+      cacheMocks.cacheGetMany.mockReturnValue(
+        new Promise((resolve) => {
+          answerRevocation = resolve;
+        }),
+      );
+      const token = await signToken({
+        claims: {
+          aal: "aal1",
+          amr: [{ method: "password", timestamp: Math.floor(Date.now() / 1000) }],
+        },
+      });
+
+      const pending = requireSensitiveActionAuth(bearerRequest(token));
+      await vi.waitFor(() => expect(authMocks.getUser).toHaveBeenCalledOnce());
+      answerRevocation([null, null]);
+
+      expect("response" in (await pending)).toBe(false);
+    });
+
+    it("refuses a revoked session even when the live lookup fails alongside it", async () => {
+      cacheMocks.cacheGetMany.mockResolvedValue([null, Date.now()]);
+      authMocks.getUser.mockRejectedValue(new Error("auth unreachable"));
+      const token = await signToken();
+
+      const result = await requireSensitiveActionAuth(bearerRequest(token));
+
+      expect("response" in result && result.response.status).toBe(401);
+    });
   });
 });

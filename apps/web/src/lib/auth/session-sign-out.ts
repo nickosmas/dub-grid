@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { createTokenScopedClient } from "@/lib/api-auth";
 import { verifyAccessToken } from "@/lib/auth/verify-token";
 import {
@@ -88,21 +89,25 @@ export async function revokeBulkSessions(input: {
   if (error) throw new Error("Provider sign-out failed");
   if (input.scope === "global") await revokeAllUserSessions(input.userId);
   else await revokeOtherUserSessions(input.userId, input.sessionId);
-  await writeSecurityAuditEvent({
-    event: input.recoveryCompletion ? "security.auth.recovery" : "security.auth.session",
-    outcome: "succeeded",
-    reason: input.recoveryCompletion
-      ? "recovery_completed"
-      : input.passwordChange
-        ? "password_changed"
-        : "session_revoked",
-    actorId: input.userId,
-    orgId: input.orgId,
-    metadata: {
-      scope: input.scope,
-      ...(input.recoveryCompletion ? { method: "otp" as const } : {}),
-    },
-  });
+  // The sessions are already ended, and the write swallows its own failures,
+  // so the record need not hold up the reply.
+  after(() =>
+    writeSecurityAuditEvent({
+      event: input.recoveryCompletion ? "security.auth.recovery" : "security.auth.session",
+      outcome: "succeeded",
+      reason: input.recoveryCompletion
+        ? "recovery_completed"
+        : input.passwordChange
+          ? "password_changed"
+          : "session_revoked",
+      actorId: input.userId,
+      orgId: input.orgId,
+      metadata: {
+        scope: input.scope,
+        ...(input.recoveryCompletion ? { method: "otp" as const } : {}),
+      },
+    }),
+  );
 }
 
 /**

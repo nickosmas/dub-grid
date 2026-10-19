@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import type { User } from "@supabase/supabase-js";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import {
@@ -179,14 +179,16 @@ export function createMfaLifecycleHandler(options: {
         });
         if (result.error || !result.data)
           return reply({ error: "We couldn't start two-factor setup. Try again." }, 502);
-        await writeSecurityAuditEvent({
-          event: "security.auth.mfa",
-          outcome: "succeeded",
-          reason: "factor_enrollment_started",
-          actorId: auth.user.id,
-          orgId: typeof auth.claims.org_id === "string" ? auth.claims.org_id : null,
-          metadata: { surface: options.surface, method: "totp" },
-        });
+        after(() =>
+          writeSecurityAuditEvent({
+            event: "security.auth.mfa",
+            outcome: "succeeded",
+            reason: "factor_enrollment_started",
+            actorId: auth.user.id,
+            orgId: typeof auth.claims.org_id === "string" ? auth.claims.org_id : null,
+            metadata: { surface: options.surface, method: "totp" },
+          }),
+        );
         return reply(result.data);
       }
 
@@ -205,14 +207,16 @@ export function createMfaLifecycleHandler(options: {
           502,
         );
       const orgId = typeof auth.claims.org_id === "string" ? auth.claims.org_id : null;
-      await writeSecurityAuditEvent({
-        event: "security.auth.mfa",
-        outcome: "succeeded",
-        reason: "factor_removed",
-        actorId: auth.user.id,
-        orgId,
-        metadata: { surface: options.surface, method: "totp" },
-      });
+      after(() =>
+        writeSecurityAuditEvent({
+          event: "security.auth.mfa",
+          outcome: "succeeded",
+          reason: "factor_removed",
+          actorId: auth.user.id,
+          orgId,
+          metadata: { surface: options.surface, method: "totp" },
+        }),
+      );
       const stillProtected = (auth.user.factors ?? []).some(
         (candidate) =>
           candidate.id !== factor.id &&

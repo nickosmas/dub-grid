@@ -10,6 +10,16 @@ const revokeSession = vi.fn();
 const revokeAllUserSessions = vi.fn();
 const revokeOtherUserSessions = vi.fn();
 
+// Runs each after() task at once, so its writes can be asserted on return.
+const after = vi.hoisted(() =>
+  vi.fn((task: () => unknown) => {
+    void task();
+  }),
+);
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (task: () => unknown) => after(task),
+}));
 vi.mock("../auth", () => ({
   requireMobileSensitiveActionAuth: (req: NextRequest) => requireMobileSensitiveActionAuth(req),
 }));
