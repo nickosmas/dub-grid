@@ -234,6 +234,7 @@ const printScheduleView = readFileSync(
   path.resolve(webSource, "components/PrintScheduleView.tsx"),
   "utf8",
 );
+const printDocument = readFileSync(path.resolve(webSource, "components/print-document.ts"), "utf8");
 const emailTheme = readFileSync(path.resolve(webSource, "emails/components/theme.ts"), "utf8");
 const emailLayout = readFileSync(
   path.resolve(webSource, "emails/components/EmailLayout.tsx"),
@@ -331,7 +332,7 @@ describe("productive typography contract", () => {
     expect(emailTheme).toContain('"Inter, -apple-system');
     expect(emailTheme).not.toContain("DM Sans");
     expect(emailLayout).not.toContain('fontFamily="DM Sans"');
-    expect(printScheduleView).toContain("font-family: 'Inter'");
+    expect(printDocument).toContain("font-family: 'Inter'");
     expect(printScheduleView).toContain("fontFamily: \"'Inter'");
   });
 
