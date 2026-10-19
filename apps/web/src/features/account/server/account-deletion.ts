@@ -24,9 +24,9 @@ export interface DeleteUserAccountResult {
 /**
  * Rejects a deleted account's access tokens, which web accepts until they
  * expire because it verifies them locally. It runs only after the deletion
- * succeeded, so a failed deletion keeps working tokens for its retry. The
- * watermark write never throws (the cache swallows its own failures); the
- * session-row delete can, and is reported rather than failing the deletion.
+ * succeeded, so a failed deletion keeps working tokens for its retry. A failed
+ * watermark write or session-row delete is reported rather than failing the
+ * deletion.
  */
 export async function rejectDeletedAccountTokens(userId: string, context: string): Promise<void> {
   try {

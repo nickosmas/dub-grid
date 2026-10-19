@@ -147,14 +147,15 @@ function makeNextRequest(
     host?: string;
     cookies?: { name: string; value: string }[];
     rawCookie?: string;
+    headers?: Record<string, string>;
   } = {},
 ) {
   const parsedUrl = new URL(url);
   const host = options.host ?? parsedUrl.host;
-  const headersMap = new Map<string, string>();
-  headersMap.set("host", host);
+  const headers = new Headers(options.headers);
+  headers.set("host", host);
   if (options.rawCookie) {
-    headersMap.set("cookie", options.rawCookie);
+    headers.set("cookie", options.rawCookie);
   }
 
   return {
@@ -163,9 +164,7 @@ function makeNextRequest(
       pathname: parsedUrl.pathname,
       searchParams: parsedUrl.searchParams,
     },
-    headers: {
-      get: (name: string) => headersMap.get(name.toLowerCase()) ?? null,
-    },
+    headers,
     cookies: {
       get: (name: string) => options.cookies?.find((cookie) => cookie.name === name),
       getAll: () => options.cookies ?? [],
@@ -330,7 +329,10 @@ describe("middleware: JWT verification", () => {
     });
     const res = await runMiddleware(req);
     expect((res as { _type: string })._type).toBe("next");
-    expect(mockJwtVerify).toHaveBeenCalled();
+    expect(mockJwtVerify).toHaveBeenCalledWith("fake-jwt", mockJwks, {
+      issuer: "https://test.supabase.co/auth/v1",
+      audience: "authenticated",
+    });
   });
 
   it("falls back to decodeJwt when jwtVerify fails", async () => {
@@ -979,8 +981,10 @@ describe("middleware: route guards", () => {
   });
 });
 
-describe("middleware: header injection", () => {
-  it("sets x-dubgrid-role header", async () => {
+describe("middleware: role headers", () => {
+  // Nothing reads them, so on the response they only told the browser the
+  // session's role, organization and impersonation state.
+  it("sends no x-dubgrid headers to the browser", async () => {
     mockSessionWithClaims({
       platform_role: "none",
       org_role: "admin",
@@ -992,37 +996,28 @@ describe("middleware: header injection", () => {
       host: "acme.localhost:3000",
     });
     const res = await runMiddleware(req);
-    expect((res as { headers: Headers }).headers.get("x-dubgrid-role")).toBe("admin");
+    expect((res as { _type: string })._type).toBe("next");
+    const names = [...(res as { headers: Headers }).headers.keys()];
+    expect(names.filter((name) => name.startsWith("x-dubgrid-"))).toEqual([]);
   });
 
-  it("sets x-dubgrid-org-id header", async () => {
+  it("does not forward x-dubgrid headers a client sent", async () => {
     mockSessionWithClaims({
       platform_role: "none",
-      org_role: "admin",
+      org_role: "user",
       org_id: "org-1",
       org_slug: "acme",
       sub: "user-1",
     });
     const req = makeNextRequest("http://acme.localhost:3000/schedule", {
       host: "acme.localhost:3000",
+      headers: { "x-dubgrid-role": "super_admin", "x-dubgrid-org-id": "org-2" },
     });
     const res = await runMiddleware(req);
-    expect((res as { headers: Headers }).headers.get("x-dubgrid-org-id")).toBe("org-1");
-  });
-
-  it("sets x-dubgrid-org-slug header when present", async () => {
-    mockSessionWithClaims({
-      platform_role: "none",
-      org_role: "admin",
-      org_id: "org-1",
-      org_slug: "acme",
-      sub: "user-1",
-    });
-    const req = makeNextRequest("http://acme.localhost:3000/schedule", {
-      host: "acme.localhost:3000",
-    });
-    const res = await runMiddleware(req);
-    expect((res as { headers: Headers }).headers.get("x-dubgrid-org-slug")).toBe("acme");
+    expect((res as { _type: string })._type).toBe("next");
+    // The mocked NextResponse.next exposes the forwarded request headers.
+    expect((res as { headers: Headers }).headers.get("x-dubgrid-role")).toBeNull();
+    expect((res as { headers: Headers }).headers.get("x-dubgrid-org-id")).toBeNull();
   });
 });
 
@@ -1056,10 +1051,8 @@ describe("middleware: impersonation", () => {
       rawCookie,
     });
     const res = await runMiddleware(req);
+    // A Gridmaster's own claims would send it to the Gridmaster host.
     expect((res as { _type: string })._type).toBe("next");
-    expect((res as { headers: Headers }).headers.get("x-dubgrid-role")).toBe("admin");
-    expect((res as { headers: Headers }).headers.get("x-dubgrid-impersonating")).toBe("true");
-    expect((res as { headers: Headers }).headers.get("x-dubgrid-org-id")).toBe("org-2");
     expect(mockVerifyImpersonationSession).toHaveBeenCalledWith(
       expect.anything(),
       "s-1",
@@ -1089,7 +1082,6 @@ describe("middleware: impersonation", () => {
     const rawCookie = `dubgrid-impersonation=${encodeURIComponent(JSON.stringify(impData))}`;
     const req = makeNextRequest("http://localhost:3000/schedule", { rawCookie });
     const res = await runMiddleware(req);
-    expect((res as { headers: Headers }).headers.get("x-dubgrid-impersonating")).not.toBe("true");
     const cookieJar = (res as { cookies: { _jar: Record<string, unknown> } }).cookies._jar;
     expect(cookieJar["dubgrid-impersonation"]).toBeDefined();
   });

@@ -63,6 +63,22 @@ async function discardSession(accessToken: string): Promise<boolean> {
   }
 }
 
+/**
+ * A refusal after the password was accepted (a Gridmaster, a non-member, a
+ * locked organization) still created a session, and its tokens never reach the
+ * phone, so nothing else would end it. The ephemeral client holds it in memory.
+ */
+async function discardRefusedSession(
+  sessionClient: ReturnType<typeof createMobileEphemeralAuthClient>,
+): Promise<void> {
+  try {
+    const { data } = await sessionClient.auth.getSession();
+    if (data.session) await discardSession(data.session.access_token);
+  } catch {
+    // Best effort, like discardSession: the refusal is the answer either way.
+  }
+}
+
 async function handlePOST(req: NextRequest, timer: Timer) {
   const startedAt = Date.now();
   const json = (body: unknown, init?: ResponseInit) =>
@@ -190,6 +206,7 @@ async function handlePOST(req: NextRequest, timer: Timer) {
 
     return json(mobileAuthLoginResponseSchema.parse(payload));
   } catch (error) {
+    await discardRefusedSession(sessionClient);
     if (error instanceof MobileApiRequestError) {
       await writeSecurityAuditEvent({
         event: "security.auth.login",

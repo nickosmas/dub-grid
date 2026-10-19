@@ -183,6 +183,26 @@ export async function cacheSet<T>(key: string, value: T, ttlSeconds: number): Pr
 }
 
 /**
+ * Set a value whose loss is a security failure (revocation markers). Unlike
+ * `cacheSet` it throws when the write fails or times out, and in production
+ * when Redis is not configured. Outside production without Redis it does
+ * nothing, as `cacheSet` does.
+ */
+export async function cacheSetOrThrow<T>(key: string, value: T, ttlSeconds: number): Promise<void> {
+  const client = getRedis();
+  if (!client) {
+    if (process.env.NODE_ENV === "production") throw new Error("Redis is not configured");
+    return;
+  }
+  const written = await withTimeout(
+    client.set(redisKey(key), value, { ex: ttlSeconds }).then(() => true),
+    REDIS_TIMEOUT_MS,
+    false,
+  );
+  if (!written) throw new Error(`Cache write timed out for ${key}`);
+}
+
+/**
  * Delete one or more cache keys. Fails silently.
  */
 export async function cacheDel(...keys: string[]): Promise<void> {

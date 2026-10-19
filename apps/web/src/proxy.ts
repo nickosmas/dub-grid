@@ -12,7 +12,7 @@ import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
 import { THEME_COOKIE_NAME, withThemeParam } from "@/lib/theme-preference";
 import { cacheSet, cacheThrough, CacheKey, TTL } from "@/lib/cache";
 import { Timer } from "@/lib/server-timing";
-import { getSupabaseJwks } from "@/lib/auth/verify-token";
+import { getSupabaseJwks, supabaseTokenClaimChecks } from "@/lib/auth/verify-token";
 import * as Sentry from "@/lib/sentry";
 import { getSupabaseSecretKey, requireSupabasePublishableKey } from "./lib/supabase-keys";
 import { getSupabaseUrl, requireSupabaseUrl } from "@/lib/supabase-keys";
@@ -243,6 +243,10 @@ export async function proxy(req: NextRequest) {
       );
 
   const requestHeaders = new Headers(req.headers);
+  // Nothing upstream may claim to have been set by this proxy.
+  for (const name of [...requestHeaders.keys()]) {
+    if (name.startsWith("x-dubgrid-")) requestHeaders.delete(name);
+  }
   requestHeaders.set("Content-Security-Policy", contentSecurityPolicyHeaderValue);
 
   // Marketing content is canonical on the apex. Organization and Gridmaster
@@ -332,9 +336,10 @@ export async function proxy(req: NextRequest) {
   let claimsVerified = false;
   try {
     const jwks = getSupabaseJwks();
-    if (jwks) {
+    const claimChecks = supabaseTokenClaimChecks();
+    if (jwks && claimChecks) {
       const { payload } = await timer.time("jwt_verify", () =>
-        jwtVerify(session.access_token, jwks),
+        jwtVerify(session.access_token, jwks, claimChecks),
       );
       claims = payload as JWTClaims;
       claimsVerified = true;
@@ -567,7 +572,6 @@ export async function proxy(req: NextRequest) {
   // the sandbox org id WITHOUT touching the JWT or the current subdomain.
   // The user stays signed in on their real organization subdomain while every
   // org_id-scoped read/write is routed to the sandbox copy.
-  let isInSandbox = false;
   if (!isImpersonating && session?.user?.id) {
     const sandboxCookie = getSandboxFromCookie(req.headers.get("cookie") ?? "");
     if (sandboxCookie) {
@@ -597,7 +601,6 @@ export async function proxy(req: NextRequest) {
                 .maybeSingle(),
             );
             if (data) {
-              isInSandbox = true;
               claims = {
                 ...claims,
                 org_id: data.id,
@@ -747,18 +750,6 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL("/schedule", req.url));
   }
 
-  // Inject headers - Requirement 11.5
-  res.headers.set("x-dubgrid-role", effectiveRole);
-  res.headers.set("x-dubgrid-org-id", claims.org_id ?? "");
-  if (claims.org_slug) {
-    res.headers.set("x-dubgrid-org-slug", claims.org_slug);
-  }
-  if (isImpersonating) {
-    res.headers.set("x-dubgrid-impersonating", "true");
-  }
-  if (isInSandbox) {
-    res.headers.set("x-dubgrid-sandbox", "true");
-  }
   timer.applyTo(res.headers);
   return res;
 }
